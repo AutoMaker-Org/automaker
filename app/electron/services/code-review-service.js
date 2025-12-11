@@ -170,7 +170,9 @@ class CodeReviewService {
 
       // Parse TypeScript errors from output
       if (output.exitCode !== 0) {
-        const errorLines = output.stderr.split("\n").filter((line) => line.trim());
+        // Combine stdout and stderr as tsc may output to either
+        const allOutput = (output.stdout || "") + "\n" + (output.stderr || "");
+        const errorLines = allOutput.split("\n").filter((line) => line.trim());
         
         for (const line of errorLines) {
           // Parse TypeScript error format: file(line,col): error TSxxxx: message
@@ -188,13 +190,24 @@ class CodeReviewService {
               column: parseInt(col, 10),
               code,
             });
-          } else if (line.includes("error") || line.includes("Error")) {
-            // Generic error line
-            issues.push({
-              severity: "error",
-              message: line.trim(),
-            });
+          } else {
+            // Check for common TypeScript error patterns without full format
+            const simpleErrorMatch = line.match(/^error\s+TS\d+:\s*(.+)$/i);
+            if (simpleErrorMatch) {
+              issues.push({
+                severity: "error",
+                message: simpleErrorMatch[1].trim(),
+              });
+            }
           }
+        }
+        
+        // If we couldn't parse any issues but the command failed, add a generic error
+        if (issues.length === 0) {
+          issues.push({
+            severity: "error",
+            message: "TypeScript compilation failed (see logs for details)",
+          });
         }
       }
 
@@ -427,7 +440,13 @@ class CodeReviewService {
     let lineNum = 0;
     for (const line of lines) {
       lineNum++;
-      if (/console\.(log|debug|info)\(/.test(line) && !/\/\//.test(line.split("console")[0])) {
+      // Check for console statements that are not commented out
+      // Match console.log/debug/info that are not preceded by // or inside a comment
+      const trimmedLine = line.trim();
+      const consoleMatch = /console\.(log|debug|info)\(/.test(trimmedLine);
+      const isCommentedOut = trimmedLine.startsWith("//") || trimmedLine.startsWith("*");
+      
+      if (consoleMatch && !isCommentedOut) {
         issues.push({
           severity: "info",
           message: "console statement found - consider removing before production",
@@ -472,24 +491,79 @@ class CodeReviewService {
    */
   async getChangedFiles(projectPath, featureId) {
     try {
-      // Try to get files from git diff
-      const output = await this.runCommand(
+      // First try to get uncommitted changes (staged and unstaged)
+      const statusOutput = await this.runCommand(
         "git",
-        ["diff", "--name-only", "HEAD~5"],
+        ["status", "--porcelain"],
         { cwd: projectPath }
       );
 
-      if (output.exitCode === 0 && output.stdout) {
-        return output.stdout
+      if (statusOutput.exitCode === 0 && statusOutput.stdout) {
+        const files = statusOutput.stdout
           .split("\n")
-          .filter((f) => f.trim())
-          .slice(0, 50); // Limit to 50 files
+          .filter((line) => line.trim())
+          .map((line) => line.slice(3).trim()) // Remove status prefix (e.g., "M ", " M", "??")
+          .filter((f) => f);
+        
+        if (files.length > 0) {
+          return files.slice(0, 50); // Limit to 50 files
+        }
+      }
+
+      // If no uncommitted changes, try to get recent committed changes
+      // Use merge-base to find changes since the common ancestor with main/master
+      try {
+        const baseBranchOutput = await this.runCommand(
+          "git",
+          ["rev-parse", "--abbrev-ref", "HEAD"],
+          { cwd: projectPath }
+        );
+        
+        const currentBranch = baseBranchOutput.stdout?.trim();
+        
+        // Try to find changes compared to main or master
+        for (const baseBranch of ["main", "master", "develop"]) {
+          const mergeBaseOutput = await this.runCommand(
+            "git",
+            ["merge-base", currentBranch, baseBranch],
+            { cwd: projectPath }
+          );
+          
+          if (mergeBaseOutput.exitCode === 0 && mergeBaseOutput.stdout) {
+            const diffOutput = await this.runCommand(
+              "git",
+              ["diff", "--name-only", mergeBaseOutput.stdout.trim()],
+              { cwd: projectPath }
+            );
+            
+            if (diffOutput.exitCode === 0 && diffOutput.stdout) {
+              return diffOutput.stdout
+                .split("\n")
+                .filter((f) => f.trim())
+                .slice(0, 50);
+            }
+          }
+        }
+      } catch {
+        // Fall back to HEAD~5 if we can't determine base branch
+        const output = await this.runCommand(
+          "git",
+          ["diff", "--name-only", "HEAD~5"],
+          { cwd: projectPath }
+        );
+
+        if (output.exitCode === 0 && output.stdout) {
+          return output.stdout
+            .split("\n")
+            .filter((f) => f.trim())
+            .slice(0, 50);
+        }
       }
     } catch (error) {
-      console.log(`[CodeReview] Could not get git diff: ${error.message}`);
+      console.log(`[CodeReview] Could not get git changes: ${error.message}`);
     }
 
-    // Fallback: scan src directory for recent files
+    // Fallback: scan src directory for TypeScript/JavaScript files
     try {
       const srcPath = path.join(projectPath, "src");
       const files = await this.findRecentFiles(srcPath, 20);

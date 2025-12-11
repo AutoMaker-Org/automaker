@@ -246,6 +246,7 @@ export interface ReviewIssue {
 export interface ReviewCheck {
   name: string;
   passed: boolean;
+  duration?: number; // milliseconds
   issues: ReviewIssue[];
 }
 
