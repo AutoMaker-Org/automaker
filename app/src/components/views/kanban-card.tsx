@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { cn } from "@/lib/utils";
+import { safeJoin } from "@/lib/path-utils";
 import {
   Card,
   CardContent,
@@ -127,12 +128,16 @@ export function KanbanCard({
       }
 
       try {
-        const api = getElectronAPI();
+        const api = await getElectronAPI();
+        if (!api) {
+          console.error("Failed to get Electron API");
+          return;
+        }
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const currentProject = (window as any).__currentProject;
         if (!currentProject?.path) return;
 
-        const contextPath = `${currentProject.path}/.automaker/agents-context/${feature.id}.md`;
+        const contextPath = safeJoin(currentProject.path, '.automaker', 'agents-context', `${feature.id}.md`);
         const result = await api.readFile(contextPath);
 
         if (result.success && result.content) {

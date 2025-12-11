@@ -59,7 +59,11 @@ export function CodeView() {
 
     setIsLoading(true);
     try {
-      const api = getElectronAPI();
+      const api = await getElectronAPI();
+      if (!api) {
+        console.error("Failed to get Electron API");
+        return;
+      }
       const result = await api.readdir(currentProject.path);
 
       if (result.success && result.entries) {
@@ -93,7 +97,11 @@ export function CodeView() {
   // Load subdirectory
   const loadSubdirectory = async (path: string): Promise<FileTreeNode[]> => {
     try {
-      const api = getElectronAPI();
+      const api = await getElectronAPI();
+      if (!api) {
+        console.error("Failed to get Electron API");
+        return [];
+      }
       const result = await api.readdir(path);
 
       if (result.success && result.entries) {
@@ -119,7 +127,11 @@ export function CodeView() {
   // Load file content
   const loadFileContent = async (path: string) => {
     try {
-      const api = getElectronAPI();
+      const api = await getElectronAPI();
+      if (!api) {
+        console.error("Failed to get Electron API");
+        return;
+      }
       const result = await api.readFile(path);
 
       if (result.success && result.content) {

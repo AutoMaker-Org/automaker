@@ -37,10 +37,15 @@ export function useAutoMode() {
 
   // Handle auto mode events
   useEffect(() => {
-    const api = getElectronAPI();
-    if (!api?.autoMode) return;
+    const setupEventListener = async () => {
+      const api = await getElectronAPI();
+      if (!api) {
+        console.error("Failed to get Electron API");
+        return;
+      }
+      if (!api.autoMode) return;
 
-    const unsubscribe = api.autoMode.onEvent((event: AutoModeEvent) => {
+      const unsubscribe = api.autoMode.onEvent((event: AutoModeEvent) => {
       console.log("[AutoMode Event]", event);
 
       switch (event.type) {
@@ -124,9 +129,15 @@ export function useAutoMode() {
           });
           break;
       }
-    });
+      });
 
-    return unsubscribe;
+      return unsubscribe;
+    };
+
+    const cleanup = setupEventListener();
+    return () => {
+      cleanup.then(unsubscribe => unsubscribe?.());
+    };
   }, [
     addRunningTask,
     removeRunningTask,
@@ -143,8 +154,12 @@ export function useAutoMode() {
     }
 
     try {
-      const api = getElectronAPI();
-      if (!api?.autoMode) {
+      const api = await getElectronAPI();
+      if (!api) {
+        console.error("Failed to get Electron API");
+        return;
+      }
+      if (!api.autoMode) {
         throw new Error("Auto mode API not available");
       }
 
@@ -167,8 +182,12 @@ export function useAutoMode() {
   // Stop auto mode
   const stop = useCallback(async () => {
     try {
-      const api = getElectronAPI();
-      if (!api?.autoMode) {
+      const api = await getElectronAPI();
+      if (!api) {
+        console.error("Failed to get Electron API");
+        return;
+      }
+      if (!api.autoMode) {
         throw new Error("Auto mode API not available");
       }
 
@@ -192,8 +211,12 @@ export function useAutoMode() {
   const stopFeature = useCallback(
     async (featureId: string) => {
       try {
-        const api = getElectronAPI();
-        if (!api?.autoMode?.stopFeature) {
+        const api = await getElectronAPI();
+        if (!api) {
+          console.error("Failed to get Electron API");
+          return;
+        }
+        if (!api.autoMode?.stopFeature) {
           throw new Error("Stop feature API not available");
         }
 

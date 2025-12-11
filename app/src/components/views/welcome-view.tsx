@@ -22,6 +22,7 @@ import {
 import { useAppStore } from "@/store/app-store";
 import { getElectronAPI } from "@/lib/electron";
 import { initializeProject } from "@/lib/project-init";
+import { safeJoin } from "@/lib/path-utils";
 import {
   FolderOpen,
   Plus,
@@ -61,7 +62,11 @@ export function WelcomeView() {
    * Kick off project analysis agent to analyze the codebase
    */
   const analyzeProject = useCallback(async (projectPath: string) => {
-    const api = getElectronAPI();
+    const api = await getElectronAPI();
+    if (!api) {
+      console.error("Failed to get Electron API");
+      return;
+    }
 
     if (!api.autoMode?.analyzeProject) {
       console.log("[Welcome] Auto mode API not available, skipping analysis");
@@ -151,7 +156,11 @@ export function WelcomeView() {
   );
 
   const handleOpenProject = useCallback(async () => {
-    const api = getElectronAPI();
+    const api = await getElectronAPI();
+    if (!api) {
+      console.error("Failed to get Electron API");
+      return;
+    }
     const result = await api.openDirectory();
 
     if (!result.canceled && result.filePaths[0]) {
@@ -182,7 +191,11 @@ export function WelcomeView() {
   };
 
   const handleSelectDirectory = async () => {
-    const api = getElectronAPI();
+    const api = await getElectronAPI();
+    if (!api) {
+      console.error("Failed to get Electron API");
+      return;
+    }
     const result = await api.openDirectory();
 
     if (!result.canceled && result.filePaths[0]) {
@@ -195,8 +208,12 @@ export function WelcomeView() {
 
     setIsCreating(true);
     try {
-      const api = getElectronAPI();
-      const projectPath = `${newProjectPath}/${newProjectName}`;
+      const api = await getElectronAPI();
+      if (!api) {
+        console.error("Failed to get Electron API");
+        return;
+      }
+      const projectPath = safeJoin(newProjectPath, newProjectName);
 
       // Create project directory
       await api.mkdir(projectPath);
@@ -213,7 +230,7 @@ export function WelcomeView() {
 
       // Update the app_spec.txt with the project name
       await api.writeFile(
-        `${projectPath}/.automaker/app_spec.txt`,
+        safeJoin(projectPath, '.automaker', 'app_spec.txt'),
         `<project_specification>
   <project_name>${newProjectName}</project_name>
 

@@ -45,6 +45,7 @@ import {
 } from "@/hooks/use-keyboard-shortcuts";
 import { getElectronAPI, Project, TrashedProject } from "@/lib/electron";
 import { initializeProject } from "@/lib/project-init";
+import { safeJoin } from "@/lib/path-utils";
 import { toast } from "sonner";
 import {
   DndContext,
@@ -202,7 +203,11 @@ export function Sidebar() {
    * Used by both the 'O' keyboard shortcut and the folder icon button.
    */
   const handleOpenFolder = useCallback(async () => {
-    const api = getElectronAPI();
+    const api = await getElectronAPI();
+    if (!api) {
+      console.error("Failed to get Electron API");
+      return;
+    }
     const result = await api.openDirectory();
 
     if (!result.canceled && result.filePaths[0]) {
@@ -271,7 +276,11 @@ export function Sidebar() {
 
       setActiveTrashId(trashedProject.id);
       try {
-        const api = getElectronAPI();
+        const api = await getElectronAPI();
+        if (!api) {
+          console.error("Failed to get Electron API");
+          return;
+        }
         if (!api.trashItem) {
           throw new Error("System Trash is not available in this build.");
         }

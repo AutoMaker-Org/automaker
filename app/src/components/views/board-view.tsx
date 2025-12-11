@@ -65,6 +65,7 @@ import {
   GitCommit,
 } from "lucide-react";
 import { toast } from "sonner";
+import { safeJoin } from "@/lib/path-utils";
 import { Slider } from "@/components/ui/slider";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useAutoMode } from "@/hooks/use-auto-mode";
@@ -246,9 +247,13 @@ export function BoardView() {
 
     setIsLoading(true);
     try {
-      const api = getElectronAPI();
+      const api = await getElectronAPI();
+      if (!api) {
+        console.error("Failed to get Electron API");
+        return;
+      }
       const result = await api.readFile(
-        `${currentProject.path}/.automaker/feature_list.json`
+        safeJoin(currentProject.path, '.automaker', 'feature_list.json')
       );
 
       if (result.success && result.content) {
@@ -274,9 +279,13 @@ export function BoardView() {
     if (!currentProject) return;
 
     try {
-      const api = getElectronAPI();
+      const api = await getElectronAPI();
+      if (!api) {
+        console.error("Failed to get Electron API");
+        return;
+      }
       const result = await api.readFile(
-        `${currentProject.path}/.automaker/categories.json`
+        safeJoin(currentProject.path, '.automaker', 'categories.json')
       );
 
       if (result.success && result.content) {
@@ -301,7 +310,11 @@ export function BoardView() {
       if (!currentProject || !category.trim()) return;
 
       try {
-        const api = getElectronAPI();
+        const api = await getElectronAPI();
+        if (!api) {
+          console.error("Failed to get Electron API");
+          return;
+        }
 
         // Read existing categories
         let categories: string[] = [...persistedCategories];
@@ -313,7 +326,7 @@ export function BoardView() {
 
           // Write back to file
           await api.writeFile(
-            `${currentProject.path}/.automaker/categories.json`,
+            safeJoin(currentProject.path, '.automaker', 'categories.json'),
             JSON.stringify(categories, null, 2)
           );
 
@@ -339,8 +352,13 @@ export function BoardView() {
 
   // Listen for auto mode feature completion and errors to reload features
   useEffect(() => {
-    const api = getElectronAPI();
-    if (!api?.autoMode) return;
+    const setupEventListener = async () => {
+      const api = await getElectronAPI();
+      if (!api) {
+        console.error("Failed to get Electron API");
+        return;
+      }
+      if (!api.autoMode) return;
 
     const { removeRunningTask } = useAppStore.getState();
 
@@ -369,7 +387,13 @@ export function BoardView() {
       }
     });
 
-    return unsubscribe;
+      return unsubscribe;
+    };
+
+    const cleanup = setupEventListener();
+    return () => {
+      cleanup.then(unsubscribe => unsubscribe?.());
+    };
   }, [loadFeatures]);
 
   useEffect(() => {
@@ -385,8 +409,12 @@ export function BoardView() {
   useEffect(() => {
     const syncRunningTasks = async () => {
       try {
-        const api = getElectronAPI();
-        if (!api?.autoMode?.status) return;
+        const api = await getElectronAPI();
+        if (!api) {
+          console.error("Failed to get Electron API");
+          return;
+        }
+        if (!api.autoMode?.status) return;
 
         const status = await api.autoMode.status();
         if (status.success && status.runningFeatures) {
@@ -449,7 +477,11 @@ export function BoardView() {
     if (!currentProject) return;
 
     try {
-      const api = getElectronAPI();
+      const api = await getElectronAPI();
+      if (!api) {
+        console.error("Failed to get Electron API");
+        return;
+      }
       const toSave = features.map((f) => ({
         id: f.id,
         category: f.category,
@@ -463,7 +495,7 @@ export function BoardView() {
         error: f.error,
       }));
       await api.writeFile(
-        `${currentProject.path}/.automaker/feature_list.json`,
+        safeJoin(currentProject.path, '.automaker', 'feature_list.json'),
         JSON.stringify(toSave, null, 2)
       );
     } catch (error) {
@@ -673,8 +705,12 @@ export function BoardView() {
 
     // Delete agent context file if it exists
     try {
-      const api = getElectronAPI();
-      const contextPath = `${currentProject.path}/.automaker/agents-context/${featureId}.md`;
+      const api = await getElectronAPI();
+      if (!api) {
+        console.error("Failed to get Electron API");
+        return;
+      }
+      const contextPath = safeJoin(currentProject.path, '.automaker', 'agents-context', `${featureId}.md`);
       await api.deleteFile(contextPath);
       console.log(`[Board] Deleted agent context for feature ${featureId}`);
     } catch (error) {
@@ -687,7 +723,11 @@ export function BoardView() {
     // Delete attached images if they exist
     if (feature.imagePaths && feature.imagePaths.length > 0) {
       try {
-        const api = getElectronAPI();
+        const api = await getElectronAPI();
+        if (!api) {
+          console.error("Failed to get Electron API");
+          return;
+        }
         for (const imagePathObj of feature.imagePaths) {
           try {
             await api.deleteFile(imagePathObj.path);
@@ -715,8 +755,12 @@ export function BoardView() {
     if (!currentProject) return;
 
     try {
-      const api = getElectronAPI();
-      if (!api?.autoMode) {
+      const api = await getElectronAPI();
+      if (!api) {
+        console.error("Failed to get Electron API");
+        return;
+      }
+      if (!api.autoMode) {
         console.error("Auto mode API not available");
         return;
       }
@@ -752,8 +796,12 @@ export function BoardView() {
     });
 
     try {
-      const api = getElectronAPI();
-      if (!api?.autoMode) {
+      const api = await getElectronAPI();
+      if (!api) {
+        console.error("Failed to get Electron API");
+        return;
+      }
+      if (!api.autoMode) {
         console.error("Auto mode API not available");
         return;
       }
@@ -787,8 +835,12 @@ export function BoardView() {
     });
 
     try {
-      const api = getElectronAPI();
-      if (!api?.autoMode) {
+      const api = await getElectronAPI();
+      if (!api) {
+        console.error("Failed to get Electron API");
+        return;
+      }
+      if (!api.autoMode) {
         console.error("Auto mode API not available");
         return;
       }
@@ -873,8 +925,12 @@ export function BoardView() {
       imagePaths: imagePaths,
     });
 
-    const api = getElectronAPI();
-    if (!api?.autoMode?.followUpFeature) {
+    const api = await getElectronAPI();
+    if (!api) {
+      console.error("Failed to get Electron API");
+      return;
+    }
+    if (!api.autoMode?.followUpFeature) {
       console.error("Follow-up feature API not available");
       toast.error("Follow-up not available", {
         description: "This feature is not available in the current version.",
@@ -925,8 +981,12 @@ export function BoardView() {
     });
 
     try {
-      const api = getElectronAPI();
-      if (!api?.autoMode?.commitFeature) {
+      const api = await getElectronAPI();
+      if (!api) {
+        console.error("Failed to get Electron API");
+        return;
+      }
+      if (!api.autoMode?.commitFeature) {
         console.error("Commit feature API not available");
         toast.error("Commit not available", {
           description: "This feature is not available in the current version.",
@@ -985,8 +1045,12 @@ export function BoardView() {
     if (!currentProject) return false;
 
     try {
-      const api = getElectronAPI();
-      if (!api?.autoMode?.contextExists) {
+      const api = await getElectronAPI();
+      if (!api) {
+        console.error("Failed to get Electron API");
+        return false;
+      }
+      if (!api.autoMode?.contextExists) {
         return false;
       }
 
@@ -1624,7 +1688,11 @@ export function BoardView() {
               variant="destructive"
               onClick={async () => {
                 const verifiedFeatures = getColumnFeatures("verified");
-                const api = getElectronAPI();
+                const api = await getElectronAPI();
+                if (!api) {
+                  console.error("Failed to get Electron API");
+                  return;
+                }
 
                 for (const feature of verifiedFeatures) {
                   // Check if the feature is currently running
@@ -1644,7 +1712,7 @@ export function BoardView() {
 
                   // Delete agent context file if it exists
                   try {
-                    const contextPath = `${currentProject.path}/.automaker/agents-context/${feature.id}.md`;
+                    const contextPath = safeJoin(currentProject.path, '.automaker', 'agents-context', `${feature.id}.md`);
                     await api.deleteFile(contextPath);
                     console.log(
                       `[Board] Deleted agent context for feature ${feature.id}`

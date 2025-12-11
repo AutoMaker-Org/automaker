@@ -1,0 +1,69 @@
+# Dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.pnpm-store/
+
+# Build output
+dist/
+build/
+out/
+*.js
+*.js.map
+*.d.ts
+
+# TypeScript
+*.tsbuildinfo
+.tsc-cache/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Environment variables
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+
+# Logs
+logs/
+*.log
+log.txt
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Temporary files
+*.tmp
+*.temp
+.tmp/
+temp/
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# Session/auth data
+sessions/
+.sessions/
+*.session
+
+# Helper-specific
+automaker-helper.json
+auth-tokens/
+.automaker/
+
+# Lock files (optional - uncomment if you don't want to commit lock files)
+# package-lock.json
+# yarn.lock
+# pnpm-lock.yaml

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useAppStore } from "@/store/app-store";
 import {
   Card,
@@ -43,7 +43,23 @@ interface ToolExecution {
 
 export function AgentToolsView() {
   const { currentProject } = useAppStore();
-  const api = getElectronAPI();
+  const [api, setApi] = useState<any>(null);
+  const [isApiLoading, setIsApiLoading] = useState(true);
+
+  // Load the Electron API on mount
+  useEffect(() => {
+    const loadApi = async () => {
+      try {
+        const electronApi = await getElectronAPI();
+        setApi(electronApi);
+      } catch (error) {
+        console.error("Failed to load Electron API:", error);
+      } finally {
+        setIsApiLoading(false);
+      }
+    };
+    loadApi();
+  }, []);
 
   // Read File Tool State
   const [readFilePath, setReadFilePath] = useState("");
@@ -74,6 +90,9 @@ export function AgentToolsView() {
       // Simulate agent requesting file read
       console.log(`[Agent Tool] Requesting to read file: ${readFilePath}`);
 
+      if (!api) {
+        throw new Error("Electron API not available");
+      }
       const result = await api.readFile(readFilePath);
 
       if (result.success) {
@@ -113,6 +132,9 @@ export function AgentToolsView() {
       // Simulate agent requesting file write
       console.log(`[Agent Tool] Requesting to write file: ${writeFilePath}`);
 
+      if (!api) {
+        throw new Error("Electron API not available");
+      }
       const result = await api.writeFile(writeFilePath, writeFileContent);
 
       if (result.success) {
@@ -189,6 +211,14 @@ export function AgentToolsView() {
       setIsRunningCommand(false);
     }
   }, [terminalCommand, currentProject]);
+
+  if (isApiLoading) {
+    return (
+      <div className="flex-1 flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
   if (!currentProject) {
     return (

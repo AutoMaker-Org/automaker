@@ -6,6 +6,7 @@
  */
 
 import { getElectronAPI } from "./electron";
+import { safeJoin } from "./path-utils";
 
 export interface ProjectInitResult {
   success: boolean;
@@ -69,14 +70,17 @@ const REQUIRED_STRUCTURE = {
 export async function initializeProject(
   projectPath: string
 ): Promise<ProjectInitResult> {
-  const api = getElectronAPI();
+  const api = await getElectronAPI();
+  if (!api) {
+    throw new Error("Failed to get Electron API");
+  }
   const createdFiles: string[] = [];
   const existingFiles: string[] = [];
 
   try {
     // Create all required directories
     for (const dir of REQUIRED_STRUCTURE.directories) {
-      const fullPath = `${projectPath}/${dir}`;
+      const fullPath = safeJoin(projectPath, dir);
       await api.mkdir(fullPath);
     }
 
@@ -84,7 +88,7 @@ export async function initializeProject(
     for (const [relativePath, defaultContent] of Object.entries(
       REQUIRED_STRUCTURE.files
     )) {
-      const fullPath = `${projectPath}/${relativePath}`;
+      const fullPath = safeJoin(projectPath, relativePath);
       const exists = await api.exists(fullPath);
 
       if (!exists) {
@@ -124,12 +128,16 @@ export async function initializeProject(
 export async function isProjectInitialized(
   projectPath: string
 ): Promise<boolean> {
-  const api = getElectronAPI();
+  const api = await getElectronAPI();
+  if (!api) {
+    console.error("Failed to get Electron API");
+    return false;
+  }
 
   try {
     // Check all required files exist
     for (const relativePath of Object.keys(REQUIRED_STRUCTURE.files)) {
-      const fullPath = `${projectPath}/${relativePath}`;
+      const fullPath = safeJoin(projectPath, relativePath);
       const exists = await api.exists(fullPath);
       if (!exists) {
         return false;
@@ -157,13 +165,17 @@ export async function getProjectInitStatus(projectPath: string): Promise<{
   missingFiles: string[];
   existingFiles: string[];
 }> {
-  const api = getElectronAPI();
+  const api = await getElectronAPI();
+  if (!api) {
+    console.error("Failed to get Electron API");
+    return { initialized: false, missingFiles: [], existingFiles: [] };
+  }
   const missingFiles: string[] = [];
   const existingFiles: string[] = [];
 
   try {
     for (const relativePath of Object.keys(REQUIRED_STRUCTURE.files)) {
-      const fullPath = `${projectPath}/${relativePath}`;
+      const fullPath = safeJoin(projectPath, relativePath);
       const exists = await api.exists(fullPath);
       if (exists) {
         existingFiles.push(relativePath);

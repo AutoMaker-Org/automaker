@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import { ImageIcon, X, Loader2 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { getElectronAPI } from "@/lib/electron";
+import { safeJoin } from "@/lib/path-utils";
 import { useAppStore } from "@/store/app-store";
 
 export interface FeatureImagePath {
@@ -75,12 +76,16 @@ export function DescriptionImageDropZone({
     mimeType: string
   ): Promise<string | null> => {
     try {
-      const api = getElectronAPI();
+      const api = await getElectronAPI();
+      if (!api) {
+        console.error("Failed to get Electron API");
+        return null;
+      }
       // Check if saveImageToTemp method exists
       if (!api.saveImageToTemp) {
         // Fallback for mock API - return a mock path in .automaker/images
         console.log("[DescriptionImageDropZone] Using mock path for image");
-        return `.automaker/images/${Date.now()}_${filename}`;
+        return safeJoin('.automaker', 'images', `${Date.now()}_${filename}`);
       }
 
       // Get projectPath from the store if available

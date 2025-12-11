@@ -6,6 +6,7 @@ import { getElectronAPI } from "@/lib/electron";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Save, RefreshCw, FileText } from "lucide-react";
+import { safeJoin } from "@/lib/path-utils";
 
 export function SpecView() {
   const { currentProject, appSpec, setAppSpec } = useAppStore();
@@ -19,9 +20,13 @@ export function SpecView() {
 
     setIsLoading(true);
     try {
-      const api = getElectronAPI();
+      const api = await getElectronAPI();
+      if (!api) {
+        console.error("Failed to get Electron API");
+        return;
+      }
       const result = await api.readFile(
-        `${currentProject.path}/.automaker/app_spec.txt`
+        safeJoin(currentProject.path, '.automaker', 'app_spec.txt')
       );
 
       if (result.success && result.content) {
@@ -45,9 +50,13 @@ export function SpecView() {
 
     setIsSaving(true);
     try {
-      const api = getElectronAPI();
+      const api = await getElectronAPI();
+      if (!api) {
+        console.error("Failed to get Electron API");
+        return;
+      }
       await api.writeFile(
-        `${currentProject.path}/.automaker/app_spec.txt`,
+        safeJoin(currentProject.path, '.automaker', 'app_spec.txt'),
         appSpec
       );
       setHasChanges(false);

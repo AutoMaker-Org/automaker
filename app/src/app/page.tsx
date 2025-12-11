@@ -12,6 +12,7 @@ import { InterviewView } from "@/components/views/interview-view";
 import { ContextView } from "@/components/views/context-view";
 import { useAppStore } from "@/store/app-store";
 import { getElectronAPI, isElectron } from "@/lib/electron";
+import { HelperConnectionStatus } from "@/components/ui/helper-connection-status";
 
 export default function Home() {
   const { currentView, setIpcConnected, theme } = useAppStore();
@@ -26,9 +27,13 @@ export default function Home() {
   useEffect(() => {
     const testConnection = async () => {
       try {
-        const api = getElectronAPI();
-        const result = await api.ping();
-        setIpcConnected(result === "pong" || result === "pong (mock)");
+        const api = await getElectronAPI();
+        if (api) {
+          const result = await api.ping();
+          setIpcConnected(result === "pong" || result === "pong (helper)");
+        } else {
+          setIpcConnected(false);
+        }
       } catch (error) {
         console.error("IPC connection failed:", error);
         setIpcConnected(false);
@@ -121,8 +126,8 @@ export default function Home() {
 
       {/* Environment indicator - only show after mount to prevent hydration issues */}
       {isMounted && !isElectron() && (
-        <div className="fixed bottom-4 right-4 px-3 py-1.5 bg-yellow-500/10 text-yellow-500 text-xs rounded-full border border-yellow-500/20 pointer-events-none">
-          Web Mode (Mock IPC)
+        <div className="fixed bottom-4 right-4 flex items-center gap-2">
+          <HelperConnectionStatus />
         </div>
       )}
     </main>

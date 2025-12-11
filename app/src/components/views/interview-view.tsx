@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getElectronAPI } from "@/lib/electron";
+import { safeJoin } from "@/lib/path-utils";
 
 interface InterviewMessage {
   id: string;
@@ -274,7 +275,11 @@ export function InterviewView() {
   };
 
   const handleSelectDirectory = async () => {
-    const api = getElectronAPI();
+    const api = await getElectronAPI();
+    if (!api) {
+      console.error("Failed to get Electron API");
+      return;
+    }
     const result = await api.openDirectory();
 
     if (!result.canceled && result.filePaths[0]) {
@@ -288,7 +293,11 @@ export function InterviewView() {
     setIsGenerating(true);
 
     try {
-      const api = getElectronAPI();
+      const api = await getElectronAPI();
+      if (!api) {
+        console.error("Failed to get Electron API");
+        return;
+      }
       const fullProjectPath = `${projectPath}/${projectName}`;
 
       // Create project directory
@@ -296,13 +305,13 @@ export function InterviewView() {
 
       // Write app_spec.txt with generated content
       await api.writeFile(
-        `${fullProjectPath}/.automaker/app_spec.txt`,
+        safeJoin(fullProjectPath, '.automaker', 'app_spec.txt'),
         generatedSpec
       );
 
       // Create initial .automaker/feature_list.json
       await api.writeFile(
-        `${fullProjectPath}/.automaker/feature_list.json`,
+        safeJoin(fullProjectPath, '.automaker', 'feature_list.json'),
         JSON.stringify(
           [
             {

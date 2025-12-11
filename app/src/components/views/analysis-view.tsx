@@ -85,7 +85,11 @@ export function AnalysisView() {
     async (path: string, depth: number = 0): Promise<FileTreeNode[]> => {
       if (depth > 10) return []; // Prevent infinite recursion
 
-      const api = getElectronAPI();
+      const api = await getElectronAPI();
+      if (!api) {
+        console.error("Failed to get Electron API");
+        return [];
+      }
       try {
         const result = await api.readdir(path);
         if (!result.success || !result.entries) return [];
@@ -196,7 +200,11 @@ export function AnalysisView() {
     setSpecGenerated(false);
 
     try {
-      const api = getElectronAPI();
+      const api = await getElectronAPI();
+      if (!api) {
+        console.error("Failed to get Electron API");
+        return;
+      }
 
       // Read key files to understand the project better
       const fileContents: Record<string, string> = {};
@@ -418,7 +426,11 @@ ${Object.entries(projectAnalysis.filesByExtension)
     setFeatureListGenerated(false);
 
     try {
-      const api = getElectronAPI();
+      const api = await getElectronAPI();
+      if (!api) {
+        console.error("Failed to get Electron API");
+        return;
+      }
 
       // Read key files to understand the project
       const fileContents: Record<string, string> = {};

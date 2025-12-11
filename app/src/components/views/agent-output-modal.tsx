@@ -11,6 +11,7 @@ import {
 import { Loader2, List, FileText } from "lucide-react";
 import { getElectronAPI } from "@/lib/electron";
 import { LogViewer } from "@/components/ui/log-viewer";
+import { safeJoin } from "@/lib/path-utils";
 
 interface AgentOutputModalProps {
   open: boolean;
@@ -49,8 +50,11 @@ export function AgentOutputModal({
     if (!open) return;
 
     const loadOutput = async () => {
-      const api = getElectronAPI();
-      if (!api) return;
+      const api = await getElectronAPI();
+      if (!api) {
+        console.error("Failed to get Electron API");
+        return;
+      }
 
       setIsLoading(true);
 
@@ -65,7 +69,7 @@ export function AgentOutputModal({
         projectPathRef.current = currentProject.path;
 
         // Ensure context directory exists
-        const contextDir = `${currentProject.path}/.automaker/agents-context`;
+        const contextDir = safeJoin(currentProject.path, '.automaker', 'agents-context');
         await api.mkdir(contextDir);
 
         // Try to read existing output file
@@ -92,11 +96,14 @@ export function AgentOutputModal({
   const saveOutput = async (newContent: string) => {
     if (!projectPathRef.current) return;
 
-    const api = getElectronAPI();
-    if (!api) return;
+    const api = await getElectronAPI();
+    if (!api) {
+      console.error("Failed to get Electron API");
+      return;
+    }
 
     try {
-      const contextDir = `${projectPathRef.current}/.automaker/agents-context`;
+      const contextDir = safeJoin(projectPathRef.current, '.automaker', 'agents-context');
       const outputPath = `${contextDir}/${featureId}.md`;
 
       await api.writeFile(outputPath, newContent);
@@ -109,8 +116,13 @@ export function AgentOutputModal({
   useEffect(() => {
     if (!open) return;
 
-    const api = getElectronAPI();
-    if (!api?.autoMode) return;
+    const setupEventListener = async () => {
+      const api = await getElectronAPI();
+      if (!api) {
+        console.error("Failed to get Electron API");
+        return;
+      }
+      if (!api.autoMode) return;
 
     const unsubscribe = api.autoMode.onEvent((event) => {
       // Filter events for this specific feature only
@@ -160,10 +172,16 @@ export function AgentOutputModal({
           return updated;
         });
       }
-    });
+      });
 
+      return () => {
+        unsubscribe();
+      };
+    };
+
+    const cleanup = setupEventListener();
     return () => {
-      unsubscribe();
+      cleanup.then(unsubscribe => unsubscribe?.());
     };
   }, [open, featureId]);
 

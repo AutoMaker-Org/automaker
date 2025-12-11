@@ -33,6 +33,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import { safeJoin } from "@/lib/path-utils";
 
 interface ContextFile {
   name: string;
@@ -75,7 +76,7 @@ export function ContextView() {
   // Get context directory path for user-added context files
   const getContextPath = useCallback(() => {
     if (!currentProject) return null;
-    return `${currentProject.path}/.automaker/context`;
+    return safeJoin(currentProject.path, '.automaker', 'context');
   }, [currentProject]);
 
   // Determine if a file is an image based on extension
@@ -100,7 +101,11 @@ export function ContextView() {
 
     setIsLoading(true);
     try {
-      const api = getElectronAPI();
+      const api = await getElectronAPI();
+      if (!api) {
+        console.error("Failed to get Electron API");
+        return;
+      }
 
       // Ensure context directory exists
       await api.mkdir(contextPath);
@@ -131,7 +136,11 @@ export function ContextView() {
   // Load selected file content
   const loadFileContent = useCallback(async (file: ContextFile) => {
     try {
-      const api = getElectronAPI();
+      const api = await getElectronAPI();
+      if (!api) {
+        console.error("Failed to get Electron API");
+        return;
+      }
       const result = await api.readFile(file.path);
       if (result.success && result.content !== undefined) {
         setEditedContent(result.content);
@@ -157,7 +166,11 @@ export function ContextView() {
 
     setIsSaving(true);
     try {
-      const api = getElectronAPI();
+      const api = await getElectronAPI();
+      if (!api) {
+        console.error("Failed to get Electron API");
+        return;
+      }
       await api.writeFile(selectedFile.path, editedContent);
       setSelectedFile({ ...selectedFile, content: editedContent });
       setHasChanges(false);
@@ -180,7 +193,11 @@ export function ContextView() {
     if (!contextPath || !newFileName.trim()) return;
 
     try {
-      const api = getElectronAPI();
+      const api = await getElectronAPI();
+      if (!api) {
+        console.error("Failed to get Electron API");
+        return;
+      }
       let filename = newFileName.trim();
 
       // Add default extension if not provided
@@ -215,7 +232,11 @@ export function ContextView() {
     if (!selectedFile) return;
 
     try {
-      const api = getElectronAPI();
+      const api = await getElectronAPI();
+      if (!api) {
+        console.error("Failed to get Electron API");
+        return;
+      }
       await api.deleteFile(selectedFile.path);
 
       setIsDeleteDialogOpen(false);
@@ -255,7 +276,11 @@ export function ContextView() {
     const contextPath = getContextPath();
     if (!contextPath) return;
 
-    const api = getElectronAPI();
+    const api = await getElectronAPI();
+    if (!api) {
+      console.error("Failed to get Electron API");
+      return;
+    }
 
     for (const file of files) {
       const reader = new FileReader();
