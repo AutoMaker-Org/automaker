@@ -220,6 +220,72 @@ export type AutoModeEvent =
       estimatedTime?: string;
     };
 
+// Code Review Types
+export type ReviewIssueSeverity = "error" | "warning" | "info";
+
+export interface ReviewIssue {
+  severity: ReviewIssueSeverity;
+  message: string;
+  file?: string;
+  line?: number;
+  column?: number;
+  code?: string; // Error code or rule ID
+}
+
+export interface ReviewCheck {
+  name: "typescript" | "build" | "patterns";
+  passed: boolean;
+  duration: number; // milliseconds
+  issues: ReviewIssue[];
+}
+
+export interface ReviewResults {
+  overallPass: boolean;
+  timestamp: string;
+  checks: ReviewCheck[];
+}
+
+export type CodeReviewEvent =
+  | { type: "review_start"; featureId: string; projectPath: string }
+  | { type: "review_progress"; featureId: string; check: string; message: string }
+  | { type: "review_complete"; featureId: string; results: ReviewResults }
+  | { type: "review_error"; featureId: string; error: string };
+
+export interface CodeReviewAPI {
+  /**
+   * Run code review on a feature
+   */
+  runReview(
+    projectPath: string,
+    featureId: string,
+    options?: {
+      checks?: ("typescript" | "build" | "patterns")[];
+      agent?: string; // Agent to use for review (e.g., 'opus', 'sonnet', 'codex')
+    }
+  ): Promise<{
+    success: boolean;
+    results?: ReviewResults;
+    error?: string;
+  }>;
+
+  /**
+   * Get diff of changes made by feature
+   */
+  getFeatureDiff(
+    projectPath: string,
+    featureId: string
+  ): Promise<{
+    success: boolean;
+    diff?: string;
+    files?: string[];
+  }>;
+
+  /**
+   * Listen for code review events
+   */
+  onEvent(callback: (event: CodeReviewEvent) => void): () => void;
+}
+
 export type SpecRegenerationEvent =
   | {
       type: "spec_regeneration_progress";
@@ -511,6 +577,9 @@ export interface ElectronAPI {
 
   // Git Operations APIs (for non-worktree operations)
   git: GitAPI;
+
+  // Code Review APIs
+  codeReview?: CodeReviewAPI;
 
   // Spec Regeneration APIs
   specRegeneration: SpecRegenerationAPI;

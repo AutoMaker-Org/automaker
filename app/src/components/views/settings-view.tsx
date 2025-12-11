@@ -67,6 +67,12 @@ export function SettingsView() {
     setMuteDoneSound,
     currentProject,
     moveProjectToTrash,
+    codeReviewMode,
+    setCodeReviewMode,
+    codeReviewChecks,
+    setCodeReviewChecks,
+    codeReviewAgent,
+    setCodeReviewAgent,
   } = useAppStore();
 
   // Convert electron Project to settings-view Project type
@@ -231,9 +237,15 @@ export function SettingsView() {
               showProfilesOnly={showProfilesOnly}
               defaultSkipTests={defaultSkipTests}
               useWorktrees={useWorktrees}
+              codeReviewMode={codeReviewMode}
+              codeReviewChecks={codeReviewChecks}
+              codeReviewAgent={codeReviewAgent}
               onShowProfilesOnlyChange={setShowProfilesOnly}
               onDefaultSkipTestsChange={setDefaultSkipTests}
               onUseWorktreesChange={setUseWorktrees}
+              onCodeReviewModeChange={setCodeReviewMode}
+              onCodeReviewChecksChange={setCodeReviewChecks}
+              onCodeReviewAgentChange={setCodeReviewAgent}
             />
 
             {/* Danger Zone Section - Only show when a project is selected */}

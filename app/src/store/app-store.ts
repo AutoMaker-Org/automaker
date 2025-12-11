@@ -231,6 +231,38 @@ export interface AIProfile {
   icon?: string; // Optional icon name from lucide
 }
 
+// Code Review types
+export type ReviewStatus = "pending" | "in_progress" | "passed" | "failed";
+
+export interface ReviewIssue {
+  severity: "error" | "warning" | "info";
+  message: string;
+  file?: string;
+  line?: number;
+  column?: number;
+  code?: string;
+}
+
+export interface ReviewCheck {
+  name: string;
+  passed: boolean;
+  issues: ReviewIssue[];
+}
+
+export interface ReviewResults {
+  timestamp: string;
+  overallPass: boolean;
+  checks: ReviewCheck[];
+}
+
+export interface CodeReviewChecks {
+  typescript: boolean;
+  build: boolean;
+  patterns: boolean;
+}
+
+export type CodeReviewAgent = "opus" | "sonnet" | "codex" | "gemini";
+
 export interface Feature {
   id: string;
   category: string;
@@ -248,6 +280,9 @@ export interface Feature {
   // Worktree info - set when a feature is being worked on in an isolated git worktree
   worktreePath?: string; // Path to the worktree directory
   branchName?: string; // Name of the feature branch
+  // Code Review info
+  reviewStatus?: ReviewStatus;
+  reviewResults?: ReviewResults;
 }
 
 // File tree node for project analysis
@@ -335,6 +370,11 @@ export interface AppState {
   // Project Analysis
   projectAnalysis: ProjectAnalysis | null;
   isAnalyzing: boolean;
+
+  // Code Review Settings
+  codeReviewMode: "auto" | "manual"; // auto: runs after agent completion, manual: user-triggered
+  codeReviewChecks: CodeReviewChecks; // Which checks to run
+  codeReviewAgent: CodeReviewAgent; // Agent to use for code review (default: opus)
 }
 
 export interface AutoModeActivity {
@@ -457,6 +497,11 @@ export interface AppActions {
   setLastSelectedSession: (projectPath: string, sessionId: string | null) => void;
   getLastSelectedSession: (projectPath: string) => string | null;
 
+  // Code Review actions
+  setCodeReviewMode: (mode: "auto" | "manual") => void;
+  setCodeReviewChecks: (checks: Partial<CodeReviewChecks>) => void;
+  setCodeReviewAgent: (agent: CodeReviewAgent) => void;
+
   // Reset
   reset: () => void;
 }
@@ -548,6 +593,14 @@ const initialState: AppState = {
   aiProfiles: DEFAULT_AI_PROFILES,
   projectAnalysis: null,
   isAnalyzing: false,
+  // Code Review defaults
+  codeReviewMode: "manual", // Default to manual mode
+  codeReviewChecks: {
+    typescript: true,
+    build: true,
+    patterns: true,
+  },
+  codeReviewAgent: "opus", // Default to opus for best quality
 };
 
 export const useAppStore = create<AppState & AppActions>()(
@@ -1132,6 +1185,13 @@ export const useAppStore = create<AppState & AppActions>()(
       getLastSelectedSession: (projectPath) => {
         return get().lastSelectedSessionByProject[projectPath] || null;
       },
+
+      // Code Review actions
+      setCodeReviewMode: (mode) => set({ codeReviewMode: mode }),
+      setCodeReviewChecks: (checks) =>
+        set({ codeReviewChecks: { ...get().codeReviewChecks, ...checks } }),
+      setCodeReviewAgent: (agent) => set({ codeReviewAgent: agent }),
+
       // Reset
       reset: () => set(initialState),
     }),
@@ -1159,6 +1219,10 @@ export const useAppStore = create<AppState & AppActions>()(
         muteDoneSound: state.muteDoneSound,
         aiProfiles: state.aiProfiles,
         lastSelectedSessionByProject: state.lastSelectedSessionByProject,
+        // Code Review settings
+        codeReviewMode: state.codeReviewMode,
+        codeReviewChecks: state.codeReviewChecks,
+        codeReviewAgent: state.codeReviewAgent,
       }),
     }
   )

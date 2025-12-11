@@ -55,6 +55,7 @@ import {
   GitMerge,
   ChevronDown,
   ChevronUp,
+  Shield,
 } from "lucide-react";
 import { CountUpTimer } from "@/components/ui/count-up-timer";
 import { getElectronAPI } from "@/lib/electron";
@@ -86,6 +87,7 @@ interface KanbanCardProps {
   onCommit?: () => void;
   onRevert?: () => void;
   onMerge?: () => void;
+  onCodeReview?: () => void;
   hasContext?: boolean;
   isCurrentAutoTask?: boolean;
   shortcutKey?: string;
@@ -109,6 +111,7 @@ export const KanbanCard = memo(function KanbanCard({
   onCommit,
   onRevert,
   onMerge,
+  onCodeReview,
   hasContext,
   isCurrentAutoTask,
   shortcutKey,
@@ -303,6 +306,49 @@ export const KanbanCard = memo(function KanbanCard({
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>
+      )}
+      {/* Review Status Badge - show when review has passed or failed */}
+      {feature.reviewStatus === "passed" && !isCurrentAutoTask && (
+        <div
+          className={cn(
+            "absolute px-1.5 py-0.5 text-[10px] font-medium rounded flex items-center gap-1 z-10",
+            "top-2 right-10",
+            "bg-green-500/20 border border-green-500/50 text-green-400"
+          )}
+          data-testid={`review-passed-badge-${feature.id}`}
+          title="Code review passed"
+        >
+          <Shield className="w-3 h-3" />
+          <span>Reviewed</span>
+        </div>
+      )}
+      {feature.reviewStatus === "failed" && !isCurrentAutoTask && (
+        <div
+          className={cn(
+            "absolute px-1.5 py-0.5 text-[10px] font-medium rounded flex items-center gap-1 z-10",
+            "top-2 right-10",
+            "bg-red-500/20 border border-red-500/50 text-red-400"
+          )}
+          data-testid={`review-failed-badge-${feature.id}`}
+          title="Code review failed - click to view issues"
+        >
+          <AlertCircle className="w-3 h-3" />
+          <span>Issues</span>
+        </div>
+      )}
+      {feature.reviewStatus === "in_progress" && !isCurrentAutoTask && (
+        <div
+          className={cn(
+            "absolute px-1.5 py-0.5 text-[10px] font-medium rounded flex items-center gap-1 z-10",
+            "top-2 right-10",
+            "bg-blue-500/20 border border-blue-500/50 text-blue-400"
+          )}
+          data-testid={`review-inprogress-badge-${feature.id}`}
+          title="Code review in progress"
+        >
+          <Loader2 className="w-3 h-3 animate-spin" />
+          <span>Reviewing</span>
+        </div>
       )}
       <CardHeader
         className={cn(
@@ -744,6 +790,43 @@ export const KanbanCard = memo(function KanbanCard({
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
+              )}
+              {/* Code Review button */}
+              {onCodeReview && (
+                <Button
+                  variant={feature.reviewStatus === "failed" ? "destructive" : "secondary"}
+                  size="sm"
+                  className="h-7 text-xs min-w-0 shrink-0"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onCodeReview();
+                  }}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  data-testid={`code-review-${feature.id}`}
+                  disabled={feature.reviewStatus === "in_progress"}
+                >
+                  {feature.reviewStatus === "in_progress" ? (
+                    <>
+                      <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                      <span className="truncate">Reviewing...</span>
+                    </>
+                  ) : feature.reviewStatus === "passed" ? (
+                    <>
+                      <CheckCircle2 className="w-3 h-3 mr-1 text-green-500" />
+                      <span className="truncate">Passed</span>
+                    </>
+                  ) : feature.reviewStatus === "failed" ? (
+                    <>
+                      <AlertCircle className="w-3 h-3 mr-1" />
+                      <span className="truncate">Issues</span>
+                    </>
+                  ) : (
+                    <>
+                      <Shield className="w-3 h-3 mr-1" />
+                      <span className="truncate">Review</span>
+                    </>
+                  )}
+                </Button>
               )}
               {/* Follow-up prompt button */}
               {onFollowUp && (

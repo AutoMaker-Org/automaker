@@ -10,6 +10,7 @@ const autoModeService = require("./auto-mode-service");
 const worktreeManager = require("./services/worktree-manager");
 const featureSuggestionsService = require("./services/feature-suggestions-service");
 const specRegenerationService = require("./services/spec-regeneration-service");
+const codeReviewService = require("./services/code-review-service");
 
 let mainWindow = null;
 
@@ -1774,6 +1775,66 @@ ipcMain.handle("running-agents:getAll", () => {
     };
   } catch (error) {
     console.error("[IPC] running-agents:getAll error:", error);
+    return { success: false, error: error.message };
+  }
+});
+
+// ============================================================================
+// Code Review IPC Handlers
+// ============================================================================
+
+/**
+ * Run code review on a feature
+ */
+ipcMain.handle(
+  "code-review:run",
+  async (_, { projectPath, featureId, options = {} }) => {
+    try {
+      // Add project path to allowed paths
+      addAllowedPath(projectPath);
+
+      const sendToRenderer = (data) => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send("code-review:event", data);
+        }
+      };
+
+      return await codeReviewService.runReview(
+        projectPath,
+        featureId,
+        options,
+        sendToRenderer
+      );
+    } catch (error) {
+      console.error("[IPC] code-review:run error:", error);
+      return { success: false, error: error.message };
+    }
+  }
+);
+
+/**
+ * Get diff for a feature
+ */
+ipcMain.handle(
+  "code-review:get-diff",
+  async (_, { projectPath, featureId }) => {
+    try {
+      return await codeReviewService.getFeatureDiff(projectPath, featureId);
+    } catch (error) {
+      console.error("[IPC] code-review:get-diff error:", error);
+      return { success: false, error: error.message };
+    }
+  }
+);
+
+/**
+ * Stop a running code review
+ */
+ipcMain.handle("code-review:stop", async (_, { featureId }) => {
+  try {
+    return codeReviewService.stopReview(featureId);
+  } catch (error) {
+    console.error("[IPC] code-review:stop error:", error);
     return { success: false, error: error.message };
   }
 });

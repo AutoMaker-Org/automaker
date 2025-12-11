@@ -392,6 +392,33 @@ contextBridge.exposeInMainWorld("electronAPI", {
     // Get all running agents across all projects
     getAll: () => ipcRenderer.invoke("running-agents:getAll"),
   },
+
+  // Code Review API
+  codeReview: {
+    // Run code review on a feature
+    runReview: (projectPath, featureId, options) =>
+      ipcRenderer.invoke("code-review:run", {
+        projectPath,
+        featureId,
+        options,
+      }),
+
+    // Get diff of changes made by feature
+    getFeatureDiff: (projectPath, featureId) =>
+      ipcRenderer.invoke("code-review:get-diff", { projectPath, featureId }),
+
+    // Listen for code review events
+    onEvent: (callback) => {
+      const subscription = (_, data) => callback(data);
+      ipcRenderer.on("code-review:event", subscription);
+      return () => {
+        ipcRenderer.removeListener("code-review:event", subscription);
+      };
+    },
+
+    // Stop a running review
+    stop: (featureId) => ipcRenderer.invoke("code-review:stop", { featureId }),
+  },
 });
 
 // Also expose a flag to detect if we're in Electron
