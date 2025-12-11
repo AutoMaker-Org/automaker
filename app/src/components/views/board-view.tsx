@@ -58,6 +58,7 @@ import { KanbanColumn } from "./kanban-column";
 import { KanbanCard } from "./kanban-card";
 import { AgentOutputModal } from "./agent-output-modal";
 import { FeatureSuggestionsDialog } from "./feature-suggestions-dialog";
+import { CodeReviewModal } from "./code-review-modal";
 import {
   Plus,
   RefreshCw,
@@ -97,6 +98,7 @@ import {
 } from "@/components/ui/tooltip";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useAutoMode } from "@/hooks/use-auto-mode";
+import { useCodeReview } from "@/hooks/use-code-review";
 import {
   useKeyboardShortcuts,
   useKeyboardShortcutsConfig,
@@ -237,6 +239,9 @@ export function BoardView() {
   const [followUpImagePaths, setFollowUpImagePaths] = useState<
     DescriptionImagePath[]
   >([]);
+  // Code review modal state
+  const [showCodeReviewModal, setShowCodeReviewModal] = useState(false);
+  const [codeReviewFeature, setCodeReviewFeature] = useState<Feature | null>(null);
   // Preview maps to persist image previews across tab switches
   const [newFeaturePreviewMap, setNewFeaturePreviewMap] =
     useState<ImagePreviewMap>(() => new Map());
@@ -299,6 +304,9 @@ export function BoardView() {
   const autoMode = useAutoMode();
   // Get runningTasks from the hook (scoped to current project)
   const runningAutoTasks = autoMode.runningTasks;
+
+  // Code review hook
+  const codeReview = useCodeReview();
 
   // Window state hook for compact dialog mode
   const { isMaximized } = useWindowState();
@@ -1313,6 +1321,58 @@ export function BoardView() {
     }
   };
 
+  // Run code review on a feature or show existing results
+  const handleCodeReview = async (feature: Feature) => {
+    console.log("[Board] Code review for:", {
+      id: feature.id,
+      description: feature.description,
+      reviewStatus: feature.reviewStatus,
+    });
+
+    // If there are existing review results, show the modal
+    if (feature.reviewResults) {
+      setCodeReviewFeature(feature);
+      setShowCodeReviewModal(true);
+      return;
+    }
+
+    // Otherwise, run a new review
+    try {
+      const result = await codeReview.runReview(feature.id);
+
+      if (result.success) {
+        // Reload features to get updated review results
+        await loadFeatures();
+        // Find the updated feature
+        const updatedFeature = features.find((f) => f.id === feature.id);
+        if (updatedFeature?.reviewResults) {
+          if (updatedFeature.reviewResults.overallPass) {
+            toast.success("Code review passed", {
+              description: "All checks passed successfully.",
+            });
+          } else {
+            toast.warning("Code review found issues", {
+              description: "Click the Review button to see details.",
+            });
+            // Open the modal to show issues
+            setCodeReviewFeature(updatedFeature);
+            setShowCodeReviewModal(true);
+          }
+        }
+      } else {
+        toast.error("Code review failed", {
+          description: result.error || "An error occurred",
+        });
+      }
+    } catch (error) {
+      console.error("[Board] Error running code review:", error);
+      toast.error("Code review failed", {
+        description:
+          error instanceof Error ? error.message : "An error occurred",
+      });
+    }
+  };
+
   // Move feature to waiting_approval (for skipTests features when agent completes)
   const handleMoveToWaitingApproval = (feature: Feature) => {
     console.log("[Board] Moving feature to waiting_approval:", {
@@ -1954,6 +2014,7 @@ export function BoardView() {
                             onCommit={() => handleCommitFeature(feature)}
                             onRevert={() => handleRevertFeature(feature)}
                             onMerge={() => handleMergeFeature(feature)}
+                            onCodeReview={() => handleCodeReview(feature)}
                             hasContext={featuresWithContext.has(feature.id)}
                             isCurrentAutoTask={runningAutoTasks.includes(
                               feature.id
@@ -2829,6 +2890,23 @@ export function BoardView() {
         featureStatus={outputFeature?.status}
         onNumberKeyPress={handleOutputModalNumberKeyPress}
       />
+
+      {/* Code Review Modal */}
+      {codeReviewFeature && (
+        <CodeReviewModal
+          feature={codeReviewFeature}
+          open={showCodeReviewModal}
+          onOpenChange={(open) => {
+            setShowCodeReviewModal(open);
+            if (!open) setCodeReviewFeature(null);
+          }}
+          onRerunReview={() => {
+            // Clear existing results and re-run review
+            codeReview.clearReview(codeReviewFeature.id);
+            handleCodeReview(codeReviewFeature);
+          }}
+        />
+      )}
 
       {/* Delete All Verified Dialog */}
       <Dialog

@@ -238,6 +238,60 @@ export interface AutoModeAPI {
   onEvent: (callback: (event: AutoModeEvent) => void) => () => void;
 }
 
+// Code Review types
+export interface ReviewIssue {
+  severity: "error" | "warning" | "info";
+  message: string;
+  file?: string;
+  line?: number;
+  column?: number;
+  code?: string;
+}
+
+export interface ReviewCheck {
+  name: string;
+  passed: boolean;
+  duration?: number;
+  issues: ReviewIssue[];
+}
+
+export interface ReviewResults {
+  overallPass: boolean;
+  timestamp: string;
+  checks: ReviewCheck[];
+}
+
+export type CodeReviewEvent =
+  | { type: "review_start"; featureId: string; projectPath: string }
+  | { type: "review_progress"; featureId: string; check: string; message: string }
+  | { type: "review_complete"; featureId: string; results: ReviewResults }
+  | { type: "review_error"; featureId: string; error: string };
+
+export interface CodeReviewAPI {
+  runReview: (
+    projectPath: string,
+    featureId: string,
+    options?: {
+      checks?: ("typescript" | "build" | "patterns")[];
+      agent?: string;
+    }
+  ) => Promise<{
+    success: boolean;
+    results?: ReviewResults;
+    error?: string;
+  }>;
+  getFeatureDiff: (
+    projectPath: string,
+    featureId: string
+  ) => Promise<{
+    success: boolean;
+    diff?: string;
+    files?: string[];
+  }>;
+  onEvent: (callback: (event: CodeReviewEvent) => void) => () => void;
+  stop?: (featureId: string) => Promise<{ success: boolean; error?: string }>;
+}
+
 export interface SaveImageResult {
   success: boolean;
   path?: string;
@@ -321,6 +375,7 @@ export interface ElectronAPI {
   autoMode?: AutoModeAPI;
   features?: FeaturesAPI;
   runningAgents?: RunningAgentsAPI;
+  codeReview?: CodeReviewAPI;
   setup?: {
     getClaudeStatus: () => Promise<{
       success: boolean;
@@ -731,6 +786,9 @@ export const getElectronAPI = (): ElectronAPI => {
 
     // Mock Running Agents API
     runningAgents: createMockRunningAgentsAPI(),
+
+    // Mock Code Review API
+    codeReview: createMockCodeReviewAPI(),
   };
 };
 
@@ -2128,6 +2186,70 @@ function createMockRunningAgentsAPI(): RunningAgentsAPI {
         totalCount: runningAgents.length,
         autoLoopRunning: mockAutoModeRunning,
       };
+    },
+  };
+}
+
+// Mock Code Review API implementation
+function createMockCodeReviewAPI(): CodeReviewAPI {
+  return {
+    runReview: async (projectPath, featureId, options) => {
+      console.log("[Mock] Running code review:", { projectPath, featureId, options });
+      // Simulate a review
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      return {
+        success: true,
+        results: {
+          overallPass: true,
+          timestamp: new Date().toISOString(),
+          checks: [
+            {
+              name: "typescript",
+              passed: true,
+              duration: 500,
+              issues: [],
+            },
+            {
+              name: "build",
+              passed: true,
+              duration: 300,
+              issues: [],
+            },
+            {
+              name: "patterns",
+              passed: true,
+              duration: 200,
+              issues: [
+                {
+                  severity: "info" as const,
+                  message: "Consider adding error handling to async functions",
+                  file: "src/example.ts",
+                  line: 10,
+                  code: "missing-error-handling",
+                },
+              ],
+            },
+          ],
+        },
+      };
+    },
+    getFeatureDiff: async (projectPath, featureId) => {
+      console.log("[Mock] Getting feature diff:", { projectPath, featureId });
+      return {
+        success: true,
+        diff: "Mock diff content",
+        files: ["src/example.ts"],
+      };
+    },
+    onEvent: (callback) => {
+      console.log("[Mock] Registering code review event listener");
+      return () => {
+        console.log("[Mock] Unregistering code review event listener");
+      };
+    },
+    stop: async (featureId) => {
+      console.log("[Mock] Stopping code review:", featureId);
+      return { success: true };
     },
   };
 }
