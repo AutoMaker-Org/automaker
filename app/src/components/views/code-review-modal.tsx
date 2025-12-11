@@ -19,6 +19,7 @@ import {
   Shield,
   Clock,
   FileText,
+  Wrench,
 } from "lucide-react";
 
 interface CodeReviewModalProps {
@@ -26,6 +27,7 @@ interface CodeReviewModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onRerunReview?: () => void;
+  onFixIssues?: () => void;
 }
 
 export function CodeReviewModal({
@@ -33,6 +35,7 @@ export function CodeReviewModal({
   open,
   onOpenChange,
   onRerunReview,
+  onFixIssues,
 }: CodeReviewModalProps) {
   const results = feature.reviewResults;
 
@@ -215,6 +218,20 @@ export function CodeReviewModal({
         </div>
 
         <DialogFooter className="flex gap-2">
+          {/* Fix Issues button - only show if there are fixable issues */}
+          {onFixIssues && !results.overallPass && (totalErrors > 0 || totalWarnings > 0) && (
+            <Button
+              variant="default"
+              onClick={() => {
+                onOpenChange(false);
+                onFixIssues();
+              }}
+              data-testid="fix-issues-button"
+            >
+              <Wrench className="w-4 h-4 mr-2" />
+              Fix Issues
+            </Button>
+          )}
           {onRerunReview && (
             <Button
               variant="outline"

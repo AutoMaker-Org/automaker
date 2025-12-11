@@ -403,6 +403,14 @@ contextBridge.exposeInMainWorld("electronAPI", {
         options,
       }),
 
+    // Run code review with automatic fixes until passing
+    runReviewWithFixes: (projectPath, featureId, options) =>
+      ipcRenderer.invoke("code-review:run-with-fixes", {
+        projectPath,
+        featureId,
+        options,
+      }),
+
     // Get diff of changes made by feature
     getFeatureDiff: (projectPath, featureId) =>
       ipcRenderer.invoke("code-review:get-diff", { projectPath, featureId }),

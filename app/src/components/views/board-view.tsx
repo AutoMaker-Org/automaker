@@ -546,12 +546,50 @@ export function BoardView() {
         console.log("[Board] Feature completed, reloading features...");
         loadFeatures();
         // Play ding sound when feature is done (unless muted)
-        const { muteDoneSound } = useAppStore.getState();
+        const { muteDoneSound, codeReviewMode, features: storeFeatures } = useAppStore.getState();
         if (!muteDoneSound) {
           const audio = new Audio("/sounds/ding.mp3");
           audio
             .play()
             .catch((err) => console.warn("Could not play ding sound:", err));
+        }
+        
+        // Auto code review: If enabled, trigger review with auto-fix for the completed feature
+        if (codeReviewMode === "auto" && event.featureId) {
+          // Find the feature and check if it should be reviewed
+          const feature = storeFeatures.find((f) => f.id === event.featureId);
+          if (feature && feature.status === "waiting_approval" && !feature.reviewStatus && !feature.error) {
+            console.log("[Board] Auto code review with fixes triggered for:", event.featureId);
+            // Small delay to ensure features are reloaded
+            setTimeout(() => {
+              // Use runReviewWithFixes for auto mode to automatically fix issues
+              codeReview.runReviewWithFixes(event.featureId).then((result) => {
+                if (result.success) {
+                  const results = result.results;
+                  const attempts = ('attempts' in result && typeof result.attempts === 'number') ? result.attempts : 1;
+                  const maxReached = ('maxAttemptsReached' in result && typeof result.maxAttemptsReached === 'boolean') ? result.maxAttemptsReached : false;
+                  
+                  if (results?.overallPass) {
+                    toast.success("Code review passed", {
+                      description: attempts > 1 
+                        ? `Fixed issues and passed after ${attempts} attempt(s).`
+                        : "Auto review completed successfully.",
+                    });
+                  } else if (maxReached) {
+                    toast.error("Code review failed", {
+                      description: `Could not fix all issues after ${attempts} attempts. Click Review to see details.`,
+                    });
+                  } else {
+                    toast.warning("Code review found issues", {
+                      description: "Click the Review button to see details.",
+                    });
+                  }
+                }
+              }).catch((err) => {
+                console.error("[Board] Auto code review error:", err);
+              });
+            }, 500);
+          }
         }
       } else if (event.type === "auto_mode_error") {
         // Reload features when an error occurs (feature moved to waiting_approval)
@@ -1322,23 +1360,26 @@ export function BoardView() {
   };
 
   // Run code review on a feature or show existing results
-  const handleCodeReview = async (feature: Feature) => {
+  const handleCodeReview = async (feature: Feature, withFixes = false) => {
     console.log("[Board] Code review for:", {
       id: feature.id,
       description: feature.description,
       reviewStatus: feature.reviewStatus,
+      withFixes,
     });
 
-    // If there are existing review results, show the modal
-    if (feature.reviewResults) {
+    // If there are existing review results and not re-running with fixes, show the modal
+    if (feature.reviewResults && !withFixes) {
       setCodeReviewFeature(feature);
       setShowCodeReviewModal(true);
       return;
     }
 
-    // Otherwise, run a new review
+    // Otherwise, run a new review (with or without auto-fixes)
     try {
-      const result = await codeReview.runReview(feature.id);
+      const result = withFixes 
+        ? await codeReview.runReviewWithFixes(feature.id)
+        : await codeReview.runReview(feature.id);
 
       if (result.success) {
         // Reload features to get updated review results
@@ -1346,10 +1387,22 @@ export function BoardView() {
         // Find the updated feature
         const updatedFeature = features.find((f) => f.id === feature.id);
         if (updatedFeature?.reviewResults) {
+          const attempts = ('attempts' in result && typeof result.attempts === 'number') ? result.attempts : 1;
+          const maxReached = ('maxAttemptsReached' in result && typeof result.maxAttemptsReached === 'boolean') ? result.maxAttemptsReached : false;
+          
           if (updatedFeature.reviewResults.overallPass) {
             toast.success("Code review passed", {
-              description: "All checks passed successfully.",
+              description: withFixes && attempts > 1
+                ? `Fixed issues and passed after ${attempts} attempt(s).`
+                : "All checks passed successfully.",
             });
+          } else if (maxReached) {
+            toast.error("Could not fix all issues", {
+              description: `Max attempts (${attempts}) reached. Review details for remaining issues.`,
+            });
+            // Open the modal to show remaining issues
+            setCodeReviewFeature(updatedFeature);
+            setShowCodeReviewModal(true);
           } else {
             toast.warning("Code review found issues", {
               description: "Click the Review button to see details.",
@@ -2904,6 +2957,11 @@ export function BoardView() {
             // Clear existing results and re-run review
             codeReview.clearReview(codeReviewFeature.id);
             handleCodeReview(codeReviewFeature);
+          }}
+          onFixIssues={() => {
+            // Clear existing results and run review with auto-fix
+            codeReview.clearReview(codeReviewFeature.id);
+            handleCodeReview(codeReviewFeature, true);
           }}
         />
       )}

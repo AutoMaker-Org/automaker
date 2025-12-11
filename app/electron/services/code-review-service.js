@@ -1,16 +1,27 @@
 const { spawn } = require("child_process");
 const path = require("path");
 const fs = require("fs/promises");
+const { query, AbortError } = require("@anthropic-ai/claude-agent-sdk");
+
+// Model name mappings for code review agents
+const REVIEW_AGENT_MODELS = {
+  opus: "claude-opus-4-5-20251101",
+  sonnet: "claude-sonnet-4-20250514",
+  codex: "gpt-5.1-codex", // OpenAI Codex
+  gemini: "gemini-2.0-flash-exp", // Google Gemini
+};
 
 /**
  * Code Review Service - Automated code review for agent-generated changes
  *
  * Runs TypeScript checks, build verification, and pattern analysis
  * to ensure code quality before features are marked as verified.
+ * Can also fix issues found during review and re-run until passing.
  */
 class CodeReviewService {
   constructor() {
     this.runningReviews = new Map(); // featureId -> { abortController }
+    this.maxFixAttempts = 5; // Maximum attempts to fix issues
   }
 
   /**
@@ -130,6 +141,236 @@ class CodeReviewService {
       return { success: false, error: error.message };
     } finally {
       this.runningReviews.delete(featureId);
+    }
+  }
+
+  /**
+   * Run code review with automatic fixes - keeps fixing until review passes or max attempts reached
+   * @param {string} projectPath - Path to the project
+   * @param {string} featureId - Feature ID being reviewed
+   * @param {Object} options - Review options
+   * @param {string[]} options.checks - Which checks to run
+   * @param {string} options.agent - Agent to use for fixing (opus, sonnet, codex, gemini)
+   * @param {Function} sendToRenderer - Function to send events to renderer
+   */
+  async runReviewWithFixes(projectPath, featureId, options = {}, sendToRenderer) {
+    const { checks = ["typescript", "build", "patterns"], agent = "opus" } = options;
+    let attempt = 0;
+    let lastResults = null;
+
+    console.log(`[CodeReview] Starting review with auto-fix for feature ${featureId}`);
+
+    while (attempt < this.maxFixAttempts) {
+      attempt++;
+      console.log(`[CodeReview] Attempt ${attempt}/${this.maxFixAttempts}`);
+
+      // Emit progress
+      this.emitEvent(sendToRenderer, {
+        type: "review_progress",
+        featureId,
+        check: "review",
+        message: `Running review (attempt ${attempt}/${this.maxFixAttempts})...`,
+      });
+
+      // Run the review
+      const reviewResult = await this.runReview(projectPath, featureId, { checks }, sendToRenderer);
+
+      if (!reviewResult.success) {
+        return reviewResult;
+      }
+
+      lastResults = reviewResult.results;
+
+      // If review passed, we're done!
+      if (lastResults.overallPass) {
+        console.log(`[CodeReview] Review passed on attempt ${attempt}`);
+        this.emitEvent(sendToRenderer, {
+          type: "review_progress",
+          featureId,
+          check: "complete",
+          message: `Review passed on attempt ${attempt}!`,
+        });
+        return { success: true, results: lastResults, attempts: attempt };
+      }
+
+      // If this is the last attempt, don't try to fix
+      if (attempt >= this.maxFixAttempts) {
+        console.log(`[CodeReview] Max attempts reached, review still failing`);
+        break;
+      }
+
+      // Collect all issues that need fixing (errors and warnings, skip info)
+      const issuesToFix = [];
+      for (const check of lastResults.checks) {
+        for (const issue of check.issues) {
+          if (issue.severity === "error" || issue.severity === "warning") {
+            issuesToFix.push({
+              check: check.name,
+              ...issue,
+            });
+          }
+        }
+      }
+
+      if (issuesToFix.length === 0) {
+        // Only info issues, consider it passed
+        console.log(`[CodeReview] Only info issues found, considering passed`);
+        lastResults.overallPass = true;
+        return { success: true, results: lastResults, attempts: attempt };
+      }
+
+      // Emit fixing progress
+      this.emitEvent(sendToRenderer, {
+        type: "review_progress",
+        featureId,
+        check: "fixing",
+        message: `Fixing ${issuesToFix.length} issue(s) with ${agent}...`,
+      });
+
+      // Try to fix the issues
+      const fixResult = await this.fixIssues(
+        projectPath,
+        featureId,
+        issuesToFix,
+        agent,
+        sendToRenderer
+      );
+
+      if (!fixResult.success) {
+        console.error(`[CodeReview] Failed to fix issues:`, fixResult.error);
+        // Continue to next attempt anyway, maybe partial fixes were made
+      }
+    }
+
+    // Max attempts reached without passing
+    return {
+      success: true,
+      results: lastResults,
+      attempts: attempt,
+      maxAttemptsReached: true,
+    };
+  }
+
+  /**
+   * Fix issues using an AI agent
+   * @param {string} projectPath - Path to the project
+   * @param {string} featureId - Feature ID
+   * @param {Array} issues - List of issues to fix
+   * @param {string} agent - Agent to use (opus, sonnet, codex, gemini)
+   * @param {Function} sendToRenderer - Function to send events to renderer
+   */
+  async fixIssues(projectPath, featureId, issues, agent, sendToRenderer) {
+    console.log(`[CodeReview] Fixing ${issues.length} issues with ${agent}`);
+
+    try {
+      // Build a prompt describing the issues to fix
+      const issueDescriptions = issues.map((issue, idx) => {
+        let desc = `${idx + 1}. [${issue.severity.toUpperCase()}] ${issue.message}`;
+        if (issue.file) {
+          desc += `\n   File: ${issue.file}`;
+          if (issue.line) desc += `:${issue.line}`;
+          if (issue.column) desc += `:${issue.column}`;
+        }
+        if (issue.code) desc += `\n   Code: ${issue.code}`;
+        return desc;
+      }).join("\n\n");
+
+      const prompt = `You are a code review assistant. The following issues were found during code review and need to be fixed:
+
+${issueDescriptions}
+
+Please fix ALL of these issues. For each issue:
+1. Read the relevant file(s)
+2. Make the necessary changes to fix the issue
+3. Ensure the fix doesn't break other functionality
+
+Focus on:
+- TypeScript errors: Fix type mismatches, missing types, incorrect imports
+- Build errors: Fix syntax errors, missing dependencies, configuration issues
+- Pattern warnings: Refactor code to follow best practices
+
+After fixing, verify your changes compile by running appropriate checks.`;
+
+      // Use Claude agent to fix issues
+      const modelString = REVIEW_AGENT_MODELS[agent] || REVIEW_AGENT_MODELS.opus;
+
+      // For Codex models, we need to use a different approach
+      if (agent === "codex") {
+        return await this.fixWithCodex(projectPath, featureId, prompt, sendToRenderer);
+      }
+
+      const abortController = new AbortController();
+
+      const options = {
+        model: modelString,
+        systemPrompt: `You are an expert code reviewer and fixer. Your job is to fix issues found during automated code review. Be precise and surgical in your fixes - only change what's necessary to fix the issues. Always verify your changes work correctly.`,
+        maxTurns: 50,
+        cwd: projectPath,
+        allowedTools: ["Read", "Write", "Edit", "Glob", "Grep", "Bash"],
+        permissionMode: "acceptEdits",
+        abortController,
+      };
+
+      const currentQuery = query({ prompt, options });
+
+      let responseText = "";
+      for await (const msg of currentQuery) {
+        if (msg.type === "assistant" && msg.message?.content) {
+          for (const block of msg.message.content) {
+            if (block.type === "text") {
+              responseText += block.text;
+            }
+          }
+        }
+
+        // Emit progress updates
+        if (msg.type === "tool_use") {
+          this.emitEvent(sendToRenderer, {
+            type: "review_progress",
+            featureId,
+            check: "fixing",
+            message: `Using tool: ${msg.name || "unknown"}`,
+          });
+        }
+      }
+
+      console.log(`[CodeReview] Fix attempt complete`);
+      return { success: true };
+    } catch (error) {
+      if (error instanceof AbortError) {
+        console.log(`[CodeReview] Fix was aborted`);
+        return { success: false, error: "Fix was aborted" };
+      }
+      console.error(`[CodeReview] Error fixing issues:`, error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Fix issues using Codex CLI
+   */
+  async fixWithCodex(projectPath, featureId, prompt, sendToRenderer) {
+    try {
+      // Use codex CLI to fix issues
+      const output = await this.runCommand(
+        "codex",
+        ["--approval-mode", "full-auto", "-q", prompt],
+        {
+          cwd: projectPath,
+          timeout: 300000, // 5 minute timeout
+        }
+      );
+
+      if (output.exitCode !== 0) {
+        console.error(`[CodeReview] Codex fix failed:`, output.stderr);
+        return { success: false, error: output.stderr || "Codex fix failed" };
+      }
+
+      console.log(`[CodeReview] Codex fix complete`);
+      return { success: true };
+    } catch (error) {
+      console.error(`[CodeReview] Error running Codex:`, error);
+      return { success: false, error: error.message };
     }
   }
 

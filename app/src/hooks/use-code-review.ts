@@ -178,6 +178,104 @@ export function useCodeReview() {
     [currentProject, updateFeature, getEnabledChecks, codeReviewAgent]
   );
 
+  // Run code review with automatic fixes until passing
+  const runReviewWithFixes = useCallback(
+    async (featureId: string) => {
+      if (!currentProject) {
+        console.error("[CodeReview] No project selected");
+        return { success: false, error: "No project selected" };
+      }
+
+      try {
+        const api = getElectronAPI();
+        const codeReviewApi = api?.codeReview;
+        if (!codeReviewApi?.runReviewWithFixes) {
+          // Fallback to regular review if runReviewWithFixes not available
+          console.warn("[CodeReview] runReviewWithFixes not available, using regular review");
+          return runReview(featureId);
+        }
+
+        console.log(`[CodeReview] Starting review with fixes for feature ${featureId}`);
+
+        // Update status to in_progress immediately
+        updateFeature(featureId, { reviewStatus: "in_progress" });
+
+        const result = await codeReviewApi.runReviewWithFixes(
+          currentProject.path,
+          featureId,
+          {
+            checks: getEnabledChecks(),
+            agent: codeReviewAgent,
+          }
+        );
+
+        if (result.success && result.results) {
+          updateFeature(featureId, {
+            reviewStatus: result.results.overallPass ? "passed" : "failed",
+            reviewResults: result.results,
+          });
+
+          // Log the attempts info
+          if (result.attempts) {
+            console.log(`[CodeReview] Completed in ${result.attempts} attempt(s)`);
+          }
+          if (result.maxAttemptsReached) {
+            console.warn(`[CodeReview] Max fix attempts reached`);
+          }
+        } else {
+          updateFeature(featureId, {
+            reviewStatus: "failed",
+            reviewResults: {
+              overallPass: false,
+              timestamp: new Date().toISOString(),
+              checks: [
+                {
+                  name: "error",
+                  passed: false,
+                  issues: [
+                    {
+                      severity: "error",
+                      message: result.error || "Review with fixes failed",
+                    },
+                  ],
+                },
+              ],
+            },
+          });
+        }
+
+        return result;
+      } catch (error) {
+        console.error("[CodeReview] Error:", error);
+        const errorMessage =
+          error instanceof Error ? error.message : "Unknown error";
+
+        updateFeature(featureId, {
+          reviewStatus: "failed",
+          reviewResults: {
+            overallPass: false,
+            timestamp: new Date().toISOString(),
+            checks: [
+              {
+                name: "error",
+                passed: false,
+                issues: [
+                  {
+                    severity: "error",
+                    message: errorMessage,
+                  },
+                ],
+              },
+            ],
+          },
+        });
+
+        return { success: false, error: errorMessage };
+      }
+    },
+    [currentProject, updateFeature, getEnabledChecks, codeReviewAgent, runReview]
+  );
+
   // Clear review status for a feature
   const clearReview = useCallback(
     (featureId: string) => {
@@ -204,6 +302,7 @@ export function useCodeReview() {
 
   return {
     runReview,
+    runReviewWithFixes,
     clearReview,
     shouldAutoReview,
     codeReviewMode,

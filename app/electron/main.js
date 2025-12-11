@@ -1838,3 +1838,32 @@ ipcMain.handle("code-review:stop", async (_, { featureId }) => {
     return { success: false, error: error.message };
   }
 });
+
+/**
+ * Run code review with automatic fixes
+ */
+ipcMain.handle(
+  "code-review:run-with-fixes",
+  async (_, { projectPath, featureId, options = {} }) => {
+    try {
+      // Add project path to allowed paths
+      addAllowedPath(projectPath);
+
+      const sendToRenderer = (data) => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send("code-review:event", data);
+        }
+      };
+
+      return await codeReviewService.runReviewWithFixes(
+        projectPath,
+        featureId,
+        options,
+        sendToRenderer
+      );
+    } catch (error) {
+      console.error("[IPC] code-review:run-with-fixes error:", error);
+      return { success: false, error: error.message };
+    }
+  }
+);

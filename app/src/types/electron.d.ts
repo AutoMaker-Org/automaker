@@ -269,6 +269,24 @@ export interface CodeReviewAPI {
   }>;
 
   /**
+   * Run code review with automatic fixes until passing
+   */
+  runReviewWithFixes(
+    projectPath: string,
+    featureId: string,
+    options?: {
+      checks?: ("typescript" | "build" | "patterns")[];
+      agent?: string;
+    }
+  ): Promise<{
+    success: boolean;
+    results?: ReviewResults;
+    attempts?: number;
+    maxAttemptsReached?: boolean;
+    error?: string;
+  }>;
+
+  /**
    * Get diff of changes made by feature
    */
   getFeatureDiff(

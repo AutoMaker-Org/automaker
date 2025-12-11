@@ -280,6 +280,20 @@ export interface CodeReviewAPI {
     results?: ReviewResults;
     error?: string;
   }>;
+  runReviewWithFixes: (
+    projectPath: string,
+    featureId: string,
+    options?: {
+      checks?: ("typescript" | "build" | "patterns")[];
+      agent?: string;
+    }
+  ) => Promise<{
+    success: boolean;
+    results?: ReviewResults;
+    attempts?: number;
+    maxAttemptsReached?: boolean;
+    error?: string;
+  }>;
   getFeatureDiff: (
     projectPath: string,
     featureId: string
@@ -2231,6 +2245,40 @@ function createMockCodeReviewAPI(): CodeReviewAPI {
             },
           ],
         },
+      };
+    },
+    runReviewWithFixes: async (projectPath, featureId, options) => {
+      console.log("[Mock] Running code review with fixes:", { projectPath, featureId, options });
+      // Simulate a review that passes after 1 attempt
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+      return {
+        success: true,
+        results: {
+          overallPass: true,
+          timestamp: new Date().toISOString(),
+          checks: [
+            {
+              name: "typescript",
+              passed: true,
+              duration: 500,
+              issues: [],
+            },
+            {
+              name: "build",
+              passed: true,
+              duration: 300,
+              issues: [],
+            },
+            {
+              name: "patterns",
+              passed: true,
+              duration: 200,
+              issues: [],
+            },
+          ],
+        },
+        attempts: 1,
+        maxAttemptsReached: false,
       };
     },
     getFeatureDiff: async (projectPath, featureId) => {
