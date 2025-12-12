@@ -64,9 +64,9 @@ export async function initializeProject(
       REQUIRED_STRUCTURE.files
     )) {
       const fullPath = `${projectPath}/${relativePath}`;
-      const existsResult = await services.fileSystem.exists(fullPath);
+      const fileExists = await services.fileSystem.exists(fullPath);
 
-      if (!existsResult.data) {
+      if (!fileExists) {
         await services.fileSystem.writeFile(fullPath, defaultContent as string);
         createdFiles.push(relativePath);
       } else {
@@ -111,8 +111,8 @@ export async function isProjectInitialized(
     // Check all required directories exist (no files required - features/ folder is source of truth)
     for (const dir of REQUIRED_STRUCTURE.directories) {
       const fullPath = `${projectPath}/${dir}`;
-      const existsResult = await services.fileSystem.exists(fullPath);
-      if (!existsResult.data) {
+      const dirExists = await services.fileSystem.exists(fullPath);
+      if (!dirExists) {
         return false;
       }
     }
@@ -153,8 +153,8 @@ export async function getProjectInitStatus(projectPath: string): Promise<{
     // Check directories (no files required - features/ folder is source of truth)
     for (const dir of REQUIRED_STRUCTURE.directories) {
       const fullPath = `${projectPath}/${dir}`;
-      const existsResult = await services.fileSystem.exists(fullPath);
-      if (existsResult.data) {
+      const dirExists = await services.fileSystem.exists(fullPath);
+      if (dirExists) {
         existingFiles.push(dir);
       } else {
         missingFiles.push(dir);
@@ -189,8 +189,7 @@ export async function hasAppSpec(projectPath: string): Promise<boolean> {
 
   try {
     const fullPath = `${projectPath}/.automaker/app_spec.txt`;
-    const existsResult = await services.fileSystem.exists(fullPath);
-    return existsResult.data || false;
+    return await services.fileSystem.exists(fullPath);
   } catch (error) {
     console.error("[project-init] Error checking app_spec.txt:", error);
     return false;
@@ -210,8 +209,7 @@ export async function hasAutomakerDir(projectPath: string): Promise<boolean> {
 
   try {
     const fullPath = `${projectPath}/.automaker`;
-    const existsResult = await services.fileSystem.exists(fullPath);
-    return existsResult.data || false;
+    return await services.fileSystem.exists(fullPath);
   } catch (error) {
     console.error("[project-init] Error checking .automaker dir:", error);
     return false;

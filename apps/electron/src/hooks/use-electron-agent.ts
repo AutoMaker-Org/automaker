@@ -111,7 +111,6 @@ export function useElectronAgent({
   const {
     queuedMessages,
     isProcessingQueue,
-    addToQueue,
     clearQueue,
     processNext,
   } = useMessageQueue({
@@ -122,8 +121,8 @@ export function useElectronAgent({
 
   // Initialize connection and load history
   useEffect(() => {
+    // Wait for services to be bootstrapped before initializing
     if (!isBootstrapped()) {
-      setError("Services not initialized. Please wait...");
       return;
     }
 

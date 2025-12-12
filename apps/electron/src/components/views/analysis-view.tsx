@@ -229,8 +229,8 @@ export function AnalysisView() {
       // Try to read key configuration files
       for (const keyFile of keyFiles) {
         const filePath = `${currentProject.path}/${keyFile}`;
-        const existsResult = await services.fileSystem.exists(filePath);
-        if (existsResult.success && existsResult.data) {
+        const fileExists = await services.fileSystem.exists(filePath);
+        if (fileExists) {
           const result = await services.fileSystem.readFile(filePath);
           if (result.success && result.data) {
             fileContents[keyFile] = result.data;
@@ -431,8 +431,8 @@ ${Object.entries(projectAnalysis.filesByExtension)
       // Try to read key configuration files
       for (const keyFile of keyFiles) {
         const filePath = `${currentProject.path}/${keyFile}`;
-        const existsResult = await services.fileSystem.exists(filePath);
-        if (existsResult.success && existsResult.data) {
+        const fileExists = await services.fileSystem.exists(filePath);
+        if (fileExists) {
           const result = await services.fileSystem.readFile(filePath);
           if (result.success && result.data) {
             fileContents[keyFile] = result.data;

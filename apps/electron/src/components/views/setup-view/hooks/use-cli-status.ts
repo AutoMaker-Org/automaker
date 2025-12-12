@@ -22,17 +22,19 @@ export function useCliStatus({
       const result = await statusApi();
       console.log(`[${cliType} Setup] Raw status result:`, result);
 
-      if (result.success) {
+      if (result.success && result.data) {
+        // Access data from ServiceResult wrapper
+        const data = result.data;
         const cliStatus = {
-          installed: result.status === "installed",
-          path: result.path || null,
-          version: result.version || null,
-          method: result.method || "none",
+          installed: data.installed || data.status === "installed",
+          path: data.path || null,
+          version: data.version || null,
+          method: data.method || "none",
         };
         console.log(`[${cliType} Setup] CLI Status:`, cliStatus);
         setCliStatus(cliStatus);
 
-        if (result.auth) {
+        if (data.auth) {
           if (cliType === "claude") {
             // Validate method is one of the expected values, default to "none"
             const validMethods = [
@@ -44,21 +46,21 @@ export function useCliStatus({
             ] as const;
             type AuthMethod = (typeof validMethods)[number];
             const method: AuthMethod = validMethods.includes(
-              result.auth.method as AuthMethod
+              data.auth.method as AuthMethod
             )
-              ? (result.auth.method as AuthMethod)
+              ? (data.auth.method as AuthMethod)
               : "none";
             const authStatus = {
-              authenticated: result.auth.authenticated,
+              authenticated: data.auth.authenticated,
               method,
               hasCredentialsFile: false,
               oauthTokenValid:
-                result.auth.hasStoredOAuthToken ||
-                result.auth.hasEnvOAuthToken,
+                data.auth.hasStoredOAuthToken ||
+                data.auth.hasEnvOAuthToken,
               apiKeyValid:
-                result.auth.hasStoredApiKey || result.auth.hasEnvApiKey,
-              hasEnvOAuthToken: result.auth.hasEnvOAuthToken,
-              hasEnvApiKey: result.auth.hasEnvApiKey,
+                data.auth.hasStoredApiKey || data.auth.hasEnvApiKey,
+              hasEnvOAuthToken: data.auth.hasEnvOAuthToken,
+              hasEnvApiKey: data.auth.hasEnvApiKey,
             };
             setAuthStatus(authStatus);
           } else {
@@ -78,14 +80,14 @@ export function useCliStatus({
               }
             };
 
-            const method = mapAuthMethod(result.auth.method);
+            const method = mapAuthMethod(data.auth.method);
             const authStatus = {
-              authenticated: result.auth.authenticated,
+              authenticated: data.auth.authenticated,
               method,
               apiKeyValid:
                 method === "cli_verified" || method === "cli_tokens"
                   ? undefined
-                  : result.auth.authenticated,
+                  : data.auth.authenticated,
             };
             console.log(`[${cliType} Setup] Auth Status:`, authStatus);
             setAuthStatus(authStatus);

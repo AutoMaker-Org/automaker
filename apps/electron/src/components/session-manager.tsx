@@ -147,10 +147,10 @@ export function SessionManager({
 
     // Always load all sessions and filter client-side
     const result = await services.sessions.list(true);
-    if (result.success && result.data?.sessions) {
-      setSessions(result.data.sessions);
+    if (result.success && result.data) {
+      setSessions(result.data);
       // Check running state for all sessions
-      await checkRunningSessions(result.data.sessions);
+      await checkRunningSessions(result.data);
     }
   };
 
