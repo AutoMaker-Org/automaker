@@ -44,7 +44,7 @@ Examples:
 
 ### 3. Read Current Version
 
-- Read `app/package.json` to get the current version (e.g., "0.1.0")
+- Read `apps/electron/package.json` to get the current version (e.g., "0.1.0")
 - Parse the version into major, minor, and patch components
 - Calculate the new version based on the type:
   - **major**: `${major + 1}.0.0` (e.g., 0.1.0 → 1.0.0)

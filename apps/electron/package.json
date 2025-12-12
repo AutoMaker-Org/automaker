@@ -1,0 +1,159 @@
+{
+  "name": "@automaker/electron",
+  "version": "0.1.0",
+  "description": "An autonomous AI development studio that helps you build software faster using AI-powered agents",
+  "homepage": "https://github.com/AutoMaker-Org/automaker",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AutoMaker-Org/automaker.git"
+  },
+  "author": {
+    "name": "Cody Seibert",
+    "email": "webdevcody@gmail.com"
+  },
+  "private": true,
+  "license": "Unlicense",
+  "main": "electron/main.js",
+  "scripts": {
+    "dev": "next dev -p 3007",
+    "dev:web": "next dev -p 3007",
+    "dev:electron": "concurrently \"next dev -p 3007\" \"wait-on http://localhost:3007 && electron .\"",
+    "dev:electron:debug": "concurrently \"next dev -p 3007\" \"wait-on http://localhost:3007 && OPEN_DEVTOOLS=true electron .\"",
+    "build": "next build",
+    "build:electron": "next build && electron-builder",
+    "start": "next start",
+    "lint": "eslint",
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "dev:electron:wsl": "concurrently \"next dev -p 3007\" \"wait-on http://localhost:3007 && electron . --no-sandbox --disable-gpu\"",
+    "dev:electron:wsl:gpu": "concurrently \"next dev -p 3007\" \"wait-on http://localhost:3007 && MESA_D3D12_DEFAULT_ADAPTER_NAME=NVIDIA electron . --no-sandbox --disable-gpu-sandbox\""
+  },
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.1.61",
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
+    "@homebridge/node-pty-prebuilt-multiarch": "^0.13.1",
+    "@radix-ui/react-checkbox": "^1.3.3",
+    "@radix-ui/react-dialog": "^1.1.15",
+    "@radix-ui/react-dropdown-menu": "^2.1.16",
+    "@radix-ui/react-label": "^2.1.8",
+    "@radix-ui/react-popover": "^1.1.15",
+    "@radix-ui/react-slider": "^1.3.6",
+    "@radix-ui/react-slot": "^1.2.4",
+    "@radix-ui/react-tabs": "^1.1.13",
+    "@radix-ui/react-tooltip": "^1.2.8",
+    "@tanstack/react-query": "^5.90.12",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "cmdk": "^1.1.1",
+    "dotenv": "^17.2.3",
+    "geist": "^1.5.1",
+    "lucide-react": "^0.556.0",
+    "next": "16.0.7",
+    "react": "19.2.0",
+    "react-dom": "19.2.0",
+    "react-markdown": "^10.1.0",
+    "sonner": "^2.0.7",
+    "tailwind-merge": "^3.4.0",
+    "zustand": "^5.0.9"
+  },
+  "devDependencies": {
+    "@electron/rebuild": "^4.0.2",
+    "@playwright/test": "^1.57.0",
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "concurrently": "^9.2.1",
+    "electron": "^39.2.6",
+    "electron-builder": "^26.0.12",
+    "eslint": "^9",
+    "eslint-config-next": "16.0.7",
+    "tailwindcss": "^4",
+    "tw-animate-css": "^1.4.0",
+    "typescript": "^5",
+    "wait-on": "^9.0.3"
+  },
+  "build": {
+    "appId": "com.automaker.app",
+    "productName": "Automaker",
+    "artifactName": "${productName}-${version}-${arch}.${ext}",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "electron/**/*",
+      ".next/**/*",
+      "public/**/*",
+      "!node_modules/**/*",
+      "node_modules/@anthropic-ai/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": ".env",
+        "to": ".env",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "mac": {
+      "category": "public.app-category.developer-tools",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ],
+      "icon": "public/logo_larger.png"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "public/logo_larger.png"
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "deb",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "category": "Development",
+      "icon": "public/logo_larger.png",
+      "maintainer": "webdevcody@gmail.com",
+      "executableName": "automaker"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    }
+  }
+}

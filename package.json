@@ -7,18 +7,18 @@
     "libs/*"
   ],
   "scripts": {
-    "dev": "npm run dev --workspace=apps/app",
-    "dev:web": "npm run dev:web --workspace=apps/app",
-    "dev:electron": "npm run dev:electron --workspace=apps/app",
-    "dev:electron:debug": "npm run dev:electron:debug --workspace=apps/app",
-    "dev:electron:wsl": "npm run dev:electron:wsl --workspace=apps/app",
-    "dev:electron:wsl:gpu": "npm run dev:electron:wsl:gpu --workspace=apps/app",
-    "build": "npm run build --workspace=apps/app",
-    "build:electron": "npm run build:electron --workspace=apps/app",
-    "start": "npm run start --workspace=apps/app",
-    "lint": "npm run lint --workspace=apps/app",
-    "test": "npm run test --workspace=apps/app",
-    "test:headed": "npm run test:headed --workspace=apps/app",
+    "dev": "npm run dev --workspace=apps/electron",
+    "dev:web": "npm run dev:web --workspace=apps/electron",
+    "dev:electron": "npm run dev:electron --workspace=apps/electron",
+    "dev:electron:debug": "npm run dev:electron:debug --workspace=apps/electron",
+    "dev:electron:wsl": "npm run dev:electron:wsl --workspace=apps/electron",
+    "dev:electron:wsl:gpu": "npm run dev:electron:wsl:gpu --workspace=apps/electron",
+    "build": "npm run build --workspace=apps/electron",
+    "build:electron": "npm run build:electron --workspace=apps/electron",
+    "start": "npm run start --workspace=apps/electron",
+    "lint": "npm run lint --workspace=apps/electron",
+    "test": "npm run test --workspace=apps/electron",
+    "test:headed": "npm run test:headed --workspace=apps/electron",
     "dev:marketing": "npm run dev --workspace=apps/marketing"
   }
 }

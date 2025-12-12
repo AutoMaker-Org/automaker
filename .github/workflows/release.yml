@@ -68,12 +68,12 @@ jobs:
         with:
           tag_name: ${{ github.event.inputs.version || github.ref_name }}
           files: |
-            apps/app/dist/*.exe
-            apps/app/dist/*.dmg
-            apps/app/dist/*.AppImage
-            apps/app/dist/*.zip
-            apps/app/dist/*.deb
-            apps/app/dist/*.rpm
+            apps/electron/dist/*.exe
+            apps/electron/dist/*.dmg
+            apps/electron/dist/*.AppImage
+            apps/electron/dist/*.zip
+            apps/electron/dist/*.deb
+            apps/electron/dist/*.rpm
           draft: false
           prerelease: false
         env:

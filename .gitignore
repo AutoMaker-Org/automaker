@@ -7,3 +7,5 @@ node_modules/
 # Build outputs
 dist/
 .next/
+
+plan/
