@@ -42,7 +42,8 @@ export function resolveModelString(
   }
 
   // OpenAI/Codex models - pass through unchanged
-  if (modelKey.startsWith("gpt-") || modelKey.startsWith("o")) {
+  // Only check for gpt-* models (Codex CLI doesn't support o1/o3)
+  if (modelKey.startsWith("gpt-")) {
     console.log(`[ModelResolver] Using OpenAI/Codex model: ${modelKey}`);
     return modelKey;
   }

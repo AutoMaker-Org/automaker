@@ -21,8 +21,9 @@ export class ProviderFactory {
   static getProviderForModel(modelId: string): BaseProvider {
     const lowerModel = modelId.toLowerCase();
 
-    // OpenAI/Codex models (gpt-*, o1, o3, etc.)
-    if (lowerModel.startsWith("gpt-") || lowerModel.startsWith("o")) {
+    // OpenAI/Codex models (gpt-*)
+    // Note: o1/o3 models are not supported by Codex CLI
+    if (lowerModel.startsWith("gpt-")) {
       return new CodexProvider();
     }
 
