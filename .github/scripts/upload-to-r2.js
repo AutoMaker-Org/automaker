@@ -65,6 +65,69 @@ function findArtifacts(dir, pattern) {
   return files.filter((f) => pattern.test(f)).map((f) => path.join(dir, f));
 }
 
+async function checkUrlAccessible(url, maxRetries = 10, initialDelay = 1000) {
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      const isAccessible = await new Promise((resolve, reject) => {
+        const request = https.get(url, { timeout: 10000 }, (response) => {
+          // Follow redirects immediately (no retry needed for redirects)
+          if (response.statusCode === 302 || response.statusCode === 301) {
+            response.destroy();
+            const redirectUrl = response.headers.location;
+            // Recursively check the redirect URL, but only once (no retries)
+            return https
+              .get(redirectUrl, { timeout: 10000 }, (redirectResponse) => {
+                const isGood =
+                  redirectResponse.statusCode >= 200 &&
+                  redirectResponse.statusCode < 300;
+                redirectResponse.destroy();
+                resolve(isGood);
+              })
+              .on("error", () => resolve(false))
+              .on("timeout", function () {
+                this.destroy();
+                resolve(false);
+              });
+          }
+          // Check if status is good (200-299 range)
+          const isGood =
+            response.statusCode >= 200 && response.statusCode < 300;
+          response.destroy();
+          resolve(isGood);
+        });
+        request.on("error", (error) => {
+          resolve(false);
+        });
+        request.on("timeout", () => {
+          request.destroy();
+          resolve(false);
+        });
+      });
+
+      if (isAccessible) {
+        if (attempt > 0) {
+          console.log(`URL ${url} is now accessible after ${attempt} retries`);
+        }
+        return true;
+      }
+    } catch (error) {
+      // Continue to retry
+    }
+
+    if (attempt < maxRetries - 1) {
+      const delay = initialDelay * Math.pow(2, attempt);
+      console.log(
+        `URL ${url} not accessible yet (attempt ${
+          attempt + 1
+        }/${maxRetries}), retrying in ${delay}ms...`
+      );
+      await new Promise((resolve) => setTimeout(resolve, delay));
+    }
+  }
+
+  throw new Error(`URL ${url} is not accessible after ${maxRetries} attempts`);
+}
+
 async function downloadFromGitHub(url, outputPath) {
   return new Promise((resolve, reject) => {
     https
@@ -111,10 +174,15 @@ async function main() {
   const sourceZipPath = path.join(tempDir, `automaker-${VERSION}.zip`);
   const sourceTarGzPath = path.join(tempDir, `automaker-${VERSION}.tar.gz`);
 
-  console.log(`Downloading source archives from GitHub...`);
+  console.log(`Waiting for source archives to be available on GitHub...`);
   console.log(`  ZIP: ${githubZipUrl}`);
   console.log(`  TAR.GZ: ${githubTarGzUrl}`);
 
+  // Wait for archives to be accessible with exponential backoff
+  await checkUrlAccessible(githubZipUrl);
+  await checkUrlAccessible(githubTarGzUrl);
+
+  console.log(`Downloading source archives from GitHub...`);
   await downloadFromGitHub(githubZipUrl, sourceZipPath);
   await downloadFromGitHub(githubTarGzUrl, sourceTarGzPath);
 
