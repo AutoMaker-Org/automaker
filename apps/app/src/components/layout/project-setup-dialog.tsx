@@ -39,6 +39,7 @@ export function ProjectSetupDialog({
     <Dialog
       open={open}
       onOpenChange={(open) => {
+        onOpenChange(open);
         if (!open && !isCreatingSpec) {
           onSkip();
         }

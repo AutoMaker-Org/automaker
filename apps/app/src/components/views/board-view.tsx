@@ -114,9 +114,21 @@ type ColumnId = Feature["status"];
 
 const COLUMNS: { id: ColumnId; title: string; colorClass: string }[] = [
   { id: "backlog", title: "Backlog", colorClass: "bg-[var(--status-backlog)]" },
-  { id: "in_progress", title: "In Progress", colorClass: "bg-[var(--status-in-progress)]" },
-  { id: "waiting_approval", title: "Waiting Approval", colorClass: "bg-[var(--status-waiting)]" },
-  { id: "verified", title: "Verified", colorClass: "bg-[var(--status-success)]" },
+  {
+    id: "in_progress",
+    title: "In Progress",
+    colorClass: "bg-[var(--status-in-progress)]",
+  },
+  {
+    id: "waiting_approval",
+    title: "Waiting Approval",
+    colorClass: "bg-[var(--status-waiting)]",
+  },
+  {
+    id: "verified",
+    title: "Verified",
+    colorClass: "bg-[var(--status-success)]",
+  },
 ];
 
 type ModelOption = {
@@ -2238,10 +2250,12 @@ export function BoardView() {
                   })}
                 </div>
 
-                <DragOverlay dropAnimation={{
-                  duration: 200,
-                  easing: 'cubic-bezier(0.18, 0.67, 0.6, 1.22)',
-                }}>
+                <DragOverlay
+                  dropAnimation={{
+                    duration: 200,
+                    easing: "cubic-bezier(0.18, 0.67, 0.6, 1.22)",
+                  }}
+                >
                   {activeFeature && (
                     <Card className="w-72 rotate-2 shadow-2xl shadow-black/25 border-primary/50 bg-card/95 backdrop-blur-sm transition-transform">
                       <CardHeader className="p-3">
