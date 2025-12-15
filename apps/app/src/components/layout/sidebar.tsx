@@ -195,6 +195,32 @@ const PROJECT_THEME_OPTIONS = [
   })),
 ] as const;
 
+// Reusable Bug Report Button Component
+const BugReportButton = ({
+  sidebarExpanded,
+  onClick
+}: {
+  sidebarExpanded: boolean;
+  onClick: () => void;
+}) => {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        "titlebar-no-drag p-1.5 rounded-lg",
+        "text-muted-foreground hover:text-foreground hover:bg-accent/80",
+        "transition-all duration-200 ease-out",
+        "hover:scale-105 active:scale-95",
+        sidebarExpanded && "absolute right-3"
+      )}
+      title="Report Bug / Feature Request"
+      data-testid={sidebarExpanded ? "bug-report-link" : "bug-report-link-collapsed"}
+    >
+      <Bug className="w-4 h-4" />
+    </button>
+  );
+};
+
 export function Sidebar() {
   const {
     projects,
@@ -836,6 +862,12 @@ export function Sidebar() {
     [trashedProjects, currentProject, globalTheme, upsertAndSetCurrentProject]
   );
 
+  // Handle bug report button click
+  const handleBugReportClick = useCallback(() => {
+    const api = getElectronAPI();
+    api.openExternalLink("https://github.com/AutoMaker-Org/automaker/issues");
+  }, []);
+
   /**
    * Opens the system folder selection dialog and initializes the selected project.
    * Used by both the 'O' keyboard shortcut and the folder icon button.
@@ -1394,50 +1426,14 @@ export function Sidebar() {
               </div>
             )}
           </div>
-          {/* Bug Report Button - Only visible in expanded sidebar */}
-          {sidebarOpen && (
-            <button
-              onClick={() => {
-                const api = getElectronAPI();
-                api.openExternalLink(
-                  "https://github.com/AutoMaker-Org/automaker/issues"
-                );
-              }}
-              className={cn(
-                "titlebar-no-drag p-1.5 rounded-lg absolute right-3",
-                "text-muted-foreground hover:text-foreground hover:bg-accent/80",
-                "transition-all duration-200 ease-out",
-                "hover:scale-105 active:scale-95"
-              )}
-              title="Report Bug / Feature Request"
-              data-testid="bug-report-link"
-            >
-              <Bug className="w-4 h-4" />
-            </button>
-          )}
+          {/* Bug Report Button - Inside logo container when expanded */}
+          {sidebarOpen && <BugReportButton sidebarExpanded onClick={handleBugReportClick} />}
         </div>
 
         {/* Bug Report Button - Collapsed sidebar version */}
         {!sidebarOpen && (
-          <div className="flex items-center justify-center px-3 py-2.5">
-            <button
-              onClick={() => {
-                const api = getElectronAPI();
-                api.openExternalLink(
-                  "https://github.com/AutoMaker-Org/automaker/issues"
-                );
-              }}
-              className={cn(
-                "titlebar-no-drag p-1.5 rounded-lg",
-                "text-muted-foreground hover:text-foreground hover:bg-accent/80",
-                "transition-all duration-200 ease-out",
-                "hover:scale-105 active:scale-95"
-              )}
-              title="Report Bug / Feature Request"
-              data-testid="bug-report-link-collapsed"
-            >
-              <Bug className="w-4 h-4" />
-            </button>
+          <div className="px-3 mt-1.5 flex justify-center">
+            <BugReportButton sidebarExpanded={false} onClick={handleBugReportClick} />
           </div>
         )}
 
@@ -1815,7 +1811,7 @@ export function Sidebar() {
         )}
 
         {/* Nav Items - Scrollable */}
-        <nav className="flex-1 overflow-y-auto px-3 mt-5 pb-2">
+        <nav className={cn("flex-1 overflow-y-auto px-3 pb-2", sidebarOpen ? "mt-5" : "mt-1.5")}>
           {!currentProject && sidebarOpen ? (
             // Placeholder when no project is selected (only in expanded state)
             <div className="flex items-center justify-center h-full px-4">
@@ -1828,7 +1824,7 @@ export function Sidebar() {
           ) : currentProject ? (
             // Navigation sections when project is selected
             navSections.map((section, sectionIdx) => (
-              <div key={sectionIdx} className={sectionIdx > 0 ? "mt-6" : ""}>
+              <div key={sectionIdx} className={sectionIdx > 0 && sidebarOpen ? "mt-6" : ""}>
                 {/* Section Label */}
                 {section.label && sidebarOpen && (
                   <div className="hidden lg:block px-3 mb-2">
@@ -1838,7 +1834,7 @@ export function Sidebar() {
                   </div>
                 )}
                 {section.label && !sidebarOpen && (
-                  <div className="h-px bg-border/30 mx-2 mb-3"></div>
+                  <div className="h-px bg-border/30 mx-2 my-1.5"></div>
                 )}
 
                 {/* Nav Items */}
