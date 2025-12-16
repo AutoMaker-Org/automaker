@@ -17,6 +17,10 @@ out/
 /.automaker/*
 /.automaker/
 
+# Automaker Backups (excluded from version control)
+.automaker-backups/
+/.automaker-backups/
+
 /logs
 
 # Logs

@@ -22,6 +22,12 @@ import type {
   SpecRegenerationEvent,
   FeatureSuggestion,
   SuggestionType,
+  BackupAPI,
+  BackupTrigger,
+  BackupMetadata,
+  BackupStats,
+  BackupHealth,
+  BackupConfig,
 } from "./electron";
 import type { Message, SessionListItem } from "@/types/electron";
 import type { Feature } from "@/store/app-store";
@@ -42,6 +48,7 @@ const getServerUrl = (): string => {
   return "http://localhost:3008";
 };
 
+
 // Get API key from environment variable
 const getApiKey = (): string | null => {
   if (typeof window !== "undefined") {
@@ -49,6 +56,7 @@ const getApiKey = (): string | null => {
   }
   return null;
 };
+
 
 type EventType =
   | "agent:stream"
@@ -102,6 +110,7 @@ export class HttpApiClient implements ElectronAPI {
         }
       };
 
+
       this.ws.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
@@ -117,6 +126,7 @@ export class HttpApiClient implements ElectronAPI {
         }
       };
 
+
       this.ws.onclose = () => {
         console.log("[HttpApiClient] WebSocket disconnected");
         this.isConnecting = false;
@@ -130,10 +140,12 @@ export class HttpApiClient implements ElectronAPI {
         }
       };
 
+
       this.ws.onerror = (error) => {
         console.error("[HttpApiClient] WebSocket error:", error);
         this.isConnecting = false;
       };
+
     } catch (error) {
       console.error("[HttpApiClient] Failed to create WebSocket:", error);
       this.isConnecting = false;
@@ -158,12 +170,14 @@ export class HttpApiClient implements ElectronAPI {
         callbacks.delete(callback);
       }
     };
+
   }
 
   private getHeaders(): Record<string, string> {
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
     };
+
     const apiKey = getApiKey();
     if (apiKey) {
       headers["X-API-Key"] = apiKey;
@@ -215,6 +229,7 @@ export class HttpApiClient implements ElectronAPI {
     // Open in new tab
     window.open(url, "_blank", "noopener,noreferrer");
     return { success: true };
+
   }
 
   // File picker - uses server-side file browser dialog
@@ -224,12 +239,14 @@ export class HttpApiClient implements ElectronAPI {
     if (!fileBrowser) {
       console.error("File browser not initialized");
       return { canceled: true, filePaths: [] };
+
     }
 
     const path = await fileBrowser();
 
     if (!path) {
       return { canceled: true, filePaths: [] };
+
     }
 
     // Validate with server
@@ -241,10 +258,12 @@ export class HttpApiClient implements ElectronAPI {
 
     if (result.success && result.path) {
       return { canceled: false, filePaths: [result.path] };
+
     }
 
     console.error("Invalid directory:", result.error);
     return { canceled: true, filePaths: [] };
+
   }
 
   async openFile(options?: object): Promise<DialogResult> {
@@ -253,6 +272,7 @@ export class HttpApiClient implements ElectronAPI {
     if (!fileBrowser) {
       console.error("File browser not initialized");
       return { canceled: true, filePaths: [] };
+
     }
 
     // For now, use the same directory browser (could be enhanced for file selection)
@@ -260,6 +280,7 @@ export class HttpApiClient implements ElectronAPI {
 
     if (!path) {
       return { canceled: true, filePaths: [] };
+
     }
 
     const result = await this.post<{ success: boolean; exists: boolean }>(
@@ -269,10 +290,12 @@ export class HttpApiClient implements ElectronAPI {
 
     if (result.success && result.exists) {
       return { canceled: false, filePaths: [path] };
+
     }
 
     console.error("File not found");
     return { canceled: true, filePaths: [] };
+
   }
 
   // File system operations
@@ -372,6 +395,7 @@ export class HttpApiClient implements ElectronAPI {
       linux?: string;
       npm?: string;
     };
+
     error?: string;
   }> {
     return this.get("/api/setup/claude-status");
@@ -395,6 +419,7 @@ export class HttpApiClient implements ElectronAPI {
     },
   };
 
+
   // Setup API
   setup = {
     getClaudeStatus: (): Promise<{
@@ -416,6 +441,7 @@ export class HttpApiClient implements ElectronAPI {
         hasCliAuth?: boolean;
         hasRecentActivity?: boolean;
       };
+
       error?: string;
     }> => this.get("/api/setup/claude-status"),
 
@@ -483,6 +509,7 @@ export class HttpApiClient implements ElectronAPI {
     },
   };
 
+
   // Features API
   features: FeaturesAPI = {
     getAll: (projectPath: string) =>
@@ -501,6 +528,7 @@ export class HttpApiClient implements ElectronAPI {
     getAgentOutput: (projectPath: string, featureId: string) =>
       this.post("/api/features/agent-output", { projectPath, featureId }),
   };
+
 
   // Auto Mode API
   autoMode: AutoModeAPI = {
@@ -552,6 +580,7 @@ export class HttpApiClient implements ElectronAPI {
     },
   };
 
+
   // Enhance Prompt API
   enhancePrompt = {
     enhance: (
@@ -565,6 +594,7 @@ export class HttpApiClient implements ElectronAPI {
         model,
       }),
   };
+
 
   // Worktree API
   worktree: WorktreeAPI = {
@@ -588,6 +618,7 @@ export class HttpApiClient implements ElectronAPI {
       }),
   };
 
+
   // Git API
   git: GitAPI = {
     getDiffs: (projectPath: string) =>
@@ -595,6 +626,7 @@ export class HttpApiClient implements ElectronAPI {
     getFileDiff: (projectPath: string, filePath: string) =>
       this.post("/api/git/file-diff", { projectPath, filePath }),
   };
+
 
   // Suggestions API
   suggestions: SuggestionsAPI = {
@@ -609,6 +641,7 @@ export class HttpApiClient implements ElectronAPI {
       );
     },
   };
+
 
   // Spec Regeneration API
   specRegeneration: SpecRegenerationAPI = {
@@ -652,6 +685,7 @@ export class HttpApiClient implements ElectronAPI {
     },
   };
 
+
   // Running Agents API
   runningAgents = {
     getAll: (): Promise<{
@@ -668,6 +702,7 @@ export class HttpApiClient implements ElectronAPI {
     }> => this.get("/api/running-agents"),
   };
 
+
   // Workspace API
   workspace = {
     getConfig: (): Promise<{
@@ -683,6 +718,7 @@ export class HttpApiClient implements ElectronAPI {
       error?: string;
     }> => this.get("/api/workspace/directories"),
   };
+
 
   // Agent API
   agent = {
@@ -728,6 +764,7 @@ export class HttpApiClient implements ElectronAPI {
     },
   };
 
+
   // Templates API
   templates = {
     clone: (
@@ -742,6 +779,7 @@ export class HttpApiClient implements ElectronAPI {
     }> =>
       this.post("/api/templates/clone", { repoUrl, projectName, parentDir }),
   };
+
 
   // Sessions API
   sessions = {
@@ -767,6 +805,7 @@ export class HttpApiClient implements ElectronAPI {
         createdAt: string;
         updatedAt: string;
       };
+
       error?: string;
     }> => this.post("/api/sessions", { name, projectPath, workingDirectory }),
 
@@ -792,8 +831,37 @@ export class HttpApiClient implements ElectronAPI {
     ): Promise<{ success: boolean; error?: string }> =>
       this.httpDelete(`/api/sessions/${sessionId}`),
   };
-}
 
+  backup: BackupAPI = {
+    create: (projectPath: string, trigger: BackupTrigger = "manual") =>
+      this.post("/api/backup/create", { projectPath, trigger }),
+
+    list: (projectPath: string) =>
+      this.post("/api/backup/list", { projectPath }),
+
+    restore: (projectPath: string, backupId?: string) =>
+      this.post("/api/backup/restore", { projectPath, backupId }),
+
+    delete: (projectPath: string, backupId: string) =>
+      this.post("/api/backup/delete", { projectPath, backupId }),
+
+    validate: (projectPath: string, backupId: string) =>
+      this.post("/api/backup/validate", { projectPath, backupId }),
+
+    stats: (projectPath: string) =>
+      this.post("/api/backup/stats", { projectPath }),
+
+    checkHealth: (projectPath: string) =>
+      this.post("/api/backup/check-health", { projectPath }),
+
+    getConfig: () =>
+      this.get("/api/backup/config"),
+
+    updateConfig: (projectPath: string, config: Partial<BackupConfig & { retentionCount?: number }>) =>
+      this.post("/api/backup/config", { projectPath, ...config }),
+  };
+
+}
 // Singleton instance
 let httpApiClientInstance: HttpApiClient | null = null;
 

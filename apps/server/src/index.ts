@@ -41,6 +41,9 @@ import { AgentService } from "./services/agent-service.js";
 import { FeatureLoader } from "./services/feature-loader.js";
 import { AutoModeService } from "./services/auto-mode-service.js";
 import { getTerminalService } from "./services/terminal-service.js";
+import { BackupService } from "./services/backup-service.js";
+import { GitWatcherService } from "./services/git-watcher-service.js";
+import { createBackupRoutes } from "./routes/backup/index.js";
 import { createSpecRegenerationRoutes } from "./routes/app-spec/index.js";
 
 // Load environment variables
@@ -108,6 +111,8 @@ const events: EventEmitter = createEventEmitter();
 const agentService = new AgentService(DATA_DIR, events);
 const featureLoader = new FeatureLoader();
 const autoModeService = new AutoModeService(events);
+const backupService = new BackupService();
+const gitWatcher = new GitWatcherService(backupService, events);
 
 // Initialize services
 (async () => {
@@ -137,6 +142,7 @@ app.use("/api/running-agents", createRunningAgentsRoutes(autoModeService));
 app.use("/api/workspace", createWorkspaceRoutes());
 app.use("/api/templates", createTemplatesRoutes());
 app.use("/api/terminal", createTerminalRoutes());
+app.use("/api/backup", createBackupRoutes({ backupService, gitWatcher }));
 
 // Create HTTP server
 const server = createServer(app);

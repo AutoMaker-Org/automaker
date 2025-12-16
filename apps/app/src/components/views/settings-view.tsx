@@ -16,6 +16,7 @@ import { AppearanceSection } from "./settings-view/appearance/appearance-section
 import { AudioSection } from "./settings-view/audio/audio-section";
 import { KeyboardShortcutsSection } from "./settings-view/keyboard-shortcuts/keyboard-shortcuts-section";
 import { FeatureDefaultsSection } from "./settings-view/feature-defaults/feature-defaults-section";
+import { BackupSection } from "./settings-view/backup/backup-section";
 import { DangerZoneSection } from "./settings-view/danger-zone/danger-zone-section";
 import type {
   Project as SettingsProject,
@@ -122,6 +123,12 @@ export function SettingsView() {
             onShowProfilesOnlyChange={setShowProfilesOnly}
             onDefaultSkipTestsChange={setDefaultSkipTests}
             onUseWorktreesChange={setUseWorktrees}
+          />
+        );
+      case "backup":
+        return (
+          <BackupSection
+            projectPath={currentProject?.path || null}
           />
         );
       case "danger":

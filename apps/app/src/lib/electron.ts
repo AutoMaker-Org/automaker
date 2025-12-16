@@ -88,7 +88,109 @@ export interface RunningAgentsAPI {
   getAll: () => Promise<RunningAgentsResult>;
 }
 
-// Feature Suggestions types
+// Backup types
+export type BackupTrigger =
+  | "manual"
+  | "git-pull"
+  | "git-merge"
+  | "git-checkout"
+  | "git-switch"
+  | "git-rebase"
+  | "scheduled"
+  | "auto-restore";
+
+export interface BackupMetadata {
+  id: string;
+  timestamp: string;
+  projectPath: string;
+  trigger: BackupTrigger;
+  fileCount: number;
+  totalSize: number;
+  checksum: string;
+  valid: boolean;
+}
+
+export interface BackupStats {
+  totalBackups: number;
+  validBackups: number;
+  totalSize: number;
+  oldestBackup: string | null;
+  newestBackup: string | null;
+}
+
+export interface BackupHealth {
+  healthy: boolean;
+  issues: string[];
+  suggestions: string[];
+}
+
+export interface BackupConfig {
+  enabled: boolean;
+  autoRestore: boolean;
+  watchedOperations: string[];
+  preOperationBackup: boolean;
+  postOperationCheck: boolean;
+}
+
+export interface BackupAPI {
+  create: (projectPath: string, trigger?: BackupTrigger) => Promise<{
+    success: boolean;
+    backupId?: string;
+    metadata?: BackupMetadata;
+    error?: string;
+  }>;
+  list: (projectPath: string) => Promise<{
+    success: boolean;
+    backups?: BackupMetadata[];
+    count?: number;
+    error?: string;
+  }>;
+  restore: (projectPath: string, backupId?: string) => Promise<{
+    success: boolean;
+    backupId?: string;
+    filesRestored?: number;
+    error?: string;
+  }>;
+  delete: (projectPath: string, backupId: string) => Promise<{
+    success: boolean;
+    message?: string;
+    error?: string;
+  }>;
+  validate: (projectPath: string, backupId: string) => Promise<{
+    success: boolean;
+    backupId?: string;
+    valid?: boolean;
+    message?: string;
+    error?: string;
+  }>;
+  stats: (projectPath: string) => Promise<{
+    success: boolean;
+    stats?: BackupStats;
+    error?: string;
+  }>;
+  checkHealth: (projectPath: string) => Promise<{
+    success: boolean;
+    health?: BackupHealth;
+    backupStats?: {
+      availableBackups: number;
+      validBackups: number;
+      newestBackup: string | null;
+    };
+    error?: string;
+  }>;
+  getConfig: () => Promise<{
+    success: boolean;
+    config?: BackupConfig;
+    error?: string;
+  }>;
+  updateConfig: (projectPath: string, config: Partial<BackupConfig & { retentionCount?: number }>) => Promise<{
+    success: boolean;
+    config?: BackupConfig;
+    message?: string;
+    error?: string;
+  }>;
+}
+
 export interface FeatureSuggestion {
   id: string;
   category: string;
