@@ -72,7 +72,7 @@ export function BoardHeader({
                 data-testid="stop-auto-mode"
               >
                 <StopCircle className="w-4 h-4 mr-2" />
-                Stop Auto Mode
+                Stop Auto Plus
               </Button>
             ) : (
               <Button
@@ -82,7 +82,7 @@ export function BoardHeader({
                 data-testid="start-auto-mode"
               >
                 <Play className="w-4 h-4 mr-2" />
-                Auto Mode
+                Auto Plus
               </Button>
             )}
           </>
