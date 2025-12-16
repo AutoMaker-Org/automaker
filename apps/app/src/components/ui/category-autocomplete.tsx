@@ -39,11 +39,33 @@ export function CategoryAutocomplete({
   "data-testid": testId,
 }: CategoryAutocompleteProps) {
   const [open, setOpen] = React.useState(false);
+  const [triggerWidth, setTriggerWidth] = React.useState<number>(0);
+  const triggerRef = React.useRef<HTMLButtonElement>(null);
+
+  // Update trigger width when component mounts or value changes
+  React.useEffect(() => {
+    if (triggerRef.current) {
+      const updateWidth = () => {
+        setTriggerWidth(triggerRef.current?.offsetWidth || 0);
+      };
+
+      updateWidth();
+
+      // Listen for resize events to handle responsive behavior
+      const resizeObserver = new ResizeObserver(updateWidth);
+      resizeObserver.observe(triggerRef.current);
+
+      return () => {
+        resizeObserver.disconnect();
+      };
+    }
+  }, [value]);
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button
+          ref={triggerRef}
           variant="outline"
           role="combobox"
           aria-expanded={open}
@@ -57,7 +79,12 @@ export function CategoryAutocomplete({
           <ChevronsUpDown className="opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[200px] p-0">
+      <PopoverContent
+        className="p-0"
+        style={{
+          width: Math.max(triggerWidth, 200),
+        }}
+      >
         <Command>
           <CommandInput placeholder="Search category..." className="h-9" />
           <CommandList>

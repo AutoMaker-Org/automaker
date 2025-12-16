@@ -273,7 +273,7 @@ export function AddFeatureDialog({
             <div className="flex w-fit items-center gap-3 select-none cursor-default">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" className="w-[180px] justify-between">
+                  <Button variant="outline" size="sm" className="w-[200px] justify-between">
                     {enhancementMode === 'improve' && 'Improve Clarity'}
                     {enhancementMode === 'technical' && 'Add Technical Details'}
                     {enhancementMode === 'simplify' && 'Simplify'}

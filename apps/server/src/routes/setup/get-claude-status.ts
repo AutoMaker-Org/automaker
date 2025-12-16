@@ -17,12 +17,15 @@ export async function getClaudeStatus() {
   let cliPath = "";
   let method = "none";
 
-  // Try to find Claude CLI
+  const isWindows = process.platform === "win32";
+
+  // Try to find Claude CLI using platform-specific command
   try {
-    const { stdout } = await execAsync(
-      "which claude || where claude 2>/dev/null"
-    );
-    cliPath = stdout.trim();
+    // Use 'where' on Windows, 'which' on Unix-like systems
+    const findCommand = isWindows ? "where claude" : "which claude";
+    const { stdout } = await execAsync(findCommand);
+    // 'where' on Windows can return multiple paths - take the first one
+    cliPath = stdout.trim().split(/\r?\n/)[0];
     installed = true;
     method = "path";
 
@@ -34,13 +37,26 @@ export async function getClaudeStatus() {
       // Version command might not be available
     }
   } catch {
-    // Not in PATH, try common locations
-    const commonPaths = [
-      path.join(os.homedir(), ".local", "bin", "claude"),
-      path.join(os.homedir(), ".claude", "local", "claude"),
-      "/usr/local/bin/claude",
-      path.join(os.homedir(), ".npm-global", "bin", "claude"),
-    ];
+    // Not in PATH, try common locations based on platform
+    const commonPaths = isWindows
+      ? (() => {
+          const appData = process.env.APPDATA || path.join(os.homedir(), "AppData", "Roaming");
+          return [
+            // Windows-specific paths
+            path.join(os.homedir(), ".local", "bin", "claude.exe"),
+            path.join(appData, "npm", "claude.cmd"),
+            path.join(appData, "npm", "claude"),
+            path.join(appData, ".npm-global", "bin", "claude.cmd"),
+            path.join(appData, ".npm-global", "bin", "claude"),
+          ];
+        })()
+      : [
+          // Unix (Linux/macOS) paths
+          path.join(os.homedir(), ".local", "bin", "claude"),
+          path.join(os.homedir(), ".claude", "local", "claude"),
+          "/usr/local/bin/claude",
+          path.join(os.homedir(), ".npm-global", "bin", "claude"),
+        ];
 
     for (const p of commonPaths) {
       try {
@@ -124,26 +140,34 @@ export async function getClaudeStatus() {
     // Settings file doesn't exist
   }
 
-  // Check for credentials file (OAuth tokens from claude login) - legacy/alternative auth
-  const credentialsPath = path.join(claudeDir, "credentials.json");
-  try {
-    const credentialsContent = await fs.readFile(credentialsPath, "utf-8");
-    const credentials = JSON.parse(credentialsContent);
-    auth.hasCredentialsFile = true;
+  // Check for credentials file (OAuth tokens from claude login)
+  // Note: Claude CLI may use ".credentials.json" (hidden) or "credentials.json" depending on version/platform
+  const credentialsPaths = [
+    path.join(claudeDir, ".credentials.json"),
+    path.join(claudeDir, "credentials.json"),
+  ];
 
-    // Check what type of token is in credentials
-    if (credentials.oauth_token || credentials.access_token) {
-      auth.hasStoredOAuthToken = true;
-      auth.oauthTokenValid = true;
-      auth.authenticated = true;
-      auth.method = "oauth_token"; // Stored OAuth token from credentials file
-    } else if (credentials.api_key) {
-      auth.apiKeyValid = true;
-      auth.authenticated = true;
-      auth.method = "api_key"; // Stored API key in credentials file
+  for (const credentialsPath of credentialsPaths) {
+    try {
+      const credentialsContent = await fs.readFile(credentialsPath, "utf-8");
+      const credentials = JSON.parse(credentialsContent);
+      auth.hasCredentialsFile = true;
+
+      // Check what type of token is in credentials
+      if (credentials.oauth_token || credentials.access_token) {
+        auth.hasStoredOAuthToken = true;
+        auth.oauthTokenValid = true;
+        auth.authenticated = true;
+        auth.method = "oauth_token"; // Stored OAuth token from credentials file
+      } else if (credentials.api_key) {
+        auth.apiKeyValid = true;
+        auth.authenticated = true;
+        auth.method = "api_key"; // Stored API key in credentials file
+      }
+      break; // Found and processed credentials file
+    } catch {
+      // No credentials file at this path or invalid format
     }
-  } catch {
-    // No credentials file or invalid format
   }
 
   // Environment variables override stored credentials (higher priority)
