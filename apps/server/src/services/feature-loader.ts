@@ -6,14 +6,24 @@
 import path from "path";
 import fs from "fs/promises";
 
+// Prompt history entry - tracks each prompt sent to the agent
+export interface FeaturePromptEntry {
+  prompt: string; // The prompt text
+  timestamp: string; // ISO timestamp when the prompt was sent
+  type: "initial" | "follow_up"; // Whether this was the initial prompt or a follow-up
+}
+
 export interface Feature {
   id: string;
   category: string;
   description: string;
+  title?: string; // AI-generated short title from the prompt (generated when task starts)
   steps?: string[];
   passes?: boolean;
   priority?: number;
   imagePaths?: Array<string | { path: string; [key: string]: unknown }>;
+  promptHistory?: FeaturePromptEntry[]; // History of all prompts sent for this feature
+  updatedAt?: string; // ISO timestamp for when the feature was last updated
   [key: string]: unknown;
 }
 

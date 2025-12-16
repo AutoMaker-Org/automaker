@@ -20,6 +20,8 @@ import { buildPromptWithImages } from "../lib/prompt-builder.js";
 import { resolveModelString, DEFAULT_MODELS } from "../lib/model-resolver.js";
 import { createAutoModeOptions } from "../lib/sdk-options.js";
 import { isAbortError, classifyError } from "../lib/error-handler.js";
+import { generateTitleFromPrompt } from "./title-generator.js";
+import type { FeaturePromptEntry } from "./feature-loader.js";
 
 const execAsync = promisify(exec);
 
@@ -27,6 +29,7 @@ interface Feature {
   id: string;
   category: string;
   description: string;
+  title?: string; // AI-generated short title from the prompt
   steps?: string[];
   status: string;
   priority?: number;
@@ -41,6 +44,8 @@ interface Feature {
         [key: string]: unknown;
       }
   >;
+  promptHistory?: FeaturePromptEntry[]; // History of all prompts sent for this feature
+  updatedAt?: string; // ISO timestamp for when the feature was last updated
 }
 
 interface RunningFeature {
@@ -232,8 +237,36 @@ export class AutoModeService {
         throw new Error(`Feature ${featureId} not found`);
       }
 
-      // Update feature status to in_progress
-      await this.updateFeatureStatus(projectPath, featureId, "in_progress");
+      // Generate a title from the description if not already set
+      if (!feature.title && feature.description) {
+        console.log(`[AutoMode] Generating title for feature ${featureId}...`);
+        const generatedTitle = await generateTitleFromPrompt(feature.description);
+        if (generatedTitle) {
+          feature.title = generatedTitle;
+          console.log(`[AutoMode] Generated title: "${generatedTitle}"`);
+        }
+      }
+
+      // Track the initial prompt in prompt history
+      const promptEntry: FeaturePromptEntry = {
+        prompt: feature.description,
+        timestamp: new Date().toISOString(),
+        type: "initial",
+      };
+      feature.promptHistory = feature.promptHistory || [];
+      // Only add if this is the first run (no previous entries)
+      if (feature.promptHistory.length === 0) {
+        feature.promptHistory.push(promptEntry);
+      }
+
+      // Update feature status to in_progress and save title + prompt history
+      await this.updateFeatureWithTitleAndPrompt(
+        projectPath,
+        featureId,
+        "in_progress",
+        feature.title,
+        feature.promptHistory
+      );
 
       // Build the prompt
       const prompt = this.buildFeaturePrompt(feature);
@@ -450,8 +483,23 @@ Address the follow-up instructions above. Review the previous work and make the 
         `[AutoMode] Follow-up for feature ${featureId} using model: ${model}`
       );
 
-      // Update feature status to in_progress
-      await this.updateFeatureStatus(projectPath, featureId, "in_progress");
+      // Track the follow-up prompt in prompt history
+      const followUpEntry: FeaturePromptEntry = {
+        prompt: prompt,
+        timestamp: new Date().toISOString(),
+        type: "follow_up",
+      };
+      const currentHistory = feature?.promptHistory || [];
+      const updatedHistory = [...currentHistory, followUpEntry];
+
+      // Update feature status to in_progress and add follow-up prompt to history
+      await this.updateFeatureWithTitleAndPrompt(
+        projectPath,
+        featureId,
+        "in_progress",
+        feature?.title,
+        updatedHistory
+      );
 
       // Copy follow-up images to feature folder
       const copiedImagePaths: string[] = [];
@@ -935,6 +983,54 @@ Format your response as a structured markdown document.`;
       await fs.writeFile(featurePath, JSON.stringify(feature, null, 2));
     } catch {
       // Feature file may not exist
+    }
+  }
+
+  /**
+   * Update feature with title, prompt history, and status
+   * Used when starting a feature to save generated title and track prompts
+   */
+  private async updateFeatureWithTitleAndPrompt(
+    projectPath: string,
+    featureId: string,
+    status: string,
+    title?: string,
+    promptHistory?: FeaturePromptEntry[]
+  ): Promise<void> {
+    const featurePath = path.join(
+      projectPath,
+      ".automaker",
+      "features",
+      featureId,
+      "feature.json"
+    );
+
+    try {
+      const data = await fs.readFile(featurePath, "utf-8");
+      const feature = JSON.parse(data);
+      feature.status = status;
+      feature.updatedAt = new Date().toISOString();
+
+      // Set title if provided
+      if (title) {
+        feature.title = title;
+      }
+
+      // Set prompt history if provided
+      if (promptHistory) {
+        feature.promptHistory = promptHistory;
+      }
+
+      // Handle justFinishedAt timestamp
+      if (status === "waiting_approval") {
+        feature.justFinishedAt = new Date().toISOString();
+      } else {
+        feature.justFinishedAt = undefined;
+      }
+
+      await fs.writeFile(featurePath, JSON.stringify(feature, null, 2));
+    } catch (error) {
+      console.error(`[AutoMode] Failed to update feature ${featureId}:`, error);
     }
   }
 

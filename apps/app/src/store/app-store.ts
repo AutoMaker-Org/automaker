@@ -272,10 +272,18 @@ export interface AIProfile {
   icon?: string; // Optional icon name from lucide
 }
 
+// Prompt history entry - tracks each prompt sent to the agent
+export interface FeaturePromptEntry {
+  prompt: string; // The prompt text
+  timestamp: string; // ISO timestamp when the prompt was sent
+  type: "initial" | "follow_up"; // Whether this was the initial prompt or a follow-up
+}
+
 export interface Feature {
   id: string;
   category: string;
   description: string;
+  title?: string; // AI-generated short title from the prompt (generated when task starts)
   steps: string[];
   status:
     | "backlog"
@@ -296,6 +304,8 @@ export interface Feature {
   worktreePath?: string; // Path to the worktree directory
   branchName?: string; // Name of the feature branch
   justFinishedAt?: string; // ISO timestamp when agent just finished and moved to waiting_approval (shows badge for 2 minutes)
+  promptHistory?: FeaturePromptEntry[]; // History of all prompts sent for this feature
+  updatedAt?: string; // ISO timestamp for when the feature was last updated
 }
 
 // File tree node for project analysis

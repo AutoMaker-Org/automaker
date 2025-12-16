@@ -588,9 +588,9 @@ export const KanbanCard = memo(function KanbanCard({
                 !isDescriptionExpanded && "line-clamp-3"
               )}
             >
-              {feature.description || feature.summary || feature.id}
+              {feature.title || feature.description || feature.summary || feature.id}
             </CardTitle>
-            {(feature.description || feature.summary || "").length > 100 && (
+            {(feature.title || feature.description || feature.summary || "").length > 100 && (
               <button
                 onClick={(e) => {
                   e.stopPropagation();
