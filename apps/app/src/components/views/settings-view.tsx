@@ -8,6 +8,7 @@ import { NAV_ITEMS } from "./settings-view/config/navigation";
 import { SettingsHeader } from "./settings-view/components/settings-header";
 import { KeyboardMapDialog } from "./settings-view/components/keyboard-map-dialog";
 import { DeleteProjectDialog } from "./settings-view/components/delete-project-dialog";
+import { ForgetProjectDialog } from "./settings-view/components/forget-project-dialog";
 import { SettingsNavigation } from "./settings-view/components/settings-navigation";
 import { ApiKeysSection } from "./settings-view/api-keys/api-keys-section";
 import { ClaudeCliStatus } from "./settings-view/cli-status/claude-cli-status";
@@ -38,6 +39,7 @@ export function SettingsView() {
     setMuteDoneSound,
     currentProject,
     moveProjectToTrash,
+    forgetProject,
   } = useAppStore();
 
   // Convert electron Project to settings-view Project type
@@ -77,6 +79,7 @@ export function SettingsView() {
   const { activeView, navigateTo } = useSettingsView();
 
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showForgetDialog, setShowForgetDialog] = useState(false);
   const [showKeyboardMapDialog, setShowKeyboardMapDialog] = useState(false);
 
   // Render the active section based on current view
@@ -129,6 +132,7 @@ export function SettingsView() {
           <DangerZoneSection
             project={settingsProject}
             onDeleteClick={() => setShowDeleteDialog(true)}
+            onForgetClick={() => setShowForgetDialog(true)}
           />
         );
       default:
@@ -156,7 +160,9 @@ export function SettingsView() {
 
         {/* Content Panel - Shows only the active section */}
         <div className="flex-1 overflow-y-auto p-8">
-          <div className="max-w-4xl mx-auto">{renderActiveSection()}</div>
+          <div className="max-w-4xl mx-auto">
+            {renderActiveSection()}
+          </div>
         </div>
       </div>
 
@@ -172,6 +178,14 @@ export function SettingsView() {
         onOpenChange={setShowDeleteDialog}
         project={currentProject}
         onConfirm={moveProjectToTrash}
+      />
+
+      {/* Forget Project Confirmation Dialog */}
+      <ForgetProjectDialog
+        open={showForgetDialog}
+        onOpenChange={setShowForgetDialog}
+        project={currentProject}
+        onConfirm={forgetProject}
       />
     </div>
   );

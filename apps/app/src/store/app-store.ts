@@ -491,6 +491,7 @@ export interface AppActions {
   setProjects: (projects: Project[]) => void;
   addProject: (project: Project) => void;
   removeProject: (projectId: string) => void;
+  forgetProject: (projectId: string) => void; // New: Remove project without moving to trash
   moveProjectToTrash: (projectId: string) => void;
   restoreTrashedProject: (projectId: string) => void;
   deleteTrashedProject: (projectId: string) => void;
@@ -768,6 +769,44 @@ export const useAppStore = create<AppState & AppActions>()(
 
       removeProject: (projectId) => {
         set({ projects: get().projects.filter((p) => p.id !== projectId) });
+      },
+
+      forgetProject: (projectId) => {
+        const project = get().projects.find((p) => p.id === projectId);
+        if (!project) return;
+
+        const isCurrent = get().currentProject?.id === projectId;
+
+        // Remove project from list without adding to trash
+        set({
+          projects: get().projects.filter((p) => p.id !== projectId),
+          currentProject: isCurrent ? null : get().currentProject,
+          currentView: isCurrent ? "welcome" : get().currentView,
+        });
+
+        // Clean up any project-specific data
+        const {
+          projectHistory,
+          boardBackgroundByProject,
+          autoModeByProject,
+          lastSelectedSessionByProject,
+        } = get();
+        const newHistory = projectHistory.filter((id) => id !== projectId);
+        const newBoardBackgrounds = { ...boardBackgroundByProject };
+        const newAutoModeState = { ...autoModeByProject };
+        const newLastSelectedSessions = { ...lastSelectedSessionByProject };
+
+        // Note: boardBackgroundByProject and lastSelectedSessionByProject are keyed by project PATH, not ID
+        delete newBoardBackgrounds[project.path];
+        delete newAutoModeState[projectId]; // autoModeByProject is keyed by project ID
+        delete newLastSelectedSessions[project.path];
+
+        set({
+          projectHistory: newHistory,
+          boardBackgroundByProject: newBoardBackgrounds,
+          autoModeByProject: newAutoModeState,
+          lastSelectedSessionByProject: newLastSelectedSessions,
+        });
       },
 
       moveProjectToTrash: (projectId) => {
