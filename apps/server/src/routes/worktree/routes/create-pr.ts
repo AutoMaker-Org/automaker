@@ -11,13 +11,34 @@ const execAsync = promisify(exec);
 
 // Extended PATH to include common tool installation locations
 // This is needed because Electron apps don't inherit the user's shell PATH
+const pathSeparator = process.platform === "win32" ? ";" : ":";
+const additionalPaths: string[] = [];
+
+if (process.platform === "win32") {
+  // Windows paths
+  if (process.env.LOCALAPPDATA) {
+    additionalPaths.push(`${process.env.LOCALAPPDATA}\\Programs\\Git\\cmd`);
+  }
+  if (process.env.PROGRAMFILES) {
+    additionalPaths.push(`${process.env.PROGRAMFILES}\\Git\\cmd`);
+  }
+  if (process.env["ProgramFiles(x86)"]) {
+    additionalPaths.push(`${process.env["ProgramFiles(x86)"]}\\Git\\cmd`);
+  }
+} else {
+  // Unix/Mac paths
+  additionalPaths.push(
+    "/opt/homebrew/bin",        // Homebrew on Apple Silicon
+    "/usr/local/bin",           // Homebrew on Intel Mac, common Linux location
+    "/home/linuxbrew/.linuxbrew/bin", // Linuxbrew
+    `${process.env.HOME}/.local/bin`, // pipx, other user installs
+  );
+}
+
 const extendedPath = [
   process.env.PATH,
-  "/opt/homebrew/bin",        // Homebrew on Apple Silicon
-  "/usr/local/bin",           // Homebrew on Intel Mac, common Linux location
-  "/home/linuxbrew/.linuxbrew/bin", // Linuxbrew
-  `${process.env.HOME}/.local/bin`, // pipx, other user installs
-].filter(Boolean).join(":");
+  ...additionalPaths.filter(Boolean),
+].filter(Boolean).join(pathSeparator);
 
 const execEnv = {
   ...process.env,
@@ -122,9 +143,12 @@ export function createCreatePRHandler() {
       let browserUrl: string | null = null;
       let ghCliAvailable = false;
 
-      // Check if gh CLI is available
+      // Check if gh CLI is available (cross-platform)
       try {
-        await execAsync("command -v gh", { env: execEnv });
+        const checkCommand = process.platform === "win32" 
+          ? "where gh" 
+          : "command -v gh";
+        await execAsync(checkCommand, { env: execEnv });
         ghCliAvailable = true;
       } catch {
         ghCliAvailable = false;
@@ -141,9 +165,22 @@ export function createCreatePRHandler() {
         });
 
         // Parse remotes to detect fork workflow and get repo URL
-        const lines = remotes.split("\n");
+        const lines = remotes.split(/\r?\n/); // Handle both Unix and Windows line endings
         for (const line of lines) {
-          const match = line.match(/^(\w+)\s+.*[:/]([^/]+)\/([^/\s]+?)(?:\.git)?\s+\(fetch\)/);
+          // Try multiple patterns to match different remote URL formats
+          // Pattern 1: git@github.com:owner/repo.git (fetch)
+          // Pattern 2: https://github.com/owner/repo.git (fetch)
+          // Pattern 3: https://github.com/owner/repo (fetch)
+          let match = line.match(/^(\w+)\s+.*[:/]([^/]+)\/([^/\s]+?)(?:\.git)?\s+\(fetch\)/);
+          if (!match) {
+            // Try SSH format: git@github.com:owner/repo.git
+            match = line.match(/^(\w+)\s+git@[^:]+:([^/]+)\/([^\s]+?)(?:\.git)?\s+\(fetch\)/);
+          }
+          if (!match) {
+            // Try HTTPS format: https://github.com/owner/repo.git
+            match = line.match(/^(\w+)\s+https?:\/\/[^/]+\/([^/]+)\/([^\s]+?)(?:\.git)?\s+\(fetch\)/);
+          }
+          
           if (match) {
             const [, remoteName, owner, repo] = match;
             if (remoteName === "upstream") {
@@ -157,8 +194,30 @@ export function createCreatePRHandler() {
             }
           }
         }
-      } catch {
-        // Couldn't parse remotes
+      } catch (error) {
+        // Couldn't parse remotes - will try fallback
+      }
+
+      // Fallback: Try to get repo URL from git config if remote parsing failed
+      if (!repoUrl) {
+        try {
+          const { stdout: originUrl } = await execAsync("git config --get remote.origin.url", {
+            cwd: worktreePath,
+            env: execEnv,
+          });
+          const url = originUrl.trim();
+          
+          // Parse URL to extract owner/repo
+          // Handle both SSH (git@github.com:owner/repo.git) and HTTPS (https://github.com/owner/repo.git)
+          let match = url.match(/[:/]([^/]+)\/([^/\s]+?)(?:\.git)?$/);
+          if (match) {
+            const [, owner, repo] = match;
+            originOwner = owner;
+            repoUrl = `https://github.com/${owner}/${repo}`;
+          }
+        } catch (error) {
+          // Failed to get repo URL from config
+        }
       }
 
       // Construct browser URL for PR creation
@@ -192,7 +251,6 @@ export function createCreatePRHandler() {
           prCmd += ` --title "${title.replace(/"/g, '\\"')}" --body "${body.replace(/"/g, '\\"')}" ${draftFlag}`;
           prCmd = prCmd.trim();
 
-          console.log("[CreatePR] Running:", prCmd);
           const { stdout: prOutput } = await execAsync(prCmd, {
             cwd: worktreePath,
             env: execEnv,
@@ -202,11 +260,9 @@ export function createCreatePRHandler() {
           // gh CLI failed
           const err = ghError as { stderr?: string; message?: string };
           prError = err.stderr || err.message || "PR creation failed";
-          console.warn("[CreatePR] gh CLI error:", prError);
         }
       } else {
         prError = "gh_cli_not_available";
-        console.log("[CreatePR] gh CLI not available, returning browser URL");
       }
 
       // Return result with browser fallback URL

@@ -53,6 +53,16 @@ export function CreatePRDialog({
   // Reset state when dialog opens or worktree changes
   useEffect(() => {
     if (open) {
+      // Only reset form fields, not the result states (prUrl, browserUrl, showBrowserFallback)
+      // These are set by the API response and should persist until dialog closes
+      setTitle("");
+      setBody("");
+      setCommitMessage("");
+      setBaseBranch("main");
+      setIsDraft(false);
+      setError(null);
+    } else {
+      // Reset everything when dialog closes
       setTitle("");
       setBody("");
       setCommitMessage("");
@@ -98,21 +108,22 @@ export function CreatePRDialog({
           onCreated();
         } else {
           // Branch was pushed successfully
-          toast.success("Branch pushed", {
-            description: result.result.committed
-              ? `Commit ${result.result.commitHash} pushed to ${result.result.branch}`
-              : `Branch ${result.result.branch} pushed`,
-          });
+          const prError = result.result.prError;
+          const hasBrowserUrl = !!result.result.browserUrl;
 
           // Check if we should show browser fallback
-          if (!result.result.prCreated && result.result.browserUrl) {
-            const prError = result.result.prError;
-
+          if (!result.result.prCreated && hasBrowserUrl) {
             // If gh CLI is not available, show browser fallback UI
             if (prError === "gh_cli_not_available" || !result.result.ghCliAvailable) {
               setBrowserUrl(result.result.browserUrl);
               setShowBrowserFallback(true);
-              onCreated();
+              toast.success("Branch pushed", {
+                description: result.result.committed
+                  ? `Commit ${result.result.commitHash} pushed to ${result.result.branch}`
+                  : `Branch ${result.result.branch} pushed`,
+              });
+              // Don't call onCreated() here - we want to keep the dialog open to show the browser URL
+              setIsLoading(false);
               return; // Don't close dialog, show browser fallback UI
             }
 
@@ -135,16 +146,27 @@ export function CreatePRDialog({
                 description: errorMessage,
                 duration: 8000,
               });
-              onCreated();
+              // Don't call onCreated() here - we want to keep the dialog open to show the browser URL
+              setIsLoading(false);
               return;
             }
           }
 
+          // Show success toast for push
+          toast.success("Branch pushed", {
+            description: result.result.committed
+              ? `Commit ${result.result.commitHash} pushed to ${result.result.branch}`
+              : `Branch ${result.result.branch} pushed`,
+          });
+
           // No browser URL available, just close
           if (!result.result.prCreated) {
-            toast.info("PR not created", {
-              description: "GitHub CLI (gh) may not be installed or authenticated",
-            });
+            if (!hasBrowserUrl) {
+              toast.info("PR not created", {
+                description: "Could not determine repository URL. GitHub CLI (gh) may not be installed or authenticated.",
+                duration: 8000,
+              });
+            }
           }
           onCreated();
           onOpenChange(false);
@@ -176,6 +198,8 @@ export function CreatePRDialog({
   };
 
   if (!worktree) return null;
+
+  const shouldShowBrowserFallback = showBrowserFallback && browserUrl;
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -212,7 +236,7 @@ export function CreatePRDialog({
               View Pull Request
             </Button>
           </div>
-        ) : showBrowserFallback && browserUrl ? (
+        ) : shouldShowBrowserFallback ? (
           <div className="py-6 text-center space-y-4">
             <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-blue-500/10">
               <GitPullRequest className="w-8 h-8 text-blue-500" />
@@ -225,17 +249,30 @@ export function CreatePRDialog({
                 Click below to create a pull request in your browser.
               </p>
             </div>
-            <div className="space-y-2">
+            <div className="space-y-3">
               <Button
-                onClick={() => window.open(browserUrl, "_blank")}
+                onClick={() => {
+                  if (browserUrl) {
+                    window.open(browserUrl, "_blank");
+                  }
+                }}
                 className="gap-2 w-full"
+                size="lg"
               >
                 <ExternalLink className="w-4 h-4" />
                 Create PR in Browser
               </Button>
+              <div className="p-2 bg-muted rounded text-xs break-all font-mono">
+                {browserUrl}
+              </div>
               <p className="text-xs text-muted-foreground">
                 Tip: Install the GitHub CLI (<code className="bg-muted px-1 rounded">gh</code>) to create PRs directly from the app
               </p>
+              <DialogFooter className="mt-4">
+                <Button variant="outline" onClick={handleClose}>
+                  Close
+                </Button>
+              </DialogFooter>
             </div>
           </div>
         ) : (
