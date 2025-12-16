@@ -6,6 +6,7 @@ import type { Request, Response } from "express";
 import fs from "fs/promises";
 import path from "path";
 import { getErrorMessage, logError } from "../common.js";
+import { getBoardDir } from "../../../lib/automaker-paths.js";
 
 export function createDeleteBoardBackgroundHandler() {
   return async (req: Request, res: Response): Promise<void> => {
@@ -20,10 +21,11 @@ export function createDeleteBoardBackgroundHandler() {
         return;
       }
 
-      const boardDir = path.join(projectPath, ".automaker", "board");
+      // Get external board directory
+      const boardDir = await getBoardDir(projectPath);
 
       try {
-        // Try to remove all files in the board directory
+        // Try to remove all background files in the board directory
         const files = await fs.readdir(boardDir);
         for (const file of files) {
           if (file.startsWith("background")) {

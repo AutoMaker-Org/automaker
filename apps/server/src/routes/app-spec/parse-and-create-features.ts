@@ -6,6 +6,7 @@ import path from "path";
 import fs from "fs/promises";
 import type { EventEmitter } from "../../lib/events.js";
 import { createLogger } from "../../lib/logger.js";
+import { getFeaturesDir } from "../../lib/automaker-paths.js";
 
 const logger = createLogger("SpecRegeneration");
 
@@ -41,7 +42,7 @@ export async function parseAndCreateFeatures(
     logger.info(`Parsed ${parsed.features?.length || 0} features`);
     logger.info("Parsed features:", JSON.stringify(parsed.features, null, 2));
 
-    const featuresDir = path.join(projectPath, ".automaker", "features");
+    const featuresDir = await getFeaturesDir(projectPath);
     await fs.mkdir(featuresDir, { recursive: true });
 
     const createdFeatures: Array<{ id: string; title: string }> = [];

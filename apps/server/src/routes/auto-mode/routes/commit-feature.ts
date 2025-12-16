@@ -9,9 +9,10 @@ import { getErrorMessage, logError } from "../common.js";
 export function createCommitFeatureHandler(autoModeService: AutoModeService) {
   return async (req: Request, res: Response): Promise<void> => {
     try {
-      const { projectPath, featureId } = req.body as {
+      const { projectPath, featureId, worktreePath } = req.body as {
         projectPath: string;
         featureId: string;
+        worktreePath?: string;
       };
 
       if (!projectPath || !featureId) {
@@ -26,7 +27,8 @@ export function createCommitFeatureHandler(autoModeService: AutoModeService) {
 
       const commitHash = await autoModeService.commitFeature(
         projectPath,
-        featureId
+        featureId,
+        worktreePath
       );
       res.json({ success: true, commitHash });
     } catch (error) {

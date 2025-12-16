@@ -52,8 +52,6 @@ import {
   MoreVertical,
   AlertCircle,
   GitBranch,
-  Undo2,
-  GitMerge,
   ChevronDown,
   ChevronUp,
   Brain,
@@ -103,8 +101,6 @@ interface KanbanCardProps {
   onMoveBackToInProgress?: () => void;
   onFollowUp?: () => void;
   onCommit?: () => void;
-  onRevert?: () => void;
-  onMerge?: () => void;
   onImplement?: () => void;
   onComplete?: () => void;
   hasContext?: boolean;
@@ -130,8 +126,6 @@ export const KanbanCard = memo(function KanbanCard({
   onMoveBackToInProgress,
   onFollowUp,
   onCommit,
-  onRevert,
-  onMerge,
   onImplement,
   onComplete,
   hasContext,
@@ -146,7 +140,6 @@ export const KanbanCard = memo(function KanbanCard({
 }: KanbanCardProps) {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isSummaryDialogOpen, setIsSummaryDialogOpen] = useState(false);
-  const [isRevertDialogOpen, setIsRevertDialogOpen] = useState(false);
   const [agentInfo, setAgentInfo] = useState<AgentTaskInfo | null>(null);
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
   const [currentTime, setCurrentTime] = useState(() => Date.now());
@@ -621,6 +614,16 @@ export const KanbanCard = memo(function KanbanCard({
       </CardHeader>
 
       <CardContent className="p-3 pt-0">
+        {/* Target Branch Display */}
+        {feature.branchName && (
+          <div className="mb-2 flex items-center gap-1.5 text-[11px] text-muted-foreground">
+            <GitBranch className="w-3 h-3 shrink-0" />
+            <span className="font-mono truncate" title={feature.branchName}>
+              {feature.branchName}
+            </span>
+          </div>
+        )}
+
         {/* Steps Preview */}
         {showSteps && feature.steps && feature.steps.length > 0 && (
           <div className="mb-3 space-y-1.5">
@@ -953,30 +956,6 @@ export const KanbanCard = memo(function KanbanCard({
           )}
           {!isCurrentAutoTask && feature.status === "waiting_approval" && (
             <>
-              {hasWorktree && onRevert && (
-                <TooltipProvider delayDuration={300}>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 w-7 p-0 text-[var(--status-error)] hover:text-[var(--status-error)] hover:bg-[var(--status-error-bg)] shrink-0"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setIsRevertDialogOpen(true);
-                        }}
-                        onPointerDown={(e) => e.stopPropagation()}
-                        data-testid={`revert-${feature.id}`}
-                      >
-                        <Undo2 className="w-3.5 h-3.5" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent side="top" className="text-xs">
-                      <p>Revert changes</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              )}
               {/* Refine prompt button */}
               {onFollowUp && (
                 <Button
@@ -994,24 +973,7 @@ export const KanbanCard = memo(function KanbanCard({
                   <span className="truncate">Refine</span>
                 </Button>
               )}
-              {hasWorktree && onMerge && (
-                <Button
-                  variant="default"
-                  size="sm"
-                  className="flex-1 h-7 text-[11px] bg-[var(--status-info)] hover:bg-[var(--status-info)]/90 min-w-0"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onMerge();
-                  }}
-                  onPointerDown={(e) => e.stopPropagation()}
-                  data-testid={`merge-${feature.id}`}
-                  title="Merge changes into main branch"
-                >
-                  <GitMerge className="w-3 h-3 mr-1 shrink-0" />
-                  <span className="truncate">Merge</span>
-                </Button>
-              )}
-              {!hasWorktree && onCommit && (
+              {onCommit && (
                 <Button
                   variant="default"
                   size="sm"
@@ -1121,53 +1083,6 @@ export const KanbanCard = memo(function KanbanCard({
         </DialogContent>
       </Dialog>
 
-      {/* Revert Confirmation Dialog */}
-      <Dialog open={isRevertDialogOpen} onOpenChange={setIsRevertDialogOpen}>
-        <DialogContent data-testid="revert-confirmation-dialog">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-[var(--status-error)]">
-              <Undo2 className="w-5 h-5" />
-              Revert Changes
-            </DialogTitle>
-            <DialogDescription>
-              This will discard all changes made by the agent and move the
-              feature back to the backlog.
-              {feature.branchName && (
-                <span className="block mt-2 font-medium">
-                  Branch{" "}
-                  <code className="bg-muted px-1.5 py-0.5 rounded text-[11px]">
-                    {feature.branchName}
-                  </code>{" "}
-                  will be deleted.
-                </span>
-              )}
-              <span className="block mt-2 text-[var(--status-error)] font-medium">
-                This action cannot be undone.
-              </span>
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
-              variant="ghost"
-              onClick={() => setIsRevertDialogOpen(false)}
-              data-testid="cancel-revert-button"
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={() => {
-                setIsRevertDialogOpen(false);
-                onRevert?.();
-              }}
-              data-testid="confirm-revert-button"
-            >
-              <Undo2 className="w-4 h-4 mr-2" />
-              Revert Changes
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </Card>
   );
 

@@ -43,7 +43,7 @@ export function createPullHandler() {
       if (hasLocalChanges) {
         res.status(400).json({
           success: false,
-          error: "You have local changes. Please commit or stash them before pulling.",
+          error: "You have local changes. Please commit them before pulling.",
         });
         return;
       }

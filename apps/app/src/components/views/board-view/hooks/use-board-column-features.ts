@@ -8,6 +8,7 @@ interface UseBoardColumnFeaturesProps {
   runningAutoTasks: string[];
   searchQuery: string;
   currentWorktreePath: string | null; // Currently selected worktree path
+  currentWorktreeBranch: string | null; // Branch name of the selected worktree (null = main)
   projectPath: string | null; // Main project path (for main worktree)
 }
 
@@ -16,6 +17,7 @@ export function useBoardColumnFeatures({
   runningAutoTasks,
   searchQuery,
   currentWorktreePath,
+  currentWorktreeBranch,
   projectPath,
 }: UseBoardColumnFeaturesProps) {
   // Memoize column features to prevent unnecessary re-renders
@@ -38,18 +40,32 @@ export function useBoardColumnFeatures({
         )
       : features;
 
-    // Determine the effective worktree path for filtering
-    // If currentWorktreePath is null, we're on the main worktree (use projectPath)
+    // Determine the effective worktree path and branch for filtering
+    // If currentWorktreePath is null, we're on the main worktree
     const effectiveWorktreePath = currentWorktreePath || projectPath;
+    const effectiveBranch = currentWorktreeBranch || "main";
 
     filteredFeatures.forEach((f) => {
       // If feature has a running agent, always show it in "in_progress"
       const isRunning = runningAutoTasks.includes(f.id);
 
       // Check if feature matches the current worktree
-      // Features without a worktreePath are considered unassigned (backlog items)
-      // Features with a worktreePath should only show if it matches the selected worktree
-      const matchesWorktree = !f.worktreePath || f.worktreePath === effectiveWorktreePath;
+      // Match by worktreePath if set, OR by branchName if set
+      // Features with neither are considered unassigned (show on main only)
+      const featureBranch = f.branchName || "main";
+      const hasWorktreeAssigned = f.worktreePath || f.branchName;
+
+      let matchesWorktree: boolean;
+      if (!hasWorktreeAssigned) {
+        // No worktree or branch assigned - show only on main
+        matchesWorktree = !currentWorktreePath;
+      } else if (f.worktreePath) {
+        // Has worktreePath - match by path
+        matchesWorktree = f.worktreePath === effectiveWorktreePath;
+      } else {
+        // Has branchName but no worktreePath - match by branch name
+        matchesWorktree = featureBranch === effectiveBranch;
+      }
 
       if (isRunning) {
         // Only show running tasks if they match the current worktree
@@ -84,7 +100,7 @@ export function useBoardColumnFeatures({
     });
 
     return map;
-  }, [features, runningAutoTasks, searchQuery, currentWorktreePath, projectPath]);
+  }, [features, runningAutoTasks, searchQuery, currentWorktreePath, currentWorktreeBranch, projectPath]);
 
   const getColumnFeatures = useCallback(
     (columnId: ColumnId) => {

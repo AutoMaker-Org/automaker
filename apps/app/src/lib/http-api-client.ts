@@ -509,12 +509,14 @@ export class HttpApiClient implements ElectronAPI {
     runFeature: (
       projectPath: string,
       featureId: string,
-      useWorktrees?: boolean
+      useWorktrees?: boolean,
+      worktreePath?: string
     ) =>
       this.post("/api/auto-mode/run-feature", {
         projectPath,
         featureId,
         useWorktrees,
+        worktreePath,
       }),
     verifyFeature: (projectPath: string, featureId: string) =>
       this.post("/api/auto-mode/verify-feature", { projectPath, featureId }),
@@ -528,16 +530,18 @@ export class HttpApiClient implements ElectronAPI {
       projectPath: string,
       featureId: string,
       prompt: string,
-      imagePaths?: string[]
+      imagePaths?: string[],
+      worktreePath?: string
     ) =>
       this.post("/api/auto-mode/follow-up-feature", {
         projectPath,
         featureId,
         prompt,
         imagePaths,
+        worktreePath,
       }),
-    commitFeature: (projectPath: string, featureId: string) =>
-      this.post("/api/auto-mode/commit-feature", { projectPath, featureId }),
+    commitFeature: (projectPath: string, featureId: string, worktreePath?: string) =>
+      this.post("/api/auto-mode/commit-feature", { projectPath, featureId, worktreePath }),
     onEvent: (callback: (event: AutoModeEvent) => void) => {
       return this.subscribeToEvent(
         "auto-mode:event",
@@ -586,6 +590,18 @@ export class HttpApiClient implements ElectronAPI {
       this.post("/api/worktree/list-branches", { worktreePath }),
     switchBranch: (worktreePath: string, branchName: string) =>
       this.post("/api/worktree/switch-branch", { worktreePath, branchName }),
+    openInEditor: (worktreePath: string) =>
+      this.post("/api/worktree/open-in-editor", { worktreePath }),
+    initGit: (projectPath: string) =>
+      this.post("/api/worktree/init-git", { projectPath }),
+    activate: (projectPath: string, worktreePath: string | null) =>
+      this.post("/api/worktree/activate", { projectPath, worktreePath }),
+    startDevServer: (projectPath: string, worktreePath: string) =>
+      this.post("/api/worktree/start-dev", { projectPath, worktreePath }),
+    stopDevServer: (worktreePath: string) =>
+      this.post("/api/worktree/stop-dev", { worktreePath }),
+    listDevServers: () =>
+      this.post("/api/worktree/list-dev-servers", {}),
   };
 
   // Git API

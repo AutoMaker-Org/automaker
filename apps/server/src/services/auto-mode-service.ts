@@ -20,6 +20,12 @@ import { buildPromptWithImages } from "../lib/prompt-builder.js";
 import { resolveModelString, DEFAULT_MODELS } from "../lib/model-resolver.js";
 import { createAutoModeOptions } from "../lib/sdk-options.js";
 import { isAbortError, classifyError } from "../lib/error-handler.js";
+import {
+  getFeatureDir,
+  getFeaturesDir,
+  getAutomakerDir,
+  getWorktreesDir,
+} from "../lib/automaker-paths.js";
 
 const execAsync = promisify(exec);
 
@@ -178,12 +184,18 @@ export class AutoModeService {
 
   /**
    * Execute a single feature
+   * @param projectPath - The main project path
+   * @param featureId - The feature ID to execute
+   * @param useWorktrees - Whether to use worktrees for isolation
+   * @param isAutoMode - Whether this is running in auto mode
+   * @param providedWorktreePath - Optional: use this worktree path instead of creating a new one
    */
   async executeFeature(
     projectPath: string,
     featureId: string,
     useWorktrees = true,
-    isAutoMode = false
+    isAutoMode = false,
+    providedWorktreePath?: string
   ): Promise<void> {
     if (this.runningFeatures.has(featureId)) {
       throw new Error(`Feature ${featureId} is already running`);
@@ -193,8 +205,13 @@ export class AutoModeService {
     const branchName = `feature/${featureId}`;
     let worktreePath: string | null = null;
 
-    // Setup worktree if enabled
-    if (useWorktrees) {
+    // Use provided worktree path if given, otherwise setup new worktree if enabled
+    if (providedWorktreePath) {
+      // User selected a specific worktree - use it directly
+      worktreePath = providedWorktreePath;
+      console.log(`[AutoMode] Using provided worktree path: ${worktreePath}`);
+    } else if (useWorktrees) {
+      // No specific worktree provided, create a new one for this feature
       worktreePath = await this.setupWorktree(
         projectPath,
         featureId,
@@ -320,14 +337,9 @@ export class AutoModeService {
     featureId: string,
     useWorktrees = true
   ): Promise<void> {
-    // Check if context exists
-    const contextPath = path.join(
-      projectPath,
-      ".automaker",
-      "features",
-      featureId,
-      "agent-output.md"
-    );
+    // Check if context exists in external automaker directory
+    const featureDir = await getFeatureDir(projectPath, featureId);
+    const contextPath = path.join(featureDir, "agent-output.md");
 
     let hasContext = false;
     try {
@@ -359,7 +371,8 @@ export class AutoModeService {
     projectPath: string,
     featureId: string,
     prompt: string,
-    imagePaths?: string[]
+    imagePaths?: string[],
+    providedWorktreePath?: string
   ): Promise<void> {
     if (this.runningFeatures.has(featureId)) {
       throw new Error(`Feature ${featureId} is already running`);
@@ -367,33 +380,28 @@ export class AutoModeService {
 
     const abortController = new AbortController();
 
-    // Check if worktree exists
-    const worktreePath = path.join(
-      projectPath,
-      ".automaker",
-      "worktrees",
-      featureId
-    );
+    // Use the provided worktreePath (from the feature's assigned branch)
+    // Fall back to project path if not provided
     let workDir = projectPath;
+    let worktreePath: string | null = null;
 
-    try {
-      await fs.access(worktreePath);
-      workDir = worktreePath;
-    } catch {
-      // No worktree, use project path
+    if (providedWorktreePath) {
+      try {
+        await fs.access(providedWorktreePath);
+        workDir = providedWorktreePath;
+        worktreePath = providedWorktreePath;
+      } catch {
+        // Worktree path provided but doesn't exist, use project path
+        console.log(`[AutoMode] Provided worktreePath doesn't exist: ${providedWorktreePath}, using project path`);
+      }
     }
 
     // Load feature info for context
     const feature = await this.loadFeature(projectPath, featureId);
 
-    // Load previous agent output if it exists
-    const contextPath = path.join(
-      projectPath,
-      ".automaker",
-      "features",
-      featureId,
-      "agent-output.md"
-    );
+    // Load previous agent output if it exists (from external automaker)
+    const featureDir = await getFeatureDir(projectPath, featureId);
+    const contextPath = path.join(featureDir, "agent-output.md");
     let previousContext = "";
     try {
       previousContext = await fs.readFile(contextPath, "utf-8");
@@ -426,8 +434,8 @@ Address the follow-up instructions above. Review the previous work and make the 
     this.runningFeatures.set(featureId, {
       featureId,
       projectPath,
-      worktreePath: workDir !== projectPath ? worktreePath : null,
-      branchName: `feature/${featureId}`,
+      worktreePath,
+      branchName: worktreePath ? path.basename(worktreePath) : null,
       abortController,
       isAutoMode: false,
       startTime: Date.now(),
@@ -453,16 +461,11 @@ Address the follow-up instructions above. Review the previous work and make the 
       // Update feature status to in_progress
       await this.updateFeatureStatus(projectPath, featureId, "in_progress");
 
-      // Copy follow-up images to feature folder
+      // Copy follow-up images to feature folder (external automaker)
       const copiedImagePaths: string[] = [];
       if (imagePaths && imagePaths.length > 0) {
-        const featureImagesDir = path.join(
-          projectPath,
-          ".automaker",
-          "features",
-          featureId,
-          "images"
-        );
+        const featureDirForImages = await getFeatureDir(projectPath, featureId);
+        const featureImagesDir = path.join(featureDirForImages, "images");
 
         await fs.mkdir(featureImagesDir, { recursive: true });
 
@@ -475,15 +478,8 @@ Address the follow-up instructions above. Review the previous work and make the 
             // Copy the image
             await fs.copyFile(imagePath, destPath);
 
-            // Store the relative path (like FeatureLoader does)
-            const relativePath = path.join(
-              ".automaker",
-              "features",
-              featureId,
-              "images",
-              filename
-            );
-            copiedImagePaths.push(relativePath);
+            // Store the absolute path (external storage uses absolute paths)
+            copiedImagePaths.push(destPath);
           } catch (error) {
             console.error(
               `[AutoMode] Failed to copy follow-up image ${imagePath}:`,
@@ -516,15 +512,10 @@ Address the follow-up instructions above. Review the previous work and make the 
         allImagePaths.push(...allPaths);
       }
 
-      // Save updated feature.json with new images
+      // Save updated feature.json with new images (external automaker)
       if (copiedImagePaths.length > 0 && feature) {
-        const featurePath = path.join(
-          projectPath,
-          ".automaker",
-          "features",
-          featureId,
-          "feature.json"
-        );
+        const featureDirForSave = await getFeatureDir(projectPath, featureId);
+        const featurePath = path.join(featureDirForSave, "feature.json");
 
         try {
           await fs.writeFile(featurePath, JSON.stringify(feature, null, 2));
@@ -576,12 +567,8 @@ Address the follow-up instructions above. Review the previous work and make the 
     projectPath: string,
     featureId: string
   ): Promise<boolean> {
-    const worktreePath = path.join(
-      projectPath,
-      ".automaker",
-      "worktrees",
-      featureId
-    );
+    // Worktrees are in project dir
+    const worktreePath = path.join(projectPath, ".worktrees", featureId);
     let workDir = projectPath;
 
     try {
@@ -640,24 +627,36 @@ Address the follow-up instructions above. Review the previous work and make the 
 
   /**
    * Commit feature changes
+   * @param projectPath - The main project path
+   * @param featureId - The feature ID to commit
+   * @param providedWorktreePath - Optional: the worktree path where the feature's changes are located
    */
   async commitFeature(
     projectPath: string,
-    featureId: string
+    featureId: string,
+    providedWorktreePath?: string
   ): Promise<string | null> {
-    const worktreePath = path.join(
-      projectPath,
-      ".automaker",
-      "worktrees",
-      featureId
-    );
     let workDir = projectPath;
 
-    try {
-      await fs.access(worktreePath);
-      workDir = worktreePath;
-    } catch {
-      // No worktree
+    // Use the provided worktree path if given
+    if (providedWorktreePath) {
+      try {
+        await fs.access(providedWorktreePath);
+        workDir = providedWorktreePath;
+        console.log(`[AutoMode] Committing in provided worktree: ${workDir}`);
+      } catch {
+        console.log(`[AutoMode] Provided worktree path doesn't exist: ${providedWorktreePath}, using project path`);
+      }
+    } else {
+      // Fallback: try to find worktree at legacy location
+      const legacyWorktreePath = path.join(projectPath, ".worktrees", featureId);
+      try {
+        await fs.access(legacyWorktreePath);
+        workDir = legacyWorktreePath;
+        console.log(`[AutoMode] Committing in legacy worktree: ${workDir}`);
+      } catch {
+        console.log(`[AutoMode] No worktree found, committing in project path: ${workDir}`);
+      }
     }
 
     try {
@@ -708,13 +707,9 @@ Address the follow-up instructions above. Review the previous work and make the 
     projectPath: string,
     featureId: string
   ): Promise<boolean> {
-    const contextPath = path.join(
-      projectPath,
-      ".automaker",
-      "features",
-      featureId,
-      "agent-output.md"
-    );
+    // Context is stored in external automaker directory
+    const featureDir = await getFeatureDir(projectPath, featureId);
+    const contextPath = path.join(featureDir, "agent-output.md");
 
     try {
       await fs.access(contextPath);
@@ -787,13 +782,10 @@ Format your response as a structured markdown document.`;
         }
       }
 
-      // Save analysis
-      const analysisPath = path.join(
-        projectPath,
-        ".automaker",
-        "project-analysis.md"
-      );
-      await fs.mkdir(path.dirname(analysisPath), { recursive: true });
+      // Save analysis to external automaker directory
+      const automakerDir = await getAutomakerDir(projectPath);
+      const analysisPath = path.join(automakerDir, "project-analysis.md");
+      await fs.mkdir(automakerDir, { recursive: true });
       await fs.writeFile(analysisPath, analysisResult);
 
       this.emitAutoModeEvent("auto_mode_feature_complete", {
@@ -852,7 +844,8 @@ Format your response as a structured markdown document.`;
     featureId: string,
     branchName: string
   ): Promise<string> {
-    const worktreesDir = path.join(projectPath, ".automaker", "worktrees");
+    // Git worktrees stay in project directory (not external automaker)
+    const worktreesDir = path.join(projectPath, ".worktrees");
     const worktreePath = path.join(worktreesDir, featureId);
 
     await fs.mkdir(worktreesDir, { recursive: true });
@@ -890,13 +883,9 @@ Format your response as a structured markdown document.`;
     projectPath: string,
     featureId: string
   ): Promise<Feature | null> {
-    const featurePath = path.join(
-      projectPath,
-      ".automaker",
-      "features",
-      featureId,
-      "feature.json"
-    );
+    // Features are stored in external automaker directory
+    const featureDir = await getFeatureDir(projectPath, featureId);
+    const featurePath = path.join(featureDir, "feature.json");
 
     try {
       const data = await fs.readFile(featurePath, "utf-8");
@@ -911,13 +900,9 @@ Format your response as a structured markdown document.`;
     featureId: string,
     status: string
   ): Promise<void> {
-    const featurePath = path.join(
-      projectPath,
-      ".automaker",
-      "features",
-      featureId,
-      "feature.json"
-    );
+    // Features are stored in external automaker directory
+    const featureDir = await getFeatureDir(projectPath, featureId);
+    const featurePath = path.join(featureDir, "feature.json");
 
     try {
       const data = await fs.readFile(featurePath, "utf-8");
@@ -939,7 +924,8 @@ Format your response as a structured markdown document.`;
   }
 
   private async loadPendingFeatures(projectPath: string): Promise<Feature[]> {
-    const featuresDir = path.join(projectPath, ".automaker", "features");
+    // Features are stored in external automaker directory
+    const featuresDir = await getFeaturesDir(projectPath);
 
     try {
       const entries = await fs.readdir(featuresDir, { withFileTypes: true });
@@ -1128,13 +1114,12 @@ When done, summarize what you implemented and any notes for the developer.`;
     // Execute via provider
     const stream = provider.executeQuery(options);
     let responseText = "";
-    const outputPath = path.join(
-      workDir,
-      ".automaker",
-      "features",
-      featureId,
-      "agent-output.md"
-    );
+    // Agent output goes to external automaker directory
+    // Note: We use the original projectPath here (from config), not workDir
+    // because workDir might be a worktree path
+    const configProjectPath = this.config?.projectPath || workDir;
+    const featureDirForOutput = await getFeatureDir(configProjectPath, featureId);
+    const outputPath = path.join(featureDirForOutput, "agent-output.md");
 
     for await (const msg of stream) {
       if (msg.type === "assistant" && msg.message?.content) {

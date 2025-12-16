@@ -30,12 +30,8 @@ export function createMergeHandler() {
       }
 
       const branchName = `feature/${featureId}`;
-      const worktreePath = path.join(
-        projectPath,
-        ".automaker",
-        "worktrees",
-        featureId
-      );
+      // Git worktrees are stored in project directory
+      const worktreePath = path.join(projectPath, ".worktrees", featureId);
 
       // Get current branch
       const { stdout: currentBranch } = await execAsync(

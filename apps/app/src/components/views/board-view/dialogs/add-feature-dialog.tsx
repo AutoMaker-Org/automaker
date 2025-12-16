@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { HotkeyButton } from "@/components/ui/hotkey-button";
 import { Label } from "@/components/ui/label";
 import { CategoryAutocomplete } from "@/components/ui/category-autocomplete";
+import { BranchAutocomplete } from "@/components/ui/branch-autocomplete";
 import {
   DescriptionImageDropZone,
   FeatureImagePath as DescriptionImagePath,
@@ -47,8 +48,10 @@ interface AddFeatureDialogProps {
     skipTests: boolean;
     model: AgentModel;
     thinkingLevel: ThinkingLevel;
+    branchName: string;
   }) => void;
   categorySuggestions: string[];
+  branchSuggestions: string[];
   defaultSkipTests: boolean;
   isMaximized: boolean;
   showProfilesOnly: boolean;
@@ -60,6 +63,7 @@ export function AddFeatureDialog({
   onOpenChange,
   onAdd,
   categorySuggestions,
+  branchSuggestions,
   defaultSkipTests,
   isMaximized,
   showProfilesOnly,
@@ -74,6 +78,7 @@ export function AddFeatureDialog({
     skipTests: false,
     model: "opus" as AgentModel,
     thinkingLevel: "none" as ThinkingLevel,
+    branchName: "main",
   });
   const [newFeaturePreviewMap, setNewFeaturePreviewMap] =
     useState<ImagePreviewMap>(() => new Map());
@@ -111,6 +116,7 @@ export function AddFeatureDialog({
       skipTests: newFeature.skipTests,
       model: selectedModel,
       thinkingLevel: normalizedThinking,
+      branchName: newFeature.branchName,
     });
 
     // Reset form
@@ -123,6 +129,7 @@ export function AddFeatureDialog({
       skipTests: defaultSkipTests,
       model: "opus",
       thinkingLevel: "none",
+      branchName: "main",
     });
     setNewFeaturePreviewMap(new Map());
     setShowAdvancedOptions(false);
@@ -236,6 +243,21 @@ export function AddFeatureDialog({
                 placeholder="e.g., Core, UI, API"
                 data-testid="feature-category-input"
               />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="branch">Target Branch</Label>
+              <BranchAutocomplete
+                value={newFeature.branchName}
+                onChange={(value) =>
+                  setNewFeature({ ...newFeature, branchName: value })
+                }
+                branches={branchSuggestions}
+                placeholder="Select or create branch..."
+                data-testid="feature-branch-input"
+              />
+              <p className="text-xs text-muted-foreground">
+                Work will be done in this branch. A worktree will be created if needed.
+              </p>
             </div>
           </TabsContent>
 

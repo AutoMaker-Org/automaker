@@ -4,6 +4,7 @@ import { Feature } from "@/store/app-store";
 import { useAppStore } from "@/store/app-store";
 import { toast } from "sonner";
 import { COLUMNS, ColumnId } from "../constants";
+import { getElectronAPI } from "@/lib/electron";
 
 interface UseBoardDragDropProps {
   features: Feature[];
@@ -14,8 +15,8 @@ interface UseBoardDragDropProps {
     updates: Partial<Feature>
   ) => Promise<void>;
   handleStartImplementation: (feature: Feature) => Promise<boolean>;
-  currentWorktreePath: string | null; // Currently selected worktree path
   projectPath: string | null; // Main project path
+  onWorktreeCreated?: () => void; // Callback when a new worktree is created
 }
 
 export function useBoardDragDrop({
@@ -24,14 +25,66 @@ export function useBoardDragDrop({
   runningAutoTasks,
   persistFeatureUpdate,
   handleStartImplementation,
-  currentWorktreePath,
   projectPath,
+  onWorktreeCreated,
 }: UseBoardDragDropProps) {
   const [activeFeature, setActiveFeature] = useState<Feature | null>(null);
   const { moveFeature } = useAppStore();
 
-  // Determine the effective worktree path for assigning to features
-  const effectiveWorktreePath = currentWorktreePath || projectPath;
+  /**
+   * Get or create the worktree path for a feature based on its branchName.
+   * - If branchName is "main" or empty, returns the project path
+   * - Otherwise, creates a worktree for that branch if needed
+   */
+  const getOrCreateWorktreeForFeature = useCallback(
+    async (feature: Feature): Promise<string | null> => {
+      if (!projectPath) return null;
+
+      const branchName = feature.branchName || "main";
+
+      // If targeting main branch, use the project path directly
+      if (branchName === "main" || branchName === "master") {
+        return projectPath;
+      }
+
+      // For other branches, create a worktree if it doesn't exist
+      try {
+        const api = getElectronAPI();
+        if (!api?.worktree?.create) {
+          console.error("[DragDrop] Worktree API not available");
+          return projectPath;
+        }
+
+        // Try to create the worktree (will return existing if already exists)
+        const result = await api.worktree.create(projectPath, branchName);
+
+        if (result.success && result.worktree) {
+          console.log(
+            `[DragDrop] Worktree ready for branch "${branchName}": ${result.worktree.path}`
+          );
+          if (result.worktree.isNew) {
+            toast.success(`Worktree created for branch "${branchName}"`, {
+              description: "A new worktree was created for this feature.",
+            });
+          }
+          return result.worktree.path;
+        } else {
+          console.error("[DragDrop] Failed to create worktree:", result.error);
+          toast.error("Failed to create worktree", {
+            description: result.error || "Could not create worktree for this branch.",
+          });
+          return projectPath; // Fall back to project path
+        }
+      } catch (error) {
+        console.error("[DragDrop] Error creating worktree:", error);
+        toast.error("Error creating worktree", {
+          description: error instanceof Error ? error.message : "Unknown error",
+        });
+        return projectPath; // Fall back to project path
+      }
+    },
+    [projectPath]
+  );
 
   const handleDragStart = useCallback(
     (event: DragStartEvent) => {
@@ -104,12 +157,16 @@ export function useBoardDragDrop({
       if (draggedFeature.status === "backlog") {
         // From backlog
         if (targetStatus === "in_progress") {
-          // Assign the current worktree to this feature when moving to in_progress
-          if (effectiveWorktreePath) {
-            await persistFeatureUpdate(featureId, { worktreePath: effectiveWorktreePath });
+          // Get or create worktree based on the feature's assigned branch
+          const worktreePath = await getOrCreateWorktreeForFeature(draggedFeature);
+          if (worktreePath) {
+            await persistFeatureUpdate(featureId, { worktreePath });
           }
+          // Always refresh worktree selector after moving to in_progress
+          onWorktreeCreated?.();
           // Use helper function to handle concurrency check and start implementation
-          await handleStartImplementation(draggedFeature);
+          // Pass feature with worktreePath so handleRunFeature uses the correct path
+          await handleStartImplementation({ ...draggedFeature, worktreePath: worktreePath || undefined });
         } else {
           moveFeature(featureId, targetStatus);
           persistFeatureUpdate(featureId, { status: targetStatus });
@@ -219,7 +276,8 @@ export function useBoardDragDrop({
       moveFeature,
       persistFeatureUpdate,
       handleStartImplementation,
-      effectiveWorktreePath,
+      getOrCreateWorktreeForFeature,
+      onWorktreeCreated,
     ]
   );
 

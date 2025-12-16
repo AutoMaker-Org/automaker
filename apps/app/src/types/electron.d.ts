@@ -340,7 +340,8 @@ export interface AutoModeAPI {
   runFeature: (
     projectPath: string,
     featureId: string,
-    useWorktrees?: boolean
+    useWorktrees?: boolean,
+    worktreePath?: string
   ) => Promise<{
     success: boolean;
     passes?: boolean;
@@ -384,7 +385,8 @@ export interface AutoModeAPI {
     projectPath: string,
     featureId: string,
     prompt: string,
-    imagePaths?: string[]
+    imagePaths?: string[],
+    worktreePath?: string
   ) => Promise<{
     success: boolean;
     passes?: boolean;
@@ -631,6 +633,8 @@ export interface WorktreeAPI {
       path: string;
       branch: string;
       isMain: boolean;
+      isCurrent: boolean; // Is this the currently checked out branch?
+      hasWorktree: boolean; // Does this branch have an active worktree?
       hasChanges?: boolean;
       changedFilesCount?: number;
     }>;
@@ -690,6 +694,7 @@ export interface WorktreeAPI {
     result?: {
       branch: string;
       pushed: boolean;
+      message: string;
     };
     error?: string;
   }>;
@@ -782,6 +787,79 @@ export interface WorktreeAPI {
       previousBranch: string;
       currentBranch: string;
       message: string;
+    };
+    error?: string;
+  }>;
+
+  // Open a worktree directory in the editor
+  openInEditor: (worktreePath: string) => Promise<{
+    success: boolean;
+    result?: {
+      message: string;
+    };
+    error?: string;
+  }>;
+
+  // Initialize git repository in a project
+  initGit: (projectPath: string) => Promise<{
+    success: boolean;
+    result?: {
+      initialized: boolean;
+      message: string;
+    };
+    error?: string;
+  }>;
+
+  // Activate a worktree (switch main project to that branch)
+  activate: (
+    projectPath: string,
+    worktreePath: string | null
+  ) => Promise<{
+    success: boolean;
+    result?: {
+      previousBranch: string;
+      currentBranch: string;
+      message: string;
+    };
+    error?: string;
+  }>;
+
+  // Start a dev server for a worktree
+  startDevServer: (
+    projectPath: string,
+    worktreePath: string
+  ) => Promise<{
+    success: boolean;
+    result?: {
+      worktreePath: string;
+      port: number;
+      url: string;
+      message: string;
+    };
+    error?: string;
+  }>;
+
+  // Stop a dev server for a worktree
+  stopDevServer: (
+    worktreePath: string
+  ) => Promise<{
+    success: boolean;
+    result?: {
+      worktreePath: string;
+      message: string;
+    };
+    error?: string;
+  }>;
+
+  // List all running dev servers
+  listDevServers: () => Promise<{
+    success: boolean;
+    result?: {
+      servers: Array<{
+        worktreePath: string;
+        port: number;
+        url: string;
+      }>;
     };
     error?: string;
   }>;

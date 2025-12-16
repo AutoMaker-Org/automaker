@@ -7,6 +7,7 @@ import fs from "fs/promises";
 import path from "path";
 import { validatePath } from "../../../lib/security.js";
 import { getErrorMessage, logError } from "../common.js";
+import { mkdirSafe } from "../../../lib/fs-utils.js";
 
 export function createWriteHandler() {
   return async (req: Request, res: Response): Promise<void> => {
@@ -23,8 +24,8 @@ export function createWriteHandler() {
 
       const resolvedPath = validatePath(filePath);
 
-      // Ensure parent directory exists
-      await fs.mkdir(path.dirname(resolvedPath), { recursive: true });
+      // Ensure parent directory exists (symlink-safe)
+      await mkdirSafe(path.dirname(resolvedPath));
       await fs.writeFile(resolvedPath, content, "utf-8");
 
       res.json({ success: true });

@@ -1,10 +1,18 @@
 /**
  * Feature Loader - Handles loading and managing features from individual feature folders
- * Each feature is stored in .automaker/features/{featureId}/feature.json
+ * Each feature is stored in external automaker storage: ~/.automaker/projects/{project-id}/features/{featureId}/feature.json
+ *
+ * Features are stored outside the git repo to avoid worktree conflicts.
  */
 
 import path from "path";
 import fs from "fs/promises";
+import {
+  getFeaturesDir,
+  getFeatureDir,
+  getFeatureImagesDir,
+  ensureAutomakerDir,
+} from "../lib/automaker-paths.js";
 
 export interface Feature {
   id: string;
@@ -21,15 +29,18 @@ export class FeatureLoader {
   /**
    * Get the features directory path
    */
-  getFeaturesDir(projectPath: string): string {
-    return path.join(projectPath, ".automaker", "features");
+  async getFeaturesDir(projectPath: string): Promise<string> {
+    return getFeaturesDir(projectPath);
   }
 
   /**
    * Get the images directory path for a feature
    */
-  getFeatureImagesDir(projectPath: string, featureId: string): string {
-    return path.join(this.getFeatureDir(projectPath, featureId), "images");
+  async getFeatureImagesDir(
+    projectPath: string,
+    featureId: string
+  ): Promise<string> {
+    return getFeatureImagesDir(projectPath, featureId);
   }
 
   /**
@@ -56,15 +67,15 @@ export class FeatureLoader {
     for (const oldPath of oldPathSet) {
       if (!newPathSet.has(oldPath)) {
         try {
-          const fullPath = path.isAbsolute(oldPath)
-            ? oldPath
-            : path.join(projectPath, oldPath);
-
-          await fs.unlink(fullPath);
+          // Paths are now absolute
+          await fs.unlink(oldPath);
           console.log(`[FeatureLoader] Deleted orphaned image: ${oldPath}`);
         } catch (error) {
           // Ignore errors when deleting (file may already be gone)
-          console.warn(`[FeatureLoader] Failed to delete image: ${oldPath}`, error);
+          console.warn(
+            `[FeatureLoader] Failed to delete image: ${oldPath}`,
+            error
+          );
         }
       }
     }
@@ -77,21 +88,28 @@ export class FeatureLoader {
     projectPath: string,
     featureId: string,
     imagePaths?: Array<string | { path: string; [key: string]: unknown }>
-  ): Promise<Array<string | { path: string; [key: string]: unknown }> | undefined> {
+  ): Promise<
+    Array<string | { path: string; [key: string]: unknown }> | undefined
+  > {
     if (!imagePaths || imagePaths.length === 0) {
       return imagePaths;
     }
 
-    const featureImagesDir = this.getFeatureImagesDir(projectPath, featureId);
+    const featureImagesDir = await this.getFeatureImagesDir(
+      projectPath,
+      featureId
+    );
     await fs.mkdir(featureImagesDir, { recursive: true });
 
-    const updatedPaths: Array<string | { path: string; [key: string]: unknown }> = [];
+    const updatedPaths: Array<string | { path: string; [key: string]: unknown }> =
+      [];
 
     for (const imagePath of imagePaths) {
       try {
-        const originalPath = typeof imagePath === "string" ? imagePath : imagePath.path;
+        const originalPath =
+          typeof imagePath === "string" ? imagePath : imagePath.path;
 
-        // Skip if already in feature directory
+        // Skip if already in feature directory (already absolute path in external storage)
         if (originalPath.includes(`/features/${featureId}/images/`)) {
           updatedPaths.push(imagePath);
           continue;
@@ -106,18 +124,21 @@ export class FeatureLoader {
         try {
           await fs.access(fullOriginalPath);
         } catch {
-          console.warn(`[FeatureLoader] Image not found, skipping: ${fullOriginalPath}`);
+          console.warn(
+            `[FeatureLoader] Image not found, skipping: ${fullOriginalPath}`
+          );
           continue;
         }
 
-        // Get filename and create new path
+        // Get filename and create new path in external storage
         const filename = path.basename(originalPath);
         const newPath = path.join(featureImagesDir, filename);
-        const relativePath = `.automaker/features/${featureId}/images/${filename}`;
 
         // Copy the file
         await fs.copyFile(fullOriginalPath, newPath);
-        console.log(`[FeatureLoader] Copied image: ${originalPath} -> ${relativePath}`);
+        console.log(
+          `[FeatureLoader] Copied image: ${originalPath} -> ${newPath}`
+        );
 
         // Try to delete the original temp file
         try {
@@ -126,11 +147,11 @@ export class FeatureLoader {
           // Ignore errors when deleting temp file
         }
 
-        // Update the path in the result
+        // Update the path in the result (use absolute path)
         if (typeof imagePath === "string") {
-          updatedPaths.push(relativePath);
+          updatedPaths.push(newPath);
         } else {
-          updatedPaths.push({ ...imagePath, path: relativePath });
+          updatedPaths.push({ ...imagePath, path: newPath });
         }
       } catch (error) {
         console.error(`[FeatureLoader] Failed to migrate image:`, error);
@@ -145,22 +166,30 @@ export class FeatureLoader {
   /**
    * Get the path to a specific feature folder
    */
-  getFeatureDir(projectPath: string, featureId: string): string {
-    return path.join(this.getFeaturesDir(projectPath), featureId);
+  async getFeatureDir(projectPath: string, featureId: string): Promise<string> {
+    return getFeatureDir(projectPath, featureId);
   }
 
   /**
    * Get the path to a feature's feature.json file
    */
-  getFeatureJsonPath(projectPath: string, featureId: string): string {
-    return path.join(this.getFeatureDir(projectPath, featureId), "feature.json");
+  async getFeatureJsonPath(
+    projectPath: string,
+    featureId: string
+  ): Promise<string> {
+    const featureDir = await this.getFeatureDir(projectPath, featureId);
+    return path.join(featureDir, "feature.json");
   }
 
   /**
    * Get the path to a feature's agent-output.md file
    */
-  getAgentOutputPath(projectPath: string, featureId: string): string {
-    return path.join(this.getFeatureDir(projectPath, featureId), "agent-output.md");
+  async getAgentOutputPath(
+    projectPath: string,
+    featureId: string
+  ): Promise<string> {
+    const featureDir = await this.getFeatureDir(projectPath, featureId);
+    return path.join(featureDir, "agent-output.md");
   }
 
   /**
@@ -175,7 +204,7 @@ export class FeatureLoader {
    */
   async getAll(projectPath: string): Promise<Feature[]> {
     try {
-      const featuresDir = this.getFeaturesDir(projectPath);
+      const featuresDir = await this.getFeaturesDir(projectPath);
 
       // Check if features directory exists
       try {
@@ -192,7 +221,10 @@ export class FeatureLoader {
       const features: Feature[] = [];
       for (const dir of featureDirs) {
         const featureId = dir.name;
-        const featureJsonPath = this.getFeatureJsonPath(projectPath, featureId);
+        const featureJsonPath = await this.getFeatureJsonPath(
+          projectPath,
+          featureId
+        );
 
         try {
           const content = await fs.readFile(featureJsonPath, "utf-8");
@@ -241,14 +273,20 @@ export class FeatureLoader {
    */
   async get(projectPath: string, featureId: string): Promise<Feature | null> {
     try {
-      const featureJsonPath = this.getFeatureJsonPath(projectPath, featureId);
+      const featureJsonPath = await this.getFeatureJsonPath(
+        projectPath,
+        featureId
+      );
       const content = await fs.readFile(featureJsonPath, "utf-8");
       return JSON.parse(content);
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === "ENOENT") {
         return null;
       }
-      console.error(`[FeatureLoader] Failed to get feature ${featureId}:`, error);
+      console.error(
+        `[FeatureLoader] Failed to get feature ${featureId}:`,
+        error
+      );
       throw error;
     }
   }
@@ -256,14 +294,16 @@ export class FeatureLoader {
   /**
    * Create a new feature
    */
-  async create(projectPath: string, featureData: Partial<Feature>): Promise<Feature> {
+  async create(
+    projectPath: string,
+    featureData: Partial<Feature>
+  ): Promise<Feature> {
     const featureId = featureData.id || this.generateFeatureId();
-    const featureDir = this.getFeatureDir(projectPath, featureId);
-    const featureJsonPath = this.getFeatureJsonPath(projectPath, featureId);
+    const featureDir = await this.getFeatureDir(projectPath, featureId);
+    const featureJsonPath = await this.getFeatureJsonPath(projectPath, featureId);
 
-    // Ensure features directory exists
-    const featuresDir = this.getFeaturesDir(projectPath);
-    await fs.mkdir(featuresDir, { recursive: true });
+    // Ensure automaker directory exists
+    await ensureAutomakerDir(projectPath);
 
     // Create feature directory
     await fs.mkdir(featureDir, { recursive: true });
@@ -285,7 +325,11 @@ export class FeatureLoader {
     };
 
     // Write feature.json
-    await fs.writeFile(featureJsonPath, JSON.stringify(feature, null, 2), "utf-8");
+    await fs.writeFile(
+      featureJsonPath,
+      JSON.stringify(feature, null, 2),
+      "utf-8"
+    );
 
     console.log(`[FeatureLoader] Created feature ${featureId}`);
     return feature;
@@ -326,11 +370,13 @@ export class FeatureLoader {
     const updatedFeature: Feature = {
       ...feature,
       ...updates,
-      ...(updatedImagePaths !== undefined ? { imagePaths: updatedImagePaths } : {}),
+      ...(updatedImagePaths !== undefined
+        ? { imagePaths: updatedImagePaths }
+        : {}),
     };
 
     // Write back to file
-    const featureJsonPath = this.getFeatureJsonPath(projectPath, featureId);
+    const featureJsonPath = await this.getFeatureJsonPath(projectPath, featureId);
     await fs.writeFile(
       featureJsonPath,
       JSON.stringify(updatedFeature, null, 2),
@@ -346,12 +392,15 @@ export class FeatureLoader {
    */
   async delete(projectPath: string, featureId: string): Promise<boolean> {
     try {
-      const featureDir = this.getFeatureDir(projectPath, featureId);
+      const featureDir = await this.getFeatureDir(projectPath, featureId);
       await fs.rm(featureDir, { recursive: true, force: true });
       console.log(`[FeatureLoader] Deleted feature ${featureId}`);
       return true;
     } catch (error) {
-      console.error(`[FeatureLoader] Failed to delete feature ${featureId}:`, error);
+      console.error(
+        `[FeatureLoader] Failed to delete feature ${featureId}:`,
+        error
+      );
       return false;
     }
   }
@@ -364,7 +413,10 @@ export class FeatureLoader {
     featureId: string
   ): Promise<string | null> {
     try {
-      const agentOutputPath = this.getAgentOutputPath(projectPath, featureId);
+      const agentOutputPath = await this.getAgentOutputPath(
+        projectPath,
+        featureId
+      );
       const content = await fs.readFile(agentOutputPath, "utf-8");
       return content;
     } catch (error) {
@@ -387,19 +439,25 @@ export class FeatureLoader {
     featureId: string,
     content: string
   ): Promise<void> {
-    const featureDir = this.getFeatureDir(projectPath, featureId);
+    const featureDir = await this.getFeatureDir(projectPath, featureId);
     await fs.mkdir(featureDir, { recursive: true });
 
-    const agentOutputPath = this.getAgentOutputPath(projectPath, featureId);
+    const agentOutputPath = await this.getAgentOutputPath(projectPath, featureId);
     await fs.writeFile(agentOutputPath, content, "utf-8");
   }
 
   /**
    * Delete agent output for a feature
    */
-  async deleteAgentOutput(projectPath: string, featureId: string): Promise<void> {
+  async deleteAgentOutput(
+    projectPath: string,
+    featureId: string
+  ): Promise<void> {
     try {
-      const agentOutputPath = this.getAgentOutputPath(projectPath, featureId);
+      const agentOutputPath = await this.getAgentOutputPath(
+        projectPath,
+        featureId
+      );
       await fs.unlink(agentOutputPath);
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== "ENOENT") {

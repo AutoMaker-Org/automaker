@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback } from "react";
 import { Feature, FeatureImage, AgentModel, ThinkingLevel, useAppStore } from "@/store/app-store";
 import { FeatureImagePath as DescriptionImagePath } from "@/components/ui/description-image-dropzone";
 import { getElectronAPI } from "@/lib/electron";
@@ -28,6 +28,8 @@ interface UseBoardActionsProps {
   setShowFollowUpDialog: (show: boolean) => void;
   inProgressFeaturesForShortcuts: Feature[];
   outputFeature: Feature | null;
+  projectPath: string | null;
+  onWorktreeCreated?: () => void;
 }
 
 export function useBoardActions({
@@ -52,9 +54,66 @@ export function useBoardActions({
   setShowFollowUpDialog,
   inProgressFeaturesForShortcuts,
   outputFeature,
+  projectPath,
+  onWorktreeCreated,
 }: UseBoardActionsProps) {
   const { addFeature, updateFeature, removeFeature, moveFeature, useWorktrees } = useAppStore();
   const autoMode = useAutoMode();
+
+  /**
+   * Get or create the worktree path for a feature based on its branchName.
+   * - If branchName is "main" or empty, returns the project path
+   * - Otherwise, creates a worktree for that branch if needed
+   */
+  const getOrCreateWorktreeForFeature = useCallback(
+    async (feature: Feature): Promise<string | null> => {
+      if (!projectPath) return null;
+
+      const branchName = feature.branchName || "main";
+
+      // If targeting main branch, use the project path directly
+      if (branchName === "main" || branchName === "master") {
+        return projectPath;
+      }
+
+      // For other branches, create a worktree if it doesn't exist
+      try {
+        const api = getElectronAPI();
+        if (!api?.worktree?.create) {
+          console.error("[BoardActions] Worktree API not available");
+          return projectPath;
+        }
+
+        // Try to create the worktree (will return existing if already exists)
+        const result = await api.worktree.create(projectPath, branchName);
+
+        if (result.success && result.worktree) {
+          console.log(
+            `[BoardActions] Worktree ready for branch "${branchName}": ${result.worktree.path}`
+          );
+          if (result.worktree.isNew) {
+            toast.success(`Worktree created for branch "${branchName}"`, {
+              description: "A new worktree was created for this feature.",
+            });
+          }
+          return result.worktree.path;
+        } else {
+          console.error("[BoardActions] Failed to create worktree:", result.error);
+          toast.error("Failed to create worktree", {
+            description: result.error || "Could not create worktree for this branch.",
+          });
+          return projectPath; // Fall back to project path
+        }
+      } catch (error) {
+        console.error("[BoardActions] Error creating worktree:", error);
+        toast.error("Error creating worktree", {
+          description: error instanceof Error ? error.message : "Unknown error",
+        });
+        return projectPath; // Fall back to project path
+      }
+    },
+    [projectPath]
+  );
 
   const handleAddFeature = useCallback(
     (featureData: {
@@ -66,6 +125,7 @@ export function useBoardActions({
       skipTests: boolean;
       model: AgentModel;
       thinkingLevel: ThinkingLevel;
+      branchName: string;
     }) => {
       const newFeatureData = {
         ...featureData,
@@ -89,6 +149,7 @@ export function useBoardActions({
         model: AgentModel;
         thinkingLevel: ThinkingLevel;
         imagePaths: DescriptionImagePath[];
+        branchName: string;
       }
     ) => {
       updateFeature(featureId, updates);
@@ -155,14 +216,19 @@ export function useBoardActions({
           return;
         }
 
+        // Use the feature's assigned worktreePath (set when moving to in_progress)
+        // This ensures work happens in the correct worktree based on the feature's branchName
+        const featureWorktreePath = feature.worktreePath;
+
         const result = await api.autoMode.runFeature(
           currentProject.path,
           feature.id,
-          useWorktrees
+          useWorktrees,
+          featureWorktreePath || undefined
         );
 
         if (result.success) {
-          console.log("[Board] Feature run started successfully");
+          console.log("[Board] Feature run started successfully in worktree:", featureWorktreePath || "main");
         } else {
           console.error("[Board] Failed to run feature:", result.error);
           await loadFeatures();
@@ -327,8 +393,10 @@ export function useBoardActions({
       });
 
     const imagePaths = followUpImagePaths.map((img) => img.path);
+    // Use the feature's worktreePath to ensure work happens in the correct branch
+    const featureWorktreePath = followUpFeature.worktreePath;
     api.autoMode
-      .followUpFeature(currentProject.path, followUpFeature.id, followUpPrompt, imagePaths)
+      .followUpFeature(currentProject.path, followUpFeature.id, followUpPrompt, imagePaths, featureWorktreePath)
       .catch((error) => {
         console.error("[Board] Error sending follow-up:", error);
         toast.error("Failed to send follow-up", {
@@ -365,7 +433,8 @@ export function useBoardActions({
           return;
         }
 
-        const result = await api.autoMode.commitFeature(currentProject.path, feature.id);
+        // Pass the feature's worktreePath to ensure commits happen in the correct worktree
+        const result = await api.autoMode.commitFeature(currentProject.path, feature.id, feature.worktreePath);
 
         if (result.success) {
           moveFeature(feature.id, "verified");
@@ -373,6 +442,8 @@ export function useBoardActions({
           toast.success("Feature committed", {
             description: `Committed and verified: ${truncateDescription(feature.description)}`,
           });
+          // Refresh worktree selector to update commit counts
+          onWorktreeCreated?.();
         } else {
           console.error("[Board] Failed to commit feature:", result.error);
           toast.error("Failed to commit feature", {
@@ -388,7 +459,7 @@ export function useBoardActions({
         await loadFeatures();
       }
     },
-    [currentProject, moveFeature, persistFeatureUpdate, loadFeatures]
+    [currentProject, moveFeature, persistFeatureUpdate, loadFeatures, onWorktreeCreated]
   );
 
   const handleRevertFeature = useCallback(
@@ -565,12 +636,29 @@ export function useBoardActions({
       return;
     }
 
-    const featuresToStart = backlogFeatures.slice(0, availableSlots);
+    if (backlogFeatures.length === 0) {
+      toast.info("Backlog empty", {
+        description: "No features in backlog to start.",
+      });
+      return;
+    }
+
+    // Start only one feature per keypress (user must press again for next)
+    const featuresToStart = backlogFeatures.slice(0, 1);
 
     for (const feature of featuresToStart) {
-      await handleStartImplementation(feature);
+      // Get or create worktree based on the feature's assigned branch (same as drag-to-in-progress)
+      const worktreePath = await getOrCreateWorktreeForFeature(feature);
+      if (worktreePath) {
+        await persistFeatureUpdate(feature.id, { worktreePath });
+      }
+      // Refresh worktree selector after creating worktree
+      onWorktreeCreated?.();
+      // Start the implementation
+      // Pass feature with worktreePath so handleRunFeature uses the correct path
+      await handleStartImplementation({ ...feature, worktreePath: worktreePath || undefined });
     }
-  }, [features, runningAutoTasks, handleStartImplementation]);
+  }, [features, runningAutoTasks, handleStartImplementation, getOrCreateWorktreeForFeature, persistFeatureUpdate, onWorktreeCreated]);
 
   const handleDeleteAllVerified = useCallback(async () => {
     const verifiedFeatures = features.filter((f) => f.status === "verified");

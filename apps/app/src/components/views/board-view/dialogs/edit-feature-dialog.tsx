@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { HotkeyButton } from "@/components/ui/hotkey-button";
 import { Label } from "@/components/ui/label";
 import { CategoryAutocomplete } from "@/components/ui/category-autocomplete";
+import { BranchAutocomplete } from "@/components/ui/branch-autocomplete";
 import {
   DescriptionImageDropZone,
   FeatureImagePath as DescriptionImagePath,
@@ -47,9 +48,11 @@ interface EditFeatureDialogProps {
       model: AgentModel;
       thinkingLevel: ThinkingLevel;
       imagePaths: DescriptionImagePath[];
+      branchName: string;
     }
   ) => void;
   categorySuggestions: string[];
+  branchSuggestions: string[];
   isMaximized: boolean;
   showProfilesOnly: boolean;
   aiProfiles: AIProfile[];
@@ -60,6 +63,7 @@ export function EditFeatureDialog({
   onClose,
   onUpdate,
   categorySuggestions,
+  branchSuggestions,
   isMaximized,
   showProfilesOnly,
   aiProfiles,
@@ -93,6 +97,7 @@ export function EditFeatureDialog({
       model: selectedModel,
       thinkingLevel: normalizedThinking,
       imagePaths: editingFeature.imagePaths ?? [],
+      branchName: editingFeature.branchName ?? "main",
     };
 
     onUpdate(editingFeature.id, updates);
@@ -213,6 +218,32 @@ export function EditFeatureDialog({
                 placeholder="e.g., Core, UI, API"
                 data-testid="edit-feature-category"
               />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-branch">Target Branch</Label>
+              <BranchAutocomplete
+                value={editingFeature.branchName ?? "main"}
+                onChange={(value) =>
+                  setEditingFeature({
+                    ...editingFeature,
+                    branchName: value,
+                  })
+                }
+                branches={branchSuggestions}
+                placeholder="Select or create branch..."
+                data-testid="edit-feature-branch"
+                disabled={editingFeature.status !== "backlog"}
+              />
+              {editingFeature.status !== "backlog" && (
+                <p className="text-xs text-muted-foreground">
+                  Branch cannot be changed after work has started.
+                </p>
+              )}
+              {editingFeature.status === "backlog" && (
+                <p className="text-xs text-muted-foreground">
+                  Work will be done in this branch. A worktree will be created if needed.
+                </p>
+              )}
             </div>
           </TabsContent>
 

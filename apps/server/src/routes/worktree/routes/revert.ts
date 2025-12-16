@@ -28,12 +28,8 @@ export function createRevertHandler() {
         return;
       }
 
-      const worktreePath = path.join(
-        projectPath,
-        ".automaker",
-        "worktrees",
-        featureId
-      );
+      // Git worktrees are stored in project directory
+      const worktreePath = path.join(projectPath, ".worktrees", featureId);
 
       try {
         // Remove worktree

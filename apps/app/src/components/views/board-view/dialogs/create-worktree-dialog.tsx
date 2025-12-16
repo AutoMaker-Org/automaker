@@ -20,7 +20,7 @@ interface CreateWorktreeDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   projectPath: string;
-  onCreated: () => void;
+  onCreated: (worktreePath: string) => void;
 }
 
 export function CreateWorktreeDialog({
@@ -68,7 +68,7 @@ export function CreateWorktreeDialog({
               : "Using existing branch",
           }
         );
-        onCreated();
+        onCreated(result.worktree.path);
         onOpenChange(false);
         setBranchName("");
       } else {

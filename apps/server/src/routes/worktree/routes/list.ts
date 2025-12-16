@@ -1,5 +1,8 @@
 /**
- * POST /list endpoint - List all worktrees
+ * POST /list endpoint - List all git worktrees
+ *
+ * Returns actual git worktrees from `git worktree list`.
+ * Does NOT include tracked branches - only real worktrees with separate directories.
  */
 
 import type { Request, Response } from "express";
@@ -13,8 +16,19 @@ interface WorktreeInfo {
   path: string;
   branch: string;
   isMain: boolean;
+  isCurrent: boolean; // Is this the currently checked out branch in main?
+  hasWorktree: boolean; // Always true for items in this list
   hasChanges?: boolean;
   changedFilesCount?: number;
+}
+
+async function getCurrentBranch(cwd: string): Promise<string> {
+  try {
+    const { stdout } = await execAsync("git branch --show-current", { cwd });
+    return stdout.trim();
+  } catch {
+    return "";
+  }
 }
 
 export function createListHandler() {
@@ -35,6 +49,10 @@ export function createListHandler() {
         return;
       }
 
+      // Get current branch in main directory
+      const currentBranch = await getCurrentBranch(projectPath);
+
+      // Get actual worktrees from git
       const { stdout } = await execAsync("git worktree list --porcelain", {
         cwd: projectPath,
       });
@@ -51,11 +69,12 @@ export function createListHandler() {
           current.branch = line.slice(7).replace("refs/heads/", "");
         } else if (line === "") {
           if (current.path && current.branch) {
-            // The first worktree in the list is always the main worktree
             worktrees.push({
               path: current.path,
               branch: current.branch,
-              isMain: isFirst
+              isMain: isFirst,
+              isCurrent: current.branch === currentBranch,
+              hasWorktree: true,
             });
             isFirst = false;
           }
@@ -71,11 +90,13 @@ export function createListHandler() {
               "git status --porcelain",
               { cwd: worktree.path }
             );
-            const changedFiles = statusOutput.trim().split("\n").filter(line => line.trim());
+            const changedFiles = statusOutput
+              .trim()
+              .split("\n")
+              .filter((line) => line.trim());
             worktree.hasChanges = changedFiles.length > 0;
             worktree.changedFilesCount = changedFiles.length;
           } catch {
-            // If we can't get status, assume no changes
             worktree.hasChanges = false;
             worktree.changedFilesCount = 0;
           }

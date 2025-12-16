@@ -29,13 +29,8 @@ export function createInfoHandler() {
         return;
       }
 
-      // Check if worktree exists
-      const worktreePath = path.join(
-        projectPath,
-        ".automaker",
-        "worktrees",
-        featureId
-      );
+      // Check if worktree exists (git worktrees are stored in project directory)
+      const worktreePath = path.join(projectPath, ".worktrees", featureId);
       try {
         await fs.access(worktreePath);
         const { stdout } = await execAsync("git rev-parse --abbrev-ref HEAD", {

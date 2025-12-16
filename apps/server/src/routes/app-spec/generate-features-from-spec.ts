@@ -3,13 +3,13 @@
  */
 
 import { query } from "@anthropic-ai/claude-agent-sdk";
-import path from "path";
 import fs from "fs/promises";
 import type { EventEmitter } from "../../lib/events.js";
 import { createLogger } from "../../lib/logger.js";
 import { createFeatureGenerationOptions } from "../../lib/sdk-options.js";
 import { logAuthStatus } from "./common.js";
 import { parseAndCreateFeatures } from "./parse-and-create-features.js";
+import { getAppSpecPath } from "../../lib/automaker-paths.js";
 
 const logger = createLogger("SpecRegeneration");
 
@@ -26,8 +26,8 @@ export async function generateFeaturesFromSpec(
   logger.debug("projectPath:", projectPath);
   logger.debug("maxFeatures:", featureCount);
 
-  // Read existing spec
-  const specPath = path.join(projectPath, ".automaker", "app_spec.txt");
+  // Read existing spec from external automaker directory
+  const specPath = await getAppSpecPath(projectPath);
   let spec: string;
 
   logger.debug("Reading spec from:", specPath);

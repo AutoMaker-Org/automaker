@@ -7,6 +7,7 @@ import fs from "fs/promises";
 import path from "path";
 import { addAllowedPath } from "../../../lib/security.js";
 import { getErrorMessage, logError } from "../common.js";
+import { getBoardDir } from "../../../lib/automaker-paths.js";
 
 export function createSaveBoardBackgroundHandler() {
   return async (req: Request, res: Response): Promise<void> => {
@@ -26,8 +27,8 @@ export function createSaveBoardBackgroundHandler() {
         return;
       }
 
-      // Create .automaker/board directory if it doesn't exist
-      const boardDir = path.join(projectPath, ".automaker", "board");
+      // Get external board directory
+      const boardDir = await getBoardDir(projectPath);
       await fs.mkdir(boardDir, { recursive: true });
 
       // Decode base64 data (remove data URL prefix if present)
@@ -42,12 +43,11 @@ export function createSaveBoardBackgroundHandler() {
       // Write file
       await fs.writeFile(filePath, buffer);
 
-      // Add project path to allowed paths if not already
-      addAllowedPath(projectPath);
+      // Add board directory to allowed paths
+      addAllowedPath(boardDir);
 
-      // Return the relative path for storage
-      const relativePath = `.automaker/board/${uniqueFilename}`;
-      res.json({ success: true, path: relativePath });
+      // Return the absolute path
+      res.json({ success: true, path: filePath });
     } catch (error) {
       logError(error, "Save board background failed");
       res.status(500).json({ success: false, error: getErrorMessage(error) });

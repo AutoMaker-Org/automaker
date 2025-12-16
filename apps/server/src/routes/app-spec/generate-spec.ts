@@ -11,6 +11,7 @@ import { createLogger } from "../../lib/logger.js";
 import { createSpecGenerationOptions } from "../../lib/sdk-options.js";
 import { logAuthStatus } from "./common.js";
 import { generateFeaturesFromSpec } from "./generate-features-from-spec.js";
+import { ensureAutomakerDir, getAppSpecPath } from "../../lib/automaker-paths.js";
 
 const logger = createLogger("SpecRegeneration");
 
@@ -209,14 +210,13 @@ ${getAppSpecFormatInstruction()}`;
     logger.error("❌ WARNING: responseText is empty! Nothing to save.");
   }
 
-  // Save spec
-  const specDir = path.join(projectPath, ".automaker");
-  const specPath = path.join(specDir, "app_spec.txt");
+  // Save spec to external automaker directory
+  const specDir = await ensureAutomakerDir(projectPath);
+  const specPath = await getAppSpecPath(projectPath);
 
   logger.info("Saving spec to:", specPath);
   logger.info(`Content to save (${responseText.length} chars)`);
 
-  await fs.mkdir(specDir, { recursive: true });
   await fs.writeFile(specPath, responseText);
 
   // Verify the file was written

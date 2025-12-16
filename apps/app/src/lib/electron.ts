@@ -224,7 +224,8 @@ export interface AutoModeAPI {
   runFeature: (
     projectPath: string,
     featureId: string,
-    useWorktrees?: boolean
+    useWorktrees?: boolean,
+    worktreePath?: string
   ) => Promise<{ success: boolean; passes?: boolean; error?: string }>;
   verifyFeature: (
     projectPath: string,
@@ -245,11 +246,13 @@ export interface AutoModeAPI {
     projectPath: string,
     featureId: string,
     prompt: string,
-    imagePaths?: string[]
+    imagePaths?: string[],
+    worktreePath?: string
   ) => Promise<{ success: boolean; passes?: boolean; error?: string }>;
   commitFeature: (
     projectPath: string,
-    featureId: string
+    featureId: string,
+    worktreePath?: string
   ) => Promise<{ success: boolean; error?: string }>;
   onEvent: (callback: (event: AutoModeEvent) => void) => () => void;
 }
@@ -1056,7 +1059,7 @@ function createMockWorktreeAPI(): WorktreeAPI {
       return {
         success: true,
         worktrees: [
-          { path: projectPath, branch: "main", isMain: true, hasChanges: false, changedFilesCount: 0 },
+          { path: projectPath, branch: "main", isMain: true, isCurrent: true, hasWorktree: true, hasChanges: false, changedFilesCount: 0 },
         ],
       };
     },
@@ -1104,6 +1107,7 @@ function createMockWorktreeAPI(): WorktreeAPI {
         result: {
           branch: "feature-branch",
           pushed: true,
+          message: "Successfully pushed to origin/feature-branch",
         },
       };
     },
@@ -1202,6 +1206,73 @@ function createMockWorktreeAPI(): WorktreeAPI {
           previousBranch: "main",
           currentBranch: branchName,
           message: `Switched to branch '${branchName}'`,
+        },
+      };
+    },
+
+    openInEditor: async (worktreePath: string) => {
+      console.log("[Mock] Opening in editor:", worktreePath);
+      return {
+        success: true,
+        result: {
+          message: `Opened ${worktreePath} in editor`,
+        },
+      };
+    },
+
+    initGit: async (projectPath: string) => {
+      console.log("[Mock] Initializing git:", projectPath);
+      return {
+        success: true,
+        result: {
+          initialized: true,
+          message: `Initialized git repository in ${projectPath}`,
+        },
+      };
+    },
+
+    activate: async (projectPath: string, worktreePath: string | null) => {
+      console.log("[Mock] Activating worktree:", { projectPath, worktreePath });
+      return {
+        success: true,
+        result: {
+          previousBranch: "main",
+          currentBranch: worktreePath ? "feature-branch" : "main",
+          message: worktreePath ? "Switched to worktree branch" : "Switched to main",
+        },
+      };
+    },
+
+    startDevServer: async (projectPath: string, worktreePath: string) => {
+      console.log("[Mock] Starting dev server:", { projectPath, worktreePath });
+      return {
+        success: true,
+        result: {
+          worktreePath,
+          port: 3001,
+          url: "http://localhost:3001",
+          message: "Dev server started on port 3001",
+        },
+      };
+    },
+
+    stopDevServer: async (worktreePath: string) => {
+      console.log("[Mock] Stopping dev server:", worktreePath);
+      return {
+        success: true,
+        result: {
+          worktreePath,
+          message: "Dev server stopped",
+        },
+      };
+    },
+
+    listDevServers: async () => {
+      console.log("[Mock] Listing dev servers");
+      return {
+        success: true,
+        result: {
+          servers: [],
         },
       };
     },
@@ -1311,7 +1382,8 @@ function createMockAutoModeAPI(): AutoModeAPI {
     runFeature: async (
       projectPath: string,
       featureId: string,
-      useWorktrees?: boolean
+      useWorktrees?: boolean,
+      worktreePath?: string
     ) => {
       if (mockRunningFeatures.has(featureId)) {
         return {
@@ -1321,7 +1393,7 @@ function createMockAutoModeAPI(): AutoModeAPI {
       }
 
       console.log(
-        `[Mock] Running feature ${featureId} with useWorktrees: ${useWorktrees}`
+        `[Mock] Running feature ${featureId} with useWorktrees: ${useWorktrees}, worktreePath: ${worktreePath}`
       );
       mockRunningFeatures.add(featureId);
       simulateAutoModeLoop(projectPath, featureId);
@@ -1481,7 +1553,8 @@ function createMockAutoModeAPI(): AutoModeAPI {
       projectPath: string,
       featureId: string,
       prompt: string,
-      imagePaths?: string[]
+      imagePaths?: string[],
+      worktreePath?: string
     ) => {
       if (mockRunningFeatures.has(featureId)) {
         return {
@@ -1506,8 +1579,8 @@ function createMockAutoModeAPI(): AutoModeAPI {
       return { success: true };
     },
 
-    commitFeature: async (projectPath: string, featureId: string) => {
-      console.log("[Mock] Committing feature:", { projectPath, featureId });
+    commitFeature: async (projectPath: string, featureId: string, worktreePath?: string) => {
+      console.log("[Mock] Committing feature:", { projectPath, featureId, worktreePath });
 
       // Simulate commit operation
       emitAutoModeEvent({

@@ -6,8 +6,9 @@ import type { Request, Response } from "express";
 import { exec } from "child_process";
 import { promisify } from "util";
 import path from "path";
-import fs from "fs/promises";
+import { mkdir, access } from "fs/promises";
 import { isGitRepo, getErrorMessage, logError } from "../common.js";
+import { trackBranch } from "./branch-tracking.js";
 
 const execAsync = promisify(exec);
 
@@ -42,14 +43,19 @@ export function createCreateHandler() {
       const worktreePath = path.join(worktreesDir, sanitizedName);
 
       // Create worktrees directory if it doesn't exist
-      await fs.mkdir(worktreesDir, { recursive: true });
+      await mkdir(worktreesDir, { recursive: true });
 
       // Check if worktree already exists
       try {
-        await fs.access(worktreePath);
-        res.status(400).json({
-          success: false,
-          error: `Worktree for branch '${branchName}' already exists`,
+        await access(worktreePath);
+        // Worktree already exists, return it instead of error
+        res.json({
+          success: true,
+          worktree: {
+            path: worktreePath,
+            branch: branchName,
+            isNew: false,
+          },
         });
         return;
       } catch {
@@ -80,22 +86,12 @@ export function createCreateHandler() {
 
       await execAsync(createCmd, { cwd: projectPath });
 
-      // Symlink .automaker directory to worktree so features are shared
-      const mainAutomaker = path.join(projectPath, ".automaker");
-      const worktreeAutomaker = path.join(worktreePath, ".automaker");
+      // Note: We intentionally do NOT symlink .automaker to worktrees
+      // Features and config are always accessed from the main project path
+      // This avoids symlink loop issues when activating worktrees
 
-      try {
-        // Check if .automaker exists in main project
-        await fs.access(mainAutomaker);
-        // Create symlink in worktree pointing to main .automaker
-        // Use 'junction' on Windows, 'dir' on other platforms
-        const symlinkType = process.platform === "win32" ? "junction" : "dir";
-        await fs.symlink(mainAutomaker, worktreeAutomaker, symlinkType);
-      } catch (symlinkError) {
-        // .automaker doesn't exist or symlink failed
-        // Log but don't fail - worktree is still usable without shared .automaker
-        console.warn("[Worktree] Could not create .automaker symlink:", symlinkError);
-      }
+      // Track the branch so it persists in the UI even after worktree is removed
+      await trackBranch(projectPath, branchName);
 
       res.json({
         success: true,

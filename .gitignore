@@ -13,3 +13,4 @@ dist/
 /.automaker/
 
 /logs
+.worktrees/

@@ -48,6 +48,31 @@ export async function initializeProject(
   const existingFiles: string[] = [];
 
   try {
+    // Initialize git repository if it doesn't exist
+    const gitDirExists = await api.exists(`${projectPath}/.git`);
+    if (!gitDirExists) {
+      console.log("[project-init] Initializing git repository...");
+      try {
+        // Initialize git and create an initial empty commit via server route
+        const result = await api.worktree?.initGit(projectPath);
+        if (result?.success && result.result?.initialized) {
+          createdFiles.push(".git");
+          console.log("[project-init] Git repository initialized with initial commit");
+        } else if (result?.success && !result.result?.initialized) {
+          // Git already existed (shouldn't happen since we checked, but handle it)
+          existingFiles.push(".git");
+          console.log("[project-init] Git repository already exists");
+        } else {
+          console.warn("[project-init] Failed to initialize git repository:", result?.error);
+        }
+      } catch (gitError) {
+        console.warn("[project-init] Failed to initialize git repository:", gitError);
+        // Don't fail the whole initialization if git init fails
+      }
+    } else {
+      existingFiles.push(".git");
+    }
+
     // Create all required directories
     for (const dir of REQUIRED_STRUCTURE.directories) {
       const fullPath = `${projectPath}/${dir}`;
