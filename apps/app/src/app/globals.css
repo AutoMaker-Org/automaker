@@ -1,9 +1,6 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
-/* Safelist theme classes that are applied dynamically via JavaScript */
-@source "../**/*.{js,ts,jsx,tsx}";
-
 @custom-variant dark (&:is(.dark *));
 @custom-variant retro (&:is(.retro *));
 @custom-variant dracula (&:is(.dracula *));
