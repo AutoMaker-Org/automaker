@@ -7,12 +7,9 @@
     "type": "git",
     "url": "https://github.com/AutoMaker-Org/automaker.git"
   },
-  "author": {
-    "name": "Cody Seibert",
-    "email": "webdevcody@gmail.com"
-  },
+  "author": "AutoMaker Team",
+  "license": "SEE LICENSE IN LICENSE",
   "private": true,
-  "license": "Unlicense",
   "main": "dist-electron/main.js",
   "scripts": {
     "dev": "vite",

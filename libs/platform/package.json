@@ -11,7 +11,8 @@
     "test:watch": "vitest"
   },
   "keywords": ["automaker", "platform"],
-  "author": "",
+  "author": "AutoMaker Team",
+  "license": "SEE LICENSE IN LICENSE",
   "dependencies": {
     "@automaker/types": "^1.0.0"
   },

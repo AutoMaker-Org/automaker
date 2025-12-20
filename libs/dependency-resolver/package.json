@@ -17,7 +17,8 @@
     "watch": "tsc --watch"
   },
   "keywords": ["automaker", "dependency", "resolver"],
-  "author": "",
+  "author": "AutoMaker Team",
+  "license": "SEE LICENSE IN LICENSE",
   "dependencies": {
     "@automaker/types": "^1.0.0"
   },
