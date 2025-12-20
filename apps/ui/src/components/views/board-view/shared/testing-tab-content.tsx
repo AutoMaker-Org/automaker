@@ -23,13 +23,13 @@ export function TestingTabContent({
   const checkboxId = testIdPrefix ? `${testIdPrefix}-skip-tests` : "skip-tests";
 
   const handleStepChange = (index: number, value: string) => {
-    const newSteps = [...steps];
+    const newSteps = [...(steps || [])];
     newSteps[index] = value;
     onStepsChange(newSteps);
   };
 
   const handleAddStep = () => {
-    onStepsChange([...steps, ""]);
+    onStepsChange([...(steps || []), ""]);
   };
 
   return (
@@ -60,7 +60,7 @@ export function TestingTabContent({
           <p className="text-xs text-muted-foreground mb-2">
             Add manual steps to verify this feature works correctly.
           </p>
-          {steps.map((step, index) => (
+          {Array.isArray(steps) && steps.map((step, index) => (
             <Input
               key={index}
               value={step}

@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from "react";
-import { useAppStore, Feature } from "@/store/app-store";
+import { useAppStore, type Feature } from "@/store/app-store";
 import { getElectronAPI } from "@/lib/electron";
 import { toast } from "sonner";
 
@@ -60,7 +60,7 @@ export function useBoardFeatures({ currentProject }: UseBoardFeaturesProps) {
 
       if (result.success && result.features) {
         const featuresWithIds = result.features.map(
-          (f: any, index: number) => ({
+          (f: Feature, index: number) => ({
             ...f,
             id: f.id || `feature-${index}-${Date.now()}`,
             status: f.status || "backlog",
@@ -68,6 +68,7 @@ export function useBoardFeatures({ currentProject }: UseBoardFeaturesProps) {
             // Ensure model and thinkingLevel are set for backward compatibility
             model: f.model || "opus",
             thinkingLevel: f.thinkingLevel || "none",
+            steps: f.steps || []
           })
         );
         // Successfully loaded features - now safe to set them
