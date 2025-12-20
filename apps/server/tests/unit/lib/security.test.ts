@@ -129,16 +129,38 @@ describe("security.ts", () => {
   });
 
   describe("isPathAllowed", () => {
-    it("should allow all paths (permissions disabled)", async () => {
+    it("should allow paths within configured allowed directories", async () => {
       process.env.ALLOWED_PROJECT_DIRS = "/allowed/project";
       process.env.DATA_DIR = "";
+      delete process.env.ALLOWED_ROOT_DIRECTORY;
 
       const { initAllowedPaths, isPathAllowed } = await import(
         "@/lib/security.js"
       );
       initAllowedPaths();
 
-      // All paths are now allowed regardless of configuration
+      // Paths within allowed directory should be allowed
+      expect(isPathAllowed("/allowed/project/file.txt")).toBe(true);
+      expect(isPathAllowed("/allowed/project/subdir/file.txt")).toBe(true);
+
+      // Paths outside allowed directory should be denied
+      expect(isPathAllowed("/not/allowed/file.txt")).toBe(false);
+      expect(isPathAllowed("/tmp/file.txt")).toBe(false);
+      expect(isPathAllowed("/etc/passwd")).toBe(false);
+    });
+
+    it("should allow all paths when no restrictions are configured", async () => {
+      delete process.env.ALLOWED_PROJECT_DIRS;
+      delete process.env.DATA_DIR;
+      delete process.env.WORKSPACE_DIR;
+      delete process.env.ALLOWED_ROOT_DIRECTORY;
+
+      const { initAllowedPaths, isPathAllowed } = await import(
+        "@/lib/security.js"
+      );
+      initAllowedPaths();
+
+      // All paths should be allowed when no restrictions are configured
       expect(isPathAllowed("/allowed/project/file.txt")).toBe(true);
       expect(isPathAllowed("/not/allowed/file.txt")).toBe(true);
       expect(isPathAllowed("/tmp/file.txt")).toBe(true);
@@ -148,9 +170,10 @@ describe("security.ts", () => {
   });
 
   describe("validatePath", () => {
-    it("should return resolved path for any path (permissions disabled)", async () => {
+    it("should return resolved path for allowed paths", async () => {
       process.env.ALLOWED_PROJECT_DIRS = "/allowed";
       process.env.DATA_DIR = "";
+      delete process.env.ALLOWED_ROOT_DIRECTORY;
 
       const { initAllowedPaths, validatePath } = await import(
         "@/lib/security.js"
@@ -161,26 +184,43 @@ describe("security.ts", () => {
       expect(result).toBe(path.resolve("/allowed/file.txt"));
     });
 
-    it("should not throw error for any path (permissions disabled)", async () => {
+    it("should throw error for paths outside allowed directories", async () => {
       process.env.ALLOWED_PROJECT_DIRS = "/allowed";
       process.env.DATA_DIR = "";
+      delete process.env.ALLOWED_ROOT_DIRECTORY;
 
       const { initAllowedPaths, validatePath } = await import(
         "@/lib/security.js"
       );
       initAllowedPaths();
 
-      // All paths are now allowed, no errors thrown
+      // Disallowed paths should throw PathNotAllowedError
+      expect(() => validatePath("/disallowed/file.txt")).toThrow();
+    });
+
+    it("should not throw error for any path when no restrictions are configured", async () => {
+      delete process.env.ALLOWED_PROJECT_DIRS;
+      delete process.env.DATA_DIR;
+      delete process.env.WORKSPACE_DIR;
+      delete process.env.ALLOWED_ROOT_DIRECTORY;
+
+      const { initAllowedPaths, validatePath } = await import(
+        "@/lib/security.js"
+      );
+      initAllowedPaths();
+
+      // All paths are allowed when no restrictions configured
       expect(() => validatePath("/disallowed/file.txt")).not.toThrow();
       expect(validatePath("/disallowed/file.txt")).toBe(
         path.resolve("/disallowed/file.txt")
       );
     });
 
-    it("should resolve relative paths", async () => {
+    it("should resolve relative paths within allowed directory", async () => {
       const cwd = process.cwd();
       process.env.ALLOWED_PROJECT_DIRS = cwd;
       process.env.DATA_DIR = "";
+      delete process.env.ALLOWED_ROOT_DIRECTORY;
 
       const { initAllowedPaths, validatePath } = await import(
         "@/lib/security.js"

@@ -37,11 +37,13 @@ services:
       # Optional - authentication (leave empty to disable)
       - AUTOMAKER_API_KEY=${AUTOMAKER_API_KEY:-}
 
-      # Optional - restrict to specific directories within container only
-      # These paths are INSIDE the container, not on your host
-      - ALLOWED_PROJECT_DIRS=${ALLOWED_PROJECT_DIRS:-/projects}
+      # Optional - restrict to specific directory within container only
+      # Projects and files can only be created/accessed within this directory
+      # Paths are INSIDE the container, not on your host
+      # Default: /projects
+      - ALLOWED_ROOT_DIRECTORY=${ALLOWED_ROOT_DIRECTORY:-/projects}
 
-      # Optional - data directory for sessions, etc. (container-only)
+      # Optional - data directory for sessions, settings, etc. (container-only)
       - DATA_DIR=/data
 
       # Optional - CORS origin (default allows all)

@@ -239,6 +239,24 @@ export function WelcomeView() {
       const api = getElectronAPI();
       const projectPath = `${parentDir}/${projectName}`;
 
+      // Validate that parent directory exists
+      const parentExists = await api.exists(parentDir);
+      if (!parentExists) {
+        toast.error("Parent directory does not exist", {
+          description: `Cannot create project in non-existent directory: ${parentDir}`,
+        });
+        return;
+      }
+
+      // Verify parent is actually a directory
+      const parentStat = await api.stat(parentDir);
+      if (parentStat && !parentStat.isDirectory) {
+        toast.error("Parent path is not a directory", {
+          description: `${parentDir} is not a directory`,
+        });
+        return;
+      }
+
       // Create project directory
       const mkdirResult = await api.mkdir(projectPath);
       if (!mkdirResult.success) {

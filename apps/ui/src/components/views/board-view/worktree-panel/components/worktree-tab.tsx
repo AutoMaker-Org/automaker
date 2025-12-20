@@ -191,7 +191,9 @@ export function WorktreeTab({
             )}
             onClick={() => onSelectWorktree(worktree)}
             disabled={isActivating}
-            title="Click to preview main"
+            title={`Click to preview ${worktree.branch}`}
+            aria-label={worktree.branch}
+            data-testid={`worktree-branch-${worktree.branch}`}
           >
             {isRunning && <Loader2 className="w-3 h-3 animate-spin" />}
             {isActivating && !isRunning && (

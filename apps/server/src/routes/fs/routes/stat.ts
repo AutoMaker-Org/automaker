@@ -4,7 +4,7 @@
 
 import type { Request, Response } from "express";
 import fs from "fs/promises";
-import { validatePath } from "../../../lib/security.js";
+import { validatePath, PathNotAllowedError } from "../../../lib/security.js";
 import { getErrorMessage, logError } from "../common.js";
 
 export function createStatHandler() {
@@ -30,6 +30,12 @@ export function createStatHandler() {
         },
       });
     } catch (error) {
+      // Path not allowed - return 403 Forbidden
+      if (error instanceof PathNotAllowedError) {
+        res.status(403).json({ success: false, error: getErrorMessage(error) });
+        return;
+      }
+
       logError(error, "Get file stats failed");
       res.status(500).json({ success: false, error: getErrorMessage(error) });
     }

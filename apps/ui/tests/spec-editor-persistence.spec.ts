@@ -46,28 +46,31 @@ test.describe("Spec Editor Persistence", () => {
     // Step 4: Click on the Spec Editor in the sidebar
     await navigateToSpecEditor(page);
 
-    // Step 5: Wait for the spec editor to load
+    // Step 5: Wait for the spec view to load (not empty state)
+    await waitForElement(page, "spec-view", { timeout: 10000 });
+
+    // Step 6: Wait for the spec editor to load
     const specEditor = await getByTestId(page, "spec-editor");
     await specEditor.waitFor({ state: "visible", timeout: 10000 });
 
-    // Step 6: Wait for CodeMirror to initialize (it has a .cm-content element)
+    // Step 7: Wait for CodeMirror to initialize (it has a .cm-content element)
     await specEditor.locator(".cm-content").waitFor({ state: "visible", timeout: 10000 });
 
-    // Step 7: Modify the editor content to "hello world"
+    // Step 8: Modify the editor content to "hello world"
     await setEditorContent(page, "hello world");
 
     // Verify content was set before saving
     const contentBeforeSave = await getEditorContent(page);
     expect(contentBeforeSave.trim()).toBe("hello world");
 
-    // Step 8: Click the save button and wait for save to complete
+    // Step 9: Click the save button and wait for save to complete
     await clickSaveButton(page);
 
-    // Step 9: Refresh the page
+    // Step 10: Refresh the page
     await page.reload();
     await waitForNetworkIdle(page);
 
-    // Step 10: Navigate back to the spec editor
+    // Step 11: Navigate back to the spec editor
     // After reload, we need to wait for the app to initialize
     await waitForElement(page, "sidebar", { timeout: 10000 });
 
@@ -116,7 +119,7 @@ test.describe("Spec Editor Persistence", () => {
       );
     }
 
-    // Step 11: Verify the content was persisted
+    // Step 12: Verify the content was persisted
     const persistedContent = await getEditorContent(page);
     expect(persistedContent.trim()).toBe("hello world");
   });

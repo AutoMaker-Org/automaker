@@ -4,7 +4,7 @@
 
 import type { Request, Response } from "express";
 import fs from "fs/promises";
-import { validatePath } from "../../../lib/security.js";
+import { validatePath, PathNotAllowedError } from "../../../lib/security.js";
 import { getErrorMessage, logError } from "../common.js";
 
 // Optional files that are expected to not exist in new projects
@@ -39,6 +39,12 @@ export function createReadHandler() {
 
       res.json({ success: true, content });
     } catch (error) {
+      // Path not allowed - return 403 Forbidden
+      if (error instanceof PathNotAllowedError) {
+        res.status(403).json({ success: false, error: getErrorMessage(error) });
+        return;
+      }
+
       // Don't log ENOENT errors for optional files (expected to be missing in new projects)
       const shouldLog = !(isENOENT(error) && isOptionalFile(req.body?.filePath || ""));
       if (shouldLog) {

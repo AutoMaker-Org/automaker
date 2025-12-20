@@ -6,7 +6,7 @@ import type { Request, Response } from "express";
 import { spawn } from "child_process";
 import path from "path";
 import fs from "fs/promises";
-import { addAllowedPath } from "../../../lib/security.js";
+import { addAllowedPath, isPathAllowed, PathNotAllowedError } from "../../../lib/security.js";
 import { logger, getErrorMessage, logError } from "../common.js";
 
 export function createCloneHandler() {
@@ -59,6 +59,24 @@ export function createCloneHandler() {
         res.status(400).json({
           success: false,
           error: "Invalid project name; potential path traversal attempt.",
+        });
+        return;
+      }
+
+      // Validate that parent directory is within allowed root directory
+      if (!isPathAllowed(resolvedParent)) {
+        res.status(403).json({
+          success: false,
+          error: `Parent directory not allowed: ${parentDir}. Must be within ALLOWED_ROOT_DIRECTORY.`,
+        });
+        return;
+      }
+
+      // Validate that project path will be within allowed root directory
+      if (!isPathAllowed(resolvedProject)) {
+        res.status(403).json({
+          success: false,
+          error: `Project path not allowed: ${projectPath}. Must be within ALLOWED_ROOT_DIRECTORY.`,
         });
         return;
       }

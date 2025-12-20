@@ -48,6 +48,34 @@ export async function initializeProject(
   const existingFiles: string[] = [];
 
   try {
+    // Validate that the project directory exists and is a directory
+    const projectExists = await api.exists(projectPath);
+    if (!projectExists) {
+      return {
+        success: false,
+        isNewProject: false,
+        error: `Project directory does not exist: ${projectPath}. Create it first before initializing.`,
+      };
+    }
+
+    // Verify it's actually a directory (not a file)
+    const projectStat = await api.stat(projectPath);
+    if (!projectStat.success) {
+      return {
+        success: false,
+        isNewProject: false,
+        error: projectStat.error || `Failed to stat project directory: ${projectPath}`,
+      };
+    }
+
+    if (projectStat.stats && !projectStat.stats.isDirectory) {
+      return {
+        success: false,
+        isNewProject: false,
+        error: `Project path is not a directory: ${projectPath}`,
+      };
+    }
+
     // Initialize git repository if it doesn't exist
     const gitDirExists = await api.exists(`${projectPath}/.git`);
     if (!gitDirExists) {

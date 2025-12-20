@@ -6,7 +6,7 @@
 import type { Request, Response } from "express";
 import fs from "fs/promises";
 import path from "path";
-import { addAllowedPath } from "../../../lib/security.js";
+import { addAllowedPath, isPathAllowed, PathNotAllowedError } from "../../../lib/security.js";
 import { getErrorMessage, logError } from "../common.js";
 
 export function createMkdirHandler() {
@@ -20,6 +20,11 @@ export function createMkdirHandler() {
       }
 
       const resolvedPath = path.resolve(dirPath);
+
+      // Validate that the path is allowed
+      if (!isPathAllowed(resolvedPath)) {
+        throw new PathNotAllowedError(dirPath);
+      }
 
       // Check if path already exists using lstat (doesn't follow symlinks)
       try {
@@ -52,6 +57,12 @@ export function createMkdirHandler() {
 
       res.json({ success: true });
     } catch (error: any) {
+      // Path not allowed - return 403 Forbidden
+      if (error instanceof PathNotAllowedError) {
+        res.status(403).json({ success: false, error: getErrorMessage(error) });
+        return;
+      }
+
       // Handle ELOOP specifically
       if (error.code === "ELOOP") {
         logError(error, "Create directory failed - symlink loop detected");

@@ -24,6 +24,7 @@ import { resolveDependencies, areDependenciesSatisfied } from "../lib/dependency
 import type { Feature } from "./feature-loader.js";
 import { FeatureLoader } from "./feature-loader.js";
 import { getFeatureDir, getAutomakerDir, getFeaturesDir, getContextDir } from "../lib/automaker-paths.js";
+import { isPathAllowed, PathNotAllowedError } from "../lib/security.js";
 
 const execAsync = promisify(exec);
 
@@ -486,6 +487,11 @@ export class AutoModeService {
     this.runningFeatures.set(featureId, tempRunningFeature);
 
     try {
+      // Validate that project path is allowed
+      if (!isPathAllowed(projectPath)) {
+        throw new PathNotAllowedError(projectPath);
+      }
+
       // Check if feature has existing context - if so, resume instead of starting fresh
       // Skip this check if we're already being called with a continuation prompt (from resumeFeature)
       if (!options?.continuationPrompt) {
@@ -548,6 +554,11 @@ export class AutoModeService {
       const workDir = worktreePath
         ? path.resolve(worktreePath)
         : path.resolve(projectPath);
+
+      // Validate that working directory is allowed
+      if (!isPathAllowed(workDir)) {
+        throw new PathNotAllowedError(workDir);
+      }
 
       // Update running feature with actual worktree info
       tempRunningFeature.worktreePath = worktreePath;

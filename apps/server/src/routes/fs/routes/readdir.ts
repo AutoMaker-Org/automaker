@@ -4,7 +4,7 @@
 
 import type { Request, Response } from "express";
 import fs from "fs/promises";
-import { validatePath } from "../../../lib/security.js";
+import { validatePath, PathNotAllowedError } from "../../../lib/security.js";
 import { getErrorMessage, logError } from "../common.js";
 
 export function createReaddirHandler() {
@@ -28,6 +28,12 @@ export function createReaddirHandler() {
 
       res.json({ success: true, entries: result });
     } catch (error) {
+      // Path not allowed - return 403 Forbidden
+      if (error instanceof PathNotAllowedError) {
+        res.status(403).json({ success: false, error: getErrorMessage(error) });
+        return;
+      }
+
       logError(error, "Read directory failed");
       res.status(500).json({ success: false, error: getErrorMessage(error) });
     }

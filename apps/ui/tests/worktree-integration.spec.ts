@@ -103,9 +103,10 @@ test.describe("Worktree Integration Tests", () => {
     const branchLabel = page.getByText("Branch:");
     await expect(branchLabel).toBeVisible({ timeout: 10000 });
 
-    // Verify main branch button is displayed
-    const mainBranchButton = page.getByRole("button", { name: "main" });
-    await expect(mainBranchButton).toBeVisible({ timeout: 10000 });
+    // Wait for worktrees to load and main branch button to appear
+    // Use data-testid for more reliable selection
+    const mainBranchButton = page.locator('[data-testid="worktree-branch-main"]');
+    await expect(mainBranchButton).toBeVisible({ timeout: 15000 });
   });
 
   test("should select main branch by default when app loads with stale worktree data", async ({

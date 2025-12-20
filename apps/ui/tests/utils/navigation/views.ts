@@ -37,8 +37,25 @@ export async function navigateToSpec(page: Page): Promise<void> {
   await page.goto("/spec");
   await page.waitForLoadState("networkidle");
 
-  // Wait for the spec view to be visible
-  await waitForElement(page, "spec-view", { timeout: 10000 });
+  // Wait for loading state to complete first (if present)
+  const loadingElement = page.locator('[data-testid="spec-view-loading"]');
+  try {
+    const loadingVisible = await loadingElement.isVisible({ timeout: 2000 });
+    if (loadingVisible) {
+      // Wait for loading to disappear (spec view or empty state will appear)
+      await loadingElement.waitFor({ state: "hidden", timeout: 10000 });
+    }
+  } catch {
+    // Loading element not found or already hidden, continue
+  }
+
+  // Wait for either the main spec view or empty state to be visible
+  // The spec-view element appears when loading is complete and spec exists
+  // The spec-view-empty element appears when loading is complete and spec doesn't exist
+  await Promise.race([
+    waitForElement(page, "spec-view", { timeout: 10000 }).catch(() => null),
+    waitForElement(page, "spec-view-empty", { timeout: 10000 }).catch(() => null),
+  ]);
 }
 
 /**

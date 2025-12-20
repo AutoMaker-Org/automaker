@@ -13,6 +13,7 @@ import { readImageAsBase64 } from "../lib/image-handler.js";
 import { buildPromptWithImages } from "../lib/prompt-builder.js";
 import { createChatOptions } from "../lib/sdk-options.js";
 import { isAbortError } from "../lib/error-handler.js";
+import { isPathAllowed, PathNotAllowedError } from "../lib/security.js";
 
 interface Message {
   id: string;
@@ -80,11 +81,20 @@ export class AgentService {
       const metadata = await this.loadMetadata();
       const sessionMetadata = metadata[sessionId];
 
+      // Determine the effective working directory
+      const effectiveWorkingDirectory = workingDirectory || process.cwd();
+      const resolvedWorkingDirectory = path.resolve(effectiveWorkingDirectory);
+
+      // Validate that the working directory is allowed
+      if (!isPathAllowed(resolvedWorkingDirectory)) {
+        throw new PathNotAllowedError(effectiveWorkingDirectory);
+      }
+
       this.sessions.set(sessionId, {
         messages,
         isRunning: false,
         abortController: null,
-        workingDirectory: workingDirectory || process.cwd(),
+        workingDirectory: resolvedWorkingDirectory,
         sdkSessionId: sessionMetadata?.sdkSessionId, // Load persisted SDK session ID
       });
     }
@@ -461,11 +471,28 @@ export class AgentService {
     const sessionId = this.generateId();
     const metadata = await this.loadMetadata();
 
+    // Determine the effective working directory
+    const effectiveWorkingDirectory = workingDirectory || projectPath || process.cwd();
+    const resolvedWorkingDirectory = path.resolve(effectiveWorkingDirectory);
+
+    // Validate that the working directory is allowed
+    if (!isPathAllowed(resolvedWorkingDirectory)) {
+      throw new PathNotAllowedError(effectiveWorkingDirectory);
+    }
+
+    // Validate that projectPath is allowed if provided
+    if (projectPath) {
+      const resolvedProjectPath = path.resolve(projectPath);
+      if (!isPathAllowed(resolvedProjectPath)) {
+        throw new PathNotAllowedError(projectPath);
+      }
+    }
+
     const session: SessionMetadata = {
       id: sessionId,
       name,
       projectPath,
-      workingDirectory: workingDirectory || projectPath || process.cwd(),
+      workingDirectory: resolvedWorkingDirectory,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       model,

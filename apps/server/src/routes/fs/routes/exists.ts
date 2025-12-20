@@ -5,6 +5,7 @@
 import type { Request, Response } from "express";
 import fs from "fs/promises";
 import path from "path";
+import { isPathAllowed, PathNotAllowedError } from "../../../lib/security.js";
 import { getErrorMessage, logError } from "../common.js";
 
 export function createExistsHandler() {
@@ -17,9 +18,12 @@ export function createExistsHandler() {
         return;
       }
 
-      // For exists, we check but don't require the path to be pre-allowed
-      // This allows the UI to validate user-entered paths
       const resolvedPath = path.resolve(filePath);
+
+      // Validate that the path is allowed
+      if (!isPathAllowed(resolvedPath)) {
+        throw new PathNotAllowedError(filePath);
+      }
 
       try {
         await fs.access(resolvedPath);
@@ -28,6 +32,12 @@ export function createExistsHandler() {
         res.json({ success: true, exists: false });
       }
     } catch (error) {
+      // Path not allowed - return 403 Forbidden
+      if (error instanceof PathNotAllowedError) {
+        res.status(403).json({ success: false, error: getErrorMessage(error) });
+        return;
+      }
+
       logError(error, "Check exists failed");
       res.status(500).json({ success: false, error: getErrorMessage(error) });
     }

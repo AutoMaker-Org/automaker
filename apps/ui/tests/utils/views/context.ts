@@ -128,7 +128,7 @@ export async function waitForContextFile(
   filename: string,
   timeout: number = 10000
 ): Promise<void> {
-  const locator = await getByTestId(page, `context-file-${filename}`);
+  const locator = page.locator(`[data-testid="context-file-${filename}"]`);
   await locator.waitFor({ state: "visible", timeout });
 }
 
