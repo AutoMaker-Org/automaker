@@ -2,7 +2,7 @@
  * Common utilities and state for suggestions routes
  */
 
-import { createLogger } from "../../lib/logger.js";
+import { createLogger } from "@automaker/utils";
 import {
   getErrorMessage as getErrorMessageShared,
   createLogError,

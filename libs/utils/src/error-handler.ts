@@ -8,6 +8,8 @@
  * - Generating user-friendly error messages
  */
 
+import type { ErrorType, ErrorInfo } from '@automaker/types';
+
 /**
  * Check if an error is an abort/cancellation error
  *
@@ -50,23 +52,6 @@ export function isAuthenticationError(errorMessage: string): boolean {
     errorMessage.includes("authentication_failed") ||
     errorMessage.includes("Fix external API key")
   );
-}
-
-/**
- * Error type classification
- */
-export type ErrorType = "authentication" | "cancellation" | "abort" | "execution" | "unknown";
-
-/**
- * Classified error information
- */
-export interface ErrorInfo {
-  type: ErrorType;
-  message: string;
-  isAbort: boolean;
-  isAuth: boolean;
-  isCancellation: boolean;
-  originalError: unknown;
 }
 
 /**
@@ -122,4 +107,28 @@ export function getUserFriendlyErrorMessage(error: unknown): string {
   }
 
   return info.message;
+}
+
+/**
+ * Extract error message from an unknown error value
+ *
+ * Simple utility for getting a string error message from any error type.
+ * Returns the error's message property if it's an Error, otherwise
+ * converts to string. Used throughout the codebase for consistent
+ * error message extraction.
+ *
+ * @param error - The error value (Error object, string, or unknown)
+ * @returns Error message string
+ *
+ * @example
+ * ```typescript
+ * try {
+ *   throw new Error("Something went wrong");
+ * } catch (error) {
+ *   const message = getErrorMessage(error); // "Something went wrong"
+ * }
+ * ```
+ */
+export function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : "Unknown error";
 }

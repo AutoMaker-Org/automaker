@@ -10,7 +10,7 @@ import path from "path";
 import {
   getBranchTrackingPath,
   ensureAutomakerDir,
-} from "../../../lib/automaker-paths.js";
+} from "@automaker/platform";
 
 export interface TrackedBranch {
   name: string;

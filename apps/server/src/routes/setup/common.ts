@@ -2,7 +2,7 @@
  * Common utilities and state for setup routes
  */
 
-import { createLogger } from "../../lib/logger.js";
+import { createLogger } from "@automaker/utils";
 import path from "path";
 import fs from "fs/promises";
 import {

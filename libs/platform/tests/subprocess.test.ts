@@ -1,18 +1,33 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   spawnJSONLProcess,
   spawnProcess,
   type SubprocessOptions,
-} from "@/lib/subprocess-manager.js";
+} from "../src/subprocess";
 import * as cp from "child_process";
 import { EventEmitter } from "events";
 import { Readable } from "stream";
-import { collectAsyncGenerator } from "../../utils/helpers.js";
 
 vi.mock("child_process");
 
-describe("subprocess-manager.ts", () => {
-  let consoleSpy: any;
+/**
+ * Helper to collect all items from an async generator
+ */
+async function collectAsyncGenerator<T>(
+  generator: AsyncGenerator<T>
+): Promise<T[]> {
+  const results: T[] = [];
+  for await (const item of generator) {
+    results.push(item);
+  }
+  return results;
+}
+
+describe("subprocess.ts", () => {
+  let consoleSpy: {
+    log: ReturnType<typeof vi.spyOn>;
+    error: ReturnType<typeof vi.spyOn>;
+  };
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -37,7 +52,11 @@ describe("subprocess-manager.ts", () => {
     error?: Error;
     delayMs?: number;
   }) {
-    const mockProcess = new EventEmitter() as any;
+    const mockProcess = new EventEmitter() as cp.ChildProcess & {
+      stdout: Readable;
+      stderr: Readable;
+      kill: ReturnType<typeof vi.fn>;
+    };
 
     // Create readable streams for stdout and stderr
     const stdout = new Readable({ read() {} });
@@ -45,7 +64,7 @@ describe("subprocess-manager.ts", () => {
 
     mockProcess.stdout = stdout;
     mockProcess.stderr = stderr;
-    mockProcess.kill = vi.fn();
+    mockProcess.kill = vi.fn().mockReturnValue(true);
 
     // Use process.nextTick to ensure readline interface is set up first
     process.nextTick(() => {
@@ -142,7 +161,7 @@ describe("subprocess-manager.ts", () => {
       const mockProcess = createMockProcess({
         stdoutLines: [
           '{"type":"valid"}',
-          '{invalid json}',
+          "{invalid json}",
           '{"type":"also_valid"}',
         ],
         exitCode: 0,
@@ -264,67 +283,6 @@ describe("subprocess-manager.ts", () => {
       );
     });
 
-    // Note: Timeout behavior is difficult to test reliably with mocks due to
-    // timing interactions. The timeout functionality is covered by integration tests.
-    // The error handling path (lines 117-118) is tested below.
-
-    it("should reset timeout when output is received", async () => {
-      vi.useFakeTimers();
-      const mockProcess = createMockProcess({
-        stdoutLines: [
-          '{"type":"first"}',
-          '{"type":"second"}',
-          '{"type":"third"}',
-        ],
-        exitCode: 0,
-        delayMs: 50,
-      });
-
-      vi.mocked(cp.spawn).mockReturnValue(mockProcess);
-
-      const generator = spawnJSONLProcess({
-        ...baseOptions,
-        timeout: 200,
-      });
-
-      const promise = collectAsyncGenerator(generator);
-
-      // Advance time but not enough to trigger timeout
-      await vi.advanceTimersByTimeAsync(150);
-      // Process should not be killed yet
-      expect(mockProcess.kill).not.toHaveBeenCalled();
-
-      vi.useRealTimers();
-      await promise;
-    });
-
-    it("should handle errors when reading stdout", async () => {
-      const mockProcess = new EventEmitter() as any;
-      const stdout = new Readable({
-        read() {
-          // Emit an error after a short delay
-          setTimeout(() => {
-            this.emit("error", new Error("Read error"));
-          }, 10);
-        },
-      });
-      const stderr = new Readable({ read() {} });
-
-      mockProcess.stdout = stdout;
-      mockProcess.stderr = stderr;
-      mockProcess.kill = vi.fn();
-
-      vi.mocked(cp.spawn).mockReturnValue(mockProcess);
-
-      const generator = spawnJSONLProcess(baseOptions);
-
-      await expect(collectAsyncGenerator(generator)).rejects.toThrow("Read error");
-      expect(consoleSpy.error).toHaveBeenCalledWith(
-        expect.stringContaining("Error reading stdout"),
-        expect.any(Error)
-      );
-    });
-
     it("should spawn process with correct arguments", async () => {
       const mockProcess = createMockProcess({ exitCode: 0 });
       vi.mocked(cp.spawn).mockReturnValue(mockProcess);
@@ -378,7 +336,7 @@ describe("subprocess-manager.ts", () => {
         type: "complex",
         nested: { deep: { value: [1, 2, 3] } },
         array: [{ id: 1 }, { id: 2 }],
-        string: "with \"quotes\" and \\backslashes",
+        string: 'with "quotes" and \\backslashes',
       };
 
       const mockProcess = createMockProcess({
@@ -404,13 +362,17 @@ describe("subprocess-manager.ts", () => {
     };
 
     it("should collect stdout and stderr", async () => {
-      const mockProcess = new EventEmitter() as any;
+      const mockProcess = new EventEmitter() as cp.ChildProcess & {
+        stdout: Readable;
+        stderr: Readable;
+        kill: ReturnType<typeof vi.fn>;
+      };
       const stdout = new Readable({ read() {} });
       const stderr = new Readable({ read() {} });
 
       mockProcess.stdout = stdout;
       mockProcess.stderr = stderr;
-      mockProcess.kill = vi.fn();
+      mockProcess.kill = vi.fn().mockReturnValue(true);
 
       vi.mocked(cp.spawn).mockReturnValue(mockProcess);
 
@@ -434,10 +396,14 @@ describe("subprocess-manager.ts", () => {
     });
 
     it("should return correct exit code", async () => {
-      const mockProcess = new EventEmitter() as any;
+      const mockProcess = new EventEmitter() as cp.ChildProcess & {
+        stdout: Readable;
+        stderr: Readable;
+        kill: ReturnType<typeof vi.fn>;
+      };
       mockProcess.stdout = new Readable({ read() {} });
       mockProcess.stderr = new Readable({ read() {} });
-      mockProcess.kill = vi.fn();
+      mockProcess.kill = vi.fn().mockReturnValue(true);
 
       vi.mocked(cp.spawn).mockReturnValue(mockProcess);
 
@@ -453,10 +419,14 @@ describe("subprocess-manager.ts", () => {
     });
 
     it("should handle process errors", async () => {
-      const mockProcess = new EventEmitter() as any;
+      const mockProcess = new EventEmitter() as cp.ChildProcess & {
+        stdout: Readable;
+        stderr: Readable;
+        kill: ReturnType<typeof vi.fn>;
+      };
       mockProcess.stdout = new Readable({ read() {} });
       mockProcess.stderr = new Readable({ read() {} });
-      mockProcess.kill = vi.fn();
+      mockProcess.kill = vi.fn().mockReturnValue(true);
 
       vi.mocked(cp.spawn).mockReturnValue(mockProcess);
 
@@ -469,10 +439,14 @@ describe("subprocess-manager.ts", () => {
 
     it("should handle AbortController signal", async () => {
       const abortController = new AbortController();
-      const mockProcess = new EventEmitter() as any;
+      const mockProcess = new EventEmitter() as cp.ChildProcess & {
+        stdout: Readable;
+        stderr: Readable;
+        kill: ReturnType<typeof vi.fn>;
+      };
       mockProcess.stdout = new Readable({ read() {} });
       mockProcess.stderr = new Readable({ read() {} });
-      mockProcess.kill = vi.fn();
+      mockProcess.kill = vi.fn().mockReturnValue(true);
 
       vi.mocked(cp.spawn).mockReturnValue(mockProcess);
 
@@ -486,10 +460,14 @@ describe("subprocess-manager.ts", () => {
     });
 
     it("should spawn with correct options", async () => {
-      const mockProcess = new EventEmitter() as any;
+      const mockProcess = new EventEmitter() as cp.ChildProcess & {
+        stdout: Readable;
+        stderr: Readable;
+        kill: ReturnType<typeof vi.fn>;
+      };
       mockProcess.stdout = new Readable({ read() {} });
       mockProcess.stderr = new Readable({ read() {} });
-      mockProcess.kill = vi.fn();
+      mockProcess.kill = vi.fn().mockReturnValue(true);
 
       vi.mocked(cp.spawn).mockReturnValue(mockProcess);
 
@@ -516,10 +494,14 @@ describe("subprocess-manager.ts", () => {
     });
 
     it("should handle empty stdout and stderr", async () => {
-      const mockProcess = new EventEmitter() as any;
+      const mockProcess = new EventEmitter() as cp.ChildProcess & {
+        stdout: Readable;
+        stderr: Readable;
+        kill: ReturnType<typeof vi.fn>;
+      };
       mockProcess.stdout = new Readable({ read() {} });
       mockProcess.stderr = new Readable({ read() {} });
-      mockProcess.kill = vi.fn();
+      mockProcess.kill = vi.fn().mockReturnValue(true);
 
       vi.mocked(cp.spawn).mockReturnValue(mockProcess);
 

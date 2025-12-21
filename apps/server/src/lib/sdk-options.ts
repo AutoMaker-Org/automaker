@@ -12,11 +12,8 @@
  */
 
 import type { Options } from "@anthropic-ai/claude-agent-sdk";
-import {
-  resolveModelString,
-  DEFAULT_MODELS,
-  CLAUDE_MODEL_MAP,
-} from "./model-resolver.js";
+import { resolveModelString } from "@automaker/model-resolver";
+import { DEFAULT_MODELS, CLAUDE_MODEL_MAP } from "@automaker/types";
 
 /**
  * Tool presets for different use cases

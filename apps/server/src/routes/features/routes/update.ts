@@ -3,10 +3,8 @@
  */
 
 import type { Request, Response } from "express";
-import {
-  FeatureLoader,
-  type Feature,
-} from "../../../services/feature-loader.js";
+import { FeatureLoader } from "../../../services/feature-loader.js";
+import type { Feature } from "@automaker/types";
 import { getErrorMessage, logError } from "../common.js";
 
 export function createUpdateHandler(featureLoader: FeatureLoader) {

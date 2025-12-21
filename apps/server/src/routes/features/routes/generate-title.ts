@@ -6,8 +6,8 @@
 
 import type { Request, Response } from "express";
 import { query } from "@anthropic-ai/claude-agent-sdk";
-import { createLogger } from "../../../lib/logger.js";
-import { CLAUDE_MODEL_MAP } from "../../../lib/model-resolver.js";
+import { createLogger } from "@automaker/utils";
+import { CLAUDE_MODEL_MAP } from "@automaker/model-resolver";
 
 const logger = createLogger("GenerateTitle");
 

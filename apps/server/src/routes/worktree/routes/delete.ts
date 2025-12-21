@@ -5,7 +5,8 @@
 import type { Request, Response } from "express";
 import { exec } from "child_process";
 import { promisify } from "util";
-import { isGitRepo, getErrorMessage, logError } from "../common.js";
+import { isGitRepo } from "@automaker/git-utils";
+import { getErrorMessage, logError } from "../common.js";
 
 const execAsync = promisify(exec);
 

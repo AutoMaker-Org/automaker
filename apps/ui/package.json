@@ -7,12 +7,9 @@
     "type": "git",
     "url": "https://github.com/AutoMaker-Org/automaker.git"
   },
-  "author": {
-    "name": "Cody Seibert",
-    "email": "webdevcody@gmail.com"
-  },
+  "author": "AutoMaker Team",
+  "license": "SEE LICENSE IN LICENSE",
   "private": true,
-  "license": "Unlicense",
   "main": "dist-electron/main.js",
   "scripts": {
     "dev": "vite",
@@ -38,6 +35,8 @@
     "dev:electron:wsl:gpu": "cross-env MESA_D3D12_DEFAULT_ADAPTER_NAME=NVIDIA vite"
   },
   "dependencies": {
+    "@automaker/dependency-resolver": "^1.0.0",
+    "@automaker/types": "^1.0.0",
     "@codemirror/lang-xml": "^6.1.0",
     "@codemirror/theme-one-dark": "^6.1.3",
     "@dnd-kit/core": "^6.3.1",

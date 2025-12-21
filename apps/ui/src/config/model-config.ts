@@ -6,48 +6,12 @@
  * - AUTOMAKER_MODEL_DEFAULT: Fallback model for all operations
  */
 
-/**
- * Claude model aliases for convenience
- */
-export const CLAUDE_MODEL_MAP: Record<string, string> = {
-  haiku: "claude-haiku-4-5",
-  sonnet: "claude-sonnet-4-20250514",
-  opus: "claude-opus-4-5-20251101",
-} as const;
+// Import shared model constants and types
+import { CLAUDE_MODEL_MAP, DEFAULT_MODELS } from "@automaker/types";
+import { resolveModelString } from "@automaker/model-resolver";
 
-/**
- * Default models per use case
- */
-export const DEFAULT_MODELS = {
-  chat: "claude-opus-4-5-20251101",
-  default: "claude-opus-4-5-20251101",
-} as const;
-
-/**
- * Resolve a model alias to a full model string
- */
-export function resolveModelString(
-  modelKey?: string,
-  defaultModel: string = DEFAULT_MODELS.default
-): string {
-  if (!modelKey) {
-    return defaultModel;
-  }
-
-  // Full Claude model string - pass through
-  if (modelKey.includes("claude-")) {
-    return modelKey;
-  }
-
-  // Check alias map
-  const resolved = CLAUDE_MODEL_MAP[modelKey];
-  if (resolved) {
-    return resolved;
-  }
-
-  // Unknown key - use default
-  return defaultModel;
-}
+// Re-export for backward compatibility
+export { CLAUDE_MODEL_MAP, DEFAULT_MODELS, resolveModelString };
 
 /**
  * Get the model for chat operations
@@ -64,13 +28,13 @@ export function getChatModel(explicitModel?: string): string {
   }
 
   const envModel =
-    process.env.AUTOMAKER_MODEL_CHAT || process.env.AUTOMAKER_MODEL_DEFAULT;
+    import.meta.env.AUTOMAKER_MODEL_CHAT || import.meta.env.AUTOMAKER_MODEL_DEFAULT;
 
   if (envModel) {
     return resolveModelString(envModel);
   }
 
-  return DEFAULT_MODELS.chat;
+  return DEFAULT_MODELS.claude;
 }
 
 /**
@@ -91,4 +55,3 @@ export const CHAT_TOOLS = [
  * Default max turns for chat
  */
 export const CHAT_MAX_TURNS = 1000;
-

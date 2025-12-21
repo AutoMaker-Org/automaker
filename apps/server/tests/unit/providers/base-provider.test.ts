@@ -6,7 +6,7 @@ import type {
   ProviderMessage,
   InstallationStatus,
   ModelDefinition,
-} from "@/providers/types.js";
+} from "@automaker/types";
 
 // Concrete implementation for testing the abstract class
 class TestProvider extends BaseProvider {

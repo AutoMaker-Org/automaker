@@ -10,7 +10,7 @@ import { useAppStore, Feature } from "@/store/app-store";
 import { getElectronAPI } from "@/lib/electron";
 import type { AutoModeEvent } from "@/types/electron";
 import { pathsEqual } from "@/lib/utils";
-import { getBlockingDependencies } from "@/lib/dependency-resolver";
+import { getBlockingDependencies } from "@automaker/dependency-resolver";
 import { BoardBackgroundModal } from "@/components/dialogs/board-background-modal";
 import { RefreshCw } from "lucide-react";
 import { useAutoMode } from "@/hooks/use-auto-mode";

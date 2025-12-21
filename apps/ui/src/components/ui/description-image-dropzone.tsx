@@ -4,14 +4,7 @@ import { cn } from "@/lib/utils";
 import { ImageIcon, X, Loader2 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { getElectronAPI } from "@/lib/electron";
-import { useAppStore } from "@/store/app-store";
-
-export interface FeatureImagePath {
-  id: string;
-  path: string; // Path to the temp file
-  filename: string;
-  mimeType: string;
-}
+import { useAppStore, type FeatureImagePath } from "@/store/app-store";
 
 // Map to store preview data by image ID (persisted across component re-mounts)
 export type ImagePreviewMap = Map<string, string>;

@@ -1,6 +1,6 @@
 import { useMemo, useCallback } from "react";
 import { Feature, useAppStore } from "@/store/app-store";
-import { resolveDependencies, getBlockingDependencies } from "@/lib/dependency-resolver";
+import { resolveDependencies, getBlockingDependencies } from "@automaker/dependency-resolver";
 
 type ColumnId = Feature["status"];
 

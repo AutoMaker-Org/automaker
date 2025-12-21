@@ -5,7 +5,7 @@
 import type { Request, Response } from "express";
 import fs from "fs/promises";
 import path from "path";
-import { isPathAllowed } from "../../../lib/security.js";
+import { isPathAllowed } from "@automaker/platform";
 import { getErrorMessage, logError } from "../common.js";
 
 export function createValidatePathHandler() {

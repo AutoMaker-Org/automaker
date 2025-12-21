@@ -6,7 +6,7 @@ import type { Request, Response } from "express";
 import fs from "fs/promises";
 import path from "path";
 import { getErrorMessage, logError } from "../common.js";
-import { getBoardDir } from "../../../lib/automaker-paths.js";
+import { getBoardDir } from "@automaker/platform";
 
 export function createDeleteBoardBackgroundHandler() {
   return async (req: Request, res: Response): Promise<void> => {

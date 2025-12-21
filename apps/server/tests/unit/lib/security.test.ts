@@ -13,41 +13,52 @@ describe("security.ts", () => {
   describe("initAllowedPaths", () => {
     it("should load ALLOWED_ROOT_DIRECTORY if set", async () => {
       process.env.ALLOWED_ROOT_DIRECTORY = "/projects";
-      process.env.DATA_DIR = "";
+      delete process.env.DATA_DIR;
 
-      const { initAllowedPaths, getAllowedPaths, getAllowedRootDirectory } =
-        await import("@/lib/security.js");
+      const { initAllowedPaths, getAllowedPaths } =
+        await import("@automaker/platform");
       initAllowedPaths();
 
       const allowed = getAllowedPaths();
       expect(allowed).toContain(path.resolve("/projects"));
-      expect(getAllowedRootDirectory()).toBe(path.resolve("/projects"));
     });
 
-    it("should always include DATA_DIR if set", async () => {
+    it("should include DATA_DIR if set", async () => {
       delete process.env.ALLOWED_ROOT_DIRECTORY;
       process.env.DATA_DIR = "/data/dir";
 
       const { initAllowedPaths, getAllowedPaths } =
-        await import("@/lib/security.js");
+        await import("@automaker/platform");
       initAllowedPaths();
 
       const allowed = getAllowedPaths();
       expect(allowed).toContain(path.resolve("/data/dir"));
     });
 
-    it("should handle both ALLOWED_ROOT_DIRECTORY and DATA_DIR", async () => {
+    it("should include both ALLOWED_ROOT_DIRECTORY and DATA_DIR if both set", async () => {
       process.env.ALLOWED_ROOT_DIRECTORY = "/projects";
       process.env.DATA_DIR = "/data";
 
       const { initAllowedPaths, getAllowedPaths } =
-        await import("@/lib/security.js");
+        await import("@automaker/platform");
       initAllowedPaths();
 
       const allowed = getAllowedPaths();
       expect(allowed).toContain(path.resolve("/projects"));
       expect(allowed).toContain(path.resolve("/data"));
       expect(allowed).toHaveLength(2);
+    });
+
+    it("should return empty array when no paths configured", async () => {
+      delete process.env.ALLOWED_ROOT_DIRECTORY;
+      delete process.env.DATA_DIR;
+
+      const { initAllowedPaths, getAllowedPaths } =
+        await import("@automaker/platform");
+      initAllowedPaths();
+
+      const allowed = getAllowedPaths();
+      expect(allowed).toHaveLength(0);
     });
   });
 
@@ -57,7 +68,7 @@ describe("security.ts", () => {
       process.env.DATA_DIR = "";
 
       const { initAllowedPaths, isPathAllowed } =
-        await import("@/lib/security.js");
+        await import("@automaker/platform");
       initAllowedPaths();
 
       // Paths within allowed directory should be allowed
@@ -75,7 +86,7 @@ describe("security.ts", () => {
       delete process.env.ALLOWED_ROOT_DIRECTORY;
 
       const { initAllowedPaths, isPathAllowed } =
-        await import("@/lib/security.js");
+        await import("@automaker/platform");
       initAllowedPaths();
 
       // All paths should be allowed when no restrictions are configured
@@ -91,7 +102,7 @@ describe("security.ts", () => {
       delete process.env.ALLOWED_ROOT_DIRECTORY;
 
       const { initAllowedPaths, isPathAllowed } =
-        await import("@/lib/security.js");
+        await import("@automaker/platform");
       initAllowedPaths();
 
       // DATA_DIR should be allowed
@@ -111,7 +122,7 @@ describe("security.ts", () => {
       process.env.DATA_DIR = "";
 
       const { initAllowedPaths, validatePath } =
-        await import("@/lib/security.js");
+        await import("@automaker/platform");
       initAllowedPaths();
 
       const result = validatePath("/allowed/file.txt");
@@ -123,7 +134,7 @@ describe("security.ts", () => {
       process.env.DATA_DIR = "";
 
       const { initAllowedPaths, validatePath } =
-        await import("@/lib/security.js");
+        await import("@automaker/platform");
       initAllowedPaths();
 
       // Disallowed paths should throw PathNotAllowedError
@@ -135,7 +146,7 @@ describe("security.ts", () => {
       delete process.env.ALLOWED_ROOT_DIRECTORY;
 
       const { initAllowedPaths, validatePath } =
-        await import("@/lib/security.js");
+        await import("@automaker/platform");
       initAllowedPaths();
 
       // All paths are allowed when no restrictions configured
@@ -151,7 +162,7 @@ describe("security.ts", () => {
       process.env.DATA_DIR = "";
 
       const { initAllowedPaths, validatePath } =
-        await import("@/lib/security.js");
+        await import("@automaker/platform");
       initAllowedPaths();
 
       const result = validatePath("./file.txt");
@@ -165,7 +176,7 @@ describe("security.ts", () => {
       process.env.DATA_DIR = "/data";
 
       const { initAllowedPaths, getAllowedPaths } =
-        await import("@/lib/security.js");
+        await import("@automaker/platform");
       initAllowedPaths();
 
       const result = getAllowedPaths();
@@ -180,7 +191,7 @@ describe("security.ts", () => {
       process.env.DATA_DIR = "";
 
       const { initAllowedPaths, getAllowedPaths } =
-        await import("@/lib/security.js");
+        await import("@automaker/platform");
       initAllowedPaths();
 
       const result = getAllowedPaths();

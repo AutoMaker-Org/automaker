@@ -6,7 +6,7 @@ import type { Request, Response } from "express";
 import fs from "fs/promises";
 import path from "path";
 import { getErrorMessage, logError } from "../common.js";
-import { getImagesDir } from "../../../lib/automaker-paths.js";
+import { getImagesDir } from "@automaker/platform";
 
 export function createSaveImageHandler() {
   return async (req: Request, res: Response): Promise<void> => {

@@ -6,7 +6,7 @@
 import type { Request, Response } from "express";
 import fs from "fs/promises";
 import path from "path";
-import { isPathAllowed, PathNotAllowedError } from "../../../lib/security.js";
+import { isPathAllowed, PathNotAllowedError } from "@automaker/platform";
 import { getErrorMessage, logError } from "../common.js";
 
 export function createMkdirHandler() {

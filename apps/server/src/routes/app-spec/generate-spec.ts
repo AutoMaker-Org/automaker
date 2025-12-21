@@ -12,11 +12,11 @@ import {
   getStructuredSpecPromptInstruction,
   type SpecOutput,
 } from "../../lib/app-spec-format.js";
-import { createLogger } from "../../lib/logger.js";
+import { createLogger } from "@automaker/utils";
 import { createSpecGenerationOptions } from "../../lib/sdk-options.js";
 import { logAuthStatus } from "./common.js";
 import { generateFeaturesFromSpec } from "./generate-features-from-spec.js";
-import { ensureAutomakerDir, getAppSpecPath } from "../../lib/automaker-paths.js";
+import { ensureAutomakerDir, getAppSpecPath } from "@automaker/platform";
 
 const logger = createLogger("SpecRegeneration");
 

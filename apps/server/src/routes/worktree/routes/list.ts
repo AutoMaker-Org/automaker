@@ -9,7 +9,8 @@ import type { Request, Response } from "express";
 import { exec } from "child_process";
 import { promisify } from "util";
 import { existsSync } from "fs";
-import { isGitRepo, getErrorMessage, logError, normalizePath } from "../common.js";
+import { isGitRepo } from "@automaker/git-utils";
+import { getErrorMessage, logError, normalizePath } from "../common.js";
 import { readAllWorktreeMetadata, type WorktreePRInfo } from "../../../lib/worktree-metadata.js";
 
 const execAsync = promisify(exec);

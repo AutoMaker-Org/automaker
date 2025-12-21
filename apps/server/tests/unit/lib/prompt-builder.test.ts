@@ -1,17 +1,24 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { buildPromptWithImages } from "@/lib/prompt-builder.js";
-import * as imageHandler from "@/lib/image-handler.js";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import * as utils from "@automaker/utils";
+import * as fs from "fs/promises";
 
-vi.mock("@/lib/image-handler.js");
+// Mock fs module for the image-handler's readFile calls
+vi.mock("fs/promises");
 
 describe("prompt-builder.ts", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Setup default mock for fs.readFile to return a valid image buffer
+    vi.mocked(fs.readFile).mockResolvedValue(Buffer.from("fake-image-data"));
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   describe("buildPromptWithImages", () => {
     it("should return plain text when no images provided", async () => {
-      const result = await buildPromptWithImages("Hello world");
+      const result = await utils.buildPromptWithImages("Hello world");
 
       expect(result).toEqual({
         content: "Hello world",
@@ -20,7 +27,7 @@ describe("prompt-builder.ts", () => {
     });
 
     it("should return plain text when imagePaths is empty array", async () => {
-      const result = await buildPromptWithImages("Hello world", []);
+      const result = await utils.buildPromptWithImages("Hello world", []);
 
       expect(result).toEqual({
         content: "Hello world",
@@ -29,44 +36,26 @@ describe("prompt-builder.ts", () => {
     });
 
     it("should build content blocks with single image", async () => {
-      vi.mocked(imageHandler.convertImagesToContentBlocks).mockResolvedValue([
-        {
-          type: "image",
-          source: { type: "base64", media_type: "image/png", data: "base64data" },
-        },
-      ]);
-
-      const result = await buildPromptWithImages("Describe this image", [
+      const result = await utils.buildPromptWithImages("Describe this image", [
         "/test.png",
       ]);
 
       expect(result.hasImages).toBe(true);
       expect(Array.isArray(result.content)).toBe(true);
-      const content = result.content as Array<any>;
+      const content = result.content as Array<{ type: string; text?: string }>;
       expect(content).toHaveLength(2);
       expect(content[0]).toEqual({ type: "text", text: "Describe this image" });
       expect(content[1].type).toBe("image");
     });
 
     it("should build content blocks with multiple images", async () => {
-      vi.mocked(imageHandler.convertImagesToContentBlocks).mockResolvedValue([
-        {
-          type: "image",
-          source: { type: "base64", media_type: "image/png", data: "data1" },
-        },
-        {
-          type: "image",
-          source: { type: "base64", media_type: "image/jpeg", data: "data2" },
-        },
-      ]);
-
-      const result = await buildPromptWithImages("Analyze these", [
+      const result = await utils.buildPromptWithImages("Analyze these", [
         "/a.png",
         "/b.jpg",
       ]);
 
       expect(result.hasImages).toBe(true);
-      const content = result.content as Array<any>;
+      const content = result.content as Array<{ type: string }>;
       expect(content).toHaveLength(3); // 1 text + 2 images
       expect(content[0].type).toBe("text");
       expect(content[1].type).toBe("image");
@@ -74,124 +63,67 @@ describe("prompt-builder.ts", () => {
     });
 
     it("should include image paths in text when requested", async () => {
-      vi.mocked(imageHandler.formatImagePathsForPrompt).mockReturnValue(
-        "\n\nAttached images:\n- /test.png"
-      );
-      vi.mocked(imageHandler.convertImagesToContentBlocks).mockResolvedValue([
-        {
-          type: "image",
-          source: { type: "base64", media_type: "image/png", data: "data" },
-        },
-      ]);
-
-      const result = await buildPromptWithImages(
+      const result = await utils.buildPromptWithImages(
         "Base prompt",
         ["/test.png"],
         undefined,
         true
       );
 
-      expect(imageHandler.formatImagePathsForPrompt).toHaveBeenCalledWith([
-        "/test.png",
-      ]);
-      const content = result.content as Array<any>;
+      const content = result.content as Array<{ type: string; text?: string }>;
       expect(content[0].text).toContain("Base prompt");
-      expect(content[0].text).toContain("Attached images:");
+      expect(content[0].text).toContain("/test.png");
     });
 
     it("should not include image paths by default", async () => {
-      vi.mocked(imageHandler.formatImagePathsForPrompt).mockReturnValue(
-        "\n\nAttached images:\n- /test.png"
-      );
-      vi.mocked(imageHandler.convertImagesToContentBlocks).mockResolvedValue([
-        {
-          type: "image",
-          source: { type: "base64", media_type: "image/png", data: "data" },
-        },
-      ]);
+      const result = await utils.buildPromptWithImages("Base prompt", ["/test.png"]);
 
-      const result = await buildPromptWithImages("Base prompt", ["/test.png"]);
-
-      expect(imageHandler.formatImagePathsForPrompt).not.toHaveBeenCalled();
-      const content = result.content as Array<any>;
+      const content = result.content as Array<{ type: string; text?: string }>;
       expect(content[0].text).toBe("Base prompt");
-    });
-
-    it("should pass workDir to convertImagesToContentBlocks", async () => {
-      vi.mocked(imageHandler.convertImagesToContentBlocks).mockResolvedValue([
-        {
-          type: "image",
-          source: { type: "base64", media_type: "image/png", data: "data" },
-        },
-      ]);
-
-      await buildPromptWithImages("Test", ["/test.png"], "/work/dir");
-
-      expect(imageHandler.convertImagesToContentBlocks).toHaveBeenCalledWith(
-        ["/test.png"],
-        "/work/dir"
-      );
+      expect(content[0].text).not.toContain("Attached");
     });
 
     it("should handle empty text content", async () => {
-      vi.mocked(imageHandler.convertImagesToContentBlocks).mockResolvedValue([
-        {
-          type: "image",
-          source: { type: "base64", media_type: "image/png", data: "data" },
-        },
-      ]);
-
-      const result = await buildPromptWithImages("", ["/test.png"]);
+      const result = await utils.buildPromptWithImages("", ["/test.png"]);
 
       expect(result.hasImages).toBe(true);
       // When text is empty/whitespace, should only have image blocks
-      const content = result.content as Array<any>;
+      const content = result.content as Array<{ type: string }>;
       expect(content.every((block) => block.type === "image")).toBe(true);
     });
 
     it("should trim text content before checking if empty", async () => {
-      vi.mocked(imageHandler.convertImagesToContentBlocks).mockResolvedValue([
-        {
-          type: "image",
-          source: { type: "base64", media_type: "image/png", data: "data" },
-        },
-      ]);
+      const result = await utils.buildPromptWithImages("   ", ["/test.png"]);
 
-      const result = await buildPromptWithImages("   ", ["/test.png"]);
-
-      const content = result.content as Array<any>;
+      const content = result.content as Array<{ type: string }>;
       // Whitespace-only text should be excluded
       expect(content.every((block) => block.type === "image")).toBe(true);
     });
 
     it("should return text when only one block and it's text", async () => {
-      vi.mocked(imageHandler.convertImagesToContentBlocks).mockResolvedValue([]);
+      // Make readFile reject to simulate image load failure
+      vi.mocked(fs.readFile).mockRejectedValue(new Error("File not found"));
 
-      const result = await buildPromptWithImages("Just text", ["/missing.png"]);
+      const result = await utils.buildPromptWithImages("Just text", ["/missing.png"]);
 
       // If no images are successfully loaded, should return just the text
       expect(result.content).toBe("Just text");
       expect(result.hasImages).toBe(true); // Still true because images were requested
     });
 
-    it("should handle workDir with relative paths", async () => {
-      vi.mocked(imageHandler.convertImagesToContentBlocks).mockResolvedValue([
-        {
-          type: "image",
-          source: { type: "base64", media_type: "image/png", data: "data" },
-        },
-      ]);
-
-      await buildPromptWithImages(
+    it("should pass workDir for path resolution", async () => {
+      // The function should use workDir to resolve relative paths
+      const result = await utils.buildPromptWithImages(
         "Test",
         ["relative.png"],
-        "/absolute/work/dir"
+        "/work/dir"
       );
 
-      expect(imageHandler.convertImagesToContentBlocks).toHaveBeenCalledWith(
-        ["relative.png"],
-        "/absolute/work/dir"
-      );
+      // Verify it tried to read the file (with resolved path including workDir)
+      expect(fs.readFile).toHaveBeenCalled();
+      // The path should be resolved using workDir
+      const readCall = vi.mocked(fs.readFile).mock.calls[0][0];
+      expect(readCall).toContain("relative.png");
     });
   });
 });

@@ -23,6 +23,11 @@ jobs:
           check-lockfile: "true"
           rebuild-node-pty-path: "apps/server"
 
+      - name: Run package tests
+        run: npm run test:packages
+        env:
+          NODE_ENV: test
+
       - name: Run server tests with coverage
         run: npm run test:server:coverage
         env:

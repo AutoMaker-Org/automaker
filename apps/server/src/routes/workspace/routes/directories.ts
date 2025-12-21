@@ -5,7 +5,7 @@
 import type { Request, Response } from "express";
 import fs from "fs/promises";
 import path from "path";
-import { getAllowedRootDirectory } from "../../../lib/security.js";
+import { getAllowedRootDirectory } from "@automaker/platform";
 import { getErrorMessage, logError } from "../common.js";
 
 export function createDirectoriesHandler() {
@@ -35,7 +35,9 @@ export function createDirectoriesHandler() {
       }
 
       // Read directory contents
-      const entries = await fs.readdir(resolvedWorkspaceDir, { withFileTypes: true });
+      const entries = await fs.readdir(resolvedWorkspaceDir, {
+        withFileTypes: true,
+      });
 
       // Filter to directories only and map to result format
       const directories = entries

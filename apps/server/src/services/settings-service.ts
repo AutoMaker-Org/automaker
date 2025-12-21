@@ -7,15 +7,16 @@
  * - Per-project settings ({projectPath}/.automaker/settings.json)
  */
 
+import { createLogger } from "@automaker/utils";
 import * as secureFs from "../lib/secure-fs.js";
-import { createLogger } from "../lib/logger.js";
+
 import {
   getGlobalSettingsPath,
   getCredentialsPath,
   getProjectSettingsPath,
   ensureDataDir,
   ensureAutomakerDir,
-} from "../lib/automaker-paths.js";
+} from "@automaker/platform";
 import type {
   GlobalSettings,
   Credentials,
@@ -64,7 +65,7 @@ async function atomicWriteJson(filePath: string, data: unknown): Promise<void> {
  */
 async function readJsonFile<T>(filePath: string, defaultValue: T): Promise<T> {
   try {
-    const content = await secureFs.readFile(filePath, "utf-8") as string;
+    const content = (await secureFs.readFile(filePath, "utf-8")) as string;
     return JSON.parse(content) as T;
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") {
@@ -231,9 +232,7 @@ export class SettingsService {
    * @param updates - Partial Credentials (usually just apiKeys)
    * @returns Promise resolving to complete updated Credentials object
    */
-  async updateCredentials(
-    updates: Partial<Credentials>
-  ): Promise<Credentials> {
+  async updateCredentials(updates: Partial<Credentials>): Promise<Credentials> {
     await ensureDataDir(this.dataDir);
     const credentialsPath = getCredentialsPath(this.dataDir);
 
@@ -495,10 +494,14 @@ export class SettingsService {
       if (appState.apiKeys) {
         const apiKeys = appState.apiKeys as {
           anthropic?: string;
+          google?: string;
+          openai?: string;
         };
         await this.updateCredentials({
           apiKeys: {
             anthropic: apiKeys.anthropic || "",
+            google: apiKeys.google || "",
+            openai: apiKeys.openai || "",
           },
         });
         migratedCredentials = true;
@@ -548,8 +551,7 @@ export class SettingsService {
           // Get theme from project object
           const project = projects.find((p) => p.path === projectPath);
           if (project?.theme) {
-            projectSettings.theme =
-              project.theme as ProjectSettings["theme"];
+            projectSettings.theme = project.theme as ProjectSettings["theme"];
           }
 
           if (boardBackgroundByProject?.[projectPath]) {
@@ -571,7 +573,9 @@ export class SettingsService {
             migratedProjectCount++;
           }
         } catch (e) {
-          errors.push(`Failed to migrate project settings for ${projectPath}: ${e}`);
+          errors.push(
+            `Failed to migrate project settings for ${projectPath}: ${e}`
+          );
         }
       }
 

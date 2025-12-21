@@ -2,7 +2,7 @@
  * Common utilities and state for terminal routes
  */
 
-import { createLogger } from "../../lib/logger.js";
+import { createLogger } from "@automaker/utils";
 import type { Request, Response, NextFunction } from "express";
 import { getTerminalService } from "../../services/terminal-service.js";
 

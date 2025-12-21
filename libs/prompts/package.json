@@ -1,0 +1,25 @@
+{
+  "name": "@automaker/prompts",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "AI prompt templates for AutoMaker",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc --watch",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "keywords": ["automaker", "prompts", "ai"],
+  "author": "AutoMaker Team",
+  "license": "SEE LICENSE IN LICENSE",
+  "dependencies": {
+    "@automaker/types": "^1.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "typescript": "^5.7.3",
+    "vitest": "^4.0.16"
+  }
+}

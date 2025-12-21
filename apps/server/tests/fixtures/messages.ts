@@ -6,7 +6,7 @@ import type {
   ConversationMessage,
   ProviderMessage,
   ContentBlock,
-} from "../../src/providers/types.js";
+} from "@automaker/types";
 
 export const conversationHistoryFixture: ConversationMessage[] = [
   {

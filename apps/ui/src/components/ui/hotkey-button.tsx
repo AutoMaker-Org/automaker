@@ -1,6 +1,5 @@
 
-import * as React from "react";
-import { useEffect, useCallback, useRef } from "react";
+import React, { useEffect, useCallback, useRef } from "react";
 import { Button, buttonVariants } from "./button";
 import { cn } from "@/lib/utils";
 import type { VariantProps } from "class-variance-authority";

@@ -8,7 +8,7 @@
  * - Convert history to Claude SDK message format
  */
 
-import type { ConversationMessage } from "../providers/types.js";
+import type { ConversationMessage } from '@automaker/types';
 
 /**
  * Extract plain text from message content (handles both string and array formats)

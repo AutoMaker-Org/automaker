@@ -5,8 +5,8 @@
 import path from "path";
 import fs from "fs/promises";
 import type { EventEmitter } from "../../lib/events.js";
-import { createLogger } from "../../lib/logger.js";
-import { getFeaturesDir } from "../../lib/automaker-paths.js";
+import { createLogger } from "@automaker/utils";
+import { getFeaturesDir } from "@automaker/platform";
 
 const logger = createLogger("SpecRegeneration");
 

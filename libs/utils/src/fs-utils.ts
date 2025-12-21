@@ -2,7 +2,7 @@
  * File system utilities that handle symlinks safely
  */
 
-import * as secureFs from "./secure-fs.js";
+import { secureFs } from "@automaker/platform";
 import path from "path";
 
 /**

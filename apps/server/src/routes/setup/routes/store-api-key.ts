@@ -9,7 +9,7 @@ import {
   getErrorMessage,
   logError,
 } from "../common.js";
-import { createLogger } from "../../../lib/logger.js";
+import { createLogger } from "@automaker/utils";
 
 const logger = createLogger("Setup");
 

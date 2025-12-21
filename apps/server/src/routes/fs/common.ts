@@ -2,7 +2,7 @@
  * Common utilities for fs routes
  */
 
-import { createLogger } from "../../lib/logger.js";
+import { createLogger } from "@automaker/utils";
 import {
   getErrorMessage as getErrorMessageShared,
   createLogError,

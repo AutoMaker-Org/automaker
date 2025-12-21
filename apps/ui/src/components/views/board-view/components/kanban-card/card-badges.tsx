@@ -8,7 +8,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { AlertCircle, Lock, Hand, Sparkles } from "lucide-react";
-import { getBlockingDependencies } from "@/lib/dependency-resolver";
+import { getBlockingDependencies } from "@automaker/dependency-resolver";
 
 interface CardBadgeProps {
   children: React.ReactNode;

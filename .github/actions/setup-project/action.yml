@@ -52,6 +52,11 @@ runs:
           @rollup/rollup-linux-x64-gnu@4.53.3 \
           @tailwindcss/oxide-linux-x64-gnu@4.1.17
 
+    - name: Build shared packages
+      shell: bash
+      # Build shared packages (types, utils, platform, etc.) before apps can use them
+      run: npm run build:packages
+
     - name: Rebuild native modules (root)
       if: inputs.rebuild-node-pty-path == ''
       shell: bash

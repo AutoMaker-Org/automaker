@@ -4,7 +4,7 @@
 
 import { query } from "@anthropic-ai/claude-agent-sdk";
 import type { EventEmitter } from "../../lib/events.js";
-import { createLogger } from "../../lib/logger.js";
+import { createLogger } from "@automaker/utils";
 import { createSuggestionsOptions } from "../../lib/sdk-options.js";
 
 const logger = createLogger("Suggestions");

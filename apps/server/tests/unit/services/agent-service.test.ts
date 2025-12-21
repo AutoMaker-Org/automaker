@@ -2,14 +2,14 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { AgentService } from "@/services/agent-service.js";
 import { ProviderFactory } from "@/providers/provider-factory.js";
 import * as fs from "fs/promises";
-import * as imageHandler from "@/lib/image-handler.js";
-import * as promptBuilder from "@/lib/prompt-builder.js";
+import * as imageHandler from "@automaker/utils";
+import * as promptBuilder from "@automaker/utils";
 import { collectAsyncGenerator } from "../../utils/helpers.js";
 
 vi.mock("fs/promises");
 vi.mock("@/providers/provider-factory.js");
-vi.mock("@/lib/image-handler.js");
-vi.mock("@/lib/prompt-builder.js");
+vi.mock("@automaker/utils");
+vi.mock("@automaker/utils");
 
 describe("agent-service.ts", () => {
   let service: AgentService;

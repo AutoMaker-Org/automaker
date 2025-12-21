@@ -4,7 +4,7 @@ import {
   getEffectiveModel,
   CLAUDE_MODEL_MAP,
   DEFAULT_MODELS,
-} from "@/lib/model-resolver.js";
+} from "@automaker/model-resolver";
 
 describe("model-resolver.ts", () => {
   let consoleSpy: any;

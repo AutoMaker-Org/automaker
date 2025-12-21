@@ -2,7 +2,7 @@
  * Common utilities for worktree routes
  */
 
-import { createLogger } from "../../lib/logger.js";
+import { createLogger } from "@automaker/utils";
 import { exec } from "child_process";
 import { promisify } from "util";
 import path from "path";

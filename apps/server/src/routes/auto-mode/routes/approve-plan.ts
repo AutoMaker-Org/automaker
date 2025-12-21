@@ -4,7 +4,7 @@
 
 import type { Request, Response } from "express";
 import type { AutoModeService } from "../../../services/auto-mode-service.js";
-import { createLogger } from "../../../lib/logger.js";
+import { createLogger } from "@automaker/utils";
 import { getErrorMessage, logError } from "../common.js";
 
 const logger = createLogger("AutoMode");

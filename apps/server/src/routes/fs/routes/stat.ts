@@ -4,7 +4,7 @@
 
 import type { Request, Response } from "express";
 import fs from "fs/promises";
-import { validatePath, PathNotAllowedError } from "../../../lib/security.js";
+import { validatePath, PathNotAllowedError } from "@automaker/platform";
 import { getErrorMessage, logError } from "../common.js";
 
 export function createStatHandler() {

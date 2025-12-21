@@ -1,11 +1,11 @@
 /**
- * Dependency Resolution Utility (Server-side)
+ * Dependency Resolution Utility
  *
  * Provides topological sorting and dependency analysis for features.
  * Uses a modified Kahn's algorithm that respects both dependencies and priorities.
  */
 
-import type { Feature } from "../services/feature-loader.js";
+import type { Feature } from '@automaker/types';
 
 export interface DependencyResolutionResult {
   orderedFeatures: Feature[];       // Features in dependency-aware order

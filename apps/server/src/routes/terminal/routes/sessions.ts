@@ -6,7 +6,7 @@
 import type { Request, Response } from "express";
 import { getTerminalService } from "../../../services/terminal-service.js";
 import { getErrorMessage, logError } from "../common.js";
-import { createLogger } from "../../../lib/logger.js";
+import { createLogger } from "@automaker/utils";
 
 const logger = createLogger("Terminal");
 

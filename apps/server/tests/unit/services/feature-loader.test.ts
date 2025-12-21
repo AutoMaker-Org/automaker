@@ -144,6 +144,7 @@ describe("feature-loader.ts", () => {
       expect(result).toHaveLength(1);
       expect(result[0].id).toBe("feature-2");
       expect(consoleSpy).toHaveBeenCalledWith(
+        "[FeatureLoader]",
         expect.stringContaining("missing required 'id' field")
       );
 
@@ -189,7 +190,10 @@ describe("feature-loader.ts", () => {
       const result = await loader.getAll(testProjectPath);
 
       expect(result).toEqual([]);
-      expect(consoleSpy).toHaveBeenCalled();
+      expect(consoleSpy).toHaveBeenCalledWith(
+        "[FeatureLoader]",
+        expect.stringContaining("Failed to parse feature.json")
+      );
 
       consoleSpy.mockRestore();
     });
@@ -362,6 +366,11 @@ describe("feature-loader.ts", () => {
       const result = await loader.delete(testProjectPath, "feature-123");
 
       expect(result).toBe(false);
+      expect(consoleSpy).toHaveBeenCalledWith(
+        "[FeatureLoader]",
+        expect.stringContaining("Failed to delete feature"),
+        expect.objectContaining({ message: "Permission denied" })
+      );
       consoleSpy.mockRestore();
     });
   });

@@ -17,7 +17,7 @@ import {
   getCredentialsPath,
   getProjectSettingsPath,
   ensureDataDir,
-} from "@/lib/automaker-paths.js";
+} from "@automaker/platform";
 
 describe("automaker-paths.ts", () => {
   const projectPath = path.join("/test", "project");

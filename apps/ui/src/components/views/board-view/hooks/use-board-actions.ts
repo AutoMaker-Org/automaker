@@ -12,7 +12,7 @@ import { getElectronAPI } from "@/lib/electron";
 import { toast } from "sonner";
 import { useAutoMode } from "@/hooks/use-auto-mode";
 import { truncateDescription } from "@/lib/utils";
-import { getBlockingDependencies } from "@/lib/dependency-resolver";
+import { getBlockingDependencies } from "@automaker/dependency-resolver";
 
 interface UseBoardActionsProps {
   currentProject: { path: string; id: string } | null;

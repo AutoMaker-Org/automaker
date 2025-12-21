@@ -8,7 +8,7 @@ import path from "path";
 import {
   getAllowedRootDirectory,
   getDataDirectory,
-} from "../../../lib/security.js";
+} from "@automaker/platform";
 import { getErrorMessage, logError } from "../common.js";
 
 export function createConfigHandler() {

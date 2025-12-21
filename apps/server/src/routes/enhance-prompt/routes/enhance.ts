@@ -7,14 +7,15 @@
 
 import type { Request, Response } from "express";
 import { query } from "@anthropic-ai/claude-agent-sdk";
-import { createLogger } from "../../../lib/logger.js";
+import { createLogger } from "@automaker/utils";
+import { resolveModelString } from "@automaker/model-resolver";
+import { CLAUDE_MODEL_MAP } from "@automaker/types";
 import {
   getSystemPrompt,
   buildUserPrompt,
   isValidEnhancementMode,
   type EnhancementMode,
 } from "../../../lib/enhancement-prompts.js";
-import { resolveModelString, CLAUDE_MODEL_MAP } from "../../../lib/model-resolver.js";
 
 const logger = createLogger("EnhancePrompt");
 

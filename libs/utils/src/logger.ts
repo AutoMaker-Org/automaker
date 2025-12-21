@@ -72,4 +72,3 @@ export function getLogLevel(): LogLevel {
 export function setLogLevel(level: LogLevel): void {
   currentLogLevel = level;
 }
-

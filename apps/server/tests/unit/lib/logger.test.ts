@@ -4,7 +4,7 @@ import {
   createLogger,
   getLogLevel,
   setLogLevel,
-} from "@/lib/logger.js";
+} from "@automaker/utils";
 
 describe("logger.ts", () => {
   let consoleSpy: {

@@ -1,4 +1,4 @@
-import { AgentModel, ThinkingLevel } from "@/store/app-store";
+import type { AgentModel, ThinkingLevel } from "@/store/app-store";
 import {
   Brain,
   Zap,

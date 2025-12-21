@@ -5,7 +5,7 @@
  */
 
 import type { Request, Response, NextFunction } from "express";
-import { validatePath, PathNotAllowedError } from "../lib/security.js";
+import { validatePath, PathNotAllowedError } from "@automaker/platform";
 
 /**
  * Creates a middleware that validates specified path parameters in req.body

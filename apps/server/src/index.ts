@@ -14,7 +14,7 @@ import { createServer } from "http";
 import dotenv from "dotenv";
 
 import { createEventEmitter, type EventEmitter } from "./lib/events.js";
-import { initAllowedPaths } from "./lib/security.js";
+import { initAllowedPaths } from "@automaker/platform";
 import { authMiddleware, getAuthStatus } from "./lib/auth.js";
 import { createFsRoutes } from "./routes/fs/index.js";
 import { createHealthRoutes } from "./routes/health/index.js";

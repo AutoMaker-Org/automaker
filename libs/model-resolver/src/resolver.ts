@@ -7,21 +7,7 @@
  * - Handles multiple model sources with priority
  */
 
-/**
- * Model alias mapping for Claude models
- */
-export const CLAUDE_MODEL_MAP: Record<string, string> = {
-  haiku: "claude-haiku-4-5",
-  sonnet: "claude-sonnet-4-20250514",
-  opus: "claude-opus-4-5-20251101",
-} as const;
-
-/**
- * Default models per provider
- */
-export const DEFAULT_MODELS = {
-  claude: "claude-opus-4-5-20251101",
-} as const;
+import { CLAUDE_MODEL_MAP, DEFAULT_MODELS } from '@automaker/types';
 
 /**
  * Resolve a model key/alias to a full model string

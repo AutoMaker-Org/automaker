@@ -10,7 +10,7 @@ import {
   getAllowedRootDirectory,
   isPathAllowed,
   PathNotAllowedError,
-} from "../../../lib/security.js";
+} from "@automaker/platform";
 import { getErrorMessage, logError } from "../common.js";
 
 export function createBrowseHandler() {

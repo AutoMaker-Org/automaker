@@ -843,6 +843,10 @@ test.describe("Worktree Integration Tests", () => {
 
     // Verify branch name is stored
     expect(featureData.branchName).toBe(branchName);
+
+    // Verify worktreePath is NOT set (worktrees are created at execution time)
+    expect(featureData.worktreePath).toBeUndefined();
+
     // Verify feature is in backlog status
     expect(featureData.status).toBe("backlog");
   });

@@ -3,10 +3,8 @@
  */
 
 import type { Request, Response } from "express";
-import {
-  FeatureLoader,
-  type Feature,
-} from "../../../services/feature-loader.js";
+import { FeatureLoader } from "../../../services/feature-loader.js";
+import type { Feature } from "@automaker/types";
 import { getErrorMessage, logError } from "../common.js";
 
 export function createCreateHandler(featureLoader: FeatureLoader) {
@@ -18,12 +16,10 @@ export function createCreateHandler(featureLoader: FeatureLoader) {
       };
 
       if (!projectPath || !feature) {
-        res
-          .status(400)
-          .json({
-            success: false,
-            error: "projectPath and feature are required",
-          });
+        res.status(400).json({
+          success: false,
+          error: "projectPath and feature are required",
+        });
         return;
       }
 

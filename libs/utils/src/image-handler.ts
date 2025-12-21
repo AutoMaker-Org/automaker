@@ -8,8 +8,9 @@
  * - Path resolution (relative/absolute)
  */
 
-import * as secureFs from "./secure-fs.js";
+import { secureFs } from "@automaker/platform";
 import path from "path";
+import type { ImageData, ImageContentBlock } from '@automaker/types';
 
 /**
  * MIME type mapping for image file extensions
@@ -21,28 +22,6 @@ const IMAGE_MIME_TYPES: Record<string, string> = {
   ".gif": "image/gif",
   ".webp": "image/webp",
 } as const;
-
-/**
- * Image data with base64 encoding and metadata
- */
-export interface ImageData {
-  base64: string;
-  mimeType: string;
-  filename: string;
-  originalPath: string;
-}
-
-/**
- * Content block for image (Claude SDK format)
- */
-export interface ImageContentBlock {
-  type: "image";
-  source: {
-    type: "base64";
-    media_type: string;
-    data: string;
-  };
-}
 
 /**
  * Get MIME type for an image file based on extension

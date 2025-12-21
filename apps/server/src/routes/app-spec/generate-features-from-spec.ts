@@ -5,11 +5,11 @@
 import { query } from "@anthropic-ai/claude-agent-sdk";
 import fs from "fs/promises";
 import type { EventEmitter } from "../../lib/events.js";
-import { createLogger } from "../../lib/logger.js";
+import { createLogger } from "@automaker/utils";
 import { createFeatureGenerationOptions } from "../../lib/sdk-options.js";
 import { logAuthStatus } from "./common.js";
 import { parseAndCreateFeatures } from "./parse-and-create-features.js";
-import { getAppSpecPath } from "../../lib/automaker-paths.js";
+import { getAppSpecPath } from "@automaker/platform";
 
 const logger = createLogger("SpecRegeneration");
 
