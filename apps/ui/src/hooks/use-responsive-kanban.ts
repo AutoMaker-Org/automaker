@@ -95,6 +95,8 @@ export function useResponsiveKanban(
     // Set initial width
     handleResize();
 
+    // Flag to prevent race condition when component unmounts before retry timeout fires
+    let cleanedUp = false;
     let observer: ResizeObserver | null = null;
     let retryTimeout: ReturnType<typeof setTimeout> | null = null;
     const setupObserver = () => {
@@ -121,13 +123,21 @@ export function useResponsiveKanban(
 
     // Element might not be mounted yet, retry after a short delay
     retryTimeout = setTimeout(() => {
-      setupObserver();
+      // Guard against race condition: don't create observer if component already unmounted
+      if (cleanedUp) return;
+
+      // If the observer is successfully set up on retry, remove the fallback listener
+      // to prevent handleResize from being called by both the observer and the window event.
+      if (setupObserver()) {
+        window.removeEventListener('resize', handleResize);
+      }
     }, 100);
 
     // Fallback to window resize event
     window.addEventListener('resize', handleResize);
 
     return () => {
+      cleanedUp = true; // Set flag first to prevent race condition with pending timeout
       observerCleanup();
       if (retryTimeout) {
         clearTimeout(retryTimeout);
