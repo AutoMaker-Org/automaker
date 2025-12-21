@@ -1,11 +1,12 @@
+import { Button } from '@/components/ui/button';
+import { HotkeyButton } from '@/components/ui/hotkey-button';
+import { Slider } from '@/components/ui/slider';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import { Plus, Bot } from 'lucide-react';
+import { KeyboardShortcut } from '@/hooks/use-keyboard-shortcuts';
 
-import { Button } from "@/components/ui/button";
-import { HotkeyButton } from "@/components/ui/hotkey-button";
-import { Slider } from "@/components/ui/slider";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
-import { Plus, Bot } from "lucide-react";
-import { KeyboardShortcut } from "@/hooks/use-keyboard-shortcuts";
+const MAX_CONCURRENCY = 10;
 
 interface BoardHeaderProps {
   projectName: string;
@@ -49,7 +50,7 @@ export function BoardHeader({
               value={[maxConcurrency]}
               onValueChange={(value) => onConcurrencyChange(value[0])}
               min={1}
-              max={10}
+              max={MAX_CONCURRENCY}
               step={1}
               className="w-20"
               data-testid="concurrency-slider"
@@ -58,7 +59,7 @@ export function BoardHeader({
               className="text-sm text-muted-foreground min-w-[5ch] text-center"
               data-testid="concurrency-value"
             >
-              {runningAgentsCount} / {maxConcurrency}
+              {maxConcurrency} / {MAX_CONCURRENCY}
             </span>
           </div>
         )}
@@ -66,10 +67,7 @@ export function BoardHeader({
         {/* Auto Mode Toggle - only show after mount to prevent hydration issues */}
         {isMounted && (
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-secondary border border-border">
-            <Label
-              htmlFor="auto-mode-toggle"
-              className="text-sm font-medium cursor-pointer"
-            >
+            <Label htmlFor="auto-mode-toggle" className="text-sm font-medium cursor-pointer">
               Auto Mode
             </Label>
             <Switch
