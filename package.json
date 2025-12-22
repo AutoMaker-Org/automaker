@@ -18,7 +18,7 @@
     "dev:server": "npm run dev --workspace=apps/server",
     "dev:full": "concurrently \"npm run dev:server\" \"npm run dev:web\"",
     "build": "npm run build:packages && npm run build --workspace=apps/ui",
-    "build:packages": "npm run build -w @automaker/types && npm run build -w @automaker/platform && npm run build -w @automaker/utils && npm run build -w @automaker/prompts && npm run build -w @automaker/model-resolver && npm run build -w @automaker/dependency-resolver && npm run build -w @automaker/git-utils",
+    "build:packages": "npm run build -w @automaker/types -w @automaker/platform -w @automaker/utils -w @automaker/prompts -w @automaker/model-resolver -w @automaker/dependency-resolver -w @automaker/git-utils",
     "build:server": "npm run build --workspace=apps/server",
     "build:electron": "npm run build:electron --workspace=apps/ui",
     "build:electron:dir": "npm run build:electron:dir --workspace=apps/ui",
