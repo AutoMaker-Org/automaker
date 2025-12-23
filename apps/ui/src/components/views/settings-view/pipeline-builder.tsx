@@ -44,6 +44,99 @@ interface PipelineBuilderProps {
   onClose: () => void;
 }
 
+// Extracted SortableStep component to prevent re-creation on each render
+const SortableStep = ({
+  step,
+  isLast,
+  onEdit,
+}: {
+  step: PipelineStepConfig;
+  isLast: boolean;
+  onEdit?: (step: PipelineStepConfig) => void;
+}) => {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: step.id,
+  });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  const getStepStatus = (step: PipelineStepConfig) => {
+    // This would come from actual execution status
+    // For now, just show as pending
+    return 'pending';
+  };
+
+  const status = getStepStatus(step);
+
+  return (
+    <div style={style} className="flex items-center gap-4 select-none">
+      <div
+        ref={setNodeRef}
+        className={cn('flex-1 border-2 rounded-lg p-4 transition-all', stepTypeColors[step.type])}
+      >
+        <div className="flex items-start justify-between">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-white dark:bg-gray-800 rounded-md">
+              {stepTypeIcons[step.type]}
+            </div>
+
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <h4 className="font-medium">{step.name}</h4>
+                <Badge variant="outline">{step.type}</Badge>
+                {step.required && <Badge variant="secondary">Required</Badge>}
+                {step.autoTrigger && <Badge variant="outline">Auto</Badge>}
+              </div>
+
+              {step.description && (
+                <p className="text-sm text-muted-foreground">{step.description}</p>
+              )}
+
+              <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                <span>Model: {step.model}</span>
+                {step.maxLoops && step.maxLoops > 1 && <span>Max loops: {step.maxLoops}</span>}
+                {step.memoryEnabled && <span>Memory enabled</span>}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <div
+              {...attributes}
+              {...listeners}
+              className="cursor-grab active:cursor-grabbing touch-none select-none"
+              style={{ touchAction: 'none' }}
+            >
+              <GripVertical className="w-4 h-4 text-muted-foreground" />
+            </div>
+            <Button variant="ghost" size="sm" onClick={() => onEdit?.(step)}>
+              <Settings className="w-4 h-4" />
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      {!isLast && (
+        <div className="flex flex-col items-center">
+          <ArrowRight className="w-5 h-5 text-muted-foreground" />
+        </div>
+      )}
+    </div>
+  );
+};
+
+const stepTypeColors: Record<StepType, string> = {
+  review: 'border-orange-200 bg-orange-50 dark:border-orange-800 dark:bg-orange-950',
+  security: 'border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950',
+  performance: 'border-purple-200 bg-purple-50 dark:border-purple-800 dark:bg-purple-950',
+  test: 'border-teal-200 bg-teal-50 dark:border-teal-800 dark:bg-teal-950',
+  custom: 'border-pink-200 bg-pink-50 dark:border-pink-800 dark:bg-pink-950',
+};
+
 export function PipelineBuilder({ config, onSave, onClose }: PipelineBuilderProps) {
   const [localConfig, setLocalConfig] = useState(config);
 
@@ -119,86 +212,6 @@ export function PipelineBuilder({ config, onSave, onClose }: PipelineBuilderProp
   const handleSave = () => {
     onSave(localConfig);
     onClose();
-  };
-
-  const getStepStatus = (step: PipelineStepConfig) => {
-    // This would come from actual execution status
-    // For now, just show as pending
-    return 'pending';
-  };
-
-  const SortableStep = ({ step, isLast }: { step: PipelineStepConfig; isLast: boolean }) => {
-    const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
-      id: step.id,
-    });
-
-    console.log('SortableStep rendered for:', step.id, 'isDragging:', isDragging);
-
-    const style = {
-      transform: CSS.Transform.toString(transform),
-      transition,
-      opacity: isDragging ? 0.5 : 1,
-    };
-
-    const status = getStepStatus(step);
-
-    return (
-      <div style={style} className="flex items-center gap-4 select-none">
-        <div
-          ref={setNodeRef}
-          className={cn('flex-1 border-2 rounded-lg p-4 transition-all', stepTypeColors[step.type])}
-        >
-          <div className="flex items-start justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-white dark:bg-gray-800 rounded-md">
-                {stepTypeIcons[step.type]}
-              </div>
-
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <h4 className="font-medium">{step.name}</h4>
-                  <Badge variant="outline">{step.type}</Badge>
-                  {step.required && <Badge variant="secondary">Required</Badge>}
-                  {step.autoTrigger && <Badge variant="outline">Auto</Badge>}
-                </div>
-
-                {step.description && (
-                  <p className="text-sm text-muted-foreground">{step.description}</p>
-                )}
-
-                <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                  <span>Model: {step.model}</span>
-                  {step.maxLoops && step.maxLoops > 1 && <span>Max loops: {step.maxLoops}</span>}
-                  {step.memoryEnabled && <span>Memory enabled</span>}
-                </div>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <div
-                {...attributes}
-                {...listeners}
-                className="cursor-grab active:cursor-grabbing touch-none select-none"
-                style={{ touchAction: 'none' }}
-                onClick={() => console.log('Drag handle clicked for:', step.id)}
-                onMouseDown={() => console.log('Mouse down on drag handle for:', step.id)}
-              >
-                <GripVertical className="w-4 h-4 text-muted-foreground" />
-              </div>
-              <Button variant="ghost" size="sm">
-                <Settings className="w-4 h-4" />
-              </Button>
-            </div>
-          </div>
-        </div>
-
-        {!isLast && (
-          <div className="flex flex-col items-center">
-            <ArrowRight className="w-5 h-5 text-muted-foreground" />
-          </div>
-        )}
-      </div>
-    );
   };
 
   return (

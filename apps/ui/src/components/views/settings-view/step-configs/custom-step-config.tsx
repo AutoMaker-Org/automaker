@@ -1,5 +1,9 @@
 /**
- * Custom Step Configuration
+ * Custom Step Configuration Component
+ *
+ * Provides UI for configuring custom prompt-based pipeline steps.
+ * Allows users to define custom prompts, success criteria, looping behavior,
+ * memory settings, and CodeRabbit integration options.
  */
 
 import React, { useState } from 'react';
@@ -45,9 +49,9 @@ export function CustomStepConfig({ config, onChange }: CustomStepConfigProps) {
 
   const availableVariables = [
     { variable: '{{feature.id}}', description: 'Feature ID' },
-    { variable: '{{feature.title}}', description: 'Feature title' },
-    { variable: '{{feature.description}}', description: 'Feature description' },
-    { variable: '{{feature.category}}', description: 'Feature category' },
+    { variable: '{{featureTitle}}', description: 'Feature title' },
+    { variable: '{{featureDescription}}', description: 'Feature description' },
+    { variable: '{{featureStatus}}', description: 'Feature status' },
   ];
 
   const codeRabbitRules = [

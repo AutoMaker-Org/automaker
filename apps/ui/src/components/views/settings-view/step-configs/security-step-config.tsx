@@ -1,5 +1,9 @@
 /**
- * Security Step Configuration
+ * Security Step Configuration Component
+ *
+ * Provides UI for configuring security analysis steps in the pipeline.
+ * Allows users to select security checklist items, set minimum severity levels,
+ * and configure additional security options.
  */
 
 import React from 'react';
@@ -15,8 +19,13 @@ import {
 } from '@/components/ui/select';
 import { PipelineStepConfig, SecurityConfig } from '@automaker/types';
 
+/**
+ * Props for SecurityStepConfig component
+ */
 interface SecurityStepConfigProps {
+  /** The current pipeline step configuration */
   config: PipelineStepConfig;
+  /** Callback fired when the configuration is updated */
   onChange: (config: PipelineStepConfig) => void;
 }
 

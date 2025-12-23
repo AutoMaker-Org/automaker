@@ -5,8 +5,10 @@
 import { Router } from 'express';
 import { PipelineConfigService } from '../../services/pipeline-config-service.js';
 import { validateWorkingDirectory } from '../../lib/sdk-options.js';
+import { FeatureLoader } from '../../services/feature-loader.js';
 
 const router = Router();
+const featureLoader = new FeatureLoader();
 
 /**
  * GET /api/pipeline/config
@@ -85,6 +87,9 @@ router.post('/', async (req, res) => {
 
     // Save the configuration
     await configService.savePipelineConfig(config);
+
+    // Clear the pipeline configuration cache
+    featureLoader.clearPipelineConfigCache(projectPath);
 
     res.json({
       success: true,

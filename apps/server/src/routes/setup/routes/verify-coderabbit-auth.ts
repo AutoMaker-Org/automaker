@@ -31,7 +31,7 @@ export function createVerifyCodeRabbitAuthHandler() {
 
       try {
         // Test the CodeRabbit API key by making a simple request
-        const response = await fetch('https://api.coderabbit.ai/api/v1/reviews', {
+        const response = await fetch('https://api.coderabbit.ai/api/v1/report.generate', {
           method: 'POST',
           headers: {
             Authorization: `Bearer ${apiKey}`,

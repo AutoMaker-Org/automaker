@@ -22,6 +22,9 @@ export function useBoardColumnFeatures({
   projectPath,
   pipelineConfig,
 }: UseBoardColumnFeaturesProps) {
+  // Get the function reference to avoid React anti-pattern
+  const isPrimaryWorktreeBranch = useAppStore((state) => state.isPrimaryWorktreeBranch);
+
   // Memoize column features to prevent unnecessary re-renders
   const columnFeaturesMap = useMemo(() => {
     // Build the initial map with base columns
@@ -75,9 +78,7 @@ export function useBoardColumnFeatures({
         // We're viewing main but branch hasn't been initialized yet
         // (worktrees disabled or haven't loaded yet).
         // Show features assigned to primary worktree's branch.
-        matchesWorktree = projectPath
-          ? useAppStore.getState().isPrimaryWorktreeBranch(projectPath, featureBranch)
-          : false;
+        matchesWorktree = projectPath ? isPrimaryWorktreeBranch(projectPath, featureBranch) : false;
       } else {
         // Match by branch name
         matchesWorktree = featureBranch === effectiveBranch;

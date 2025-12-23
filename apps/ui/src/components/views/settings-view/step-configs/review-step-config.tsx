@@ -1,5 +1,9 @@
 /**
- * Review Step Configuration
+ * Review Step Configuration Component
+ *
+ * Provides UI for configuring code review steps in the pipeline.
+ * Allows users to select review focus areas, set issue limits,
+ * and configure exclude patterns for files to ignore.
  */
 
 import React from 'react';

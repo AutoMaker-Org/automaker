@@ -11,7 +11,7 @@
       "required": true,
       "autoTrigger": true,
       "config": {
-        "coverage": 90,
+        "coverageThreshold": 90,
         "excludePatterns": ["*.spec.ts", "test/integration/"]
       }
     },
@@ -24,8 +24,7 @@
       "autoTrigger": true,
       "config": {
         "focus": ["testing", "coverage"],
-        "maxIssues": 3,
-        "includePatterns": ["*.test.ts", "*.spec.ts"]
+        "maxIssues": 3
       }
     }
   ]

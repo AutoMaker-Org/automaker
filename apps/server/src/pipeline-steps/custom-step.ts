@@ -182,7 +182,8 @@ export class CustomStep {
     // Substitute variables
     if (config.variables) {
       for (const [key, value] of Object.entries(config.variables)) {
-        prompt = prompt.replace(new RegExp(`\\{\\{${key}\\}\\}`, 'g'), value);
+        const escapedKey = this.escapeRegExp(key);
+        prompt = prompt.replace(new RegExp(`\\{\\{${escapedKey}\\}\\}`, 'g'), value);
       }
     }
 
@@ -266,5 +267,12 @@ Please address any remaining issues.
     } catch (error) {
       throw new Error(`CodeRabbit integration failed: ${error}`);
     }
+  }
+
+  /**
+   * Escape special characters in a string for use in a regular expression
+   */
+  private escapeRegExp(str: string): string {
+    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   }
 }

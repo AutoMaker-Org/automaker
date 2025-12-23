@@ -21,6 +21,12 @@ export class PipelineConfigService {
 
   /**
    * Load pipeline configuration from project
+   *
+   * Attempts to load the pipeline configuration from:
+   * 1. .automaker/pipeline.json (pipeline-specific config)
+   * 2. automaker.json (project settings fallback)
+   *
+   * @returns Promise<PipelineConfig> The loaded configuration or DEFAULT_PIPELINE_CONFIG if none found
    */
   async loadPipelineConfig(): Promise<PipelineConfig> {
     try {
@@ -62,6 +68,12 @@ export class PipelineConfigService {
 
   /**
    * Save pipeline configuration to project
+   *
+   * Validates the configuration and saves it to .automaker/pipeline.json.
+   * Uses atomic write (temporary file + rename) to prevent corruption.
+   *
+   * @param config - The pipeline configuration to save
+   * @throws Error if the configuration is invalid
    */
   async savePipelineConfig(config: PipelineConfig): Promise<void> {
     if (!validatePipelineConfig(config)) {
@@ -82,6 +94,11 @@ export class PipelineConfigService {
 
   /**
    * Get ordered list of pipeline steps
+   *
+   * Loads the pipeline configuration and returns steps sorted by dependencies.
+   * Required steps are placed before optional steps when possible.
+   *
+   * @returns Promise<PipelineStepConfig[]> Array of pipeline steps in execution order
    */
   async getPipelineSteps(): Promise<PipelineStepConfig[]> {
     const config = await this.loadPipelineConfig();
@@ -90,6 +107,11 @@ export class PipelineConfigService {
 
   /**
    * Validate pipeline configuration
+   *
+   * Validates the configuration against the pipeline schema.
+   *
+   * @param config - The configuration to validate
+   * @returns boolean True if the configuration is valid
    */
   validateConfig(config: any): boolean {
     return validatePipelineConfig(config);
@@ -97,6 +119,9 @@ export class PipelineConfigService {
 
   /**
    * Migrate configuration to latest version
+   *
+   * Checks the current configuration version and applies migrations
+   * to bring it up to the latest schema version.
    */
   async migrateConfig(): Promise<void> {
     const config = await this.loadPipelineConfig();
@@ -111,6 +136,10 @@ export class PipelineConfigService {
 
   /**
    * Export pipeline configuration
+   *
+   * Loads the current configuration and returns it as a formatted JSON string.
+   *
+   * @returns Promise<string> The configuration as a JSON string
    */
   async exportConfig(): Promise<string> {
     const config = await this.loadPipelineConfig();
@@ -119,6 +148,11 @@ export class PipelineConfigService {
 
   /**
    * Import pipeline configuration
+   *
+   * Parses and validates a JSON configuration string and saves it.
+   *
+   * @param configJson - The configuration as a JSON string
+   * @throws Error if the configuration is invalid or cannot be parsed
    */
   async importConfig(configJson: string): Promise<void> {
     try {
@@ -137,6 +171,13 @@ export class PipelineConfigService {
 
   /**
    * Sort steps by dependencies
+   *
+   * Performs a topological sort to ensure steps are ordered correctly
+   * based on their dependencies. Handles circular dependencies by placing
+   * dependent steps after their dependencies when possible.
+   *
+   * @param steps - Array of pipeline steps to sort
+   * @returns PipelineStepConfig[] Array of steps in dependency order
    */
   private sortStepsByDependencies(steps: PipelineStepConfig[]): PipelineStepConfig[] {
     const sorted: PipelineStepConfig[] = [];

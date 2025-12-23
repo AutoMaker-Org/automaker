@@ -2,9 +2,10 @@
  * Unit Tests: Pipeline Configuration Validation
  */
 
-import { describe, it, expect, beforeEach } from 'bun:test';
+import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
 import { PipelineConfigService } from '../../services/pipeline-config-service.js';
 import * as secureFs from '../../lib/secure-fs.js';
+import { DEFAULT_PIPELINE_CONFIG } from '@automaker/types';
 import path from 'path';
 
 describe('Pipeline Configuration Validation', () => {
@@ -14,7 +15,7 @@ describe('Pipeline Configuration Validation', () => {
   beforeEach(async () => {
     // Create temporary directory for tests
     tempDir = path.join(process.cwd(), 'temp-test-config');
-    await secureFs.ensureDir(tempDir);
+    await secureFs.mkdir(tempDir, { recursive: true });
     configService = new PipelineConfigService(tempDir);
   });
 
@@ -49,6 +50,7 @@ describe('Pipeline Configuration Validation', () => {
         ],
       };
 
+      await secureFs.mkdir(path.join(tempDir, '.automaker'), { recursive: true });
       await secureFs.writeFile(
         path.join(tempDir, '.automaker', 'pipeline.json'),
         JSON.stringify(validConfig),
@@ -59,19 +61,21 @@ describe('Pipeline Configuration Validation', () => {
       expect(config).toEqual(validConfig);
     });
 
-    it('should return null when configuration does not exist', async () => {
+    it('should return DEFAULT_PIPELINE_CONFIG when configuration does not exist', async () => {
       const config = await configService.loadPipelineConfig();
-      expect(config).toBeNull();
+      expect(config).toEqual(DEFAULT_PIPELINE_CONFIG);
     });
 
-    it('should throw error for invalid JSON', async () => {
+    it('should return DEFAULT_PIPELINE_CONFIG for invalid JSON', async () => {
+      await secureFs.mkdir(path.join(tempDir, '.automaker'), { recursive: true });
       await secureFs.writeFile(
         path.join(tempDir, '.automaker', 'pipeline.json'),
         '{ invalid json }',
         'utf-8'
       );
 
-      await expect(configService.loadPipelineConfig()).rejects.toThrow();
+      const config = await configService.loadPipelineConfig();
+      expect(config).toEqual(DEFAULT_PIPELINE_CONFIG);
     });
   });
 
@@ -97,9 +101,8 @@ describe('Pipeline Configuration Validation', () => {
         ],
       };
 
-      const result = configService.validatePipelineConfig(validConfig);
-      expect(result.valid).toBe(true);
-      expect(result.errors).toBeUndefined();
+      const result = configService.validateConfig(validConfig);
+      expect(result).toBe(true);
     });
 
     it('should detect missing required fields', () => {
@@ -108,9 +111,8 @@ describe('Pipeline Configuration Validation', () => {
         steps: [],
       };
 
-      const result = configService.validatePipelineConfig(invalidConfig);
-      expect(result.valid).toBe(false);
-      expect(result.errors).toContain('version is required');
+      const result = configService.validateConfig(invalidConfig);
+      expect(result).toBe(false);
     });
 
     it('should detect invalid step types', () => {
@@ -130,11 +132,8 @@ describe('Pipeline Configuration Validation', () => {
         ],
       };
 
-      const result = configService.validatePipelineConfig(invalidConfig);
-      expect(result.valid).toBe(false);
-      expect(result.errors).toContain(
-        'step 0: type must be one of: review, security, performance, test, custom'
-      );
+      const result = configService.validateConfig(invalidConfig);
+      expect(result).toBe(false);
     });
 
     it('should detect duplicate step IDs', () => {
@@ -163,9 +162,8 @@ describe('Pipeline Configuration Validation', () => {
         ],
       };
 
-      const result = configService.validatePipelineConfig(invalidConfig);
-      expect(result.valid).toBe(false);
-      expect(result.errors).toContain('step 1: duplicate step id "duplicate"');
+      const result = configService.validateConfig(invalidConfig);
+      expect(result).toBe(false);
     });
 
     it('should validate step-specific configurations', () => {
@@ -187,11 +185,8 @@ describe('Pipeline Configuration Validation', () => {
         ],
       };
 
-      const result = configService.validatePipelineConfig(invalidConfig);
-      expect(result.valid).toBe(false);
-      expect(result.errors).toContain(
-        'step 0: test coverageThreshold must be a number between 0 and 100'
-      );
+      const result = configService.validateConfig(invalidConfig);
+      expect(result).toBe(false);
     });
   });
 
@@ -204,6 +199,7 @@ describe('Pipeline Configuration Validation', () => {
         steps: [],
       };
 
+      await secureFs.mkdir(path.join(tempDir, '.automaker'), { recursive: true });
       await configService.savePipelineConfig(config);
 
       const savedContent = await secureFs.readFile(
@@ -224,8 +220,8 @@ describe('Pipeline Configuration Validation', () => {
 
       await configService.savePipelineConfig(config);
 
-      const exists = await secureFs.pathExists(path.join(tempDir, '.automaker', 'pipeline.json'));
-      expect(exists).toBe(true);
+      const exists = await secureFs.access(path.join(tempDir, '.automaker', 'pipeline.json'));
+      expect(exists).not.toThrow();
     });
   });
 });

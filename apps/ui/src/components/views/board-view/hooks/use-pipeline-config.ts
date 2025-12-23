@@ -1,7 +1,11 @@
 /**
  * Pipeline Configuration Hook for Board View
  *
- * Manages pipeline configuration state and API calls for the Kanban board
+ * Manages pipeline configuration state and API calls for the Kanban board.
+ * Provides loading, error handling, and caching for pipeline configurations.
+ *
+ * @param projectPath - The path to the project, or null if no project is loaded
+ * @returns Object containing config, loading state, error state, and action functions
  */
 
 import { useState, useEffect, useCallback } from 'react';

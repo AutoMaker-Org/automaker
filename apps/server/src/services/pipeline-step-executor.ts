@@ -62,6 +62,12 @@ export class PipelineStepExecutor extends EventEmitter {
 
   /**
    * Execute a pipeline step
+   *
+   * Executes the specified pipeline step with the given context.
+   * Handles different step types and manages status updates and progress reporting.
+   *
+   * @param context - The execution context containing feature, step config, and callbacks
+   * @returns Promise<PipelineStepResult> The result of step execution
    */
   async executeStep(context: StepExecutionContext): Promise<PipelineStepResult> {
     const { feature, stepConfig, signal, onProgress, onStatusChange, projectPath } = context;
@@ -126,6 +132,16 @@ export class PipelineStepExecutor extends EventEmitter {
 
   /**
    * Execute a single step iteration
+   *
+   * Executes one iteration of a pipeline step with the given prompt and model.
+   * Handles CodeRabbit integration for custom steps when enabled.
+   *
+   * @param feature - The feature being processed
+   * @param stepConfig - The step configuration
+   * @param prompt - The prompt to execute
+   * @param model - The AI model to use
+   * @param signal - AbortSignal for cancellation
+   * @returns Promise<PipelineStepResult> The result of the execution
    */
   private async executeSingleStep(
     feature: Feature,
@@ -157,6 +173,15 @@ export class PipelineStepExecutor extends EventEmitter {
 
   /**
    * Execute step with CodeRabbit integration
+   *
+   * Executes a custom step using CodeRabbit for code review analysis.
+   * Requires CODERABBIT_API_KEY environment variable to be set.
+   *
+   * @param feature - The feature being processed
+   * @param stepConfig - The step configuration
+   * @param signal - AbortSignal for cancellation
+   * @returns Promise<PipelineStepResult> The result from CodeRabbit
+   * @throws Error if API key is not configured
    */
   private async executeCodeRabbitStep(
     feature: Feature,
@@ -181,6 +206,12 @@ export class PipelineStepExecutor extends EventEmitter {
 
   /**
    * Parse step result from model response
+   *
+   * Parses the AI model output to extract the step status and structured results.
+   * Looks for status markers like [REVIEW_PASSED] or [SECURITY_FAILED].
+   *
+   * @param output - The raw output from the AI model
+   * @returns PipelineStepResult The parsed result with status and structured data
    */
   private parseStepResult(output: string): PipelineStepResult {
     // Check for status markers
@@ -211,6 +242,12 @@ export class PipelineStepExecutor extends EventEmitter {
 
   /**
    * Extract issues from step output
+   *
+   * Parses the step output to extract structured issue information.
+   * Looks for numbered issues with optional location and severity information.
+   *
+   * @param output - The step output containing issues
+   * @returns Array of extracted issues with hash, summary, location, and severity
    */
   private extractIssues(output: string): Array<{
     hash: string;
@@ -252,6 +289,12 @@ export class PipelineStepExecutor extends EventEmitter {
 
   /**
    * Generate issue hash for deduplication
+   *
+   * Generates a consistent hash for an issue based on its summary,
+   * location, and type. Used to identify duplicate issues across iterations.
+   *
+   * @param issue - The issue object containing summary, location, and type
+   * @returns string The hexadecimal hash of the issue
    */
   private generateIssueHash(issue: { summary: string; location?: string; type: string }): string {
     const normalized = [
@@ -272,6 +315,14 @@ export class PipelineStepExecutor extends EventEmitter {
 
   /**
    * Get model to use for a step
+   *
+   * Determines which AI model to use based on the step configuration.
+   * Supports 'same' (use feature's model), 'different' (use alternate model),
+   * or explicit model selection.
+   *
+   * @param feature - The feature being processed
+   * @param stepConfig - The step configuration with model preference
+   * @returns Promise<AgentModel> The selected AI model
    */
   private async getModelForStep(
     feature: Feature,

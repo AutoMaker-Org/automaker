@@ -104,12 +104,6 @@ export const buildProviderConfigs = ({
     hasStoredKey: apiKeys.coderabbit,
     inputTestId: 'coderabbit-api-key-input',
     toggleTestId: 'toggle-coderabbit-visibility',
-    testButton: {
-      onClick: async () => {},
-      disabled: true,
-      loading: false,
-      testId: 'test-coderabbit-connection',
-    },
     result: null,
     resultTestId: 'coderabbit-test-connection-result',
     resultMessageTestId: 'coderabbit-test-connection-message',

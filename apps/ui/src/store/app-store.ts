@@ -898,6 +898,7 @@ const initialState: AppState = {
     anthropic: '',
     google: '',
     openai: '',
+    coderabbit: '',
   },
   chatSessions: [],
   currentChatSession: null,

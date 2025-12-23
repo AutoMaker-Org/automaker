@@ -151,33 +151,36 @@ router.post('/', async (req, res) => {
           } else {
             // Check for circular dependencies
             const checkCircular = (
-              stepId: string,
-              deps: string[],
-              visited: Set<string>,
+              startId: string,
+              currentId: string,
+              visiting: Set<string>,
               path: string[]
             ): boolean => {
-              if (visited.has(stepId)) {
+              if (visiting.has(currentId)) {
                 errors.push(
-                  `step ${index}: circular dependency detected: ${path.join(' -> ')} -> ${stepId}`
+                  `step ${index}: circular dependency detected: ${[...path, currentId].join(' -> ')}`
                 );
                 return true;
               }
-              visited.add(stepId);
 
-              for (const dep of deps) {
-                const depStep = config.steps.find((s: any) => s.id === dep);
-                if (depStep && depStep.dependencies) {
-                  if (
-                    checkCircular(dep, depStep.dependencies, new Set(visited), [...path, stepId])
-                  ) {
-                    return true;
-                  }
+              const currentStep = config.steps.find((s: any) => s.id === currentId);
+              if (!currentStep || !currentStep.dependencies) {
+                return false;
+              }
+
+              visiting.add(currentId);
+              for (const dep of currentStep.dependencies) {
+                if (checkCircular(startId, dep, visiting, [...path, currentId])) {
+                  return true;
                 }
               }
+              visiting.delete(currentId);
               return false;
             };
 
-            checkCircular(step.id, step.dependencies, new Set(), []);
+            for (const dep of step.dependencies) {
+              checkCircular(step.id, dep, new Set(), [step.id]);
+            }
           }
         }
       }

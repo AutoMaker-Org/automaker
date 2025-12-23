@@ -1720,7 +1720,7 @@ Format your response as a structured markdown document.`;
         maxTurns: 1, // Single turn for pipeline steps
         cwd: projectPath || '',
         allowedTools: ['Read', 'Glob', 'Grep'],
-        abortController: { signal, abort: () => {} } as AbortController,
+        abortController: signal ? ({ signal } as AbortController) : undefined,
       };
 
       const stream = provider.executeQuery(options);
@@ -1756,6 +1756,14 @@ Format your response as a structured markdown document.`;
    * Skip a pipeline step
    */
   async skipPipelineStep(projectPath: string, featureId: string, stepId: string): Promise<void> {
+    // Load pipeline config to check if step is required
+    const pipelineConfig = await this.loadPipelineConfig(projectPath);
+    const stepConfig = pipelineConfig?.steps.find((s) => s.id === stepId);
+
+    if (stepConfig?.required) {
+      throw new Error('Cannot skip required step');
+    }
+
     const feature = await this.loadFeature(projectPath, featureId);
     if (!feature || !feature.pipelineSteps) {
       return;
@@ -1963,7 +1971,7 @@ ${feature.spec}
         .join('\n');
 
       prompt += `
-**?? Context Images Attached:**
+**📎 Context Images Attached:**
 The user has attached ${feature.imagePaths.length} image(s) for context. These images are provided both visually (in the initial message) and as files you can read:
 
 ${imagesList}
@@ -2688,7 +2696,7 @@ Implement all the changes described in the plan above.`;
             if (responseText.length > 0 && !responseText.endsWith('\n')) {
               responseText += '\n';
             }
-            responseText += `\n?? Tool: ${block.name}\n`;
+            responseText += `\n🔧 Tool: ${block.name}\n`;
             if (block.input) {
               responseText += `Input: ${JSON.stringify(block.input, null, 2)}\n`;
             }
@@ -2932,9 +2940,21 @@ Begin implementing task ${task.id} now.`;
           continue;
         }
 
-        // Execute steps
+        // Create and store AbortController for this feature
+        const abortController = new AbortController();
+        this.runningFeatures.set(item.featureId, {
+          featureId: item.featureId,
+          projectPath: item.projectPath,
+          worktreePath: null,
+          branchName: null,
+          abortController,
+          isAutoMode: true,
+          startTime: Date.now(),
+        });
+
+        // Execute steps with the controller signal
         const startTime = Date.now();
-        await this.executePipelineSteps(item.projectPath, feature, new AbortController().signal);
+        await this.executePipelineSteps(item.projectPath, feature, abortController.signal);
         const executionTime = Date.now() - startTime;
 
         // Update metrics
@@ -2949,9 +2969,15 @@ Begin implementing task ${task.id} now.`;
           projectPath: item.projectPath,
           executionTime,
         });
+
+        // Remove from running features
+        this.runningFeatures.delete(item.featureId);
       } catch (error) {
         console.error(`[Pipeline] Failed to process ${item.featureId}:`, error);
         this.updatePipelineMetrics(0, false);
+
+        // Remove from running features
+        this.runningFeatures.delete(item.featureId);
 
         // Keep in queue for retry if it's a required step failure
         this.emitAutoModeEvent('pipeline_failed', {

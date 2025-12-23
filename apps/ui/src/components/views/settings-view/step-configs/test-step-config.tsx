@@ -1,5 +1,9 @@
 /**
- * Test Step Configuration
+ * Test Step Configuration Component
+ *
+ * Provides UI for configuring test analysis steps in the pipeline.
+ * Allows users to set coverage thresholds, enable quality checks,
+ * and configure patterns for test files to include or exclude.
  */
 
 import React from 'react';

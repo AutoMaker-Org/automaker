@@ -1,5 +1,9 @@
 /**
- * Performance Step Configuration
+ * Performance Step Configuration Component
+ *
+ * Provides UI for configuring performance analysis steps in the pipeline.
+ * Allows users to select performance metrics to analyze, set thresholds,
+ * and enable profiling for detailed performance insights.
  */
 
 import React from 'react';

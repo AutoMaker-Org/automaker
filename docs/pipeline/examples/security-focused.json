@@ -11,9 +11,9 @@
       "required": true,
       "autoTrigger": true,
       "config": {
-        "focus": ["vulnerabilities", "secrets", "authentication"],
-        "severity": "high",
-        "excludePatterns": ["*.test.ts", "*.mock.ts", "test/"]
+        "checklist": ["vulnerabilities", "secrets", "authentication"],
+        "minSeverity": "high",
+        "excludeTests": true
       }
     },
     {

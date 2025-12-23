@@ -150,7 +150,7 @@ app.use('/api/settings', createSettingsRoutes(settingsService));
 app.use('/api/claude', createClaudeRoutes(claudeUsageService));
 app.use('/api/github', createGitHubRoutes());
 app.use('/api/context', createContextRoutes());
-app.use('/api/pipeline', createPipelineRoutes());
+app.use('/api/pipeline', createPipelineRoutes(autoModeService));
 
 // Create HTTP server
 const server = createServer(app);

@@ -45,10 +45,12 @@ interface CodeRabbitSuggestion {
 
 export class CodeRabbitIntegration {
   private apiKey: string;
+  private projectPath: string;
   private baseUrl = 'https://api.coderabbit.ai';
 
-  constructor(apiKey: string) {
+  constructor(apiKey: string, projectPath: string) {
     this.apiKey = apiKey;
+    this.projectPath = projectPath;
   }
 
   /**
@@ -93,7 +95,7 @@ export class CodeRabbitIntegration {
       const result = await spawnProcess({
         command: 'git',
         args: ['diff', 'main...HEAD', '--unified=3'],
-        cwd: this.getProjectPath(feature),
+        cwd: this.getProjectPath(),
       });
 
       if (result.exitCode !== 0) {
@@ -124,10 +126,11 @@ export class CodeRabbitIntegration {
         'X-Source': 'automaker-pipeline',
         'User-Agent': 'AutoMaker/1.0',
       },
+      signal: AbortSignal.timeout(30000), // 30 second timeout
       body: JSON.stringify({
         diff: diff,
         repository: {
-          url: this.getGitRepoUrl(),
+          url: await this.getGitRepoUrl(),
           branch: feature.branchName || 'main',
         },
         rules: {
@@ -259,21 +262,25 @@ Metrics:
   /**
    * Get git repository URL
    */
-  private getGitRepoUrl(): string {
+  private async getGitRepoUrl(): Promise<string> {
     try {
-      // This would get the remote origin URL
-      return 'https://github.com/example/repo'; // Placeholder
+      const { spawnProcess } = await import('@automaker/platform');
+      const result = await spawnProcess({
+        command: 'git',
+        args: ['config', '--get', 'remote.origin.url'],
+        cwd: this.projectPath,
+      });
+      return result.stdout.trim() || '';
     } catch {
       return '';
     }
   }
 
   /**
-   * Get project path from feature
+   * Get project path
    */
-  private getProjectPath(feature: Feature): string {
-    // This would extract the project path from feature context
-    return process.cwd(); // Placeholder
+  private getProjectPath(): string {
+    return this.projectPath;
   }
 
   /**
@@ -286,6 +293,7 @@ Metrics:
           Authorization: `Bearer ${this.apiKey}`,
           'User-Agent': 'AutoMaker/1.0',
         },
+        signal: AbortSignal.timeout(10000), // 10 second timeout
       });
 
       return response.ok;
@@ -304,6 +312,7 @@ Metrics:
           Authorization: `Bearer ${this.apiKey}`,
           'User-Agent': 'AutoMaker/1.0',
         },
+        signal: AbortSignal.timeout(10000), // 10 second timeout
       });
 
       if (!response.ok) {

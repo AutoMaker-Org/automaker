@@ -481,6 +481,29 @@ export interface ElectronAPI {
     onInstallProgress?: (callback: (progress: any) => void) => () => void;
     onAuthProgress?: (callback: (progress: any) => void) => () => void;
   };
+  pipeline?: {
+    executeStep: (
+      projectPath: string,
+      featureId: string,
+      stepId: string
+    ) => Promise<{
+      success: boolean;
+      error?: string;
+    }>;
+    skipStep: (
+      projectPath: string,
+      featureId: string,
+      stepId: string
+    ) => Promise<{
+      success: boolean;
+      error?: string;
+    }>;
+    getMetrics: (projectPath: string) => Promise<{
+      success: boolean;
+      metrics?: any;
+      error?: string;
+    }>;
+  };
   agent?: {
     start: (
       sessionId: string,

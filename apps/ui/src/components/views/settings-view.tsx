@@ -87,9 +87,6 @@ export function SettingsView() {
   // Use settings view navigation hook
   const { activeView, navigateTo } = useSettingsView();
 
-  // Debug currentProject
-  console.log('[SettingsView] currentProject:', currentProject);
-
   // Use pipeline configuration hook
   const {
     config: pipelineConfig,

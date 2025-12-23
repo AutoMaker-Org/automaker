@@ -10,6 +10,13 @@ import { FeatureLoader } from '../../services/feature-loader.js';
 
 const router = Router();
 
+// Store the service instance
+let autoModeServiceInstance: AutoModeService;
+
+export function setAutoModeService(service: AutoModeService) {
+  autoModeServiceInstance = service;
+}
+
 /**
  * POST /api/pipeline/execute-step
  * Manually execute a pipeline step for a feature
@@ -18,24 +25,10 @@ router.post('/', async (req, res) => {
   try {
     const { projectPath, featureId, stepId } = req.body;
 
-    if (!projectPath || typeof projectPath !== 'string') {
+    if (!projectPath || !featureId || !stepId) {
       return res.status(400).json({
         success: false,
-        error: 'projectPath is required',
-      });
-    }
-
-    if (!featureId || typeof featureId !== 'string') {
-      return res.status(400).json({
-        success: false,
-        error: 'featureId is required',
-      });
-    }
-
-    if (!stepId || typeof stepId !== 'string') {
-      return res.status(400).json({
-        success: false,
-        error: 'stepId is required',
+        error: 'Missing required fields: projectPath, featureId, stepId',
       });
     }
 
@@ -52,14 +45,8 @@ router.post('/', async (req, res) => {
       });
     }
 
-    // Get the auto mode service instance
-    // Note: In a real implementation, you'd get this from a service registry
-    const autoModeService = new AutoModeService({
-      emit: (event: string, data: unknown) => {
-        // Emit events to connected clients
-        console.log(`[Pipeline] Event: ${event}`, data);
-      },
-    } as any);
+    // Use the injected service instance
+    const autoModeService = autoModeServiceInstance;
 
     // Load pipeline configuration
     const configService = new (
