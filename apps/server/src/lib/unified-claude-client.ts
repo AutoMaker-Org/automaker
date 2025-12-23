@@ -87,16 +87,20 @@ export async function* executeUnifiedQuery(
       }
 
       // Try to extract text from the first message
-      if (messages.length > 0 && messages[0].message?.content) {
-        const content = messages[0].message.content;
+      const firstMsg = messages[0];
+      if (firstMsg?.message?.content) {
+        const content = firstMsg.message.content;
         if (Array.isArray(content)) {
           const textBlocks = content.filter((c: any) => c.type === 'text');
           promptText = textBlocks.map((b: any) => b.text).join('');
         } else {
           promptText = String(content);
         }
+      } else if (firstMsg) {
+        promptText = String(firstMsg);
       } else {
-        promptText = String(messages[0] || '');
+        promptText = '';
+        logger.warn('[Unified] Empty prompt received from AsyncIterable');
       }
     }
 

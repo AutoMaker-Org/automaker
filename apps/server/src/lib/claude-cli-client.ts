@@ -264,9 +264,10 @@ export async function executeCliQuery(
     const errorMsg = messages.find((m) => m.type === 'error');
 
     if (errorMsg) {
+      const errorText = 'error' in errorMsg ? errorMsg.error : 'Unknown error';
       return {
         success: false,
-        error: errorMsg.error,
+        error: errorText || 'Unknown error',
       };
     }
 

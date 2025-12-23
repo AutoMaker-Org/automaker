@@ -85,7 +85,8 @@ async function checkCLIAuthStatus(): Promise<{
     };
   }
 
-  const authStatus = await checkCLIAuth();
+  // Pass detection result to avoid redundant CLI detection
+  const authStatus = await checkCLIAuth(detection);
 
   return {
     installed: true,
@@ -171,17 +172,45 @@ export async function getAuthStatus(forceRefresh = false): Promise<ClaudeAuthSta
  *
  * This is more thorough than just checking configuration - it actually
  * tries to use the authentication to ensure it works.
+ *
+ * @param method - Optional specific method to verify. If not provided, uses current config.
  */
 export async function verifyAuth(method?: ClaudeAuthMethod): Promise<ClaudeAuthStatus> {
   const targetMethod = method || currentAuthConfig.method;
 
   logger.info(`[Auth] Verifying authentication with method: ${targetMethod}`);
 
-  // For now, we'll just check the status
-  // The actual verification will be implemented in the API routes
-  // that call the Claude SDK or CLI
+  // Get fresh status with force refresh
   const status = await getAuthStatus(true);
 
+  // If a specific method was requested, verify only that method
+  if (method) {
+    if (method === 'api_key') {
+      const isApiKeyValid = !!status.apiKey?.configured && !!status.apiKey?.valid;
+      return {
+        authenticated: isApiKeyValid,
+        method: 'api_key',
+        apiKey: status.apiKey,
+        cli: status.cli,
+        error: isApiKeyValid ? undefined : 'API key not configured or invalid',
+      };
+    } else if (method === 'cli') {
+      const isCLIValid = !!status.cli?.installed && !!status.cli?.authenticated;
+      return {
+        authenticated: isCLIValid,
+        method: 'cli',
+        apiKey: status.apiKey,
+        cli: status.cli,
+        error: isCLIValid
+          ? undefined
+          : status.cli?.installed
+            ? 'Not authenticated. Run "claude login" to authenticate.'
+            : 'Claude CLI not installed',
+      };
+    }
+  }
+
+  // For 'auto' or no method specified, return full status
   if (!status.authenticated) {
     logger.warn('[Auth] Verification failed - not authenticated');
   } else {

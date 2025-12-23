@@ -99,10 +99,12 @@ export async function detectClaudeCLI(): Promise<CLIDetectionResult> {
  *
  * This attempts to verify if the user is logged into the Claude CLI.
  * We do this by running a minimal test query and checking for auth errors.
+ *
+ * @param detectionResult - Optional pre-computed detection result to avoid redundant checks
  */
-export async function checkCLIAuth(): Promise<CLIAuthStatus> {
+export async function checkCLIAuth(detectionResult?: CLIDetectionResult): Promise<CLIAuthStatus> {
   try {
-    const detection = await detectClaudeCLI();
+    const detection = detectionResult || (await detectClaudeCLI());
 
     if (!detection.installed) {
       return {
