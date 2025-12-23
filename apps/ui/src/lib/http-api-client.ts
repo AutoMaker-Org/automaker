@@ -496,11 +496,13 @@ export class HttpApiClient implements ElectronAPI {
       error?: string;
     }> => this.post('/api/setup/verify-claude-auth', { authMethod }),
 
-    verifyZaiAuth: (): Promise<{
+    verifyZaiAuth: (
+      apiKey?: string
+    ): Promise<{
       success: boolean;
       authenticated: boolean;
       error?: string;
-    }> => this.post('/api/setup/verify-zai-auth', {}),
+    }> => this.post('/api/setup/verify-zai-auth', { apiKey }),
 
     getGhStatus: (): Promise<{
       success: boolean;

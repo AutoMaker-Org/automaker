@@ -465,7 +465,7 @@ export interface ElectronAPI {
       authenticated: boolean;
       error?: string;
     }>;
-    verifyZaiAuth: () => Promise<{
+    verifyZaiAuth: (apiKey?: string) => Promise<{
       success: boolean;
       authenticated: boolean;
       error?: string;
@@ -1039,7 +1039,7 @@ interface SetupAPI {
     authenticated: boolean;
     error?: string;
   }>;
-  verifyZaiAuth: () => Promise<{
+  verifyZaiAuth: (apiKey?: string) => Promise<{
     success: boolean;
     authenticated: boolean;
     error?: string;
@@ -1140,7 +1140,7 @@ function createMockSetupAPI(): SetupAPI {
       };
     },
 
-    verifyZaiAuth: async () => {
+    verifyZaiAuth: async (_apiKey?: string) => {
       console.log('[Mock] Verifying Z.AI auth');
       // Mock always returns not authenticated
       return {

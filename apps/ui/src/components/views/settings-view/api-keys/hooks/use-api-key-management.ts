@@ -133,9 +133,20 @@ export function useApiKeyManagement() {
     setTestingZaiConnection(true);
     setZaiTestResult(null);
 
+    // Basic validation - check key is provided
+    if (!zaiKey || zaiKey.trim().length < 10) {
+      setZaiTestResult({
+        success: false,
+        message: 'Please enter a valid API key.',
+      });
+      setTestingZaiConnection(false);
+      return;
+    }
+
     try {
       const api = getElectronAPI();
-      const data = await api.setup?.verifyZaiAuth?.();
+      // Pass the current key value so we can test before saving
+      const data = await api.setup?.verifyZaiAuth?.(zaiKey);
 
       if (data && data.success && data.authenticated) {
         setZaiTestResult({

@@ -83,8 +83,9 @@ export function createVerifyZaiAuthHandler() {
       const originalAuthToken = process.env.ANTHROPIC_AUTH_TOKEN;
 
       try {
-        // Get the Z.AI API key
-        const zaiApiKey = getApiKey('zai');
+        // Get the Z.AI API key - prefer the one passed in request body for testing unsaved keys
+        const { apiKey: requestApiKey } = req.body as { apiKey?: string };
+        const zaiApiKey = requestApiKey || getApiKey('zai');
         if (!zaiApiKey) {
           res.json({
             success: true,
