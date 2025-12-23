@@ -3,7 +3,6 @@
  */
 
 import { Router } from 'express';
-import { PIPELINE_CONFIG_SCHEMA } from '@automaker/types';
 
 const router = Router();
 
