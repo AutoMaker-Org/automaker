@@ -26,6 +26,7 @@ export function useBoardColumnFeatures({
     const map: Record<ColumnId, Feature[]> = {
       backlog: [],
       in_progress: [],
+      double_check: [],
       waiting_approval: [],
       verified: [],
       completed: [], // Completed features are shown in the archive modal, not as a column
@@ -79,7 +80,13 @@ export function useBoardColumnFeatures({
       if (isRunning) {
         // Only show running tasks if they match the current worktree
         if (matchesWorktree) {
-          map.in_progress.push(f);
+          // For double_check status, keep it in the double_check column even when running
+          // The card will still show the running indicator via isCurrentAutoTask prop
+          if (f.status === 'double_check') {
+            map.double_check.push(f);
+          } else {
+            map.in_progress.push(f);
+          }
         }
       } else {
         // Otherwise, use the feature's status (fallback to backlog for unknown statuses)

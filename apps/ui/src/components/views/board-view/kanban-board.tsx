@@ -1,10 +1,11 @@
+import { useMemo } from 'react';
 import { DndContext, DragOverlay } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { HotkeyButton } from '@/components/ui/hotkey-button';
 import { KanbanColumn, KanbanCard } from './components';
-import { Feature } from '@/store/app-store';
+import { Feature, useAppStore } from '@/store/app-store';
 import { FastForward, Lightbulb, Archive } from 'lucide-react';
 import { useKeyboardShortcutsConfig } from '@/hooks/use-keyboard-shortcuts';
 import { useResponsiveKanban } from '@/hooks/use-responsive-kanban';
@@ -41,6 +42,8 @@ interface KanbanBoardProps {
   onImplement: (feature: Feature) => void;
   onViewPlan: (feature: Feature) => void;
   onApprovePlan: (feature: Feature) => void;
+  onDoubleCheck: (feature: Feature) => void;
+  onSkipDoubleCheck: (feature: Feature) => void;
   featuresWithContext: Set<string>;
   runningAutoTasks: string[];
   shortcuts: ReturnType<typeof useKeyboardShortcutsConfig>;
@@ -73,6 +76,8 @@ export function KanbanBoard({
   onImplement,
   onViewPlan,
   onApprovePlan,
+  onDoubleCheck,
+  onSkipDoubleCheck,
   featuresWithContext,
   runningAutoTasks,
   shortcuts,
@@ -81,9 +86,20 @@ export function KanbanBoard({
   suggestionsCount,
   onArchiveAllVerified,
 }: KanbanBoardProps) {
+  // Get double-check mode setting to conditionally show the column
+  const { doubleCheckMode } = useAppStore();
+
+  // Filter columns based on settings - hide double_check column when mode is disabled
+  const visibleColumns = useMemo(() => {
+    if (doubleCheckMode?.enabled) {
+      return COLUMNS;
+    }
+    return COLUMNS.filter((col) => col.id !== 'double_check');
+  }, [doubleCheckMode?.enabled]);
+
   // Use responsive column widths based on window size
   // containerStyle handles centering and ensures columns fit without horizontal scroll in Electron
-  const { columnWidth, containerStyle } = useResponsiveKanban(COLUMNS.length);
+  const { columnWidth, containerStyle } = useResponsiveKanban(visibleColumns.length);
 
   return (
     <div className="flex-1 overflow-x-hidden px-5 pb-4 relative" style={backgroundImageStyle}>
@@ -94,7 +110,7 @@ export function KanbanBoard({
         onDragEnd={onDragEnd}
       >
         <div className="h-full py-1" style={containerStyle}>
-          {COLUMNS.map((column) => {
+          {visibleColumns.map((column) => {
             const columnFeatures = getColumnFeatures(column.id);
             return (
               <KanbanColumn
@@ -184,6 +200,8 @@ export function KanbanBoard({
                         onImplement={() => onImplement(feature)}
                         onViewPlan={() => onViewPlan(feature)}
                         onApprovePlan={() => onApprovePlan(feature)}
+                        onDoubleCheck={() => onDoubleCheck(feature)}
+                        onSkipDoubleCheck={() => onSkipDoubleCheck(feature)}
                         hasContext={featuresWithContext.has(feature.id)}
                         isCurrentAutoTask={runningAutoTasks.includes(feature.id)}
                         shortcutKey={shortcutKey}

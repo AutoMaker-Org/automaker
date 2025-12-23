@@ -113,8 +113,8 @@ const events: EventEmitter = createEventEmitter();
 // Create services
 const agentService = new AgentService(DATA_DIR, events);
 const featureLoader = new FeatureLoader();
-const autoModeService = new AutoModeService(events);
 const settingsService = new SettingsService(DATA_DIR);
+const autoModeService = new AutoModeService(events, settingsService);
 const claudeUsageService = new ClaudeUsageService();
 
 // Initialize services

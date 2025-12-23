@@ -12,6 +12,8 @@ export type {
   PlanningMode,
   ThinkingLevel,
   ModelProvider,
+  DoubleCheckModelStrategy,
+  DoubleCheckMode,
   KeyboardShortcuts,
   AIProfile,
   ProjectRef,

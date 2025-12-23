@@ -10,6 +10,8 @@ import {
   Eye,
   Wand2,
   Archive,
+  CheckCheck,
+  SkipForward,
 } from 'lucide-react';
 
 interface CardActionsProps {
@@ -28,6 +30,9 @@ interface CardActionsProps {
   onComplete?: () => void;
   onViewPlan?: () => void;
   onApprovePlan?: () => void;
+  onDoubleCheck?: () => void;
+  onSkipDoubleCheck?: () => void;
+  onMoveBackToInProgress?: () => void;
 }
 
 export function CardActions({
@@ -46,6 +51,9 @@ export function CardActions({
   onComplete,
   onViewPlan,
   onApprovePlan,
+  onDoubleCheck,
+  onSkipDoubleCheck,
+  onMoveBackToInProgress,
 }: CardActionsProps) {
   return (
     <div className="flex flex-wrap gap-1.5 -mx-3 -mb-3 px-3 pb-3">
@@ -280,6 +288,44 @@ export function CardActions({
               Mark as Verified
             </Button>
           ) : null}
+        </>
+      )}
+      {!isCurrentAutoTask && feature.status === 'double_check' && (
+        <>
+          {/* Run Double-Check button */}
+          {onDoubleCheck && (
+            <Button
+              variant="default"
+              size="sm"
+              className="flex-1 h-7 text-xs min-w-0 bg-purple-600 hover:bg-purple-700"
+              onClick={(e) => {
+                e.stopPropagation();
+                onDoubleCheck();
+              }}
+              onPointerDown={(e) => e.stopPropagation()}
+              data-testid={`double-check-${feature.id}`}
+            >
+              <CheckCheck className="w-3 h-3 mr-1 shrink-0" />
+              <span className="truncate">Run Double-Check</span>
+            </Button>
+          )}
+          {/* Skip Double-Check button - moves to Waiting Approval */}
+          {onSkipDoubleCheck && (
+            <Button
+              variant="secondary"
+              size="sm"
+              className="flex-1 h-7 text-xs min-w-0"
+              onClick={(e) => {
+                e.stopPropagation();
+                onSkipDoubleCheck();
+              }}
+              onPointerDown={(e) => e.stopPropagation()}
+              data-testid={`skip-double-check-${feature.id}`}
+            >
+              <SkipForward className="w-3 h-3 mr-1 shrink-0" />
+              <span className="truncate">Skip</span>
+            </Button>
+          )}
         </>
       )}
       {!isCurrentAutoTask && feature.status === 'backlog' && (

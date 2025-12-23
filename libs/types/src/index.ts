@@ -16,7 +16,13 @@ export type {
 } from './provider.js';
 
 // Feature types
-export type { Feature, FeatureImagePath, FeatureTextFilePath, FeatureStatus } from './feature.js';
+export type {
+  Feature,
+  FeatureImagePath,
+  FeatureTextFilePath,
+  FeatureStatus,
+  DoubleCheckResult,
+} from './feature.js';
 
 // Session types
 export type {
@@ -52,6 +58,8 @@ export type {
   PlanningMode,
   ThinkingLevel,
   ModelProvider,
+  DoubleCheckModelStrategy,
+  DoubleCheckMode,
   KeyboardShortcuts,
   AIProfile,
   ProjectRef,

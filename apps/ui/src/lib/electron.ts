@@ -323,6 +323,16 @@ export interface AutoModeAPI {
     editedPlan?: string,
     feedback?: string
   ) => Promise<{ success: boolean; error?: string }>;
+  doubleCheckFeature: (
+    projectPath: string,
+    featureId: string
+  ) => Promise<{
+    success: boolean;
+    passed?: boolean;
+    summary?: string;
+    discrepancies?: string[];
+    error?: string;
+  }>;
   onEvent: (callback: (event: AutoModeEvent) => void) => () => void;
 }
 

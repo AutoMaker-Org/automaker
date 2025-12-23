@@ -10,7 +10,7 @@
  */
 
 import { ProviderFactory } from '../providers/provider-factory.js';
-import type { ExecuteOptions, Feature } from '@automaker/types';
+import type { ExecuteOptions, Feature, DoubleCheckResult, AgentModel } from '@automaker/types';
 import {
   buildPromptWithImages,
   isAbortError,
@@ -27,6 +27,8 @@ import * as secureFs from '../lib/secure-fs.js';
 import type { EventEmitter } from '../lib/events.js';
 import { createAutoModeOptions, validateWorkingDirectory } from '../lib/sdk-options.js';
 import { FeatureLoader } from './feature-loader.js';
+import { SettingsService } from './settings-service.js';
+import type { GlobalSettings, DoubleCheckMode } from '../types/settings.js';
 
 const execAsync = promisify(exec);
 
@@ -341,9 +343,360 @@ export class AutoModeService {
   private autoLoopAbortController: AbortController | null = null;
   private config: AutoModeConfig | null = null;
   private pendingApprovals = new Map<string, PendingApproval>();
+  private settingsService: SettingsService | null = null;
 
-  constructor(events: EventEmitter) {
+  constructor(events: EventEmitter, settingsService?: SettingsService) {
     this.events = events;
+    this.settingsService = settingsService || null;
+  }
+
+  /**
+   * Set the settings service (for dependency injection after construction)
+   */
+  setSettingsService(settingsService: SettingsService): void {
+    this.settingsService = settingsService;
+  }
+
+  /**
+   * Load global settings from the settings service
+   */
+  private async loadGlobalSettings(): Promise<GlobalSettings | null> {
+    if (!this.settingsService) {
+      return null;
+    }
+    try {
+      return await this.settingsService.getGlobalSettings();
+    } catch (error) {
+      console.error('[AutoMode] Failed to load global settings:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Determine the final status for a completed feature based on double-check mode
+   */
+  private async determineFinalStatus(
+    feature: Feature,
+    _projectPath: string
+  ): Promise<'double_check' | 'waiting_approval' | 'verified'> {
+    // If automated testing is enabled (skipTests=false), go directly to verified
+    if (!feature.skipTests) {
+      return 'verified';
+    }
+
+    // Check if double-check mode is enabled
+    const settings = await this.loadGlobalSettings();
+    if (settings?.doubleCheckMode?.enabled) {
+      return 'double_check';
+    }
+
+    // Default: manual verification required
+    return 'waiting_approval';
+  }
+
+  /**
+   * Get the model to use for double-check verification
+   */
+  private getDoubleCheckModel(feature: Feature, settings: GlobalSettings): AgentModel {
+    const doubleCheckMode = settings.doubleCheckMode;
+    const strategy = doubleCheckMode.modelStrategy;
+
+    switch (strategy) {
+      case 'specific':
+        return doubleCheckMode.specificModel || 'sonnet';
+
+      case 'different': {
+        // Select a different model from the one that implemented the feature
+        const availableModels: AgentModel[] = ['opus', 'sonnet', 'haiku'];
+        const usedModel = (feature.model as AgentModel) || 'sonnet';
+        const differentModels = availableModels.filter((m) => m !== usedModel);
+        // Prefer sonnet if available, otherwise use first different model
+        return differentModels.includes('sonnet') ? 'sonnet' : differentModels[0];
+      }
+
+      case 'any':
+      default:
+        return (feature.model as AgentModel) || settings.enhancementModel || 'sonnet';
+    }
+  }
+
+  /**
+   * Build the double-check verification prompt
+   */
+  private buildDoubleCheckPrompt(feature: Feature): string {
+    const title = feature.title || this.extractTitleFromDescription(feature.description);
+
+    return `## Double-Check Verification
+
+**Feature ID:** ${feature.id}
+**Title:** ${title}
+**Description:** ${feature.description}
+**Implemented by:** ${feature.model || 'unknown'}
+
+This feature has been implemented and is now undergoing double-check verification. Your task is to thoroughly review and ensure:
+
+### Verification Checklist
+
+1. **Completeness Check**
+   - [ ] No TODO, FIXME, or placeholder comments remain
+   - [ ] All required functionality is implemented
+   - [ ] No stub methods or empty functions
+
+2. **Functionality Verification**
+   - [ ] Feature works as described
+   - [ ] Edge cases are handled
+   - [ ] Error handling is appropriate
+
+3. **Code Quality**
+   - [ ] Code follows project conventions
+   - [ ] Proper error handling and logging
+   - [ ] No obvious bugs or issues
+
+4. **Testing Coverage**
+   - [ ] Tests are comprehensive
+   - [ ] All tests pass
+   - [ ] Edge cases are tested
+
+5. **Documentation**
+   - [ ] README updated if needed
+   - [ ] Code comments are appropriate
+   - [ ] API documentation updated
+
+### Instructions
+
+1. Run the project equivalent of testing, linting, and type-checking
+2. Review the implementation code
+
+### Outcome
+
+- **If everything is complete and working**:
+  Respond with "[DOUBLE_CHECK_PASSED]" and a brief summary of what was verified
+
+- **If issues are found**:
+  Respond with "[DOUBLE_CHECK_FAILED]" followed by:
+  1. List of specific issues found
+  2. Recommended fixes
+  3. Any critical blockers
+
+Begin your double-check verification now.`;
+  }
+
+  /**
+   * Extract title from feature description (first line or first sentence)
+   */
+  private extractTitleFromDescription(description: string): string {
+    const firstLine = description.split('\n')[0].trim();
+    if (firstLine.length <= 100) {
+      return firstLine;
+    }
+    return firstLine.substring(0, 97) + '...';
+  }
+
+  /**
+   * Execute double-check verification on a feature
+   */
+  async doubleCheckFeature(
+    projectPath: string,
+    featureId: string
+  ): Promise<{ passed: boolean; summary?: string; discrepancies?: string[] }> {
+    const feature = await this.featureLoader.get(projectPath, featureId);
+    if (!feature) {
+      throw new Error(`Feature ${featureId} not found`);
+    }
+
+    if (feature.status !== 'double_check') {
+      throw new Error(`Feature ${featureId} is not in double_check status`);
+    }
+
+    const settings = await this.loadGlobalSettings();
+    if (!settings) {
+      throw new Error('Unable to load settings');
+    }
+
+    const model = this.getDoubleCheckModel(feature, settings);
+    const prompt = this.buildDoubleCheckPrompt(feature);
+    const modelString = resolveModelString(model, DEFAULT_MODELS.claude);
+
+    // Add to running features so UI shows it as active
+    const abortController = new AbortController();
+    this.runningFeatures.set(featureId, {
+      featureId,
+      projectPath,
+      worktreePath: null,
+      branchName: feature.branchName || null,
+      abortController,
+      isAutoMode: false, // Manual double-check, not auto mode
+      startTime: Date.now(),
+    });
+
+    // Emit start event so UI shows the running indicator
+    this.emitAutoModeEvent('auto_mode_feature_start', {
+      featureId,
+      projectPath,
+    });
+
+    this.emitAutoModeEvent('auto_mode_progress', {
+      featureId,
+      projectPath,
+      content: `Starting double-check verification with model: ${model}`,
+    });
+
+    try {
+      // Load context files for the project
+      const { formattedPrompt: contextFilesPrompt } = await loadContextFiles({
+        projectPath,
+        fsModule: secureFs as Parameters<typeof loadContextFiles>[0]['fsModule'],
+      });
+
+      // Get the provider for the model
+      const provider = ProviderFactory.getProviderForModel(modelString);
+
+      // Execute the double-check
+      const abortController = new AbortController();
+      const executeOptions: ExecuteOptions = {
+        prompt,
+        model: modelString,
+        cwd: projectPath,
+        maxTurns: 50, // Limited turns for verification
+        abortController,
+        systemPrompt: contextFilesPrompt || undefined,
+      };
+
+      const stream = provider.executeQuery(executeOptions);
+      let resultText = '';
+
+      // Collect the streaming response
+      for await (const msg of stream) {
+        if (msg.type === 'assistant' && msg.message?.content) {
+          for (const block of msg.message.content) {
+            if (block.type === 'text') {
+              resultText += block.text || '';
+            }
+          }
+        }
+      }
+      const passed = resultText.includes('[DOUBLE_CHECK_PASSED]');
+      const failed = resultText.includes('[DOUBLE_CHECK_FAILED]');
+
+      // Extract summary and discrepancies
+      let summary: string | undefined;
+      let discrepancies: string[] | undefined;
+
+      if (passed) {
+        const passedIndex = resultText.indexOf('[DOUBLE_CHECK_PASSED]');
+        summary = resultText.substring(passedIndex + '[DOUBLE_CHECK_PASSED]'.length).trim();
+      } else if (failed) {
+        const failedIndex = resultText.indexOf('[DOUBLE_CHECK_FAILED]');
+        const failedContent = resultText
+          .substring(failedIndex + '[DOUBLE_CHECK_FAILED]'.length)
+          .trim();
+        // Try to extract discrepancies as bullet points
+        const lines = failedContent
+          .split('\n')
+          .filter((l) => l.trim().startsWith('-') || l.trim().match(/^\d+\./));
+        discrepancies = lines
+          .map((l) => l.replace(/^[-\d.]+\s*/, '').trim())
+          .filter((l) => l.length > 0);
+        summary =
+          discrepancies.length > 0
+            ? `Found ${discrepancies.length} issue(s)`
+            : failedContent.substring(0, 200);
+      }
+
+      // Create the double-check result
+      const doubleCheckResult: DoubleCheckResult = {
+        status: passed ? 'passed' : 'failed',
+        discrepancies: discrepancies,
+        checkedAt: new Date().toISOString(),
+        checkedBy: model,
+        originalModel: (feature.model as AgentModel) || 'sonnet',
+        summary: summary,
+      };
+
+      // Update feature with result and new status
+      // If double-check failed, send back to backlog so auto-mode can pick it up for re-implementation
+      const newStatus = passed ? 'waiting_approval' : 'backlog';
+      await this.updateFeatureWithDoubleCheckResult(
+        projectPath,
+        featureId,
+        doubleCheckResult,
+        newStatus
+      );
+
+      // Remove from running features
+      this.runningFeatures.delete(featureId);
+
+      // Emit appropriate event
+      if (passed) {
+        this.emitAutoModeEvent('auto_mode_feature_complete', {
+          featureId,
+          projectPath,
+          passes: true,
+          message: `Double-check passed: ${summary || 'No issues found'}`,
+        });
+      } else {
+        this.emitAutoModeEvent('auto_mode_feature_complete', {
+          featureId,
+          projectPath,
+          passes: false,
+          message: `Double-check failed: ${summary || 'Issues found'}`,
+        });
+      }
+
+      return { passed, summary, discrepancies };
+    } catch (error) {
+      // Remove from running features on error
+      this.runningFeatures.delete(featureId);
+
+      console.error(`[AutoMode] Double-check failed for ${featureId}:`, error);
+      const errorInfo = classifyError(error);
+
+      // Keep in double_check status on error
+      this.emitAutoModeEvent('auto_mode_error', {
+        featureId,
+        error: `Double-check failed: ${errorInfo.message}`,
+        errorType: errorInfo.type,
+        projectPath,
+      });
+
+      throw error;
+    }
+  }
+
+  /**
+   * Update feature with double-check result
+   */
+  private async updateFeatureWithDoubleCheckResult(
+    projectPath: string,
+    featureId: string,
+    result: DoubleCheckResult,
+    newStatus: string
+  ): Promise<void> {
+    const featureDir = getFeatureDir(projectPath, featureId);
+    const featurePath = path.join(featureDir, 'feature.json');
+
+    try {
+      const data = (await secureFs.readFile(featurePath, 'utf-8')) as string;
+      const feature = JSON.parse(data);
+      feature.status = newStatus;
+      feature.doubleCheckResult = result;
+      feature.updatedAt = new Date().toISOString();
+
+      // Set justFinishedAt when moving to waiting_approval
+      if (newStatus === 'waiting_approval') {
+        feature.justFinishedAt = new Date().toISOString();
+      }
+
+      await secureFs.writeFile(featurePath, JSON.stringify(feature, null, 2));
+
+      this.events.emit('feature:updated', { projectPath, featureId });
+    } catch (error) {
+      console.error(
+        `[AutoMode] Failed to update feature ${featureId} with double-check result:`,
+        error
+      );
+      throw error;
+    }
   }
 
   /**
@@ -389,6 +742,55 @@ export class AutoModeService {
         if (this.runningFeatures.size >= (this.config?.maxConcurrency || 3)) {
           await this.sleep(5000);
           continue;
+        }
+
+        // Check for features awaiting double-check (if auto-trigger is enabled)
+        const settings = await this.loadGlobalSettings();
+        const doubleCheckEnabled = settings?.doubleCheckMode?.enabled;
+        const autoTrigger = settings?.doubleCheckMode?.autoTriggerInAutoMode;
+        console.log('[AutoMode] Double-check settings:', {
+          enabled: doubleCheckEnabled,
+          autoTriggerInAutoMode: autoTrigger,
+        });
+
+        // Always check for double-check features first, regardless of auto-trigger setting
+        // This ensures double-check items are processed before new backlog items
+        const doubleCheckFeatures = await this.loadFeaturesWithStatus(
+          this.config!.projectPath,
+          'double_check'
+        );
+        console.log('[AutoMode] Found double-check features:', doubleCheckFeatures.length);
+
+        if (doubleCheckFeatures.length > 0 && doubleCheckEnabled) {
+          const nextDoubleCheck = doubleCheckFeatures.find(
+            (f: Feature) => !this.runningFeatures.has(f.id)
+          );
+
+          if (nextDoubleCheck) {
+            if (autoTrigger) {
+              console.log('[AutoMode] Auto-processing double-check feature:', nextDoubleCheck.id);
+              // Run double-check in background
+              this.doubleCheckFeature(this.config!.projectPath, nextDoubleCheck.id).catch(
+                (error) => {
+                  console.error(
+                    `[AutoMode] Double-check feature ${nextDoubleCheck.id} error:`,
+                    error
+                  );
+                }
+              );
+              await this.sleep(2000);
+              continue;
+            } else {
+              // Double-check items exist but auto-trigger is off - wait for manual trigger
+              // Don't start new backlog items while double-check items are pending
+              console.log(
+                '[AutoMode] Double-check feature waiting for manual trigger:',
+                nextDoubleCheck.id
+              );
+              await this.sleep(5000);
+              continue;
+            }
+          }
         }
 
         // Load pending features
@@ -607,18 +1009,25 @@ export class AutoModeService {
         }
       );
 
-      // Determine final status based on testing mode:
-      // - skipTests=false (automated testing): go directly to 'verified' (no manual verify needed)
+      // Determine final status based on testing mode and double-check settings:
+      // - skipTests=false (automated testing): go directly to 'verified'
+      // - skipTests=true + doubleCheckMode.enabled: go to 'double_check' for verification
       // - skipTests=true (manual verification): go to 'waiting_approval' for manual review
-      const finalStatus = feature.skipTests ? 'waiting_approval' : 'verified';
+      const finalStatus = await this.determineFinalStatus(feature, projectPath);
       await this.updateFeatureStatus(projectPath, featureId, finalStatus);
 
+      const statusMessage =
+        finalStatus === 'verified'
+          ? ' - auto-verified'
+          : finalStatus === 'double_check'
+            ? ' - pending double-check'
+            : '';
       this.emitAutoModeEvent('auto_mode_feature_complete', {
         featureId,
         passes: true,
         message: `Feature completed in ${Math.round(
           (Date.now() - tempRunningFeature.startTime) / 1000
-        )}s${finalStatus === 'verified' ? ' - auto-verified' : ''}`,
+        )}s${statusMessage}`,
         projectPath,
       });
     } catch (error) {
@@ -882,16 +1291,22 @@ Address the follow-up instructions above. Review the previous work and make the 
         }
       );
 
-      // Determine final status based on testing mode:
-      // - skipTests=false (automated testing): go directly to 'verified' (no manual verify needed)
-      // - skipTests=true (manual verification): go to 'waiting_approval' for manual review
-      const finalStatus = feature?.skipTests ? 'waiting_approval' : 'verified';
+      // Determine final status based on testing mode and double-check settings
+      const finalStatus = feature
+        ? await this.determineFinalStatus(feature, projectPath)
+        : 'waiting_approval';
       await this.updateFeatureStatus(projectPath, featureId, finalStatus);
 
+      const statusMessage =
+        finalStatus === 'verified'
+          ? ' - auto-verified'
+          : finalStatus === 'double_check'
+            ? ' - pending double-check'
+            : '';
       this.emitAutoModeEvent('auto_mode_feature_complete', {
         featureId,
         passes: true,
-        message: `Follow-up completed successfully${finalStatus === 'verified' ? ' - auto-verified' : ''}`,
+        message: `Follow-up completed successfully${statusMessage}`,
         projectPath,
       });
     } catch (error) {
@@ -1431,14 +1846,21 @@ Format your response as a structured markdown document.`;
       const feature = JSON.parse(data);
       feature.status = status;
       feature.updatedAt = new Date().toISOString();
-      // Set justFinishedAt timestamp when moving to waiting_approval (agent just completed)
+
+      // Set justFinishedAt timestamp when agent just completed
       // Badge will show for 2 minutes after this timestamp
-      if (status === 'waiting_approval') {
+      if (status === 'waiting_approval' || status === 'double_check') {
         feature.justFinishedAt = new Date().toISOString();
       } else {
         // Clear the timestamp when moving to other statuses
         feature.justFinishedAt = undefined;
       }
+
+      // Clear doubleCheckResult when moving back to in_progress (for re-implementation)
+      if (status === 'in_progress' || status === 'backlog') {
+        feature.doubleCheckResult = undefined;
+      }
+
       await secureFs.writeFile(featurePath, JSON.stringify(feature, null, 2));
     } catch {
       // Feature file may not exist
@@ -1532,21 +1954,36 @@ Format your response as a structured markdown document.`;
   }
 
   /**
-   * Extract a title from feature description (first line or truncated)
+   * Load features with a specific status
    */
-  private extractTitleFromDescription(description: string): string {
-    if (!description || !description.trim()) {
-      return 'Untitled Feature';
-    }
+  private async loadFeaturesWithStatus(projectPath: string, status: string): Promise<Feature[]> {
+    const featuresDir = getFeaturesDir(projectPath);
 
-    // Get first line, or first 60 characters if no newline
-    const firstLine = description.split('\n')[0].trim();
-    if (firstLine.length <= 60) {
-      return firstLine;
-    }
+    try {
+      const entries = await secureFs.readdir(featuresDir, {
+        withFileTypes: true,
+      });
+      const features: Feature[] = [];
 
-    // Truncate to 60 characters and add ellipsis
-    return firstLine.substring(0, 57) + '...';
+      for (const entry of entries) {
+        if (entry.isDirectory()) {
+          const featurePath = path.join(featuresDir, entry.name, 'feature.json');
+          try {
+            const data = (await secureFs.readFile(featurePath, 'utf-8')) as string;
+            const feature = JSON.parse(data);
+            if (feature.status === status) {
+              features.push(feature);
+            }
+          } catch {
+            // Skip invalid features
+          }
+        }
+      }
+
+      return features;
+    } catch {
+      return [];
+    }
   }
 
   /**

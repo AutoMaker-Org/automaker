@@ -368,6 +368,8 @@ export function BoardView() {
     handleResumeFeature,
     handleManualVerify,
     handleMoveBackToInProgress,
+    handleDoubleCheck,
+    handleSkipDoubleCheck,
     handleOpenFollowUp,
     handleSendFollowUp,
     handleCommitFeature,
@@ -537,6 +539,24 @@ export function BoardView() {
     handleStartImplementationRef.current = handleStartImplementation;
   }, [handleStartImplementation]);
 
+  // Keep latest double-check handler without retriggering the auto mode effect
+  const handleDoubleCheckRef = useRef(handleDoubleCheck);
+  useEffect(() => {
+    handleDoubleCheckRef.current = handleDoubleCheck;
+  }, [handleDoubleCheck]);
+
+  // Keep latest resume handler without retriggering the auto mode effect
+  const handleResumeFeatureRef = useRef(handleResumeFeature);
+  useEffect(() => {
+    handleResumeFeatureRef.current = handleResumeFeature;
+  }, [handleResumeFeature]);
+
+  // Track which features have context (for resuming)
+  const featuresWithContextRef = useRef(featuresWithContext);
+  useEffect(() => {
+    featuresWithContextRef.current = featuresWithContext;
+  }, [featuresWithContext]);
+
   // Track features that are pending (started but not yet confirmed running)
   const pendingFeaturesRef = useRef<Set<string>>(new Set());
 
@@ -612,10 +632,112 @@ export function BoardView() {
           return;
         }
 
-        // Filter backlog features by the currently selected worktree branch
-        // This logic mirrors use-board-column-features.ts for consistency
         // Use ref to get the latest features without causing effect re-runs
         const currentFeatures = hookFeaturesRef.current;
+        const { doubleCheckMode } = useAppStore.getState();
+
+        // Track how many slots we've used for double-check features
+        let slotsUsedByDoubleCheck = 0;
+
+        // Check for double-check features first (they take priority over backlog)
+        if (doubleCheckMode.enabled) {
+          const doubleCheckFeatures = currentFeatures.filter((f) => {
+            if (f.status !== 'double_check') return false;
+            // Skip already running or pending
+            if (runningAutoTasksRef.current.includes(f.id)) return false;
+            if (pendingFeaturesRef.current.has(f.id)) return false;
+
+            // Filter by worktree branch
+            const featureBranch = f.branchName;
+            if (!featureBranch || typeof featureBranch !== 'string') {
+              const isViewingPrimary = currentWorktreePath === null;
+              return isViewingPrimary;
+            }
+            if (currentWorktreeBranch === null) {
+              return currentProject.path
+                ? isPrimaryWorktreeBranch(currentProject.path, featureBranch)
+                : false;
+            }
+            return featureBranch === currentWorktreeBranch;
+          });
+
+          if (doubleCheckFeatures.length > 0) {
+            if (doubleCheckMode.autoTriggerInAutoMode) {
+              // Auto-trigger: start double-check features (up to available slots)
+              const doubleCheckHandler = handleDoubleCheckRef.current;
+              if (doubleCheckHandler) {
+                const doubleCheckToStart = doubleCheckFeatures.slice(0, availableSlots);
+                for (const dcFeature of doubleCheckToStart) {
+                  if (!isActive || !autoModeRunningRef.current || !currentProject) {
+                    return;
+                  }
+                  pendingFeaturesRef.current.add(dcFeature.id);
+                  await doubleCheckHandler(dcFeature);
+                  slotsUsedByDoubleCheck++;
+                }
+              }
+              // Continue to start backlog items with remaining slots
+            } else {
+              // Manual trigger: don't start new backlog items while double-check is waiting
+              return;
+            }
+          }
+        }
+
+        // Calculate remaining slots after double-check
+        let remainingSlots = availableSlots - slotsUsedByDoubleCheck;
+        if (remainingSlots <= 0) {
+          return;
+        }
+
+        // Check for in_progress features that need to be resumed (have context)
+        // These take priority over new backlog items
+        const currentFeaturesWithContext = featuresWithContextRef.current;
+        const inProgressFeatures = currentFeatures.filter((f) => {
+          if (f.status !== 'in_progress') return false;
+          // Skip already running or pending
+          if (runningAutoTasksRef.current.includes(f.id)) return false;
+          if (pendingFeaturesRef.current.has(f.id)) return false;
+          // Must have context to resume (indicates it was previously worked on)
+          if (!currentFeaturesWithContext.has(f.id)) return false;
+
+          // Filter by worktree branch
+          const featureBranch = f.branchName;
+          if (!featureBranch || typeof featureBranch !== 'string') {
+            const isViewingPrimary = currentWorktreePath === null;
+            return isViewingPrimary;
+          }
+          if (currentWorktreeBranch === null) {
+            return currentProject.path
+              ? isPrimaryWorktreeBranch(currentProject.path, featureBranch)
+              : false;
+          }
+          return featureBranch === currentWorktreeBranch;
+        });
+
+        if (inProgressFeatures.length > 0) {
+          const resumeHandler = handleResumeFeatureRef.current;
+          if (resumeHandler) {
+            const featuresToResume = inProgressFeatures.slice(0, remainingSlots);
+            for (const feature of featuresToResume) {
+              if (!isActive || !autoModeRunningRef.current || !currentProject) {
+                return;
+              }
+              pendingFeaturesRef.current.add(feature.id);
+              console.log(`[AutoMode] Resuming in_progress feature: ${feature.id}`);
+              await resumeHandler(feature);
+              remainingSlots--;
+            }
+          }
+        }
+
+        // Check if we still have slots after resuming in_progress features
+        if (remainingSlots <= 0) {
+          return;
+        }
+
+        // Filter backlog features by the currently selected worktree branch
+        // This logic mirrors use-board-column-features.ts for consistency
         const backlogFeatures = currentFeatures.filter((f) => {
           if (f.status !== 'backlog') return false;
 
@@ -657,8 +779,8 @@ export function BoardView() {
             })
           : sortedBacklog;
 
-        // Start features up to available slots
-        const featuresToStart = eligibleFeatures.slice(0, availableSlots);
+        // Start features up to remaining slots (after double-check)
+        const featuresToStart = eligibleFeatures.slice(0, remainingSlots);
         const startImplementation = handleStartImplementationRef.current;
         if (!startImplementation) {
           return;
@@ -1021,6 +1143,8 @@ export function BoardView() {
             onImplement={handleStartImplementation}
             onViewPlan={(feature) => setViewPlanFeature(feature)}
             onApprovePlan={handleOpenApprovalDialog}
+            onDoubleCheck={handleDoubleCheck}
+            onSkipDoubleCheck={handleSkipDoubleCheck}
             featuresWithContext={featuresWithContext}
             runningAutoTasks={runningAutoTasks}
             shortcuts={shortcuts}

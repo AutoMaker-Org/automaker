@@ -9,6 +9,7 @@ import {
   FlaskConical,
   Trash2,
   Sparkles,
+  CheckCheck,
 } from 'lucide-react';
 import type { SettingsViewId } from '../hooks/use-settings-view';
 
@@ -28,5 +29,6 @@ export const NAV_ITEMS: NavigationItem[] = [
   { id: 'keyboard', label: 'Keyboard Shortcuts', icon: Settings2 },
   { id: 'audio', label: 'Audio', icon: Volume2 },
   { id: 'defaults', label: 'Feature Defaults', icon: FlaskConical },
+  { id: 'double-check', label: 'Double-Check', icon: CheckCheck },
   { id: 'danger', label: 'Danger Zone', icon: Trash2 },
 ];

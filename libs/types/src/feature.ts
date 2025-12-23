@@ -2,7 +2,29 @@
  * Feature types for AutoMaker feature management
  */
 
+import type { AgentModel } from './model.js';
 import type { PlanningMode } from './settings.js';
+
+/**
+ * DoubleCheckResult - Result of a double-check verification on a feature
+ *
+ * Tracks whether a feature passed verification, any discrepancies found,
+ * which model performed the check, and metadata about the verification.
+ */
+export interface DoubleCheckResult {
+  /** Status of the double-check verification */
+  status: 'pending' | 'passed' | 'failed';
+  /** List of specific issues or discrepancies found during verification */
+  discrepancies?: string[];
+  /** ISO timestamp when the double-check was performed */
+  checkedAt: string;
+  /** Model that performed the double-check verification */
+  checkedBy: AgentModel;
+  /** Model that originally implemented the feature */
+  originalModel: AgentModel;
+  /** Brief summary of the verification result */
+  summary?: string;
+}
 
 export interface FeatureImagePath {
   id: string;
@@ -54,7 +76,14 @@ export interface Feature {
   error?: string;
   summary?: string;
   startedAt?: string;
+  doubleCheckResult?: DoubleCheckResult;
   [key: string]: unknown; // Keep catch-all for extensibility
 }
 
-export type FeatureStatus = 'pending' | 'running' | 'completed' | 'failed' | 'verified';
+export type FeatureStatus =
+  | 'pending'
+  | 'running'
+  | 'completed'
+  | 'failed'
+  | 'double_check'
+  | 'verified';
