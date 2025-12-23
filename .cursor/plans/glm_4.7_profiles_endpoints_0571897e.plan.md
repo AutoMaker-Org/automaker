@@ -18,7 +18,7 @@ todos:
       - settings-zai-key
   - id: feature-schema-propagation
     content: Extend Feature schema and update Add/Edit Feature dialogs + quick select to store planningModel and endpoint override fields.
-    status: pending
+    status: completed
     dependencies:
       - profiles-plan-vs-code
   - id: server-env-injection
