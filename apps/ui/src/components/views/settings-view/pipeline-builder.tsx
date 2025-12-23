@@ -137,6 +137,14 @@ const stepTypeColors: Record<StepType, string> = {
   custom: 'border-pink-200 bg-pink-50 dark:border-pink-800 dark:bg-pink-950',
 };
 
+const stepTypeIcons: Record<StepType, React.ReactNode> = {
+  review: <Settings className="w-4 h-4" />,
+  security: <XCircle className="w-4 h-4" />,
+  performance: <Play className="w-4 h-4" />,
+  test: <CheckCircle className="w-4 h-4" />,
+  custom: <Clock className="w-4 h-4" />,
+};
+
 export function PipelineBuilder({ config, onSave, onClose }: PipelineBuilderProps) {
   const [localConfig, setLocalConfig] = useState(config);
 
@@ -155,22 +163,6 @@ export function PipelineBuilder({ config, onSave, onClose }: PipelineBuilderProp
       coordinateGetter: sortableKeyboardCoordinates,
     })
   );
-
-  const stepTypeIcons: Record<StepType, React.ReactNode> = {
-    review: <Settings className="w-4 h-4" />,
-    security: <XCircle className="w-4 h-4" />,
-    performance: <Play className="w-4 h-4" />,
-    test: <CheckCircle className="w-4 h-4" />,
-    custom: <Clock className="w-4 h-4" />,
-  };
-
-  const stepTypeColors: Record<StepType, string> = {
-    review: 'border-orange-200 bg-orange-50 dark:border-orange-800 dark:bg-orange-950',
-    security: 'border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950',
-    performance: 'border-purple-200 bg-purple-50 dark:border-purple-800 dark:bg-purple-950',
-    test: 'border-teal-200 bg-teal-50 dark:border-teal-800 dark:bg-teal-950',
-    custom: 'border-pink-200 bg-pink-50 dark:border-pink-800 dark:bg-pink-950',
-  };
 
   const handleAddStep = (type: StepType) => {
     const newStep: PipelineStepConfig = {

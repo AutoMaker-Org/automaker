@@ -8,7 +8,7 @@
  * @returns Object containing config, loading state, error state, and action functions
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { getHttpApiClient } from '@/lib/http-api-client';
 import { PipelineConfig, DEFAULT_PIPELINE_CONFIG } from '@automaker/types';
 
@@ -17,8 +17,8 @@ export function usePipelineConfig(projectPath: string | null) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Get API client
-  const api = getHttpApiClient();
+  // Get API client - memoized to maintain stable reference
+  const api = useMemo(() => getHttpApiClient(), []);
 
   // Load pipeline configuration
   const loadConfig = useCallback(async () => {

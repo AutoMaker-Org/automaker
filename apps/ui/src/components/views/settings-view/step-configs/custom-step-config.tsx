@@ -307,17 +307,16 @@ export function CustomStepConfig({ config, onChange }: CustomStepConfigProps) {
               <div>
                 <Label htmlFor="coderabbitSeverity">Severity Level</Label>
                 <Select
-                  value={customConfig.coderabbitSeverity || 'medium'}
+                  value={customConfig.coderabbitSeverity || 'warning'}
                   onValueChange={(value) => updateConfig({ coderabbitSeverity: value })}
                 >
                   <SelectTrigger className="mt-1">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="low">Low</SelectItem>
-                    <SelectItem value="medium">Medium</SelectItem>
-                    <SelectItem value="high">High</SelectItem>
-                    <SelectItem value="critical">Critical</SelectItem>
+                    <SelectItem value="info">Info</SelectItem>
+                    <SelectItem value="warning">Warning</SelectItem>
+                    <SelectItem value="error">Error</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

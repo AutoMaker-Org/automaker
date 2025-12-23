@@ -483,15 +483,29 @@ export const PROJECT_SETTINGS_VERSION = 1;
  * Validate pipeline configuration
  */
 export function validatePipelineConfig(config: any): config is PipelineConfig {
+  // Reserved base column names that cannot be used as step IDs
+  const reservedNames = new Set([
+    'backlog',
+    'in_progress',
+    'waiting_approval',
+    'verified',
+    'completed',
+  ]);
+
   return (
     typeof config === 'object' &&
     config !== null &&
     typeof config.version === 'string' &&
     typeof config.enabled === 'boolean' &&
     Array.isArray(config.steps) &&
-    config.steps.every(
-      (step: any) =>
+    config.steps.every((step: any) => {
+      // Normalize step ID for comparison (trim and lowercase)
+      const normalizedId = step.id?.toString().trim().toLowerCase();
+
+      return (
         typeof step.id === 'string' &&
+        step.id.trim().length > 0 && // Ensure non-empty after trimming
+        !reservedNames.has(normalizedId) && // Check against reserved names
         typeof step.type === 'string' &&
         ['review', 'security', 'performance', 'test', 'custom'].includes(step.type) &&
         typeof step.name === 'string' &&
@@ -501,6 +515,7 @@ export function validatePipelineConfig(config: any): config is PipelineConfig {
         typeof step.autoTrigger === 'boolean' &&
         typeof step.config === 'object' &&
         step.config !== null
-    )
+      );
+    })
   );
 }

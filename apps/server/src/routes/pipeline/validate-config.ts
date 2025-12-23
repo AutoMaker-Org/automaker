@@ -54,6 +54,15 @@ router.post('/', async (req, res) => {
     } else {
       // Validate each step
       const stepIds = new Set<string>();
+      // Reserved base column names that cannot be used as step IDs
+      const reservedNames = new Set([
+        'backlog',
+        'in_progress',
+        'waiting_approval',
+        'verified',
+        'completed',
+      ]);
+      const conflictingSteps: string[] = [];
 
       for (const [index, step] of config.steps.entries()) {
         if (typeof step !== 'object' || step === null) {
@@ -65,11 +74,24 @@ router.post('/', async (req, res) => {
         if (!step.id || typeof step.id !== 'string') {
           errors.push(`step ${index}: id is required and must be a string`);
         } else {
-          // Check for duplicate IDs
-          if (stepIds.has(step.id)) {
-            errors.push(`step ${index}: duplicate step id "${step.id}"`);
+          // Normalize step ID for comparison
+          const normalizedId = step.id.trim().toLowerCase();
+
+          // Check for empty ID after trimming
+          if (step.id.trim().length === 0) {
+            errors.push(`step ${index}: id cannot be empty or whitespace only`);
           } else {
-            stepIds.add(step.id);
+            // Check against reserved names
+            if (reservedNames.has(normalizedId)) {
+              conflictingSteps.push(step.id);
+            }
+
+            // Check for duplicate IDs
+            if (stepIds.has(step.id)) {
+              errors.push(`step ${index}: duplicate step id "${step.id}"`);
+            } else {
+              stepIds.add(step.id);
+            }
           }
         }
 
@@ -183,6 +205,14 @@ router.post('/', async (req, res) => {
             }
           }
         }
+      }
+
+      // Add reserved name errors if any
+      if (conflictingSteps.length > 0) {
+        errors.push(
+          `The following step IDs conflict with reserved base column names: ${conflictingSteps.join(', ')}. ` +
+            `Reserved names: backlog, in_progress, waiting_approval, verified, completed`
+        );
       }
     }
 

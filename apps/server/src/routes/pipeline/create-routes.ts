@@ -3,7 +3,7 @@
  */
 
 import { Router } from 'express';
-import { AutoModeService } from '../services/auto-mode-service.js';
+import { AutoModeService } from '../../services/auto-mode-service.js';
 import {
   configRouter,
   executeStepRouter,

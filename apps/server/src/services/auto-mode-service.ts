@@ -349,6 +349,8 @@ interface PipelineQueueItem {
   priority: 'high' | 'medium' | 'low';
   addedAt: Date;
   dependencies: string[];
+  retryCount?: number;
+  maxRetries?: number;
 }
 
 export class AutoModeService {
@@ -363,7 +365,8 @@ export class AutoModeService {
   private pipelineConfigs = new Map<string, PipelineConfig>();
   private pipelineExecutors = new Map<string, PipelineStepExecutor>();
   private pipelineQueue: PipelineQueueItem[] = [];
-  private pipelineStorage = new PipelineStorage('./data');
+  private pipelineStorage: PipelineStorage | null = null;
+  private projectPath: string | null = null;
   private pipelineMetrics = {
     totalExecuted: 0,
     totalPassed: 0,
@@ -373,6 +376,18 @@ export class AutoModeService {
 
   constructor(events: EventEmitter) {
     this.events = events;
+  }
+
+  /**
+   * Get or create the PipelineStorage instance with the correct project-relative path
+   */
+  private getPipelineStorage(projectPath: string): PipelineStorage {
+    if (!this.pipelineStorage || this.projectPath !== projectPath) {
+      const storagePath = path.join(projectPath, '.automaker', 'pipeline-data');
+      this.pipelineStorage = new PipelineStorage(storagePath);
+      this.projectPath = projectPath;
+    }
+    return this.pipelineStorage;
   }
 
   /**
@@ -1629,7 +1644,12 @@ Format your response as a structured markdown document.`;
 
       // Save detailed result to storage
       try {
-        await this.pipelineStorage.saveStepResult(projectPath, feature.id, stepConfig.id, result);
+        await this.getPipelineStorage(projectPath).saveStepResult(
+          projectPath,
+          feature.id,
+          stepConfig.id,
+          result
+        );
       } catch (error) {
         console.warn(`[Pipeline] Failed to save step result to storage:`, error);
         // Continue execution even if storage fails
@@ -2884,6 +2904,8 @@ Begin implementing task ${task.id} now.`;
         stepConfigs,
         priority,
         addedAt: new Date(),
+        retryCount: 0, // Reset retry count when updated
+        maxRetries: this.pipelineQueue[existingIndex].maxRetries || 3,
       };
     } else {
       // Add new item
@@ -2894,6 +2916,8 @@ Begin implementing task ${task.id} now.`;
         priority,
         addedAt: new Date(),
         dependencies: [], // Will be resolved later
+        retryCount: 0,
+        maxRetries: 3,
       };
 
       this.pipelineQueue.push(queueItem);
@@ -2979,12 +3003,37 @@ Begin implementing task ${task.id} now.`;
         // Remove from running features
         this.runningFeatures.delete(item.featureId);
 
-        // Keep in queue for retry if it's a required step failure
-        this.emitAutoModeEvent('pipeline_failed', {
-          featureId: item.featureId,
-          projectPath: item.projectPath,
-          error: error instanceof Error ? error.message : 'Unknown error',
-        });
+        // Increment retry count
+        item.retryCount = (item.retryCount || 0) + 1;
+
+        // Check if max retries exceeded
+        if (item.retryCount >= (item.maxRetries || 3)) {
+          // Remove from queue and running features
+          this.pipelineQueue = this.pipelineQueue.filter((q) => q !== item);
+          this.runningFeatures.delete(item.featureId);
+
+          console.error(
+            `[Pipeline] Dropped feature ${item.featureId} after ${item.retryCount} retries`
+          );
+          this.emitAutoModeEvent('pipeline_dropped', {
+            featureId: item.featureId,
+            projectPath: item.projectPath,
+            error: error instanceof Error ? error.message : 'Unknown error',
+            retryCount: item.retryCount,
+            maxRetries: item.maxRetries || 3,
+          });
+        } else {
+          // Keep in queue for retry
+          console.warn(
+            `[Pipeline] Retrying feature ${item.featureId} (attempt ${item.retryCount}/${item.maxRetries || 3})`
+          );
+          this.emitAutoModeEvent('pipeline_failed', {
+            featureId: item.featureId,
+            projectPath: item.projectPath,
+            error: error instanceof Error ? error.message : 'Unknown error',
+            retryCount: item.retryCount,
+          });
+        }
       }
     }
   }

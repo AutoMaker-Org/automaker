@@ -80,7 +80,7 @@ export function createVerifyCodeRabbitAuthHandler() {
           // Other error
           const errorText = await response.text().catch(() => 'Unknown error');
           res.json({
-            success: true,
+            success: false,
             authenticated: false,
             error: `CodeRabbit API error: ${response.status} ${errorText}`,
           });
@@ -97,7 +97,7 @@ export function createVerifyCodeRabbitAuthHandler() {
         } else {
           logger.error('CodeRabbit API verification failed:', error);
           res.json({
-            success: true,
+            success: false,
             authenticated: false,
             error: 'Failed to connect to CodeRabbit API. Please check your network connection.',
           });

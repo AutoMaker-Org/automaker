@@ -200,7 +200,14 @@ export class PipelineStepExecutor extends EventEmitter {
       );
     }
 
-    const codeRabbit = new CodeRabbitIntegration(apiKey);
+    // Determine project path - prefer class projectPath
+    const projectPath = this.projectPath;
+
+    if (!projectPath) {
+      throw new Error('Project path is required for CodeRabbit integration but is not available.');
+    }
+
+    const codeRabbit = new CodeRabbitIntegration(apiKey, projectPath);
     return codeRabbit.submitReview(feature, stepConfig);
   }
 

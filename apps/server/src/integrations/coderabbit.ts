@@ -215,7 +215,16 @@ Metrics:
         hash: this.generateIssueHash(issue),
         summary: issue.message,
         location: `${issue.file}:${issue.line}`,
-        severity: issue.severity as 'low' | 'medium' | 'high',
+        severity:
+          issue.severity === 'critical'
+            ? 'high'
+            : issue.severity === 'low'
+              ? 'low'
+              : issue.severity === 'medium'
+                ? 'medium'
+                : issue.severity === 'high'
+                  ? 'high'
+                  : 'medium',
       })),
     };
   }

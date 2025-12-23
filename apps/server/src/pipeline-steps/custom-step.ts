@@ -40,8 +40,8 @@ export class CustomStep {
   constructor(autoModeService: AutoModeService, projectPath?: string, codeRabbitApiKey?: string) {
     this.autoModeService = autoModeService;
     this.memory = new PipelineMemory(projectPath);
-    if (codeRabbitApiKey) {
-      this.codeRabbit = new CodeRabbitIntegration(codeRabbitApiKey);
+    if (codeRabbitApiKey && projectPath) {
+      this.codeRabbit = new CodeRabbitIntegration(codeRabbitApiKey, projectPath);
     }
   }
 
