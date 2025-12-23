@@ -1,367 +1,213 @@
-import { useState, useCallback } from 'react';
-import { useNavigate, useLocation } from '@tanstack/react-router';
+import React from 'react';
+import {
+  Code2,
+  PanelLeft,
+  Plus,
+  Folder,
+  Bell,
+  FolderOpen,
+  MoreVertical,
+  LayoutGrid,
+  Bot,
+  FileJson,
+  BookOpen,
+  UserCircle,
+  TerminalSquare,
+  Book,
+  Activity,
+  Settings,
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useAppStore, type ThemeMode } from '@/store/app-store';
-import { useKeyboardShortcuts, useKeyboardShortcutsConfig } from '@/hooks/use-keyboard-shortcuts';
-import { getElectronAPI } from '@/lib/electron';
-import { initializeProject, hasAppSpec, hasAutomakerDir } from '@/lib/project-init';
-import { toast } from 'sonner';
-import { DeleteProjectDialog } from '@/components/views/settings-view/components/delete-project-dialog';
-import { NewProjectModal } from '@/components/dialogs/new-project-modal';
-import { CreateSpecDialog } from '@/components/views/spec-view/dialogs';
-
-// Local imports from subfolder
-import {
-  CollapseToggleButton,
-  SidebarHeader,
-  ProjectActions,
-  SidebarNavigation,
-  ProjectSelectorWithOptions,
-  SidebarFooter,
-} from './sidebar/components';
-import { TrashDialog, OnboardingDialog } from './sidebar/dialogs';
-import { SIDEBAR_FEATURE_FLAGS } from './sidebar/constants';
-import {
-  useSidebarAutoCollapse,
-  useRunningAgents,
-  useSpecRegeneration,
-  useNavigation,
-  useProjectCreation,
-  useSetupDialog,
-  useTrashDialog,
-  useProjectTheme,
-} from './sidebar/hooks';
+import { Link, useLocation } from '@tanstack/react-router';
 
 export function Sidebar() {
-  const navigate = useNavigate();
   const location = useLocation();
 
-  const {
-    projects,
-    trashedProjects,
-    currentProject,
-    sidebarOpen,
-    projectHistory,
-    upsertAndSetCurrentProject,
-    toggleSidebar,
-    restoreTrashedProject,
-    deleteTrashedProject,
-    emptyTrash,
-    cyclePrevProject,
-    cycleNextProject,
-    moveProjectToTrash,
-    specCreatingForProject,
-    setSpecCreatingForProject,
-  } = useAppStore();
-
-  // Environment variable flags for hiding sidebar items
-  const { hideTerminal, hideWiki, hideRunningAgents, hideContext, hideSpecEditor, hideAiProfiles } =
-    SIDEBAR_FEATURE_FLAGS;
-
-  // Get customizable keyboard shortcuts
-  const shortcuts = useKeyboardShortcutsConfig();
-
-  // State for project picker (needed for keyboard shortcuts)
-  const [isProjectPickerOpen, setIsProjectPickerOpen] = useState(false);
-
-  // State for delete project confirmation dialog
-  const [showDeleteProjectDialog, setShowDeleteProjectDialog] = useState(false);
-
-  // Project theme management (must come before useProjectCreation which uses globalTheme)
-  const { globalTheme } = useProjectTheme();
-
-  // Project creation state and handlers
-  const {
-    showNewProjectModal,
-    setShowNewProjectModal,
-    isCreatingProject,
-    showOnboardingDialog,
-    setShowOnboardingDialog,
-    newProjectName,
-    setNewProjectName,
-    newProjectPath,
-    setNewProjectPath,
-    handleCreateBlankProject,
-    handleCreateFromTemplate,
-    handleCreateFromCustomUrl,
-  } = useProjectCreation({
-    trashedProjects,
-    currentProject,
-    globalTheme,
-    upsertAndSetCurrentProject,
-  });
-
-  // Setup dialog state and handlers
-  const {
-    showSetupDialog,
-    setShowSetupDialog,
-    setupProjectPath,
-    setSetupProjectPath,
-    projectOverview,
-    setProjectOverview,
-    generateFeatures,
-    setGenerateFeatures,
-    analyzeProject,
-    setAnalyzeProject,
-    featureCount,
-    setFeatureCount,
-    handleCreateInitialSpec,
-    handleSkipSetup,
-    handleOnboardingGenerateSpec,
-    handleOnboardingSkip,
-  } = useSetupDialog({
-    setSpecCreatingForProject,
-    newProjectPath,
-    setNewProjectName,
-    setNewProjectPath,
-    setShowOnboardingDialog,
-  });
-
-  // Derive isCreatingSpec from store state
-  const isCreatingSpec = specCreatingForProject !== null;
-  const creatingSpecProjectPath = specCreatingForProject;
-
-  // Auto-collapse sidebar on small screens and update Electron window minWidth
-  useSidebarAutoCollapse({ sidebarOpen, toggleSidebar });
-
-  // Running agents count
-  const { runningAgentsCount } = useRunningAgents();
-
-  // Trash dialog and operations
-  const {
-    showTrashDialog,
-    setShowTrashDialog,
-    activeTrashId,
-    isEmptyingTrash,
-    handleRestoreProject,
-    handleDeleteProjectFromDisk,
-    handleEmptyTrash,
-  } = useTrashDialog({
-    restoreTrashedProject,
-    deleteTrashedProject,
-    emptyTrash,
-    trashedProjects,
-  });
-
-  // Spec regeneration events
-  useSpecRegeneration({
-    creatingSpecProjectPath,
-    setupProjectPath,
-    setSpecCreatingForProject,
-    setShowSetupDialog,
-    setProjectOverview,
-    setSetupProjectPath,
-    setNewProjectName,
-    setNewProjectPath,
-  });
-
-  /**
-   * Opens the system folder selection dialog and initializes the selected project.
-   * Used by both the 'O' keyboard shortcut and the folder icon button.
-   */
-  const handleOpenFolder = useCallback(async () => {
-    const api = getElectronAPI();
-    const result = await api.openDirectory();
-
-    if (!result.canceled && result.filePaths[0]) {
-      const path = result.filePaths[0];
-      // Extract folder name from path (works on both Windows and Mac/Linux)
-      const name = path.split(/[/\\]/).filter(Boolean).pop() || 'Untitled Project';
-
-      try {
-        // Check if this is a brand new project (no .automaker directory)
-        const hadAutomakerDir = await hasAutomakerDir(path);
-
-        // Initialize the .automaker directory structure
-        const initResult = await initializeProject(path);
-
-        if (!initResult.success) {
-          toast.error('Failed to initialize project', {
-            description: initResult.error || 'Unknown error occurred',
-          });
-          return;
-        }
-
-        // Upsert project and set as current (handles both create and update cases)
-        // Theme preservation is handled by the store action
-        const trashedProject = trashedProjects.find((p) => p.path === path);
-        const effectiveTheme =
-          (trashedProject?.theme as ThemeMode | undefined) ||
-          (currentProject?.theme as ThemeMode | undefined) ||
-          globalTheme;
-        upsertAndSetCurrentProject(path, name, effectiveTheme);
-
-        // Check if app_spec.txt exists
-        const specExists = await hasAppSpec(path);
-
-        if (!hadAutomakerDir && !specExists) {
-          // This is a brand new project - show setup dialog
-          setSetupProjectPath(path);
-          setShowSetupDialog(true);
-          toast.success('Project opened', {
-            description: `Opened ${name}. Let's set up your app specification!`,
-          });
-        } else if (initResult.createdFiles && initResult.createdFiles.length > 0) {
-          toast.success(initResult.isNewProject ? 'Project initialized' : 'Project updated', {
-            description: `Set up ${initResult.createdFiles.length} file(s) in .automaker`,
-          });
-        } else {
-          toast.success('Project opened', {
-            description: `Opened ${name}`,
-          });
-        }
-      } catch (error) {
-        console.error('[Sidebar] Failed to open project:', error);
-        toast.error('Failed to open project', {
-          description: error instanceof Error ? error.message : 'Unknown error',
-        });
-      }
-    }
-  }, [trashedProjects, upsertAndSetCurrentProject, currentProject, globalTheme]);
-
-  // Navigation sections and keyboard shortcuts (defined after handlers)
-  const { navSections, navigationShortcuts } = useNavigation({
-    shortcuts,
-    hideSpecEditor,
-    hideContext,
-    hideTerminal,
-    hideAiProfiles,
-    currentProject,
-    projects,
-    projectHistory,
-    navigate,
-    toggleSidebar,
-    handleOpenFolder,
-    setIsProjectPickerOpen,
-    cyclePrevProject,
-    cycleNextProject,
-  });
-
-  // Register keyboard shortcuts
-  useKeyboardShortcuts(navigationShortcuts);
-
-  const isActiveRoute = (id: string) => {
-    // Map view IDs to route paths
-    const routePath = id === 'welcome' ? '/' : `/${id}`;
-    return location.pathname === routePath;
-  };
-
   return (
-    <aside
-      className={cn(
-        'flex-shrink-0 flex flex-col z-30 relative',
-        // Glass morphism background with gradient
-        'bg-gradient-to-b from-sidebar/95 via-sidebar/85 to-sidebar/90 backdrop-blur-2xl',
-        // Premium border with subtle glow
-        'border-r border-border/60 shadow-[1px_0_20px_-5px_rgba(0,0,0,0.1)]',
-        // Smooth width transition
-        'transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]',
-        sidebarOpen ? 'w-16 lg:w-72' : 'w-16'
-      )}
-      data-testid="sidebar"
-    >
-      <CollapseToggleButton
-        sidebarOpen={sidebarOpen}
-        toggleSidebar={toggleSidebar}
-        shortcut={shortcuts.toggleSidebar}
-      />
-
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <SidebarHeader sidebarOpen={sidebarOpen} navigate={navigate} />
-
-        {/* Project Actions - Moved above project selector */}
-        {sidebarOpen && (
-          <ProjectActions
-            setShowNewProjectModal={setShowNewProjectModal}
-            handleOpenFolder={handleOpenFolder}
-            setShowTrashDialog={setShowTrashDialog}
-            trashedProjects={trashedProjects}
-            shortcuts={{ openProject: shortcuts.openProject }}
-          />
-        )}
-
-        <ProjectSelectorWithOptions
-          sidebarOpen={sidebarOpen}
-          isProjectPickerOpen={isProjectPickerOpen}
-          setIsProjectPickerOpen={setIsProjectPickerOpen}
-          setShowDeleteProjectDialog={setShowDeleteProjectDialog}
-        />
-
-        <SidebarNavigation
-          currentProject={currentProject}
-          sidebarOpen={sidebarOpen}
-          navSections={navSections}
-          isActiveRoute={isActiveRoute}
-          navigate={navigate}
-        />
+    <aside className="w-[260px] flex-shrink-0 flex flex-col glass-sidebar z-30 relative h-full">
+      {/* Logo */}
+      <div className="h-16 flex items-center px-6 gap-3 flex-shrink-0">
+        <div className="text-brand-cyan relative flex items-center justify-center">
+          <div className="absolute inset-0 bg-brand-cyan blur-md opacity-30"></div>
+          <Code2 className="w-6 h-6 relative z-10" />
+        </div>
+        <span className="text-white font-bold text-lg tracking-tight">automaker.</span>
+        <button className="ml-auto text-slate-600 hover:text-white transition">
+          <PanelLeft className="w-4 h-4" />
+        </button>
       </div>
 
-      <SidebarFooter
-        sidebarOpen={sidebarOpen}
-        isActiveRoute={isActiveRoute}
-        navigate={navigate}
-        hideWiki={hideWiki}
-        hideRunningAgents={hideRunningAgents}
-        runningAgentsCount={runningAgentsCount}
-        shortcuts={{ settings: shortcuts.settings }}
-      />
-      <TrashDialog
-        open={showTrashDialog}
-        onOpenChange={setShowTrashDialog}
-        trashedProjects={trashedProjects}
-        activeTrashId={activeTrashId}
-        handleRestoreProject={handleRestoreProject}
-        handleDeleteProjectFromDisk={handleDeleteProjectFromDisk}
-        deleteTrashedProject={deleteTrashedProject}
-        handleEmptyTrash={handleEmptyTrash}
-        isEmptyingTrash={isEmptyingTrash}
-      />
+      {/* Top Actions */}
+      <div className="px-5 pb-6 space-y-4 flex-shrink-0">
+        <div className="grid grid-cols-4 gap-2">
+          <button className="col-span-2 bg-dark-850/60 hover:bg-dark-700 text-slate-200 py-2 px-3 rounded-lg border border-white/5 flex items-center justify-center gap-2 transition text-xs font-medium shadow-lg shadow-black/20 group">
+            <Plus className="w-3.5 h-3.5 group-hover:text-brand-cyan transition-colors" /> New
+          </button>
+          <button className="col-span-1 bg-dark-850/60 hover:bg-dark-700 text-slate-400 hover:text-white py-2 rounded-lg border border-white/5 flex items-center justify-center transition">
+            <Folder className="w-3.5 h-3.5" />
+            <span className="ml-1 text-[10px]">0</span>
+          </button>
+          <button className="col-span-1 bg-dark-850/60 hover:bg-dark-700 text-slate-400 hover:text-white py-2 rounded-lg border border-white/5 flex items-center justify-center transition relative">
+            <Bell className="w-3.5 h-3.5" />
+            <span className="absolute top-2 right-2.5 w-1.5 h-1.5 bg-brand-red rounded-full ring-2 ring-dark-850"></span>
+          </button>
+        </div>
 
-      {/* New Project Setup Dialog */}
-      <CreateSpecDialog
-        open={showSetupDialog}
-        onOpenChange={setShowSetupDialog}
-        projectOverview={projectOverview}
-        onProjectOverviewChange={setProjectOverview}
-        generateFeatures={generateFeatures}
-        onGenerateFeaturesChange={setGenerateFeatures}
-        analyzeProject={analyzeProject}
-        onAnalyzeProjectChange={setAnalyzeProject}
-        featureCount={featureCount}
-        onFeatureCountChange={setFeatureCount}
-        onCreateSpec={handleCreateInitialSpec}
-        onSkip={handleSkipSetup}
-        isCreatingSpec={isCreatingSpec}
-        showSkipButton={true}
-        title="Set Up Your Project"
-        description="We didn't find an app_spec.txt file. Let us help you generate your app_spec.txt to help describe your project for our system. We'll analyze your project's tech stack and create a comprehensive specification."
-      />
+        {/* Project Selector */}
+        <div className="bg-dark-850/40 border border-white/5 rounded-xl p-1 flex items-center justify-between cursor-pointer hover:border-white/10 hover:bg-dark-850/60 transition group">
+          <div className="flex items-center gap-3 px-2 py-1.5">
+            <FolderOpen className="w-4 h-4 text-brand-cyan group-hover:text-cyan-300 transition" />
+            <span className="text-white font-medium text-sm">test case 1</span>
+          </div>
+          <div className="flex items-center gap-1 pr-1">
+            <span className="w-5 h-5 rounded bg-dark-700 flex items-center justify-center text-[10px] text-slate-400 font-bold border border-white/5">
+              P
+            </span>
+            <MoreVertical className="w-4 h-4 text-slate-500" />
+          </div>
+        </div>
+      </div>
 
-      <OnboardingDialog
-        open={showOnboardingDialog}
-        onOpenChange={setShowOnboardingDialog}
-        newProjectName={newProjectName}
-        onSkip={handleOnboardingSkip}
-        onGenerateSpec={handleOnboardingGenerateSpec}
-      />
+      {/* Navigation */}
+      <div className="flex-1 overflow-y-auto px-0 space-y-6 custom-scrollbar">
+        {/* Project Section */}
+        <div>
+          <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 px-6 font-mono">
+            Project
+          </h3>
+          <nav className="space-y-0.5">
+            <NavItem
+              to="/"
+              icon={<LayoutGrid className="w-4 h-4" />}
+              label="Kanban Board"
+              shortcut="L"
+              isActive={location.pathname === '/' || location.pathname === '/board'}
+            />
+            <NavItem
+              to="/agents"
+              icon={<Bot className="w-4 h-4" />}
+              label="Agent Runner"
+              shortcut="A"
+              isActive={location.pathname.startsWith('/agents')}
+            />
+          </nav>
+        </div>
 
-      {/* Delete Project Confirmation Dialog */}
-      <DeleteProjectDialog
-        open={showDeleteProjectDialog}
-        onOpenChange={setShowDeleteProjectDialog}
-        project={currentProject}
-        onConfirm={moveProjectToTrash}
-      />
+        {/* Tools Section */}
+        <div>
+          <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 px-6 font-mono">
+            Tools
+          </h3>
+          <nav className="space-y-0.5">
+            <NavItem
+              to="/spec"
+              icon={<FileJson className="w-4 h-4" />}
+              label="Spec Editor"
+              shortcut="D"
+              isActive={location.pathname.startsWith('/spec')}
+            />
+            <NavItem
+              to="/context"
+              icon={<BookOpen className="w-4 h-4" />}
+              label="Context"
+              shortcut="C"
+              isActive={location.pathname.startsWith('/context')}
+            />
+            <NavItem
+              to="/profiles"
+              icon={<UserCircle className="w-4 h-4" />}
+              label="AI Profiles"
+              shortcut="H"
+              isActive={location.pathname.startsWith('/profiles')}
+            />
+            <NavItem
+              to="/terminal"
+              icon={<TerminalSquare className="w-4 h-4" />}
+              label="Terminal"
+              shortcut="T"
+              isActive={location.pathname.startsWith('/terminal')}
+            />
+          </nav>
+        </div>
+      </div>
 
-      {/* New Project Modal */}
-      <NewProjectModal
-        open={showNewProjectModal}
-        onOpenChange={setShowNewProjectModal}
-        onCreateBlankProject={handleCreateBlankProject}
-        onCreateFromTemplate={handleCreateFromTemplate}
-        onCreateFromCustomUrl={handleCreateFromCustomUrl}
-        isCreating={isCreatingProject}
-      />
+      {/* Footer */}
+      <div className="p-4 border-t border-white/5 space-y-1 bg-dark-900/30 flex-shrink-0 backdrop-blur-sm">
+        <Link
+          to="/wiki"
+          className="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition"
+        >
+          <Book className="w-4 h-4" />
+          <span className="text-sm">Wiki</span>
+        </Link>
+        <Link
+          to="/running-agents"
+          className="flex items-center justify-between px-3 py-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition"
+        >
+          <div className="flex items-center gap-3">
+            <Activity className="w-4 h-4 text-brand-cyan" />
+            <span className="text-sm">Running Agents</span>
+          </div>
+          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-brand-cyan text-[10px] text-black font-bold shadow-glow-cyan">
+            3
+          </span>
+        </Link>
+        <Link
+          to="/settings"
+          className="flex items-center justify-between px-3 py-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition"
+        >
+          <div className="flex items-center gap-3">
+            <Settings className="w-4 h-4" />
+            <span className="text-sm">Settings</span>
+          </div>
+          <span className="text-[10px] bg-dark-700 text-slate-500 px-1.5 py-0.5 rounded font-mono border border-white/5">
+            S
+          </span>
+        </Link>
+      </div>
     </aside>
+  );
+}
+
+function NavItem({
+  to,
+  icon,
+  label,
+  shortcut,
+  isActive,
+}: {
+  to: string;
+  icon: React.ReactNode;
+  label: string;
+  shortcut: string;
+  isActive: boolean;
+}) {
+  return (
+    <Link
+      to={to}
+      className={cn(
+        'flex items-center justify-between px-6 py-2.5 transition group border-l-[2px]',
+        isActive
+          ? 'nav-item-active bg-gradient-to-r from-brand-cyan/10 to-transparent border-brand-cyan text-brand-cyan-hover'
+          : 'text-slate-400 hover:text-white hover:bg-white/5 border-transparent'
+      )}
+    >
+      <div className="flex items-center gap-3">
+        <span className={cn(isActive ? 'text-brand-cyan' : 'group-hover:text-slate-300')}>
+          {icon}
+        </span>
+        <span className="text-sm font-medium">{label}</span>
+      </div>
+      <span
+        className={cn(
+          'text-[10px] px-1.5 py-0.5 rounded font-mono border',
+          isActive
+            ? 'bg-brand-cyan/10 text-brand-cyan border-brand-cyan/20'
+            : 'bg-dark-700 text-slate-500 border-white/5 group-hover:text-slate-300'
+        )}
+      >
+        {shortcut}
+      </span>
+    </Link>
   );
 }

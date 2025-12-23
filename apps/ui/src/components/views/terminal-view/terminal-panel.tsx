@@ -543,6 +543,7 @@ export function TerminalPanel({
         allowProposedApi: true,
         screenReaderMode: screenReaderEnabled,
         scrollback: terminalScrollback,
+        allowTransparency: true,
       });
 
       // Create fit addon

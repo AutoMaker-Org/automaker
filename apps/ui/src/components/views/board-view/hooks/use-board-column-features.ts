@@ -109,7 +109,9 @@ export function useBoardColumnFeatures({
     // This ensures features appear in dependency order (dependencies before dependents)
     // Within the same dependency level, features are sorted by priority
     if (map.backlog.length > 0) {
-      const { orderedFeatures } = resolveDependencies(map.backlog);
+      const { orderedFeatures } = resolveDependencies(map.backlog as any) as {
+        orderedFeatures: Feature[];
+      };
 
       // Get all features to check blocking dependencies against
       const allFeatures = features;
@@ -122,7 +124,7 @@ export function useBoardColumnFeatures({
         const blocked: Feature[] = [];
 
         for (const f of orderedFeatures) {
-          if (getBlockingDependencies(f, allFeatures).length > 0) {
+          if (getBlockingDependencies(f as any, allFeatures as any).length > 0) {
             blocked.push(f);
           } else {
             unblocked.push(f);

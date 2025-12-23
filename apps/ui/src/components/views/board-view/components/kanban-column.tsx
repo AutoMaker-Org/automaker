@@ -2,31 +2,30 @@ import { memo } from 'react';
 import { useDroppable } from '@dnd-kit/core';
 import { cn } from '@/lib/utils';
 import type { ReactNode } from 'react';
+import { GlassPanel } from '@/components/ui/glass-panel';
 
 interface KanbanColumnProps {
   id: string;
   title: string;
-  colorClass: string;
+  accent: 'cyan' | 'blue' | 'orange' | 'green' | 'none';
   count: number;
   children: ReactNode;
   headerAction?: ReactNode;
+  width?: number;
+  // Legacy props ignored or used for compatibility
+  colorClass?: string;
   opacity?: number;
   showBorder?: boolean;
   hideScrollbar?: boolean;
-  /** Custom width in pixels. If not provided, defaults to 288px (w-72) */
-  width?: number;
 }
 
 export const KanbanColumn = memo(function KanbanColumn({
   id,
   title,
-  colorClass,
+  accent,
   count,
   children,
   headerAction,
-  opacity = 100,
-  showBorder = true,
-  hideScrollbar = false,
   width,
 }: KanbanColumnProps) {
   const { setNodeRef, isOver } = useDroppable({ id });
@@ -35,60 +34,63 @@ export const KanbanColumn = memo(function KanbanColumn({
   const widthStyle = width ? { width: `${width}px`, flexShrink: 0 } : undefined;
 
   return (
-    <div
+    <GlassPanel
       ref={setNodeRef}
+      accent={accent}
       className={cn(
-        'relative flex flex-col h-full rounded-xl',
-        // Only transition ring/shadow for drag-over effect, not width
-        'transition-[box-shadow,ring] duration-200',
-        !width && 'w-72', // Only apply w-72 if no custom width
-        showBorder && 'border border-border/60',
+        'relative flex flex-col h-full min-w-[300px] transition-[box-shadow,ring] duration-200',
+        !width && 'w-72',
         isOver && 'ring-2 ring-primary/30 ring-offset-1 ring-offset-background'
       )}
       style={widthStyle}
       data-testid={`kanban-column-${id}`}
     >
-      {/* Background layer with opacity */}
-      <div
-        className={cn(
-          'absolute inset-0 rounded-xl backdrop-blur-sm transition-colors duration-200',
-          isOver ? 'bg-accent/80' : 'bg-card/80'
-        )}
-        style={{ opacity: opacity / 100 }}
-      />
+      {/* Subtle Glow Top (Only for Blue/Orange/Green to match design, could make generic) */}
+      {(accent === 'blue' || accent === 'orange' || accent === 'green') && (
+        <div
+          className={cn(
+            'absolute top-0 left-0 w-full h-32 bg-gradient-to-b pointer-events-none rounded-t-2xl',
+            accent === 'blue' && 'from-brand-blue/10 to-transparent',
+            accent === 'orange' && 'from-brand-orange/10 to-transparent',
+            accent === 'green' && 'from-brand-green/10 to-transparent'
+          )}
+        ></div>
+      )}
 
       {/* Column Header */}
-      <div
-        className={cn(
-          'relative z-10 flex items-center gap-3 px-3 py-2.5',
-          showBorder && 'border-b border-border/40'
-        )}
-      >
-        <div className={cn('w-2.5 h-2.5 rounded-full shrink-0', colorClass)} />
-        <h3 className="font-semibold text-sm text-foreground/90 flex-1 tracking-tight">{title}</h3>
-        {headerAction}
-        <span className="text-xs font-medium text-muted-foreground/80 bg-muted/50 px-2 py-0.5 rounded-md tabular-nums">
+      <div className="flex items-center justify-between p-4 border-b border-white/5 relative z-10">
+        <div className="flex items-center gap-2">
+          {/* Status Dot */}
+          <div
+            className={cn(
+              'w-2 h-2 rounded-full',
+              accent === 'cyan' && 'bg-slate-400', // Backlog is neutral in design
+              accent === 'blue' && 'bg-brand-orange shadow-glow-orange', // In Progress has orange dot in design
+              accent === 'orange' && 'bg-brand-orange shadow-glow-orange',
+              accent === 'green' && 'bg-brand-green shadow-glow-green'
+            )}
+          ></div>
+          <span className="font-bold text-slate-200 text-sm">{title}</span>
+
+          {/* Action container (like "Make") */}
+          {headerAction}
+        </div>
+
+        {/* Count Badge */}
+        <span className="text-[10px] bg-dark-700 text-slate-400 px-2 py-0.5 rounded border border-white/5 font-medium">
           {count}
         </span>
       </div>
 
       {/* Column Content */}
-      <div
-        className={cn(
-          'relative z-10 flex-1 overflow-y-auto p-2 space-y-2.5',
-          hideScrollbar &&
-            '[&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]',
-          // Smooth scrolling
-          'scroll-smooth'
-        )}
-      >
+      <div className="flex-1 overflow-y-auto p-3 space-y-3 custom-scrollbar relative z-10">
         {children}
       </div>
 
       {/* Drop zone indicator when dragging over */}
       {isOver && (
-        <div className="absolute inset-0 rounded-xl bg-primary/5 pointer-events-none z-5 border-2 border-dashed border-primary/20" />
+        <div className="absolute inset-0 rounded-2xl bg-white/5 pointer-events-none z-20 border-2 border-dashed border-white/10" />
       )}
-    </div>
+    </GlassPanel>
   );
 });

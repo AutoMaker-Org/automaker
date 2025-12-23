@@ -110,7 +110,7 @@ export function SettingsView() {
           <AppearanceSection
             effectiveTheme={effectiveTheme}
             currentProject={settingsProject}
-            onThemeChange={handleSetTheme}
+            onThemeChange={handleSetTheme as (theme: Theme) => void}
           />
         );
       case 'terminal':

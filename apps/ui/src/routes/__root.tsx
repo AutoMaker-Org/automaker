@@ -1,6 +1,6 @@
 import { createRootRoute, Outlet, useLocation, useNavigate } from '@tanstack/react-router';
 import { useEffect, useState, useCallback, useDeferredValue } from 'react';
-import { Sidebar } from '@/components/layout/sidebar';
+import { AppLayout } from '@/components/layout/app-layout';
 import {
   FileBrowserProvider,
   useFileBrowser,
@@ -159,10 +159,9 @@ function RootLayoutContent() {
   }
 
   return (
-    <main className="flex h-screen overflow-hidden" data-testid="app-container">
-      <Sidebar />
+    <AppLayout>
       <div
-        className="flex-1 flex flex-col overflow-hidden transition-all duration-300"
+        className="h-full flex flex-col overflow-hidden transition-all duration-300"
         style={{ marginRight: streamerPanelOpen ? '250px' : '0' }}
       >
         <Outlet />
@@ -170,12 +169,12 @@ function RootLayoutContent() {
 
       {/* Hidden streamer panel - opens with "\" key, pushes content */}
       <div
-        className={`fixed top-0 right-0 h-full w-[250px] bg-background border-l border-border transition-transform duration-300 ${
+        className={`fixed top-0 right-0 h-full w-[250px] bg-background border-l border-border transition-transform duration-300 z-50 ${
           streamerPanelOpen ? 'translate-x-0' : 'translate-x-full'
         }`}
       />
       <Toaster richColors position="bottom-right" />
-    </main>
+    </AppLayout>
   );
 }
 

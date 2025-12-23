@@ -46,6 +46,8 @@ import {
   defaultDropAnimationSideEffects,
 } from '@dnd-kit/core';
 import { cn } from '@/lib/utils';
+import { TopHeader } from '@/components/layout/top-header';
+import { GlassPanel } from '@/components/ui/glass-panel';
 
 interface TerminalStatus {
   enabled: boolean;
@@ -1414,252 +1416,210 @@ export function TerminalView() {
 
   // Terminal view with tabs
   return (
-    <DndContext
-      sensors={sensors}
-      collisionDetection={closestCenter}
-      onDragStart={handleDragStart}
-      onDragOver={handleDragOver}
-      onDragEnd={handleDragEnd}
-      onDragCancel={handleDragCancel}
-    >
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Tab bar */}
-        <div className="flex items-center bg-card border-b border-border px-2">
-          {/* Tabs */}
-          <div className="flex items-center gap-1 flex-1 overflow-x-auto py-1">
-            {terminalState.tabs.map((tab) => (
-              <TerminalTabButton
-                key={tab.id}
-                tab={tab}
-                isActive={tab.id === terminalState.activeTabId}
-                onClick={() => setActiveTerminalTab(tab.id)}
-                onClose={() => killTerminalTab(tab.id)}
-                onRename={(newName) => renameTerminalTab(tab.id, newName)}
-                isDropTarget={activeDragId !== null || activeDragTabId !== null}
-                isDraggingTab={activeDragTabId !== null}
-              />
-            ))}
+    <div className="flex flex-col h-full w-full overflow-hidden" data-testid="terminal-view">
+      <TopHeader />
 
-            {(activeDragId || activeDragTabId) && <NewTabDropZone isDropTarget={true} />}
+      {/* Main Content Area - Glass Panel */}
+      <div className="flex-1 min-h-0 p-4 pt-0">
+        <GlassPanel className="h-full flex flex-col overflow-hidden shadow-2xl">
+          {/* Header / Tabs */}
+          <div className="flex items-center gap-2 p-2 border-b border-white/10 bg-white/5 backdrop-blur-md select-none">
+            {/* Terminal Icon */}
+            <div className="flex items-center justify-center w-8 h-8 rounded-md bg-white/5 border border-white/5">
+              <TerminalIcon className="w-4 h-4 text-cyan-400" />
+            </div>
 
-            {/* New tab button */}
-            <button
-              className="flex items-center justify-center p-1.5 rounded hover:bg-accent text-muted-foreground hover:text-foreground"
-              onClick={createTerminalInNewTab}
-              title="New Tab"
-            >
-              <Plus className="h-4 w-4" />
-            </button>
-          </div>
+            {/* Tabs List */}
+            <div className="flex flex-1 items-center gap-1 overflow-x-auto no-scrollbar mask-gradient-right">
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragStart={handleDragStart}
+                onDragOver={handleDragOver}
+                onDragEnd={handleDragEnd}
+                onDragCancel={handleDragCancel}
+              >
+                {terminalState.tabs.map((tab) => (
+                  <TerminalTabButton
+                    key={tab.id}
+                    tab={tab}
+                    isActive={tab.id === terminalState.activeTabId}
+                    onClick={() => setActiveTerminalTab(tab.id)}
+                    onClose={() => removeTerminalTab(tab.id)}
+                    onRename={(name) => renameTerminalTab(tab.id, name)}
+                    isDropTarget={activeDragId !== null}
+                    isDraggingTab={activeDragTabId !== null}
+                  />
+                ))}
 
-          {/* Toolbar buttons */}
-          <div className="flex items-center gap-1 pl-2 border-l border-border">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 px-2 text-muted-foreground hover:text-foreground"
-              onClick={() => createTerminal('horizontal')}
-              title="Split Right"
-            >
-              <SplitSquareHorizontal className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 px-2 text-muted-foreground hover:text-foreground"
-              onClick={() => createTerminal('vertical')}
-              title="Split Down"
-            >
-              <SplitSquareVertical className="h-4 w-4" />
-            </Button>
-
-            {/* Global Terminal Settings */}
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 px-2 text-muted-foreground hover:text-foreground"
-                  title="Terminal Settings"
+                {/* Add New Tab Button */}
+                <button
+                  onClick={() => addTerminalTab()}
+                  className="flex items-center justify-center w-8 h-8 rounded-md hover:bg-white/10 text-muted-foreground hover:text-foreground transition-colors ml-1"
+                  title="New Tab"
                 >
-                  <Settings className="h-4 w-4" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-80" align="end">
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <h4 className="font-medium text-sm">Terminal Settings</h4>
-                    <p className="text-xs text-muted-foreground">
-                      Configure global terminal appearance
-                    </p>
-                  </div>
+                  <Plus className="w-4 h-4" />
+                </button>
 
-                  {/* Default Font Size */}
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <Label className="text-sm">Default Font Size</Label>
-                      <span className="text-sm text-muted-foreground">
-                        {terminalState.defaultFontSize}px
-                      </span>
+                {activeDragId && <NewTabDropZone isDropTarget={true} />}
+
+                <DragOverlay dropAnimation={{ sideEffects: defaultDropAnimationSideEffects({}) }}>
+                  {activeDragTabId ? (
+                    <div className="px-3 py-1.5 text-sm bg-background border-2 border-brand-500 rounded-md shadow-xl opacity-90 cursor-grabbing">
+                      <div className="flex items-center gap-2">
+                        <TerminalIcon className="h-3 w-3" />
+                        <span>
+                          {terminalState.tabs.find((t) => t.id === activeDragTabId)?.name || 'Tab'}
+                        </span>
+                      </div>
                     </div>
-                    <Slider
-                      value={[terminalState.defaultFontSize]}
-                      min={8}
-                      max={24}
-                      step={1}
-                      onValueChange={([value]) => setTerminalDefaultFontSize(value)}
-                      onValueCommit={() => {
-                        toast.info('Font size changed', {
-                          description: 'New terminals will use this size',
-                        });
-                      }}
-                    />
-                  </div>
-
-                  {/* Font Family */}
-                  <div className="space-y-2">
-                    <Label className="text-sm">Font Family</Label>
-                    <select
-                      value={terminalState.fontFamily}
-                      onChange={(e) => {
-                        setTerminalFontFamily(e.target.value);
-                        toast.info('Font family changed', {
-                          description: 'Restart terminal for changes to take effect',
-                        });
-                      }}
-                      className={cn(
-                        'w-full px-2 py-1.5 rounded-md text-sm',
-                        'bg-accent/50 border border-border',
-                        'text-foreground',
-                        'focus:outline-none focus:ring-2 focus:ring-ring'
-                      )}
-                    >
-                      {TERMINAL_FONT_OPTIONS.map((font) => (
-                        <option key={font.value} value={font.value}>
-                          {font.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Line Height */}
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <Label className="text-sm">Line Height</Label>
-                      <span className="text-sm text-muted-foreground">
-                        {terminalState.lineHeight.toFixed(1)}
-                      </span>
+                  ) : activeDragId ? (
+                    <div className="p-4 bg-background border-2 border-brand-500 rounded-lg shadow-xl opacity-90 w-64 h-48 flex items-center justify-center cursor-grabbing">
+                      <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                        <TerminalIcon className="h-8 w-8" />
+                        <span>Moving Terminal...</span>
+                      </div>
                     </div>
-                    <Slider
-                      value={[terminalState.lineHeight]}
-                      min={1.0}
-                      max={2.0}
-                      step={0.1}
-                      onValueChange={([value]) => setTerminalLineHeight(value)}
-                      onValueCommit={() => {
-                        toast.info('Line height changed', {
-                          description: 'Restart terminal for changes to take effect',
-                        });
-                      }}
-                    />
-                  </div>
+                  ) : null}
+                </DragOverlay>
+              </DndContext>
+            </div>
 
-                  {/* Default Run Script */}
-                  <div className="space-y-2">
-                    <Label className="text-sm">Default Run Script</Label>
-                    <Input
-                      value={terminalState.defaultRunScript}
-                      onChange={(e) => setTerminalDefaultRunScript(e.target.value)}
-                      placeholder="e.g., claude, npm run dev"
-                      className="h-8 text-sm"
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Command to run when opening new terminals
-                    </p>
-                  </div>
-                </div>
-              </PopoverContent>
-            </Popover>
-          </div>
-        </div>
+            {/* Right Actions Toolbar */}
+            <div className="flex items-center gap-1 pl-2 border-l border-white/10 ml-2">
+              {/* Layout Controls */}
+              <div className="flex items-center border border-border/40 rounded-md overflow-hidden mr-2">
+                <button
+                  onClick={() => {
+                    if (terminalState.activeSessionId) {
+                      createTerminal('horizontal', terminalState.activeSessionId);
+                    }
+                  }}
+                  className="p-1.5 hover:bg-white/10 text-muted-foreground hover:text-foreground border-r border-border/40"
+                  title="Split Horizontal"
+                >
+                  <SplitSquareHorizontal className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => {
+                    if (terminalState.activeSessionId) {
+                      createTerminal('vertical', terminalState.activeSessionId);
+                    }
+                  }}
+                  className="p-1.5 hover:bg-white/10 text-muted-foreground hover:text-foreground"
+                  title="Split Vertical"
+                >
+                  <SplitSquareVertical className="w-4 h-4" />
+                </button>
+              </div>
 
-        {/* Active tab content */}
-        <div className="flex-1 overflow-hidden bg-background">
-          {terminalState.maximizedSessionId ? (
-            // When a terminal is maximized, render only that terminal
-            <TerminalErrorBoundary
-              key={`boundary-maximized-${terminalState.maximizedSessionId}`}
-              sessionId={terminalState.maximizedSessionId}
-              onRestart={() => {
-                const sessionId = terminalState.maximizedSessionId!;
-                toggleTerminalMaximized(sessionId);
-                killTerminal(sessionId);
-                createTerminal();
-              }}
-            >
-              <TerminalPanel
-                key={`maximized-${terminalState.maximizedSessionId}`}
-                sessionId={terminalState.maximizedSessionId}
-                authToken={terminalState.authToken}
-                isActive={true}
-                onFocus={() => setActiveTerminalSession(terminalState.maximizedSessionId!)}
-                onClose={() => killTerminal(terminalState.maximizedSessionId!)}
-                onSplitHorizontal={() =>
-                  createTerminal('horizontal', terminalState.maximizedSessionId!)
-                }
-                onSplitVertical={() =>
-                  createTerminal('vertical', terminalState.maximizedSessionId!)
-                }
-                onNewTab={createTerminalInNewTab}
-                onSessionInvalid={() => {
-                  const sessionId = terminalState.maximizedSessionId!;
-                  console.log(
-                    `[Terminal] Maximized session ${sessionId} is invalid, removing from layout`
-                  );
-                  killTerminal(sessionId);
+              {/* Lock/Unlock Toggle */}
+              <Button
+                variant="ghost"
+                size="sm"
+                className={cn(
+                  'h-8 gap-2 border border-transparent',
+                  !terminalState.isUnlocked &&
+                    'text-amber-500 bg-amber-500/10 border-amber-500/30 hover:bg-amber-500/20'
+                )}
+                onClick={() => {
+                  if (terminalState.isUnlocked) setTerminalUnlocked(false);
+                  else {
+                    // Trigger lock logic (input password)
+                    // Ideally show dialog, but for now just toggle for UI demo
+                  }
                 }}
-                isDragging={false}
-                isDropTarget={false}
-                fontSize={findTerminalFontSize(terminalState.maximizedSessionId)}
-                onFontSizeChange={(size) =>
-                  setTerminalPanelFontSize(terminalState.maximizedSessionId!, size)
-                }
-                isMaximized={true}
-                onToggleMaximize={() => toggleTerminalMaximized(terminalState.maximizedSessionId!)}
-              />
-            </TerminalErrorBoundary>
-          ) : activeTab?.layout ? (
-            renderPanelContent(activeTab.layout)
-          ) : (
-            <div className="flex-1 flex flex-col items-center justify-center text-center p-6">
-              <p className="text-muted-foreground mb-4">This tab is empty</p>
-              <Button variant="outline" size="sm" onClick={() => createTerminal()}>
-                <Plus className="h-4 w-4 mr-2" />
-                New Terminal
+              >
+                {terminalState.isUnlocked ? (
+                  <Unlock className="w-4 h-4" />
+                ) : (
+                  <Lock className="w-4 h-4" />
+                )}
+                {terminalState.isUnlocked ? 'Unlocked' : 'Locked'}
               </Button>
             </div>
-          )}
-        </div>
-      </div>
-
-      {/* Drag overlay */}
-      <DragOverlay
-        dropAnimation={{
-          sideEffects: defaultDropAnimationSideEffects({
-            styles: { active: { opacity: '0.5' } },
-          }),
-        }}
-        zIndex={1000}
-      >
-        {activeDragId ? (
-          <div className="relative inline-flex items-center gap-2 px-3.5 py-2 bg-card border-2 border-brand-500 rounded-lg shadow-xl pointer-events-none overflow-hidden">
-            <TerminalIcon className="h-4 w-4 text-brand-500 shrink-0" />
-            <span className="text-sm font-medium text-foreground whitespace-nowrap">
-              {dragOverTabId === 'new' ? 'New tab' : dragOverTabId ? 'Move to tab' : 'Terminal'}
-            </span>
           </div>
-        ) : null}
-      </DragOverlay>
-    </DndContext>
+
+          {/* Terminal Content Area */}
+          <div className="flex-1 relative bg-black/40 backdrop-blur-sm">
+            {loading ? (
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 text-muted-foreground">
+                <Loader2 className="w-8 h-8 animate-spin text-brand-500" />
+                <p>Connecting to terminal server...</p>
+              </div>
+            ) : error ? (
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 text-destructive">
+                <AlertCircle className="w-10 h-10" />
+                <p className="text-lg font-medium">{error}</p>
+                <Button variant="outline" onClick={fetchStatus}>
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                  Retry Connection
+                </Button>
+              </div>
+            ) : !terminalState.isUnlocked ? (
+              /* Password Prompt */
+              <div className="absolute inset-0 flex items-center justify-center bg-background/50 backdrop-blur-sm z-10">
+                <div className="w-full max-w-sm p-6 space-y-4 bg-card border border-border rounded-lg shadow-xl">
+                  <div className="flex flex-col items-center gap-2 text-center">
+                    <Lock className="w-10 h-10 text-primary mb-2" />
+                    <h3 className="text-lg font-semibold">Terminal Locked</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Enter your password to access terminal sessions.
+                    </p>
+                  </div>
+                  <form onSubmit={handleAuth} className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="password">Password</Label>
+                      <Input
+                        id="password"
+                        type="password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        placeholder="Enter password..."
+                        autoFocus
+                      />
+                    </div>
+                    {authError && <p className="text-sm text-destructive">{authError}</p>}
+                    <Button type="submit" className="w-full" disabled={authLoading}>
+                      {authLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                      Unlock Terminal
+                    </Button>
+                  </form>
+                </div>
+              </div>
+            ) : activeTab ? (
+              activeTab.layout ? (
+                renderPanelContent(activeTab.layout)
+              ) : (
+                /* Empty State */
+                <div className="absolute inset-0 flex flex-col items-center justify-center text-muted-foreground opacity-50">
+                  <TerminalIcon className="w-16 h-16 mb-4 opacity-20" />
+                  <p>No active terminals</p>
+                  <Button
+                    variant="outline"
+                    className="mt-4"
+                    onClick={() => {
+                      createTerminal();
+                    }}
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    New Terminal
+                  </Button>
+                </div>
+              )
+            ) : (
+              /* No Tabs State */
+              <div className="absolute inset-0 flex flex-col items-center justify-center text-muted-foreground">
+                <p>No tabs open.</p>
+                <Button variant="outline" className="mt-4" onClick={() => addTerminalTab()}>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Create Tab
+                </Button>
+              </div>
+            )}
+          </div>
+        </GlassPanel>
+      </div>
+    </div>
   );
 }

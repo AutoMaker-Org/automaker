@@ -31,6 +31,7 @@ interface CardHeaderProps {
   onEdit: () => void;
   onDelete: () => void;
   onViewOutput?: () => void;
+  hideActions?: boolean;
 }
 
 export function CardHeaderSection({
@@ -40,6 +41,7 @@ export function CardHeaderSection({
   onEdit,
   onDelete,
   onViewOutput,
+  hideActions,
 }: CardHeaderProps) {
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);

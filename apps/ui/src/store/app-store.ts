@@ -7,10 +7,21 @@ import type {
   AgentModel,
   PlanningMode,
   AIProfile,
+  ThinkingLevel,
+  ModelProvider,
+  FeatureTextFilePath,
 } from '@automaker/types';
 
-// Re-export ThemeMode for convenience
-export type { ThemeMode };
+export type {
+  AgentModel,
+  ThinkingLevel,
+  ModelProvider,
+  AIProfile,
+  PlanningMode,
+  FeatureTextFilePath,
+};
+
+// ThemeMode is defined below, no need to re-export here
 
 export type ViewMode =
   | 'welcome'
@@ -262,13 +273,24 @@ export interface Feature extends Omit<
   titleGenerating?: boolean;
   category: string;
   description: string;
-  steps: string[]; // Required in UI (not optional)
+  steps?: string[] | undefined; // Optional in UI
   status: 'backlog' | 'in_progress' | 'waiting_approval' | 'verified' | 'completed';
   images?: FeatureImage[]; // UI-specific base64 images
   imagePaths?: FeatureImagePath[]; // Stricter type than base (no string | union)
   textFilePaths?: FeatureTextFilePath[]; // Text file attachments for context
   justFinishedAt?: string; // UI-specific: ISO timestamp when agent just finished
   prUrl?: string; // UI-specific: Pull request URL
+  planSpec?: PlanSpec; // Spec/Plan data
+  planningMode?: PlanningMode; // Planning mode used
+  priority?: number; // Priority (1 is highest)
+  branchName?: string; // Branch associated with feature
+  model?: AgentModel;
+  thinkingLevel?: ThinkingLevel;
+  skipTests?: boolean;
+  requirePlanApproval?: boolean;
+  summary?: string;
+  dependencies?: string[];
+  startedAt?: string;
 }
 
 // Parsed task from spec (for spec and full planning modes)
@@ -881,6 +903,9 @@ const DEFAULT_AI_PROFILES: AIProfile[] = [
 ];
 
 const initialState: AppState = {
+  claudeRefreshInterval: 60,
+  claudeUsage: null,
+  claudeUsageLastUpdated: null,
   projects: [],
   currentProject: null,
   trashedProjects: [],

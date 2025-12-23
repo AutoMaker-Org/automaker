@@ -101,6 +101,7 @@ export function KanbanBoard({
                 key={column.id}
                 id={column.id}
                 title={column.title}
+                accent={column.accent}
                 colorClass={column.colorClass}
                 count={columnFeatures.length}
                 width={columnWidth}

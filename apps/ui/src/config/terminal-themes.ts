@@ -61,7 +61,7 @@ export const DEFAULT_TERMINAL_FONT = TERMINAL_FONT_OPTIONS[0].value;
 
 // Dark theme (default)
 const darkTheme: TerminalTheme = {
-  background: '#0a0a0a',
+  background: 'transparent', // Transparent for glassmorphism
   foreground: '#d4d4d4',
   cursor: '#d4d4d4',
   cursorAccent: '#0a0a0a',

@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { useAppStore } from '@/store/app-store';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -18,6 +18,9 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getElectronAPI } from '@/lib/electron';
+import { TopHeader } from '@/components/layout/top-header';
+import { GlassPanel } from '@/components/ui/glass-panel';
+import { GlassCard } from '@/components/ui/glass-card';
 
 interface ToolResult {
   success: boolean;
@@ -190,258 +193,285 @@ export function AgentToolsView() {
   }
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden content-bg" data-testid="agent-tools-view">
-      {/* Header */}
-      <div className="flex items-center gap-3 p-4 border-b border-border bg-glass backdrop-blur-md">
-        <Wrench className="w-5 h-5 text-primary" />
-        <div>
-          <h1 className="text-xl font-bold">Agent Tools</h1>
-          <p className="text-sm text-muted-foreground">
-            Test file system and terminal tools for {currentProject.name}
-          </p>
-        </div>
-      </div>
-
-      {/* Tools Grid */}
-      <div className="flex-1 overflow-y-auto p-4">
-        <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-2 xl:grid-cols-3">
-          {/* Read File Tool */}
-          <Card data-testid="read-file-tool">
-            <CardHeader>
-              <div className="flex items-center gap-2">
-                <File className="w-5 h-5 text-blue-500" />
-                <CardTitle className="text-lg">Read File</CardTitle>
+    <div className="flex-1 flex flex-col overflow-hidden bg-background">
+      <TopHeader />
+      <div className="flex-1 flex flex-col overflow-hidden p-6 pt-0">
+        <GlassPanel className="flex-1 flex flex-col overflow-hidden relative shadow-2xl bg-black/40 backdrop-blur-xl border-white/5">
+          <div className="flex-1 flex flex-col overflow-hidden p-6">
+            {/* Header */}
+            <div className="flex items-center gap-4 mb-6">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-purple-500/20 to-blue-600/20 border border-purple-500/30 flex items-center justify-center shadow-inner shadow-purple-500/20">
+                <Wrench className="w-6 h-6 text-purple-400" />
               </div>
-              <CardDescription>Agent requests to read a file from the filesystem</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="read-file-path">File Path</Label>
-                <Input
-                  id="read-file-path"
-                  placeholder="/path/to/file.txt"
-                  value={readFilePath}
-                  onChange={(e) => setReadFilePath(e.target.value)}
-                  data-testid="read-file-path-input"
-                />
+              <div>
+                <h1 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-white/70">
+                  Agent Tools
+                </h1>
+                <p className="text-sm text-muted-foreground">
+                  Test file system and terminal tools for {currentProject.name}
+                </p>
               </div>
-              <Button
-                onClick={handleReadFile}
-                disabled={isReadingFile || !readFilePath.trim()}
-                className="w-full"
-                data-testid="read-file-button"
-              >
-                {isReadingFile ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Reading...
-                  </>
-                ) : (
-                  <>
-                    <Play className="w-4 h-4 mr-2" />
-                    Execute Read
-                  </>
-                )}
-              </Button>
-
-              {/* Result */}
-              {readFileResult && (
-                <div
-                  className={cn(
-                    'p-3 rounded-md border',
-                    readFileResult.success
-                      ? 'bg-green-500/10 border-green-500/20'
-                      : 'bg-red-500/10 border-red-500/20'
-                  )}
-                  data-testid="read-file-result"
-                >
-                  <div className="flex items-center gap-2 mb-2">
-                    {readFileResult.success ? (
-                      <CheckCircle className="w-4 h-4 text-green-500" />
-                    ) : (
-                      <XCircle className="w-4 h-4 text-red-500" />
-                    )}
-                    <span className="text-sm font-medium">
-                      {readFileResult.success ? 'Success' : 'Failed'}
-                    </span>
-                  </div>
-                  <pre className="text-xs overflow-auto max-h-40 whitespace-pre-wrap">
-                    {readFileResult.success ? readFileResult.output : readFileResult.error}
-                  </pre>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Write File Tool */}
-          <Card data-testid="write-file-tool">
-            <CardHeader>
-              <div className="flex items-center gap-2">
-                <Pencil className="w-5 h-5 text-green-500" />
-                <CardTitle className="text-lg">Write File</CardTitle>
-              </div>
-              <CardDescription>Agent requests to write content to a file</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="write-file-path">File Path</Label>
-                <Input
-                  id="write-file-path"
-                  placeholder="/path/to/file.txt"
-                  value={writeFilePath}
-                  onChange={(e) => setWriteFilePath(e.target.value)}
-                  data-testid="write-file-path-input"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="write-file-content">Content</Label>
-                <textarea
-                  id="write-file-content"
-                  placeholder="File content..."
-                  value={writeFileContent}
-                  onChange={(e) => setWriteFileContent(e.target.value)}
-                  className="w-full min-h-[100px] px-3 py-2 text-sm rounded-md border border-input bg-background resize-y"
-                  data-testid="write-file-content-input"
-                />
-              </div>
-              <Button
-                onClick={handleWriteFile}
-                disabled={isWritingFile || !writeFilePath.trim() || !writeFileContent.trim()}
-                className="w-full"
-                data-testid="write-file-button"
-              >
-                {isWritingFile ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Writing...
-                  </>
-                ) : (
-                  <>
-                    <Play className="w-4 h-4 mr-2" />
-                    Execute Write
-                  </>
-                )}
-              </Button>
-
-              {/* Result */}
-              {writeFileResult && (
-                <div
-                  className={cn(
-                    'p-3 rounded-md border',
-                    writeFileResult.success
-                      ? 'bg-green-500/10 border-green-500/20'
-                      : 'bg-red-500/10 border-red-500/20'
-                  )}
-                  data-testid="write-file-result"
-                >
-                  <div className="flex items-center gap-2 mb-2">
-                    {writeFileResult.success ? (
-                      <CheckCircle className="w-4 h-4 text-green-500" />
-                    ) : (
-                      <XCircle className="w-4 h-4 text-red-500" />
-                    )}
-                    <span className="text-sm font-medium">
-                      {writeFileResult.success ? 'Success' : 'Failed'}
-                    </span>
-                  </div>
-                  <pre className="text-xs overflow-auto max-h-40 whitespace-pre-wrap">
-                    {writeFileResult.success ? writeFileResult.output : writeFileResult.error}
-                  </pre>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Terminal Tool */}
-          <Card data-testid="terminal-tool">
-            <CardHeader>
-              <div className="flex items-center gap-2">
-                <Terminal className="w-5 h-5 text-purple-500" />
-                <CardTitle className="text-lg">Run Terminal</CardTitle>
-              </div>
-              <CardDescription>Agent requests to execute a terminal command</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="terminal-command">Command</Label>
-                <Input
-                  id="terminal-command"
-                  placeholder="ls -la"
-                  value={terminalCommand}
-                  onChange={(e) => setTerminalCommand(e.target.value)}
-                  data-testid="terminal-command-input"
-                />
-              </div>
-              <Button
-                onClick={handleRunCommand}
-                disabled={isRunningCommand || !terminalCommand.trim()}
-                className="w-full"
-                data-testid="run-terminal-button"
-              >
-                {isRunningCommand ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Running...
-                  </>
-                ) : (
-                  <>
-                    <Play className="w-4 h-4 mr-2" />
-                    Execute Command
-                  </>
-                )}
-              </Button>
-
-              {/* Result */}
-              {terminalResult && (
-                <div
-                  className={cn(
-                    'p-3 rounded-md border',
-                    terminalResult.success
-                      ? 'bg-green-500/10 border-green-500/20'
-                      : 'bg-red-500/10 border-red-500/20'
-                  )}
-                  data-testid="terminal-result"
-                >
-                  <div className="flex items-center gap-2 mb-2">
-                    {terminalResult.success ? (
-                      <CheckCircle className="w-4 h-4 text-green-500" />
-                    ) : (
-                      <XCircle className="w-4 h-4 text-red-500" />
-                    )}
-                    <span className="text-sm font-medium">
-                      {terminalResult.success ? 'Success' : 'Failed'}
-                    </span>
-                  </div>
-                  <pre className="text-xs overflow-auto max-h-40 whitespace-pre-wrap font-mono bg-black/50 text-green-400 p-2 rounded">
-                    $ {terminalCommand}
-                    {'\n'}
-                    {terminalResult.success ? terminalResult.output : terminalResult.error}
-                  </pre>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Tool Log Section */}
-        <Card className="mt-6" data-testid="tool-log">
-          <CardHeader>
-            <CardTitle className="text-lg">Tool Execution Log</CardTitle>
-            <CardDescription>View agent tool requests and responses</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2 text-sm">
-              <p className="text-muted-foreground">
-                Open your browser&apos;s developer console to see detailed agent tool logs.
-              </p>
-              <ul className="list-disc list-inside space-y-1 text-muted-foreground">
-                <li>Read File - Agent requests file content from filesystem</li>
-                <li>Write File - Agent writes content to specified path</li>
-                <li>Run Terminal - Agent executes shell commands</li>
-              </ul>
             </div>
-          </CardContent>
-        </Card>
+
+            {/* Tools Grid */}
+            <div className="flex-1 overflow-y-auto">
+              <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 max-w-7xl">
+                {/* Read File Tool */}
+                <GlassCard
+                  className="flex flex-col gap-4 bg-white/5 border-white/10"
+                  data-testid="read-file-tool"
+                >
+                  <div className="flex items-center gap-3 pb-2 border-b border-white/5">
+                    <div className="p-2 rounded-lg bg-blue-500/10">
+                      <File className="w-5 h-5 text-blue-400" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-foreground">Read File</h3>
+                      <p className="text-xs text-muted-foreground">Read from filesystem</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4 flex-1">
+                    <div className="space-y-2">
+                      <Label htmlFor="read-file-path">File Path</Label>
+                      <Input
+                        id="read-file-path"
+                        placeholder="/path/to/file.txt"
+                        value={readFilePath}
+                        onChange={(e) => setReadFilePath(e.target.value)}
+                        data-testid="read-file-path-input"
+                        className="bg-black/20 border-white/10 focus:border-blue-500/50"
+                      />
+                    </div>
+                    <Button
+                      onClick={handleReadFile}
+                      disabled={isReadingFile || !readFilePath.trim()}
+                      className="w-full bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 border border-blue-500/30"
+                      data-testid="read-file-button"
+                    >
+                      {isReadingFile ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Reading...
+                        </>
+                      ) : (
+                        <>
+                          <Play className="w-4 h-4 mr-2" />
+                          Execute Read
+                        </>
+                      )}
+                    </Button>
+
+                    {/* Result */}
+                    {readFileResult && (
+                      <div
+                        className={cn(
+                          'p-3 rounded-lg border text-xs',
+                          readFileResult.success
+                            ? 'bg-green-500/10 border-green-500/20 text-green-300'
+                            : 'bg-red-500/10 border-red-500/20 text-red-300'
+                        )}
+                        data-testid="read-file-result"
+                      >
+                        <div className="flex items-center gap-2 mb-2 font-medium">
+                          {readFileResult.success ? (
+                            <CheckCircle className="w-4 h-4 text-green-400" />
+                          ) : (
+                            <XCircle className="w-4 h-4 text-red-400" />
+                          )}
+                          <span>{readFileResult.success ? 'Success' : 'Failed'}</span>
+                        </div>
+                        <pre className="overflow-auto max-h-40 whitespace-pre-wrap font-mono bg-black/30 p-2 rounded border border-white/5">
+                          {readFileResult.success ? readFileResult.output : readFileResult.error}
+                        </pre>
+                      </div>
+                    )}
+                  </div>
+                </GlassCard>
+
+                {/* Write File Tool */}
+                <GlassCard
+                  className="flex flex-col gap-4 bg-white/5 border-white/10"
+                  data-testid="write-file-tool"
+                >
+                  <div className="flex items-center gap-3 pb-2 border-b border-white/5">
+                    <div className="p-2 rounded-lg bg-green-500/10">
+                      <Pencil className="w-5 h-5 text-green-400" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-foreground">Write File</h3>
+                      <p className="text-xs text-muted-foreground">Write to filesystem</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4 flex-1">
+                    <div className="space-y-2">
+                      <Label htmlFor="write-file-path">File Path</Label>
+                      <Input
+                        id="write-file-path"
+                        placeholder="/path/to/file.txt"
+                        value={writeFilePath}
+                        onChange={(e) => setWriteFilePath(e.target.value)}
+                        data-testid="write-file-path-input"
+                        className="bg-black/20 border-white/10 focus:border-green-500/50"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="write-file-content">Content</Label>
+                      <textarea
+                        id="write-file-content"
+                        placeholder="File content..."
+                        value={writeFileContent}
+                        onChange={(e) => setWriteFileContent(e.target.value)}
+                        className="w-full min-h-[100px] px-3 py-2 text-sm rounded-md border border-white/10 bg-black/20 resize-y focus:outline-none focus:ring-1 focus:ring-green-500/50"
+                        data-testid="write-file-content-input"
+                      />
+                    </div>
+                    <Button
+                      onClick={handleWriteFile}
+                      disabled={isWritingFile || !writeFilePath.trim() || !writeFileContent.trim()}
+                      className="w-full bg-green-600/20 hover:bg-green-600/30 text-green-400 border border-green-500/30"
+                      data-testid="write-file-button"
+                    >
+                      {isWritingFile ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Writing...
+                        </>
+                      ) : (
+                        <>
+                          <Play className="w-4 h-4 mr-2" />
+                          Execute Write
+                        </>
+                      )}
+                    </Button>
+
+                    {/* Result */}
+                    {writeFileResult && (
+                      <div
+                        className={cn(
+                          'p-3 rounded-lg border text-xs',
+                          writeFileResult.success
+                            ? 'bg-green-500/10 border-green-500/20 text-green-300'
+                            : 'bg-red-500/10 border-red-500/20 text-red-300'
+                        )}
+                        data-testid="write-file-result"
+                      >
+                        <div className="flex items-center gap-2 mb-2 font-medium">
+                          {writeFileResult.success ? (
+                            <CheckCircle className="w-4 h-4 text-green-400" />
+                          ) : (
+                            <XCircle className="w-4 h-4 text-red-400" />
+                          )}
+                          <span>{writeFileResult.success ? 'Success' : 'Failed'}</span>
+                        </div>
+                        <pre className="overflow-auto max-h-40 whitespace-pre-wrap font-mono bg-black/30 p-2 rounded border border-white/5">
+                          {writeFileResult.success ? writeFileResult.output : writeFileResult.error}
+                        </pre>
+                      </div>
+                    )}
+                  </div>
+                </GlassCard>
+
+                {/* Terminal Tool */}
+                <GlassCard
+                  className="flex flex-col gap-4 bg-white/5 border-white/10"
+                  data-testid="terminal-tool"
+                >
+                  <div className="flex items-center gap-3 pb-2 border-b border-white/5">
+                    <div className="p-2 rounded-lg bg-purple-500/10">
+                      <Terminal className="w-5 h-5 text-purple-400" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-foreground">Run Terminal</h3>
+                      <p className="text-xs text-muted-foreground">Execute shell commands</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4 flex-1">
+                    <div className="space-y-2">
+                      <Label htmlFor="terminal-command">Command</Label>
+                      <Input
+                        id="terminal-command"
+                        placeholder="ls -la"
+                        value={terminalCommand}
+                        onChange={(e) => setTerminalCommand(e.target.value)}
+                        data-testid="terminal-command-input"
+                        className="bg-black/20 border-white/10 focus:border-purple-500/50 font-mono text-sm"
+                      />
+                    </div>
+                    <Button
+                      onClick={handleRunCommand}
+                      disabled={isRunningCommand || !terminalCommand.trim()}
+                      className="w-full bg-purple-600/20 hover:bg-purple-600/30 text-purple-400 border border-purple-500/30"
+                      data-testid="run-terminal-button"
+                    >
+                      {isRunningCommand ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Running...
+                        </>
+                      ) : (
+                        <>
+                          <Play className="w-4 h-4 mr-2" />
+                          Execute Command
+                        </>
+                      )}
+                    </Button>
+
+                    {/* Result */}
+                    {terminalResult && (
+                      <div
+                        className={cn(
+                          'p-3 rounded-lg border text-xs',
+                          terminalResult.success
+                            ? 'bg-green-500/10 border-green-500/20 text-green-300'
+                            : 'bg-red-500/10 border-red-500/20 text-red-300'
+                        )}
+                        data-testid="terminal-result"
+                      >
+                        <div className="flex items-center gap-2 mb-2 font-medium">
+                          {terminalResult.success ? (
+                            <CheckCircle className="w-4 h-4 text-green-400" />
+                          ) : (
+                            <XCircle className="w-4 h-4 text-red-400" />
+                          )}
+                          <span>{terminalResult.success ? 'Success' : 'Failed'}</span>
+                        </div>
+                        <pre className="overflow-auto max-h-40 whitespace-pre-wrap font-mono bg-black/30 p-2 rounded border border-white/5">
+                          $ {terminalCommand}
+                          {'\n'}
+                          {terminalResult.success ? terminalResult.output : terminalResult.error}
+                        </pre>
+                      </div>
+                    )}
+                  </div>
+                </GlassCard>
+              </div>
+
+              {/* Tool Log Section */}
+              <GlassCard className="mt-6 bg-white/5 border-white/10" data-testid="tool-log">
+                <div className="flex flex-col gap-2">
+                  <h3 className="font-semibold text-foreground">Tool Execution Log</h3>
+                  <p className="text-sm text-muted-foreground">
+                    View agent tool requests and responses
+                  </p>
+
+                  <div className="mt-4 space-y-2 text-sm bg-black/20 p-4 rounded-lg border border-white/5">
+                    <p className="text-muted-foreground">
+                      Open your browser&apos;s developer console to see detailed agent tool logs.
+                    </p>
+                    <ul className="list-disc list-inside space-y-1 text-muted-foreground">
+                      <li>Read File - Agent requests file content from filesystem</li>
+                      <li>Write File - Agent writes content to specified path</li>
+                      <li>Run Terminal - Agent executes shell commands</li>
+                    </ul>
+                  </div>
+                </div>
+              </GlassCard>
+            </div>
+          </div>
+        </GlassPanel>
       </div>
     </div>
   );

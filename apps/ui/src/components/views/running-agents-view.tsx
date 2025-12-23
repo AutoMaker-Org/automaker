@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Bot, Folder, Loader2, RefreshCw, Square, Activity } from 'lucide-react';
+import { TopHeader } from '@/components/layout/top-header';
+import { GlassPanel } from '@/components/ui/glass-panel';
 import { getElectronAPI, RunningAgent } from '@/lib/electron';
 import { useAppStore } from '@/store/app-store';
 import { Button } from '@/components/ui/button';
@@ -103,102 +105,121 @@ export function RunningAgentsView() {
   }
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden p-6">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-3">
-          <div className="p-2 rounded-lg bg-brand-500/10">
-            <Activity className="h-6 w-6 text-brand-500" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold">Running Agents</h1>
-            <p className="text-sm text-muted-foreground">
-              {runningAgents.length === 0
-                ? 'No agents currently running'
-                : `${runningAgents.length} agent${runningAgents.length === 1 ? '' : 's'} running across all projects`}
-            </p>
-          </div>
-        </div>
-        <Button variant="outline" size="sm" onClick={handleRefresh} disabled={refreshing}>
-          <RefreshCw className={cn('h-4 w-4 mr-2', refreshing && 'animate-spin')} />
-          Refresh
-        </Button>
-      </div>
+    <div className="flex-1 flex flex-col overflow-hidden bg-background">
+      <TopHeader />
 
-      {/* Content */}
-      {runningAgents.length === 0 ? (
-        <div className="flex-1 flex flex-col items-center justify-center text-center">
-          <div className="p-4 rounded-full bg-muted/50 mb-4">
-            <Bot className="h-12 w-12 text-muted-foreground" />
-          </div>
-          <h2 className="text-lg font-medium mb-2">No Running Agents</h2>
-          <p className="text-muted-foreground max-w-md">
-            Agents will appear here when they are actively working on features. Start an agent from
-            the Kanban board by dragging a feature to "In Progress".
-          </p>
-        </div>
-      ) : (
-        <div className="flex-1 overflow-auto">
-          <div className="space-y-3">
-            {runningAgents.map((agent) => (
-              <div
-                key={`${agent.projectPath}-${agent.featureId}`}
-                className="flex items-center justify-between p-4 rounded-lg border border-border bg-card hover:bg-accent/50 transition-colors"
-              >
-                <div className="flex items-center gap-4 min-w-0">
-                  {/* Status indicator */}
-                  <div className="relative">
-                    <Bot className="h-8 w-8 text-brand-500" />
-                    <span className="absolute -top-1 -right-1 flex h-3 w-3">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
-                      <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500" />
-                    </span>
-                  </div>
-
-                  {/* Agent info */}
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium truncate">{agent.featureId}</span>
-                      {agent.isAutoMode && (
-                        <span className="px-2 py-0.5 text-[10px] font-medium rounded-full bg-brand-500/10 text-brand-500 border border-brand-500/30">
-                          AUTO
-                        </span>
-                      )}
-                    </div>
-                    <button
-                      onClick={() => handleNavigateToProject(agent)}
-                      className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
-                    >
-                      <Folder className="h-3.5 w-3.5" />
-                      <span className="truncate">{agent.projectName}</span>
-                    </button>
-                  </div>
+      <div className="flex-1 flex flex-col overflow-hidden p-6 pt-0">
+        <GlassPanel className="flex-1 flex flex-col overflow-hidden relative shadow-2xl bg-black/40 backdrop-blur-xl border-white/5">
+          <div className="flex-1 flex flex-col overflow-hidden p-6">
+            {/* Header */}
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-500/20 to-blue-600/20 border border-brand-500/30 flex items-center justify-center shadow-inner shadow-brand-500/20">
+                  <Activity className="h-5 w-5 text-brand-400" />
                 </div>
-
-                {/* Actions */}
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleNavigateToProject(agent)}
-                    className="text-muted-foreground hover:text-foreground"
-                  >
-                    View Project
-                  </Button>
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    onClick={() => handleStopAgent(agent.featureId)}
-                  >
-                    <Square className="h-3.5 w-3.5 mr-1.5" />
-                    Stop
-                  </Button>
+                <div>
+                  <h1 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-white/70">
+                    Running Agents
+                  </h1>
+                  <p className="text-xs text-muted-foreground">
+                    {runningAgents.length === 0
+                      ? 'No agents currently running'
+                      : `${runningAgents.length} agent${runningAgents.length === 1 ? '' : 's'} running across all projects`}
+                  </p>
                 </div>
               </div>
-            ))}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleRefresh}
+                disabled={refreshing}
+                className="bg-white/5 border-white/10 hover:bg-white/10 text-xs gap-2"
+              >
+                <RefreshCw className={cn('h-3.5 w-3.5', refreshing && 'animate-spin')} />
+                Refresh
+              </Button>
+            </div>
+
+            {/* Content */}
+            {runningAgents.length === 0 ? (
+              <div className="flex-1 flex flex-col items-center justify-center text-center">
+                <div className="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center mb-6">
+                  <Bot className="h-8 w-8 text-muted-foreground/50" />
+                </div>
+                <h2 className="text-lg font-medium mb-2 text-foreground">No Running Agents</h2>
+                <p className="text-muted-foreground max-w-sm text-sm">
+                  Agents will appear here when they are actively working on features. Start an agent
+                  from the Kanban board.
+                </p>
+              </div>
+            ) : (
+              <div className="flex-1 overflow-auto pr-2">
+                <div className="grid gap-3 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
+                  {runningAgents.map((agent) => (
+                    <div
+                      key={`${agent.projectPath}-${agent.featureId}`}
+                      className="group relative flex flex-col p-4 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 hover:border-white/20 transition-all duration-300"
+                    >
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex items-center gap-3">
+                          {/* Status indicator */}
+                          <div className="relative">
+                            <div className="w-10 h-10 rounded-lg bg-brand-500/10 flex items-center justify-center">
+                              <Bot className="h-5 w-5 text-brand-400" />
+                            </div>
+                            <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
+                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
+                              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500" />
+                            </span>
+                          </div>
+
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2 mb-0.5">
+                              <span className="font-semibold text-sm truncate text-foreground">
+                                {agent.featureId}
+                              </span>
+                              {agent.isAutoMode && (
+                                <span className="px-1.5 py-0.5 text-[10px] font-bold rounded bg-brand-500/20 text-brand-400 border border-brand-500/20">
+                                  AUTO
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                              <Folder className="h-3 w-3" />
+                              <span className="truncate max-w-[120px]">{agent.projectName}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Actions */}
+                      <div className="mt-auto pt-3 flex items-center gap-2 border-t border-white/5">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleNavigateToProject(agent)}
+                          className="flex-1 h-8 text-xs hover:bg-white/10"
+                        >
+                          View Project
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleStopAgent(agent.featureId)}
+                          className="h-8 w-8 p-0 text-muted-foreground hover:text-red-400 hover:bg-red-500/10"
+                          title="Stop Agent"
+                        >
+                          <Square className="h-3.5 w-3.5 fill-current" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
-        </div>
-      )}
+        </GlassPanel>
+      </div>
     </div>
   );
 }

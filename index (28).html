@@ -1,0 +1,1065 @@
+<!doctype html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Automaker - Intelligent Kanban</title>
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <script>
+      tailwind.config = {
+        darkMode: 'class',
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['Inter', 'sans-serif'],
+              mono: ['JetBrains Mono', 'monospace'],
+            },
+            colors: {
+              dark: {
+                950: '#020408', // Ultra deep background
+                900: '#080a0f', // Sidebar base
+                850: '#0e121a', // Panel base
+                800: '#161b26', // Card base
+                700: '#1f2937', // Input/Hover
+                600: '#374151', // Border/Active
+              },
+              brand: {
+                cyan: '#06b6d4',
+                cyanHover: '#22d3ee',
+                blue: '#3b82f6',
+                orange: '#f97316',
+                green: '#10b981',
+                red: '#ef4444',
+                purple: '#8b5cf6',
+              },
+            },
+            boxShadow: {
+              'glow-cyan': '0 0 20px -5px rgba(6, 182, 212, 0.4)',
+              'glow-blue': '0 0 20px -5px rgba(59, 130, 246, 0.4)',
+              'glow-orange': '0 0 20px -5px rgba(249, 115, 22, 0.3)',
+              'glow-green': '0 0 20px -5px rgba(16, 185, 129, 0.3)',
+              glass: '0 8px 32px 0 rgba(0, 0, 0, 0.3)',
+              'inner-light': 'inset 0 1px 0 0 rgba(255, 255, 255, 0.05)',
+            },
+            fontSize: {
+              xxs: '0.65rem',
+            },
+          },
+        },
+      };
+    </script>
+
+    <style>
+      /* Base Styles */
+      body {
+        background-color: #020408;
+        color: #94a3b8;
+        overflow: hidden;
+      }
+
+      /* Custom Scrollbar */
+      .custom-scrollbar::-webkit-scrollbar {
+        width: 5px;
+        height: 5px;
+      }
+      .custom-scrollbar::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      .custom-scrollbar::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.08);
+        border-radius: 3px;
+      }
+      .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+        background: rgba(255, 255, 255, 0.15);
+      }
+
+      /* Glassmorphism Utilities */
+      .glass-sidebar {
+        background: rgba(5, 7, 12, 0.6);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border-right: 1px solid rgba(255, 255, 255, 0.03);
+      }
+
+      .glass-header {
+        background: rgba(2, 4, 8, 0.5);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+      }
+
+      .glass-panel {
+        background: rgba(14, 18, 26, 0.4);
+        backdrop-filter: blur(12px);
+        border: 1px solid rgba(255, 255, 255, 0.04);
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+      }
+
+      /* Card Styles */
+      .glass-card {
+        background: linear-gradient(180deg, rgba(30, 35, 45, 0.4) 0%, rgba(15, 20, 30, 0.4) 100%);
+        backdrop-filter: blur(12px);
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        box-shadow:
+          0 4px 6px -1px rgba(0, 0, 0, 0.2),
+          inset 0 1px 0 0 rgba(255, 255, 255, 0.02);
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+
+      .glass-card:hover {
+        background: linear-gradient(180deg, rgba(40, 48, 65, 0.5) 0%, rgba(25, 32, 45, 0.5) 100%);
+        border-color: rgba(255, 255, 255, 0.1);
+        transform: translateY(-2px);
+        box-shadow: 0 10px 20px -5px rgba(0, 0, 0, 0.4);
+      }
+
+      /* Active Card Style (In Progress) */
+      .card-active-blue {
+        background: linear-gradient(180deg, rgba(59, 130, 246, 0.1) 0%, rgba(15, 20, 30, 0.6) 100%);
+        border: 1px solid rgba(59, 130, 246, 0.5);
+        box-shadow: 0 0 20px -5px rgba(59, 130, 246, 0.15);
+      }
+
+      /* Ambient Backgrounds */
+      .ambient-blob {
+        position: fixed;
+        border-radius: 50%;
+        filter: blur(100px);
+        z-index: -1;
+        pointer-events: none;
+      }
+
+      /* The main rainbow glow on the left/bottom */
+      .blob-rainbow {
+        bottom: -25%;
+        left: -15%;
+        width: 1000px;
+        height: 1000px;
+        background: radial-gradient(
+          circle at center,
+          rgba(6, 182, 212, 0.15) 0%,
+          rgba(59, 130, 246, 0.12) 30%,
+          rgba(249, 115, 22, 0.08) 60%,
+          transparent 80%
+        );
+        opacity: 0.8;
+      }
+
+      .blob-top-right {
+        top: -20%;
+        right: -10%;
+        width: 700px;
+        height: 700px;
+        background: radial-gradient(circle, rgba(16, 185, 129, 0.05) 0%, transparent 70%);
+      }
+
+      /* Active Navigation Item */
+      .nav-item-active {
+        background: linear-gradient(90deg, rgba(6, 182, 212, 0.1) 0%, transparent 100%);
+        border-left: 2px solid #06b6d4;
+        color: #22d3ee;
+      }
+
+      /* Toggle Switch */
+      .toggle-switch {
+        width: 28px;
+        height: 16px;
+        background-color: #2d3546;
+        border-radius: 9999px;
+        position: relative;
+        cursor: pointer;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        transition: background-color 0.3s;
+      }
+      .toggle-switch::after {
+        content: '';
+        position: absolute;
+        top: 2px;
+        right: 2px;
+        width: 10px;
+        height: 10px;
+        background-color: #06b6d4;
+        border-radius: 50%;
+        box-shadow: 0 0 6px rgba(6, 182, 212, 0.6);
+      }
+
+      /* Column Top Accents */
+      .col-accent-cyan {
+        border-top: 1px solid rgba(6, 182, 212, 0.4);
+        box-shadow: inset 0 10px 20px -10px rgba(6, 182, 212, 0.05);
+      }
+      .col-accent-blue {
+        border-top: 1px solid rgba(59, 130, 246, 0.4);
+        box-shadow: inset 0 10px 20px -10px rgba(59, 130, 246, 0.05);
+      }
+      .col-accent-orange {
+        border-top: 1px solid rgba(249, 115, 22, 0.4);
+        box-shadow: inset 0 10px 20px -10px rgba(249, 115, 22, 0.05);
+      }
+      .col-accent-green {
+        border-top: 1px solid rgba(16, 185, 129, 0.4);
+        box-shadow: inset 0 10px 20px -10px rgba(16, 185, 129, 0.05);
+      }
+
+      /* Text Truncation */
+      .line-clamp-3 {
+        display: -webkit-box;
+        -webkit-line-clamp: 3;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+      }
+
+      /* Button Animations */
+      .btn-hover-effect {
+        transition: all 0.2s ease;
+      }
+      .btn-hover-effect:hover {
+        transform: translateY(-1px);
+      }
+
+      /* Search Input Focus */
+      .search-input:focus {
+        box-shadow:
+          0 0 0 1px rgba(6, 182, 212, 0.3),
+          0 4px 12px rgba(0, 0, 0, 0.3);
+      }
+    </style>
+  </head>
+  <body
+    class="flex h-screen w-full relative selection:bg-brand-cyan selection:text-black font-sans"
+  >
+    <!-- Ambient Background -->
+    <div class="ambient-blob blob-rainbow"></div>
+    <div class="ambient-blob blob-top-right"></div>
+
+    <!-- Sidebar -->
+    <aside class="w-[260px] flex-shrink-0 flex flex-col glass-sidebar z-30 relative">
+      <!-- Logo -->
+      <div class="h-16 flex items-center px-6 gap-3 flex-shrink-0">
+        <div class="text-brand-cyan relative flex items-center justify-center">
+          <div class="absolute inset-0 bg-brand-cyan blur-md opacity-30"></div>
+          <i data-lucide="code-2" class="w-6 h-6 relative z-10"></i>
+        </div>
+        <span class="text-white font-bold text-lg tracking-tight">automaker.</span>
+        <button class="ml-auto text-slate-600 hover:text-white transition">
+          <i data-lucide="panel-left" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <!-- Top Actions -->
+      <div class="px-5 pb-6 space-y-4 flex-shrink-0">
+        <div class="grid grid-cols-4 gap-2">
+          <button
+            class="col-span-2 bg-dark-850/60 hover:bg-dark-700 text-slate-200 py-2 px-3 rounded-lg border border-white/5 flex items-center justify-center gap-2 transition text-xs font-medium shadow-lg shadow-black/20 group"
+          >
+            <i
+              data-lucide="plus"
+              class="w-3.5 h-3.5 group-hover:text-brand-cyan transition-colors"
+            ></i>
+            New
+          </button>
+          <button
+            class="col-span-1 bg-dark-850/60 hover:bg-dark-700 text-slate-400 hover:text-white py-2 rounded-lg border border-white/5 flex items-center justify-center transition"
+          >
+            <i data-lucide="folder" class="w-3.5 h-3.5"></i>
+            <span class="ml-1 text-[10px]">0</span>
+          </button>
+          <button
+            class="col-span-1 bg-dark-850/60 hover:bg-dark-700 text-slate-400 hover:text-white py-2 rounded-lg border border-white/5 flex items-center justify-center transition relative"
+          >
+            <i data-lucide="bell" class="w-3.5 h-3.5"></i>
+            <span
+              class="absolute top-2 right-2.5 w-1.5 h-1.5 bg-brand-red rounded-full ring-2 ring-dark-850"
+            ></span>
+          </button>
+        </div>
+
+        <!-- Project Selector -->
+        <div
+          class="bg-dark-850/40 border border-white/5 rounded-xl p-1 flex items-center justify-between cursor-pointer hover:border-white/10 hover:bg-dark-850/60 transition group"
+        >
+          <div class="flex items-center gap-3 px-2 py-1.5">
+            <i
+              data-lucide="folder-open"
+              class="w-4 h-4 text-brand-cyan group-hover:text-cyan-300 transition"
+            ></i>
+            <span class="text-white font-medium text-sm">test case 1</span>
+          </div>
+          <div class="flex items-center gap-1 pr-1">
+            <span
+              class="w-5 h-5 rounded bg-dark-700 flex items-center justify-center text-[10px] text-slate-400 font-bold border border-white/5"
+              >P</span
+            >
+            <i data-lucide="more-vertical" class="w-4 h-4 text-slate-500"></i>
+          </div>
+        </div>
+      </div>
+
+      <!-- Navigation -->
+      <div class="flex-1 overflow-y-auto px-0 space-y-6 custom-scrollbar">
+        <!-- Project Section -->
+        <div>
+          <h3
+            class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 px-6 font-mono"
+          >
+            Project
+          </h3>
+          <nav class="space-y-0.5">
+            <a
+              href="#"
+              class="nav-item-active flex items-center justify-between px-6 py-2.5 transition group"
+            >
+              <div class="flex items-center gap-3">
+                <i data-lucide="layout-grid" class="w-4 h-4"></i>
+                <span class="text-sm font-medium">Kanban Board</span>
+              </div>
+              <span
+                class="text-[10px] bg-brand-cyan/10 text-brand-cyan px-1.5 py-0.5 rounded font-mono border border-brand-cyan/20"
+                >L</span
+              >
+            </a>
+            <a
+              href="#"
+              class="flex items-center justify-between px-6 py-2.5 text-slate-400 hover:text-white hover:bg-white/5 transition group border-l-[2px] border-transparent"
+            >
+              <div class="flex items-center gap-3">
+                <i data-lucide="bot" class="w-4 h-4 group-hover:text-slate-300"></i>
+                <span class="text-sm">Agent Runner</span>
+              </div>
+              <span
+                class="text-[10px] bg-dark-700 text-slate-500 px-1.5 py-0.5 rounded font-mono border border-white/5 group-hover:text-slate-300"
+                >A</span
+              >
+            </a>
+          </nav>
+        </div>
+
+        <!-- Tools Section -->
+        <div>
+          <h3
+            class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 px-6 font-mono"
+          >
+            Tools
+          </h3>
+          <nav class="space-y-0.5">
+            <a
+              href="#"
+              class="flex items-center justify-between px-6 py-2.5 text-slate-400 hover:text-white hover:bg-white/5 transition group border-l-[2px] border-transparent"
+            >
+              <div class="flex items-center gap-3">
+                <i data-lucide="file-json" class="w-4 h-4 group-hover:text-slate-300"></i>
+                <span class="text-sm">Spec Editor</span>
+              </div>
+              <span
+                class="text-[10px] bg-dark-700 text-slate-500 px-1.5 py-0.5 rounded font-mono border border-white/5 group-hover:text-slate-300"
+                >D</span
+              >
+            </a>
+            <a
+              href="#"
+              class="flex items-center justify-between px-6 py-2.5 text-slate-400 hover:text-white hover:bg-white/5 transition group border-l-[2px] border-transparent"
+            >
+              <div class="flex items-center gap-3">
+                <i data-lucide="book-open" class="w-4 h-4 group-hover:text-slate-300"></i>
+                <span class="text-sm">Context</span>
+              </div>
+              <span
+                class="text-[10px] bg-dark-700 text-slate-500 px-1.5 py-0.5 rounded font-mono border border-white/5 group-hover:text-slate-300"
+                >C</span
+              >
+            </a>
+            <a
+              href="#"
+              class="flex items-center justify-between px-6 py-2.5 text-slate-400 hover:text-white hover:bg-white/5 transition group border-l-[2px] border-transparent"
+            >
+              <div class="flex items-center gap-3">
+                <i data-lucide="user-circle" class="w-4 h-4 group-hover:text-slate-300"></i>
+                <span class="text-sm">AI Profiles</span>
+              </div>
+              <span
+                class="text-[10px] bg-dark-700 text-slate-500 px-1.5 py-0.5 rounded font-mono border border-white/5 group-hover:text-slate-300"
+                >H</span
+              >
+            </a>
+            <a
+              href="#"
+              class="flex items-center justify-between px-6 py-2.5 text-slate-400 hover:text-white hover:bg-white/5 transition group border-l-[2px] border-transparent"
+            >
+              <div class="flex items-center gap-3">
+                <i data-lucide="terminal-square" class="w-4 h-4 group-hover:text-slate-300"></i>
+                <span class="text-sm">Terminal</span>
+              </div>
+              <span
+                class="text-[10px] bg-dark-700 text-slate-500 px-1.5 py-0.5 rounded font-mono border border-white/5 group-hover:text-slate-300"
+                >T</span
+              >
+            </a>
+          </nav>
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <div
+        class="p-4 border-t border-white/5 space-y-1 bg-dark-900/30 flex-shrink-0 backdrop-blur-sm"
+      >
+        <a
+          href="#"
+          class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition"
+        >
+          <i data-lucide="book" class="w-4 h-4"></i>
+          <span class="text-sm">Wiki</span>
+        </a>
+        <a
+          href="#"
+          class="flex items-center justify-between px-3 py-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition"
+        >
+          <div class="flex items-center gap-3">
+            <i data-lucide="activity" class="w-4 h-4 text-brand-cyan"></i>
+            <span class="text-sm">Running Agents</span>
+          </div>
+          <span
+            class="flex h-5 w-5 items-center justify-center rounded-full bg-brand-cyan text-[10px] text-black font-bold shadow-glow-cyan"
+            >3</span
+          >
+        </a>
+        <a
+          href="#"
+          class="flex items-center justify-between px-3 py-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition"
+        >
+          <div class="flex items-center gap-3">
+            <i data-lucide="settings" class="w-4 h-4"></i>
+            <span class="text-sm">Settings</span>
+          </div>
+          <span
+            class="text-[10px] bg-dark-700 text-slate-500 px-1.5 py-0.5 rounded font-mono border border-white/5"
+            >S</span
+          >
+        </a>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="flex-1 flex flex-col min-w-0 relative z-10">
+      <!-- Header -->
+      <header class="h-16 glass-header flex items-center justify-between px-8 flex-shrink-0 z-20">
+        <div>
+          <h1 class="text-white font-bold text-lg tracking-tight">Kanban Board</h1>
+          <p class="text-xs text-slate-500 font-medium font-mono mt-0.5">test case 1</p>
+        </div>
+
+        <div class="flex items-center gap-4">
+          <!-- User Toggle -->
+          <div
+            class="flex items-center bg-dark-850/60 rounded-lg p-1 border border-white/5 h-9 shadow-inner-light"
+          >
+            <div class="flex items-center gap-3 px-2 border-r border-white/5 h-full mr-2">
+              <i data-lucide="users" class="w-3.5 h-3.5 text-slate-400"></i>
+              <div class="toggle-switch"></div>
+            </div>
+            <span class="text-xs text-slate-400 px-1 font-mono">3</span>
+          </div>
+
+          <!-- Auto Mode -->
+          <button
+            class="flex items-center gap-2 text-slate-300 hover:text-white px-3 py-1.5 rounded-lg border border-white/5 bg-dark-850/60 hover:bg-dark-700 transition text-xs font-medium h-9"
+          >
+            <i data-lucide="play" class="w-3.5 h-3.5 fill-current"></i>
+            <span>Auto Mode</span>
+          </button>
+
+          <!-- Add Feature -->
+          <button
+            class="flex items-center gap-2 bg-brand-cyan hover:bg-cyan-400 text-dark-950 font-bold px-4 py-1.5 rounded-lg transition shadow-glow-cyan text-xs h-9 btn-hover-effect"
+          >
+            <i data-lucide="plus" class="w-4 h-4"></i>
+            <span>Add Feature</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- Search & Filter -->
+      <div class="px-8 py-6 flex items-center justify-between gap-4 flex-shrink-0 z-10">
+        <div class="relative w-[500px] group">
+          <i
+            data-lucide="search"
+            class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-brand-cyan transition-colors"
+          ></i>
+          <input
+            type="text"
+            placeholder="Search features by keyword..."
+            class="search-input w-full bg-dark-850/40 border border-white/5 text-slate-200 text-sm rounded-xl pl-10 pr-12 py-2.5 focus:outline-none focus:border-brand-cyan/30 focus:bg-dark-850/60 transition placeholder-slate-600 shadow-inner"
+          />
+          <div
+            class="absolute right-3 top-1/2 -translate-y-1/2 px-1.5 py-0.5 bg-dark-700 rounded text-[10px] text-slate-500 border border-white/5 font-mono"
+          >
+            /
+          </div>
+        </div>
+        <div class="flex gap-2">
+          <button
+            class="p-2.5 text-slate-400 hover:text-white bg-dark-850/40 border border-white/5 rounded-xl hover:bg-dark-700 transition"
+          >
+            <i data-lucide="layout-template" class="w-4 h-4"></i>
+          </button>
+          <button
+            class="p-2.5 text-slate-400 hover:text-white bg-dark-850/40 border border-white/5 rounded-xl hover:bg-dark-700 transition"
+          >
+            <i data-lucide="trash-2" class="w-4 h-4"></i>
+          </button>
+          <button
+            class="p-2.5 text-slate-400 hover:text-white bg-dark-850/40 border border-white/5 rounded-xl hover:bg-dark-700 transition"
+          >
+            <i data-lucide="maximize-2" class="w-4 h-4"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Kanban Board -->
+      <div class="flex-1 overflow-x-auto overflow-y-hidden px-8 pb-8 z-0 custom-scrollbar">
+        <div class="flex h-full gap-6 min-w-[1200px]">
+          <!-- Column 1: Backlog -->
+          <div class="flex-1 flex flex-col min-w-[300px] glass-panel rounded-2xl col-accent-cyan">
+            <div class="flex items-center justify-between p-4 border-b border-white/5">
+              <div class="flex items-center gap-2">
+                <div class="w-2 h-2 rounded-full bg-slate-400"></div>
+                <span class="font-bold text-slate-200 text-sm">Backlog</span>
+                <div class="flex items-center gap-1.5 ml-2 text-slate-500">
+                  <i data-lucide="lightbulb" class="w-3.5 h-3.5 text-brand-orange/70"></i>
+                  <i data-lucide="git-branch" class="w-3.5 h-3.5 text-brand-cyan/70"></i>
+                  <span class="text-[10px] text-brand-cyan font-mono font-medium">Make</span>
+                </div>
+              </div>
+              <div class="flex items-center gap-2">
+                <span class="text-[10px] text-slate-500 font-mono">6</span>
+                <span
+                  class="text-[10px] bg-dark-700 text-slate-400 px-2 py-0.5 rounded border border-white/5 font-mono"
+                  >47</span
+                >
+              </div>
+            </div>
+
+            <div class="flex-1 overflow-y-auto p-3 space-y-3 custom-scrollbar">
+              <!-- Card -->
+              <div class="glass-card rounded-xl p-4 group relative">
+                <div class="flex justify-between items-start mb-2">
+                  <div class="w-full"></div>
+                  <button
+                    class="text-slate-600 hover:text-brand-red transition opacity-0 group-hover:opacity-100"
+                  >
+                    <i data-lucide="trash" class="w-3.5 h-3.5"></i>
+                  </button>
+                </div>
+                <p
+                  class="text-slate-300 text-sm leading-relaxed mb-4 font-medium -mt-6 line-clamp-3"
+                >
+                  Create a bouncing animation using CSS keyframes that simulates elastic motion...
+                </p>
+
+                <div
+                  class="flex items-center gap-1 text-xxs text-slate-500 mb-4 cursor-pointer hover:text-slate-300 transition w-fit"
+                >
+                  <i data-lucide="chevron-down" class="w-3 h-3"></i> More
+                </div>
+
+                <div class="flex items-center gap-2 mb-4">
+                  <i data-lucide="layers" class="w-3.5 h-3.5 text-brand-cyan"></i>
+                  <span class="text-[10px] text-brand-cyan font-mono">Opus 4.2</span>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2">
+                  <button
+                    class="flex items-center justify-center gap-2 py-2 rounded-lg bg-dark-700/50 hover:bg-dark-600 border border-white/10 text-slate-300 text-xs font-medium transition"
+                  >
+                    <i data-lucide="edit-3" class="w-3.5 h-3.5"></i> Edit
+                  </button>
+                  <button
+                    class="flex items-center justify-center gap-2 py-2 rounded-lg bg-brand-cyan hover:bg-cyan-400 text-dark-950 text-xs font-bold transition shadow-glow-cyan btn-hover-effect"
+                  >
+                    <i data-lucide="play-circle" class="w-3.5 h-3.5"></i> Make
+                  </button>
+                </div>
+              </div>
+
+              <!-- Card -->
+              <div class="glass-card rounded-xl p-4 group relative">
+                <div class="flex justify-between items-start mb-2">
+                  <div class="w-full"></div>
+                  <button
+                    class="text-slate-600 hover:text-brand-red transition opacity-0 group-hover:opacity-100"
+                  >
+                    <i data-lucide="trash" class="w-3.5 h-3.5"></i>
+                  </button>
+                </div>
+                <p
+                  class="text-slate-300 text-sm leading-relaxed mb-4 font-medium -mt-6 line-clamp-3"
+                >
+                  Implement CSS reset rules and establish base styling for the page including
+                  typography...
+                </p>
+
+                <div
+                  class="flex items-center gap-1 text-xxs text-slate-500 mb-4 cursor-pointer hover:text-slate-300 transition w-fit"
+                >
+                  <i data-lucide="chevron-down" class="w-3 h-3"></i> More
+                </div>
+
+                <div class="flex items-center gap-2 mb-4">
+                  <i data-lucide="layers" class="w-3.5 h-3.5 text-brand-cyan"></i>
+                  <span class="text-[10px] text-brand-cyan font-mono">Opus 4.3</span>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2">
+                  <button
+                    class="flex items-center justify-center gap-2 py-2 rounded-lg bg-dark-700/50 hover:bg-dark-600 border border-white/10 text-slate-300 text-xs font-medium transition"
+                  >
+                    <i data-lucide="edit-3" class="w-3.5 h-3.5"></i> Edit
+                  </button>
+                  <button
+                    class="flex items-center justify-center gap-2 py-2 rounded-lg bg-brand-cyan hover:bg-cyan-400 text-dark-950 text-xs font-bold transition shadow-glow-cyan btn-hover-effect"
+                  >
+                    <i data-lucide="play-circle" class="w-3.5 h-3.5"></i> Make
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Column 2: In Progress -->
+          <div
+            class="flex-1 flex flex-col min-w-[300px] glass-panel rounded-2xl col-accent-blue relative overflow-hidden"
+          >
+            <!-- Subtle Glow Top -->
+            <div
+              class="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-brand-blue/10 to-transparent pointer-events-none"
+            ></div>
+
+            <div
+              class="flex items-center justify-between p-4 border-b border-white/5 relative z-10"
+            >
+              <div class="flex items-center gap-2">
+                <div class="w-2 h-2 rounded-full bg-brand-orange shadow-glow-orange"></div>
+                <span class="font-bold text-slate-200 text-sm">In Progress</span>
+              </div>
+              <span
+                class="text-[10px] bg-dark-700 text-slate-400 px-2 py-0.5 rounded border border-white/5 font-medium"
+                >3</span
+              >
+            </div>
+
+            <div class="flex-1 overflow-y-auto p-3 space-y-3 custom-scrollbar relative z-10">
+              <!-- Active Card -->
+              <div class="glass-card card-active-blue rounded-xl p-4 relative">
+                <div class="flex justify-end mb-3">
+                  <div
+                    class="flex items-center gap-2 bg-brand-orange/10 border border-brand-orange/20 rounded px-2 py-0.5"
+                  >
+                    <i data-lucide="loader-2" class="w-3 h-3 text-brand-orange animate-spin"></i>
+                    <span class="text-[10px] text-brand-orange font-mono font-bold">Open 6.5s</span>
+                    <span class="text-[10px] text-slate-500 font-mono border-l border-white/10 pl-2"
+                      >00:45</span
+                    >
+                  </div>
+                </div>
+
+                <p class="text-slate-200 text-sm leading-relaxed mb-4 font-medium line-clamp-3">
+                  Configure the application for deployment to a web hosting platform. Set up
+                  necessary build processes...
+                </p>
+
+                <div
+                  class="flex items-center gap-1 text-xxs text-slate-500 mb-4 cursor-pointer hover:text-slate-300 transition w-fit"
+                >
+                  <i data-lucide="chevron-down" class="w-3 h-3"></i> More
+                </div>
+
+                <div class="flex gap-2">
+                  <button
+                    class="flex-1 flex items-center justify-center gap-2 py-2 rounded-lg bg-brand-blue hover:bg-blue-500 text-white text-xs font-bold transition shadow-glow-blue btn-hover-effect"
+                  >
+                    <i data-lucide="file-text" class="w-3.5 h-3.5"></i> Logs
+                    <span
+                      class="bg-white/20 px-1.5 rounded text-[9px] ml-1 font-mono text-brand-blue"
+                      >1</span
+                    >
+                  </button>
+                  <button
+                    class="w-10 flex items-center justify-center rounded-lg bg-brand-red hover:bg-red-500 text-white transition shadow-lg shadow-red-500/20 btn-hover-effect"
+                  >
+                    <i data-lucide="square" class="w-3.5 h-3.5 fill-current"></i>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Active Card -->
+              <div class="glass-card card-active-blue rounded-xl p-4 relative">
+                <div class="flex justify-end mb-3">
+                  <div
+                    class="flex items-center gap-2 bg-brand-orange/10 border border-brand-orange/20 rounded px-2 py-0.5"
+                  >
+                    <i data-lucide="loader-2" class="w-3 h-3 text-brand-orange animate-spin"></i>
+                    <span class="text-[10px] text-brand-orange font-mono font-bold">Opus 4.5s</span>
+                    <span class="text-[10px] text-slate-500 font-mono border-l border-white/10 pl-2"
+                      >01:12</span
+                    >
+                  </div>
+                </div>
+
+                <p class="text-slate-200 text-sm leading-relaxed mb-4 font-medium line-clamp-3">
+                  Create helper functions for selecting and querying DOM elements. Provide reusable
+                  utilities...
+                </p>
+
+                <div
+                  class="flex items-center gap-1 text-xxs text-slate-500 mb-4 cursor-pointer hover:text-slate-300 transition w-fit"
+                >
+                  <i data-lucide="chevron-down" class="w-3 h-3"></i> More
+                </div>
+
+                <div class="flex gap-2">
+                  <button
+                    class="flex-1 flex items-center justify-center gap-2 py-2 rounded-lg bg-brand-blue hover:bg-blue-500 text-white text-xs font-bold transition shadow-glow-blue btn-hover-effect"
+                  >
+                    <i data-lucide="file-text" class="w-3.5 h-3.5"></i> Logs
+                    <span
+                      class="bg-white/20 px-1.5 rounded text-[9px] ml-1 font-mono text-brand-blue"
+                      >2</span
+                    >
+                  </button>
+                  <button
+                    class="w-10 flex items-center justify-center rounded-lg bg-brand-red hover:bg-red-500 text-white transition shadow-lg shadow-red-500/20 btn-hover-effect"
+                  >
+                    <i data-lucide="square" class="w-3.5 h-3.5 fill-current"></i>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Active Card -->
+              <div class="glass-card card-active-blue rounded-xl p-4 relative">
+                <div class="flex justify-end mb-3">
+                  <div
+                    class="flex items-center gap-2 bg-brand-orange/10 border border-brand-orange/20 rounded px-2 py-0.5"
+                  >
+                    <i data-lucide="loader-2" class="w-3 h-3 text-brand-orange animate-spin"></i>
+                    <span class="text-[10px] text-brand-orange font-mono font-bold">Opus 8.5s</span>
+                    <span class="text-[10px] text-slate-500 font-mono border-l border-white/10 pl-2"
+                      >00:02</span
+                    >
+                  </div>
+                </div>
+
+                <p class="text-slate-200 text-sm leading-relaxed mb-4 font-medium line-clamp-3">
+                  Create controls to adjust animation duration separately from speed. Enable
+                  fine-tuned control...
+                </p>
+
+                <div
+                  class="flex items-center gap-1 text-xxs text-slate-500 mb-4 cursor-pointer hover:text-slate-300 transition w-fit"
+                >
+                  <i data-lucide="chevron-down" class="w-3 h-3"></i> More
+                </div>
+
+                <div class="flex gap-2">
+                  <button
+                    class="flex-1 flex items-center justify-center gap-2 py-2 rounded-lg bg-brand-blue hover:bg-blue-500 text-white text-xs font-bold transition shadow-glow-blue btn-hover-effect"
+                  >
+                    <i data-lucide="file-text" class="w-3.5 h-3.5"></i> Logs
+                    <span
+                      class="bg-white/20 px-1.5 rounded text-[9px] ml-1 font-mono text-brand-blue"
+                      >3</span
+                    >
+                  </button>
+                  <button
+                    class="w-10 flex items-center justify-center rounded-lg bg-brand-red hover:bg-red-500 text-white transition shadow-lg shadow-red-500/20 btn-hover-effect"
+                  >
+                    <i data-lucide="square" class="w-3.5 h-3.5 fill-current"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Column 3: Waiting Approval -->
+          <div
+            class="flex-1 flex flex-col min-w-[300px] glass-panel rounded-2xl col-accent-orange relative overflow-hidden"
+          >
+            <div
+              class="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-brand-orange/10 to-transparent pointer-events-none"
+            ></div>
+
+            <div
+              class="flex items-center justify-between p-4 border-b border-white/5 relative z-10"
+            >
+              <div class="flex items-center gap-2">
+                <div class="w-2 h-2 rounded-full bg-brand-orange shadow-glow-orange"></div>
+                <span class="font-bold text-slate-200 text-sm">Waiting Approval</span>
+              </div>
+              <span
+                class="text-[10px] bg-dark-700 text-slate-400 px-2 py-0.5 rounded border border-white/5 font-medium"
+                >2</span
+              >
+            </div>
+
+            <div class="flex-1 overflow-y-auto p-3 space-y-3 custom-scrollbar relative z-10">
+              <!-- Card -->
+              <div class="glass-card rounded-xl p-4 group relative">
+                <div
+                  class="flex justify-end gap-2 mb-2 opacity-0 group-hover:opacity-100 transition"
+                >
+                  <button class="text-slate-500 hover:text-white">
+                    <i data-lucide="file-edit" class="w-3.5 h-3.5"></i>
+                  </button>
+                  <button class="text-slate-500 hover:text-white">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                  </button>
+                  <button class="text-slate-500 hover:text-brand-red">
+                    <i data-lucide="trash" class="w-3.5 h-3.5"></i>
+                  </button>
+                </div>
+                <p
+                  class="text-slate-300 text-sm leading-relaxed mb-4 font-medium -mt-6 line-clamp-3"
+                >
+                  Add descriptive labels and titles for each button animation style to identify them
+                  visually...
+                </p>
+
+                <div
+                  class="flex items-center gap-1 text-xxs text-slate-500 mb-4 cursor-pointer hover:text-slate-300 transition w-fit"
+                >
+                  <i data-lucide="chevron-down" class="w-3 h-3"></i> More
+                </div>
+
+                <div class="grid grid-cols-2 gap-2">
+                  <button
+                    class="flex items-center justify-center gap-2 py-2 rounded-lg bg-dark-700/50 hover:bg-dark-600 border border-white/10 text-slate-300 text-xs font-medium transition"
+                  >
+                    <i data-lucide="wrench" class="w-3.5 h-3.5"></i> Refine
+                  </button>
+                  <button
+                    class="flex items-center justify-center gap-2 py-2 rounded-lg bg-brand-cyan hover:bg-cyan-400 text-dark-950 text-xs font-bold transition shadow-glow-cyan btn-hover-effect"
+                  >
+                    <i data-lucide="git-commit-horizontal" class="w-3.5 h-3.5"></i> Commit
+                  </button>
+                </div>
+              </div>
+
+              <!-- Card -->
+              <div class="glass-card rounded-xl p-4 group relative">
+                <div
+                  class="flex justify-end gap-2 mb-2 opacity-0 group-hover:opacity-100 transition"
+                >
+                  <button class="text-slate-500 hover:text-white">
+                    <i data-lucide="file-edit" class="w-3.5 h-3.5"></i>
+                  </button>
+                  <button class="text-slate-500 hover:text-white">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                  </button>
+                  <button class="text-slate-500 hover:text-brand-red">
+                    <i data-lucide="trash" class="w-3.5 h-3.5"></i>
+                  </button>
+                </div>
+                <p
+                  class="text-slate-300 text-sm leading-relaxed mb-4 font-medium -mt-6 line-clamp-3"
+                >
+                  Implement JavaScript logic to replay animations on demand by removing and
+                  re-applying...
+                </p>
+
+                <div
+                  class="flex items-center gap-1 text-xxs text-slate-500 mb-4 cursor-pointer hover:text-slate-300 transition w-fit"
+                >
+                  <i data-lucide="chevron-down" class="w-3 h-3"></i> More
+                </div>
+
+                <div class="grid grid-cols-2 gap-2">
+                  <button
+                    class="flex items-center justify-center gap-2 py-2 rounded-lg bg-dark-700/50 hover:bg-dark-600 border border-white/10 text-slate-300 text-xs font-medium transition"
+                  >
+                    <i data-lucide="wrench" class="w-3.5 h-3.5"></i> Refine
+                  </button>
+                  <button
+                    class="flex items-center justify-center gap-2 py-2 rounded-lg bg-brand-cyan hover:bg-cyan-400 text-dark-950 text-xs font-bold transition shadow-glow-cyan btn-hover-effect"
+                  >
+                    <i data-lucide="git-commit-horizontal" class="w-3.5 h-3.5"></i> Commit
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Column 4: Verified -->
+          <div
+            class="flex-1 flex flex-col min-w-[300px] glass-panel rounded-2xl col-accent-green relative overflow-hidden"
+          >
+            <div
+              class="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-brand-green/10 to-transparent pointer-events-none"
+            ></div>
+
+            <div
+              class="flex items-center justify-between p-4 border-b border-white/5 relative z-10"
+            >
+              <div class="flex items-center gap-2">
+                <div class="w-2 h-2 rounded-full bg-brand-green shadow-glow-green"></div>
+                <span class="font-bold text-slate-200 text-sm">Verified</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <button
+                  class="text-[10px] text-brand-red bg-brand-red/10 px-2 py-0.5 rounded border border-brand-red/20 flex items-center gap-1 hover:bg-brand-red/20 transition"
+                >
+                  <i data-lucide="trash-2" class="w-3 h-3"></i> Delete All
+                </button>
+                <span
+                  class="text-[10px] bg-dark-700 text-slate-400 px-2 py-0.5 rounded border border-white/5 font-medium"
+                  >4</span
+                >
+              </div>
+            </div>
+
+            <div class="flex-1 overflow-y-auto p-3 space-y-3 custom-scrollbar relative z-10">
+              <!-- Card -->
+              <div
+                class="glass-card rounded-xl p-4 group relative opacity-80 hover:opacity-100 transition-opacity"
+              >
+                <div
+                  class="flex justify-end gap-2 mb-2 opacity-0 group-hover:opacity-100 transition"
+                >
+                  <button class="text-slate-500 hover:text-white">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                  </button>
+                  <button class="text-slate-500 hover:text-brand-red">
+                    <i data-lucide="trash" class="w-3.5 h-3.5"></i>
+                  </button>
+                </div>
+                <p
+                  class="text-slate-300 text-sm leading-relaxed mb-4 font-medium -mt-6 line-clamp-3"
+                >
+                  Define foundational button styles with padding, borders, border-radius, and
+                  default colors...
+                </p>
+
+                <div
+                  class="flex items-center gap-1 text-xxs text-slate-500 mb-4 cursor-pointer hover:text-slate-300 transition w-fit"
+                >
+                  <i data-lucide="chevron-down" class="w-3 h-3"></i> More
+                </div>
+
+                <div class="grid grid-cols-2 gap-2">
+                  <button
+                    class="flex items-center justify-center gap-2 py-2 rounded-lg bg-dark-700/50 hover:bg-dark-600 border border-white/10 text-slate-300 text-xs font-medium transition"
+                  >
+                    <i data-lucide="file-text" class="w-3.5 h-3.5"></i> Logs
+                  </button>
+                  <button
+                    class="flex items-center justify-center gap-2 py-2 rounded-lg bg-brand-cyan hover:bg-cyan-400 text-dark-950 text-xs font-bold transition shadow-glow-cyan btn-hover-effect"
+                  >
+                    <i data-lucide="archive" class="w-3.5 h-3.5"></i> Complete
+                  </button>
+                </div>
+              </div>
+
+              <!-- Card -->
+              <div
+                class="glass-card rounded-xl p-4 group relative opacity-80 hover:opacity-100 transition-opacity"
+              >
+                <div
+                  class="flex justify-end gap-2 mb-2 opacity-0 group-hover:opacity-100 transition"
+                >
+                  <button class="text-slate-500 hover:text-white">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                  </button>
+                  <button class="text-slate-500 hover:text-brand-red">
+                    <i data-lucide="trash" class="w-3.5 h-3.5"></i>
+                  </button>
+                </div>
+                <p
+                  class="text-slate-300 text-sm leading-relaxed mb-4 font-medium -mt-6 line-clamp-3"
+                >
+                  Implement click event listeners for all buttons to trigger animations on demand.
+                  Handle...
+                </p>
+
+                <div
+                  class="flex items-center gap-1 text-xxs text-slate-500 mb-4 cursor-pointer hover:text-slate-300 transition w-fit"
+                >
+                  <i data-lucide="chevron-down" class="w-3 h-3"></i> More
+                </div>
+
+                <div class="grid grid-cols-2 gap-2">
+                  <button
+                    class="flex items-center justify-center gap-2 py-2 rounded-lg bg-dark-700/50 hover:bg-dark-600 border border-white/10 text-slate-300 text-xs font-medium transition"
+                  >
+                    <i data-lucide="file-text" class="w-3.5 h-3.5"></i> Logs
+                  </button>
+                  <button
+                    class="flex items-center justify-center gap-2 py-2 rounded-lg bg-brand-cyan hover:bg-cyan-400 text-dark-950 text-xs font-bold transition shadow-glow-cyan btn-hover-effect"
+                  >
+                    <i data-lucide="archive" class="w-3.5 h-3.5"></i> Complete
+                  </button>
+                </div>
+              </div>
+
+              <!-- Card -->
+              <div
+                class="glass-card rounded-xl p-4 group relative opacity-80 hover:opacity-100 transition-opacity"
+              >
+                <div
+                  class="flex justify-end gap-2 mb-2 opacity-0 group-hover:opacity-100 transition"
+                >
+                  <button class="text-slate-500 hover:text-white">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                  </button>
+                  <button class="text-slate-500 hover:text-brand-red">
+                    <i data-lucide="trash" class="w-3.5 h-3.5"></i>
+                  </button>
+                </div>
+                <p
+                  class="text-slate-300 text-sm leading-relaxed mb-4 font-medium -mt-6 line-clamp-3"
+                >
+                  Add JavaScript logic to manage hover states for buttons with mouseenter/mouseleave
+                  events...
+                </p>
+
+                <div
+                  class="flex items-center gap-1 text-xxs text-slate-500 mb-4 cursor-pointer hover:text-slate-300 transition w-fit"
+                >
+                  <i data-lucide="chevron-down" class="w-3 h-3"></i> More
+                </div>
+
+                <div class="grid grid-cols-2 gap-2">
+                  <button
+                    class="flex items-center justify-center gap-2 py-2 rounded-lg bg-dark-700/50 hover:bg-dark-600 border border-white/10 text-slate-300 text-xs font-medium transition"
+                  >
+                    <i data-lucide="file-text" class="w-3.5 h-3.5"></i> Logs
+                  </button>
+                  <button
+                    class="flex items-center justify-center gap-2 py-2 rounded-lg bg-brand-cyan hover:bg-cyan-400 text-dark-950 text-xs font-bold transition shadow-glow-cyan btn-hover-effect"
+                  >
+                    <i data-lucide="archive" class="w-3.5 h-3.5"></i> Complete
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <script>
+      // Initialize Lucide Icons
+      lucide.createIcons();
+    </script>
+  </body>
+</html>

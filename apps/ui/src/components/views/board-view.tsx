@@ -17,7 +17,8 @@ import { useAutoMode } from '@/hooks/use-auto-mode';
 import { useKeyboardShortcutsConfig } from '@/hooks/use-keyboard-shortcuts';
 import { useWindowState } from '@/hooks/use-window-state';
 // Board-view specific imports
-import { BoardHeader } from './board-view/board-header';
+import { TopHeader } from '@/components/layout/top-header';
+// BoardHeader removed
 import { BoardSearchBar } from './board-view/board-search-bar';
 import { BoardControls } from './board-view/board-controls';
 import { KanbanBoard } from './board-view/kanban-board';
@@ -263,9 +264,9 @@ export function BoardView() {
   // Calculate unarchived card counts per branch
   const branchCardCounts = useMemo(() => {
     return hookFeatures.reduce(
-      (counts, feature) => {
+      (counts: Record<string, number>, feature) => {
         if (feature.status !== 'completed') {
-          const branch = feature.branchName ?? 'main';
+          const branch = (feature.branchName as string) ?? 'main';
           counts[branch] = (counts[branch] || 0) + 1;
         }
         return counts;
@@ -918,27 +919,8 @@ export function BoardView() {
       data-testid="board-view"
     >
       {/* Header */}
-      <BoardHeader
-        projectName={currentProject.name}
-        maxConcurrency={maxConcurrency}
-        runningAgentsCount={runningAutoTasks.length}
-        onConcurrencyChange={setMaxConcurrency}
-        isAutoModeRunning={autoMode.isRunning}
-        onAutoModeToggle={(enabled) => {
-          if (enabled) {
-            autoMode.start();
-          } else {
-            autoMode.stop();
-          }
-        }}
-        onAddFeature={() => setShowAddDialog(true)}
-        addFeatureShortcut={{
-          key: shortcuts.addFeature,
-          action: () => setShowAddDialog(true),
-          description: 'Add new feature',
-        }}
-        isMounted={isMounted}
-      />
+      {/* Top Header */}
+      <TopHeader />
 
       {/* Worktree Panel */}
       <WorktreePanel

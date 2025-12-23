@@ -1,1127 +1,168 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
 
-/* Dark themes */
-@custom-variant dark (&:is(.dark *));
-@custom-variant retro (&:is(.retro *));
-@custom-variant dracula (&:is(.dracula *));
-@custom-variant nord (&:is(.nord *));
-@custom-variant monokai (&:is(.monokai *));
-@custom-variant tokyonight (&:is(.tokyonight *));
-@custom-variant solarized (&:is(.solarized *));
-@custom-variant gruvbox (&:is(.gruvbox *));
-@custom-variant catppuccin (&:is(.catppuccin *));
-@custom-variant onedark (&:is(.onedark *));
-@custom-variant synthwave (&:is(.synthwave *));
-@custom-variant red (&:is(.red *));
-@custom-variant sunset (&:is(.sunset *));
-@custom-variant gray (&:is(.gray *));
-@custom-variant forest (&:is(.forest *));
-@custom-variant ocean (&:is(.ocean *));
-
-/* Light themes */
-@custom-variant cream (&:is(.cream *));
-@custom-variant solarizedlight (&:is(.solarizedlight *));
-@custom-variant github (&:is(.github *));
-@custom-variant paper (&:is(.paper *));
-@custom-variant rose (&:is(.rose *));
-@custom-variant mint (&:is(.mint *));
-@custom-variant lavender (&:is(.lavender *));
-@custom-variant sand (&:is(.sand *));
-@custom-variant sky (&:is(.sky *));
-@custom-variant peach (&:is(.peach *));
-@custom-variant snow (&:is(.snow *));
-@custom-variant sepia (&:is(.sepia *));
-@custom-variant gruvboxlight (&:is(.gruvboxlight *));
-@custom-variant nordlight (&:is(.nordlight *));
-@custom-variant blossom (&:is(.blossom *));
-
-@theme inline {
-  --color-background: var(--background);
-  --color-background-50: var(--background-50);
-  --color-background-80: var(--background-80);
-  --color-foreground: var(--foreground);
-  --color-foreground-secondary: var(--foreground-secondary);
-  --color-foreground-muted: var(--foreground-muted);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-
-  /* Sidebar colors */
-  --color-sidebar-ring: var(--sidebar-ring);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar: var(--sidebar);
-
-  /* Chart colors */
-  --color-chart-5: var(--chart-5);
-  --color-chart-4: var(--chart-4);
-  --color-chart-3: var(--chart-3);
-  --color-chart-2: var(--chart-2);
-  --color-chart-1: var(--chart-1);
-
-  /* UI element colors */
-  --color-ring: var(--ring);
-  --color-input: var(--input);
-  --color-border: var(--border);
-  --color-border-glass: var(--border-glass);
-  --color-destructive: var(--destructive);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-accent: var(--accent);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-muted: var(--muted);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-secondary: var(--secondary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-primary: var(--primary);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-popover: var(--popover);
-  --color-card-foreground: var(--card-foreground);
-  --color-card: var(--card);
-
-  /* Brand colors */
-  --color-brand-400: var(--brand-400);
-  --color-brand-500: var(--brand-500);
-  --color-brand-600: var(--brand-600);
-
-  /* Action button colors */
-  --color-action-view: var(--action-view);
-  --color-action-view-hover: var(--action-view-hover);
-  --color-action-followup: var(--action-followup);
-  --color-action-followup-hover: var(--action-followup-hover);
-  --color-action-commit: var(--action-commit);
-  --color-action-commit-hover: var(--action-commit-hover);
-  --color-action-verify: var(--action-verify);
-  --color-action-verify-hover: var(--action-verify-hover);
-
-  /* Running task indicator colors */
-  --color-running-indicator: var(--running-indicator);
-  --color-running-indicator-text: var(--running-indicator-text);
-
-  /* Status colors */
-  --color-status-success: var(--status-success);
-  --color-status-success-bg: var(--status-success-bg);
-  --color-status-warning: var(--status-warning);
-  --color-status-warning-bg: var(--status-warning-bg);
-  --color-status-error: var(--status-error);
-  --color-status-error-bg: var(--status-error-bg);
-  --color-status-info: var(--status-info);
-  --color-status-info-bg: var(--status-info-bg);
-  --color-status-backlog: var(--status-backlog);
-  --color-status-in-progress: var(--status-in-progress);
-  --color-status-waiting: var(--status-waiting);
-
-  /* Border radius */
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
-}
-
-:root {
-  /* Default to light mode */
-  --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
-  --background-50: oklch(1 0 0 / 0.5);
-  --background-80: oklch(1 0 0 / 0.8);
-  --foreground-secondary: oklch(0.4 0 0);
-  --foreground-muted: oklch(0.556 0 0);
-  --border-glass: oklch(0.145 0 0 / 0.1);
-  --brand-400: oklch(0.6 0.22 265);
-  --brand-500: oklch(0.55 0.25 265);
-  --brand-600: oklch(0.5 0.28 270);
-
-  /* Action button colors - Light mode */
-  --action-view: oklch(0.55 0.25 265); /* Purple */
-  --action-view-hover: oklch(0.5 0.28 270);
-  --action-followup: oklch(0.55 0.2 230); /* Blue */
-  --action-followup-hover: oklch(0.5 0.22 230);
-  --action-commit: oklch(0.55 0.2 140); /* Green */
-  --action-commit-hover: oklch(0.5 0.22 140);
-  --action-verify: oklch(0.55 0.2 140); /* Green */
-  --action-verify-hover: oklch(0.5 0.22 140);
-
-  /* Running indicator - Purple */
-  --running-indicator: oklch(0.55 0.25 265);
-  --running-indicator-text: oklch(0.6 0.22 265);
-
-  /* Status colors - Light mode */
-  --status-success: oklch(0.55 0.2 140);
-  --status-success-bg: oklch(0.55 0.2 140 / 0.15);
-  --status-warning: oklch(0.7 0.15 70);
-  --status-warning-bg: oklch(0.7 0.15 70 / 0.15);
-  --status-error: oklch(0.55 0.22 25);
-  --status-error-bg: oklch(0.55 0.22 25 / 0.15);
-  --status-info: oklch(0.55 0.2 230);
-  --status-info-bg: oklch(0.55 0.2 230 / 0.15);
-  --status-backlog: oklch(0.5 0 0);
-  --status-in-progress: oklch(0.7 0.15 70);
-  --status-waiting: oklch(0.65 0.18 50);
-
-  /* Shadow tokens */
-  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.05);
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-
-  /* Transition tokens */
-  --transition-fast: 150ms ease;
-  --transition-normal: 200ms ease;
-  --transition-slow: 300ms ease-out;
-}
-
-/* Apply dark mode immediately based on system preference (before JS runs) */
-@media (prefers-color-scheme: dark) {
-  :root {
-    /* Deep dark backgrounds - zinc-950 family */
-    --background: oklch(0.04 0 0); /* zinc-950 */
-    --background-50: oklch(0.04 0 0 / 0.5); /* zinc-950/50 */
-    --background-80: oklch(0.04 0 0 / 0.8); /* zinc-950/80 */
-
-    /* Text colors following hierarchy */
-    --foreground: oklch(1 0 0); /* text-white */
-    --foreground-secondary: oklch(0.588 0 0); /* text-zinc-400 */
-    --foreground-muted: oklch(0.525 0 0); /* text-zinc-500 */
-
-    /* Card and popover backgrounds */
-    --card: oklch(0.14 0 0);
-    --card-foreground: oklch(1 0 0);
-    --popover: oklch(0.1 0 0);
-    --popover-foreground: oklch(1 0 0);
-
-    /* Brand colors - purple/violet theme */
-    --primary: oklch(0.55 0.25 265);
-    --primary-foreground: oklch(1 0 0);
-    --brand-400: oklch(0.6 0.22 265);
-    --brand-500: oklch(0.55 0.25 265);
-    --brand-600: oklch(0.5 0.28 270);
-
-    /* Glass morphism borders and accents */
-    --secondary: oklch(1 0 0 / 0.05);
-    --secondary-foreground: oklch(1 0 0);
-    --muted: oklch(0.176 0 0);
-    --muted-foreground: oklch(0.588 0 0);
-    --accent: oklch(1 0 0 / 0.1);
-    --accent-foreground: oklch(1 0 0);
-
-    /* Borders with transparency for glass effect */
-    --border: oklch(0.176 0 0);
-    --border-glass: oklch(1 0 0 / 0.1);
-    --destructive: oklch(0.6 0.25 25);
-    --input: oklch(0.04 0 0 / 0.8);
-    --ring: oklch(0.55 0.25 265);
-
-    /* Chart colors with brand theme */
-    --chart-1: oklch(0.55 0.25 265);
-    --chart-2: oklch(0.65 0.2 160);
-    --chart-3: oklch(0.75 0.2 70);
-    --chart-4: oklch(0.6 0.25 300);
-    --chart-5: oklch(0.6 0.25 20);
-
-    /* Sidebar with glass morphism */
-    --sidebar: oklch(0.04 0 0 / 0.5);
-    --sidebar-foreground: oklch(1 0 0);
-    --sidebar-primary: oklch(0.55 0.25 265);
-    --sidebar-primary-foreground: oklch(1 0 0);
-    --sidebar-accent: oklch(1 0 0 / 0.05);
-    --sidebar-accent-foreground: oklch(1 0 0);
-    --sidebar-border: oklch(1 0 0 / 0.1);
-    --sidebar-ring: oklch(0.55 0.25 265);
-
-    /* Action button colors */
-    --action-view: oklch(0.6 0.25 265);
-    --action-view-hover: oklch(0.55 0.27 270);
-    --action-followup: oklch(0.6 0.2 230);
-    --action-followup-hover: oklch(0.55 0.22 230);
-    --action-commit: oklch(0.55 0.2 140);
-    --action-commit-hover: oklch(0.5 0.22 140);
-    --action-verify: oklch(0.55 0.2 140);
-    --action-verify-hover: oklch(0.5 0.22 140);
-
-    /* Running indicator - Purple */
-    --running-indicator: oklch(0.6 0.25 265);
-    --running-indicator-text: oklch(0.65 0.22 265);
-
-    /* Status colors - Dark mode */
-    --status-success: oklch(0.65 0.2 140);
-    --status-success-bg: oklch(0.65 0.2 140 / 0.2);
-    --status-warning: oklch(0.75 0.15 70);
-    --status-warning-bg: oklch(0.75 0.15 70 / 0.2);
-    --status-error: oklch(0.65 0.22 25);
-    --status-error-bg: oklch(0.65 0.22 25 / 0.2);
-    --status-info: oklch(0.65 0.2 230);
-    --status-info-bg: oklch(0.65 0.2 230 / 0.2);
-    --status-backlog: oklch(0.6 0 0);
-    --status-in-progress: oklch(0.75 0.15 70);
-    --status-waiting: oklch(0.7 0.18 50);
-
-    /* Shadow tokens - darker for dark mode */
-    --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.3);
-    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(0, 0, 0, 0.3);
-    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -1px rgba(0, 0, 0, 0.3);
-    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -2px rgba(0, 0, 0, 0.2);
-    --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.3);
-  }
-}
-
-.light {
-  /* Explicit light mode - same as root but ensures it overrides any dark defaults */
-  --background: oklch(1 0 0); /* White */
-  --background-50: oklch(1 0 0 / 0.5);
-  --background-80: oklch(1 0 0 / 0.8);
-  --foreground: oklch(0.145 0 0); /* Dark text */
-  --foreground-secondary: oklch(0.4 0 0);
-  --foreground-muted: oklch(0.556 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.55 0.25 265);
-  --primary-foreground: oklch(1 0 0);
-  --brand-400: oklch(0.6 0.22 265);
-  --brand-500: oklch(0.55 0.25 265);
-  --brand-600: oklch(0.5 0.28 270);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.95 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --border-glass: oklch(0.145 0 0 / 0.1);
-  --input: oklch(1 0 0);
-  --ring: oklch(0.55 0.25 265);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: oklch(0.98 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.55 0.25 265);
-  --sidebar-primary-foreground: oklch(1 0 0);
-  --sidebar-accent: oklch(0.95 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.9 0 0);
-  --sidebar-ring: oklch(0.55 0.25 265);
-
-  /* Action button colors */
-  --action-view: oklch(0.55 0.25 265); /* Purple */
-  --action-view-hover: oklch(0.5 0.28 270);
-  --action-followup: oklch(0.55 0.2 230); /* Blue */
-  --action-followup-hover: oklch(0.5 0.22 230);
-  --action-commit: oklch(0.55 0.2 140); /* Green */
-  --action-commit-hover: oklch(0.5 0.22 140);
-  --action-verify: oklch(0.55 0.2 140); /* Green */
-  --action-verify-hover: oklch(0.5 0.22 140);
-
-  /* Running indicator - Purple */
-  --running-indicator: oklch(0.55 0.25 265);
-  --running-indicator-text: oklch(0.6 0.22 265);
-}
-
-@layer base {
-  * {
-    @apply border-border outline-ring/50;
-  }
-  html {
-    @apply bg-background;
-  }
-  body {
-    @apply bg-background text-foreground;
-    background-color: var(--background);
-  }
-
-  /* Ensure all clickable elements show pointer cursor */
-  button:not(:disabled),
-  [role='button']:not([aria-disabled='true']),
-  a[href],
-  input[type='button']:not(:disabled),
-  input[type='submit']:not(:disabled),
-  input[type='reset']:not(:disabled),
-  select:not(:disabled),
-  [tabindex]:not([tabindex='-1']):not(:disabled) {
-    cursor: pointer;
-  }
-
-  /* Disabled elements should show not-allowed cursor */
-  button:disabled,
-  [role='button'][aria-disabled='true'],
-  input:disabled,
-  select:disabled,
-  textarea:disabled {
-    cursor: not-allowed;
-  }
-}
-
-/* Custom scrollbar for dark themes */
-:is(
-    .dark,
-    .retro,
-    .dracula,
-    .nord,
-    .monokai,
-    .tokyonight,
-    .solarized,
-    .gruvbox,
-    .catppuccin,
-    .onedark,
-    .synthwave,
-    .red,
-    .sunset,
-    .gray
-  )
-  ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-
-:is(
-    .dark,
-    .retro,
-    .dracula,
-    .nord,
-    .monokai,
-    .tokyonight,
-    .solarized,
-    .gruvbox,
-    .catppuccin,
-    .onedark,
-    .synthwave,
-    .red,
-    .sunset,
-    .gray
-  )
-  ::-webkit-scrollbar-track {
-  background: var(--muted);
-}
-
-:is(.dark, .retro) ::-webkit-scrollbar-thumb {
-  background: oklch(0.3 0 0);
-  border-radius: 4px;
-}
-
-:is(.dark, .retro) ::-webkit-scrollbar-thumb:hover {
-  background: oklch(0.4 0 0);
-}
-
-/* Retro Scrollbar override */
-.retro ::-webkit-scrollbar-thumb {
-  background: var(--primary);
-  border-radius: 0;
-}
-.retro ::-webkit-scrollbar-track {
-  background: var(--background);
-}
-
-/* Red theme scrollbar */
-.red ::-webkit-scrollbar-thumb {
-  background: oklch(0.35 0.15 25);
-  border-radius: 4px;
-}
-
-.red ::-webkit-scrollbar-thumb:hover {
-  background: oklch(0.45 0.18 25);
-}
-
-.red ::-webkit-scrollbar-track {
-  background: oklch(0.15 0.05 25);
-}
-
-/* Always visible scrollbar for file diffs and code blocks */
-.scrollbar-visible {
-  overflow-y: auto !important;
-  scrollbar-width: thin;
-  scrollbar-color: var(--muted-foreground) var(--muted);
-}
-
-.scrollbar-visible::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-
-.scrollbar-visible::-webkit-scrollbar-track {
-  background: var(--muted);
-  border-radius: 4px;
-}
-
-.scrollbar-visible::-webkit-scrollbar-thumb {
-  background: var(--muted-foreground);
-  border-radius: 4px;
-  min-height: 40px;
-}
-
-.scrollbar-visible::-webkit-scrollbar-thumb:hover {
-  background: var(--foreground-secondary);
-}
-
-/* Force scrollbar to always be visible (not auto-hide) */
-.scrollbar-visible::-webkit-scrollbar-thumb {
-  visibility: visible;
-}
-
-/* Styled scrollbar for code blocks and log entries (horizontal/vertical) */
-.scrollbar-styled {
-  scrollbar-width: thin;
-  scrollbar-color: var(--muted-foreground) transparent;
-}
-
-.scrollbar-styled::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-
-.scrollbar-styled::-webkit-scrollbar-track {
-  background: transparent;
-  border-radius: 3px;
-}
-
-.scrollbar-styled::-webkit-scrollbar-thumb {
-  background: oklch(0.35 0 0);
-  border-radius: 3px;
-}
-
-.scrollbar-styled::-webkit-scrollbar-thumb:hover {
-  background: oklch(0.45 0 0);
-}
-
-/* Glass morphism utilities */
-@layer utilities {
-  .glass {
-    @apply backdrop-blur-md border-white/10;
-  }
-
-  .glass-subtle {
-    @apply backdrop-blur-sm border-white/5;
-  }
-
-  .glass-strong {
-    @apply backdrop-blur-xl border-white/20;
-  }
-
-  /* Text color hierarchy utilities */
-  .text-primary-white {
-    color: oklch(1 0 0);
-  }
-
-  .text-secondary {
-    color: oklch(0.588 0 0); /* zinc-400 equivalent */
-  }
-
-  .text-muted {
-    color: oklch(0.525 0 0); /* zinc-500 equivalent */
-  }
-
-  /* Brand gradient utilities */
-  .gradient-brand {
-    background: linear-gradient(135deg, oklch(0.55 0.25 265), oklch(0.5 0.28 270));
-  }
-
-  .gradient-brand-subtle {
-    background: linear-gradient(135deg, oklch(0.55 0.25 265 / 0.1), oklch(0.5 0.28 270 / 0.1));
-  }
-
-  /* Glass morphism background utilities */
-  .bg-glass {
-    background: var(--card);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-  }
-
-  .bg-glass-80 {
-    background: var(--popover);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-  }
-
-  /* Hover state utilities */
-  .hover-glass {
-    transition: background-color 0.2s ease;
-  }
-
-  .hover-glass:hover {
-    background: oklch(1 0 0 / 0.05);
-  }
-
-  .hover-glass-strong {
-    transition: background-color 0.2s ease;
-  }
-
-  .hover-glass-strong:hover {
-    background: oklch(1 0 0 / 0.1);
-  }
-
-  /* Content area background */
-  .content-bg {
-    background: var(--background);
-  }
-
-  /* Action button utilities */
-  .bg-action-view {
-    background-color: var(--action-view);
-  }
-
-  .hover\:bg-action-view-hover:hover {
-    background-color: var(--action-view-hover);
-  }
-
-  .bg-action-followup {
-    background-color: var(--action-followup);
-  }
-
-  .hover\:bg-action-followup-hover:hover {
-    background-color: var(--action-followup-hover);
-  }
-
-  .bg-action-commit {
-    background-color: var(--action-commit);
-  }
-
-  .hover\:bg-action-commit-hover:hover {
-    background-color: var(--action-commit-hover);
-  }
-
-  .bg-action-verify {
-    background-color: var(--action-verify);
-  }
-
-  .hover\:bg-action-verify-hover:hover {
-    background-color: var(--action-verify-hover);
-  }
-
-  /* Running task indicator utilities */
-  .border-running-indicator {
-    border-color: var(--running-indicator);
-  }
-
-  .bg-running-indicator\/20 {
-    background-color: color-mix(in oklch, var(--running-indicator), transparent 80%);
-  }
-
-  .shadow-running-indicator\/50 {
-    box-shadow:
-      0 10px 15px -3px color-mix(in oklch, var(--running-indicator), transparent 50%),
-      0 4px 6px -4px color-mix(in oklch, var(--running-indicator), transparent 50%);
-  }
-
-  .text-running-indicator {
-    color: var(--running-indicator-text);
-  }
-
-  /* Animated border for in-progress cards */
-  /* Using a subtle pulse animation instead of continuous gradient rotation for GPU efficiency */
-  @keyframes border-pulse {
-    0%,
+@theme {
+  /* Font Family */
+  --font-sans: 'Inter', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+
+  /* Brand Colors - Neon Palette */
+  --color-brand-cyan: #06b6d4;
+  --color-brand-cyan-hover: #22d3ee;
+  --color-brand-blue: #3b82f6;
+  --color-brand-orange: #f97316;
+  --color-brand-green: #10b981;
+  --color-brand-red: #ef4444;
+  --color-brand-purple: #8b5cf6;
+
+  /* Dark Theme Colors */
+  --color-dark-950: #020408; /* Ultra deep background */
+  --color-dark-900: #080a0f; /* Sidebar base */
+  --color-dark-850: #0e121a; /* Panel base */
+  --color-dark-800: #161b26; /* Card base */
+  --color-dark-700: #1f2937; /* Input/Hover */
+  --color-dark-600: #374151; /* Border/Active */
+
+  /* Semantic Colors Mapped to New Theme */
+  --color-background: var(--color-dark-950);
+  --color-foreground: #94a3b8; /* Slate 400 */
+  --color-primary: var(--color-brand-cyan);
+  --color-primary-foreground: #020408;
+  --color-secondary: var(--color-dark-850);
+  --color-secondary-foreground: #e2e8f0;
+  --color-muted: var(--color-dark-900);
+  --color-muted-foreground: #64748b;
+  --color-accent: var(--color-brand-cyan);
+  --color-accent-foreground: #020408;
+  --color-destructive: var(--color-brand-red);
+  --color-destructive-foreground: #ffffff;
+  --color-border: rgba(255, 255, 255, 0.05);
+  --color-input: rgba(255, 255, 255, 0.05);
+  --color-ring: var(--color-brand-cyan);
+
+  /* Shadows */
+  --shadow-glow-cyan: 0 0 20px -5px rgba(6, 182, 212, 0.4);
+  --shadow-glow-blue: 0 0 20px -5px rgba(59, 130, 246, 0.4);
+  --shadow-glow-orange: 0 0 20px -5px rgba(249, 115, 22, 0.3);
+  --shadow-glow-green: 0 0 20px -5px rgba(16, 185, 129, 0.3);
+  --shadow-glass: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+  --shadow-inner-light: inset 0 1px 0 0 rgba(255, 255, 255, 0.05);
+
+  /* Font Sizes */
+  --text-xxs: 0.65rem;
+
+  /* Animations */
+  --animate-blob: blob 7s infinite;
+
+  @keyframes blob {
+    0% {
+      transform: translate(0px, 0px) scale(1);
+    }
+    33% {
+      transform: translate(30px, -50px) scale(1.1);
+    }
+    66% {
+      transform: translate(-20px, 20px) scale(0.9);
+    }
     100% {
-      opacity: 0.7;
-    }
-    50% {
-      opacity: 1;
+      transform: translate(0px, 0px) scale(1);
     }
   }
-
-  .animated-border-wrapper {
-    position: relative;
-    border-radius: 0.75rem;
-    padding: 2px;
-    background: linear-gradient(
-      135deg,
-      var(--running-indicator),
-      color-mix(in oklch, var(--running-indicator), transparent 30%),
-      var(--running-indicator)
-    );
-    animation: border-pulse 2s ease-in-out infinite;
-  }
-
-  /* Pause animation when user prefers reduced motion */
-  @media (prefers-reduced-motion: reduce) {
-    .animated-border-wrapper {
-      animation: none;
-      opacity: 1;
-    }
-  }
-
-  .animated-border-wrapper > * {
-    border-radius: calc(0.75rem - 2px);
-  }
 }
 
-/* Retro Overrides for Utilities */
-
-.retro * {
-  border-radius: 0 !important;
+/* Glassmorphism Utilities */
+@utility glass-sidebar {
+  background: rgba(5, 7, 12, 0.6);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-right: 1px solid rgba(255, 255, 255, 0.03);
 }
 
-/* Animated Outline Button Styles */
-.animated-outline-gradient {
-  /* Default gradient - purple to blue */
-  background: conic-gradient(from 90deg at 50% 50%, #a855f7 0%, #3b82f6 50%, #a855f7 100%);
+@utility glass-header {
+  background: rgba(2, 4, 8, 0.5);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
 }
 
-/* Light mode - deeper purple to blue gradient for better visibility */
+@utility glass-panel {
+  background: rgba(14, 18, 26, 0.4);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
 
-/* Dark mode - purple to blue gradient */
+@utility glass-card {
+  background: linear-gradient(180deg, rgba(30, 35, 45, 0.4) 0%, rgba(15, 20, 30, 0.4) 100%);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  box-shadow:
+    0 4px 6px -1px rgba(0, 0, 0, 0.2),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.02);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 
-/* Retro mode - unique scanline + neon effect */
-
-@keyframes retro-glow {
-  from {
-    filter: brightness(1) drop-shadow(0 0 2px #00ff41);
-  }
-  to {
-    filter: brightness(1.2) drop-shadow(0 0 8px #00ff41);
+  &:hover {
+    background: linear-gradient(180deg, rgba(40, 48, 65, 0.5) 0%, rgba(25, 32, 45, 0.5) 100%);
+    border-color: rgba(255, 255, 255, 0.1);
+    transform: translateY(-2px);
+    box-shadow: 0 10px 20px -5px rgba(0, 0, 0, 0.4);
   }
 }
 
-/* Dracula animated-outline - purple/pink */
-
-/* Nord animated-outline - frost blue */
-
-/* Monokai animated-outline - pink/yellow */
-
-/* Tokyo Night animated-outline - blue/magenta */
-
-/* Solarized animated-outline - blue/cyan */
-
-/* Gruvbox animated-outline - yellow/orange */
-
-/* Catppuccin animated-outline - mauve/pink */
-
-/* One Dark animated-outline - blue/magenta */
-
-/* Synthwave animated-outline - hot pink/cyan with glow */
-
-@keyframes synthwave-glow {
-  from {
-    filter: brightness(1) drop-shadow(0 0 3px #f97e72);
-  }
-  to {
-    filter: brightness(1.3) drop-shadow(0 0 10px #ff7edb);
-  }
+@utility card-active-blue {
+  background: linear-gradient(180deg, rgba(59, 130, 246, 0.1) 0%, rgba(15, 20, 30, 0.6) 100%);
+  border: 1px solid rgba(59, 130, 246, 0.5);
+  box-shadow: 0 0 20px -5px rgba(59, 130, 246, 0.15);
 }
 
-/* Slider Theme Styles */
-
-/* Dracula slider */
-
-/* Nord slider */
-
-/* Monokai slider */
-
-/* Tokyo Night slider */
-
-/* Solarized slider */
-
-/* Gruvbox slider */
-
-/* Catppuccin slider */
-
-/* One Dark slider */
-
-/* Synthwave slider */
-
-/* Line clamp utilities for text overflow prevention */
-.line-clamp-2 {
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  text-overflow: ellipsis;
+@utility col-accent-cyan {
+  border-top: 1px solid rgba(6, 182, 212, 0.4);
+  box-shadow: inset 0 10px 20px -10px rgba(6, 182, 212, 0.05);
+}
+@utility col-accent-blue {
+  border-top: 1px solid rgba(59, 130, 246, 0.4);
+  box-shadow: inset 0 10px 20px -10px rgba(59, 130, 246, 0.05);
+}
+@utility col-accent-orange {
+  border-top: 1px solid rgba(249, 115, 22, 0.4);
+  box-shadow: inset 0 10px 20px -10px rgba(249, 115, 22, 0.05);
+}
+@utility col-accent-green {
+  border-top: 1px solid rgba(16, 185, 129, 0.4);
+  box-shadow: inset 0 10px 20px -10px rgba(16, 185, 129, 0.05);
 }
 
-.line-clamp-3 {
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* Kanban card improvements to prevent text overflow */
-.kanban-card-content {
-  word-wrap: break-word;
-  overflow-wrap: break-word;
-  hyphens: auto;
-}
-
-/* Ensure proper column layout in double-width kanban columns */
-.kanban-columns-layout > * {
-  page-break-inside: avoid;
-  break-inside: avoid;
-  display: block;
-  width: 100%;
-  box-sizing: border-box;
-}
-
-/* Electron title bar drag region */
-.titlebar-drag-region {
-  -webkit-app-region: drag;
-}
-
-.titlebar-no-drag {
-  -webkit-app-region: no-drag;
-}
-
-/* ========================================
-   XML SYNTAX HIGHLIGHTING
-   Theme-aware colors for XML editor
-   ======================================== */
-
-/* Light theme - professional and readable */
-
-/* Dark theme - high contrast */
-
-/* Retro theme - neon green on black */
-
-/* Dracula theme */
-
-/* Nord theme */
-
-/* Monokai theme */
-
-/* Tokyo Night theme */
-
-/* Solarized theme */
-
-/* Gruvbox theme */
-
-/* Catppuccin theme */
-
-/* One Dark theme */
-
-/* Synthwave theme */
-
-/* XML Editor container styles */
-.xml-editor {
-  position: relative;
-}
-
-.xml-editor textarea {
-  z-index: 1;
-}
-
-.xml-editor .xml-highlight {
-  z-index: 0;
-}
-
-/* Accordion animations - CSS-only approach */
-@keyframes accordion-down {
-  from {
-    height: 0;
-    opacity: 0;
-  }
-  to {
-    height: var(--accordion-content-height, auto);
-    opacity: 1;
-  }
-}
-
-@keyframes accordion-up {
-  from {
-    height: var(--accordion-content-height, auto);
-    opacity: 1;
-  }
-  to {
-    height: 0;
-    opacity: 0;
-  }
-}
-
-.animate-accordion-down {
-  animation: accordion-down 0.2s ease-out forwards;
-}
-
-.animate-accordion-up {
-  animation: accordion-up 0.2s ease-out forwards;
-}
-
-/* Terminal scrollbar theming */
-.xterm-viewport::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-
-.xterm-viewport::-webkit-scrollbar-track {
-  background: var(--muted);
-  border-radius: 4px;
-}
-
-.xterm-viewport::-webkit-scrollbar-thumb {
-  background: var(--border);
-  border-radius: 4px;
-}
-
-.xterm-viewport::-webkit-scrollbar-thumb:hover {
-  background: var(--muted-foreground);
-}
-
-/* ========================================
-   DEPENDENCY GRAPH STYLES
-   Theme-aware styling for React Flow graph
-   ======================================== */
-
-/* React Flow base theme overrides */
-.graph-canvas {
-  --xy-background-color: transparent;
-  --xy-node-background-color: var(--card);
-  --xy-node-border-color: var(--border);
-  --xy-node-border-radius: 0.75rem;
-  --xy-edge-stroke-default: var(--border);
-  --xy-edge-stroke-selected: var(--brand-500);
-  --xy-minimap-background-color: var(--popover);
-  --xy-minimap-mask-background-color: rgba(0, 0, 0, 0.2);
-  --xy-controls-background-color: var(--popover);
-  --xy-controls-border-color: var(--border);
-}
-
-/* MiniMap styling */
-.graph-canvas .react-flow__minimap {
-  background-color: var(--popover) !important;
-  border: 1px solid var(--border) !important;
-  border-radius: 0.5rem;
-}
-
-.graph-canvas .react-flow__minimap-mask {
-  fill: var(--background);
-  fill-opacity: 0.8;
-}
-
-/* Edge animations */
-@keyframes flow-dash {
-  to {
-    stroke-dashoffset: -20;
-  }
-}
-
-@keyframes edge-glow {
-  0%,
-  100% {
-    filter: drop-shadow(0 0 2px var(--status-in-progress));
-  }
-  50% {
-    filter: drop-shadow(0 0 6px var(--status-in-progress));
-  }
-}
-
-.graph-canvas .animated-edge path {
-  animation: flow-dash 0.5s linear infinite;
-}
-
-.graph-canvas .edge-flowing path {
-  animation:
-    flow-dash 0.5s linear infinite,
-    edge-glow 2s ease-in-out infinite;
-}
-
-/* Edge particle animation */
-.edge-particle {
-  pointer-events: none;
-}
-
-/* Node animations */
-@keyframes pulse-subtle {
-  0%,
-  100% {
-    box-shadow: 0 0 0 0 var(--status-in-progress);
-  }
-  50% {
-    box-shadow: 0 0 15px 3px var(--status-in-progress);
-  }
-}
-
-.animate-pulse-subtle {
-  animation: pulse-subtle 2s ease-in-out infinite;
-}
-
-/* Progress bar indeterminate animation */
-@keyframes progress-indeterminate {
-  0% {
-    transform: translateX(-100%);
-    width: 50%;
-  }
-  50% {
-    transform: translateX(50%);
-    width: 30%;
-  }
-  100% {
-    transform: translateX(200%);
-    width: 50%;
-  }
-}
-
-.animate-progress-indeterminate {
-  animation: progress-indeterminate 1.5s ease-in-out infinite;
-}
-
-/* Handle styling */
-.graph-canvas .react-flow__handle {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background-color: var(--border);
-  border: 2px solid var(--background);
+@utility btn-hover-effect {
   transition: all 0.2s ease;
-}
 
-.graph-canvas .react-flow__handle:hover {
-  background-color: var(--brand-500);
-  transform: scale(1.2);
-}
-
-.graph-canvas .react-flow__handle-left {
-  left: -6px;
-}
-
-.graph-canvas .react-flow__handle-right {
-  right: -6px;
-}
-
-/* Node base styling - override React Flow defaults */
-.graph-canvas .react-flow__node {
-  background: transparent !important;
-  border: none !important;
-  box-shadow: none !important;
-  padding: 0 !important;
-}
-
-/* Selection styles */
-.graph-canvas .react-flow__node.selected {
-  outline: none;
-}
-
-.graph-canvas .react-flow__edge.selected path {
-  stroke: var(--brand-500);
-  stroke-width: 3;
-}
-
-/* Attribution removal (requires pro license) */
-.graph-canvas .react-flow__attribution {
-  display: none;
-}
-
-/* Panel styling */
-.graph-canvas .react-flow__panel {
-  margin: 12px;
-}
-
-/* Retro theme overrides */
-.retro .graph-canvas .react-flow__handle,
-.retro .graph-canvas .react-flow__minimap {
-  border-radius: 0 !important;
-}
-
-.retro .graph-canvas .react-flow__node {
-  border-radius: 0 !important;
-}
-
-/* Graph Filter Highlight States */
-
-/* Matched node - direct search/filter match */
-.graph-node-matched {
-  box-shadow:
-    0 0 0 3px var(--brand-500),
-    0 0 20px 4px var(--brand-500);
-  border-color: var(--brand-500) !important;
-  z-index: 10;
-}
-
-/* Animated glow for matched nodes */
-@keyframes matched-node-glow {
-  0%,
-  100% {
-    box-shadow:
-      0 0 0 3px var(--brand-500),
-      0 0 15px 2px var(--brand-500);
-  }
-  50% {
-    box-shadow:
-      0 0 0 3px var(--brand-500),
-      0 0 25px 6px var(--brand-500);
+  &:hover {
+    transform: translateY(-1px);
   }
 }
 
-.graph-node-matched {
-  animation: matched-node-glow 2s ease-in-out infinite;
+/* Base resets */
+@layer base {
+  body {
+    background-color: var(--color-dark-950);
+    color: var(--color-foreground);
+    @apply font-sans antialiased overflow-hidden;
+  }
 }
 
-/* Highlighted path node - part of the dependency path */
-.graph-node-highlighted {
-  box-shadow:
-    0 0 0 2px var(--brand-400),
-    0 0 12px 2px var(--brand-400);
-  z-index: 5;
-}
-
-/* Dimmed node - not part of filter results */
-.graph-node-dimmed {
-  opacity: 0.25;
-  filter: grayscale(60%);
-  transition:
-    opacity 0.3s ease,
-    filter 0.3s ease;
-}
-
-.graph-node-dimmed:hover {
-  opacity: 0.4;
-  filter: grayscale(40%);
-}
-
-/* Highlighted edge styles */
-.graph-edge-highlighted path {
-  stroke: var(--brand-500) !important;
-  stroke-width: 4px !important;
-  filter: drop-shadow(0 0 6px var(--brand-500));
-}
-
-/* Dimmed edge styles */
-.graph-edge-dimmed path {
-  opacity: 0.15;
-  stroke-width: 1px !important;
-  filter: none !important;
-}
-
-/* Reduce motion preference */
-@media (prefers-reduced-motion: reduce) {
-  .graph-canvas .animated-edge path,
-  .graph-canvas .edge-flowing path,
-  .animate-pulse-subtle,
-  .animate-progress-indeterminate,
-  .graph-node-matched {
-    animation: none;
+/* Custom Scrollbar */
+@layer utilities {
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 5px;
+    height: 5px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 3px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.15);
   }
 }
