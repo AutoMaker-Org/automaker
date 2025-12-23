@@ -9,6 +9,7 @@
 import { Router } from 'express';
 import { createGenerateHandler } from './routes/generate.js';
 import { createTTSHandler } from './routes/tts.js';
+import { createVerifyHandler } from './routes/verify.js';
 
 /**
  * Create the synopsis router
@@ -23,6 +24,9 @@ export function createSynopsisRoutes(): Router {
 
   // POST /synopsis/tts - Convert text to speech using ElevenLabs
   router.post('/tts', createTTSHandler());
+
+  // POST /synopsis/verify - Verify ElevenLabs API key
+  router.post('/verify', createVerifyHandler());
 
   return router;
 }

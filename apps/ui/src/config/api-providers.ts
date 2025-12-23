@@ -55,6 +55,9 @@ export interface ProviderConfigParams {
     setValue: Dispatch<SetStateAction<string>>;
     show: boolean;
     setShow: Dispatch<SetStateAction<boolean>>;
+    testing: boolean;
+    onTest: () => Promise<void>;
+    result: { success: boolean; message: string } | null;
   };
 }
 
@@ -102,12 +105,12 @@ export const buildProviderConfigs = ({
     inputTestId: 'elevenlabs-api-key-input',
     toggleTestId: 'toggle-elevenlabs-visibility',
     testButton: {
-      onClick: async () => {},
-      disabled: true,
-      loading: false,
+      onClick: elevenLabs.onTest,
+      disabled: !elevenLabs.value || elevenLabs.testing,
+      loading: elevenLabs.testing,
       testId: 'test-elevenlabs-connection',
     },
-    result: null,
+    result: elevenLabs.result,
     resultTestId: 'elevenlabs-test-connection-result',
     resultMessageTestId: 'elevenlabs-test-connection-message',
     descriptionPrefix: 'Used for audio synopsis (Cmd+Y). Get your key at',
