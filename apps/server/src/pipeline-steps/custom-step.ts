@@ -153,16 +153,12 @@ export class CustomStep {
         finalResult = {
           ...result,
           status:
-            hasSuccessCriteria && !successMet
-              ? 'failed'
-              : result.status === 'failed'
-                ? 'failed'
-                : 'passed',
+            (hasSuccessCriteria && !successMet) || result.status === 'failed' ? 'failed' : 'passed',
           iterations: loopCount,
         };
 
         break;
-      } while (signal.aborted === false);
+      } while (!signal.aborted);
 
       if (!finalResult) {
         throw new Error('No result generated');
@@ -297,35 +293,44 @@ ${output}
 
 Respond with ONLY "YES" if the criteria are met, or "NO" if they are not met.`;
 
-      // Use ProviderFactory directly for evaluation
-      const { ProviderFactory } = await import('../providers/provider-factory.js');
-      const provider = ProviderFactory.getProviderForModel('sonnet');
-
-      const options = {
-        prompt: evaluationPrompt,
-        model: 'sonnet',
-        maxTurns: 1,
-        cwd: '',
-        allowedTools: [] as string[],
-        abortController: undefined,
+      // Create a minimal feature and step config for evaluation
+      const evaluationFeature: Feature = {
+        id: 'evaluation',
+        title: 'Success Criteria Evaluation',
+        description: '',
+        status: 'in_progress',
+        category: 'evaluation',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        branch: '',
+        files: [],
+        plan: '',
+        implementation: '',
+        testResults: '',
       };
 
-      const stream = provider.executeQuery(options);
-      let result = '';
+      const evaluationStepConfig: PipelineStepConfig = {
+        id: 'evaluation',
+        type: 'custom',
+        name: 'Success Criteria Evaluation',
+        model: 'sonnet',
+        required: true,
+        autoTrigger: true,
+        config: {},
+      };
 
-      for await (const msg of stream) {
-        if (msg.type === 'assistant' && msg.message?.content) {
-          for (const block of msg.message.content) {
-            if (block.type === 'text') {
-              result = block.text || '';
-            }
-          }
-        } else if (msg.type === 'result' && msg.subtype === 'success') {
-          break;
-        }
-      }
+      // Use autoModeService for consistent AI execution
+      const evaluationResult = await this.autoModeService.executeAIStep({
+        feature: evaluationFeature,
+        stepConfig: evaluationStepConfig,
+        signal: new AbortController().signal,
+        prompt: evaluationPrompt,
+        onProgress: (message) => {
+          console.log(`[Custom Step] Evaluation: ${message}`);
+        },
+      });
 
-      const response = result.trim().toLowerCase();
+      const response = evaluationResult.output.trim().toLowerCase();
       if (response === 'yes') {
         console.log('[Custom Step] Evaluation: AI evaluation returned YES');
         return true;
