@@ -147,9 +147,17 @@ export class CustomStep {
         }
 
         // No more retries, return the last result
+        // If success criteria were defined but not met, status should be 'failed'
+        const hasSuccessCriteria =
+          !!config.successCriteria && config.successCriteria.trim().length > 0;
         finalResult = {
           ...result,
-          status: result.status === 'failed' ? 'failed' : 'passed',
+          status:
+            hasSuccessCriteria && !successMet
+              ? 'failed'
+              : result.status === 'failed'
+                ? 'failed'
+                : 'passed',
           iterations: loopCount,
         };
 
