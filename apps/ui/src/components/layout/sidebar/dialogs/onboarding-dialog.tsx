@@ -37,11 +37,11 @@ export function OnboardingDialog({
       <DialogContent className="max-w-2xl bg-popover/95 backdrop-blur-xl">
         <DialogHeader>
           <div className="flex items-center gap-3 mb-2">
-            <div className="flex items-center justify-center w-12 h-12 rounded-full bg-brand-500/10 border border-brand-500/20">
+            <div className="flex items-center justify-center w-12 h-12 rounded-full bg-brand-500/10 border border-brand-500/20 shrink-0">
               <Rocket className="w-6 h-6 text-brand-500" />
             </div>
-            <div>
-              <DialogTitle className="text-2xl">Welcome to {newProjectName}!</DialogTitle>
+            <div className="min-w-0 flex-1">
+              <DialogTitle className="text-2xl truncate">Welcome to {newProjectName}!</DialogTitle>
               <DialogDescription className="text-muted-foreground mt-1">
                 Your new project is ready. Let&apos;s get you started.
               </DialogDescription>

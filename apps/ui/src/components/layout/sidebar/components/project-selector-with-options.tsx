@@ -47,7 +47,6 @@ export function ProjectSelectorWithOptions({
   setIsProjectPickerOpen,
   setShowDeleteProjectDialog,
 }: ProjectSelectorWithOptionsProps) {
-  // Get data from store
   const {
     projects,
     currentProject,
@@ -59,7 +58,6 @@ export function ProjectSelectorWithOptions({
     clearProjectHistory,
   } = useAppStore();
 
-  // Get keyboard shortcuts
   const shortcuts = useKeyboardShortcutsConfig();
   const {
     projectSearchQuery,
@@ -75,10 +73,8 @@ export function ProjectSelectorWithOptions({
     setCurrentProject,
   });
 
-  // Drag-and-drop handlers
   const { sensors, handleDragEnd } = useDragAndDrop({ projects, reorderProjects });
 
-  // Theme management
   const {
     globalTheme,
     setTheme,
@@ -107,7 +103,6 @@ export function ProjectSelectorWithOptions({
               'shadow-sm shadow-black/5',
               'text-foreground titlebar-no-drag min-w-0',
               'transition-all duration-200 ease-out',
-              'hover:scale-[1.01] active:scale-[0.99]',
               isProjectPickerOpen &&
                 'from-brand-500/10 to-brand-600/5 border-brand-500/30 ring-2 ring-brand-500/20 shadow-lg shadow-brand-500/5'
             )}
@@ -140,7 +135,7 @@ export function ProjectSelectorWithOptions({
           align="start"
           data-testid="project-picker-dropdown"
         >
-          {/* Search input for type-ahead filtering */}
+          {/* Search input */}
           <div className="px-1 pb-2">
             <div className="relative">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
@@ -151,10 +146,10 @@ export function ProjectSelectorWithOptions({
                 value={projectSearchQuery}
                 onChange={(e) => setProjectSearchQuery(e.target.value)}
                 className={cn(
-                  'w-full h-9 pl-8 pr-3 text-sm rounded-lg',
+                  'w-full h-8 pl-8 pr-3 text-sm rounded-lg',
                   'border border-border bg-background/50',
                   'text-foreground placeholder:text-muted-foreground',
-                  'focus:outline-none focus:ring-2 focus:ring-brand-500/30 focus:border-brand-500/50',
+                  'focus:outline-none focus:ring-1 focus:ring-brand-500/30 focus:border-brand-500/50',
                   'transition-all duration-200'
                 )}
                 data-testid="project-search-input"
@@ -176,7 +171,7 @@ export function ProjectSelectorWithOptions({
                 items={filteredProjects.map((p) => p.id)}
                 strategy={verticalListSortingStrategy}
               >
-                <div className="space-y-0.5 max-h-64 overflow-y-auto">
+                <div className="space-y-0.5 max-h-64 overflow-y-auto overflow-x-hidden">
                   {filteredProjects.map((project, index) => (
                     <SortableProjectItem
                       key={project.id}
@@ -197,9 +192,9 @@ export function ProjectSelectorWithOptions({
           {/* Keyboard hint */}
           <div className="px-2 pt-2 mt-1.5 border-t border-border/50">
             <p className="text-[10px] text-muted-foreground text-center tracking-wide">
-              <span className="text-foreground/60">arrow</span> navigate{' '}
+              <span className="text-foreground/60">↑↓</span> navigate{' '}
               <span className="mx-1 text-foreground/30">|</span>{' '}
-              <span className="text-foreground/60">enter</span> select{' '}
+              <span className="text-foreground/60">↵</span> select{' '}
               <span className="mx-1 text-foreground/30">|</span>{' '}
               <span className="text-foreground/60">esc</span> close
             </p>
@@ -207,7 +202,7 @@ export function ProjectSelectorWithOptions({
         </DropdownMenuContent>
       </DropdownMenu>
 
-      {/* Project Options Menu - theme and history */}
+      {/* Project Options Menu */}
       {currentProject && (
         <DropdownMenu
           onOpenChange={(open) => {
@@ -224,8 +219,7 @@ export function ProjectSelectorWithOptions({
                 'text-muted-foreground hover:text-foreground',
                 'bg-transparent hover:bg-accent/60',
                 'border border-border/50 hover:border-border',
-                'transition-all duration-200 ease-out titlebar-no-drag',
-                'hover:scale-[1.02] active:scale-[0.98]'
+                'transition-all duration-200 ease-out titlebar-no-drag'
               )}
               title="Project options"
               data-testid="project-options-menu"
@@ -253,7 +247,6 @@ export function ProjectSelectorWithOptions({
                   setPreviewTheme(null);
                 }}
               >
-                {/* Use Global Option */}
                 <DropdownMenuRadioGroup
                   value={currentProject.theme || ''}
                   onValueChange={(value) => {
@@ -329,7 +322,7 @@ export function ProjectSelectorWithOptions({
               </DropdownMenuSubContent>
             </DropdownMenuSub>
 
-            {/* Project History Section - only show when there's history */}
+            {/* Project History Section */}
             {projectHistory.length > 1 && (
               <>
                 <DropdownMenuSeparator />

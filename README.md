@@ -61,7 +61,7 @@ Traditional development tools help you write code. Automaker helps you **orchest
 
 ### Powered by Claude Code
 
-Automaker leverages the [Claude Agent SDK](https://docs.anthropic.com/en/docs/claude-code) to give AI agents full access to your codebase. Agents can read files, write code, execute commands, run tests, and make git commits—all while working in isolated git worktrees to keep your main branch safe.
+Automaker leverages the [Claude Agent SDK](https://platform.claude.com/docs/en/agent-sdk/overview) to give AI agents full access to your codebase. Agents can read files, write code, execute commands, run tests, and make git commits—all while working in isolated git worktrees to keep your main branch safe.
 
 ### Why This Matters
 
@@ -106,7 +106,7 @@ https://discord.gg/jjem7aEDKU
 
 - Node.js 18+
 - npm
-- [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code) installed and authenticated
+- [Claude Code CLI](https://code.claude.com/docs/en/overview) installed and authenticated
 
 ### Quick Start
 

@@ -45,7 +45,12 @@ export function SortableProjectItem({
 
       {/* Project content - clickable area */}
       <div className="flex items-center gap-2.5 flex-1 min-w-0" onClick={() => onSelect(project)}>
-        <Folder className="h-4 w-4 shrink-0 text-muted-foreground" />
+        <Folder
+          className={cn(
+            'h-4 w-4 shrink-0',
+            currentProjectId === project.id ? 'text-brand-500' : 'text-muted-foreground'
+          )}
+        />
         <span className="flex-1 truncate text-sm font-medium">{project.name}</span>
         {currentProjectId === project.id && <Check className="h-4 w-4 text-brand-500 shrink-0" />}
       </div>
