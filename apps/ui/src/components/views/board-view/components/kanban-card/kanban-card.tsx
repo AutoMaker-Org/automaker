@@ -1,4 +1,4 @@
-import React, { memo } from 'react';
+import React, { memo, useCallback } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { cn } from '@/lib/utils';
@@ -34,6 +34,7 @@ interface KanbanCardProps {
   glassmorphism?: boolean;
   cardBorderEnabled?: boolean;
   cardBorderOpacity?: number;
+  isSelected?: boolean;
 }
 
 export const KanbanCard = memo(function KanbanCard({
@@ -60,8 +61,21 @@ export const KanbanCard = memo(function KanbanCard({
   glassmorphism = true,
   cardBorderEnabled = true,
   cardBorderOpacity = 100,
+  isSelected = false,
 }: KanbanCardProps) {
-  const { useWorktrees } = useAppStore();
+  const { useWorktrees, toggleFeatureSelection } = useAppStore();
+
+  // Handle shift+click for multi-selection
+  const handleClick = useCallback(
+    (e: React.MouseEvent) => {
+      if (e.shiftKey) {
+        e.preventDefault();
+        e.stopPropagation();
+        toggleFeatureSelection(feature.id);
+      }
+    },
+    [feature.id, toggleFeatureSelection]
+  );
 
   const isDraggable =
     feature.status === 'backlog' ||
@@ -109,9 +123,12 @@ export const KanbanCard = memo(function KanbanCard({
         feature.error &&
           !isCurrentAutoTask &&
           'border-[var(--status-error)] border-2 shadow-[var(--status-error-bg)] shadow-lg',
-        !isDraggable && 'cursor-default'
+        !isDraggable && 'cursor-default',
+        // Multi-selection state
+        isSelected && 'ring-2 ring-brand-500 ring-offset-2 ring-offset-background'
       )}
       data-testid={`kanban-card-${feature.id}`}
+      onClick={handleClick}
       onDoubleClick={onEdit}
       {...attributes}
       {...(isDraggable ? listeners : {})}

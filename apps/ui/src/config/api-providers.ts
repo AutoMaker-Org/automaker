@@ -1,7 +1,7 @@
 import type { Dispatch, SetStateAction } from 'react';
 import type { ApiKeys } from '@/store/app-store';
 
-export type ProviderKey = 'anthropic' | 'google';
+export type ProviderKey = 'anthropic' | 'google' | 'elevenLabs';
 
 export interface ProviderConfig {
   key: ProviderKey;
@@ -50,11 +50,21 @@ export interface ProviderConfigParams {
     onTest: () => Promise<void>;
     result: { success: boolean; message: string } | null;
   };
+  elevenLabs: {
+    value: string;
+    setValue: Dispatch<SetStateAction<string>>;
+    show: boolean;
+    setShow: Dispatch<SetStateAction<boolean>>;
+    testing: boolean;
+    onTest: () => Promise<void>;
+    result: { success: boolean; message: string } | null;
+  };
 }
 
 export const buildProviderConfigs = ({
   apiKeys,
   anthropic,
+  elevenLabs,
 }: ProviderConfigParams): ProviderConfig[] => [
   {
     key: 'anthropic',
@@ -80,6 +90,32 @@ export const buildProviderConfigs = ({
     descriptionPrefix: 'Used for Claude AI features. Get your key at',
     descriptionLinkHref: 'https://console.anthropic.com/account/keys',
     descriptionLinkText: 'console.anthropic.com',
+    descriptionSuffix: '.',
+  },
+  {
+    key: 'elevenLabs',
+    label: 'ElevenLabs API Key',
+    inputId: 'elevenlabs-key',
+    placeholder: 'sk_...',
+    value: elevenLabs.value,
+    setValue: elevenLabs.setValue,
+    showValue: elevenLabs.show,
+    setShowValue: elevenLabs.setShow,
+    hasStoredKey: apiKeys.elevenLabs,
+    inputTestId: 'elevenlabs-api-key-input',
+    toggleTestId: 'toggle-elevenlabs-visibility',
+    testButton: {
+      onClick: elevenLabs.onTest,
+      disabled: !elevenLabs.value || elevenLabs.testing,
+      loading: elevenLabs.testing,
+      testId: 'test-elevenlabs-connection',
+    },
+    result: elevenLabs.result,
+    resultTestId: 'elevenlabs-test-connection-result',
+    resultMessageTestId: 'elevenlabs-test-connection-message',
+    descriptionPrefix: 'Used for audio synopsis (Cmd+Y). Get your key at',
+    descriptionLinkHref: 'https://elevenlabs.io/app/settings/api-keys',
+    descriptionLinkText: 'elevenlabs.io',
     descriptionSuffix: '.',
   },
   // {

@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { Node, Edge } from '@xyflow/react';
-import { Feature } from '@/store/app-store';
+import { Feature, useAppStore } from '@/store/app-store';
 import { getBlockingDependencies } from '@automaker/dependency-resolver';
 import { GraphFilterResult } from './use-graph-filter';
 
@@ -18,6 +18,9 @@ export interface TaskNodeData extends Feature {
   isMatched?: boolean;
   isHighlighted?: boolean;
   isDimmed?: boolean;
+  // Multi-selection state (for shift+click selection and Cmd+Y synopsis)
+  isMultiSelected?: boolean;
+  onShiftClick?: (featureId: string) => void;
   // Action callbacks
   onViewLogs?: () => void;
   onViewDetails?: () => void;
@@ -59,6 +62,10 @@ export function useGraphNodes({
   filterResult,
   actionCallbacks,
 }: UseGraphNodesProps) {
+  // Get multi-selection state from store
+  const selectedFeatureIds = useAppStore((state) => state.selectedFeatureIds);
+  const toggleFeatureSelection = useAppStore((state) => state.toggleFeatureSelection);
+
   const { nodes, edges } = useMemo(() => {
     const nodeList: TaskNode[] = [];
     const edgeList: DependencyEdge[] = [];
@@ -96,6 +103,9 @@ export function useGraphNodes({
           isMatched,
           isHighlighted,
           isDimmed,
+          // Multi-selection state (for shift+click and Cmd+Y synopsis)
+          isMultiSelected: selectedFeatureIds.includes(feature.id),
+          onShiftClick: toggleFeatureSelection,
           // Action callbacks (bound to this feature's ID)
           onViewLogs: actionCallbacks?.onViewLogs
             ? () => actionCallbacks.onViewLogs!(feature.id)
@@ -150,7 +160,7 @@ export function useGraphNodes({
     });
 
     return { nodes: nodeList, edges: edgeList };
-  }, [features, runningAutoTasks, filterResult, actionCallbacks]);
+  }, [features, runningAutoTasks, filterResult, actionCallbacks, selectedFeatureIds, toggleFeatureSelection]);
 
   return { nodes, edges };
 }

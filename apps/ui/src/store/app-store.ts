@@ -53,6 +53,7 @@ export interface ApiKeys {
   anthropic: string;
   google: string;
   openai: string;
+  elevenLabs: string;
 }
 
 // Keyboard Shortcut with optional modifiers
@@ -169,6 +170,9 @@ export interface KeyboardShortcuts {
   splitTerminalDown: string;
   closeTerminal: string;
   newTerminalTab: string;
+
+  // Audio synopsis shortcut
+  audioSynopsis: string;
 }
 
 // Default keyboard shortcuts
@@ -204,6 +208,9 @@ export const DEFAULT_KEYBOARD_SHORTCUTS: KeyboardShortcuts = {
   splitTerminalDown: 'Alt+S',
   closeTerminal: 'Alt+W',
   newTerminalTab: 'Alt+T',
+
+  // Audio synopsis shortcut (active in board view when features are selected)
+  audioSynopsis: 'Cmd+Y',
 };
 
 export interface ImageAttachment {
@@ -526,6 +533,9 @@ export interface AppState {
   claudeRefreshInterval: number; // Refresh interval in seconds (default: 60)
   claudeUsage: ClaudeUsage | null;
   claudeUsageLastUpdated: number | null;
+
+  // Feature Multi-Selection (for shift+click selection and Cmd+Y synopsis)
+  selectedFeatureIds: string[];
 }
 
 // Claude Usage interface matching the server response
@@ -841,6 +851,11 @@ export interface AppActions {
     } | null
   ) => void;
 
+  // Feature Multi-Selection actions (for shift+click and Cmd+Y synopsis)
+  toggleFeatureSelection: (featureId: string) => void;
+  clearFeatureSelection: () => void;
+  setFeatureSelection: (featureIds: string[]) => void;
+
   // Reset
   reset: () => void;
 }
@@ -897,6 +912,7 @@ const initialState: AppState = {
     anthropic: '',
     google: '',
     openai: '',
+    elevenLabs: '',
   },
   chatSessions: [],
   currentChatSession: null,
@@ -941,6 +957,7 @@ const initialState: AppState = {
   defaultRequirePlanApproval: false,
   defaultAIProfileId: null,
   pendingPlanApproval: null,
+  selectedFeatureIds: [],
 };
 
 export const useAppStore = create<AppState & AppActions>()(
@@ -2541,6 +2558,18 @@ export const useAppStore = create<AppState & AppActions>()(
 
       // Plan Approval actions
       setPendingPlanApproval: (approval) => set({ pendingPlanApproval: approval }),
+
+      // Feature Multi-Selection actions
+      toggleFeatureSelection: (featureId) => {
+        const { selectedFeatureIds } = get();
+        if (selectedFeatureIds.includes(featureId)) {
+          set({ selectedFeatureIds: selectedFeatureIds.filter((id) => id !== featureId) });
+        } else {
+          set({ selectedFeatureIds: [...selectedFeatureIds, featureId] });
+        }
+      },
+      clearFeatureSelection: () => set({ selectedFeatureIds: [] }),
+      setFeatureSelection: (featureIds) => set({ selectedFeatureIds: featureIds }),
 
       // Claude Usage Tracking actions
       setClaudeRefreshInterval: (interval: number) => set({ claudeRefreshInterval: interval }),

@@ -23,16 +23,20 @@ export function useApiKeyManagement() {
   // API key values
   const [anthropicKey, setAnthropicKey] = useState(apiKeys.anthropic);
   const [googleKey, setGoogleKey] = useState(apiKeys.google);
+  const [elevenLabsKey, setElevenLabsKey] = useState(apiKeys.elevenLabs);
 
   // Visibility toggles
   const [showAnthropicKey, setShowAnthropicKey] = useState(false);
   const [showGoogleKey, setShowGoogleKey] = useState(false);
+  const [showElevenLabsKey, setShowElevenLabsKey] = useState(false);
 
   // Test connection states
   const [testingConnection, setTestingConnection] = useState(false);
   const [testResult, setTestResult] = useState<TestResult | null>(null);
   const [testingGeminiConnection, setTestingGeminiConnection] = useState(false);
   const [geminiTestResult, setGeminiTestResult] = useState<TestResult | null>(null);
+  const [testingElevenLabsConnection, setTestingElevenLabsConnection] = useState(false);
+  const [elevenLabsTestResult, setElevenLabsTestResult] = useState<TestResult | null>(null);
 
   // API key status from environment
   const [apiKeyStatus, setApiKeyStatus] = useState<ApiKeyStatus | null>(null);
@@ -44,6 +48,7 @@ export function useApiKeyManagement() {
   useEffect(() => {
     setAnthropicKey(apiKeys.anthropic);
     setGoogleKey(apiKeys.google);
+    setElevenLabsKey(apiKeys.elevenLabs);
   }, [apiKeys]);
 
   // Check API key status from environment on mount
@@ -122,11 +127,61 @@ export function useApiKeyManagement() {
     setTestingGeminiConnection(false);
   };
 
+  // Test ElevenLabs connection
+  const handleTestElevenLabsConnection = async () => {
+    setTestingElevenLabsConnection(true);
+    setElevenLabsTestResult(null);
+
+    // Basic validation - check key exists
+    if (!elevenLabsKey || elevenLabsKey.trim().length < 10) {
+      setElevenLabsTestResult({
+        success: false,
+        message: 'Please enter a valid API key.',
+      });
+      setTestingElevenLabsConnection(false);
+      return;
+    }
+
+    try {
+      // Get server URL
+      const serverUrl = import.meta.env.VITE_SERVER_URL || 'http://localhost:3008';
+
+      const response = await fetch(`${serverUrl}/api/synopsis/verify`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setElevenLabsTestResult({
+          success: true,
+          message: data.message || 'Connection successful!',
+        });
+      } else {
+        setElevenLabsTestResult({
+          success: false,
+          message: data.error || 'Failed to verify ElevenLabs API key.',
+        });
+      }
+    } catch {
+      setElevenLabsTestResult({
+        success: false,
+        message: 'Network error. Please check your connection.',
+      });
+    } finally {
+      setTestingElevenLabsConnection(false);
+    }
+  };
+
   // Save API keys
   const handleSave = () => {
     setApiKeys({
       anthropic: anthropicKey,
       google: googleKey,
+      elevenLabs: elevenLabsKey,
     });
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
@@ -152,6 +207,15 @@ export function useApiKeyManagement() {
       testing: testingGeminiConnection,
       onTest: handleTestGeminiConnection,
       result: geminiTestResult,
+    },
+    elevenLabs: {
+      value: elevenLabsKey,
+      setValue: setElevenLabsKey,
+      show: showElevenLabsKey,
+      setShow: setShowElevenLabsKey,
+      testing: testingElevenLabsConnection,
+      onTest: handleTestElevenLabsConnection,
+      result: elevenLabsTestResult,
     },
   };
 

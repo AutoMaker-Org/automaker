@@ -136,6 +136,8 @@ export interface KeyboardShortcuts {
   splitTerminalDown: string;
   /** Close current terminal */
   closeTerminal: string;
+  /** Generate audio synopsis of selected features (Cmd+Y) */
+  audioSynopsis: string;
 }
 
 /**
@@ -314,6 +316,8 @@ export interface Credentials {
     google: string;
     /** OpenAI API key (for compatibility or alternative providers) */
     openai: string;
+    /** ElevenLabs API key (for text-to-speech audio synopsis) */
+    elevenLabs: string;
   };
 }
 
@@ -418,6 +422,7 @@ export const DEFAULT_KEYBOARD_SHORTCUTS: KeyboardShortcuts = {
   splitTerminalRight: 'Alt+D',
   splitTerminalDown: 'Alt+S',
   closeTerminal: 'Alt+W',
+  audioSynopsis: 'Cmd+Y',
 };
 
 /** Default global settings used when no settings file exists */
@@ -456,6 +461,7 @@ export const DEFAULT_CREDENTIALS: Credentials = {
     anthropic: '',
     google: '',
     openai: '',
+    elevenLabs: '',
   },
 };
 
