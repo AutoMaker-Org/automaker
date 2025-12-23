@@ -110,7 +110,7 @@ export const buildProviderConfigs = ({
       loading: coderabbit.testing,
       testId: 'coderabbit-test-connection-button',
     },
-    result: null,
+    result: coderabbit.result,
     resultTestId: 'coderabbit-test-connection-result',
     resultMessageTestId: 'coderabbit-test-connection-message',
     descriptionPrefix: 'Used for automated code reviews in pipelines. Get your key at',

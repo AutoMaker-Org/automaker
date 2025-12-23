@@ -225,7 +225,7 @@ Please address any remaining issues.
   }
 
   private async checkSuccessCriteria(output: string, criteria: string): Promise<boolean> {
-    // Simple keyword-based check - in a real implementation, this could use AI
+    console.log('[Custom Step] Evaluating success criteria...');
     const lowerOutput = output.toLowerCase();
     const lowerCriteria = criteria.toLowerCase();
 
@@ -235,6 +235,7 @@ Please address any remaining issues.
       lowerOutput.includes('all requirements satisfied') ||
       lowerOutput.includes('criteria fulfilled')
     ) {
+      console.log('[Custom Step] Evaluation: explicit success indicators found');
       return true;
     }
 
@@ -244,12 +245,93 @@ Please address any remaining issues.
       lowerOutput.includes('requirements not satisfied') ||
       lowerOutput.includes('criteria failed')
     ) {
+      console.log('[Custom Step] Evaluation: explicit failure indicators found');
       return false;
     }
 
-    // For more complex criteria, we could use an AI to evaluate
-    // For now, default to success if no explicit indicators
-    return true;
+    // Try to parse structured outputs (JSON/XML)
+    try {
+      // Look for JSON blocks in the output
+      const jsonMatch = output.match(/```json\s*([\s\S]*?)\s*```/);
+      if (jsonMatch) {
+        const jsonData = JSON.parse(jsonMatch[1]);
+        if (
+          jsonData.success === true ||
+          jsonData.status === 'passed' ||
+          jsonData.result === 'success'
+        ) {
+          console.log('[Custom Step] Evaluation: JSON indicates success');
+          return true;
+        }
+        if (
+          jsonData.success === false ||
+          jsonData.status === 'failed' ||
+          jsonData.result === 'failure'
+        ) {
+          console.log('[Custom Step] Evaluation: JSON indicates failure');
+          return false;
+        }
+      }
+    } catch (e) {
+      // JSON parsing failed, continue to next evaluation
+    }
+
+    // Fallback to AI-based evaluation
+    try {
+      console.log('[Custom Step] Evaluation: using AI fallback evaluation');
+      const evaluationPrompt = `Based on the following criteria and output, respond with ONLY "YES" or "NO" - did the output meet the success criteria?
+
+CRITERIA:
+${criteria}
+
+OUTPUT:
+${output}
+
+Respond with ONLY "YES" if the criteria are met, or "NO" if they are not met.`;
+
+      // Use ProviderFactory directly for evaluation
+      const { ProviderFactory } = await import('../providers/provider-factory.js');
+      const provider = ProviderFactory.getProviderForModel('sonnet');
+
+      const options = {
+        prompt: evaluationPrompt,
+        model: 'sonnet',
+        maxTurns: 1,
+        cwd: '',
+        allowedTools: [] as string[],
+        abortController: undefined,
+      };
+
+      const stream = provider.executeQuery(options);
+      let result = '';
+
+      for await (const msg of stream) {
+        if (msg.type === 'assistant' && msg.message?.content) {
+          for (const block of msg.message.content) {
+            if (block.type === 'text') {
+              result = block.text || '';
+            }
+          }
+        } else if (msg.type === 'result' && msg.subtype === 'success') {
+          break;
+        }
+      }
+
+      const response = result.trim().toLowerCase();
+      if (response === 'yes') {
+        console.log('[Custom Step] Evaluation: AI evaluation returned YES');
+        return true;
+      } else {
+        console.log('[Custom Step] Evaluation: AI evaluation returned NO or ambiguous');
+        return false;
+      }
+    } catch (error) {
+      console.error('[Custom Step] Evaluation: AI evaluation failed', error);
+    }
+
+    // Default to false if no explicit success found
+    console.log('[Custom Step] Evaluation: no explicit success found, defaulting to false');
+    return false;
   }
 
   private async executeCodeRabbit(

@@ -43,8 +43,8 @@ router.post('/', async (req, res) => {
     }
 
     // Check onFailure
-    if (config.onFailure && !['stop', 'continue'].includes(config.onFailure)) {
-      errors.push('onFailure must be either "stop" or "continue"');
+    if (config.onFailure && !['stop', 'continue', 'skip-optional'].includes(config.onFailure)) {
+      errors.push('onFailure must be either "stop", "continue", or "skip-optional"');
     }
 
     // Check steps
