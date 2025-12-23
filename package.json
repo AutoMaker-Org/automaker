@@ -53,6 +53,7 @@
   },
   "dependencies": {
     "cross-spawn": "^7.0.6",
+    "node": "^24.12.0",
     "rehype-sanitize": "^6.0.0",
     "tree-kill": "^1.2.2"
   },
