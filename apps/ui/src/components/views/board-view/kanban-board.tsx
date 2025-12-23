@@ -5,7 +5,16 @@ import { Button } from '@/components/ui/button';
 import { HotkeyButton } from '@/components/ui/hotkey-button';
 import { KanbanColumn, KanbanCard } from './components';
 import { Feature } from '@/store/app-store';
-import { FastForward, Lightbulb, Archive } from 'lucide-react';
+import {
+  FastForward,
+  Lightbulb,
+  Archive,
+  ChevronDown,
+  ChevronsDown,
+  EyeOff,
+  Eye,
+} from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { useKeyboardShortcutsConfig } from '@/hooks/use-keyboard-shortcuts';
 import { useResponsiveKanban } from '@/hooks/use-responsive-kanban';
 import { COLUMNS, ColumnId } from './constants';
@@ -41,6 +50,7 @@ interface KanbanBoardProps {
   onImplement: (feature: Feature) => void;
   onViewPlan: (feature: Feature) => void;
   onApprovePlan: (feature: Feature) => void;
+  onHide: (feature: Feature) => void;
   featuresWithContext: Set<string>;
   runningAutoTasks: string[];
   shortcuts: ReturnType<typeof useKeyboardShortcutsConfig>;
@@ -48,6 +58,18 @@ interface KanbanBoardProps {
   onShowSuggestions: () => void;
   suggestionsCount: number;
   onArchiveAllVerified: () => void;
+  backlogPagination: {
+    totalCount: number;
+    visibleCount: number;
+    hasMore: boolean;
+    remainingCount: number;
+    hiddenCount: number;
+    showOnlyHidden: boolean;
+  };
+  onShowMoreBacklog: () => void;
+  onShowAllBacklog: () => void;
+  onToggleShowOnlyHidden: () => void;
+  onResetBacklogPagination: () => void;
 }
 
 export function KanbanBoard({
@@ -73,6 +95,7 @@ export function KanbanBoard({
   onImplement,
   onViewPlan,
   onApprovePlan,
+  onHide,
   featuresWithContext,
   runningAutoTasks,
   shortcuts,
@@ -80,6 +103,11 @@ export function KanbanBoard({
   onShowSuggestions,
   suggestionsCount,
   onArchiveAllVerified,
+  backlogPagination,
+  onShowMoreBacklog,
+  onShowAllBacklog,
+  onToggleShowOnlyHidden,
+  onResetBacklogPagination,
 }: KanbanBoardProps) {
   // Use responsive column widths based on window size
   // containerStyle handles centering and ensures columns fit without horizontal scroll in Electron
@@ -102,11 +130,15 @@ export function KanbanBoard({
                 id={column.id}
                 title={column.title}
                 colorClass={column.colorClass}
-                count={columnFeatures.length}
+                count={
+                  column.id === 'backlog' ? backlogPagination.totalCount : columnFeatures.length
+                }
                 width={columnWidth}
                 opacity={backgroundSettings.columnOpacity}
                 showBorder={backgroundSettings.columnBorderEnabled}
                 hideScrollbar={backgroundSettings.hideScrollbar}
+                onCompact={column.id === 'backlog' ? onResetBacklogPagination : undefined}
+                visibleCount={column.id === 'backlog' ? backlogPagination.visibleCount : undefined}
                 headerAction={
                   column.id === 'verified' && columnFeatures.length > 0 ? (
                     <Button
@@ -139,6 +171,42 @@ export function KanbanBoard({
                           </span>
                         )}
                       </Button>
+                      {backlogPagination.hiddenCount > 0 && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className={cn(
+                            'h-6 w-6 p-0 relative',
+                            backlogPagination.showOnlyHidden
+                              ? 'text-primary hover:text-primary/80 bg-primary/10 hover:bg-primary/20'
+                              : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                          )}
+                          onClick={onToggleShowOnlyHidden}
+                          title={
+                            backlogPagination.showOnlyHidden
+                              ? 'Show all features'
+                              : `Show ${backlogPagination.hiddenCount} hidden feature${backlogPagination.hiddenCount > 1 ? 's' : ''}`
+                          }
+                          data-testid="show-hidden-button"
+                        >
+                          {backlogPagination.showOnlyHidden ? (
+                            <Eye className="w-3.5 h-3.5" />
+                          ) : (
+                            <EyeOff className="w-3.5 h-3.5" />
+                          )}
+                          <span
+                            className={cn(
+                              'absolute -top-1 -right-1 w-4 h-4 text-[9px] font-mono rounded-full flex items-center justify-center',
+                              backlogPagination.showOnlyHidden
+                                ? 'bg-primary text-primary-foreground'
+                                : 'bg-muted-foreground text-background'
+                            )}
+                            data-testid="hidden-count"
+                          >
+                            {backlogPagination.hiddenCount}
+                          </span>
+                        </Button>
+                      )}
                       {columnFeatures.length > 0 && (
                         <HotkeyButton
                           variant="ghost"
@@ -153,6 +221,32 @@ export function KanbanBoard({
                           Make
                         </HotkeyButton>
                       )}
+                    </div>
+                  ) : undefined
+                }
+                footerAction={
+                  column.id === 'backlog' && backlogPagination.hasMore ? (
+                    <div className="flex gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="flex-1 h-8 text-xs text-muted-foreground hover:text-foreground"
+                        onClick={onShowMoreBacklog}
+                        data-testid="show-more-backlog-button"
+                      >
+                        <ChevronDown className="w-3.5 h-3.5 mr-1" />
+                        +10
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="flex-1 h-8 text-xs text-muted-foreground hover:text-foreground"
+                        onClick={onShowAllBacklog}
+                        data-testid="show-all-backlog-button"
+                      >
+                        <ChevronsDown className="w-3.5 h-3.5 mr-1" />
+                        All ({backlogPagination.remainingCount})
+                      </Button>
                     </div>
                   ) : undefined
                 }
@@ -184,6 +278,7 @@ export function KanbanBoard({
                         onImplement={() => onImplement(feature)}
                         onViewPlan={() => onViewPlan(feature)}
                         onApprovePlan={() => onApprovePlan(feature)}
+                        onHide={() => onHide(feature)}
                         hasContext={featuresWithContext.has(feature.id)}
                         isCurrentAutoTask={runningAutoTasks.includes(feature.id)}
                         shortcutKey={shortcutKey}

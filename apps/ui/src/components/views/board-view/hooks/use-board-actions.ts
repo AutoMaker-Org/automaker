@@ -859,6 +859,22 @@ export function useBoardActions({
     });
   }, [features, runningAutoTasks, autoMode, updateFeature, persistFeatureUpdate]);
 
+  const handleHideFeature = useCallback(
+    (feature: Feature) => {
+      const newHidden = !feature.hidden;
+      const updates = { hidden: newHidden };
+      updateFeature(feature.id, updates);
+      persistFeatureUpdate(feature.id, updates);
+
+      toast.success(newHidden ? 'Feature hidden' : 'Feature unhidden', {
+        description: newHidden
+          ? `Hidden: ${truncateDescription(feature.description)}`
+          : `Shown: ${truncateDescription(feature.description)}`,
+      });
+    },
+    [updateFeature, persistFeatureUpdate]
+  );
+
   return {
     handleAddFeature,
     handleUpdateFeature,
@@ -879,5 +895,6 @@ export function useBoardActions({
     handleForceStopFeature,
     handleStartNextFeatures,
     handleArchiveAllVerified,
+    handleHideFeature,
   };
 }

@@ -1,8 +1,11 @@
-import { useMemo, useCallback } from 'react';
+import { useMemo, useCallback, useState } from 'react';
 import { Feature, useAppStore } from '@/store/app-store';
 import { resolveDependencies, getBlockingDependencies } from '@automaker/dependency-resolver';
 
 type ColumnId = Feature['status'];
+
+/** Number of backlog items to show per page */
+const BACKLOG_PAGE_SIZE = 10;
 
 interface UseBoardColumnFeaturesProps {
   features: Feature[];
@@ -21,6 +24,10 @@ export function useBoardColumnFeatures({
   currentWorktreeBranch,
   projectPath,
 }: UseBoardColumnFeaturesProps) {
+  // State for backlog pagination - how many items to show
+  const [backlogVisibleCount, setBacklogVisibleCount] = useState(BACKLOG_PAGE_SIZE);
+  // State for showing only hidden features (filter mode)
+  const [showOnlyHidden, setShowOnlyHidden] = useState(false);
   // Memoize column features to prevent unnecessary re-renders
   const columnFeaturesMap = useMemo(() => {
     const map: Record<ColumnId, Feature[]> = {
@@ -117,22 +124,23 @@ export function useBoardColumnFeatures({
 
       // Sort blocked features to the end of the backlog
       // This keeps the dependency order within each group (unblocked/blocked)
-      if (enableDependencyBlocking) {
-        const unblocked: Feature[] = [];
-        const blocked: Feature[] = [];
+      // Also sort hidden features to the very end
+      const visible: Feature[] = [];
+      const blocked: Feature[] = [];
+      const hidden: Feature[] = [];
 
-        for (const f of orderedFeatures) {
-          if (getBlockingDependencies(f, allFeatures).length > 0) {
-            blocked.push(f);
-          } else {
-            unblocked.push(f);
-          }
+      for (const f of orderedFeatures) {
+        if (f.hidden) {
+          hidden.push(f);
+        } else if (enableDependencyBlocking && getBlockingDependencies(f, allFeatures).length > 0) {
+          blocked.push(f);
+        } else {
+          visible.push(f);
         }
-
-        map.backlog = [...unblocked, ...blocked];
-      } else {
-        map.backlog = orderedFeatures;
       }
+
+      // Order: visible (unblocked) -> blocked -> hidden
+      map.backlog = [...visible, ...blocked, ...hidden];
     }
 
     return map;
@@ -147,10 +155,66 @@ export function useBoardColumnFeatures({
 
   const getColumnFeatures = useCallback(
     (columnId: ColumnId) => {
-      return columnFeaturesMap[columnId];
+      const allFeatures = columnFeaturesMap[columnId];
+      // Apply pagination and hidden filter only to backlog column
+      if (columnId === 'backlog') {
+        // If showing only hidden, filter to just hidden features
+        if (showOnlyHidden) {
+          return allFeatures.filter((f) => f.hidden);
+        }
+        // Otherwise, show non-hidden features with pagination
+        const nonHiddenFeatures = allFeatures.filter((f) => !f.hidden);
+        return nonHiddenFeatures.slice(0, backlogVisibleCount);
+      }
+      return allFeatures;
     },
-    [columnFeaturesMap]
+    [columnFeaturesMap, backlogVisibleCount, showOnlyHidden]
   );
+
+  // Count hidden features in backlog
+  const hiddenFeaturesCount = useMemo(() => {
+    return columnFeaturesMap.backlog.filter((f) => f.hidden).length;
+  }, [columnFeaturesMap.backlog]);
+
+  // Calculate backlog pagination info (based on non-hidden features when not in hidden filter mode)
+  const backlogPagination = useMemo(() => {
+    const nonHiddenFeatures = columnFeaturesMap.backlog.filter((f) => !f.hidden);
+    const totalCount = showOnlyHidden ? hiddenFeaturesCount : nonHiddenFeatures.length;
+    const visibleCount = showOnlyHidden
+      ? hiddenFeaturesCount
+      : Math.min(backlogVisibleCount, totalCount);
+    const hasMore = !showOnlyHidden && visibleCount < totalCount;
+    const remainingCount = totalCount - visibleCount;
+    return {
+      totalCount,
+      visibleCount,
+      hasMore,
+      remainingCount,
+      hiddenCount: hiddenFeaturesCount,
+      showOnlyHidden,
+    };
+  }, [columnFeaturesMap.backlog, backlogVisibleCount, hiddenFeaturesCount, showOnlyHidden]);
+
+  // Show more backlog items (10 more)
+  const showMoreBacklog = useCallback(() => {
+    setBacklogVisibleCount((prev) => prev + BACKLOG_PAGE_SIZE);
+  }, []);
+
+  // Show all backlog items
+  const showAllBacklog = useCallback(() => {
+    setBacklogVisibleCount(Infinity);
+  }, []);
+
+  // Toggle showing only hidden features
+  const toggleShowOnlyHidden = useCallback(() => {
+    setShowOnlyHidden((prev) => !prev);
+  }, []);
+
+  // Reset backlog pagination (e.g., when search changes)
+  const resetBacklogPagination = useCallback(() => {
+    setBacklogVisibleCount(BACKLOG_PAGE_SIZE);
+    setShowOnlyHidden(false);
+  }, []);
 
   // Memoize completed features for the archive modal
   const completedFeatures = useMemo(() => {
@@ -161,5 +225,10 @@ export function useBoardColumnFeatures({
     columnFeaturesMap,
     getColumnFeatures,
     completedFeatures,
+    backlogPagination,
+    showMoreBacklog,
+    showAllBacklog,
+    toggleShowOnlyHidden,
+    resetBacklogPagination,
   };
 }
