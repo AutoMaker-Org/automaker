@@ -4,7 +4,7 @@ import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/ca
 import { Button } from '@/components/ui/button';
 import { HotkeyButton } from '@/components/ui/hotkey-button';
 import { KanbanColumn, KanbanCard } from './components';
-import { Feature } from '@/store/app-store';
+import { Feature, useAppStore } from '@/store/app-store';
 import { FastForward, Lightbulb, Archive } from 'lucide-react';
 import { useKeyboardShortcutsConfig } from '@/hooks/use-keyboard-shortcuts';
 import { useResponsiveKanban } from '@/hooks/use-responsive-kanban';
@@ -84,6 +84,9 @@ export function KanbanBoard({
   // Use responsive column widths based on window size
   // containerStyle handles centering and ensures columns fit without horizontal scroll in Electron
   const { columnWidth, containerStyle } = useResponsiveKanban(COLUMNS.length);
+
+  // Get selected feature IDs from store for multi-selection highlighting
+  const selectedFeatureIds = useAppStore((state) => state.selectedFeatureIds);
 
   return (
     <div className="flex-1 overflow-x-hidden px-5 pb-4 relative" style={backgroundImageStyle}>
@@ -191,6 +194,7 @@ export function KanbanBoard({
                         glassmorphism={backgroundSettings.cardGlassmorphism}
                         cardBorderEnabled={backgroundSettings.cardBorderEnabled}
                         cardBorderOpacity={backgroundSettings.cardBorderOpacity}
+                        isSelected={selectedFeatureIds.includes(feature.id)}
                       />
                     );
                   })}

@@ -23,10 +23,12 @@ export function useApiKeyManagement() {
   // API key values
   const [anthropicKey, setAnthropicKey] = useState(apiKeys.anthropic);
   const [googleKey, setGoogleKey] = useState(apiKeys.google);
+  const [elevenLabsKey, setElevenLabsKey] = useState(apiKeys.elevenLabs);
 
   // Visibility toggles
   const [showAnthropicKey, setShowAnthropicKey] = useState(false);
   const [showGoogleKey, setShowGoogleKey] = useState(false);
+  const [showElevenLabsKey, setShowElevenLabsKey] = useState(false);
 
   // Test connection states
   const [testingConnection, setTestingConnection] = useState(false);
@@ -44,6 +46,7 @@ export function useApiKeyManagement() {
   useEffect(() => {
     setAnthropicKey(apiKeys.anthropic);
     setGoogleKey(apiKeys.google);
+    setElevenLabsKey(apiKeys.elevenLabs);
   }, [apiKeys]);
 
   // Check API key status from environment on mount
@@ -127,6 +130,7 @@ export function useApiKeyManagement() {
     setApiKeys({
       anthropic: anthropicKey,
       google: googleKey,
+      elevenLabs: elevenLabsKey,
     });
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
@@ -152,6 +156,12 @@ export function useApiKeyManagement() {
       testing: testingGeminiConnection,
       onTest: handleTestGeminiConnection,
       result: geminiTestResult,
+    },
+    elevenLabs: {
+      value: elevenLabsKey,
+      setValue: setElevenLabsKey,
+      show: showElevenLabsKey,
+      setShow: setShowElevenLabsKey,
     },
   };
 

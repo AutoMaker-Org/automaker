@@ -203,6 +203,7 @@ Automaker supports multiple authentication methods (in order of priority):
 | ---------------- | -------------------- | ------------------------------- |
 | API Key (env)    | `ANTHROPIC_API_KEY`  | Anthropic API key               |
 | API Key (stored) | —                    | Anthropic API key stored in app |
+| ElevenLabs       | —                    | ElevenLabs API key for Audio Synopsis (stored in Settings) |
 
 ### Persistent Setup (Optional)
 
@@ -231,8 +232,19 @@ Then restart your terminal or run `source ~/.bashrc`.
 - 👤 **AI Profiles** - Create and manage different AI agent profiles for various tasks
 - 💬 **Chat History** - Keep track of conversations and interactions with AI agents
 - ⌨️ **Keyboard Shortcuts** - Efficient navigation and actions via keyboard shortcuts
+- 🔊 **Audio Synopsis** - Select multiple tasks with Shift+Click and press Cmd+Y to hear an AI-generated audio summary (requires ElevenLabs API key)
 - 🎨 **Dark/Light Theme** - Beautiful UI with theme support
 - 🖥️ **Cross-Platform** - Desktop application built with Electron for Windows, macOS, and Linux
+
+### Audio Synopsis
+
+The Audio Synopsis feature allows you to quickly get an audio summary of selected tasks:
+
+1. **Select Tasks** - Hold `Shift` and click on tasks in the Kanban board or dependency graph to multi-select them
+2. **Generate Synopsis** - Press `Cmd+Y` (Mac) or `Ctrl+Y` (Windows/Linux) to generate and play an audio synopsis
+3. **Listen** - Claude AI summarizes the selected tasks, and ElevenLabs converts it to natural-sounding speech
+
+**Setup:** Add your ElevenLabs API key in Settings > API Keys. Get your key at [elevenlabs.io](https://elevenlabs.io/app/settings/api-keys).
 
 ## Tech Stack
 

@@ -5,6 +5,7 @@ import {
   KeyboardShortcut,
 } from '@/hooks/use-keyboard-shortcuts';
 import { Feature } from '@/store/app-store';
+import { useAudioSynopsis } from '@/hooks/use-audio-synopsis';
 
 interface UseBoardKeyboardShortcutsProps {
   features: Feature[];
@@ -22,6 +23,9 @@ export function useBoardKeyboardShortcuts({
   onViewOutput,
 }: UseBoardKeyboardShortcutsProps) {
   const shortcuts = useKeyboardShortcutsConfig();
+
+  // Audio synopsis hook for Cmd+Y shortcut
+  const { generateAndPlay: generateAudioSynopsis } = useAudioSynopsis();
 
   // Get in-progress features for keyboard shortcuts (memoized for shortcuts)
   const inProgressFeaturesForShortcuts = useMemo(() => {
@@ -52,6 +56,11 @@ export function useBoardKeyboardShortcuts({
         action: () => startNextFeaturesRef.current(),
         description: 'Start next features from backlog',
       },
+      {
+        key: shortcuts.audioSynopsis,
+        action: generateAudioSynopsis,
+        description: 'Generate audio synopsis of selected features',
+      },
     ];
 
     // Add shortcuts for in-progress cards (1-9 and 0 for 10th)
@@ -68,7 +77,7 @@ export function useBoardKeyboardShortcuts({
     });
 
     return shortcutsList;
-  }, [inProgressFeaturesForShortcuts, shortcuts, onAddFeature, onViewOutput]);
+  }, [inProgressFeaturesForShortcuts, shortcuts, onAddFeature, onViewOutput, generateAudioSynopsis]);
 
   useKeyboardShortcuts(boardShortcuts);
 

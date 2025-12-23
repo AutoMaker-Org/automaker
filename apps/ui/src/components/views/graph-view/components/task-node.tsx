@@ -83,8 +83,19 @@ export const TaskNode = memo(function TaskNode({ data, selected }: TaskNodeProps
   const isHighlighted = data.isHighlighted ?? false;
   const isDimmed = data.isDimmed ?? false;
 
+  // Multi-selection state (separate from React Flow's native selection)
+  const isMultiSelected = data.isMultiSelected ?? false;
+
   // Task is stopped if it's in_progress but not actively running
   const isStopped = data.status === 'in_progress' && !data.isRunning;
+
+  // Handle shift+click for multi-selection
+  const handleClick = (e: React.MouseEvent) => {
+    if (e.shiftKey) {
+      e.stopPropagation();
+      data.onShiftClick?.(data.id);
+    }
+  };
 
   return (
     <>
@@ -106,6 +117,8 @@ export const TaskNode = memo(function TaskNode({ data, selected }: TaskNodeProps
           'transition-all duration-300',
           config.borderClass,
           selected && 'ring-2 ring-brand-500 ring-offset-2 ring-offset-background',
+          // Multi-selection state (shift+click selection for audio synopsis)
+          isMultiSelected && 'ring-2 ring-brand-500 ring-offset-2 ring-offset-background',
           data.isRunning && 'animate-pulse-subtle',
           data.error && 'border-[var(--status-error)]',
           // Filter highlight states
@@ -113,6 +126,7 @@ export const TaskNode = memo(function TaskNode({ data, selected }: TaskNodeProps
           isHighlighted && !isMatched && 'graph-node-highlighted',
           isDimmed && 'graph-node-dimmed'
         )}
+        onClick={handleClick}
       >
         {/* Header with status and actions */}
         <div
