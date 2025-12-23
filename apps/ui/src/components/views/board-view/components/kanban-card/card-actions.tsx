@@ -10,7 +10,13 @@ import {
   Eye,
   Wand2,
   Archive,
+  SkipForward,
+  RefreshCw,
+  Trash2,
 } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import type { PipelineStep } from '@automaker/types';
 
 interface CardActionsProps {
   feature: Feature;
@@ -28,6 +34,9 @@ interface CardActionsProps {
   onComplete?: () => void;
   onViewPlan?: () => void;
   onApprovePlan?: () => void;
+  onSkipPipelineStep?: (stepId: string) => void;
+  onRetryPipelineStep?: (stepId: string) => void;
+  onClearPipelineStep?: (stepId: string) => void;
 }
 
 export function CardActions({
@@ -46,6 +55,9 @@ export function CardActions({
   onComplete,
   onViewPlan,
   onApprovePlan,
+  onSkipPipelineStep,
+  onRetryPipelineStep,
+  onClearPipelineStep,
 }: CardActionsProps) {
   return (
     <div className="flex flex-wrap gap-1.5 -mx-3 -mb-3 px-3 pb-3">
@@ -332,6 +344,85 @@ export function CardActions({
           )}
         </>
       )}
+
+      {/* Pipeline Step Actions */}
+      {feature.pipelineSteps &&
+        Object.entries(feature.pipelineSteps).map(([stepId, step]) => (
+          <div key={stepId} className="flex gap-1 items-center">
+            <Badge
+              variant={
+                step.status === 'passed'
+                  ? 'default'
+                  : step.status === 'failed'
+                    ? 'destructive'
+                    : 'secondary'
+              }
+              className="text-xs"
+            >
+              {step.type}: {step.status}
+            </Badge>
+
+            {step.status === 'failed' && onRetryPipelineStep && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-6 w-6 p-0"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onRetryPipelineStep(stepId);
+                    }}
+                    onPointerDown={(e) => e.stopPropagation()}
+                  >
+                    <RefreshCw className="w-3 h-3" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Retry Step</TooltipContent>
+              </Tooltip>
+            )}
+
+            {step.status !== 'passed' && step.status !== 'skipped' && onSkipPipelineStep && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 w-6 p-0"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onSkipPipelineStep(stepId);
+                    }}
+                    onPointerDown={(e) => e.stopPropagation()}
+                  >
+                    <SkipForward className="w-3 h-3" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Skip Step</TooltipContent>
+              </Tooltip>
+            )}
+
+            {step.status && onClearPipelineStep && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 w-6 p-0 text-red-500 hover:text-red-600"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onClearPipelineStep(stepId);
+                    }}
+                    onPointerDown={(e) => e.stopPropagation()}
+                  >
+                    <Trash2 className="w-3 h-3" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Clear Result</TooltipContent>
+              </Tooltip>
+            )}
+          </div>
+        ))}
     </div>
   );
 }

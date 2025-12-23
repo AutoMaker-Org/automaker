@@ -4,6 +4,7 @@ export type SettingsViewId =
   | 'api-keys'
   | 'claude'
   | 'ai-enhancement'
+  | 'pipeline'
   | 'appearance'
   | 'terminal'
   | 'keyboard'

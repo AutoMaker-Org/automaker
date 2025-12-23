@@ -11,6 +11,7 @@ interface TestResult {
 interface ApiKeyStatus {
   hasAnthropicKey: boolean;
   hasGoogleKey: boolean;
+  hasCodeRabbitKey: boolean;
 }
 
 /**
@@ -21,12 +22,14 @@ export function useApiKeyManagement() {
   const { apiKeys, setApiKeys } = useAppStore();
 
   // API key values
-  const [anthropicKey, setAnthropicKey] = useState(apiKeys.anthropic);
-  const [googleKey, setGoogleKey] = useState(apiKeys.google);
+  const [anthropicKey, setAnthropicKey] = useState(apiKeys.anthropic || '');
+  const [googleKey, setGoogleKey] = useState(apiKeys.google || '');
+  const [coderabbitKey, setCoderabbitKey] = useState(apiKeys.coderabbit || '');
 
   // Visibility toggles
   const [showAnthropicKey, setShowAnthropicKey] = useState(false);
   const [showGoogleKey, setShowGoogleKey] = useState(false);
+  const [showCoderabbitKey, setShowCoderabbitKey] = useState(false);
 
   // Test connection states
   const [testingConnection, setTestingConnection] = useState(false);
@@ -42,8 +45,9 @@ export function useApiKeyManagement() {
 
   // Sync local state with store
   useEffect(() => {
-    setAnthropicKey(apiKeys.anthropic);
-    setGoogleKey(apiKeys.google);
+    setAnthropicKey(apiKeys.anthropic || '');
+    setGoogleKey(apiKeys.google || '');
+    setCoderabbitKey(apiKeys.coderabbit || '');
   }, [apiKeys]);
 
   // Check API key status from environment on mount
@@ -57,6 +61,7 @@ export function useApiKeyManagement() {
             setApiKeyStatus({
               hasAnthropicKey: status.hasAnthropicKey,
               hasGoogleKey: status.hasGoogleKey,
+              hasCodeRabbitKey: (status as any).hasCodeRabbitKey || false,
             });
           }
         } catch (error) {
@@ -74,9 +79,9 @@ export function useApiKeyManagement() {
 
     try {
       const api = getElectronAPI();
-      const data = await api.setup.verifyClaudeAuth('api_key');
+      const data = await api.setup?.verifyClaudeAuth('api_key');
 
-      if (data.success && data.authenticated) {
+      if (data?.success && data.authenticated) {
         setTestResult({
           success: true,
           message: 'Connection successful! Claude responded.',
@@ -84,7 +89,7 @@ export function useApiKeyManagement() {
       } else {
         setTestResult({
           success: false,
-          message: data.error || 'Failed to connect to Claude API.',
+          message: data?.error || 'Failed to connect to Claude API.',
         });
       }
     } catch {
@@ -127,6 +132,7 @@ export function useApiKeyManagement() {
     setApiKeys({
       anthropic: anthropicKey,
       google: googleKey,
+      coderabbit: coderabbitKey,
     });
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
@@ -152,6 +158,15 @@ export function useApiKeyManagement() {
       testing: testingGeminiConnection,
       onTest: handleTestGeminiConnection,
       result: geminiTestResult,
+    },
+    coderabbit: {
+      value: coderabbitKey,
+      setValue: setCoderabbitKey,
+      show: showCoderabbitKey,
+      setShow: setShowCoderabbitKey,
+      testing: false,
+      onTest: async () => {},
+      result: null,
     },
   };
 

@@ -1,0 +1,25 @@
+{
+  "version": "1.0",
+  "enabled": true,
+  "onFailure": "stop",
+  "steps": [
+    {
+      "id": "coderabbit-essential",
+      "type": "custom",
+      "name": "CodeRabbit Essential Review",
+      "model": "same",
+      "required": true,
+      "autoTrigger": true,
+      "config": {
+        "prompt": "Review the code changes for critical issues, bugs, and style problems. Focus on code that impacts functionality and maintainability.",
+        "coderabbitEnabled": true,
+        "coderabbitRules": ["bug-risk", "code-style", "best-practices"],
+        "coderabbitSeverity": "medium",
+        "maxIssues": 10,
+        "fallbackToAI": true,
+        "includeTests": false,
+        "successCriteria": "No critical bugs or security issues found"
+      }
+    }
+  ]
+}

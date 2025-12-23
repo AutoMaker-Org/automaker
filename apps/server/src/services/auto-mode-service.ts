@@ -7,10 +7,17 @@
  * - Concurrent execution with max concurrency limits
  * - Progress streaming via events
  * - Verification and merge workflows
+ * - Pipeline step execution for custom verification workflows
  */
 
 import { ProviderFactory } from '../providers/provider-factory.js';
-import type { ExecuteOptions, Feature } from '@automaker/types';
+import type {
+  ExecuteOptions,
+  Feature,
+  PipelineConfig,
+  PipelineStepConfig,
+  PipelineStep,
+} from '@automaker/types';
 import {
   buildPromptWithImages,
   isAbortError,
@@ -27,6 +34,9 @@ import * as secureFs from '../lib/secure-fs.js';
 import type { EventEmitter } from '../lib/events.js';
 import { createAutoModeOptions, validateWorkingDirectory } from '../lib/sdk-options.js';
 import { FeatureLoader } from './feature-loader.js';
+import { PipelineConfigService } from './pipeline-config-service.js';
+import { PipelineStepExecutor } from './pipeline-step-executor.js';
+import { PipelineStorage } from './pipeline-storage.js';
 
 const execAsync = promisify(exec);
 
@@ -332,6 +342,15 @@ interface AutoModeConfig {
   projectPath: string;
 }
 
+interface PipelineQueueItem {
+  featureId: string;
+  projectPath: string;
+  stepConfigs: PipelineStepConfig[];
+  priority: 'high' | 'medium' | 'low';
+  addedAt: Date;
+  dependencies: string[];
+}
+
 export class AutoModeService {
   private events: EventEmitter;
   private runningFeatures = new Map<string, RunningFeature>();
@@ -341,6 +360,16 @@ export class AutoModeService {
   private autoLoopAbortController: AbortController | null = null;
   private config: AutoModeConfig | null = null;
   private pendingApprovals = new Map<string, PendingApproval>();
+  private pipelineConfigs = new Map<string, PipelineConfig>();
+  private pipelineExecutors = new Map<string, PipelineStepExecutor>();
+  private pipelineQueue: PipelineQueueItem[] = [];
+  private pipelineStorage = new PipelineStorage('./data');
+  private pipelineMetrics = {
+    totalExecuted: 0,
+    totalPassed: 0,
+    totalFailed: 0,
+    averageExecutionTime: 0,
+  };
 
   constructor(events: EventEmitter) {
     this.events = events;
@@ -419,6 +448,9 @@ export class AutoModeService {
         }
 
         await this.sleep(2000);
+
+        // Process pipeline queue
+        await this.processPipelineQueue();
       } catch (error) {
         console.error('[AutoMode] Loop iteration error:', error);
         await this.sleep(5000);
@@ -607,10 +639,24 @@ export class AutoModeService {
         }
       );
 
-      // Determine final status based on testing mode:
-      // - skipTests=false (automated testing): go directly to 'verified' (no manual verify needed)
-      // - skipTests=true (manual verification): go to 'waiting_approval' for manual review
-      const finalStatus = feature.skipTests ? 'waiting_approval' : 'verified';
+      // Execute pipeline steps if configured
+      await this.executePipelineSteps(projectPath, feature, abortController.signal);
+
+      // Determine final status based on testing mode and pipeline:
+      // - If pipeline is enabled and has steps, feature status will be the last step
+      // - If no pipeline or pipeline disabled, use original logic
+      const pipelineConfig = await this.loadPipelineConfig(projectPath);
+      let finalStatus: string;
+
+      if (pipelineConfig?.enabled && pipelineConfig.steps.length > 0) {
+        // Pipeline is active, status is already set to the last step
+        // Move to waiting_approval or verified based on skipTests
+        finalStatus = feature.skipTests ? 'waiting_approval' : 'verified';
+      } else {
+        // No pipeline, use original logic
+        finalStatus = feature.skipTests ? 'waiting_approval' : 'verified';
+      }
+
       await this.updateFeatureStatus(projectPath, featureId, finalStatus);
 
       this.emitAutoModeEvent('auto_mode_feature_complete', {
@@ -1420,7 +1466,11 @@ Format your response as a structured markdown document.`;
   private async updateFeatureStatus(
     projectPath: string,
     featureId: string,
-    status: string
+    status: string,
+    pipelineState?: {
+      pipelineSteps?: Record<string, PipelineStep>;
+      currentPipelineStep?: string;
+    }
   ): Promise<void> {
     // Features are stored in .automaker directory
     const featureDir = getFeatureDir(projectPath, featureId);
@@ -1439,10 +1489,320 @@ Format your response as a structured markdown document.`;
         // Clear the timestamp when moving to other statuses
         feature.justFinishedAt = undefined;
       }
+
+      // Persist pipeline state if provided
+      if (pipelineState) {
+        if (pipelineState.pipelineSteps !== undefined) {
+          feature.pipelineSteps = pipelineState.pipelineSteps;
+        }
+        if (pipelineState.currentPipelineStep !== undefined) {
+          feature.currentPipelineStep = pipelineState.currentPipelineStep;
+        } else {
+          // Explicitly clear currentPipelineStep when undefined is passed
+          delete feature.currentPipelineStep;
+        }
+      }
+
       await secureFs.writeFile(featurePath, JSON.stringify(feature, null, 2));
     } catch {
       // Feature file may not exist
     }
+  }
+
+  /**
+   * Load pipeline configuration for a project
+   */
+  private async loadPipelineConfig(projectPath: string): Promise<PipelineConfig | null> {
+    if (this.pipelineConfigs.has(projectPath)) {
+      return this.pipelineConfigs.get(projectPath)!;
+    }
+
+    try {
+      const configService = new PipelineConfigService(projectPath);
+      const config = await configService.loadPipelineConfig();
+      this.pipelineConfigs.set(projectPath, config);
+      return config;
+    } catch (error) {
+      console.error('Failed to load pipeline config:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Execute pipeline steps for a feature
+   */
+  private async executePipelineSteps(
+    projectPath: string,
+    feature: Feature,
+    signal: AbortSignal
+  ): Promise<void> {
+    const pipelineConfig = await this.loadPipelineConfig(projectPath);
+
+    if (!pipelineConfig?.enabled || pipelineConfig.steps.length === 0) {
+      // No pipeline configured, proceed normally
+      return;
+    }
+
+    // Get or create pipeline executor for this project
+    let executor = this.pipelineExecutors.get(projectPath);
+    if (!executor) {
+      executor = new PipelineStepExecutor(this, projectPath);
+      this.pipelineExecutors.set(projectPath, executor);
+    }
+
+    // Initialize pipeline steps on feature if not present
+    if (!feature.pipelineSteps) {
+      feature.pipelineSteps = {};
+    }
+
+    // Execute each step in order
+    for (const stepConfig of pipelineConfig.steps) {
+      // Check if step should be auto-triggered
+      if (!stepConfig.autoTrigger) {
+        console.log(`[Pipeline] Skipping step ${stepConfig.id} (auto-trigger disabled)`);
+        continue;
+      }
+
+      // Check if already completed
+      const existingStep = feature.pipelineSteps[stepConfig.id];
+      if (existingStep && existingStep.status === 'passed') {
+        console.log(`[Pipeline] Step ${stepConfig.id} already passed, skipping`);
+        continue;
+      }
+
+      // Update current step
+      feature.currentPipelineStep = stepConfig.id;
+      await this.updateFeatureStatus(projectPath, feature.id, feature.status || 'in_progress', {
+        pipelineSteps: feature.pipelineSteps,
+        currentPipelineStep: feature.currentPipelineStep,
+      });
+
+      // Execute the step
+      console.log(`[Pipeline] Executing step: ${stepConfig.name}`);
+
+      const result = await executor.executeStep({
+        feature,
+        stepConfig,
+        signal,
+        projectPath,
+        onProgress: (message) => {
+          this.emitAutoModeEvent('pipeline_step_progress', {
+            featureId: feature.id,
+            stepId: stepConfig.id,
+            message,
+            projectPath,
+          });
+        },
+        onStatusChange: (status) => {
+          // Update step status
+          if (!feature.pipelineSteps) {
+            feature.pipelineSteps = {};
+          }
+
+          feature.pipelineSteps[stepConfig.id] = {
+            id: stepConfig.id,
+            status,
+            startedAt: new Date().toISOString(),
+            completedAt:
+              status === 'passed' || status === 'failed' ? new Date().toISOString() : undefined,
+          };
+
+          this.updateFeatureStatus(projectPath!, feature.id, feature.status || 'in_progress', {
+            pipelineSteps: feature.pipelineSteps,
+            currentPipelineStep: feature.currentPipelineStep,
+          });
+        },
+      });
+
+      // Store result
+      if (!feature.pipelineSteps) {
+        feature.pipelineSteps = {};
+      }
+
+      feature.pipelineSteps[stepConfig.id] = {
+        id: stepConfig.id,
+        status: result.status,
+        result,
+        startedAt: new Date().toISOString(),
+        completedAt: new Date().toISOString(),
+      };
+
+      // Save detailed result to storage
+      try {
+        await this.pipelineStorage.saveStepResult(projectPath, feature.id, stepConfig.id, result);
+      } catch (error) {
+        console.warn(`[Pipeline] Failed to save step result to storage:`, error);
+        // Continue execution even if storage fails
+      }
+
+      // Update feature status
+      feature.status = stepConfig.id; // Set status to current step
+      await this.updateFeatureStatus(projectPath, feature.id, feature.status, {
+        pipelineSteps: feature.pipelineSteps,
+        currentPipelineStep: feature.currentPipelineStep,
+      });
+
+      // Check if step failed and is required
+      if (result.status === 'failed' && stepConfig.required) {
+        console.log(`[Pipeline] Required step ${stepConfig.id} failed, stopping pipeline`);
+        throw new Error(`Required pipeline step ${stepConfig.name} failed: ${result.output}`);
+      }
+
+      // Emit step completion
+      this.emitAutoModeEvent('pipeline_step_complete', {
+        featureId: feature.id,
+        stepId: stepConfig.id,
+        status: result.status,
+        result,
+        projectPath,
+      });
+    }
+
+    // Clear current step (pipeline completed)
+    feature.currentPipelineStep = undefined;
+    await this.updateFeatureStatus(projectPath, feature.id, feature.status || 'in_progress', {
+      pipelineSteps: feature.pipelineSteps,
+      // Pass undefined to explicitly clear currentPipelineStep from the file
+    });
+  }
+
+  /**
+   * Get the model to use for a pipeline step
+   */
+  getStepModel(feature: Feature, stepConfig: PipelineStepConfig): string {
+    if (stepConfig.model === 'same') {
+      return (feature.model as string) || DEFAULT_MODELS.claude;
+    }
+
+    if (stepConfig.model === 'different') {
+      // Use a different model than the feature's model
+      const featureModel = (feature.model as string) || DEFAULT_MODELS.claude;
+      switch (featureModel) {
+        case 'opus':
+          return 'sonnet';
+        case 'sonnet':
+          return 'opus';
+        case 'haiku':
+          return 'sonnet';
+        default:
+          return 'opus';
+      }
+    }
+
+    return stepConfig.model as string;
+  }
+
+  /**
+   * Execute an AI step for pipeline processing
+   */
+  async executeAIStep(params: {
+    feature: Feature;
+    stepConfig: PipelineStepConfig;
+    signal: AbortSignal;
+    prompt: string;
+    onProgress?: (message: string) => void;
+    projectPath?: string;
+  }): Promise<{ status: 'passed' | 'failed'; output: string; error?: string }> {
+    const { feature, stepConfig, signal, prompt, onProgress, projectPath } = params;
+
+    try {
+      // Get the model to use
+      const model = this.getStepModel(feature, stepConfig);
+
+      // Get provider for this model
+      const provider = ProviderFactory.getProviderForModel(model);
+
+      onProgress?.(`Executing ${stepConfig.name} with model ${model}...`);
+
+      const options: ExecuteOptions = {
+        prompt,
+        model,
+        maxTurns: 1, // Single turn for pipeline steps
+        cwd: projectPath || '',
+        allowedTools: ['Read', 'Glob', 'Grep'],
+        abortController: { signal, abort: () => {} } as AbortController,
+      };
+
+      const stream = provider.executeQuery(options);
+      let result = '';
+
+      for await (const msg of stream) {
+        if (msg.type === 'assistant' && msg.message?.content) {
+          for (const block of msg.message.content) {
+            if (block.type === 'text') {
+              result = block.text || '';
+              onProgress?.('Processing response...');
+            }
+          }
+        } else if (msg.type === 'result' && msg.subtype === 'success') {
+          result = msg.result || result;
+        }
+      }
+
+      return {
+        status: 'passed',
+        output: result,
+      };
+    } catch (error) {
+      return {
+        status: 'failed',
+        output: error instanceof Error ? error.message : 'AI step execution failed',
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  }
+
+  /**
+   * Skip a pipeline step
+   */
+  async skipPipelineStep(projectPath: string, featureId: string, stepId: string): Promise<void> {
+    const feature = await this.loadFeature(projectPath, featureId);
+    if (!feature || !feature.pipelineSteps) {
+      return;
+    }
+
+    const executor = this.pipelineExecutors.get(projectPath);
+    if (executor) {
+      await executor.skipStep(stepId, featureId);
+    }
+
+    // Update step status
+    feature.pipelineSteps[stepId] = {
+      id: stepId,
+      status: 'skipped',
+      completedAt: new Date().toISOString(),
+    };
+
+    await this.updateFeatureStatus(projectPath, featureId, feature.status || 'in_progress', {
+      pipelineSteps: feature.pipelineSteps,
+      currentPipelineStep: feature.currentPipelineStep,
+    });
+  }
+
+  /**
+   * Clear pipeline step results
+   */
+  async clearPipelineStepResults(
+    projectPath: string,
+    featureId: string,
+    stepId: string
+  ): Promise<void> {
+    const feature = await this.loadFeature(projectPath, featureId);
+    if (!feature || !feature.pipelineSteps) {
+      return;
+    }
+
+    const executor = this.pipelineExecutors.get(projectPath);
+    if (executor) {
+      await executor.clearStepResults(stepId, featureId);
+    }
+
+    // Remove step from feature
+    delete feature.pipelineSteps[stepId];
+    await this.updateFeatureStatus(projectPath, featureId, feature.status || 'in_progress', {
+      pipelineSteps: feature.pipelineSteps,
+      currentPipelineStep: feature.currentPipelineStep,
+    });
   }
 
   /**
@@ -1603,7 +1963,7 @@ ${feature.spec}
         .join('\n');
 
       prompt += `
-**📎 Context Images Attached:**
+**?? Context Images Attached:**
 The user has attached ${feature.imagePaths.length} image(s) for context. These images are provided both visually (in the initial message) and as files you can read:
 
 ${imagesList}
@@ -2328,7 +2688,7 @@ Implement all the changes described in the plan above.`;
             if (responseText.length > 0 && !responseText.endsWith('\n')) {
               responseText += '\n';
             }
-            responseText += `\n🔧 Tool: ${block.name}\n`;
+            responseText += `\n?? Tool: ${block.name}\n`;
             if (block.input) {
               responseText += `Input: ${JSON.stringify(block.input, null, 2)}\n`;
             }
@@ -2493,5 +2853,163 @@ Begin implementing task ${task.id} now.`;
         );
       }
     });
+  }
+
+  /**
+   * Add feature to pipeline queue
+   */
+  async addToPipelineQueue(
+    featureId: string,
+    projectPath: string,
+    stepConfigs: PipelineStepConfig[],
+    priority: 'high' | 'medium' | 'low' = 'medium'
+  ): Promise<void> {
+    // Check if already in queue
+    const existingIndex = this.pipelineQueue.findIndex(
+      (item) => item.featureId === featureId && item.projectPath === projectPath
+    );
+
+    if (existingIndex >= 0) {
+      // Update existing item
+      this.pipelineQueue[existingIndex] = {
+        ...this.pipelineQueue[existingIndex],
+        stepConfigs,
+        priority,
+        addedAt: new Date(),
+      };
+    } else {
+      // Add new item
+      const queueItem: PipelineQueueItem = {
+        featureId,
+        projectPath,
+        stepConfigs,
+        priority,
+        addedAt: new Date(),
+        dependencies: [], // Will be resolved later
+      };
+
+      this.pipelineQueue.push(queueItem);
+    }
+
+    // Sort queue by priority and time
+    this.sortPipelineQueue();
+
+    console.log(`[Pipeline] Added feature ${featureId} to queue with priority ${priority}`);
+    this.emitAutoModeEvent('pipeline_queued', { featureId, projectPath, priority });
+  }
+
+  /**
+   * Process pipeline queue
+   */
+  private async processPipelineQueue(): Promise<void> {
+    if (this.pipelineQueue.length === 0) {
+      return;
+    }
+
+    // Get executor
+    const executor = this.pipelineExecutors.get(this.config?.projectPath || '');
+    if (!executor) {
+      return;
+    }
+
+    // Process items in order
+    const itemsToProcess = this.pipelineQueue.filter((item) => {
+      // Check dependencies
+      if (item.dependencies.length > 0) {
+        return item.dependencies.every(
+          (dep) => this.pipelineQueue.findIndex((q) => q.featureId === dep) === -1
+        );
+      }
+      return true;
+    });
+
+    for (const item of itemsToProcess) {
+      try {
+        // Load feature
+        const feature = await this.loadFeature(item.projectPath, item.featureId);
+        if (!feature) {
+          console.error(`[Pipeline] Feature ${item.featureId} not found`);
+          continue;
+        }
+
+        // Execute steps
+        const startTime = Date.now();
+        await this.executePipelineSteps(item.projectPath, feature, new AbortController().signal);
+        const executionTime = Date.now() - startTime;
+
+        // Update metrics
+        this.updatePipelineMetrics(executionTime, true);
+
+        // Remove from queue
+        this.pipelineQueue = this.pipelineQueue.filter((q) => q !== item);
+
+        console.log(`[Pipeline] Completed pipeline for feature ${item.featureId}`);
+        this.emitAutoModeEvent('pipeline_completed', {
+          featureId: item.featureId,
+          projectPath: item.projectPath,
+          executionTime,
+        });
+      } catch (error) {
+        console.error(`[Pipeline] Failed to process ${item.featureId}:`, error);
+        this.updatePipelineMetrics(0, false);
+
+        // Keep in queue for retry if it's a required step failure
+        this.emitAutoModeEvent('pipeline_failed', {
+          featureId: item.featureId,
+          projectPath: item.projectPath,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        });
+      }
+    }
+  }
+
+  /**
+   * Sort pipeline queue by priority
+   */
+  private sortPipelineQueue(): void {
+    const priorityOrder = { high: 3, medium: 2, low: 1 };
+    this.pipelineQueue.sort((a, b) => {
+      // First by priority
+      const priorityDiff = priorityOrder[b.priority] - priorityOrder[a.priority];
+      if (priorityDiff !== 0) return priorityDiff;
+
+      // Then by time (earlier first)
+      return a.addedAt.getTime() - b.addedAt.getTime();
+    });
+  }
+
+  /**
+   * Update pipeline metrics
+   */
+  private updatePipelineMetrics(executionTime: number, passed: boolean): void {
+    this.pipelineMetrics.totalExecuted++;
+
+    if (passed) {
+      this.pipelineMetrics.totalPassed++;
+    } else {
+      this.pipelineMetrics.totalFailed++;
+    }
+
+    // Update average execution time
+    const totalTime =
+      this.pipelineMetrics.averageExecutionTime * (this.pipelineMetrics.totalExecuted - 1) +
+      executionTime;
+    this.pipelineMetrics.averageExecutionTime = totalTime / this.pipelineMetrics.totalExecuted;
+  }
+
+  /**
+   * Get pipeline metrics
+   */
+  getPipelineMetrics() {
+    return { ...this.pipelineMetrics };
+  }
+
+  /**
+   * Clear pipeline queue
+   */
+  clearPipelineQueue(): void {
+    this.pipelineQueue = [];
+    console.log('[Pipeline] Queue cleared');
+    this.emitAutoModeEvent('pipeline_queue_cleared', {});
   }
 }

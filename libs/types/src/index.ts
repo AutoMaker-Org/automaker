@@ -71,6 +71,7 @@ export {
   SETTINGS_VERSION,
   CREDENTIALS_VERSION,
   PROJECT_SETTINGS_VERSION,
+  validatePipelineConfig,
 } from './settings.js';
 
 // Model display constants
@@ -81,3 +82,21 @@ export {
   THINKING_LEVEL_LABELS,
   getModelDisplayName,
 } from './model-display.js';
+
+// Pipeline types and constants
+export type {
+  PipelineConfig,
+  PipelineStepConfig,
+  PipelineStep,
+  PipelineStepResult,
+  PipelineArtifact,
+  StepType,
+  StepTypeConfig,
+  StepStatus,
+  ReviewConfig,
+  SecurityConfig,
+  PerformanceConfig,
+  TestConfig,
+  CustomConfig,
+} from './pipeline.js';
+export { DEFAULT_PIPELINE_CONFIG, PIPELINE_CONFIG_SCHEMA } from './pipeline.js';

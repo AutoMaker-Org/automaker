@@ -3,6 +3,7 @@
  */
 
 import type { PlanningMode } from './settings.js';
+import type { PipelineStep } from './pipeline.js';
 
 export interface FeatureImagePath {
   id: string;
@@ -29,7 +30,7 @@ export interface Feature {
   description: string;
   passes?: boolean;
   priority?: number;
-  status?: string;
+  status?: string; // Changed to string to support dynamic pipeline statuses
   dependencies?: string[];
   spec?: string;
   model?: string;
@@ -54,6 +55,9 @@ export interface Feature {
   error?: string;
   summary?: string;
   startedAt?: string;
+  // Pipeline fields
+  pipelineSteps?: Record<string, PipelineStep>; // stepId -> PipelineStep
+  currentPipelineStep?: string; // Currently executing step ID
   [key: string]: unknown; // Keep catch-all for extensibility
 }
 

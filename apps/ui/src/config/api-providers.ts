@@ -1,7 +1,7 @@
 import type { Dispatch, SetStateAction } from 'react';
 import type { ApiKeys } from '@/store/app-store';
 
-export type ProviderKey = 'anthropic' | 'google';
+export type ProviderKey = 'anthropic' | 'google' | 'coderabbit';
 
 export interface ProviderConfig {
   key: ProviderKey;
@@ -50,11 +50,21 @@ export interface ProviderConfigParams {
     onTest: () => Promise<void>;
     result: { success: boolean; message: string } | null;
   };
+  coderabbit: {
+    value: string;
+    setValue: Dispatch<SetStateAction<string>>;
+    show: boolean;
+    setShow: Dispatch<SetStateAction<boolean>>;
+    testing: boolean;
+    onTest: () => Promise<void>;
+    result: { success: boolean; message: string } | null;
+  };
 }
 
 export const buildProviderConfigs = ({
   apiKeys,
   anthropic,
+  coderabbit,
 }: ProviderConfigParams): ProviderConfig[] => [
   {
     key: 'anthropic',
@@ -80,6 +90,32 @@ export const buildProviderConfigs = ({
     descriptionPrefix: 'Used for Claude AI features. Get your key at',
     descriptionLinkHref: 'https://console.anthropic.com/account/keys',
     descriptionLinkText: 'console.anthropic.com',
+    descriptionSuffix: '.',
+  },
+  {
+    key: 'coderabbit',
+    label: 'CodeRabbit API Key',
+    inputId: 'coderabbit-key',
+    placeholder: 'cr_...',
+    value: coderabbit.value,
+    setValue: coderabbit.setValue,
+    showValue: coderabbit.show,
+    setShowValue: coderabbit.setShow,
+    hasStoredKey: apiKeys.coderabbit,
+    inputTestId: 'coderabbit-api-key-input',
+    toggleTestId: 'toggle-coderabbit-visibility',
+    testButton: {
+      onClick: async () => {},
+      disabled: true,
+      loading: false,
+      testId: 'test-coderabbit-connection',
+    },
+    result: null,
+    resultTestId: 'coderabbit-test-connection-result',
+    resultMessageTestId: 'coderabbit-test-connection-message',
+    descriptionPrefix: 'Used for automated code reviews in pipelines. Get your key at',
+    descriptionLinkHref: 'https://coderabbit.ai',
+    descriptionLinkText: 'coderabbit.ai',
     descriptionSuffix: '.',
   },
   // {

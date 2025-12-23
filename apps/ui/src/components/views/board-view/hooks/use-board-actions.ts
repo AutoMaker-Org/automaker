@@ -859,6 +859,111 @@ export function useBoardActions({
     });
   }, [features, runningAutoTasks, autoMode, updateFeature, persistFeatureUpdate]);
 
+  // Pipeline step handlers
+  const handleSkipPipelineStep = useCallback(
+    async (featureId: string, stepId: string) => {
+      if (!currentProject) return;
+
+      try {
+        const api = getElectronAPI();
+        if (!api?.pipeline) {
+          console.error('Pipeline API not available');
+          return;
+        }
+
+        const result = await api.pipeline.skipStep(currentProject.path, featureId, stepId);
+
+        if (result.success) {
+          toast.success('Step skipped', {
+            description: `Pipeline step ${stepId} was skipped successfully.`,
+          });
+          // Reload features to update UI
+          await loadFeatures();
+        } else {
+          toast.error('Failed to skip step', {
+            description: result.error,
+          });
+        }
+      } catch (error) {
+        console.error('[Board] Error skipping pipeline step:', error);
+        toast.error('Error skipping step', {
+          description: error instanceof Error ? error.message : 'Unknown error',
+        });
+      }
+    },
+    [currentProject, loadFeatures]
+  );
+
+  const handleRetryPipelineStep = useCallback(
+    async (featureId: string, stepId: string) => {
+      if (!currentProject) return;
+
+      try {
+        const api = getElectronAPI();
+        if (!api?.pipeline) {
+          console.error('Pipeline API not available');
+          return;
+        }
+
+        // Clear the step first, then execute it
+        await api.pipeline.resetPipeline(currentProject.path, featureId, stepId);
+        const result = await api.pipeline.executeStep(currentProject.path, featureId, stepId);
+
+        if (result.success) {
+          toast.success('Step retry initiated', {
+            description: `Pipeline step ${stepId} is being retried.`,
+          });
+          // Reload features to update UI
+          await loadFeatures();
+        } else {
+          toast.error('Failed to retry step', {
+            description: result.error,
+          });
+        }
+      } catch (error) {
+        console.error('[Board] Error retrying pipeline step:', error);
+        toast.error('Error retrying step', {
+          description: error instanceof Error ? error.message : 'Unknown error',
+        });
+      }
+    },
+    [currentProject, loadFeatures]
+  );
+
+  const handleClearPipelineStep = useCallback(
+    async (featureId: string, stepId: string) => {
+      if (!currentProject) return;
+
+      try {
+        const api = getElectronAPI();
+        if (!api?.pipeline) {
+          console.error('Pipeline API not available');
+          return;
+        }
+
+        const result = await api.pipeline.resetPipeline(currentProject.path, featureId, stepId);
+
+        if (result.success) {
+          toast.success('Step cleared', {
+            description: `Pipeline step ${stepId} result was cleared.`,
+          });
+          // Reload features to update UI
+          await loadFeatures();
+        } else {
+          toast.error('Failed to clear step', {
+            description: result.error,
+          });
+        }
+      } catch (error) {
+        console.error('[Board] Error clearing pipeline step:', error);
+        toast.error('Error clearing step', {
+          description: error instanceof Error ? error.message : 'Unknown error',
+        });
+      }
+    },
+    [currentProject, loadFeatures]
+  );
+
   return {
     handleAddFeature,
     handleUpdateFeature,
@@ -879,5 +984,8 @@ export function useBoardActions({
     handleForceStopFeature,
     handleStartNextFeatures,
     handleArchiveAllVerified,
+    handleSkipPipelineStep,
+    handleRetryPipelineStep,
+    handleClearPipelineStep,
   };
 }

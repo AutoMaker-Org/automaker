@@ -8,7 +8,8 @@ import { Feature } from '@/store/app-store';
 import { FastForward, Lightbulb, Archive } from 'lucide-react';
 import { useKeyboardShortcutsConfig } from '@/hooks/use-keyboard-shortcuts';
 import { useResponsiveKanban } from '@/hooks/use-responsive-kanban';
-import { COLUMNS, ColumnId } from './constants';
+import { generateColumns } from './constants';
+import type { PipelineConfig } from '@automaker/types';
 
 interface KanbanBoardProps {
   sensors: any;
@@ -16,7 +17,7 @@ interface KanbanBoardProps {
   onDragStart: (event: any) => void;
   onDragEnd: (event: any) => void;
   activeFeature: Feature | null;
-  getColumnFeatures: (columnId: ColumnId) => Feature[];
+  getColumnFeatures: (columnId: string) => Feature[];
   backgroundImageStyle: React.CSSProperties;
   backgroundSettings: {
     columnOpacity: number;
@@ -27,6 +28,7 @@ interface KanbanBoardProps {
     cardBorderEnabled: boolean;
     cardBorderOpacity: number;
   };
+  pipelineConfig?: PipelineConfig | null;
   onEdit: (feature: Feature) => void;
   onDelete: (featureId: string) => void;
   onViewOutput: (feature: Feature) => void;
@@ -48,6 +50,9 @@ interface KanbanBoardProps {
   onShowSuggestions: () => void;
   suggestionsCount: number;
   onArchiveAllVerified: () => void;
+  onSkipPipelineStep?: (featureId: string, stepId: string) => void;
+  onRetryPipelineStep?: (featureId: string, stepId: string) => void;
+  onClearPipelineStep?: (featureId: string, stepId: string) => void;
 }
 
 export function KanbanBoard({
@@ -59,6 +64,7 @@ export function KanbanBoard({
   getColumnFeatures,
   backgroundImageStyle,
   backgroundSettings,
+  pipelineConfig,
   onEdit,
   onDelete,
   onViewOutput,
@@ -80,10 +86,16 @@ export function KanbanBoard({
   onShowSuggestions,
   suggestionsCount,
   onArchiveAllVerified,
+  onSkipPipelineStep,
+  onRetryPipelineStep,
+  onClearPipelineStep,
 }: KanbanBoardProps) {
+  // Generate columns dynamically based on pipeline config
+  const columns = generateColumns(pipelineConfig);
+
   // Use responsive column widths based on window size
   // containerStyle handles centering and ensures columns fit without horizontal scroll in Electron
-  const { columnWidth, containerStyle } = useResponsiveKanban(COLUMNS.length);
+  const { columnWidth, containerStyle } = useResponsiveKanban(columns.length);
 
   return (
     <div className="flex-1 overflow-x-hidden px-5 pb-4 relative" style={backgroundImageStyle}>
@@ -94,7 +106,7 @@ export function KanbanBoard({
         onDragEnd={onDragEnd}
       >
         <div className="h-full py-1" style={containerStyle}>
-          {COLUMNS.map((column) => {
+          {columns.map((column) => {
             const columnFeatures = getColumnFeatures(column.id);
             return (
               <KanbanColumn
@@ -102,6 +114,8 @@ export function KanbanBoard({
                 id={column.id}
                 title={column.title}
                 colorClass={column.colorClass}
+                description={column.description}
+                required={column.required}
                 count={columnFeatures.length}
                 width={columnWidth}
                 opacity={backgroundSettings.columnOpacity}
@@ -184,6 +198,21 @@ export function KanbanBoard({
                         onImplement={() => onImplement(feature)}
                         onViewPlan={() => onViewPlan(feature)}
                         onApprovePlan={() => onApprovePlan(feature)}
+                        onSkipPipelineStep={
+                          onSkipPipelineStep
+                            ? (stepId: string) => onSkipPipelineStep(feature.id, stepId)
+                            : undefined
+                        }
+                        onRetryPipelineStep={
+                          onRetryPipelineStep
+                            ? (stepId: string) => onRetryPipelineStep(feature.id, stepId)
+                            : undefined
+                        }
+                        onClearPipelineStep={
+                          onClearPipelineStep
+                            ? (stepId: string) => onClearPipelineStep(feature.id, stepId)
+                            : undefined
+                        }
                         hasContext={featuresWithContext.has(feature.id)}
                         isCurrentAutoTask={runningAutoTasks.includes(feature.id)}
                         shortcutKey={shortcutKey}

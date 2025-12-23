@@ -11,6 +11,7 @@ import { createDeleteApiKeyHandler } from './routes/delete-api-key.js';
 import { createApiKeysHandler } from './routes/api-keys.js';
 import { createPlatformHandler } from './routes/platform.js';
 import { createVerifyClaudeAuthHandler } from './routes/verify-claude-auth.js';
+import { createVerifyCodeRabbitAuthHandler } from './routes/verify-coderabbit-auth.js';
 import { createGhStatusHandler } from './routes/gh-status.js';
 
 export function createSetupRoutes(): Router {
@@ -24,6 +25,7 @@ export function createSetupRoutes(): Router {
   router.get('/api-keys', createApiKeysHandler());
   router.get('/platform', createPlatformHandler());
   router.post('/verify-claude-auth', createVerifyClaudeAuthHandler());
+  router.post('/verify-coderabbit-auth', createVerifyCodeRabbitAuthHandler());
   router.get('/gh-status', createGhStatusHandler());
 
   return router;

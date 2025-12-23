@@ -25,6 +25,9 @@ interface KanbanCardProps {
   onComplete?: () => void;
   onViewPlan?: () => void;
   onApprovePlan?: () => void;
+  onSkipPipelineStep?: (stepId: string) => void;
+  onRetryPipelineStep?: (stepId: string) => void;
+  onClearPipelineStep?: (stepId: string) => void;
   hasContext?: boolean;
   isCurrentAutoTask?: boolean;
   shortcutKey?: string;

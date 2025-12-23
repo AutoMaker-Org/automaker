@@ -1,0 +1,69 @@
+{
+  "version": "1.0",
+  "enabled": true,
+  "onFailure": "stop",
+  "steps": [
+    {
+      "id": "security-pre-check",
+      "type": "security",
+      "name": "Security Pre-Check",
+      "model": "same",
+      "required": true,
+      "autoTrigger": true,
+      "config": {
+        "checklist": [
+          "Input validation and sanitization",
+          "Authentication and authorization checks",
+          "SQL injection prevention",
+          "XSS protection",
+          "Sensitive data exposure"
+        ],
+        "severity": "medium",
+        "excludeTests": true
+      }
+    },
+    {
+      "id": "coderabbit-security",
+      "type": "custom",
+      "name": "CodeRabbit Security Deep Dive",
+      "model": "same",
+      "required": true,
+      "autoTrigger": true,
+      "dependencies": ["security-pre-check"],
+      "config": {
+        "prompt": "Perform a comprehensive security analysis of the code changes. Look for vulnerabilities, insecure patterns, and potential attack vectors. Pay special attention to authentication, authorization, data validation, and sensitive data handling.",
+        "coderabbitEnabled": true,
+        "coderabbitRules": ["security"],
+        "coderabbitCustomRules": [
+          "owasp-top-10",
+          "authentication-flaws",
+          "authorization-bypass",
+          "data-exposure",
+          "insecure-deserialization",
+          "security-headers",
+          "crypto-implementation",
+          "session-management"
+        ],
+        "coderabbitSeverity": "high",
+        "maxIssues": 25,
+        "fallbackToAI": true,
+        "includeTests": false,
+        "successCriteria": "No high or critical security vulnerabilities found"
+      }
+    },
+    {
+      "id": "security-report",
+      "type": "custom",
+      "name": "Security Summary Report",
+      "model": "same",
+      "required": false,
+      "autoTrigger": true,
+      "dependencies": ["coderabbit-security"],
+      "config": {
+        "prompt": "Generate a security summary report that categorizes findings by severity and provides clear remediation steps for each issue identified.",
+        "coderabbitEnabled": false,
+        "includeTests": false
+      }
+    }
+  ]
+}

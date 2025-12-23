@@ -1,0 +1,33 @@
+{
+  "version": "1.0",
+  "enabled": true,
+  "onFailure": "stop",
+  "steps": [
+    {
+      "id": "security",
+      "type": "security",
+      "name": "Security Analysis",
+      "model": "same",
+      "required": true,
+      "autoTrigger": true,
+      "config": {
+        "focus": ["vulnerabilities", "secrets", "authentication"],
+        "severity": "high",
+        "excludePatterns": ["*.test.ts", "*.mock.ts", "test/"]
+      }
+    },
+    {
+      "id": "review",
+      "type": "review",
+      "name": "Security Code Review",
+      "model": "same",
+      "required": true,
+      "autoTrigger": true,
+      "config": {
+        "focus": ["security", "best-practices"],
+        "maxIssues": 3,
+        "excludePatterns": ["*.test.ts", "*.spec.ts"]
+      }
+    }
+  ]
+}

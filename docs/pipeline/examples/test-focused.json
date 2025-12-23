@@ -1,0 +1,32 @@
+{
+  "version": "1.0",
+  "enabled": true,
+  "onFailure": "stop",
+  "steps": [
+    {
+      "id": "test",
+      "type": "test",
+      "name": "Unit Tests",
+      "model": "same",
+      "required": true,
+      "autoTrigger": true,
+      "config": {
+        "coverage": 90,
+        "excludePatterns": ["*.spec.ts", "test/integration/"]
+      }
+    },
+    {
+      "id": "review",
+      "type": "review",
+      "name": "Test Review",
+      "model": "same",
+      "required": true,
+      "autoTrigger": true,
+      "config": {
+        "focus": ["testing", "coverage"],
+        "maxIssues": 3,
+        "includePatterns": ["*.test.ts", "*.spec.ts"]
+      }
+    }
+  ]
+}

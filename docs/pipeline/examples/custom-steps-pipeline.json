@@ -1,0 +1,46 @@
+{
+  "version": "1.0",
+  "enabled": true,
+  "onFailure": "stop",
+  "steps": [
+    {
+      "id": "custom-lint",
+      "type": "custom",
+      "name": "Custom Linting Rules",
+      "model": "same",
+      "required": true,
+      "autoTrigger": true,
+      "config": {
+        "command": "npm run lint:custom",
+        "description": "Runs custom ESLint rules for the project",
+        "timeout": 300000
+      }
+    },
+    {
+      "id": "custom-audit",
+      "type": "custom",
+      "name": "Dependency Audit",
+      "model": "same",
+      "required": true,
+      "autoTrigger": false,
+      "config": {
+        "command": "npm audit --audit-level moderate",
+        "description": "Checks for known vulnerabilities in dependencies",
+        "timeout": 60000
+      }
+    },
+    {
+      "id": "review",
+      "type": "review",
+      "name": "Code Review",
+      "model": "same",
+      "required": true,
+      "autoTrigger": true,
+      "config": {
+        "focus": ["quality", "standards"],
+        "maxIssues": 5,
+        "excludePatterns": ["*.test.ts", "*.spec.ts", "generated/"]
+      }
+    }
+  ]
+}

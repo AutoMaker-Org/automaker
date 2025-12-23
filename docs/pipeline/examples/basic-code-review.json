@@ -1,0 +1,20 @@
+{
+  "version": "1.0",
+  "enabled": true,
+  "onFailure": "stop",
+  "steps": [
+    {
+      "id": "review",
+      "type": "review",
+      "name": "Code Review",
+      "model": "same",
+      "required": true,
+      "autoTrigger": true,
+      "config": {
+        "focus": ["quality", "standards"],
+        "maxIssues": 5,
+        "excludePatterns": ["*.test.ts", "*.spec.ts"]
+      }
+    }
+  ]
+}

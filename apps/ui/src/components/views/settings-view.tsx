@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useAppStore } from '@/store/app-store';
 
-import { useCliStatus, useSettingsView } from './settings-view/hooks';
+import { useCliStatus, useSettingsView, usePipelineConfig } from './settings-view/hooks';
 import { NAV_ITEMS } from './settings-view/config/navigation';
 import { SettingsHeader } from './settings-view/components/settings-header';
 import { KeyboardMapDialog } from './settings-view/components/keyboard-map-dialog';
@@ -16,6 +16,7 @@ import { TerminalSection } from './settings-view/terminal/terminal-section';
 import { AudioSection } from './settings-view/audio/audio-section';
 import { KeyboardShortcutsSection } from './settings-view/keyboard-shortcuts/keyboard-shortcuts-section';
 import { FeatureDefaultsSection } from './settings-view/feature-defaults/feature-defaults-section';
+import { PipelineSection } from './settings-view/pipeline-section';
 import { DangerZoneSection } from './settings-view/danger-zone/danger-zone-section';
 import type { Project as SettingsProject, Theme } from './settings-view/shared/types';
 import type { Project as ElectronProject } from '@/lib/electron';
@@ -86,6 +87,17 @@ export function SettingsView() {
   // Use settings view navigation hook
   const { activeView, navigateTo } = useSettingsView();
 
+  // Debug currentProject
+  console.log('[SettingsView] currentProject:', currentProject);
+
+  // Use pipeline configuration hook
+  const {
+    config: pipelineConfig,
+    setConfig: setPipelineConfig,
+    isLoading: isPipelineLoading,
+    error: pipelineError,
+  } = usePipelineConfig(currentProject?.path || null);
+
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showKeyboardMapDialog, setShowKeyboardMapDialog] = useState(false);
 
@@ -105,6 +117,10 @@ export function SettingsView() {
         );
       case 'ai-enhancement':
         return <AIEnhancementSection />;
+      case 'pipeline':
+        return (
+          <PipelineSection pipelineConfig={pipelineConfig} onPipelineChange={setPipelineConfig} />
+        );
       case 'appearance':
         return (
           <AppearanceSection

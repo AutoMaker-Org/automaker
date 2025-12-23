@@ -495,6 +495,14 @@ export class HttpApiClient implements ElectronAPI {
       error?: string;
     }> => this.post('/api/setup/verify-claude-auth', { authMethod }),
 
+    verifyCodeRabbitAuth: (options: {
+      apiKey: string;
+    }): Promise<{
+      success: boolean;
+      authenticated: boolean;
+      error?: string;
+    }> => this.post('/api/setup/verify-coderabbit-auth', options),
+
     getGhStatus: (): Promise<{
       success: boolean;
       installed: boolean;
@@ -599,6 +607,62 @@ export class HttpApiClient implements ElectronAPI {
     onEvent: (callback: (event: AutoModeEvent) => void) => {
       return this.subscribeToEvent('auto-mode:event', callback as EventCallback);
     },
+  };
+
+  // Pipeline API
+  pipeline = {
+    getConfig: (
+      projectPath: string
+    ): Promise<{
+      success: boolean;
+      config?: any;
+      error?: string;
+    }> => this.get(`/api/pipeline/config?projectPath=${encodeURIComponent(projectPath)}`),
+
+    updateConfig: (
+      projectPath: string,
+      config: any
+    ): Promise<{
+      success: boolean;
+      error?: string;
+    }> => this.post('/api/pipeline/config', { projectPath, config }),
+
+    executeStep: (
+      projectPath: string,
+      featureId: string,
+      stepId: string
+    ): Promise<{
+      success: boolean;
+      result?: any;
+      error?: string;
+    }> => this.post('/api/pipeline/execute-step', { projectPath, featureId, stepId }),
+
+    skipStep: (
+      projectPath: string,
+      featureId: string,
+      stepId: string
+    ): Promise<{
+      success: boolean;
+      error?: string;
+    }> => this.post('/api/pipeline/skip-step', { projectPath, featureId, stepId }),
+
+    resetPipeline: (
+      projectPath: string,
+      featureId: string,
+      stepId?: string
+    ): Promise<{
+      success: boolean;
+      error?: string;
+    }> => this.post('/api/pipeline/reset-pipeline', { projectPath, featureId, stepId }),
+
+    validateConfig: (
+      config: any
+    ): Promise<{
+      success: boolean;
+      valid?: boolean;
+      errors?: string[];
+      error?: string;
+    }> => this.post('/api/pipeline/validate-config', { config }),
   };
 
   // Enhance Prompt API

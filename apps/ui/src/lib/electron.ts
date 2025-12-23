@@ -464,6 +464,11 @@ export interface ElectronAPI {
       authenticated: boolean;
       error?: string;
     }>;
+    verifyCodeRabbitAuth: (options: { apiKey: string }) => Promise<{
+      success: boolean;
+      authenticated: boolean;
+      error?: string;
+    }>;
     getGhStatus?: () => Promise<{
       success: boolean;
       installed: boolean;
@@ -1032,6 +1037,11 @@ interface SetupAPI {
     authenticated: boolean;
     error?: string;
   }>;
+  verifyCodeRabbitAuth: (options: { apiKey: string }) => Promise<{
+    success: boolean;
+    authenticated: boolean;
+    error?: string;
+  }>;
   getGhStatus?: () => Promise<{
     success: boolean;
     installed: boolean;
@@ -1119,6 +1129,16 @@ function createMockSetupAPI(): SetupAPI {
 
     verifyClaudeAuth: async (authMethod?: 'cli' | 'api_key') => {
       console.log('[Mock] Verifying Claude auth with method:', authMethod);
+      // Mock always returns not authenticated
+      return {
+        success: true,
+        authenticated: false,
+        error: 'Mock environment - authentication not available',
+      };
+    },
+
+    verifyCodeRabbitAuth: async (options: { apiKey: string }) => {
+      console.log('[Mock] Verifying CodeRabbit auth');
       // Mock always returns not authenticated
       return {
         success: true,
