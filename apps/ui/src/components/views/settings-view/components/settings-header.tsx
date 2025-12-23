@@ -11,13 +11,7 @@ export function SettingsHeader({
   description = 'Configure your API keys and preferences',
 }: SettingsHeaderProps) {
   return (
-    <div
-      className={cn(
-        'shrink-0',
-        'border-b border-border/50',
-        'bg-gradient-to-r from-card/90 via-card/70 to-card/80 backdrop-blur-xl'
-      )}
-    >
+    <div className={cn('shrink-0', 'border-b border-white/10', 'bg-white/5 backdrop-blur-xl')}>
       <div className="px-8 py-6">
         <div className="flex items-center gap-4">
           <div

@@ -17,8 +17,9 @@ import {
   ProjectActions,
   SidebarNavigation,
   ProjectSelectorWithOptions,
-  SidebarFooter,
 } from './sidebar/components';
+import { Hud } from './hud';
+import { FloatingDock } from './floating-dock';
 import { TrashDialog, OnboardingDialog } from './sidebar/dialogs';
 import { SIDEBAR_FEATURE_FLAGS } from './sidebar/constants';
 import {
@@ -247,64 +248,27 @@ export function Sidebar() {
   };
 
   return (
-    <aside
-      className={cn(
-        'flex-shrink-0 flex flex-col z-30 relative',
-        // Glass morphism background with gradient
-        'bg-gradient-to-b from-sidebar/95 via-sidebar/85 to-sidebar/90 backdrop-blur-2xl',
-        // Premium border with subtle glow
-        'border-r border-border/60 shadow-[1px_0_20px_-5px_rgba(0,0,0,0.1)]',
-        // Smooth width transition
-        'transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]',
-        sidebarOpen ? 'w-16 lg:w-72' : 'w-16'
-      )}
-      data-testid="sidebar"
-    >
-      <CollapseToggleButton
-        sidebarOpen={sidebarOpen}
-        toggleSidebar={toggleSidebar}
-        shortcut={shortcuts.toggleSidebar}
+    <>
+      {/* Heads-Up Display (Top Bar) */}
+      <Hud
+        onOpenProjectPicker={() => setIsProjectPickerOpen(true)}
+        onOpenFolder={handleOpenFolder}
       />
 
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <SidebarHeader sidebarOpen={sidebarOpen} navigate={navigate} />
+      {/* Floating Navigation Dock */}
+      <FloatingDock />
 
-        {/* Project Actions - Moved above project selector */}
-        {sidebarOpen && (
-          <ProjectActions
-            setShowNewProjectModal={setShowNewProjectModal}
-            handleOpenFolder={handleOpenFolder}
-            setShowTrashDialog={setShowTrashDialog}
-            trashedProjects={trashedProjects}
-            shortcuts={{ openProject: shortcuts.openProject }}
-          />
-        )}
-
+      {/* Project Selector Dialog (Hidden logic, controlled by state) */}
+      <div className="hidden">
         <ProjectSelectorWithOptions
-          sidebarOpen={sidebarOpen}
+          sidebarOpen={true}
           isProjectPickerOpen={isProjectPickerOpen}
           setIsProjectPickerOpen={setIsProjectPickerOpen}
           setShowDeleteProjectDialog={setShowDeleteProjectDialog}
         />
-
-        <SidebarNavigation
-          currentProject={currentProject}
-          sidebarOpen={sidebarOpen}
-          navSections={navSections}
-          isActiveRoute={isActiveRoute}
-          navigate={navigate}
-        />
       </div>
 
-      <SidebarFooter
-        sidebarOpen={sidebarOpen}
-        isActiveRoute={isActiveRoute}
-        navigate={navigate}
-        hideWiki={hideWiki}
-        hideRunningAgents={hideRunningAgents}
-        runningAgentsCount={runningAgentsCount}
-        shortcuts={{ settings: shortcuts.settings }}
-      />
+      {/* Dialogs & Modals - Preservation of Logic */}
       <TrashDialog
         open={showTrashDialog}
         onOpenChange={setShowTrashDialog}
@@ -317,7 +281,6 @@ export function Sidebar() {
         isEmptyingTrash={isEmptyingTrash}
       />
 
-      {/* New Project Setup Dialog */}
       <CreateSpecDialog
         open={showSetupDialog}
         onOpenChange={setShowSetupDialog}
@@ -345,7 +308,6 @@ export function Sidebar() {
         onGenerateSpec={handleOnboardingGenerateSpec}
       />
 
-      {/* Delete Project Confirmation Dialog */}
       <DeleteProjectDialog
         open={showDeleteProjectDialog}
         onOpenChange={setShowDeleteProjectDialog}
@@ -353,7 +315,6 @@ export function Sidebar() {
         onConfirm={moveProjectToTrash}
       />
 
-      {/* New Project Modal */}
       <NewProjectModal
         open={showNewProjectModal}
         onOpenChange={setShowNewProjectModal}
@@ -362,6 +323,6 @@ export function Sidebar() {
         onCreateFromCustomUrl={handleCreateFromCustomUrl}
         isCreating={isCreatingProject}
       />
-    </aside>
+    </>
   );
 }

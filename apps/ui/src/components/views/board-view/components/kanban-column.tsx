@@ -7,6 +7,7 @@ interface KanbanColumnProps {
   id: string;
   title: string;
   colorClass: string;
+  columnClass?: string;
   count: number;
   children: ReactNode;
   headerAction?: ReactNode;
@@ -21,6 +22,7 @@ export const KanbanColumn = memo(function KanbanColumn({
   id,
   title,
   colorClass,
+  columnClass,
   count,
   children,
   headerAction,
@@ -43,7 +45,8 @@ export const KanbanColumn = memo(function KanbanColumn({
         'transition-[box-shadow,ring] duration-200',
         !width && 'w-72', // Only apply w-72 if no custom width
         showBorder && 'border border-border/60',
-        isOver && 'ring-2 ring-primary/30 ring-offset-1 ring-offset-background'
+        isOver && 'ring-2 ring-primary/30 ring-offset-1 ring-offset-background',
+        columnClass
       )}
       style={widthStyle}
       data-testid={`kanban-column-${id}`}

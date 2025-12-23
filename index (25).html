@@ -1,0 +1,723 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>automaker. | Kanban Board</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg-deep: #0b101a;
+        --sidebar-bg: rgba(13, 17, 26, 0.7);
+        --accent-cyan: #22d3ee;
+        --accent-orange: #f59e0b;
+        --accent-green: #10b981;
+        --accent-red: #ef4444;
+        --glass-bg: rgba(255, 255, 255, 0.03);
+        --glass-border: rgba(255, 255, 255, 0.07);
+        --card-radius: 1.5rem;
+      }
+
+      body {
+        font-family: 'Inter', sans-serif;
+        background-color: var(--bg-deep);
+        color: #e2e8f0;
+        overflow: hidden;
+        height: 100vh;
+      }
+
+      .mono {
+        font-family: 'JetBrains Mono', monospace;
+      }
+
+      /* Rainbow Prism Background Effect */
+      .prism-bg {
+        position: fixed;
+        inset: 0;
+        z-index: -1;
+        background:
+          radial-gradient(circle at 10% 20%, rgba(34, 211, 238, 0.1) 0%, transparent 40%),
+          radial-gradient(circle at 90% 80%, rgba(139, 92, 246, 0.08) 0%, transparent 40%),
+          radial-gradient(circle at 50% 50%, rgba(245, 158, 11, 0.04) 0%, transparent 60%),
+          linear-gradient(
+            145deg,
+            rgba(255, 0, 0, 0.02) 0%,
+            rgba(0, 255, 255, 0.02) 50%,
+            rgba(0, 0, 255, 0.02) 100%
+          );
+        filter: blur(80px);
+      }
+
+      /* Glassmorphism */
+      .glass {
+        background: var(--glass-bg);
+        backdrop-filter: blur(24px);
+        border: 1px solid var(--glass-border);
+      }
+
+      .sidebar-glass {
+        background: var(--sidebar-bg);
+        backdrop-filter: blur(40px);
+        border-right: 1px solid rgba(255, 255, 255, 0.04);
+      }
+
+      /* Nav Active State */
+      .nav-active {
+        background: linear-gradient(90deg, rgba(34, 211, 238, 0.12) 0%, transparent 100%);
+        border-left: 3px solid var(--accent-cyan);
+        color: #fff;
+      }
+
+      /* Column Specific Visuals */
+      .col-in-progress {
+        border: 1px solid rgba(34, 211, 238, 0.25);
+        background: rgba(34, 211, 238, 0.02);
+        box-shadow: inset 0 0 40px rgba(34, 211, 238, 0.03);
+      }
+      .col-waiting {
+        border-top: 2px solid rgba(245, 158, 11, 0.3);
+      }
+      .col-verified {
+        border-top: 2px solid rgba(16, 185, 129, 0.3);
+      }
+
+      /* Custom Scrollbar */
+      .custom-scrollbar::-webkit-scrollbar {
+        width: 5px;
+        height: 5px;
+      }
+      .custom-scrollbar::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      .custom-scrollbar::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 10px;
+      }
+      .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+        background: rgba(255, 255, 255, 0.2);
+      }
+
+      /* Shortcut Badge */
+      .shortcut-badge {
+        font-size: 9px;
+        background: rgba(255, 255, 255, 0.05);
+        color: rgba(255, 255, 255, 0.3);
+        padding: 1px 5px;
+        border-radius: 4px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        font-family: 'JetBrains Mono', monospace;
+        font-weight: 600;
+      }
+
+      /* Toggle Switch */
+      .toggle-track {
+        width: 42px;
+        height: 20px;
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 20px;
+        position: relative;
+        cursor: pointer;
+      }
+      .toggle-thumb {
+        position: absolute;
+        right: 3px;
+        top: 3px;
+        width: 12px;
+        height: 12px;
+        background: var(--accent-cyan);
+        border-radius: 50%;
+        box-shadow: 0 0 8px var(--accent-cyan);
+      }
+
+      /* Card Styles */
+      .kanban-card {
+        border-radius: var(--card-radius);
+        padding: 1.5rem;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+      .kanban-card:hover {
+        transform: translateY(-3px);
+        background: rgba(255, 255, 255, 0.06);
+        border-color: rgba(255, 255, 255, 0.15);
+      }
+
+      .btn-cyan {
+        background: var(--accent-cyan);
+        color: #0b101a;
+        font-weight: 800;
+        transition: all 0.2s;
+      }
+      .btn-cyan:hover {
+        filter: brightness(1.1);
+        box-shadow: 0 0 15px rgba(34, 211, 238, 0.4);
+      }
+
+      .status-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        display: inline-block;
+      }
+      .glow-cyan {
+        box-shadow: 0 0 10px var(--accent-cyan);
+      }
+      .glow-orange {
+        box-shadow: 0 0 10px var(--accent-orange);
+      }
+      .glow-green {
+        box-shadow: 0 0 10px var(--accent-green);
+      }
+
+      .line-clamp-3 {
+        display: -webkit-box;
+        -webkit-line-clamp: 3;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+      }
+    </style>
+  </head>
+  <body class="flex h-screen w-screen overflow-hidden">
+    <div class="prism-bg"></div>
+
+    <!-- SIDEBAR -->
+    <aside class="w-64 h-full sidebar-glass flex flex-col z-30 shrink-0">
+      <!-- Brand -->
+      <div class="p-6 flex items-center gap-2.5">
+        <div class="bg-cyan-500/10 p-1.5 rounded-lg border border-cyan-500/30">
+          <i data-lucide="code-2" class="w-5 h-5 text-cyan-400 stroke-[2.5px]"></i>
+        </div>
+        <h1 class="text-xl font-bold tracking-tighter text-white">
+          automaker<span class="text-cyan-400">.</span>
+        </h1>
+      </div>
+
+      <!-- Top Actions -->
+      <div class="px-4 space-y-3 mb-8">
+        <div class="flex gap-2">
+          <button
+            class="flex-1 glass py-2 rounded-xl text-[11px] font-bold hover:bg-white/10 transition flex items-center justify-center gap-2"
+          >
+            <i data-lucide="plus" class="w-3.5 h-3.5"></i> New
+          </button>
+          <button
+            class="w-10 glass rounded-xl flex items-center justify-center hover:bg-white/10 transition relative"
+          >
+            <i data-lucide="file-text" class="w-4 h-4 opacity-40"></i>
+            <span class="mono text-[8px] absolute top-1 right-1.5 opacity-40 font-bold">0</span>
+          </button>
+          <button
+            class="w-10 glass rounded-xl flex items-center justify-center hover:bg-white/10 transition relative"
+          >
+            <i data-lucide="layers" class="w-4 h-4 opacity-40"></i>
+            <span
+              class="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-rose-500 rounded-full border border-[#0b101a]"
+            ></span>
+          </button>
+        </div>
+
+        <!-- Project Dropdown -->
+        <div
+          class="glass p-3.5 rounded-2xl flex items-center justify-between cursor-pointer hover:bg-white/5 transition group"
+        >
+          <div class="flex items-center gap-3">
+            <i data-lucide="folder-kanban" class="w-4 h-4 text-cyan-400"></i>
+            <span class="text-xs font-bold text-slate-200">test case 1</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="shortcut-badge">P</span>
+            <i data-lucide="chevron-down" class="w-4 h-4 text-slate-500 group-hover:text-white"></i>
+          </div>
+        </div>
+      </div>
+
+      <!-- Navigation -->
+      <nav class="flex-1 px-0 space-y-8 overflow-y-auto custom-scrollbar">
+        <div>
+          <p class="px-6 text-[10px] font-black text-slate-600 uppercase tracking-[0.2em] mb-3">
+            Project
+          </p>
+          <div class="space-y-0.5">
+            <a href="#" class="nav-active flex items-center justify-between px-6 py-3 text-sm">
+              <div class="flex items-center gap-3">
+                <i data-lucide="layout-grid" class="w-4 h-4"></i
+                ><span class="font-medium">Kanban Board</span>
+              </div>
+              <span class="shortcut-badge">E</span>
+            </a>
+            <a
+              href="#"
+              class="flex items-center justify-between px-6 py-3 text-sm text-slate-400 hover:text-white hover:bg-white/5 transition"
+            >
+              <div class="flex items-center gap-3">
+                <i data-lucide="zap" class="w-4 h-4"></i
+                ><span class="font-medium">Agent Runner</span>
+              </div>
+              <span class="shortcut-badge">A</span>
+            </a>
+          </div>
+        </div>
+
+        <div>
+          <p class="px-6 text-[10px] font-black text-slate-600 uppercase tracking-[0.2em] mb-3">
+            Tools
+          </p>
+          <div class="space-y-0.5">
+            <a
+              href="#"
+              class="flex items-center justify-between px-6 py-3 text-sm text-slate-400 hover:text-white hover:bg-white/5 transition"
+            >
+              <div class="flex items-center gap-3">
+                <i data-lucide="file-edit" class="w-4 h-4"></i><span>Spec Editor</span>
+              </div>
+              <span class="shortcut-badge">D</span>
+            </a>
+            <a
+              href="#"
+              class="flex items-center justify-between px-6 py-3 text-sm text-slate-400 hover:text-white hover:bg-white/5 transition"
+            >
+              <div class="flex items-center gap-3">
+                <i data-lucide="database" class="w-4 h-4"></i><span>Context</span>
+              </div>
+              <span class="shortcut-badge">C</span>
+            </a>
+            <a
+              href="#"
+              class="flex items-center justify-between px-6 py-3 text-sm text-slate-400 hover:text-white hover:bg-white/5 transition"
+            >
+              <div class="flex items-center gap-3">
+                <i data-lucide="user-circle" class="w-4 h-4"></i><span>AI Profiles</span>
+              </div>
+              <span class="shortcut-badge">H</span>
+            </a>
+            <a
+              href="#"
+              class="flex items-center justify-between px-6 py-3 text-sm text-slate-400 hover:text-white hover:bg-white/5 transition"
+            >
+              <div class="flex items-center gap-3">
+                <i data-lucide="terminal" class="w-4 h-4"></i><span>Terminal</span>
+              </div>
+              <span class="shortcut-badge">T</span>
+            </a>
+          </div>
+        </div>
+      </nav>
+
+      <!-- Footer -->
+      <div class="p-4 border-t border-white/5 space-y-1 mt-auto bg-black/10">
+        <a
+          href="#"
+          class="flex items-center gap-3 px-3 py-2 text-sm text-slate-400 hover:text-white transition"
+        >
+          <i data-lucide="book-open" class="w-4 h-4"></i> Wiki
+        </a>
+        <div
+          class="flex items-center justify-between px-3 py-2 text-sm text-slate-400 hover:text-white cursor-pointer group transition"
+        >
+          <div class="flex items-center gap-3">
+            <i data-lucide="activity" class="w-4 h-4 text-cyan-400"></i> Running Agents
+          </div>
+          <span class="bg-cyan-500 text-slate-950 font-black text-[10px] px-2 py-0.5 rounded-full"
+            >3</span
+          >
+        </div>
+        <a
+          href="#"
+          class="flex items-center gap-3 px-3 py-2 text-sm text-slate-400 hover:text-white transition"
+        >
+          <i data-lucide="settings" class="w-4 h-4"></i> Settings
+          <span class="ml-auto shortcut-badge">S</span>
+        </a>
+      </div>
+    </aside>
+
+    <!-- MAIN CONTENT -->
+    <main class="flex-1 flex flex-col min-w-0">
+      <!-- Header -->
+      <header
+        class="h-16 flex items-center justify-between px-8 border-b border-white/5 bg-[#0b101a]/40 backdrop-blur-md z-20 shrink-0"
+      >
+        <div>
+          <h2 class="text-lg font-bold text-white tracking-tight">Kanban Board</h2>
+          <p class="text-[10px] text-slate-500 uppercase tracking-[0.2em] font-bold mono">
+            test case 1
+          </p>
+        </div>
+
+        <div class="flex items-center gap-5">
+          <div
+            class="flex items-center bg-white/5 border border-white/10 rounded-full px-4 py-1.5 gap-3"
+          >
+            <i data-lucide="users" class="w-4 h-4 text-slate-500"></i>
+            <div class="toggle-track">
+              <div class="toggle-thumb"></div>
+            </div>
+            <span class="mono text-xs font-bold text-slate-400">3</span>
+          </div>
+          <button
+            class="flex items-center gap-2 glass px-5 py-2 rounded-xl text-xs font-bold hover:bg-white/10 transition"
+          >
+            <i data-lucide="play" class="w-3.5 h-3.5 text-cyan-400 fill-cyan-400"></i> Auto Mode
+          </button>
+          <button
+            class="btn-cyan px-6 py-2 rounded-xl text-xs font-black flex items-center gap-2 shadow-lg shadow-cyan-500/20"
+          >
+            <i data-lucide="plus" class="w-4 h-4 stroke-[3.5px]"></i> ADD FEATURE
+          </button>
+        </div>
+      </header>
+
+      <!-- Search Bar -->
+      <div class="px-8 py-4 flex items-center justify-between shrink-0">
+        <div class="relative flex-1 max-w-2xl group">
+          <i
+            data-lucide="search"
+            class="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-cyan-400 transition-colors"
+          ></i>
+          <input
+            type="text"
+            placeholder="Search features by keyword..."
+            class="w-full bg-white/5 border border-white/10 rounded-2xl py-2.5 pl-12 pr-12 text-sm focus:outline-none focus:border-cyan-500/50 transition-all mono"
+          />
+          <div class="absolute right-4 top-1/2 -translate-y-1/2">
+            <span class="shortcut-badge">/</span>
+          </div>
+        </div>
+        <div class="flex items-center gap-2 ml-6">
+          <button class="p-2.5 glass rounded-xl text-slate-500 hover:text-white transition">
+            <i data-lucide="history" class="w-4.5 h-4.5"></i>
+          </button>
+          <button class="p-2.5 glass rounded-xl text-slate-500 hover:text-white transition">
+            <i data-lucide="trash-2" class="w-4.5 h-4.5"></i>
+          </button>
+          <div class="w-px h-6 bg-white/10 mx-1"></div>
+          <button class="p-2.5 glass rounded-xl text-slate-500 hover:text-white transition">
+            <i data-lucide="maximize-2" class="w-4.5 h-4.5"></i>
+          </button>
+          <button class="p-2.5 glass rounded-xl text-slate-500 hover:text-white transition">
+            <i data-lucide="layout" class="w-4.5 h-4.5"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Kanban Grid -->
+      <div class="flex-1 overflow-x-auto custom-scrollbar px-8 pb-8">
+        <div class="flex gap-6 h-full min-w-max items-start">
+          <!-- COLUMN: BACKLOG -->
+          <div class="w-80 flex flex-col gap-5 h-full">
+            <div class="flex items-center justify-between px-2 shrink-0">
+              <div class="flex items-center gap-3">
+                <span class="status-dot bg-slate-600"></span>
+                <h3 class="text-[11px] font-black text-slate-400 uppercase tracking-widest">
+                  Backlog
+                </h3>
+                <div class="flex items-center gap-1.5 opacity-40">
+                  <i data-lucide="lightbulb" class="w-3.5 h-3.5 text-yellow-500"></i>
+                  <i data-lucide="git-branch" class="w-3.5 h-3.5 text-cyan-400"></i>
+                  <span class="mono text-[9px] text-cyan-400 font-bold">Mabe 6</span>
+                </div>
+              </div>
+              <span
+                class="mono text-[10px] bg-white/5 px-2.5 py-0.5 rounded-full text-slate-500 border border-white/5"
+                >47</span
+              >
+            </div>
+
+            <div class="flex-1 overflow-y-auto custom-scrollbar space-y-4 pr-2">
+              <div class="glass kanban-card flex flex-col gap-4 group relative">
+                <div
+                  class="absolute top-5 right-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  <i
+                    data-lucide="trash-2"
+                    class="w-4 h-4 text-slate-600 hover:text-red-400 cursor-pointer"
+                  ></i>
+                </div>
+                <p class="text-[13px] text-slate-300 leading-relaxed font-medium line-clamp-3">
+                  Create a bouncing animation using CSS keyframes that simulates elastic motion...
+                </p>
+                <div
+                  class="flex items-center gap-1 text-[10px] text-slate-500 -mt-1 cursor-pointer hover:text-slate-300"
+                >
+                  <i data-lucide="chevron-down" class="w-3 h-3"></i> More
+                </div>
+                <div
+                  class="text-[10px] font-bold text-cyan-400/80 mono flex items-center gap-1.5 uppercase tracking-tight"
+                >
+                  <i data-lucide="layers" class="w-3.5 h-3.5"></i> Opus 4.2
+                </div>
+                <div class="flex gap-2">
+                  <button
+                    class="flex-1 glass py-2.5 rounded-xl text-[11px] font-bold flex items-center justify-center gap-2 hover:bg-white/10 transition"
+                  >
+                    <i data-lucide="edit-3" class="w-3.5 h-3.5"></i> Edit
+                  </button>
+                  <button
+                    class="flex-1 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border border-cyan-500/20 py-2.5 rounded-xl text-[11px] font-bold flex items-center justify-center gap-2 transition"
+                  >
+                    <i data-lucide="target" class="w-3.5 h-3.5"></i> Make
+                  </button>
+                </div>
+              </div>
+              <div class="glass kanban-card flex flex-col gap-4">
+                <p class="text-[13px] text-slate-300 leading-relaxed font-medium line-clamp-3">
+                  Implement CSS reset rules and establish base styling for the page including
+                  typography, spacing...
+                </p>
+                <div
+                  class="text-[10px] font-bold text-cyan-400/80 mono flex items-center gap-1.5 uppercase"
+                >
+                  <i data-lucide="layers" class="w-3.5 h-3.5"></i> Opus 4.3
+                </div>
+                <div class="flex gap-2">
+                  <button class="flex-1 glass py-2.5 rounded-xl text-[11px] font-bold">Edit</button>
+                  <button
+                    class="flex-1 bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 py-2.5 rounded-xl text-[11px] font-bold"
+                  >
+                    Make
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- COLUMN: IN PROGRESS -->
+          <div class="w-80 flex flex-col gap-5 col-in-progress rounded-[2.5rem] p-3 h-full">
+            <div class="flex items-center justify-between px-2 shrink-0">
+              <div class="flex items-center gap-3">
+                <span class="status-dot bg-cyan-400 glow-cyan"></span>
+                <h3 class="text-[11px] font-black text-slate-200 uppercase tracking-widest">
+                  In Progress
+                </h3>
+              </div>
+              <span
+                class="mono text-[10px] bg-cyan-500/10 px-2.5 py-0.5 rounded-full text-cyan-400 border border-cyan-500/20"
+                >3</span
+              >
+            </div>
+
+            <div class="flex-1 overflow-y-auto custom-scrollbar space-y-4 pr-1">
+              <!-- Active Card -->
+              <div
+                class="glass kanban-card border-cyan-500/40 bg-cyan-500/[0.08] flex flex-col gap-4"
+              >
+                <div class="flex justify-end items-center gap-2">
+                  <div
+                    class="bg-orange-500/15 text-orange-400 text-[9px] px-2.5 py-1 rounded-lg border border-orange-500/20 flex items-center gap-1.5 font-black mono"
+                  >
+                    <i data-lucide="refresh-cw" class="w-3 h-3"></i> Opus 6.5
+                  </div>
+                  <div
+                    class="bg-slate-900/50 text-slate-500 text-[9px] px-2 py-1 rounded-lg border border-white/5 font-mono"
+                  >
+                    00:04
+                  </div>
+                </div>
+                <p class="text-[13px] text-white leading-relaxed font-semibold">
+                  Configure the application for deployment to a web hosting platform. Set up
+                  necessary build processes...
+                </p>
+                <div class="flex gap-2 mt-2">
+                  <button
+                    class="flex-[4] btn-cyan py-3 rounded-xl text-[11px] font-black flex items-center justify-center gap-2 tracking-widest"
+                  >
+                    <i data-lucide="terminal" class="w-4 h-4 stroke-[2.5px]"></i> LOGS
+                    <span class="bg-black/10 px-1.5 rounded ml-1">8</span>
+                  </button>
+                  <button
+                    class="flex-1 bg-rose-500 hover:bg-rose-600 text-white py-3 rounded-xl flex items-center justify-center transition shadow-lg shadow-rose-500/20"
+                  >
+                    <i data-lucide="square" class="w-4 h-4 fill-current"></i>
+                  </button>
+                </div>
+              </div>
+              <!-- Card 2 -->
+              <div class="glass kanban-card flex flex-col gap-4">
+                <div class="flex justify-end gap-2">
+                  <div
+                    class="bg-orange-500/10 text-orange-400 text-[9px] px-2.5 py-1 rounded-lg border border-orange-500/10 flex items-center gap-1.5 font-bold mono"
+                  >
+                    <i data-lucide="refresh-cw" class="w-3 h-3"></i> Opus 4.5
+                  </div>
+                  <div
+                    class="bg-slate-900/50 text-slate-500 text-[9px] px-2 py-1 rounded-lg border border-white/5 font-mono"
+                  >
+                    00:07
+                  </div>
+                </div>
+                <p class="text-[13px] text-slate-300 leading-relaxed font-medium">
+                  Create helper functions for selecting and querying DOM elements. Provide reusable
+                  utilities for element...
+                </p>
+                <div class="flex gap-2 mt-2">
+                  <button
+                    class="flex-[4] bg-cyan-500/15 text-cyan-400 border border-cyan-500/20 py-3 rounded-xl text-[11px] font-bold flex items-center justify-center gap-2"
+                  >
+                    <i data-lucide="terminal" class="w-4 h-4"></i> LOGS
+                    <span class="bg-cyan-500/10 px-1.5 rounded ml-1">2</span>
+                  </button>
+                  <button
+                    class="flex-1 bg-rose-500/20 text-rose-500/50 border border-rose-500/20 py-3 rounded-xl flex items-center justify-center"
+                  >
+                    <i data-lucide="square" class="w-4 h-4"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- COLUMN: WAITING APPROVAL -->
+          <div class="w-80 flex flex-col gap-5 col-waiting rounded-[2.5rem] p-3 h-full">
+            <div class="flex items-center justify-between px-2 shrink-0">
+              <div class="flex items-center gap-3">
+                <span class="status-dot bg-orange-500 glow-orange"></span>
+                <h3 class="text-[11px] font-black text-slate-300 uppercase tracking-widest">
+                  Waiting Approval
+                </h3>
+              </div>
+              <span
+                class="mono text-[10px] bg-white/5 px-2.5 py-0.5 rounded-full text-slate-500 border border-white/5"
+                >2</span
+              >
+            </div>
+
+            <div class="flex-1 overflow-y-auto custom-scrollbar space-y-4 pr-1">
+              <div class="glass kanban-card flex flex-col gap-4 group">
+                <div
+                  class="flex justify-end gap-3.5 opacity-30 group-hover:opacity-100 transition-opacity"
+                >
+                  <i
+                    data-lucide="edit-3"
+                    class="w-4 h-4 cursor-pointer hover:text-white transition"
+                  ></i>
+                  <i
+                    data-lucide="copy"
+                    class="w-4 h-4 cursor-pointer hover:text-white transition"
+                  ></i>
+                  <i
+                    data-lucide="trash-2"
+                    class="w-4 h-4 cursor-pointer hover:text-rose-400 transition"
+                  ></i>
+                </div>
+                <p class="text-[13px] text-slate-300 leading-relaxed font-medium italic">
+                  Add descriptive labels and titles for each button animation style to identify them
+                  visually. Help users...
+                </p>
+                <div class="flex gap-2.5 mt-2">
+                  <button
+                    class="flex-1 glass border-white/10 py-3 rounded-xl text-[11px] font-bold flex items-center justify-center gap-2 hover:bg-white/10 transition"
+                  >
+                    <i data-lucide="wand-2" class="w-4 h-4"></i> Refine
+                  </button>
+                  <button
+                    class="flex-1 btn-cyan py-3 rounded-xl text-[11px] font-black flex items-center justify-center gap-2 tracking-widest"
+                  >
+                    <i data-lucide="git-commit" class="w-4 h-4 stroke-[2.5px]"></i> COMMIT
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- COLUMN: VERIFIED -->
+          <div class="w-80 flex flex-col gap-5 col-verified rounded-[2.5rem] p-3 h-full">
+            <div class="flex items-center justify-between px-2 shrink-0">
+              <div class="flex items-center gap-3">
+                <span class="status-dot bg-emerald-500 glow-green"></span>
+                <h3 class="text-[11px] font-black text-slate-300 uppercase tracking-widest">
+                  Verified
+                </h3>
+                <button
+                  class="ml-2 text-[10px] text-rose-500 flex items-center gap-1 hover:underline font-black transition"
+                >
+                  <i data-lucide="trash-2" class="w-3.5 h-3.5"></i> Delete All
+                </button>
+              </div>
+              <span
+                class="mono text-[10px] bg-emerald-500/10 px-2.5 py-0.5 rounded-full text-emerald-500 border border-emerald-500/20"
+                >4</span
+              >
+            </div>
+
+            <div class="flex-1 overflow-y-auto custom-scrollbar space-y-4 pr-1">
+              <div
+                class="glass kanban-card opacity-60 hover:opacity-100 flex flex-col gap-4 transition-all"
+              >
+                <div class="flex justify-end gap-3.5 opacity-20">
+                  <i data-lucide="edit-3" class="w-4 h-4"></i>
+                  <i data-lucide="trash-2" class="w-4 h-4"></i>
+                </div>
+                <p
+                  class="text-[13px] text-slate-400 leading-relaxed line-through decoration-slate-600 font-medium"
+                >
+                  Define foundational button styles with padding, borders, radius, and default
+                  colors. Create...
+                </p>
+                <div class="flex gap-2.5 mt-2">
+                  <button
+                    class="px-7 glass border-white/10 py-3 rounded-xl text-[11px] font-bold text-slate-500 hover:text-slate-300 transition"
+                  >
+                    Logs
+                  </button>
+                  <button
+                    class="flex-1 bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 py-3 rounded-xl text-[11px] font-black flex items-center justify-center gap-2 tracking-widest"
+                  >
+                    <i data-lucide="check-circle" class="w-4 h-4 stroke-[2.5px]"></i> COMPLETE
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- Floating UI -->
+    <div class="fixed bottom-8 right-8 flex flex-col gap-4 z-50">
+      <button
+        class="w-12 h-12 glass rounded-2xl flex items-center justify-center text-slate-400 hover:text-white transition shadow-2xl"
+      >
+        <i data-lucide="history" class="w-5 h-5"></i>
+      </button>
+      <button
+        class="w-14 h-14 bg-cyan-500 rounded-2xl flex items-center justify-center text-slate-950 shadow-2xl shadow-cyan-500/40 hover:scale-110 active:scale-95 transition-all"
+      >
+        <i data-lucide="message-square" class="w-7 h-7 stroke-[2.5px]"></i>
+      </button>
+    </div>
+
+    <script>
+      // Initialize Lucide Icons
+      lucide.createIcons();
+
+      // Smooth horizontal scroll for the board
+      const board = document.querySelector('.overflow-x-auto');
+      board.addEventListener(
+        'wheel',
+        (evt) => {
+          if (evt.deltaY !== 0) {
+            evt.preventDefault();
+            board.scrollLeft += evt.deltaY * 1.5;
+          }
+        },
+        { passive: false }
+      );
+
+      // Keyboard shortcut for search
+      window.addEventListener('keydown', (e) => {
+        if (e.key === '/') {
+          const searchInput = document.querySelector('input[type="text"]');
+          if (document.activeElement !== searchInput) {
+            e.preventDefault();
+            searchInput.focus();
+          }
+        }
+      });
+    </script>
+  </body>
+</html>

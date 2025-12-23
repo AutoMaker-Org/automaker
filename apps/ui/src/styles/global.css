@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
 @import 'tailwindcss';
 @import 'tw-animate-css';
 
@@ -43,8 +44,8 @@
   --color-foreground: var(--foreground);
   --color-foreground-secondary: var(--foreground-secondary);
   --color-foreground-muted: var(--foreground-muted);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, monospace;
 
   /* Sidebar colors */
   --color-sidebar-ring: var(--sidebar-ring);
@@ -119,29 +120,94 @@
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+
+  /* Animations */
+  --animate-in-fade: in-fade 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  --animate-in-scale: in-scale 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  --animate-out-fade: out-fade 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  --animate-out-scale: out-scale 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+
+  @keyframes in-fade {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes in-scale {
+    from {
+      opacity: 0;
+      transform: scale(0.96);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  @keyframes out-fade {
+    from {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    to {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+  }
+
+  @keyframes out-scale {
+    from {
+      opacity: 1;
+      transform: scale(1);
+    }
+    to {
+      opacity: 0;
+      transform: scale(0.96);
+    }
+  }
 }
 
 :root {
-  /* Default to light mode */
-  --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  /* Default to light mode (overridden by Prism values below for now as we pivot) */
+  --radius: 0.75rem;
+
+  /* PRISM THEME VALUES (Base) */
+  --bg-deep: #0b101a;
+  --sidebar-bg: rgba(13, 17, 26, 0.7);
+  --glass-bg: rgba(255, 255, 255, 0.03);
+  --glass-border: rgba(255, 255, 255, 0.07);
+
+  /* Accents */
+  --accent-cyan: #22d3ee;
+  --accent-orange: #f59e0b;
+  --accent-green: #10b981;
+  --accent-red: #ef4444;
+
+  /* Mapping to existing variables where possible, or overriding for the visual appearance */
+  --background: oklch(0.08 0.03 260); /* Approximation of #0b101a */
+  --foreground: oklch(0.95 0 0);
+  --card: oklch(1 0 0 / 0.03); /* Glass card default */
+  --card-foreground: oklch(0.95 0 0);
+  --popover: oklch(0.08 0.03 260 / 0.9);
+  --popover-foreground: oklch(0.95 0 0);
+  --primary: oklch(0.78 0.15 200); /* Cyan-ish */
+  --primary-foreground: oklch(0.1 0.03 260);
+  --secondary: oklch(1 0 0 / 0.1);
+  --secondary-foreground: oklch(0.98 0 0);
+  --muted: oklch(1 0 0 / 0.05);
+  --muted-foreground: oklch(0.7 0 0);
+  --accent: oklch(0.78 0.15 200);
+  --accent-foreground: oklch(0.1 0.03 260);
+  --destructive: oklch(0.6 0.2 20);
+  --border: oklch(1 0 0 / 0.1);
+  --input: oklch(1 0 0 / 0.05);
+  --ring: oklch(0.78 0.15 200);
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
@@ -159,7 +225,7 @@
   --background-80: oklch(1 0 0 / 0.8);
   --foreground-secondary: oklch(0.4 0 0);
   --foreground-muted: oklch(0.556 0 0);
-  --border-glass: oklch(0.145 0 0 / 0.1);
+  --border-glass: oklch(0.145 0 0 / 0.08);
   --brand-400: oklch(0.6 0.22 265);
   --brand-500: oklch(0.55 0.25 265);
   --brand-600: oklch(0.5 0.28 270);
@@ -191,17 +257,17 @@
   --status-in-progress: oklch(0.7 0.15 70);
   --status-waiting: oklch(0.65 0.18 50);
 
-  /* Shadow tokens */
+  /* Shadow tokens - more diffused for modern feel */
   --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.05);
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08), 0 4px 10px rgba(0, 0, 0, 0.02);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.08), 0 12px 24px -4px rgba(0, 0, 0, 0.04);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 20px 40px -8px rgba(0, 0, 0, 0.06);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.08), 0 30px 60px -12px rgba(0, 0, 0, 0.1);
 
   /* Transition tokens */
-  --transition-fast: 150ms ease;
-  --transition-normal: 200ms ease;
-  --transition-slow: 300ms ease-out;
+  --transition-fast: 150ms cubic-bezier(0.16, 1, 0.3, 1);
+  --transition-normal: 250ms cubic-bezier(0.16, 1, 0.3, 1);
+  --transition-slow: 400ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 /* Apply dark mode immediately based on system preference (before JS runs) */
@@ -214,13 +280,13 @@
 
     /* Text colors following hierarchy */
     --foreground: oklch(1 0 0); /* text-white */
-    --foreground-secondary: oklch(0.588 0 0); /* text-zinc-400 */
-    --foreground-muted: oklch(0.525 0 0); /* text-zinc-500 */
+    --foreground-secondary: oklch(0.65 0 0); /* lighter for better readability */
+    --foreground-muted: oklch(0.525 0 0);
 
     /* Card and popover backgrounds */
-    --card: oklch(0.14 0 0);
+    --card: oklch(0.1 0 0 / 0.6); /* Slightly transparent */
     --card-foreground: oklch(1 0 0);
-    --popover: oklch(0.1 0 0);
+    --popover: oklch(0.08 0 0 / 0.9);
     --popover-foreground: oklch(1 0 0);
 
     /* Brand colors - purple/violet theme */
@@ -231,18 +297,18 @@
     --brand-600: oklch(0.5 0.28 270);
 
     /* Glass morphism borders and accents */
-    --secondary: oklch(1 0 0 / 0.05);
+    --secondary: oklch(1 0 0 / 0.08);
     --secondary-foreground: oklch(1 0 0);
     --muted: oklch(0.176 0 0);
-    --muted-foreground: oklch(0.588 0 0);
-    --accent: oklch(1 0 0 / 0.1);
+    --muted-foreground: oklch(0.6 0 0);
+    --accent: oklch(1 0 0 / 0.12);
     --accent-foreground: oklch(1 0 0);
 
     /* Borders with transparency for glass effect */
-    --border: oklch(0.176 0 0);
-    --border-glass: oklch(1 0 0 / 0.1);
+    --border: oklch(1 0 0 / 0.08);
+    --border-glass: oklch(1 0 0 / 0.12);
     --destructive: oklch(0.6 0.25 25);
-    --input: oklch(0.04 0 0 / 0.8);
+    --input: oklch(1 0 0 / 0.08);
     --ring: oklch(0.55 0.25 265);
 
     /* Chart colors with brand theme */
@@ -253,13 +319,13 @@
     --chart-5: oklch(0.6 0.25 20);
 
     /* Sidebar with glass morphism */
-    --sidebar: oklch(0.04 0 0 / 0.5);
+    --sidebar: oklch(0.04 0 0 / 0.6);
     --sidebar-foreground: oklch(1 0 0);
     --sidebar-primary: oklch(0.55 0.25 265);
     --sidebar-primary-foreground: oklch(1 0 0);
-    --sidebar-accent: oklch(1 0 0 / 0.05);
+    --sidebar-accent: oklch(1 0 0 / 0.08);
     --sidebar-accent-foreground: oklch(1 0 0);
-    --sidebar-border: oklch(1 0 0 / 0.1);
+    --sidebar-border: oklch(1 0 0 / 0.08);
     --sidebar-ring: oklch(0.55 0.25 265);
 
     /* Action button colors */
@@ -292,67 +358,21 @@
     /* Shadow tokens - darker for dark mode */
     --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.3);
     --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(0, 0, 0, 0.3);
-    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -1px rgba(0, 0, 0, 0.3);
-    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -2px rgba(0, 0, 0, 0.2);
-    --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.5), 0 2px 4px -1px rgba(0, 0, 0, 0.4);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.6), 0 4px 6px -2px rgba(0, 0, 0, 0.4);
+    --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.7), 0 10px 10px -5px rgba(0, 0, 0, 0.5);
   }
 }
 
 .light {
-  /* Explicit light mode - same as root but ensures it overrides any dark defaults */
+  /* Explicit light mode overrides */
   --background: oklch(1 0 0); /* White */
-  --background-50: oklch(1 0 0 / 0.5);
-  --background-80: oklch(1 0 0 / 0.8);
-  --foreground: oklch(0.145 0 0); /* Dark text */
-  --foreground-secondary: oklch(0.4 0 0);
-  --foreground-muted: oklch(0.556 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.55 0.25 265);
-  --primary-foreground: oklch(1 0 0);
-  --brand-400: oklch(0.6 0.22 265);
-  --brand-500: oklch(0.55 0.25 265);
-  --brand-600: oklch(0.5 0.28 270);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.95 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --border-glass: oklch(0.145 0 0 / 0.1);
-  --input: oklch(1 0 0);
-  --ring: oklch(0.55 0.25 265);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: oklch(0.98 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.55 0.25 265);
-  --sidebar-primary-foreground: oklch(1 0 0);
-  --sidebar-accent: oklch(0.95 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.9 0 0);
-  --sidebar-ring: oklch(0.55 0.25 265);
-
-  /* Action button colors */
-  --action-view: oklch(0.55 0.25 265); /* Purple */
-  --action-view-hover: oklch(0.5 0.28 270);
-  --action-followup: oklch(0.55 0.2 230); /* Blue */
-  --action-followup-hover: oklch(0.5 0.22 230);
-  --action-commit: oklch(0.55 0.2 140); /* Green */
-  --action-commit-hover: oklch(0.5 0.22 140);
-  --action-verify: oklch(0.55 0.2 140); /* Green */
-  --action-verify-hover: oklch(0.5 0.22 140);
-
-  /* Running indicator - Purple */
-  --running-indicator: oklch(0.55 0.25 265);
-  --running-indicator-text: oklch(0.6 0.22 265);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  /* Re-declare all light vars to ensure priority if needed, 
+     but :root typically handles this. 
+     Just ensuring important overrides. */
+  --card: oklch(1 0 0 / 0.8);
 }
 
 @layer base {
@@ -360,10 +380,13 @@
     @apply border-border outline-ring/50;
   }
   html {
-    @apply bg-background;
+    @apply bg-background antialiased;
+    font-feature-settings:
+      'rlig' 1,
+      'calt' 1;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground tracking-tight;
     background-color: var(--background);
   }
 
@@ -386,6 +409,7 @@
   select:disabled,
   textarea:disabled {
     cursor: not-allowed;
+    opacity: 0.5;
   }
 }
 
@@ -407,8 +431,8 @@
     .gray
   )
   ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
 
 :is(
@@ -428,110 +452,35 @@
     .gray
   )
   ::-webkit-scrollbar-track {
-  background: var(--muted);
+  background: transparent;
 }
 
 :is(.dark, .retro) ::-webkit-scrollbar-thumb {
-  background: oklch(0.3 0 0);
-  border-radius: 4px;
+  background: oklch(1 0 0 / 0.2);
+  border-radius: 99px;
+  transition: background 0.2s;
 }
 
 :is(.dark, .retro) ::-webkit-scrollbar-thumb:hover {
-  background: oklch(0.4 0 0);
-}
-
-/* Retro Scrollbar override */
-.retro ::-webkit-scrollbar-thumb {
-  background: var(--primary);
-  border-radius: 0;
-}
-.retro ::-webkit-scrollbar-track {
-  background: var(--background);
-}
-
-/* Red theme scrollbar */
-.red ::-webkit-scrollbar-thumb {
-  background: oklch(0.35 0.15 25);
-  border-radius: 4px;
-}
-
-.red ::-webkit-scrollbar-thumb:hover {
-  background: oklch(0.45 0.18 25);
-}
-
-.red ::-webkit-scrollbar-track {
-  background: oklch(0.15 0.05 25);
-}
-
-/* Always visible scrollbar for file diffs and code blocks */
-.scrollbar-visible {
-  overflow-y: auto !important;
-  scrollbar-width: thin;
-  scrollbar-color: var(--muted-foreground) var(--muted);
-}
-
-.scrollbar-visible::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-
-.scrollbar-visible::-webkit-scrollbar-track {
-  background: var(--muted);
-  border-radius: 4px;
-}
-
-.scrollbar-visible::-webkit-scrollbar-thumb {
-  background: var(--muted-foreground);
-  border-radius: 4px;
-  min-height: 40px;
-}
-
-.scrollbar-visible::-webkit-scrollbar-thumb:hover {
-  background: var(--foreground-secondary);
-}
-
-/* Force scrollbar to always be visible (not auto-hide) */
-.scrollbar-visible::-webkit-scrollbar-thumb {
-  visibility: visible;
-}
-
-/* Styled scrollbar for code blocks and log entries (horizontal/vertical) */
-.scrollbar-styled {
-  scrollbar-width: thin;
-  scrollbar-color: var(--muted-foreground) transparent;
-}
-
-.scrollbar-styled::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-
-.scrollbar-styled::-webkit-scrollbar-track {
-  background: transparent;
-  border-radius: 3px;
-}
-
-.scrollbar-styled::-webkit-scrollbar-thumb {
-  background: oklch(0.35 0 0);
-  border-radius: 3px;
-}
-
-.scrollbar-styled::-webkit-scrollbar-thumb:hover {
-  background: oklch(0.45 0 0);
+  background: oklch(1 0 0 / 0.3);
 }
 
 /* Glass morphism utilities */
 @layer utilities {
   .glass {
-    @apply backdrop-blur-md border-white/10;
+    @apply backdrop-blur-xl border border-white/10 bg-white/5;
   }
 
   .glass-subtle {
-    @apply backdrop-blur-sm border-white/5;
+    @apply backdrop-blur-md border border-white/5 bg-white/3;
   }
 
   .glass-strong {
-    @apply backdrop-blur-xl border-white/20;
+    @apply backdrop-blur-2xl border border-white/10 bg-black/40;
+  }
+
+  .glass-panel {
+    @apply backdrop-blur-3xl border border-border-glass bg-background/60 shadow-xl;
   }
 
   /* Text color hierarchy utilities */
@@ -540,55 +489,73 @@
   }
 
   .text-secondary {
-    color: oklch(0.588 0 0); /* zinc-400 equivalent */
+    color: var(--foreground-secondary);
   }
 
   .text-muted {
-    color: oklch(0.525 0 0); /* zinc-500 equivalent */
+    color: var(--foreground-muted);
   }
 
   /* Brand gradient utilities */
   .gradient-brand {
-    background: linear-gradient(135deg, oklch(0.55 0.25 265), oklch(0.5 0.28 270));
+    background: linear-gradient(135deg, var(--brand-500), var(--brand-600));
   }
 
   .gradient-brand-subtle {
-    background: linear-gradient(135deg, oklch(0.55 0.25 265 / 0.1), oklch(0.5 0.28 270 / 0.1));
+    background: linear-gradient(
+      135deg,
+      color-mix(in oklch, var(--brand-500), transparent 90%),
+      color-mix(in oklch, var(--brand-600), transparent 90%)
+    );
   }
 
-  /* Glass morphism background utilities */
-  .bg-glass {
-    background: var(--card);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-  }
-
-  .bg-glass-80 {
-    background: var(--popover);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
+  .gradient-glass-border {
+    background: linear-gradient(
+      to bottom right,
+      rgba(255, 255, 255, 0.2),
+      rgba(255, 255, 255, 0.05)
+    );
   }
 
   /* Hover state utilities */
   .hover-glass {
-    transition: background-color 0.2s ease;
+    transition:
+      background-color 0.2s ease,
+      transform 0.2s ease;
   }
 
   .hover-glass:hover {
-    background: oklch(1 0 0 / 0.05);
+    background: color-mix(in oklch, var(--foreground), transparent 95%);
   }
 
-  .hover-glass-strong {
-    transition: background-color 0.2s ease;
+  .hover-lift {
+    transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   }
 
-  .hover-glass-strong:hover {
-    background: oklch(1 0 0 / 0.1);
+  .hover-lift:hover {
+    transform: translateY(-2px);
+  }
+
+  .hover-glow {
+    transition: box-shadow 0.3s ease;
+  }
+
+  .hover-glow:hover {
+    box-shadow: 0 0 20px -5px var(--primary);
   }
 
   /* Content area background */
   .content-bg {
-    background: var(--background);
+    background: transparent;
+  }
+
+  /* Utils for hiding scrollbar but allowing scroll */
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
   }
 
   /* Action button utilities */
@@ -644,7 +611,6 @@
   }
 
   /* Animated border for in-progress cards */
-  /* Using a subtle pulse animation instead of continuous gradient rotation for GPU efficiency */
   @keyframes border-pulse {
     0%,
     100% {
@@ -657,8 +623,8 @@
 
   .animated-border-wrapper {
     position: relative;
-    border-radius: 0.75rem;
-    padding: 2px;
+    border-radius: var(--radius);
+    padding: 1px;
     background: linear-gradient(
       135deg,
       var(--running-indicator),
@@ -677,7 +643,7 @@
   }
 
   .animated-border-wrapper > * {
-    border-radius: calc(0.75rem - 2px);
+    border-radius: calc(var(--radius) - 1px);
   }
 }
 
@@ -685,6 +651,7 @@
 
 .retro * {
   border-radius: 0 !important;
+  --radius: 0;
 }
 
 /* Animated Outline Button Styles */
@@ -692,12 +659,6 @@
   /* Default gradient - purple to blue */
   background: conic-gradient(from 90deg at 50% 50%, #a855f7 0%, #3b82f6 50%, #a855f7 100%);
 }
-
-/* Light mode - deeper purple to blue gradient for better visibility */
-
-/* Dark mode - purple to blue gradient */
-
-/* Retro mode - unique scanline + neon effect */
 
 @keyframes retro-glow {
   from {
@@ -708,24 +669,6 @@
   }
 }
 
-/* Dracula animated-outline - purple/pink */
-
-/* Nord animated-outline - frost blue */
-
-/* Monokai animated-outline - pink/yellow */
-
-/* Tokyo Night animated-outline - blue/magenta */
-
-/* Solarized animated-outline - blue/cyan */
-
-/* Gruvbox animated-outline - yellow/orange */
-
-/* Catppuccin animated-outline - mauve/pink */
-
-/* One Dark animated-outline - blue/magenta */
-
-/* Synthwave animated-outline - hot pink/cyan with glow */
-
 @keyframes synthwave-glow {
   from {
     filter: brightness(1) drop-shadow(0 0 3px #f97e72);
@@ -734,26 +677,6 @@
     filter: brightness(1.3) drop-shadow(0 0 10px #ff7edb);
   }
 }
-
-/* Slider Theme Styles */
-
-/* Dracula slider */
-
-/* Nord slider */
-
-/* Monokai slider */
-
-/* Tokyo Night slider */
-
-/* Solarized slider */
-
-/* Gruvbox slider */
-
-/* Catppuccin slider */
-
-/* One Dark slider */
-
-/* Synthwave slider */
 
 /* Line clamp utilities for text overflow prevention */
 .line-clamp-2 {
@@ -801,30 +724,6 @@
    XML SYNTAX HIGHLIGHTING
    Theme-aware colors for XML editor
    ======================================== */
-
-/* Light theme - professional and readable */
-
-/* Dark theme - high contrast */
-
-/* Retro theme - neon green on black */
-
-/* Dracula theme */
-
-/* Nord theme */
-
-/* Monokai theme */
-
-/* Tokyo Night theme */
-
-/* Solarized theme */
-
-/* Gruvbox theme */
-
-/* Catppuccin theme */
-
-/* One Dark theme */
-
-/* Synthwave theme */
 
 /* XML Editor container styles */
 .xml-editor {
@@ -1057,4 +956,89 @@
   .animate-progress-indeterminate {
     animation: none;
   }
+}
+
+/* Prism Scrollbar */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* Prism Shortcut Badge */
+.shortcut-badge {
+  font-size: 9px;
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.3);
+  padding: 1px 5px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  font-family: var(--font-mono);
+  font-weight: 600;
+}
+
+/* Prism Toggle Switch */
+.toggle-track {
+  width: 42px;
+  height: 20px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+  position: relative;
+  cursor: pointer;
+}
+.toggle-thumb {
+  position: absolute;
+  right: 3px;
+  top: 3px;
+  width: 12px;
+  height: 12px;
+  background: var(--accent-cyan);
+  border-radius: 50%;
+  box-shadow: 0 0 8px var(--accent-cyan);
+}
+
+/* Prism Column Styles */
+.col-in-progress {
+  border: 1px solid rgba(34, 211, 238, 0.25);
+  background: rgba(34, 211, 238, 0.02);
+  box-shadow: inset 0 0 40px rgba(34, 211, 238, 0.03);
+}
+.col-waiting {
+  border-top: 2px solid rgba(245, 158, 11, 0.3);
+}
+.col-verified {
+  border-top: 2px solid rgba(16, 185, 129, 0.3);
+}
+
+/* Prism Font Overrides - Ensure these take precedence */
+:root {
+  --font-sans:
+    'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+    'Helvetica Neue', Arial, 'Noto Sans', sans-serif;
+  --font-mono:
+    'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono',
+    'Courier New', monospace;
+
+  /* Ensure backgrounds are deep prism color */
+  --background: oklch(0.08 0.03 260);
+  --foreground: oklch(0.95 0 0);
+}
+
+body {
+  background-color: var(--bg-deep);
+  font-family: var(--font-sans);
+}
+
+.mono {
+  font-family: var(--font-mono) !important;
 }

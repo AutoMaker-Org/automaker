@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useAppStore } from '@/store/app-store';
+import { PageShell } from '@/components/layout/page-shell';
 
 import { useCliStatus, useSettingsView } from './settings-view/hooks';
 import { NAV_ITEMS } from './settings-view/config/navigation';
@@ -156,36 +157,38 @@ export function SettingsView() {
   };
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden content-bg" data-testid="settings-view">
-      {/* Header Section */}
-      <SettingsHeader />
+    <PageShell>
+      <div className="flex-1 flex flex-col overflow-hidden h-full" data-testid="settings-view">
+        {/* Header Section */}
+        <SettingsHeader />
 
-      {/* Content Area with Sidebar */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* Side Navigation - No longer scrolls, just switches views */}
-        <SettingsNavigation
-          navItems={NAV_ITEMS}
-          activeSection={activeView}
-          currentProject={currentProject}
-          onNavigate={navigateTo}
-        />
+        {/* Content Area with Sidebar */}
+        <div className="flex-1 flex overflow-hidden">
+          {/* Side Navigation - No longer scrolls, just switches views */}
+          <SettingsNavigation
+            navItems={NAV_ITEMS}
+            activeSection={activeView}
+            currentProject={currentProject}
+            onNavigate={navigateTo}
+          />
 
-        {/* Content Panel - Shows only the active section */}
-        <div className="flex-1 overflow-y-auto p-8">
-          <div className="max-w-4xl mx-auto">{renderActiveSection()}</div>
+          {/* Content Panel - Shows only the active section */}
+          <div className="flex-1 overflow-y-auto p-8">
+            <div className="max-w-4xl mx-auto">{renderActiveSection()}</div>
+          </div>
         </div>
+
+        {/* Keyboard Map Dialog */}
+        <KeyboardMapDialog open={showKeyboardMapDialog} onOpenChange={setShowKeyboardMapDialog} />
+
+        {/* Delete Project Confirmation Dialog */}
+        <DeleteProjectDialog
+          open={showDeleteDialog}
+          onOpenChange={setShowDeleteDialog}
+          project={currentProject}
+          onConfirm={moveProjectToTrash}
+        />
       </div>
-
-      {/* Keyboard Map Dialog */}
-      <KeyboardMapDialog open={showKeyboardMapDialog} onOpenChange={setShowKeyboardMapDialog} />
-
-      {/* Delete Project Confirmation Dialog */}
-      <DeleteProjectDialog
-        open={showDeleteDialog}
-        onOpenChange={setShowDeleteDialog}
-        project={currentProject}
-        onConfirm={moveProjectToTrash}
-      />
-    </div>
+    </PageShell>
   );
 }

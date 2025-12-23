@@ -24,6 +24,13 @@ const badgeVariants = cva(
         // Muted variants for subtle indication
         muted: 'border-border/50 bg-muted/50 text-muted-foreground',
         brand: 'border-transparent bg-brand-500/15 text-brand-500 border border-brand-500/30',
+        // Prism variants
+        prism:
+          'border-cyan-500/30 bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20 font-mono tracking-wide rounded-md',
+        'prism-orange':
+          'border-amber-500/30 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 font-mono tracking-wide rounded-md',
+        'prism-green':
+          'border-emerald-500/30 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 font-mono tracking-wide rounded-md',
       },
       size: {
         default: 'px-2.5 py-0.5 text-xs',

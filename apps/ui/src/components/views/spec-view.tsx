@@ -115,7 +115,7 @@ export function SpecView() {
 
   // Main view - spec exists
   return (
-    <div className="flex-1 flex flex-col overflow-hidden content-bg" data-testid="spec-view">
+    <div className="flex-1 flex flex-col overflow-hidden" data-testid="spec-view">
       <SpecHeader
         projectPath={currentProject.path}
         isRegenerating={isRegenerating}

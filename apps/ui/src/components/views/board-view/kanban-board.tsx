@@ -102,6 +102,7 @@ export function KanbanBoard({
                 id={column.id}
                 title={column.title}
                 colorClass={column.colorClass}
+                columnClass={column.columnClass}
                 count={columnFeatures.length}
                 width={columnWidth}
                 opacity={backgroundSettings.columnOpacity}

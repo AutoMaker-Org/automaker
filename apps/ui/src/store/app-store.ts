@@ -4,13 +4,11 @@ import type { Project, TrashedProject } from '@/lib/electron';
 import type {
   Feature as BaseFeature,
   FeatureImagePath,
+  FeatureTextFilePath, // Import missing type
   AgentModel,
   PlanningMode,
   AIProfile,
 } from '@automaker/types';
-
-// Re-export ThemeMode for convenience
-export type { ThemeMode };
 
 export type ViewMode =
   | 'welcome'
@@ -43,7 +41,25 @@ export type ThemeMode =
   | 'red'
   | 'cream'
   | 'sunset'
-  | 'gray';
+  | 'gray'
+  | 'forest'
+  | 'ocean'
+  | 'light'
+  | 'cream'
+  | 'solarizedlight'
+  | 'github'
+  | 'paper'
+  | 'rose'
+  | 'mint'
+  | 'lavender'
+  | 'sand'
+  | 'sky'
+  | 'peach'
+  | 'snow'
+  | 'sepia'
+  | 'gruvboxlight'
+  | 'nordlight'
+  | 'blossom';
 
 export type KanbanCardDetailLevel = 'minimal' | 'standard' | 'detailed';
 
@@ -903,19 +919,19 @@ const initialState: AppState = {
   chatHistoryOpen: false,
   autoModeByProject: {},
   autoModeActivityLog: [],
-  maxConcurrency: 3, // Default to 3 concurrent agents
-  kanbanCardDetailLevel: 'standard', // Default to standard detail level
-  boardViewMode: 'kanban', // Default to kanban view
-  defaultSkipTests: true, // Default to manual verification (tests disabled)
-  enableDependencyBlocking: true, // Default to enabled (show dependency blocking UI)
-  useWorktrees: false, // Default to disabled (worktree feature is experimental)
+  maxConcurrency: 3,
+  kanbanCardDetailLevel: 'standard',
+  boardViewMode: 'kanban',
+  defaultSkipTests: false,
+  enableDependencyBlocking: true,
+  useWorktrees: false,
   currentWorktreeByProject: {},
   worktreesByProject: {},
-  showProfilesOnly: false, // Default to showing all options (not profiles only)
-  keyboardShortcuts: DEFAULT_KEYBOARD_SHORTCUTS, // Default keyboard shortcuts
-  muteDoneSound: false, // Default to sound enabled (not muted)
-  enhancementModel: 'sonnet', // Default to sonnet for feature enhancement
   aiProfiles: DEFAULT_AI_PROFILES,
+  showProfilesOnly: false,
+  keyboardShortcuts: DEFAULT_KEYBOARD_SHORTCUTS,
+  muteDoneSound: false,
+  enhancementModel: 'sonnet',
   projectAnalysis: null,
   isAnalyzing: false,
   boardBackgroundByProject: {},
@@ -928,19 +944,23 @@ const initialState: AppState = {
     activeSessionId: null,
     maximizedSessionId: null,
     defaultFontSize: 14,
-    defaultRunScript: '',
+    defaultRunScript: '', // Empty string = standard shell
     screenReaderMode: false,
-    fontFamily: "Menlo, Monaco, 'Courier New', monospace",
-    scrollbackLines: 5000,
-    lineHeight: 1.0,
-    maxSessions: 100,
+    fontFamily: 'monospace',
+    scrollbackLines: 1000,
+    lineHeight: 1.2,
+    maxSessions: 20,
   },
   terminalLayoutByProject: {},
   specCreatingForProject: null,
-  defaultPlanningMode: 'skip' as PlanningMode,
-  defaultRequirePlanApproval: false,
+  defaultPlanningMode: 'lite',
+  defaultRequirePlanApproval: true,
   defaultAIProfileId: null,
   pendingPlanApproval: null,
+  // Claude Usage Defaults
+  claudeRefreshInterval: 60,
+  claudeUsage: null,
+  claudeUsageLastUpdated: null,
 };
 
 export const useAppStore = create<AppState & AppActions>()(

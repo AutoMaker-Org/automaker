@@ -16,6 +16,7 @@ import { RefreshCw } from 'lucide-react';
 import { useAutoMode } from '@/hooks/use-auto-mode';
 import { useKeyboardShortcutsConfig } from '@/hooks/use-keyboard-shortcuts';
 import { useWindowState } from '@/hooks/use-window-state';
+import { PageShell } from '@/components/layout/page-shell';
 // Board-view specific imports
 import { BoardHeader } from './board-view/board-header';
 import { BoardSearchBar } from './board-view/board-search-bar';

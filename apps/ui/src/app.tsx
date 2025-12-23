@@ -6,6 +6,8 @@ import { useSettingsMigration } from './hooks/use-settings-migration';
 import './styles/global.css';
 import './styles/theme-imports';
 
+import { Shell } from './components/layout/shell';
+
 export default function App() {
   const [showSplash, setShowSplash] = useState(() => {
     // Only show splash once per session
@@ -27,9 +29,9 @@ export default function App() {
   }, []);
 
   return (
-    <>
+    <Shell>
       <RouterProvider router={router} />
       {showSplash && <SplashScreen onComplete={handleSplashComplete} />}
-    </>
+    </Shell>
   );
 }

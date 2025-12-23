@@ -11,9 +11,9 @@ function Card({ className, gradient = false, ...props }: CardProps) {
     <div
       data-slot="card"
       className={cn(
-        'bg-card text-card-foreground flex flex-col gap-1 rounded-xl border border-white/10 backdrop-blur-md py-6',
-        // Premium layered shadow
-        'shadow-[0_1px_2px_rgba(0,0,0,0.05),0_4px_6px_rgba(0,0,0,0.05),0_10px_20px_rgba(0,0,0,0.04)]',
+        'bg-white/5 text-card-foreground flex flex-col gap-1 rounded-[1.5rem] border border-white/10 backdrop-blur-xl py-6 transition-all duration-300',
+        // Prism hover effect
+        'hover:-translate-y-1 hover:bg-white/[0.06] hover:border-white/15',
         // Gradient border option
         gradient &&
           'relative before:absolute before:inset-0 before:rounded-xl before:p-[1px] before:bg-gradient-to-br before:from-white/20 before:to-transparent before:pointer-events-none before:-z-10',

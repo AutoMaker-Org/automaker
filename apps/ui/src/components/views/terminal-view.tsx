@@ -46,6 +46,7 @@ import {
   defaultDropAnimationSideEffects,
 } from '@dnd-kit/core';
 import { cn } from '@/lib/utils';
+import { PageShell } from '@/components/layout/page-shell';
 
 interface TerminalStatus {
   enabled: boolean;
@@ -141,11 +142,11 @@ function TerminalTabButton({
       {...dragAttributes}
       {...dragListeners}
       className={cn(
-        'flex items-center gap-1 px-3 py-1.5 text-sm rounded-t-md border-b-2 cursor-grab active:cursor-grabbing transition-colors select-none',
+        'flex items-center gap-1 px-3 py-1.5 text-sm rounded-t-md border-b-2 cursor-grab active:cursor-grabbing transition-all select-none',
         isActive
-          ? 'bg-background border-brand-500 text-foreground'
-          : 'bg-muted border-transparent text-muted-foreground hover:text-foreground hover:bg-accent',
-        isOver && isDropTarget && isDraggingTab && 'ring-2 ring-blue-500 bg-blue-500/10',
+          ? 'bg-white/10 border-cyan-500 text-cyan-100 shadow-[0_-1px_10px_rgba(6,182,212,0.1)]'
+          : 'bg-white/5 border-transparent text-muted-foreground hover:text-cyan-50 hover:bg-white/10',
+        isOver && isDropTarget && isDraggingTab && 'ring-2 ring-cyan-500/50 bg-cyan-500/10',
         isDragging && 'opacity-50'
       )}
       onClick={onClick}
@@ -192,8 +193,8 @@ function NewTabDropZone({ isDropTarget }: { isDropTarget: boolean }) {
       className={cn(
         'flex items-center justify-center px-3 py-1.5 rounded-t-md border-2 border-dashed transition-all',
         isOver && isDropTarget
-          ? 'border-green-500 bg-green-500/10 text-green-500'
-          : 'border-transparent text-muted-foreground hover:border-border'
+          ? 'border-cyan-500/50 bg-cyan-500/10 text-cyan-400'
+          : 'border-transparent text-muted-foreground hover:border-white/10'
       )}
     >
       <SquarePlus className="h-4 w-4" />
@@ -1414,252 +1415,256 @@ export function TerminalView() {
 
   // Terminal view with tabs
   return (
-    <DndContext
-      sensors={sensors}
-      collisionDetection={closestCenter}
-      onDragStart={handleDragStart}
-      onDragOver={handleDragOver}
-      onDragEnd={handleDragEnd}
-      onDragCancel={handleDragCancel}
-    >
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Tab bar */}
-        <div className="flex items-center bg-card border-b border-border px-2">
-          {/* Tabs */}
-          <div className="flex items-center gap-1 flex-1 overflow-x-auto py-1">
-            {terminalState.tabs.map((tab) => (
-              <TerminalTabButton
-                key={tab.id}
-                tab={tab}
-                isActive={tab.id === terminalState.activeTabId}
-                onClick={() => setActiveTerminalTab(tab.id)}
-                onClose={() => killTerminalTab(tab.id)}
-                onRename={(newName) => renameTerminalTab(tab.id, newName)}
-                isDropTarget={activeDragId !== null || activeDragTabId !== null}
-                isDraggingTab={activeDragTabId !== null}
-              />
-            ))}
-
-            {(activeDragId || activeDragTabId) && <NewTabDropZone isDropTarget={true} />}
-
-            {/* New tab button */}
-            <button
-              className="flex items-center justify-center p-1.5 rounded hover:bg-accent text-muted-foreground hover:text-foreground"
-              onClick={createTerminalInNewTab}
-              title="New Tab"
-            >
-              <Plus className="h-4 w-4" />
-            </button>
-          </div>
-
-          {/* Toolbar buttons */}
-          <div className="flex items-center gap-1 pl-2 border-l border-border">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 px-2 text-muted-foreground hover:text-foreground"
-              onClick={() => createTerminal('horizontal')}
-              title="Split Right"
-            >
-              <SplitSquareHorizontal className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 px-2 text-muted-foreground hover:text-foreground"
-              onClick={() => createTerminal('vertical')}
-              title="Split Down"
-            >
-              <SplitSquareVertical className="h-4 w-4" />
-            </Button>
-
-            {/* Global Terminal Settings */}
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 px-2 text-muted-foreground hover:text-foreground"
-                  title="Terminal Settings"
-                >
-                  <Settings className="h-4 w-4" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-80" align="end">
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <h4 className="font-medium text-sm">Terminal Settings</h4>
-                    <p className="text-xs text-muted-foreground">
-                      Configure global terminal appearance
-                    </p>
-                  </div>
-
-                  {/* Default Font Size */}
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <Label className="text-sm">Default Font Size</Label>
-                      <span className="text-sm text-muted-foreground">
-                        {terminalState.defaultFontSize}px
-                      </span>
-                    </div>
-                    <Slider
-                      value={[terminalState.defaultFontSize]}
-                      min={8}
-                      max={24}
-                      step={1}
-                      onValueChange={([value]) => setTerminalDefaultFontSize(value)}
-                      onValueCommit={() => {
-                        toast.info('Font size changed', {
-                          description: 'New terminals will use this size',
-                        });
-                      }}
-                    />
-                  </div>
-
-                  {/* Font Family */}
-                  <div className="space-y-2">
-                    <Label className="text-sm">Font Family</Label>
-                    <select
-                      value={terminalState.fontFamily}
-                      onChange={(e) => {
-                        setTerminalFontFamily(e.target.value);
-                        toast.info('Font family changed', {
-                          description: 'Restart terminal for changes to take effect',
-                        });
-                      }}
-                      className={cn(
-                        'w-full px-2 py-1.5 rounded-md text-sm',
-                        'bg-accent/50 border border-border',
-                        'text-foreground',
-                        'focus:outline-none focus:ring-2 focus:ring-ring'
-                      )}
-                    >
-                      {TERMINAL_FONT_OPTIONS.map((font) => (
-                        <option key={font.value} value={font.value}>
-                          {font.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Line Height */}
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <Label className="text-sm">Line Height</Label>
-                      <span className="text-sm text-muted-foreground">
-                        {terminalState.lineHeight.toFixed(1)}
-                      </span>
-                    </div>
-                    <Slider
-                      value={[terminalState.lineHeight]}
-                      min={1.0}
-                      max={2.0}
-                      step={0.1}
-                      onValueChange={([value]) => setTerminalLineHeight(value)}
-                      onValueCommit={() => {
-                        toast.info('Line height changed', {
-                          description: 'Restart terminal for changes to take effect',
-                        });
-                      }}
-                    />
-                  </div>
-
-                  {/* Default Run Script */}
-                  <div className="space-y-2">
-                    <Label className="text-sm">Default Run Script</Label>
-                    <Input
-                      value={terminalState.defaultRunScript}
-                      onChange={(e) => setTerminalDefaultRunScript(e.target.value)}
-                      placeholder="e.g., claude, npm run dev"
-                      className="h-8 text-sm"
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Command to run when opening new terminals
-                    </p>
-                  </div>
-                </div>
-              </PopoverContent>
-            </Popover>
-          </div>
-        </div>
-
-        {/* Active tab content */}
-        <div className="flex-1 overflow-hidden bg-background">
-          {terminalState.maximizedSessionId ? (
-            // When a terminal is maximized, render only that terminal
-            <TerminalErrorBoundary
-              key={`boundary-maximized-${terminalState.maximizedSessionId}`}
-              sessionId={terminalState.maximizedSessionId}
-              onRestart={() => {
-                const sessionId = terminalState.maximizedSessionId!;
-                toggleTerminalMaximized(sessionId);
-                killTerminal(sessionId);
-                createTerminal();
-              }}
-            >
-              <TerminalPanel
-                key={`maximized-${terminalState.maximizedSessionId}`}
-                sessionId={terminalState.maximizedSessionId}
-                authToken={terminalState.authToken}
-                isActive={true}
-                onFocus={() => setActiveTerminalSession(terminalState.maximizedSessionId!)}
-                onClose={() => killTerminal(terminalState.maximizedSessionId!)}
-                onSplitHorizontal={() =>
-                  createTerminal('horizontal', terminalState.maximizedSessionId!)
-                }
-                onSplitVertical={() =>
-                  createTerminal('vertical', terminalState.maximizedSessionId!)
-                }
-                onNewTab={createTerminalInNewTab}
-                onSessionInvalid={() => {
-                  const sessionId = terminalState.maximizedSessionId!;
-                  console.log(
-                    `[Terminal] Maximized session ${sessionId} is invalid, removing from layout`
-                  );
-                  killTerminal(sessionId);
-                }}
-                isDragging={false}
-                isDropTarget={false}
-                fontSize={findTerminalFontSize(terminalState.maximizedSessionId)}
-                onFontSizeChange={(size) =>
-                  setTerminalPanelFontSize(terminalState.maximizedSessionId!, size)
-                }
-                isMaximized={true}
-                onToggleMaximize={() => toggleTerminalMaximized(terminalState.maximizedSessionId!)}
-              />
-            </TerminalErrorBoundary>
-          ) : activeTab?.layout ? (
-            renderPanelContent(activeTab.layout)
-          ) : (
-            <div className="flex-1 flex flex-col items-center justify-center text-center p-6">
-              <p className="text-muted-foreground mb-4">This tab is empty</p>
-              <Button variant="outline" size="sm" onClick={() => createTerminal()}>
-                <Plus className="h-4 w-4 mr-2" />
-                New Terminal
-              </Button>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Drag overlay */}
-      <DragOverlay
-        dropAnimation={{
-          sideEffects: defaultDropAnimationSideEffects({
-            styles: { active: { opacity: '0.5' } },
-          }),
-        }}
-        zIndex={1000}
+    <PageShell fullWidth>
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragStart={handleDragStart}
+        onDragOver={handleDragOver}
+        onDragEnd={handleDragEnd}
+        onDragCancel={handleDragCancel}
       >
-        {activeDragId ? (
-          <div className="relative inline-flex items-center gap-2 px-3.5 py-2 bg-card border-2 border-brand-500 rounded-lg shadow-xl pointer-events-none overflow-hidden">
-            <TerminalIcon className="h-4 w-4 text-brand-500 shrink-0" />
-            <span className="text-sm font-medium text-foreground whitespace-nowrap">
-              {dragOverTabId === 'new' ? 'New tab' : dragOverTabId ? 'Move to tab' : 'Terminal'}
-            </span>
+        <div className="flex-1 flex flex-col overflow-hidden">
+          {/* Tab bar */}
+          <div className="flex items-center bg-card border-b border-border px-2">
+            {/* Tabs */}
+            <div className="flex items-center gap-1 flex-1 overflow-x-auto py-1">
+              {terminalState.tabs.map((tab) => (
+                <TerminalTabButton
+                  key={tab.id}
+                  tab={tab}
+                  isActive={tab.id === terminalState.activeTabId}
+                  onClick={() => setActiveTerminalTab(tab.id)}
+                  onClose={() => killTerminalTab(tab.id)}
+                  onRename={(newName) => renameTerminalTab(tab.id, newName)}
+                  isDropTarget={activeDragId !== null || activeDragTabId !== null}
+                  isDraggingTab={activeDragTabId !== null}
+                />
+              ))}
+
+              {(activeDragId || activeDragTabId) && <NewTabDropZone isDropTarget={true} />}
+
+              {/* New tab button */}
+              <button
+                className="flex items-center justify-center p-1.5 rounded hover:bg-accent text-muted-foreground hover:text-foreground"
+                onClick={createTerminalInNewTab}
+                title="New Tab"
+              >
+                <Plus className="h-4 w-4" />
+              </button>
+            </div>
+
+            {/* Toolbar buttons */}
+            <div className="flex items-center gap-1 pl-2 border-l border-border">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2 text-muted-foreground hover:text-foreground"
+                onClick={() => createTerminal('horizontal')}
+                title="Split Right"
+              >
+                <SplitSquareHorizontal className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2 text-muted-foreground hover:text-foreground"
+                onClick={() => createTerminal('vertical')}
+                title="Split Down"
+              >
+                <SplitSquareVertical className="h-4 w-4" />
+              </Button>
+
+              {/* Global Terminal Settings */}
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2 text-muted-foreground hover:text-foreground"
+                    title="Terminal Settings"
+                  >
+                    <Settings className="h-4 w-4" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-80" align="end">
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <h4 className="font-medium text-sm">Terminal Settings</h4>
+                      <p className="text-xs text-muted-foreground">
+                        Configure global terminal appearance
+                      </p>
+                    </div>
+
+                    {/* Default Font Size */}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-sm">Default Font Size</Label>
+                        <span className="text-sm text-muted-foreground">
+                          {terminalState.defaultFontSize}px
+                        </span>
+                      </div>
+                      <Slider
+                        value={[terminalState.defaultFontSize]}
+                        min={8}
+                        max={24}
+                        step={1}
+                        onValueChange={([value]) => setTerminalDefaultFontSize(value)}
+                        onValueCommit={() => {
+                          toast.info('Font size changed', {
+                            description: 'New terminals will use this size',
+                          });
+                        }}
+                      />
+                    </div>
+
+                    {/* Font Family */}
+                    <div className="space-y-2">
+                      <Label className="text-sm">Font Family</Label>
+                      <select
+                        value={terminalState.fontFamily}
+                        onChange={(e) => {
+                          setTerminalFontFamily(e.target.value);
+                          toast.info('Font family changed', {
+                            description: 'Restart terminal for changes to take effect',
+                          });
+                        }}
+                        className={cn(
+                          'w-full px-2 py-1.5 rounded-md text-sm',
+                          'bg-accent/50 border border-border',
+                          'text-foreground',
+                          'focus:outline-none focus:ring-2 focus:ring-ring'
+                        )}
+                      >
+                        {TERMINAL_FONT_OPTIONS.map((font) => (
+                          <option key={font.value} value={font.value}>
+                            {font.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Line Height */}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-sm">Line Height</Label>
+                        <span className="text-sm text-muted-foreground">
+                          {terminalState.lineHeight.toFixed(1)}
+                        </span>
+                      </div>
+                      <Slider
+                        value={[terminalState.lineHeight]}
+                        min={1.0}
+                        max={2.0}
+                        step={0.1}
+                        onValueChange={([value]) => setTerminalLineHeight(value)}
+                        onValueCommit={() => {
+                          toast.info('Line height changed', {
+                            description: 'Restart terminal for changes to take effect',
+                          });
+                        }}
+                      />
+                    </div>
+
+                    {/* Default Run Script */}
+                    <div className="space-y-2">
+                      <Label className="text-sm">Default Run Script</Label>
+                      <Input
+                        value={terminalState.defaultRunScript}
+                        onChange={(e) => setTerminalDefaultRunScript(e.target.value)}
+                        placeholder="e.g., claude, npm run dev"
+                        className="h-8 text-sm"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Command to run when opening new terminals
+                      </p>
+                    </div>
+                  </div>
+                </PopoverContent>
+              </Popover>
+            </div>
           </div>
-        ) : null}
-      </DragOverlay>
-    </DndContext>
+
+          {/* Active tab content */}
+          <div className="flex-1 overflow-hidden bg-background">
+            {terminalState.maximizedSessionId ? (
+              // When a terminal is maximized, render only that terminal
+              <TerminalErrorBoundary
+                key={`boundary-maximized-${terminalState.maximizedSessionId}`}
+                sessionId={terminalState.maximizedSessionId}
+                onRestart={() => {
+                  const sessionId = terminalState.maximizedSessionId!;
+                  toggleTerminalMaximized(sessionId);
+                  killTerminal(sessionId);
+                  createTerminal();
+                }}
+              >
+                <TerminalPanel
+                  key={`maximized-${terminalState.maximizedSessionId}`}
+                  sessionId={terminalState.maximizedSessionId}
+                  authToken={terminalState.authToken}
+                  isActive={true}
+                  onFocus={() => setActiveTerminalSession(terminalState.maximizedSessionId!)}
+                  onClose={() => killTerminal(terminalState.maximizedSessionId!)}
+                  onSplitHorizontal={() =>
+                    createTerminal('horizontal', terminalState.maximizedSessionId!)
+                  }
+                  onSplitVertical={() =>
+                    createTerminal('vertical', terminalState.maximizedSessionId!)
+                  }
+                  onNewTab={createTerminalInNewTab}
+                  onSessionInvalid={() => {
+                    const sessionId = terminalState.maximizedSessionId!;
+                    console.log(
+                      `[Terminal] Maximized session ${sessionId} is invalid, removing from layout`
+                    );
+                    killTerminal(sessionId);
+                  }}
+                  isDragging={false}
+                  isDropTarget={false}
+                  fontSize={findTerminalFontSize(terminalState.maximizedSessionId)}
+                  onFontSizeChange={(size) =>
+                    setTerminalPanelFontSize(terminalState.maximizedSessionId!, size)
+                  }
+                  isMaximized={true}
+                  onToggleMaximize={() =>
+                    toggleTerminalMaximized(terminalState.maximizedSessionId!)
+                  }
+                />
+              </TerminalErrorBoundary>
+            ) : activeTab?.layout ? (
+              renderPanelContent(activeTab.layout)
+            ) : (
+              <div className="flex-1 flex flex-col items-center justify-center text-center p-6">
+                <p className="text-muted-foreground mb-4">This tab is empty</p>
+                <Button variant="outline" size="sm" onClick={() => createTerminal()}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  New Terminal
+                </Button>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Drag overlay */}
+        <DragOverlay
+          dropAnimation={{
+            sideEffects: defaultDropAnimationSideEffects({
+              styles: { active: { opacity: '0.5' } },
+            }),
+          }}
+          zIndex={1000}
+        >
+          {activeDragId ? (
+            <div className="relative inline-flex items-center gap-2 px-3.5 py-2 bg-card border-2 border-brand-500 rounded-lg shadow-xl pointer-events-none overflow-hidden">
+              <TerminalIcon className="h-4 w-4 text-brand-500 shrink-0" />
+              <span className="text-sm font-medium text-foreground whitespace-nowrap">
+                {dragOverTabId === 'new' ? 'New tab' : dragOverTabId ? 'Move to tab' : 'Terminal'}
+              </span>
+            </div>
+          ) : null}
+        </DragOverlay>
+      </DndContext>
+    </PageShell>
   );
 }

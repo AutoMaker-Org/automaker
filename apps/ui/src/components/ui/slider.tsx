@@ -50,10 +50,10 @@ const Slider = React.forwardRef<HTMLSpanElement, SliderProps>(({ className, ...p
     className={cn('relative flex w-full touch-none select-none items-center', className)}
     {...props}
   >
-    <SliderTrackPrimitive className="slider-track relative h-1.5 w-full grow overflow-hidden rounded-full bg-muted cursor-pointer">
-      <SliderRangePrimitive className="slider-range absolute h-full bg-primary" />
+    <SliderTrackPrimitive className="slider-track relative h-1.5 w-full grow overflow-hidden rounded-full bg-white/10 cursor-pointer">
+      <SliderRangePrimitive className="slider-range absolute h-full bg-cyan-400" />
     </SliderTrackPrimitive>
-    <SliderThumbPrimitive className="slider-thumb block h-4 w-4 rounded-full border border-border bg-card shadow transition-colors cursor-grab active:cursor-grabbing focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 disabled:cursor-not-allowed hover:bg-accent" />
+    <SliderThumbPrimitive className="slider-thumb block h-4 w-4 rounded-full border border-cyan-400/50 bg-background shadow-none transition-colors cursor-grab active:cursor-grabbing focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-cyan-400 disabled:pointer-events-none disabled:opacity-50 hover:bg-cyan-950/30 hover:border-cyan-400" />
   </SliderRootPrimitive>
 ));
 Slider.displayName = SliderPrimitive.Root.displayName;

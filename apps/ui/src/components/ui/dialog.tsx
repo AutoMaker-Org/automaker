@@ -66,10 +66,10 @@ function DialogOverlay({
     <DialogOverlayPrimitive
       data-slot="dialog-overlay"
       className={cn(
-        'fixed inset-0 z-50 bg-black/60 backdrop-blur-sm',
+        'fixed inset-0 z-50 bg-black/40 backdrop-blur-md',
         'data-[state=open]:animate-in data-[state=closed]:animate-out',
         'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
-        'duration-200',
+        'duration-300',
         className
       )}
       {...props}
@@ -99,15 +99,15 @@ const DialogContent = React.forwardRef<HTMLDivElement, DialogContentProps>(
           className={cn(
             'fixed top-[50%] left-[50%] z-50 translate-x-[-50%] translate-y-[-50%]',
             'flex flex-col w-full max-w-[calc(100%-2rem)] max-h-[calc(100vh-4rem)]',
-            'bg-card border border-border rounded-xl shadow-2xl',
+            'bg-card/90 border border-white/10 rounded-2xl shadow-2xl backdrop-blur-xl',
             // Premium shadow
-            'shadow-[0_25px_50px_-12px_rgba(0,0,0,0.25)]',
+            'shadow-[0_40px_80px_-12px_rgba(0,0,0,0.5)]',
             // Animations - smoother with scale
             'data-[state=open]:animate-in data-[state=closed]:animate-out',
             'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
             'data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95',
             'data-[state=closed]:slide-out-to-top-[2%] data-[state=open]:slide-in-from-top-[2%]',
-            'duration-200',
+            'duration-300 ease-out',
             compact ? 'max-w-4xl p-4' : !hasCustomMaxWidth ? 'sm:max-w-2xl p-6' : 'p-6',
             className
           )}
