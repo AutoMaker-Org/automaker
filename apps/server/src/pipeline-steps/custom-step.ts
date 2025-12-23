@@ -186,8 +186,7 @@ export class CustomStep {
     // Substitute variables
     if (config.variables) {
       for (const [key, value] of Object.entries(config.variables)) {
-        const escapedKey = this.escapeRegExp(key);
-        prompt = prompt.replace(new RegExp(`\\{\\{${escapedKey}\\}\\}`, 'g'), value);
+        prompt = prompt.replaceAll(`{{${key}}}`, value);
       }
     }
 
@@ -298,15 +297,7 @@ Respond with ONLY "YES" if the criteria are met, or "NO" if they are not met.`;
         id: 'evaluation',
         title: 'Success Criteria Evaluation',
         description: '',
-        status: 'in_progress',
         category: 'evaluation',
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        branch: '',
-        files: [],
-        plan: '',
-        implementation: '',
-        testResults: '',
       };
 
       const evaluationStepConfig: PipelineStepConfig = {
