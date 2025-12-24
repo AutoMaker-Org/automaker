@@ -596,6 +596,16 @@ export class HttpApiClient implements ElectronAPI {
         editedPlan,
         feedback,
       }),
+    doubleCheckFeature: (projectPath: string, featureId: string) =>
+      this.post<{
+        success: boolean;
+        passed: boolean;
+        summary?: string;
+        discrepancies?: string[];
+      }>('/api/auto-mode/double-check-feature', {
+        projectPath,
+        featureId,
+      }),
     onEvent: (callback: (event: AutoModeEvent) => void) => {
       return this.subscribeToEvent('auto-mode:event', callback as EventCallback);
     },

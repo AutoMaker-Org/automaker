@@ -134,6 +134,10 @@ export class SettingsService {
     return {
       ...DEFAULT_GLOBAL_SETTINGS,
       ...settings,
+      doubleCheckMode: {
+        ...DEFAULT_GLOBAL_SETTINGS.doubleCheckMode,
+        ...settings.doubleCheckMode,
+      },
       keyboardShortcuts: {
         ...DEFAULT_GLOBAL_SETTINGS.keyboardShortcuts,
         ...settings.keyboardShortcuts,
@@ -166,6 +170,14 @@ export class SettingsService {
       updated.keyboardShortcuts = {
         ...current.keyboardShortcuts,
         ...updates.keyboardShortcuts,
+      };
+    }
+
+    // Deep merge doubleCheckMode if provided
+    if (updates.doubleCheckMode) {
+      updated.doubleCheckMode = {
+        ...current.doubleCheckMode,
+        ...updates.doubleCheckMode,
       };
     }
 

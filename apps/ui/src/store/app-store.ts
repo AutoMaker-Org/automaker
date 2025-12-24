@@ -7,6 +7,7 @@ import type {
   AgentModel,
   PlanningMode,
   AIProfile,
+  DoubleCheckMode,
 } from '@automaker/types';
 
 // Re-export ThemeMode for convenience
@@ -263,7 +264,13 @@ export interface Feature extends Omit<
   category: string;
   description: string;
   steps: string[]; // Required in UI (not optional)
-  status: 'backlog' | 'in_progress' | 'waiting_approval' | 'verified' | 'completed';
+  status:
+    | 'backlog'
+    | 'in_progress'
+    | 'double_check'
+    | 'waiting_approval'
+    | 'verified'
+    | 'completed';
   images?: FeatureImage[]; // UI-specific base64 images
   imagePaths?: FeatureImagePath[]; // Stricter type than base (no string | union)
   textFilePaths?: FeatureTextFilePath[]; // Text file attachments for context
@@ -474,6 +481,9 @@ export interface AppState {
 
   // Enhancement Model Settings
   enhancementModel: AgentModel; // Model used for feature enhancement (default: sonnet)
+
+  // Double-Check Mode Settings
+  doubleCheckMode: DoubleCheckMode; // Configuration for double-check verification
 
   // Project Analysis
   projectAnalysis: ProjectAnalysis | null;
@@ -745,6 +755,9 @@ export interface AppActions {
   // Enhancement Model actions
   setEnhancementModel: (model: AgentModel) => void;
 
+  // Double-Check Mode actions
+  setDoubleCheckMode: (mode: Partial<DoubleCheckMode>) => void;
+
   // AI Profile actions
   addAIProfile: (profile: Omit<AIProfile, 'id'>) => void;
   updateAIProfile: (id: string, updates: Partial<AIProfile>) => void;
@@ -915,6 +928,11 @@ const initialState: AppState = {
   keyboardShortcuts: DEFAULT_KEYBOARD_SHORTCUTS, // Default keyboard shortcuts
   muteDoneSound: false, // Default to sound enabled (not muted)
   enhancementModel: 'sonnet', // Default to sonnet for feature enhancement
+  doubleCheckMode: {
+    enabled: false,
+    modelStrategy: 'different',
+    autoTriggerInAutoMode: true,
+  },
   aiProfiles: DEFAULT_AI_PROFILES,
   projectAnalysis: null,
   isAnalyzing: false,
@@ -941,6 +959,9 @@ const initialState: AppState = {
   defaultRequirePlanApproval: false,
   defaultAIProfileId: null,
   pendingPlanApproval: null,
+  claudeRefreshInterval: 60,
+  claudeUsage: null,
+  claudeUsageLastUpdated: null,
 };
 
 export const useAppStore = create<AppState & AppActions>()(
@@ -1536,6 +1557,12 @@ export const useAppStore = create<AppState & AppActions>()(
 
       // Enhancement Model actions
       setEnhancementModel: (model) => set({ enhancementModel: model }),
+
+      // Double-Check Mode actions
+      setDoubleCheckMode: (mode) =>
+        set((state) => ({
+          doubleCheckMode: { ...state.doubleCheckMode, ...mode },
+        })),
 
       // AI Profile actions
       addAIProfile: (profile) => {
@@ -2679,6 +2706,7 @@ export const useAppStore = create<AppState & AppActions>()(
           keyboardShortcuts: state.keyboardShortcuts,
           muteDoneSound: state.muteDoneSound,
           enhancementModel: state.enhancementModel,
+          doubleCheckMode: state.doubleCheckMode,
           // Profiles and sessions
           aiProfiles: state.aiProfiles,
           chatSessions: state.chatSessions,

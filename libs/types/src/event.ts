@@ -19,6 +19,7 @@ export type EventType =
   | 'feature:follow-up-completed'
   | 'feature:verified'
   | 'feature:committed'
+  | 'feature:updated'
   | 'project:analysis-started'
   | 'project:analysis-progress'
   | 'project:analysis-completed'

@@ -81,6 +81,7 @@
   --status-info-bg: oklch(0.65 0.2 230 / 0.2);
   --status-backlog: oklch(0.6 0 0);
   --status-in-progress: oklch(0.75 0.15 70);
+  --status-double-check: oklch(0.7 0.18 280);
   --status-waiting: oklch(0.7 0.18 50);
 
   /* Shadow tokens - darker for dark mode */

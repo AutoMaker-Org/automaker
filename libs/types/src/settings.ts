@@ -71,6 +71,32 @@ export type ThinkingLevel = 'none' | 'low' | 'medium' | 'high' | 'ultrathink';
 export type ModelProvider = 'claude';
 
 /**
+ * DoubleCheckModelStrategy - How to select the model for double-check verification
+ *
+ * - 'specific': Use a specific model configured in settings
+ * - 'different': Use a different model than the one that implemented the feature
+ * - 'any': Use the same model that implemented the feature (or default)
+ */
+export type DoubleCheckModelStrategy = 'specific' | 'different' | 'any';
+
+/**
+ * DoubleCheckMode - Configuration for the double-check verification feature
+ *
+ * Controls whether features undergo a verification step before approval,
+ * which model performs the verification, and automation behavior.
+ */
+export interface DoubleCheckMode {
+  /** Whether double-check mode is enabled */
+  enabled: boolean;
+  /** Strategy for selecting which model performs the double-check */
+  modelStrategy: DoubleCheckModelStrategy;
+  /** Specific model to use when strategy is 'specific' */
+  specificModel?: AgentModel;
+  /** Automatically trigger double-check in Auto Mode */
+  autoTriggerInAutoMode: boolean;
+}
+
+/**
  * WindowBounds - Electron window position and size for persistence
  *
  * Stored in global settings to restore window state across sessions.
@@ -262,6 +288,10 @@ export interface GlobalSettings {
   /** Which model to use for feature name/description enhancement */
   enhancementModel: AgentModel;
 
+  // Double-Check Verification
+  /** Configuration for double-check verification mode */
+  doubleCheckMode: DoubleCheckMode;
+
   // Input Configuration
   /** User's keyboard shortcut bindings */
   keyboardShortcuts: KeyboardShortcuts;
@@ -437,6 +467,11 @@ export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
   defaultAIProfileId: null,
   muteDoneSound: false,
   enhancementModel: 'sonnet',
+  doubleCheckMode: {
+    enabled: false,
+    modelStrategy: 'different',
+    autoTriggerInAutoMode: true,
+  },
   keyboardShortcuts: DEFAULT_KEYBOARD_SHORTCUTS,
   aiProfiles: [],
   projects: [],

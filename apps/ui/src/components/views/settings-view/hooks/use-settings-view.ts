@@ -9,6 +9,7 @@ export type SettingsViewId =
   | 'keyboard'
   | 'audio'
   | 'defaults'
+  | 'double-check'
   | 'danger';
 
 interface UseSettingsViewOptions {

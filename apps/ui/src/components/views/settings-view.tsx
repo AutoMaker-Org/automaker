@@ -16,6 +16,7 @@ import { TerminalSection } from './settings-view/terminal/terminal-section';
 import { AudioSection } from './settings-view/audio/audio-section';
 import { KeyboardShortcutsSection } from './settings-view/keyboard-shortcuts/keyboard-shortcuts-section';
 import { FeatureDefaultsSection } from './settings-view/feature-defaults/feature-defaults-section';
+import { DoubleCheckSection } from './settings-view/double-check';
 import { DangerZoneSection } from './settings-view/danger-zone/danger-zone-section';
 import type { Project as SettingsProject, Theme } from './settings-view/shared/types';
 import type { Project as ElectronProject } from '@/lib/electron';
@@ -143,6 +144,8 @@ export function SettingsView() {
             onDefaultAIProfileIdChange={setDefaultAIProfileId}
           />
         );
+      case 'double-check':
+        return <DoubleCheckSection />;
       case 'danger':
         return (
           <DangerZoneSection

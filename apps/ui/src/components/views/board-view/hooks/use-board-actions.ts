@@ -491,6 +491,69 @@ export function useBoardActions({
     [updateFeature, persistFeatureUpdate]
   );
 
+  const handleDoubleCheck = useCallback(
+    async (feature: Feature) => {
+      if (!currentProject) return;
+
+      try {
+        const api = getElectronAPI();
+        if (!api?.autoMode?.doubleCheckFeature) {
+          console.error('Double-check feature API not available');
+          toast.error('Double-check not available', {
+            description: 'This feature is not available in the current version.',
+          });
+          return;
+        }
+
+        toast.info('Starting double-check', {
+          description: `Verifying: ${truncateDescription(feature.description)}`,
+        });
+
+        const result = await api.autoMode.doubleCheckFeature(currentProject.path, feature.id);
+
+        if (result.success) {
+          if (result.passed) {
+            toast.success('Double-check passed', {
+              description: result.summary || 'Feature verified successfully.',
+            });
+          } else {
+            toast.warning('Double-check found issues', {
+              description:
+                result.discrepancies?.join(', ') || result.summary || 'Issues were found.',
+            });
+          }
+          // Refresh features to get updated status
+          await loadFeatures();
+        } else {
+          console.error('[Board] Double-check failed:', result.error);
+          toast.error('Double-check failed', {
+            description: result.error || 'An error occurred',
+          });
+        }
+      } catch (error) {
+        console.error('[Board] Error running double-check:', error);
+        toast.error('Double-check failed', {
+          description: error instanceof Error ? error.message : 'An error occurred',
+        });
+      }
+    },
+    [currentProject, loadFeatures]
+  );
+
+  const handleSkipDoubleCheck = useCallback(
+    (feature: Feature) => {
+      const updates: Partial<Feature> = {
+        status: 'waiting_approval' as const,
+      };
+      updateFeature(feature.id, updates);
+      persistFeatureUpdate(feature.id, updates);
+      toast.info('Skipped double-check', {
+        description: `Moved to Waiting Approval: ${truncateDescription(feature.description)}`,
+      });
+    },
+    [updateFeature, persistFeatureUpdate]
+  );
+
   const handleOpenFollowUp = useCallback(
     (feature: Feature) => {
       setFollowUpFeature(feature);
@@ -743,9 +806,47 @@ export function useBoardActions({
   );
 
   const handleStartNextFeatures = useCallback(async () => {
+    const { doubleCheckMode } = useAppStore.getState();
+    const primaryBranch = projectPath ? getPrimaryWorktreeBranch(projectPath) : null;
+
+    // Check for double-check features first (they take priority over backlog)
+    // Only check if double-check mode is enabled
+    if (doubleCheckMode.enabled) {
+      const doubleCheckFeatures = features.filter((f) => {
+        if (f.status !== 'double_check') return false;
+        if (runningAutoTasks.includes(f.id)) return false; // Skip already running
+
+        // Filter by worktree branch
+        const featureBranch = f.branchName || primaryBranch || 'main';
+        if (
+          !currentWorktreeBranch ||
+          (projectPath && isPrimaryWorktreeBranch(projectPath, currentWorktreeBranch))
+        ) {
+          return (
+            !f.branchName || (projectPath && isPrimaryWorktreeBranch(projectPath, featureBranch))
+          );
+        }
+        return featureBranch === currentWorktreeBranch;
+      });
+
+      if (doubleCheckFeatures.length > 0) {
+        const nextDoubleCheck = doubleCheckFeatures[0];
+        if (doubleCheckMode.autoTriggerInAutoMode) {
+          // Auto-trigger: start double-check automatically
+          await handleDoubleCheck(nextDoubleCheck);
+          return;
+        } else {
+          // Manual trigger: notify user that double-check is waiting
+          toast.info('Double-check waiting', {
+            description: `Feature "${truncateDescription(nextDoubleCheck.description)}" is awaiting verification. Click "Run Double-Check" to verify.`,
+          });
+          return;
+        }
+      }
+    }
+
     // Filter backlog features by the currently selected worktree branch
     // This ensures "G" only starts features from the filtered list
-    const primaryBranch = projectPath ? getPrimaryWorktreeBranch(projectPath) : null;
     const backlogFeatures = features.filter((f) => {
       if (f.status !== 'backlog') return false;
 
@@ -827,6 +928,7 @@ export function useBoardActions({
     features,
     runningAutoTasks,
     handleStartImplementation,
+    handleDoubleCheck,
     currentWorktreeBranch,
     projectPath,
     isPrimaryWorktreeBranch,
@@ -868,6 +970,8 @@ export function useBoardActions({
     handleResumeFeature,
     handleManualVerify,
     handleMoveBackToInProgress,
+    handleDoubleCheck,
+    handleSkipDoubleCheck,
     handleOpenFollowUp,
     handleSendFollowUp,
     handleCommitFeature,

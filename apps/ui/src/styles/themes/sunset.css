@@ -79,6 +79,7 @@
   --status-info-bg: oklch(0.75 0.16 340 / 0.2);
   --status-backlog: oklch(0.65 0.02 280);
   --status-in-progress: oklch(0.78 0.18 70);
+  --status-double-check: oklch(0.72 0.18 300);
   --status-waiting: oklch(0.72 0.17 60);
 }
 

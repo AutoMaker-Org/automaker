@@ -25,6 +25,8 @@ interface KanbanCardProps {
   onComplete?: () => void;
   onViewPlan?: () => void;
   onApprovePlan?: () => void;
+  onDoubleCheck?: () => void;
+  onSkipDoubleCheck?: () => void;
   hasContext?: boolean;
   isCurrentAutoTask?: boolean;
   shortcutKey?: string;
@@ -45,12 +47,14 @@ export const KanbanCard = memo(function KanbanCard({
   onResume,
   onForceStop,
   onManualVerify,
-  onMoveBackToInProgress: _onMoveBackToInProgress,
+  onMoveBackToInProgress,
   onFollowUp,
   onImplement,
   onComplete,
   onViewPlan,
   onApprovePlan,
+  onDoubleCheck,
+  onSkipDoubleCheck,
   hasContext,
   isCurrentAutoTask,
   shortcutKey,
@@ -67,6 +71,7 @@ export const KanbanCard = memo(function KanbanCard({
     feature.status === 'backlog' ||
     feature.status === 'waiting_approval' ||
     feature.status === 'verified' ||
+    feature.status === 'double_check' ||
     (feature.status === 'in_progress' && !isCurrentAutoTask);
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: feature.id,
@@ -177,6 +182,9 @@ export const KanbanCard = memo(function KanbanCard({
           onComplete={onComplete}
           onViewPlan={onViewPlan}
           onApprovePlan={onApprovePlan}
+          onDoubleCheck={onDoubleCheck}
+          onSkipDoubleCheck={onSkipDoubleCheck}
+          onMoveBackToInProgress={onMoveBackToInProgress}
         />
       </CardContent>
     </Card>
