@@ -126,6 +126,18 @@ npm run dev
 # Then choose your run mode when prompted, or use specific commands below
 ```
 
+### Claude Code Plugin Setup
+
+This project includes the [minimal-claude](https://github.com/KenKaiii/minimal-claude) plugin for code quality automation:
+
+**Available Commands:**
+
+- `/setup-code-quality` - Auto-detect and configure linting/type-checking
+- `/setup-claude-md` - Generate code quality guidelines for AI agents
+- `/setup-commits` - Create custom commit command with quality checks
+
+The plugin installs automatically when you run `claude` in this repository.
+
 ## How to Run
 
 ### Development Mode

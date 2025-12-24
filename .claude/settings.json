@@ -20,5 +20,16 @@
       "mcp__puppeteer__puppeteer_hover",
       "mcp__puppeteer__puppeteer_evaluate"
     ]
+  },
+  "extraKnownMarketplaces": {
+    "minimal-claude-marketplace": {
+      "source": {
+        "source": "github",
+        "repo": "KenKaiii/minimal-claude"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "minimal-claude@minimal-claude-marketplace": true
   }
 }

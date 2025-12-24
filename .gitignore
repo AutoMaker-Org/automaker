@@ -42,6 +42,11 @@ Desktop.ini
 *.sublime-workspace
 *.sublime-project
 
+# Claude Code local settings (user-specific, do not commit)
+.claude/settings.local.json
+.claude/*.local.json
+.claude/session-env/
+
 # Editor backup/temp files
 *~
 *.bak
