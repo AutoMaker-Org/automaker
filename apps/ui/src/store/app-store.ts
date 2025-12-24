@@ -147,6 +147,7 @@ export interface KeyboardShortcuts {
   settings: string;
   profiles: string;
   terminal: string;
+  beads: string;
 
   // UI shortcuts
   toggleSidebar: string;
@@ -179,6 +180,7 @@ export const DEFAULT_KEYBOARD_SHORTCUTS: KeyboardShortcuts = {
   settings: 'S',
   profiles: 'M',
   terminal: 'T',
+  beads: 'B',
 
   // UI
   toggleSidebar: '`',

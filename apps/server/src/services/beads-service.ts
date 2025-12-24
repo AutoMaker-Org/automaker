@@ -9,6 +9,7 @@ import { execFile } from 'child_process';
 import { promisify } from 'util';
 import path from 'path';
 import fs from 'fs/promises';
+import fsCallback from 'fs';
 
 const execFileAsync = promisify(execFile);
 
@@ -58,9 +59,9 @@ export class BeadsService {
 
     try {
       await fs.access(dbPath);
-      return { installed: true, initialized: true, version };
+      return { installed: true, initialized: true, version: version ?? undefined };
     } catch {
-      return { installed: true, initialized: false, version };
+      return { installed: true, initialized: false, version: version ?? undefined };
     }
   }
 
@@ -344,7 +345,7 @@ export class BeadsService {
     const dbPath = this.getDatabasePath(projectPath);
 
     try {
-      const watcher = fs.watch(dbPath, () => {
+      const watcher = fsCallback.watch(dbPath, () => {
         // Debounce rapid changes
         if (this.watchTimeout) {
           clearTimeout(this.watchTimeout);

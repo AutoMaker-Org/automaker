@@ -1,4 +1,25 @@
 /**
+ * Common utilities for beads routes
+ */
+
+import { execFile } from 'child_process';
+import { promisify } from 'util';
+
+const execFileAsync = promisify(execFile);
+
+/**
+ * Get the path to the bd CLI binary
+ */
+export async function getBdBin(): Promise<string> {
+  try {
+    const { stdout } = await execFileAsync('which', ['bd']);
+    return stdout.trim();
+  } catch {
+    throw new Error('bd CLI not found in PATH');
+  }
+}
+
+/**
  * Derives a readable string message from an unknown error value.
  *
  * @param error - The error value to extract a message from.

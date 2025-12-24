@@ -5,6 +5,7 @@ import { BeadsColumn } from './components/beads-column';
 import { BeadsCard } from './components/beads-card';
 import type { BeadsIssue } from '@automaker/types';
 import { useAppStore } from '@/store/app-store';
+import { useBoardBackgroundSettings } from '@/hooks/use-board-background-settings';
 import { cn } from '@/lib/utils';
 
 interface BeadsKanbanBoardProps {
@@ -30,8 +31,22 @@ export const BeadsKanbanBoard = memo(function BeadsKanbanBoard({
   onStartIssue,
   onCloseIssue,
 }: BeadsKanbanBoardProps) {
+  const store = useAppStore();
+  const bgSettings = useBoardBackgroundSettings();
+
+  const projectPath = store.currentProject?.path;
+  const settings = projectPath
+    ? bgSettings.getCurrentSettings(projectPath)
+    : {
+        cardOpacity: 100,
+        columnOpacity: 100,
+        columnBorderEnabled: true,
+        cardGlassmorphism: true,
+        hideScrollbar: false,
+      };
+
   const { cardOpacity, columnOpacity, columnBorderEnabled, cardGlassmorphism, hideScrollbar } =
-    useAppStore();
+    settings;
 
   const sensors = useSensors(
     useSensor(PointerSensor, {

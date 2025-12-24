@@ -6,16 +6,16 @@
 
 import { useState, useCallback } from 'react';
 import { useAppStore } from '@/store/app-store';
-import { useBeadsIssues } from './hooks/use-beads-issues';
-import { useBeadsColumnIssues } from './hooks/use-beads-column-issues';
-import { useBeadsActions } from './hooks/use-beads-actions';
-import { useBeadsDragDrop } from './hooks/use-beads-drag-drop';
-import { BeadsHeader } from './beads-header';
-import { BeadsKanbanBoard } from './beads-kanban-board';
-import { CreateIssueDialog } from './dialogs/create-issue-dialog';
-import { EditIssueDialog } from './dialogs/edit-issue-dialog';
-import { DeleteIssueDialog } from './dialogs/delete-issue-dialog';
-import type { BeadsIssue } from '@automaker/types';
+import { useBeadsIssues } from './beads-view/hooks/use-beads-issues';
+import { useBeadsColumnIssues } from './beads-view/hooks/use-beads-column-issues';
+import { useBeadsActions } from './beads-view/hooks/use-beads-actions';
+import { useBeadsDragDrop } from './beads-view/hooks/use-beads-drag-drop';
+import { BeadsHeader } from './beads-view/beads-header';
+import { BeadsKanbanBoard } from './beads-view/beads-kanban-board';
+import { CreateIssueDialog } from './beads-view/dialogs/create-issue-dialog';
+import { EditIssueDialog } from './beads-view/dialogs/edit-issue-dialog';
+import { DeleteIssueDialog } from './beads-view/dialogs/delete-issue-dialog';
+import type { BeadsIssue, BeadsDependency } from '@automaker/types';
 import { getElectronAPI } from '@/lib/electron';
 import { toast } from 'sonner';
 
@@ -30,6 +30,9 @@ import { toast } from 'sonner';
  */
 export function BeadsView() {
   const { currentProject } = useAppStore();
+
+  // Search state - must be declared before using in hooks
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Custom hooks
   const { issues, isLoading, error, loadIssues } = useBeadsIssues({ currentProject });
@@ -53,9 +56,6 @@ export function BeadsView() {
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [selectedIssue, setSelectedIssue] = useState<BeadsIssue | null>(null);
-
-  // Search state
-  const [searchQuery, setSearchQuery] = useState('');
 
   // Helper to get blocking counts for an issue
   const getBlockingCounts = useCallback(

@@ -8,6 +8,14 @@ interface UseBeadsColumnIssuesProps {
   currentProject: { path: string } | null;
 }
 
+export interface BeadsStats {
+  total: number;
+  open: number;
+  inProgress: number;
+  closed: number;
+  blocked: number;
+}
+
 /**
  * Organizes bead issues into board columns and provides a column selector and basic counts.
  *

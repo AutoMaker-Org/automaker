@@ -27,11 +27,11 @@ export interface BdResult {
 /**
  * Execute bd CLI command using spawn (for long-running processes)
  */
-export function runBd(args: string[], options: BdOptions = {}): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const bdBin = getBdBin();
-    const spawnArgs = options.noDb ? ['--no-db', ...args] : args;
+export async function runBd(args: string[], options: BdOptions = {}): Promise<string> {
+  const bdBin = await getBdBin();
+  const spawnArgs = options.noDb ? ['--no-db', ...args] : args;
 
+  return new Promise((resolve, reject) => {
     const child = spawn(bdBin, spawnArgs, {
       cwd: options.cwd,
       env: { ...process.env, ...options.env },
@@ -71,8 +71,8 @@ export function runBd(args: string[], options: BdOptions = {}): Promise<string> 
 /**
  * Execute bd CLI command using exec (for simple commands)
  */
-export function runBdExec(args: string[], options: BdOptions = {}): Promise<string> {
-  const bdBin = getBdBin();
+export async function runBdExec(args: string[], options: BdOptions = {}): Promise<string> {
+  const bdBin = await getBdBin();
   const spawnArgs = options.noDb ? ['--no-db', ...args] : args;
   const cmd = `"${bdBin}" ${spawnArgs.map((arg) => `"${arg}"`).join(' ')}`;
 
