@@ -81,3 +81,18 @@ export {
   THINKING_LEVEL_LABELS,
   getModelDisplayName,
 } from './model-display.js';
+
+// Beads types
+export type {
+  BeadsIssue,
+  BeadsIssueStatus,
+  BeadsIssueType,
+  BeadsIssuePriority,
+  BeadsDependencyType,
+  BeadsDependency,
+  CreateBeadsIssueInput,
+  UpdateBeadsIssueInput,
+  ListBeadsIssuesFilters,
+  BeadsValidationResult,
+  BeadsStats,
+} from './beads.js';

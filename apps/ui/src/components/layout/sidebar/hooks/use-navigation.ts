@@ -3,13 +3,13 @@ import type { NavigateOptions } from '@tanstack/react-router';
 import {
   FileText,
   LayoutGrid,
+  ListTodo,
   Bot,
   BookOpen,
   UserCircle,
   Terminal,
   CircleDot,
   GitPullRequest,
-  Zap,
 } from 'lucide-react';
 import type { NavSection, NavItem } from '../types';
 import type { KeyboardShortcut } from '@/hooks/use-keyboard-shortcuts';
@@ -27,6 +27,7 @@ interface UseNavigationProps {
     context: string;
     profiles: string;
     board: string;
+    beads: string;
     agent: string;
     terminal: string;
     settings: string;
@@ -130,6 +131,12 @@ export function useNavigation({
         label: 'Kanban Board',
         icon: LayoutGrid,
         shortcut: shortcuts.board,
+      },
+      {
+        id: 'beads',
+        label: 'Beads',
+        icon: ListTodo,
+        shortcut: shortcuts.beads,
       },
       {
         id: 'agent',

@@ -48,6 +48,8 @@ import { createClaudeRoutes } from './routes/claude/index.js';
 import { ClaudeUsageService } from './services/claude-usage-service.js';
 import { createGitHubRoutes } from './routes/github/index.js';
 import { createContextRoutes } from './routes/context/index.js';
+import { createBeadsRoutes } from './routes/beads/index.js';
+import { BeadsService } from './services/beads-service.js';
 
 // Load environment variables
 dotenv.config();
@@ -116,6 +118,7 @@ const featureLoader = new FeatureLoader();
 const autoModeService = new AutoModeService(events);
 const settingsService = new SettingsService(DATA_DIR);
 const claudeUsageService = new ClaudeUsageService();
+const beadsService = new BeadsService();
 
 // Initialize services
 (async () => {
@@ -149,6 +152,7 @@ app.use('/api/settings', createSettingsRoutes(settingsService));
 app.use('/api/claude', createClaudeRoutes(claudeUsageService));
 app.use('/api/github', createGitHubRoutes());
 app.use('/api/context', createContextRoutes());
+app.use('/api/beads', createBeadsRoutes(beadsService));
 
 // Create HTTP server
 const server = createServer(app);

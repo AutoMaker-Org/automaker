@@ -4,9 +4,13 @@ import type { Project, TrashedProject } from '@/lib/electron';
 import type {
   Feature as BaseFeature,
   FeatureImagePath,
+  FeatureTextFilePath,
   AgentModel,
   PlanningMode,
   AIProfile,
+  BeadsIssue,
+  BeadsIssueStatus,
+  BeadsIssueType,
 } from '@automaker/types';
 
 // Re-export ThemeMode for convenience
@@ -17,6 +21,7 @@ export type ViewMode =
   | 'setup'
   | 'spec'
   | 'board'
+  | 'beads'
   | 'agent'
   | 'settings'
   | 'interview'
@@ -526,6 +531,25 @@ export interface AppState {
   claudeRefreshInterval: number; // Refresh interval in seconds (default: 60)
   claudeUsage: ClaudeUsage | null;
   claudeUsageLastUpdated: number | null;
+
+  // Beads state (per-project, keyed by project path)
+  beadsByProject: Record<
+    string,
+    {
+      issues: BeadsIssue[];
+      readyWork: BeadsIssue[];
+      lastUpdated: number;
+      isWatching: boolean;
+    }
+  >;
+  currentBeadsView: 'issues' | 'epics' | 'board';
+  beadsFilter: {
+    status?: BeadsIssueStatus[];
+    type?: BeadsIssueType[];
+    labels?: string[];
+    searchQuery?: string;
+  };
+  selectedBeadsIssue: BeadsIssue | null;
 }
 
 // Claude Usage interface matching the server response
@@ -841,6 +865,18 @@ export interface AppActions {
     } | null
   ) => void;
 
+  // Beads actions
+  setBeadsIssues: (projectPath: string, issues: BeadsIssue[]) => void;
+  updateBeadsIssue: (projectPath: string, issueId: string, updates: Partial<BeadsIssue>) => void;
+  addBeadsIssue: (projectPath: string, issue: BeadsIssue) => void;
+  removeBeadsIssue: (projectPath: string, issueId: string) => void;
+  setBeadsReadyWork: (projectPath: string, issues: BeadsIssue[]) => void;
+  setCurrentBeadsView: (view: 'issues' | 'epics' | 'board') => void;
+  setBeadsFilter: (filter: Partial<AppState['beadsFilter']>) => void;
+  setSelectedBeadsIssue: (issue: BeadsIssue | null) => void;
+  startWatchingBeads: (projectPath: string) => void;
+  stopWatchingBeads: (projectPath: string) => void;
+
   // Reset
   reset: () => void;
 }
@@ -941,6 +977,12 @@ const initialState: AppState = {
   defaultRequirePlanApproval: false,
   defaultAIProfileId: null,
   pendingPlanApproval: null,
+
+  // Beads state
+  beadsByProject: {},
+  currentBeadsView: 'issues' as const,
+  beadsFilter: {},
+  selectedBeadsIssue: null,
 };
 
 export const useAppStore = create<AppState & AppActions>()(
@@ -2550,6 +2592,151 @@ export const useAppStore = create<AppState & AppActions>()(
           claudeUsage: usage,
           claudeUsageLastUpdated: usage ? Date.now() : null,
         }),
+
+      // Beads actions
+      setBeadsIssues: (projectPath, issues) => {
+        const beadsByProject = get().beadsByProject;
+        const current = beadsByProject[projectPath] || {
+          issues: [],
+          readyWork: [],
+          lastUpdated: 0,
+          isWatching: false,
+        };
+        set({
+          beadsByProject: {
+            ...beadsByProject,
+            [projectPath]: {
+              ...current,
+              issues,
+              lastUpdated: Date.now(),
+            },
+          },
+        });
+      },
+
+      updateBeadsIssue: (projectPath, issueId, updates) => {
+        const beadsByProject = get().beadsByProject;
+        const current = beadsByProject[projectPath];
+        if (!current) return;
+
+        const issues = current.issues.map((issue) =>
+          issue.id === issueId ? { ...issue, ...updates } : issue
+        );
+
+        set({
+          beadsByProject: {
+            ...beadsByProject,
+            [projectPath]: {
+              ...current,
+              issues,
+              lastUpdated: Date.now(),
+            },
+          },
+        });
+      },
+
+      addBeadsIssue: (projectPath, issue) => {
+        const beadsByProject = get().beadsByProject;
+        const current = beadsByProject[projectPath];
+        if (!current) return;
+
+        set({
+          beadsByProject: {
+            ...beadsByProject,
+            [projectPath]: {
+              ...current,
+              issues: [...current.issues, issue],
+              lastUpdated: Date.now(),
+            },
+          },
+        });
+      },
+
+      removeBeadsIssue: (projectPath, issueId) => {
+        const beadsByProject = get().beadsByProject;
+        const current = beadsByProject[projectPath];
+        if (!current) return;
+
+        set({
+          beadsByProject: {
+            ...beadsByProject,
+            [projectPath]: {
+              ...current,
+              issues: current.issues.filter((issue) => issue.id !== issueId),
+              lastUpdated: Date.now(),
+            },
+          },
+        });
+      },
+
+      setBeadsReadyWork: (projectPath, issues) => {
+        const beadsByProject = get().beadsByProject;
+        const current = beadsByProject[projectPath] || {
+          issues: [],
+          readyWork: [],
+          lastUpdated: 0,
+          isWatching: false,
+        };
+        set({
+          beadsByProject: {
+            ...beadsByProject,
+            [projectPath]: {
+              ...current,
+              readyWork: issues,
+              lastUpdated: Date.now(),
+            },
+          },
+        });
+      },
+
+      setCurrentBeadsView: (view) => set({ currentBeadsView: view }),
+
+      setBeadsFilter: (filter) => {
+        const current = get().beadsFilter;
+        set({
+          beadsFilter: {
+            ...current,
+            ...filter,
+          },
+        });
+      },
+
+      setSelectedBeadsIssue: (issue) => set({ selectedBeadsIssue: issue }),
+
+      startWatchingBeads: (projectPath) => {
+        const beadsByProject = get().beadsByProject;
+        const current = beadsByProject[projectPath] || {
+          issues: [],
+          readyWork: [],
+          lastUpdated: 0,
+          isWatching: false,
+        };
+        set({
+          beadsByProject: {
+            ...beadsByProject,
+            [projectPath]: {
+              ...current,
+              isWatching: true,
+            },
+          },
+        });
+      },
+
+      stopWatchingBeads: (projectPath) => {
+        const beadsByProject = get().beadsByProject;
+        const current = beadsByProject[projectPath];
+        if (!current) return;
+
+        set({
+          beadsByProject: {
+            ...beadsByProject,
+            [projectPath]: {
+              ...current,
+              isWatching: false,
+            },
+          },
+        });
+      },
 
       // Reset
       reset: () => set(initialState),
