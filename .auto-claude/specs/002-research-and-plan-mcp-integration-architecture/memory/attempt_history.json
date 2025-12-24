@@ -1,57 +1,8 @@
 {
-  "subtasks": {
-    "subtask-3-1": {
-      "attempts": [
-        {
-          "session": 1,
-          "timestamp": "2025-12-23T21:02:35.749710",
-          "approach": "Implemented: Pass MCP servers to Claude SDK in provider",
-          "success": true,
-          "error": null
-        }
-      ],
-      "status": "completed"
-    },
-    "subtask-3-2": {
-      "attempts": [
-        {
-          "session": 2,
-          "timestamp": "2025-12-23T21:07:51.634635",
-          "approach": "Implemented: Pass MCP config through auto-mode-service to provider",
-          "success": true,
-          "error": null
-        }
-      ],
-      "status": "completed"
-    },
-    "subtask-4-1": {
-      "attempts": [
-        {
-          "session": 3,
-          "timestamp": "2025-12-23T21:13:55.058118",
-          "approach": "Implemented: Add MCP server state and actions to app store",
-          "success": true,
-          "error": null
-        }
-      ],
-      "status": "completed"
-    },
-    "subtask-5-1": {
-      "attempts": [
-        {
-          "session": 4,
-          "timestamp": "2025-12-23T21:19:36.007964",
-          "approach": "Implemented: Create MCP settings panel component",
-          "success": true,
-          "error": null
-        }
-      ],
-      "status": "completed"
-    }
-  },
+  "subtasks": {},
   "stuck_subtasks": [],
   "metadata": {
-    "created_at": "2025-12-23T20:59:30.576571",
-    "last_updated": "2025-12-23T21:19:36.007974"
+    "created_at": "2025-12-23T21:45:26.781796",
+    "last_updated": "2025-12-23T21:45:26.781800"
   }
 }

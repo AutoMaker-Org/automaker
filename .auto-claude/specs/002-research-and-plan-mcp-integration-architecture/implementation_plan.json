@@ -3,7 +3,7 @@
   "workflow_type": "feature",
   "workflow_rationale": "New user-facing functionality requiring changes across types, backend services, API routes, and frontend UI. Introduces MCP server configuration management with per-task isolation.",
   "created_at": "2025-12-24T01:18:29.841Z",
-  "updated_at": "2025-12-24T01:59:27.486Z",
+  "updated_at": "2025-12-24T02:45:22.702Z",
   "status": "in_progress",
   "planStatus": "in_progress",
   "phases": [
@@ -223,7 +223,9 @@
             "url": "http://localhost:5173/settings",
             "checks": ["MCP settings section renders", "Server list displays", "Add button visible"]
           },
-          "status": "pending"
+          "status": "completed",
+          "notes": "Successfully integrated MCP settings panel into settings view. Added 'mcp' to SettingsViewId type, added navigation item with Server icon to NAV_ITEMS, and added case in renderActiveSection to render McpSettingsPanel. ESLint passes with no new errors.",
+          "updated_at": "2025-12-24T02:23:23.542129+00:00"
         }
       ]
     },
@@ -256,7 +258,9 @@
               "Checkboxes are toggleable"
             ]
           },
-          "status": "pending"
+          "status": "completed",
+          "notes": "Implementation already completed and committed (d0aff90). MCP server checkboxes are fully implemented in the Options tab with: empty state display, checkbox list for all configured servers, proper state management via enabledMcpServers, and integration with the onAdd callback.",
+          "updated_at": "2025-12-24T02:35:10.023446+00:00"
         },
         {
           "id": "subtask-6-2",
@@ -271,7 +275,9 @@
             "command": "cd apps/ui && npx tsc --noEmit",
             "expected": "TypeScript compilation succeeds"
           },
-          "status": "pending"
+          "status": "completed",
+          "notes": "Added enabledMcpServers?: string[] to both handleAddFeature and handleUpdateFeature type definitions in use-board-actions.ts. This ensures the enabledMcpServers field flows through from AddFeatureDialog to feature persistence. The Feature type in libs/types already has this field (added in subtask-1-2). Pre-existing TypeScript errors in codebase unrelated to MCP changes. Committed in 33398dd.",
+          "updated_at": "2025-12-24T02:38:54.467900+00:00"
         }
       ]
     },
@@ -296,7 +302,9 @@
             "command": "cd apps/server && npm run test -- --grep 'settings' --run",
             "expected": "All settings tests pass"
           },
-          "status": "pending"
+          "status": "completed",
+          "notes": "MCP migration tests already implemented and passing. All 12 MCP-related tests pass: 6 'MCP Server Configuration' tests + 5 'Settings Version Migration' tests + 1 SETTINGS_VERSION verification test. Tests cover: v1 to v2 migration with empty mcpServers array, McpServerConfig CRUD operations, deep merge preserving mcpServers on partial updates, stdio/HTTP transport types, env variables and headers, multiple servers, optional description handling. Two pre-existing test failures on Windows (chmod 0o444 permission tests) are unrelated to MCP.",
+          "updated_at": "2025-12-24T02:43:09.108577+00:00"
         },
         {
           "id": "subtask-7-2",
@@ -456,6 +464,6 @@
     }
   },
   "qa_signoff": null,
-  "last_updated": "2025-12-24T02:19:17.018715+00:00",
-  "recoveryNote": "Task recovered from stuck state at 2025-12-24T01:59:27.486Z"
+  "last_updated": "2025-12-24T02:43:09.108587+00:00",
+  "recoveryNote": "Task recovered from stuck state at 2025-12-24T02:45:22.702Z"
 }
