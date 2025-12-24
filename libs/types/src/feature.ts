@@ -30,6 +30,7 @@ export interface Feature {
   passes?: boolean;
   priority?: number;
   status?: string;
+  hidden?: boolean; // Hidden features appear at the bottom of backlog
   dependencies?: string[];
   spec?: string;
   model?: string;

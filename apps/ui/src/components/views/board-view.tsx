@@ -379,6 +379,7 @@ export function BoardView() {
     handleForceStopFeature,
     handleStartNextFeatures,
     handleArchiveAllVerified,
+    handleHideFeature,
   } = useBoardActions({
     currentProject,
     features: hookFeatures,
@@ -744,7 +745,15 @@ export function BoardView() {
   });
 
   // Use column features hook
-  const { getColumnFeatures, completedFeatures } = useBoardColumnFeatures({
+  const {
+    getColumnFeatures,
+    completedFeatures,
+    backlogPagination,
+    showMoreBacklog,
+    showAllBacklog,
+    toggleShowOnlyHidden,
+    resetBacklogPagination,
+  } = useBoardColumnFeatures({
     features: hookFeatures,
     runningAutoTasks,
     searchQuery,
@@ -1021,6 +1030,7 @@ export function BoardView() {
             onImplement={handleStartImplementation}
             onViewPlan={(feature) => setViewPlanFeature(feature)}
             onApprovePlan={handleOpenApprovalDialog}
+            onHide={handleHideFeature}
             featuresWithContext={featuresWithContext}
             runningAutoTasks={runningAutoTasks}
             shortcuts={shortcuts}
@@ -1028,6 +1038,11 @@ export function BoardView() {
             onShowSuggestions={() => setShowSuggestionsDialog(true)}
             suggestionsCount={suggestionsCount}
             onArchiveAllVerified={() => setShowArchiveAllVerifiedDialog(true)}
+            backlogPagination={backlogPagination}
+            onShowMoreBacklog={showMoreBacklog}
+            onShowAllBacklog={showAllBacklog}
+            onToggleShowOnlyHidden={toggleShowOnlyHidden}
+            onResetBacklogPagination={resetBacklogPagination}
           />
         ) : (
           <GraphView

@@ -1,6 +1,7 @@
-import { memo } from 'react';
+import { memo, useRef, useState, useEffect } from 'react';
 import { useDroppable } from '@dnd-kit/core';
 import { cn } from '@/lib/utils';
+import { ChevronUp } from 'lucide-react';
 import type { ReactNode } from 'react';
 
 interface KanbanColumnProps {
@@ -10,11 +11,16 @@ interface KanbanColumnProps {
   count: number;
   children: ReactNode;
   headerAction?: ReactNode;
+  footerAction?: ReactNode;
   opacity?: number;
   showBorder?: boolean;
   hideScrollbar?: boolean;
   /** Custom width in pixels. If not provided, defaults to 288px (w-72) */
   width?: number;
+  /** Called when user clicks the compact bar to scroll to top */
+  onCompact?: () => void;
+  /** Number of currently visible items (used in compact bar label) */
+  visibleCount?: number;
 }
 
 export const KanbanColumn = memo(function KanbanColumn({
@@ -24,12 +30,38 @@ export const KanbanColumn = memo(function KanbanColumn({
   count,
   children,
   headerAction,
+  footerAction,
   opacity = 100,
   showBorder = true,
   hideScrollbar = false,
   width,
+  onCompact,
+  visibleCount,
 }: KanbanColumnProps) {
   const { setNodeRef, isOver } = useDroppable({ id });
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [showCompactBar, setShowCompactBar] = useState(false);
+
+  // Track scroll position to show/hide compact bar
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container || !onCompact) return;
+
+    const handleScroll = () => {
+      // Show compact bar when scrolled more than 100px
+      setShowCompactBar(container.scrollTop > 100);
+    };
+
+    container.addEventListener('scroll', handleScroll, { passive: true });
+    return () => container.removeEventListener('scroll', handleScroll);
+  }, [onCompact]);
+
+  const handleCompactClick = () => {
+    // Scroll to top
+    scrollContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+    // Reset pagination
+    onCompact?.();
+  };
 
   // Use inline style for width if provided, otherwise use default w-72
   const widthStyle = width ? { width: `${width}px`, flexShrink: 0 } : undefined;
@@ -74,6 +106,7 @@ export const KanbanColumn = memo(function KanbanColumn({
 
       {/* Column Content */}
       <div
+        ref={scrollContainerRef}
         className={cn(
           'relative z-10 flex-1 overflow-y-auto p-2 space-y-2.5',
           hideScrollbar &&
@@ -82,7 +115,29 @@ export const KanbanColumn = memo(function KanbanColumn({
           'scroll-smooth'
         )}
       >
+        {/* Compact Bar - appears when scrolled down */}
+        {showCompactBar && onCompact && (
+          <div
+            className={cn(
+              'sticky top-0 z-20 -mx-2 -mt-2 mb-2 px-3 py-2',
+              'flex items-center justify-center gap-2',
+              'bg-primary/10 backdrop-blur-md',
+              'border-b border-primary/20',
+              'cursor-pointer',
+              'hover:bg-primary/20 transition-colors duration-200',
+              'text-xs font-medium text-primary'
+            )}
+            onClick={handleCompactClick}
+            data-testid="compact-bar"
+          >
+            <ChevronUp className="w-3.5 h-3.5" />
+            <span>Compact{visibleCount ? ` (${visibleCount})` : ''}</span>
+            <ChevronUp className="w-3.5 h-3.5" />
+          </div>
+        )}
         {children}
+        {/* Footer Action (e.g., Show More button) */}
+        {footerAction && <div className="pt-1">{footerAction}</div>}
       </div>
 
       {/* Drop zone indicator when dragging over */}

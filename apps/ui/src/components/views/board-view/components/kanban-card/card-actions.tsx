@@ -10,6 +10,7 @@ import {
   Eye,
   Wand2,
   Archive,
+  EyeOff,
 } from 'lucide-react';
 
 interface CardActionsProps {
@@ -28,6 +29,7 @@ interface CardActionsProps {
   onComplete?: () => void;
   onViewPlan?: () => void;
   onApprovePlan?: () => void;
+  onHide?: () => void;
 }
 
 export function CardActions({
@@ -46,6 +48,7 @@ export function CardActions({
   onComplete,
   onViewPlan,
   onApprovePlan,
+  onHide,
 }: CardActionsProps) {
   return (
     <div className="flex flex-wrap gap-1.5 -mx-3 -mb-3 px-3 pb-3">
@@ -298,6 +301,22 @@ export function CardActions({
             <Edit className="w-3 h-3 mr-1" />
             Edit
           </Button>
+          {onHide && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 text-xs px-2"
+              onClick={(e) => {
+                e.stopPropagation();
+                onHide();
+              }}
+              onPointerDown={(e) => e.stopPropagation()}
+              data-testid={`hide-${feature.id}`}
+              title={feature.hidden ? 'Show' : 'Hide'}
+            >
+              <EyeOff className="w-3 h-3" />
+            </Button>
+          )}
           {feature.planSpec?.content && onViewPlan && (
             <Button
               variant="outline"

@@ -25,6 +25,7 @@ interface KanbanCardProps {
   onComplete?: () => void;
   onViewPlan?: () => void;
   onApprovePlan?: () => void;
+  onHide?: () => void;
   hasContext?: boolean;
   isCurrentAutoTask?: boolean;
   shortcutKey?: string;
@@ -51,6 +52,7 @@ export const KanbanCard = memo(function KanbanCard({
   onComplete,
   onViewPlan,
   onApprovePlan,
+  onHide,
   hasContext,
   isCurrentAutoTask,
   shortcutKey,
@@ -177,6 +179,7 @@ export const KanbanCard = memo(function KanbanCard({
           onComplete={onComplete}
           onViewPlan={onViewPlan}
           onApprovePlan={onApprovePlan}
+          onHide={onHide}
         />
       </CardContent>
     </Card>
@@ -185,6 +188,15 @@ export const KanbanCard = memo(function KanbanCard({
   // Wrap with animated border when in progress
   if (isCurrentAutoTask) {
     return <div className="animated-border-wrapper">{cardElement}</div>;
+  }
+
+  // Wrap hidden cards with visual indicator (dimmed + grayscale)
+  if (feature.hidden) {
+    return (
+      <div className="opacity-40 grayscale hover:opacity-70 hover:grayscale-[50%] transition-all duration-200">
+        {cardElement}
+      </div>
+    );
   }
 
   return cardElement;
