@@ -267,12 +267,6 @@ export function ClaudeSetupStep({ onNext, onBack, onSkip }: ClaudeSetupStepProps
   const isApiKeyVerified = apiKeyVerificationStatus === 'verified';
   const isReady = isCliVerified || isApiKeyVerified;
 
-  const getAuthMethodLabel = () => {
-    if (isApiKeyVerified) return 'API Key';
-    if (isCliVerified) return 'Claude CLI';
-    return null;
-  };
-
   // Helper to get status badge for CLI
   const getCliStatusBadge = () => {
     if (cliVerificationStatus === 'verified') {

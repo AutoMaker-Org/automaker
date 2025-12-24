@@ -4,18 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  FileText,
-  FolderOpen,
-  Terminal,
-  CheckCircle,
-  XCircle,
-  Loader2,
-  Play,
-  File,
-  Pencil,
-  Wrench,
-} from 'lucide-react';
+import { Terminal, CheckCircle, XCircle, Loader2, Play, File, Pencil, Wrench } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getElectronAPI } from '@/lib/electron';
 
@@ -24,13 +13,6 @@ interface ToolResult {
   output?: string;
   error?: string;
   timestamp: Date;
-}
-
-interface ToolExecution {
-  tool: string;
-  input: string;
-  result: ToolResult | null;
-  isRunning: boolean;
 }
 
 export function AgentToolsView() {

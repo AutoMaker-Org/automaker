@@ -9,7 +9,6 @@ import {
   Terminal,
   CircleDot,
   GitPullRequest,
-  Zap,
 } from 'lucide-react';
 import type { NavSection, NavItem } from '../types';
 import type { KeyboardShortcut } from '@/hooks/use-keyboard-shortcuts';

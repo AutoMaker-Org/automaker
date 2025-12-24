@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import {
   ChevronDown,
   ChevronRight,
@@ -21,7 +21,6 @@ import {
   X,
   Filter,
   Circle,
-  Play,
   Loader2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';

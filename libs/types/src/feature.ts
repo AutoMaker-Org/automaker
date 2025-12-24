@@ -50,10 +50,19 @@ export interface Feature {
     reviewedByUser: boolean;
     tasksCompleted?: number;
     tasksTotal?: number;
+    tasks?: Array<{
+      id: string;
+      description: string;
+      status: 'pending' | 'in_progress' | 'completed' | 'failed';
+      filePath?: string;
+      phase?: string;
+    }>;
+    currentTaskId?: string;
   };
   error?: string;
   summary?: string;
   startedAt?: string;
+  steps?: string[]; // Optional steps array (required in UI but optional in base type)
   [key: string]: unknown; // Keep catch-all for extensibility
 }
 

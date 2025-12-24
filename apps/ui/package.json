@@ -32,7 +32,8 @@
     "test": "playwright test",
     "test:headed": "playwright test --headed",
     "dev:electron:wsl": "cross-env vite",
-    "dev:electron:wsl:gpu": "cross-env MESA_D3D12_DEFAULT_ADAPTER_NAME=NVIDIA vite"
+    "dev:electron:wsl:gpu": "cross-env MESA_D3D12_DEFAULT_ADAPTER_NAME=NVIDIA vite",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@automaker/dependency-resolver": "^1.0.0",

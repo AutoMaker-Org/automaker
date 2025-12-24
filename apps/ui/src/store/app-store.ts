@@ -4,28 +4,28 @@ import type { Project, TrashedProject } from '@/lib/electron';
 import type {
   Feature as BaseFeature,
   FeatureImagePath,
+  FeatureTextFilePath,
   AgentModel,
   PlanningMode,
   AIProfile,
+  ThinkingLevel,
+  ModelProvider,
+  ThemeMode as SharedThemeMode,
 } from '@automaker/types';
 
-// Re-export ThemeMode for convenience
-export type { ThemeMode };
+// Re-export types from @automaker/types for convenience
+export type {
+  AgentModel,
+  AIProfile,
+  ThinkingLevel,
+  ModelProvider,
+  FeatureImagePath,
+  FeatureTextFilePath,
+  PlanningMode,
+};
+export type { ThemeMode as SharedThemeMode };
 
-export type ViewMode =
-  | 'welcome'
-  | 'setup'
-  | 'spec'
-  | 'board'
-  | 'agent'
-  | 'settings'
-  | 'interview'
-  | 'context'
-  | 'profiles'
-  | 'running-agents'
-  | 'terminal'
-  | 'wiki';
-
+// Local ThemeMode type for UI (extends shared type)
 export type ThemeMode =
   | 'light'
   | 'dark'
@@ -44,6 +44,20 @@ export type ThemeMode =
   | 'cream'
   | 'sunset'
   | 'gray';
+
+export type ViewMode =
+  | 'welcome'
+  | 'setup'
+  | 'spec'
+  | 'board'
+  | 'agent'
+  | 'settings'
+  | 'interview'
+  | 'context'
+  | 'profiles'
+  | 'running-agents'
+  | 'terminal'
+  | 'wiki';
 
 export type KanbanCardDetailLevel = 'minimal' | 'standard' | 'detailed';
 
@@ -255,18 +269,19 @@ export type ClaudeModel = 'opus' | 'sonnet' | 'haiku';
 
 export interface Feature extends Omit<
   BaseFeature,
-  'steps' | 'imagePaths' | 'textFilePaths' | 'status'
+  'imagePaths' | 'textFilePaths' | 'status' | 'planSpec'
 > {
   id: string;
   title?: string;
   titleGenerating?: boolean;
   category: string;
   description: string;
-  steps: string[]; // Required in UI (not optional)
+  steps?: string[]; // Made optional to align with BaseFeature
   status: 'backlog' | 'in_progress' | 'waiting_approval' | 'verified' | 'completed';
   images?: FeatureImage[]; // UI-specific base64 images
   imagePaths?: FeatureImagePath[]; // Stricter type than base (no string | union)
-  textFilePaths?: FeatureTextFilePath[]; // Text file attachments for context
+  textFilePaths?: FeatureTextFilePath[]; // Use the correct type from @automaker/types
+  planSpec?: PlanSpec; // Use local PlanSpec type instead of BaseFeature's
   justFinishedAt?: string; // UI-specific: ISO timestamp when agent just finished
   prUrl?: string; // UI-specific: Pull request URL
 }
@@ -387,6 +402,68 @@ export interface PersistedTerminalSettings {
   scrollbackLines: number;
   lineHeight: number;
   maxSessions: number;
+}
+
+// Claude Usage interface matching the server response
+export type ClaudeUsage = {
+  sessionTokensUsed: number;
+  sessionLimit: number;
+  sessionPercentage: number;
+  sessionResetTime: string;
+  sessionResetText: string;
+
+  weeklyTokensUsed: number;
+  weeklyLimit: number;
+  weeklyPercentage: number;
+  weeklyResetTime: string;
+  weeklyResetText: string;
+
+  sonnetWeeklyTokensUsed: number;
+  sonnetWeeklyPercentage: number;
+  sonnetResetText: string;
+
+  costUsed: number | null;
+  costLimit: number | null;
+  costCurrency: string | null;
+
+  lastUpdated: string;
+  userTimezone: string;
+};
+
+// Response type for Claude usage API (can be success or error)
+export type ClaudeUsageResponse = ClaudeUsage | { error: string; message?: string };
+
+/**
+ * Check if Claude usage is at its limit (any of: session >= 100%, weekly >= 100%, OR cost >= limit)
+ * Returns true if any limit is reached, meaning auto mode should pause feature pickup.
+ */
+export function isClaudeUsageAtLimit(claudeUsage: ClaudeUsage | null): boolean {
+  if (!claudeUsage) {
+    // No usage data available - don't block
+    return false;
+  }
+
+  // Check session limit (5-hour window)
+  if (claudeUsage.sessionPercentage >= 100) {
+    return true;
+  }
+
+  // Check weekly limit
+  if (claudeUsage.weeklyPercentage >= 100) {
+    return true;
+  }
+
+  // Check cost limit (if configured)
+  if (
+    claudeUsage.costLimit !== null &&
+    claudeUsage.costLimit > 0 &&
+    claudeUsage.costUsed !== null &&
+    claudeUsage.costUsed >= claudeUsage.costLimit
+  ) {
+    return true;
+  }
+
+  return false;
 }
 
 export interface AppState {
@@ -526,68 +603,6 @@ export interface AppState {
   claudeRefreshInterval: number; // Refresh interval in seconds (default: 60)
   claudeUsage: ClaudeUsage | null;
   claudeUsageLastUpdated: number | null;
-}
-
-// Claude Usage interface matching the server response
-export type ClaudeUsage = {
-  sessionTokensUsed: number;
-  sessionLimit: number;
-  sessionPercentage: number;
-  sessionResetTime: string;
-  sessionResetText: string;
-
-  weeklyTokensUsed: number;
-  weeklyLimit: number;
-  weeklyPercentage: number;
-  weeklyResetTime: string;
-  weeklyResetText: string;
-
-  sonnetWeeklyTokensUsed: number;
-  sonnetWeeklyPercentage: number;
-  sonnetResetText: string;
-
-  costUsed: number | null;
-  costLimit: number | null;
-  costCurrency: string | null;
-
-  lastUpdated: string;
-  userTimezone: string;
-};
-
-// Response type for Claude usage API (can be success or error)
-export type ClaudeUsageResponse = ClaudeUsage | { error: string; message?: string };
-
-/**
- * Check if Claude usage is at its limit (any of: session >= 100%, weekly >= 100%, OR cost >= limit)
- * Returns true if any limit is reached, meaning auto mode should pause feature pickup.
- */
-export function isClaudeUsageAtLimit(claudeUsage: ClaudeUsage | null): boolean {
-  if (!claudeUsage) {
-    // No usage data available - don't block
-    return false;
-  }
-
-  // Check session limit (5-hour window)
-  if (claudeUsage.sessionPercentage >= 100) {
-    return true;
-  }
-
-  // Check weekly limit
-  if (claudeUsage.weeklyPercentage >= 100) {
-    return true;
-  }
-
-  // Check cost limit (if configured)
-  if (
-    claudeUsage.costLimit !== null &&
-    claudeUsage.costLimit > 0 &&
-    claudeUsage.costUsed !== null &&
-    claudeUsage.costUsed >= claudeUsage.costLimit
-  ) {
-    return true;
-  }
-
-  return false;
 }
 
 // Default background settings for board backgrounds
@@ -841,6 +856,11 @@ export interface AppActions {
     } | null
   ) => void;
 
+  // Claude Usage Tracking actions
+  setClaudeRefreshInterval: (interval: number) => void;
+  setClaudeUsageLastUpdated: (timestamp: number) => void;
+  setClaudeUsage: (usage: ClaudeUsage | null) => void;
+
   // Reset
   reset: () => void;
 }
@@ -941,6 +961,9 @@ const initialState: AppState = {
   defaultRequirePlanApproval: false,
   defaultAIProfileId: null,
   pendingPlanApproval: null,
+  claudeRefreshInterval: 60, // Default to 60 seconds
+  claudeUsage: null,
+  claudeUsageLastUpdated: null,
 };
 
 export const useAppStore = create<AppState & AppActions>()(
@@ -2451,8 +2474,8 @@ export const useAppStore = create<AppState & AppActions>()(
 
         const updatedLayout = updateSizes(tab.layout);
 
-        const newTabs = current.tabs.map((t) =>
-          t.id === tabId ? { ...t, layout: updatedLayout } : t
+        const newTabs = current.tabs.map((_t) =>
+          _t.id === tabId ? { ..._t, layout: updatedLayout } : _t
         );
 
         set({
