@@ -348,7 +348,7 @@ export class ClaudeUsageService {
     if (resetText) {
       resetTime = this.parseResetTime(resetText, type);
       // Strip timezone like "(Asia/Dubai)" from the display text
-      resetText = resetText.replace(/\s*\([A-Za-z_\/]+\)\s*$/, '').trim();
+      resetText = resetText.replace(/\s*\([A-Za-z_/]+\)\s*$/, '').trim();
     }
 
     return { percentage, resetTime, resetText };

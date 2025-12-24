@@ -34,7 +34,7 @@ export function createCheckoutBranchHandler() {
       }
 
       // Validate branch name (basic validation)
-      const invalidChars = /[\s~^:?*\[\\]/;
+      const invalidChars = /[\s~^:?*[\\]/;
       if (invalidChars.test(branchName)) {
         res.status(400).json({
           success: false,

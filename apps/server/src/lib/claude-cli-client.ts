@@ -90,7 +90,7 @@ function parseCliError(error: string, sessionId: string): ProviderMessage {
  * This provides an async generator interface that yields ProviderMessage objects,
  * matching the Claude Agent SDK's streaming interface.
  */
-export async function* streamCliQuery(options: CLIQueryOptions): AsyncGenerator<ProviderMessage> {
+export async function streamCliQuery(options: CLIQueryOptions): AsyncGenerator<ProviderMessage> {
   const {
     prompt,
     model = 'claude-sonnet-4-20250514',
