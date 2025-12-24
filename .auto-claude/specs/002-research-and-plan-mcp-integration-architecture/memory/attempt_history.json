@@ -1,8 +1,21 @@
 {
-  "subtasks": {},
+  "subtasks": {
+    "subtask-1-1": {
+      "attempts": [
+        {
+          "session": 1,
+          "timestamp": "2025-12-23T20:42:41.222413",
+          "approach": "Implemented: Add MCP server configuration types to settings.ts",
+          "success": true,
+          "error": null
+        }
+      ],
+      "status": "completed"
+    }
+  },
   "stuck_subtasks": [],
   "metadata": {
     "created_at": "2025-12-23T20:40:56.497149",
-    "last_updated": "2025-12-23T20:40:56.497169"
+    "last_updated": "2025-12-23T20:42:41.222421"
   }
 }

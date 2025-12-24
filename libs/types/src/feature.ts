@@ -43,6 +43,7 @@ export interface Feature {
   skipTests?: boolean;
   thinkingLevel?: string;
   planningMode?: PlanningMode;
+  enabledMcpServers?: string[]; // IDs of MCP servers enabled for this task
   requirePlanApproval?: boolean;
   planSpec?: {
     status: 'pending' | 'generating' | 'generated' | 'approved' | 'rejected';
