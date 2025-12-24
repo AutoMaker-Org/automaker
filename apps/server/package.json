@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.1.72",
+    "@modelcontextprotocol/sdk": "^1.12.1",
     "@automaker/dependency-resolver": "^1.0.0",
     "@automaker/git-utils": "^1.0.0",
     "@automaker/model-resolver": "^1.0.0",
@@ -33,7 +34,8 @@
     "express": "^5.2.1",
     "morgan": "^1.10.1",
     "node-pty": "1.1.0-beta41",
-    "ws": "^8.18.3"
+    "ws": "^8.18.3",
+    "zod": "^3.25.0"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",

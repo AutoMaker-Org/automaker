@@ -972,6 +972,44 @@ export class HttpApiClient implements ElectronAPI {
       migratedProjectCount: number;
       errors: string[];
     }> => this.post('/api/settings/migrate', { data }),
+
+    // MCP Server Testing
+    testMcpServer: (
+      config?: unknown,
+      serverId?: string,
+      timeoutMs?: number
+    ): Promise<{
+      success: boolean;
+      result?: {
+        success: boolean;
+        status: 'connected' | 'failed' | 'timeout';
+        serverInfo?: { name: string; version: string };
+        tools?: Array<{ name: string; description?: string; inputSchema?: object }>;
+        error?: string;
+        latencyMs: number;
+        testedAt: string;
+      };
+      error?: string;
+    }> => this.post('/api/settings/mcp-servers/test', { config, serverId, timeoutMs }),
+
+    testAllMcpServers: (
+      timeoutMs?: number
+    ): Promise<{
+      success: boolean;
+      results?: Record<
+        string,
+        {
+          success: boolean;
+          status: 'connected' | 'failed' | 'timeout';
+          serverInfo?: { name: string; version: string };
+          tools?: Array<{ name: string; description?: string; inputSchema?: object }>;
+          error?: string;
+          latencyMs: number;
+          testedAt: string;
+        }
+      >;
+      error?: string;
+    }> => this.post('/api/settings/mcp-servers/test-all', { timeoutMs }),
   };
 
   // Sessions API

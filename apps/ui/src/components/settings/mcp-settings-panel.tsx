@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useAppStore } from '@/store/app-store';
-import type { McpServerConfig } from '@automaker/types';
+import type { McpServerConfig, McpTestResult, McpToolInfo } from '@automaker/types';
 import {
   Dialog,
   DialogContent,
@@ -17,8 +17,24 @@ import { Badge } from '@/components/ui/badge';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
-import { Plus, Pencil, Trash2, Server, Globe, Terminal } from 'lucide-react';
+import {
+  Plus,
+  Pencil,
+  Trash2,
+  Server,
+  Globe,
+  Terminal,
+  CheckCircle2,
+  XCircle,
+  AlertCircle,
+  Loader2,
+  ChevronDown,
+  ChevronRight,
+  Wrench,
+  RefreshCw,
+} from 'lucide-react';
 import { toast } from 'sonner';
+import { getElectronAPI } from '@/lib/electron';
 
 type TransportType = 'stdio' | 'http';
 
@@ -49,6 +65,92 @@ const DEFAULT_FORM_DATA: McpServerFormData = {
   enabled: true,
 };
 
+function StatusIndicator({ testResult }: { testResult?: McpTestResult }) {
+  if (!testResult) {
+    return (
+      <div className="flex items-center gap-1.5">
+        <AlertCircle className="w-4 h-4 text-muted-foreground" />
+        <span className="text-xs text-muted-foreground">Not tested</span>
+      </div>
+    );
+  }
+
+  if (testResult.status === 'connected') {
+    return (
+      <div className="flex items-center gap-1.5">
+        <CheckCircle2 className="w-4 h-4 text-green-500" />
+        <span className="text-xs text-green-500">Connected</span>
+        {testResult.tools && testResult.tools.length > 0 && (
+          <Badge variant="outline" size="sm" className="text-green-500 border-green-500/30">
+            {testResult.tools.length} tools
+          </Badge>
+        )}
+      </div>
+    );
+  }
+
+  if (testResult.status === 'timeout') {
+    return (
+      <div className="flex items-center gap-1.5">
+        <AlertCircle className="w-4 h-4 text-yellow-500" />
+        <span className="text-xs text-yellow-500">Timeout</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-1.5">
+      <XCircle className="w-4 h-4 text-red-500" />
+      <span className="text-xs text-red-500">Failed</span>
+    </div>
+  );
+}
+
+function ToolsList({ tools }: { tools: McpToolInfo[] }) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  if (tools.length === 0) {
+    return <p className="text-xs text-muted-foreground/60 italic">No tools available</p>;
+  }
+
+  return (
+    <div>
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+      >
+        {isOpen ? (
+          <ChevronDown className="w-3.5 h-3.5" />
+        ) : (
+          <ChevronRight className="w-3.5 h-3.5" />
+        )}
+        <Wrench className="w-3.5 h-3.5" />
+        <span>{tools.length} tools available</span>
+      </button>
+      {isOpen && (
+        <div className="mt-2 space-y-1.5 pl-5">
+          {tools.map((tool) => (
+            <div
+              key={tool.name}
+              className="flex items-start gap-2 p-2 rounded-lg bg-background/50 border border-border/30"
+            >
+              <div className="w-1.5 h-1.5 rounded-full bg-brand-500 mt-1.5 flex-shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-medium text-foreground truncate">{tool.name}</p>
+                {tool.description && (
+                  <p className="text-xs text-muted-foreground/80 line-clamp-2">
+                    {tool.description}
+                  </p>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function McpSettingsPanel() {
   const { mcpServers, addMcpServer, updateMcpServer, deleteMcpServer } = useAppStore();
 
@@ -56,6 +158,8 @@ export function McpSettingsPanel() {
   const [editingServer, setEditingServer] = useState<McpServerConfig | null>(null);
   const [formData, setFormData] = useState<McpServerFormData>(DEFAULT_FORM_DATA);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [testingServerId, setTestingServerId] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   const handleOpenAddDialog = () => {
     setEditingServer(null);
@@ -112,7 +216,52 @@ export function McpSettingsPanel() {
     return result;
   };
 
-  const handleSave = () => {
+  const testServer = async (server: McpServerConfig): Promise<McpTestResult | null> => {
+    try {
+      const api = getElectronAPI();
+      if (!api.settings?.testMcpServer) {
+        console.error('MCP server testing not available');
+        return null;
+      }
+      const response = await api.settings.testMcpServer(server);
+      if (response.success && response.result) {
+        return response.result as McpTestResult;
+      }
+      return null;
+    } catch (error) {
+      console.error('Failed to test MCP server:', error);
+      return null;
+    }
+  };
+
+  const handleTestServer = async (server: McpServerConfig) => {
+    setTestingServerId(server.id);
+    toast.info(`Testing ${server.name}...`);
+
+    try {
+      const result = await testServer(server);
+      if (result) {
+        // Update the server with test result
+        updateMcpServer(server.id, { lastTestResult: result });
+
+        if (result.success) {
+          toast.success(
+            `${server.name} connected successfully${result.tools?.length ? ` (${result.tools.length} tools)` : ''}`
+          );
+        } else {
+          toast.error(`${server.name} connection failed: ${result.error || 'Unknown error'}`);
+        }
+      } else {
+        toast.error(`Failed to test ${server.name}`);
+      }
+    } catch (error) {
+      toast.error(`Error testing ${server.name}`);
+    } finally {
+      setTestingServerId(null);
+    }
+  };
+
+  const handleSave = async () => {
     if (!formData.name.trim()) {
       toast.error('Server name is required');
       return;
@@ -128,9 +277,14 @@ export function McpSettingsPanel() {
       return;
     }
 
+    setIsSaving(true);
+
+    let serverConfig: Omit<McpServerConfig, 'id' | 'createdAt' | 'updatedAt'>;
+
     if (formData.transportType === 'stdio') {
       if (!formData.command.trim()) {
         toast.error('Command is required for stdio transport');
+        setIsSaving(false);
         return;
       }
 
@@ -149,26 +303,16 @@ export function McpSettingsPanel() {
         delete (transport as { env?: Record<string, string> }).env;
       }
 
-      if (editingServer) {
-        updateMcpServer(editingServer.id, {
-          name: formData.name.trim(),
-          description: formData.description.trim() || undefined,
-          transport,
-          enabled: formData.enabled,
-        });
-        toast.success('MCP server updated');
-      } else {
-        addMcpServer({
-          name: formData.name.trim(),
-          description: formData.description.trim() || undefined,
-          transport,
-          enabled: formData.enabled,
-        });
-        toast.success('MCP server added');
-      }
+      serverConfig = {
+        name: formData.name.trim(),
+        description: formData.description.trim() || undefined,
+        transport,
+        enabled: formData.enabled,
+      };
     } else {
       if (!formData.url.trim()) {
         toast.error('URL is required for HTTP transport');
+        setIsSaving(false);
         return;
       }
 
@@ -177,6 +321,7 @@ export function McpSettingsPanel() {
         new URL(formData.url.trim());
       } catch {
         toast.error('Invalid URL format');
+        setIsSaving(false);
         return;
       }
 
@@ -191,25 +336,51 @@ export function McpSettingsPanel() {
         delete (transport as { headers?: Record<string, string> }).headers;
       }
 
-      if (editingServer) {
-        updateMcpServer(editingServer.id, {
-          name: formData.name.trim(),
-          description: formData.description.trim() || undefined,
-          transport,
-          enabled: formData.enabled,
-        });
-        toast.success('MCP server updated');
+      serverConfig = {
+        name: formData.name.trim(),
+        description: formData.description.trim() || undefined,
+        transport,
+        enabled: formData.enabled,
+      };
+    }
+
+    // Create a temp config for testing
+    const tempConfig: McpServerConfig = {
+      ...serverConfig,
+      id: editingServer?.id || 'temp-test',
+      createdAt: editingServer?.createdAt || new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    // Auto-test the server before saving
+    toast.info('Testing server connection...');
+    const testResult = await testServer(tempConfig);
+
+    if (editingServer) {
+      updateMcpServer(editingServer.id, {
+        ...serverConfig,
+        lastTestResult: testResult || undefined,
+      });
+      toast.success('MCP server updated');
+    } else {
+      addMcpServer({
+        ...serverConfig,
+        lastTestResult: testResult || undefined,
+      });
+      toast.success('MCP server added');
+    }
+
+    if (testResult) {
+      if (testResult.success) {
+        toast.success(
+          `Connection verified${testResult.tools?.length ? ` - ${testResult.tools.length} tools available` : ''}`
+        );
       } else {
-        addMcpServer({
-          name: formData.name.trim(),
-          description: formData.description.trim() || undefined,
-          transport,
-          enabled: formData.enabled,
-        });
-        toast.success('MCP server added');
+        toast.warning(`Server saved but connection failed: ${testResult.error || 'Unknown error'}`);
       }
     }
 
+    setIsSaving(false);
     handleCloseDialog();
   };
 
@@ -221,6 +392,49 @@ export function McpSettingsPanel() {
 
   const handleToggleEnabled = (server: McpServerConfig) => {
     updateMcpServer(server.id, { enabled: !server.enabled });
+  };
+
+  const handleTestAllServers = async () => {
+    if (mcpServers.length === 0) {
+      toast.info('No MCP servers configured');
+      return;
+    }
+
+    toast.info(`Testing ${mcpServers.length} servers...`);
+
+    try {
+      const api = getElectronAPI();
+      if (!api.settings?.testAllMcpServers) {
+        toast.error('MCP server testing not available');
+        return;
+      }
+      const response = await api.settings.testAllMcpServers();
+
+      if (response.success && response.results) {
+        let successCount = 0;
+        let failCount = 0;
+
+        for (const [serverId, result] of Object.entries(response.results)) {
+          const testResult = result as McpTestResult;
+          updateMcpServer(serverId, { lastTestResult: testResult });
+          if (testResult.success) {
+            successCount++;
+          } else {
+            failCount++;
+          }
+        }
+
+        if (failCount === 0) {
+          toast.success(`All ${successCount} servers connected successfully`);
+        } else {
+          toast.warning(`${successCount} connected, ${failCount} failed`);
+        }
+      } else {
+        toast.error('Failed to test servers');
+      }
+    } catch (error) {
+      toast.error('Error testing servers');
+    }
   };
 
   return (
@@ -246,10 +460,23 @@ export function McpSettingsPanel() {
               </p>
             </div>
           </div>
-          <Button onClick={handleOpenAddDialog} size="sm" className="gap-1.5">
-            <Plus className="w-4 h-4" />
-            Add Server
-          </Button>
+          <div className="flex items-center gap-2">
+            {mcpServers.length > 0 && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleTestAllServers}
+                className="gap-1.5"
+              >
+                <RefreshCw className="w-4 h-4" />
+                Test All
+              </Button>
+            )}
+            <Button onClick={handleOpenAddDialog} size="sm" className="gap-1.5">
+              <Plus className="w-4 h-4" />
+              Add Server
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -269,93 +496,122 @@ export function McpSettingsPanel() {
               <div
                 key={server.id}
                 className={cn(
-                  'flex items-center justify-between p-4 rounded-xl',
+                  'p-4 rounded-xl',
                   'bg-accent/30 border border-border/50',
                   'transition-all duration-200 hover:bg-accent/50'
                 )}
               >
-                <div className="flex items-center gap-4 flex-1 min-w-0">
-                  <div className="flex-shrink-0">
-                    {server.transport.type === 'stdio' ? (
-                      <Terminal className="w-5 h-5 text-muted-foreground" />
-                    ) : (
-                      <Globe className="w-5 h-5 text-muted-foreground" />
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium text-foreground truncate">{server.name}</span>
-                      <Badge
-                        variant={server.transport.type === 'stdio' ? 'outline' : 'secondary'}
-                        size="sm"
-                      >
-                        {server.transport.type}
-                      </Badge>
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex items-start gap-4 flex-1 min-w-0">
+                    <div className="flex-shrink-0 mt-0.5">
+                      {server.transport.type === 'stdio' ? (
+                        <Terminal className="w-5 h-5 text-muted-foreground" />
+                      ) : (
+                        <Globe className="w-5 h-5 text-muted-foreground" />
+                      )}
                     </div>
-                    {server.description && (
-                      <p className="text-sm text-muted-foreground truncate mt-0.5">
-                        {server.description}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-medium text-foreground">{server.name}</span>
+                        <Badge
+                          variant={server.transport.type === 'stdio' ? 'outline' : 'secondary'}
+                          size="sm"
+                        >
+                          {server.transport.type}
+                        </Badge>
+                      </div>
+                      {server.description && (
+                        <p className="text-sm text-muted-foreground truncate mt-0.5">
+                          {server.description}
+                        </p>
+                      )}
+                      <p className="text-xs text-muted-foreground/60 truncate mt-0.5">
+                        {server.transport.type === 'stdio'
+                          ? `${server.transport.command} ${server.transport.args.join(' ')}`
+                          : server.transport.url}
                       </p>
-                    )}
-                    <p className="text-xs text-muted-foreground/60 truncate mt-0.5">
-                      {server.transport.type === 'stdio'
-                        ? `${server.transport.command} ${server.transport.args.join(' ')}`
-                        : server.transport.url}
-                    </p>
-                  </div>
-                </div>
 
-                <div className="flex items-center gap-3 flex-shrink-0">
-                  <div className="flex items-center gap-2">
-                    <Label
-                      htmlFor={`enabled-${server.id}`}
-                      className="text-xs text-muted-foreground cursor-pointer"
-                    >
-                      Default
-                    </Label>
-                    <Switch
-                      id={`enabled-${server.id}`}
-                      checked={server.enabled}
-                      onCheckedChange={() => handleToggleEnabled(server)}
-                    />
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    onClick={() => handleOpenEditDialog(server)}
-                    className="text-muted-foreground hover:text-foreground"
-                  >
-                    <Pencil className="w-4 h-4" />
-                  </Button>
-                  {deleteConfirmId === server.id ? (
-                    <div className="flex items-center gap-1">
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => handleDelete(server.id)}
-                        className="h-7 px-2 text-xs"
-                      >
-                        Confirm
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setDeleteConfirmId(null)}
-                        className="h-7 px-2 text-xs"
-                      >
-                        Cancel
-                      </Button>
+                      {/* Status and Tools */}
+                      <div className="mt-3 space-y-2">
+                        <StatusIndicator testResult={server.lastTestResult} />
+                        {server.lastTestResult?.success && server.lastTestResult.tools && (
+                          <ToolsList tools={server.lastTestResult.tools} />
+                        )}
+                        {server.lastTestResult?.error && (
+                          <p className="text-xs text-red-500/80 line-clamp-2">
+                            {server.lastTestResult.error}
+                          </p>
+                        )}
+                      </div>
                     </div>
-                  ) : (
+                  </div>
+
+                  <div className="flex items-center gap-3 flex-shrink-0">
+                    <div className="flex items-center gap-2">
+                      <Label
+                        htmlFor={`enabled-${server.id}`}
+                        className="text-xs text-muted-foreground cursor-pointer"
+                      >
+                        Default
+                      </Label>
+                      <Switch
+                        id={`enabled-${server.id}`}
+                        checked={server.enabled}
+                        onCheckedChange={() => handleToggleEnabled(server)}
+                      />
+                    </div>
                     <Button
                       variant="ghost"
                       size="icon-sm"
-                      onClick={() => setDeleteConfirmId(server.id)}
-                      className="text-muted-foreground hover:text-destructive"
+                      onClick={() => handleTestServer(server)}
+                      disabled={testingServerId === server.id}
+                      className="text-muted-foreground hover:text-foreground"
+                      title="Test connection"
                     >
-                      <Trash2 className="w-4 h-4" />
+                      {testingServerId === server.id ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <RefreshCw className="w-4 h-4" />
+                      )}
                     </Button>
-                  )}
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      onClick={() => handleOpenEditDialog(server)}
+                      className="text-muted-foreground hover:text-foreground"
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </Button>
+                    {deleteConfirmId === server.id ? (
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => handleDelete(server.id)}
+                          className="h-7 px-2 text-xs"
+                        >
+                          Confirm
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setDeleteConfirmId(null)}
+                          className="h-7 px-2 text-xs"
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    ) : (
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        onClick={() => setDeleteConfirmId(server.id)}
+                        className="text-muted-foreground hover:text-destructive"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    )}
+                  </div>
                 </div>
               </div>
             ))}
@@ -524,10 +780,21 @@ export function McpSettingsPanel() {
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={handleCloseDialog}>
+            <Button variant="outline" onClick={handleCloseDialog} disabled={isSaving}>
               Cancel
             </Button>
-            <Button onClick={handleSave}>{editingServer ? 'Save Changes' : 'Add Server'}</Button>
+            <Button onClick={handleSave} disabled={isSaving}>
+              {isSaving ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Testing...
+                </>
+              ) : editingServer ? (
+                'Save Changes'
+              ) : (
+                'Add Server'
+              )}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

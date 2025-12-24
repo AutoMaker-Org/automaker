@@ -567,6 +567,39 @@ export interface ElectronAPI {
       };
       error?: string;
     }>;
+    testMcpServer: (
+      config?: unknown,
+      serverId?: string,
+      timeoutMs?: number
+    ) => Promise<{
+      success: boolean;
+      result?: {
+        success: boolean;
+        status: 'connected' | 'failed' | 'timeout';
+        serverInfo?: { name: string; version: string };
+        tools?: Array<{ name: string; description?: string; inputSchema?: object }>;
+        error?: string;
+        latencyMs: number;
+        testedAt: string;
+      };
+      error?: string;
+    }>;
+    testAllMcpServers: (timeoutMs?: number) => Promise<{
+      success: boolean;
+      results?: Record<
+        string,
+        {
+          success: boolean;
+          status: 'connected' | 'failed' | 'timeout';
+          serverInfo?: { name: string; version: string };
+          tools?: Array<{ name: string; description?: string; inputSchema?: object }>;
+          error?: string;
+          latencyMs: number;
+          testedAt: string;
+        }
+      >;
+      error?: string;
+    }>;
   };
 }
 

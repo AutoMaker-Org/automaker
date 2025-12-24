@@ -106,6 +106,52 @@ export interface HttpMcpConfig {
 }
 
 /**
+ * McpToolInfo - Information about a tool discovered from an MCP server
+ *
+ * Represents a single tool exposed by an MCP server, including its name,
+ * description, and input schema for validation.
+ */
+export interface McpToolInfo {
+  /** Tool name (used for invocation, e.g., "read_file") */
+  name: string;
+  /** Human-readable description of what the tool does */
+  description?: string;
+  /** JSON Schema for tool input parameters */
+  inputSchema?: object;
+}
+
+/**
+ * McpServerStatus - Connection status for an MCP server
+ */
+export type McpServerStatus = 'connected' | 'failed' | 'timeout' | 'untested';
+
+/**
+ * McpTestResult - Result of testing an MCP server connection
+ *
+ * Stored on McpServerConfig to show connection status and available tools.
+ * Updated when the server is tested (manually or on add/edit).
+ */
+export interface McpTestResult {
+  /** Whether the connection was successful */
+  success: boolean;
+  /** Connection status */
+  status: McpServerStatus;
+  /** Server information (name, version) if connected */
+  serverInfo?: {
+    name: string;
+    version: string;
+  };
+  /** List of available tools if connected */
+  tools?: McpToolInfo[];
+  /** Error message if connection failed */
+  error?: string;
+  /** Time taken to complete the test in milliseconds */
+  latencyMs: number;
+  /** ISO timestamp of when the test was performed */
+  testedAt: string;
+}
+
+/**
  * McpServerConfig - Complete configuration for an MCP server
  *
  * Represents a user-configured MCP server that can be enabled/disabled
@@ -126,6 +172,8 @@ export interface McpServerConfig {
   createdAt: string;
   /** ISO timestamp of when the server was last updated */
   updatedAt: string;
+  /** Result of the last connection test (tools, status, latency) */
+  lastTestResult?: McpTestResult;
 }
 
 /**
