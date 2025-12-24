@@ -11,6 +11,16 @@ interface UseBeadsDragDropProps {
   ) => Promise<boolean>;
 }
 
+/**
+ * Provides drag-and-drop handlers and the currently active issue for managing bead issue status changes.
+ *
+ * @param issues - The list of bead issues available on the board.
+ * @param handleStatusChange - Callback invoked with `(issueId, newStatus)` to persist a status update for an issue.
+ * @returns An object containing:
+ *  - `activeIssue`: the issue currently being dragged, or `null` when none is active
+ *  - `handleDragStart`: handler to call when a drag starts (sets `activeIssue`)
+ *  - `handleDragEnd`: handler to call when a drag ends (determines target column/status and invokes `handleStatusChange` if the status should change)
+ */
 export function useBeadsDragDrop({ issues, handleStatusChange }: UseBeadsDragDropProps) {
   const [activeIssue, setActiveIssue] = useState<BeadsIssue | null>(null);
 

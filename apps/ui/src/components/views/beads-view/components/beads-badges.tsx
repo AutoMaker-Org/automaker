@@ -7,6 +7,13 @@ interface TypeBadgeProps {
   className?: string;
 }
 
+/**
+ * Renders a compact badge that displays the issue type with its associated colors.
+ *
+ * @param type - The issue type text to display; color styling is derived from TYPE_COLORS with a fallback to the `task` color.
+ * @param className - Optional additional CSS classes to apply to the badge container.
+ * @returns A span element styled as a small badge showing the provided `type`.
+ */
 export function TypeBadge({ type, className }: TypeBadgeProps) {
   const colors = TYPE_COLORS[type] || TYPE_COLORS.task;
 
@@ -28,6 +35,17 @@ interface PriorityIndicatorProps {
   className?: string;
 }
 
+/**
+ * Render a compact priority indicator with a colored dot and uppercase label.
+ *
+ * Displays a small colored dot and the priority label (uppercase). The displayed
+ * color and label are derived from the provided `priority` using the module's
+ * priority mappings. Additional CSS classes can be appended via `className`.
+ *
+ * @param priority - Issue priority key used to select the label and colors
+ * @param className - Optional additional class names to apply to the container
+ * @returns A JSX element showing the colored dot and priority label
+ */
 export function PriorityIndicator({ priority, className }: PriorityIndicatorProps) {
   const label = PRIORITY_LABELS[priority];
   const colors = PRIORITY_COLORS[priority];
@@ -45,6 +63,15 @@ interface BlockingBadgeProps {
   className?: string;
 }
 
+/**
+ * Render a compact "Blocks N" badge for an issue when it blocks other issues.
+ *
+ * Renders nothing when `count` is 0.
+ *
+ * @param count - Number of issues this issue blocks; when `0` the component returns `null`
+ * @param className - Optional additional CSS class names to apply to the badge
+ * @returns A `span` element displaying "Blocks {count}", or `null` if `count` is `0`
+ */
 export function BlockingBadge({ count, className }: BlockingBadgeProps) {
   if (count === 0) return null;
 
@@ -67,6 +94,15 @@ interface BlockedBadgeProps {
   className?: string;
 }
 
+/**
+ * Render a compact "Blocked by N" badge when an issue is blocked by one or more other issues.
+ *
+ * The component returns `null` when `count` is zero.
+ *
+ * @param count - Number of issues blocking this issue; determines the displayed count and whether the badge is rendered
+ * @param className - Additional CSS classes to apply to the badge container
+ * @returns A span element displaying "Blocked by {count}" when `count` > 0, `null` otherwise
+ */
 export function BlockedBadge({ count, className }: BlockedBadgeProps) {
   if (count === 0) return null;
 
@@ -89,6 +125,13 @@ interface LabelsListProps {
   className?: string;
 }
 
+/**
+ * Render a wrapped list of label chips from an array of strings.
+ *
+ * @param labels - Array of label text to display; if empty or missing, nothing is rendered
+ * @param className - Optional additional CSS class names applied to the container
+ * @returns A container of styled label chips for each string in `labels`, or `null` when `labels` is empty
+ */
 export function LabelsList({ labels, className }: LabelsListProps) {
   if (!labels || labels.length === 0) return null;
 

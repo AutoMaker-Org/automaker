@@ -19,6 +19,15 @@ import type { BeadsIssue } from '@automaker/types';
 import { getElectronAPI } from '@/lib/electron';
 import { toast } from 'sonner';
 
+/**
+ * Render the Beads Kanban board view for the current project.
+ *
+ * Wires Beads-related hooks to load and organize issues, manages create/edit/delete dialog
+ * state and selected issue, handles status transitions and drag-and-drop, validates Beads
+ * initialization before creating issues, and displays loading, error, or no-project states.
+ *
+ * @returns A React element containing the Beads Kanban board, header, and dialogs.
+ */
 export function BeadsView() {
   const { currentProject } = useAppStore();
 

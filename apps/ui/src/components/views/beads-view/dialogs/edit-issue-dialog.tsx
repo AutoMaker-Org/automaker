@@ -43,6 +43,18 @@ const PRIORITY_OPTIONS: { value: BeadsIssuePriority; label: string }[] = [
   { value: 4, label: 'LOWEST' },
 ];
 
+/**
+ * Dialog UI for editing an existing Beads issue.
+ *
+ * Preloads form fields from `issue`, lets the user edit title, description, type, priority and labels,
+ * validates that title is present before submitting, shows an updating state while saving, and closes the dialog when the update succeeds.
+ *
+ * @param open - Whether the dialog is visible
+ * @param onOpenChange - Callback invoked with the new open state
+ * @param issue - The current issue to edit (or `null` to show an empty/initial form)
+ * @param onUpdate - Async callback called with `(issueId, updates)` to persist changes; should return `true` on success
+ * @returns The EditIssueDialog React element
+ */
 export function EditIssueDialog({ open, onOpenChange, issue, onUpdate }: EditIssueDialogProps) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');

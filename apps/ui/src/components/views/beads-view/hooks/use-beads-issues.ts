@@ -8,6 +8,16 @@ interface UseBeadsIssuesProps {
   currentProject: { path: string; id: string } | null;
 }
 
+/**
+ * Hook that loads and exposes Beads issues for the provided project.
+ *
+ * @param currentProject - The active project (contains `path` and `id`), or `null` when no project is selected.
+ * @returns An object with:
+ *  - `issues`: the array of `BeadsIssue` for the current project (empty if no project or none available),
+ *  - `isLoading`: `true` while the hook is loading issues,
+ *  - `error`: an error message when loading fails, or `null` when there is no error,
+ *  - `loadIssues`: a function to trigger a manual reload of issues
+ */
 export function useBeadsIssues({ currentProject }: UseBeadsIssuesProps) {
   const { beadsByProject, setBeadsIssues } = useAppStore();
   const [isLoading, setIsLoading] = useState(true);

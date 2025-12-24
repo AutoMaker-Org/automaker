@@ -6,6 +6,12 @@ import type { Request, Response } from 'express';
 import { BeadsService } from '../../../services/beads-service.js';
 import { getErrorMessage, logError } from '../common.js';
 
+/**
+ * Create an Express POST /delete handler that deletes a beads issue.
+ *
+ * @param beadsService - Service used to perform issue deletion
+ * @returns An Express request handler that validates `projectPath` and `issueId` from the request body, optionally accepts `force`, invokes `beadsService.deleteIssue`, responds with `{ success: true }` on success, and returns structured JSON errors with appropriate HTTP status codes on validation failure or internal errors
+ */
 export function createDeleteHandler(beadsService: BeadsService) {
   return async (req: Request, res: Response): Promise<void> => {
     try {

@@ -14,6 +14,17 @@ interface UseBeadsActionsProps {
   loadIssues: () => Promise<void>;
 }
 
+/**
+ * Provide handlers to create, update, delete, and change the status of Beads issues for the current project.
+ *
+ * @param currentProject - The currently selected project (object with `path`) or `null` if none is selected
+ * @param loadIssues - Function to trigger reloading of issues; may be used by consumers of the hook
+ * @returns An object exposing four handlers:
+ * - `handleCreateIssue`: creates an issue and returns the created `BeadsIssue` if successful, or `null` on failure.
+ * - `handleUpdateIssue`: updates an issue and returns `true` on success, or `false` on failure.
+ * - `handleDeleteIssue`: deletes an issue and returns `true` on success, or `false` on failure.
+ * - `handleStatusChange`: updates only the issue status and returns `true` on success, or `false` on failure.
+ */
 export function useBeadsActions({ currentProject, loadIssues }: UseBeadsActionsProps) {
   const { addBeadsIssue, updateBeadsIssue, removeBeadsIssue } = useAppStore();
 
