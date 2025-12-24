@@ -8,6 +8,7 @@ import type {
   AgentModel,
   PlanningMode,
   AIProfile,
+  McpServerConfig,
 } from '@automaker/types';
 
 // Re-export ThemeMode for convenience
@@ -465,6 +466,9 @@ export interface AppState {
   // AI Profiles
   aiProfiles: AIProfile[];
 
+  // MCP Server Configuration
+  mcpServers: McpServerConfig[];
+
   // Profile Display Settings
   showProfilesOnly: boolean; // When true, hide model tweaking options and show only profile selection
 
@@ -754,6 +758,15 @@ export interface AppActions {
   reorderAIProfiles: (oldIndex: number, newIndex: number) => void;
   resetAIProfiles: () => void;
 
+  // MCP Server actions
+  setMcpServers: (servers: McpServerConfig[]) => void;
+  addMcpServer: (server: Omit<McpServerConfig, 'id' | 'createdAt' | 'updatedAt'>) => void;
+  updateMcpServer: (
+    id: string,
+    updates: Partial<Omit<McpServerConfig, 'id' | 'createdAt'>>
+  ) => void;
+  deleteMcpServer: (id: string) => void;
+
   // Project Analysis actions
   setProjectAnalysis: (analysis: ProjectAnalysis | null) => void;
   setIsAnalyzing: (analyzing: boolean) => void;
@@ -925,6 +938,7 @@ const initialState: AppState = {
   muteDoneSound: false, // Default to sound enabled (not muted)
   enhancementModel: 'sonnet', // Default to sonnet for feature enhancement
   aiProfiles: DEFAULT_AI_PROFILES,
+  mcpServers: [],
   projectAnalysis: null,
   isAnalyzing: false,
   boardBackgroundByProject: {},
@@ -950,6 +964,9 @@ const initialState: AppState = {
   defaultRequirePlanApproval: false,
   defaultAIProfileId: null,
   pendingPlanApproval: null,
+  claudeRefreshInterval: 60,
+  claudeUsage: null,
+  claudeUsageLastUpdated: null,
 };
 
 export const useAppStore = create<AppState & AppActions>()(
@@ -1584,6 +1601,31 @@ export const useAppStore = create<AppState & AppActions>()(
           (p) => !p.isBuiltIn && !defaultProfileIds.has(p.id)
         );
         set({ aiProfiles: [...DEFAULT_AI_PROFILES, ...userProfiles] });
+      },
+
+      // MCP Server actions
+      setMcpServers: (servers) => set({ mcpServers: servers }),
+
+      addMcpServer: (server) => {
+        const id = `mcp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        const now = new Date().toISOString();
+        set({
+          mcpServers: [...get().mcpServers, { ...server, id, createdAt: now, updatedAt: now }],
+        });
+      },
+
+      updateMcpServer: (id, updates) => {
+        set({
+          mcpServers: get().mcpServers.map((server) =>
+            server.id === id
+              ? { ...server, ...updates, updatedAt: new Date().toISOString() }
+              : server
+          ),
+        });
+      },
+
+      deleteMcpServer: (id) => {
+        set({ mcpServers: get().mcpServers.filter((server) => server.id !== id) });
       },
 
       // Project Analysis actions
@@ -2706,8 +2748,9 @@ export const useAppStore = create<AppState & AppActions>()(
           keyboardShortcuts: state.keyboardShortcuts,
           muteDoneSound: state.muteDoneSound,
           enhancementModel: state.enhancementModel,
-          // Profiles and sessions
+          // Profiles, MCP servers, and sessions
           aiProfiles: state.aiProfiles,
+          mcpServers: state.mcpServers,
           chatSessions: state.chatSessions,
           lastSelectedSessionByProject: state.lastSelectedSessionByProject,
           // Board background settings
