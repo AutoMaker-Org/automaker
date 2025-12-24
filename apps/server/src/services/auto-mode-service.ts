@@ -28,6 +28,7 @@ import type { EventEmitter } from '../lib/events.js';
 import { createAutoModeOptions, validateWorkingDirectory } from '../lib/sdk-options.js';
 import { computeModelEnv, getZaiCredentialsError } from '../lib/env-computation.js';
 import { FeatureLoader } from './feature-loader.js';
+import { convertMcpConfigsToSdkFormat } from '../lib/mcp-config.js';
 
 const execAsync = promisify(exec);
 
@@ -620,6 +621,7 @@ export class AutoModeService {
           systemPrompt: contextFilesPrompt || undefined,
           implementationEndpointPreset: feature.implementationEndpointPreset,
           implementationEndpointUrl: feature.implementationEndpointUrl,
+          enabledMcpServers: feature.enabledMcpServers,
         }
       );
 
@@ -896,6 +898,7 @@ Address the follow-up instructions above. Review the previous work and make the 
           planningMode: 'skip', // Follow-ups don't require approval
           previousContent: previousContext || undefined,
           systemPrompt: contextFilesPrompt || undefined,
+          enabledMcpServers: feature?.enabledMcpServers,
         }
       );
 
@@ -1731,6 +1734,7 @@ This helps parse your summary correctly in the output logs.`;
       systemPrompt?: string;
       implementationEndpointPreset?: 'default' | 'zai' | 'custom';
       implementationEndpointUrl?: string;
+      enabledMcpServers?: string[];
     }
   ): Promise<void> {
     const finalProjectPath = options?.projectPath || projectPath;
@@ -1874,6 +1878,40 @@ This mock response was generated because AUTOMAKER_MOCK_AGENT=true was set.
       );
     }
 
+    // Load and convert MCP server configuration
+    // 1. Get global MCP configs from settings
+    // 2. Filter to only enabled servers for this task
+    // 3. Convert to SDK format for provider
+    let mcpServersConfig: Record<string, import('../providers/types.js').McpSdkConfig> | undefined;
+    if (options?.enabledMcpServers && options.enabledMcpServers.length > 0) {
+      try {
+        if (this.settingsService) {
+          const globalSettings = await this.settingsService.getGlobalSettings();
+          const mcpServers = globalSettings.mcpServers ?? [];
+          if (mcpServers.length > 0) {
+            mcpServersConfig = convertMcpConfigsToSdkFormat(mcpServers, options.enabledMcpServers);
+            const loadedServerNames = Object.keys(mcpServersConfig);
+            if (loadedServerNames.length > 0) {
+              console.log(
+                `[AutoMode] Loading MCP servers for feature ${featureId}: [${loadedServerNames.join(', ')}]`
+              );
+            } else {
+              console.log(
+                `[AutoMode] No matching MCP servers found for enabled IDs: [${options.enabledMcpServers.join(', ')}]`
+              );
+            }
+          }
+        } else {
+          console.log(`[AutoMode] SettingsService not available, skipping MCP config`);
+        }
+      } catch (error) {
+        console.error(`[AutoMode] Failed to load MCP config for feature ${featureId}:`, error);
+        // Continue without MCP - don't fail the entire execution
+      }
+    } else {
+      console.log(`[AutoMode] No MCP servers enabled for feature ${featureId}`);
+    }
+
     // Execute via provider with environment injection
     // Initial stream uses planning model for spec/full modes, implementation model otherwise
     const executeOptions: ExecuteOptions = {
@@ -1885,6 +1923,7 @@ This mock response was generated because AUTOMAKER_MOCK_AGENT=true was set.
       abortController,
       systemPrompt: options?.systemPrompt,
       ...(providerConfigEnv ? { providerConfig: { env: providerConfigEnv } } : {}),
+      ...(mcpServersConfig ? { mcpServers: mcpServersConfig } : {}),
     };
 
     console.log(
@@ -2127,6 +2166,7 @@ After generating the revised spec, output:
                         ...(providerConfigEnv
                           ? { providerConfig: { env: providerConfigEnv } }
                           : {}),
+                        ...(mcpServersConfig ? { mcpServers: mcpServersConfig } : {}),
                       });
 
                       let revisionText = '';
@@ -2271,6 +2311,7 @@ After generating the revised spec, output:
                     allowedTools: allowedTools,
                     abortController,
                     ...(implementationEnv ? { providerConfig: { env: implementationEnv } } : {}),
+                    ...(mcpServersConfig ? { mcpServers: mcpServersConfig } : {}),
                   });
 
                   let taskOutput = '';
@@ -2368,6 +2409,7 @@ Implement all the changes described in the plan above.`;
                   allowedTools: allowedTools,
                   abortController,
                   ...(implementationEnv ? { providerConfig: { env: implementationEnv } } : {}),
+                  ...(mcpServersConfig ? { mcpServers: mcpServersConfig } : {}),
                 });
 
                 for await (const msg of continuationStream) {
