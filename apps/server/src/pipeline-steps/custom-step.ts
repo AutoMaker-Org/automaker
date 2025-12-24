@@ -112,7 +112,11 @@ export class CustomStep {
         });
 
         // Check success criteria
-        const successMet = await this.checkSuccessCriteria(result.output, config.successCriteria);
+        const successMet = await this.checkSuccessCriteria(
+          result.output,
+          config.successCriteria,
+          signal
+        );
 
         if (successMet) {
           finalResult = {
@@ -191,19 +195,19 @@ export class CustomStep {
     }
 
     // Add feature context
-    prompt = prompt.replace(/\{\{feature\}\}/g, JSON.stringify(feature, null, 2));
-    prompt = prompt.replace(/\{\{featureTitle\}\}/g, feature.title || '');
-    prompt = prompt.replace(/\{\{featureDescription\}\}/g, feature.description || '');
-    prompt = prompt.replace(/\{\{featureStatus\}\}/g, feature.status || '');
+    prompt = prompt.replaceAll('{{feature}}', JSON.stringify(feature, null, 2));
+    prompt = prompt.replaceAll('{{featureTitle}}', feature.title || '');
+    prompt = prompt.replaceAll('{{featureDescription}}', feature.description || '');
+    prompt = prompt.replaceAll('{{featureStatus}}', feature.status || '');
 
     // Add memory context
     if (memoryContext) {
       const previousFeedback = memoryContext.previousIssues
         .map((issue) => `${issue.summary}${issue.location ? ` (${issue.location})` : ''}`)
         .join('\n');
-      prompt = prompt.replace(/\{\{previousFeedback\}\}/g, previousFeedback);
-      prompt = prompt.replace(/\{\{loopCount\}\}/g, loopCount.toString());
-      prompt = prompt.replace(/\{\{previousAttempts\}\}/g, memoryContext.iterationCount.toString());
+      prompt = prompt.replaceAll('{{previousFeedback}}', previousFeedback);
+      prompt = prompt.replaceAll('{{loopCount}}', loopCount.toString());
+      prompt = prompt.replaceAll('{{previousAttempts}}', memoryContext.iterationCount.toString());
     }
 
     // Add success criteria
@@ -227,7 +231,11 @@ Please address any remaining issues.
     return prompt;
   }
 
-  private async checkSuccessCriteria(output: string, criteria: string): Promise<boolean> {
+  private async checkSuccessCriteria(
+    output: string,
+    criteria: string,
+    signal: AbortSignal
+  ): Promise<boolean> {
     console.log('[Custom Step] Evaluating success criteria...');
     const lowerOutput = output.toLowerCase();
     const lowerCriteria = criteria.toLowerCase();
@@ -314,7 +322,7 @@ Respond with ONLY "YES" if the criteria are met, or "NO" if they are not met.`;
       const evaluationResult = await this.autoModeService.executeAIStep({
         feature: evaluationFeature,
         stepConfig: evaluationStepConfig,
-        signal: new AbortController().signal,
+        signal,
         prompt: evaluationPrompt,
         onProgress: (message) => {
           console.log(`[Custom Step] Evaluation: ${message}`);
@@ -353,12 +361,5 @@ Respond with ONLY "YES" if the criteria are met, or "NO" if they are not met.`;
     } catch (error) {
       throw new Error(`CodeRabbit integration failed: ${error}`);
     }
-  }
-
-  /**
-   * Escape special characters in a string for use in a regular expression
-   */
-  private escapeRegExp(str: string): string {
-    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   }
 }
