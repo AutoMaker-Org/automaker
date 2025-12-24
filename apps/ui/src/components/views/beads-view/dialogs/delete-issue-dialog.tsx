@@ -19,6 +19,20 @@ interface DeleteIssueDialogProps {
   isDeleting?: boolean;
 }
 
+/**
+ * Render a confirmation dialog for deleting a Beads issue.
+ *
+ * Shows the issue's title and ID, an optional warning when the issue blocks others,
+ * and actions to cancel or confirm deletion.
+ *
+ * @param open - Whether the dialog is visible
+ * @param onOpenChange - Callback invoked with the new open state
+ * @param issue - The issue to delete; when null nothing is shown in the dialog body
+ * @param blockingCount - Number of other issues blocked by this issue; used to show a warning when > 0
+ * @param onDelete - Async handler invoked when the user confirms deletion
+ * @param isDeleting - When true, disables actions and shows a "Deleting..." label on the confirm button
+ * @returns The dialog element for confirming and performing issue deletion
+ */
 export function DeleteIssueDialog({
   open,
   onOpenChange,

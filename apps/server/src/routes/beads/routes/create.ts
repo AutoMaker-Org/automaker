@@ -6,6 +6,16 @@ import type { Request, Response } from 'express';
 import { BeadsService } from '../../../services/beads-service.js';
 import { getErrorMessage, logError } from '../common.js';
 
+/**
+ * Creates an Express request handler for creating a beads issue.
+ *
+ * The handler validates that `projectPath` and `issue.title` are present in the request body,
+ * calls the provided service to create the issue, and sends a JSON response:
+ * on success `{ success: true, issue }`, on validation failure a 400 with `{ success: false, error }`,
+ * and on internal error a 500 with `{ success: false, error }`.
+ *
+ * @returns An Express-compatible request handler that performs the described validation, creation, and responses.
+ */
 export function createCreateHandler(beadsService: BeadsService) {
   return async (req: Request, res: Response): Promise<void> => {
     try {

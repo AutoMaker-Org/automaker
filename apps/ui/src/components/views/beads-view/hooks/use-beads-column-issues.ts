@@ -8,6 +8,14 @@ interface UseBeadsColumnIssuesProps {
   currentProject: { path: string } | null;
 }
 
+/**
+ * Organizes bead issues into board columns and provides a column selector and basic counts.
+ *
+ * @returns An object containing:
+ * - `columnIssuesMap`: a record mapping column IDs (`backlog`, `ready`, `in_progress`, `blocked`, `done`) to arrays of `BeadsIssue`. Each column's issues are ordered by priority (lower number = higher priority) and then by `createdAt` (older first).
+ * - `getColumnIssues`: a function `(columnId: BeadsColumnId) => BeadsIssue[]` that returns the issues for the given column.
+ * - `stats`: an object with issue counts `{ total, open, inProgress, closed, blocked }`.
+ */
 export function useBeadsColumnIssues({
   issues,
   searchQuery,

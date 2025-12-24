@@ -47,6 +47,11 @@ interface UseNavigationProps {
   cycleNextProject: () => void;
 }
 
+/**
+ * Constructs sidebar navigation sections and their keyboard shortcuts based on the provided state and visibility flags.
+ *
+ * @returns An object containing `navSections` — an array of navigation sections (labels and items) to render, and `navigationShortcuts` — an array of keyboard shortcut descriptors with keys, actions, and descriptions.
+ */
 export function useNavigation({
   shortcuts,
   hideSpecEditor,

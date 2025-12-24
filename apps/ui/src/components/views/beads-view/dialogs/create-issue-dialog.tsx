@@ -38,6 +38,14 @@ const PRIORITY_OPTIONS: { value: BeadsIssuePriority; label: string }[] = [
   { value: 4, label: 'LOWEST' },
 ];
 
+/**
+ * Modal dialog UI for creating a new Beads issue with title, description, type, priority and labels.
+ *
+ * @param open - Whether the dialog is visible
+ * @param onOpenChange - Callback invoked with the updated open state when the dialog should open or close
+ * @param onCreate - Async callback invoked with the issue input when the user submits; should resolve to `true` on successful creation
+ * @returns The rendered Create Issue dialog element
+ */
 export function CreateIssueDialog({ open, onOpenChange, onCreate }: CreateIssueDialogProps) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');

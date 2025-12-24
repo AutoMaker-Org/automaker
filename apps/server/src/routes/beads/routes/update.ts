@@ -6,6 +6,12 @@ import type { Request, Response } from 'express';
 import { BeadsService } from '../../../services/beads-service.js';
 import { getErrorMessage, logError } from '../common.js';
 
+/**
+ * Create an Express route handler that updates an existing beads issue.
+ *
+ * @param beadsService - Service used to perform the issue update
+ * @returns An Express request handler that validates `projectPath`, `issueId`, and `updates` from the request body, calls the service to apply changes, and sends JSON responses: on success `{ success: true, issue }`, on validation failure a 400 with `{ success: false, error }`, and on unexpected errors a 500 with `{ success: false, error }`.
+ */
 export function createUpdateHandler(beadsService: BeadsService) {
   return async (req: Request, res: Response): Promise<void> => {
     try {

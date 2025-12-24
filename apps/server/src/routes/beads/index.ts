@@ -12,6 +12,12 @@ import { createDeleteHandler } from './routes/delete.js';
 import { createReadyWorkHandler } from './routes/ready.js';
 import { createValidateHandler } from './routes/validate.js';
 
+/**
+ * Create an Express Router configured with Beads-related POST endpoints.
+ *
+ * @param beadsService - Service used by route handlers to perform Beads operations
+ * @returns The configured Express Router containing the Beads endpoints (POST /list, /create, /update, /delete, /ready, and /validate)
+ */
 export function createBeadsRoutes(beadsService: BeadsService): Router {
   const router = Router();
 
