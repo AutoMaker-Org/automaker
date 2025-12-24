@@ -266,8 +266,8 @@ export class BeadsService {
     type: 'blocks' | 'related' | 'parent' | 'discovered-from'
   ): Promise<void> {
     try {
-      const command = `bd dep add ${issueId} ${depId} --type ${type}`;
-      await execAsync(command, { cwd: projectPath });
+      const args = ['dep', 'add', issueId, depId, '--type', type];
+      await execFileAsync('bd', args, { cwd: projectPath });
     } catch (error) {
       throw new Error(`Failed to add dependency: ${error}`);
     }
@@ -278,8 +278,8 @@ export class BeadsService {
    */
   async removeDependency(projectPath: string, issueId: string, depId: string): Promise<void> {
     try {
-      const command = `bd dep remove ${issueId} ${depId}`;
-      await execAsync(command, { cwd: projectPath });
+      const args = ['dep', 'remove', issueId, depId];
+      await execFileAsync('bd', args, { cwd: projectPath });
     } catch (error) {
       throw new Error(`Failed to remove dependency: ${error}`);
     }
@@ -290,11 +290,11 @@ export class BeadsService {
    */
   async getReadyWork(projectPath: string, limit?: number): Promise<any[]> {
     try {
-      let command = 'bd ready --json';
+      const args = ['ready', '--json'];
       if (limit) {
-        command += ` --limit ${limit}`;
+        args.push('--limit', String(limit));
       }
-      const { stdout } = await execAsync(command, { cwd: projectPath });
+      const { stdout } = await execFileAsync('bd', args, { cwd: projectPath });
       const issues = JSON.parse(stdout);
       return issues;
     } catch (error) {
@@ -310,7 +310,7 @@ export class BeadsService {
    */
   async getStats(projectPath: string): Promise<any> {
     try {
-      const { stdout } = await execAsync('bd stats --json', { cwd: projectPath });
+      const { stdout } = await execFileAsync('bd', ['stats', '--json'], { cwd: projectPath });
       const stats = JSON.parse(stdout);
       return stats;
     } catch (error) {
@@ -331,7 +331,7 @@ export class BeadsService {
    */
   async sync(projectPath: string): Promise<void> {
     try {
-      await execAsync('bd sync', { cwd: projectPath });
+      await execFileAsync('bd', ['sync'], { cwd: projectPath });
     } catch (error) {
       throw new Error(`Failed to sync database: ${error}`);
     }
