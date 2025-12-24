@@ -102,6 +102,7 @@ export function useBoardActions({
       priority: number;
       planningMode: PlanningMode;
       requirePlanApproval: boolean;
+      dependencies?: string[];
       implementationEndpointPreset?: 'default' | 'zai' | 'custom';
       implementationEndpointUrl?: string;
       enabledMcpServers?: string[];
@@ -157,6 +158,7 @@ export function useBoardActions({
         titleGenerating: needsTitleGeneration,
         status: 'backlog' as const,
         branchName: finalBranchName,
+        dependencies: featureData.dependencies || [],
       };
       const createdFeature = addFeature(newFeatureData);
       // Must await to ensure feature exists on server before user can drag it

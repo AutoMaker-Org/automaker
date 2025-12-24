@@ -48,6 +48,7 @@ import { createClaudeRoutes } from './routes/claude/index.js';
 import { ClaudeUsageService } from './services/claude-usage-service.js';
 import { createGitHubRoutes } from './routes/github/index.js';
 import { createContextRoutes } from './routes/context/index.js';
+import { cleanupStaleValidations } from './routes/github/routes/validation-common.js';
 
 // Load environment variables
 dotenv.config();
@@ -123,6 +124,15 @@ const claudeUsageService = new ClaudeUsageService();
   console.log('[Server] Agent service initialized');
 })();
 
+// Run stale validation cleanup every hour to prevent memory leaks from crashed validations
+const VALIDATION_CLEANUP_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
+setInterval(() => {
+  const cleaned = cleanupStaleValidations();
+  if (cleaned > 0) {
+    console.log(`[Server] Cleaned up ${cleaned} stale validation entries`);
+  }
+}, VALIDATION_CLEANUP_INTERVAL_MS);
+
 // Mount API routes - health is unauthenticated for monitoring
 app.use('/api/health', createHealthRoutes());
 
@@ -147,7 +157,7 @@ app.use('/api/templates', createTemplatesRoutes());
 app.use('/api/terminal', createTerminalRoutes());
 app.use('/api/settings', createSettingsRoutes(settingsService));
 app.use('/api/claude', createClaudeRoutes(claudeUsageService));
-app.use('/api/github', createGitHubRoutes());
+app.use('/api/github', createGitHubRoutes(events));
 app.use('/api/context', createContextRoutes());
 
 // Create HTTP server

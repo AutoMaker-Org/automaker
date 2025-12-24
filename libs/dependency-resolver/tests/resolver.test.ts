@@ -3,6 +3,8 @@ import {
   resolveDependencies,
   areDependenciesSatisfied,
   getBlockingDependencies,
+  wouldCreateCircularDependency,
+  dependencyExists,
 } from '../src/resolver';
 import type { Feature } from '@automaker/types';
 
@@ -346,6 +348,206 @@ describe('resolver.ts', () => {
       expect(blocking).toContain('Dep1');
       expect(blocking).toContain('Dep3');
       expect(blocking).not.toContain('Dep2');
+    });
+  });
+
+  describe('wouldCreateCircularDependency', () => {
+    it('should return false for features with no existing dependencies', () => {
+      const features = [createFeature('A'), createFeature('B')];
+
+      // Making B depend on A should not create a cycle
+      expect(wouldCreateCircularDependency(features, 'A', 'B')).toBe(false);
+    });
+
+    it('should return false for valid linear dependency chain', () => {
+      // A <- B <- C (C depends on B, B depends on A)
+      const features = [
+        createFeature('A'),
+        createFeature('B', { dependencies: ['A'] }),
+        createFeature('C', { dependencies: ['B'] }),
+      ];
+
+      // Making D depend on C should not create a cycle
+      const featuresWithD = [...features, createFeature('D')];
+      expect(wouldCreateCircularDependency(featuresWithD, 'C', 'D')).toBe(false);
+    });
+
+    it('should detect direct circular dependency (A -> B -> A)', () => {
+      // B depends on A
+      const features = [createFeature('A'), createFeature('B', { dependencies: ['A'] })];
+
+      // Making A depend on B would create: A -> B -> A (cycle!)
+      // sourceId = B (prerequisite), targetId = A (will depend on B)
+      // This creates a cycle because B already depends on A
+      expect(wouldCreateCircularDependency(features, 'B', 'A')).toBe(true);
+    });
+
+    it('should detect transitive circular dependency (A -> B -> C -> A)', () => {
+      // C depends on B, B depends on A
+      const features = [
+        createFeature('A'),
+        createFeature('B', { dependencies: ['A'] }),
+        createFeature('C', { dependencies: ['B'] }),
+      ];
+
+      // Making A depend on C would create: A -> C -> B -> A (cycle!)
+      // sourceId = C (prerequisite), targetId = A (will depend on C)
+      expect(wouldCreateCircularDependency(features, 'C', 'A')).toBe(true);
+    });
+
+    it('should detect cycle in complex graph', () => {
+      // Graph: A <- B, A <- C, B <- C (C depends on both A and B, B depends on A)
+      const features = [
+        createFeature('A'),
+        createFeature('B', { dependencies: ['A'] }),
+        createFeature('C', { dependencies: ['A', 'B'] }),
+      ];
+
+      // Making A depend on C would create a cycle
+      expect(wouldCreateCircularDependency(features, 'C', 'A')).toBe(true);
+
+      // Making B depend on C would also create a cycle
+      expect(wouldCreateCircularDependency(features, 'C', 'B')).toBe(true);
+    });
+
+    it('should return false for parallel branches', () => {
+      // A <- B, A <- C (B and C both depend on A, but not on each other)
+      const features = [
+        createFeature('A'),
+        createFeature('B', { dependencies: ['A'] }),
+        createFeature('C', { dependencies: ['A'] }),
+      ];
+
+      // Making B depend on C should be fine (no cycle)
+      expect(wouldCreateCircularDependency(features, 'C', 'B')).toBe(false);
+
+      // Making C depend on B should also be fine
+      expect(wouldCreateCircularDependency(features, 'B', 'C')).toBe(false);
+    });
+
+    it('should handle self-dependency check', () => {
+      const features = [createFeature('A')];
+
+      // A depending on itself would be a trivial cycle
+      expect(wouldCreateCircularDependency(features, 'A', 'A')).toBe(true);
+    });
+
+    it('should handle feature not in list', () => {
+      const features = [createFeature('A')];
+
+      // Non-existent source - should return false (no path exists)
+      expect(wouldCreateCircularDependency(features, 'NonExistent', 'A')).toBe(false);
+
+      // Non-existent target - should return false
+      expect(wouldCreateCircularDependency(features, 'A', 'NonExistent')).toBe(false);
+    });
+
+    it('should handle empty features list', () => {
+      const features: Feature[] = [];
+
+      expect(wouldCreateCircularDependency(features, 'A', 'B')).toBe(false);
+    });
+
+    it('should handle longer transitive chains', () => {
+      // A <- B <- C <- D <- E
+      const features = [
+        createFeature('A'),
+        createFeature('B', { dependencies: ['A'] }),
+        createFeature('C', { dependencies: ['B'] }),
+        createFeature('D', { dependencies: ['C'] }),
+        createFeature('E', { dependencies: ['D'] }),
+      ];
+
+      // Making A depend on E would create a 5-node cycle
+      expect(wouldCreateCircularDependency(features, 'E', 'A')).toBe(true);
+
+      // Making B depend on E would create a 4-node cycle
+      expect(wouldCreateCircularDependency(features, 'E', 'B')).toBe(true);
+
+      // Making E depend on A is fine (already exists transitively, but adding explicit is ok)
+      // Wait, E already depends on A transitively. Let's add F instead
+      const featuresWithF = [...features, createFeature('F')];
+      expect(wouldCreateCircularDependency(featuresWithF, 'E', 'F')).toBe(false);
+    });
+
+    it('should handle diamond dependency pattern', () => {
+      //     A
+      //    / \
+      //   B   C
+      //    \ /
+      //     D
+      const features = [
+        createFeature('A'),
+        createFeature('B', { dependencies: ['A'] }),
+        createFeature('C', { dependencies: ['A'] }),
+        createFeature('D', { dependencies: ['B', 'C'] }),
+      ];
+
+      // Making A depend on D would create a cycle through both paths
+      expect(wouldCreateCircularDependency(features, 'D', 'A')).toBe(true);
+
+      // Making B depend on D would create a cycle
+      expect(wouldCreateCircularDependency(features, 'D', 'B')).toBe(true);
+
+      // Adding E that depends on D should be fine
+      const featuresWithE = [...features, createFeature('E')];
+      expect(wouldCreateCircularDependency(featuresWithE, 'D', 'E')).toBe(false);
+    });
+  });
+
+  describe('dependencyExists', () => {
+    it('should return false when target has no dependencies', () => {
+      const features = [createFeature('A'), createFeature('B')];
+
+      expect(dependencyExists(features, 'A', 'B')).toBe(false);
+    });
+
+    it('should return true when direct dependency exists', () => {
+      const features = [createFeature('A'), createFeature('B', { dependencies: ['A'] })];
+
+      expect(dependencyExists(features, 'A', 'B')).toBe(true);
+    });
+
+    it('should return false for reverse direction', () => {
+      const features = [createFeature('A'), createFeature('B', { dependencies: ['A'] })];
+
+      // B depends on A, but A does not depend on B
+      expect(dependencyExists(features, 'B', 'A')).toBe(false);
+    });
+
+    it('should return false for transitive dependencies', () => {
+      // This function only checks direct dependencies, not transitive
+      const features = [
+        createFeature('A'),
+        createFeature('B', { dependencies: ['A'] }),
+        createFeature('C', { dependencies: ['B'] }),
+      ];
+
+      // C depends on B which depends on A, but C doesn't directly depend on A
+      expect(dependencyExists(features, 'A', 'C')).toBe(false);
+    });
+
+    it('should return true for one of multiple dependencies', () => {
+      const features = [
+        createFeature('A'),
+        createFeature('B'),
+        createFeature('C', { dependencies: ['A', 'B'] }),
+      ];
+
+      expect(dependencyExists(features, 'A', 'C')).toBe(true);
+      expect(dependencyExists(features, 'B', 'C')).toBe(true);
+    });
+
+    it('should return false when target feature does not exist', () => {
+      const features = [createFeature('A')];
+
+      expect(dependencyExists(features, 'A', 'NonExistent')).toBe(false);
+    });
+
+    it('should return false for empty dependencies array', () => {
+      const features = [createFeature('A'), createFeature('B', { dependencies: [] })];
+
+      expect(dependencyExists(features, 'A', 'B')).toBe(false);
     });
   });
 });

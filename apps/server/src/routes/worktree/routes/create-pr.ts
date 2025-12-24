@@ -56,32 +56,56 @@ export function createCreatePRHandler() {
       }
 
       // Check for uncommitted changes
+      console.log(`[CreatePR] Checking for uncommitted changes in: ${worktreePath}`);
       const { stdout: status } = await execAsync('git status --porcelain', {
         cwd: worktreePath,
         env: execEnv,
       });
       const hasChanges = status.trim().length > 0;
+      console.log(`[CreatePR] Has uncommitted changes: ${hasChanges}`);
+      if (hasChanges) {
+        console.log(`[CreatePR] Changed files:\n${status}`);
+      }
 
       // If there are changes, commit them
       let commitHash: string | null = null;
+      let commitError: string | null = null;
       if (hasChanges) {
         const message = commitMessage || `Changes from ${branchName}`;
+        console.log(`[CreatePR] Committing changes with message: ${message}`);
 
-        // Stage all changes
-        await execAsync('git add -A', { cwd: worktreePath, env: execEnv });
+        try {
+          // Stage all changes
+          console.log(`[CreatePR] Running: git add -A`);
+          await execAsync('git add -A', { cwd: worktreePath, env: execEnv });
 
-        // Create commit
-        await execAsync(`git commit -m "${message.replace(/"/g, '\\"')}"`, {
-          cwd: worktreePath,
-          env: execEnv,
-        });
+          // Create commit
+          console.log(`[CreatePR] Running: git commit`);
+          await execAsync(`git commit -m "${message.replace(/"/g, '\\"')}"`, {
+            cwd: worktreePath,
+            env: execEnv,
+          });
 
-        // Get commit hash
-        const { stdout: hashOutput } = await execAsync('git rev-parse HEAD', {
-          cwd: worktreePath,
-          env: execEnv,
-        });
-        commitHash = hashOutput.trim().substring(0, 8);
+          // Get commit hash
+          const { stdout: hashOutput } = await execAsync('git rev-parse HEAD', {
+            cwd: worktreePath,
+            env: execEnv,
+          });
+          commitHash = hashOutput.trim().substring(0, 8);
+          console.log(`[CreatePR] Commit successful: ${commitHash}`);
+        } catch (commitErr: unknown) {
+          const err = commitErr as { stderr?: string; message?: string };
+          commitError = err.stderr || err.message || 'Commit failed';
+          console.error(`[CreatePR] Commit failed: ${commitError}`);
+
+          // Return error immediately - don't proceed with push/PR if commit fails
+          res.status(500).json({
+            success: false,
+            error: `Failed to commit changes: ${commitError}`,
+            commitError,
+          });
+          return;
+        }
       }
 
       // Push the branch to remote
@@ -360,8 +384,9 @@ export function createCreatePRHandler() {
         success: true,
         result: {
           branch: branchName,
-          committed: hasChanges,
+          committed: hasChanges && !commitError,
           commitHash,
+          commitError: commitError || undefined,
           pushed: true,
           prUrl,
           prNumber,

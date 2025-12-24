@@ -19,6 +19,7 @@ import {
   ChevronDown,
   ChevronUp,
   Cpu,
+  GitFork,
 } from 'lucide-react';
 import { CountUpTimer } from '@/components/ui/count-up-timer';
 import { formatModelName, DEFAULT_MODEL } from '@/lib/agent-context-parser';
@@ -31,6 +32,7 @@ interface CardHeaderProps {
   onEdit: () => void;
   onDelete: () => void;
   onViewOutput?: () => void;
+  onSpawnTask?: () => void;
 }
 
 export function CardHeaderSection({
@@ -40,6 +42,7 @@ export function CardHeaderSection({
   onEdit,
   onDelete,
   onViewOutput,
+  onSpawnTask,
 }: CardHeaderProps) {
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -92,6 +95,17 @@ export function CardHeaderSection({
                 <Edit className="w-3 h-3 mr-2" />
                 Edit
               </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onSpawnTask?.();
+                }}
+                data-testid={`spawn-running-${feature.id}`}
+                className="text-xs"
+              >
+                <GitFork className="w-3 h-3 mr-2" />
+                Spawn Sub-Task
+              </DropdownMenuItem>
               {/* Model info in dropdown */}
               <div className="px-2 py-1.5 text-[10px] text-muted-foreground border-t mt-1 pt-1.5">
                 <div className="flex items-center gap-1">
@@ -106,7 +120,21 @@ export function CardHeaderSection({
 
       {/* Backlog header */}
       {!isCurrentAutoTask && feature.status === 'backlog' && (
-        <div className="absolute top-2 right-2">
+        <div className="absolute top-2 right-2 flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 w-6 p-0 hover:bg-white/10 text-muted-foreground hover:text-foreground"
+            onClick={(e) => {
+              e.stopPropagation();
+              onSpawnTask?.();
+            }}
+            onPointerDown={(e) => e.stopPropagation()}
+            data-testid={`spawn-backlog-${feature.id}`}
+            title="Spawn Sub-Task"
+          >
+            <GitFork className="w-4 h-4" />
+          </Button>
           <Button
             variant="ghost"
             size="sm"
@@ -140,6 +168,22 @@ export function CardHeaderSection({
                 title="Edit"
               >
                 <Edit className="w-4 h-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 w-6 p-0 hover:bg-white/10 text-muted-foreground hover:text-foreground"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onSpawnTask?.();
+                }}
+                onPointerDown={(e) => e.stopPropagation()}
+                data-testid={`spawn-${
+                  feature.status === 'waiting_approval' ? 'waiting' : 'verified'
+                }-${feature.id}`}
+                title="Spawn Sub-Task"
+              >
+                <GitFork className="w-4 h-4" />
               </Button>
               {onViewOutput && (
                 <Button
@@ -229,6 +273,17 @@ export function CardHeaderSection({
                     View Logs
                   </DropdownMenuItem>
                 )}
+                <DropdownMenuItem
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onSpawnTask?.();
+                  }}
+                  data-testid={`spawn-feature-${feature.id}`}
+                  className="text-xs"
+                >
+                  <GitFork className="w-3 h-3 mr-2" />
+                  Spawn Sub-Task
+                </DropdownMenuItem>
                 {/* Model info in dropdown */}
                 <div className="px-2 py-1.5 text-[10px] text-muted-foreground border-t mt-1 pt-1.5">
                   <div className="flex items-center gap-1">

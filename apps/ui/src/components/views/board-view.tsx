@@ -107,6 +107,9 @@ export function BoardView() {
   // State for viewing plan in read-only mode
   const [viewPlanFeature, setViewPlanFeature] = useState<Feature | null>(null);
 
+  // State for spawn task mode
+  const [spawnParentFeature, setSpawnParentFeature] = useState<Feature | null>(null);
+
   // Worktree dialog states
   const [showCreateWorktreeDialog, setShowCreateWorktreeDialog] = useState(false);
   const [showDeleteWorktreeDialog, setShowDeleteWorktreeDialog] = useState(false);
@@ -1021,6 +1024,10 @@ export function BoardView() {
             onImplement={handleStartImplementation}
             onViewPlan={(feature) => setViewPlanFeature(feature)}
             onApprovePlan={handleOpenApprovalDialog}
+            onSpawnTask={(feature) => {
+              setSpawnParentFeature(feature);
+              setShowAddDialog(true);
+            }}
             featuresWithContext={featuresWithContext}
             runningAutoTasks={runningAutoTasks}
             shortcuts={shortcuts}
@@ -1043,6 +1050,12 @@ export function BoardView() {
             onStartTask={handleStartImplementation}
             onStopTask={handleForceStopFeature}
             onResumeTask={handleResumeFeature}
+            onUpdateFeature={updateFeature}
+            onSpawnTask={(feature) => {
+              setSpawnParentFeature(feature);
+              setShowAddDialog(true);
+            }}
+            onDeleteTask={(feature) => handleDeleteFeature(feature.id)}
           />
         )}
       </div>
@@ -1077,7 +1090,12 @@ export function BoardView() {
       {/* Add Feature Dialog */}
       <AddFeatureDialog
         open={showAddDialog}
-        onOpenChange={setShowAddDialog}
+        onOpenChange={(open) => {
+          setShowAddDialog(open);
+          if (!open) {
+            setSpawnParentFeature(null);
+          }
+        }}
         onAdd={handleAddFeature}
         categorySuggestions={categorySuggestions}
         branchSuggestions={branchSuggestions}
@@ -1088,6 +1106,8 @@ export function BoardView() {
         isMaximized={isMaximized}
         showProfilesOnly={showProfilesOnly}
         aiProfiles={aiProfiles}
+        parentFeature={spawnParentFeature}
+        allFeatures={hookFeatures}
       />
 
       {/* Edit Feature Dialog */}

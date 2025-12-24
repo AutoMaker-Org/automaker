@@ -30,6 +30,7 @@ import {
   useSetupDialog,
   useTrashDialog,
   useProjectTheme,
+  useUnviewedValidations,
 } from './sidebar/hooks';
 
 export function Sidebar() {
@@ -126,6 +127,9 @@ export function Sidebar() {
 
   // Running agents count
   const { runningAgentsCount } = useRunningAgents();
+
+  // Unviewed validations count
+  const { count: unviewedValidationsCount } = useUnviewedValidations(currentProject);
 
   // Trash dialog and operations
   const {
@@ -235,6 +239,7 @@ export function Sidebar() {
     setIsProjectPickerOpen,
     cyclePrevProject,
     cycleNextProject,
+    unviewedValidationsCount,
   });
 
   // Register keyboard shortcuts

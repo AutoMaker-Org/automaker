@@ -24,6 +24,8 @@ import type {
   GitHubAPI,
   GitHubIssue,
   GitHubPR,
+  IssueValidationInput,
+  IssueValidationEvent,
 } from './electron';
 import type { Message, SessionListItem } from '@/types/electron';
 import type { Feature, ClaudeUsageResponse } from '@/store/app-store';
@@ -51,7 +53,8 @@ type EventType =
   | 'agent:stream'
   | 'auto-mode:event'
   | 'suggestions:event'
-  | 'spec-regeneration:event';
+  | 'spec-regeneration:event'
+  | 'issue-validation:event';
 
 type EventCallback = (payload: unknown) => void;
 
@@ -760,6 +763,18 @@ export class HttpApiClient implements ElectronAPI {
     checkRemote: (projectPath: string) => this.post('/api/github/check-remote', { projectPath }),
     listIssues: (projectPath: string) => this.post('/api/github/issues', { projectPath }),
     listPRs: (projectPath: string) => this.post('/api/github/prs', { projectPath }),
+    validateIssue: (projectPath: string, issue: IssueValidationInput, model?: string) =>
+      this.post('/api/github/validate-issue', { projectPath, ...issue, model }),
+    getValidationStatus: (projectPath: string, issueNumber?: number) =>
+      this.post('/api/github/validation-status', { projectPath, issueNumber }),
+    stopValidation: (projectPath: string, issueNumber: number) =>
+      this.post('/api/github/validation-stop', { projectPath, issueNumber }),
+    getValidations: (projectPath: string, issueNumber?: number) =>
+      this.post('/api/github/validations', { projectPath, issueNumber }),
+    markValidationViewed: (projectPath: string, issueNumber: number) =>
+      this.post('/api/github/validation-mark-viewed', { projectPath, issueNumber }),
+    onValidationEvent: (callback: (event: IssueValidationEvent) => void) =>
+      this.subscribeToEvent('issue-validation:event', callback as EventCallback),
   };
 
   // Workspace API

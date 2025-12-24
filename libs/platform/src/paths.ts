@@ -112,6 +112,44 @@ export function getWorktreesDir(projectPath: string): string {
 }
 
 /**
+ * Get the validations directory for a project
+ *
+ * Stores GitHub issue validation results, organized by issue number.
+ *
+ * @param projectPath - Absolute path to project directory
+ * @returns Absolute path to {projectPath}/.automaker/validations
+ */
+export function getValidationsDir(projectPath: string): string {
+  return path.join(getAutomakerDir(projectPath), 'validations');
+}
+
+/**
+ * Get the directory for a specific issue validation
+ *
+ * Contains validation result and metadata for a GitHub issue.
+ *
+ * @param projectPath - Absolute path to project directory
+ * @param issueNumber - GitHub issue number
+ * @returns Absolute path to {projectPath}/.automaker/validations/{issueNumber}
+ */
+export function getValidationDir(projectPath: string, issueNumber: number): string {
+  return path.join(getValidationsDir(projectPath), String(issueNumber));
+}
+
+/**
+ * Get the validation result file path for a GitHub issue
+ *
+ * Stores the JSON validation result including verdict, analysis, and metadata.
+ *
+ * @param projectPath - Absolute path to project directory
+ * @param issueNumber - GitHub issue number
+ * @returns Absolute path to {projectPath}/.automaker/validations/{issueNumber}/validation.json
+ */
+export function getValidationPath(projectPath: string, issueNumber: number): string {
+  return path.join(getValidationDir(projectPath, issueNumber), 'validation.json');
+}
+
+/**
  * Get the app spec file path for a project
  *
  * Stores the application specification document used for generation.

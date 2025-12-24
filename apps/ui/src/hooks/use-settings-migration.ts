@@ -222,6 +222,7 @@ export async function syncSettingsToServer(): Promise<boolean> {
       defaultAIProfileId: state.defaultAIProfileId,
       muteDoneSound: state.muteDoneSound,
       enhancementModel: state.enhancementModel,
+      validationModel: state.validationModel,
       keyboardShortcuts: state.keyboardShortcuts,
       aiProfiles: state.aiProfiles,
       projects: state.projects,

@@ -481,6 +481,9 @@ export interface AppState {
   // Enhancement Model Settings
   enhancementModel: AgentModel; // Model used for feature enhancement (default: sonnet)
 
+  // Validation Model Settings
+  validationModel: AgentModel; // Model used for GitHub issue validation (default: opus)
+
   // Project Analysis
   projectAnalysis: ProjectAnalysis | null;
   isAnalyzing: boolean;
@@ -751,6 +754,9 @@ export interface AppActions {
   // Enhancement Model actions
   setEnhancementModel: (model: AgentModel) => void;
 
+  // Validation Model actions
+  setValidationModel: (model: AgentModel) => void;
+
   // AI Profile actions
   addAIProfile: (profile: Omit<AIProfile, 'id'>) => void;
   updateAIProfile: (id: string, updates: Partial<AIProfile>) => void;
@@ -937,6 +943,7 @@ const initialState: AppState = {
   keyboardShortcuts: DEFAULT_KEYBOARD_SHORTCUTS, // Default keyboard shortcuts
   muteDoneSound: false, // Default to sound enabled (not muted)
   enhancementModel: 'sonnet', // Default to sonnet for feature enhancement
+  validationModel: 'opus', // Default to opus for GitHub issue validation
   aiProfiles: DEFAULT_AI_PROFILES,
   mcpServers: [],
   projectAnalysis: null,
@@ -1562,6 +1569,9 @@ export const useAppStore = create<AppState & AppActions>()(
 
       // Enhancement Model actions
       setEnhancementModel: (model) => set({ enhancementModel: model }),
+
+      // Validation Model actions
+      setValidationModel: (model) => set({ validationModel: model }),
 
       // AI Profile actions
       addAIProfile: (profile) => {
@@ -2748,6 +2758,7 @@ export const useAppStore = create<AppState & AppActions>()(
           keyboardShortcuts: state.keyboardShortcuts,
           muteDoneSound: state.muteDoneSound,
           enhancementModel: state.enhancementModel,
+          validationModel: state.validationModel,
           // Profiles, MCP servers, and sessions
           aiProfiles: state.aiProfiles,
           mcpServers: state.mcpServers,

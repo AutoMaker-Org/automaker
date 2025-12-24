@@ -39,6 +39,7 @@ import {
   FeatureImage,
   AIProfile,
   PlanningMode,
+  Feature,
 } from '@/store/app-store';
 import {
   ModelSelector,
@@ -48,6 +49,7 @@ import {
   PrioritySelector,
   BranchSelector,
   PlanningModeSelector,
+  AncestorContextSection,
 } from '../shared';
 import {
   DropdownMenu,
@@ -56,6 +58,11 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useNavigate } from '@tanstack/react-router';
+import {
+  getAncestors,
+  formatAncestorContextForPrompt,
+  type AncestorContext,
+} from '@automaker/dependency-resolver';
 
 interface AddFeatureDialogProps {
   open: boolean;
@@ -75,6 +82,7 @@ interface AddFeatureDialogProps {
     priority: number;
     planningMode: PlanningMode;
     requirePlanApproval: boolean;
+    dependencies?: string[];
     implementationEndpointPreset?: 'default' | 'zai' | 'custom';
     implementationEndpointUrl?: string;
     enabledMcpServers?: string[];
@@ -88,6 +96,9 @@ interface AddFeatureDialogProps {
   isMaximized?: boolean;
   showProfilesOnly?: boolean;
   aiProfiles?: AIProfile[];
+  // Spawn task mode props
+  parentFeature?: Feature | null;
+  allFeatures?: Feature[];
 }
 
 export function AddFeatureDialog({
@@ -103,7 +114,10 @@ export function AddFeatureDialog({
   isMaximized,
   showProfilesOnly,
   aiProfiles,
+  parentFeature = null,
+  allFeatures = [],
 }: AddFeatureDialogProps) {
+  const isSpawnMode = !!parentFeature;
   const navigate = useNavigate();
   const [useCurrentBranch, setUseCurrentBranch] = useState(true);
   const [newFeature, setNewFeature] = useState({
@@ -133,6 +147,10 @@ export function AddFeatureDialog({
   const [planningMode, setPlanningMode] = useState<PlanningMode>('skip');
   const [requirePlanApproval, setRequirePlanApproval] = useState(false);
   const [enabledMcpServers, setEnabledMcpServers] = useState<string[]>([]);
+
+  // Spawn mode state
+  const [ancestors, setAncestors] = useState<AncestorContext[]>([]);
+  const [selectedAncestorIds, setSelectedAncestorIds] = useState<Set<string>>(new Set());
 
   // Get enhancement model, planning mode defaults, and worktrees setting from store
   const {
@@ -167,6 +185,17 @@ export function AddFeatureDialog({
       setRequirePlanApproval(defaultRequirePlanApproval);
       // Initialize enabled MCP servers from global defaults
       setEnabledMcpServers(mcpServers.filter((s) => s.enabled).map((s) => s.id));
+
+      // Initialize ancestors for spawn mode
+      if (parentFeature) {
+        const ancestorList = getAncestors(parentFeature, allFeatures);
+        setAncestors(ancestorList);
+        // Only select parent by default - ancestors are optional context
+        setSelectedAncestorIds(new Set([parentFeature.id]));
+      } else {
+        setAncestors([]);
+        setSelectedAncestorIds(new Set());
+      }
     }
   }, [
     open,
@@ -177,6 +206,8 @@ export function AddFeatureDialog({
     defaultAIProfileId,
     aiProfiles,
     mcpServers,
+    parentFeature,
+    allFeatures,
   ]);
 
   const handleAdd = () => {
@@ -202,10 +233,34 @@ export function AddFeatureDialog({
     // Otherwise (primary worktree), use empty string which means "unassigned" (show only on primary)
     const finalBranchName = useCurrentBranch ? currentBranch || '' : newFeature.branchName || '';
 
+    // Build final description - prepend ancestor context in spawn mode
+    let finalDescription = newFeature.description;
+    if (isSpawnMode && parentFeature && selectedAncestorIds.size > 0) {
+      // Create parent context as an AncestorContext
+      const parentContext: AncestorContext = {
+        id: parentFeature.id,
+        title: parentFeature.title,
+        description: parentFeature.description,
+        spec: parentFeature.spec,
+        summary: parentFeature.summary,
+        depth: -1,
+      };
+
+      const allAncestorsWithParent = [parentContext, ...ancestors];
+      const contextText = formatAncestorContextForPrompt(
+        allAncestorsWithParent,
+        selectedAncestorIds
+      );
+
+      if (contextText) {
+        finalDescription = `${contextText}\n\n---\n\n## Task Description\n\n${newFeature.description}`;
+      }
+    }
+
     onAdd({
       title: newFeature.title,
       category,
-      description: newFeature.description,
+      description: finalDescription,
       images: newFeature.images,
       imagePaths: newFeature.imagePaths,
       textFilePaths: newFeature.textFilePaths,
@@ -217,6 +272,8 @@ export function AddFeatureDialog({
       priority: newFeature.priority,
       planningMode,
       requirePlanApproval,
+      // In spawn mode, automatically add parent as dependency
+      dependencies: isSpawnMode && parentFeature ? [parentFeature.id] : undefined,
       implementationEndpointPreset: newFeature.implementationEndpointPreset,
       implementationEndpointUrl: newFeature.implementationEndpointUrl,
       enabledMcpServers,
@@ -330,8 +387,12 @@ export function AddFeatureDialog({
         }}
       >
         <DialogHeader>
-          <DialogTitle>Add New Feature</DialogTitle>
-          <DialogDescription>Create a new feature card for the Kanban board.</DialogDescription>
+          <DialogTitle>{isSpawnMode ? 'Spawn Sub-Task' : 'Add New Feature'}</DialogTitle>
+          <DialogDescription>
+            {isSpawnMode
+              ? `Create a sub-task that depends on "${parentFeature?.title || parentFeature?.description.slice(0, 50)}..."`
+              : 'Create a new feature card for the Kanban board.'}
+          </DialogDescription>
         </DialogHeader>
         <Tabs defaultValue="prompt" className="py-4 flex-1 min-h-0 flex flex-col">
           <TabsList className="w-full grid grid-cols-3 mb-4">
@@ -351,6 +412,22 @@ export function AddFeatureDialog({
 
           {/* Prompt Tab */}
           <TabsContent value="prompt" className="space-y-4 overflow-y-auto cursor-default">
+            {/* Ancestor Context Section - only in spawn mode */}
+            {isSpawnMode && parentFeature && (
+              <AncestorContextSection
+                parentFeature={{
+                  id: parentFeature.id,
+                  title: parentFeature.title,
+                  description: parentFeature.description,
+                  spec: parentFeature.spec,
+                  summary: parentFeature.summary,
+                }}
+                ancestors={ancestors}
+                selectedAncestorIds={selectedAncestorIds}
+                onSelectionChange={setSelectedAncestorIds}
+              />
+            )}
+
             <div className="space-y-2">
               <Label htmlFor="description">Description</Label>
               <DescriptionImageDropZone
@@ -610,7 +687,7 @@ export function AddFeatureDialog({
             data-testid="confirm-add-feature"
             disabled={useWorktrees && !useCurrentBranch && !newFeature.branchName.trim()}
           >
-            Add Feature
+            {isSpawnMode ? 'Spawn Task' : 'Add Feature'}
           </HotkeyButton>
         </DialogFooter>
       </DialogContent>

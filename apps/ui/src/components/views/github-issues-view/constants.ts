@@ -1,0 +1,1 @@
+export const VALIDATION_STALENESS_HOURS = 24;
