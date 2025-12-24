@@ -1,0 +1,10 @@
+{
+  "discovered_files": {
+    "apps/ui/src/components/settings/mcp-settings-panel.tsx": {
+      "description": "MCP settings panel component for managing MCP server configurations. Supports CRUD operations for stdio (command/args/env) and HTTP (url/headers) transport types. Uses Radix UI components following the existing settings section patterns. Types imported from @automaker/types, store actions from @/store/app-store.",
+      "category": "component",
+      "discovered_at": "2025-12-24T02:19:23.365943+00:00"
+    }
+  },
+  "last_updated": "2025-12-24T02:19:23.365956+00:00"
+}

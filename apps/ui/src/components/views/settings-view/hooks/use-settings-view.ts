@@ -4,6 +4,7 @@ export type SettingsViewId =
   | 'api-keys'
   | 'claude'
   | 'ai-enhancement'
+  | 'mcp'
   | 'appearance'
   | 'terminal'
   | 'keyboard'
