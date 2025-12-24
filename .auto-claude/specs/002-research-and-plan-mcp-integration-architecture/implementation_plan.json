@@ -150,7 +150,9 @@
             "command": "cd apps/server && npx tsc --noEmit",
             "expected": "TypeScript compilation succeeds"
           },
-          "status": "pending"
+          "status": "completed",
+          "notes": "Implemented MCP config pass-through in auto-mode-service.ts: imported convertMcpConfigsToSdkFormat utility, added enabledMcpServers to runAgent options, loaded and converted MCP configs from global settings, passed mcpServers to all provider.executeQuery() calls (initial stream, revision stream, task stream, continuation stream). Includes logging to verify correct MCP server filtering per feature. TypeScript compilation verified.",
+          "updated_at": "2025-12-24T02:07:39.179978+00:00"
         }
       ]
     },
@@ -175,7 +177,9 @@
             "command": "cd apps/ui && npx tsc --noEmit",
             "expected": "TypeScript compilation succeeds"
           },
-          "status": "pending"
+          "status": "completed",
+          "notes": "Added MCP server state and actions to app store: imported McpServerConfig type, added mcpServers: McpServerConfig[] to AppState, added CRUD actions (setMcpServers, addMcpServer, updateMcpServer, deleteMcpServer) to AppActions interface, initialized mcpServers as empty array, implemented action handlers following aiProfiles pattern, added mcpServers to partialize for persistence. Also fixed pre-existing issue with missing claudeRefreshInterval, claudeUsage, claudeUsageLastUpdated in initialState. Committed in 17dcdc4. Note: Verification shows pre-existing TypeScript errors in codebase unrelated to MCP changes - no MCP-specific errors found.",
+          "updated_at": "2025-12-24T02:13:42.896695+00:00"
         }
       ]
     },
@@ -450,6 +454,6 @@
     }
   },
   "qa_signoff": null,
-  "last_updated": "2025-12-24T02:02:17.431139+00:00",
+  "last_updated": "2025-12-24T02:13:42.896706+00:00",
   "recoveryNote": "Task recovered from stuck state at 2025-12-24T01:59:27.486Z"
 }

@@ -3,13 +3,13 @@
   "spec": "002-research-and-plan-mcp-integration-architecture",
   "state": "building",
   "subtasks": {
-    "completed": 6,
+    "completed": 8,
     "total": 15,
     "in_progress": 1,
     "failed": 0
   },
   "phase": {
-    "current": "Provider MCP Integration",
+    "current": "Global MCP Settings UI",
     "id": null,
     "total": 2
   },
@@ -18,8 +18,8 @@
     "max": 1
   },
   "session": {
-    "number": 2,
+    "number": 4,
     "started_at": "2025-12-23T20:59:30.577293"
   },
-  "last_update": "2025-12-23T21:02:53.079112"
+  "last_update": "2025-12-23T21:14:09.884703"
 }
