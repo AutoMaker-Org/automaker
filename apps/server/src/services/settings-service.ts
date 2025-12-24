@@ -124,6 +124,9 @@ export class SettingsService {
    * Missing fields are filled in from DEFAULT_GLOBAL_SETTINGS for forward/backward
    * compatibility during schema migrations.
    *
+   * Includes migration logic for version upgrades:
+   * - v1 -> v2: Adds mcpServers array for MCP server configuration
+   *
    * @returns Promise resolving to complete GlobalSettings object
    */
   async getGlobalSettings(): Promise<GlobalSettings> {
@@ -131,7 +134,7 @@ export class SettingsService {
     const settings = await readJsonFile<GlobalSettings>(settingsPath, DEFAULT_GLOBAL_SETTINGS);
 
     // Apply any missing defaults (for backwards compatibility)
-    return {
+    const result: GlobalSettings = {
       ...DEFAULT_GLOBAL_SETTINGS,
       ...settings,
       keyboardShortcuts: {
@@ -139,6 +142,15 @@ export class SettingsService {
         ...settings.keyboardShortcuts,
       },
     };
+
+    // Migration: v1 -> v2 - Add mcpServers array for MCP server configuration
+    if (!settings.version || settings.version < 2) {
+      result.mcpServers = settings.mcpServers ?? [];
+      result.version = SETTINGS_VERSION;
+      logger.info('Migrated settings from v1 to v2: added mcpServers array');
+    }
+
+    return result;
   }
 
   /**
