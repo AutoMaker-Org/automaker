@@ -380,6 +380,30 @@ export class HttpApiClient implements ElectronAPI {
     return this.post('/api/fs/delete-board-background', { projectPath });
   }
 
+  async listFiles(
+    projectPath: string,
+    options?: {
+      extensions?: string[];
+      maxDepth?: number;
+      maxFiles?: number;
+    }
+  ): Promise<{
+    success: boolean;
+    files?: Array<{
+      relativePath: string;
+      absolutePath: string;
+      extension: string;
+      size: number;
+    }>;
+    truncated?: boolean;
+    error?: string;
+  }> {
+    return this.post('/api/fs/list-files', {
+      path: projectPath,
+      ...options,
+    });
+  }
+
   // CLI checks - server-side
   async checkClaudeCli(): Promise<{
     success: boolean;

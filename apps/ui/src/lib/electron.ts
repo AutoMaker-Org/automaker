@@ -423,6 +423,24 @@ export interface ElectronAPI {
   stat: (filePath: string) => Promise<StatResult>;
   deleteFile: (filePath: string) => Promise<WriteResult>;
   trashItem?: (filePath: string) => Promise<WriteResult>;
+  listFiles?: (
+    projectPath: string,
+    options?: {
+      extensions?: string[];
+      maxDepth?: number;
+      maxFiles?: number;
+    }
+  ) => Promise<{
+    success: boolean;
+    files?: Array<{
+      relativePath: string;
+      absolutePath: string;
+      extension: string;
+      size: number;
+    }>;
+    truncated?: boolean;
+    error?: string;
+  }>;
   getPath: (name: string) => Promise<string>;
   openInEditor?: (
     filePath: string,

@@ -19,6 +19,7 @@ import { createBrowseHandler } from './routes/browse.js';
 import { createImageHandler } from './routes/image.js';
 import { createSaveBoardBackgroundHandler } from './routes/save-board-background.js';
 import { createDeleteBoardBackgroundHandler } from './routes/delete-board-background.js';
+import { createListFilesHandler } from './routes/list-files.js';
 
 export function createFsRoutes(_events: EventEmitter): Router {
   const router = Router();
@@ -37,6 +38,7 @@ export function createFsRoutes(_events: EventEmitter): Router {
   router.get('/image', createImageHandler());
   router.post('/save-board-background', createSaveBoardBackgroundHandler());
   router.post('/delete-board-background', createDeleteBoardBackgroundHandler());
+  router.post('/list-files', createListFilesHandler());
 
   return router;
 }

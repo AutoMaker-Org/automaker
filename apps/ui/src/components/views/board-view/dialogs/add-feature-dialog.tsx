@@ -15,10 +15,13 @@ import { Label } from '@/components/ui/label';
 import { CategoryAutocomplete } from '@/components/ui/category-autocomplete';
 import {
   DescriptionImageDropZone,
-  FeatureImagePath as DescriptionImagePath,
-  FeatureTextFilePath as DescriptionTextFilePath,
   ImagePreviewMap,
 } from '@/components/ui/description-image-dropzone';
+import type {
+  FeatureImagePath as DescriptionImagePath,
+  FeatureTextFilePath as DescriptionTextFilePath,
+} from '@automaker/types';
+import type { FileReference } from '@/lib/file-mention-utils';
 import { MessageSquare, Settings2, SlidersHorizontal, Sparkles, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { getElectronAPI } from '@/lib/electron';
@@ -120,6 +123,7 @@ export function AddFeatureDialog({
     branchName: '',
     priority: 2 as number, // Default to medium priority
   });
+  const [fileReferences, setFileReferences] = useState<FileReference[]>([]);
   const [newFeaturePreviewMap, setNewFeaturePreviewMap] = useState<ImagePreviewMap>(
     () => new Map()
   );
@@ -267,6 +271,7 @@ export function AddFeatureDialog({
       thinkingLevel: 'none',
       branchName: '',
     });
+    setFileReferences([]);
     setUseCurrentBranch(true);
     setPlanningMode(defaultPlanningMode);
     setRequirePlanApproval(defaultRequirePlanApproval);
@@ -406,6 +411,8 @@ export function AddFeatureDialog({
                 onTextFilesChange={(textFiles) =>
                   setNewFeature({ ...newFeature, textFilePaths: textFiles })
                 }
+                fileReferences={fileReferences}
+                onFileReferencesChange={setFileReferences}
                 placeholder="Describe the feature..."
                 previewMap={newFeaturePreviewMap}
                 onPreviewMapChange={setNewFeaturePreviewMap}
