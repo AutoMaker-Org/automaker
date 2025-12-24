@@ -764,9 +764,9 @@ export class HttpApiClient implements ElectronAPI {
     list: (projectPath: string, filters?: ListBeadsIssuesFilters) =>
       this.post('/api/beads/list', { projectPath, filters }),
     create: (projectPath: string, input: CreateBeadsIssueInput) =>
-      this.post('/api/beads/create', { projectPath, ...input }),
+      this.post('/api/beads/create', { projectPath, issue: input }),
     update: (projectPath: string, issueId: string, updates: UpdateBeadsIssueInput) =>
-      this.post('/api/beads/update', { projectPath, issueId, ...updates }),
+      this.post('/api/beads/update', { projectPath, issueId, updates }),
     delete: (projectPath: string, issueId: string) =>
       this.post('/api/beads/delete', { projectPath, issueId }),
     getReady: (projectPath: string, limit?: number) =>

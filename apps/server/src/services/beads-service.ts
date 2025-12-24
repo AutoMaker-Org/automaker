@@ -5,12 +5,12 @@
  * Beads is a dependency-aware issue tracker that gives AI agents long-term task memory.
  */
 
-import { exec } from 'child_process';
+import { execFile } from 'child_process';
 import { promisify } from 'util';
 import path from 'path';
 import fs from 'fs/promises';
 
-const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 export class BeadsService {
   private watchTimeout?: NodeJS.Timeout;
@@ -20,7 +20,7 @@ export class BeadsService {
    */
   async isBeadsInstalled(): Promise<boolean> {
     try {
-      const { stdout } = await execAsync('which bd');
+      const { stdout } = await execFileAsync('which', ['bd']);
       return stdout.trim().length > 0;
     } catch {
       return false;
@@ -32,7 +32,7 @@ export class BeadsService {
    */
   async getBeadsVersion(): Promise<string | null> {
     try {
-      const { stdout } = await execAsync('bd --version');
+      const { stdout } = await execFileAsync('bd', ['--version']);
       return stdout.trim();
     } catch {
       return null;
@@ -76,7 +76,7 @@ export class BeadsService {
       return;
     } catch {
       // Not initialized, run bd init
-      await execAsync('bd init --quiet', { cwd: projectPath });
+      await execFileAsync('bd', ['init', '--quiet'], { cwd: projectPath });
     }
   }
 
@@ -104,35 +104,35 @@ export class BeadsService {
     }
   ): Promise<any[]> {
     try {
-      let command = 'bd list --json';
+      const args = ['list', '--json'];
 
       // Apply filters
       if (filters?.status?.length) {
-        command += ` --status ${filters.status.join(',')}`;
+        args.push('--status', filters.status.join(','));
       }
       if (filters?.type?.length) {
-        command += ` --type ${filters.type.join(',')}`;
+        args.push('--type', filters.type.join(','));
       }
       if (filters?.labels?.length) {
-        command += ` --label ${filters.labels.join(',')}`;
+        args.push('--label', filters.labels.join(','));
       }
       if (filters?.priorityMin !== undefined) {
-        command += ` --priority-min ${filters.priorityMin}`;
+        args.push('--priority-min', String(filters.priorityMin));
       }
       if (filters?.priorityMax !== undefined) {
-        command += ` --priority-max ${filters.priorityMax}`;
+        args.push('--priority-max', String(filters.priorityMax));
       }
       if (filters?.titleContains) {
-        command += ` --title-contains "${filters.titleContains}"`;
+        args.push('--title-contains', filters.titleContains);
       }
       if (filters?.descContains) {
-        command += ` --desc-contains "${filters.descContains}"`;
+        args.push('--desc-contains', filters.descContains);
       }
       if (filters?.ids?.length) {
-        command += ` --id ${filters.ids.join(',')}`;
+        args.push('--id', filters.ids.join(','));
       }
 
-      const { stdout } = await execAsync(command, { cwd: projectPath });
+      const { stdout } = await execFileAsync('bd', args, { cwd: projectPath });
       const issues = JSON.parse(stdout);
       return issues;
     } catch (error) {
@@ -149,7 +149,7 @@ export class BeadsService {
    */
   async getIssue(projectPath: string, issueId: string): Promise<any> {
     try {
-      const { stdout } = await execAsync(`bd show ${issueId} --json`, {
+      const { stdout } = await execFileAsync('bd', ['show', issueId, '--json'], {
         cwd: projectPath,
       });
       const issue = JSON.parse(stdout);
@@ -173,22 +173,22 @@ export class BeadsService {
     }
   ): Promise<any> {
     try {
-      let command = `bd create "${input.title}" --json`;
+      const args = ['create', input.title, '--json'];
 
       if (input.description) {
-        command += ` --description "${input.description}"`;
+        args.push('--description', input.description);
       }
       if (input.type) {
-        command += ` --type ${input.type}`;
+        args.push('--type', input.type);
       }
       if (input.priority !== undefined) {
-        command += ` --priority ${input.priority}`;
+        args.push('--priority', String(input.priority));
       }
       if (input.labels?.length) {
-        command += ` --labels ${input.labels.join(',')}`;
+        args.push('--labels', input.labels.join(','));
       }
 
-      const { stdout } = await execAsync(command, { cwd: projectPath });
+      const { stdout } = await execFileAsync('bd', args, { cwd: projectPath });
       const issue = JSON.parse(stdout);
       return issue;
     } catch (error) {
@@ -212,28 +212,28 @@ export class BeadsService {
     }
   ): Promise<any> {
     try {
-      let command = `bd update ${issueId} --json`;
+      const args = ['update', issueId, '--json'];
 
       if (updates.title) {
-        command += ` --title "${updates.title}"`;
+        args.push('--title', updates.title);
       }
       if (updates.description) {
-        command += ` --description "${updates.description}"`;
+        args.push('--description', updates.description);
       }
       if (updates.status) {
-        command += ` --status ${updates.status}`;
+        args.push('--status', updates.status);
       }
       if (updates.type) {
-        command += ` --type ${updates.type}`;
+        args.push('--type', updates.type);
       }
       if (updates.priority !== undefined) {
-        command += ` --priority ${updates.priority}`;
+        args.push('--priority', String(updates.priority));
       }
       if (updates.labels) {
-        command += ` --labels ${updates.labels.join(',')}`;
+        args.push('--labels', updates.labels.join(','));
       }
 
-      const { stdout } = await execAsync(command, { cwd: projectPath });
+      const { stdout } = await execFileAsync('bd', args, { cwd: projectPath });
       const issue = JSON.parse(stdout);
       return issue;
     } catch (error) {
@@ -246,8 +246,11 @@ export class BeadsService {
    */
   async deleteIssue(projectPath: string, issueId: string, force = false): Promise<void> {
     try {
-      const command = force ? `bd delete ${issueId} --force` : `bd delete ${issueId}`;
-      await execAsync(command, { cwd: projectPath });
+      const args = ['delete', issueId];
+      if (force) {
+        args.push('--force');
+      }
+      await execFileAsync('bd', args, { cwd: projectPath });
     } catch (error) {
       throw new Error(`Failed to delete issue ${issueId}: ${error}`);
     }
@@ -263,8 +266,8 @@ export class BeadsService {
     type: 'blocks' | 'related' | 'parent' | 'discovered-from'
   ): Promise<void> {
     try {
-      const command = `bd dep add ${issueId} ${depId} --type ${type}`;
-      await execAsync(command, { cwd: projectPath });
+      const args = ['dep', 'add', issueId, depId, '--type', type];
+      await execFileAsync('bd', args, { cwd: projectPath });
     } catch (error) {
       throw new Error(`Failed to add dependency: ${error}`);
     }
@@ -275,8 +278,8 @@ export class BeadsService {
    */
   async removeDependency(projectPath: string, issueId: string, depId: string): Promise<void> {
     try {
-      const command = `bd dep remove ${issueId} ${depId}`;
-      await execAsync(command, { cwd: projectPath });
+      const args = ['dep', 'remove', issueId, depId];
+      await execFileAsync('bd', args, { cwd: projectPath });
     } catch (error) {
       throw new Error(`Failed to remove dependency: ${error}`);
     }
@@ -287,11 +290,11 @@ export class BeadsService {
    */
   async getReadyWork(projectPath: string, limit?: number): Promise<any[]> {
     try {
-      let command = 'bd ready --json';
+      const args = ['ready', '--json'];
       if (limit) {
-        command += ` --limit ${limit}`;
+        args.push('--limit', String(limit));
       }
-      const { stdout } = await execAsync(command, { cwd: projectPath });
+      const { stdout } = await execFileAsync('bd', args, { cwd: projectPath });
       const issues = JSON.parse(stdout);
       return issues;
     } catch (error) {
@@ -307,7 +310,7 @@ export class BeadsService {
    */
   async getStats(projectPath: string): Promise<any> {
     try {
-      const { stdout } = await execAsync('bd stats --json', { cwd: projectPath });
+      const { stdout } = await execFileAsync('bd', ['stats', '--json'], { cwd: projectPath });
       const stats = JSON.parse(stdout);
       return stats;
     } catch (error) {
@@ -328,7 +331,7 @@ export class BeadsService {
    */
   async sync(projectPath: string): Promise<void> {
     try {
-      await execAsync('bd sync', { cwd: projectPath });
+      await execFileAsync('bd', ['sync'], { cwd: projectPath });
     } catch (error) {
       throw new Error(`Failed to sync database: ${error}`);
     }
