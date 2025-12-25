@@ -36,7 +36,7 @@ export function BeadsView() {
   const [searchQuery, setSearchQuery] = useState('');
 
   // Custom hooks
-  const { issues, isLoading, error } = useBeadsIssues({ currentProject });
+  const { issues, isLoading, error, loadIssues } = useBeadsIssues({ currentProject });
   const { columnIssuesMap, stats } = useBeadsColumnIssues({
     issues,
     searchQuery,

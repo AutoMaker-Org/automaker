@@ -5,21 +5,17 @@
  */
 
 import type { Request, Response, NextFunction } from 'express';
-
-// Rate limit function type
-type RateLimitFunction = (
-  options: unknown
-) => (req: Request, res: Response, next: NextFunction) => void;
+import type { RateLimit } from 'express-rate-limit';
 
 // Temporary: Make rate limiting optional due to missing dependency
-let rateLimitFn: RateLimitFunction;
+let rateLimit: RateLimit;
 
 try {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  rateLimitFn = require('express-rate-limit');
+  rateLimit = require('express-rate-limit');
 } catch {
   console.warn('[rate-limiter] express-rate-limit not installed, rate limiting disabled');
-  rateLimitFn = () => (req: Request, res: Response, next: NextFunction) => next();
+  rateLimit = () => (req: Request, res: Response, next: NextFunction) => next();
 }
 
 // ============================================================================
@@ -32,7 +28,7 @@ try {
  * Limits each IP to 100 requests per 15-minute window.
  * Suitable for general API endpoints.
  */
-export const apiLimiter = rateLimitFn({
+export const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 100, // Limit each IP to 100 requests per windowMs
   message: {
@@ -53,7 +49,7 @@ export const apiLimiter = rateLimitFn({
  * Limits each IP to 10 requests per 1-minute window.
  * Prevents health endpoint abuse while allowing monitoring.
  */
-export const healthLimiter = rateLimitFn({
+export const healthLimiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute
   max: 10, // Limit each IP to 10 requests per windowMs
   message: {
@@ -74,7 +70,7 @@ export const healthLimiter = rateLimitFn({
  * Limits each IP to 5 requests per 1-minute window.
  * Use for authentication, settings changes, etc.
  */
-export const strictLimiter = rateLimitFn({
+export const strictLimiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute
   max: 5, // Limit each IP to 5 requests per windowMs
   message: {
@@ -95,7 +91,7 @@ export const strictLimiter = rateLimitFn({
  * Limits each IP to 200 requests per 15-minute window.
  * Beads operations can be frequent, so we allow more requests.
  */
-export const beadsLimiter = rateLimitFn({
+export const beadsLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 200, // Limit each IP to 200 requests per windowMs
   message: {
