@@ -35,16 +35,14 @@ export function BeadsView() {
   const [searchQuery, setSearchQuery] = useState('');
 
   // Custom hooks
-  const { issues, isLoading, error, loadIssues } = useBeadsIssues({ currentProject });
+  const { issues, isLoading, error } = useBeadsIssues({ currentProject });
   const { columnIssuesMap, stats } = useBeadsColumnIssues({
     issues,
     searchQuery,
-    _currentProject: currentProject,
   });
   const { handleCreateIssue, handleUpdateIssue, handleDeleteIssue, handleStatusChange } =
     useBeadsActions({
       currentProject,
-      _loadIssues: loadIssues,
     });
   const { activeIssue, handleDragStart, handleDragEnd } = useBeadsDragDrop({
     issues,

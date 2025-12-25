@@ -7,13 +7,6 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { BeadsService } from '@/services/beads-service.js';
-import type {
-  BeadsIssue,
-  BeadsStats,
-  CreateBeadsIssueInput,
-  UpdateBeadsIssueInput,
-  ListBeadsIssuesFilters,
-} from '@automaker/types';
 
 describe('BeadsService', () => {
   let beadsService: BeadsService;

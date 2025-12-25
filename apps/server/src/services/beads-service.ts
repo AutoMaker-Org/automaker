@@ -176,6 +176,9 @@ export class BeadsService {
       if (input.labels?.length) {
         args.push('--labels', input.labels.join(','));
       }
+      if (input.parentIssueId) {
+        args.push('--parent', input.parentIssueId);
+      }
 
       const { stdout } = await execFileAsync('bd', args, { cwd: projectPath });
       const issue = safeJsonParse<BeadsIssue>(stdout, 'createIssue');

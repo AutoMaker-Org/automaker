@@ -31,12 +31,14 @@ The beads Kanban board implementation is **functionally complete** but has signi
 **Files:** All beads-related files
 **Fix Required:**
 
-- Unit tests for `BeadsService` (0 tests)
+- ~~Unit tests for `BeadsService` (0 tests)~~ ✅ **COMPLETED** - Basic unit tests added in PR #11
 - Integration tests for API routes (0 tests)
 - Component tests for React UI (0 tests)
 - E2E tests for user workflows (0 tests)
 
 **Estimated Effort:** 3-5 days
+
+**Note:** As of PR #11, basic unit tests for `BeadsService` have been implemented covering database path resolution and error detection. Additional test coverage for service methods (createIssue, updateIssue, etc.) is still needed.
 
 ---
 

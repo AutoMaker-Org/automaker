@@ -69,6 +69,7 @@ export const createBeadsIssueSchema = z.object({
   type: beadsIssueTypeSchema.optional(),
   priority: beadsIssuePrioritySchema.optional(),
   labels: beadsLabelsSchema,
+  parentIssueId: beadsIssueIdSchema.optional(),
 });
 
 /**
@@ -131,7 +132,16 @@ export const listBeadsIssuesFiltersSchema = z
     descContains: z.string().max(200).optional(),
     ids: z.array(beadsIssueIdSchema).optional(),
   })
-  .strict();
+  .strict()
+  .refine(
+    (data) => {
+      if (data.priorityMin !== undefined && data.priorityMax !== undefined) {
+        return data.priorityMin <= data.priorityMax;
+      }
+      return true;
+    },
+    { message: 'priorityMin must be less than or equal to priorityMax' }
+  );
 
 /**
  * Search issues schema

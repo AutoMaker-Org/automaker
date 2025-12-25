@@ -6,7 +6,6 @@ import { getIssueColumn, hasOpenBlockers } from '../lib/column-utils';
 interface UseBeadsColumnIssuesProps {
   issues: BeadsIssue[];
   searchQuery: string;
-  _currentProject: { path: string } | null;
 }
 
 export interface BeadsStats {
@@ -25,11 +24,7 @@ export interface BeadsStats {
  * - `getColumnIssues`: a function `(columnId: BeadsColumnId) => BeadsIssue[]` that returns the issues for the given column.
  * - `stats`: an object with issue counts `{ total, open, inProgress, closed, blocked }`.
  */
-export function useBeadsColumnIssues({
-  issues,
-  searchQuery,
-  _currentProject,
-}: UseBeadsColumnIssuesProps) {
+export function useBeadsColumnIssues({ issues, searchQuery }: UseBeadsColumnIssuesProps) {
   // Memoize column issues to prevent unnecessary re-renders
   const columnIssuesMap = useMemo(() => {
     const map: Record<BeadsColumnId, BeadsIssue[]> = {
