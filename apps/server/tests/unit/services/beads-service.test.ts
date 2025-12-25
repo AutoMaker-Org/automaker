@@ -30,8 +30,8 @@ describe('BeadsService', () => {
       expect(path).toBe('/my/project/.beads/beads.db');
     });
 
-    it('should handle paths without trailing slash', () => {
-      const path = beadsService.getDatabasePath('/my/project');
+    it('should handle paths with trailing slash', () => {
+      const path = beadsService.getDatabasePath('/my/project/');
       expect(path).toBe('/my/project/.beads/beads.db');
     });
   });
