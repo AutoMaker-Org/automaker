@@ -12,7 +12,6 @@ import morgan from 'morgan';
 import { WebSocketServer, WebSocket } from 'ws';
 import { createServer } from 'http';
 import dotenv from 'dotenv';
-import path from 'path';
 
 import { createEventEmitter, type EventEmitter } from './lib/events.js';
 import { initAllowedPaths } from '@automaker/platform';
@@ -54,10 +53,7 @@ import { createBeadsRoutes } from './routes/beads/index.js';
 import { BeadsService } from './services/beads-service.js';
 
 // Load environment variables
-// Try loading from project root (for development) and current directory
-const projectRoot = process.env.INIT_CWD || process.cwd();
-dotenv.config({ path: path.join(projectRoot, '.env') });
-dotenv.config(); // Fallback to default behavior (loads from cwd)
+dotenv.config();
 
 const PORT = parseInt(process.env.PORT || '3008', 10);
 const DATA_DIR = process.env.DATA_DIR || './data';
@@ -189,25 +185,25 @@ app.use('/api', authMiddleware);
 
 // General API routes with standard rate limiting
 app.use('/api/fs', apiLimiter, createFsRoutes(events));
-app.use('/api/agent', createAgentRoutes(agentService, events));
-app.use('/api/sessions', createSessionsRoutes(agentService));
-app.use('/api/features', createFeaturesRoutes(featureLoader));
-app.use('/api/auto-mode', createAutoModeRoutes(autoModeService));
-app.use('/api/enhance-prompt', createEnhancePromptRoutes());
-app.use('/api/worktree', createWorktreeRoutes());
-app.use('/api/git', createGitRoutes());
+app.use('/api/agent', apiLimiter, createAgentRoutes(agentService, events));
+app.use('/api/sessions', apiLimiter, createSessionsRoutes(agentService));
+app.use('/api/features', apiLimiter, createFeaturesRoutes(featureLoader));
+app.use('/api/auto-mode', apiLimiter, createAutoModeRoutes(autoModeService));
+app.use('/api/enhance-prompt', apiLimiter, createEnhancePromptRoutes());
+app.use('/api/worktree', apiLimiter, createWorktreeRoutes());
+app.use('/api/git', apiLimiter, createGitRoutes());
 app.use('/api/setup', strictLimiter, createSetupRoutes());
-app.use('/api/suggestions', createSuggestionsRoutes(events));
-app.use('/api/models', createModelsRoutes());
-app.use('/api/spec-regeneration', createSpecRegenerationRoutes(events));
-app.use('/api/running-agents', createRunningAgentsRoutes(autoModeService));
-app.use('/api/workspace', createWorkspaceRoutes());
-app.use('/api/templates', createTemplatesRoutes());
-app.use('/api/terminal', createTerminalRoutes());
+app.use('/api/suggestions', apiLimiter, createSuggestionsRoutes(events));
+app.use('/api/models', apiLimiter, createModelsRoutes());
+app.use('/api/spec-regeneration', apiLimiter, createSpecRegenerationRoutes(events));
+app.use('/api/running-agents', apiLimiter, createRunningAgentsRoutes(autoModeService));
+app.use('/api/workspace', apiLimiter, createWorkspaceRoutes());
+app.use('/api/templates', apiLimiter, createTemplatesRoutes());
+app.use('/api/terminal', apiLimiter, createTerminalRoutes());
 app.use('/api/settings', strictLimiter, createSettingsRoutes(settingsService));
-app.use('/api/claude', createClaudeRoutes(claudeUsageService));
-app.use('/api/github', createGitHubRoutes());
-app.use('/api/context', createContextRoutes());
+app.use('/api/claude', apiLimiter, createClaudeRoutes(claudeUsageService));
+app.use('/api/github', apiLimiter, createGitHubRoutes());
+app.use('/api/context', apiLimiter, createContextRoutes());
 app.use('/api/beads', beadsLimiter, createBeadsRoutes(beadsService));
 
 // Create HTTP server
