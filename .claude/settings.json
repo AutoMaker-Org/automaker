@@ -1,10 +1,5 @@
 {
-  "sandbox": {
-    "enabled": true,
-    "autoAllowBashIfSandboxed": true
-  },
   "permissions": {
-    "defaultMode": "acceptEdits",
     "allow": [
       "Read(./**)",
       "Write(./**)",
@@ -19,7 +14,14 @@
       "mcp__puppeteer__puppeteer_select",
       "mcp__puppeteer__puppeteer_hover",
       "mcp__puppeteer__puppeteer_evaluate"
-    ]
+    ],
+    "defaultMode": "acceptEdits"
+  },
+  "enabledPlugins": {
+    "minimal-claude@minimal-claude-marketplace": true,
+    "typescript-lsp@claude-plugins-official": true,
+    "greptile@claude-plugins-official": true,
+    "sentry@claude-plugins-official": true
   },
   "extraKnownMarketplaces": {
     "minimal-claude-marketplace": {
@@ -29,7 +31,8 @@
       }
     }
   },
-  "enabledPlugins": {
-    "minimal-claude@minimal-claude-marketplace": true
+  "sandbox": {
+    "enabled": true,
+    "autoAllowBashIfSandboxed": true
   }
 }
