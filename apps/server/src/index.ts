@@ -12,7 +12,6 @@ import morgan from 'morgan';
 import { WebSocketServer, WebSocket } from 'ws';
 import { createServer } from 'http';
 import dotenv from 'dotenv';
-import path from 'path';
 
 import { createEventEmitter, type EventEmitter } from './lib/events.js';
 import { initAllowedPaths } from '@automaker/platform';
@@ -57,10 +56,7 @@ import { BeadsService } from './services/beads-service.js';
 import { GitHubIssuePollerService } from './services/github-issue-poller-service.js';
 
 // Load environment variables
-// Try loading from project root (for development) and current directory
-const projectRoot = process.env.INIT_CWD || process.cwd();
-dotenv.config({ path: path.join(projectRoot, '.env') });
-dotenv.config(); // Fallback to default behavior (loads from cwd)
+dotenv.config();
 
 const PORT = parseInt(process.env.PORT || '3008', 10);
 const DATA_DIR = process.env.DATA_DIR || './data';
@@ -208,7 +204,6 @@ app.use('/api', authMiddleware);
 
 // General API routes with standard rate limiting
 app.use('/api/fs', apiLimiter, createFsRoutes(events));
-<<<<<<< HEAD
 app.use('/api/agent', apiLimiter, createAgentRoutes(agentService, events));
 app.use('/api/sessions', apiLimiter, createSessionsRoutes(agentService));
 app.use('/api/features', apiLimiter, createFeaturesRoutes(featureLoader));
@@ -232,27 +227,6 @@ app.use(
   createGitHubRoutes({ prWatcherService, pollerService: gitHubIssuePollerService })
 );
 app.use('/api/context', apiLimiter, createContextRoutes());
-=======
-app.use('/api/agent', createAgentRoutes(agentService, events));
-app.use('/api/sessions', createSessionsRoutes(agentService));
-app.use('/api/features', createFeaturesRoutes(featureLoader));
-app.use('/api/auto-mode', createAutoModeRoutes(autoModeService));
-app.use('/api/enhance-prompt', createEnhancePromptRoutes());
-app.use('/api/worktree', createWorktreeRoutes());
-app.use('/api/git', createGitRoutes());
-app.use('/api/setup', strictLimiter, createSetupRoutes());
-app.use('/api/suggestions', createSuggestionsRoutes(events));
-app.use('/api/models', createModelsRoutes());
-app.use('/api/spec-regeneration', createSpecRegenerationRoutes(events));
-app.use('/api/running-agents', createRunningAgentsRoutes(autoModeService));
-app.use('/api/workspace', createWorkspaceRoutes());
-app.use('/api/templates', createTemplatesRoutes());
-app.use('/api/terminal', createTerminalRoutes());
-app.use('/api/settings', strictLimiter, createSettingsRoutes(settingsService));
-app.use('/api/claude', createClaudeRoutes(claudeUsageService));
-app.use('/api/github', createGitHubRoutes());
-app.use('/api/context', createContextRoutes());
->>>>>>> bc08e6c (fix(beads): Address code review feedback from PR #11)
 app.use('/api/beads', beadsLimiter, createBeadsRoutes(beadsService));
 
 // Create HTTP server

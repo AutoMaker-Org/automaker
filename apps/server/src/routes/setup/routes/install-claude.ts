@@ -96,7 +96,6 @@ export function createInstallClaudeHandler() {
 
         // Retry verification with exponential backoff (max 4 retries)
         const maxRetries = 4;
-        let verified = false;
 
         for (let i = 0; i < maxRetries; i++) {
           try {
@@ -108,7 +107,6 @@ export function createInstallClaudeHandler() {
             });
 
             if (verifyResult.exitCode === 0) {
-              verified = true;
               const version = verifyResult.stdout.trim();
               console.log(`[Install Claude] Verification successful: ${version}`);
               res.json({
