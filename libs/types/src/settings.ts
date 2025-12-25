@@ -68,7 +68,7 @@ export type PlanningMode = 'skip' | 'lite' | 'spec' | 'full';
 export type ThinkingLevel = 'none' | 'low' | 'medium' | 'high' | 'ultrathink';
 
 /** ModelProvider - AI model provider for credentials and API key management */
-export type ModelProvider = 'claude';
+export type ModelProvider = 'claude' | 'cursor';
 
 /**
  * WindowBounds - Electron window position and size for persistence

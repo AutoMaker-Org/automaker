@@ -1,4 +1,4 @@
-import type { AgentModel, ThinkingLevel } from '@/store/app-store';
+import type { AgentModel, ThinkingLevel, ModelProvider } from '@automaker/types';
 import { Brain, Zap, Scale, Cpu, Rocket, Sparkles } from 'lucide-react';
 
 export type ModelOption = {
@@ -6,7 +6,7 @@ export type ModelOption = {
   label: string;
   description: string;
   badge?: string;
-  provider: 'claude';
+  provider: ModelProvider;
 };
 
 export const CLAUDE_MODELS: ModelOption[] = [
@@ -32,6 +32,33 @@ export const CLAUDE_MODELS: ModelOption[] = [
     provider: 'claude',
   },
 ];
+
+export const CURSOR_MODELS: ModelOption[] = [
+  {
+    id: 'cursor-opus-thinking',
+    label: 'Cursor Opus 4.5 Thinking',
+    description: 'Claude Opus 4.5 with extended thinking via Cursor.',
+    badge: 'Premium',
+    provider: 'cursor',
+  },
+  {
+    id: 'cursor-sonnet',
+    label: 'Cursor Sonnet 4.5',
+    description: 'Claude Sonnet 4.5 via Cursor subscription.',
+    badge: 'Balanced',
+    provider: 'cursor',
+    default: true,
+  },
+  {
+    id: 'cursor-gpt5',
+    label: 'Cursor GPT-5.2',
+    description: 'OpenAI GPT-5.2 via Cursor subscription.',
+    badge: 'Premium',
+    provider: 'cursor',
+  },
+];
+
+export const ALL_MODELS: ModelOption[] = [...CLAUDE_MODELS, ...CURSOR_MODELS];
 
 export const THINKING_LEVELS: ThinkingLevel[] = ['none', 'low', 'medium', 'high', 'ultrathink'];
 

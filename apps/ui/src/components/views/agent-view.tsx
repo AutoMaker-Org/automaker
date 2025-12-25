@@ -50,7 +50,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { CLAUDE_MODELS } from '@/components/views/board-view/shared/model-constants';
+import { ALL_MODELS } from '@/components/views/board-view/shared/model-constants';
 
 export function AgentView() {
   const { currentProject, setLastSelectedSession, getLastSelectedSession } = useAppStore();
@@ -542,6 +542,45 @@ export function AgentView() {
 
           {/* Status indicators & actions */}
           <div className="flex items-center gap-3">
+            {/* Model Selector */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 gap-1.5 text-xs font-medium"
+                  disabled={isProcessing}
+                  data-testid="model-selector"
+                >
+                  <Bot className="w-3.5 h-3.5" />
+                  {ALL_MODELS.find((m) => m.id === selectedModel)
+                    ?.label.replace('Claude ', '')
+                    .replace('Cursor ', '') || 'Sonnet'}
+                  <ChevronDown className="w-3 h-3 opacity-50" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                {ALL_MODELS.map((model) => (
+                  <DropdownMenuItem
+                    key={model.id}
+                    onClick={() => setSelectedModel(model.id)}
+                    className={cn('cursor-pointer', selectedModel === model.id && 'bg-accent')}
+                    data-testid={`model-option-${model.id}`}
+                  >
+                    <div className="flex flex-col">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">{model.label}</span>
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                          {model.provider}
+                        </span>
+                      </div>
+                      <span className="text-xs text-muted-foreground">{model.description}</span>
+                    </div>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+
             {currentTool && (
               <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/50 px-3 py-1.5 rounded-full border border-border">
                 <Wrench className="w-3 h-3 text-primary" />
@@ -921,25 +960,29 @@ export function AgentView() {
                   <Button
                     variant="outline"
                     className="h-11 gap-1 text-xs font-medium rounded-xl border-border px-2.5"
-                    data-testid="model-selector"
+                    data-testid="model-selector-input"
                   >
-                    {CLAUDE_MODELS.find((m) => m.id === selectedModel)?.label.replace(
-                      'Claude ',
-                      ''
-                    ) || 'Sonnet'}
+                    {ALL_MODELS.find((m) => m.id === selectedModel)
+                      ?.label.replace('Claude ', '')
+                      .replace('Cursor ', '') || 'Sonnet'}
                     <ChevronDown className="w-3 h-3 opacity-50" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-48">
-                  {CLAUDE_MODELS.map((model) => (
+                <DropdownMenuContent align="end" className="w-56">
+                  {ALL_MODELS.map((model) => (
                     <DropdownMenuItem
                       key={model.id}
                       onClick={() => setSelectedModel(model.id)}
                       className={cn('cursor-pointer', selectedModel === model.id && 'bg-accent')}
-                      data-testid={`model-option-${model.id}`}
+                      data-testid={`model-option-input-${model.id}`}
                     >
                       <div className="flex flex-col">
-                        <span className="font-medium">{model.label}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">{model.label}</span>
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                            {model.provider}
+                          </span>
+                        </div>
                         <span className="text-xs text-muted-foreground">{model.description}</span>
                       </div>
                     </DropdownMenuItem>

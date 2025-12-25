@@ -9,7 +9,7 @@ import { DeleteProjectDialog } from './settings-view/components/delete-project-d
 import { SettingsNavigation } from './settings-view/components/settings-navigation';
 import { ApiKeysSection } from './settings-view/api-keys/api-keys-section';
 import { ClaudeUsageSection } from './settings-view/api-keys/claude-usage-section';
-import { ClaudeCliStatus } from './settings-view/cli-status/claude-cli-status';
+import { ClaudeCliStatus, CursorCliStatusCard } from './settings-view/cli-status';
 import { ClaudeMdSettings } from './settings-view/claude/claude-md-settings';
 import { AIEnhancementSection } from './settings-view/ai-enhancement';
 import { AppearanceSection } from './settings-view/appearance/appearance-section';
@@ -86,7 +86,14 @@ export function SettingsView() {
   };
 
   // Use CLI status hook
-  const { claudeCliStatus, isCheckingClaudeCli, handleRefreshClaudeCli } = useCliStatus();
+  const {
+    claudeCliStatus,
+    cursorCliStatus,
+    isCheckingClaudeCli,
+    isCheckingCursorCli,
+    handleRefreshClaudeCli,
+    handleRefreshCursorCli,
+  } = useCliStatus();
 
   // Use settings view navigation hook
   const { activeView, navigateTo } = useSettingsView();
@@ -97,13 +104,18 @@ export function SettingsView() {
   // Render the active section based on current view
   const renderActiveSection = () => {
     switch (activeView) {
-      case 'claude':
+      case 'providers':
         return (
           <div className="space-y-6">
             <ClaudeCliStatus
               status={claudeCliStatus}
               isChecking={isCheckingClaudeCli}
               onRefresh={handleRefreshClaudeCli}
+            />
+            <CursorCliStatusCard
+              status={cursorCliStatus}
+              isChecking={isCheckingCursorCli}
+              onRefresh={handleRefreshCursorCli}
             />
             <ClaudeMdSettings
               autoLoadClaudeMd={autoLoadClaudeMd}

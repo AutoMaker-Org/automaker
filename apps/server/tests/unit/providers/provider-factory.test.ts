@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ProviderFactory } from '@/providers/provider-factory.js';
 import { ClaudeProvider } from '@/providers/claude-provider.js';
+import { CursorProvider } from '@/providers/cursor-provider.js';
 
 describe('provider-factory.ts', () => {
   let consoleSpy: any;
@@ -65,6 +66,28 @@ describe('provider-factory.ts', () => {
       });
     });
 
+    describe('Cursor models (cursor-* prefix)', () => {
+      it('should return CursorProvider for cursor-sonnet-4', () => {
+        const provider = ProviderFactory.getProviderForModel('cursor-sonnet-4');
+        expect(provider).toBeInstanceOf(CursorProvider);
+      });
+
+      it('should return CursorProvider for cursor-sonnet-4-thinking', () => {
+        const provider = ProviderFactory.getProviderForModel('cursor-sonnet-4-thinking');
+        expect(provider).toBeInstanceOf(CursorProvider);
+      });
+
+      it('should return CursorProvider for cursor-gpt-5', () => {
+        const provider = ProviderFactory.getProviderForModel('cursor-gpt-5');
+        expect(provider).toBeInstanceOf(CursorProvider);
+      });
+
+      it('should be case-insensitive for cursor models', () => {
+        const provider = ProviderFactory.getProviderForModel('CURSOR-SONNET-4');
+        expect(provider).toBeInstanceOf(CursorProvider);
+      });
+    });
+
     describe('Unknown models', () => {
       it('should default to ClaudeProvider for unknown model', () => {
         const provider = ProviderFactory.getProviderForModel('unknown-model-123');
@@ -114,9 +137,15 @@ describe('provider-factory.ts', () => {
       expect(hasClaudeProvider).toBe(true);
     });
 
-    it('should return exactly 1 provider', () => {
+    it('should include CursorProvider', () => {
       const providers = ProviderFactory.getAllProviders();
-      expect(providers).toHaveLength(1);
+      const hasCursorProvider = providers.some((p) => p instanceof CursorProvider);
+      expect(hasCursorProvider).toBe(true);
+    });
+
+    it('should return exactly 2 providers', () => {
+      const providers = ProviderFactory.getAllProviders();
+      expect(providers).toHaveLength(2);
     });
 
     it('should create new instances each time', () => {
@@ -132,12 +161,14 @@ describe('provider-factory.ts', () => {
       const statuses = await ProviderFactory.checkAllProviders();
 
       expect(statuses).toHaveProperty('claude');
+      expect(statuses).toHaveProperty('cursor');
     });
 
     it('should call detectInstallation on each provider', async () => {
       const statuses = await ProviderFactory.checkAllProviders();
 
       expect(statuses.claude).toHaveProperty('installed');
+      expect(statuses.cursor).toHaveProperty('installed');
     });
 
     it('should return correct provider names as keys', async () => {
@@ -145,7 +176,8 @@ describe('provider-factory.ts', () => {
       const keys = Object.keys(statuses);
 
       expect(keys).toContain('claude');
-      expect(keys).toHaveLength(1);
+      expect(keys).toContain('cursor');
+      expect(keys).toHaveLength(2);
     });
   });
 
@@ -160,12 +192,19 @@ describe('provider-factory.ts', () => {
       expect(provider).toBeInstanceOf(ClaudeProvider);
     });
 
+    it("should return CursorProvider for 'cursor'", () => {
+      const provider = ProviderFactory.getProviderByName('cursor');
+      expect(provider).toBeInstanceOf(CursorProvider);
+    });
+
     it('should be case-insensitive', () => {
       const provider1 = ProviderFactory.getProviderByName('CLAUDE');
       const provider2 = ProviderFactory.getProviderByName('ANTHROPIC');
+      const provider3 = ProviderFactory.getProviderByName('CURSOR');
 
       expect(provider1).toBeInstanceOf(ClaudeProvider);
       expect(provider2).toBeInstanceOf(ClaudeProvider);
+      expect(provider3).toBeInstanceOf(CursorProvider);
     });
 
     it('should return null for unknown provider', () => {
@@ -217,6 +256,15 @@ describe('provider-factory.ts', () => {
       const hasClaudeModels = models.some((m) => m.id.toLowerCase().includes('claude'));
 
       expect(hasClaudeModels).toBe(true);
+    });
+
+    it('should include Cursor models', () => {
+      const models = ProviderFactory.getAllAvailableModels();
+
+      // Cursor models should include cursor-* in their IDs
+      const hasCursorModels = models.some((m) => m.id.toLowerCase().includes('cursor'));
+
+      expect(hasCursorModels).toBe(true);
     });
   });
 });

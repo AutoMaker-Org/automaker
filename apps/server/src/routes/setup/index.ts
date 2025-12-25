@@ -4,6 +4,7 @@
 
 import { Router } from 'express';
 import { createClaudeStatusHandler } from './routes/claude-status.js';
+import { createCursorStatusHandler } from './routes/cursor-status.js';
 import { createInstallClaudeHandler } from './routes/install-claude.js';
 import { createAuthClaudeHandler } from './routes/auth-claude.js';
 import { createStoreApiKeyHandler } from './routes/store-api-key.js';
@@ -17,6 +18,7 @@ export function createSetupRoutes(): Router {
   const router = Router();
 
   router.get('/claude-status', createClaudeStatusHandler());
+  router.get('/cursor-status', createCursorStatusHandler());
   router.post('/install-claude', createInstallClaudeHandler());
   router.post('/auth-claude', createAuthClaudeHandler());
   router.post('/store-api-key', createStoreApiKeyHandler());
