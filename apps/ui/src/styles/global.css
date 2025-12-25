@@ -411,6 +411,106 @@
   height: 8px;
 }
 
+/* General thin scrollbar for all themes (applies to light themes too) */
+:is(
+    .light,
+    .cream,
+    .solarizedlight,
+    .github,
+    .paper,
+    .rose,
+    .mint,
+    .lavender,
+    .sand,
+    .sky,
+    .peach,
+    .snow,
+    .sepia,
+    .gruvboxlight,
+    .nordlight,
+    .blossom,
+    .forest,
+    .ocean
+  )
+  ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+:is(
+    .light,
+    .cream,
+    .solarizedlight,
+    .github,
+    .paper,
+    .rose,
+    .mint,
+    .lavender,
+    .sand,
+    .sky,
+    .peach,
+    .snow,
+    .sepia,
+    .gruvboxlight,
+    .nordlight,
+    .blossom,
+    .forest,
+    .ocean
+  )
+  ::-webkit-scrollbar-track {
+  background: var(--muted);
+  border-radius: 4px;
+}
+
+:is(
+    .light,
+    .cream,
+    .solarizedlight,
+    .github,
+    .paper,
+    .rose,
+    .mint,
+    .lavender,
+    .sand,
+    .sky,
+    .peach,
+    .snow,
+    .sepia,
+    .gruvboxlight,
+    .nordlight,
+    .blossom,
+    .forest,
+    .ocean
+  )
+  ::-webkit-scrollbar-thumb {
+  background: var(--muted-foreground);
+  border-radius: 4px;
+}
+
+:is(
+    .light,
+    .cream,
+    .solarizedlight,
+    .github,
+    .paper,
+    .rose,
+    .mint,
+    .lavender,
+    .sand,
+    .sky,
+    .peach,
+    .snow,
+    .sepia,
+    .gruvboxlight,
+    .nordlight,
+    .blossom,
+    .forest,
+    .ocean
+  )
+  ::-webkit-scrollbar-thumb:hover {
+  background: var(--foreground-secondary);
+}
+
 :is(
     .dark,
     .retro,

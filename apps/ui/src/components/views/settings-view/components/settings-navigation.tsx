@@ -34,8 +34,10 @@ export function SettingsNavigation({
               <button
                 key={item.id}
                 onClick={() => onNavigate(item.id)}
+                aria-selected={isActive}
+                role="tab"
                 className={cn(
-                  'group w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ease-out text-left relative overflow-hidden',
+                  'group w-full flex items-center gap-2.5 pl-4 pr-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ease-out text-left relative overflow-hidden',
                   isActive
                     ? [
                         'bg-gradient-to-r from-brand-500/15 via-brand-500/10 to-brand-600/5',
@@ -53,7 +55,7 @@ export function SettingsNavigation({
               >
                 {/* Active indicator bar */}
                 {isActive && (
-                  <div className="absolute inset-y-0 left-0 w-0.5 bg-gradient-to-b from-brand-400 via-brand-500 to-brand-600 rounded-r-full" />
+                  <div className="absolute inset-y-0 left-0 w-1 bg-gradient-to-b from-brand-400 via-brand-500 to-brand-600 rounded-r-full z-10" />
                 )}
                 <Icon
                   className={cn(

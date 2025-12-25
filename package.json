@@ -42,6 +42,8 @@
     "test:packages": "npm run test -w @automaker/types -w @automaker/utils -w @automaker/prompts -w @automaker/platform -w @automaker/model-resolver -w @automaker/dependency-resolver -w @automaker/git-utils --if-present",
     "test:all": "npm run test:packages && npm run test:server",
     "lint:lockfile": "! grep -q 'git+ssh://' package-lock.json || (echo 'Error: package-lock.json contains git+ssh:// URLs. Run: git config --global url.\"https://github.com/\".insteadOf \"git@github.com:\"' && exit 1)",
+    "check:deps": "bash scripts/check-dependencies.sh",
+    "rebuild:pty": "cd apps/server && npm rebuild node-pty",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "prepare": "husky && npm run build:packages",
@@ -58,7 +60,6 @@
   },
   "dependencies": {
     "cross-spawn": "^7.0.6",
-    "node": "^24.12.0",
     "rehype-sanitize": "^6.0.0",
     "tree-kill": "^1.2.2"
   },

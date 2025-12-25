@@ -101,7 +101,7 @@ export function KanbanBoard({
         onDragStart={onDragStart}
         onDragEnd={onDragEnd}
       >
-        <div className="h-full py-1" style={containerStyle}>
+        <div className="h-full py-1 max-h-[calc(100vh-12rem)]" style={containerStyle}>
           {COLUMNS.map((column) => {
             const columnFeatures = getColumnFeatures(column.id);
             return (

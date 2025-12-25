@@ -1074,6 +1074,16 @@ export function TerminalPanel({
           return;
         }
 
+        // Handle abnormal closure
+        if (event.code === 1006) {
+          setConnectionStatus('disconnected');
+          toast.error('Terminal connection closed unexpectedly', {
+            description: 'The server may have restarted. Check the server status.',
+            duration: 5000,
+          });
+          return;
+        }
+
         if (event.code === 4004) {
           setConnectionStatus('disconnected');
           // Notify parent that this session is no longer valid on the server
@@ -1130,6 +1140,12 @@ export function TerminalPanel({
 
       ws.onerror = (error) => {
         console.error(`[Terminal] WebSocket error for session ${sessionId}:`, error);
+
+        // Show user-facing error
+        toast.error('Terminal connection error', {
+          description: 'WebSocket connection failed. Check that the server is running.',
+          duration: 5000,
+        });
       };
     };
 

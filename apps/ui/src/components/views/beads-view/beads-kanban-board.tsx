@@ -50,7 +50,7 @@ export const BeadsKanbanBoard = memo(function BeadsKanbanBoard({
         columnOpacity: 100,
         columnBorderEnabled: true,
         cardGlassmorphism: true,
-        hideScrollbar: false,
+        hideScrollbar: true,
       };
 
   const { cardOpacity, columnOpacity, columnBorderEnabled, cardGlassmorphism, hideScrollbar } =

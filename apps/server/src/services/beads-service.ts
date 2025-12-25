@@ -57,6 +57,10 @@ export class BeadsService {
     initialized: boolean;
     version?: string;
     error?: string;
+    cliPath?: string;
+    dbPath?: string;
+    dbExists?: boolean;
+    canInitialize?: boolean;
   }> {
     const installed = await this.isBeadsInstalled();
     if (!installed) {
@@ -64,13 +68,63 @@ export class BeadsService {
     }
 
     const version = await this.getBeadsVersion();
+    const cliPath = await this.getBeadsCliPath();
     const dbPath = this.getDatabasePath(projectPath);
+    const dbExists = await this.checkDatabaseExists(dbPath);
+    const canInitialize = await this.canInitializeBeads(projectPath);
 
+    return {
+      installed: true,
+      initialized: dbExists,
+      version: version ?? undefined,
+      cliPath,
+      dbPath,
+      dbExists,
+      canInitialize,
+    };
+  }
+
+  /**
+   * Get the path to the bd CLI executable
+   */
+  private async getBeadsCliPath(): Promise<string | undefined> {
+    try {
+      const { stdout } = await execFileAsync('which', ['bd']);
+      return stdout.trim();
+    } catch {
+      return undefined;
+    }
+  }
+
+  /**
+   * Check if the database file exists
+   */
+  private async checkDatabaseExists(dbPath: string): Promise<boolean> {
     try {
       await fs.access(dbPath);
-      return { installed: true, initialized: true, version: version ?? undefined };
+      return true;
     } catch {
-      return { installed: true, initialized: false, version: version ?? undefined };
+      return false;
+    }
+  }
+
+  /**
+   * Check if Beads can be initialized in the project directory
+   */
+  private async canInitializeBeads(projectPath: string): Promise<boolean> {
+    try {
+      const beadsDir = path.join(projectPath, '.beads');
+      await fs.access(beadsDir, fs.constants.W_OK);
+      return true;
+    } catch {
+      // Directory doesn't exist or isn't writable
+      // Check if parent directory is writable
+      try {
+        await fs.access(projectPath, fs.constants.W_OK);
+        return true;
+      } catch {
+        return false;
+      }
     }
   }
 

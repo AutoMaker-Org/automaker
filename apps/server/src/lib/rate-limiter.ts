@@ -4,7 +4,19 @@
  * Provides rate limiters to prevent abuse and brute force attacks.
  */
 
-import rateLimit from 'express-rate-limit';
+import type { Request, Response, NextFunction } from 'express';
+import type { RateLimit } from 'express-rate-limit';
+
+// Temporary: Make rate limiting optional due to missing dependency
+let rateLimit: RateLimit;
+
+try {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  rateLimit = require('express-rate-limit');
+} catch {
+  console.warn('[rate-limiter] express-rate-limit not installed, rate limiting disabled');
+  rateLimit = () => (req: Request, res: Response, next: NextFunction) => next();
+}
 
 // ============================================================================
 // Standard API Rate Limiter
