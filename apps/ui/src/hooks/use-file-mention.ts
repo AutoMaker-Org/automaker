@@ -351,35 +351,35 @@ export function useFileMention({
         let url: string;
         switch (preferredEditor) {
           case 'cursor':
-            // Cursor uses cursor://file//<absolute-path>
             url = `cursor://file/${file.absolutePath}`;
             break;
           case 'code':
-            // VS Code uses vscode://file/<absolute-path>
             url = `vscode://file${file.absolutePath}`;
             break;
           case 'zed':
-            // Zed uses zed://file/<absolute-path>
             url = `zed://file${file.absolutePath}`;
             break;
           default:
-            // Default to cursor
             url = `cursor://file/${file.absolutePath}`;
         }
 
-        // Open via anchor click (most reliable for custom URL schemes)
-        const anchor = document.createElement('a');
-        anchor.href = url;
-        anchor.style.display = 'none';
-        document.body.appendChild(anchor);
-        anchor.click();
-        document.body.removeChild(anchor);
+        openUrlScheme(url);
       } catch (err) {
         console.error('Failed to open in editor:', err);
       }
     },
     [preferredEditor]
   );
+
+  // Helper to open a URL scheme via anchor click (most reliable for custom URL schemes)
+  const openUrlScheme = (url: string) => {
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.style.display = 'none';
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+  };
 
   // Handle keyboard events
   const handleKeyDown = useCallback(

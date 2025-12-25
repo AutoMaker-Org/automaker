@@ -48,6 +48,7 @@ import { createClaudeRoutes } from './routes/claude/index.js';
 import { ClaudeUsageService } from './services/claude-usage-service.js';
 import { createGitHubRoutes } from './routes/github/index.js';
 import { createContextRoutes } from './routes/context/index.js';
+import { createEditorRoutes } from './routes/editor/index.js';
 import { cleanupStaleValidations } from './routes/github/routes/validation-common.js';
 
 // Load environment variables

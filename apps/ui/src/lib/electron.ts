@@ -447,6 +447,11 @@ export interface ElectronAPI {
     line?: number,
     column?: number
   ) => Promise<{ success: boolean; error?: string }>;
+  /** Open a file in a terminal-based editor (vim, nvim) */
+  openInTerminalEditor?: (
+    filePath: string,
+    editor: 'vim' | 'nvim'
+  ) => Promise<{ success: boolean; error?: string }>;
   saveImageToTemp?: (
     data: string,
     filename: string,

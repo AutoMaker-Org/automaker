@@ -196,8 +196,22 @@ function matchesGitignore(relativePath: string, patterns: string[]): boolean {
       if (parts.length === 2) {
         const [prefix, suffix] = parts;
         const prefixMatch = !prefix || relativePath.startsWith(prefix);
-        const suffixMatch = !suffix || relativePath.endsWith(suffix.replace(/^\//, ''));
-        if (prefixMatch && suffixMatch) return true;
+        const cleanSuffix = suffix.replace(/^\//, '');
+
+        if (prefixMatch && cleanSuffix) {
+          // For patterns like **/foo, we need to check:
+          // 1. Path ends with the suffix (e.g., "a/foo" matches **/foo)
+          // 2. Path contains the suffix as a directory segment (e.g., "a/foo/bar.txt" matches **/foo)
+          const suffixMatch = relativePath.endsWith(cleanSuffix);
+          const containsAsSegment =
+            relativePath.includes('/' + cleanSuffix + '/') ||
+            relativePath.startsWith(cleanSuffix + '/');
+
+          if (suffixMatch || containsAsSegment) return true;
+        } else if (prefixMatch && !cleanSuffix) {
+          // Pattern ends with ** (e.g., "foo/**")
+          return true;
+        }
       }
     }
 

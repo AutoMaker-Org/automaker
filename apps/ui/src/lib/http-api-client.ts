@@ -245,6 +245,23 @@ export class HttpApiClient implements ElectronAPI {
     }
   }
 
+  async openInTerminalEditor(
+    filePath: string,
+    editor: 'vim' | 'nvim'
+  ): Promise<{ success: boolean; error?: string }> {
+    try {
+      return await this.post<{ success: boolean; error?: string }>('/api/editor/open-terminal', {
+        filePath,
+        editor,
+      });
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to open in terminal editor',
+      };
+    }
+  }
+
   // File picker - uses server-side file browser dialog
   async openDirectory(): Promise<DialogResult> {
     const fileBrowser = getGlobalFileBrowser();

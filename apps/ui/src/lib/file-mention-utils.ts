@@ -388,6 +388,7 @@ export function removeFileReferencesFromText(text: string): string {
 /**
  * Extract file references from text and create FileReference objects
  * Used when loading existing feature descriptions in edit mode
+ * Note: Deduplicates references based on their path to avoid UI bugs
  */
 export function extractFileReferencesFromText(
   text: string,
@@ -395,6 +396,8 @@ export function extractFileReferencesFromText(
   projects: Array<{ name: string; path: string }>
 ): FileReference[] {
   const references: FileReference[] = [];
+  // Track seen paths to deduplicate (format: "@@project:path" or "@path")
+  const seenPaths = new Set<string>();
 
   // Find cross-project references (@@project:path)
   const crossProjectRegex = /@@([^:@\s]+):([^\s@]+)/g;
@@ -405,15 +408,19 @@ export function extractFileReferencesFromText(
     const project = projects.find((p) => p.name === projectName);
 
     if (project) {
-      references.push({
-        id: generateFileReferenceId(),
-        type: 'external',
-        projectName,
-        projectPath: project.path,
-        relativePath,
-        absolutePath: `${project.path}/${relativePath}`,
-        extension: relativePath.includes('.') ? `.${relativePath.split('.').pop()}` : '',
-      });
+      const pathKey = `@@${projectName}:${relativePath}`;
+      if (!seenPaths.has(pathKey)) {
+        seenPaths.add(pathKey);
+        references.push({
+          id: generateFileReferenceId(),
+          type: 'external',
+          projectName,
+          projectPath: project.path,
+          relativePath,
+          absolutePath: `${project.path}/${relativePath}`,
+          extension: relativePath.includes('.') ? `.${relativePath.split('.').pop()}` : '',
+        });
+      }
     }
   }
 
@@ -423,14 +430,18 @@ export function extractFileReferencesFromText(
     const relativePath = match[1];
 
     if (currentProjectPath) {
-      references.push({
-        id: generateFileReferenceId(),
-        type: 'current',
-        projectPath: currentProjectPath,
-        relativePath,
-        absolutePath: `${currentProjectPath}/${relativePath}`,
-        extension: relativePath.includes('.') ? `.${relativePath.split('.').pop()}` : '',
-      });
+      const pathKey = `@${relativePath}`;
+      if (!seenPaths.has(pathKey)) {
+        seenPaths.add(pathKey);
+        references.push({
+          id: generateFileReferenceId(),
+          type: 'current',
+          projectPath: currentProjectPath,
+          relativePath,
+          absolutePath: `${currentProjectPath}/${relativePath}`,
+          extension: relativePath.includes('.') ? `.${relativePath.split('.').pop()}` : '',
+        });
+      }
     }
   }
 

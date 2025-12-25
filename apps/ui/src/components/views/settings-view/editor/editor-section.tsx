@@ -19,10 +19,6 @@ const EDITOR_OPTIONS: { value: PreferredEditor; label: string; description: stri
   { value: 'cursor', label: 'Cursor', description: 'AI-powered code editor' },
   { value: 'code', label: 'VS Code', description: 'Visual Studio Code' },
   { value: 'zed', label: 'Zed', description: 'High-performance code editor' },
-  { value: 'vim', label: 'Vim', description: 'Classic terminal editor' },
-  { value: 'nvim', label: 'Neovim', description: 'Hyperextensible Vim-based editor' },
-  { value: 'sublime', label: 'Sublime Text', description: 'Sophisticated text editor' },
-  { value: 'atom', label: 'Atom', description: 'Hackable text editor' },
 ];
 
 export function EditorSection({ preferredEditor, onPreferredEditorChange }: EditorSectionProps) {

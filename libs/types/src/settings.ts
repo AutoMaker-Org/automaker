@@ -71,7 +71,7 @@ export type ThinkingLevel = 'none' | 'low' | 'medium' | 'high' | 'ultrathink';
 export type ModelProvider = 'claude';
 
 /** PreferredEditor - Code editor for opening files with Ctrl+Enter in file mention picker */
-export type PreferredEditor = 'cursor' | 'code' | 'vim' | 'nvim' | 'zed' | 'sublime' | 'atom';
+export type PreferredEditor = 'cursor' | 'code' | 'zed';
 
 /**
  * WindowBounds - Electron window position and size for persistence

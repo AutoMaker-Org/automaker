@@ -224,7 +224,7 @@ export function DescriptionImageDropZone({
           ? `@@${refToRemove.projectName}:${refToRemove.relativePath}`
           : `@${refToRemove.relativePath}`;
 
-      const newValue = value.replace(refText, '').replace(/\s+/g, ' ').trim();
+      const newValue = value.replaceAll(refText, '').replace(/\s+/g, ' ').trim();
       onChange(newValue);
     },
     [fileReferences, onFileReferencesChange, value, onChange]
