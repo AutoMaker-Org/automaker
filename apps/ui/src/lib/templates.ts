@@ -18,7 +18,7 @@ export interface StarterTemplate {
 export const starterTemplates: StarterTemplate[] = [
   {
     id: 'automaker-starter-kit',
-    name: 'Automaker Starter Kit',
+    name: 'DevFlow Starter Kit',
     description:
       'An online community and training platform template for aspiring full stack engineers. Master frontend and backend development, build real-world projects, and launch your software engineering career.',
     repoUrl: 'https://github.com/webdevcody/automaker-starter-kit',

@@ -1346,7 +1346,7 @@ export const useAppStore = create<AppState & AppActions>()(
               id: 'welcome',
               role: 'assistant',
               content:
-                "Hello! I'm the Automaker Agent. I can help you build software autonomously. What would you like to create today?",
+                "Hello! I'm the DevFlow Agent. I can help you build software autonomously. What would you like to create today?",
               timestamp: now,
             },
           ],

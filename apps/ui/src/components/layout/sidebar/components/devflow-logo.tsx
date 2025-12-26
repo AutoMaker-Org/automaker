@@ -1,12 +1,12 @@
 import type { NavigateOptions } from '@tanstack/react-router';
 import { cn } from '@/lib/utils';
 
-interface AutomakerLogoProps {
+interface DevFlowLogoProps {
   sidebarOpen: boolean;
   navigate: (opts: NavigateOptions) => void;
 }
 
-export function AutomakerLogo({ sidebarOpen, navigate }: AutomakerLogoProps) {
+export function DevFlowLogo({ sidebarOpen, navigate }: DevFlowLogoProps) {
   return (
     <div
       className={cn(
@@ -22,7 +22,7 @@ export function AutomakerLogo({ sidebarOpen, navigate }: AutomakerLogoProps) {
             xmlns="http://www.w3.org/2000/svg"
             viewBox="0 0 256 256"
             role="img"
-            aria-label="Automaker Logo"
+            aria-label="DevFlow Logo"
             className="size-8 group-hover:rotate-12 transition-transform duration-300 ease-out"
           >
             <defs>
@@ -68,7 +68,7 @@ export function AutomakerLogo({ sidebarOpen, navigate }: AutomakerLogoProps) {
             xmlns="http://www.w3.org/2000/svg"
             viewBox="0 0 256 256"
             role="img"
-            aria-label="automaker"
+            aria-label="DevFlow"
             className="h-[36.8px] w-[36.8px] group-hover:rotate-12 transition-transform duration-300 ease-out"
           >
             <defs>
@@ -108,7 +108,7 @@ export function AutomakerLogo({ sidebarOpen, navigate }: AutomakerLogoProps) {
             </g>
           </svg>
           <span className="font-bold text-foreground text-[1.7rem] tracking-tight leading-none translate-y-[-2px]">
-            automaker<span className="text-brand-500">.</span>
+            DevFlow<span className="text-brand-500">.</span><span className="font-outline">brnd</span>
           </span>
         </div>
       )}

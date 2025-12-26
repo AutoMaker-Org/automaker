@@ -547,6 +547,13 @@
     color: oklch(0.525 0 0); /* zinc-500 equivalent */
   }
 
+  /* Font outline utility for logo branding */
+  .font-outline {
+    -webkit-text-stroke: 1.5px var(--foreground);
+    color: transparent;
+    font-weight: 700;
+  }
+
   /* Brand gradient utilities */
   .gradient-brand {
     background: linear-gradient(135deg, oklch(0.55 0.25 265), oklch(0.5 0.28 270));

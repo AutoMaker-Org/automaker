@@ -539,11 +539,11 @@ export function WelcomeView() {
         <div className="px-8 py-6">
           <div className="flex items-center gap-4 animate-in fade-in slide-in-from-top-2 duration-500">
             <div className="w-12 h-12 rounded-xl bg-linear-to-br from-brand-500/20 to-brand-600/10 border border-brand-500/20 flex items-center justify-center shadow-lg shadow-brand-500/10">
-              <img src="/logo.png" alt="Automaker Logo" className="w-8 h-8" />
+              <img src="/logo.png" alt="DevFlow Logo" className="w-8 h-8" />
             </div>
             <div>
               <h1 className="text-2xl font-bold text-foreground tracking-tight">
-                Welcome to Automaker
+                Welcome to DevFlow
               </h1>
               <p className="text-sm text-muted-foreground mt-0.5">
                 Your autonomous AI development studio

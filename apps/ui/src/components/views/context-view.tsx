@@ -263,7 +263,7 @@ export function ContextView() {
       }
 
       const message =
-        result.error || `Automaker couldn't generate a description for “${fileName}”.`;
+        result.error || `DevFlow couldn't generate a description for "${fileName}".`;
       toast.error('Failed to generate description', { description: message });
     } catch (error) {
       console.error('Failed to generate description:', error);

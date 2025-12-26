@@ -493,9 +493,9 @@ function createWindow(): void {
 
 // App lifecycle
 app.whenReady().then(async () => {
-  // Ensure userData path is consistent across dev/prod so files land in Automaker dir
+  // Ensure userData path is consistent across dev/prod so files land in DevFlow dir
   try {
-    const desiredUserDataPath = path.join(app.getPath('appData'), 'Automaker');
+    const desiredUserDataPath = path.join(app.getPath('appData'), 'DevFlow');
     if (app.getPath('userData') !== desiredUserDataPath) {
       app.setPath('userData', desiredUserDataPath);
       console.log('[Electron] userData path set to:', desiredUserDataPath);
@@ -531,7 +531,7 @@ app.whenReady().then(async () => {
     const errorMessage = (error as Error).message;
     const isNodeError = errorMessage.includes('Node.js');
     dialog.showErrorBox(
-      'Automaker Failed to Start',
+      'DevFlow Failed to Start',
       `The application failed to start.\n\n${errorMessage}\n\n${
         isNodeError
           ? 'Please install Node.js from https://nodejs.org or via a package manager (Homebrew, nvm, fnm).'

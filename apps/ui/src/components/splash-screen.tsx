@@ -207,7 +207,7 @@ export function SplashScreen({ onComplete }: { onComplete: () => void }) {
           xmlns="http://www.w3.org/2000/svg"
           viewBox="0 0 256 256"
           role="img"
-          aria-label="Automaker Logo"
+          aria-label="DevFlow Logo"
           className="relative z-10"
           style={{
             width: 120,
@@ -253,7 +253,7 @@ export function SplashScreen({ onComplete }: { onComplete: () => void }) {
         </svg>
       </div>
 
-      {/* Automaker text that fades in below the logo */}
+      {/* DevFlow text that fades in below the logo */}
       <div
         className="absolute flex items-center gap-1"
         style={{
@@ -274,7 +274,7 @@ export function SplashScreen({ onComplete }: { onComplete: () => void }) {
         }}
       >
         <span className="font-bold text-foreground text-4xl tracking-tight leading-none">
-          automaker<span className="text-brand-500">.</span>
+          DevFlow<span className="text-brand-500">.</span><span className="font-outline">brnd</span>
         </span>
       </div>
     </div>

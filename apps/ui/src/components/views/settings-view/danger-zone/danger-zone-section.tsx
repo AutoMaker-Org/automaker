@@ -28,7 +28,7 @@ export function DangerZoneSection({ project, onDeleteClick }: DangerZoneSectionP
           <h2 className="text-lg font-semibold text-foreground tracking-tight">Danger Zone</h2>
         </div>
         <p className="text-sm text-muted-foreground/80 ml-12">
-          Permanently remove this project from Automaker.
+          Permanently remove this project from DevFlow.
         </p>
       </div>
       <div className="p-6">

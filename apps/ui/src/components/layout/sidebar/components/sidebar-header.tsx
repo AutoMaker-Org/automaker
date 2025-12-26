@@ -1,6 +1,6 @@
 import type { NavigateOptions } from '@tanstack/react-router';
 import { cn, isMac } from '@/lib/utils';
-import { AutomakerLogo } from './automaker-logo';
+import { DevFlowLogo } from './devflow-logo';
 import { BugReportButton } from './bug-report-button';
 
 interface SidebarHeaderProps {
@@ -25,7 +25,7 @@ export function SidebarHeader({ sidebarOpen, navigate }: SidebarHeaderProps) {
           isMac && 'pt-4 pl-20'
         )}
       >
-        <AutomakerLogo sidebarOpen={sidebarOpen} navigate={navigate} />
+        <DevFlowLogo sidebarOpen={sidebarOpen} navigate={navigate} />
         {/* Bug Report Button - Inside logo container when expanded */}
         {sidebarOpen && <BugReportButton sidebarExpanded />}
       </div>
