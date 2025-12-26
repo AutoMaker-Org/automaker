@@ -205,6 +205,18 @@ export class CursorProvider extends BaseProvider {
       stderrOutput += chunk.toString();
     });
 
+    // Set up close promise early to avoid missing fast exits
+    const closePromise = new Promise<void>((resolve, reject) => {
+      proc.on('close', (code) => {
+        if (code !== 0 && code !== null) {
+          reject(new Error(`cursor-agent exited with code ${code}: ${stderrOutput}`));
+        } else {
+          resolve();
+        }
+      });
+      proc.on('error', reject);
+    });
+
     try {
       for await (const chunk of stdout) {
         buffer += chunk.toString();
@@ -250,16 +262,7 @@ export class CursorProvider extends BaseProvider {
       }
 
       // Wait for process to exit
-      await new Promise<void>((resolve, reject) => {
-        proc.on('close', (code) => {
-          if (code !== 0 && code !== null) {
-            reject(new Error(`cursor-agent exited with code ${code}: ${stderrOutput}`));
-          } else {
-            resolve();
-          }
-        });
-        proc.on('error', reject);
-      });
+      await closePromise;
     } catch (error) {
       // Emit error message
       yield {
