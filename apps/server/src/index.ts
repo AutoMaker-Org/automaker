@@ -49,6 +49,8 @@ import { ClaudeUsageService } from './services/claude-usage-service.js';
 import { createGitHubRoutes } from './routes/github/index.js';
 import { createContextRoutes } from './routes/context/index.js';
 import { createPipelineRoutes } from './routes/pipeline/create-routes.js';
+import { createBacklogPlanRoutes } from './routes/backlog-plan/index.js';
+import { cleanupStaleValidations } from './routes/github/routes/validation-common.js';
 
 // Load environment variables
 dotenv.config();
@@ -112,10 +114,11 @@ app.use(express.json({ limit: '50mb' }));
 const events: EventEmitter = createEventEmitter();
 
 // Create services
-const agentService = new AgentService(DATA_DIR, events);
-const featureLoader = new FeatureLoader();
-const autoModeService = new AutoModeService(events);
+// Note: settingsService is created first so it can be injected into other services
 const settingsService = new SettingsService(DATA_DIR);
+const agentService = new AgentService(DATA_DIR, events, settingsService);
+const featureLoader = new FeatureLoader();
+const autoModeService = new AutoModeService(events, settingsService);
 const claudeUsageService = new ClaudeUsageService();
 
 // Initialize services
@@ -123,6 +126,15 @@ const claudeUsageService = new ClaudeUsageService();
   await agentService.initialize();
   console.log('[Server] Agent service initialized');
 })();
+
+// Run stale validation cleanup every hour to prevent memory leaks from crashed validations
+const VALIDATION_CLEANUP_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
+setInterval(() => {
+  const cleaned = cleanupStaleValidations();
+  if (cleaned > 0) {
+    console.log(`[Server] Cleaned up ${cleaned} stale validation entries`);
+  }
+}, VALIDATION_CLEANUP_INTERVAL_MS);
 
 // Mount API routes - health is unauthenticated for monitoring
 app.use('/api/health', createHealthRoutes());
@@ -139,18 +151,18 @@ app.use('/api/enhance-prompt', createEnhancePromptRoutes());
 app.use('/api/worktree', createWorktreeRoutes());
 app.use('/api/git', createGitRoutes());
 app.use('/api/setup', createSetupRoutes());
-app.use('/api/suggestions', createSuggestionsRoutes(events));
+app.use('/api/suggestions', createSuggestionsRoutes(events, settingsService));
 app.use('/api/models', createModelsRoutes());
-app.use('/api/spec-regeneration', createSpecRegenerationRoutes(events));
+app.use('/api/spec-regeneration', createSpecRegenerationRoutes(events, settingsService));
 app.use('/api/running-agents', createRunningAgentsRoutes(autoModeService));
 app.use('/api/workspace', createWorkspaceRoutes());
 app.use('/api/templates', createTemplatesRoutes());
 app.use('/api/terminal', createTerminalRoutes());
 app.use('/api/settings', createSettingsRoutes(settingsService));
 app.use('/api/claude', createClaudeRoutes(claudeUsageService));
-app.use('/api/github', createGitHubRoutes());
-app.use('/api/context', createContextRoutes());
-app.use('/api/pipeline', createPipelineRoutes(autoModeService));
+app.use('/api/github', createGitHubRoutes(events, settingsService));
+app.use('/api/context', createContextRoutes(settingsService));
+app.use('/api/backlog-plan', createBacklogPlanRoutes(events, settingsService));
 
 // Create HTTP server
 const server = createServer(app);

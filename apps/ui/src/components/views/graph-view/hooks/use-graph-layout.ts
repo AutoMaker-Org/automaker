@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useRef } from 'react';
 import dagre from 'dagre';
 import { Node, Edge, useReactFlow } from '@xyflow/react';
 import { TaskNode, DependencyEdge } from './use-graph-nodes';
@@ -17,6 +17,10 @@ interface UseGraphLayoutProps {
  */
 export function useGraphLayout({ nodes, edges }: UseGraphLayoutProps) {
   const { fitView, setNodes } = useReactFlow();
+
+  // Cache the last computed positions to avoid recalculating layout
+  const positionCache = useRef<Map<string, { x: number; y: number }>>(new Map());
+  const lastStructureKey = useRef<string>('');
 
   const getLayoutedElements = useCallback(
     (
@@ -48,12 +52,15 @@ export function useGraphLayout({ nodes, edges }: UseGraphLayoutProps) {
 
       const layoutedNodes = inputNodes.map((node) => {
         const nodeWithPosition = dagreGraph.node(node.id);
+        const position = {
+          x: nodeWithPosition.x - NODE_WIDTH / 2,
+          y: nodeWithPosition.y - NODE_HEIGHT / 2,
+        };
+        // Update cache
+        positionCache.current.set(node.id, position);
         return {
           ...node,
-          position: {
-            x: nodeWithPosition.x - NODE_WIDTH / 2,
-            y: nodeWithPosition.y - NODE_HEIGHT / 2,
-          },
+          position,
           targetPosition: isHorizontal ? 'left' : 'top',
           sourcePosition: isHorizontal ? 'right' : 'bottom',
         } as TaskNode;
@@ -64,13 +71,45 @@ export function useGraphLayout({ nodes, edges }: UseGraphLayoutProps) {
     []
   );
 
-  // Initial layout
+  // Create a stable structure key based only on node IDs (not edge changes)
+  // Edges changing shouldn't trigger re-layout
+  const structureKey = useMemo(() => {
+    const nodeIds = nodes
+      .map((n) => n.id)
+      .sort()
+      .join(',');
+    return nodeIds;
+  }, [nodes]);
+
+  // Initial layout - only recalculate when node structure changes (new nodes added/removed)
   const layoutedElements = useMemo(() => {
     if (nodes.length === 0) {
+      positionCache.current.clear();
+      lastStructureKey.current = '';
       return { nodes: [], edges: [] };
     }
-    return getLayoutedElements(nodes, edges, 'LR');
-  }, [nodes, edges, getLayoutedElements]);
+
+    // Check if structure changed (new nodes added or removed)
+    const structureChanged = structureKey !== lastStructureKey.current;
+
+    if (structureChanged) {
+      // Structure changed - run full layout
+      lastStructureKey.current = structureKey;
+      return getLayoutedElements(nodes, edges, 'LR');
+    } else {
+      // Structure unchanged - preserve cached positions, just update node data
+      const layoutedNodes = nodes.map((node) => {
+        const cachedPosition = positionCache.current.get(node.id);
+        return {
+          ...node,
+          position: cachedPosition || { x: 0, y: 0 },
+          targetPosition: 'left',
+          sourcePosition: 'right',
+        } as TaskNode;
+      });
+      return { nodes: layoutedNodes, edges };
+    }
+  }, [nodes, edges, structureKey, getLayoutedElements]);
 
   // Manual re-layout function
   const runLayout = useCallback(

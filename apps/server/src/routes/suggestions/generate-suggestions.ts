@@ -6,8 +6,93 @@ import { query } from '@anthropic-ai/claude-agent-sdk';
 import type { EventEmitter } from '../../lib/events.js';
 import { createLogger } from '@automaker/utils';
 import { createSuggestionsOptions } from '../../lib/sdk-options.js';
+import { FeatureLoader } from '../../services/feature-loader.js';
+import { getAppSpecPath } from '@automaker/platform';
+import * as secureFs from '../../lib/secure-fs.js';
+import type { SettingsService } from '../../services/settings-service.js';
+import { getAutoLoadClaudeMdSetting } from '../../lib/settings-helpers.js';
 
 const logger = createLogger('Suggestions');
+
+/**
+ * Extract implemented features from app_spec.txt XML content
+ *
+ * Note: This uses regex-based parsing which is sufficient for our controlled
+ * XML structure. If more complex XML parsing is needed in the future, consider
+ * using a library like 'fast-xml-parser' or 'xml2js'.
+ */
+function extractImplementedFeatures(specContent: string): string[] {
+  const features: string[] = [];
+
+  // Match <implemented_features>...</implemented_features> section
+  const implementedMatch = specContent.match(
+    /<implemented_features>([\s\S]*?)<\/implemented_features>/
+  );
+
+  if (implementedMatch) {
+    const implementedSection = implementedMatch[1];
+
+    // Extract feature names from <name>...</name> tags using matchAll
+    const nameRegex = /<name>(.*?)<\/name>/g;
+    const matches = implementedSection.matchAll(nameRegex);
+
+    for (const match of matches) {
+      features.push(match[1].trim());
+    }
+  }
+
+  return features;
+}
+
+/**
+ * Load existing context (app spec and backlog features) to avoid duplicates
+ */
+async function loadExistingContext(projectPath: string): Promise<string> {
+  let context = '';
+
+  // 1. Read app_spec.txt for implemented features
+  try {
+    const appSpecPath = getAppSpecPath(projectPath);
+    const specContent = (await secureFs.readFile(appSpecPath, 'utf-8')) as string;
+
+    if (specContent && specContent.trim().length > 0) {
+      const implementedFeatures = extractImplementedFeatures(specContent);
+
+      if (implementedFeatures.length > 0) {
+        context += '\n\n=== ALREADY IMPLEMENTED FEATURES ===\n';
+        context += 'These features are already implemented in the codebase:\n';
+        context += implementedFeatures.map((feature) => `- ${feature}`).join('\n') + '\n';
+      }
+    }
+  } catch (error) {
+    // app_spec.txt doesn't exist or can't be read - that's okay
+    logger.debug('No app_spec.txt found or error reading it:', error);
+  }
+
+  // 2. Load existing features from backlog
+  try {
+    const featureLoader = new FeatureLoader();
+    const features = await featureLoader.getAll(projectPath);
+
+    if (features.length > 0) {
+      context += '\n\n=== EXISTING FEATURES IN BACKLOG ===\n';
+      context += 'These features are already planned or in progress:\n';
+      context +=
+        features
+          .map((feature) => {
+            const status = feature.status || 'pending';
+            const title = feature.title || feature.description?.substring(0, 50) || 'Untitled';
+            return `- ${title} (${status})`;
+          })
+          .join('\n') + '\n';
+    }
+  } catch (error) {
+    // Features directory doesn't exist or can't be read - that's okay
+    logger.debug('No features found or error loading them:', error);
+  }
+
+  return context;
+}
 
 /**
  * JSON Schema for suggestions output
@@ -42,7 +127,8 @@ export async function generateSuggestions(
   projectPath: string,
   suggestionType: string,
   events: EventEmitter,
-  abortController: AbortController
+  abortController: AbortController,
+  settingsService?: SettingsService
 ): Promise<void> {
   const typePrompts: Record<string, string> = {
     features: 'Analyze this project and suggest new features that would add value.',
@@ -51,8 +137,13 @@ export async function generateSuggestions(
     performance: 'Analyze this project for performance issues and suggest optimizations.',
   };
 
-  const prompt = `${typePrompts[suggestionType] || typePrompts.features}
+  // Load existing context to avoid duplicates
+  const existingContext = await loadExistingContext(projectPath);
 
+  const prompt = `${typePrompts[suggestionType] || typePrompts.features}
+${existingContext}
+
+${existingContext ? '\nIMPORTANT: Do NOT suggest features that are already implemented or already in the backlog above. Focus on NEW ideas that complement what already exists.\n' : ''}
 Look at the codebase and provide 3-5 concrete suggestions.
 
 For each suggestion, provide:
@@ -63,14 +154,20 @@ For each suggestion, provide:
 
 The response will be automatically formatted as structured JSON.`;
 
-  events.emit('suggestions:event', {
-    type: 'suggestions_progress',
-    content: `Starting ${suggestionType} analysis...\n`,
-  });
+  // Don't send initial message - let the agent output speak for itself
+  // The first agent message will be captured as an info entry
+
+  // Load autoLoadClaudeMd setting
+  const autoLoadClaudeMd = await getAutoLoadClaudeMdSetting(
+    projectPath,
+    settingsService,
+    '[Suggestions]'
+  );
 
   const options = createSuggestionsOptions({
     cwd: projectPath,
     abortController,
+    autoLoadClaudeMd,
     outputFormat: {
       type: 'json_schema',
       schema: suggestionsSchema,

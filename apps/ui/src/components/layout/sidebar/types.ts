@@ -11,6 +11,8 @@ export interface NavItem {
   label: string;
   icon: React.ComponentType<{ className?: string }>;
   shortcut?: string;
+  /** Optional count badge to display next to the nav item */
+  count?: number;
 }
 
 export interface SortableProjectItemProps {

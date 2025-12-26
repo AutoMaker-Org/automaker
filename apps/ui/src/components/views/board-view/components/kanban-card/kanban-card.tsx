@@ -28,6 +28,7 @@ interface KanbanCardProps {
   onSkipPipelineStep?: (stepId: string) => void;
   onRetryPipelineStep?: (stepId: string) => void;
   onClearPipelineStep?: (stepId: string) => void;
+  onSpawnTask?: () => void;
   hasContext?: boolean;
   isCurrentAutoTask?: boolean;
   shortcutKey?: string;
@@ -54,6 +55,7 @@ export const KanbanCard = memo(function KanbanCard({
   onComplete,
   onViewPlan,
   onApprovePlan,
+  onSpawnTask,
   hasContext,
   isCurrentAutoTask,
   shortcutKey,
@@ -149,6 +151,7 @@ export const KanbanCard = memo(function KanbanCard({
         onEdit={onEdit}
         onDelete={onDelete}
         onViewOutput={onViewOutput}
+        onSpawnTask={onSpawnTask}
       />
 
       <CardContent className="px-3 pt-0 pb-0">

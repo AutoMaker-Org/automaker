@@ -78,14 +78,29 @@ export function SidebarNavigation({
                     title={!sidebarOpen ? item.label : undefined}
                     data-testid={`nav-${item.id}`}
                   >
-                    <Icon
-                      className={cn(
-                        'w-[18px] h-[18px] shrink-0 transition-all duration-200',
-                        isActive
-                          ? 'text-brand-500 drop-shadow-sm'
-                          : 'group-hover:text-brand-400 group-hover:scale-110'
+                    <div className="relative">
+                      <Icon
+                        className={cn(
+                          'w-[18px] h-[18px] shrink-0 transition-all duration-200',
+                          isActive
+                            ? 'text-brand-500 drop-shadow-sm'
+                            : 'group-hover:text-brand-400 group-hover:scale-110'
+                        )}
+                      />
+                      {/* Count badge for collapsed state */}
+                      {!sidebarOpen && item.count !== undefined && item.count > 0 && (
+                        <span
+                          className={cn(
+                            'absolute -top-1.5 -right-1.5 flex items-center justify-center',
+                            'min-w-4 h-4 px-1 text-[9px] font-bold rounded-full',
+                            'bg-primary text-primary-foreground shadow-sm',
+                            'animate-in fade-in zoom-in duration-200'
+                          )}
+                        >
+                          {item.count > 99 ? '99' : item.count}
+                        </span>
                       )}
-                    />
+                    </div>
                     <span
                       className={cn(
                         'ml-3 font-medium text-sm flex-1 text-left',
@@ -94,7 +109,21 @@ export function SidebarNavigation({
                     >
                       {item.label}
                     </span>
-                    {item.shortcut && sidebarOpen && (
+                    {/* Count badge */}
+                    {item.count !== undefined && item.count > 0 && sidebarOpen && (
+                      <span
+                        className={cn(
+                          'hidden lg:flex items-center justify-center',
+                          'min-w-5 h-5 px-1.5 text-[10px] font-bold rounded-full',
+                          'bg-primary text-primary-foreground shadow-sm',
+                          'animate-in fade-in zoom-in duration-200'
+                        )}
+                        data-testid={`count-${item.id}`}
+                      >
+                        {item.count > 99 ? '99+' : item.count}
+                      </span>
+                    )}
+                    {item.shortcut && sidebarOpen && !item.count && (
                       <span
                         className={cn(
                           'hidden lg:flex items-center justify-center min-w-5 h-5 px-1.5 text-[10px] font-mono rounded-md transition-all duration-200',
