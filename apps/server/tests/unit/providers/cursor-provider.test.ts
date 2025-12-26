@@ -452,19 +452,19 @@ describe('cursor-provider.ts', () => {
         }
         return {} as any;
       });
-      const mockProcess = new EventEmitter() as any;
-      mockProcess.stdout = new Readable({
-        read() {
-          this.push('1.0.0');
-          this.push(null);
-        },
-      });
-      mockProcess.stderr = new Readable({
-        read() {
-          this.push(null);
-        },
-      });
       vi.mocked(spawn).mockImplementation(() => {
+        const mockProcess = new EventEmitter() as any;
+        mockProcess.stdout = new Readable({
+          read() {
+            this.push('1.0.0');
+            this.push(null);
+          },
+        });
+        mockProcess.stderr = new Readable({
+          read() {
+            this.push(null);
+          },
+        });
         setTimeout(() => mockProcess.emit('close', 0), 10);
         return mockProcess;
       });
