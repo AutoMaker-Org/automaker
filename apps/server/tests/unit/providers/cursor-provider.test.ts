@@ -1,13 +1,33 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { CursorProvider } from '@/providers/cursor-provider.js';
-import { spawn } from 'child_process';
+import { spawn, exec } from 'child_process';
 import { EventEmitter } from 'events';
 import { Readable } from 'stream';
 
 // Mock child_process
 vi.mock('child_process', () => ({
   spawn: vi.fn(),
+  exec: vi.fn(),
 }));
+
+// Mock fs/promises
+vi.mock('fs/promises', () => ({
+  access: vi.fn().mockRejectedValue(new Error('ENOENT')),
+}));
+
+// Mock os - needs to handle default import properly
+vi.mock('os', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('os')>();
+  const mockHomedir = () => '/home/testuser';
+  return {
+    ...actual,
+    homedir: mockHomedir,
+    default: {
+      ...actual,
+      homedir: mockHomedir,
+    },
+  };
+});
 
 describe('cursor-provider.ts', () => {
   let provider: CursorProvider;
@@ -16,6 +36,13 @@ describe('cursor-provider.ts', () => {
     vi.clearAllMocks();
     provider = new CursorProvider();
     delete process.env.CURSOR_API_KEY;
+    // Default mock for exec (findCliPath) - assume cursor-agent is in PATH
+    vi.mocked(exec).mockImplementation((cmd: any, callback: any) => {
+      if (typeof callback === 'function') {
+        callback(null, { stdout: '/usr/local/bin/cursor-agent', stderr: '' });
+      }
+      return {} as any;
+    });
   });
 
   afterEach(() => {
@@ -113,7 +140,7 @@ describe('cursor-provider.ts', () => {
 
       // Model should be mapped from 'cursor-sonnet-4.5' to 'sonnet-4.5'
       expect(spawn).toHaveBeenCalledWith(
-        'cursor-agent',
+        '/usr/local/bin/cursor-agent',
         expect.arrayContaining([
           '--print',
           '--output-format',
@@ -148,7 +175,7 @@ describe('cursor-provider.ts', () => {
       }
 
       expect(spawn).toHaveBeenCalledWith(
-        'cursor-agent',
+        '/usr/local/bin/cursor-agent',
         expect.arrayContaining(['--model', 'sonnet-4.5']),
         expect.any(Object)
       );
@@ -170,7 +197,7 @@ describe('cursor-provider.ts', () => {
       }
 
       expect(spawn).toHaveBeenCalledWith(
-        'cursor-agent',
+        '/usr/local/bin/cursor-agent',
         expect.arrayContaining(['--model', 'gpt-5.2']),
         expect.any(Object)
       );
@@ -192,7 +219,7 @@ describe('cursor-provider.ts', () => {
       }
 
       expect(spawn).toHaveBeenCalledWith(
-        'cursor-agent',
+        '/usr/local/bin/cursor-agent',
         expect.arrayContaining(['--model', 'opus-4.5-thinking']),
         expect.any(Object)
       );
@@ -216,7 +243,7 @@ describe('cursor-provider.ts', () => {
       }
 
       expect(spawn).toHaveBeenCalledWith(
-        'cursor-agent',
+        '/usr/local/bin/cursor-agent',
         expect.arrayContaining(['--resume', 'existing-session-id']),
         expect.any(Object)
       );
@@ -314,7 +341,7 @@ describe('cursor-provider.ts', () => {
       }
 
       expect(spawn).toHaveBeenCalledWith(
-        'cursor-agent',
+        '/usr/local/bin/cursor-agent',
         expect.any(Array),
         expect.objectContaining({
           env: expect.objectContaining({
@@ -348,7 +375,7 @@ describe('cursor-provider.ts', () => {
 
       // Should have extracted and joined text parts
       expect(spawn).toHaveBeenCalledWith(
-        'cursor-agent',
+        '/usr/local/bin/cursor-agent',
         expect.arrayContaining(['Part 1\nPart 2']),
         expect.any(Object)
       );
@@ -357,6 +384,14 @@ describe('cursor-provider.ts', () => {
 
   describe('detectInstallation', () => {
     it('should detect installed cursor-agent', async () => {
+      // Mock exec for findCliPath (which command)
+      vi.mocked(exec).mockImplementation((cmd: any, callback: any) => {
+        if (typeof callback === 'function') {
+          callback(null, { stdout: '/usr/local/bin/cursor-agent', stderr: '' });
+        }
+        return {} as any;
+      });
+      // Mock spawn for version and status commands
       const mockVersionProcess = new EventEmitter() as any;
       mockVersionProcess.stdout = new Readable({
         read() {
@@ -369,7 +404,6 @@ describe('cursor-provider.ts', () => {
           this.push(null);
         },
       });
-
       const mockStatusProcess = new EventEmitter() as any;
       mockStatusProcess.stdout = new Readable({
         read() {
@@ -382,7 +416,6 @@ describe('cursor-provider.ts', () => {
           this.push(null);
         },
       });
-
       let callCount = 0;
       vi.mocked(spawn).mockImplementation(() => {
         callCount++;
@@ -390,42 +423,35 @@ describe('cursor-provider.ts', () => {
         setTimeout(() => proc.emit('close', 0), 10);
         return proc;
       });
-
       const result = await provider.detectInstallation();
-
       expect(result.installed).toBe(true);
       expect(result.method).toBe('cli');
       expect(result.version).toBe('1.0.0');
+      expect(result.path).toBe('/usr/local/bin/cursor-agent');
     });
 
     it('should return not installed when cursor-agent not found', async () => {
-      const mockProcess = new EventEmitter() as any;
-      mockProcess.stdout = new Readable({
-        read() {
-          this.push(null);
-        },
+      // Mock exec to fail (not in PATH)
+      vi.mocked(exec).mockImplementation((cmd: any, callback: any) => {
+        if (typeof callback === 'function') {
+          callback(new Error('command not found'), { stdout: '', stderr: 'command not found' });
+        }
+        return {} as any;
       });
-      mockProcess.stderr = new Readable({
-        read() {
-          this.push('command not found');
-          this.push(null);
-        },
-      });
-
-      vi.mocked(spawn).mockImplementation(() => {
-        setTimeout(() => mockProcess.emit('close', 1), 10);
-        return mockProcess;
-      });
-
       const result = await provider.detectInstallation();
-
       expect(result.installed).toBe(false);
       expect(result.method).toBe('cli');
     });
 
     it('should detect CURSOR_API_KEY environment variable', async () => {
       process.env.CURSOR_API_KEY = 'test-key';
-
+      // Mock exec for findCliPath
+      vi.mocked(exec).mockImplementation((cmd: any, callback: any) => {
+        if (typeof callback === 'function') {
+          callback(null, { stdout: '/usr/local/bin/cursor-agent', stderr: '' });
+        }
+        return {} as any;
+      });
       const mockProcess = new EventEmitter() as any;
       mockProcess.stdout = new Readable({
         read() {
@@ -438,23 +464,21 @@ describe('cursor-provider.ts', () => {
           this.push(null);
         },
       });
-
       vi.mocked(spawn).mockImplementation(() => {
         setTimeout(() => mockProcess.emit('close', 0), 10);
         return mockProcess;
       });
-
       const result = await provider.detectInstallation();
-
       expect(result.hasApiKey).toBe(true);
+      expect(result.authenticated).toBe(true);
     });
   });
 
   describe('getAvailableModels', () => {
-    it('should return 3 Cursor models', () => {
+    it('should return 4 Cursor models', () => {
       const models = provider.getAvailableModels();
 
-      expect(models).toHaveLength(3);
+      expect(models).toHaveLength(4);
     });
 
     it('should include Cursor Opus 4.5 Thinking', () => {
@@ -481,11 +505,11 @@ describe('cursor-provider.ts', () => {
       expect(gpt5).toBeDefined();
     });
 
-    it('should mark Cursor Sonnet 4.5 as default', () => {
+    it('should mark Cursor Opus 4.5 Thinking as default', () => {
       const models = provider.getAvailableModels();
 
-      const sonnet = models.find((m) => m.id === 'cursor-sonnet-4.5');
-      expect(sonnet?.default).toBe(true);
+      const opus = models.find((m) => m.id === 'cursor-opus-4.5-thinking');
+      expect(opus?.default).toBe(true);
     });
 
     it('should all support vision and tools', () => {
