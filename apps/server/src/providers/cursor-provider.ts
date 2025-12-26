@@ -5,7 +5,11 @@
  * with the provider architecture.
  */
 
-import { spawn, type ChildProcess } from 'child_process';
+import { spawn, exec, type ChildProcess } from 'child_process';
+import { promisify } from 'util';
+import os from 'os';
+import path from 'path';
+import fs from 'fs/promises';
 import { BaseProvider } from './base-provider.js';
 import type {
   ExecuteOptions,
@@ -13,6 +17,8 @@ import type {
   InstallationStatus,
   ModelDefinition,
 } from './types.js';
+
+const execAsync = promisify(exec);
 
 /**
  * Parsed JSON message from cursor-agent --output-format stream-json
@@ -44,10 +50,67 @@ interface CursorStreamMessage {
 }
 
 export class CursorProvider extends BaseProvider {
-  private cliCommand = 'cursor-agent';
+  private cachedCliPath: string | null = null;
+  private cliPathChecked = false;
 
   getName(): string {
     return 'cursor';
+  }
+
+  /**
+   * Find the cursor-agent CLI path, checking PATH first then common locations
+   */
+  async findCliPath(): Promise<string | null> {
+    if (this.cliPathChecked) {
+      return this.cachedCliPath;
+    }
+    const isWindows = process.platform === 'win32';
+    // Try to find in PATH first
+    try {
+      const findCommand = isWindows ? 'where cursor-agent' : 'which cursor-agent';
+      const { stdout } = await execAsync(findCommand);
+      const foundPath = stdout.trim().split(/\r?\n/)[0];
+      if (foundPath) {
+        this.cachedCliPath = foundPath;
+        this.cliPathChecked = true;
+        return foundPath;
+      }
+    } catch {
+      // Not in PATH, try common locations
+    }
+    // Check common installation paths
+    const commonPaths = isWindows
+      ? (() => {
+          const appData = process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming');
+          return [
+            path.join(os.homedir(), '.local', 'bin', 'cursor-agent.exe'),
+            path.join(appData, 'npm', 'cursor-agent.cmd'),
+            path.join(appData, 'npm', 'cursor-agent'),
+          ];
+        })()
+      : [
+          path.join(os.homedir(), '.local', 'bin', 'cursor-agent'),
+          '/usr/local/bin/cursor-agent',
+          path.join(os.homedir(), '.npm-global', 'bin', 'cursor-agent'),
+        ];
+    for (const p of commonPaths) {
+      try {
+        await fs.access(p);
+        this.cachedCliPath = p;
+        this.cliPathChecked = true;
+        return p;
+      } catch {
+        // Not found at this path
+      }
+    }
+    this.cliPathChecked = true;
+    return null;
+  }
+
+  /** Get the CLI command to use (path or fallback to 'cursor-agent') */
+  private async getCliCommand(): Promise<string> {
+    const cliPath = await this.findCliPath();
+    return cliPath || 'cursor-agent';
   }
 
   /**
@@ -99,8 +162,11 @@ export class CursorProvider extends BaseProvider {
 
     args.push(promptText);
 
+    // Get CLI command (uses cached path or finds it)
+    const cliCommand = await this.getCliCommand();
+
     // Spawn cursor-agent process
-    const proc = spawn(this.cliCommand, args, {
+    const proc = spawn(cliCommand, args, {
       cwd,
       env: {
         ...process.env,
@@ -295,57 +361,63 @@ export class CursorProvider extends BaseProvider {
    * Detect cursor-agent CLI installation
    */
   async detectInstallation(): Promise<InstallationStatus> {
-    try {
-      // Try to run cursor-agent --version
-      const result = await this.runCommand(['-v']);
-
-      const hasApiKey = !!process.env.CURSOR_API_KEY || !!this.config.apiKey;
-
-      // Check auth status
-      let authenticated = false;
-      try {
-        const statusResult = await this.runCommand(['status']);
-        authenticated = !statusResult.includes('not logged in') && !statusResult.includes('error');
-      } catch {
-        // Status check failed, assume not authenticated
-      }
-
-      return {
-        installed: true,
-        method: 'cli',
-        version: result.trim(),
-        hasApiKey,
-        authenticated,
-      };
-    } catch (error) {
+    const cliPath = await this.findCliPath();
+    if (!cliPath) {
       return {
         installed: false,
         method: 'cli',
-        error: (error as Error).message,
+        error: 'cursor-agent CLI not found in PATH or common locations',
       };
     }
+    const hasApiKey = !!process.env.CURSOR_API_KEY || !!this.config.apiKey;
+    let version = '';
+    try {
+      const result = await this.runCommand(['-v']);
+      version = result.trim();
+    } catch {
+      // Version command might not be available
+    }
+    let authenticated = false;
+    try {
+      const statusResult = await this.runCommand(['status']);
+      authenticated =
+        !statusResult.toLowerCase().includes('not logged in') &&
+        !statusResult.toLowerCase().includes('error') &&
+        !statusResult.toLowerCase().includes('not authenticated');
+    } catch {
+      // Status check failed, assume not authenticated
+    }
+    // Environment variable API key overrides
+    if (process.env.CURSOR_API_KEY) {
+      authenticated = true;
+    }
+    return {
+      installed: true,
+      method: 'cli',
+      path: cliPath,
+      version,
+      hasApiKey,
+      authenticated,
+    };
   }
 
   /**
    * Run a cursor-agent command and return output
    */
-  private runCommand(args: string[]): Promise<string> {
+  private async runCommand(args: string[]): Promise<string> {
+    const cliCommand = await this.getCliCommand();
     return new Promise((resolve, reject) => {
-      const proc = spawn(this.cliCommand, args, {
+      const proc = spawn(cliCommand, args, {
         stdio: ['pipe', 'pipe', 'pipe'],
       });
-
       let stdout = '';
       let stderr = '';
-
       proc.stdout?.on('data', (data: Buffer) => {
         stdout += data.toString();
       });
-
       proc.stderr?.on('data', (data: Buffer) => {
         stderr += data.toString();
       });
-
       proc.on('close', (code) => {
         if (code === 0) {
           resolve(stdout);
@@ -353,7 +425,6 @@ export class CursorProvider extends BaseProvider {
           reject(new Error(stderr || `Command failed with code ${code}`));
         }
       });
-
       proc.on('error', (err) => {
         reject(err);
       });
