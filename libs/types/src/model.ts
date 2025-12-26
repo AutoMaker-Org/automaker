@@ -40,6 +40,6 @@ export type ModelAlias = ClaudeModelAlias | CursorModelAlias;
 /**
  * AgentModel - Represents all available models across providers
  * Claude models: "opus" | "sonnet" | "haiku"
- * Cursor models: "cursor-sonnet" | "cursor-sonnet-thinking" | "cursor-gpt5"
+ * Cursor models: "cursor-opus-thinking" | "cursor-sonnet" | "cursor-gpt5" | "cursor-composer"
  */
 export type AgentModel = ModelAlias;
