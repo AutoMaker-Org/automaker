@@ -576,7 +576,7 @@ export function AddFeatureDialog({
 
             {/* Quick Select Profile Section */}
             <ProfileQuickSelect
-              profiles={aiProfiles}
+              profiles={aiProfiles.filter((p) => p.provider === selectedProvider)}
               selectedModel={newFeature.model}
               selectedThinkingLevel={newFeature.thinkingLevel}
               onSelect={handleProfileSelect}

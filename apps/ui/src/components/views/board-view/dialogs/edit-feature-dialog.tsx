@@ -489,7 +489,7 @@ export function EditFeatureDialog({
 
             {/* Quick Select Profile Section */}
             <ProfileQuickSelect
-              profiles={aiProfiles}
+              profiles={aiProfiles.filter((p) => p.provider === selectedProvider)}
               selectedModel={editingFeature.model ?? 'opus'}
               selectedThinkingLevel={editingFeature.thinkingLevel ?? 'none'}
               onSelect={handleProfileSelect}
