@@ -106,7 +106,7 @@ describe('cursor-provider.ts', () => {
 
       const generator = provider.executeQuery({
         prompt: 'Hello',
-        model: 'cursor-sonnet-4',
+        model: 'cursor-sonnet',
         cwd: '/test',
       });
 
@@ -233,7 +233,7 @@ describe('cursor-provider.ts', () => {
 
       const generator = provider.executeQuery({
         prompt: 'Continue',
-        model: 'cursor-sonnet-4',
+        model: 'cursor-sonnet',
         cwd: '/test',
         sdkSessionId: 'existing-session-id',
       });
@@ -276,7 +276,7 @@ describe('cursor-provider.ts', () => {
 
       const generator = provider.executeQuery({
         prompt: 'Think about this',
-        model: 'cursor-sonnet-4-thinking',
+        model: 'cursor-opus-thinking',
         cwd: '/test',
       });
 
@@ -307,7 +307,7 @@ describe('cursor-provider.ts', () => {
 
       const generator = provider.executeQuery({
         prompt: 'Test',
-        model: 'cursor-sonnet-4',
+        model: 'cursor-sonnet',
         cwd: '/test',
         abortController,
       });
@@ -332,7 +332,7 @@ describe('cursor-provider.ts', () => {
 
       const generator = providerWithApiKey.executeQuery({
         prompt: 'Test',
-        model: 'cursor-sonnet-4',
+        model: 'cursor-sonnet',
         cwd: '/test',
       });
 
@@ -365,7 +365,7 @@ describe('cursor-provider.ts', () => {
 
       const generator = provider.executeQuery({
         prompt: arrayPrompt as any,
-        model: 'cursor-sonnet-4',
+        model: 'cursor-sonnet',
         cwd: '/test',
       });
 
