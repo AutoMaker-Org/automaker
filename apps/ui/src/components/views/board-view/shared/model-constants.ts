@@ -7,6 +7,7 @@ export type ModelOption = {
   description: string;
   badge?: string;
   provider: ModelProvider;
+  default?: boolean;
 };
 
 export const CLAUDE_MODELS: ModelOption[] = [
