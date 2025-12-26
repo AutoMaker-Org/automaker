@@ -447,6 +447,7 @@ export class CursorProvider extends BaseProvider {
         supportsVision: true,
         supportsTools: true,
         tier: 'premium',
+        default: true,
       },
       {
         id: 'cursor-sonnet-4.5',
@@ -459,7 +460,6 @@ export class CursorProvider extends BaseProvider {
         supportsVision: true,
         supportsTools: true,
         tier: 'standard',
-        default: true,
       },
       {
         id: 'cursor-gpt-5.2',
@@ -468,6 +468,18 @@ export class CursorProvider extends BaseProvider {
         provider: 'cursor',
         description: 'OpenAI GPT-5.2 via Cursor',
         contextWindow: 128000,
+        maxOutputTokens: 16000,
+        supportsVision: true,
+        supportsTools: true,
+        tier: 'premium',
+      },
+      {
+        id: 'cursor-composer',
+        name: 'Cursor Composer',
+        modelString: 'composer',
+        provider: 'cursor',
+        description: 'Cursor Composer model',
+        contextWindow: 200000,
         maxOutputTokens: 16000,
         supportsVision: true,
         supportsTools: true,
@@ -494,6 +506,7 @@ export class CursorProvider extends BaseProvider {
       'cursor-opus-thinking': 'opus-4.5-thinking',
       'cursor-sonnet': 'sonnet-4.5',
       'cursor-gpt5': 'gpt-5.2',
+      'cursor-composer': 'composer',
       // Full IDs -> cursor-agent format
       'cursor-opus-4.5-thinking': 'opus-4.5-thinking',
       'cursor-sonnet-4.5': 'sonnet-4.5',

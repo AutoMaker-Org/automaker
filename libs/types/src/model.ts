@@ -14,6 +14,7 @@ export const CURSOR_MODEL_MAP: Record<string, string> = {
   'cursor-opus-thinking': 'cursor-opus-4.5-thinking',
   'cursor-sonnet': 'cursor-sonnet-4.5',
   'cursor-gpt5': 'cursor-gpt-5.2',
+  'cursor-composer': 'cursor-composer',
 } as const;
 
 /**
@@ -29,7 +30,7 @@ export const ALL_MODEL_MAP: Record<string, string> = {
  */
 export const DEFAULT_MODELS = {
   claude: 'claude-opus-4-5-20251101',
-  cursor: 'cursor-sonnet-4',
+  cursor: 'cursor-opus-4.5-thinking',
 } as const;
 
 export type ClaudeModelAlias = keyof typeof CLAUDE_MODEL_MAP;
