@@ -2,11 +2,16 @@ import { Label } from '@/components/ui/label';
 import { Brain, MousePointer2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { AgentModel } from '@/store/app-store';
+import type { ModelProvider } from '@automaker/types';
 import { CLAUDE_MODELS, CURSOR_MODELS, ModelOption } from './model-constants';
+import { PROVIDERS } from './provider-constants';
+import { ProviderSelector } from './provider-selector';
 
 interface ModelSelectorProps {
   selectedModel: AgentModel;
   onModelSelect: (model: AgentModel) => void;
+  selectedProvider: ModelProvider;
+  onProviderSelect: (provider: ModelProvider) => void;
   testIdPrefix?: string;
   showCursor?: boolean;
 }
@@ -89,31 +94,36 @@ function ModelGroup({
 export function ModelSelector({
   selectedModel,
   onModelSelect,
+  selectedProvider,
+  onProviderSelect,
   testIdPrefix = 'model-select',
   showCursor = true,
 }: ModelSelectorProps) {
+  const availableProviders = showCursor ? PROVIDERS : PROVIDERS.filter((p) => p.id === 'claude');
+  const currentProvider = availableProviders.find((p) => p.id === selectedProvider);
+  const availableModels = currentProvider?.models || [];
+
+  const getProviderIcon = (providerId: ModelProvider) => {
+    return providerId === 'claude' ? Brain : MousePointer2;
+  };
+
+  const Icon = currentProvider ? getProviderIcon(currentProvider.id) : Brain;
+
   return (
     <div className="space-y-4">
-      {/* Claude Models */}
-      <ModelGroup
-        label="Claude (SDK)"
-        icon={Brain}
-        badge="Native"
-        badgeColor="primary"
-        models={CLAUDE_MODELS}
-        selectedModel={selectedModel}
-        onModelSelect={onModelSelect}
-        testIdPrefix={testIdPrefix}
+      <ProviderSelector
+        selectedProvider={selectedProvider}
+        onProviderSelect={onProviderSelect}
+        availableProviders={availableProviders}
       />
 
-      {/* Cursor Models */}
-      {showCursor && (
+      {currentProvider && (
         <ModelGroup
-          label="Cursor Agent"
-          icon={MousePointer2}
-          badge="CLI"
-          badgeColor="cyan"
-          models={CURSOR_MODELS}
+          label={currentProvider.name}
+          icon={Icon}
+          badge={currentProvider.badge}
+          badgeColor={currentProvider.badgeColor}
+          models={availableModels}
           selectedModel={selectedModel}
           onModelSelect={onModelSelect}
           testIdPrefix={testIdPrefix}

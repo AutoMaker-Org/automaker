@@ -791,11 +791,12 @@ export async function setupMockProjectWithProfiles(
 
     // Default built-in profiles (same as DEFAULT_AI_PROFILES from app-store.ts)
     const builtInProfiles = [
+      // Claude profiles
       {
         id: 'profile-heavy-task',
         name: 'Heavy Task',
         description:
-          'Claude Opus with Ultrathink for complex architecture, migrations, or deep debugging.',
+          'Opus with Ultrathink for complex architecture, migrations, or deep debugging.',
         model: 'opus' as const,
         thinkingLevel: 'ultrathink' as const,
         provider: 'claude' as const,
@@ -805,7 +806,7 @@ export async function setupMockProjectWithProfiles(
       {
         id: 'profile-balanced',
         name: 'Balanced',
-        description: 'Claude Sonnet with medium thinking for typical development tasks.',
+        description: 'Sonnet with medium thinking for typical development tasks.',
         model: 'sonnet' as const,
         thinkingLevel: 'medium' as const,
         provider: 'claude' as const,
@@ -815,10 +816,42 @@ export async function setupMockProjectWithProfiles(
       {
         id: 'profile-quick-edit',
         name: 'Quick Edit',
-        description: 'Claude Haiku for fast, simple edits and minor fixes.',
+        description: 'Haiku for fast, simple edits and minor fixes.',
         model: 'haiku' as const,
         thinkingLevel: 'none' as const,
         provider: 'claude' as const,
+        isBuiltIn: true,
+        icon: 'Zap',
+      },
+      // Cursor profiles
+      {
+        id: 'profile-cursor-heavy-task',
+        name: 'Heavy Task',
+        description:
+          'Opus with Ultrathink for complex architecture, migrations, or deep debugging.',
+        model: 'cursor-opus-thinking' as const,
+        thinkingLevel: 'ultrathink' as const,
+        provider: 'cursor' as const,
+        isBuiltIn: true,
+        icon: 'Brain',
+      },
+      {
+        id: 'profile-cursor-balanced',
+        name: 'Balanced',
+        description: 'GPT-5 with medium thinking for typical development tasks.',
+        model: 'cursor-gpt5' as const,
+        thinkingLevel: 'medium' as const,
+        provider: 'cursor' as const,
+        isBuiltIn: true,
+        icon: 'Scale',
+      },
+      {
+        id: 'profile-cursor-quick-edit',
+        name: 'Quick Edit',
+        description: 'Composer for fast, simple edits and minor fixes.',
+        model: 'cursor-composer' as const,
+        thinkingLevel: 'none' as const,
+        provider: 'cursor' as const,
         isBuiltIn: true,
         icon: 'Zap',
       },

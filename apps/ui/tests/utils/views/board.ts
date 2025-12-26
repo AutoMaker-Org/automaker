@@ -176,6 +176,72 @@ export async function addFeature(
   await confirmAddFeature(page);
 }
 
+/**
+ * Select a provider in the add feature dialog
+ */
+export async function selectProvider(page: Page, providerId: 'claude' | 'cursor'): Promise<void> {
+  await page.selectOption('[data-testid="provider-select"]', providerId);
+  await page.waitForTimeout(300);
+}
+
+/**
+ * Fill add feature dialog with provider and model selection
+ */
+export async function fillAddFeatureDialogWithProvider(
+  page: Page,
+  description: string,
+  options?: {
+    provider?: 'claude' | 'cursor';
+    model?: string;
+    branch?: string;
+    category?: string;
+  }
+): Promise<void> {
+  await page.locator('[data-testid="add-feature-dialog"] textarea').first().fill(description);
+
+  if (options?.provider || options?.model) {
+    await page.click('[data-testid="tab-model"]');
+
+    if (options.provider) {
+      await selectProvider(page, options.provider);
+    }
+
+    if (options.model) {
+      await page.click(`[data-testid="model-select-${options.model}"]`);
+    }
+
+    await page.click('[data-testid="tab-prompt"]');
+  }
+
+  if (options?.branch) {
+    const otherBranchRadio = page
+      .locator('[data-testid="feature-radio-group"]')
+      .locator('[id="feature-other"]');
+    await otherBranchRadio.waitFor({ state: 'visible', timeout: 5000 });
+    await otherBranchRadio.click();
+    await page.waitForTimeout(300);
+
+    const branchInput = page.locator('[data-testid="feature-input"]');
+    await branchInput.waitFor({ state: 'visible', timeout: 5000 });
+    await branchInput.click();
+    await page.waitForTimeout(300);
+    const commandInput = page.locator('[cmdk-input]');
+    await commandInput.fill(options.branch);
+    await commandInput.press('Enter');
+    await page.waitForTimeout(200);
+  }
+
+  if (options?.category) {
+    const categoryButton = page.locator('[data-testid="feature-category-input"]');
+    await categoryButton.click();
+    await page.waitForTimeout(300);
+    const commandInput = page.locator('[cmdk-input]');
+    await commandInput.fill(options.category);
+    await commandInput.press('Enter');
+    await page.waitForTimeout(200);
+  }
+}
+
 // ============================================================================
 // Worktree Selector
 // ============================================================================

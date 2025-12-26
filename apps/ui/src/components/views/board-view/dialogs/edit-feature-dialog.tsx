@@ -38,6 +38,8 @@ import {
   useAppStore,
   PlanningMode,
 } from '@/store/app-store';
+import type { ModelProvider } from '@automaker/types';
+import { PROVIDERS } from '../shared/provider-constants';
 import {
   ModelSelector,
   ThinkingLevelSelector,
@@ -46,6 +48,7 @@ import {
   PrioritySelector,
   BranchSelector,
   PlanningModeSelector,
+  getModelForProvider,
 } from '../shared';
 import {
   DropdownMenu,
@@ -116,6 +119,16 @@ export function EditFeatureDialog({
   const [requirePlanApproval, setRequirePlanApproval] = useState(
     feature?.requirePlanApproval ?? false
   );
+  const [selectedProvider, setSelectedProvider] = useState<ModelProvider>(() => {
+    const initialModel = (feature?.model ?? 'opus') as AgentModel;
+    return PROVIDERS.find((p) => p.models.some((m) => m.id === initialModel))?.id || 'claude';
+  });
+  const [providerModelMemory, setProviderModelMemory] = useState<Record<ModelProvider, AgentModel>>(
+    {
+      claude: 'opus',
+      cursor: 'cursor-sonnet',
+    }
+  );
 
   // Get enhancement model and worktrees setting from store
   const { enhancementModel, useWorktrees } = useAppStore();
@@ -127,6 +140,12 @@ export function EditFeatureDialog({
       setRequirePlanApproval(feature.requirePlanApproval ?? false);
       // If feature has no branchName, default to using current branch
       setUseCurrentBranch(!feature.branchName);
+
+      // Initialize provider based on feature's model
+      const featureModel = (feature.model ?? 'opus') as AgentModel;
+      const featureProvider =
+        PROVIDERS.find((p) => p.models.some((m) => m.id === featureModel))?.id || 'claude';
+      setSelectedProvider(featureProvider);
     } else {
       setEditFeaturePreviewMap(new Map());
       setShowEditAdvancedOptions(false);
@@ -194,14 +213,50 @@ export function EditFeatureDialog({
       model,
       thinkingLevel: modelSupportsThinking(model) ? editingFeature.thinkingLevel : 'none',
     });
+
+    // Remember this model for its provider
+    const modelProvider = PROVIDERS.find((p) => p.models.some((m) => m.id === model))?.id;
+
+    if (modelProvider) {
+      setProviderModelMemory({
+        ...providerModelMemory,
+        [modelProvider]: model,
+      });
+    }
+  };
+
+  const handleProviderSelect = (provider: ModelProvider) => {
+    setSelectedProvider(provider);
+
+    // Restore previously selected model for this provider
+    const rememberedModel = providerModelMemory[provider];
+    if (rememberedModel) {
+      handleModelSelect(rememberedModel);
+    } else {
+      // Fallback: select first model of provider
+      const providerConfig = PROVIDERS.find((p) => p.id === provider);
+      if (providerConfig && providerConfig.models.length > 0) {
+        handleModelSelect(providerConfig.models[0].id);
+      }
+    }
   };
 
   const handleProfileSelect = (model: AgentModel, thinkingLevel: ThinkingLevel) => {
     if (!editingFeature) return;
+
+    // Map the profile's model to the equivalent model for the current provider
+    const mappedModel = getModelForProvider(model, selectedProvider);
+
     setEditingFeature({
       ...editingFeature,
-      model,
+      model: mappedModel,
       thinkingLevel,
+    });
+
+    // Update the model memory for the current provider (keep user's provider selection)
+    setProviderModelMemory({
+      ...providerModelMemory,
+      [selectedProvider]: mappedModel,
     });
   };
 
@@ -452,6 +507,8 @@ export function EditFeatureDialog({
                 <ModelSelector
                   selectedModel={(editingFeature.model ?? 'opus') as AgentModel}
                   onModelSelect={handleModelSelect}
+                  selectedProvider={selectedProvider}
+                  onProviderSelect={handleProviderSelect}
                   testIdPrefix="edit-model-select"
                 />
                 {editModelAllowsThinking && (

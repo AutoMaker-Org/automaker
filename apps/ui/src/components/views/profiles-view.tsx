@@ -12,6 +12,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import { DeleteConfirmDialog } from '@/components/ui/delete-confirm-dialog';
@@ -25,6 +26,8 @@ import {
 } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { SortableProfileCard, ProfileForm, ProfilesHeader } from './profiles-view/components';
+import type { ModelProvider } from '@automaker/types';
+import { PROVIDERS } from './board-view/shared/provider-constants';
 
 export function ProfilesView() {
   const {
@@ -40,6 +43,7 @@ export function ProfilesView() {
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [editingProfile, setEditingProfile] = useState<AIProfile | null>(null);
   const [profileToDelete, setProfileToDelete] = useState<AIProfile | null>(null);
+  const [selectedProvider, setSelectedProvider] = useState<ModelProvider>('claude');
 
   // Sensors for drag-and-drop
   const sensors = useSensors(
@@ -50,9 +54,15 @@ export function ProfilesView() {
     })
   );
 
-  // Separate built-in and custom profiles
-  const builtInProfiles = useMemo(() => aiProfiles.filter((p) => p.isBuiltIn), [aiProfiles]);
-  const customProfiles = useMemo(() => aiProfiles.filter((p) => !p.isBuiltIn), [aiProfiles]);
+  // Separate built-in and custom profiles, filtered by selected provider
+  const builtInProfiles = useMemo(
+    () => aiProfiles.filter((p) => p.isBuiltIn && p.provider === selectedProvider),
+    [aiProfiles, selectedProvider]
+  );
+  const customProfiles = useMemo(
+    () => aiProfiles.filter((p) => !p.isBuiltIn && p.provider === selectedProvider),
+    [aiProfiles, selectedProvider]
+  );
 
   const handleDragEnd = useCallback(
     (event: DragEndEvent) => {
@@ -134,6 +144,20 @@ export function ProfilesView() {
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-8">
         <div className="max-w-4xl mx-auto space-y-8">
+          {/* Provider Tabs */}
+          <Tabs
+            value={selectedProvider}
+            onValueChange={(value) => setSelectedProvider(value as ModelProvider)}
+          >
+            <TabsList className="grid w-full grid-cols-2 max-w-md">
+              {PROVIDERS.map((provider) => (
+                <TabsTrigger key={provider.id} value={provider.id}>
+                  {provider.name}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </Tabs>
+
           {/* Custom Profiles Section */}
           <div>
             <div className="flex items-center gap-2 mb-4">

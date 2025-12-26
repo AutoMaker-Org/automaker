@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -32,6 +32,8 @@ import {
   PlanningMode,
   Feature,
 } from '@/store/app-store';
+import type { ModelProvider } from '@automaker/types';
+import { PROVIDERS } from '../shared/provider-constants';
 import {
   ModelSelector,
   ThinkingLevelSelector,
@@ -41,6 +43,7 @@ import {
   BranchSelector,
   PlanningModeSelector,
   AncestorContextSection,
+  getModelForProvider,
 } from '../shared';
 import {
   DropdownMenu,
@@ -120,6 +123,15 @@ export function AddFeatureDialog({
     branchName: '',
     priority: 2 as number, // Default to medium priority
   });
+  const [selectedProvider, setSelectedProvider] = useState<ModelProvider>('claude');
+  const [providerModelMemory, setProviderModelMemory] = useState<Record<ModelProvider, AgentModel>>(
+    {
+      claude: 'opus',
+      cursor: 'cursor-sonnet',
+    }
+  );
+  // Track if provider was explicitly changed by user to avoid resetting on dialog reopen
+  const userChangedProviderRef = useRef<boolean>(false);
   const [newFeaturePreviewMap, setNewFeaturePreviewMap] = useState<ImagePreviewMap>(
     () => new Map()
   );
@@ -153,14 +165,24 @@ export function AddFeatureDialog({
         ? aiProfiles.find((p) => p.id === defaultAIProfileId)
         : null;
 
+      const initialModel = defaultProfile?.model ?? 'opus';
+
       setNewFeature((prev) => ({
         ...prev,
         skipTests: defaultSkipTests,
         branchName: defaultBranch || '',
         // Use default profile's model/thinkingLevel if set, else fallback to defaults
-        model: defaultProfile?.model ?? 'opus',
+        model: initialModel,
         thinkingLevel: defaultProfile?.thinkingLevel ?? 'none',
       }));
+
+      // Only initialize provider if user hasn't explicitly changed it
+      if (!userChangedProviderRef.current) {
+        const initialProvider =
+          PROVIDERS.find((p) => p.models.some((m) => m.id === initialModel))?.id || 'claude';
+        setSelectedProvider(initialProvider);
+      }
+
       setUseCurrentBranch(true);
       setPlanningMode(defaultPlanningMode);
       setRequirePlanApproval(defaultRequirePlanApproval);
@@ -318,13 +340,50 @@ export function AddFeatureDialog({
       model,
       thinkingLevel: modelSupportsThinking(model) ? newFeature.thinkingLevel : 'none',
     });
+
+    // Remember this model for its provider
+    const modelProvider = PROVIDERS.find((p) => p.models.some((m) => m.id === model))?.id;
+
+    if (modelProvider) {
+      setProviderModelMemory({
+        ...providerModelMemory,
+        [modelProvider]: model,
+      });
+    }
+  };
+
+  const handleProviderSelect = (provider: ModelProvider) => {
+    setSelectedProvider(provider);
+    // Mark that user explicitly changed provider
+    userChangedProviderRef.current = true;
+
+    // Restore previously selected model for this provider
+    const rememberedModel = providerModelMemory[provider];
+    if (rememberedModel) {
+      handleModelSelect(rememberedModel);
+    } else {
+      // Fallback: select first model of provider
+      const providerConfig = PROVIDERS.find((p) => p.id === provider);
+      if (providerConfig && providerConfig.models.length > 0) {
+        handleModelSelect(providerConfig.models[0].id);
+      }
+    }
   };
 
   const handleProfileSelect = (model: AgentModel, thinkingLevel: ThinkingLevel) => {
+    // Map the profile's model to the equivalent model for the current provider
+    const mappedModel = getModelForProvider(model, selectedProvider);
+
     setNewFeature({
       ...newFeature,
-      model,
+      model: mappedModel,
       thinkingLevel,
+    });
+
+    // Update the model memory for the current provider (keep user's provider selection)
+    setProviderModelMemory({
+      ...providerModelMemory,
+      [selectedProvider]: mappedModel,
     });
   };
 
@@ -533,10 +592,15 @@ export function AddFeatureDialog({
               <div className="border-t border-border" />
             )}
 
-            {/* Claude Models Section */}
+            {/* Provider and Model Selection */}
             {(!showProfilesOnly || showAdvancedOptions) && (
               <>
-                <ModelSelector selectedModel={newFeature.model} onModelSelect={handleModelSelect} />
+                <ModelSelector
+                  selectedModel={newFeature.model}
+                  onModelSelect={handleModelSelect}
+                  selectedProvider={selectedProvider}
+                  onProviderSelect={handleProviderSelect}
+                />
                 {newModelAllowsThinking && (
                   <ThinkingLevelSelector
                     selectedLevel={newFeature.thinkingLevel}

@@ -100,6 +100,9 @@ export const TEST_IDS = {
   featureBranchInput: 'feature-input',
   featureCategoryInput: 'feature-category-input',
   worktreeSelector: 'worktree-selector',
+  providerSelect: 'provider-select',
+  providerOptionClaude: 'provider-select-option-claude',
+  providerOptionCursor: 'provider-select-option-cursor',
 
   // Spec Editor
   specEditor: 'spec-editor',

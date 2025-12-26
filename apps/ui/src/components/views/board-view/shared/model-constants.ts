@@ -68,6 +68,44 @@ export const CURSOR_MODELS: ModelOption[] = [
 
 export const ALL_MODELS: ModelOption[] = [...CLAUDE_MODELS, ...CURSOR_MODELS];
 
+/**
+ * Maps profile models (Claude-based) to equivalent models for each provider.
+ * When a profile is selected, we use this to get the appropriate model for the current provider.
+ */
+export const PROFILE_MODEL_MAP: Record<ModelProvider, Record<string, AgentModel>> = {
+  claude: {
+    opus: 'opus',
+    sonnet: 'sonnet',
+    haiku: 'haiku',
+  },
+  cursor: {
+    opus: 'cursor-opus-thinking',
+    sonnet: 'cursor-gpt5',
+    haiku: 'cursor-composer',
+  },
+};
+
+/**
+ * Get the equivalent model for a provider based on a profile's base model.
+ * Falls back to the original model if no mapping exists.
+ */
+export function getModelForProvider(profileModel: AgentModel, provider: ModelProvider): AgentModel {
+  const mapping = PROFILE_MODEL_MAP[provider];
+  if (mapping && mapping[profileModel]) {
+    return mapping[profileModel];
+  }
+  // If it's already a cursor model and provider is cursor, keep it
+  if (provider === 'cursor' && profileModel.startsWith('cursor-')) {
+    return profileModel;
+  }
+  // If it's a claude model and provider is claude, keep it
+  if (provider === 'claude' && !profileModel.startsWith('cursor-')) {
+    return profileModel;
+  }
+  // Fallback to the original model
+  return profileModel;
+}
+
 export const THINKING_LEVELS: ThinkingLevel[] = ['none', 'low', 'medium', 'high', 'ultrathink'];
 
 export const THINKING_LEVEL_LABELS: Record<ThinkingLevel, string> = {

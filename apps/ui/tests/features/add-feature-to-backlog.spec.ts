@@ -70,6 +70,12 @@ test.describe('Feature Backlog', () => {
     });
 
     await clickAddFeature(page);
+
+    // Verify provider selector is present in Model tab
+    await page.click('[data-testid="tab-model"]');
+    await expect(page.locator('[data-testid="provider-select"]')).toBeVisible();
+    await page.click('[data-testid="tab-prompt"]');
+
     await fillAddFeatureDialog(page, featureDescription);
     await confirmAddFeature(page);
 
