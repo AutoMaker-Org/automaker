@@ -423,11 +423,34 @@ export interface ElectronAPI {
   stat: (filePath: string) => Promise<StatResult>;
   deleteFile: (filePath: string) => Promise<WriteResult>;
   trashItem?: (filePath: string) => Promise<WriteResult>;
+  listFiles?: (
+    projectPath: string,
+    options?: {
+      extensions?: string[];
+      maxDepth?: number;
+      maxFiles?: number;
+    }
+  ) => Promise<{
+    success: boolean;
+    files?: Array<{
+      relativePath: string;
+      absolutePath: string;
+      extension: string;
+      size: number;
+    }>;
+    truncated?: boolean;
+    error?: string;
+  }>;
   getPath: (name: string) => Promise<string>;
   openInEditor?: (
     filePath: string,
     line?: number,
     column?: number
+  ) => Promise<{ success: boolean; error?: string }>;
+  /** Open a file in a terminal-based editor (vim, nvim) */
+  openInTerminalEditor?: (
+    filePath: string,
+    editor: 'vim' | 'nvim'
   ) => Promise<{ success: boolean; error?: string }>;
   saveImageToTemp?: (
     data: string,

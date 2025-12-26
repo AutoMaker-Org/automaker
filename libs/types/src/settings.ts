@@ -70,6 +70,9 @@ export type ThinkingLevel = 'none' | 'low' | 'medium' | 'high' | 'ultrathink';
 /** ModelProvider - AI model provider for credentials and API key management */
 export type ModelProvider = 'claude';
 
+/** PreferredEditor - Code editor for opening files with Ctrl+Enter in file mention picker */
+export type PreferredEditor = 'cursor' | 'code' | 'zed';
+
 /**
  * WindowBounds - Electron window position and size for persistence
  *
@@ -264,6 +267,10 @@ export interface GlobalSettings {
   /** Which model to use for GitHub issue validation */
   validationModel: AgentModel;
 
+  // Editor Settings
+  /** Preferred code editor for opening files from file mention picker (Ctrl+Enter) */
+  preferredEditor: PreferredEditor;
+
   // Input Configuration
   /** User's keyboard shortcut bindings */
   keyboardShortcuts: KeyboardShortcuts;
@@ -448,6 +455,7 @@ export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
   muteDoneSound: false,
   enhancementModel: 'sonnet',
   validationModel: 'opus',
+  preferredEditor: 'cursor',
   keyboardShortcuts: DEFAULT_KEYBOARD_SHORTCUTS,
   aiProfiles: [],
   projects: [],

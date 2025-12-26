@@ -52,6 +52,7 @@ export type {
   PlanningMode,
   ThinkingLevel,
   ModelProvider,
+  PreferredEditor,
   KeyboardShortcuts,
   AIProfile,
   ProjectRef,

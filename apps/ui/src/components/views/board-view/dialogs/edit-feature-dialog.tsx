@@ -15,10 +15,13 @@ import { Label } from '@/components/ui/label';
 import { CategoryAutocomplete } from '@/components/ui/category-autocomplete';
 import {
   DescriptionImageDropZone,
-  FeatureImagePath as DescriptionImagePath,
-  FeatureTextFilePath as DescriptionTextFilePath,
   ImagePreviewMap,
 } from '@/components/ui/description-image-dropzone';
+import type {
+  FeatureImagePath as DescriptionImagePath,
+  FeatureTextFilePath as DescriptionTextFilePath,
+} from '@automaker/types';
+import type { FileReference } from '@/lib/file-mention-utils';
 import {
   MessageSquare,
   Settings2,
@@ -103,6 +106,7 @@ export function EditFeatureDialog({
     // If feature has no branchName, default to using current branch
     return !feature?.branchName;
   });
+  const [fileReferences, setFileReferences] = useState<FileReference[]>([]);
   const [editFeaturePreviewMap, setEditFeaturePreviewMap] = useState<ImagePreviewMap>(
     () => new Map()
   );
@@ -302,6 +306,8 @@ export function EditFeatureDialog({
                     textFilePaths: textFiles,
                   })
                 }
+                fileReferences={fileReferences}
+                onFileReferencesChange={setFileReferences}
                 placeholder="Describe the feature..."
                 previewMap={editFeaturePreviewMap}
                 onPreviewMapChange={setEditFeaturePreviewMap}
