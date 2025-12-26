@@ -21,10 +21,10 @@ export const PROVIDERS: ProviderConfig[] = [
   },
   {
     id: 'cursor',
-    name: 'Cursor Agent',
+    name: 'Cursor CLI',
     badge: 'CLI',
     badgeColor: 'cyan',
     models: CURSOR_MODELS,
-    description: 'CLI-based Cursor Agent integration',
+    description: 'CLI-based Cursor CLI integration',
   },
 ];

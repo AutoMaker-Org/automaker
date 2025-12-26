@@ -113,7 +113,7 @@ test.describe('Provider Selection in Add Feature Dialog', () => {
 
     await page.locator('[data-testid="provider-select"]').click();
     await page.waitForTimeout(300);
-    await page.getByRole('option', { name: /Cursor Agent/ }).click();
+    await page.getByRole('option', { name: /Cursor CLI/ }).click();
     await page.waitForTimeout(300);
 
     await expect(page.locator('[data-testid="model-select-cursor-sonnet"]')).toBeVisible();
@@ -138,7 +138,7 @@ test.describe('Provider Selection in Add Feature Dialog', () => {
 
     await page.locator('[data-testid="provider-select"]').click();
     await page.waitForTimeout(300);
-    await page.getByRole('option', { name: /Cursor Agent/ }).click();
+    await page.getByRole('option', { name: /Cursor CLI/ }).click();
     await page.waitForTimeout(300);
     await page.click('[data-testid="model-select-cursor-sonnet"]');
 
@@ -162,7 +162,7 @@ test.describe('Provider Selection in Add Feature Dialog', () => {
 
     await page.locator('[data-testid="provider-select"]').click();
     await page.waitForTimeout(300);
-    await page.getByRole('option', { name: /Cursor Agent/ }).click();
+    await page.getByRole('option', { name: /Cursor CLI/ }).click();
     await page.waitForTimeout(300);
     await page.click('[data-testid="model-select-cursor-sonnet"]');
 
@@ -173,7 +173,7 @@ test.describe('Provider Selection in Add Feature Dialog', () => {
     await page.click('[data-testid="tab-model"]');
 
     const providerSelect = page.locator('[data-testid="provider-select"]');
-    await expect(providerSelect).toContainText('Cursor Agent');
+    await expect(providerSelect).toContainText('Cursor CLI');
   });
 
   test('should show only available providers in dropdown', async ({ page }) => {
@@ -189,7 +189,7 @@ test.describe('Provider Selection in Add Feature Dialog', () => {
     await page.waitForTimeout(300);
 
     const claudeOption = page.getByRole('option', { name: /Claude \(SDK\)/ });
-    const cursorOption = page.getByRole('option', { name: /Cursor Agent/ });
+    const cursorOption = page.getByRole('option', { name: /Cursor CLI/ });
 
     await expect(claudeOption).toBeVisible();
     await expect(cursorOption).toBeVisible();

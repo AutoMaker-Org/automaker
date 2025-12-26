@@ -1,5 +1,5 @@
 /**
- * Business logic for getting Cursor Agent CLI status
+ * Business logic for getting Cursor CLI status
  * Uses CursorProvider as the single source of truth for CLI detection
  */
 

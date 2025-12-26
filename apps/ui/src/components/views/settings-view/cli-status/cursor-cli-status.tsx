@@ -27,9 +27,7 @@ export function CursorCliStatusCard({ status, isChecking, onRefresh }: CursorCli
             <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-cyan-500/20 to-cyan-600/10 flex items-center justify-center border border-cyan-500/20">
               <MousePointer2 className="w-5 h-5 text-cyan-500" />
             </div>
-            <h2 className="text-lg font-semibold text-foreground tracking-tight">
-              Cursor Agent CLI
-            </h2>
+            <h2 className="text-lg font-semibold text-foreground tracking-tight">Cursor CLI</h2>
           </div>
           <Button
             variant="ghost"
@@ -48,7 +46,7 @@ export function CursorCliStatusCard({ status, isChecking, onRefresh }: CursorCli
           </Button>
         </div>
         <p className="text-sm text-muted-foreground/80 ml-12">
-          Cursor Agent CLI enables using your Cursor subscription for AI tasks.
+          Cursor CLI enables using your Cursor subscription for AI tasks.
         </p>
       </div>
       <div className="p-6 space-y-4">
@@ -59,7 +57,7 @@ export function CursorCliStatusCard({ status, isChecking, onRefresh }: CursorCli
                 <CheckCircle2 className="w-5 h-5 text-cyan-500" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-cyan-400">Cursor Agent CLI Installed</p>
+                <p className="text-sm font-medium text-cyan-400">Cursor CLI Installed</p>
                 <div className="text-xs text-cyan-400/70 mt-1.5 space-y-0.5">
                   {status.method && (
                     <p>
@@ -97,9 +95,7 @@ export function CursorCliStatusCard({ status, isChecking, onRefresh }: CursorCli
                 <AlertCircle className="w-5 h-5 text-muted-foreground" />
               </div>
               <div className="flex-1">
-                <p className="text-sm font-medium text-muted-foreground">
-                  Cursor Agent CLI Not Detected
-                </p>
+                <p className="text-sm font-medium text-muted-foreground">Cursor CLI Not Detected</p>
                 <p className="text-xs text-muted-foreground/70 mt-1">
                   Install cursor-agent to use your Cursor subscription for AI tasks.
                 </p>

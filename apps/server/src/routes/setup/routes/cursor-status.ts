@@ -1,5 +1,5 @@
 /**
- * GET /cursor-status endpoint - Get Cursor Agent CLI status
+ * GET /cursor-status endpoint - Get Cursor CLI status
  */
 
 import type { Request, Response } from 'express';
