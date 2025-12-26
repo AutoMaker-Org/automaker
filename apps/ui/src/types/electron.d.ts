@@ -943,6 +943,30 @@ export interface WorktreeAPI {
     };
     error?: string;
   }>;
+
+  // Stage changes from a feature worktree to target branch (no commit)
+  stageChanges: (
+    projectPath: string,
+    featureId: string,
+    options?: {
+      targetBranch?: string;
+    }
+  ) => Promise<{
+    success: boolean;
+    staged?: boolean;
+    conflicts?: Array<{
+      filePath: string;
+      resolved: boolean;
+      strategy?: 'auto' | 'ai' | 'manual';
+    }>;
+    allConflictsResolved?: boolean;
+    suggestedMessage?: string;
+    diffSummary?: string;
+    filesChanged?: number;
+    insertions?: number;
+    deletions?: number;
+    error?: string;
+  }>;
 }
 
 export interface GitAPI {

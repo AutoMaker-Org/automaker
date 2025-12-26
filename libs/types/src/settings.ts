@@ -74,6 +74,14 @@ export type ModelProvider = 'claude';
 export type McpTransportType = 'stdio' | 'http';
 
 /**
+ * WorktreeCategory - Category types for organizing worktrees
+ *
+ * Used to categorize features/tasks and determine worktree folder structure.
+ * Worktrees are created in folders matching their category (e.g., feature/001-auth-setup).
+ */
+export type WorktreeCategory = 'feature' | 'bugfix' | 'hotfix' | 'refactor' | 'chore' | 'docs';
+
+/**
  * StdioMcpConfig - Configuration for local process-based MCP servers
  *
  * Stdio transport spawns a local process and communicates via stdin/stdout.

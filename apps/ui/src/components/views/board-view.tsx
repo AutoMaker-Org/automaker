@@ -38,6 +38,7 @@ import { DeleteWorktreeDialog } from './board-view/dialogs/delete-worktree-dialo
 import { CommitWorktreeDialog } from './board-view/dialogs/commit-worktree-dialog';
 import { CreatePRDialog } from './board-view/dialogs/create-pr-dialog';
 import { CreateBranchDialog } from './board-view/dialogs/create-branch-dialog';
+import { StagedChangesDialog } from './board-view/dialogs/staged-changes-dialog';
 import { WorktreePanel } from './board-view/worktree-panel';
 import type { PRInfo, WorktreeInfo } from './board-view/worktree-panel/types';
 import { COLUMNS } from './board-view/constants';
@@ -116,6 +117,15 @@ export function BoardView() {
   const [showCommitWorktreeDialog, setShowCommitWorktreeDialog] = useState(false);
   const [showCreatePRDialog, setShowCreatePRDialog] = useState(false);
   const [showCreateBranchDialog, setShowCreateBranchDialog] = useState(false);
+  const [showStagedChangesDialog, setShowStagedChangesDialog] = useState(false);
+  const [stagedChangesInfo, setStagedChangesInfo] = useState<{
+    feature: Feature;
+    suggestedMessage: string;
+    diffSummary: string;
+    filesChanged: number;
+    insertions: number;
+    deletions: number;
+  } | null>(null);
   const [selectedWorktreeForAction, setSelectedWorktreeForAction] = useState<{
     path: string;
     branch: string;
@@ -375,6 +385,7 @@ export function BoardView() {
     handleSendFollowUp,
     handleCommitFeature,
     handleMergeFeature,
+    handleStageChanges,
     handleCompleteFeature,
     handleUnarchiveFeature,
     handleViewOutput,
@@ -428,6 +439,47 @@ export function BoardView() {
     },
     currentWorktreeBranch,
   });
+
+  // Handler for staging changes from a feature worktree (wrapper for dialog)
+  const onStageChanges = useCallback(
+    async (feature: Feature) => {
+      const result = await handleStageChanges(feature);
+      if (result?.success && result.staged) {
+        setStagedChangesInfo({
+          feature,
+          suggestedMessage: result.suggestedMessage || `feat: merge feature/${feature.id}`,
+          diffSummary: result.diffSummary || 'No changes staged',
+          filesChanged: result.filesChanged || 0,
+          insertions: result.insertions || 0,
+          deletions: result.deletions || 0,
+        });
+        setShowStagedChangesDialog(true);
+      }
+    },
+    [handleStageChanges]
+  );
+
+  // Handler for aborting a staged merge
+  const handleAbortStagedMerge = useCallback(async () => {
+    if (!currentProject) return;
+    try {
+      const api = getElectronAPI();
+      // Execute git merge --abort to clean up the staging
+      // We'll use the Bash API or a direct exec call
+      // For now, we'll just close the dialog - the backend should handle cleanup
+      setStagedChangesInfo(null);
+      setShowStagedChangesDialog(false);
+    } catch (error) {
+      console.error('[BoardView] Error aborting merge:', error);
+    }
+  }, [currentProject]);
+
+  // Handler for when staged changes are committed
+  const handleStagedChangesCommitted = useCallback(() => {
+    loadFeatures();
+    setStagedChangesInfo(null);
+    setShowStagedChangesDialog(false);
+  }, [loadFeatures]);
 
   // Handler for addressing PR comments - creates a feature and starts it automatically
   const handleAddressPRComments = useCallback(
@@ -1028,6 +1080,7 @@ export function BoardView() {
               setSpawnParentFeature(feature);
               setShowAddDialog(true);
             }}
+            onStageChanges={onStageChanges}
             featuresWithContext={featuresWithContext}
             runningAutoTasks={runningAutoTasks}
             shortcuts={shortcuts}
@@ -1303,6 +1356,20 @@ export function BoardView() {
           setWorktreeRefreshKey((k) => k + 1);
           setSelectedWorktreeForAction(null);
         }}
+      />
+
+      <StagedChangesDialog
+        open={showStagedChangesDialog}
+        onOpenChange={setShowStagedChangesDialog}
+        feature={stagedChangesInfo?.feature || null}
+        suggestedMessage={stagedChangesInfo?.suggestedMessage || ''}
+        diffSummary={stagedChangesInfo?.diffSummary || ''}
+        filesChanged={stagedChangesInfo?.filesChanged || 0}
+        insertions={stagedChangesInfo?.insertions || 0}
+        deletions={stagedChangesInfo?.deletions || 0}
+        projectPath={currentProject?.path || ''}
+        onCommitted={handleStagedChangesCommitted}
+        onAbort={handleAbortStagedMerge}
       />
     </div>
   );

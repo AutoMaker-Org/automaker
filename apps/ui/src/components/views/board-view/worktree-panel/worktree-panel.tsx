@@ -11,8 +11,9 @@ import {
   useWorktreeActions,
   useDefaultEditor,
   useRunningFeatures,
+  useWorktreeGroups,
 } from './hooks';
-import { WorktreeTab } from './components';
+import { WorktreeTab, WorktreeFolderGroup } from './components';
 
 const WORKTREE_PANEL_COLLAPSED_KEY = 'worktree-panel-collapsed';
 
@@ -40,6 +41,9 @@ export function WorktreePanel({
     fetchWorktrees,
     handleSelectWorktree,
   } = useWorktrees({ projectPath, refreshTrigger, onRemovedWorktrees });
+
+  // Group worktrees by folder
+  const { groups, individualWorktrees } = useWorktreeGroups({ worktrees, projectPath });
 
   const {
     isStartingDevServer,
@@ -144,8 +148,97 @@ export function WorktreePanel({
     }
   };
 
-  const mainWorktree = worktrees.find((w) => w.isMain);
-  const nonMainWorktrees = worktrees.filter((w) => !w.isMain);
+  // Helper function to create hasChanges map for folder groups
+  const createHasChangesMap = () => {
+    const map: Record<string, boolean> = {};
+    worktrees.forEach((w) => {
+      if (w.hasChanges) {
+        map[w.path] = true;
+      }
+    });
+    return map;
+  };
+
+  const createChangedFilesCountMap = () => {
+    const map: Record<string, number> = {};
+    worktrees.forEach((w) => {
+      if (w.changedFilesCount !== undefined) {
+        map[w.path] = w.changedFilesCount;
+      }
+    });
+    return map;
+  };
+
+  // Helper functions to create maps for folder group action dropdowns
+  const createDevServerInfoMap = () => {
+    const map: Record<string, ReturnType<typeof getDevServerInfo>> = {};
+    worktrees.forEach((w) => {
+      const info = getDevServerInfo(w);
+      if (info) {
+        map[w.path] = info;
+      }
+    });
+    return map;
+  };
+
+  const createIsDevServerRunningMap = () => {
+    const map: Record<string, boolean> = {};
+    worktrees.forEach((w) => {
+      map[w.path] = isDevServerRunning(w);
+    });
+    return map;
+  };
+
+  const createIsPullingMap = () => {
+    const map: Record<string, boolean> = {};
+    worktrees.forEach((w) => {
+      map[w.path] = isPulling === w.path;
+    });
+    return map;
+  };
+
+  const createIsPushingMap = () => {
+    const map: Record<string, boolean> = {};
+    worktrees.forEach((w) => {
+      map[w.path] = isPushing === w.path;
+    });
+    return map;
+  };
+
+  const createIsStartingDevServerMap = () => {
+    const map: Record<string, boolean> = {};
+    worktrees.forEach((w) => {
+      const key = getWorktreeKey(w);
+      map[w.path] = isStartingDevServer === key;
+    });
+    return map;
+  };
+
+  const createAheadCountMap = () => {
+    const map: Record<string, number> = {};
+    worktrees.forEach((w) => {
+      // aheadCount is shared state from useBranches, apply to current worktree
+      if (w.path === currentWorktreePath) {
+        map[w.path] = aheadCount;
+      } else {
+        map[w.path] = 0;
+      }
+    });
+    return map;
+  };
+
+  const createBehindCountMap = () => {
+    const map: Record<string, number> = {};
+    worktrees.forEach((w) => {
+      // behindCount is shared state from useBranches, apply to current worktree
+      if (w.path === currentWorktreePath) {
+        map[w.path] = behindCount;
+      } else {
+        map[w.path] = 0;
+      }
+    });
+    return map;
+  };
 
   // Collapsed view - just show current branch and toggle
   if (isCollapsed) {
@@ -188,19 +281,20 @@ export function WorktreePanel({
       <GitBranch className="w-4 h-4 text-muted-foreground" />
       <span className="text-sm text-muted-foreground mr-2">Branch:</span>
 
+      {/* Individual worktrees (main worktree + root-level worktrees) */}
       <div className="flex items-center gap-2">
-        {mainWorktree && (
+        {individualWorktrees.map((worktree) => (
           <WorktreeTab
-            key={mainWorktree.path}
-            worktree={mainWorktree}
-            cardCount={branchCardCounts?.[mainWorktree.branch]}
-            hasChanges={mainWorktree.hasChanges}
-            changedFilesCount={mainWorktree.changedFilesCount}
-            isSelected={isWorktreeSelected(mainWorktree)}
-            isRunning={hasRunningFeatures(mainWorktree)}
+            key={worktree.path}
+            worktree={worktree}
+            cardCount={branchCardCounts?.[worktree.branch]}
+            hasChanges={worktree.hasChanges}
+            changedFilesCount={worktree.changedFilesCount}
+            isSelected={isWorktreeSelected(worktree)}
+            isRunning={hasRunningFeatures(worktree)}
             isActivating={isActivating}
-            isDevServerRunning={isDevServerRunning(mainWorktree)}
-            devServerInfo={getDevServerInfo(mainWorktree)}
+            isDevServerRunning={isDevServerRunning(worktree)}
+            devServerInfo={getDevServerInfo(worktree)}
             defaultEditorName={defaultEditorName}
             branches={branches}
             filteredBranches={filteredBranches}
@@ -214,8 +308,8 @@ export function WorktreePanel({
             behindCount={behindCount}
             gitRepoStatus={gitRepoStatus}
             onSelectWorktree={handleSelectWorktree}
-            onBranchDropdownOpenChange={handleBranchDropdownOpenChange(mainWorktree)}
-            onActionsDropdownOpenChange={handleActionsDropdownOpenChange(mainWorktree)}
+            onBranchDropdownOpenChange={handleBranchDropdownOpenChange(worktree)}
+            onActionsDropdownOpenChange={handleActionsDropdownOpenChange(worktree)}
             onBranchFilterChange={setBranchFilter}
             onSwitchBranch={handleSwitchBranch}
             onCreateBranch={onCreateBranch}
@@ -232,7 +326,7 @@ export function WorktreePanel({
             onOpenDevServerUrl={handleOpenDevServerUrl}
             onOpenDevServerInElectron={handleOpenDevServerInElectron}
           />
-        )}
+        ))}
       </div>
 
       {/* Worktrees section - only show if enabled */}
@@ -243,53 +337,47 @@ export function WorktreePanel({
           <span className="text-sm text-muted-foreground mr-2">Worktrees:</span>
 
           <div className="flex items-center gap-2 flex-wrap">
-            {nonMainWorktrees.map((worktree) => {
-              const cardCount = branchCardCounts?.[worktree.branch];
-              return (
-                <WorktreeTab
-                  key={worktree.path}
-                  worktree={worktree}
-                  cardCount={cardCount}
-                  hasChanges={worktree.hasChanges}
-                  changedFilesCount={worktree.changedFilesCount}
-                  isSelected={isWorktreeSelected(worktree)}
-                  isRunning={hasRunningFeatures(worktree)}
-                  isActivating={isActivating}
-                  isDevServerRunning={isDevServerRunning(worktree)}
-                  devServerInfo={getDevServerInfo(worktree)}
-                  defaultEditorName={defaultEditorName}
-                  branches={branches}
-                  filteredBranches={filteredBranches}
-                  branchFilter={branchFilter}
-                  isLoadingBranches={isLoadingBranches}
-                  isSwitching={isSwitching}
-                  isPulling={isPulling}
-                  isPushing={isPushing}
-                  isStartingDevServer={isStartingDevServer}
-                  aheadCount={aheadCount}
-                  behindCount={behindCount}
-                  gitRepoStatus={gitRepoStatus}
-                  onSelectWorktree={handleSelectWorktree}
-                  onBranchDropdownOpenChange={handleBranchDropdownOpenChange(worktree)}
-                  onActionsDropdownOpenChange={handleActionsDropdownOpenChange(worktree)}
-                  onBranchFilterChange={setBranchFilter}
-                  onSwitchBranch={handleSwitchBranch}
-                  onCreateBranch={onCreateBranch}
-                  onPull={handlePull}
-                  onPush={handlePush}
-                  onOpenInEditor={handleOpenInEditor}
-                  onCommit={onCommit}
-                  onCreatePR={onCreatePR}
-                  onAddressPRComments={onAddressPRComments}
-                  onResolveConflicts={onResolveConflicts}
-                  onDeleteWorktree={onDeleteWorktree}
-                  onStartDevServer={handleStartDevServer}
-                  onStopDevServer={handleStopDevServer}
-                  onOpenDevServerUrl={handleOpenDevServerUrl}
-                  onOpenDevServerInElectron={handleOpenDevServerInElectron}
-                />
-              );
-            })}
+            {/* Folder groups */}
+            {groups.map((group) => (
+              <WorktreeFolderGroup
+                key={group.folderPath}
+                group={group}
+                selectedWorktreePath={currentWorktreePath}
+                cardCounts={branchCardCounts}
+                hasChangesMap={createHasChangesMap()}
+                changedFilesCountMap={createChangedFilesCountMap()}
+                onSelectWorktree={handleSelectWorktree}
+                // Action dropdown state maps
+                devServerInfoMap={createDevServerInfoMap()}
+                isDevServerRunningMap={createIsDevServerRunningMap()}
+                isPullingMap={createIsPullingMap()}
+                isPushingMap={createIsPushingMap()}
+                isStartingDevServerMap={createIsStartingDevServerMap()}
+                aheadCountMap={createAheadCountMap()}
+                behindCountMap={createBehindCountMap()}
+                gitRepoStatus={gitRepoStatus}
+                defaultEditorName={defaultEditorName}
+                // Action handlers
+                onActionsDropdownOpenChange={(open) => {
+                  // When any folder group action dropdown opens, fetch branches
+                  if (open && group.worktrees.length > 0) {
+                    fetchBranches(group.worktrees[0].path);
+                  }
+                }}
+                onPull={handlePull}
+                onPush={handlePush}
+                onOpenInEditor={handleOpenInEditor}
+                onCommit={onCommit}
+                onCreatePR={onCreatePR}
+                onAddressPRComments={onAddressPRComments}
+                onResolveConflicts={onResolveConflicts}
+                onDeleteWorktree={onDeleteWorktree}
+                onStartDevServer={handleStartDevServer}
+                onStopDevServer={handleStopDevServer}
+                onOpenDevServerUrl={handleOpenDevServerUrl}
+                onOpenDevServerInElectron={handleOpenDevServerInElectron}
+              />
+            ))}
 
             <Button
               variant="ghost"

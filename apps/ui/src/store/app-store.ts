@@ -9,6 +9,7 @@ import type {
   PlanningMode,
   AIProfile,
   McpServerConfig,
+  WorktreeCategory,
 } from '@automaker/types';
 
 // Re-export ThemeMode for convenience
@@ -267,6 +268,7 @@ export interface Feature extends Omit<
   description: string;
   steps: string[]; // Required in UI (not optional)
   status: 'backlog' | 'in_progress' | 'waiting_approval' | 'verified' | 'completed';
+  worktreeCategory?: WorktreeCategory; // Optional category for worktree folder structure (feature, bugfix, hotfix, etc.)
   images?: FeatureImage[]; // UI-specific base64 images
   imagePaths?: FeatureImagePath[]; // Stricter type than base (no string | union)
   textFilePaths?: FeatureTextFilePath[]; // Text file attachments for context

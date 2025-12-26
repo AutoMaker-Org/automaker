@@ -27,9 +27,11 @@ import {
 } from './routes/open-in-editor.js';
 import { createInitGitHandler } from './routes/init-git.js';
 import { createMigrateHandler } from './routes/migrate.js';
+import { createCountByCategoryHandler } from './routes/count-by-category.js';
 import { createStartDevHandler } from './routes/start-dev.js';
 import { createStopDevHandler } from './routes/stop-dev.js';
 import { createListDevServersHandler } from './routes/list-dev-servers.js';
+import { createStageHandler } from './routes/stage.js';
 import type { SettingsService } from '../../services/settings-service.js';
 
 export function createWorktreeRoutes(settingsService?: SettingsService): Router {
@@ -45,6 +47,12 @@ export function createWorktreeRoutes(settingsService?: SettingsService): Router 
     validatePathParams('projectPath'),
     requireValidProject,
     createMergeHandler()
+  );
+  router.post(
+    '/stage',
+    validatePathParams('projectPath'),
+    requireValidProject,
+    createStageHandler()
   );
   router.post('/create', validatePathParams('projectPath'), createCreateHandler(settingsService));
   router.post('/delete', validatePathParams('projectPath', 'worktreePath'), createDeleteHandler());
@@ -87,6 +95,11 @@ export function createWorktreeRoutes(settingsService?: SettingsService): Router 
   );
   router.post('/stop-dev', createStopDevHandler());
   router.post('/list-dev-servers', createListDevServersHandler());
+  router.post(
+    '/count-by-category',
+    validatePathParams('projectPath'),
+    createCountByCategoryHandler()
+  );
 
   return router;
 }

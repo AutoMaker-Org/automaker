@@ -76,9 +76,11 @@ export function createVerifyClaudeAuthHandler() {
 
       logger.info(`[Setup] Verifying Claude authentication using method: ${authMethod || 'auto'}`);
 
-      // Create an AbortController with a 30-second timeout
+      // Create an AbortController with a 2-minute timeout
+      // Note: On Windows, the Claude CLI initialization can take 60-90+ seconds
+      // due to slow `tasklist | findstr` process enumeration for IDE detection
       const abortController = new AbortController();
-      const timeoutId = setTimeout(() => abortController.abort(), 30000);
+      const timeoutId = setTimeout(() => abortController.abort(), 120000);
 
       let authenticated = false;
       let errorMessage = '';

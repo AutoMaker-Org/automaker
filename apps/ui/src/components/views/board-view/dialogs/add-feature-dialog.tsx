@@ -50,7 +50,9 @@ import {
   BranchSelector,
   PlanningModeSelector,
   AncestorContextSection,
+  WorktreeCategorySelector,
 } from '../shared';
+import type { WorktreeCategory } from '@automaker/types';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -86,6 +88,7 @@ interface AddFeatureDialogProps {
     implementationEndpointPreset?: 'default' | 'zai' | 'custom';
     implementationEndpointUrl?: string;
     enabledMcpServers?: string[];
+    worktreeCategory?: WorktreeCategory;
   }) => void;
   categorySuggestions?: string[];
   branchSuggestions?: string[];
@@ -147,6 +150,7 @@ export function AddFeatureDialog({
   const [planningMode, setPlanningMode] = useState<PlanningMode>('skip');
   const [requirePlanApproval, setRequirePlanApproval] = useState(false);
   const [enabledMcpServers, setEnabledMcpServers] = useState<string[]>([]);
+  const [worktreeCategory, setWorktreeCategory] = useState<WorktreeCategory>('feature');
 
   // Spawn mode state
   const [ancestors, setAncestors] = useState<AncestorContext[]>([]);
@@ -185,6 +189,7 @@ export function AddFeatureDialog({
       setRequirePlanApproval(defaultRequirePlanApproval);
       // Initialize enabled MCP servers from global defaults
       setEnabledMcpServers(mcpServers.filter((s) => s.enabled).map((s) => s.id));
+      setWorktreeCategory('feature'); // Default to feature category
 
       // Initialize ancestors for spawn mode
       if (parentFeature) {
@@ -277,6 +282,7 @@ export function AddFeatureDialog({
       implementationEndpointPreset: newFeature.implementationEndpointPreset,
       implementationEndpointUrl: newFeature.implementationEndpointUrl,
       enabledMcpServers,
+      worktreeCategory: useWorktrees ? worktreeCategory : undefined,
     });
 
     // Reset form
@@ -299,6 +305,7 @@ export function AddFeatureDialog({
     setPlanningMode(defaultPlanningMode);
     setRequirePlanApproval(defaultRequirePlanApproval);
     setEnabledMcpServers(mcpServers.filter((s) => s.enabled).map((s) => s.id));
+    setWorktreeCategory('feature');
     setNewFeaturePreviewMap(new Map());
     setShowAdvancedOptions(false);
     setDescriptionError(false);
@@ -519,6 +526,15 @@ export function AddFeatureDialog({
                 branchCardCounts={branchCardCounts}
                 currentBranch={currentBranch}
                 testIdPrefix="feature"
+              />
+            )}
+
+            {/* Worktree Category Selector - only show when worktrees are enabled */}
+            {useWorktrees && (
+              <WorktreeCategorySelector
+                selectedCategory={worktreeCategory}
+                onCategorySelect={setWorktreeCategory}
+                testIdPrefix="add-feature"
               />
             )}
 

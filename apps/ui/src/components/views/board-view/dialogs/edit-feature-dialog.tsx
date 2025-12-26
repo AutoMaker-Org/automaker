@@ -46,7 +46,9 @@ import {
   PrioritySelector,
   BranchSelector,
   PlanningModeSelector,
+  WorktreeCategorySelector,
 } from '../shared';
+import type { WorktreeCategory } from '@automaker/types';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -76,6 +78,7 @@ interface EditFeatureDialogProps {
       requirePlanApproval?: boolean;
       implementationEndpointPreset?: 'default' | 'zai' | 'custom';
       implementationEndpointUrl?: string;
+      worktreeCategory?: WorktreeCategory;
     }
   ) => void;
   categorySuggestions?: string[];
@@ -179,6 +182,7 @@ export function EditFeatureDialog({
       requirePlanApproval,
       implementationEndpointPreset: editingFeature.implementationEndpointPreset,
       implementationEndpointUrl: editingFeature.implementationEndpointUrl,
+      worktreeCategory: editingFeature.worktreeCategory,
     };
 
     onUpdate(editingFeature.id, updates);
@@ -409,6 +413,21 @@ export function EditFeatureDialog({
                 currentBranch={currentBranch}
                 disabled={editingFeature.status !== 'backlog'}
                 testIdPrefix="edit-feature"
+              />
+            )}
+
+            {/* Worktree Category Selector - only show when worktrees are enabled */}
+            {useWorktrees && (
+              <WorktreeCategorySelector
+                selectedCategory={editingFeature.worktreeCategory ?? 'feature'}
+                onCategorySelect={(worktreeCategory) =>
+                  setEditingFeature({
+                    ...editingFeature,
+                    worktreeCategory,
+                  })
+                }
+                testIdPrefix="edit-feature"
+                disabled={editingFeature.status !== 'backlog'}
               />
             )}
 

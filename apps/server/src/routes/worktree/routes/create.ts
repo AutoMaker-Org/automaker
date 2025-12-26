@@ -23,6 +23,7 @@ import {
 } from '../common.js';
 import { trackBranch } from './branch-tracking.js';
 import type { SettingsService } from '../../../services/settings-service.js';
+import type { WorktreeCategory } from '@automaker/types';
 
 const execAsync = promisify(exec);
 
@@ -143,19 +144,85 @@ async function findExistingWorktreeForBranch(
   }
 }
 
+/**
+ * Convert a title to a kebab-case slug for use in branch names
+ * e.g., "Add User Authentication" -> "add-user-authentication"
+ */
+function titleToSlug(title: string): string {
+  return title
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, '') // Remove special characters
+    .replace(/\s+/g, '-') // Replace spaces with hyphens
+    .replace(/-+/g, '-') // Replace multiple hyphens with single
+    .replace(/^-|-$/g, '') // Remove leading/trailing hyphens
+    .slice(0, 50); // Limit length
+}
+
+/**
+ * Count existing worktrees in a category folder to determine the next number
+ */
+async function getNextWorktreeNumber(
+  worktreesDir: string,
+  category: WorktreeCategory
+): Promise<number> {
+  const categoryPath = path.join(worktreesDir, category);
+
+  try {
+    const entries = await secureFs.readdir(categoryPath, { withFileTypes: true });
+    const directories = entries.filter((entry) => entry.isDirectory());
+    return directories.length + 1;
+  } catch {
+    // Category folder doesn't exist yet - start at 1
+    return 1;
+  }
+}
+
+/**
+ * Generate the branch name and worktree path for categorized worktrees
+ * Pattern: {category}/{NNN}-{title-slug}
+ * e.g., feature/001-add-user-auth
+ */
+async function generateCategorizedWorktreePath(
+  projectPath: string,
+  worktreesDir: string,
+  category: WorktreeCategory,
+  title: string
+): Promise<{ branchName: string; worktreePath: string; folderName: string }> {
+  const nextNumber = await getNextWorktreeNumber(worktreesDir, category);
+  const paddedNumber = String(nextNumber).padStart(3, '0');
+  const titleSlug = titleToSlug(title);
+
+  // Branch name: category/NNN-title-slug (e.g., feature/001-add-user-auth)
+  const branchName = `${category}/${paddedNumber}-${titleSlug}`;
+
+  // Folder name within category: NNN-title-slug (e.g., 001-add-user-auth)
+  const folderName = `${paddedNumber}-${titleSlug}`;
+
+  // Worktree path: .worktrees/{category}/{NNN-title-slug}
+  const categoryDir = path.join(worktreesDir, category);
+  const worktreePath = path.join(categoryDir, folderName);
+
+  return { branchName, worktreePath, folderName };
+}
+
 export function createCreateHandler(settingsService?: SettingsService) {
   return async (req: Request, res: Response): Promise<void> => {
     try {
-      const { projectPath, branchName, baseBranch } = req.body as {
+      const { projectPath, branchName, baseBranch, worktreeCategory, title } = req.body as {
         projectPath: string;
         branchName: string;
         baseBranch?: string; // Optional base branch to create from (defaults to current HEAD)
+        worktreeCategory?: WorktreeCategory; // Optional category for organized worktrees
+        title?: string; // Optional title to generate branch name from (used with worktreeCategory)
       };
 
-      if (!projectPath || !branchName) {
+      // branchName is required unless worktreeCategory and title are provided
+      const usesCategorizedNaming = worktreeCategory && title;
+      if (!projectPath || (!branchName && !usesCategorizedNaming)) {
         res.status(400).json({
           success: false,
-          error: 'projectPath and branchName required',
+          error:
+            'projectPath and branchName required (or worktreeCategory and title for auto-generated names)',
         });
         return;
       }
@@ -171,41 +238,69 @@ export function createCreateHandler(settingsService?: SettingsService) {
       // Ensure the repository has at least one commit so worktree commands referencing HEAD succeed
       await ensureInitialCommit(projectPath);
 
+      // Set up worktrees directory
+      const worktreesDir = path.join(projectPath, '.worktrees');
+
+      // Determine the actual branch name and worktree path to use
+      let actualBranchName: string;
+      let worktreePath: string;
+
+      if (usesCategorizedNaming) {
+        // Use categorized naming: {category}/{NNN}-{title-slug}
+        const categorized = await generateCategorizedWorktreePath(
+          projectPath,
+          worktreesDir,
+          worktreeCategory,
+          title
+        );
+        actualBranchName = categorized.branchName;
+        worktreePath = categorized.worktreePath;
+
+        console.log(
+          `[Worktree] Using categorized naming: branch="${actualBranchName}", path="${worktreePath}"`
+        );
+      } else {
+        // Use traditional naming: sanitize branch name for directory
+        actualBranchName = branchName;
+        const sanitizedName = branchName.replace(/[^a-zA-Z0-9_-]/g, '-');
+        worktreePath = path.join(worktreesDir, sanitizedName);
+      }
+
       // First, check if git already has a worktree for this branch (anywhere)
-      const existingWorktree = await findExistingWorktreeForBranch(projectPath, branchName);
+      const existingWorktree = await findExistingWorktreeForBranch(projectPath, actualBranchName);
       if (existingWorktree) {
         // Worktree already exists, return it as success (not an error)
         // This handles manually created worktrees or worktrees from previous runs
         console.log(
-          `[Worktree] Found existing worktree for branch "${branchName}" at: ${existingWorktree.path}`
+          `[Worktree] Found existing worktree for branch "${actualBranchName}" at: ${existingWorktree.path}`
         );
 
         // Track the branch so it persists in the UI
-        await trackBranch(projectPath, branchName);
+        await trackBranch(projectPath, actualBranchName);
 
         res.json({
           success: true,
           worktree: {
             path: normalizePath(existingWorktree.path),
-            branch: branchName,
+            branch: actualBranchName,
             isNew: false, // Not newly created
           },
         });
         return;
       }
 
-      // Sanitize branch name for directory usage
-      const sanitizedName = branchName.replace(/[^a-zA-Z0-9_-]/g, '-');
-      const worktreesDir = path.join(projectPath, '.worktrees');
-      const worktreePath = path.join(worktreesDir, sanitizedName);
-
-      // Create worktrees directory if it doesn't exist
-      await secureFs.mkdir(worktreesDir, { recursive: true });
+      // Create worktrees directory (and category subdirectory if needed) if it doesn't exist
+      if (usesCategorizedNaming) {
+        const categoryDir = path.join(worktreesDir, worktreeCategory);
+        await secureFs.mkdir(categoryDir, { recursive: true });
+      } else {
+        await secureFs.mkdir(worktreesDir, { recursive: true });
+      }
 
       // Check if branch exists
       let branchExists = false;
       try {
-        await execAsync(`git rev-parse --verify ${branchName}`, {
+        await execAsync(`git rev-parse --verify ${actualBranchName}`, {
           cwd: projectPath,
         });
         branchExists = true;
@@ -217,11 +312,11 @@ export function createCreateHandler(settingsService?: SettingsService) {
       let createCmd: string;
       if (branchExists) {
         // Use existing branch
-        createCmd = `git worktree add "${worktreePath}" ${branchName}`;
+        createCmd = `git worktree add "${worktreePath}" ${actualBranchName}`;
       } else {
         // Create new branch from base or HEAD
         const base = baseBranch || 'HEAD';
-        createCmd = `git worktree add -b ${branchName} "${worktreePath}" ${base}`;
+        createCmd = `git worktree add -b ${actualBranchName} "${worktreePath}" ${base}`;
       }
 
       console.log(
@@ -247,7 +342,7 @@ export function createCreateHandler(settingsService?: SettingsService) {
       // This avoids symlink loop issues when activating worktrees
 
       // Track the branch so it persists in the UI even after worktree is removed
-      await trackBranch(projectPath, branchName);
+      await trackBranch(projectPath, actualBranchName);
 
       // Resolve to absolute path for cross-platform compatibility
       // normalizePath converts to forward slashes for API consistency

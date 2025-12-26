@@ -694,6 +694,12 @@ export class HttpApiClient implements ElectronAPI {
     listDevServers: () => this.post('/api/worktree/list-dev-servers', {}),
     getPRInfo: (worktreePath: string, branchName: string) =>
       this.post('/api/worktree/pr-info', { worktreePath, branchName }),
+    stageChanges: (projectPath: string, featureId: string, options?: { targetBranch?: string }) =>
+      this.post('/api/worktree/stage', {
+        projectPath,
+        featureId,
+        ...options,
+      }),
   };
 
   // Git API

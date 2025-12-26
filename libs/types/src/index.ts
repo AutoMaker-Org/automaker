@@ -56,6 +56,7 @@ export type {
   ThinkingLevel,
   ModelProvider,
   McpTransportType,
+  WorktreeCategory,
   StdioMcpConfig,
   HttpMcpConfig,
   McpToolInfo,

@@ -1595,6 +1595,25 @@ function createMockWorktreeAPI(): WorktreeAPI {
         },
       };
     },
+
+    stageChanges: async (
+      projectPath: string,
+      featureId: string,
+      options?: { targetBranch?: string }
+    ) => {
+      console.log('[Mock] Staging changes:', { projectPath, featureId, options });
+      return {
+        success: true,
+        staged: true,
+        conflicts: [],
+        allConflictsResolved: true,
+        suggestedMessage: `feat: merge feature/${featureId}`,
+        diffSummary: '3 files changed, 50 insertions(+), 10 deletions(-)',
+        filesChanged: 3,
+        insertions: 50,
+        deletions: 10,
+      };
+    },
   };
 }
 

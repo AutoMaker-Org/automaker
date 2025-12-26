@@ -10,12 +10,14 @@ import {
   Eye,
   Wand2,
   Archive,
+  GitMerge,
 } from 'lucide-react';
 
 interface CardActionsProps {
   feature: Feature;
   isCurrentAutoTask: boolean;
   hasContext?: boolean;
+  hasWorktree?: boolean;
   shortcutKey?: string;
   onEdit: () => void;
   onViewOutput?: () => void;
@@ -28,12 +30,14 @@ interface CardActionsProps {
   onComplete?: () => void;
   onViewPlan?: () => void;
   onApprovePlan?: () => void;
+  onStageChanges?: () => void;
 }
 
 export function CardActions({
   feature,
   isCurrentAutoTask,
   hasContext,
+  hasWorktree,
   shortcutKey,
   onEdit,
   onViewOutput,
@@ -46,6 +50,7 @@ export function CardActions({
   onComplete,
   onViewPlan,
   onApprovePlan,
+  onStageChanges,
 }: CardActionsProps) {
   return (
     <div className="flex flex-wrap gap-1.5 -mx-3 -mb-3 px-3 pb-3">
@@ -246,6 +251,23 @@ export function CardActions({
             >
               <Wand2 className="w-3 h-3 mr-1 shrink-0" />
               <span className="truncate">Refine</span>
+            </Button>
+          )}
+          {/* Stage Changes button - show for features with worktrees */}
+          {hasWorktree && onStageChanges && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="flex-1 h-7 text-[11px] min-w-0 border-purple-500/50 hover:bg-purple-500/10"
+              onClick={(e) => {
+                e.stopPropagation();
+                onStageChanges();
+              }}
+              onPointerDown={(e) => e.stopPropagation()}
+              data-testid={`stage-changes-${feature.id}`}
+            >
+              <GitMerge className="w-3 h-3 mr-1 shrink-0" />
+              <span className="truncate">Stage Changes</span>
             </Button>
           )}
           {/* Show Verify button if PR was created (changes are committed), otherwise show Mark as Verified button */}
