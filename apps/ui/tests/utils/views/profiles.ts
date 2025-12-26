@@ -4,6 +4,38 @@ import { waitForElement, waitForElementHidden } from '../core/waiting';
 import { getByTestId } from '../core/elements';
 import { navigateToView } from '../navigation/views';
 
+// ============================================================================
+// Provider Tab Operations
+// ============================================================================
+
+/**
+ * Select a provider tab in the profiles view
+ * @param provider - 'claude' or 'cursor'
+ */
+export async function selectProviderTab(page: Page, provider: 'claude' | 'cursor'): Promise<void> {
+  const tab = page.locator(`[data-testid="provider-tab-${provider}"]`);
+  await tab.click();
+  // Wait for tab to become active
+  await tab.waitFor({ state: 'visible' });
+}
+
+/**
+ * Get the currently active provider tab
+ * @returns 'claude' or 'cursor'
+ */
+export async function getActiveProviderTab(page: Page): Promise<'claude' | 'cursor' | null> {
+  const claudeTab = page.locator('[data-testid="provider-tab-claude"]');
+  const cursorTab = page.locator('[data-testid="provider-tab-cursor"]');
+
+  const claudeState = await claudeTab.getAttribute('data-state');
+  if (claudeState === 'active') return 'claude';
+
+  const cursorState = await cursorTab.getAttribute('data-state');
+  if (cursorState === 'active') return 'cursor';
+
+  return null;
+}
+
 /**
  * Navigate to the profiles view
  */

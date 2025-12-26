@@ -149,9 +149,13 @@ export function ProfilesView() {
             value={selectedProvider}
             onValueChange={(value) => setSelectedProvider(value as ModelProvider)}
           >
-            <TabsList className="grid w-full grid-cols-2 max-w-md">
+            <TabsList className="grid w-full grid-cols-2 max-w-md" data-testid="provider-tabs">
               {PROVIDERS.map((provider) => (
-                <TabsTrigger key={provider.id} value={provider.id}>
+                <TabsTrigger
+                  key={provider.id}
+                  value={provider.id}
+                  data-testid={`provider-tab-${provider.id}`}
+                >
                   {provider.name}
                 </TabsTrigger>
               ))}
