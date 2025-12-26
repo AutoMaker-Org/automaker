@@ -110,18 +110,10 @@ export function CursorCliStatusCard({ status, isChecking, onRefresh }: CursorCli
               <div className="space-y-2">
                 <div className="p-3 rounded-xl bg-accent/30 border border-border/50">
                   <p className="text-[10px] text-muted-foreground mb-1.5 font-medium uppercase tracking-wider">
-                    npm (global)
+                    Install via curl
                   </p>
                   <code className="text-xs text-foreground/80 font-mono break-all">
-                    npm install -g @anthropic-ai/cursor-agent
-                  </code>
-                </div>
-                <div className="p-3 rounded-xl bg-accent/30 border border-border/50">
-                  <p className="text-[10px] text-muted-foreground mb-1.5 font-medium uppercase tracking-wider">
-                    Then authenticate
-                  </p>
-                  <code className="text-xs text-foreground/80 font-mono break-all">
-                    cursor-agent login
+                    curl https://cursor.com/install -fsS | bash
                   </code>
                 </div>
               </div>
