@@ -1,5 +1,8 @@
 /**
  * POST /commit endpoint - Commit changes in a worktree
+ *
+ * Note: Git repository validation (isGitRepo) is handled by
+ * the requireGitRepoOnly middleware in index.ts
  */
 
 import type { Request, Response } from 'express';

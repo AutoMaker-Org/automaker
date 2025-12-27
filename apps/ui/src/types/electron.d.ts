@@ -733,6 +733,7 @@ export interface WorktreeAPI {
       message: string;
     };
     error?: string;
+    code?: 'NOT_GIT_REPO' | 'NO_COMMITS';
   }>;
 
   // Create a pull request from a worktree
@@ -783,6 +784,7 @@ export interface WorktreeAPI {
       message: string;
     };
     error?: string;
+    code?: 'NOT_GIT_REPO' | 'NO_COMMITS';
   }>;
 
   // Create and checkout a new branch
@@ -797,6 +799,7 @@ export interface WorktreeAPI {
       message: string;
     };
     error?: string;
+    code?: 'NOT_GIT_REPO' | 'NO_COMMITS';
   }>;
 
   // List all local branches
@@ -813,6 +816,7 @@ export interface WorktreeAPI {
       behindCount: number;
     };
     error?: string;
+    code?: 'NOT_GIT_REPO' | 'NO_COMMITS'; // Error codes for git status issues
   }>;
 
   // Switch to an existing branch
@@ -827,6 +831,7 @@ export interface WorktreeAPI {
       message: string;
     };
     error?: string;
+    code?: 'NOT_GIT_REPO' | 'NO_COMMITS' | 'UNCOMMITTED_CHANGES';
   }>;
 
   // Open a worktree directory in the editor

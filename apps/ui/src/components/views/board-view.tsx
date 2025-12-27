@@ -9,7 +9,9 @@ import {
 import { useAppStore, Feature } from '@/store/app-store';
 import { getElectronAPI } from '@/lib/electron';
 import type { AutoModeEvent } from '@/types/electron';
+import type { BacklogPlanResult } from '@automaker/types';
 import { pathsEqual } from '@/lib/utils';
+import { toast } from 'sonner';
 import { getBlockingDependencies } from '@automaker/dependency-resolver';
 import { BoardBackgroundModal } from '@/components/dialogs/board-background-modal';
 import { RefreshCw } from 'lucide-react';
@@ -25,6 +27,7 @@ import { GraphView } from './graph-view';
 import {
   AddFeatureDialog,
   AgentOutputModal,
+  BacklogPlanDialog,
   CompletedFeaturesModal,
   ArchiveAllVerifiedDialog,
   DeleteCompletedFeatureDialog,
@@ -56,9 +59,6 @@ import {
 
 // Stable empty array to avoid infinite loop in selector
 const EMPTY_WORKTREES: ReturnType<ReturnType<typeof useAppStore.getState>['getWorktrees']> = [];
-
-/** Delay before starting a newly created feature to allow state to settle */
-const FEATURE_CREATION_SETTLE_DELAY_MS = 500;
 
 export function BoardView() {
   const {
@@ -107,6 +107,9 @@ export function BoardView() {
   // State for viewing plan in read-only mode
   const [viewPlanFeature, setViewPlanFeature] = useState<Feature | null>(null);
 
+  // State for spawn task mode
+  const [spawnParentFeature, setSpawnParentFeature] = useState<Feature | null>(null);
+
   // Worktree dialog states
   const [showCreateWorktreeDialog, setShowCreateWorktreeDialog] = useState(false);
   const [showDeleteWorktreeDialog, setShowDeleteWorktreeDialog] = useState(false);
@@ -121,6 +124,11 @@ export function BoardView() {
     changedFilesCount?: number;
   } | null>(null);
   const [worktreeRefreshKey, setWorktreeRefreshKey] = useState(0);
+
+  // Backlog plan dialog state
+  const [showPlanDialog, setShowPlanDialog] = useState(false);
+  const [pendingBacklogPlan, setPendingBacklogPlan] = useState<BacklogPlanResult | null>(null);
+  const [isGeneratingPlan, setIsGeneratingPlan] = useState(false);
 
   // Follow-up state hook
   const {
@@ -450,23 +458,22 @@ export function BoardView() {
         requirePlanApproval: false,
       };
 
+      // Capture existing feature IDs before adding
+      const featuresBeforeIds = new Set(useAppStore.getState().features.map((f) => f.id));
       await handleAddFeature(featureData);
 
-      // Find the newly created feature and start it
-      // We need to wait a moment for the feature to be created
-      setTimeout(async () => {
-        const latestFeatures = useAppStore.getState().features;
-        const newFeature = latestFeatures.find(
-          (f) =>
-            f.branchName === worktree.branch &&
-            f.status === 'backlog' &&
-            f.description.includes(`PR #${prNumber}`)
-        );
+      // Find the newly created feature by looking for an ID that wasn't in the original set
+      const latestFeatures = useAppStore.getState().features;
+      const newFeature = latestFeatures.find((f) => !featuresBeforeIds.has(f.id));
 
-        if (newFeature) {
-          await handleStartImplementation(newFeature);
-        }
-      }, FEATURE_CREATION_SETTLE_DELAY_MS);
+      if (newFeature) {
+        await handleStartImplementation(newFeature);
+      } else {
+        console.error('Could not find newly created feature to start it automatically.');
+        toast.error('Failed to auto-start feature', {
+          description: 'The feature was created but could not be started automatically.',
+        });
+      }
     },
     [handleAddFeature, handleStartImplementation, defaultSkipTests]
   );
@@ -492,24 +499,47 @@ export function BoardView() {
         requirePlanApproval: false,
       };
 
+      // Capture existing feature IDs before adding
+      const featuresBeforeIds = new Set(useAppStore.getState().features.map((f) => f.id));
       await handleAddFeature(featureData);
 
-      // Find the newly created feature and start it
-      setTimeout(async () => {
-        const latestFeatures = useAppStore.getState().features;
-        const newFeature = latestFeatures.find(
-          (f) =>
-            f.branchName === worktree.branch &&
-            f.status === 'backlog' &&
-            f.description.includes('Pull latest from origin/main')
-        );
+      // Find the newly created feature by looking for an ID that wasn't in the original set
+      const latestFeatures = useAppStore.getState().features;
+      const newFeature = latestFeatures.find((f) => !featuresBeforeIds.has(f.id));
 
-        if (newFeature) {
-          await handleStartImplementation(newFeature);
-        }
-      }, FEATURE_CREATION_SETTLE_DELAY_MS);
+      if (newFeature) {
+        await handleStartImplementation(newFeature);
+      } else {
+        console.error('Could not find newly created feature to start it automatically.');
+        toast.error('Failed to auto-start feature', {
+          description: 'The feature was created but could not be started automatically.',
+        });
+      }
     },
     [handleAddFeature, handleStartImplementation, defaultSkipTests]
+  );
+
+  // Handler for "Make" button - creates a feature and immediately starts it
+  const handleAddAndStartFeature = useCallback(
+    async (featureData: Parameters<typeof handleAddFeature>[0]) => {
+      // Capture existing feature IDs before adding
+      const featuresBeforeIds = new Set(useAppStore.getState().features.map((f) => f.id));
+      await handleAddFeature(featureData);
+
+      // Find the newly created feature by looking for an ID that wasn't in the original set
+      const latestFeatures = useAppStore.getState().features;
+      const newFeature = latestFeatures.find((f) => !featuresBeforeIds.has(f.id));
+
+      if (newFeature) {
+        await handleStartImplementation(newFeature);
+      } else {
+        console.error('Could not find newly created feature to start it automatically.');
+        toast.error('Failed to auto-start feature', {
+          description: 'The feature was created but could not be started automatically.',
+        });
+      }
+    },
+    [handleAddFeature, handleStartImplementation]
   );
 
   // Client-side auto mode: periodically check for backlog items and move them to in-progress
@@ -574,6 +604,37 @@ export function BoardView() {
 
     return unsubscribe;
   }, [currentProject]);
+
+  // Listen for backlog plan events (for background generation)
+  useEffect(() => {
+    const api = getElectronAPI();
+    if (!api?.backlogPlan) return;
+
+    const unsubscribe = api.backlogPlan.onEvent(
+      (event: { type: string; result?: BacklogPlanResult; error?: string }) => {
+        if (event.type === 'backlog_plan_complete') {
+          setIsGeneratingPlan(false);
+          if (event.result && event.result.changes?.length > 0) {
+            setPendingBacklogPlan(event.result);
+            toast.success('Plan ready! Click to review.', {
+              duration: 10000,
+              action: {
+                label: 'Review',
+                onClick: () => setShowPlanDialog(true),
+              },
+            });
+          } else {
+            toast.info('No changes generated. Try again with a different prompt.');
+          }
+        } else if (event.type === 'backlog_plan_error') {
+          setIsGeneratingPlan(false);
+          toast.error(`Plan generation failed: ${event.error}`);
+        }
+      }
+    );
+
+    return unsubscribe;
+  }, []);
 
   useEffect(() => {
     if (!autoMode.isRunning || !currentProject) {
@@ -932,6 +993,7 @@ export function BoardView() {
           }
         }}
         onAddFeature={() => setShowAddDialog(true)}
+        onOpenPlanDialog={() => setShowPlanDialog(true)}
         addFeatureShortcut={{
           key: shortcuts.addFeature,
           action: () => setShowAddDialog(true),
@@ -1021,6 +1083,10 @@ export function BoardView() {
             onImplement={handleStartImplementation}
             onViewPlan={(feature) => setViewPlanFeature(feature)}
             onApprovePlan={handleOpenApprovalDialog}
+            onSpawnTask={(feature) => {
+              setSpawnParentFeature(feature);
+              setShowAddDialog(true);
+            }}
             featuresWithContext={featuresWithContext}
             runningAutoTasks={runningAutoTasks}
             shortcuts={shortcuts}
@@ -1043,6 +1109,12 @@ export function BoardView() {
             onStartTask={handleStartImplementation}
             onStopTask={handleForceStopFeature}
             onResumeTask={handleResumeFeature}
+            onUpdateFeature={updateFeature}
+            onSpawnTask={(feature) => {
+              setSpawnParentFeature(feature);
+              setShowAddDialog(true);
+            }}
+            onDeleteTask={(feature) => handleDeleteFeature(feature.id)}
           />
         )}
       </div>
@@ -1077,8 +1149,14 @@ export function BoardView() {
       {/* Add Feature Dialog */}
       <AddFeatureDialog
         open={showAddDialog}
-        onOpenChange={setShowAddDialog}
+        onOpenChange={(open) => {
+          setShowAddDialog(open);
+          if (!open) {
+            setSpawnParentFeature(null);
+          }
+        }}
         onAdd={handleAddFeature}
+        onAddAndStart={handleAddAndStartFeature}
         categorySuggestions={categorySuggestions}
         branchSuggestions={branchSuggestions}
         branchCardCounts={branchCardCounts}
@@ -1088,6 +1166,8 @@ export function BoardView() {
         isMaximized={isMaximized}
         showProfilesOnly={showProfilesOnly}
         aiProfiles={aiProfiles}
+        parentFeature={spawnParentFeature}
+        allFeatures={hookFeatures}
       />
 
       {/* Edit Feature Dialog */}
@@ -1150,6 +1230,18 @@ export function BoardView() {
         setSuggestions={updateSuggestions}
         isGenerating={isGeneratingSuggestions}
         setIsGenerating={setIsGeneratingSuggestions}
+      />
+
+      {/* Backlog Plan Dialog */}
+      <BacklogPlanDialog
+        open={showPlanDialog}
+        onClose={() => setShowPlanDialog(false)}
+        projectPath={currentProject.path}
+        onPlanApplied={loadFeatures}
+        pendingPlanResult={pendingBacklogPlan}
+        setPendingPlanResult={setPendingBacklogPlan}
+        isGeneratingPlan={isGeneratingPlan}
+        setIsGeneratingPlan={setIsGeneratingPlan}
       />
 
       {/* Plan Approval Dialog */}

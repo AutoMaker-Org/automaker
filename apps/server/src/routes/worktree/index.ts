@@ -4,6 +4,7 @@
 
 import { Router } from 'express';
 import { validatePathParams } from '../../middleware/validate-paths.js';
+import { requireValidWorktree, requireValidProject, requireGitRepoOnly } from './middleware.js';
 import { createInfoHandler } from './routes/info.js';
 import { createStatusHandler } from './routes/status.js';
 import { createListHandler } from './routes/list.js';
@@ -38,17 +39,42 @@ export function createWorktreeRoutes(): Router {
   router.post('/list', createListHandler());
   router.post('/diffs', validatePathParams('projectPath'), createDiffsHandler());
   router.post('/file-diff', validatePathParams('projectPath', 'filePath'), createFileDiffHandler());
-  router.post('/merge', validatePathParams('projectPath'), createMergeHandler());
+  router.post(
+    '/merge',
+    validatePathParams('projectPath'),
+    requireValidProject,
+    createMergeHandler()
+  );
   router.post('/create', validatePathParams('projectPath'), createCreateHandler());
   router.post('/delete', validatePathParams('projectPath', 'worktreePath'), createDeleteHandler());
   router.post('/create-pr', createCreatePRHandler());
   router.post('/pr-info', createPRInfoHandler());
-  router.post('/commit', validatePathParams('worktreePath'), createCommitHandler());
-  router.post('/push', validatePathParams('worktreePath'), createPushHandler());
-  router.post('/pull', validatePathParams('worktreePath'), createPullHandler());
-  router.post('/checkout-branch', createCheckoutBranchHandler());
-  router.post('/list-branches', validatePathParams('worktreePath'), createListBranchesHandler());
-  router.post('/switch-branch', createSwitchBranchHandler());
+  router.post(
+    '/commit',
+    validatePathParams('worktreePath'),
+    requireGitRepoOnly,
+    createCommitHandler()
+  );
+  router.post(
+    '/push',
+    validatePathParams('worktreePath'),
+    requireValidWorktree,
+    createPushHandler()
+  );
+  router.post(
+    '/pull',
+    validatePathParams('worktreePath'),
+    requireValidWorktree,
+    createPullHandler()
+  );
+  router.post('/checkout-branch', requireValidWorktree, createCheckoutBranchHandler());
+  router.post(
+    '/list-branches',
+    validatePathParams('worktreePath'),
+    requireValidWorktree,
+    createListBranchesHandler()
+  );
+  router.post('/switch-branch', requireValidWorktree, createSwitchBranchHandler());
   router.post('/open-in-editor', validatePathParams('worktreePath'), createOpenInEditorHandler());
   router.get('/default-editor', createGetDefaultEditorHandler());
   router.post('/init-git', validatePathParams('projectPath'), createInitGitHandler());

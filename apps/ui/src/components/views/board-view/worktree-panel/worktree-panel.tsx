@@ -61,6 +61,7 @@ export function WorktreePanel({
     setBranchFilter,
     resetBranchFilter,
     fetchBranches,
+    gitRepoStatus,
   } = useBranches();
 
   const {
@@ -210,6 +211,7 @@ export function WorktreePanel({
             isStartingDevServer={isStartingDevServer}
             aheadCount={aheadCount}
             behindCount={behindCount}
+            gitRepoStatus={gitRepoStatus}
             onSelectWorktree={handleSelectWorktree}
             onBranchDropdownOpenChange={handleBranchDropdownOpenChange(mainWorktree)}
             onActionsDropdownOpenChange={handleActionsDropdownOpenChange(mainWorktree)}
@@ -264,6 +266,7 @@ export function WorktreePanel({
                   isStartingDevServer={isStartingDevServer}
                   aheadCount={aheadCount}
                   behindCount={behindCount}
+                  gitRepoStatus={gitRepoStatus}
                   onSelectWorktree={handleSelectWorktree}
                   onBranchDropdownOpenChange={handleBranchDropdownOpenChange(worktree)}
                   onActionsDropdownOpenChange={handleActionsDropdownOpenChange(worktree)}

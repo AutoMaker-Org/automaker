@@ -1,5 +1,8 @@
 /**
  * POST /pull endpoint - Pull latest changes for a worktree/branch
+ *
+ * Note: Git repository validation (isGitRepo, hasCommits) is handled by
+ * the requireValidWorktree middleware in index.ts
  */
 
 import type { Request, Response } from 'express';

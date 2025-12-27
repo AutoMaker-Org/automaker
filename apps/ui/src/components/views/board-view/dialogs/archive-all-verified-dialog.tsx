@@ -45,7 +45,7 @@ export function ArchiveAllVerifiedDialog({
           </Button>
           <Button variant="default" onClick={onConfirm} data-testid="confirm-archive-all-verified">
             <Archive className="w-4 h-4 mr-2" />
-            Archive All
+            Complete All
           </Button>
         </DialogFooter>
       </DialogContent>

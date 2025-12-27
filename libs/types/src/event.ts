@@ -9,6 +9,7 @@ export type EventType =
   | 'auto-mode:stopped'
   | 'auto-mode:idle'
   | 'auto-mode:error'
+  | 'backlog-plan:event'
   | 'feature:started'
   | 'feature:completed'
   | 'feature:stopped'
@@ -24,6 +25,7 @@ export type EventType =
   | 'project:analysis-completed'
   | 'project:analysis-error'
   | 'suggestions:event'
-  | 'spec-regeneration:event';
+  | 'spec-regeneration:event'
+  | 'issue-validation:event';
 
 export type EventCallback = (type: EventType, payload: unknown) => void;

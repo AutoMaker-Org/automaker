@@ -23,6 +23,11 @@ export interface BranchInfo {
   isRemote: boolean;
 }
 
+export interface GitRepoStatus {
+  isGitRepo: boolean;
+  hasCommits: boolean;
+}
+
 export interface DevServerInfo {
   worktreePath: string;
   port: number;

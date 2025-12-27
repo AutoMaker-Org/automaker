@@ -112,6 +112,19 @@ export async function isGitRepo(repoPath: string): Promise<boolean> {
 }
 
 /**
+ * Check if a git repository has at least one commit (i.e., HEAD exists)
+ * Returns false for freshly initialized repos with no commits
+ */
+export async function hasCommits(repoPath: string): Promise<boolean> {
+  try {
+    await execAsync('git rev-parse --verify HEAD', { cwd: repoPath });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Check if an error is ENOENT (file/path not found or spawn failed)
  * These are expected in test environments with mock paths
  */

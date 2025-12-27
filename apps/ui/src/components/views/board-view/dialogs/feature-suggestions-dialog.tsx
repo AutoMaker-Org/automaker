@@ -21,6 +21,8 @@ import {
   RefreshCw,
   Shield,
   Zap,
+  List,
+  FileText,
 } from 'lucide-react';
 import {
   getElectronAPI,
@@ -30,6 +32,7 @@ import {
 } from '@/lib/electron';
 import { useAppStore, Feature } from '@/store/app-store';
 import { toast } from 'sonner';
+import { LogViewer } from '@/components/ui/log-viewer';
 
 interface FeatureSuggestionsDialogProps {
   open: boolean;
@@ -92,6 +95,7 @@ export function FeatureSuggestionsDialog({
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [isImporting, setIsImporting] = useState(false);
   const [currentSuggestionType, setCurrentSuggestionType] = useState<SuggestionType | null>(null);
+  const [viewMode, setViewMode] = useState<'parsed' | 'raw'>('parsed');
   const scrollRef = useRef<HTMLDivElement>(null);
   const autoScrollRef = useRef(true);
 
@@ -123,7 +127,9 @@ export function FeatureSuggestionsDialog({
         setProgress((prev) => [...prev, event.content || '']);
       } else if (event.type === 'suggestions_tool') {
         const toolName = event.tool || 'Unknown Tool';
-        setProgress((prev) => [...prev, `Using tool: ${toolName}\n`]);
+        const toolInput = event.input ? JSON.stringify(event.input, null, 2) : '';
+        const formattedTool = `\n🔧 Tool: ${toolName}\n${toolInput ? `Input: ${toolInput}\n` : ''}`;
+        setProgress((prev) => [...prev, formattedTool]);
       } else if (event.type === 'suggestions_complete') {
         setIsGenerating(false);
         if (event.suggestions && event.suggestions.length > 0) {
@@ -245,6 +251,7 @@ export function FeatureSuggestionsDialog({
         id: `feature-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         category: s.category,
         description: s.description,
+        steps: [], // Required empty steps array for new features
         status: 'backlog' as const,
         skipTests: true, // As specified, testing mode true
         priority: s.priority, // Preserve priority from suggestion
@@ -297,7 +304,7 @@ export function FeatureSuggestionsDialog({
     setCurrentSuggestionType(null);
   }, [setSuggestions]);
 
-  const hasStarted = progress.length > 0 || suggestions.length > 0;
+  const hasStarted = isGenerating || progress.length > 0 || suggestions.length > 0;
   const hasSuggestions = suggestions.length > 0;
   const currentConfig = currentSuggestionType ? suggestionTypeConfig[currentSuggestionType] : null;
 
@@ -371,19 +378,56 @@ export function FeatureSuggestionsDialog({
                 <Loader2 className="w-4 h-4 animate-spin" />
                 Analyzing project...
               </div>
-              <Button variant="destructive" size="sm" onClick={handleStop}>
-                <StopCircle className="w-4 h-4 mr-2" />
-                Stop
-              </Button>
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1 bg-muted rounded-lg p-1">
+                  <button
+                    onClick={() => setViewMode('parsed')}
+                    className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium transition-all ${
+                      viewMode === 'parsed'
+                        ? 'bg-primary/20 text-primary shadow-sm'
+                        : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+                    }`}
+                    data-testid="view-mode-parsed"
+                  >
+                    <List className="w-3 h-3" />
+                    Logs
+                  </button>
+                  <button
+                    onClick={() => setViewMode('raw')}
+                    className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium transition-all ${
+                      viewMode === 'raw'
+                        ? 'bg-primary/20 text-primary shadow-sm'
+                        : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+                    }`}
+                    data-testid="view-mode-raw"
+                  >
+                    <FileText className="w-3 h-3" />
+                    Raw
+                  </button>
+                </div>
+                <Button variant="destructive" size="sm" onClick={handleStop}>
+                  <StopCircle className="w-4 h-4 mr-2" />
+                  Stop
+                </Button>
+              </div>
             </div>
             <div
               ref={scrollRef}
               onScroll={handleScroll}
               className="flex-1 overflow-y-auto bg-zinc-950 rounded-lg p-4 font-mono text-xs min-h-[200px] max-h-[400px]"
             >
-              <div className="whitespace-pre-wrap break-words text-zinc-300">
-                {progress.join('')}
-              </div>
+              {progress.length === 0 ? (
+                <div className="flex items-center justify-center min-h-[168px] text-muted-foreground">
+                  <Loader2 className="w-6 h-6 animate-spin mr-2" />
+                  Waiting for AI response...
+                </div>
+              ) : viewMode === 'parsed' ? (
+                <LogViewer output={progress.join('')} />
+              ) : (
+                <div className="whitespace-pre-wrap break-words text-zinc-300">
+                  {progress.join('')}
+                </div>
+              )}
             </div>
           </div>
         ) : hasSuggestions ? (

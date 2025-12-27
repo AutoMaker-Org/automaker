@@ -1,5 +1,8 @@
 /**
  * POST /checkout-branch endpoint - Create and checkout a new branch
+ *
+ * Note: Git repository validation (isGitRepo, hasCommits) is handled by
+ * the requireValidWorktree middleware in index.ts
  */
 
 import type { Request, Response } from 'express';

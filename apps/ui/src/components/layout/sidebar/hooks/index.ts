@@ -8,5 +8,5 @@ export { useSpecRegeneration } from './use-spec-regeneration';
 export { useNavigation } from './use-navigation';
 export { useProjectCreation } from './use-project-creation';
 export { useSetupDialog } from './use-setup-dialog';
-export { useTrashDialog } from './use-trash-dialog';
 export { useProjectTheme } from './use-project-theme';
+export { useUnviewedValidations } from './use-unviewed-validations';

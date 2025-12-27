@@ -23,9 +23,9 @@ import {
   MessageSquare,
   Settings2,
   SlidersHorizontal,
-  FlaskConical,
   Sparkles,
   ChevronDown,
+  Play,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { getElectronAPI } from '@/lib/electron';
@@ -37,6 +37,7 @@ import {
   FeatureImage,
   AIProfile,
   PlanningMode,
+  Feature,
 } from '@/store/app-store';
 import {
   ModelSelector,
@@ -46,6 +47,7 @@ import {
   PrioritySelector,
   BranchSelector,
   PlanningModeSelector,
+  AncestorContextSection,
 } from '../shared';
 import {
   DropdownMenu,
@@ -54,25 +56,34 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useNavigate } from '@tanstack/react-router';
+import {
+  getAncestors,
+  formatAncestorContextForPrompt,
+  type AncestorContext,
+} from '@automaker/dependency-resolver';
+
+type FeatureData = {
+  title: string;
+  category: string;
+  description: string;
+  images: FeatureImage[];
+  imagePaths: DescriptionImagePath[];
+  textFilePaths: DescriptionTextFilePath[];
+  skipTests: boolean;
+  model: AgentModel;
+  thinkingLevel: ThinkingLevel;
+  branchName: string; // Can be empty string to use current branch
+  priority: number;
+  planningMode: PlanningMode;
+  requirePlanApproval: boolean;
+  dependencies?: string[];
+};
 
 interface AddFeatureDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onAdd: (feature: {
-    title: string;
-    category: string;
-    description: string;
-    images: FeatureImage[];
-    imagePaths: DescriptionImagePath[];
-    textFilePaths: DescriptionTextFilePath[];
-    skipTests: boolean;
-    model: AgentModel;
-    thinkingLevel: ThinkingLevel;
-    branchName: string; // Can be empty string to use current branch
-    priority: number;
-    planningMode: PlanningMode;
-    requirePlanApproval: boolean;
-  }) => void;
+  onAdd: (feature: FeatureData) => void;
+  onAddAndStart?: (feature: FeatureData) => void;
   categorySuggestions: string[];
   branchSuggestions: string[];
   branchCardCounts?: Record<string, number>; // Map of branch name to unarchived card count
@@ -82,12 +93,16 @@ interface AddFeatureDialogProps {
   isMaximized: boolean;
   showProfilesOnly: boolean;
   aiProfiles: AIProfile[];
+  // Spawn task mode props
+  parentFeature?: Feature | null;
+  allFeatures?: Feature[];
 }
 
 export function AddFeatureDialog({
   open,
   onOpenChange,
   onAdd,
+  onAddAndStart,
   categorySuggestions,
   branchSuggestions,
   branchCardCounts,
@@ -97,7 +112,10 @@ export function AddFeatureDialog({
   isMaximized,
   showProfilesOnly,
   aiProfiles,
+  parentFeature = null,
+  allFeatures = [],
 }: AddFeatureDialogProps) {
+  const isSpawnMode = !!parentFeature;
   const navigate = useNavigate();
   const [useCurrentBranch, setUseCurrentBranch] = useState(true);
   const [newFeature, setNewFeature] = useState({
@@ -124,6 +142,10 @@ export function AddFeatureDialog({
   >('improve');
   const [planningMode, setPlanningMode] = useState<PlanningMode>('skip');
   const [requirePlanApproval, setRequirePlanApproval] = useState(false);
+
+  // Spawn mode state
+  const [ancestors, setAncestors] = useState<AncestorContext[]>([]);
+  const [selectedAncestorIds, setSelectedAncestorIds] = useState<Set<string>>(new Set());
 
   // Get enhancement model, planning mode defaults, and worktrees setting from store
   const {
@@ -153,6 +175,17 @@ export function AddFeatureDialog({
       setUseCurrentBranch(true);
       setPlanningMode(defaultPlanningMode);
       setRequirePlanApproval(defaultRequirePlanApproval);
+
+      // Initialize ancestors for spawn mode
+      if (parentFeature) {
+        const ancestorList = getAncestors(parentFeature, allFeatures);
+        setAncestors(ancestorList);
+        // Only select parent by default - ancestors are optional context
+        setSelectedAncestorIds(new Set([parentFeature.id]));
+      } else {
+        setAncestors([]);
+        setSelectedAncestorIds(new Set());
+      }
     }
   }, [
     open,
@@ -162,18 +195,20 @@ export function AddFeatureDialog({
     defaultRequirePlanApproval,
     defaultAIProfileId,
     aiProfiles,
+    parentFeature,
+    allFeatures,
   ]);
 
-  const handleAdd = () => {
+  const buildFeatureData = (): FeatureData | null => {
     if (!newFeature.description.trim()) {
       setDescriptionError(true);
-      return;
+      return null;
     }
 
     // Validate branch selection when "other branch" is selected
     if (useWorktrees && !useCurrentBranch && !newFeature.branchName.trim()) {
       toast.error('Please select a branch name');
-      return;
+      return null;
     }
 
     const category = newFeature.category || 'Uncategorized';
@@ -187,10 +222,34 @@ export function AddFeatureDialog({
     // Otherwise (primary worktree), use empty string which means "unassigned" (show only on primary)
     const finalBranchName = useCurrentBranch ? currentBranch || '' : newFeature.branchName || '';
 
-    onAdd({
+    // Build final description - prepend ancestor context in spawn mode
+    let finalDescription = newFeature.description;
+    if (isSpawnMode && parentFeature && selectedAncestorIds.size > 0) {
+      // Create parent context as an AncestorContext
+      const parentContext: AncestorContext = {
+        id: parentFeature.id,
+        title: parentFeature.title,
+        description: parentFeature.description,
+        spec: parentFeature.spec,
+        summary: parentFeature.summary,
+        depth: -1,
+      };
+
+      const allAncestorsWithParent = [parentContext, ...ancestors];
+      const contextText = formatAncestorContextForPrompt(
+        allAncestorsWithParent,
+        selectedAncestorIds
+      );
+
+      if (contextText) {
+        finalDescription = `${contextText}\n\n---\n\n## Task Description\n\n${newFeature.description}`;
+      }
+    }
+
+    return {
       title: newFeature.title,
       category,
-      description: newFeature.description,
+      description: finalDescription,
       images: newFeature.images,
       imagePaths: newFeature.imagePaths,
       textFilePaths: newFeature.textFilePaths,
@@ -201,9 +260,12 @@ export function AddFeatureDialog({
       priority: newFeature.priority,
       planningMode,
       requirePlanApproval,
-    });
+      // In spawn mode, automatically add parent as dependency
+      dependencies: isSpawnMode && parentFeature ? [parentFeature.id] : undefined,
+    };
+  };
 
-    // Reset form
+  const resetForm = () => {
     setNewFeature({
       title: '',
       category: '',
@@ -225,6 +287,20 @@ export function AddFeatureDialog({
     setDescriptionError(false);
     onOpenChange(false);
   };
+
+  const handleAction = (actionFn?: (data: FeatureData) => void) => {
+    if (!actionFn) return;
+
+    const featureData = buildFeatureData();
+    if (!featureData) return;
+
+    actionFn(featureData);
+    resetForm();
+  };
+
+  const handleAdd = () => handleAction(onAdd);
+
+  const handleAddAndStart = () => handleAction(onAddAndStart);
 
   const handleDialogClose = (open: boolean) => {
     onOpenChange(open);
@@ -299,8 +375,12 @@ export function AddFeatureDialog({
         }}
       >
         <DialogHeader>
-          <DialogTitle>Add New Feature</DialogTitle>
-          <DialogDescription>Create a new feature card for the Kanban board.</DialogDescription>
+          <DialogTitle>{isSpawnMode ? 'Spawn Sub-Task' : 'Add New Feature'}</DialogTitle>
+          <DialogDescription>
+            {isSpawnMode
+              ? `Create a sub-task that depends on "${parentFeature?.title || parentFeature?.description.slice(0, 50)}..."`
+              : 'Create a new feature card for the Kanban board.'}
+          </DialogDescription>
         </DialogHeader>
         <Tabs defaultValue="prompt" className="py-4 flex-1 min-h-0 flex flex-col">
           <TabsList className="w-full grid grid-cols-3 mb-4">
@@ -320,6 +400,22 @@ export function AddFeatureDialog({
 
           {/* Prompt Tab */}
           <TabsContent value="prompt" className="space-y-4 overflow-y-auto cursor-default">
+            {/* Ancestor Context Section - only in spawn mode */}
+            {isSpawnMode && parentFeature && (
+              <AncestorContextSection
+                parentFeature={{
+                  id: parentFeature.id,
+                  title: parentFeature.title,
+                  description: parentFeature.description,
+                  spec: parentFeature.spec,
+                  summary: parentFeature.summary,
+                }}
+                ancestors={ancestors}
+                selectedAncestorIds={selectedAncestorIds}
+                onSelectionChange={setSelectedAncestorIds}
+              />
+            )}
+
             <div className="space-y-2">
               <Label htmlFor="description">Description</Label>
               <DescriptionImageDropZone
@@ -505,6 +601,17 @@ export function AddFeatureDialog({
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
+          {onAddAndStart && (
+            <Button
+              onClick={handleAddAndStart}
+              variant="secondary"
+              data-testid="confirm-add-and-start-feature"
+              disabled={useWorktrees && !useCurrentBranch && !newFeature.branchName.trim()}
+            >
+              <Play className="w-4 h-4 mr-2" />
+              Make
+            </Button>
+          )}
           <HotkeyButton
             onClick={handleAdd}
             hotkey={{ key: 'Enter', cmdCtrl: true }}
@@ -512,7 +619,7 @@ export function AddFeatureDialog({
             data-testid="confirm-add-feature"
             disabled={useWorktrees && !useCurrentBranch && !newFeature.branchName.trim()}
           >
-            Add Feature
+            {isSpawnMode ? 'Spawn Task' : 'Add Feature'}
           </HotkeyButton>
         </DialogFooter>
       </DialogContent>

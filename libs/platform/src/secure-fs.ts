@@ -4,19 +4,149 @@
  * All file I/O operations must go through this adapter to enforce
  * ALLOWED_ROOT_DIRECTORY restrictions at the actual access point,
  * not just at the API layer. This provides defense-in-depth security.
+ *
+ * This module also implements:
+ * - Concurrency limiting via p-limit to prevent ENFILE/EMFILE errors
+ * - Retry logic with exponential backoff for transient file descriptor errors
  */
 
 import fs from 'fs/promises';
 import type { Dirent } from 'fs';
 import path from 'path';
+import pLimit from 'p-limit';
 import { validatePath } from './security.js';
+
+/**
+ * Configuration for file operation throttling
+ */
+interface ThrottleConfig {
+  /** Maximum concurrent file operations (default: 100) */
+  maxConcurrency: number;
+  /** Maximum retry attempts for ENFILE/EMFILE errors (default: 3) */
+  maxRetries: number;
+  /** Base delay in ms for exponential backoff (default: 100) */
+  baseDelay: number;
+  /** Maximum delay in ms for exponential backoff (default: 5000) */
+  maxDelay: number;
+}
+
+const DEFAULT_CONFIG: ThrottleConfig = {
+  maxConcurrency: 100,
+  maxRetries: 3,
+  baseDelay: 100,
+  maxDelay: 5000,
+};
+
+let config: ThrottleConfig = { ...DEFAULT_CONFIG };
+let fsLimit = pLimit(config.maxConcurrency);
+
+/**
+ * Configure the file operation throttling settings
+ * @param newConfig - Partial configuration to merge with defaults
+ */
+export function configureThrottling(newConfig: Partial<ThrottleConfig>): void {
+  const newConcurrency = newConfig.maxConcurrency;
+
+  if (newConcurrency !== undefined && newConcurrency !== config.maxConcurrency) {
+    if (fsLimit.activeCount > 0 || fsLimit.pendingCount > 0) {
+      throw new Error(
+        `[SecureFS] Cannot change maxConcurrency while operations are in flight. Active: ${fsLimit.activeCount}, Pending: ${fsLimit.pendingCount}`
+      );
+    }
+    fsLimit = pLimit(newConcurrency);
+  }
+
+  config = { ...config, ...newConfig };
+}
+
+/**
+ * Get the current throttling configuration
+ */
+export function getThrottlingConfig(): Readonly<ThrottleConfig> {
+  return { ...config };
+}
+
+/**
+ * Get the number of pending operations in the queue
+ */
+export function getPendingOperations(): number {
+  return fsLimit.pendingCount;
+}
+
+/**
+ * Get the number of active operations currently running
+ */
+export function getActiveOperations(): number {
+  return fsLimit.activeCount;
+}
+
+/**
+ * Error codes that indicate file descriptor exhaustion
+ */
+const FILE_DESCRIPTOR_ERROR_CODES = new Set(['ENFILE', 'EMFILE']);
+
+/**
+ * Check if an error is a file descriptor exhaustion error
+ */
+function isFileDescriptorError(error: unknown): boolean {
+  if (error && typeof error === 'object' && 'code' in error) {
+    return FILE_DESCRIPTOR_ERROR_CODES.has((error as { code: string }).code);
+  }
+  return false;
+}
+
+/**
+ * Calculate delay with exponential backoff and jitter
+ */
+function calculateDelay(attempt: number): number {
+  const exponentialDelay = config.baseDelay * Math.pow(2, attempt);
+  const jitter = Math.random() * config.baseDelay;
+  return Math.min(exponentialDelay + jitter, config.maxDelay);
+}
+
+/**
+ * Sleep for a specified duration
+ */
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Execute a file operation with throttling and retry logic
+ */
+async function executeWithRetry<T>(operation: () => Promise<T>, operationName: string): Promise<T> {
+  return fsLimit(async () => {
+    let lastError: unknown;
+
+    for (let attempt = 0; attempt <= config.maxRetries; attempt++) {
+      try {
+        return await operation();
+      } catch (error) {
+        lastError = error;
+
+        if (isFileDescriptorError(error) && attempt < config.maxRetries) {
+          const delay = calculateDelay(attempt);
+          console.warn(
+            `[SecureFS] ${operationName}: File descriptor error (attempt ${attempt + 1}/${config.maxRetries + 1}), retrying in ${delay}ms`
+          );
+          await sleep(delay);
+          continue;
+        }
+
+        throw error;
+      }
+    }
+
+    throw lastError;
+  });
+}
 
 /**
  * Wrapper around fs.access that validates path first
  */
 export async function access(filePath: string, mode?: number): Promise<void> {
   const validatedPath = validatePath(filePath);
-  return fs.access(validatedPath, mode);
+  return executeWithRetry(() => fs.access(validatedPath, mode), `access(${filePath})`);
 }
 
 /**
@@ -27,10 +157,12 @@ export async function readFile(
   encoding?: BufferEncoding
 ): Promise<string | Buffer> {
   const validatedPath = validatePath(filePath);
-  if (encoding) {
-    return fs.readFile(validatedPath, encoding);
-  }
-  return fs.readFile(validatedPath);
+  return executeWithRetry<string | Buffer>(() => {
+    if (encoding) {
+      return fs.readFile(validatedPath, encoding);
+    }
+    return fs.readFile(validatedPath);
+  }, `readFile(${filePath})`);
 }
 
 /**
@@ -42,7 +174,10 @@ export async function writeFile(
   encoding?: BufferEncoding
 ): Promise<void> {
   const validatedPath = validatePath(filePath);
-  return fs.writeFile(validatedPath, data, encoding);
+  return executeWithRetry(
+    () => fs.writeFile(validatedPath, data, encoding),
+    `writeFile(${filePath})`
+  );
 }
 
 /**
@@ -53,7 +188,7 @@ export async function mkdir(
   options?: { recursive?: boolean; mode?: number }
 ): Promise<string | undefined> {
   const validatedPath = validatePath(dirPath);
-  return fs.mkdir(validatedPath, options);
+  return executeWithRetry(() => fs.mkdir(validatedPath, options), `mkdir(${dirPath})`);
 }
 
 /**
@@ -72,18 +207,20 @@ export async function readdir(
   options?: { withFileTypes?: boolean; encoding?: BufferEncoding }
 ): Promise<string[] | Dirent[]> {
   const validatedPath = validatePath(dirPath);
-  if (options?.withFileTypes === true) {
-    return fs.readdir(validatedPath, { withFileTypes: true });
-  }
-  return fs.readdir(validatedPath);
+  return executeWithRetry<string[] | Dirent[]>(() => {
+    if (options?.withFileTypes === true) {
+      return fs.readdir(validatedPath, { withFileTypes: true });
+    }
+    return fs.readdir(validatedPath);
+  }, `readdir(${dirPath})`);
 }
 
 /**
  * Wrapper around fs.stat that validates path first
  */
-export async function stat(filePath: string): Promise<any> {
+export async function stat(filePath: string): Promise<ReturnType<typeof fs.stat>> {
   const validatedPath = validatePath(filePath);
-  return fs.stat(validatedPath);
+  return executeWithRetry(() => fs.stat(validatedPath), `stat(${filePath})`);
 }
 
 /**
@@ -94,7 +231,7 @@ export async function rm(
   options?: { recursive?: boolean; force?: boolean }
 ): Promise<void> {
   const validatedPath = validatePath(filePath);
-  return fs.rm(validatedPath, options);
+  return executeWithRetry(() => fs.rm(validatedPath, options), `rm(${filePath})`);
 }
 
 /**
@@ -102,7 +239,7 @@ export async function rm(
  */
 export async function unlink(filePath: string): Promise<void> {
   const validatedPath = validatePath(filePath);
-  return fs.unlink(validatedPath);
+  return executeWithRetry(() => fs.unlink(validatedPath), `unlink(${filePath})`);
 }
 
 /**
@@ -111,7 +248,10 @@ export async function unlink(filePath: string): Promise<void> {
 export async function copyFile(src: string, dest: string, mode?: number): Promise<void> {
   const validatedSrc = validatePath(src);
   const validatedDest = validatePath(dest);
-  return fs.copyFile(validatedSrc, validatedDest, mode);
+  return executeWithRetry(
+    () => fs.copyFile(validatedSrc, validatedDest, mode),
+    `copyFile(${src}, ${dest})`
+  );
 }
 
 /**
@@ -123,7 +263,10 @@ export async function appendFile(
   encoding?: BufferEncoding
 ): Promise<void> {
   const validatedPath = validatePath(filePath);
-  return fs.appendFile(validatedPath, data, encoding);
+  return executeWithRetry(
+    () => fs.appendFile(validatedPath, data, encoding),
+    `appendFile(${filePath})`
+  );
 }
 
 /**
@@ -132,16 +275,19 @@ export async function appendFile(
 export async function rename(oldPath: string, newPath: string): Promise<void> {
   const validatedOldPath = validatePath(oldPath);
   const validatedNewPath = validatePath(newPath);
-  return fs.rename(validatedOldPath, validatedNewPath);
+  return executeWithRetry(
+    () => fs.rename(validatedOldPath, validatedNewPath),
+    `rename(${oldPath}, ${newPath})`
+  );
 }
 
 /**
  * Wrapper around fs.lstat that validates path first
  * Returns file stats without following symbolic links
  */
-export async function lstat(filePath: string): Promise<any> {
+export async function lstat(filePath: string): Promise<ReturnType<typeof fs.lstat>> {
   const validatedPath = validatePath(filePath);
-  return fs.lstat(validatedPath);
+  return executeWithRetry(() => fs.lstat(validatedPath), `lstat(${filePath})`);
 }
 
 /**

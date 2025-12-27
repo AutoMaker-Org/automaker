@@ -179,7 +179,7 @@ describe('sdk-options.ts', () => {
     it('should create options with chat settings', async () => {
       const { createChatOptions, TOOL_PRESETS, MAX_TURNS } = await import('@/lib/sdk-options.js');
 
-      const options = createChatOptions({ cwd: '/test/path' });
+      const options = createChatOptions({ cwd: '/test/path', enableSandboxMode: true });
 
       expect(options.cwd).toBe('/test/path');
       expect(options.maxTurns).toBe(MAX_TURNS.standard);
@@ -212,6 +212,27 @@ describe('sdk-options.ts', () => {
 
       expect(options.model).toBe('claude-sonnet-4-20250514');
     });
+
+    it('should not set sandbox when enableSandboxMode is false', async () => {
+      const { createChatOptions } = await import('@/lib/sdk-options.js');
+
+      const options = createChatOptions({
+        cwd: '/test/path',
+        enableSandboxMode: false,
+      });
+
+      expect(options.sandbox).toBeUndefined();
+    });
+
+    it('should not set sandbox when enableSandboxMode is not provided', async () => {
+      const { createChatOptions } = await import('@/lib/sdk-options.js');
+
+      const options = createChatOptions({
+        cwd: '/test/path',
+      });
+
+      expect(options.sandbox).toBeUndefined();
+    });
   });
 
   describe('createAutoModeOptions', () => {
@@ -219,7 +240,7 @@ describe('sdk-options.ts', () => {
       const { createAutoModeOptions, TOOL_PRESETS, MAX_TURNS } =
         await import('@/lib/sdk-options.js');
 
-      const options = createAutoModeOptions({ cwd: '/test/path' });
+      const options = createAutoModeOptions({ cwd: '/test/path', enableSandboxMode: true });
 
       expect(options.cwd).toBe('/test/path');
       expect(options.maxTurns).toBe(MAX_TURNS.maximum);
@@ -251,6 +272,27 @@ describe('sdk-options.ts', () => {
       });
 
       expect(options.abortController).toBe(abortController);
+    });
+
+    it('should not set sandbox when enableSandboxMode is false', async () => {
+      const { createAutoModeOptions } = await import('@/lib/sdk-options.js');
+
+      const options = createAutoModeOptions({
+        cwd: '/test/path',
+        enableSandboxMode: false,
+      });
+
+      expect(options.sandbox).toBeUndefined();
+    });
+
+    it('should not set sandbox when enableSandboxMode is not provided', async () => {
+      const { createAutoModeOptions } = await import('@/lib/sdk-options.js');
+
+      const options = createAutoModeOptions({
+        cwd: '/test/path',
+      });
+
+      expect(options.sandbox).toBeUndefined();
     });
   });
 

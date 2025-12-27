@@ -19,6 +19,7 @@ export function useProjectPicker({
   const [projectSearchQuery, setProjectSearchQuery] = useState('');
   const [selectedProjectIndex, setSelectedProjectIndex] = useState(0);
   const projectSearchInputRef = useRef<HTMLInputElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   // Filtered projects based on search query
   const filteredProjects = useMemo(() => {
@@ -29,38 +30,66 @@ export function useProjectPicker({
     return projects.filter((project) => project.name.toLowerCase().includes(query));
   }, [projects, projectSearchQuery]);
 
-  // Reset selection when filtered results change and project picker is open
+  // Helper function to scroll to a specific project
+  const scrollToProject = useCallback((projectId: string) => {
+    if (!scrollContainerRef.current) return;
+
+    const element = scrollContainerRef.current.querySelector(
+      `[data-testid="project-option-${projectId}"]`
+    );
+
+    if (element) {
+      element.scrollIntoView({
+        behavior: 'smooth',
+        block: 'nearest',
+      });
+    }
+  }, []);
+
+  // On open/close, handle search query reset and focus
+  useEffect(() => {
+    if (isProjectPickerOpen) {
+      // Focus search input after DOM renders
+      requestAnimationFrame(() => {
+        projectSearchInputRef.current?.focus();
+      });
+    } else {
+      // Reset search when closing
+      setProjectSearchQuery('');
+    }
+  }, [isProjectPickerOpen]);
+
+  // Update selection when search query changes (while picker is open)
   useEffect(() => {
     if (!isProjectPickerOpen) {
+      setSelectedProjectIndex(0);
       return;
     }
 
-    if (!projectSearchQuery.trim()) {
+    if (projectSearchQuery.trim()) {
+      // When searching, reset to first result
+      setSelectedProjectIndex(0);
+    } else {
+      // When not searching (e.g., on open or search cleared), find and select the current project
       const currentIndex = currentProject
         ? filteredProjects.findIndex((p) => p.id === currentProject.id)
         : -1;
-      if (currentIndex !== -1) {
-        setSelectedProjectIndex(currentIndex);
-        return;
-      }
+      setSelectedProjectIndex(currentIndex !== -1 ? currentIndex : 0);
     }
+  }, [isProjectPickerOpen, projectSearchQuery, filteredProjects, currentProject]);
 
-    setSelectedProjectIndex(0);
-  }, [isProjectPickerOpen, filteredProjects.length, projectSearchQuery, currentProject]);
-
-  // Reset search query when dropdown closes, set to current project index when it opens
+  // Scroll to highlighted item when selection changes
   useEffect(() => {
-    if (!isProjectPickerOpen) {
-      setProjectSearchQuery('');
-      setSelectedProjectIndex(0);
-    } else {
-      // Focus the search input when dropdown opens
-      // Small delay to ensure the dropdown is rendered
-      setTimeout(() => {
-        projectSearchInputRef.current?.focus();
-      }, 0);
+    if (!isProjectPickerOpen) return;
+
+    const targetProject = filteredProjects[selectedProjectIndex];
+    if (targetProject) {
+      // Use requestAnimationFrame to ensure DOM is rendered before scrolling
+      requestAnimationFrame(() => {
+        scrollToProject(targetProject.id);
+      });
     }
-  }, [isProjectPickerOpen]);
+  }, [selectedProjectIndex, isProjectPickerOpen, filteredProjects, scrollToProject]);
 
   // Handle selecting the currently highlighted project
   const selectHighlightedProject = useCallback(() => {
@@ -111,6 +140,7 @@ export function useProjectPicker({
     selectedProjectIndex,
     setSelectedProjectIndex,
     projectSearchInputRef,
+    scrollContainerRef,
     filteredProjects,
     selectHighlightedProject,
   };

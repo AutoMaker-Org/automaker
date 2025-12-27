@@ -209,3 +209,188 @@ export function getBlockingDependencies(feature: Feature, allFeatures: Feature[]
     return dep && dep.status !== 'completed' && dep.status !== 'verified';
   });
 }
+
+/**
+ * Checks if adding a dependency from sourceId to targetId would create a circular dependency.
+ * When we say "targetId depends on sourceId", we add sourceId to targetId.dependencies.
+ * A cycle would occur if sourceId already depends on targetId (directly or transitively).
+ *
+ * @param features - All features in the system
+ * @param sourceId - The feature that would become a dependency (the prerequisite)
+ * @param targetId - The feature that would depend on sourceId
+ * @returns true if adding this dependency would create a cycle
+ */
+export function wouldCreateCircularDependency(
+  features: Feature[],
+  sourceId: string,
+  targetId: string
+): boolean {
+  const featureMap = new Map(features.map((f) => [f.id, f]));
+  const visited = new Set<string>();
+
+  // Check if 'from' can reach 'to' by following dependencies
+  function canReach(fromId: string, toId: string): boolean {
+    if (fromId === toId) return true;
+    if (visited.has(fromId)) return false;
+
+    visited.add(fromId);
+    const feature = featureMap.get(fromId);
+    if (!feature?.dependencies) return false;
+
+    for (const depId of feature.dependencies) {
+      if (canReach(depId, toId)) return true;
+    }
+    return false;
+  }
+
+  // We want to add: targetId depends on sourceId (sourceId -> targetId in dependency graph)
+  // This would create a cycle if sourceId already depends on targetId (transitively)
+  // i.e., if we can reach targetId starting from sourceId by following dependencies
+  return canReach(sourceId, targetId);
+}
+
+/**
+ * Checks if a dependency already exists between two features.
+ *
+ * @param features - All features in the system
+ * @param sourceId - The potential dependency (prerequisite)
+ * @param targetId - The feature that might depend on sourceId
+ * @returns true if targetId already depends on sourceId
+ */
+export function dependencyExists(features: Feature[], sourceId: string, targetId: string): boolean {
+  const targetFeature = features.find((f) => f.id === targetId);
+  if (!targetFeature?.dependencies) return false;
+  return targetFeature.dependencies.includes(sourceId);
+}
+
+/**
+ * Context information about an ancestor feature in the dependency graph.
+ */
+export interface AncestorContext {
+  id: string;
+  title?: string;
+  description: string;
+  spec?: string;
+  summary?: string;
+  depth: number; // 0 = immediate parent, 1 = grandparent, etc.
+}
+
+/**
+ * Traverses the dependency graph to find all ancestors of a feature.
+ * Returns ancestors ordered by depth (closest first).
+ *
+ * @param feature - The feature to find ancestors for
+ * @param allFeatures - All features in the system
+ * @param maxDepth - Maximum depth to traverse (prevents infinite loops)
+ * @returns Array of ancestor contexts, sorted by depth (closest first)
+ */
+export function getAncestors(
+  feature: Feature,
+  allFeatures: Feature[],
+  maxDepth: number = 10
+): AncestorContext[] {
+  const featureMap = new Map(allFeatures.map((f) => [f.id, f]));
+  const ancestors: AncestorContext[] = [];
+  const visited = new Set<string>();
+
+  function traverse(featureId: string, depth: number) {
+    if (depth > maxDepth || visited.has(featureId)) return;
+    visited.add(featureId);
+
+    const f = featureMap.get(featureId);
+    if (!f?.dependencies) return;
+
+    for (const depId of f.dependencies) {
+      const dep = featureMap.get(depId);
+      if (dep && !visited.has(depId)) {
+        ancestors.push({
+          id: dep.id,
+          title: dep.title,
+          description: dep.description,
+          spec: dep.spec,
+          summary: dep.summary,
+          depth,
+        });
+        traverse(depId, depth + 1);
+      }
+    }
+  }
+
+  traverse(feature.id, 0);
+
+  // Sort by depth (closest ancestors first)
+  return ancestors.sort((a, b) => a.depth - b.depth);
+}
+
+/**
+ * Formats ancestor context for inclusion in a task description.
+ * The parent task (depth=-1) is formatted with special emphasis indicating
+ * it was already completed and is provided for context only.
+ *
+ * @param ancestors - Array of ancestor contexts (including parent with depth=-1)
+ * @param selectedIds - Set of selected ancestor IDs to include
+ * @returns Formatted markdown string with ancestor context
+ */
+export function formatAncestorContextForPrompt(
+  ancestors: AncestorContext[],
+  selectedIds: Set<string>
+): string {
+  const selectedAncestors = ancestors.filter((a) => selectedIds.has(a.id));
+  if (selectedAncestors.length === 0) return '';
+
+  // Separate parent (depth=-1) from other ancestors
+  const parent = selectedAncestors.find((a) => a.depth === -1);
+  const otherAncestors = selectedAncestors.filter((a) => a.depth !== -1);
+
+  const sections: string[] = [];
+
+  // Format parent with special emphasis
+  if (parent) {
+    const parentTitle = parent.title || `Task (${parent.id.slice(0, 8)})`;
+    const parentParts: string[] = [];
+
+    parentParts.push(`## Parent Task Context (Already Completed)`);
+    parentParts.push(
+      `> **Note:** The following parent task has already been completed. This context is provided to help you understand the background and requirements for this sub-task. Do not re-implement the parent task - focus only on the new sub-task described below.`
+    );
+    parentParts.push(`### ${parentTitle}`);
+
+    if (parent.description) {
+      parentParts.push(`**Description:** ${parent.description}`);
+    }
+    if (parent.spec) {
+      parentParts.push(`**Specification:**\n${parent.spec}`);
+    }
+    if (parent.summary) {
+      parentParts.push(`**Summary:** ${parent.summary}`);
+    }
+
+    sections.push(parentParts.join('\n\n'));
+  }
+
+  // Format other ancestors if any
+  if (otherAncestors.length > 0) {
+    const ancestorSections = otherAncestors.map((ancestor) => {
+      const parts: string[] = [];
+      const title = ancestor.title || `Task (${ancestor.id.slice(0, 8)})`;
+
+      parts.push(`### ${title}`);
+
+      if (ancestor.description) {
+        parts.push(`**Description:** ${ancestor.description}`);
+      }
+      if (ancestor.spec) {
+        parts.push(`**Specification:**\n${ancestor.spec}`);
+      }
+      if (ancestor.summary) {
+        parts.push(`**Summary:** ${ancestor.summary}`);
+      }
+
+      return parts.join('\n\n');
+    });
+
+    sections.push(`## Additional Ancestor Context\n\n${ancestorSections.join('\n\n---\n\n')}`);
+  }
+
+  return sections.join('\n\n---\n\n');
+}

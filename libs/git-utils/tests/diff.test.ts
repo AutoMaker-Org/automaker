@@ -117,6 +117,49 @@ describe('diff.ts', () => {
       expect(diff).toContain(`diff --git a/${fileName} b/${fileName}`);
       expect(diff).toContain('[Unable to read file content]');
     });
+
+    it('should handle empty directory path gracefully', async () => {
+      const dirName = 'some-directory';
+      const dirPath = path.join(tempDir, dirName);
+      await fs.mkdir(dirPath);
+
+      const diff = await generateSyntheticDiffForNewFile(tempDir, dirName);
+
+      expect(diff).toContain(`diff --git a/${dirName} b/${dirName}`);
+      expect(diff).toContain('new file mode 040000');
+      expect(diff).toContain('[Empty directory]');
+    });
+
+    it('should expand directory with files and generate diffs for each file', async () => {
+      const dirName = 'new-feature';
+      const dirPath = path.join(tempDir, dirName);
+      await fs.mkdir(dirPath);
+      await fs.writeFile(path.join(dirPath, 'index.ts'), 'export const foo = 1;\n');
+      await fs.writeFile(path.join(dirPath, 'utils.ts'), 'export const bar = 2;\n');
+
+      const diff = await generateSyntheticDiffForNewFile(tempDir, dirName);
+
+      // Should contain diffs for both files in the directory
+      expect(diff).toContain(`diff --git a/${dirName}/index.ts b/${dirName}/index.ts`);
+      expect(diff).toContain(`diff --git a/${dirName}/utils.ts b/${dirName}/utils.ts`);
+      expect(diff).toContain('+export const foo = 1;');
+      expect(diff).toContain('+export const bar = 2;');
+      // Should NOT contain a diff for the directory itself
+      expect(diff).not.toContain('[Empty directory]');
+    });
+
+    it('should handle directory path with trailing slash', async () => {
+      const dirName = 'trailing-slash-dir';
+      const dirPath = path.join(tempDir, dirName);
+      await fs.mkdir(dirPath);
+      await fs.writeFile(path.join(dirPath, 'file.txt'), 'content\n');
+
+      // git status reports untracked directories with trailing slash
+      const diff = await generateSyntheticDiffForNewFile(tempDir, `${dirName}/`);
+
+      expect(diff).toContain(`diff --git a/${dirName}/file.txt b/${dirName}/file.txt`);
+      expect(diff).toContain('+content');
+    });
   });
 
   describe('appendUntrackedFileDiffs', () => {

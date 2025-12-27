@@ -114,13 +114,12 @@ export function useDevServers({ projectPath }: UseDevServersOptions) {
 
   const handleOpenDevServerUrl = useCallback(
     (worktree: WorktreeInfo) => {
-      const targetPath = worktree.isMain ? projectPath : worktree.path;
-      const serverInfo = runningDevServers.get(targetPath);
+      const serverInfo = runningDevServers.get(getWorktreeKey(worktree));
       if (serverInfo) {
         window.open(serverInfo.url, '_blank');
       }
     },
-    [projectPath, runningDevServers]
+    [runningDevServers, getWorktreeKey]
   );
 
   const isDevServerRunning = useCallback(

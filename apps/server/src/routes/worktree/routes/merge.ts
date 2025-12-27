@@ -1,5 +1,8 @@
 /**
  * POST /merge endpoint - Merge feature (merge worktree branch into main)
+ *
+ * Note: Git repository validation (isGitRepo, hasCommits) is handled by
+ * the requireValidProject middleware in index.ts
  */
 
 import type { Request, Response } from 'express';

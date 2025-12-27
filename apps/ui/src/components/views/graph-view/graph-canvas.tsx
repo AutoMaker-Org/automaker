@@ -1,4 +1,4 @@
-import { useCallback, useState, useEffect } from 'react';
+import { useCallback, useState, useEffect, useRef } from 'react';
 import {
   ReactFlow,
   Background,
@@ -11,6 +11,7 @@ import {
   SelectionMode,
   ConnectionMode,
   Node,
+  Connection,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
@@ -53,6 +54,7 @@ interface GraphCanvasProps {
   onSearchQueryChange: (query: string) => void;
   onNodeDoubleClick?: (featureId: string) => void;
   nodeActionCallbacks?: NodeActionCallbacks;
+  onCreateDependency?: (sourceId: string, targetId: string) => Promise<boolean>;
   backgroundStyle?: React.CSSProperties;
   className?: string;
 }
@@ -64,6 +66,7 @@ function GraphCanvasInner({
   onSearchQueryChange,
   onNodeDoubleClick,
   nodeActionCallbacks,
+  onCreateDependency,
   backgroundStyle,
   className,
 }: GraphCanvasProps) {
@@ -107,10 +110,49 @@ function GraphCanvasInner({
   const [nodes, setNodes, onNodesChange] = useNodesState(layoutedNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(layoutedEdges);
 
-  // Update nodes/edges when features change
+  // Track if initial layout has been applied
+  const hasInitialLayout = useRef(false);
+  // Track the previous node IDs to detect new nodes
+  const prevNodeIds = useRef<Set<string>>(new Set());
+
+  // Update nodes/edges when features change, but preserve user positions
   useEffect(() => {
-    setNodes(layoutedNodes);
-    setEdges(layoutedEdges);
+    const currentNodeIds = new Set(layoutedNodes.map((n) => n.id));
+    const isInitialRender = !hasInitialLayout.current;
+
+    // Check if there are new nodes that need layout
+    const hasNewNodes = layoutedNodes.some((n) => !prevNodeIds.current.has(n.id));
+
+    if (isInitialRender) {
+      // Apply full layout for initial render
+      setNodes(layoutedNodes);
+      setEdges(layoutedEdges);
+      hasInitialLayout.current = true;
+    } else if (hasNewNodes) {
+      // New nodes added - need to re-layout but try to preserve existing positions
+      setNodes((currentNodes) => {
+        const positionMap = new Map(currentNodes.map((n) => [n.id, n.position]));
+        return layoutedNodes.map((node) => ({
+          ...node,
+          position: positionMap.get(node.id) || node.position,
+        }));
+      });
+      setEdges(layoutedEdges);
+    } else {
+      // No new nodes - just update data without changing positions
+      setNodes((currentNodes) => {
+        const positionMap = new Map(currentNodes.map((n) => [n.id, n.position]));
+        return layoutedNodes.map((node) => ({
+          ...node,
+          position: positionMap.get(node.id) || node.position,
+        }));
+      });
+      // Update edges without triggering re-render of nodes
+      setEdges(layoutedEdges);
+    }
+
+    // Update prev node IDs for next comparison
+    prevNodeIds.current = currentNodeIds;
   }, [layoutedNodes, layoutedEdges, setNodes, setEdges]);
 
   // Handle layout direction change
@@ -136,6 +178,29 @@ function GraphCanvasInner({
       onNodeDoubleClick?.(node.id);
     },
     [onNodeDoubleClick]
+  );
+
+  // Handle edge connection (creating dependencies)
+  const handleConnect = useCallback(
+    async (connection: Connection) => {
+      if (!connection.source || !connection.target) return;
+
+      // In React Flow, dragging from source handle to target handle means:
+      // - source = the node being dragged FROM (the prerequisite/dependency)
+      // - target = the node being dragged TO (the dependent task)
+      await onCreateDependency?.(connection.source, connection.target);
+    },
+    [onCreateDependency]
+  );
+
+  // Allow any connection between different nodes
+  const isValidConnection = useCallback(
+    (connection: Connection | { source: string; target: string }) => {
+      // Don't allow self-connections
+      if (connection.source === connection.target) return false;
+      return true;
+    },
+    []
   );
 
   // MiniMap node color based on status
@@ -165,6 +230,8 @@ function GraphCanvasInner({
         onNodesChange={isLocked ? undefined : onNodesChange}
         onEdgesChange={onEdgesChange}
         onNodeDoubleClick={handleNodeDoubleClick}
+        onConnect={handleConnect}
+        isValidConnection={isValidConnection}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         fitView

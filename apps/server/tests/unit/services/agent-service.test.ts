@@ -106,9 +106,9 @@ describe('agent-service.ts', () => {
       });
 
       expect(result.success).toBe(true);
-      // First call reads session file and metadata file (2 calls)
+      // First call reads session file, metadata file, and queue state file (3 calls)
       // Second call should reuse in-memory session (no additional calls)
-      expect(fs.readFile).toHaveBeenCalledTimes(2);
+      expect(fs.readFile).toHaveBeenCalledTimes(3);
     });
   });
 

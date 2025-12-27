@@ -10,6 +10,8 @@ import { createFeatureGenerationOptions } from '../../lib/sdk-options.js';
 import { logAuthStatus } from './common.js';
 import { parseAndCreateFeatures } from './parse-and-create-features.js';
 import { getAppSpecPath } from '@automaker/platform';
+import type { SettingsService } from '../../services/settings-service.js';
+import { getAutoLoadClaudeMdSetting } from '../../lib/settings-helpers.js';
 
 const logger = createLogger('SpecRegeneration');
 
@@ -19,7 +21,8 @@ export async function generateFeaturesFromSpec(
   projectPath: string,
   events: EventEmitter,
   abortController: AbortController,
-  maxFeatures?: number
+  maxFeatures?: number,
+  settingsService?: SettingsService
 ): Promise<void> {
   const featureCount = maxFeatures ?? DEFAULT_MAX_FEATURES;
   logger.debug('========== generateFeaturesFromSpec() started ==========');
@@ -91,9 +94,17 @@ IMPORTANT: Do not ask for clarification. The specification is provided above. Ge
     projectPath: projectPath,
   });
 
+  // Load autoLoadClaudeMd setting
+  const autoLoadClaudeMd = await getAutoLoadClaudeMdSetting(
+    projectPath,
+    settingsService,
+    '[FeatureGeneration]'
+  );
+
   const options = createFeatureGenerationOptions({
     cwd: projectPath,
     abortController,
+    autoLoadClaudeMd,
   });
 
   logger.debug('SDK Options:', JSON.stringify(options, null, 2));

@@ -1,5 +1,8 @@
 /**
  * POST /push endpoint - Push a worktree branch to remote
+ *
+ * Note: Git repository validation (isGitRepo, hasCommits) is handled by
+ * the requireValidWorktree middleware in index.ts
  */
 
 import type { Request, Response } from 'express';

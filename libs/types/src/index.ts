@@ -81,3 +81,27 @@ export {
   THINKING_LEVEL_LABELS,
   getModelDisplayName,
 } from './model-display.js';
+
+// Issue validation types
+export type {
+  IssueValidationVerdict,
+  IssueValidationConfidence,
+  IssueComplexity,
+  IssueValidationInput,
+  IssueValidationRequest,
+  IssueValidationResult,
+  IssueValidationResponse,
+  IssueValidationErrorResponse,
+  IssueValidationEvent,
+  StoredValidation,
+} from './issue-validation.js';
+
+// Backlog plan types
+export type {
+  BacklogChange,
+  DependencyUpdate,
+  BacklogPlanResult,
+  BacklogPlanEvent,
+  BacklogPlanRequest,
+  BacklogPlanApplyResult,
+} from './backlog-plan.js';

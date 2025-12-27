@@ -81,3 +81,5 @@ blob-report/
 
 docker-compose.override.yml
 Dockerfile.custom
+.claude/
+

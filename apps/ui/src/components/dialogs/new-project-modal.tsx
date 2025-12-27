@@ -245,18 +245,21 @@ export function NewProjectModal({
           {/* Workspace Directory Display */}
           <div
             className={cn(
-              'flex items-center gap-2 text-sm',
+              'flex items-start gap-2 text-sm',
               errors.workspaceDir ? 'text-red-500' : 'text-muted-foreground'
             )}
           >
-            <Folder className="w-4 h-4 shrink-0" />
-            <span className="flex-1 min-w-0">
+            <Folder className="w-4 h-4 shrink-0 mt-0.5" />
+            <span className="flex-1 min-w-0 flex flex-col gap-1">
               {isLoadingWorkspace ? (
                 'Loading workspace...'
               ) : workspaceDir ? (
                 <>
-                  Will be created at:{' '}
-                  <code className="text-xs bg-muted px-1.5 py-0.5 rounded truncate">
+                  <span>Will be created at:</span>
+                  <code
+                    className="text-xs bg-muted px-1.5 py-0.5 rounded truncate block max-w-full"
+                    title={projectPath || workspaceDir}
+                  >
                     {projectPath || workspaceDir}
                   </code>
                 </>

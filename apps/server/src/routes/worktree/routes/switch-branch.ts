@@ -4,6 +4,9 @@
  * Simple branch switching.
  * If there are uncommitted changes, the switch will fail and
  * the user should commit first.
+ *
+ * Note: Git repository validation (isGitRepo, hasCommits) is handled by
+ * the requireValidWorktree middleware in index.ts
  */
 
 import type { Request, Response } from 'express';
