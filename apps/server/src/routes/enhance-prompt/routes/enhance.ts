@@ -150,14 +150,10 @@ export function createEnhanceHandler(): (req: Request, res: Response) => Promise
         cwd: process.cwd(),
         prompt: userPrompt,
         useCase: 'chat',
+        model: resolvedModel,
         apiKeys,
-        modelOverride: resolvedModel,
-        options: {
-          systemPrompt,
-          maxTurns: 1,
-          allowedTools: [],
-          permissionMode: 'acceptEdits',
-        },
+        maxTurns: 1,
+        allowedTools: [],
       });
 
       // Extract the enhanced text from the response

@@ -43,11 +43,17 @@ export function ZaiSetupStep({ onNext, onBack, onSkip }: ZaiSetupStepProps) {
     },
   });
 
+  // Validate API key format
+  const isValidApiKey = (key: string): boolean => {
+    const trimmed = key.trim();
+    return trimmed.length >= 20; // Z.ai API keys are typically 20+ characters
+  };
+
   // Verify Zai API Key
   const verifyApiKey = useCallback(async () => {
-    if (!apiKey || apiKey.trim().length < 10) {
+    if (!apiKey || !isValidApiKey(apiKey)) {
       setVerificationStatus('error');
-      setVerificationError('Please enter a valid API key.');
+      setVerificationError('Please enter a valid API key (at least 20 characters).');
       return;
     }
 

@@ -185,6 +185,8 @@ export const useSetupStore = create<SetupState & SetupActions>()(
       partialize: (state) => ({
         isFirstRun: state.isFirstRun,
         setupComplete: state.setupComplete,
+        selectedProvider: state.selectedProvider,
+        currentStep: state.currentStep,
         skipClaudeSetup: state.skipClaudeSetup,
       }),
     }

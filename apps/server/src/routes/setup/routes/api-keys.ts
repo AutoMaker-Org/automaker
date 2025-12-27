@@ -11,6 +11,8 @@ export function createApiKeysHandler() {
       res.json({
         success: true,
         hasAnthropicKey: !!getApiKey('anthropic') || !!process.env.ANTHROPIC_API_KEY,
+        hasZaiKey: !!getApiKey('zai') || !!process.env.ZAI_API_KEY,
+        hasGoogleKey: false,
       });
     } catch (error) {
       logError(error, 'Get API keys failed');

@@ -31,22 +31,39 @@ const execAsync = promisify(exec);
 const ALLOWED_COMMANDS = new Set([
   // File operations - note: chmod, chown removed for security (easy to misuse)
   'ls',
+  'dir', // Windows dir = Unix ls
   'cat',
+  'type', // Windows type = Unix cat
   'head',
-  'tail',
+  'powershell', // For Get-Content -Head on Windows
+  'tail', // Windows has tail in Git Bash / WSL
   'wc',
-  'sort',
+  'sort', // Windows has sort command
   'uniq',
   'find',
+  'findstr', // Windows findstr = Unix grep
   'locate',
   'which',
+  'where', // Windows where = Unix which
   'whereis',
   'mkdir',
+  'md', // Windows md = mkdir
   'rm',
+  'del',
+  'erase',
+  'rmdir', // Windows del/erase = Unix rm
   'cp',
+  'copy',
+  'xcopy',
+  'robocopy', // Windows copy/xcopy = Unix cp
   'mv',
+  'move',
+  'ren',
+  'rename', // Windows move/ren = Unix mv
   'touch',
+  'echo', // For creating files on Windows
   'ln',
+  'mklink', // Windows mklink = Unix ln (requires admin)
   // Development tools
   'git',
   'npm',
@@ -115,8 +132,9 @@ const ALLOWED_COMMANDS = new Set([
   'echo',
   'printf',
   'date',
-  'sleep',
   'time',
+  'sleep',
+  'timeout', // Windows timeout = Unix sleep
   'watch',
   'xargs',
   'tar',
@@ -125,6 +143,7 @@ const ALLOWED_COMMANDS = new Set([
   'gzip',
   'gunzip',
   'grep',
+  'findstr', // Windows findstr = Unix grep
   'sed',
   'awk',
   'tr',
@@ -136,6 +155,11 @@ const ALLOWED_COMMANDS = new Set([
   'pushd',
   'popd',
   'dirs',
+  'cmd',
+  'cmd.exe', // Windows command prompt
+  'powershell',
+  'pwsh', // PowerShell (pwsh = PowerShell Core)
+  'call', // Windows call for batch scripts
 ]);
 
 /**
@@ -196,22 +220,33 @@ const GREP_EXTENSIONS = new Set([
  */
 const PATH_COMMANDS = new Set<string>([
   'rm',
+  'del',
+  'erase',
   'mv',
+  'move',
   'cp',
+  'copy',
+  'xcopy',
   'mkdir',
+  'md',
   'touch',
   'ln',
+  'mklink',
   'cat',
+  'type',
   'head',
   'tail',
   'ls',
+  'dir',
   'find',
+  'findstr',
   'grep',
   'sed',
   'git',
   'npm',
   'pnpm',
   'yarn',
+  'bun',
   'node',
   'python',
   'python3',
@@ -219,6 +254,7 @@ const PATH_COMMANDS = new Set<string>([
   'vitest',
   'jest',
   'pytest',
+  'mocha',
 ]);
 
 /**
@@ -569,13 +605,16 @@ function validateGlobPattern(pattern: string): void {
   }
 
   // Check for command injection characters
-  const dangerousChars = /[;&|`$(){}[\]<>"'\\]/;
+  // Note: Allow / and \ as path separators for glob patterns
+  // Allow : for Windows drive letters in patterns like C:/folder/**
+  // Allow * ? {} [] as they are glob wildcards
+  const dangerousChars = /[;&|`$()<>"]/;
   if (dangerousChars.test(pattern)) {
     throw new Error('Invalid characters in glob pattern');
   }
 
-  // Check for absolute paths
-  if (path.isAbsolute(pattern)) {
+  // Check for absolute paths (but allow patterns like **/*.ts)
+  if (path.isAbsolute(pattern) && !pattern.includes('*')) {
     throw new Error('Absolute paths not allowed in glob pattern');
   }
 }
@@ -980,9 +1019,11 @@ export class ZaiProvider extends BaseProvider {
         } catch (error) {
           logger.warn(`Image description failed: ${(error as Error).message}`);
           // Fall back to text-only content
-          finalPrompt = (prompt as Array<{ type: string; text?: string }>)
-            .map((block) => block.text || '')
-            .join('\n');
+          if (Array.isArray(prompt)) {
+            finalPrompt = prompt.map((block) => block.text || '').join('\n');
+          } else {
+            finalPrompt = prompt; // Already a string
+          }
         }
       }
     }
@@ -1247,9 +1288,21 @@ export class ZaiProvider extends BaseProvider {
             }
           }
 
-          // Check for tool use completion (no more deltas and we have tool calls)
-          if (finishReason === 'tool_calls' || finishReason === 'stop') {
+          // Check for completion - only break if all content has been received
+          // For 'stop': all deltas should be complete
+          // For 'tool_calls': verify all tool calls are complete before breaking
+          if (finishReason === 'stop') {
             break;
+          }
+          if (finishReason === 'tool_calls' && currentToolCalls.size > 0) {
+            // Verify all tool calls have complete data (id, name, and arguments)
+            const allComplete = Array.from(currentToolCalls.values()).every(
+              (tc) => tc.id && tc.name && tc.arguments
+            );
+            if (allComplete) {
+              break;
+            }
+            // Otherwise continue waiting for complete tool call data
           }
         }
 

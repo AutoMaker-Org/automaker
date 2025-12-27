@@ -527,6 +527,7 @@ export interface ElectronAPI {
       success: boolean;
       hasAnthropicKey: boolean;
       hasGoogleKey: boolean;
+      hasZaiKey: boolean;
     }>;
     getPlatform: () => Promise<{
       success: boolean;
@@ -538,6 +539,11 @@ export interface ElectronAPI {
       isLinux: boolean;
     }>;
     verifyClaudeAuth: (authMethod?: 'cli' | 'api_key') => Promise<{
+      success: boolean;
+      authenticated: boolean;
+      error?: string;
+    }>;
+    verifyZaiAuth: (apiKey?: string) => Promise<{
       success: boolean;
       authenticated: boolean;
       error?: string;
@@ -1175,6 +1181,7 @@ function createMockSetupAPI(): SetupAPI {
         success: true,
         hasAnthropicKey: false,
         hasGoogleKey: false,
+        hasZaiKey: false,
       };
     },
 
@@ -1198,6 +1205,15 @@ function createMockSetupAPI(): SetupAPI {
     verifyClaudeAuth: async (authMethod?: 'cli' | 'api_key') => {
       console.log('[Mock] Verifying Claude auth with method:', authMethod);
       // Mock always returns not authenticated
+      return {
+        success: true,
+        authenticated: false,
+        error: 'Mock environment - authentication not available',
+      };
+    },
+
+    verifyZaiAuth: async (_apiKey?: string) => {
+      console.log('[Mock] Verifying Z.ai auth');
       return {
         success: true,
         authenticated: false,

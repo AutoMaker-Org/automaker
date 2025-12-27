@@ -2,6 +2,8 @@
  * Shared types for AI model providers
  */
 
+import type { ProviderFeature } from './base-provider.js';
+
 /**
  * Configuration for a provider instance
  */
@@ -30,10 +32,8 @@ export interface ThinkingConfig {
   clear_thinking?: boolean;
 }
 
-/**
- * Provider feature type for capability checking
- */
-export type ProviderFeature = 'tools' | 'text' | 'vision' | 'mcp' | 'browser' | 'extendedThinking';
+// Re-export ProviderFeature from base-provider (source of truth)
+export type { ProviderFeature } from './base-provider.js';
 
 /**
  * Options for executing a query via a provider
@@ -137,17 +137,50 @@ export interface ExecuteOptions {
 
 /**
  * Content block in a provider message (matches Claude SDK format)
+ * Using discriminated unions for type safety
  */
-export interface ContentBlock {
-  type: 'text' | 'tool_use' | 'thinking' | 'tool_result' | 'reasoning';
-  text?: string;
-  thinking?: string;
-  reasoning_content?: string; // Zai's reasoning field from thinking mode
-  name?: string;
-  input?: unknown;
-  tool_use_id?: string;
-  content?: string;
+
+/** Text content block */
+export interface TextBlock {
+  type: 'text';
+  text: string;
 }
+
+/** Tool use content block */
+export interface ToolUseBlock {
+  type: 'tool_use';
+  id?: string;
+  name: string;
+  input: unknown;
+}
+
+/** Thinking content block (Claude) */
+export interface ThinkingBlock {
+  type: 'thinking';
+  thinking: string;
+}
+
+/** Reasoning content block (Zai GLM thinking mode) */
+export interface ReasoningBlock {
+  type: 'reasoning';
+  reasoning_content: string;
+}
+
+/** Tool result content block */
+export interface ToolResultBlock {
+  type: 'tool_result';
+  tool_use_id: string;
+  content: string;
+  is_error?: boolean;
+}
+
+/** Union of all content block types */
+export type ContentBlock =
+  | TextBlock
+  | ToolUseBlock
+  | ThinkingBlock
+  | ReasoningBlock
+  | ToolResultBlock;
 
 /**
  * Message returned by a provider (matches Claude SDK streaming format)

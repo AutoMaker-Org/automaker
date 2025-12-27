@@ -24,17 +24,25 @@ export function createStoreApiKeyHandler() {
       setApiKey(provider, apiKey);
 
       // Also set as environment variable and persist to .env
-      if (provider === 'anthropic' || provider === 'anthropic_oauth_token') {
-        // Both API key and OAuth token use ANTHROPIC_API_KEY
-        process.env.ANTHROPIC_API_KEY = apiKey;
-        await persistApiKeyToEnv('ANTHROPIC_API_KEY', apiKey);
-        logger.info('[Setup] Stored API key as ANTHROPIC_API_KEY');
-      } else {
-        res.status(400).json({
-          success: false,
-          error: `Unsupported provider: ${provider}. Only anthropic is supported.`,
-        });
-        return;
+      switch (provider) {
+        case 'anthropic':
+        case 'anthropic_oauth_token':
+          // Both API key and OAuth token use ANTHROPIC_API_KEY
+          process.env.ANTHROPIC_API_KEY = apiKey;
+          await persistApiKeyToEnv('ANTHROPIC_API_KEY', apiKey);
+          logger.info('[Setup] Stored API key as ANTHROPIC_API_KEY');
+          break;
+        case 'zai':
+          process.env.ZAI_API_KEY = apiKey;
+          await persistApiKeyToEnv('ZAI_API_KEY', apiKey);
+          logger.info('[Setup] Stored API key as ZAI_API_KEY');
+          break;
+        default:
+          res.status(400).json({
+            success: false,
+            error: `Unsupported provider: ${provider}. Only anthropic and zai are supported.`,
+          });
+          return;
       }
 
       res.json({ success: true });

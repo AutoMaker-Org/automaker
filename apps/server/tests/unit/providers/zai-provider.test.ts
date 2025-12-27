@@ -737,4 +737,120 @@ describe('zai-provider.ts', () => {
       expect(toolUseResult).toBeDefined();
     });
   });
+
+  describe('executeToolCall - write_file', () => {
+    it('should handle write_file tool call', async () => {
+      mockFetch.mockImplementation(() =>
+        createMockStreamResponse([
+          'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_123","function":{"name":"write_file","arguments":"{\\"path\\": \\"test.txt\\", \\"content\\": \\"hello world\\"}"}}]}}]}\n\n',
+          'data: {"choices":[{"finish_reason":"tool_calls"}]}\n\n',
+          'data: [DONE]\n\n',
+        ])
+      );
+
+      const generator = provider.executeQuery({
+        prompt: 'Write a file',
+        cwd: '/test/project',
+        model: 'glm-4.7',
+      });
+
+      const results = await collectAsyncGenerator(generator);
+
+      // Should have tool_use message for write_file
+      const toolUseResult = results.find(
+        (r: any) =>
+          r.type === 'assistant' &&
+          r.message?.content?.[0]?.type === 'tool_use' &&
+          r.message?.content?.[0]?.name === 'write_file'
+      );
+      expect(toolUseResult).toBeDefined();
+    });
+  });
+
+  describe('executeToolCall - edit_file', () => {
+    it('should handle edit_file tool call', async () => {
+      mockFetch.mockImplementation(() =>
+        createMockStreamResponse([
+          'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_456","function":{"name":"edit_file","arguments":"{\\"path\\": \\"test.txt\\", \\"edits\\": [{\\"oldText\\": \\"foo\\", \\"newText\\": \\"bar\\"}]}"}}]}}]}\n\n',
+          'data: {"choices":[{"finish_reason":"tool_calls"}]}\n\n',
+          'data: [DONE]\n\n',
+        ])
+      );
+
+      const generator = provider.executeQuery({
+        prompt: 'Edit a file',
+        cwd: '/test/project',
+        model: 'glm-4.7',
+      });
+
+      const results = await collectAsyncGenerator(generator);
+
+      // Should have tool_use message for edit_file
+      const toolUseResult = results.find(
+        (r: any) =>
+          r.type === 'assistant' &&
+          r.message?.content?.[0]?.type === 'tool_use' &&
+          r.message?.content?.[0]?.name === 'edit_file'
+      );
+      expect(toolUseResult).toBeDefined();
+    });
+  });
+
+  describe('executeToolCall - glob_search', () => {
+    it('should handle glob_search tool call', async () => {
+      mockFetch.mockImplementation(() =>
+        createMockStreamResponse([
+          'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_789","function":{"name":"glob_search","arguments":"{\\"pattern\\": \\"**/*.ts\\", \\"path\\": \\".\\"}"}}]}}]}\n\n',
+          'data: {"choices":[{"finish_reason":"tool_calls"}]}\n\n',
+          'data: [DONE]\n\n',
+        ])
+      );
+
+      const generator = provider.executeQuery({
+        prompt: 'Find TypeScript files',
+        cwd: '/test/project',
+        model: 'glm-4.7',
+      });
+
+      const results = await collectAsyncGenerator(generator);
+
+      // Should have tool_use message for glob_search
+      const toolUseResult = results.find(
+        (r: any) =>
+          r.type === 'assistant' &&
+          r.message?.content?.[0]?.type === 'tool_use' &&
+          r.message?.content?.[0]?.name === 'glob_search'
+      );
+      expect(toolUseResult).toBeDefined();
+    });
+  });
+
+  describe('executeToolCall - grep_search', () => {
+    it('should handle grep_search tool call', async () => {
+      mockFetch.mockImplementation(() =>
+        createMockStreamResponse([
+          'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_101","function":{"name":"grep_search","arguments":"{\\"pattern\\": \\"TODO\\", \\"path\\": \\".\\"}"}}]}}]}\n\n',
+          'data: {"choices":[{"finish_reason":"tool_calls"}]}\n\n',
+          'data: [DONE]\n\n',
+        ])
+      );
+
+      const generator = provider.executeQuery({
+        prompt: 'Search for TODO comments',
+        cwd: '/test/project',
+        model: 'glm-4.7',
+      });
+
+      const results = await collectAsyncGenerator(generator);
+
+      // Should have tool_use message for grep_search
+      const toolUseResult = results.find(
+        (r: any) =>
+          r.type === 'assistant' &&
+          r.message?.content?.[0]?.type === 'tool_use' &&
+          r.message?.content?.[0]?.name === 'grep_search'
+      );
+      expect(toolUseResult).toBeDefined();
+    });
+  });
 });

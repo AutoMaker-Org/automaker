@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { CheckCircle2, Terminal, Key, ArrowRight, ArrowLeft } from 'lucide-react';
 import { useSetupStore, SelectedProvider } from '@/store/setup-store';
+import { cn } from '@/lib/utils';
 
 interface ProviderSelectionStepProps {
   onNext: () => void;
@@ -50,10 +51,6 @@ export function ProviderSelectionStep({ onNext, onBack, onSkip }: ProviderSelect
 
   const handleProviderSelect = (providerId: SelectedProvider) => {
     setSelectedProvider(providerId);
-    // Auto-advance to next step after a brief delay
-    setTimeout(() => {
-      onNext();
-    }, 300);
   };
 
   const isReady = selectedProvider !== null;
@@ -160,8 +157,4 @@ export function ProviderSelectionStep({ onNext, onBack, onSkip }: ProviderSelect
       </div>
     </div>
   );
-}
-
-function cn(...classes: (string | undefined | null | boolean)[]) {
-  return classes.filter(Boolean).join(' ');
 }
