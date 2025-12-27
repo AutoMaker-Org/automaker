@@ -225,6 +225,7 @@ export async function syncSettingsToServer(): Promise<boolean> {
       defaultProvider: state.defaultProvider,
       defaultModel: state.defaultModel,
       validationModel: state.validationModel,
+      autoLoadClaudeMd: state.autoLoadClaudeMd,
       keyboardShortcuts: state.keyboardShortcuts,
       aiProfiles: state.aiProfiles,
       projects: state.projects,

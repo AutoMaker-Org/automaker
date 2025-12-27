@@ -487,6 +487,9 @@ export interface AppState {
   // Validation Model Settings
   validationModel: AgentModel; // Model used for GitHub issue validation (default: opus)
 
+  // Claude Agent SDK Settings
+  autoLoadClaudeMd: boolean; // Auto-load CLAUDE.md files using SDK's settingSources option
+
   // Project Analysis
   projectAnalysis: ProjectAnalysis | null;
   isAnalyzing: boolean;
@@ -764,6 +767,9 @@ export interface AppActions {
   // Validation Model actions
   setValidationModel: (model: AgentModel) => void;
 
+  // Claude Agent SDK Settings actions
+  setAutoLoadClaudeMd: (enabled: boolean) => Promise<void>;
+
   // AI Profile actions
   addAIProfile: (profile: Omit<AIProfile, 'id'>) => void;
   updateAIProfile: (id: string, updates: Partial<AIProfile>) => void;
@@ -934,9 +940,10 @@ const initialState: AppState = {
   keyboardShortcuts: DEFAULT_KEYBOARD_SHORTCUTS, // Default keyboard shortcuts
   muteDoneSound: false, // Default to sound enabled (not muted)
   enhancementModel: 'sonnet', // Default to sonnet for feature enhancement
-  defaultProvider: 'cursor', // Default to Cursor CLI for AI provider
-  defaultModel: 'auto', // Default to auto for Cursor
+  defaultProvider: 'claude', // Default to Claude SDK for AI provider
+  defaultModel: 'sonnet', // Default to Claude Sonnet
   validationModel: 'opus', // Default to opus for GitHub issue validation
+  autoLoadClaudeMd: false, // Default to disabled (user must opt-in)
   aiProfiles: DEFAULT_AI_PROFILES,
   projectAnalysis: null,
   isAnalyzing: false,
@@ -1579,6 +1586,13 @@ export const useAppStore = create<AppState & AppActions>()(
 
       // Validation Model actions
       setValidationModel: (model) => set({ validationModel: model }),
+
+      // Claude Agent SDK Settings actions
+      setAutoLoadClaudeMd: async (enabled) => {
+        set({ autoLoadClaudeMd: enabled });
+        const { syncSettingsToServer } = await import('@/hooks/use-settings-migration');
+        await syncSettingsToServer();
+      },
 
       // AI Profile actions
       addAIProfile: (profile) => {
@@ -2725,6 +2739,7 @@ export const useAppStore = create<AppState & AppActions>()(
           defaultProvider: state.defaultProvider,
           defaultModel: state.defaultModel,
           validationModel: state.validationModel,
+          autoLoadClaudeMd: state.autoLoadClaudeMd,
           // Profiles and sessions
           aiProfiles: state.aiProfiles,
           chatSessions: state.chatSessions,

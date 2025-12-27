@@ -21,8 +21,8 @@ export function useProviderSync() {
     const syncProvider = async () => {
       try {
         const api = getElectronAPI();
-        if (api.setup && 'setDefaultProvider' in api.setup) {
-          await (api.setup as any).setDefaultProvider(defaultProvider);
+        if (api.setup?.setDefaultProvider) {
+          await api.setup.setDefaultProvider(defaultProvider);
           console.log(`[ProviderSync] Synced default provider: ${defaultProvider}`);
         }
       } catch (error) {

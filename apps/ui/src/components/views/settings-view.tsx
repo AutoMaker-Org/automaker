@@ -13,6 +13,7 @@ import { ClaudeCliStatus } from './settings-view/cli-status/claude-cli-status';
 import { CodexCliStatus } from './settings-view/cli-status/codex-cli-status';
 import { CursorCliStatus } from './settings-view/cli-status/cursor-cli-status';
 import { OpenCodeCliStatus } from './settings-view/cli-status/opencode-cli-status';
+import { ClaudeMdSettings } from './settings-view/claude/claude-md-settings';
 import { AIEnhancementSection } from './settings-view/ai-enhancement';
 import { AIProviderSection } from './settings-view/ai-provider';
 import { AppearanceSection } from './settings-view/appearance/appearance-section';
@@ -55,6 +56,8 @@ export function SettingsView() {
     setDefaultModel,
     validationModel,
     setValidationModel,
+    autoLoadClaudeMd,
+    setAutoLoadClaudeMd,
   } = useAppStore();
 
   // Hide usage tracking when using API key (only show for Claude Code CLI users)
@@ -118,7 +121,7 @@ export function SettingsView() {
   // Render the active section based on current view
   const renderActiveSection = () => {
     switch (activeView) {
-      case 'cursor':
+      case 'ai-provider':
         return (
           <div className="space-y-6">
             <AIProviderSection
@@ -151,6 +154,10 @@ export function SettingsView() {
               status={claudeCliStatus}
               isChecking={isCheckingClaudeCli}
               onRefresh={handleRefreshClaudeCli}
+            />
+            <ClaudeMdSettings
+              autoLoadClaudeMd={autoLoadClaudeMd}
+              onAutoLoadClaudeMdChange={setAutoLoadClaudeMd}
             />
             {showUsageTracking && <ClaudeUsageSection />}
           </div>

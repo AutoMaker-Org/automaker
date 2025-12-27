@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react';
 
 export type SettingsViewId =
   | 'api-keys'
-  | 'cursor'
+  | 'ai-provider'
   | 'claude'
   | 'ai-enhancement'
   | 'appearance'

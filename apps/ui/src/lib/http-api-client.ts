@@ -1133,6 +1133,45 @@ export class HttpApiClient implements ElectronAPI {
       error?: string;
     }> => this.post('/api/context/describe-file', { filePath }),
   };
+
+  // Backlog Plan API
+  backlogPlan = {
+    generate: (
+      projectPath: string,
+      prompt: string,
+      model?: string
+    ): Promise<{ success: boolean; error?: string }> =>
+      this.post('/api/backlog-plan/generate', { projectPath, prompt, model }),
+
+    stop: (): Promise<{ success: boolean; error?: string }> =>
+      this.post('/api/backlog-plan/stop', {}),
+
+    status: (): Promise<{ success: boolean; isRunning?: boolean; error?: string }> =>
+      this.get('/api/backlog-plan/status'),
+
+    apply: (
+      projectPath: string,
+      plan: {
+        changes: Array<{
+          type: 'add' | 'update' | 'delete';
+          featureId?: string;
+          feature?: Record<string, unknown>;
+          reason: string;
+        }>;
+        summary: string;
+        dependencyUpdates: Array<{
+          featureId: string;
+          removedDependencies: string[];
+          addedDependencies: string[];
+        }>;
+      }
+    ): Promise<{ success: boolean; appliedChanges?: string[]; error?: string }> =>
+      this.post('/api/backlog-plan/apply', { projectPath, plan }),
+
+    onEvent: (callback: (data: unknown) => void): (() => void) => {
+      return this.subscribeToEvent('backlog-plan:event', callback as EventCallback);
+    },
+  };
 }
 
 // Singleton instance

@@ -1,5 +1,6 @@
 import { Label } from '@/components/ui/label';
-import { Brain, Wand2, Check, Terminal, Sparkles, Code2 } from 'lucide-react';
+import { Brain, Wand2, Terminal, Sparkles, Code2 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { ModelProvider, AgentModel } from '@/store/app-store';
 import {
@@ -17,6 +18,7 @@ import {
 } from '@/components/ui/select';
 import { getElectronAPI } from '@/lib/electron';
 import { toast } from 'sonner';
+import { ProviderCard } from './provider-card';
 
 interface AIProviderSectionProps {
   defaultProvider: ModelProvider;
@@ -40,6 +42,43 @@ export function AIProviderSection({
           ? OPENCODE_MODELS
           : CLAUDE_MODELS;
 
+  const providers: Array<{
+    id: ModelProvider;
+    icon: LucideIcon;
+    label: string;
+    description: string;
+    color: 'purple' | 'sky' | 'emerald' | 'amber';
+  }> = [
+    {
+      id: 'cursor',
+      icon: Wand2,
+      label: 'Cursor',
+      description: 'Auto mode with Claude Sonnet via Cursor CLI',
+      color: 'purple',
+    },
+    {
+      id: 'codex',
+      icon: Terminal,
+      label: 'Codex',
+      description: 'OpenAI Codex CLI with GPT-5.2 Codex models',
+      color: 'sky',
+    },
+    {
+      id: 'opencode',
+      icon: Code2,
+      label: 'OpenCode',
+      description: 'GLM 4.7 free model via CLI',
+      color: 'emerald',
+    },
+    {
+      id: 'claude',
+      icon: Brain,
+      label: 'Claude SDK',
+      description: 'Haiku, Sonnet, Opus via API',
+      color: 'amber',
+    },
+  ];
+
   // When switching providers, select the default model for that provider
   const handleProviderChange = async (provider: ModelProvider) => {
     // Update local state first
@@ -58,8 +97,8 @@ export function AIProviderSection({
     // Sync with backend
     try {
       const api = getElectronAPI();
-      if (api.setup && 'setDefaultProvider' in api.setup) {
-        const result = await (api.setup as any).setDefaultProvider(provider);
+      if (api.setup?.setDefaultProvider) {
+        const result = await api.setup.setDefaultProvider(provider);
         if (result.success) {
           const label =
             provider === 'cursor'
@@ -69,11 +108,12 @@ export function AIProviderSection({
                 : provider === 'codex'
                   ? 'Codex CLI'
                   : 'Claude SDK';
-          toast.success(`Provider par défaut: ${label}`);
+          toast.success(`Default provider: ${label}`);
         }
       }
     } catch (error) {
       console.error('Failed to sync provider with backend:', error);
+      toast.error('Failed to update provider. Please try again.');
     }
   };
 
@@ -102,153 +142,17 @@ export function AIProviderSection({
         <div className="space-y-3">
           <Label className="text-foreground font-medium">Default Provider</Label>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-            {/* Cursor Card */}
-            <button
-              onClick={() => handleProviderChange('cursor')}
-              className={cn(
-                'relative p-4 rounded-xl border transition-all duration-200',
-                'flex flex-col items-center gap-3 text-center',
-                'hover:scale-[1.02] hover:shadow-md',
-                defaultProvider === 'cursor'
-                  ? 'border-purple-500/50 bg-purple-500/10 shadow-purple-500/10'
-                  : 'border-border/50 hover:border-border bg-card/50'
-              )}
-            >
-              {defaultProvider === 'cursor' && (
-                <div className="absolute top-2 right-2">
-                  <Check className="w-4 h-4 text-purple-500" />
-                </div>
-              )}
-              <div
-                className={cn(
-                  'w-12 h-12 rounded-xl flex items-center justify-center',
-                  defaultProvider === 'cursor' ? 'bg-purple-500/20' : 'bg-accent/50'
-                )}
-              >
-                <Wand2
-                  className={cn(
-                    'w-6 h-6',
-                    defaultProvider === 'cursor' ? 'text-purple-500' : 'text-muted-foreground'
-                  )}
-                />
-              </div>
-              <div>
-                <p className="font-semibold text-foreground">Cursor</p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Auto mode with Claude Sonnet via Cursor CLI
-                </p>
-              </div>
-            </button>
-
-            {/* Codex Card */}
-            <button
-              onClick={() => handleProviderChange('codex')}
-              className={cn(
-                'relative p-4 rounded-xl border transition-all duration-200',
-                'flex flex-col items-center gap-3 text-center',
-                'hover:scale-[1.02] hover:shadow-md',
-                defaultProvider === 'codex'
-                  ? 'border-sky-500/50 bg-sky-500/10 shadow-sky-500/10'
-                  : 'border-border/50 hover:border-border bg-card/50'
-              )}
-            >
-              {defaultProvider === 'codex' && (
-                <div className="absolute top-2 right-2">
-                  <Check className="w-4 h-4 text-sky-500" />
-                </div>
-              )}
-              <div
-                className={cn(
-                  'w-12 h-12 rounded-xl flex items-center justify-center',
-                  defaultProvider === 'codex' ? 'bg-sky-500/20' : 'bg-accent/50'
-                )}
-              >
-                <Terminal
-                  className={cn(
-                    'w-6 h-6',
-                    defaultProvider === 'codex' ? 'text-sky-500' : 'text-muted-foreground'
-                  )}
-                />
-              </div>
-              <div>
-                <p className="font-semibold text-foreground">Codex</p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  OpenAI Codex CLI with GPT-5.2 Codex models
-                </p>
-              </div>
-            </button>
-
-            {/* OpenCode Card */}
-            <button
-              onClick={() => handleProviderChange('opencode')}
-              className={cn(
-                'relative p-4 rounded-xl border transition-all duration-200',
-                'flex flex-col items-center gap-3 text-center',
-                'hover:scale-[1.02] hover:shadow-md',
-                defaultProvider === 'opencode'
-                  ? 'border-emerald-500/50 bg-emerald-500/10 shadow-emerald-500/10'
-                  : 'border-border/50 hover:border-border bg-card/50'
-              )}
-            >
-              {defaultProvider === 'opencode' && (
-                <div className="absolute top-2 right-2">
-                  <Check className="w-4 h-4 text-emerald-500" />
-                </div>
-              )}
-              <div
-                className={cn(
-                  'w-12 h-12 rounded-xl flex items-center justify-center',
-                  defaultProvider === 'opencode' ? 'bg-emerald-500/20' : 'bg-accent/50'
-                )}
-              >
-                <Code2
-                  className={cn(
-                    'w-6 h-6',
-                    defaultProvider === 'opencode' ? 'text-emerald-500' : 'text-muted-foreground'
-                  )}
-                />
-              </div>
-              <div>
-                <p className="font-semibold text-foreground">OpenCode</p>
-                <p className="text-xs text-muted-foreground mt-1">GLM 4.7 free model via CLI</p>
-              </div>
-            </button>
-
-            {/* Claude Card */}
-            <button
-              onClick={() => handleProviderChange('claude')}
-              className={cn(
-                'relative p-4 rounded-xl border transition-all duration-200',
-                'flex flex-col items-center gap-3 text-center',
-                'hover:scale-[1.02] hover:shadow-md',
-                defaultProvider === 'claude'
-                  ? 'border-amber-500/50 bg-amber-500/10 shadow-amber-500/10'
-                  : 'border-border/50 hover:border-border bg-card/50'
-              )}
-            >
-              {defaultProvider === 'claude' && (
-                <div className="absolute top-2 right-2">
-                  <Check className="w-4 h-4 text-amber-500" />
-                </div>
-              )}
-              <div
-                className={cn(
-                  'w-12 h-12 rounded-xl flex items-center justify-center',
-                  defaultProvider === 'claude' ? 'bg-amber-500/20' : 'bg-accent/50'
-                )}
-              >
-                <Brain
-                  className={cn(
-                    'w-6 h-6',
-                    defaultProvider === 'claude' ? 'text-amber-500' : 'text-muted-foreground'
-                  )}
-                />
-              </div>
-              <div>
-                <p className="font-semibold text-foreground">Claude SDK</p>
-                <p className="text-xs text-muted-foreground mt-1">Haiku, Sonnet, Opus via API</p>
-              </div>
-            </button>
+            {providers.map((provider) => (
+              <ProviderCard
+                key={provider.id}
+                icon={provider.icon}
+                label={provider.label}
+                description={provider.description}
+                color={provider.color}
+                isSelected={defaultProvider === provider.id}
+                onClick={() => handleProviderChange(provider.id)}
+              />
+            ))}
           </div>
         </div>
 

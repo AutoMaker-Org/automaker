@@ -11,6 +11,8 @@ import type {
   IssueValidationEvent,
   StoredValidation,
   AgentModel,
+  BacklogPlanResult,
+  BacklogPlanEvent,
 } from '@automaker/types';
 import { getJSON, setJSON, removeItem } from './storage';
 
@@ -470,6 +472,20 @@ export interface ElectronAPI {
   features?: FeaturesAPI;
   runningAgents?: RunningAgentsAPI;
   github?: GitHubAPI;
+  backlogPlan?: {
+    generate: (
+      projectPath: string,
+      prompt: string,
+      model?: string
+    ) => Promise<{ success: boolean; error?: string }>;
+    stop: () => Promise<{ success: boolean; error?: string }>;
+    status: () => Promise<{ success: boolean; isRunning?: boolean; error?: string }>;
+    apply: (
+      projectPath: string,
+      plan: BacklogPlanResult
+    ) => Promise<{ success: boolean; appliedChanges?: string[]; error?: string }>;
+    onEvent: (callback: (event: BacklogPlanEvent) => void) => () => void;
+  };
   enhancePrompt?: {
     enhance: (
       originalText: string,
@@ -1167,6 +1183,22 @@ interface SetupAPI {
     };
     error?: string;
   }>;
+  getCodexStatus?: () => Promise<{
+    success: boolean;
+    status?: string;
+    installed?: boolean;
+    method?: string;
+    version?: string;
+    path?: string;
+    auth?: {
+      authenticated: boolean;
+      method: string;
+      hasApiKey?: boolean;
+      apiKeyValid?: boolean;
+      hasEnvApiKey?: boolean;
+    };
+    error?: string;
+  }>;
   installClaude: () => Promise<{
     success: boolean;
     message?: string;
@@ -1216,6 +1248,12 @@ interface SetupAPI {
     authenticated: boolean;
     method?: string;
     output?: string;
+    error?: string;
+  }>;
+  setDefaultProvider?: (provider: 'claude' | 'cursor' | 'opencode' | 'codex') => Promise<{
+    success: boolean;
+    provider?: 'claude' | 'cursor' | 'opencode' | 'codex';
+    message?: string;
     error?: string;
   }>;
   getGhStatus?: () => Promise<{
@@ -1372,6 +1410,13 @@ function createMockSetupAPI(): SetupAPI {
         success: true,
         authenticated: false,
         error: 'Mock environment - authentication not available',
+      };
+    },
+    setDefaultProvider: async (provider: 'claude' | 'cursor' | 'opencode' | 'codex') => {
+      console.log('[Mock] Setting default provider:', provider);
+      return {
+        success: true,
+        provider,
       };
     },
 
