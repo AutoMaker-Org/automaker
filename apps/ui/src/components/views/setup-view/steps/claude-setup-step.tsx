@@ -755,11 +755,6 @@ export function ClaudeSetupStep({ onNext, onBack, onSkip }: ClaudeSetupStepProps
                     <code className="bg-muted px-2 py-1 rounded">~/.claude/settings.json</code>.
                     This option will use that token for authentication.
                   </p>
-                  <p className="text-sm text-muted-foreground">
-                    The settings file should contain{' '}
-                    <code className="bg-muted px-2 py-1 rounded">ANTHROPIC_AUTH_TOKEN</code> in the{' '}
-                    <code className="bg-muted px-2 py-1 rounded">env</code> section.
-                  </p>
                 </div>
 
                 {/* Settings File Verification Status */}

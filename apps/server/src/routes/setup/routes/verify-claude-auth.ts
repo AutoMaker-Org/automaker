@@ -72,26 +72,39 @@ function containsAuthError(text: string): boolean {
 }
 
 /**
- * Read ANTHROPIC_AUTH_TOKEN from ~/.claude/settings.json
- * Returns the token if found, null otherwise
+ * Read all env variables from ~/.claude/settings.json
+ * Returns the env object if found, null otherwise
  */
-async function getSettingsFileToken(): Promise<string | null> {
+async function getSettingsFileEnv(): Promise<Record<string, string> | null> {
   const settingsPath = path.join(os.homedir(), '.claude', 'settings.json');
   try {
     const content = await fs.readFile(settingsPath, 'utf-8');
     const settings = JSON.parse(content);
 
-    // Check if settings has env with ANTHROPIC_AUTH_TOKEN
-    if (settings.env?.ANTHROPIC_AUTH_TOKEN) {
-      return settings.env.ANTHROPIC_AUTH_TOKEN;
+    // Return the env section if it exists and has content
+    if (settings.env && typeof settings.env === 'object' && Object.keys(settings.env).length > 0) {
+      return settings.env;
     }
 
-    // Also check for api_key in settings
-    if (settings.apiKey || settings.api_key) {
-      return settings.apiKey || settings.api_key;
+    // Build env from root-level tokens if no env section
+    const env: Record<string, string> = {};
+
+    // Check for OAuth tokens at root level
+    if (settings.oauthToken) {
+      env.ANTHROPIC_API_KEY = settings.oauthToken;
+    } else if (settings.oauth_token) {
+      env.ANTHROPIC_API_KEY = settings.oauth_token;
+    }
+    // Check for API keys at root level
+    else if (settings.apiKey) {
+      env.ANTHROPIC_API_KEY = settings.apiKey;
+    } else if (settings.api_key) {
+      env.ANTHROPIC_API_KEY = settings.api_key;
+    } else if (settings.primaryApiKey) {
+      env.ANTHROPIC_API_KEY = settings.primaryApiKey;
     }
 
-    return null;
+    return Object.keys(env).length > 0 ? env : null;
   } catch {
     return null;
   }
@@ -113,19 +126,24 @@ export function createVerifyClaudeAuthHandler() {
       let errorMessage = '';
       let receivedAnyContent = false;
 
-      // Save original env values
-      const originalAnthropicKey = process.env.ANTHROPIC_API_KEY;
+      // Save original env values for restoration later
+      const originalEnvValues: Record<string, string | undefined> = {};
+      const envKeysToRestore: string[] = [];
 
       try {
         // Configure environment based on auth method
         if (authMethod === 'cli') {
           // For CLI verification, remove any API key so it uses CLI credentials only
+          originalEnvValues.ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+          envKeysToRestore.push('ANTHROPIC_API_KEY');
           delete process.env.ANTHROPIC_API_KEY;
           logger.info('[Setup] Cleared API key environment for CLI verification');
         } else if (authMethod === 'api_key') {
           // For API key verification, ensure we're using the stored API key
           const storedApiKey = getApiKey('anthropic');
           if (storedApiKey) {
+            originalEnvValues.ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+            envKeysToRestore.push('ANTHROPIC_API_KEY');
             process.env.ANTHROPIC_API_KEY = storedApiKey;
             logger.info('[Setup] Using stored API key for verification');
           } else {
@@ -140,17 +158,32 @@ export function createVerifyClaudeAuthHandler() {
             }
           }
         } else if (authMethod === 'settings_file') {
-          // For settings_file verification, read the token from ~/.claude/settings.json
-          const settingsToken = await getSettingsFileToken();
-          if (settingsToken) {
-            process.env.ANTHROPIC_API_KEY = settingsToken;
-            logger.info('[Setup] Using token from ~/.claude/settings.json for verification');
+          // For settings_file verification, load ALL env vars from ~/.claude/settings.json
+          const settingsEnv = await getSettingsFileEnv();
+          if (settingsEnv) {
+            // Save original values and apply settings env
+            for (const [key, value] of Object.entries(settingsEnv)) {
+              originalEnvValues[key] = process.env[key];
+              envKeysToRestore.push(key);
+              process.env[key] = value;
+            }
+            // Map ANTHROPIC_AUTH_TOKEN to ANTHROPIC_API_KEY if present
+            if (settingsEnv.ANTHROPIC_AUTH_TOKEN && !settingsEnv.ANTHROPIC_API_KEY) {
+              originalEnvValues.ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+              if (!envKeysToRestore.includes('ANTHROPIC_API_KEY')) {
+                envKeysToRestore.push('ANTHROPIC_API_KEY');
+              }
+              process.env.ANTHROPIC_API_KEY = settingsEnv.ANTHROPIC_AUTH_TOKEN;
+            }
+            logger.info('[Setup] Using env from ~/.claude/settings.json for verification', {
+              keys: Object.keys(settingsEnv),
+            });
           } else {
             res.json({
               success: true,
               authenticated: false,
               error:
-                'No authentication token found in ~/.claude/settings.json. Please ensure the file exists and contains ANTHROPIC_AUTH_TOKEN in the env section.',
+                'No authentication token found in ~/.claude/settings.json. Please ensure the file exists and contains a valid authentication token.',
             });
             return;
           }
@@ -192,7 +225,7 @@ export function createVerifyClaudeAuthHandler() {
                 "CLI authentication failed. Please run 'claude login' in your terminal to authenticate.";
             } else if (authMethod === 'settings_file') {
               errorMessage =
-                'Authentication from ~/.claude/settings.json failed. Please check that ANTHROPIC_AUTH_TOKEN is valid.';
+                'Authentication from ~/.claude/settings.json failed. Please check that your authentication token is valid.';
             } else {
               errorMessage = 'API key is invalid or has been revoked.';
             }
@@ -214,7 +247,7 @@ export function createVerifyClaudeAuthHandler() {
                         "CLI authentication failed. Please run 'claude login' in your terminal to authenticate.";
                     } else if (authMethod === 'settings_file') {
                       errorMessage =
-                        'Authentication from ~/.claude/settings.json failed. Please check that ANTHROPIC_AUTH_TOKEN is valid.';
+                        'Authentication from ~/.claude/settings.json failed. Please check that your authentication token is valid.';
                     } else {
                       errorMessage = 'API key is invalid or has been revoked.';
                     }
@@ -255,7 +288,7 @@ export function createVerifyClaudeAuthHandler() {
                   "CLI authentication failed. Please run 'claude login' in your terminal to authenticate.";
               } else if (authMethod === 'settings_file') {
                 errorMessage =
-                  'Authentication from ~/.claude/settings.json failed. Please check that ANTHROPIC_AUTH_TOKEN is valid.';
+                  'Authentication from ~/.claude/settings.json failed. Please check that your authentication token is valid.';
               } else {
                 errorMessage = 'API key is invalid or has been revoked.';
               }
@@ -306,7 +339,7 @@ export function createVerifyClaudeAuthHandler() {
               "CLI authentication failed. Please run 'claude login' in your terminal to authenticate.";
           } else if (authMethod === 'settings_file') {
             errorMessage =
-              'Authentication from ~/.claude/settings.json failed. Please check that ANTHROPIC_AUTH_TOKEN is valid.';
+              'Authentication from ~/.claude/settings.json failed. Please check that your authentication token is valid.';
           } else {
             errorMessage = 'API key is invalid or has been revoked.';
           }
@@ -327,11 +360,12 @@ export function createVerifyClaudeAuthHandler() {
       } finally {
         clearTimeout(timeoutId);
         // Restore original environment
-        if (originalAnthropicKey !== undefined) {
-          process.env.ANTHROPIC_API_KEY = originalAnthropicKey;
-        } else if (authMethod === 'cli') {
-          // If we cleared it and there was no original, keep it cleared
-          delete process.env.ANTHROPIC_API_KEY;
+        for (const key of envKeysToRestore) {
+          if (originalEnvValues[key] !== undefined) {
+            process.env[key] = originalEnvValues[key];
+          } else {
+            delete process.env[key];
+          }
         }
       }
 

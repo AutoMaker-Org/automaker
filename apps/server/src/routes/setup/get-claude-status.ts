@@ -14,6 +14,11 @@ const execAsync = promisify(exec);
 /**
  * Check if ~/.claude/settings.json exists and has auth
  * This is used by the Claude Agent SDK directly
+ *
+ * Checks multiple locations:
+ * 1. env section (env.ANTHROPIC_AUTH_TOKEN) - Claude Code format
+ * 2. OAuth tokens at root level (oauthToken, oauth_token)
+ * 3. API keys at root level (apiKey, api_key, primaryApiKey)
  */
 async function checkSettingsFileAuth(): Promise<boolean> {
   const settingsPath = path.join(os.homedir(), '.claude', 'settings.json');
@@ -21,13 +26,18 @@ async function checkSettingsFileAuth(): Promise<boolean> {
     const content = await fs.readFile(settingsPath, 'utf-8');
     const settings = JSON.parse(content);
 
-    // Check if settings has env with ANTHROPIC_AUTH_TOKEN
+    // Check env section (Claude Code format)
     if (settings.env?.ANTHROPIC_AUTH_TOKEN) {
       return true;
     }
 
-    // Also check for api_key in settings
-    if (settings.apiKey || settings.api_key) {
+    // Check for OAuth tokens at root level
+    if (settings.oauthToken || settings.oauth_token) {
+      return true;
+    }
+
+    // Check for API keys at root level
+    if (settings.apiKey || settings.api_key || settings.primaryApiKey) {
       return true;
     }
 

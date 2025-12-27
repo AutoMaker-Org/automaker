@@ -39,6 +39,11 @@ async function loadClaudeSettings(): Promise<Record<string, string> | null> {
 
 /**
  * Check if ~/.claude/settings.json exists and has auth token
+ *
+ * Checks multiple locations:
+ * 1. env section (env.ANTHROPIC_AUTH_TOKEN) - Claude Code format
+ * 2. OAuth tokens at root level (oauthToken, oauth_token)
+ * 3. API keys at root level (apiKey, api_key, primaryApiKey)
  */
 async function hasClaudeSettingsWithAuth(): Promise<boolean> {
   const settingsPath = path.join(os.homedir(), '.claude', 'settings.json');
@@ -46,13 +51,18 @@ async function hasClaudeSettingsWithAuth(): Promise<boolean> {
     const content = await fs.readFile(settingsPath, 'utf-8');
     const settings = JSON.parse(content);
 
-    // Check if settings has env with ANTHROPIC_AUTH_TOKEN
+    // Check env section (Claude Code format)
     if (settings.env?.ANTHROPIC_AUTH_TOKEN) {
       return true;
     }
 
-    // Also check for api_key in settings
-    if (settings.apiKey || settings.api_key) {
+    // Check for OAuth tokens at root level
+    if (settings.oauthToken || settings.oauth_token) {
+      return true;
+    }
+
+    // Check for API keys at root level
+    if (settings.apiKey || settings.api_key || settings.primaryApiKey) {
       return true;
     }
 
@@ -96,7 +106,7 @@ export class ClaudeProvider extends BaseProvider {
    * Execute a query using Claude Agent SDK
    *
    * Loads environment variables from ~/.claude/settings.json if available.
-   * This allows the SDK to use ANTHROPIC_AUTH_TOKEN and other settings.
+   * This allows the SDK to use authentication tokens and other settings.
    */
   async *executeQuery(options: ExecuteOptions): AsyncGenerator<ProviderMessage> {
     const {
