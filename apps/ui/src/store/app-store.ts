@@ -420,6 +420,12 @@ export interface AppState {
   // API Keys
   apiKeys: ApiKeys;
 
+  // Provider Configuration
+  enabledProviders: {
+    claude: boolean;
+    zai: boolean;
+  };
+
   // Chat Sessions
   chatSessions: ChatSession[];
   currentChatSession: ChatSession | null;
@@ -683,6 +689,10 @@ export interface AppActions {
   // API Keys actions
   setApiKeys: (keys: Partial<ApiKeys>) => void;
 
+  // Provider Configuration actions
+  setEnabledProviders: (providers: Partial<{ claude: boolean; zai: boolean }>) => void;
+  toggleProvider: (provider: 'claude' | 'zai') => void;
+
   // Chat Session actions
   createChatSession: (title?: string) => ChatSession;
   updateChatSession: (sessionId: string, updates: Partial<ChatSession>) => void;
@@ -912,6 +922,10 @@ const initialState: AppState = {
     google: '',
     openai: '',
     zai: '',
+  },
+  enabledProviders: {
+    claude: true,
+    zai: true,
   },
   chatSessions: [],
   currentChatSession: null,
@@ -1279,6 +1293,17 @@ export const useAppStore = create<AppState & AppActions>()(
 
       // API Keys actions
       setApiKeys: (keys) => set({ apiKeys: { ...get().apiKeys, ...keys } }),
+
+      // Provider Configuration actions
+      setEnabledProviders: (providers) =>
+        set({ enabledProviders: { ...get().enabledProviders, ...providers } }),
+      toggleProvider: (provider) =>
+        set((state) => ({
+          enabledProviders: {
+            ...state.enabledProviders,
+            [provider]: !state.enabledProviders[provider],
+          },
+        })),
 
       // Chat Session actions
       createChatSession: (title) => {

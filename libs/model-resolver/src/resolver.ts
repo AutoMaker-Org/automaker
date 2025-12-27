@@ -8,7 +8,14 @@
  * - Handles multiple model sources with priority
  */
 
-import { CLAUDE_MODEL_MAP, ZAI_MODEL_MAP, ALL_MODEL_MAPS, DEFAULT_MODELS } from '@automaker/types';
+import {
+  CLAUDE_MODEL_MAP,
+  ZAI_MODEL_MAP,
+  ALL_MODEL_MAPS,
+  DEFAULT_MODELS,
+  MODEL_EQUIVALENCE,
+  getProviderForModel,
+} from '@automaker/types';
 
 /**
  * Use case types for model selection
@@ -168,4 +175,95 @@ export function getModelForUseCase(useCase: ModelUseCase = 'default'): string {
     `[ModelResolver] No model env var for use case "${useCase}", using default: ${fallback}`
   );
   return fallback;
+}
+
+/**
+ * Provider availability configuration
+ */
+export interface EnabledProviders {
+  claude: boolean;
+  zai: boolean;
+}
+
+/**
+ * Resolve a model with provider availability checking
+ *
+ * This function checks if the requested model's provider is enabled.
+ * If not, it attempts to find an equivalent model from an enabled provider.
+ *
+ * @param model - The model to resolve
+ * @param enabledProviders - Which providers are enabled
+ * @param defaultModel - Optional fallback if no equivalent is found
+ * @returns The resolved model string (original, equivalent, or default)
+ *
+ * @example
+ * ```typescript
+ * // Claude disabled, Zai enabled
+ * resolveModelWithProviderAvailability('claude-opus-4-5-20251101', { claude: false, zai: true })
+ * // Returns: 'glm-4.7'
+ *
+ * // Both disabled, with default
+ * resolveModelWithProviderAvailability('opus', { claude: false, zai: false }, 'haiku')
+ * // Returns: 'haiku' (or default from enabled provider if available)
+ * ```
+ */
+export function resolveModelWithProviderAvailability(
+  model: string,
+  enabledProviders: EnabledProviders,
+  defaultModel?: string
+): string {
+  // First resolve the model string to get the full model
+  const resolvedModel = resolveModelString(model, defaultModel);
+
+  // Get the provider for this model
+  const provider = getProviderForModel(resolvedModel);
+
+  // If we can't determine the provider, return as-is
+  if (!provider) {
+    console.warn(`[ModelResolver] Unknown provider for model: ${resolvedModel}`);
+    return resolvedModel;
+  }
+
+  // Check if the provider is enabled
+  if (enabledProviders[provider]) {
+    // Provider is enabled, use the model as-is
+    return resolvedModel;
+  }
+
+  // Provider is disabled, try to find an equivalent model
+  console.log(
+    `[ModelResolver] Provider "${provider}" is disabled for model "${resolvedModel}", looking for equivalent...`
+  );
+
+  const equivalent = MODEL_EQUIVALENCE[resolvedModel];
+  if (equivalent) {
+    // Check if the equivalent's provider is enabled
+    if (enabledProviders[equivalent.provider]) {
+      console.log(
+        `[ModelResolver] Using equivalent model: "${resolvedModel}" -> "${equivalent.model}" (${equivalent.provider})`
+      );
+      return equivalent.model;
+    } else {
+      console.log(`[ModelResolver] Equivalent provider "${equivalent.provider}" is also disabled`);
+    }
+  }
+
+  // No equivalent found or equivalent's provider is also disabled
+  // Find any enabled provider and use its default model
+  if (enabledProviders.claude) {
+    console.log(`[ModelResolver] Falling back to Claude default: ${DEFAULT_MODELS.claude}`);
+    return DEFAULT_MODELS.claude;
+  }
+
+  if (enabledProviders.zai) {
+    console.log(`[ModelResolver] Falling back to Zai default: ${DEFAULT_MODELS.zai}`);
+    return DEFAULT_MODELS.zai;
+  }
+
+  // All providers disabled - this is an error condition
+  console.error(`[ModelResolver] No providers are enabled! Cannot resolve model: ${resolvedModel}`);
+
+  // Return the defaultModel if provided, otherwise return the resolved model
+  // (calling code should handle this error case)
+  return defaultModel || resolvedModel;
 }

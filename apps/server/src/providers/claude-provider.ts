@@ -6,7 +6,7 @@
  */
 
 import { query, type Options } from '@anthropic-ai/claude-agent-sdk';
-import { BaseProvider } from './base-provider.js';
+import { BaseProvider, type ProviderFeature } from './base-provider.js';
 import type {
   ExecuteOptions,
   ProviderMessage,
@@ -173,8 +173,17 @@ export class ClaudeProvider extends BaseProvider {
   /**
    * Check if the provider supports a specific feature
    */
-  supportsFeature(feature: string): boolean {
-    const supportedFeatures = ['tools', 'text', 'vision', 'thinking'];
-    return supportedFeatures.includes(feature);
+  supportsFeature(feature: ProviderFeature | string): boolean {
+    // Claude supports: tools, text, vision, thinking, structured output (native), mcp, browser
+    const supportedFeatures: ProviderFeature[] = [
+      'tools',
+      'text',
+      'vision',
+      'thinking',
+      'structuredOutput',
+      'mcp',
+      'browser',
+    ];
+    return supportedFeatures.includes(feature as ProviderFeature);
   }
 }

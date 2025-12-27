@@ -54,16 +54,22 @@ export interface InstallProgress {
 export type SetupStep =
   | 'welcome'
   | 'theme'
-  | 'claude_detect'
-  | 'claude_auth'
+  | 'provider_selection'
+  | 'claude_setup'
+  | 'zai_setup'
   | 'github'
   | 'complete';
+
+export type SelectedProvider = 'claude' | 'zai';
 
 export interface SetupState {
   // Setup wizard state
   isFirstRun: boolean;
   setupComplete: boolean;
   currentStep: SetupStep;
+
+  // Provider selection
+  selectedProvider: SelectedProvider | null;
 
   // Claude CLI state
   claudeCliStatus: CliStatus | null;
@@ -96,6 +102,7 @@ export interface SetupActions {
 
   // Preferences
   setSkipClaudeSetup: (skip: boolean) => void;
+  setSelectedProvider: (provider: SelectedProvider | null) => void;
 }
 
 const initialInstallProgress: InstallProgress = {
@@ -112,6 +119,8 @@ const initialState: SetupState = {
   isFirstRun: !shouldSkipSetup,
   setupComplete: shouldSkipSetup,
   currentStep: shouldSkipSetup ? 'complete' : 'welcome',
+
+  selectedProvider: null,
 
   claudeCliStatus: null,
   claudeAuthStatus: null,
@@ -169,6 +178,7 @@ export const useSetupStore = create<SetupState & SetupActions>()(
 
       // Preferences
       setSkipClaudeSetup: (skip) => set({ skipClaudeSetup: skip }),
+      setSelectedProvider: (provider) => set({ selectedProvider: provider }),
     }),
     {
       name: 'automaker-setup',

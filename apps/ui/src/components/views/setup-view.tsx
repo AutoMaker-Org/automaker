@@ -6,23 +6,29 @@ import {
   CompleteStep,
   ClaudeSetupStep,
   GitHubSetupStep,
+  ProviderSelectionStep,
+  ZaiSetupStep,
 } from './setup-view/steps';
 import { useNavigate } from '@tanstack/react-router';
 
 // Main Setup View
 export function SetupView() {
-  const { currentStep, setCurrentStep, completeSetup, setSkipClaudeSetup } = useSetupStore();
+  const { currentStep, setCurrentStep, completeSetup, selectedProvider } = useSetupStore();
   const navigate = useNavigate();
 
-  const steps = ['welcome', 'theme', 'claude', 'github', 'complete'] as const;
+  // Steps for the progress indicator
+  const steps = ['welcome', 'theme', 'provider', 'setup', 'github', 'complete'] as const;
   type StepName = (typeof steps)[number];
+
   const getStepName = (): StepName => {
-    if (currentStep === 'claude_detect' || currentStep === 'claude_auth') return 'claude';
     if (currentStep === 'welcome') return 'welcome';
     if (currentStep === 'theme') return 'theme';
+    if (currentStep === 'provider_selection') return 'provider';
+    if (currentStep === 'claude_setup' || currentStep === 'zai_setup') return 'setup';
     if (currentStep === 'github') return 'github';
     return 'complete';
   };
+
   const currentIndex = steps.indexOf(getStepName());
 
   const handleNext = (from: string) => {
@@ -33,10 +39,21 @@ export function SetupView() {
         setCurrentStep('theme');
         break;
       case 'theme':
-        console.log('[Setup Flow] Moving to claude_detect step');
-        setCurrentStep('claude_detect');
+        console.log('[Setup Flow] Moving to provider_selection step');
+        setCurrentStep('provider_selection');
         break;
-      case 'claude':
+      case 'provider_selection':
+        // Move to the appropriate setup step based on selected provider
+        if (selectedProvider === 'claude') {
+          console.log('[Setup Flow] Moving to claude_setup step');
+          setCurrentStep('claude_setup');
+        } else if (selectedProvider === 'zai') {
+          console.log('[Setup Flow] Moving to zai_setup step');
+          setCurrentStep('zai_setup');
+        }
+        break;
+      case 'claude_setup':
+      case 'zai_setup':
         console.log('[Setup Flow] Moving to github step');
         setCurrentStep('github');
         break;
@@ -53,18 +70,26 @@ export function SetupView() {
       case 'theme':
         setCurrentStep('welcome');
         break;
-      case 'claude':
+      case 'provider_selection':
         setCurrentStep('theme');
         break;
+      case 'claude_setup':
+      case 'zai_setup':
+        setCurrentStep('provider_selection');
+        break;
       case 'github':
-        setCurrentStep('claude_detect');
+        // Go back to the setup step that was selected
+        if (selectedProvider === 'claude') {
+          setCurrentStep('claude_setup');
+        } else {
+          setCurrentStep('zai_setup');
+        }
         break;
     }
   };
 
-  const handleSkipClaude = () => {
-    console.log('[Setup Flow] Skipping Claude setup');
-    setSkipClaudeSetup(true);
+  const handleSkipProvider = () => {
+    console.log('[Setup Flow] Skipping provider setup');
     setCurrentStep('github');
   };
 
@@ -106,11 +131,27 @@ export function SetupView() {
               <ThemeStep onNext={() => handleNext('theme')} onBack={() => handleBack('theme')} />
             )}
 
-            {(currentStep === 'claude_detect' || currentStep === 'claude_auth') && (
+            {currentStep === 'provider_selection' && (
+              <ProviderSelectionStep
+                onNext={() => handleNext('provider_selection')}
+                onBack={() => handleBack('provider_selection')}
+                onSkip={handleSkipProvider}
+              />
+            )}
+
+            {currentStep === 'claude_setup' && (
               <ClaudeSetupStep
-                onNext={() => handleNext('claude')}
-                onBack={() => handleBack('claude')}
-                onSkip={handleSkipClaude}
+                onNext={() => handleNext('claude_setup')}
+                onBack={() => handleBack('claude_setup')}
+                onSkip={handleSkipProvider}
+              />
+            )}
+
+            {currentStep === 'zai_setup' && (
+              <ZaiSetupStep
+                onNext={() => handleNext('zai_setup')}
+                onBack={() => handleBack('zai_setup')}
+                onSkip={handleSkipProvider}
               />
             )}
 

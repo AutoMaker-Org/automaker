@@ -4,3 +4,5 @@ export { ThemeStep } from './theme-step';
 export { CompleteStep } from './complete-step';
 export { ClaudeSetupStep } from './claude-setup-step';
 export { GitHubSetupStep } from './github-setup-step';
+export { ProviderSelectionStep } from './provider-selection-step';
+export { ZaiSetupStep } from './zai-setup-step';

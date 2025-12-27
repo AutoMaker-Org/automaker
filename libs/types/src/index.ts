@@ -38,6 +38,8 @@ export {
   ZAI_MODEL_MAP,
   ALL_MODEL_MAPS,
   DEFAULT_MODELS,
+  MODEL_EQUIVALENCE,
+  getProviderForModel,
   type ModelAlias,
   type AgentModel,
 } from './model.js';

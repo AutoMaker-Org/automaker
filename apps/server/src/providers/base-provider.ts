@@ -12,6 +12,20 @@ import type {
 } from './types.js';
 
 /**
+ * Supported provider features
+ * Used to check capability compatibility between providers
+ */
+export type ProviderFeature =
+  | 'tools'
+  | 'text'
+  | 'vision'
+  | 'mcp'
+  | 'browser'
+  | 'extendedThinking'
+  | 'thinking'
+  | 'structuredOutput';
+
+/**
  * Base provider class that all provider implementations must extend
  */
 export abstract class BaseProvider {
@@ -69,13 +83,13 @@ export abstract class BaseProvider {
 
   /**
    * Check if the provider supports a specific feature
-   * @param feature Feature name (e.g., "vision", "tools", "mcp")
+   * @param feature Feature name (e.g., "vision", "tools", "mcp", "structuredOutput")
    * @returns Whether the feature is supported
    */
-  supportsFeature(feature: string): boolean {
+  supportsFeature(feature: ProviderFeature | string): boolean {
     // Default implementation - override in subclasses
-    const commonFeatures = ['tools', 'text'];
-    return commonFeatures.includes(feature);
+    const commonFeatures: ProviderFeature[] = ['tools', 'text', 'structuredOutput'];
+    return commonFeatures.includes(feature as ProviderFeature);
   }
 
   /**

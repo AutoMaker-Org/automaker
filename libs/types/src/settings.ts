@@ -264,6 +264,15 @@ export interface GlobalSettings {
   /** Which model to use for GitHub issue validation */
   validationModel: AgentModel;
 
+  // Provider Configuration
+  /** Enabled AI providers (controls which providers can be used) */
+  enabledProviders: {
+    /** Claude provider (Anthropic) */
+    claude: boolean;
+    /** Zai provider (ZhipuAI GLM models) */
+    zai: boolean;
+  };
+
   // Input Configuration
   /** User's keyboard shortcut bindings */
   keyboardShortcuts: KeyboardShortcuts;
@@ -450,6 +459,10 @@ export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
   muteDoneSound: false,
   enhancementModel: 'sonnet',
   validationModel: 'opus',
+  enabledProviders: {
+    claude: true,
+    zai: true,
+  },
   keyboardShortcuts: DEFAULT_KEYBOARD_SHORTCUTS,
   aiProfiles: [],
   projects: [],

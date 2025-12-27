@@ -4,6 +4,80 @@ All notable changes to AutoMaker will be documented in this file.
 
 ## [Unreleased] - 2025-01
 
+### Added - Multi-Provider UX Enhancements
+
+This release enhances the multi-provider system with improved user experience for provider management and model equivalence routing.
+
+#### Backend Changes
+
+**Model Resolver System**
+
+- Added `resolveModelWithProviderAvailability()` function for provider-aware model resolution
+- `MODEL_EQUIVALENCE` map for cross-provider model fallback:
+  - `claude-opus-4.5-...` ↔ `glm-4.7` (Premium tier)
+  - `claude-sonnet-4.5-...` ↔ `glm-4.6` (Balanced tier)
+  - `claude-haiku-4.5-...` ↔ `glm-4.5-air` (Speed tier)
+- `getProviderForModel()` helper function for provider detection
+- `EnabledProviders` type for provider availability configuration
+
+**Provider Query Layer**
+
+- `executeProviderQuery()` accepts `enabledProviders` option
+- Automatic model substitution when provider is disabled
+- Logged fallback behavior for debugging
+
+**Type System**
+
+- `GlobalSettings` includes `enabledProviders: { claude: boolean; zai: boolean }`
+- `DEFAULT_GLOBAL_SETTINGS` has both providers enabled by default
+- Exported `MODEL_EQUIVALENCE` and `getProviderForModel` from types package
+
+#### Frontend Changes
+
+**Settings UI - Provider Cards**
+
+- Redesigned API Keys section with provider cards
+- Each provider card includes:
+  - Provider name, icon, and description
+  - Enable/disable toggle switch
+  - API key input with visibility toggle
+  - Test connection button
+  - Verification status indicator
+- Auto-enable provider when valid API key is saved
+- Manual toggle to disable providers without removing API keys
+
+**Setup Wizard - Provider Selection**
+
+- New `ProviderSelectionStep` component for choosing primary provider
+- Provider selection cards with feature comparison:
+  - Claude: CLI support + API key, multiple models (Haiku, Sonnet, Opus)
+  - Zai: API key only, GLM models (GLM-4.7, GLM-4.6v, GLM-4.6, GLM-4.5-Air)
+- New `ZaiSetupStep` component for Zai API key configuration
+- Updated wizard flow: `welcome → theme → provider_selection → provider_setup → github → complete`
+- Dynamic routing based on selected provider
+
+**State Management**
+
+- `app-store` includes `enabledProviders` state with actions:
+  - `setEnabledProviders()` - Set provider enable states
+  - `toggleProvider()` - Toggle single provider
+- `setup-store` includes `selectedProvider` for wizard flow
+- Both providers persisted in settings
+
+**New Components**
+
+- `provider-card.tsx` - Reusable provider configuration card
+- `provider-selection-step.tsx` - Provider choice in setup wizard
+- `zai-setup-step.tsx` - Zai-specific setup step
+
+#### Architecture Updates
+
+- Updated `architecture.md` with:
+  - Provider enable/disable UX documentation
+  - Model equivalence routing explanation
+  - Onboarding wizard flow documentation
+  - Provider configuration in state management
+
 ### Added - Zai (GLM) Provider Integration
 
 This release adds support for Z.ai's GLM models as an alternative AI provider alongside Claude.

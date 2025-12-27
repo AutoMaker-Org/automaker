@@ -37,24 +37,101 @@ export type ProviderFeature = 'tools' | 'text' | 'vision' | 'mcp' | 'browser' | 
 
 /**
  * Options for executing a query via a provider
+ *
+ * This interface supports all providers through a common set of options,
+ * with provider-specific fields noted below.
  */
 export interface ExecuteOptions {
+  // === Required for all providers ===
+
+  /**
+   * The prompt to send to the model
+   * Can be a simple string or an array of content blocks (for multimodal input)
+   */
   prompt: string | Array<{ type: string; text?: string; source?: object }>;
+
+  /**
+   * Model identifier (e.g., "claude-opus-4-5-20251101", "glm-4.7")
+   * The provider is determined automatically from the model prefix
+   */
   model: string;
+
+  /**
+   * Current working directory for file operations
+   * Used by tools like Read, Write, Glob, Grep, and Bash
+   */
   cwd: string;
+
+  // === Common optional fields ===
+
+  /**
+   * System prompt to guide the model's behavior
+   * Can be a simple string or a preset configuration
+   */
   systemPrompt?: string | { type: 'preset'; preset: 'claude_code'; append?: string };
+
+  /**
+   * Maximum number of conversation turns (tool call cycles)
+   * Default: 20
+   */
   maxTurns?: number;
+
+  /**
+   * Whitelist of tools the model is allowed to use
+   * Common tools: Read, Write, Edit, Glob, Grep, Bash
+   * Claude also supports: WebSearch, WebFetch, MCP tools
+   */
   allowedTools?: string[];
-  mcpServers?: Record<string, unknown>;
+
+  /**
+   * Abort controller for cancelling the request
+   */
   abortController?: AbortController;
-  conversationHistory?: ConversationMessage[]; // Previous messages for context
-  sdkSessionId?: string; // Claude SDK session ID for resuming conversations
-  settingSources?: Array<'user' | 'project' | 'local'>; // Claude filesystem settings to load
+
+  /**
+   * Previous messages for context in multi-turn conversations
+   */
+  conversationHistory?: ConversationMessage[];
+
+  /**
+   * Structured output configuration
+   * When provided, the model will respond with JSON matching the schema
+   * - Claude: Native support via SDK
+   * - Zai: Via prompt engineering + JSON response format
+   */
   outputFormat?: {
     type: 'json_schema';
     schema: Record<string, unknown>;
   };
-  /** Thinking mode configuration (for Zai GLM-4.7, etc.) */
+
+  // === Claude-specific fields ===
+
+  /**
+   * [Claude] SDK session ID for resuming conversations
+   * Enables conversation continuity across requests
+   */
+  sdkSessionId?: string;
+
+  /**
+   * [Claude] Filesystem setting sources to load
+   * Controls which CLAUDE.md files are loaded (user, project, local)
+   */
+  settingSources?: Array<'user' | 'project' | 'local'>;
+
+  /**
+   * [Claude] MCP servers to connect to
+   * Maps server name to server configuration
+   */
+  mcpServers?: Record<string, unknown>;
+
+  // === Zai-specific fields ===
+
+  /**
+   * [Zai] Thinking mode configuration for GLM models
+   * Enables extended reasoning with preserved context across turns
+   * - type: 'enabled' | 'disabled'
+   * - clear_thinking: false preserves thinking, true clears it
+   */
   thinking?: ThinkingConfig;
 }
 

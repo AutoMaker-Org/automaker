@@ -176,6 +176,12 @@ The UI is built with **React 19.2.3** using modern React patterns:
   apiKeys: Credentials
   aiProfiles: AIProfile[]
 
+  // Provider Configuration
+  enabledProviders: {
+    claude: boolean
+    zai: boolean
+  }
+
   // UI State
   sidebarOpen: boolean
   terminalLayout: TerminalLayout
@@ -288,6 +294,7 @@ AutoMaker uses **file-based storage** (no traditional database):
 **Settings**:
 
 - Global settings: theme, keyboard shortcuts, AI profiles, project history
+- Provider configuration: enabled providers (claude, zai)
 - Project settings: per-project overrides
 - Credentials: API keys (masked in UI)
 
@@ -385,6 +392,7 @@ const stream = executeProviderQuery({
   prompt: userPrompt,
   useCase: 'chat', // Routes to appropriate model
   apiKeys: await getApiKeys(),
+  enabledProviders: await getEnabledProviders(), // Optional: for model equivalence
   modelOverride: model, // Optional explicit model
   options: {
     systemPrompt,
@@ -398,6 +406,7 @@ This ensures:
 
 - **Unified interface** - Single code path for all providers
 - **Automatic routing** - Model ID determines provider
+- **Provider availability** - Routes to equivalent model if provider disabled
 - **Feature parity** - Structured output, tools, vision work across providers
 - **Easy extensibility** - New providers integrate via BaseProvider interface
 
@@ -455,10 +464,21 @@ The Zai Provider integrates ZhipuAI's GLM models through Z.ai's OpenAI-compatibl
 
 **Security Features**:
 
-- Path resolution with sandboxing for write operations
-- Command execution restrictions (10MB buffer limit)
-- Relative path enforcement for file operations
-- API key validation via `/models` endpoint
+- **Command Allowlist**: Pre-approved commands only; network commands (`curl`, `wget`) and permission modifiers (`chmod`, `chown`) removed
+- **Docker Gating**: Docker commands require `ZAI_ALLOW_DOCKER=1` environment variable (disabled by default)
+- **Argument Sanitization**: Shell metacharacters (`;&|`$(){}`[]<>"'\`) blocked in command arguments
+- **Path Traversal Blocking**: `..` blocked in all arguments (including `--flag=../path` forms)
+- **Recursive Flag Blocking**: Dangerous flags (`-r`, `-R`, `-a`, `--recursive`) blocked
+- **ALLOWED_ROOT Enforcement**: Uses `validatePath()` from `@automaker/platform` consistently for:
+  - Command working directory (`cwd`)
+  - Path-like command arguments
+  - Glob/grep search paths
+- **Native File Operations**: Glob and grep use native Node.js `fs.readdir` (no shell commands)
+- **Symlink Target Validation**: `ln` command validates target path to prevent escapes
+- **Command Execution Limits**: 1MB buffer, 30-second timeout per command, minimal `PATH` environment
+- **Tool Execution Guard**: Tools only execute when `finish_reason === 'tool_calls'`
+- **API Key Validation**: Authentication verified via `/models` endpoint
+- **ReDoS-Safe JSON Parsing**: Brace-matching algorithm prevents catastrophic backtracking
 
 **Vision Handling**:
 
@@ -482,11 +502,31 @@ The Zai Provider integrates ZhipuAI's GLM models through Z.ai's OpenAI-compatibl
   - Applies to both Claude (extended thinking) and Zai (thinking mode)
 - Set `clear_thinking: false` to preserve reasoning context across conversation turns
 
-**Provider Factory**: Routes model IDs to appropriate provider
+**Provider Factory**: Registry-based routing for extensibility
+
+```typescript
+interface ProviderRegistration {
+  providerClass: new (config?: ProviderConfig) => BaseProvider;
+  modelPrefixes: string[];
+  aliases: string[];
+  providerAliases?: string[];
+}
+
+class ProviderFactory {
+  private static registry = new Map<string, ProviderRegistration>();
+
+  static registerProvider(name: string, registration: ProviderRegistration): void;
+  static getProviderForModel(modelId: string, config?: ProviderConfig): BaseProvider;
+  static getAllProviders(): BaseProvider[];
+}
+```
+
+**Model Routing**:
 
 - Model IDs starting with `glm-` → ZaiProvider
 - Model IDs starting with `claude-` → ClaudeProvider
-- Direct provider access via `zai`, `glm`, or `claude`
+- Aliases: `zai`, `glm` → ZaiProvider; `claude` → ClaudeProvider
+- Extensible via `ProviderFactory.registerProvider()`
 
 ### Model Resolver System
 
@@ -495,13 +535,14 @@ The `libs/model-resolver` library provides centralized model resolution and rout
 **Resolution Flow**:
 
 ```
-User Input → Alias Lookup → Provider Detection → Model Selection
+User Input → Alias Lookup → Provider Detection → Provider Availability Check → Model Selection
 ```
 
 1. **Full model strings** (e.g., `glm-4.7`, `claude-opus-4.5-20251101`) pass through unchanged
 2. **Model aliases** are resolved via provider-specific maps
 3. **Provider detection** via model prefix or explicit selection
-4. **Provider-aware defaults** via `providerHint` parameter
+4. **Provider availability check** - Falls back to equivalent model if provider disabled
+5. **Provider-aware defaults** via `providerHint` parameter
 
 **Provider-Aware Model Resolution**:
 
@@ -516,6 +557,24 @@ resolveModelString(
 - `providerHint: 'zai'` → defaults to `glm-4.7`
 - `providerHint: 'claude'` → defaults to `claude-opus-4.5-20251101`
 - `providerHint: 'auto'` → defaults to Claude (backward compatibility)
+
+**Model Equivalence (Provider Fallback)**:
+
+When a provider is disabled, the system automatically routes to an equivalent model from an enabled provider:
+
+```typescript
+resolveModelWithProviderAvailability(
+  model: string,
+  enabledProviders: { claude: boolean; zai: boolean },
+  defaultModel?: string
+): string
+```
+
+| Model                   | Equivalent      | Provider Mapping    |
+| ----------------------- | --------------- | ------------------- |
+| `claude-opus-4.5-...`   | ↔ `glm-4.7`     | Premium ↔ Premium   |
+| `claude-sonnet-4.5-...` | ↔ `glm-4.6`     | Balanced ↔ Balanced |
+| `claude-haiku-4.5-...`  | ↔ `glm-4.5-air` | Speed ↔ Speed       |
 
 **Model Aliases**:
 
@@ -593,6 +652,54 @@ type ModelProvider = 'claude' | 'zai';
 - Protection against directory traversal
 - Atomic file writes for data integrity
 - API key masking in UI
+
+---
+
+## Onboarding Wizard
+
+The setup wizard guides users through initial configuration:
+
+**Wizard Flow**:
+
+```
+welcome → theme → provider_selection → provider_setup → github → complete
+```
+
+**Steps**:
+
+| Step                   | Purpose                                                         |
+| ---------------------- | --------------------------------------------------------------- |
+| **Welcome**            | Introduction to AutoMaker                                       |
+| **Theme**              | Select visual theme preference                                  |
+| **Provider Selection** | Choose primary AI provider (Claude or Zai)                      |
+| **Provider Setup**     | Configure API key for selected provider (CLI option for Claude) |
+| **GitHub**             | Optional GitHub integration for PR creation                     |
+| **Complete**           | Setup finished, redirect to main view                           |
+
+**Provider Selection**:
+
+Users choose one primary provider during onboarding:
+
+- **Claude (Anthropic)**: CLI support + API key option
+- **Z.ai (GLM)**: API key only
+
+Additional providers can be added later from Settings view.
+
+**Provider Cards**:
+
+Each provider in Settings view displays:
+
+- Provider name and icon
+- Enable/disable toggle switch
+- API key input with visibility toggle
+- Test connection button
+- Verification status indicator
+
+**Auto-Enable Behavior**:
+
+- Providers are auto-enabled when a valid API key is saved
+- Manual toggle allows disabling without removing the API key
+- Both providers can be enabled simultaneously
 
 ---
 
@@ -723,11 +830,17 @@ export class NewProvider extends BaseProvider {
 - Include provider map in `ALL_MODEL_MAPS`
 - Add `providerHint` support for provider-aware defaults
 
-**4. Update Provider Factory** (`apps/server/src/providers/provider-factory.ts`):
+**4. Register Provider** (`apps/server/src/providers/provider-factory.ts`):
 
-- Add routing logic for new provider's model prefix
-- Include in `getAllProviders()` return
-- Add to `checkAllProviders()` status checks
+```typescript
+ProviderFactory.registerProvider('provider-name', {
+  providerClass: NewProvider,
+  modelPrefixes: ['provider-'],
+  aliases: ['provider', 'prov'],
+});
+```
+
+The registry pattern eliminates if/else chains and allows dynamic provider registration.
 
 **5. Update Provider Query** (`apps/server/src/lib/provider-query.ts`):
 
@@ -859,11 +972,14 @@ AutoMaker is a sophisticated monorepo combining modern web development with cutt
 5. **File-based Storage** - Lightweight, portable, no database required
 6. **Provider Architecture** - Extensible AI model integration via BaseProvider interface
 7. **Model Resolver System** - Centralized model routing, alias resolution, provider-aware defaults
-8. **Extended Thinking Support** - UI displays reasoning content for both Claude and Zai with collapsible toggle
-9. **Git Worktree Isolation** - Safe concurrent feature development
-10. **Real-time Events** - WebSocket-based live updates
-11. **Comprehensive Testing** - Unit, integration, and E2E coverage for providers
-12. **Cross-platform** - Electron desktop apps for Windows, macOS, Linux
+8. **Model Equivalence Routing** - Automatic fallback to equivalent models when provider is disabled
+9. **Provider Enable/Disable UX** - Toggle switches in settings for provider control
+10. **Setup Wizard Provider Selection** - Choose primary provider (Claude or Zai) during onboarding
+11. **Extended Thinking Support** - UI displays reasoning content for both Claude and Zai with collapsible toggle
+12. **Git Worktree Isolation** - Safe concurrent feature development
+13. **Real-time Events** - WebSocket-based live updates
+14. **Comprehensive Testing** - Unit, integration, and E2E coverage for providers
+15. **Cross-platform** - Electron desktop apps for Windows, macOS, Linux
 
 **Zai Integration Status**: ✅ Complete
 
@@ -872,4 +988,13 @@ AutoMaker is a sophisticated monorepo combining modern web development with cutt
 - Vision support via GLM-4.6v (with fallback for other models)
 - Extended thinking mode with UI display
 - Provider-agnostic route execution
-- Comprehensive test coverage
+- Comprehensive test coverage (44 provider tests)
+- **Security hardened**:
+  - Command allowlist (network commands and permission modifiers removed)
+  - Docker commands gated by `ZAI_ALLOW_DOCKER` environment variable
+  - Path traversal blocking (including `--flag=path` forms)
+  - Recursive flag blocking (`-r`, `-R`, `-a`, `--recursive`)
+  - `ALLOWED_ROOT_DIRECTORY` enforced via `@automaker/platform` guards
+  - Symlink target validation for `ln` command
+  - Tool execution guard (only executes on proper `finish_reason`)
+- **Extensibility**: Registry-based provider factory for easy additions

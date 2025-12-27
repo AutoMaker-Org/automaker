@@ -1,9 +1,12 @@
 /**
  * Provider Factory - Routes model IDs to the appropriate provider
  *
- * This factory implements model-based routing to automatically select
- * the correct provider based on the model string. This makes adding
- * new providers (Cursor, OpenCode, etc.) trivial - just add one line.
+ * This factory implements model-based routing using a registry pattern.
+ * New providers can be registered dynamically, making the system extensible.
+ *
+ * To add a new provider:
+ * 1. Import the provider class
+ * 2. Call ProviderFactory.registerProvider() with the registration config
  */
 
 import { BaseProvider } from './base-provider.js';
@@ -11,52 +14,77 @@ import { ClaudeProvider } from './claude-provider.js';
 import { ZaiProvider } from './zai-provider.js';
 import type { InstallationStatus, ProviderConfig } from './types.js';
 
+/**
+ * Provider registration configuration
+ */
+export interface ProviderRegistration {
+  /** Provider class to instantiate */
+  providerClass: new (config?: ProviderConfig) => BaseProvider;
+  /** Model prefixes that route to this provider (e.g., ['claude-', 'glm-']) */
+  modelPrefixes: string[];
+  /** Model aliases that route to this provider (e.g., ['opus', 'sonnet']) */
+  aliases: string[];
+  /** Provider name aliases (e.g., 'anthropic' for Claude) */
+  providerAliases?: string[];
+}
+
 export class ProviderFactory {
+  /**
+   * Registry of all registered providers
+   */
+  private static registry = new Map<string, ProviderRegistration>();
+
+  /**
+   * Register a provider with the factory
+   *
+   * @param name Unique provider name (e.g., 'claude', 'zai')
+   * @param registration Provider registration configuration
+   */
+  static registerProvider(name: string, registration: ProviderRegistration): void {
+    this.registry.set(name.toLowerCase(), registration);
+  }
+
+  /**
+   * Unregister a provider
+   *
+   * @param name Provider name to unregister
+   */
+  static unregisterProvider(name: string): void {
+    this.registry.delete(name.toLowerCase());
+  }
+
   /**
    * Get the appropriate provider for a given model ID
    *
-   * @param modelId Model identifier (e.g., "claude-opus-4-5-20251101", "gpt-5.2", "cursor-fast")
+   * @param modelId Model identifier (e.g., "claude-opus-4-5-20251101", "glm-4.7")
    * @param config Optional provider configuration (including API keys)
    * @returns Provider instance for the model
    */
   static getProviderForModel(modelId: string, config?: ProviderConfig): BaseProvider {
     const lowerModel = modelId.toLowerCase();
 
-    // z.ai models (glm-4, glm-4.7, etc.)
-    if (lowerModel.startsWith('glm-')) {
-      const provider = new ZaiProvider(config);
-      return provider;
+    // Check model prefixes first
+    for (const [name, registration] of this.registry) {
+      if (
+        registration.modelPrefixes.some((prefix) => lowerModel.startsWith(prefix)) ||
+        registration.aliases.includes(lowerModel)
+      ) {
+        return new registration.providerClass(config);
+      }
     }
-
-    // Claude models (claude-*, opus, sonnet, haiku)
-    if (lowerModel.startsWith('claude-') || ['haiku', 'sonnet', 'opus'].includes(lowerModel)) {
-      const provider = new ClaudeProvider(config);
-      return provider;
-    }
-
-    // Future providers:
-    // if (lowerModel.startsWith("cursor-")) {
-    //   return new CursorProvider();
-    // }
-    // if (lowerModel.startsWith("opencode-")) {
-    //   return new OpenCodeProvider();
-    // }
 
     // Default to Claude for unknown models
-    console.warn(`[ProviderFactory] Unknown model prefix for "${modelId}", defaulting to Claude`);
-    const provider = new ClaudeProvider(config);
-    return provider;
+    console.warn(
+      `[ProviderFactory] Unknown model "${modelId}", defaulting to Claude (registered providers: ${Array.from(this.registry.keys()).join(', ')})`
+    );
+    return new ClaudeProvider(config);
   }
 
   /**
    * Get all available providers
    */
   static getAllProviders(): BaseProvider[] {
-    return [
-      new ClaudeProvider(),
-      new ZaiProvider(),
-      // Future providers...
-    ];
+    return Array.from(this.registry.values()).map(({ providerClass }) => new providerClass());
   }
 
   /**
@@ -80,30 +108,20 @@ export class ProviderFactory {
   /**
    * Get provider by name (for direct access if needed)
    *
-   * @param name Provider name (e.g., "claude", "cursor")
+   * @param name Provider name (e.g., "claude", "zai")
    * @returns Provider instance or null if not found
    */
-  static getProviderByName(name: string): BaseProvider | null {
+  static getProviderByName(name: string, config?: ProviderConfig): BaseProvider | null {
     const lowerName = name.toLowerCase();
 
-    switch (lowerName) {
-      case 'claude':
-      case 'anthropic':
-        return new ClaudeProvider();
-
-      case 'zai':
-      case 'glm':
-        return new ZaiProvider();
-
-      // Future providers:
-      // case "cursor":
-      //   return new CursorProvider();
-      // case "opencode":
-      //   return new OpenCodeProvider();
-
-      default:
-        return null;
+    // Check registered providers
+    for (const [providerName, registration] of this.registry) {
+      if (providerName === lowerName || registration.providerAliases?.includes(lowerName)) {
+        return new registration.providerClass(config);
+      }
     }
+
+    return null;
   }
 
   /**
@@ -121,3 +139,18 @@ export class ProviderFactory {
     return allModels;
   }
 }
+
+// Auto-register built-in providers on module load
+ProviderFactory.registerProvider('claude', {
+  providerClass: ClaudeProvider,
+  modelPrefixes: ['claude-'],
+  aliases: ['haiku', 'sonnet', 'opus'],
+  providerAliases: ['anthropic'],
+});
+
+ProviderFactory.registerProvider('zai', {
+  providerClass: ZaiProvider,
+  modelPrefixes: ['glm-'],
+  aliases: ['glm'],
+  providerAliases: ['zhipuai', 'zhipu'],
+});

@@ -5,11 +5,12 @@
  * with tool calling capabilities. GLM-4.6v is the only model that supports vision.
  */
 
-import { secureFs } from '@automaker/platform';
+import { secureFs, validatePath } from '@automaker/platform';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import * as path from 'path';
-import { BaseProvider } from './base-provider.js';
+import * as fs from 'fs/promises';
+import { BaseProvider, type ProviderFeature } from './base-provider.js';
 import type {
   ExecuteOptions,
   ProviderMessage,
@@ -22,6 +23,401 @@ import { createLogger } from '@automaker/utils';
 const logger = createLogger('ZaiProvider');
 
 const execAsync = promisify(exec);
+
+/**
+ * Whitelist of allowed commands for execute_command tool
+ * Commands are executed with sanitized arguments to prevent command injection
+ */
+const ALLOWED_COMMANDS = new Set([
+  // File operations - note: chmod, chown removed for security (easy to misuse)
+  'ls',
+  'cat',
+  'head',
+  'tail',
+  'wc',
+  'sort',
+  'uniq',
+  'find',
+  'locate',
+  'which',
+  'whereis',
+  'mkdir',
+  'rm',
+  'cp',
+  'mv',
+  'touch',
+  'ln',
+  // Development tools
+  'git',
+  'npm',
+  'pnpm',
+  'yarn',
+  'bun',
+  'node',
+  'python',
+  'python3',
+  'pip',
+  'pip3',
+  'poetry',
+  'cargo',
+  'rustc',
+  'go',
+  'gofmt',
+  'javac',
+  'java',
+  'mvn',
+  'gradle',
+  'kotlinc',
+  'kotlin',
+  'dotnet',
+  'nuget',
+  'ruby',
+  'gem',
+  'bundle',
+  'php',
+  'composer',
+  // Docker - disabled by default, requires ZAI_ALLOW_DOCKER=1
+  'docker',
+  'docker-compose',
+  'podman',
+  // Build tools
+  'make',
+  'cmake',
+  'ninja',
+  'gcc',
+  'g++',
+  'clang',
+  'clang++',
+  'cc',
+  'c++',
+  'rustfmt',
+  'black',
+  'prettier',
+  'eslint',
+  // Testing tools
+  'pytest',
+  'vitest',
+  'jest',
+  'mocha',
+  'jasmine',
+  'karma',
+  'test',
+  // Build tools
+  'webpack',
+  'vite',
+  'rollup',
+  'parcel',
+  'esbuild',
+  'tsc',
+  'babel',
+  'swc',
+  // Common utilities - curl, wget removed (bypass sandbox)
+  'echo',
+  'printf',
+  'date',
+  'sleep',
+  'time',
+  'watch',
+  'xargs',
+  'tar',
+  'zip',
+  'unzip',
+  'gzip',
+  'gunzip',
+  'grep',
+  'sed',
+  'awk',
+  'tr',
+  'cut',
+  'paste',
+  'join',
+  'pwd',
+  'cd',
+  'pushd',
+  'popd',
+  'dirs',
+]);
+
+/**
+ * File extensions for grep search - expand to cover more file types
+ */
+const GREP_EXTENSIONS = new Set([
+  'ts',
+  'tsx',
+  'js',
+  'jsx',
+  'mjs',
+  'cjs',
+  'json',
+  'jsonc',
+  'md',
+  'mdx',
+  'txt',
+  'css',
+  'scss',
+  'sass',
+  'less',
+  'html',
+  'htm',
+  'xml',
+  'svg',
+  'yaml',
+  'yml',
+  'toml',
+  'ini',
+  'conf',
+  'py',
+  'rb',
+  'php',
+  'java',
+  'go',
+  'rs',
+  'c',
+  'cpp',
+  'cc',
+  'cxx',
+  'h',
+  'hpp',
+  'sh',
+  'bash',
+  'zsh',
+  'fish',
+  'dockerfile',
+  'dockerignore',
+  'gitignore',
+  'gitattributes',
+  'env',
+  'env.example',
+]);
+
+/**
+ * Commands that take file paths as arguments
+ * Used for additional path validation
+ */
+const PATH_COMMANDS = new Set<string>([
+  'rm',
+  'mv',
+  'cp',
+  'mkdir',
+  'touch',
+  'ln',
+  'cat',
+  'head',
+  'tail',
+  'ls',
+  'find',
+  'grep',
+  'sed',
+  'git',
+  'npm',
+  'pnpm',
+  'yarn',
+  'node',
+  'python',
+  'python3',
+  'tsc',
+  'vitest',
+  'jest',
+  'pytest',
+]);
+
+/**
+ * Flags that indicate next arg is a path (e.g., -f, -o, --out)
+ */
+const PATH_FLAGS = new Set([
+  '-f',
+  '-o',
+  '-i',
+  '--file',
+  '--output',
+  '--out',
+  '-C',
+  '-c',
+  '--config',
+]);
+
+/**
+ * Extract path from --flag=value or -Cvalue format
+ * Returns the path part if found, null otherwise
+ */
+function extractPathFromFlag(arg: string): string | null {
+  // Handle --flag=path or --flag:path format
+  if (arg.startsWith('--')) {
+    const eqMatch = arg.match(/^--[^=]+=(.+)/);
+    if (eqMatch) return eqMatch[1];
+    const colonMatch = arg.match(/^--[^:]+:(.+)/);
+    if (colonMatch) return colonMatch[1];
+  }
+  // Handle -Cpath or -fpath format (single dash with value attached)
+  if (arg.startsWith('-') && !arg.startsWith('--') && arg.length > 2) {
+    // Some flags like -C, -f, -o can have attached values
+    const flag = arg.slice(0, 2);
+    if (PATH_FLAGS.has(flag)) {
+      return arg.slice(2);
+    }
+  }
+  return null;
+}
+
+/**
+ * Dangerous recursive flags to block
+ */
+const RECURSIVE_FLAGS = new Set(['-R', '-r', '--recursive', '-a']);
+
+/**
+ * Check if an argument looks like a file path
+ */
+function looksLikePath(arg: string): boolean {
+  return (
+    arg.startsWith('./') ||
+    arg.includes('/') ||
+    arg.includes('\\') ||
+    /^\w+\.\w+$/.test(arg) ||
+    arg === '-' ||
+    arg === '.'
+  );
+}
+
+/**
+ * Validate and sanitize a shell command
+ * @param command - Command string to sanitize
+ * @param cwd - Current working directory for path validation
+ * @returns Object with command and sanitized arguments
+ * @throws Error if command is not allowed or arguments contain dangerous characters
+ */
+function sanitizeCommand(command: string, cwd: string): { command: string; args: string[] } {
+  const trimmed = command.trim();
+  if (!trimmed) {
+    throw new Error('Command cannot be empty');
+  }
+
+  // Split by whitespace but respect quotes
+  const parts: string[] = [];
+  let current = '';
+  let inQuote = false;
+  let quoteChar = '';
+
+  for (let i = 0; i < trimmed.length; i++) {
+    const char = trimmed[i];
+
+    if (inQuote) {
+      if (char === quoteChar) {
+        inQuote = false;
+        quoteChar = '';
+      } else {
+        current += char;
+      }
+    } else if (char === '"' || char === "'") {
+      inQuote = true;
+      quoteChar = char;
+    } else if (char === ' ' || char === '\t') {
+      if (current) {
+        parts.push(current);
+        current = '';
+      }
+    } else {
+      current += char;
+    }
+  }
+
+  if (current) {
+    parts.push(current);
+  }
+
+  if (parts.length === 0) {
+    throw new Error('Command cannot be empty');
+  }
+
+  const baseCommand = parts[0];
+
+  if (!ALLOWED_COMMANDS.has(baseCommand)) {
+    throw new Error(`Command not allowed: ${baseCommand}`);
+  }
+
+  // Sanitize arguments - reject shell metacharacters that could enable injection
+  const dangerousChars = /[;&|`$(){}[\]<>"'\\]/;
+  for (let i = 1; i < parts.length; i++) {
+    const arg = parts[i];
+    if (dangerousChars.test(arg)) {
+      throw new Error(`Invalid characters in argument: ${arg}`);
+    }
+  }
+
+  // Check for path traversal in ALL arguments (including --flag=value forms)
+  for (let i = 1; i < parts.length; i++) {
+    const arg = parts[i];
+    const embeddedPath = extractPathFromFlag(arg);
+    if (arg.includes('..') || (embeddedPath && embeddedPath.includes('..'))) {
+      throw new Error(`Path traversal not allowed: ${arg}`);
+    }
+  }
+
+  // Block recursive/dangerous flags
+  for (let i = 1; i < parts.length; i++) {
+    const arg = parts[i];
+    if (RECURSIVE_FLAGS.has(arg)) {
+      throw new Error(`Recursive flag not allowed: ${arg}`);
+    }
+  }
+
+  // Track symlink target for ln command (ln source target - target is 2nd path arg)
+  let symlinkTargetIndex = -1;
+  if (baseCommand === 'ln') {
+    // ln creates source -> target, where target is the second path-like arg
+    let pathCount = 0;
+    for (let i = 1; i < parts.length; i++) {
+      const arg = parts[i];
+      const embeddedPath = extractPathFromFlag(arg);
+      const hasPath = looksLikePath(arg) || embeddedPath !== null;
+      if (hasPath || PATH_FLAGS.has(arg)) {
+        pathCount++;
+        if (pathCount === 2) {
+          symlinkTargetIndex = i;
+          break;
+        }
+      }
+    }
+  }
+
+  // Validate path-like arguments using platform guard
+  let nextArgIsPath = false;
+  for (let i = 1; i < parts.length; i++) {
+    const arg = parts[i];
+    const embeddedPath = extractPathFromFlag(arg);
+
+    // Check if this arg should be treated as a path
+    if (nextArgIsPath || (PATH_COMMANDS.has(baseCommand) && looksLikePath(arg))) {
+      // Use platform guard - blocks absolute paths and outside-root
+      const resolved = path.resolve(cwd, arg);
+      validatePath(resolved); // Throws if outside ALLOWED_ROOT_DIRECTORY
+      nextArgIsPath = false;
+    } else if (embeddedPath !== null) {
+      // Handle --flag=path or -Cpath format
+      const resolved = path.resolve(cwd, embeddedPath);
+      validatePath(resolved); // Throws if outside ALLOWED_ROOT_DIRECTORY
+    } else if (PATH_FLAGS.has(arg)) {
+      nextArgIsPath = true;
+    }
+  }
+
+  // Special check for ln: verify symlink target won't point outside root
+  if (baseCommand === 'ln' && symlinkTargetIndex > 0) {
+    const targetArg = parts[symlinkTargetIndex];
+    const embeddedPath = extractPathFromFlag(targetArg);
+    const pathToCheck = embeddedPath || targetArg;
+
+    // For symlinks, verify the target exists and resolve to check if it escapes
+    const resolvedTarget = path.resolve(cwd, pathToCheck);
+    // Check if the target itself is within allowed root
+    try {
+      validatePath(resolvedTarget);
+    } catch {
+      throw new Error(`Symlink target outside allowed root: ${pathToCheck}`);
+    }
+  }
+
+  return { command: baseCommand, args: parts.slice(1) };
+}
 
 /**
  * Z.ai API configuration
@@ -164,48 +560,152 @@ const ZAI_TOOLS = [
 ];
 
 /**
- * Simple glob implementation using shell
+ * Validate glob pattern for security
+ */
+function validateGlobPattern(pattern: string): void {
+  // Check for path traversal
+  if (pattern.includes('..')) {
+    throw new Error('Path traversal not allowed in glob pattern');
+  }
+
+  // Check for command injection characters
+  const dangerousChars = /[;&|`$(){}[\]<>"'\\]/;
+  if (dangerousChars.test(pattern)) {
+    throw new Error('Invalid characters in glob pattern');
+  }
+
+  // Check for absolute paths
+  if (path.isAbsolute(pattern)) {
+    throw new Error('Absolute paths not allowed in glob pattern');
+  }
+}
+
+/**
+ * Native glob implementation using fs.readdir
+ * No external dependencies or shell commands for better security
  */
 async function glob(pattern: string, cwd: string): Promise<string[]> {
+  validateGlobPattern(pattern);
+
   try {
-    // Use command string directly with shell
-    const cmd = `cd "${cwd}" && ls -d ${pattern} 2>/dev/null || echo ""`;
-    const { stdout } = await execAsync(cmd, {
-      maxBuffer: 10 * 1024 * 1024,
-    });
-    const results = stdout.trim().split('\n').filter(Boolean);
+    const results: string[] = [];
+    const regex = globToRegex(pattern, cwd);
+    const maxDepth = (pattern.match(/\//g) || []).length + 2; // Limit recursion depth
+
+    async function walkDir(dir: string, depth: number): Promise<void> {
+      if (depth > maxDepth) return;
+
+      try {
+        const entries = await fs.readdir(dir, { withFileTypes: true });
+
+        for (const entry of entries) {
+          const fullPath = path.join(dir, entry.name);
+          const relativePath = path.relative(cwd, fullPath);
+
+          // Skip dot files unless explicitly requested
+          if (!pattern.includes('.') && entry.name.startsWith('.')) {
+            continue;
+          }
+
+          // Check if the path matches the pattern
+          if (regex.test(relativePath)) {
+            results.push(relativePath.replace(/\\/g, '/'));
+          }
+
+          // Recurse into directories
+          if (entry.isDirectory()) {
+            // Check if pattern might have deeper matches
+            if (pattern.includes('/') || pattern.includes('*')) {
+              await walkDir(fullPath, depth + 1);
+            }
+          }
+        }
+      } catch {
+        // Skip directories we can't read
+      }
+    }
+
+    await walkDir(cwd, 0);
     return results;
-  } catch {
+  } catch (error) {
+    logger.warn(`Glob failed: ${(error as Error).message}`);
     return [];
   }
 }
 
 /**
- * Simple grep implementation using shell
+ * Convert a glob pattern to a RegExp for matching
+ */
+function globToRegex(globPattern: string, basePath: string): RegExp {
+  // Escape special regex characters except for glob wildcards
+  let regexStr = globPattern
+    .replace(/\./g, '\\.') // Literal dots
+    .replace(/\?/g, '[^/]') // ? matches any single character except /
+    .replace(/\*\*/g, '.*') // ** matches any number of path segments
+    .replace(/\*/g, '[^/]*'); // * matches any characters except /
+
+  return new RegExp(`^${regexStr}$`);
+}
+
+/**
+ * Native grep implementation using fs and glob
+ * No shell commands involved for better security
  */
 async function grep(
   pattern: string,
   searchPath: string
 ): Promise<Array<{ path: string; line: number; text: string }>> {
+  // Validate pattern for security
+  if (/[;&|`$(){}[\]<>"'\\]/.test(pattern)) {
+    throw new Error('Invalid characters in grep pattern');
+  }
+
   try {
-    const cmd = `grep -rn --include="*.ts" --include="*.tsx" --include="*.js" --include="*.jsx" --include="*.json" --include="*.md" "${pattern}" "${searchPath}" 2>/dev/null || echo ""`;
-    const { stdout } = await execAsync(cmd, {
-      maxBuffer: 10 * 1024 * 1024,
-    });
-    const results: Array<{ path: string; line: number; text: string }> = [];
-    for (const line of stdout.trim().split('\n')) {
-      if (!line) continue;
-      const match = line.match(/^([^:]+):(\d+):(.+)$/);
-      if (match) {
-        results.push({
-          path: match[1],
-          line: parseInt(match[2], 10),
-          text: match[3].trim(),
-        });
+    // Find all files with matching extensions in the search path
+    const extensionPatterns = Array.from(GREP_EXTENSIONS).flatMap((ext) => [
+      `**/*.${ext}`,
+      `**/*.${ext.toUpperCase()}`,
+    ]);
+
+    // Collect all matching file paths
+    const filePathsSet = new Set<string>();
+    for (const extPattern of extensionPatterns) {
+      const matches = await glob(extPattern, searchPath);
+      for (const match of matches) {
+        filePathsSet.add(match);
       }
     }
+
+    const filePaths = Array.from(filePathsSet).slice(0, 1000); // Limit to 1000 files
+
+    // Search through each file
+    const results: Array<{ path: string; line: number; text: string }> = [];
+    const regex = new RegExp(pattern, 'i'); // Case-insensitive search
+
+    for (const filePath of filePaths) {
+      try {
+        const fullPath = path.resolve(searchPath, filePath);
+        const content = await fs.readFile(fullPath, 'utf-8');
+        const lines = content.split('\n');
+
+        for (let i = 0; i < lines.length; i++) {
+          if (regex.test(lines[i])) {
+            results.push({
+              path: filePath,
+              line: i + 1,
+              text: lines[i].trim().substring(0, 200), // Limit text length
+            });
+          }
+        }
+      } catch {
+        // Skip files that can't be read
+        continue;
+      }
+    }
+
     return results;
-  } catch {
+  } catch (error) {
+    logger.warn(`Grep failed: ${(error as Error).message}`);
     return [];
   }
 }
@@ -214,8 +714,18 @@ async function grep(
  * Safely resolve a file path relative to baseCwd
  * For read operations, allows paths outside baseCwd (for context)
  * For write operations, restricts to within baseCwd (for security)
+ * Enhanced with symlink checking and null byte detection
  */
-function safeResolvePath(baseCwd: string, filePath: string, allowOutside: boolean = false): string {
+async function safeResolvePath(
+  baseCwd: string,
+  filePath: string,
+  allowOutside: boolean = false
+): Promise<string> {
+  // Check for null byte injection attack
+  if (filePath.includes('\0')) {
+    throw new Error('Null bytes not allowed in paths');
+  }
+
   // Remove leading slash if present (indicates absolute path on Unix)
   // On Windows, this prevents paths like /home/workspace from becoming C:\home\workspace
   let normalizedPath = filePath.replace(/^\/+/, '');
@@ -227,8 +737,39 @@ function safeResolvePath(baseCwd: string, filePath: string, allowOutside: boolea
   // Security check: only enforce if allowOutside is false
   if (!allowOutside) {
     const relativePath = path.relative(baseCwd, absolutePath);
-    if (relativePath.startsWith('..')) {
+    if (relativePath.startsWith('..') || path.isAbsolute(relativePath)) {
       throw new Error(`Access denied: path "${filePath}" is outside working directory`);
+    }
+
+    // Check for symlink escape attempts
+    try {
+      const stat = await fs.stat(absolutePath);
+      if (stat.isSymbolicLink()) {
+        const targetPath = path.resolve(
+          path.dirname(absolutePath),
+          await fs.readlink(absolutePath)
+        );
+        const targetRelative = path.relative(baseCwd, targetPath);
+        if (targetRelative.startsWith('..')) {
+          throw new Error(`Symlink targets outside working directory: ${filePath}`);
+        }
+      }
+    } catch {
+      // File doesn't exist yet - allow for new file creation
+      // But check parent directory for symlinks
+      try {
+        const parentDir = path.dirname(absolutePath);
+        const parentStat = await fs.stat(parentDir);
+        if (parentStat.isSymbolicLink()) {
+          const targetPath = path.resolve(path.dirname(parentDir), await fs.readlink(parentDir));
+          const targetRelative = path.relative(baseCwd, targetPath);
+          if (targetRelative.startsWith('..')) {
+            throw new Error(`Parent directory symlink targets outside working directory`);
+          }
+        }
+      } catch {
+        // Parent doesn't exist either - will be created
+      }
     }
   }
 
@@ -247,7 +788,7 @@ async function executeToolCall(
     case 'read_file': {
       const filePath = toolArgs.filePath as string;
       // Allow reading files outside worktree for context
-      const absolutePath = safeResolvePath(baseCwd, filePath, true);
+      const absolutePath = await safeResolvePath(baseCwd, filePath, true);
       const content = (await secureFs.readFile(absolutePath, 'utf-8')) as string;
       return content;
     }
@@ -256,7 +797,7 @@ async function executeToolCall(
       const filePath = toolArgs.filePath as string;
       const content = toolArgs.content as string;
       // Writes must be within worktree (security)
-      const absolutePath = safeResolvePath(baseCwd, filePath, false);
+      const absolutePath = await safeResolvePath(baseCwd, filePath, false);
       // Ensure parent directory exists
       const dir = path.dirname(absolutePath);
       await secureFs.mkdir(dir, { recursive: true });
@@ -269,7 +810,7 @@ async function executeToolCall(
       const oldString = toolArgs.oldString as string;
       const newString = toolArgs.newString as string;
       // Edits must be within worktree (security)
-      const absolutePath = safeResolvePath(baseCwd, filePath, false);
+      const absolutePath = await safeResolvePath(baseCwd, filePath, false);
       const content = (await secureFs.readFile(absolutePath, 'utf-8')) as string;
       const newContent = content.replace(oldString, newString);
       if (newContent === content) {
@@ -282,8 +823,9 @@ async function executeToolCall(
     case 'glob_search': {
       const pattern = toolArgs.pattern as string;
       const searchCwd = (toolArgs.cwd as string) || baseCwd;
-      // Allow searching outside worktree for context
-      const safeSearchCwd = safeResolvePath(baseCwd, searchCwd, true);
+      // Restrict to worktree for security
+      const safeSearchCwd = await safeResolvePath(baseCwd, searchCwd, false);
+      validatePath(safeSearchCwd); // Enforce ALLOWED_ROOT_DIRECTORY
       const results = await glob(pattern, safeSearchCwd);
       return results.join('\n');
     }
@@ -291,8 +833,9 @@ async function executeToolCall(
     case 'grep_search': {
       const pattern = toolArgs.pattern as string;
       const searchPath = (toolArgs.searchPath as string) || baseCwd;
-      // Allow searching outside worktree for context
-      const safeSearchPath = safeResolvePath(baseCwd, searchPath, true);
+      // Restrict to worktree for security
+      const safeSearchPath = await safeResolvePath(baseCwd, searchPath, false);
+      validatePath(safeSearchPath); // Enforce ALLOWED_ROOT_DIRECTORY
       const results = await grep(pattern, safeSearchPath);
       return results.map((r) => `${r.path}:${r.line}:${r.text}`).join('\n');
     }
@@ -300,22 +843,43 @@ async function executeToolCall(
     case 'execute_command': {
       const command = toolArgs.command as string;
       const commandCwd = (toolArgs.cwd as string) || baseCwd;
-      // For commands, allow the cwd to be anywhere (not restricted to baseCwd)
-      // The model might need to run commands in the project directory or other locations
-      // Only normalize Unix-style absolute paths
-      let normalizedCwd = commandCwd.replace(/^\/+/, '');
+
+      // Resolve and validate cwd using platform guard
       const resolvedCwd = path.isAbsolute(commandCwd)
         ? commandCwd
-        : path.resolve(baseCwd, normalizedCwd);
+        : path.resolve(baseCwd, commandCwd);
+      validatePath(resolvedCwd); // Throws if outside ALLOWED_ROOT_DIRECTORY
+
+      // Sanitize command with cwd for path validation
+      const sanitized = sanitizeCommand(command, resolvedCwd);
+
+      // Check for docker (disabled by default)
+      if (sanitized.command === 'docker' && !process.env.ZAI_ALLOW_DOCKER) {
+        throw new Error('Docker commands not enabled (set ZAI_ALLOW_DOCKER=1)');
+      }
+
       try {
-        const { stdout, stderr } = await execAsync(command, {
+        // Build command with sanitized arguments
+        const cmdString =
+          sanitized.args.length > 0
+            ? `${sanitized.command} ${sanitized.args.join(' ')}`
+            : sanitized.command;
+
+        const { stdout, stderr } = await execAsync(cmdString, {
           cwd: resolvedCwd,
-          maxBuffer: 10 * 1024 * 1024, // 10MB
-          env: { ...process.env },
+          maxBuffer: 1024 * 1024, // 1MB
+          env: { PATH: process.env.PATH }, // Minimal environment
+          timeout: 30000, // 30 second timeout
         });
+
         return stdout || stderr;
       } catch (error) {
-        return `Command failed: ${(error as Error).message}`;
+        const errorMessage = (error as Error).message;
+        // Check if it's a timeout
+        if (errorMessage.includes('timedOut')) {
+          return `Command timed out after 30 seconds`;
+        }
+        return `Command failed: ${errorMessage}`;
       }
     }
 
@@ -542,7 +1106,7 @@ export class ZaiProvider extends BaseProvider {
       turnCount++;
 
       try {
-        // Call Z.ai API
+        // Call Z.ai API with streaming enabled
         const response = await fetch(`${ZAI_API_BASE}/chat/completions`, {
           method: 'POST',
           headers: {
@@ -554,7 +1118,7 @@ export class ZaiProvider extends BaseProvider {
             messages,
             tools: toolsToUse.length > 0 ? toolsToUse : undefined,
             tool_choice: toolsToUse.length > 0 ? 'auto' : undefined,
-            stream: false,
+            stream: true, // Enable streaming for better UX
             temperature: 0.7,
             // Z.ai thinking mode support (GLM-4.7)
             // Default to enabled thinking for GLM-4.7 if not explicitly disabled
@@ -570,63 +1134,159 @@ export class ZaiProvider extends BaseProvider {
           throw new Error(`Z.ai API error: ${response.status} - ${errorText}`);
         }
 
-        const data = (await response.json()) as {
-          choices: Array<{
-            message: {
-              role: string;
-              content?: string;
-              reasoning_content?: string; // Zai thinking mode output
-              tool_calls?: Array<{
-                id: string;
-                type: string;
-                function: { name: string; arguments: string };
-              }>;
-            };
-            finish_reason: string;
-          }>;
-        };
+        // Parse streaming response (Server-Sent Events format)
+        const reader = response.body?.getReader();
+        if (!reader) {
+          throw new Error('No response body');
+        }
 
-        const choice = data.choices[0];
-        const message = choice.message;
+        const decoder = new TextDecoder();
+        let currentContent = '';
+        let currentReasoning = '';
+        let currentToolCalls: Map<number, { id: string; name: string; arguments: string }> =
+          new Map();
+        let finishReason = '';
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const chunk = decoder.decode(value, { stream: true });
+          const lines = chunk.split('\n');
+
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed || !trimmed.startsWith('data: ')) continue;
+
+            const data = trimmed.slice(6); // Remove 'data: ' prefix
+            if (data === '[DONE]') continue;
+
+            try {
+              const parsed = JSON.parse(data) as {
+                choices?: Array<{
+                  delta?: {
+                    content?: string;
+                    reasoning_content?: string;
+                    tool_calls?: Array<{
+                      index: number;
+                      id?: string;
+                      function?: { name?: string; arguments?: string };
+                    }>;
+                  };
+                  finish_reason?: string;
+                }>;
+              };
+
+              const choice = parsed.choices?.[0];
+              if (!choice) continue;
+
+              // Handle content delta
+              if (choice.delta?.content) {
+                currentContent += choice.delta.content;
+
+                // Yield text content incrementally
+                yield {
+                  type: 'assistant',
+                  session_id: sessionId,
+                  message: {
+                    role: 'assistant',
+                    content: [{ type: 'text', text: choice.delta.content }],
+                  },
+                };
+              }
+
+              // Handle reasoning content (thinking mode)
+              if (choice.delta?.reasoning_content) {
+                currentReasoning += choice.delta.reasoning_content;
+
+                // Yield reasoning content incrementally
+                yield {
+                  type: 'assistant',
+                  session_id: sessionId,
+                  message: {
+                    role: 'assistant',
+                    content: [
+                      {
+                        type: 'reasoning',
+                        reasoning_content: choice.delta.reasoning_content,
+                      },
+                    ],
+                  },
+                };
+              }
+
+              // Handle tool calls in streaming
+              if (choice.delta?.tool_calls) {
+                for (const toolCall of choice.delta.tool_calls) {
+                  const index = toolCall.index;
+
+                  if (!currentToolCalls.has(index)) {
+                    currentToolCalls.set(index, {
+                      id: toolCall.id || '',
+                      name: '',
+                      arguments: '',
+                    });
+                  }
+
+                  const current = currentToolCalls.get(index)!;
+                  if (toolCall.id) current.id = toolCall.id;
+                  if (toolCall.function?.name) current.name = toolCall.function.name;
+                  if (toolCall.function?.arguments) {
+                    current.arguments += toolCall.function.arguments;
+                  }
+                }
+              }
+
+              // Track finish reason
+              if (choice.finish_reason) {
+                finishReason = choice.finish_reason;
+              }
+            } catch (parseError) {
+              // Skip unparseable chunks
+              logger.debug(`Failed to parse SSE chunk: ${(parseError as Error).message}`);
+            }
+          }
+
+          // Check for tool use completion (no more deltas and we have tool calls)
+          if (finishReason === 'tool_calls' || finishReason === 'stop') {
+            break;
+          }
+        }
 
         // Add assistant message to history
-        // Include reasoning_content for preserved thinking (required by Zai)
         messages.push({
           role: 'assistant',
-          content: message.content,
-          reasoning_content: message.reasoning_content,
-          tool_calls: message.tool_calls,
+          content: currentContent || undefined,
+          reasoning_content: currentReasoning || undefined,
+          tool_calls:
+            currentToolCalls.size > 0
+              ? Array.from(currentToolCalls.values()).map((tc) => ({
+                  id: tc.id,
+                  type: 'function',
+                  function: {
+                    name: tc.name,
+                    arguments: tc.arguments,
+                  },
+                }))
+              : undefined,
         });
 
-        // Yield reasoning content first (thinking mode)
-        if (message.reasoning_content) {
-          yield {
-            type: 'assistant',
-            session_id: sessionId,
-            message: {
-              role: 'assistant',
-              content: [{ type: 'reasoning', reasoning_content: message.reasoning_content }],
-            },
-          };
-        }
+        // Process tool calls after streaming is complete
+        // Only execute tools if we received a proper tool_calls finish reason
+        if (currentToolCalls.size > 0 && finishReason === 'tool_calls') {
+          for (const [index, toolCall] of currentToolCalls) {
+            const toolName = toolCall.name;
+            let toolArgs: Record<string, unknown>;
 
-        // Yield text content
-        if (message.content) {
-          yield {
-            type: 'assistant',
-            session_id: sessionId,
-            message: {
-              role: 'assistant',
-              content: [{ type: 'text', text: message.content }],
-            },
-          };
-        }
-
-        // Handle tool calls
-        if (message.tool_calls && message.tool_calls.length > 0) {
-          for (const toolCall of message.tool_calls) {
-            const toolName = toolCall.function.name;
-            const toolArgs = JSON.parse(toolCall.function.arguments);
+            try {
+              toolArgs = JSON.parse(toolCall.arguments);
+            } catch {
+              yield {
+                type: 'error',
+                error: `Invalid tool arguments: ${toolCall.arguments}`,
+              };
+              continue;
+            }
 
             // Yield tool_use message
             yield {
@@ -679,8 +1339,8 @@ export class ZaiProvider extends BaseProvider {
           continue;
         }
 
-        // If no tool calls or finish_reason is 'stop', we're done
-        if (choice.finish_reason === 'stop' || !message.tool_calls) {
+        // If finish_reason is 'stop', we're done
+        if (finishReason === 'stop') {
           yield {
             type: 'result',
             result: 'Conversation completed',
@@ -830,58 +1490,63 @@ export class ZaiProvider extends BaseProvider {
    * Detect if Z.ai API key is configured
    */
   async detectInstallation(): Promise<InstallationStatus> {
+    let apiKey: string;
     try {
-      const apiKey = this.getApiKey();
-      const hasKey = !!apiKey && apiKey.length > 0;
+      apiKey = this.getApiKey();
+    } catch {
+      // No API key configured
+      return {
+        installed: true,
+        method: 'sdk',
+        hasApiKey: false,
+        authenticated: false,
+        error: 'ZAI_API_KEY not configured',
+      };
+    }
 
-      if (!hasKey) {
-        return {
-          installed: true,
-          method: 'sdk',
-          hasApiKey: false,
-          authenticated: false,
-          error: 'ZAI_API_KEY not configured',
-        };
-      }
+    const hasKey = !!apiKey && apiKey.length > 0;
+    if (!hasKey) {
+      return {
+        installed: true,
+        method: 'sdk',
+        hasApiKey: false,
+        authenticated: false,
+        error: 'ZAI_API_KEY not configured',
+      };
+    }
 
-      // Try a simple API call to verify the key works
-      try {
-        const response = await fetch(`${ZAI_API_BASE}/models`, {
-          method: 'GET',
-          headers: {
-            Authorization: `Bearer ${apiKey}`,
-          },
-        });
+    // Try a simple API call to verify the key works
+    try {
+      const response = await fetch(`${ZAI_API_BASE}/models`, {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+        },
+      });
 
-        if (response.ok) {
-          return {
-            installed: true,
-            method: 'sdk',
-            hasApiKey: true,
-            authenticated: true,
-          };
-        } else {
-          return {
-            installed: true,
-            method: 'sdk',
-            hasApiKey: true,
-            authenticated: false,
-            error: `API key validation failed: ${response.status}`,
-          };
-        }
-      } catch {
-        // Network error - consider as installed but unverified
+      if (response.ok) {
         return {
           installed: true,
           method: 'sdk',
           hasApiKey: true,
-          authenticated: true, // Assume valid if network fails
+          authenticated: true,
+        };
+      } else {
+        return {
+          installed: true,
+          method: 'sdk',
+          hasApiKey: true,
+          authenticated: false,
+          error: `API key validation failed: ${response.status}`,
         };
       }
-    } catch (error) {
+    } catch {
+      // Network error - consider as installed but unverified
       return {
-        installed: false,
-        error: (error as Error).message,
+        installed: true,
+        method: 'sdk',
+        hasApiKey: true,
+        authenticated: true, // Assume valid if network fails
       };
     }
   }
@@ -953,11 +1618,17 @@ export class ZaiProvider extends BaseProvider {
   /**
    * Check if the provider supports a specific feature
    */
-  supportsFeature(feature: string): boolean {
-    // Zai supports: tools, text, vision (via glm-4.6v), extended thinking (via glm-4.7)
+  supportsFeature(feature: ProviderFeature | string): boolean {
+    // Zai supports: tools, text, vision (via glm-4.6v), extended thinking (via all GLM models), structured output
     // Zai does NOT support: mcp, browser (these are application-layer features)
-    const supportedFeatures = ['tools', 'text', 'vision', 'extendedThinking'];
-    return supportedFeatures.includes(feature);
+    const supportedFeatures: ProviderFeature[] = [
+      'tools',
+      'text',
+      'vision',
+      'extendedThinking',
+      'structuredOutput',
+    ];
+    return supportedFeatures.includes(feature as ProviderFeature);
   }
 
   /**
@@ -970,7 +1641,7 @@ export class ZaiProvider extends BaseProvider {
     try {
       this.getApiKey();
     } catch {
-      errors.push('ZAI_API_KEY is not configured');
+      errors.push('ZAI_API_KEY not configured');
     }
 
     return {

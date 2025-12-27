@@ -13,7 +13,11 @@
 
 import type { EventEmitter } from './events.js';
 import { ProviderFactory } from '../providers/provider-factory.js';
-import { resolveModelString } from '@automaker/model-resolver';
+import {
+  resolveModelString,
+  resolveModelWithProviderAvailability,
+  type EnabledProviders,
+} from '@automaker/model-resolver';
 import { getModelForUseCase } from './sdk-options.js';
 import type { Options } from '@anthropic-ai/claude-agent-sdk';
 import { createLogger } from '@automaker/utils';
@@ -50,6 +54,8 @@ export interface ProviderQueryOptions {
     google?: string;
     openai?: string;
   };
+  /** Enabled providers (controls provider availability) */
+  enabledProviders?: EnabledProviders;
 }
 
 export interface StructuredOutputInfo {
@@ -144,10 +150,27 @@ export async function* executeProviderQuery(
     autoLoadClaudeMd = false,
     outputFormat,
     apiKeys,
+    enabledProviders,
   } = options;
 
   // Resolve the model to use
-  const resolvedModel = getModelForUseCase(useCase, explicitModel);
+  let resolvedModel = getModelForUseCase(useCase, explicitModel);
+
+  // Apply provider availability check if enabledProviders is provided
+  if (enabledProviders) {
+    const fallbackModel = resolveModelWithProviderAvailability(
+      resolvedModel,
+      enabledProviders,
+      explicitModel // Use explicit model as fallback if all providers disabled
+    );
+    if (fallbackModel !== resolvedModel) {
+      logger.info(
+        `[ProviderQuery] Model substituted due to provider availability: ${resolvedModel} -> ${fallbackModel}`
+      );
+    }
+    resolvedModel = fallbackModel;
+  }
+
   logger.info(`[ProviderQuery] Using model: ${resolvedModel} for use case: ${useCase}`);
 
   // Determine the appropriate API key for this model
@@ -261,28 +284,223 @@ export async function* executeProviderQuery(
 
 /**
  * Try to parse JSON from text that may contain conversational content
+ * Improved implementation that avoids ReDoS and properly handles nested structures
  */
-function parseJsonFromText(text: string): unknown | null {
-  // Try to find JSON in the text
-  const jsonMatch = text.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) {
-    // Try to find a JSON array
-    const arrayMatch = text.match(/\[[\s\S]*\]/);
-    if (arrayMatch) {
-      try {
-        return JSON.parse(arrayMatch[0]);
-      } catch {
-        return null;
-      }
+export function parseJsonFromText(text: string, schema?: Record<string, unknown>): unknown | null {
+  // First try to parse the entire text as JSON
+  try {
+    const parsed = JSON.parse(text);
+    if (schema) {
+      return validateAgainstSchema(parsed, schema) ? parsed : null;
     }
-    return null;
+    return parsed;
+  } catch {
+    // Not pure JSON, continue to extraction
   }
 
-  try {
-    return JSON.parse(jsonMatch[0]);
-  } catch {
-    return null;
+  // Try to find a complete JSON object by matching braces
+  const objectResult = extractJsonBraces(text);
+  if (objectResult) {
+    try {
+      const parsed = JSON.parse(objectResult);
+      if (schema) {
+        return validateAgainstSchema(parsed, schema) ? parsed : null;
+      }
+      return parsed;
+    } catch {
+      // Invalid JSON, continue
+    }
   }
+
+  // Try to find a JSON array
+  const arrayResult = extractJsonBrackets(text);
+  if (arrayResult) {
+    try {
+      const parsed = JSON.parse(arrayResult);
+      if (schema) {
+        return validateAgainstSchema(parsed, schema) ? parsed : null;
+      }
+      return parsed;
+    } catch {
+      // Invalid JSON
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Extract a complete JSON object from text by matching braces
+ * This avoids the ReDoS vulnerability of regex /\{[\s\S]*\}/
+ */
+function extractJsonBraces(text: string): string | null {
+  let startPos = text.indexOf('{');
+  if (startPos === -1) return null;
+
+  let depth = 0;
+  let inString = false;
+  let escapeNext = false;
+
+  for (let i = startPos; i < text.length; i++) {
+    const char = text[i];
+
+    if (escapeNext) {
+      escapeNext = false;
+      continue;
+    }
+
+    if (char === '\\') {
+      escapeNext = true;
+      continue;
+    }
+
+    if (char === '"') {
+      inString = !inString;
+      continue;
+    }
+
+    if (!inString) {
+      if (char === '{') {
+        depth++;
+      } else if (char === '}') {
+        depth--;
+        if (depth === 0) {
+          // Found complete object
+          return text.substring(startPos, i + 1);
+        }
+      }
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Extract a complete JSON array from text by matching brackets
+ */
+function extractJsonBrackets(text: string): string | null {
+  let startPos = text.indexOf('[');
+  if (startPos === -1) return null;
+
+  let depth = 0;
+  let inString = false;
+  let escapeNext = false;
+
+  for (let i = startPos; i < text.length; i++) {
+    const char = text[i];
+
+    if (escapeNext) {
+      escapeNext = false;
+      continue;
+    }
+
+    if (char === '\\') {
+      escapeNext = true;
+      continue;
+    }
+
+    if (char === '"') {
+      inString = !inString;
+      continue;
+    }
+
+    if (!inString) {
+      if (char === '[') {
+        depth++;
+      } else if (char === ']') {
+        depth--;
+        if (depth === 0) {
+          // Found complete array
+          return text.substring(startPos, i + 1);
+        }
+      }
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Basic schema validation for parsed JSON
+ * This is a lightweight validation - for full validation, consider using jsonschema package
+ */
+function validateAgainstSchema(data: unknown, schema: Record<string, unknown>): boolean {
+  if (!schema) return true;
+
+  const schemaType = schema.type as string;
+
+  // Type validation
+  if (schemaType === 'object') {
+    if (typeof data !== 'object' || data === null || Array.isArray(data)) {
+      return false;
+    }
+
+    // Check required properties
+    const required = schema.required as string[] | undefined;
+    if (required && Array.isArray(required)) {
+      const dataObj = data as Record<string, unknown>;
+      for (const prop of required) {
+        if (!(prop in dataObj)) {
+          return false;
+        }
+      }
+    }
+
+    // Check properties
+    const properties = schema.properties as Record<string, Record<string, unknown>> | undefined;
+    if (properties) {
+      const dataObj = data as Record<string, unknown>;
+      for (const [key, propSchema] of Object.entries(properties)) {
+        if (key in dataObj) {
+          if (!validateAgainstSchema(dataObj[key], propSchema)) {
+            return false;
+          }
+        }
+      }
+    }
+  }
+
+  if (schemaType === 'array') {
+    if (!Array.isArray(data)) {
+      return false;
+    }
+
+    const itemsSchema = schema.items as Record<string, unknown> | undefined;
+    if (itemsSchema) {
+      for (const item of data) {
+        if (!validateAgainstSchema(item, itemsSchema)) {
+          return false;
+        }
+      }
+    }
+  }
+
+  if (schemaType === 'string') {
+    if (typeof data !== 'string') {
+      return false;
+    }
+  }
+
+  if (schemaType === 'number') {
+    if (typeof data !== 'number') {
+      return false;
+    }
+  }
+
+  if (schemaType === 'boolean') {
+    if (typeof data !== 'boolean') {
+      return false;
+    }
+  }
+
+  // Enum validation
+  if (schema.enum && Array.isArray(schema.enum)) {
+    if (!schema.enum.includes(data)) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 /**

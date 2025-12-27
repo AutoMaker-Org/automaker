@@ -2,8 +2,7 @@ import { useAppStore } from '@/store/app-store';
 import { useSetupStore } from '@/store/setup-store';
 import { Button } from '@/components/ui/button';
 import { Key, CheckCircle2, Settings, Trash2, Loader2 } from 'lucide-react';
-import { ApiKeyField } from './api-key-field';
-import { buildProviderConfigs } from '@/config/api-providers';
+import { ProviderCard } from './provider-card';
 import { AuthenticationStatusDisplay } from './authentication-status-display';
 import { SecurityNotice } from './security-notice';
 import { useApiKeyManagement } from './hooks/use-api-key-management';
@@ -14,14 +13,15 @@ import { toast } from 'sonner';
 import { useNavigate } from '@tanstack/react-router';
 
 export function ApiKeysSection() {
-  const { apiKeys, setApiKeys } = useAppStore();
+  const { apiKeys, setApiKeys, enabledProviders, setEnabledProviders, toggleProvider } =
+    useAppStore();
   const { claudeAuthStatus, setClaudeAuthStatus, setSetupComplete } = useSetupStore();
   const [isDeletingAnthropicKey, setIsDeletingAnthropicKey] = useState(false);
   const navigate = useNavigate();
 
   const { providerConfigParams, apiKeyStatus, handleSave, saved } = useApiKeyManagement();
 
-  const providerConfigs = buildProviderConfigs(providerConfigParams);
+  const { anthropic, zai } = providerConfigParams;
 
   // Delete Anthropic API key
   const deleteAnthropicKey = useCallback(async () => {
@@ -58,6 +58,67 @@ export function ApiKeysSection() {
     navigate({ to: '/setup' });
   }, [setSetupComplete, navigate]);
 
+  // Handle save with auto-enable provider on successful save
+  const handleSaveWithAutoEnable = useCallback(async () => {
+    await handleSave();
+
+    // Auto-enable providers that have valid API keys
+    if (anthropic.value && anthropic.result?.success) {
+      setEnabledProviders({ claude: true });
+    }
+    if (zai.value && zai.result?.success) {
+      setEnabledProviders({ zai: true });
+    }
+  }, [handleSave, anthropic, zai, setEnabledProviders]);
+
+  // Provider configurations for cards
+  const providers = [
+    {
+      provider: 'anthropic' as const,
+      label: 'Anthropic (Claude)',
+      description: 'Used for Claude AI features.',
+      apiKeyLink: 'https://console.anthropic.com/settings/keys',
+      apiKeyLinkText: 'Get your key at console.anthropic.com',
+      enabled: enabledProviders.claude,
+      onToggle: () => toggleProvider('claude'),
+      apiKeyValue: anthropic.value,
+      onApiKeyChange: anthropic.setValue,
+      showApiKey: anthropic.show,
+      onToggleApiKeyVisibility: anthropic.setShow,
+      hasStoredKey: apiKeys.anthropic,
+      isTesting: anthropic.testing,
+      onTest: anthropic.onTest,
+      testResult: anthropic.result,
+      inputTestId: 'anthropic-api-key-input',
+      toggleTestId: 'toggle-anthropic-visibility',
+      testButtonTestId: 'test-claude-connection',
+      resultTestId: 'test-connection-result',
+      resultMessageTestId: 'test-connection-message',
+    },
+    {
+      provider: 'zai' as const,
+      label: 'Z.ai (GLM)',
+      description: 'Used for GLM-4.7 AI features.',
+      apiKeyLink: 'https://open.bigmodel.cn/usercenter/apikeys',
+      apiKeyLinkText: 'Get your key at open.bigmodel.cn',
+      enabled: enabledProviders.zai,
+      onToggle: () => toggleProvider('zai'),
+      apiKeyValue: zai.value,
+      onApiKeyChange: zai.setValue,
+      showApiKey: zai.show,
+      onToggleApiKeyVisibility: zai.setShow,
+      hasStoredKey: apiKeys.zai,
+      isTesting: zai.testing,
+      onTest: zai.onTest,
+      testResult: zai.result,
+      inputTestId: 'zai-api-key-input',
+      toggleTestId: 'toggle-zai-visibility',
+      testButtonTestId: 'test-zai-connection',
+      resultTestId: 'zai-test-connection-result',
+      resultMessageTestId: 'zai-test-connection-message',
+    },
+  ];
+
   return (
     <div
       className={cn(
@@ -75,14 +136,18 @@ export function ApiKeysSection() {
           <h2 className="text-lg font-semibold text-foreground tracking-tight">API Keys</h2>
         </div>
         <p className="text-sm text-muted-foreground/80 ml-12">
-          Configure your AI provider API keys. Keys are stored locally in your browser.
+          Configure your AI provider API keys. Keys are stored locally. Use the toggle to
+          enable/disable providers.
         </p>
       </div>
+
       <div className="p-6 space-y-6">
-        {/* API Key Fields */}
-        {providerConfigs.map((provider) => (
-          <ApiKeyField key={provider.key} config={provider} />
-        ))}
+        {/* Provider Cards */}
+        <div className="space-y-4">
+          {providers.map((provider) => (
+            <ProviderCard key={provider.provider} {...provider} />
+          ))}
+        </div>
 
         {/* Authentication Status Display */}
         <AuthenticationStatusDisplay
@@ -97,7 +162,7 @@ export function ApiKeysSection() {
         {/* Action Buttons */}
         <div className="flex flex-wrap items-center gap-3 pt-2">
           <Button
-            onClick={handleSave}
+            onClick={handleSaveWithAutoEnable}
             data-testid="save-settings"
             className={cn(
               'min-w-[140px] h-10',

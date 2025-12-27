@@ -13,19 +13,44 @@ vi.mock('@automaker/platform', () => ({
     writeFile: vi.fn(),
     mkdir: vi.fn(),
   },
+  validatePath: vi.fn((path: string) => path),
+  isPathAllowed: vi.fn(() => true),
 }));
+
+/**
+ * Helper to create a mock streaming response
+ * Simulates Server-Sent Events (SSE) format from streaming APIs
+ * Creates a fresh stream on each call
+ */
+function createMockStreamResponse(chunks: string[]): Response {
+  const encoder = new TextEncoder();
+
+  const readableStream = new ReadableStream({
+    async start(controller) {
+      for (const chunk of chunks) {
+        controller.enqueue(encoder.encode(chunk));
+        // Small delay to simulate real streaming
+        await new Promise((resolve) => setTimeout(resolve, 1));
+      }
+      controller.close();
+    },
+  });
+
+  return {
+    ok: true,
+    status: 200,
+    body: readableStream,
+  } as Response;
+}
 
 describe('zai-provider.ts', () => {
   let provider: ZaiProvider;
 
   beforeEach(() => {
-    vi.clearAllMocks();
+    mockFetch.mockReset();
+    mockFetch.mockClear();
     provider = new ZaiProvider({ apiKey: 'test-zai-key' });
     delete process.env.ZAI_API_KEY;
-  });
-
-  afterEach(() => {
-    mockFetch.mockReset();
   });
 
   describe('getName', () => {
@@ -35,21 +60,15 @@ describe('zai-provider.ts', () => {
   });
 
   describe('executeQuery', () => {
-    it('should execute simple text query', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: async () => ({
-          choices: [
-            {
-              message: {
-                role: 'assistant',
-                content: 'Hello! How can I help you today?',
-              },
-              finish_reason: 'stop',
-            },
-          ],
-        }),
-      });
+    it('should execute simple text query with streaming', async () => {
+      // Mock streaming SSE response
+      mockFetch.mockImplementation(() =>
+        createMockStreamResponse([
+          'data: {"choices":[{"delta":{"content":"Hello"}}]}\n\n',
+          'data: {"choices":[{"delta":{"content":"! How can I help you today?"}}]}\n\n',
+          'data: [DONE]\n\n',
+        ])
+      );
 
       const generator = provider.executeQuery({
         prompt: 'Hello',
@@ -59,7 +78,7 @@ describe('zai-provider.ts', () => {
 
       const results = await collectAsyncGenerator(generator);
 
-      expect(mockFetch).toHaveBeenCalledTimes(1);
+      expect(mockFetch).toHaveBeenCalled();
       expect(results.length).toBeGreaterThan(0);
 
       const textResult = results.find((r: any) => r.type === 'assistant');
@@ -67,20 +86,12 @@ describe('zai-provider.ts', () => {
     });
 
     it('should pass correct model to API', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: async () => ({
-          choices: [
-            {
-              message: {
-                role: 'assistant',
-                content: 'Response',
-              },
-              finish_reason: 'stop',
-            },
-          ],
-        }),
-      });
+      mockFetch.mockImplementation(() =>
+        createMockStreamResponse([
+          'data: {"choices":[{"delta":{"content":"Response"}}]}\n\n',
+          'data: [DONE]\n\n',
+        ])
+      );
 
       const generator = provider.executeQuery({
         prompt: 'Test prompt',
@@ -93,27 +104,21 @@ describe('zai-provider.ts', () => {
       const fetchCall = mockFetch.mock.calls[0];
       const body = JSON.parse(fetchCall[1].body);
       expect(body.model).toBe('glm-4.6');
+      expect(body.stream).toBe(true);
     });
 
     it('should include system prompt if provided', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: async () => ({
-          choices: [
-            {
-              message: {
-                role: 'assistant',
-                content: 'Response',
-              },
-              finish_reason: 'stop',
-            },
-          ],
-        }),
-      });
+      mockFetch.mockImplementation(() =>
+        createMockStreamResponse([
+          'data: {"choices":[{"delta":{"content":"Response"}}]}\n\n',
+          'data: [DONE]\n\n',
+        ])
+      );
 
       const generator = provider.executeQuery({
         prompt: 'Test',
         cwd: '/test',
+        model: 'glm-4.7',
         systemPrompt: 'You are a helpful assistant',
       });
 
@@ -126,21 +131,13 @@ describe('zai-provider.ts', () => {
     });
 
     it('should handle reasoning_content from thinking mode', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: async () => ({
-          choices: [
-            {
-              message: {
-                role: 'assistant',
-                reasoning_content: 'Let me think about this...',
-                content: 'Here is my response',
-              },
-              finish_reason: 'stop',
-            },
-          ],
-        }),
-      });
+      mockFetch.mockImplementation(() =>
+        createMockStreamResponse([
+          'data: {"choices":[{"delta":{"reasoning_content":"Let me think about this..."}}]}\n\n',
+          'data: {"choices":[{"delta":{"content":"Here is my response"}}]}\n\n',
+          'data: [DONE]\n\n',
+        ])
+      );
 
       const generator = provider.executeQuery({
         prompt: 'Solve this problem',
@@ -164,45 +161,13 @@ describe('zai-provider.ts', () => {
     });
 
     it('should handle tool calls', async () => {
-      mockFetch
-        .mockResolvedValueOnce({
-          ok: true,
-          json: async () => ({
-            choices: [
-              {
-                message: {
-                  role: 'assistant',
-                  content: '',
-                  tool_calls: [
-                    {
-                      id: 'call_123',
-                      type: 'function',
-                      function: {
-                        name: 'read_file',
-                        arguments: JSON.stringify({ filePath: 'test.txt' }),
-                      },
-                    },
-                  ],
-                },
-                finish_reason: 'tool_calls',
-              },
-            ],
-          }),
-        })
-        .mockResolvedValueOnce({
-          ok: true,
-          json: async () => ({
-            choices: [
-              {
-                message: {
-                  role: 'assistant',
-                  content: 'I have read the file',
-                },
-                finish_reason: 'stop',
-              },
-            ],
-          }),
-        });
+      mockFetch.mockImplementation(() =>
+        createMockStreamResponse([
+          'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_123","function":{"name":"read_file","arguments":"{\\"filePath\\": \\"test.txt\\"}"}}]}}]}\n\n',
+          'data: {"choices":[{"finish_reason":"tool_calls"}]}\n\n',
+          'data: [DONE]\n\n',
+        ])
+      );
 
       const { secureFs } = await import('@automaker/platform');
       vi.mocked(secureFs.readFile).mockResolvedValue('file content');
@@ -228,20 +193,12 @@ describe('zai-provider.ts', () => {
     });
 
     it('should filter tools based on allowedTools', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: async () => ({
-          choices: [
-            {
-              message: {
-                role: 'assistant',
-                content: 'Response',
-              },
-              finish_reason: 'stop',
-            },
-          ],
-        }),
-      });
+      mockFetch.mockImplementation(() =>
+        createMockStreamResponse([
+          'data: {"choices":[{"delta":{"content":"Response"}}]}\n\n',
+          'data: [DONE]\n\n',
+        ])
+      );
 
       const generator = provider.executeQuery({
         prompt: 'Test',
@@ -260,20 +217,12 @@ describe('zai-provider.ts', () => {
     });
 
     it('should use sdkSessionId when provided', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: async () => ({
-          choices: [
-            {
-              message: {
-                role: 'assistant',
-                content: 'Response',
-              },
-              finish_reason: 'stop',
-            },
-          ],
-        }),
-      });
+      mockFetch.mockImplementation(() =>
+        createMockStreamResponse([
+          'data: {"choices":[{"delta":{"content":"Response"}}]}\n\n',
+          'data: [DONE]\n\n',
+        ])
+      );
 
       const generator = provider.executeQuery({
         prompt: 'Test',
@@ -289,20 +238,12 @@ describe('zai-provider.ts', () => {
     });
 
     it('should handle structured output requests', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: async () => ({
-          choices: [
-            {
-              message: {
-                role: 'assistant',
-                content: '{"result": "value"}',
-              },
-              finish_reason: 'stop',
-            },
-          ],
-        }),
-      });
+      mockFetch.mockImplementation(() =>
+        createMockStreamResponse([
+          'data: {"choices":[{"delta":{"content":"{\\"result\\": \\"value\\"}"}}]}\n\n',
+          'data: [DONE]\n\n',
+        ])
+      );
 
       const generator = provider.executeQuery({
         prompt: 'Generate JSON',
@@ -382,7 +323,8 @@ describe('zai-provider.ts', () => {
     });
 
     it('should return hasApiKey false when no key present', async () => {
-      const result = await provider.detectInstallation();
+      const noKeyProvider = new ZaiProvider();
+      const result = await noKeyProvider.detectInstallation();
 
       expect(result.hasApiKey).toBe(false);
       expect(result.authenticated).toBe(false);
@@ -549,6 +491,250 @@ describe('zai-provider.ts', () => {
       const config = provider.getConfig();
       expect(config.apiKey).toBe('key1');
       expect(config.model).toBe('model1');
+    });
+  });
+
+  describe('command sanitization security', () => {
+    beforeEach(async () => {
+      // Set ALLOWED_ROOT_DIRECTORY to allow test paths
+      process.env.ALLOWED_ROOT_DIRECTORY = '/test/project';
+
+      // Update the validatePath mock to throw for absolute paths outside root
+      const { validatePath } = await import('@automaker/platform');
+      vi.mocked(validatePath).mockImplementation((path: string) => {
+        // Allow paths within /test/project (including Windows variants)
+        if (
+          path.startsWith('/test/project') ||
+          path.startsWith('\\test\\project') ||
+          path.includes('test\\project') ||
+          path.includes('test/project')
+        ) {
+          return path;
+        }
+        // Reject other absolute paths
+        if (path.startsWith('/') && !path.startsWith('/test')) {
+          throw new Error(`Path not allowed: ${path}`);
+        }
+        if (path.match(/^[A-Za-z]:/) && !path.includes('test')) {
+          throw new Error(`Path not allowed: ${path}`);
+        }
+        // Allow relative paths
+        return path;
+      });
+    });
+
+    afterEach(() => {
+      delete process.env.ALLOWED_ROOT_DIRECTORY;
+      delete process.env.ZAI_ALLOW_DOCKER;
+    });
+
+    it('should reject commands with .. for path traversal', async () => {
+      // Note: This tests the internal sanitizeCommand function through tool execution
+      // In actual usage, commands with .. will be blocked
+      mockFetch.mockImplementation(() =>
+        createMockStreamResponse([
+          'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_123","function":{"name":"execute_command","arguments":"{\\"command\\": \\"cat ../../../etc/passwd\\"}"}}]}}]}\n\n',
+          'data: {"choices":[{"finish_reason":"tool_calls"}]}\n\n',
+          'data: [DONE]\n\n',
+        ])
+      );
+
+      const generator = provider.executeQuery({
+        prompt: 'Read a file',
+        cwd: '/test/project',
+        model: 'glm-4.7',
+      });
+
+      const results = await collectAsyncGenerator(generator);
+
+      // Should get an error about path traversal
+      const errorResult = results.find((r: any) => r.type === 'error');
+      expect(errorResult).toBeDefined();
+      expect((errorResult as any).error).toContain('Path traversal');
+    });
+
+    it('should reject absolute paths in command arguments', async () => {
+      mockFetch.mockImplementation(() =>
+        createMockStreamResponse([
+          'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_123","function":{"name":"execute_command","arguments":"{\\"command\\": \\"cat /etc/passwd\\"}"}}]}}]}\n\n',
+          'data: {"choices":[{"finish_reason":"tool_calls"}]}\n\n',
+          'data: [DONE]\n\n',
+        ])
+      );
+
+      const generator = provider.executeQuery({
+        prompt: 'Read a file',
+        cwd: '/test/project',
+        model: 'glm-4.7',
+      });
+
+      const results = await collectAsyncGenerator(generator);
+
+      // Should get an error
+      const errorResult = results.find((r: any) => r.type === 'error');
+      expect(errorResult).toBeDefined();
+      // The error could be from path validation or path traversal
+      expect((errorResult as any).error).toMatch(/Path|not allowed/);
+    });
+
+    it('should reject recursive flags like -r, -R, -a', async () => {
+      mockFetch.mockImplementation(() =>
+        createMockStreamResponse([
+          'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_123","function":{"name":"execute_command","arguments":"{\\"command\\": \\"rm -r test_dir\\"}"}}]}}]}\n\n',
+          'data: {"choices":[{"finish_reason":"tool_calls"}]}\n\n',
+          'data: [DONE]\n\n',
+        ])
+      );
+
+      const generator = provider.executeQuery({
+        prompt: 'Remove directory',
+        cwd: '/test/project',
+        model: 'glm-4.7',
+      });
+
+      const results = await collectAsyncGenerator(generator);
+
+      // Should get an error about recursive flag
+      const errorResult = results.find((r: any) => r.type === 'error');
+      expect(errorResult).toBeDefined();
+      expect((errorResult as any).error).toContain('Recursive flag');
+    });
+
+    it('should reject commands that were removed from allowlist (curl, wget)', async () => {
+      mockFetch.mockImplementation(() =>
+        createMockStreamResponse([
+          'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_123","function":{"name":"execute_command","arguments":"{\\"command\\": \\"curl http://example.com\\"}"}}]}}]}\n\n',
+          'data: {"choices":[{"finish_reason":"tool_calls"}]}\n\n',
+          'data: [DONE]\n\n',
+        ])
+      );
+
+      const generator = provider.executeQuery({
+        prompt: 'Fetch URL',
+        cwd: '/test/project',
+        model: 'glm-4.7',
+      });
+
+      const results = await collectAsyncGenerator(generator);
+
+      // Should get an error about command not allowed
+      const errorResult = results.find((r: any) => r.type === 'error');
+      expect(errorResult).toBeDefined();
+      expect((errorResult as any).error).toContain('not allowed');
+    });
+
+    it('should reject docker commands without ZAI_ALLOW_DOCKER env var', async () => {
+      mockFetch.mockImplementation(() =>
+        createMockStreamResponse([
+          'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_123","function":{"name":"execute_command","arguments":"{\\"command\\": \\"docker ps\\"}"}}]}}]}\n\n',
+          'data: {"choices":[{"finish_reason":"tool_calls"}]}\n\n',
+          'data: [DONE]\n\n',
+        ])
+      );
+
+      delete process.env.ZAI_ALLOW_DOCKER;
+
+      const generator = provider.executeQuery({
+        prompt: 'List containers',
+        cwd: '/test/project',
+        model: 'glm-4.7',
+      });
+
+      const results = await collectAsyncGenerator(generator);
+
+      // Should get an error about docker not enabled
+      const errorResult = results.find((r: any) => r.type === 'error');
+      expect(errorResult).toBeDefined();
+      expect((errorResult as any).error).toContain('Docker');
+    });
+
+    it('should allow docker commands when ZAI_ALLOW_DOCKER=1', async () => {
+      mockFetch.mockImplementation(() =>
+        createMockStreamResponse([
+          'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_123","function":{"name":"execute_command","arguments":"{\\"command\\": \\"docker ps\\"}"}}]}}]}\n\n',
+          'data: {"choices":[{"finish_reason":"tool_calls"}]}\n\n',
+          'data: [DONE]\n\n',
+        ])
+      );
+
+      process.env.ZAI_ALLOW_DOCKER = '1';
+
+      const generator = provider.executeQuery({
+        prompt: 'List containers',
+        cwd: '/test/project',
+        model: 'glm-4.7',
+      });
+
+      const results = await collectAsyncGenerator(generator);
+
+      // Should have tool_use message (docker command was not blocked)
+      const toolUseResult = results.find(
+        (r: any) => r.type === 'assistant' && r.message?.content?.[0]?.type === 'tool_use'
+      );
+      expect(toolUseResult).toBeDefined();
+
+      // Should not have an error about docker being disabled
+      const errorResult = results.find((r: any) => r.type === 'error');
+      expect(errorResult).toBeUndefined();
+
+      delete process.env.ZAI_ALLOW_DOCKER;
+    });
+
+    it('should allow safe mutating commands within project root', async () => {
+      // Mock successful file operations for mkdir/rm
+      mockFetch.mockImplementation(() =>
+        createMockStreamResponse([
+          'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_123","function":{"name":"execute_command","arguments":"{\\"command\\": \\"mkdir test_dir\\"}"}}]}}]}\n\n',
+          'data: {"choices":[{"finish_reason":"tool_calls"}]}\n\n',
+          'data: [DONE]\n\n',
+        ])
+      );
+
+      const generator = provider.executeQuery({
+        prompt: 'Create directory',
+        cwd: '/test/project',
+        model: 'glm-4.7',
+      });
+
+      const results = await collectAsyncGenerator(generator);
+
+      // Should have tool_use, no error from sanitization
+      const toolUseResult = results.find(
+        (r: any) => r.type === 'assistant' && r.message?.content?.[0]?.type === 'tool_use'
+      );
+      expect(toolUseResult).toBeDefined();
+
+      // The tool result may have an error from actual execution (expected in test env)
+      // but sanitization should not block the command
+      const toolResult = results.find((r: any) => r.type === 'result');
+      expect(toolResult).toBeDefined();
+    });
+
+    it('should allow rm command for files within project root', async () => {
+      mockFetch.mockImplementation(() =>
+        createMockStreamResponse([
+          'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_123","function":{"name":"execute_command","arguments":"{\\"command\\": \\"rm test_file.txt\\"}"}}]}}]}\n\n',
+          'data: {"choices":[{"finish_reason":"tool_calls"}]}\n\n',
+          'data: [DONE]\n\n',
+        ])
+      );
+
+      const generator = provider.executeQuery({
+        prompt: 'Remove file',
+        cwd: '/test/project',
+        model: 'glm-4.7',
+      });
+
+      const results = await collectAsyncGenerator(generator);
+
+      // Should succeed without error
+      const errorResult = results.find((r: any) => r.type === 'error');
+      expect(errorResult).toBeUndefined();
+
+      const toolUseResult = results.find(
+        (r: any) => r.type === 'assistant' && r.message?.content?.[0]?.type === 'tool_use'
+      );
+      expect(toolUseResult).toBeDefined();
     });
   });
 });

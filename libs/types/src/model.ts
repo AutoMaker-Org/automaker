@@ -49,3 +49,56 @@ export const ALL_MODEL_MAPS = {
   ...CLAUDE_MODEL_MAP,
   ...ZAI_MODEL_MAP,
 } as const;
+
+/**
+ * Model equivalence mapping for cross-provider fallback
+ *
+ * Maps each model to its equivalent in the other provider.
+ * Used when a provider is disabled but an equivalent model is available.
+ *
+ * Mapping hierarchy:
+ * - Claude Opus (premium) ↔ Zai GLM-4.7 (premium)
+ * - Claude Sonnet (balanced) ↔ Zai GLM-4.6 (balanced)
+ * - Claude Haiku (speed) ↔ Zai GLM-4.5-Air (speed)
+ *
+ * Note: GLM-4.6v (vision) doesn't have a direct Claude equivalent for vision,
+ * but for general reasoning it maps to Sonnet.
+ */
+export const MODEL_EQUIVALENCE: Record<string, { provider: 'claude' | 'zai'; model: string }> = {
+  // Claude models → Zai equivalents
+  'claude-opus-4-5-20251101': { provider: 'zai', model: 'glm-4.7' },
+  'claude-sonnet-4-5-20250929': { provider: 'zai', model: 'glm-4.6' },
+  'claude-haiku-4-5-20251001': { provider: 'zai', model: 'glm-4.5-air' },
+  // Zai models → Claude equivalents
+  'glm-4.7': { provider: 'claude', model: 'claude-opus-4-5-20251101' },
+  'glm-4.6v': { provider: 'claude', model: 'claude-sonnet-4-5-20250929' },
+  'glm-4.6': { provider: 'claude', model: 'claude-sonnet-4-5-20250929' },
+  'glm-4.5-air': { provider: 'claude', model: 'claude-haiku-4-5-20251001' },
+} as const;
+
+/**
+ * Get the provider for a given model string
+ *
+ * @param model - Model identifier or full model string
+ * @returns Provider name ('claude' | 'zai') or undefined if unknown
+ */
+export function getProviderForModel(model: string): 'claude' | 'zai' | undefined {
+  const lowerModel = model.toLowerCase();
+
+  // Check Claude models
+  if (
+    lowerModel.includes('claude-') ||
+    lowerModel === 'haiku' ||
+    lowerModel === 'sonnet' ||
+    lowerModel === 'opus'
+  ) {
+    return 'claude';
+  }
+
+  // Check Zai models
+  if (lowerModel.startsWith('glm-') || lowerModel === 'glm') {
+    return 'zai';
+  }
+
+  return undefined;
+}
