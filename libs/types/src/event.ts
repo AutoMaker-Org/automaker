@@ -24,6 +24,14 @@ export type EventType =
   | 'project:analysis-completed'
   | 'project:analysis-error'
   | 'suggestions:event'
-  | 'spec-regeneration:event';
+  | 'spec-regeneration:event'
+  | 'merge-gatekeeper:monitoring-started'
+  | 'merge-gatekeeper:monitoring-stopped'
+  | 'merge-gatekeeper:ready-for-merge'
+  | 'merge-gatekeeper:progress'
+  | 'merge-gatekeeper:merged'
+  | 'merge-gatekeeper:rejected'
+  | 'merge-gatekeeper:error'
+  | 'merge-gatekeeper:kanban-task-update';
 
 export type EventCallback = (type: EventType, payload: unknown) => void;
