@@ -10,10 +10,8 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { PathInput } from '@/components/ui/path-input';
-import { Kbd, KbdGroup } from '@/components/ui/kbd';
 import { getJSON, setJSON } from '@/lib/storage';
 import { getDefaultWorkspaceDirectory, saveLastProjectDirectory } from '@/lib/workspace-config';
-import { useOSDetection } from '@/hooks';
 
 interface DirectoryEntry {
   name: string;
@@ -69,7 +67,6 @@ export function FileBrowserDialog({
   description = 'Navigate to your project folder or paste a path directly',
   initialPath,
 }: FileBrowserDialogProps) {
-  const { isMac } = useOSDetection();
   const [currentPath, setCurrentPath] = useState<string>('');
   const [parentPath, setParentPath] = useState<string | null>(null);
   const [directories, setDirectories] = useState<DirectoryEntry[]>([]);
@@ -235,7 +232,7 @@ export function FileBrowserDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-popover border-border max-w-3xl max-h-[85vh] overflow-hidden flex flex-col p-4 focus:outline-none focus-visible:outline-none">
+      <DialogContent className="bg-popover border-border max-w-3xl max-h-[85vh] overflow-hidden flex flex-col p-4">
         <DialogHeader className="pb-1">
           <DialogTitle className="flex items-center gap-2 text-base">
             <FolderOpen className="w-4 h-4 text-brand-500" />
@@ -255,12 +252,6 @@ export function FileBrowserDialog({
             error={!!error}
             onNavigate={handleNavigate}
             onHome={handleGoHome}
-            entries={directories.map((dir) => ({ ...dir, isDirectory: true }))}
-            onSelectEntry={(entry) => {
-              if (entry.isDirectory) {
-                handleSelectDirectory(entry);
-              }
-            }}
           />
 
           {/* Recent folders */}
@@ -375,10 +366,12 @@ export function FileBrowserDialog({
           >
             <FolderOpen className="w-3.5 h-3.5 mr-1.5" />
             Select Current Folder
-            <KbdGroup className="ml-1">
-              <Kbd>{isMac ? '⌘' : 'Ctrl'}</Kbd>
-              <Kbd>↵</Kbd>
-            </KbdGroup>
+            <kbd className="ml-2 px-1.5 py-0.5 text-[10px] bg-background/50 rounded border border-border">
+              {typeof navigator !== 'undefined' && navigator.platform?.includes('Mac')
+                ? '⌘'
+                : 'Ctrl'}
+              +↵
+            </kbd>
           </Button>
         </DialogFooter>
       </DialogContent>

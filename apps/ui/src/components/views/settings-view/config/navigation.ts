@@ -9,6 +9,7 @@ import {
   FlaskConical,
   Trash2,
   Sparkles,
+  Wand2,
 } from 'lucide-react';
 import type { SettingsViewId } from '../hooks/use-settings-view';
 
@@ -21,7 +22,8 @@ export interface NavigationItem {
 // Navigation items for the settings side panel
 export const NAV_ITEMS: NavigationItem[] = [
   { id: 'api-keys', label: 'API Keys', icon: Key },
-  { id: 'claude', label: 'Claude', icon: Terminal },
+  { id: 'cursor', label: 'AI Provider', icon: Wand2 },
+  { id: 'claude', label: 'Claude SDK', icon: Terminal },
   { id: 'ai-enhancement', label: 'AI Enhancement', icon: Sparkles },
   { id: 'appearance', label: 'Appearance', icon: Palette },
   { id: 'terminal', label: 'Terminal', icon: SquareTerminal },

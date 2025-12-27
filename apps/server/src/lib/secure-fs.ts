@@ -20,9 +20,4 @@ export const {
   lstat,
   joinPath,
   resolvePath,
-  // Throttling configuration and monitoring
-  configureThrottling,
-  getThrottlingConfig,
-  getPendingOperations,
-  getActiveOperations,
 } = secureFs;

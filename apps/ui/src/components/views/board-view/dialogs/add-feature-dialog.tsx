@@ -107,6 +107,8 @@ export function AddFeatureDialog({
   const isSpawnMode = !!parentFeature;
   const navigate = useNavigate();
   const [useCurrentBranch, setUseCurrentBranch] = useState(true);
+  // Get default provider/model from store for initial state
+  const initialDefaultModel = useAppStore.getState().defaultModel;
   const [newFeature, setNewFeature] = useState({
     title: '',
     category: '',
@@ -115,7 +117,7 @@ export function AddFeatureDialog({
     imagePaths: [] as DescriptionImagePath[],
     textFilePaths: [] as DescriptionTextFilePath[],
     skipTests: false,
-    model: 'opus' as AgentModel,
+    model: initialDefaultModel, // Use store's default model
     thinkingLevel: 'none' as ThinkingLevel,
     branchName: '',
     priority: 2 as number, // Default to medium priority
@@ -143,6 +145,8 @@ export function AddFeatureDialog({
     defaultRequirePlanApproval,
     defaultAIProfileId,
     useWorktrees,
+    defaultProvider,
+    defaultModel,
   } = useAppStore();
 
   // Sync defaults when dialog opens
@@ -157,8 +161,8 @@ export function AddFeatureDialog({
         ...prev,
         skipTests: defaultSkipTests,
         branchName: defaultBranch || '',
-        // Use default profile's model/thinkingLevel if set, else fallback to defaults
-        model: defaultProfile?.model ?? 'opus',
+        // Use default profile's model/thinkingLevel if set, else fallback to store defaults
+        model: defaultProfile?.model ?? defaultModel,
         thinkingLevel: defaultProfile?.thinkingLevel ?? 'none',
       }));
       setUseCurrentBranch(true);
@@ -184,6 +188,8 @@ export function AddFeatureDialog({
     defaultRequirePlanApproval,
     defaultAIProfileId,
     aiProfiles,
+    defaultModel,
+    defaultProvider,
     parentFeature,
     allFeatures,
   ]);
@@ -253,7 +259,7 @@ export function AddFeatureDialog({
       dependencies: isSpawnMode && parentFeature ? [parentFeature.id] : undefined,
     });
 
-    // Reset form
+    // Reset form - use current defaultModel from store
     setNewFeature({
       title: '',
       category: '',
@@ -262,7 +268,7 @@ export function AddFeatureDialog({
       imagePaths: [],
       textFilePaths: [],
       skipTests: defaultSkipTests,
-      model: 'opus',
+      model: defaultModel,
       priority: 2,
       thinkingLevel: 'none',
       branchName: '',

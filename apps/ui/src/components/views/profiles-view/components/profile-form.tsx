@@ -8,7 +8,12 @@ import { cn, modelSupportsThinking } from '@/lib/utils';
 import { DialogFooter } from '@/components/ui/dialog';
 import { Brain } from 'lucide-react';
 import { toast } from 'sonner';
-import type { AIProfile, AgentModel, ThinkingLevel } from '@/store/app-store';
+import {
+  useAppStore,
+  type AIProfile,
+  type AgentModel,
+  type ThinkingLevel,
+} from '@/store/app-store';
 import { CLAUDE_MODELS, THINKING_LEVELS, ICON_OPTIONS } from '../constants';
 import { getProviderFromModel } from '../utils';
 
@@ -27,10 +32,12 @@ export function ProfileForm({
   isEditing,
   hotkeyActive,
 }: ProfileFormProps) {
+  // Use defaultModel from store as fallback
+  const { defaultModel } = useAppStore();
   const [formData, setFormData] = useState({
     name: profile.name || '',
     description: profile.description || '',
-    model: profile.model || ('opus' as AgentModel),
+    model: profile.model || defaultModel,
     thinkingLevel: profile.thinkingLevel || ('none' as ThinkingLevel),
     icon: profile.icon || 'Brain',
   });

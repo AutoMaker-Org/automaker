@@ -137,59 +137,6 @@ function getBaseOptions(): Partial<Options> {
 }
 
 /**
- * Build system prompt configuration based on autoLoadClaudeMd setting.
- * When autoLoadClaudeMd is true:
- * - Uses preset mode with 'claude_code' to enable CLAUDE.md auto-loading
- * - If there's a custom systemPrompt, appends it to the preset
- * - Sets settingSources to ['project'] for SDK to load CLAUDE.md files
- *
- * @param config - The SDK options config
- * @returns Object with systemPrompt and settingSources for SDK options
- */
-function buildClaudeMdOptions(config: CreateSdkOptionsConfig): {
-  systemPrompt?: string | SystemPromptConfig;
-  settingSources?: Array<'user' | 'project' | 'local'>;
-} {
-  if (!config.autoLoadClaudeMd) {
-    // Standard mode - just pass through the system prompt as-is
-    return config.systemPrompt ? { systemPrompt: config.systemPrompt } : {};
-  }
-
-  // Auto-load CLAUDE.md mode - use preset with settingSources
-  const result: {
-    systemPrompt: SystemPromptConfig;
-    settingSources: Array<'user' | 'project' | 'local'>;
-  } = {
-    systemPrompt: {
-      type: 'preset',
-      preset: 'claude_code',
-    },
-    // Load both user (~/.claude/CLAUDE.md) and project (.claude/CLAUDE.md) settings
-    settingSources: ['user', 'project'],
-  };
-
-  // If there's a custom system prompt, append it to the preset
-  if (config.systemPrompt) {
-    result.systemPrompt.append = config.systemPrompt;
-  }
-
-  return result;
-}
-
-/**
- * System prompt configuration for SDK options
- * When using preset mode with claude_code, CLAUDE.md files are automatically loaded
- */
-export interface SystemPromptConfig {
-  /** Use preset mode with claude_code to enable CLAUDE.md auto-loading */
-  type: 'preset';
-  /** The preset to use - 'claude_code' enables CLAUDE.md loading */
-  preset: 'claude_code';
-  /** Optional additional prompt to append to the preset */
-  append?: string;
-}
-
-/**
  * Options configuration for creating SDK options
  */
 export interface CreateSdkOptionsConfig {
@@ -213,9 +160,6 @@ export interface CreateSdkOptionsConfig {
     type: 'json_schema';
     schema: Record<string, unknown>;
   };
-
-  /** Enable auto-loading of CLAUDE.md files via SDK's settingSources */
-  autoLoadClaudeMd?: boolean;
 }
 
 /**
@@ -225,14 +169,10 @@ export interface CreateSdkOptionsConfig {
  * - Uses read-only tools for codebase analysis
  * - Extended turns for thorough exploration
  * - Opus model by default (can be overridden)
- * - When autoLoadClaudeMd is true, uses preset mode and settingSources for CLAUDE.md loading
  */
 export function createSpecGenerationOptions(config: CreateSdkOptionsConfig): Options {
   // Validate working directory before creating options
   validateWorkingDirectory(config.cwd);
-
-  // Build CLAUDE.md auto-loading options if enabled
-  const claudeMdOptions = buildClaudeMdOptions(config);
 
   return {
     ...getBaseOptions(),
@@ -244,7 +184,7 @@ export function createSpecGenerationOptions(config: CreateSdkOptionsConfig): Opt
     maxTurns: MAX_TURNS.maximum,
     cwd: config.cwd,
     allowedTools: [...TOOL_PRESETS.specGeneration],
-    ...claudeMdOptions,
+    ...(config.systemPrompt && { systemPrompt: config.systemPrompt }),
     ...(config.abortController && { abortController: config.abortController }),
     ...(config.outputFormat && { outputFormat: config.outputFormat }),
   };
@@ -257,14 +197,10 @@ export function createSpecGenerationOptions(config: CreateSdkOptionsConfig): Opt
  * - Uses read-only tools (just needs to read the spec)
  * - Quick turns since it's mostly JSON generation
  * - Sonnet model by default for speed
- * - When autoLoadClaudeMd is true, uses preset mode and settingSources for CLAUDE.md loading
  */
 export function createFeatureGenerationOptions(config: CreateSdkOptionsConfig): Options {
   // Validate working directory before creating options
   validateWorkingDirectory(config.cwd);
-
-  // Build CLAUDE.md auto-loading options if enabled
-  const claudeMdOptions = buildClaudeMdOptions(config);
 
   return {
     ...getBaseOptions(),
@@ -274,7 +210,7 @@ export function createFeatureGenerationOptions(config: CreateSdkOptionsConfig): 
     maxTurns: MAX_TURNS.quick,
     cwd: config.cwd,
     allowedTools: [...TOOL_PRESETS.readOnly],
-    ...claudeMdOptions,
+    ...(config.systemPrompt && { systemPrompt: config.systemPrompt }),
     ...(config.abortController && { abortController: config.abortController }),
   };
 }
@@ -286,14 +222,10 @@ export function createFeatureGenerationOptions(config: CreateSdkOptionsConfig): 
  * - Uses read-only tools for analysis
  * - Standard turns to allow thorough codebase exploration and structured output generation
  * - Opus model by default for thorough analysis
- * - When autoLoadClaudeMd is true, uses preset mode and settingSources for CLAUDE.md loading
  */
 export function createSuggestionsOptions(config: CreateSdkOptionsConfig): Options {
   // Validate working directory before creating options
   validateWorkingDirectory(config.cwd);
-
-  // Build CLAUDE.md auto-loading options if enabled
-  const claudeMdOptions = buildClaudeMdOptions(config);
 
   return {
     ...getBaseOptions(),
@@ -301,7 +233,7 @@ export function createSuggestionsOptions(config: CreateSdkOptionsConfig): Option
     maxTurns: MAX_TURNS.extended,
     cwd: config.cwd,
     allowedTools: [...TOOL_PRESETS.readOnly],
-    ...claudeMdOptions,
+    ...(config.systemPrompt && { systemPrompt: config.systemPrompt }),
     ...(config.abortController && { abortController: config.abortController }),
     ...(config.outputFormat && { outputFormat: config.outputFormat }),
   };
@@ -315,7 +247,6 @@ export function createSuggestionsOptions(config: CreateSdkOptionsConfig): Option
  * - Standard turns for interactive sessions
  * - Model priority: explicit model > session model > chat default
  * - Sandbox enabled for bash safety
- * - When autoLoadClaudeMd is true, uses preset mode and settingSources for CLAUDE.md loading
  */
 export function createChatOptions(config: CreateSdkOptionsConfig): Options {
   // Validate working directory before creating options
@@ -323,9 +254,6 @@ export function createChatOptions(config: CreateSdkOptionsConfig): Options {
 
   // Model priority: explicit model > session model > chat default
   const effectiveModel = config.model || config.sessionModel;
-
-  // Build CLAUDE.md auto-loading options if enabled
-  const claudeMdOptions = buildClaudeMdOptions(config);
 
   return {
     ...getBaseOptions(),
@@ -337,7 +265,7 @@ export function createChatOptions(config: CreateSdkOptionsConfig): Options {
       enabled: true,
       autoAllowBashIfSandboxed: true,
     },
-    ...claudeMdOptions,
+    ...(config.systemPrompt && { systemPrompt: config.systemPrompt }),
     ...(config.abortController && { abortController: config.abortController }),
   };
 }
@@ -350,14 +278,10 @@ export function createChatOptions(config: CreateSdkOptionsConfig): Options {
  * - Extended turns for thorough feature implementation
  * - Uses default model (can be overridden)
  * - Sandbox enabled for bash safety
- * - When autoLoadClaudeMd is true, uses preset mode and settingSources for CLAUDE.md loading
  */
 export function createAutoModeOptions(config: CreateSdkOptionsConfig): Options {
   // Validate working directory before creating options
   validateWorkingDirectory(config.cwd);
-
-  // Build CLAUDE.md auto-loading options if enabled
-  const claudeMdOptions = buildClaudeMdOptions(config);
 
   return {
     ...getBaseOptions(),
@@ -369,7 +293,7 @@ export function createAutoModeOptions(config: CreateSdkOptionsConfig): Options {
       enabled: true,
       autoAllowBashIfSandboxed: true,
     },
-    ...claudeMdOptions,
+    ...(config.systemPrompt && { systemPrompt: config.systemPrompt }),
     ...(config.abortController && { abortController: config.abortController }),
   };
 }
@@ -378,7 +302,6 @@ export function createAutoModeOptions(config: CreateSdkOptionsConfig): Options {
  * Create custom SDK options with explicit configuration
  *
  * Use this when the preset options don't fit your use case.
- * When autoLoadClaudeMd is true, uses preset mode and settingSources for CLAUDE.md loading
  */
 export function createCustomOptions(
   config: CreateSdkOptionsConfig & {
@@ -390,9 +313,6 @@ export function createCustomOptions(
   // Validate working directory before creating options
   validateWorkingDirectory(config.cwd);
 
-  // Build CLAUDE.md auto-loading options if enabled
-  const claudeMdOptions = buildClaudeMdOptions(config);
-
   return {
     ...getBaseOptions(),
     model: getModelForUseCase('default', config.model),
@@ -400,7 +320,7 @@ export function createCustomOptions(
     cwd: config.cwd,
     allowedTools: config.allowedTools ? [...config.allowedTools] : [...TOOL_PRESETS.readOnly],
     ...(config.sandbox && { sandbox: config.sandbox }),
-    ...claudeMdOptions,
+    ...(config.systemPrompt && { systemPrompt: config.systemPrompt }),
     ...(config.abortController && { abortController: config.abortController }),
   };
 }

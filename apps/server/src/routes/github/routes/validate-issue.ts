@@ -23,8 +23,6 @@ import {
   logError,
   logger,
 } from './validation-common.js';
-import type { SettingsService } from '../../../services/settings-service.js';
-import { getAutoLoadClaudeMdSetting } from '../../../lib/settings-helpers.js';
 
 /** Valid model values for validation */
 const VALID_MODELS: readonly AgentModel[] = ['opus', 'sonnet', 'haiku'] as const;
@@ -56,8 +54,7 @@ async function runValidation(
   issueLabels: string[] | undefined,
   model: AgentModel,
   events: EventEmitter,
-  abortController: AbortController,
-  settingsService?: SettingsService
+  abortController: AbortController
 ): Promise<void> {
   // Emit start event
   const startEvent: IssueValidationEvent = {
@@ -79,20 +76,12 @@ async function runValidation(
     // Build the prompt
     const prompt = buildValidationPrompt(issueNumber, issueTitle, issueBody, issueLabels);
 
-    // Load autoLoadClaudeMd setting
-    const autoLoadClaudeMd = await getAutoLoadClaudeMdSetting(
-      projectPath,
-      settingsService,
-      '[ValidateIssue]'
-    );
-
     // Create SDK options with structured output and abort controller
     const options = createSuggestionsOptions({
       cwd: projectPath,
       model,
       systemPrompt: ISSUE_VALIDATION_SYSTEM_PROMPT,
       abortController,
-      autoLoadClaudeMd,
       outputFormat: {
         type: 'json_schema',
         schema: issueValidationSchema as Record<string, unknown>,
@@ -201,10 +190,7 @@ async function runValidation(
  * - System prompt guiding the validation process
  * - Async execution with event emission
  */
-export function createValidateIssueHandler(
-  events: EventEmitter,
-  settingsService?: SettingsService
-) {
+export function createValidateIssueHandler(events: EventEmitter) {
   return async (req: Request, res: Response): Promise<void> => {
     try {
       const {
@@ -270,8 +256,7 @@ export function createValidateIssueHandler(
         issueLabels,
         model,
         events,
-        abortController,
-        settingsService
+        abortController
       )
         .catch((error) => {
           // Error is already handled inside runValidation (event emitted)

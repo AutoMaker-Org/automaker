@@ -55,8 +55,6 @@ export class ClaudeProvider extends BaseProvider {
       ...(sdkSessionId && conversationHistory && conversationHistory.length > 0
         ? { resume: sdkSessionId }
         : {}),
-      // Forward settingSources for CLAUDE.md file loading
-      ...(options.settingSources && { settingSources: options.settingSources }),
     };
 
     // Build prompt payload
