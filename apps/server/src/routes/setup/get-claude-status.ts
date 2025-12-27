@@ -8,44 +8,9 @@ import os from 'os';
 import path from 'path';
 import fs from 'fs/promises';
 import { getApiKey } from './common.js';
+import { hasSettingsFileAuth } from '../../lib/claude-settings.js';
 
 const execAsync = promisify(exec);
-
-/**
- * Check if ~/.claude/settings.json exists and has auth
- * This is used by the Claude Agent SDK directly
- *
- * Checks multiple locations:
- * 1. env section (env.ANTHROPIC_AUTH_TOKEN) - Claude Code format
- * 2. OAuth tokens at root level (oauthToken, oauth_token)
- * 3. API keys at root level (apiKey, api_key, primaryApiKey)
- */
-async function checkSettingsFileAuth(): Promise<boolean> {
-  const settingsPath = path.join(os.homedir(), '.claude', 'settings.json');
-  try {
-    const content = await fs.readFile(settingsPath, 'utf-8');
-    const settings = JSON.parse(content);
-
-    // Check env section (Claude Code format)
-    if (settings.env?.ANTHROPIC_AUTH_TOKEN) {
-      return true;
-    }
-
-    // Check for OAuth tokens at root level
-    if (settings.oauthToken || settings.oauth_token) {
-      return true;
-    }
-
-    // Check for API keys at root level
-    if (settings.apiKey || settings.api_key || settings.primaryApiKey) {
-      return true;
-    }
-
-    return false;
-  } catch {
-    return false;
-  }
-}
 
 export async function getClaudeStatus() {
   let installed = false;
@@ -134,8 +99,8 @@ export async function getClaudeStatus() {
     hasRecentActivity: false,
   };
 
-  // Check for ~/.claude/settings.json with auth token (NEW - highest priority for SDK usage)
-  auth.hasSettingsFileAuth = await checkSettingsFileAuth();
+  // Check for ~/.claude/settings.json with auth token (highest priority for SDK usage)
+  auth.hasSettingsFileAuth = await hasSettingsFileAuth();
   if (auth.hasSettingsFileAuth && !auth.authenticated) {
     auth.authenticated = true;
     auth.method = 'settings_file';

@@ -18,70 +18,13 @@ import type {
   InstallationStatus,
   ModelDefinition,
 } from './types.js';
-import * as fs from 'fs/promises';
-import * as path from 'path';
-import * as os from 'os';
+import { getSettingsEnv, hasSettingsFileAuth } from '../lib/claude-settings.js';
 
 /**
- * Load Claude settings from ~/.claude/settings.json
- * Returns the env section if it exists
+ * Helper to get Anthropic API key from in-memory storage.
+ * Used as fallback when no env var or settings file is available.
  */
-async function loadClaudeSettings(): Promise<Record<string, string> | null> {
-  const settingsPath = path.join(os.homedir(), '.claude', 'settings.json');
-  try {
-    const content = await fs.readFile(settingsPath, 'utf-8');
-    const settings = JSON.parse(content);
-    return settings.env || null;
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Check if ~/.claude/settings.json exists and has auth token
- *
- * Checks multiple locations:
- * 1. env section (env.ANTHROPIC_AUTH_TOKEN) - Claude Code format
- * 2. OAuth tokens at root level (oauthToken, oauth_token)
- * 3. API keys at root level (apiKey, api_key, primaryApiKey)
- */
-async function hasClaudeSettingsWithAuth(): Promise<boolean> {
-  const settingsPath = path.join(os.homedir(), '.claude', 'settings.json');
-  try {
-    const content = await fs.readFile(settingsPath, 'utf-8');
-    const settings = JSON.parse(content);
-
-    // Check env section (Claude Code format)
-    if (settings.env?.ANTHROPIC_AUTH_TOKEN) {
-      return true;
-    }
-
-    // Check for OAuth tokens at root level
-    if (settings.oauthToken || settings.oauth_token) {
-      return true;
-    }
-
-    // Check for API keys at root level
-    if (settings.apiKey || settings.api_key || settings.primaryApiKey) {
-      return true;
-    }
-
-    return false;
-  } catch {
-    return false;
-  }
-}
-
-/**
- * Helper to get Anthropic API key from multiple sources.
- * Checks in-memory storage first (from UI setup), then env var.
- */
-function getAnthropicApiKey(): string | undefined {
-  // Try environment variable first
-  if (process.env.ANTHROPIC_API_KEY) {
-    return process.env.ANTHROPIC_API_KEY;
-  }
-
+function getInMemoryApiKey(): string | undefined {
   // Try dynamic import of in-memory storage
   try {
     // Dynamic import to avoid circular dependency
@@ -126,7 +69,7 @@ export class ClaudeProvider extends BaseProvider {
     const envKeysToRestore: string[] = [];
 
     // Load settings from ~/.claude/settings.json
-    const settingsEnv = await loadClaudeSettings();
+    const settingsEnv = await getSettingsEnv();
 
     // Set environment variables from settings file if available
     if (settingsEnv) {
@@ -134,20 +77,30 @@ export class ClaudeProvider extends BaseProvider {
         // Save original value if it exists
         if (key in process.env) {
           originalEnv[key] = process.env[key];
-          envKeysToRestore.push(key);
         }
+        envKeysToRestore.push(key);
         // Set the environment variable
         process.env[key] = value;
       }
+      // Map ANTHROPIC_AUTH_TOKEN to ANTHROPIC_API_KEY if present
+      if (settingsEnv.ANTHROPIC_AUTH_TOKEN && !settingsEnv.ANTHROPIC_API_KEY) {
+        if ('ANTHROPIC_API_KEY' in process.env) {
+          originalEnv.ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+        }
+        if (!envKeysToRestore.includes('ANTHROPIC_API_KEY')) {
+          envKeysToRestore.push('ANTHROPIC_API_KEY');
+        }
+        process.env.ANTHROPIC_API_KEY = settingsEnv.ANTHROPIC_AUTH_TOKEN;
+      }
     }
 
-    // If no settings file and no API key env var, try in-memory storage
-    const hasEnvApiKey = !!process.env.ANTHROPIC_API_KEY;
-    if (!hasEnvApiKey && !settingsEnv) {
-      const inMemoryApiKey = getAnthropicApiKey();
+    // If no API key env var is set yet (from settings or original env), try in-memory storage
+    if (!process.env.ANTHROPIC_API_KEY) {
+      const inMemoryApiKey = getInMemoryApiKey();
       if (inMemoryApiKey) {
-        process.env.ANTHROPIC_API_KEY = inMemoryApiKey;
+        originalEnv.ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
         envKeysToRestore.push('ANTHROPIC_API_KEY');
+        process.env.ANTHROPIC_API_KEY = inMemoryApiKey;
       }
     }
 
@@ -224,19 +177,24 @@ export class ClaudeProvider extends BaseProvider {
   async detectInstallation(): Promise<InstallationStatus> {
     // Claude SDK is always available since it's a dependency
     // Check for authentication from multiple sources
-    const hasApiKey = !!getAnthropicApiKey();
-    const hasSettingsAuth = await hasClaudeSettingsWithAuth();
+    const hasEnvApiKey = !!process.env.ANTHROPIC_API_KEY;
+    const hasInMemoryApiKey = !!getInMemoryApiKey();
+    const hasSettingsAuth = await hasSettingsFileAuth();
 
-    // Authenticated if we have either API key or settings file with auth
-    const authenticated = hasApiKey || hasSettingsAuth;
+    // Authenticated if we have any auth source
+    const authenticated = hasEnvApiKey || hasInMemoryApiKey || hasSettingsAuth;
 
     const status: InstallationStatus = {
       installed: true,
       method: 'sdk',
-      hasApiKey,
+      hasApiKey: hasEnvApiKey || hasInMemoryApiKey,
       authenticated,
       // Additional info about auth method
-      authMethod: hasSettingsAuth ? 'settings_file' : hasApiKey ? 'api_key' : 'none',
+      authMethod: hasSettingsAuth
+        ? 'settings_file'
+        : hasEnvApiKey || hasInMemoryApiKey
+          ? 'api_key'
+          : 'none',
     };
 
     return status;

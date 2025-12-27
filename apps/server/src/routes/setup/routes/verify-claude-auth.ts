@@ -7,9 +7,7 @@ import type { Request, Response } from 'express';
 import { query } from '@anthropic-ai/claude-agent-sdk';
 import { createLogger } from '@automaker/utils';
 import { getApiKey } from '../common.js';
-import os from 'os';
-import path from 'path';
-import fs from 'fs/promises';
+import { getSettingsEnv } from '../../../lib/claude-settings.js';
 
 const logger = createLogger('Setup');
 
@@ -72,42 +70,16 @@ function containsAuthError(text: string): boolean {
 }
 
 /**
- * Read all env variables from ~/.claude/settings.json
- * Returns the env object if found, null otherwise
+ * Get appropriate error message based on auth method
  */
-async function getSettingsFileEnv(): Promise<Record<string, string> | null> {
-  const settingsPath = path.join(os.homedir(), '.claude', 'settings.json');
-  try {
-    const content = await fs.readFile(settingsPath, 'utf-8');
-    const settings = JSON.parse(content);
-
-    // Return the env section if it exists and has content
-    if (settings.env && typeof settings.env === 'object' && Object.keys(settings.env).length > 0) {
-      return settings.env;
-    }
-
-    // Build env from root-level tokens if no env section
-    const env: Record<string, string> = {};
-
-    // Check for OAuth tokens at root level
-    if (settings.oauthToken) {
-      env.ANTHROPIC_API_KEY = settings.oauthToken;
-    } else if (settings.oauth_token) {
-      env.ANTHROPIC_API_KEY = settings.oauth_token;
-    }
-    // Check for API keys at root level
-    else if (settings.apiKey) {
-      env.ANTHROPIC_API_KEY = settings.apiKey;
-    } else if (settings.api_key) {
-      env.ANTHROPIC_API_KEY = settings.api_key;
-    } else if (settings.primaryApiKey) {
-      env.ANTHROPIC_API_KEY = settings.primaryApiKey;
-    }
-
-    return Object.keys(env).length > 0 ? env : null;
-  } catch {
-    return null;
-  }
+function getAuthErrorMessage(authMethod?: 'cli' | 'api_key' | 'settings_file'): string {
+  const errorMessages = {
+    cli: "CLI authentication failed. Please run 'claude login' in your terminal to authenticate.",
+    settings_file:
+      'Authentication from ~/.claude/settings.json failed. Please check that your authentication token is valid.',
+    api_key: 'API key is invalid or has been revoked.',
+  };
+  return errorMessages[authMethod || 'api_key'];
 }
 
 export function createVerifyClaudeAuthHandler() {
@@ -159,7 +131,7 @@ export function createVerifyClaudeAuthHandler() {
           }
         } else if (authMethod === 'settings_file') {
           // For settings_file verification, load ALL env vars from ~/.claude/settings.json
-          const settingsEnv = await getSettingsFileEnv();
+          const settingsEnv = await getSettingsEnv();
           if (settingsEnv) {
             // Save original values and apply settings env
             for (const [key, value] of Object.entries(settingsEnv)) {
@@ -220,15 +192,7 @@ export function createVerifyClaudeAuthHandler() {
           // Check if any part of the message contains auth errors
           if (containsAuthError(msgStr)) {
             logger.error('[Setup] Found auth error in message');
-            if (authMethod === 'cli') {
-              errorMessage =
-                "CLI authentication failed. Please run 'claude login' in your terminal to authenticate.";
-            } else if (authMethod === 'settings_file') {
-              errorMessage =
-                'Authentication from ~/.claude/settings.json failed. Please check that your authentication token is valid.';
-            } else {
-              errorMessage = 'API key is invalid or has been revoked.';
-            }
+            errorMessage = getAuthErrorMessage(authMethod);
             break;
           }
 
@@ -242,15 +206,7 @@ export function createVerifyClaudeAuthHandler() {
                   logger.info('[Setup] Assistant text:', text);
 
                   if (containsAuthError(text)) {
-                    if (authMethod === 'cli') {
-                      errorMessage =
-                        "CLI authentication failed. Please run 'claude login' in your terminal to authenticate.";
-                    } else if (authMethod === 'settings_file') {
-                      errorMessage =
-                        'Authentication from ~/.claude/settings.json failed. Please check that your authentication token is valid.';
-                    } else {
-                      errorMessage = 'API key is invalid or has been revoked.';
-                    }
+                    errorMessage = getAuthErrorMessage(authMethod);
                     break;
                   }
 
@@ -283,15 +239,7 @@ export function createVerifyClaudeAuthHandler() {
               authenticated = false;
               break;
             } else if (containsAuthError(resultStr)) {
-              if (authMethod === 'cli') {
-                errorMessage =
-                  "CLI authentication failed. Please run 'claude login' in your terminal to authenticate.";
-              } else if (authMethod === 'settings_file') {
-                errorMessage =
-                  'Authentication from ~/.claude/settings.json failed. Please check that your authentication token is valid.';
-              } else {
-                errorMessage = 'API key is invalid or has been revoked.';
-              }
+              errorMessage = getAuthErrorMessage(authMethod);
             } else {
               // Got a result without errors
               receivedAnyContent = true;
@@ -334,15 +282,7 @@ export function createVerifyClaudeAuthHandler() {
         }
         // Check for auth-related errors in exception
         else if (containsAuthError(errMessage)) {
-          if (authMethod === 'cli') {
-            errorMessage =
-              "CLI authentication failed. Please run 'claude login' in your terminal to authenticate.";
-          } else if (authMethod === 'settings_file') {
-            errorMessage =
-              'Authentication from ~/.claude/settings.json failed. Please check that your authentication token is valid.';
-          } else {
-            errorMessage = 'API key is invalid or has been revoked.';
-          }
+          errorMessage = getAuthErrorMessage(authMethod);
         } else if (errMessage.includes('abort') || errMessage.includes('timeout')) {
           errorMessage = 'Verification timed out. Please try again.';
         } else if (errMessage.includes('exit') && errMessage.includes('code 1')) {
