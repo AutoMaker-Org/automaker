@@ -16,8 +16,6 @@ import {
 import { ProviderFactory } from '../providers/provider-factory.js';
 import { createChatOptions, validateWorkingDirectory } from '../lib/sdk-options.js';
 import { PathNotAllowedError } from '@automaker/platform';
-import type { SettingsService } from './settings-service.js';
-import { getAutoLoadClaudeMdSetting, filterClaudeMdFromContext } from '../lib/settings-helpers.js';
 
 interface Message {
   id: string;
@@ -32,14 +30,6 @@ interface Message {
   isError?: boolean;
 }
 
-interface QueuedPrompt {
-  id: string;
-  message: string;
-  imagePaths?: string[];
-  model?: string;
-  addedAt: string;
-}
-
 interface Session {
   messages: Message[];
   isRunning: boolean;
@@ -47,7 +37,6 @@ interface Session {
   workingDirectory: string;
   model?: string;
   sdkSessionId?: string; // Claude SDK session ID for conversation continuity
-  promptQueue: QueuedPrompt[]; // Queue of prompts to auto-run after current task
 }
 
 interface SessionMetadata {
@@ -68,13 +57,11 @@ export class AgentService {
   private stateDir: string;
   private metadataFile: string;
   private events: EventEmitter;
-  private settingsService: SettingsService | null = null;
 
-  constructor(dataDir: string, events: EventEmitter, settingsService?: SettingsService) {
+  constructor(dataDir: string, events: EventEmitter) {
     this.stateDir = path.join(dataDir, 'agent-sessions');
     this.metadataFile = path.join(dataDir, 'sessions-metadata.json');
     this.events = events;
-    this.settingsService = settingsService ?? null;
   }
 
   async initialize(): Promise<void> {
@@ -103,16 +90,12 @@ export class AgentService {
       // Validate that the working directory is allowed using centralized validation
       validateWorkingDirectory(resolvedWorkingDirectory);
 
-      // Load persisted queue
-      const promptQueue = await this.loadQueueState(sessionId);
-
       this.sessions.set(sessionId, {
         messages,
         isRunning: false,
         abortController: null,
         workingDirectory: resolvedWorkingDirectory,
         sdkSessionId: sessionMetadata?.sdkSessionId, // Load persisted SDK session ID
-        promptQueue,
       });
     }
 
@@ -191,11 +174,6 @@ export class AgentService {
     session.isRunning = true;
     session.abortController = new AbortController();
 
-    // Emit started event so UI can show thinking indicator
-    this.emitAgentEvent(sessionId, {
-      type: 'started',
-    });
-
     // Emit user message event
     this.emitAgentEvent(sessionId, {
       type: 'message',
@@ -208,22 +186,11 @@ export class AgentService {
       // Determine the effective working directory for context loading
       const effectiveWorkDir = workingDirectory || session.workingDirectory;
 
-      // Load autoLoadClaudeMd setting (project setting takes precedence over global)
-      const autoLoadClaudeMd = await getAutoLoadClaudeMdSetting(
-        effectiveWorkDir,
-        this.settingsService,
-        '[AgentService]'
-      );
-
       // Load project context files (CLAUDE.md, CODE_QUALITY.md, etc.)
-      const contextResult = await loadContextFiles({
+      const { formattedPrompt: contextFilesPrompt } = await loadContextFiles({
         projectPath: effectiveWorkDir,
         fsModule: secureFs as Parameters<typeof loadContextFiles>[0]['fsModule'],
       });
-
-      // When autoLoadClaudeMd is enabled, filter out CLAUDE.md to avoid duplication
-      // (SDK handles CLAUDE.md via settingSources), but keep other context files like CODE_QUALITY.md
-      const contextFilesPrompt = filterClaudeMdFromContext(contextResult, autoLoadClaudeMd);
 
       // Build combined system prompt with base prompt and context files
       const baseSystemPrompt = this.getSystemPrompt();
@@ -238,7 +205,6 @@ export class AgentService {
         sessionModel: session.model,
         systemPrompt: combinedSystemPrompt,
         abortController: session.abortController!,
-        autoLoadClaudeMd,
       });
 
       // Extract model, maxTurns, and allowedTools from SDK options
@@ -258,12 +224,11 @@ export class AgentService {
         prompt: '', // Will be set below based on images
         model: effectiveModel,
         cwd: effectiveWorkDir,
-        systemPrompt: sdkOptions.systemPrompt,
+        systemPrompt: combinedSystemPrompt,
         maxTurns: maxTurns,
         allowedTools: allowedTools,
         abortController: session.abortController!,
         conversationHistory: conversationHistory.length > 0 ? conversationHistory : undefined,
-        settingSources: sdkOptions.settingSources,
         sdkSessionId: session.sdkSessionId, // Pass SDK session ID for resuming
       };
 
@@ -284,6 +249,8 @@ export class AgentService {
       let currentAssistantMessage: Message | null = null;
       let responseText = '';
       const toolUses: Array<{ name: string; input: unknown }> = [];
+      let sawError = false;
+      let emittedComplete = false;
 
       for await (const msg of stream) {
         // Capture SDK session ID from any message and persist it
@@ -333,10 +300,18 @@ export class AgentService {
             }
           }
         } else if (msg.type === 'result') {
-          if (msg.subtype === 'success' && msg.result) {
-            if (currentAssistantMessage) {
-              currentAssistantMessage.content = msg.result;
-              responseText = msg.result;
+          if (msg.subtype === 'success' && msg.result !== undefined) {
+            responseText = msg.result;
+            if (!currentAssistantMessage) {
+              currentAssistantMessage = {
+                id: this.generateId(),
+                role: 'assistant',
+                content: responseText,
+                timestamp: new Date().toISOString(),
+              };
+              session.messages.push(currentAssistantMessage);
+            } else {
+              currentAssistantMessage.content = responseText;
             }
           }
 
@@ -346,16 +321,26 @@ export class AgentService {
             content: responseText,
             toolUses,
           });
+          emittedComplete = true;
+        } else if (msg.type === 'error') {
+          sawError = true;
+          throw new Error(msg.error || 'Unknown error');
         }
+      }
+
+      if (!emittedComplete && !sawError) {
+        this.emitAgentEvent(sessionId, {
+          type: 'complete',
+          messageId: currentAssistantMessage?.id,
+          content: responseText,
+          toolUses,
+        });
       }
 
       await this.saveSession(sessionId, session.messages);
 
       session.isRunning = false;
       session.abortController = null;
-
-      // Process next item in queue after completion
-      setImmediate(() => this.processNextInQueue(sessionId));
 
       return {
         success: true,
@@ -593,167 +578,6 @@ export class AgentService {
     this.sessions.delete(sessionId);
 
     return true;
-  }
-
-  // Queue management methods
-
-  /**
-   * Add a prompt to the queue for later execution
-   */
-  async addToQueue(
-    sessionId: string,
-    prompt: { message: string; imagePaths?: string[]; model?: string }
-  ): Promise<{ success: boolean; queuedPrompt?: QueuedPrompt; error?: string }> {
-    const session = this.sessions.get(sessionId);
-    if (!session) {
-      return { success: false, error: 'Session not found' };
-    }
-
-    const queuedPrompt: QueuedPrompt = {
-      id: this.generateId(),
-      message: prompt.message,
-      imagePaths: prompt.imagePaths,
-      model: prompt.model,
-      addedAt: new Date().toISOString(),
-    };
-
-    session.promptQueue.push(queuedPrompt);
-    await this.saveQueueState(sessionId, session.promptQueue);
-
-    // Emit queue update event
-    this.emitAgentEvent(sessionId, {
-      type: 'queue_updated',
-      queue: session.promptQueue,
-    });
-
-    return { success: true, queuedPrompt };
-  }
-
-  /**
-   * Get the current queue for a session
-   */
-  getQueue(sessionId: string): { success: boolean; queue?: QueuedPrompt[]; error?: string } {
-    const session = this.sessions.get(sessionId);
-    if (!session) {
-      return { success: false, error: 'Session not found' };
-    }
-    return { success: true, queue: session.promptQueue };
-  }
-
-  /**
-   * Remove a specific prompt from the queue
-   */
-  async removeFromQueue(
-    sessionId: string,
-    promptId: string
-  ): Promise<{ success: boolean; error?: string }> {
-    const session = this.sessions.get(sessionId);
-    if (!session) {
-      return { success: false, error: 'Session not found' };
-    }
-
-    const index = session.promptQueue.findIndex((p) => p.id === promptId);
-    if (index === -1) {
-      return { success: false, error: 'Prompt not found in queue' };
-    }
-
-    session.promptQueue.splice(index, 1);
-    await this.saveQueueState(sessionId, session.promptQueue);
-
-    this.emitAgentEvent(sessionId, {
-      type: 'queue_updated',
-      queue: session.promptQueue,
-    });
-
-    return { success: true };
-  }
-
-  /**
-   * Clear all prompts from the queue
-   */
-  async clearQueue(sessionId: string): Promise<{ success: boolean; error?: string }> {
-    const session = this.sessions.get(sessionId);
-    if (!session) {
-      return { success: false, error: 'Session not found' };
-    }
-
-    session.promptQueue = [];
-    await this.saveQueueState(sessionId, []);
-
-    this.emitAgentEvent(sessionId, {
-      type: 'queue_updated',
-      queue: [],
-    });
-
-    return { success: true };
-  }
-
-  /**
-   * Save queue state to disk for persistence
-   */
-  private async saveQueueState(sessionId: string, queue: QueuedPrompt[]): Promise<void> {
-    const queueFile = path.join(this.stateDir, `${sessionId}-queue.json`);
-    try {
-      await secureFs.writeFile(queueFile, JSON.stringify(queue, null, 2), 'utf-8');
-    } catch (error) {
-      console.error('[AgentService] Failed to save queue state:', error);
-    }
-  }
-
-  /**
-   * Load queue state from disk
-   */
-  private async loadQueueState(sessionId: string): Promise<QueuedPrompt[]> {
-    const queueFile = path.join(this.stateDir, `${sessionId}-queue.json`);
-    try {
-      const data = (await secureFs.readFile(queueFile, 'utf-8')) as string;
-      return JSON.parse(data);
-    } catch {
-      return [];
-    }
-  }
-
-  /**
-   * Process the next item in the queue (called after task completion)
-   */
-  private async processNextInQueue(sessionId: string): Promise<void> {
-    const session = this.sessions.get(sessionId);
-    if (!session || session.promptQueue.length === 0) {
-      return;
-    }
-
-    // Don't process if already running
-    if (session.isRunning) {
-      return;
-    }
-
-    const nextPrompt = session.promptQueue.shift();
-    if (!nextPrompt) return;
-
-    await this.saveQueueState(sessionId, session.promptQueue);
-
-    this.emitAgentEvent(sessionId, {
-      type: 'queue_updated',
-      queue: session.promptQueue,
-    });
-
-    console.log(`[AgentService] Processing next queued prompt for session ${sessionId}`);
-
-    try {
-      await this.sendMessage({
-        sessionId,
-        message: nextPrompt.message,
-        imagePaths: nextPrompt.imagePaths,
-        model: nextPrompt.model,
-      });
-    } catch (error) {
-      console.error('[AgentService] Failed to process queued prompt:', error);
-      this.emitAgentEvent(sessionId, {
-        type: 'queue_error',
-        error: (error as Error).message,
-        promptId: nextPrompt.id,
-      });
-    }
   }
 
   private emitAgentEvent(sessionId: string, data: Record<string, unknown>): void {
