@@ -12,6 +12,7 @@ import { SettingsNavigation } from './settings-view/components/settings-navigati
 import { ApiKeysSection } from './settings-view/api-keys/api-keys-section';
 import { ClaudeUsageSection } from './settings-view/api-keys/claude-usage-section';
 import { ClaudeCliStatus } from './settings-view/cli-status/claude-cli-status';
+import { ClaudeMdSettings } from './settings-view/claude/claude-md-settings';
 import { AIEnhancementSection } from './settings-view/ai-enhancement';
 import { McpSettingsPanel } from '@/components/settings/mcp-settings-panel';
 import { AppearanceSection } from './settings-view/appearance/appearance-section';
@@ -50,6 +51,8 @@ export function SettingsView() {
     apiKeys,
     validationModel,
     setValidationModel,
+    autoLoadClaudeMd,
+    setAutoLoadClaudeMd,
     getWorktreeSetupScript,
     setWorktreeSetupScript,
   } = useAppStore();
@@ -139,6 +142,10 @@ export function SettingsView() {
               status={claudeCliStatus}
               isChecking={isCheckingClaudeCli}
               onRefresh={handleRefreshClaudeCli}
+            />
+            <ClaudeMdSettings
+              autoLoadClaudeMd={autoLoadClaudeMd}
+              onAutoLoadClaudeMdChange={setAutoLoadClaudeMd}
             />
             {showUsageTracking && <ClaudeUsageSection />}
           </div>

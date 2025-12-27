@@ -55,7 +55,7 @@ export interface ExecuteOptions {
   prompt: string | Array<{ type: string; text?: string; source?: object }>;
   model: string;
   cwd: string;
-  systemPrompt?: string;
+  systemPrompt?: string | { type: 'preset'; preset: 'claude_code'; append?: string };
   maxTurns?: number;
   allowedTools?: string[];
   mcpServers?: Record<string, McpSdkConfig>;
@@ -63,6 +63,7 @@ export interface ExecuteOptions {
   conversationHistory?: ConversationMessage[]; // Previous messages for context
   sdkSessionId?: string; // Claude SDK session ID for resuming conversations
   providerConfig?: ProviderConfig; // Optional provider configuration (e.g., env vars)
+  settingSources?: Array<'user' | 'project' | 'local'>; // Claude filesystem settings to load
 }
 
 /**

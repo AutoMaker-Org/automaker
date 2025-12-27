@@ -421,6 +421,10 @@ export interface GlobalSettings {
   // Window State (Electron only)
   /** Persisted window bounds for restoring position/size across sessions */
   windowBounds?: WindowBounds;
+
+  // Claude Agent SDK Settings
+  /** Auto-load CLAUDE.md files using SDK's settingSources option */
+  autoLoadClaudeMd?: boolean;
 }
 
 /**
@@ -520,6 +524,10 @@ export interface ProjectSettings {
   // Session Tracking
   /** Last chat session selected in this project */
   lastSelectedSessionId?: string;
+
+  // Claude Agent SDK Settings
+  /** Auto-load CLAUDE.md files using SDK's settingSources option (project override) */
+  autoLoadClaudeMd?: boolean;
 }
 
 /**
@@ -579,6 +587,7 @@ export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
   recentFolders: [],
   worktreePanelCollapsed: false,
   lastSelectedSessionByProject: {},
+  autoLoadClaudeMd: false,
 };
 
 /** Default credentials (empty strings - user must provide API keys) */

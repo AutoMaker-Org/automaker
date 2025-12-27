@@ -17,6 +17,8 @@ import { createSpecGenerationOptions } from '../../lib/sdk-options.js';
 import { logAuthStatus } from './common.js';
 import { generateFeaturesFromSpec } from './generate-features-from-spec.js';
 import { ensureAutomakerDir, getAppSpecPath } from '@automaker/platform';
+import type { SettingsService } from '../../services/settings-service.js';
+import { getAutoLoadClaudeMdSetting } from '../../lib/settings-helpers.js';
 
 const logger = createLogger('SpecRegeneration');
 
@@ -27,7 +29,8 @@ export async function generateSpec(
   abortController: AbortController,
   generateFeatures?: boolean,
   analyzeProject?: boolean,
-  maxFeatures?: number
+  maxFeatures?: number,
+  settingsService?: SettingsService
 ): Promise<void> {
   logger.info('========== generateSpec() started ==========');
   logger.info('projectPath:', projectPath);
@@ -83,9 +86,17 @@ ${getStructuredSpecPromptInstruction()}`;
     content: 'Starting spec generation...\n',
   });
 
+  // Load autoLoadClaudeMd setting
+  const autoLoadClaudeMd = await getAutoLoadClaudeMdSetting(
+    projectPath,
+    settingsService,
+    '[SpecRegeneration]'
+  );
+
   const options = createSpecGenerationOptions({
     cwd: projectPath,
     abortController,
+    autoLoadClaudeMd,
     outputFormat: {
       type: 'json_schema',
       schema: specOutputSchema,
@@ -269,7 +280,13 @@ ${getStructuredSpecPromptInstruction()}`;
     // Create a new abort controller for feature generation
     const featureAbortController = new AbortController();
     try {
-      await generateFeaturesFromSpec(projectPath, events, featureAbortController, maxFeatures);
+      await generateFeaturesFromSpec(
+        projectPath,
+        events,
+        featureAbortController,
+        maxFeatures,
+        settingsService
+      );
       // Final completion will be emitted by generateFeaturesFromSpec -> parseAndCreateFeatures
     } catch (featureError) {
       logger.error('Feature generation failed:', featureError);

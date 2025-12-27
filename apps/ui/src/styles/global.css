@@ -389,78 +389,23 @@
   }
 }
 
-/* Custom scrollbar for dark themes */
-:is(
-    .dark,
-    .retro,
-    .dracula,
-    .nord,
-    .monokai,
-    .tokyonight,
-    .solarized,
-    .gruvbox,
-    .catppuccin,
-    .onedark,
-    .synthwave,
-    .red,
-    .sunset,
-    .gray
-  )
-  ::-webkit-scrollbar {
+/* Universal scrollbar styling using theme CSS variables */
+::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 
-:is(
-    .dark,
-    .retro,
-    .dracula,
-    .nord,
-    .monokai,
-    .tokyonight,
-    .solarized,
-    .gruvbox,
-    .catppuccin,
-    .onedark,
-    .synthwave,
-    .red,
-    .sunset,
-    .gray
-  )
-  ::-webkit-scrollbar-track {
+::-webkit-scrollbar-track {
   background: var(--muted);
 }
 
-:is(.dark, .retro) ::-webkit-scrollbar-thumb {
-  background: oklch(0.3 0 0);
+::-webkit-scrollbar-thumb {
+  background: var(--muted-foreground);
   border-radius: 4px;
 }
 
-:is(.dark, .retro) ::-webkit-scrollbar-thumb:hover {
-  background: oklch(0.4 0 0);
-}
-
-/* Retro Scrollbar override */
-.retro ::-webkit-scrollbar-thumb {
-  background: var(--primary);
-  border-radius: 0;
-}
-.retro ::-webkit-scrollbar-track {
-  background: var(--background);
-}
-
-/* Red theme scrollbar */
-.red ::-webkit-scrollbar-thumb {
-  background: oklch(0.35 0.15 25);
-  border-radius: 4px;
-}
-
-.red ::-webkit-scrollbar-thumb:hover {
-  background: oklch(0.45 0.18 25);
-}
-
-.red ::-webkit-scrollbar-track {
-  background: oklch(0.15 0.05 25);
+::-webkit-scrollbar-thumb:hover {
+  background: var(--foreground);
 }
 
 /* Always visible scrollbar for file diffs and code blocks */

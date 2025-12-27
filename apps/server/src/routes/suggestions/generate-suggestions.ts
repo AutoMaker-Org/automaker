@@ -9,6 +9,8 @@ import { createSuggestionsOptions } from '../../lib/sdk-options.js';
 import { FeatureLoader } from '../../services/feature-loader.js';
 import { getAppSpecPath } from '@automaker/platform';
 import * as secureFs from '../../lib/secure-fs.js';
+import type { SettingsService } from '../../services/settings-service.js';
+import { getAutoLoadClaudeMdSetting } from '../../lib/settings-helpers.js';
 
 const logger = createLogger('Suggestions');
 
@@ -125,7 +127,8 @@ export async function generateSuggestions(
   projectPath: string,
   suggestionType: string,
   events: EventEmitter,
-  abortController: AbortController
+  abortController: AbortController,
+  settingsService?: SettingsService
 ): Promise<void> {
   const typePrompts: Record<string, string> = {
     features: 'Analyze this project and suggest new features that would add value.',
@@ -154,9 +157,17 @@ The response will be automatically formatted as structured JSON.`;
   // Don't send initial message - let the agent output speak for itself
   // The first agent message will be captured as an info entry
 
+  // Load autoLoadClaudeMd setting
+  const autoLoadClaudeMd = await getAutoLoadClaudeMdSetting(
+    projectPath,
+    settingsService,
+    '[Suggestions]'
+  );
+
   const options = createSuggestionsOptions({
     cwd: projectPath,
     abortController,
+    autoLoadClaudeMd,
     outputFormat: {
       type: 'json_schema',
       schema: suggestionsSchema,

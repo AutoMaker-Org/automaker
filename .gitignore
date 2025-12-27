@@ -17,6 +17,7 @@ out/
 /.automaker/*
 /.automaker/
 .serena/
+.auto-claude/
 
 .worktrees/
 
@@ -89,6 +90,5 @@ blob-report/
 cursor-*.log
 
 docker-compose.override.yml
-
 # Auto Claude data directory
-.auto-claude/
+.claude/

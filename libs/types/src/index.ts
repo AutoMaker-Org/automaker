@@ -106,3 +106,13 @@ export type {
   IssueValidationEvent,
   StoredValidation,
 } from './issue-validation.js';
+
+// Backlog plan types
+export type {
+  BacklogChange,
+  DependencyUpdate,
+  BacklogPlanResult,
+  BacklogPlanEvent,
+  BacklogPlanRequest,
+  BacklogPlanApplyResult,
+} from './backlog-plan.js';

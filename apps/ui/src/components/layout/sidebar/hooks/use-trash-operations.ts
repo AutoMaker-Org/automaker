@@ -6,35 +6,35 @@ interface UseTrashOperationsProps {
   restoreTrashedProject: (projectId: string) => void;
   deleteTrashedProject: (projectId: string) => void;
   emptyTrash: () => void;
-  trashedProjects: TrashedProject[];
 }
 
 export function useTrashOperations({
   restoreTrashedProject,
   deleteTrashedProject,
   emptyTrash,
-  trashedProjects,
 }: UseTrashOperationsProps) {
   const [activeTrashId, setActiveTrashId] = useState<string | null>(null);
   const [isEmptyingTrash, setIsEmptyingTrash] = useState(false);
 
   const handleRestoreProject = useCallback(
     (projectId: string) => {
-      restoreTrashedProject(projectId);
-      toast.success('Project restored', {
-        description: 'Added back to your project list.',
-      });
+      try {
+        restoreTrashedProject(projectId);
+        toast.success('Project restored', {
+          description: 'Added back to your project list.',
+        });
+      } catch (error) {
+        console.error('[Sidebar] Failed to restore project:', error);
+        toast.error('Failed to restore project', {
+          description: error instanceof Error ? error.message : 'Unknown error',
+        });
+      }
     },
     [restoreTrashedProject]
   );
 
   const handleDeleteProjectFromDisk = useCallback(
     async (trashedProject: TrashedProject) => {
-      const confirmed = window.confirm(
-        `Delete "${trashedProject.name}" from disk?\nThis sends the folder to your system Trash.`
-      );
-      if (!confirmed) return;
-
       setActiveTrashId(trashedProject.id);
       try {
         const api = getElectronAPI();
@@ -64,23 +64,19 @@ export function useTrashOperations({
   );
 
   const handleEmptyTrash = useCallback(() => {
-    if (trashedProjects.length === 0) {
-      return;
-    }
-
-    const confirmed = window.confirm(
-      'Clear all projects from recycle bin? This does not delete folders from disk.'
-    );
-    if (!confirmed) return;
-
     setIsEmptyingTrash(true);
     try {
       emptyTrash();
       toast.success('Recycle bin cleared');
+    } catch (error) {
+      console.error('[Sidebar] Failed to empty trash:', error);
+      toast.error('Failed to clear recycle bin', {
+        description: error instanceof Error ? error.message : 'Unknown error',
+      });
     } finally {
       setIsEmptyingTrash(false);
     }
-  }, [emptyTrash, trashedProjects.length]);
+  }, [emptyTrash]);
 
   return {
     activeTrashId,
