@@ -12,7 +12,10 @@ import type {
   PipelineConfig,
   PipelineStep,
   PromptCustomization,
+=======
+  AutoUpdateSettings,
 } from '@automaker/types';
+import { DEFAULT_AUTO_UPDATE_SETTINGS } from '@automaker/types';
 
 // Re-export ThemeMode for convenience
 export type { ThemeMode };
@@ -495,6 +498,9 @@ export interface AppState {
 
   // Prompt Customization
   promptCustomization: PromptCustomization; // Custom prompts for Auto Mode, Agent, Backlog Plan, Enhancement
+=======
+  // Auto-Update Settings
+  autoUpdate: AutoUpdateSettings; // Configuration for automatic update checking
 
   // Project Analysis
   projectAnalysis: ProjectAnalysis | null;
@@ -781,6 +787,9 @@ export interface AppActions {
   // Prompt Customization actions
   setPromptCustomization: (customization: PromptCustomization) => Promise<void>;
 
+  // Auto-Update Settings actions
+  setAutoUpdate: (settings: Partial<AutoUpdateSettings>) => void;
+
   // AI Profile actions
   addAIProfile: (profile: Omit<AIProfile, 'id'>) => void;
   updateAIProfile: (id: string, updates: Partial<AIProfile>) => void;
@@ -980,6 +989,9 @@ const initialState: AppState = {
   mcpAutoApproveTools: true, // Default to enabled - bypass permission prompts for MCP tools
   mcpUnrestrictedTools: true, // Default to enabled - don't filter allowedTools when MCP enabled
   promptCustomization: {}, // Empty by default - all prompts use built-in defaults
+=======
+  enableSandboxMode: true, // Default to enabled for security (can be disabled if issues occur)
+  autoUpdate: DEFAULT_AUTO_UPDATE_SETTINGS, // Default auto-update settings
   aiProfiles: DEFAULT_AI_PROFILES,
   projectAnalysis: null,
   isAnalyzing: false,
@@ -1642,6 +1654,13 @@ export const useAppStore = create<AppState & AppActions>()(
         // Sync to server settings file
         const { syncSettingsToServer } = await import('@/hooks/use-settings-migration');
         await syncSettingsToServer();
+      },
+
+      // Auto-Update Settings actions
+      setAutoUpdate: (settings) => {
+        set((state) => ({
+          autoUpdate: { ...state.autoUpdate, ...settings },
+        }));
       },
 
       // AI Profile actions
@@ -2927,6 +2946,8 @@ export const useAppStore = create<AppState & AppActions>()(
           mcpUnrestrictedTools: state.mcpUnrestrictedTools,
           // Prompt customization
           promptCustomization: state.promptCustomization,
+=======
+          autoUpdate: state.autoUpdate,
           // Profiles and sessions
           aiProfiles: state.aiProfiles,
           chatSessions: state.chatSessions,

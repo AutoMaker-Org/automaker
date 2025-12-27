@@ -647,6 +647,51 @@ export interface ElectronAPI {
       error?: string;
     }>;
   };
+  updates?: {
+    check: () => Promise<{
+      success: boolean;
+      result?: {
+        updateAvailable: boolean;
+        localCommit: string;
+        localCommitShort: string;
+        remoteCommit: string | null;
+        remoteCommitShort: string | null;
+        upstreamUrl: string;
+        automakerPath: string;
+        error?: string;
+      };
+      error?: string;
+    }>;
+    pull: () => Promise<{
+      success: boolean;
+      result?: {
+        success: boolean;
+        previousCommit: string;
+        previousCommitShort: string;
+        newCommit: string;
+        newCommitShort: string;
+        alreadyUpToDate: boolean;
+        message: string;
+      };
+      error?: string;
+    }>;
+    info: () => Promise<{
+      success: boolean;
+      result?: {
+        automakerPath: string;
+        isGitRepo: boolean;
+        gitAvailable: boolean;
+        currentCommit: string | null;
+        currentCommitShort: string | null;
+        currentBranch: string | null;
+        hasLocalChanges: boolean;
+        upstreamUrl: string;
+        autoUpdateEnabled: boolean;
+        checkIntervalMinutes: number;
+      };
+      error?: string;
+    }>;
+  };
 }
 
 // Note: Window interface is declared in @/types/electron.d.ts

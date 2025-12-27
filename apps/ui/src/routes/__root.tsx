@@ -20,6 +20,7 @@ import { Toaster } from 'sonner';
 import { ThemeOption, themeOptions } from '@/config/theme-options';
 import { SandboxRiskDialog } from '@/components/dialogs/sandbox-risk-dialog';
 import { SandboxRejectionScreen } from '@/components/dialogs/sandbox-rejection-screen';
+import { useAutoUpdate } from '@/hooks/use-auto-update';
 
 // Session storage key for sandbox risk acknowledgment
 const SANDBOX_RISK_ACKNOWLEDGED_KEY = 'automaker-sandbox-risk-acknowledged';
@@ -52,6 +53,9 @@ function RootLayoutContent() {
     }
     return 'pending';
   });
+
+  // Auto-update polling - checks for updates at configured interval
+  useAutoUpdate();
 
   // Hidden streamer panel - opens with "\" key
   const handleStreamerPanelShortcut = useCallback((event: KeyboardEvent) => {

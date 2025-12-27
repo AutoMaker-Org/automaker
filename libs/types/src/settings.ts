@@ -365,6 +365,10 @@ export interface GlobalSettings {
   // Prompt Customization
   /** Custom prompts for Auto Mode, Agent Runner, Backlog Planning, and Enhancements */
   promptCustomization?: PromptCustomization;
+=======
+  // Auto-Update Settings
+  /** Configuration for automatic update checking */
+  autoUpdate: AutoUpdateSettings;
 }
 
 /**
@@ -501,6 +505,27 @@ export const DEFAULT_KEYBOARD_SHORTCUTS: KeyboardShortcuts = {
   closeTerminal: 'Alt+W',
 };
 
+/**
+ * AutoUpdateSettings - Configuration for automatic update checking
+ *
+ * Controls how the app checks for and applies updates from the upstream repository.
+ */
+export interface AutoUpdateSettings {
+  /** Whether automatic update checking is enabled */
+  enabled: boolean;
+  /** How often to check for updates (in minutes) */
+  checkIntervalMinutes: number;
+  /** URL of the upstream repository to check for updates */
+  upstreamUrl: string;
+}
+
+/** Default auto-update settings */
+export const DEFAULT_AUTO_UPDATE_SETTINGS: AutoUpdateSettings = {
+  enabled: true,
+  checkIntervalMinutes: 15,
+  upstreamUrl: 'https://github.com/AutoMaker-Org/automaker.git',
+};
+
 /** Default global settings used when no settings file exists */
 export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
   version: SETTINGS_VERSION,
@@ -536,6 +561,9 @@ export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
   // via the security warning dialog that explains the risks.
   mcpAutoApproveTools: true,
   mcpUnrestrictedTools: true,
+=======
+  enableSandboxMode: true,
+  autoUpdate: DEFAULT_AUTO_UPDATE_SETTINGS,
 };
 
 /** Default credentials (empty strings - user must provide API keys) */

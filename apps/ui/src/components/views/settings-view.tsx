@@ -18,6 +18,7 @@ import { TerminalSection } from './settings-view/terminal/terminal-section';
 import { AudioSection } from './settings-view/audio/audio-section';
 import { KeyboardShortcutsSection } from './settings-view/keyboard-shortcuts/keyboard-shortcuts-section';
 import { FeatureDefaultsSection } from './settings-view/feature-defaults/feature-defaults-section';
+import { UpdatesSection } from './settings-view/updates/updates-section';
 import { DangerZoneSection } from './settings-view/danger-zone/danger-zone-section';
 import { MCPServersSection } from './settings-view/mcp-servers';
 import { PromptCustomizationSection } from './settings-view/prompts';
@@ -57,6 +58,8 @@ export function SettingsView() {
     setEnableSandboxMode,
     promptCustomization,
     setPromptCustomization,
+    autoUpdate,
+    setAutoUpdate,
   } = useAppStore();
 
   const claudeAuthStatus = useSetupStore((state) => state.claudeAuthStatus);
@@ -179,6 +182,8 @@ export function SettingsView() {
             onValidationModelChange={setValidationModel}
           />
         );
+      case 'updates':
+        return <UpdatesSection autoUpdate={autoUpdate} onAutoUpdateChange={setAutoUpdate} />;
       case 'danger':
         return (
           <DangerZoneSection
