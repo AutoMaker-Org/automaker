@@ -838,8 +838,8 @@ export async function setupMockProjectWithProfiles(
       {
         id: 'profile-cursor-balanced',
         name: 'Balanced',
-        description: 'GPT-5 with medium thinking for typical development tasks.',
-        model: 'cursor-gpt5' as const,
+        description: 'Sonnet with medium thinking for typical development tasks.',
+        model: 'cursor-sonnet' as const,
         thinkingLevel: 'medium' as const,
         provider: 'cursor' as const,
         isBuiltIn: true,

@@ -904,8 +904,8 @@ const DEFAULT_AI_PROFILES: AIProfile[] = [
   {
     id: 'profile-cursor-balanced',
     name: 'Balanced',
-    description: 'GPT-5 with medium thinking for typical development tasks.',
-    model: 'cursor-gpt5',
+    description: 'Sonnet with medium thinking for typical development tasks.',
+    model: 'cursor-sonnet',
     thinkingLevel: 'medium',
     provider: 'cursor',
     isBuiltIn: true,

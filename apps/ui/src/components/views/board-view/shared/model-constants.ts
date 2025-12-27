@@ -41,7 +41,6 @@ export const CURSOR_MODELS: ModelOption[] = [
     description: 'Claude Opus 4.5 with extended thinking via Cursor.',
     badge: 'Premium',
     provider: 'cursor',
-    default: true,
   },
   {
     id: 'cursor-sonnet',
@@ -49,6 +48,7 @@ export const CURSOR_MODELS: ModelOption[] = [
     description: 'Claude Sonnet 4.5 via Cursor subscription.',
     badge: 'Balanced',
     provider: 'cursor',
+    default: true,
   },
   {
     id: 'cursor-gpt5',
@@ -61,7 +61,7 @@ export const CURSOR_MODELS: ModelOption[] = [
     id: 'cursor-composer',
     label: 'Cursor Composer',
     description: 'Cursor Composer model.',
-    badge: 'Premium',
+    badge: 'Fast',
     provider: 'cursor',
   },
 ];
@@ -80,7 +80,7 @@ export const PROFILE_MODEL_MAP: Record<ModelProvider, Record<string, AgentModel>
   },
   cursor: {
     opus: 'cursor-opus-thinking',
-    sonnet: 'cursor-gpt5',
+    sonnet: 'cursor-sonnet',
     haiku: 'cursor-composer',
   },
 };
