@@ -666,6 +666,7 @@ const mockFileSystem: Record<string, string> = {};
 
 // Check if we're in Electron (for UI indicators only)
 export const isElectron = (): boolean => {
+  // Check if we're in an Electron environment
   if (typeof window === 'undefined') {
     return false;
   }
@@ -674,7 +675,8 @@ export const isElectron = (): boolean => {
     return true;
   }
 
-  return window.electronAPI?.isElectron === true;
+  // Check if electronAPI is available (which indicates we're in Electron)
+  return window.electronAPI !== undefined;
 };
 
 // Check if backend server is available
@@ -2668,6 +2670,26 @@ function createMockFeaturesAPI(): FeaturesAPI {
       const words = description.split(/\s+/).slice(0, 6).join(' ');
       const title = words.length > 40 ? words.substring(0, 40) + '...' : words;
       return { success: true, title: `Add ${title}` };
+    },
+
+    validateFeature: async (projectPath: string, featureId: string) => {
+      console.log('[Mock] Validating feature:', { projectPath, featureId });
+
+      // Mock validation - return a default response
+      // In a real implementation, this would analyze the codebase
+      const mockValidation = {
+        assessment: 'NOT_IMPLEMENTED' as const,
+        reasoning:
+          'This is a mock validation response. In a real implementation, the AI would analyze the codebase to determine if the feature is implemented.',
+        evidence: 'Mock evidence: No related code found in the mock codebase.',
+        fullResponse:
+          'ASSESSMENT: NOT_IMPLEMENTED\nREASONING: This is a mock validation response.\nEVIDENCE: No related code found.',
+      };
+
+      return {
+        success: true,
+        validation: mockValidation,
+      };
     },
   };
 }

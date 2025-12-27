@@ -45,7 +45,7 @@ interface KanbanBoardProps {
   onApprovePlan: (feature: Feature) => void;
   onSpawnTask?: (feature: Feature) => void;
   onValidate?: (feature: Feature) => void;
-  onValidateAllBacklog?: () => void;
+  onValidateAllBacklog?: () => Promise<void>;
   featuresWithContext: Set<string>;
   runningAutoTasks: string[];
   shortcuts: ReturnType<typeof useKeyboardShortcutsConfig>;

@@ -8,11 +8,18 @@ import { AgentService } from '../../../services/agent-service.js';
 import { getErrorMessage, logError } from '../common.js';
 import type { Feature } from '@automaker/types';
 
+interface ValidateFeatureRequest {
+  projectPath: string;
+  featureId: string;
+}
+
 export function createValidateFeatureHandler(
   featureLoader: FeatureLoader,
   agentService: AgentService
 ) {
-  return async (req: any, res: any) => {
+  return async (req: Request, res: Response) => {
+    let sessionId: string | undefined;
+
     try {
       const { projectPath, featureId }: ValidateFeatureRequest = req.body;
 
@@ -60,16 +67,19 @@ If NOT_IMPLEMENTED, explain why you believe this feature hasn't been addressed.`
           projectPath
         );
 
+        // Track session ID for cleanup
+        sessionId = session.id;
+
         // Then initialize the conversation session in memory
         await agentService.startConversation({
           sessionId: session.id,
           workingDirectory: projectPath,
         });
       } catch (sessionError) {
-        console.error('[ValidateFeature] Failed to create session:', sessionError);
+        logError(sessionError, 'Failed to create agent session');
         return res.status(500).json({
           success: false,
-          error: 'Failed to create agent session',
+          error: getErrorMessage(sessionError) || 'Failed to create agent session',
         });
       }
 
@@ -82,27 +92,31 @@ If NOT_IMPLEMENTED, explain why you believe this feature hasn't been addressed.`
           workingDirectory: projectPath,
         });
       } catch (messageError) {
-        console.error('[ValidateFeature] Failed to send message:', messageError);
+        logError(messageError, 'Failed to send message to agent');
 
         // Clean up the session if it exists
-        try {
-          await agentService.deleteSession(session.id);
-        } catch (cleanupError) {
-          console.error('[ValidateFeature] Failed to cleanup session:', cleanupError);
+        if (sessionId) {
+          try {
+            await agentService.deleteSession(sessionId);
+          } catch (cleanupError) {
+            logError(cleanupError, 'Failed to cleanup session after message error');
+          }
         }
 
         return res.status(500).json({
           success: false,
-          error: 'Failed to send message to agent',
+          error: getErrorMessage(messageError) || 'Failed to send message to agent',
         });
       }
 
       if (!result.success) {
         // Clean up the session
-        try {
-          await agentService.deleteSession(session.id);
-        } catch (cleanupError) {
-          console.error('[ValidateFeature] Failed to cleanup session:', cleanupError);
+        if (sessionId) {
+          try {
+            await agentService.deleteSession(sessionId);
+          } catch (cleanupError) {
+            logError(cleanupError, 'Failed to cleanup session after failed result');
+          }
         }
 
         return res.status(500).json({
@@ -111,24 +125,28 @@ If NOT_IMPLEMENTED, explain why you believe this feature hasn't been addressed.`
         });
       }
 
-      // Parse the agent response
+      // Parse the agent response with improved regex
       const response = result.message?.content || '';
       console.log('[ValidateFeature] Raw AI Response:', response);
 
+      // Improved regex patterns to handle edge cases
       const assessmentMatch = response.match(
-        /ASSESSMENT:\s*\*{0,2}(FULLY_IMPLEMENTED|PARTIALLY_IMPLEMENTED|NOT_IMPLEMENTED)\*{0,2}/
+        /ASSESSMENT:\s*\*{0,2}(FULLY_IMPLEMENTED|PARTIALLY_IMPLEMENTED|NOT_IMPLEMENTED)\*{0,2}/im
       );
-      const reasoningMatch = response.match(/REASONING:\s*\*{0,2}([^\n*]+)\*{0,2}/);
-      const evidenceMatch = response.match(/EVIDENCE:\s*\*{0,2}([\s\S]*?)\*{0,2}(?=\n\n|$)/);
+      const reasoningMatch = response.match(
+        /REASONING:\s*\*{0,2}([^\n*]+(?:\n[^\n*]+)*?)\*(?=\n[A-Z]+:|$)/im
+      );
+      const evidenceMatch = response.match(/EVIDENCE:\s*\*{0,2}([\s\S]*?)(?=\n\n[A-Z]+:|$)/im);
 
       console.log('[ValidateFeature] Regex matches:');
       console.log('  - Assessment match:', assessmentMatch);
       console.log('  - Reasoning match:', reasoningMatch);
       console.log('  - Evidence match:', evidenceMatch);
 
-      const assessment = assessmentMatch?.[1] || 'NOT_IMPLEMENTED';
-      const reasoning = reasoningMatch?.[1] || 'Unable to determine reasoning';
-      const evidence = evidenceMatch?.[1] || 'No specific evidence provided';
+      // Extract values with better fallbacks
+      const assessment = assessmentMatch?.[1]?.trim() || 'NOT_IMPLEMENTED';
+      const reasoning = reasoningMatch?.[1]?.trim() || 'Unable to determine reasoning';
+      const evidence = evidenceMatch?.[1]?.trim() || 'No specific evidence provided';
 
       console.log('[ValidateFeature] Extracted values:');
       console.log('  - Assessment:', assessment);
@@ -136,22 +154,41 @@ If NOT_IMPLEMENTED, explain why you believe this feature hasn't been addressed.`
       console.log('  - Evidence:', evidence?.substring(0, 200) + '...');
 
       // Clean up the session
-      await agentService.deleteSession(session.id);
+      if (sessionId) {
+        try {
+          await agentService.deleteSession(sessionId);
+        } catch (cleanupError) {
+          logError(cleanupError, 'Failed to cleanup session after successful validation');
+        }
+      }
 
       return res.json({
         success: true,
         validation: {
-          assessment,
+          assessment: assessment as
+            | 'FULLY_IMPLEMENTED'
+            | 'PARTIALLY_IMPLEMENTED'
+            | 'NOT_IMPLEMENTED',
           reasoning,
           evidence,
           fullResponse: response,
         },
       });
     } catch (error) {
-      console.error('[ValidateFeature] Error:', error);
+      logError(error, 'Unexpected error in validate feature handler');
+
+      // Ensure session cleanup on any thrown exception
+      if (sessionId) {
+        try {
+          await agentService.deleteSession(sessionId);
+        } catch (cleanupError) {
+          logError(cleanupError, 'Failed to cleanup session in outer catch');
+        }
+      }
+
       return res.status(500).json({
         success: false,
-        error: (error as Error).message,
+        error: getErrorMessage(error),
       });
     }
   };
