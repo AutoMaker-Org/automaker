@@ -9,9 +9,18 @@ export function cn(...inputs: ClassValue[]) {
 /**
  * Determine if the current model supports extended thinking controls
  */
-export function modelSupportsThinking(_model?: AgentModel | string): boolean {
-  // All Claude models support thinking
-  return true;
+export function modelSupportsThinking(model?: AgentModel | string): boolean {
+  if (!model) return true; // Default for safety
+  const modelStr = model.toString();
+  // Claude models support extended thinking
+  const claudeModels = ['haiku', 'sonnet', 'opus', 'claude-haiku', 'claude-sonnet', 'claude-opus'];
+  // All Zai GLM models support thinking mode (glm-4.5-air, glm-4.6, glm-4.6v, glm-4.7)
+  const zaiModels = ['glm', 'glm-4.5-air', 'glm-4.6', 'glm-4.6v', 'glm-4.7'];
+  return (
+    claudeModels.some((m) => modelStr.includes(m)) ||
+    zaiModels.includes(modelStr) ||
+    zaiModels.some((m) => modelStr.includes(m))
+  );
 }
 
 /**
@@ -22,6 +31,11 @@ export function getModelDisplayName(model: AgentModel | string): string {
     haiku: 'Claude Haiku',
     sonnet: 'Claude Sonnet',
     opus: 'Claude Opus',
+    'glm-4.7': 'GLM-4.7',
+    'glm-4.6v': 'GLM-4.6v',
+    'glm-4.6': 'GLM-4.6',
+    'glm-4.5-air': 'GLM-4.5-Air',
+    glm: 'GLM-4.5-Air',
   };
   return displayNames[model] || model;
 }

@@ -1,8 +1,10 @@
 /**
  * Generate app_spec.txt from project overview
+ *
+ * Refactored to use provider-agnostic query system,
+ * supporting both Claude and Z.ai (and future providers).
  */
 
-import { query } from '@anthropic-ai/claude-agent-sdk';
 import path from 'path';
 import * as secureFs from '../../lib/secure-fs.js';
 import type { EventEmitter } from '../../lib/events.js';
@@ -13,7 +15,7 @@ import {
   type SpecOutput,
 } from '../../lib/app-spec-format.js';
 import { createLogger } from '@automaker/utils';
-import { createSpecGenerationOptions } from '../../lib/sdk-options.js';
+import { executeProviderQuery } from '../../lib/provider-query.js';
 import { logAuthStatus } from './common.js';
 import { generateFeaturesFromSpec } from './generate-features-from-spec.js';
 import { ensureAutomakerDir, getAppSpecPath } from '@automaker/platform';
@@ -93,39 +95,44 @@ ${getStructuredSpecPromptInstruction()}`;
     '[SpecRegeneration]'
   );
 
-  const options = createSpecGenerationOptions({
-    cwd: projectPath,
-    abortController,
-    autoLoadClaudeMd,
-    outputFormat: {
-      type: 'json_schema',
-      schema: specOutputSchema,
-    },
-  });
+  logger.info('[ProviderQuery] Calling provider for spec generation...');
 
-  logger.debug('SDK Options:', JSON.stringify(options, null, 2));
-  logger.info('Calling Claude Agent SDK query()...');
+  // Log auth status for debugging
+  logAuthStatus('Right before provider query');
 
-  // Log auth status right before the SDK call
-  logAuthStatus('Right before SDK query()');
-
-  let stream;
-  try {
-    stream = query({ prompt, options });
-    logger.debug('query() returned stream successfully');
-  } catch (queryError) {
-    logger.error('❌ query() threw an exception:');
-    logger.error('Error:', queryError);
-    throw queryError;
+  // Get credentials from settings service if available
+  let apiKeys: { anthropic?: string; zai?: string; google?: string; openai?: string } | undefined;
+  if (settingsService) {
+    try {
+      const credentials = await settingsService.getCredentials();
+      apiKeys = credentials.apiKeys;
+      logger.info(`[SpecRegeneration] Loaded credentials from settings service`);
+    } catch (error) {
+      logger.warn(`[SpecRegeneration] Failed to load credentials:`, error);
+    }
   }
 
   let responseText = '';
   let messageCount = 0;
   let structuredOutput: SpecOutput | null = null;
 
-  logger.info('Starting to iterate over stream...');
-
   try {
+    // Use provider-agnostic query
+    const stream = executeProviderQuery({
+      cwd: projectPath,
+      prompt,
+      useCase: 'spec',
+      maxTurns: 250,
+      allowedTools: ['Read', 'Glob', 'Grep'],
+      abortController,
+      autoLoadClaudeMd,
+      apiKeys,
+      outputFormat: {
+        type: 'json_schema',
+        schema: specOutputSchema,
+      },
+    });
+
     for await (const msg of stream) {
       messageCount++;
       logger.info(
@@ -204,8 +211,6 @@ ${getStructuredSpecPromptInstruction()}`;
     logger.info(`Generated XML from structured output: ${xmlContent.length} chars`);
   } else {
     // Fallback: Extract XML content from response text
-    // Claude might include conversational text before/after
-    // See: https://github.com/AutoMaker-Org/automaker/issues/149
     logger.warn('⚠️ No structured output, falling back to text parsing');
     logger.info('========== FINAL RESPONSE TEXT ==========');
     logger.info(responseText || '(empty)');
@@ -224,13 +229,7 @@ ${getStructuredSpecPromptInstruction()}`;
       logger.info(`Extracted XML content: ${xmlContent.length} chars (from position ${xmlStart})`);
     } else {
       // No valid XML structure found in the response text
-      // This happens when structured output was expected but not received, and the agent
-      // output conversational text instead of XML (e.g., "The project directory appears to be empty...")
-      // We should NOT save this conversational text as it's not a valid spec
       logger.error('❌ Response does not contain valid <project_specification> XML structure');
-      logger.error(
-        'This typically happens when structured output failed and the agent produced conversational text instead of XML'
-      );
       throw new Error(
         'Failed to generate spec: No valid XML structure found in response. ' +
           'The response contained conversational text but no <project_specification> tags. ' +

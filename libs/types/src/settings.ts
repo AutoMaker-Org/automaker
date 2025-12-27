@@ -68,7 +68,7 @@ export type PlanningMode = 'skip' | 'lite' | 'spec' | 'full';
 export type ThinkingLevel = 'none' | 'low' | 'medium' | 'high' | 'ultrathink';
 
 /** ModelProvider - AI model provider for credentials and API key management */
-export type ModelProvider = 'claude';
+export type ModelProvider = 'claude' | 'zai';
 
 /**
  * WindowBounds - Electron window position and size for persistence
@@ -320,6 +320,8 @@ export interface Credentials {
     google: string;
     /** OpenAI API key (for compatibility or alternative providers) */
     openai: string;
+    /** Z.ai API key (for GLM models) */
+    zai: string;
   };
 }
 
@@ -468,6 +470,7 @@ export const DEFAULT_CREDENTIALS: Credentials = {
     anthropic: '',
     google: '',
     openai: '',
+    zai: '',
   },
 };
 

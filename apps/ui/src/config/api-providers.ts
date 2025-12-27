@@ -1,7 +1,7 @@
 import type { Dispatch, SetStateAction } from 'react';
 import type { ApiKeys } from '@/store/app-store';
 
-export type ProviderKey = 'anthropic' | 'google';
+export type ProviderKey = 'anthropic' | 'google' | 'zai';
 
 export interface ProviderConfig {
   key: ProviderKey;
@@ -50,11 +50,21 @@ export interface ProviderConfigParams {
     onTest: () => Promise<void>;
     result: { success: boolean; message: string } | null;
   };
+  zai: {
+    value: string;
+    setValue: Dispatch<SetStateAction<string>>;
+    show: boolean;
+    setShow: Dispatch<SetStateAction<boolean>>;
+    testing: boolean;
+    onTest: () => Promise<void>;
+    result: { success: boolean; message: string } | null;
+  };
 }
 
 export const buildProviderConfigs = ({
   apiKeys,
   anthropic,
+  zai,
 }: ProviderConfigParams): ProviderConfig[] => [
   {
     key: 'anthropic',
@@ -80,6 +90,32 @@ export const buildProviderConfigs = ({
     descriptionPrefix: 'Used for Claude AI features. Get your key at',
     descriptionLinkHref: 'https://console.anthropic.com/account/keys',
     descriptionLinkText: 'console.anthropic.com',
+    descriptionSuffix: '.',
+  },
+  {
+    key: 'zai',
+    label: 'Z.ai API Key',
+    inputId: 'zai-key',
+    placeholder: 'Your Z.ai API key',
+    value: zai.value,
+    setValue: zai.setValue,
+    showValue: zai.show,
+    setShowValue: zai.setShow,
+    hasStoredKey: apiKeys.zai,
+    inputTestId: 'zai-api-key-input',
+    toggleTestId: 'toggle-zai-visibility',
+    testButton: {
+      onClick: zai.onTest,
+      disabled: !zai.value || zai.testing,
+      loading: zai.testing,
+      testId: 'test-zai-connection',
+    },
+    result: zai.result,
+    resultTestId: 'zai-test-connection-result',
+    resultMessageTestId: 'zai-test-connection-message',
+    descriptionPrefix: 'Used for GLM-4.7 AI features. Get your key at',
+    descriptionLinkHref: 'https://open.bigmodel.cn/usercenter/apikeys',
+    descriptionLinkText: 'open.bigmodel.cn',
     descriptionSuffix: '.',
   },
   // {

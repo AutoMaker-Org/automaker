@@ -1,17 +1,20 @@
 /**
  * Generate features from existing app_spec.txt
+ *
+ * Refactored to use provider-agnostic query system,
+ * supporting both Claude and Z.ai (and future providers).
  */
 
-import { query } from '@anthropic-ai/claude-agent-sdk';
 import * as secureFs from '../../lib/secure-fs.js';
 import type { EventEmitter } from '../../lib/events.js';
 import { createLogger } from '@automaker/utils';
-import { createFeatureGenerationOptions } from '../../lib/sdk-options.js';
+import { executeProviderQuery } from '../../lib/provider-query.js';
 import { logAuthStatus } from './common.js';
 import { parseAndCreateFeatures } from './parse-and-create-features.js';
 import { getAppSpecPath } from '@automaker/platform';
 import type { SettingsService } from '../../services/settings-service.js';
 import { getAutoLoadClaudeMdSetting } from '../../lib/settings-helpers.js';
+import type { ProviderMessage } from '../../providers/types.js';
 
 const logger = createLogger('SpecRegeneration');
 
@@ -101,33 +104,38 @@ IMPORTANT: Do not ask for clarification. The specification is provided above. Ge
     '[FeatureGeneration]'
   );
 
-  const options = createFeatureGenerationOptions({
-    cwd: projectPath,
-    abortController,
-    autoLoadClaudeMd,
-  });
+  logger.debug('[ProviderQuery] Calling provider for feature generation...');
 
-  logger.debug('SDK Options:', JSON.stringify(options, null, 2));
-  logger.info('Calling Claude Agent SDK query() for features...');
+  logAuthStatus('Right before provider query for features');
 
-  logAuthStatus('Right before SDK query() for features');
-
-  let stream;
-  try {
-    stream = query({ prompt, options });
-    logger.debug('query() returned stream successfully');
-  } catch (queryError) {
-    logger.error('❌ query() threw an exception:');
-    logger.error('Error:', queryError);
-    throw queryError;
+  // Get credentials from settings service if available
+  let apiKeys: { anthropic?: string; zai?: string; google?: string; openai?: string } | undefined;
+  if (settingsService) {
+    try {
+      const credentials = await settingsService.getCredentials();
+      apiKeys = credentials.apiKeys;
+      logger.info(`[FeatureGeneration] Loaded credentials from settings service`);
+    } catch (error) {
+      logger.warn(`[FeatureGeneration] Failed to load credentials:`, error);
+    }
   }
 
   let responseText = '';
   let messageCount = 0;
 
-  logger.debug('Starting to iterate over feature stream...');
-
   try {
+    // Use provider-agnostic query
+    const stream = executeProviderQuery({
+      cwd: projectPath,
+      prompt,
+      useCase: 'features',
+      maxTurns: 50,
+      allowedTools: ['Read', 'Glob', 'Grep'],
+      abortController,
+      autoLoadClaudeMd,
+      apiKeys,
+    });
+
     for await (const msg of stream) {
       messageCount++;
       logger.debug(
@@ -135,9 +143,11 @@ IMPORTANT: Do not ask for clarification. The specification is provided above. Ge
         JSON.stringify({ type: msg.type, subtype: (msg as any).subtype }, null, 2)
       );
 
-      if (msg.type === 'assistant' && msg.message.content) {
-        for (const block of msg.message.content) {
-          if (block.type === 'text') {
+      if (msg.type === 'assistant' && (msg as ProviderMessage).message?.content) {
+        const content = (msg as ProviderMessage).message!.content!;
+        if (!content) continue;
+        for (const block of content) {
+          if (block.type === 'text' && block.text) {
             responseText += block.text;
             logger.debug(`Feature text block received (${block.text.length} chars)`);
             events.emit('spec-regeneration:event', {

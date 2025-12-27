@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ProviderFactory } from '@/providers/provider-factory.js';
 import { ClaudeProvider } from '@/providers/claude-provider.js';
+import { ZaiProvider } from '@/providers/zai-provider.js';
 
 describe('provider-factory.ts', () => {
   let consoleSpy: any;
@@ -65,6 +66,45 @@ describe('provider-factory.ts', () => {
       });
     });
 
+    describe('Zai GLM models (glm-* prefix)', () => {
+      it('should return ZaiProvider for glm-4.7', () => {
+        const provider = ProviderFactory.getProviderForModel('glm-4.7');
+        expect(provider).toBeInstanceOf(ZaiProvider);
+      });
+
+      it('should return ZaiProvider for glm-4.6v', () => {
+        const provider = ProviderFactory.getProviderForModel('glm-4.6v');
+        expect(provider).toBeInstanceOf(ZaiProvider);
+      });
+
+      it('should return ZaiProvider for glm-4.6', () => {
+        const provider = ProviderFactory.getProviderForModel('glm-4.6');
+        expect(provider).toBeInstanceOf(ZaiProvider);
+      });
+
+      it('should return ZaiProvider for glm-4.5-air', () => {
+        const provider = ProviderFactory.getProviderForModel('glm-4.5-air');
+        expect(provider).toBeInstanceOf(ZaiProvider);
+      });
+
+      it('should be case-insensitive for glm models', () => {
+        const provider = ProviderFactory.getProviderForModel('GLM-4.7');
+        expect(provider).toBeInstanceOf(ZaiProvider);
+      });
+    });
+
+    describe('Zai GLM aliases', () => {
+      it("should return ZaiProvider for 'glm' alias", () => {
+        const provider = ProviderFactory.getProviderForModel('glm');
+        expect(provider).toBeInstanceOf(ZaiProvider);
+      });
+
+      it('should be case-insensitive for glm alias', () => {
+        const provider = ProviderFactory.getProviderForModel('GLM');
+        expect(provider).toBeInstanceOf(ZaiProvider);
+      });
+    });
+
     describe('Unknown models', () => {
       it('should default to ClaudeProvider for unknown model', () => {
         const provider = ProviderFactory.getProviderForModel('unknown-model-123');
@@ -114,9 +154,15 @@ describe('provider-factory.ts', () => {
       expect(hasClaudeProvider).toBe(true);
     });
 
-    it('should return exactly 1 provider', () => {
+    it('should include ZaiProvider', () => {
       const providers = ProviderFactory.getAllProviders();
-      expect(providers).toHaveLength(1);
+      const hasZaiProvider = providers.some((p) => p instanceof ZaiProvider);
+      expect(hasZaiProvider).toBe(true);
+    });
+
+    it('should return exactly 2 providers', () => {
+      const providers = ProviderFactory.getAllProviders();
+      expect(providers).toHaveLength(2);
     });
 
     it('should create new instances each time', () => {
@@ -124,6 +170,7 @@ describe('provider-factory.ts', () => {
       const providers2 = ProviderFactory.getAllProviders();
 
       expect(providers1[0]).not.toBe(providers2[0]);
+      expect(providers1[1]).not.toBe(providers2[1]);
     });
   });
 
@@ -132,12 +179,14 @@ describe('provider-factory.ts', () => {
       const statuses = await ProviderFactory.checkAllProviders();
 
       expect(statuses).toHaveProperty('claude');
+      expect(statuses).toHaveProperty('zai');
     });
 
     it('should call detectInstallation on each provider', async () => {
       const statuses = await ProviderFactory.checkAllProviders();
 
       expect(statuses.claude).toHaveProperty('installed');
+      expect(statuses.zai).toHaveProperty('installed');
     });
 
     it('should return correct provider names as keys', async () => {
@@ -145,7 +194,8 @@ describe('provider-factory.ts', () => {
       const keys = Object.keys(statuses);
 
       expect(keys).toContain('claude');
-      expect(keys).toHaveLength(1);
+      expect(keys).toContain('zai');
+      expect(keys).toHaveLength(2);
     });
   });
 
@@ -160,12 +210,19 @@ describe('provider-factory.ts', () => {
       expect(provider).toBeInstanceOf(ClaudeProvider);
     });
 
+    it("should return ZaiProvider for 'zai'", () => {
+      const provider = ProviderFactory.getProviderByName('zai');
+      expect(provider).toBeInstanceOf(ZaiProvider);
+    });
+
     it('should be case-insensitive', () => {
       const provider1 = ProviderFactory.getProviderByName('CLAUDE');
       const provider2 = ProviderFactory.getProviderByName('ANTHROPIC');
+      const provider3 = ProviderFactory.getProviderByName('ZAI');
 
       expect(provider1).toBeInstanceOf(ClaudeProvider);
       expect(provider2).toBeInstanceOf(ClaudeProvider);
+      expect(provider3).toBeInstanceOf(ZaiProvider);
     });
 
     it('should return null for unknown provider', () => {
@@ -217,6 +274,25 @@ describe('provider-factory.ts', () => {
       const hasClaudeModels = models.some((m) => m.id.toLowerCase().includes('claude'));
 
       expect(hasClaudeModels).toBe(true);
+    });
+
+    it('should include GLM models', () => {
+      const models = ProviderFactory.getAllAvailableModels();
+
+      // GLM models should include glm- in their IDs
+      const hasGlmModels = models.some((m) => m.id.toLowerCase().includes('glm'));
+
+      expect(hasGlmModels).toBe(true);
+    });
+
+    it('should include models from both Claude and Zai providers', () => {
+      const models = ProviderFactory.getAllAvailableModels();
+
+      const claudeModels = models.filter((m) => m.provider === 'anthropic');
+      const zaiModels = models.filter((m) => m.provider === 'zai');
+
+      expect(claudeModels.length).toBeGreaterThan(0);
+      expect(zaiModels.length).toBeGreaterThan(0);
     });
   });
 });

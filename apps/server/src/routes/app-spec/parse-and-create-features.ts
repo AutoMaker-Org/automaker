@@ -10,6 +10,25 @@ import { getFeaturesDir } from '@automaker/platform';
 
 const logger = createLogger('SpecRegeneration');
 
+/**
+ * Clean and sanitize LLM-generated JSON
+ * Handles common issues like trailing commas, comments, etc.
+ */
+function cleanJson(jsonString: string): string {
+  let cleaned = jsonString.trim();
+
+  // Remove trailing commas before closing brackets/braces
+  cleaned = cleaned.replace(/,\s*([}\]])/g, '$1');
+
+  // Remove single-line comments (// ...)
+  cleaned = cleaned.replace(/\/\/.*$/gm, '');
+
+  // Remove multi-line comments (/* ... */)
+  cleaned = cleaned.replace(/\/\*[\s\S]*?\*\//g, '');
+
+  return cleaned;
+}
+
 export async function parseAndCreateFeatures(
   projectPath: string,
   content: string,
@@ -34,11 +53,14 @@ export async function parseAndCreateFeatures(
     }
 
     logger.info(`JSON match found (${jsonMatch[0].length} chars)`);
-    logger.info('========== MATCHED JSON ==========');
-    logger.info(jsonMatch[0]);
+
+    // Clean the JSON to handle common LLM issues
+    const cleanedJson = cleanJson(jsonMatch[0]);
+    logger.info('========== MATCHED JSON (cleaned) ==========');
+    logger.info(cleanedJson.substring(0, 2000) + (cleanedJson.length > 2000 ? '...' : ''));
     logger.info('========== END MATCHED JSON ==========');
 
-    const parsed = JSON.parse(jsonMatch[0]);
+    const parsed = JSON.parse(cleanedJson);
     logger.info(`Parsed ${parsed.features?.length || 0} features`);
     logger.info('Parsed features:', JSON.stringify(parsed.features, null, 2));
 

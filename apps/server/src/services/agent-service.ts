@@ -23,6 +23,7 @@ interface Message {
   id: string;
   role: 'user' | 'assistant';
   content: string;
+  reasoning_content?: string; // Extended thinking/reasoning from AI provider
   images?: Array<{
     data: string;
     mimeType: string;
@@ -316,6 +317,29 @@ export class AgentService {
                   type: 'stream',
                   messageId: currentAssistantMessage.id,
                   content: responseText,
+                  isComplete: false,
+                });
+              } else if (block.type === 'reasoning' && block.reasoning_content) {
+                // Handle extended thinking/reasoning content from providers (Zai, Claude)
+                if (!currentAssistantMessage) {
+                  currentAssistantMessage = {
+                    id: this.generateId(),
+                    role: 'assistant',
+                    content: '',
+                    reasoning_content: block.reasoning_content,
+                    timestamp: new Date().toISOString(),
+                  };
+                  session.messages.push(currentAssistantMessage);
+                } else {
+                  currentAssistantMessage.reasoning_content = block.reasoning_content;
+                }
+
+                // Emit reasoning update to UI
+                this.emitAgentEvent(sessionId, {
+                  type: 'stream',
+                  messageId: currentAssistantMessage.id,
+                  content: responseText,
+                  reasoning_content: block.reasoning_content,
                   isComplete: false,
                 });
               } else if (block.type === 'tool_use') {

@@ -2,7 +2,7 @@
 
 ## Overview
 
-**AutoMaker** is an autonomous AI development studio that enables users to orchestrate AI agents to build software features automatically. It is a cross-platform desktop application (Electron) with a web interface that leverages the Claude Agent SDK to implement features described on a Kanban board.
+**AutoMaker** is an autonomous AI development studio that enables users to orchestrate AI agents to build software features automatically. It is a cross-platform desktop application (Electron) with a web interface that leverages multiple AI providers (Claude, Z.ai GLM) to implement features described on a Kanban board.
 
 ### Key Concepts
 
@@ -96,7 +96,7 @@ automaker/
 │  ┌───────────────────────────────────────────────────────┐  │
 │  │  AI Providers (BaseProvider Interface)                 │  │
 │  │  ┌───────────┐ ┌──────────┐ ┌───────────────────┐     │  │
-│  │  │  Claude   │ │  Google  │ │    OpenAI         │     │  │
+│  │  │  Claude   │ │  Zai/GLM │ │    OpenAI         │     │  │
 │  │  │ Provider  │ │ Provider │ │    (extensible)   │     │  │
 │  │  └───────────┘ └──────────┘ └───────────────────┘     │  │
 │  └───────────────────────────────────────────────────────┘  │
@@ -358,7 +358,7 @@ Tasks extracted from markdown specs:
 
 ### AI Provider Architecture
 
-Extensible provider system for multiple AI models:
+Extensible provider system for multiple AI models with a unified query interface:
 
 ```typescript
 abstract class BaseProvider {
@@ -372,12 +372,171 @@ abstract class BaseProvider {
 }
 ```
 
+**Provider-Agnostic Query Execution**:
+
+All AI routes use `executeProviderQuery()` instead of provider-specific SDKs:
+
+```typescript
+// Provider-agnostic query that routes to Claude or Zai automatically
+import { executeProviderQuery } from '@/lib/provider-query.js';
+
+const stream = executeProviderQuery({
+  cwd: projectPath,
+  prompt: userPrompt,
+  useCase: 'chat', // Routes to appropriate model
+  apiKeys: await getApiKeys(),
+  modelOverride: model, // Optional explicit model
+  options: {
+    systemPrompt,
+    maxTurns: 1,
+    allowedTools: [],
+  },
+});
+```
+
+This ensures:
+
+- **Unified interface** - Single code path for all providers
+- **Automatic routing** - Model ID determines provider
+- **Feature parity** - Structured output, tools, vision work across providers
+- **Easy extensibility** - New providers integrate via BaseProvider interface
+
 **Current Providers**:
 
-- **Claude Provider**: Primary implementation with full feature support
-- **Extensible**: Comments indicate support for Cursor, OpenAI, Google
+| Provider   | Models                                  | Tools | Vision | MCP\* | Browser | Extended Thinking |
+| ---------- | --------------------------------------- | :---: | :----: | :---: | :-----: | :---------------: |
+| **Claude** | Opus, Sonnet, Haiku                     |  ✅   |   ✅   |  ✅   |   ✅    |        ✅         |
+| **Zai**    | GLM-4.7, GLM-4.6, GLM-4.6v, GLM-4.5-Air |  ✅   |  ✅†   |  N/A  |   ❌    |        ✅         |
+
+\*MCP (Model Context Protocol) is an application-layer feature, not a provider-specific feature. Zai provides MCP servers that any client can connect to.
+†Vision support via GLM-4.6v only
+
+### Zai Provider (GLM Models)
+
+The Zai Provider integrates ZhipuAI's GLM models through Z.ai's OpenAI-compatible API:
+
+**API Configuration**:
+
+- **Base URL**: `https://api.z.ai/api/coding/paas/v4`
+- **Authentication**: Bearer token via `ZAI_API_KEY` environment variable
+- **Provider IDs**: `zai` or `glm`
+
+**Supported Models**:
+
+| Model         | Tier     | Context | Output | Description                          |
+| ------------- | -------- | ------- | ------ | ------------------------------------ |
+| `glm-4.7`     | Premium  | 128K    | 8K     | Flagship model, strong reasoning     |
+| `glm-4.6v`    | Vision   | 128K    | 8K     | Multimodal model with vision support |
+| `glm-4.6`     | Balanced | 128K    | 8K     | Balanced performance                 |
+| `glm-4.5-air` | Speed    | 128K    | 4K     | Fast for simple tasks                |
+| `glm`         | Alias    | -       | -      | Maps to `glm-4.5-air`                |
+
+**Tool Mapping**:
+
+| AutoMaker Tool | Zai Function      | Parameters                                    |
+| -------------- | ----------------- | --------------------------------------------- |
+| Read           | `read_file`       | `filePath` (required)                         |
+| Write          | `write_file`      | `filePath`, `content` (required)              |
+| Edit           | `edit_file`       | `filePath`, `oldString`, `newString`          |
+| Glob           | `glob_search`     | `pattern` (required), `cwd` (optional)        |
+| Grep           | `grep_search`     | `pattern` (required), `searchPath` (optional) |
+| Bash           | `execute_command` | `command` (required), `cwd` (optional)        |
+
+**Note**: Optional path parameters default to the project working directory.
+
+**Features**:
+
+- ✅ **Tools**: Full support for all 6 core tools with function calling
+- ✅ **Vision**: GLM-4.6v supports multimodal content (base64 images)
+- ✅ **Structured Output**: JSON response format via `response_format: { type: 'json_object' }`
+- ✅ **Extended Thinking**: All GLM models support thinking mode via `thinking: { type: 'enabled', clear_thinking: false }`
+- ❌ **Browser**: Not implemented (no web automation)
+- ℹ️ **MCP**: Application-layer feature (Zai provides MCP servers, not consumed by provider)
+
+**Security Features**:
+
+- Path resolution with sandboxing for write operations
+- Command execution restrictions (10MB buffer limit)
+- Relative path enforcement for file operations
+- API key validation via `/models` endpoint
+
+**Vision Handling**:
+
+- GLM-4.6v directly processes images in multimodal requests
+- For non-vision Zai models (glm-4.7, glm-4.6, glm-4.5-air) with images:
+  - GLM-4.6v describes the images in the context of the prompt
+  - Description is prepended as `[Image Context: ...]` to the prompt
+  - Selected model continues with text prompt containing image descriptions
+- All logic contained within ZaiProvider, no service layer changes needed
+
+**Extended Thinking Mode**:
+
+- All GLM models (glm-4.7, glm-4.6, glm-4.6v, glm-4.5-air) support thinking mode
+- Enabled via `thinking: { type: 'enabled', clear_thinking: false }` parameter
+- Returns `reasoning_content` field containing preserved reasoning across turns
+- Reasoning content is yielded as `{ type: 'reasoning', reasoning_content: string }`
+- **UI Display**:
+  - Agent view shows reasoning content with Brain icon
+  - Collapsible details section with "Show/Hide reasoning" toggle
+  - User setting `showReasoningByDefault` controls default expanded state
+  - Applies to both Claude (extended thinking) and Zai (thinking mode)
+- Set `clear_thinking: false` to preserve reasoning context across conversation turns
 
 **Provider Factory**: Routes model IDs to appropriate provider
+
+- Model IDs starting with `glm-` → ZaiProvider
+- Model IDs starting with `claude-` → ClaudeProvider
+- Direct provider access via `zai`, `glm`, or `claude`
+
+### Model Resolver System
+
+The `libs/model-resolver` library provides centralized model resolution and routing:
+
+**Resolution Flow**:
+
+```
+User Input → Alias Lookup → Provider Detection → Model Selection
+```
+
+1. **Full model strings** (e.g., `glm-4.7`, `claude-opus-4.5-20251101`) pass through unchanged
+2. **Model aliases** are resolved via provider-specific maps
+3. **Provider detection** via model prefix or explicit selection
+4. **Provider-aware defaults** via `providerHint` parameter
+
+**Provider-Aware Model Resolution**:
+
+```typescript
+resolveModelString(
+  modelKey?: string,
+  defaultModel?: string,
+  providerHint?: 'claude' | 'zai' | 'auto'
+): string
+```
+
+- `providerHint: 'zai'` → defaults to `glm-4.7`
+- `providerHint: 'claude'` → defaults to `claude-opus-4.5-20251101`
+- `providerHint: 'auto'` → defaults to Claude (backward compatibility)
+
+**Model Aliases**:
+
+| Alias    | Resolves To                  | Provider |
+| -------- | ---------------------------- | -------- |
+| `opus`   | `claude-opus-4.5-20251101`   | Claude   |
+| `sonnet` | `claude-sonnet-4.5-20251101` | Claude   |
+| `haiku`  | `claude-haiku-4.5-20251101`  | Claude   |
+| `glm`    | `glm-4.5-air`                | Zai      |
+
+**Provider Type** (`ModelProvider`):
+
+```typescript
+type ModelProvider = 'claude' | 'zai';
+```
+
+**Display Names**:
+
+- Models have UI-friendly labels (e.g., `GLM-4.7`, `Claude Opus`)
+- Badge system for model tiers (Premium, Balanced, Speed, Vision)
+- Provider metadata for filtering and grouping
 
 ---
 
@@ -396,7 +555,7 @@ abstract class BaseProvider {
    - Project history
 
 2. **Credentials** (`credentials.json`):
-   - API keys for Claude, Google, OpenAI
+   - API keys for Claude, Google, OpenAI, Zai
    - Stored separately for security
 
 3. **Project Settings** (`.automaker/settings.json`):
@@ -410,11 +569,23 @@ abstract class BaseProvider {
 | Variable                 | Purpose                               |
 | ------------------------ | ------------------------------------- |
 | `ANTHROPIC_API_KEY`      | Claude API authentication             |
+| `ZAI_API_KEY`            | Z.ai GLM API authentication           |
 | `ALLOWED_ROOT_DIRECTORY` | Security boundary for file operations |
 | `DATA_DIR`               | Custom data directory location        |
 | `AUTOMAKER_API_KEY`      | Server API authentication             |
 | `CORS_ORIGIN`            | Cross-origin restrictions             |
 | `TERMINAL_ENABLED`       | Terminal access control               |
+
+### Model Selection Environment Variables
+
+| Variable                      | Purpose                       |
+| ----------------------------- | ----------------------------- |
+| `AUTOMAKER_MODEL_SPEC`        | Model for spec generation     |
+| `AUTOMAKER_MODEL_FEATURES`    | Model for feature generation  |
+| `AUTOMAKER_MODEL_SUGGESTIONS` | Model for suggestions         |
+| `AUTOMAKER_MODEL_CHAT`        | Model for chat sessions       |
+| `AUTOMAKER_MODEL_AUTO`        | Model for auto-mode execution |
+| `AUTOMAKER_MODEL_DEFAULT`     | Default fallback model        |
 
 ### Security
 
@@ -524,9 +695,65 @@ tests/
 
 ### Adding New AI Providers
 
-1. Extend `BaseProvider` class
-2. Implement required abstract methods
-3. Add to `ProviderFactory` model routing
+The Zai provider integration serves as a reference for adding new AI providers:
+
+**1. Create Provider Class** (`apps/server/src/providers/{provider}-provider.ts`):
+
+```typescript
+export class NewProvider extends BaseProvider {
+  getName(): string { return 'provider-name'; }
+  async *executeQuery(options: ExecuteOptions): AsyncGenerator<ContentBlock> { ... }
+  async detectInstallation(): Promise<InstallationStatus> { ... }
+  getAvailableModels(): ModelInfo[] { ... }
+  supportsFeature(feature: FeatureType): boolean { ... }
+  validateConfig(): { valid: boolean; errors: string[] } { ... }
+}
+```
+
+**2. Update Types** (`libs/types/src/`):
+
+- Add provider to `ModelProvider` type
+- Create model map (`{PROVIDER}_MODEL_MAP`)
+- Add display metadata to `ModelOption[]`
+- Add API key field to `Credentials` interface in `settings.ts`
+
+**3. Update Model Resolver** (`libs/model-resolver/src/resolver.ts`):
+
+- Add model alias resolution
+- Include provider map in `ALL_MODEL_MAPS`
+- Add `providerHint` support for provider-aware defaults
+
+**4. Update Provider Factory** (`apps/server/src/providers/provider-factory.ts`):
+
+- Add routing logic for new provider's model prefix
+- Include in `getAllProviders()` return
+- Add to `checkAllProviders()` status checks
+
+**5. Update Provider Query** (`apps/server/src/lib/provider-query.ts`):
+
+- Add API key extraction for new provider
+- Add provider-specific output format handling if needed
+
+**6. Update UI**:
+
+- Add provider to `apps/ui/src/config/api-providers.ts`
+- Update model selector in `apps/ui/src/components/views/`
+- Add API key management in settings view
+- Add provider to available models endpoint response
+
+**7. Update Tests**:
+
+- Create `{provider}-provider.test.ts` following existing patterns
+- Update `provider-factory.test.ts` with new provider routing tests
+- Mock provider's API calls in tests
+
+**For Vision-Specific Models** (e.g., GLM-4.6v):
+
+- Add model entry with `supportsVision: true` in provider's `getAvailableModels()`
+- Implement `modelSupportsVision()` helper method
+- Implement `describeImages()` method to proxy image descriptions via vision model
+- Modify `executeQuery()` to detect non-vision model + images and call `describeImages()`
+- Update provider types to include `'vision'` tier option
 
 ### Adding New Features
 
@@ -626,10 +853,23 @@ npm run test:e2e     # E2E tests only
 AutoMaker is a sophisticated monorepo combining modern web development with cutting-edge AI capabilities. Key architectural highlights:
 
 1. **Monorepo Structure** - Shared libraries with apps/ui and apps/server
-2. **Zustand State Management** - Simple, powerful, with persistence
-3. **File-based Storage** - Lightweight, portable, no database required
-4. **Provider Architecture** - Extensible AI model integration
-5. **Git Worktree Isolation** - Safe concurrent feature development
-6. **Real-time Events** - WebSocket-based live updates
-7. **Comprehensive Testing** - Unit, integration, and E2E coverage
-8. **Cross-platform** - Electron desktop apps for Windows, macOS, Linux
+2. **Multi-Provider Support** - Claude and Z.ai (GLM) providers with extensible architecture
+3. **Provider-Agnostic Query System** - `executeProviderQuery()` unifies all providers under single interface
+4. **Zustand State Management** - Simple, powerful, with persistence
+5. **File-based Storage** - Lightweight, portable, no database required
+6. **Provider Architecture** - Extensible AI model integration via BaseProvider interface
+7. **Model Resolver System** - Centralized model routing, alias resolution, provider-aware defaults
+8. **Extended Thinking Support** - UI displays reasoning content for both Claude and Zai with collapsible toggle
+9. **Git Worktree Isolation** - Safe concurrent feature development
+10. **Real-time Events** - WebSocket-based live updates
+11. **Comprehensive Testing** - Unit, integration, and E2E coverage for providers
+12. **Cross-platform** - Electron desktop apps for Windows, macOS, Linux
+
+**Zai Integration Status**: ✅ Complete
+
+- All 4 GLM models (glm-4.7, glm-4.6v, glm-4.6, glm-4.5-air) fully integrated
+- Tool calling with optional parameters
+- Vision support via GLM-4.6v (with fallback for other models)
+- Extended thinking mode with UI display
+- Provider-agnostic route execution
+- Comprehensive test coverage

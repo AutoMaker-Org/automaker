@@ -33,7 +33,14 @@ export type { ErrorType, ErrorInfo } from './error.js';
 export type { ImageData, ImageContentBlock } from './image.js';
 
 // Model types and constants
-export { CLAUDE_MODEL_MAP, DEFAULT_MODELS, type ModelAlias, type AgentModel } from './model.js';
+export {
+  CLAUDE_MODEL_MAP,
+  ZAI_MODEL_MAP,
+  ALL_MODEL_MAPS,
+  DEFAULT_MODELS,
+  type ModelAlias,
+  type AgentModel,
+} from './model.js';
 
 // Event types
 export type { EventType, EventCallback } from './event.js';
@@ -77,6 +84,7 @@ export {
 export type { ModelOption, ThinkingLevelOption } from './model-display.js';
 export {
   CLAUDE_MODELS,
+  ZAI_MODELS,
   THINKING_LEVELS,
   THINKING_LEVEL_LABELS,
   getModelDisplayName,

@@ -7,4 +7,9 @@
 export { CLAUDE_MODEL_MAP, DEFAULT_MODELS, type ModelAlias } from '@automaker/types';
 
 // Export resolver functions
-export { resolveModelString, getEffectiveModel } from './resolver.js';
+export {
+  resolveModelString,
+  getEffectiveModel,
+  getModelForUseCase,
+  type ModelUseCase,
+} from './resolver.js';

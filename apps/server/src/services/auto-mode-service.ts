@@ -17,7 +17,7 @@ import {
   classifyError,
   loadContextFiles,
 } from '@automaker/utils';
-import { resolveModelString, DEFAULT_MODELS } from '@automaker/model-resolver';
+import { resolveModelString, getModelForUseCase, DEFAULT_MODELS } from '@automaker/model-resolver';
 import { resolveDependencies, areDependenciesSatisfied } from '@automaker/dependency-resolver';
 import { getFeatureDir, getAutomakerDir, getFeaturesDir } from '@automaker/platform';
 import { exec } from 'child_process';
@@ -604,8 +604,9 @@ export class AutoModeService {
         typeof img === 'string' ? img : img.path
       );
 
-      // Get model from feature
-      const model = resolveModelString(feature.model, DEFAULT_MODELS.claude);
+      // Get model for auto mode - env var takes precedence over feature model
+      // This allows overriding models via AUTOMAKER_MODEL_AUTO
+      const model = getModelForUseCase('auto');
       console.log(`[AutoMode] Executing feature ${featureId} with model: ${model} in ${workDir}`);
 
       // Run the agent with the feature's model and images
@@ -1850,8 +1851,36 @@ This mock response was generated because AUTOMAKER_MOCK_AGENT=true was set.
       `[AutoMode] runAgent called for feature ${featureId} with model: ${finalModel}, planningMode: ${planningMode}, requiresApproval: ${requiresApproval}`
     );
 
-    // Get provider for this model
-    const provider = ProviderFactory.getProviderForModel(finalModel);
+    // Load credentials from SettingsService
+    let apiKey: string | undefined;
+    if (this.settingsService) {
+      try {
+        const credentials = await this.settingsService.getCredentials();
+        const lowerModel = finalModel.toLowerCase();
+
+        // Determine the appropriate API key for this model
+        if (lowerModel.startsWith('glm-') || lowerModel === 'glm') {
+          apiKey = credentials.apiKeys?.zai;
+        } else if (
+          lowerModel.startsWith('claude-') ||
+          ['haiku', 'sonnet', 'opus'].includes(lowerModel)
+        ) {
+          apiKey = credentials.apiKeys?.anthropic;
+        }
+
+        if (apiKey) {
+          console.log(`[AutoMode] Loaded API key from settings for model: ${finalModel}`);
+        }
+      } catch (error) {
+        console.warn(`[AutoMode] Failed to load credentials:`, error);
+      }
+    }
+
+    // Get provider for this model with API key
+    const provider = ProviderFactory.getProviderForModel(
+      finalModel,
+      apiKey ? { apiKey } : undefined
+    );
 
     console.log(`[AutoMode] Using provider "${provider.getName()}" for model "${finalModel}"`);
 

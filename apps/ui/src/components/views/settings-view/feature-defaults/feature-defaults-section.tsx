@@ -259,6 +259,18 @@ export function FeatureDefaultsSection({
                   <SelectItem value="haiku">
                     <span>Haiku</span>
                   </SelectItem>
+                  <SelectItem value="glm">
+                    <span>GLM-4.7</span>
+                    <span className="text-[10px] text-muted-foreground ml-1">(Z.ai)</span>
+                  </SelectItem>
+                  <SelectItem value="glm-4.6">
+                    <span>GLM-4.6</span>
+                    <span className="text-[10px] text-muted-foreground ml-1">(Balanced)</span>
+                  </SelectItem>
+                  <SelectItem value="glm-4.5-air">
+                    <span>GLM-4.5-Air</span>
+                    <span className="text-[10px] text-muted-foreground ml-1">(Fast)</span>
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>

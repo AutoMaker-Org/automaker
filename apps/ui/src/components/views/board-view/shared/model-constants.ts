@@ -6,7 +6,7 @@ export type ModelOption = {
   label: string;
   description: string;
   badge?: string;
-  provider: 'claude';
+  provider: 'claude' | 'zai';
 };
 
 export const CLAUDE_MODELS: ModelOption[] = [
@@ -32,6 +32,39 @@ export const CLAUDE_MODELS: ModelOption[] = [
     provider: 'claude',
   },
 ];
+
+export const ZAI_MODELS: ModelOption[] = [
+  {
+    id: 'glm-4.7',
+    label: 'GLM-4.7',
+    description: 'Flagship model with strong reasoning.',
+    badge: 'Premium',
+    provider: 'zai',
+  },
+  {
+    id: 'glm-4.6v',
+    label: 'GLM-4.6v',
+    description: 'Multimodal model with vision support.',
+    badge: 'Vision',
+    provider: 'zai',
+  },
+  {
+    id: 'glm-4.6',
+    label: 'GLM-4.6',
+    description: 'Balanced performance with good reasoning.',
+    badge: 'Balanced',
+    provider: 'zai',
+  },
+  {
+    id: 'glm-4.5-air',
+    label: 'GLM-4.5-Air',
+    description: 'Fast and efficient for simple tasks.',
+    badge: 'Speed',
+    provider: 'zai',
+  },
+];
+
+export const ALL_MODELS: ModelOption[] = [...CLAUDE_MODELS, ...ZAI_MODELS];
 
 export const THINKING_LEVELS: ThinkingLevel[] = ['none', 'low', 'medium', 'high', 'ultrathink'];
 

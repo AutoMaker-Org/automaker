@@ -2,7 +2,7 @@ import { Label } from '@/components/ui/label';
 import { Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAppStore } from '@/store/app-store';
-import { CLAUDE_MODELS } from '@/components/views/board-view/shared/model-constants';
+import { ALL_MODELS } from '@/components/views/board-view/shared/model-constants';
 
 export function AIEnhancementSection() {
   const { enhancementModel, setEnhancementModel } = useAppStore();
@@ -31,7 +31,7 @@ export function AIEnhancementSection() {
         <div className="space-y-4">
           <Label className="text-foreground font-medium">Enhancement Model</Label>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            {CLAUDE_MODELS.map(({ id, label, description, badge }) => {
+            {ALL_MODELS.map(({ id, label, description, badge }) => {
               const isActive = enhancementModel === id;
               return (
                 <button

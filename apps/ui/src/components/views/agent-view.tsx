@@ -19,6 +19,8 @@ import {
   FileText,
   Square,
   ListOrdered,
+  Brain,
+  ChevronRight,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useElectronAgent } from '@/hooks/use-electron-agent';
@@ -50,10 +52,11 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { CLAUDE_MODELS } from '@/components/views/board-view/shared/model-constants';
+import { ALL_MODELS } from '@/components/views/board-view/shared/model-constants';
 
 export function AgentView() {
-  const { currentProject, setLastSelectedSession, getLastSelectedSession } = useAppStore();
+  const { currentProject, setLastSelectedSession, getLastSelectedSession, showReasoningByDefault } =
+    useAppStore();
   const shortcuts = useKeyboardShortcutsConfig();
   const [input, setInput] = useState('');
   const [selectedImages, setSelectedImages] = useState<ImageAttachment[]>([]);
@@ -630,6 +633,23 @@ export function AgentView() {
                       : 'bg-card border border-border'
                   )}
                 >
+                  {message.role === 'assistant' && message.reasoning_content && (
+                    <div className="mb-3 p-2.5 bg-muted/50 rounded-lg border border-border">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Brain className="w-3.5 h-3.5 text-primary" />
+                        <span className="text-xs font-medium text-muted-foreground">Thinking</span>
+                      </div>
+                      <details className="group" open={showReasoningByDefault}>
+                        <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground list-none flex items-center gap-1">
+                          <ChevronRight className="w-3 h-3 transition-transform group-open:rotate-90" />
+                          {showReasoningByDefault ? 'Hide' : 'Show'} reasoning
+                        </summary>
+                        <div className="mt-2 text-xs text-muted-foreground whitespace-pre-wrap font-mono">
+                          {message.reasoning_content}
+                        </div>
+                      </details>
+                    </div>
+                  )}
                   {message.role === 'assistant' ? (
                     <Markdown className="text-sm text-foreground prose-p:leading-relaxed prose-headings:text-foreground prose-strong:text-foreground prose-code:text-primary prose-code:bg-muted prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded">
                       {message.content}
@@ -923,15 +943,13 @@ export function AgentView() {
                     className="h-11 gap-1 text-xs font-medium rounded-xl border-border px-2.5"
                     data-testid="model-selector"
                   >
-                    {CLAUDE_MODELS.find((m) => m.id === selectedModel)?.label.replace(
-                      'Claude ',
-                      ''
-                    ) || 'Sonnet'}
+                    {ALL_MODELS.find((m) => m.id === selectedModel)?.label.replace('Claude ', '') ||
+                      'Sonnet'}
                     <ChevronDown className="w-3 h-3 opacity-50" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-48">
-                  {CLAUDE_MODELS.map((model) => (
+                  {ALL_MODELS.map((model) => (
                     <DropdownMenuItem
                       key={model.id}
                       onClick={() => setSelectedModel(model.id)}

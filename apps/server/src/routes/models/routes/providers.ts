@@ -16,6 +16,12 @@ export function createProvidersHandler() {
         anthropic: {
           available: statuses.claude?.installed || false,
           hasApiKey: !!process.env.ANTHROPIC_API_KEY,
+          authenticated: statuses.claude?.authenticated || false,
+        },
+        zai: {
+          available: statuses.zai?.installed || false,
+          hasApiKey: !!process.env.ZAI_API_KEY,
+          authenticated: statuses.zai?.authenticated || false,
         },
       };
 

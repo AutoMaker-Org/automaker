@@ -7,10 +7,12 @@ interface AuthenticationStatusDisplayProps {
   apiKeyStatus: {
     hasAnthropicKey: boolean;
     hasGoogleKey: boolean;
+    hasZaiKey: boolean;
   } | null;
   apiKeys: {
     anthropic: string;
     google: string;
+    zai: string;
   };
 }
 
@@ -69,6 +71,37 @@ export function AuthenticationStatusDisplay({
                 <Info className="w-3 h-3 shrink-0" />
                 <span>Using manual API key from settings</span>
               </div>
+            ) : (
+              <div className="flex items-center gap-1.5 text-yellow-500 py-0.5">
+                <AlertCircle className="w-3 h-3 shrink-0" />
+                <span className="text-xs">Not configured</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Z.ai Authentication Status */}
+        <div className="p-3 rounded-lg bg-card border border-border">
+          <div className="flex items-center gap-2 mb-1.5">
+            <Terminal className="w-4 h-4 text-brand-500" />
+            <span className="text-sm font-medium text-foreground">Z.ai (GLM)</span>
+          </div>
+          <div className="space-y-1.5 text-xs min-h-12">
+            {apiKeyStatus?.hasZaiKey || apiKeys.zai ? (
+              <>
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="w-3 h-3 text-green-500 shrink-0" />
+                  <span className="text-green-400 font-medium">Configured</span>
+                </div>
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <Info className="w-3 h-3 shrink-0" />
+                  <span>
+                    {apiKeyStatus?.hasZaiKey
+                      ? 'Using environment variable (ZAI_API_KEY)'
+                      : 'Using manual API key from settings'}
+                  </span>
+                </div>
+              </>
             ) : (
               <div className="flex items-center gap-1.5 text-yellow-500 py-0.5">
                 <AlertCircle className="w-3 h-3 shrink-0" />

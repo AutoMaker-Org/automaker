@@ -19,8 +19,8 @@ export interface ModelOption {
   description: string;
   /** Optional badge text (e.g., "Speed", "Balanced", "Premium") */
   badge?: string;
-  /** AI provider (currently only "claude") */
-  provider: 'claude';
+  /** AI provider */
+  provider: 'claude' | 'zai';
 }
 
 /**
@@ -59,6 +59,40 @@ export const CLAUDE_MODELS: ModelOption[] = [
     description: 'Most capable model for complex work.',
     badge: 'Premium',
     provider: 'claude',
+  },
+];
+
+/**
+ * Z.ai model options with full metadata for UI display
+ */
+export const ZAI_MODELS: ModelOption[] = [
+  {
+    id: 'glm-4.7',
+    label: 'GLM-4.7',
+    description: 'Flagship model with strong reasoning.',
+    badge: 'Premium',
+    provider: 'zai',
+  },
+  {
+    id: 'glm-4.6v',
+    label: 'GLM-4.6v',
+    description: 'Multimodal model with vision support.',
+    badge: 'Vision',
+    provider: 'zai',
+  },
+  {
+    id: 'glm-4.6',
+    label: 'GLM-4.6',
+    description: 'Balanced performance with good reasoning.',
+    badge: 'Balanced',
+    provider: 'zai',
+  },
+  {
+    id: 'glm-4.5-air',
+    label: 'GLM-4.5-Air',
+    description: 'Fast and efficient for simple tasks.',
+    badge: 'Speed',
+    provider: 'zai',
   },
 ];
 
@@ -106,6 +140,11 @@ export function getModelDisplayName(model: AgentModel | string): string {
     haiku: 'Claude Haiku',
     sonnet: 'Claude Sonnet',
     opus: 'Claude Opus',
+    glm: 'GLM-4.5-Air',
+    'glm-4.5-air': 'GLM-4.5-Air',
+    'glm-4.6': 'GLM-4.6',
+    'glm-4.6v': 'GLM-4.6v',
+    'glm-4.7': 'GLM-4.7',
   };
   return displayNames[model] || model;
 }

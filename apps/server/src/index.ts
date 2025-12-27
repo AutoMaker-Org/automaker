@@ -12,6 +12,8 @@ import morgan from 'morgan';
 import { WebSocketServer, WebSocket } from 'ws';
 import { createServer } from 'http';
 import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 import { createEventEmitter, type EventEmitter } from './lib/events.js';
 import { initAllowedPaths } from '@automaker/platform';
@@ -51,8 +53,24 @@ import { createContextRoutes } from './routes/context/index.js';
 import { createBacklogPlanRoutes } from './routes/backlog-plan/index.js';
 import { cleanupStaleValidations } from './routes/github/routes/validation-common.js';
 
-// Load environment variables
+// Load environment variables from multiple locations
+// Try root .env first, then local .env
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const rootEnvPath = path.join(__dirname, '../../../.env');
+
+console.log(`[Server] Loading .env from: ${rootEnvPath}`);
+const rootResult = dotenv.config({ path: rootEnvPath });
+console.log(`[Server] Root .env loaded: ${Object.keys(rootResult.parsed || {}).length} variables`);
 dotenv.config();
+
+// Log model overrides for debugging
+if (process.env.AUTOMAKER_MODEL_SPEC) {
+  console.log(`[Server] AUTOMAKER_MODEL_SPEC=${process.env.AUTOMAKER_MODEL_SPEC}`);
+}
+if (process.env.AUTOMAKER_MODEL_DEFAULT) {
+  console.log(`[Server] AUTOMAKER_MODEL_DEFAULT=${process.env.AUTOMAKER_MODEL_DEFAULT}`);
+}
 
 const PORT = parseInt(process.env.PORT || '3008', 10);
 const DATA_DIR = process.env.DATA_DIR || './data';
@@ -60,6 +78,7 @@ const ENABLE_REQUEST_LOGGING = process.env.ENABLE_REQUEST_LOGGING !== 'false'; /
 
 // Check for required environment variables
 const hasAnthropicKey = !!process.env.ANTHROPIC_API_KEY;
+const hasZaiKey = !!process.env.ZAI_API_KEY;
 
 if (!hasAnthropicKey) {
   console.warn(`
@@ -76,6 +95,23 @@ if (!hasAnthropicKey) {
 `);
 } else {
   console.log('[Server] ✓ ANTHROPIC_API_KEY detected (API key auth)');
+}
+
+if (!hasZaiKey) {
+  console.warn(`
+╔═══════════════════════════════════════════════════════════════════════╗
+║  ⚠️  WARNING: Z.ai API key not configured                              ║
+║                                                                       ║
+║  Z.ai GLM models require ZAI_API_KEY to function.                      ║
+║                                                                       ║
+║  Set your Z.ai API key:                                               ║
+║    export ZAI_API_KEY="your-key-here"                                 ║
+║                                                                       ║
+║  Or configure in Settings. Zai models will not work without this.     ║
+╚═══════════════════════════════════════════════════════════════════════╝
+`);
+} else {
+  console.log('[Server] ✓ ZAI_API_KEY detected (GLM models available)');
 }
 
 // Initialize security

@@ -53,6 +53,7 @@ export interface ApiKeys {
   anthropic: string;
   google: string;
   openai: string;
+  zai: string;
 }
 
 // Keyboard Shortcut with optional modifiers
@@ -480,6 +481,7 @@ export interface AppState {
 
   // Claude Agent SDK Settings
   autoLoadClaudeMd: boolean; // Auto-load CLAUDE.md files using SDK's settingSources option
+  showReasoningByDefault: boolean; // Show extended thinking/reasoning content expanded by default
 
   // Project Analysis
   projectAnalysis: ProjectAnalysis | null;
@@ -909,6 +911,7 @@ const initialState: AppState = {
     anthropic: '',
     google: '',
     openai: '',
+    zai: '',
   },
   chatSessions: [],
   currentChatSession: null,
@@ -929,6 +932,7 @@ const initialState: AppState = {
   enhancementModel: 'sonnet', // Default to sonnet for feature enhancement
   validationModel: 'opus', // Default to opus for GitHub issue validation
   autoLoadClaudeMd: false, // Default to disabled (user must opt-in)
+  showReasoningByDefault: false, // Default to collapsed (user can expand)
   aiProfiles: DEFAULT_AI_PROFILES,
   projectAnalysis: null,
   isAnalyzing: false,
@@ -1561,6 +1565,8 @@ export const useAppStore = create<AppState & AppActions>()(
         const { syncSettingsToServer } = await import('@/hooks/use-settings-migration');
         await syncSettingsToServer();
       },
+
+      setShowReasoningByDefault: (enabled) => set({ showReasoningByDefault: enabled }),
 
       // AI Profile actions
       addAIProfile: (profile) => {
@@ -2706,6 +2712,7 @@ export const useAppStore = create<AppState & AppActions>()(
           enhancementModel: state.enhancementModel,
           validationModel: state.validationModel,
           autoLoadClaudeMd: state.autoLoadClaudeMd,
+          showReasoningByDefault: state.showReasoningByDefault,
           // Profiles and sessions
           aiProfiles: state.aiProfiles,
           chatSessions: state.chatSessions,

@@ -19,6 +19,7 @@ export function createAvailableHandler() {
   return async (_req: Request, res: Response): Promise<void> => {
     try {
       const models: ModelDefinition[] = [
+        // Claude Models
         {
           id: 'claude-opus-4-5-20251101',
           name: 'Claude Opus 4.5',
@@ -53,6 +54,43 @@ export function createAvailableHandler() {
           contextWindow: 200000,
           maxOutputTokens: 8192,
           supportsVision: true,
+          supportsTools: true,
+        },
+        // Zai GLM Models
+        {
+          id: 'glm-4.7',
+          name: 'GLM-4.7 (Premium)',
+          provider: 'zai',
+          contextWindow: 128000,
+          maxOutputTokens: 4096,
+          supportsVision: false,
+          supportsTools: true,
+        },
+        {
+          id: 'glm-4.6v',
+          name: 'GLM-4.6v (Vision)',
+          provider: 'zai',
+          contextWindow: 128000,
+          maxOutputTokens: 4096,
+          supportsVision: true,
+          supportsTools: true,
+        },
+        {
+          id: 'glm-4.6',
+          name: 'GLM-4.6 (Balanced)',
+          provider: 'zai',
+          contextWindow: 128000,
+          maxOutputTokens: 4096,
+          supportsVision: false,
+          supportsTools: true,
+        },
+        {
+          id: 'glm-4.5-air',
+          name: 'GLM-4.5-Air (Speed)',
+          provider: 'zai',
+          contextWindow: 128000,
+          maxOutputTokens: 4096,
+          supportsVision: false,
           supportsTools: true,
         },
       ];

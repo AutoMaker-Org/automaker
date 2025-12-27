@@ -267,7 +267,9 @@ export function useElectronAgent({
             // Final update
             setMessages((prev) =>
               prev.map((msg) =>
-                msg.id === event.messageId ? { ...msg, content: event.content } : msg
+                msg.id === event.messageId
+                  ? { ...msg, content: event.content, reasoning_content: event.reasoning_content }
+                  : msg
               )
             );
             currentMessageRef.current = null;
@@ -278,7 +280,9 @@ export function useElectronAgent({
               if (existingIndex >= 0) {
                 // Update existing message
                 return prev.map((msg) =>
-                  msg.id === event.messageId ? { ...msg, content: event.content } : msg
+                  msg.id === event.messageId
+                    ? { ...msg, content: event.content, reasoning_content: event.reasoning_content }
+                    : msg
                 );
               } else {
                 // Create new message
@@ -286,6 +290,7 @@ export function useElectronAgent({
                   id: event.messageId,
                   role: 'assistant',
                   content: event.content,
+                  reasoning_content: event.reasoning_content,
                   timestamp: new Date().toISOString(),
                 };
                 currentMessageRef.current = newMessage;

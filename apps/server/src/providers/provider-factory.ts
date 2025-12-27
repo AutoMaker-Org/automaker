@@ -8,21 +8,30 @@
 
 import { BaseProvider } from './base-provider.js';
 import { ClaudeProvider } from './claude-provider.js';
-import type { InstallationStatus } from './types.js';
+import { ZaiProvider } from './zai-provider.js';
+import type { InstallationStatus, ProviderConfig } from './types.js';
 
 export class ProviderFactory {
   /**
    * Get the appropriate provider for a given model ID
    *
    * @param modelId Model identifier (e.g., "claude-opus-4-5-20251101", "gpt-5.2", "cursor-fast")
+   * @param config Optional provider configuration (including API keys)
    * @returns Provider instance for the model
    */
-  static getProviderForModel(modelId: string): BaseProvider {
+  static getProviderForModel(modelId: string, config?: ProviderConfig): BaseProvider {
     const lowerModel = modelId.toLowerCase();
+
+    // z.ai models (glm-4, glm-4.7, etc.)
+    if (lowerModel.startsWith('glm-')) {
+      const provider = new ZaiProvider(config);
+      return provider;
+    }
 
     // Claude models (claude-*, opus, sonnet, haiku)
     if (lowerModel.startsWith('claude-') || ['haiku', 'sonnet', 'opus'].includes(lowerModel)) {
-      return new ClaudeProvider();
+      const provider = new ClaudeProvider(config);
+      return provider;
     }
 
     // Future providers:
@@ -35,7 +44,8 @@ export class ProviderFactory {
 
     // Default to Claude for unknown models
     console.warn(`[ProviderFactory] Unknown model prefix for "${modelId}", defaulting to Claude`);
-    return new ClaudeProvider();
+    const provider = new ClaudeProvider(config);
+    return provider;
   }
 
   /**
@@ -44,6 +54,7 @@ export class ProviderFactory {
   static getAllProviders(): BaseProvider[] {
     return [
       new ClaudeProvider(),
+      new ZaiProvider(),
       // Future providers...
     ];
   }
@@ -79,6 +90,10 @@ export class ProviderFactory {
       case 'claude':
       case 'anthropic':
         return new ClaudeProvider();
+
+      case 'zai':
+      case 'glm':
+        return new ZaiProvider();
 
       // Future providers:
       // case "cursor":

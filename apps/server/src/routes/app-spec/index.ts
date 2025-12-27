@@ -17,7 +17,7 @@ export function createSpecRegenerationRoutes(
 ): Router {
   const router = Router();
 
-  router.post('/create', createCreateHandler(events));
+  router.post('/create', createCreateHandler(events, settingsService));
   router.post('/generate', createGenerateHandler(events, settingsService));
   router.post('/generate-features', createGenerateFeaturesHandler(events, settingsService));
   router.post('/stop', createStopHandler());

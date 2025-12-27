@@ -10,14 +10,13 @@
  */
 
 import type { Request, Response } from 'express';
-import { query } from '@anthropic-ai/claude-agent-sdk';
 import { createLogger } from '@automaker/utils';
-import { CLAUDE_MODEL_MAP } from '@automaker/types';
+import { DEFAULT_MODELS } from '@automaker/types';
 import { PathNotAllowedError } from '@automaker/platform';
-import { createCustomOptions } from '../../../lib/sdk-options.js';
+import { executeProviderQuery } from '../../../lib/provider-query.js';
 import * as secureFs from '../../../lib/secure-fs.js';
 import * as path from 'path';
-import type { SettingsService } from '../../../services/settings-service.js';
+import { SettingsService } from '../../../services/settings-service.js';
 import { getAutoLoadClaudeMdSetting } from '../../../lib/settings-helpers.js';
 
 const logger = createLogger('DescribeFile');
@@ -47,7 +46,7 @@ interface DescribeFileErrorResponse {
 }
 
 /**
- * Extract text content from Claude SDK response messages
+ * Extract text content from provider response messages
  */
 async function extractTextFromStream(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -160,12 +159,12 @@ export function createDescribeFileHandler(
 
 Respond with ONLY the description text, no additional formatting, preamble, or explanation.
 
-File: ${fileName}${truncated ? ' (truncated)' : ''}`;
+File: ${fileName}${truncated ? ' (truncated)' : ''}
 
-      const promptContent = [
-        { type: 'text' as const, text: instructionText },
-        { type: 'text' as const, text: `\n\n--- FILE CONTENT ---\n${contentToAnalyze}` },
-      ];
+---
+
+File Content:
+${contentToAnalyze}`;
 
       // Use the file's directory as the working directory
       const cwd = path.dirname(resolvedPath);
@@ -177,33 +176,25 @@ File: ${fileName}${truncated ? ' (truncated)' : ''}`;
         '[DescribeFile]'
       );
 
-      // Use centralized SDK options with proper cwd validation
-      // No tools needed since we're passing file content directly
-      const sdkOptions = createCustomOptions({
+      // Get API keys for provider authentication
+      const apiKeys = settingsService ? await settingsService.getApiKeys() : undefined;
+
+      // Use provider-agnostic query - no tools needed since file content is passed directly
+      const stream = executeProviderQuery({
         cwd,
-        model: CLAUDE_MODEL_MAP.haiku,
+        prompt: instructionText,
+        useCase: 'suggestions', // Use fast model (haiku or equivalent)
         maxTurns: 1,
         allowedTools: [],
         autoLoadClaudeMd,
-        sandbox: { enabled: true, autoAllowBashIfSandboxed: true },
+        apiKeys,
       });
-
-      const promptGenerator = (async function* () {
-        yield {
-          type: 'user' as const,
-          session_id: '',
-          message: { role: 'user' as const, content: promptContent },
-          parent_tool_use_id: null,
-        };
-      })();
-
-      const stream = query({ prompt: promptGenerator, options: sdkOptions });
 
       // Extract the description from the response
       const description = await extractTextFromStream(stream);
 
       if (!description || description.trim().length === 0) {
-        logger.warn('Received empty response from Claude');
+        logger.warn('Received empty response from provider');
         const response: DescribeFileErrorResponse = {
           success: false,
           error: 'Failed to generate description - empty response',

@@ -2,15 +2,14 @@
  * Business logic for generating suggestions
  */
 
-import { query } from '@anthropic-ai/claude-agent-sdk';
 import type { EventEmitter } from '../../lib/events.js';
 import { createLogger } from '@automaker/utils';
-import { createSuggestionsOptions } from '../../lib/sdk-options.js';
 import { FeatureLoader } from '../../services/feature-loader.js';
 import { getAppSpecPath } from '@automaker/platform';
 import * as secureFs from '../../lib/secure-fs.js';
 import type { SettingsService } from '../../services/settings-service.js';
 import { getAutoLoadClaudeMdSetting } from '../../lib/settings-helpers.js';
+import { executeProviderQuery } from '../../lib/provider-query.js';
 
 const logger = createLogger('Suggestions');
 
@@ -164,17 +163,21 @@ The response will be automatically formatted as structured JSON.`;
     '[Suggestions]'
   );
 
-  const options = createSuggestionsOptions({
+  // Get API keys for provider authentication
+  const apiKeys = settingsService ? await settingsService.getApiKeys() : undefined;
+
+  const stream = executeProviderQuery({
     cwd: projectPath,
+    prompt,
+    useCase: 'suggestions',
     abortController,
     autoLoadClaudeMd,
+    apiKeys,
     outputFormat: {
       type: 'json_schema',
       schema: suggestionsSchema,
     },
   });
-
-  const stream = query({ prompt, options });
   let responseText = '';
   let structuredOutput: { suggestions: Array<Record<string, unknown>> } | null = null;
 

@@ -20,6 +20,22 @@ export interface ConversationMessage {
 }
 
 /**
+ * Thinking configuration for providers that support extended thinking
+ * Used by Zai (GLM-4.7) and similar providers
+ */
+export interface ThinkingConfig {
+  /** Enable or disable thinking mode */
+  type: 'enabled' | 'disabled';
+  /** Whether to clear previous thinking content (false = preserved thinking) */
+  clear_thinking?: boolean;
+}
+
+/**
+ * Provider feature type for capability checking
+ */
+export type ProviderFeature = 'tools' | 'text' | 'vision' | 'mcp' | 'browser' | 'extendedThinking';
+
+/**
  * Options for executing a query via a provider
  */
 export interface ExecuteOptions {
@@ -34,15 +50,22 @@ export interface ExecuteOptions {
   conversationHistory?: ConversationMessage[]; // Previous messages for context
   sdkSessionId?: string; // Claude SDK session ID for resuming conversations
   settingSources?: Array<'user' | 'project' | 'local'>; // Claude filesystem settings to load
+  outputFormat?: {
+    type: 'json_schema';
+    schema: Record<string, unknown>;
+  };
+  /** Thinking mode configuration (for Zai GLM-4.7, etc.) */
+  thinking?: ThinkingConfig;
 }
 
 /**
  * Content block in a provider message (matches Claude SDK format)
  */
 export interface ContentBlock {
-  type: 'text' | 'tool_use' | 'thinking' | 'tool_result';
+  type: 'text' | 'tool_use' | 'thinking' | 'tool_result' | 'reasoning';
   text?: string;
   thinking?: string;
+  reasoning_content?: string; // Zai's reasoning field from thinking mode
   name?: string;
   input?: unknown;
   tool_use_id?: string;
@@ -100,6 +123,7 @@ export interface ModelDefinition {
   maxOutputTokens?: number;
   supportsVision?: boolean;
   supportsTools?: boolean;
-  tier?: 'basic' | 'standard' | 'premium';
+  supportsExtendedThinking?: boolean; // For Claude extended thinking and Zai thinking mode
+  tier?: 'basic' | 'standard' | 'premium' | 'vision';
   default?: boolean;
 }

@@ -11,9 +11,11 @@ export { specOutputSchema } from '@automaker/types';
 
 /**
  * Escape special XML characters
+ * Handles undefined values by converting them to empty strings
  */
-function escapeXml(str: string): string {
-  return str
+function escapeXml(str: string | undefined): string {
+  if (str === undefined || str === null) return '';
+  return String(str)
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
@@ -27,6 +29,11 @@ function escapeXml(str: string): string {
 export function specToXml(spec: import('@automaker/types').SpecOutput): string {
   const indent = '  ';
 
+  // Helper to safely map arrays, defaulting to empty array
+  const safeMap = <T, R>(arr: T[] | undefined, fn: (item: T) => R): R[] => {
+    return (arr || []).map(fn);
+  };
+
   let xml = `<?xml version="1.0" encoding="UTF-8"?>
 <project_specification>
 ${indent}<project_name>${escapeXml(spec.project_name)}</project_name>
@@ -36,28 +43,27 @@ ${indent}${indent}${escapeXml(spec.overview)}
 ${indent}</overview>
 
 ${indent}<technology_stack>
-${spec.technology_stack.map((t) => `${indent}${indent}<technology>${escapeXml(t)}</technology>`).join('\n')}
+${safeMap(spec.technology_stack, (t) => `${indent}${indent}<technology>${escapeXml(t)}</technology>`).join('\n')}
 ${indent}</technology_stack>
 
 ${indent}<core_capabilities>
-${spec.core_capabilities.map((c) => `${indent}${indent}<capability>${escapeXml(c)}</capability>`).join('\n')}
+${safeMap(spec.core_capabilities, (c) => `${indent}${indent}<capability>${escapeXml(c)}</capability>`).join('\n')}
 ${indent}</core_capabilities>
 
 ${indent}<implemented_features>
-${spec.implemented_features
-  .map(
-    (f) => `${indent}${indent}<feature>
+${safeMap(
+  spec.implemented_features,
+  (f) => `${indent}${indent}<feature>
 ${indent}${indent}${indent}<name>${escapeXml(f.name)}</name>
 ${indent}${indent}${indent}<description>${escapeXml(f.description)}</description>${
-      f.file_locations && f.file_locations.length > 0
-        ? `\n${indent}${indent}${indent}<file_locations>
-${f.file_locations.map((loc) => `${indent}${indent}${indent}${indent}<location>${escapeXml(loc)}</location>`).join('\n')}
+    f.file_locations && f.file_locations.length > 0
+      ? `\n${indent}${indent}${indent}<file_locations>
+${safeMap(f.file_locations, (loc) => `${indent}${indent}${indent}${indent}<location>${escapeXml(loc)}</location>`).join('\n')}
 ${indent}${indent}${indent}</file_locations>`
-        : ''
-    }
+      : ''
+  }
 ${indent}${indent}</feature>`
-  )
-  .join('\n')}
+).join('\n')}
 ${indent}</implemented_features>`;
 
   // Optional sections
@@ -65,7 +71,7 @@ ${indent}</implemented_features>`;
     xml += `
 
 ${indent}<additional_requirements>
-${spec.additional_requirements.map((r) => `${indent}${indent}<requirement>${escapeXml(r)}</requirement>`).join('\n')}
+${safeMap(spec.additional_requirements, (r) => `${indent}${indent}<requirement>${escapeXml(r)}</requirement>`).join('\n')}
 ${indent}</additional_requirements>`;
   }
 
@@ -73,7 +79,7 @@ ${indent}</additional_requirements>`;
     xml += `
 
 ${indent}<development_guidelines>
-${spec.development_guidelines.map((g) => `${indent}${indent}<guideline>${escapeXml(g)}</guideline>`).join('\n')}
+${safeMap(spec.development_guidelines, (g) => `${indent}${indent}<guideline>${escapeXml(g)}</guideline>`).join('\n')}
 ${indent}</development_guidelines>`;
   }
 
@@ -81,15 +87,14 @@ ${indent}</development_guidelines>`;
     xml += `
 
 ${indent}<implementation_roadmap>
-${spec.implementation_roadmap
-  .map(
-    (r) => `${indent}${indent}<phase>
+${safeMap(
+  spec.implementation_roadmap,
+  (r) => `${indent}${indent}<phase>
 ${indent}${indent}${indent}<name>${escapeXml(r.phase)}</name>
 ${indent}${indent}${indent}<status>${escapeXml(r.status)}</status>
 ${indent}${indent}${indent}<description>${escapeXml(r.description)}</description>
 ${indent}${indent}</phase>`
-  )
-  .join('\n')}
+).join('\n')}
 ${indent}</implementation_roadmap>`;
   }
 

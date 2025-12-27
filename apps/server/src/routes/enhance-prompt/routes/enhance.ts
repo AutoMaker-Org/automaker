@@ -1,15 +1,16 @@
 /**
  * POST /enhance-prompt endpoint - Enhance user input text
  *
- * Uses Claude AI to enhance text based on the specified enhancement mode.
+ * Uses AI providers (Claude, Zai, etc.) to enhance text based on the specified enhancement mode.
  * Supports modes: improve, technical, simplify, acceptance
  */
 
 import type { Request, Response } from 'express';
-import { query } from '@anthropic-ai/claude-agent-sdk';
 import { createLogger } from '@automaker/utils';
 import { resolveModelString } from '@automaker/model-resolver';
-import { CLAUDE_MODEL_MAP } from '@automaker/types';
+import { DEFAULT_MODELS } from '@automaker/types';
+import { executeProviderQuery } from '../../../lib/provider-query.js';
+import { SettingsService } from '../../../services/settings-service.js';
 import {
   getSystemPrompt,
   buildUserPrompt,
@@ -48,7 +49,7 @@ interface EnhanceErrorResponse {
 }
 
 /**
- * Extract text content from Claude SDK response messages
+ * Extract text content from provider response messages
  *
  * @param stream - The async iterable from the query function
  * @returns The extracted text content
@@ -136,16 +137,22 @@ export function createEnhanceHandler(): (req: Request, res: Response) => Promise
       const userPrompt = buildUserPrompt(validMode, trimmedText, true);
 
       // Resolve the model - use the passed model, default to sonnet for quality
-      const resolvedModel = resolveModelString(model, CLAUDE_MODEL_MAP.sonnet);
+      const resolvedModel = resolveModelString(model, DEFAULT_MODELS.claude);
 
       logger.debug(`Using model: ${resolvedModel}`);
 
-      // Call Claude SDK with minimal configuration for text transformation
+      // Get API keys for provider authentication
+      const apiKeys = await SettingsService.getApiKeys();
+
+      // Call provider-agnostic query with minimal configuration for text transformation
       // Key: no tools, just text completion
-      const stream = query({
+      const stream = executeProviderQuery({
+        cwd: process.cwd(),
         prompt: userPrompt,
+        useCase: 'chat',
+        apiKeys,
+        modelOverride: resolvedModel,
         options: {
-          model: resolvedModel,
           systemPrompt,
           maxTurns: 1,
           allowedTools: [],
@@ -157,7 +164,7 @@ export function createEnhanceHandler(): (req: Request, res: Response) => Promise
       const enhancedText = await extractTextFromStream(stream);
 
       if (!enhancedText || enhancedText.trim().length === 0) {
-        logger.warn('Received empty response from Claude');
+        logger.warn('Received empty response from provider');
         const response: EnhanceErrorResponse = {
           success: false,
           error: 'Failed to generate enhanced text - empty response',

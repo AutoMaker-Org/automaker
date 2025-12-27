@@ -9,7 +9,7 @@ import { DialogFooter } from '@/components/ui/dialog';
 import { Brain } from 'lucide-react';
 import { toast } from 'sonner';
 import type { AIProfile, AgentModel, ThinkingLevel } from '@/store/app-store';
-import { CLAUDE_MODELS, THINKING_LEVELS, ICON_OPTIONS } from '../constants';
+import { ALL_MODELS, THINKING_LEVELS, ICON_OPTIONS } from '../constants';
 import { getProviderFromModel } from '../utils';
 
 interface ProfileFormProps {
@@ -120,7 +120,7 @@ export function ProfileForm({
             Model
           </Label>
           <div className="flex gap-2 flex-wrap">
-            {CLAUDE_MODELS.map(({ id, label }) => (
+            {ALL_MODELS.map(({ id, label }) => (
               <button
                 key={id}
                 type="button"
