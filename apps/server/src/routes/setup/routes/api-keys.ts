@@ -11,6 +11,8 @@ export function createApiKeysHandler() {
       res.json({
         success: true,
         hasAnthropicKey: !!getApiKey('anthropic') || !!process.env.ANTHROPIC_API_KEY,
+        hasGoogleKey: !!getApiKey('google') || !!process.env.GOOGLE_API_KEY,
+        hasCodeRabbitKey: !!getApiKey('coderabbit') || !!process.env.CODERABBIT_API_KEY,
       });
     } catch (error) {
       logError(error, 'Get API keys failed');

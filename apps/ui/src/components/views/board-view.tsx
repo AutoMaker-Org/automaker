@@ -43,7 +43,7 @@ import { CreatePRDialog } from './board-view/dialogs/create-pr-dialog';
 import { CreateBranchDialog } from './board-view/dialogs/create-branch-dialog';
 import { WorktreePanel } from './board-view/worktree-panel';
 import type { PRInfo, WorktreeInfo } from './board-view/worktree-panel/types';
-import { COLUMNS } from './board-view/constants';
+import { generateColumns } from './board-view/constants';
 import {
   useBoardFeatures,
   useBoardDragDrop,
@@ -55,6 +55,7 @@ import {
   useBoardPersistence,
   useFollowUpState,
   useSuggestionsState,
+  usePipelineConfig,
 } from './board-view/hooks';
 
 // Stable empty array to avoid infinite loop in selector
@@ -209,6 +210,14 @@ export function BoardView() {
   // Get runningTasks from the hook (scoped to current project)
   const runningAutoTasks = autoMode.runningTasks;
 
+  // Pipeline configuration hook
+  const {
+    config: pipelineConfig,
+    skipStep: handleSkipPipelineStep,
+    retryStep: handleRetryPipelineStep,
+    clearStep: handleClearPipelineStep,
+  } = usePipelineConfig(currentProject?.path || null);
+
   // Window state hook for compact dialog mode
   const { isMaximized } = useWindowState();
 
@@ -285,22 +294,28 @@ export function BoardView() {
     );
   }, [hookFeatures]);
 
+  // Generate columns dynamically based on pipeline config
+  const columns = useMemo(() => generateColumns(pipelineConfig), [pipelineConfig]);
+
   // Custom collision detection that prioritizes columns over cards
-  const collisionDetectionStrategy = useCallback((args: any) => {
-    // First, check if pointer is within a column
-    const pointerCollisions = pointerWithin(args);
-    const columnCollisions = pointerCollisions.filter((collision: any) =>
-      COLUMNS.some((col) => col.id === collision.id)
-    );
+  const collisionDetectionStrategy = useCallback(
+    (args: any) => {
+      // First, check if pointer is within a column
+      const pointerCollisions = pointerWithin(args);
+      const columnCollisions = pointerCollisions.filter((collision: any) =>
+        columns.some((col) => col.id === collision.id)
+      );
 
-    // If we found a column collision, use that
-    if (columnCollisions.length > 0) {
-      return columnCollisions;
-    }
+      // If we found a column collision, use that
+      if (columnCollisions.length > 0) {
+        return columnCollisions;
+      }
 
-    // Otherwise, use rectangle intersection for cards
-    return rectIntersection(args);
-  }, []);
+      // Otherwise, use rectangle intersection for cards
+      return rectIntersection(args);
+    },
+    [columns]
+  );
 
   // Use persistence hook
   const { persistFeatureCreate, persistFeatureUpdate, persistFeatureDelete } = useBoardPersistence({
@@ -793,6 +808,7 @@ export function BoardView() {
     currentWorktreePath,
     currentWorktreeBranch,
     projectPath: currentProject?.path || null,
+    pipelineConfig,
   });
 
   // Use background hook
@@ -1050,6 +1066,7 @@ export function BoardView() {
             getColumnFeatures={getColumnFeatures}
             backgroundImageStyle={backgroundImageStyle}
             backgroundSettings={backgroundSettings}
+            pipelineConfig={pipelineConfig}
             onEdit={(feature) => setEditingFeature(feature)}
             onDelete={(featureId) => handleDeleteFeature(featureId)}
             onViewOutput={handleViewOutput}
@@ -1075,6 +1092,9 @@ export function BoardView() {
             onShowSuggestions={() => setShowSuggestionsDialog(true)}
             suggestionsCount={suggestionsCount}
             onArchiveAllVerified={() => setShowArchiveAllVerifiedDialog(true)}
+            onSkipPipelineStep={handleSkipPipelineStep}
+            onRetryPipelineStep={handleRetryPipelineStep}
+            onClearPipelineStep={handleClearPipelineStep}
           />
         ) : (
           <GraphView

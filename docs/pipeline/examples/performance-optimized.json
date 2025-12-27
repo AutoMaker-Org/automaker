@@ -1,0 +1,33 @@
+{
+  "version": "1.0",
+  "enabled": true,
+  "onFailure": "stop",
+  "steps": [
+    {
+      "id": "performance",
+      "type": "performance",
+      "name": "Performance Analysis",
+      "model": "same",
+      "required": true,
+      "autoTrigger": true,
+      "config": {
+        "focus": ["bottlenecks", "memory", "cpu"],
+        "threshold": 80,
+        "excludePatterns": ["*.test.ts", "benchmark/"]
+      }
+    },
+    {
+      "id": "review",
+      "type": "review",
+      "name": "Performance Code Review",
+      "model": "same",
+      "required": true,
+      "autoTrigger": true,
+      "config": {
+        "focus": ["performance", "optimization"],
+        "maxIssues": 5,
+        "excludePatterns": ["*.test.ts", "*.spec.ts"]
+      }
+    }
+  ]
+}

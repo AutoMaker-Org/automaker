@@ -1,0 +1,58 @@
+{
+  "version": "1.0",
+  "enabled": true,
+  "onFailure": "continue",
+  "steps": [
+    {
+      "id": "review",
+      "type": "review",
+      "name": "Code Quality Review",
+      "model": "same",
+      "required": true,
+      "autoTrigger": true,
+      "config": {
+        "focus": ["quality", "standards", "maintainability"],
+        "maxIssues": 10,
+        "excludePatterns": ["*.test.ts", "*.spec.ts", "dist/", "build/"]
+      }
+    },
+    {
+      "id": "security",
+      "type": "security",
+      "name": "Security Check",
+      "model": "same",
+      "required": true,
+      "autoTrigger": true,
+      "config": {
+        "focus": ["vulnerabilities", "best-practices"],
+        "severity": "medium",
+        "excludePatterns": ["*.test.ts", "*.mock.ts"]
+      }
+    },
+    {
+      "id": "performance",
+      "type": "performance",
+      "name": "Performance Review",
+      "model": "same",
+      "required": false,
+      "autoTrigger": true,
+      "config": {
+        "focus": ["optimization", "efficiency"],
+        "threshold": 70,
+        "excludePatterns": ["*.test.ts", "benchmark/"]
+      }
+    },
+    {
+      "id": "test",
+      "type": "test",
+      "name": "Test Coverage Analysis",
+      "model": "same",
+      "required": true,
+      "autoTrigger": true,
+      "config": {
+        "coverage": 80,
+        "excludePatterns": ["*.spec.ts", "test/helpers/"]
+      }
+    }
+  ]
+}

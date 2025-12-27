@@ -43,7 +43,7 @@ export function ApiKeyField({ config }: ApiKeyFieldProps) {
           <Input
             id={inputId}
             type={showValue ? 'text' : 'password'}
-            value={value}
+            value={value || ''}
             onChange={(e) => setValue(e.target.value)}
             placeholder={placeholder}
             className="pr-10 bg-input border-border text-foreground placeholder:text-muted-foreground"
@@ -60,26 +60,28 @@ export function ApiKeyField({ config }: ApiKeyFieldProps) {
             {showValue ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
           </Button>
         </div>
-        <Button
-          type="button"
-          variant="secondary"
-          onClick={testButton.onClick}
-          disabled={testButton.disabled}
-          className="bg-secondary hover:bg-accent text-secondary-foreground border border-border"
-          data-testid={testButton.testId}
-        >
-          {testButton.loading ? (
-            <>
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              Testing...
-            </>
-          ) : (
-            <>
-              <Zap className="w-4 h-4 mr-2" />
-              Test
-            </>
-          )}
-        </Button>
+        {!testButton.disabled && (
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={testButton.onClick}
+            disabled={testButton.disabled}
+            className="bg-secondary hover:bg-accent text-secondary-foreground border border-border"
+            data-testid={testButton.testId}
+          >
+            {testButton.loading ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Testing...
+              </>
+            ) : (
+              <>
+                <Zap className="w-4 h-4 mr-2" />
+                Test
+              </>
+            )}
+          </Button>
+        )}
       </div>
       <p className="text-xs text-muted-foreground">
         {descriptionPrefix}{' '}

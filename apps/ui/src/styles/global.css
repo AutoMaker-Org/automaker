@@ -114,6 +114,19 @@
   --color-status-in-progress: var(--status-in-progress);
   --color-status-waiting: var(--status-waiting);
 
+  /* Pipeline step colors */
+  --color-status-review: var(--status-review);
+  --color-status-review-bg: var(--status-review-bg);
+  --color-status-security: var(--status-security);
+  --color-status-security-bg: var(--status-security-bg);
+  --color-status-performance: var(--status-performance);
+  --color-status-performance-bg: var(--status-performance-bg);
+  --color-status-test: var(--status-test);
+  --color-status-test-bg: var(--status-test-bg);
+  --color-status-custom: var(--status-custom);
+  --color-status-custom-bg: var(--status-custom-bg);
+  --color-status-pipeline-step: var(--status-pipeline-step);
+
   /* Border radius */
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
@@ -190,6 +203,19 @@
   --status-backlog: oklch(0.5 0 0);
   --status-in-progress: oklch(0.7 0.15 70);
   --status-waiting: oklch(0.65 0.18 50);
+
+  /* Pipeline step colors - Light mode */
+  --status-review: oklch(0.6 0.2 30); /* Orange */
+  --status-review-bg: oklch(0.6 0.2 30 / 0.15);
+  --status-security: oklch(0.55 0.22 25); /* Red */
+  --status-security-bg: oklch(0.55 0.22 25 / 0.15);
+  --status-performance: oklch(0.55 0.2 200); /* Purple */
+  --status-performance-bg: oklch(0.55 0.2 200 / 0.15);
+  --status-test: oklch(0.55 0.2 160); /* Teal */
+  --status-test-bg: oklch(0.55 0.2 160 / 0.15);
+  --status-custom: oklch(0.6 0.18 280); /* Pink */
+  --status-custom-bg: oklch(0.6 0.18 280 / 0.15);
+  --status-pipeline-step: oklch(0.5 0.15 220); /* Generic blue */
 
   /* Shadow tokens */
   --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.05);
@@ -288,6 +314,19 @@
     --status-backlog: oklch(0.6 0 0);
     --status-in-progress: oklch(0.75 0.15 70);
     --status-waiting: oklch(0.7 0.18 50);
+
+    /* Pipeline step colors - Dark mode */
+    --status-review: oklch(0.7 0.2 30); /* Orange */
+    --status-review-bg: oklch(0.7 0.2 30 / 0.2);
+    --status-security: oklch(0.65 0.22 25); /* Red */
+    --status-security-bg: oklch(0.65 0.22 25 / 0.2);
+    --status-performance: oklch(0.65 0.2 200); /* Purple */
+    --status-performance-bg: oklch(0.65 0.2 200 / 0.2);
+    --status-test: oklch(0.65 0.2 160); /* Teal */
+    --status-test-bg: oklch(0.65 0.2 160 / 0.2);
+    --status-custom: oklch(0.7 0.18 280); /* Pink */
+    --status-custom-bg: oklch(0.7 0.18 280 / 0.2);
+    --status-pipeline-step: oklch(0.6 0.15 220); /* Generic blue */
 
     /* Shadow tokens - darker for dark mode */
     --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.3);

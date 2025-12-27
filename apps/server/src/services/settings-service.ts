@@ -472,12 +472,14 @@ export class SettingsService {
           anthropic?: string;
           google?: string;
           openai?: string;
+          coderabbit?: string;
         };
         await this.updateCredentials({
           apiKeys: {
             anthropic: apiKeys.anthropic || '',
             google: apiKeys.google || '',
             openai: apiKeys.openai || '',
+            coderabbit: apiKeys.coderabbit || '',
           },
         });
         migratedCredentials = true;

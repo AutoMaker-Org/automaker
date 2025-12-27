@@ -542,6 +542,11 @@ export interface ElectronAPI {
       authenticated: boolean;
       error?: string;
     }>;
+    verifyCodeRabbitAuth: (options: { apiKey: string }) => Promise<{
+      success: boolean;
+      authenticated: boolean;
+      error?: string;
+    }>;
     getGhStatus?: () => Promise<{
       success: boolean;
       installed: boolean;
@@ -553,6 +558,29 @@ export interface ElectronAPI {
     }>;
     onInstallProgress?: (callback: (progress: any) => void) => () => void;
     onAuthProgress?: (callback: (progress: any) => void) => () => void;
+  };
+  pipeline?: {
+    executeStep: (
+      projectPath: string,
+      featureId: string,
+      stepId: string
+    ) => Promise<{
+      success: boolean;
+      error?: string;
+    }>;
+    skipStep: (
+      projectPath: string,
+      featureId: string,
+      stepId: string
+    ) => Promise<{
+      success: boolean;
+      error?: string;
+    }>;
+    getMetrics: (projectPath: string) => Promise<{
+      success: boolean;
+      metrics?: any;
+      error?: string;
+    }>;
   };
   agent?: {
     start: (
@@ -1110,6 +1138,11 @@ interface SetupAPI {
     authenticated: boolean;
     error?: string;
   }>;
+  verifyCodeRabbitAuth: (options: { apiKey: string }) => Promise<{
+    success: boolean;
+    authenticated: boolean;
+    error?: string;
+  }>;
   getGhStatus?: () => Promise<{
     success: boolean;
     installed: boolean;
@@ -1197,6 +1230,16 @@ function createMockSetupAPI(): SetupAPI {
 
     verifyClaudeAuth: async (authMethod?: 'cli' | 'api_key') => {
       console.log('[Mock] Verifying Claude auth with method:', authMethod);
+      // Mock always returns not authenticated
+      return {
+        success: true,
+        authenticated: false,
+        error: 'Mock environment - authentication not available',
+      };
+    },
+
+    verifyCodeRabbitAuth: async (options: { apiKey: string }) => {
+      console.log('[Mock] Verifying CodeRabbit auth');
       // Mock always returns not authenticated
       return {
         success: true,

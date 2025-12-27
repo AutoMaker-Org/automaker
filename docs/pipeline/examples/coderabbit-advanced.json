@@ -1,0 +1,76 @@
+{
+  "version": "1.0",
+  "enabled": true,
+  "onFailure": "continue",
+  "steps": [
+    {
+      "id": "pre-flight-check",
+      "type": "review",
+      "name": "Pre-flight Check",
+      "model": "haiku",
+      "required": true,
+      "autoTrigger": true,
+      "config": {
+        "focus": ["quality", "standards"],
+        "maxIssues": 5,
+        "excludePatterns": ["*.test.ts", "*.spec.ts", "dist/", "build/"]
+      }
+    },
+    {
+      "id": "coderabbit-iterative-review",
+      "type": "custom",
+      "name": "CodeRabbit Iterative Review",
+      "model": "same",
+      "required": true,
+      "autoTrigger": true,
+      "dependencies": ["pre-flight-check"],
+      "loopUntilSuccess": true,
+      "maxLoops": 3,
+      "memoryEnabled": true,
+      "config": {
+        "prompt": "Review the code and provide actionable feedback. If issues are found, the developer will fix them and we'll run another review until all critical issues are resolved.",
+        "coderabbitEnabled": true,
+        "coderabbitRules": ["bug-risk", "best-practices", "complexity"],
+        "coderabbitCustomRules": ["type-safety", "async-patterns", "resource-cleanup"],
+        "coderabbitSeverity": "medium",
+        "maxIssues": 10,
+        "fallbackToAI": true,
+        "includeTests": false,
+        "successCriteria": "No medium or high severity issues remain"
+      }
+    },
+    {
+      "id": "coderabbit-documentation",
+      "type": "custom",
+      "name": "Documentation Review",
+      "model": "same",
+      "required": false,
+      "autoTrigger": true,
+      "config": {
+        "prompt": "Check that all new functions, classes, and APIs have appropriate documentation. Ensure comments are helpful and not redundant.",
+        "coderabbitEnabled": true,
+        "coderabbitRules": ["documentation"],
+        "coderabbitCustomRules": ["jsdoc-coverage", "readme-updates", "example-code"],
+        "coderabbitSeverity": "low",
+        "maxIssues": 8,
+        "fallbackToAI": true,
+        "includeTests": false
+      }
+    },
+    {
+      "id": "final-approval",
+      "type": "custom",
+      "name": "Final Approval Check",
+      "model": "opus",
+      "required": true,
+      "autoTrigger": true,
+      "dependencies": ["coderabbit-iterative-review", "coderabbit-documentation"],
+      "config": {
+        "prompt": "Final review to ensure the code is production-ready. Check that all previous feedback has been addressed and the changes align with project goals.",
+        "coderabbitEnabled": false,
+        "includeTests": false,
+        "successCriteria": "Code meets all quality standards and is ready for merge"
+      }
+    }
+  ]
+}

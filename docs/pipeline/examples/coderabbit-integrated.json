@@ -1,0 +1,153 @@
+{
+  "version": "1.0",
+  "enabled": true,
+  "onFailure": "continue",
+  "steps": [
+    {
+      "id": "coderabbit-style",
+      "type": "custom",
+      "name": "CodeRabbit Style Check",
+      "model": "same",
+      "required": true,
+      "autoTrigger": true,
+      "memoryEnabled": true,
+      "config": {
+        "prompt": "Review the code changes for style consistency and formatting issues according to team standards.",
+        "coderabbitEnabled": true,
+        "coderabbitRules": ["code-style", "best-practices"],
+        "coderabbitSeverity": "low",
+        "maxIssues": 10,
+        "fallbackToAI": true,
+        "includeTests": false
+      }
+    },
+    {
+      "id": "coderabbit-quality",
+      "type": "custom",
+      "name": "CodeRabbit Quality Review",
+      "model": "same",
+      "required": true,
+      "autoTrigger": true,
+      "memoryEnabled": true,
+      "config": {
+        "prompt": "Perform a thorough code quality review focusing on maintainability, readability, and adherence to best practices.",
+        "coderabbitEnabled": true,
+        "coderabbitRules": ["bug-risk", "best-practices", "complexity"],
+        "coderabbitCustomRules": [
+          "no-hardcoded-secrets",
+          "proper-error-handling",
+          "consistent-naming"
+        ],
+        "coderabbitSeverity": "medium",
+        "maxIssues": 15,
+        "fallbackToAI": true,
+        "includeTests": false
+      }
+    },
+    {
+      "id": "coderabbit-security",
+      "type": "custom",
+      "name": "CodeRabbit Security Scan",
+      "model": "same",
+      "required": true,
+      "autoTrigger": true,
+      "config": {
+        "prompt": "Analyze the code for security vulnerabilities, input validation issues, and potential security risks.",
+        "coderabbitEnabled": true,
+        "coderabbitRules": ["security"],
+        "coderabbitCustomRules": [
+          "sql-injection-check",
+          "xss-prevention",
+          "auth-authorization",
+          "data-validation"
+        ],
+        "coderabbitSeverity": "high",
+        "maxIssues": 20,
+        "fallbackToAI": true,
+        "includeTests": false
+      }
+    },
+    {
+      "id": "coderabbit-performance",
+      "type": "custom",
+      "name": "CodeRabbit Performance Review",
+      "model": "same",
+      "required": false,
+      "autoTrigger": true,
+      "config": {
+        "prompt": "Review the code for performance issues, inefficient algorithms, and optimization opportunities.",
+        "coderabbitEnabled": true,
+        "coderabbitRules": ["performance"],
+        "coderabbitCustomRules": [
+          "database-query-optimization",
+          "memory-leaks",
+          "async-patterns",
+          "caching-strategies"
+        ],
+        "coderabbitSeverity": "medium",
+        "maxIssues": 10,
+        "fallbackToAI": true,
+        "includeTests": false
+      }
+    },
+    {
+      "id": "coderabbit-tests",
+      "type": "custom",
+      "name": "CodeRabbit Test Coverage",
+      "model": "same",
+      "required": true,
+      "autoTrigger": true,
+      "loopUntilSuccess": true,
+      "maxLoops": 3,
+      "memoryEnabled": true,
+      "config": {
+        "prompt": "Review test files for coverage, quality, and proper test structure. Ensure tests are meaningful and cover edge cases.",
+        "coderabbitEnabled": true,
+        "coderabbitRules": ["documentation", "best-practices"],
+        "coderabbitCustomRules": [
+          "test-naming-convention",
+          "assertion-quality",
+          "mock-usage",
+          "edge-case-coverage"
+        ],
+        "coderabbitSeverity": "medium",
+        "maxIssues": 15,
+        "fallbackToAI": true,
+        "includeTests": true
+      }
+    },
+    {
+      "id": "coderabbit-final-review",
+      "type": "custom",
+      "name": "CodeRabbit Final Review",
+      "model": "same",
+      "required": true,
+      "autoTrigger": true,
+      "dependencies": [
+        "coderabbit-style",
+        "coderabbit-quality",
+        "coderabbit-security",
+        "coderabbit-performance",
+        "coderabbit-tests"
+      ],
+      "config": {
+        "prompt": "Final comprehensive review of all changes. Ensure all previous feedback has been addressed and the code is ready for production.",
+        "coderabbitEnabled": true,
+        "coderabbitRules": [
+          "code-style",
+          "bug-risk",
+          "performance",
+          "security",
+          "best-practices",
+          "complexity",
+          "documentation",
+          "error-handling"
+        ],
+        "coderabbitSeverity": "medium",
+        "maxIssues": 5,
+        "fallbackToAI": true,
+        "includeTests": false
+      }
+    }
+  ]
+}

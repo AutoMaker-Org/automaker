@@ -4,7 +4,7 @@
  */
 
 import path from 'path';
-import type { Feature } from '@automaker/types';
+import type { Feature, PipelineConfig } from '@automaker/types';
 import { createLogger } from '@automaker/utils';
 import * as secureFs from '../lib/secure-fs.js';
 import {
@@ -13,6 +13,7 @@ import {
   getFeatureImagesDir,
   ensureAutomakerDir,
 } from '@automaker/platform';
+import { PipelineConfigService } from './pipeline-config-service.js';
 
 const logger = createLogger('FeatureLoader');
 
@@ -20,6 +21,8 @@ const logger = createLogger('FeatureLoader');
 export type { Feature };
 
 export class FeatureLoader {
+  private pipelineConfigCache = new Map<string, PipelineConfig | null>();
+
   /**
    * Get the features directory path
    */
@@ -138,6 +141,22 @@ export class FeatureLoader {
   }
 
   /**
+   * Handle image updates during feature update - delete orphaned images and migrate new ones
+   */
+  private async handleImageUpdates(
+    projectPath: string,
+    featureId: string,
+    existingPaths: Array<string | { path: string; [key: string]: unknown }> | undefined,
+    newPaths: Array<string | { path: string; [key: string]: unknown }> | undefined
+  ): Promise<Array<string | { path: string; [key: string]: unknown }> | undefined> {
+    // Delete images that were removed
+    await this.deleteOrphanedImages(projectPath, existingPaths, newPaths);
+
+    // Migrate any new images from temp to feature directory
+    return this.migrateImages(projectPath, featureId, newPaths);
+  }
+
+  /**
    * Get the path to a specific feature folder
    */
   getFeatureDir(projectPath: string, featureId: string): string {
@@ -240,7 +259,19 @@ export class FeatureLoader {
     try {
       const featureJsonPath = this.getFeatureJsonPath(projectPath, featureId);
       const content = (await secureFs.readFile(featureJsonPath, 'utf-8')) as string;
-      return JSON.parse(content);
+      const feature: Feature = JSON.parse(content);
+
+      // Load pipeline configuration if feature has pipeline steps
+      if (feature.pipelineSteps && Object.keys(feature.pipelineSteps).length > 0) {
+        const pipelineConfig = await this.loadPipelineConfig(projectPath);
+
+        // Validate and sanitize pipeline steps
+        if (pipelineConfig) {
+          feature.pipelineSteps = this.validatePipelineSteps(feature.pipelineSteps, pipelineConfig);
+        }
+      }
+
+      return feature;
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
         return null;
@@ -295,34 +326,35 @@ export class FeatureLoader {
     featureId: string,
     updates: Partial<Feature>
   ): Promise<Feature> {
-    const feature = await this.get(projectPath, featureId);
-    if (!feature) {
+    const featureJsonPath = this.getFeatureJsonPath(projectPath, featureId);
+
+    // Load existing feature
+    const existing = await this.get(projectPath, featureId);
+    if (!existing) {
       throw new Error(`Feature ${featureId} not found`);
     }
 
-    // Handle image path changes
-    let updatedImagePaths = updates.imagePaths;
-    if (updates.imagePaths !== undefined) {
-      // Delete orphaned images (images that were removed)
-      await this.deleteOrphanedImages(projectPath, feature.imagePaths, updates.imagePaths);
-
-      // Migrate any new images
-      updatedImagePaths = await this.migrateImages(projectPath, featureId, updates.imagePaths);
-    }
+    // Handle image path updates
+    const updatedImagePaths = await this.handleImageUpdates(
+      projectPath,
+      featureId,
+      existing.imagePaths,
+      updates.imagePaths
+    );
 
     // Merge updates
-    const updatedFeature: Feature = {
-      ...feature,
+    const updated: Feature = {
+      ...existing,
       ...updates,
-      ...(updatedImagePaths !== undefined ? { imagePaths: updatedImagePaths } : {}),
+      imagePaths: updatedImagePaths,
+      updatedAt: new Date().toISOString(),
     };
 
-    // Write back to file
-    const featureJsonPath = this.getFeatureJsonPath(projectPath, featureId);
-    await secureFs.writeFile(featureJsonPath, JSON.stringify(updatedFeature, null, 2), 'utf-8');
+    // Write updated feature
+    await secureFs.writeFile(featureJsonPath, JSON.stringify(updated, null, 2), 'utf-8');
 
     logger.info(`Updated feature ${featureId}`);
-    return updatedFeature;
+    return updated;
   }
 
   /**
@@ -337,6 +369,72 @@ export class FeatureLoader {
     } catch (error) {
       logger.error(`[FeatureLoader] Failed to delete feature ${featureId}:`, error);
       return false;
+    }
+  }
+
+  /**
+   * Load pipeline configuration for a project with caching
+   */
+  private async loadPipelineConfig(projectPath: string): Promise<PipelineConfig | null> {
+    // Check cache first
+    if (this.pipelineConfigCache.has(projectPath)) {
+      return this.pipelineConfigCache.get(projectPath)!;
+    }
+
+    try {
+      const configService = new PipelineConfigService(projectPath);
+      const config = await configService.loadPipelineConfig();
+      this.pipelineConfigCache.set(projectPath, config);
+      return config;
+    } catch (error) {
+      logger.warn(`[FeatureLoader] Failed to load pipeline config: ${error}`);
+      this.pipelineConfigCache.set(projectPath, null);
+      return null;
+    }
+  }
+
+  /**
+   * Validate and sanitize pipeline steps against configuration
+   */
+  private validatePipelineSteps(
+    pipelineSteps: Record<string, any>,
+    pipelineConfig: PipelineConfig
+  ): Record<string, any> {
+    const validatedSteps: Record<string, any> = {};
+    const configStepIds = new Set(pipelineConfig.steps.map((s) => s.id));
+
+    // Validate each step
+    for (const [stepId, stepData] of Object.entries(pipelineSteps)) {
+      // Check if step exists in configuration
+      if (!configStepIds.has(stepId)) {
+        logger.warn(`[FeatureLoader] Unknown pipeline step: ${stepId}`);
+        continue;
+      }
+
+      // Sanitize step data
+      const configStep = pipelineConfig.steps.find((s) => s.id === stepId)!;
+      validatedSteps[stepId] = {
+        id: stepId,
+        type: configStep.type,
+        status: stepData.status || 'pending',
+        startedAt: stepData.startedAt,
+        completedAt: stepData.completedAt,
+        result: stepData.result,
+        // Remove any extra fields
+      };
+    }
+
+    return validatedSteps;
+  }
+
+  /**
+   * Clear pipeline configuration cache
+   */
+  clearPipelineConfigCache(projectPath?: string): void {
+    if (projectPath) {
+      this.pipelineConfigCache.delete(projectPath);
+    } else {
+      this.pipelineConfigCache.clear();
     }
   }
 

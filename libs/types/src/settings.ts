@@ -7,9 +7,10 @@
  */
 
 import type { AgentModel } from './model.js';
+import type { PipelineConfig } from './pipeline.js';
 
-// Re-export AgentModel for convenience
-export type { AgentModel };
+// Re-export AgentModel and PipelineConfig for convenience
+export type { AgentModel, PipelineConfig };
 
 /**
  * ThemeMode - Available color themes for the UI
@@ -320,6 +321,8 @@ export interface Credentials {
     google: string;
     /** OpenAI API key (for compatibility or alternative providers) */
     openai: string;
+    /** CodeRabbit API key for automated code reviews */
+    coderabbit: string;
   };
 }
 
@@ -392,6 +395,10 @@ export interface ProjectSettings {
   // Board Customization
   /** Project-specific board background settings */
   boardBackground?: BoardBackgroundSettings;
+
+  // Pipeline Configuration
+  /** Project-specific pipeline configuration */
+  pipeline?: PipelineConfig;
 
   // Session Tracking
   /** Last chat session selected in this project */
@@ -468,6 +475,7 @@ export const DEFAULT_CREDENTIALS: Credentials = {
     anthropic: '',
     google: '',
     openai: '',
+    coderabbit: '',
   },
 };
 
@@ -482,3 +490,44 @@ export const SETTINGS_VERSION = 1;
 export const CREDENTIALS_VERSION = 1;
 /** Current version of the project settings schema */
 export const PROJECT_SETTINGS_VERSION = 1;
+
+/**
+ * Validate pipeline configuration
+ */
+export function validatePipelineConfig(config: any): config is PipelineConfig {
+  // Reserved base column names that cannot be used as step IDs
+  const reservedNames = new Set([
+    'backlog',
+    'in_progress',
+    'waiting_approval',
+    'verified',
+    'completed',
+  ]);
+
+  return (
+    typeof config === 'object' &&
+    config !== null &&
+    typeof config.version === 'string' &&
+    typeof config.enabled === 'boolean' &&
+    Array.isArray(config.steps) &&
+    config.steps.every((step: any) => {
+      // Normalize step ID for comparison (trim and lowercase)
+      const normalizedId = step.id?.toString().trim().toLowerCase();
+
+      return (
+        typeof step.id === 'string' &&
+        step.id.trim().length > 0 && // Ensure non-empty after trimming
+        !reservedNames.has(normalizedId) && // Check against reserved names
+        typeof step.type === 'string' &&
+        ['review', 'security', 'performance', 'test', 'custom'].includes(step.type) &&
+        typeof step.name === 'string' &&
+        typeof step.model === 'string' &&
+        ['opus', 'sonnet', 'haiku', 'different', 'same'].includes(step.model) &&
+        typeof step.required === 'boolean' &&
+        typeof step.autoTrigger === 'boolean' &&
+        typeof step.config === 'object' &&
+        step.config !== null
+      );
+    })
+  );
+}

@@ -15,6 +15,10 @@ interface KanbanColumnProps {
   hideScrollbar?: boolean;
   /** Custom width in pixels. If not provided, defaults to 288px (w-72) */
   width?: number;
+  /** Optional description for pipeline step columns */
+  description?: string;
+  /** Whether the pipeline step is required */
+  required?: boolean;
 }
 
 export const KanbanColumn = memo(function KanbanColumn({
