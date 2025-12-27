@@ -6,7 +6,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Loader2, List, FileText, GitBranch } from 'lucide-react';
+import { Loader2, List, FileText, GitBranch, Copy, Check } from 'lucide-react';
+import { toast } from 'sonner';
 import { getElectronAPI } from '@/lib/electron';
 import { LogViewer } from '@/components/ui/log-viewer';
 import { GitDiffPanel } from '@/components/ui/git-diff-panel';
@@ -39,10 +40,30 @@ export function AgentOutputModal({
   const [isLoading, setIsLoading] = useState(true);
   const [viewMode, setViewMode] = useState<ViewMode>('parsed');
   const [projectPath, setProjectPath] = useState<string>('');
+  const [copied, setCopied] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const autoScrollRef = useRef(true);
   const projectPathRef = useRef<string>('');
   const useWorktrees = useAppStore((state) => state.useWorktrees);
+
+  // Copy output to clipboard
+  const handleCopyOutput = async () => {
+    if (!output) return;
+
+    try {
+      await navigator.clipboard.writeText(output);
+      setCopied(true);
+      toast.success('Output copied to clipboard');
+
+      // Reset copied state after 2 seconds
+      setTimeout(() => {
+        setCopied(false);
+      }, 2000);
+    } catch (error) {
+      console.error('Failed to copy output:', error);
+      toast.error('Failed to copy output');
+    }
+  };
 
   // Auto-scroll to bottom when output changes
   useEffect(() => {
@@ -292,42 +313,69 @@ export function AgentOutputModal({
               )}
               Agent Output
             </DialogTitle>
-            <div className="flex items-center gap-1 bg-muted rounded-lg p-1">
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1 bg-muted rounded-lg p-1">
+                <button
+                  onClick={() => setViewMode('parsed')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                    viewMode === 'parsed'
+                      ? 'bg-primary/20 text-primary shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+                  }`}
+                  data-testid="view-mode-parsed"
+                >
+                  <List className="w-3.5 h-3.5" />
+                  Logs
+                </button>
+                <button
+                  onClick={() => setViewMode('changes')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                    viewMode === 'changes'
+                      ? 'bg-primary/20 text-primary shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+                  }`}
+                  data-testid="view-mode-changes"
+                >
+                  <GitBranch className="w-3.5 h-3.5" />
+                  Changes
+                </button>
+                <button
+                  onClick={() => setViewMode('raw')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                    viewMode === 'raw'
+                      ? 'bg-primary/20 text-primary shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+                  }`}
+                  data-testid="view-mode-raw"
+                >
+                  <FileText className="w-3.5 h-3.5" />
+                  Raw
+                </button>
+              </div>
               <button
-                onClick={() => setViewMode('parsed')}
+                onClick={handleCopyOutput}
+                disabled={!output}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
-                  viewMode === 'parsed'
-                    ? 'bg-primary/20 text-primary shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+                  copied
+                    ? 'bg-green-500/20 text-green-500'
+                    : output
+                      ? 'bg-muted text-muted-foreground hover:text-foreground hover:bg-accent'
+                      : 'bg-muted text-muted-foreground/50 cursor-not-allowed'
                 }`}
-                data-testid="view-mode-parsed"
+                title="Copy output to clipboard"
+                data-testid="copy-output-button"
               >
-                <List className="w-3.5 h-3.5" />
-                Logs
-              </button>
-              <button
-                onClick={() => setViewMode('changes')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
-                  viewMode === 'changes'
-                    ? 'bg-primary/20 text-primary shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-accent'
-                }`}
-                data-testid="view-mode-changes"
-              >
-                <GitBranch className="w-3.5 h-3.5" />
-                Changes
-              </button>
-              <button
-                onClick={() => setViewMode('raw')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
-                  viewMode === 'raw'
-                    ? 'bg-primary/20 text-primary shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-accent'
-                }`}
-                data-testid="view-mode-raw"
-              >
-                <FileText className="w-3.5 h-3.5" />
-                Raw
+                {copied ? (
+                  <>
+                    <Check className="w-3.5 h-3.5" />
+                    Copied
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-3.5 h-3.5" />
+                    Copy
+                  </>
+                )}
               </button>
             </div>
           </div>
