@@ -163,6 +163,7 @@ app.use('/api/claude', createClaudeRoutes(claudeUsageService));
 app.use('/api/github', createGitHubRoutes(events, settingsService));
 app.use('/api/context', createContextRoutes(settingsService));
 app.use('/api/backlog-plan', createBacklogPlanRoutes(events, settingsService));
+app.use('/api/pipeline', createPipelineRoutes(autoModeService));
 
 // Create HTTP server
 const server = createServer(app);
