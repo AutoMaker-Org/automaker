@@ -7,14 +7,20 @@ import { AuthenticationStatusDisplay } from './authentication-status-display';
 import { SecurityNotice } from './security-notice';
 import { useApiKeyManagement } from './hooks/use-api-key-management';
 import { cn } from '@/lib/utils';
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { getElectronAPI } from '@/lib/electron';
 import { toast } from 'sonner';
 import { useNavigate } from '@tanstack/react-router';
 
 export function ApiKeysSection() {
-  const { apiKeys, setApiKeys, enabledProviders, setEnabledProviders, toggleProvider } =
-    useAppStore();
+  const {
+    apiKeys,
+    setApiKeys,
+    enabledProviders,
+    setEnabledProviders,
+    toggleProvider,
+    providerToggleTouched,
+  } = useAppStore();
   const { claudeAuthStatus, setClaudeAuthStatus, setSetupComplete } = useSetupStore();
   const [isDeletingAnthropicKey, setIsDeletingAnthropicKey] = useState(false);
   const navigate = useNavigate();
@@ -22,6 +28,8 @@ export function ApiKeysSection() {
   const { providerConfigParams, apiKeyStatus, handleSave, saved } = useApiKeyManagement();
 
   const { anthropic, zai } = providerConfigParams;
+  const hasAnthropicKey = Boolean(apiKeyStatus?.hasAnthropicKey || apiKeys.anthropic);
+  const hasZaiKey = Boolean(apiKeyStatus?.hasZaiKey || apiKeys.zai);
 
   // Delete Anthropic API key
   const deleteAnthropicKey = useCallback(async () => {
@@ -36,6 +44,7 @@ export function ApiKeysSection() {
       const result = await api.setup.deleteApiKey('anthropic');
       if (result.success) {
         setApiKeys({ ...apiKeys, anthropic: '' });
+        setEnabledProviders({ claude: false });
         setClaudeAuthStatus({
           authenticated: false,
           method: 'none',
@@ -63,13 +72,34 @@ export function ApiKeysSection() {
     await handleSave();
 
     // Auto-enable providers that have valid API keys
-    if (anthropic.value && anthropic.result?.success) {
+    setEnabledProviders({
+      claude: Boolean(anthropic.value && anthropic.result?.success),
+      zai: Boolean(zai.value && zai.result?.success),
+    });
+  }, [handleSave, anthropic, zai, setEnabledProviders]);
+
+  // Auto-enable providers when a key exists and user never disabled the switch
+  useEffect(() => {
+    const claudeValidated = anthropic.result?.success || apiKeyStatus?.hasAnthropicKey;
+    const zaiValidated = zai.result?.success || apiKeyStatus?.hasZaiKey;
+
+    if (claudeValidated && !enabledProviders.claude && !providerToggleTouched.claude) {
       setEnabledProviders({ claude: true });
     }
-    if (zai.value && zai.result?.success) {
+    if (zaiValidated && !enabledProviders.zai && !providerToggleTouched.zai) {
       setEnabledProviders({ zai: true });
     }
-  }, [handleSave, anthropic, zai, setEnabledProviders]);
+  }, [
+    anthropic.result,
+    zai.result,
+    apiKeyStatus?.hasAnthropicKey,
+    apiKeyStatus?.hasZaiKey,
+    enabledProviders.claude,
+    enabledProviders.zai,
+    providerToggleTouched.claude,
+    providerToggleTouched.zai,
+    setEnabledProviders,
+  ]);
 
   // Provider configurations for cards
   const providers = [
@@ -85,7 +115,7 @@ export function ApiKeysSection() {
       onApiKeyChange: anthropic.setValue,
       showApiKey: anthropic.show,
       onToggleApiKeyVisibility: anthropic.setShow,
-      hasStoredKey: apiKeys.anthropic,
+      hasStoredKey: hasAnthropicKey,
       isTesting: anthropic.testing,
       onTest: anthropic.onTest,
       testResult: anthropic.result,
@@ -107,7 +137,7 @@ export function ApiKeysSection() {
       onApiKeyChange: zai.setValue,
       showApiKey: zai.show,
       onToggleApiKeyVisibility: zai.setShow,
-      hasStoredKey: apiKeys.zai,
+      hasStoredKey: hasZaiKey,
       isTesting: zai.testing,
       onTest: zai.onTest,
       testResult: zai.result,

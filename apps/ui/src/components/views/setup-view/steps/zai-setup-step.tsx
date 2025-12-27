@@ -1,9 +1,8 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { useSetupStore } from '@/store/setup-store';
 import { useAppStore } from '@/store/app-store';
 import { getElectronAPI } from '@/lib/electron';
 import {
@@ -56,40 +55,36 @@ export function ZaiSetupStep({ onNext, onBack, onSkip }: ZaiSetupStepProps) {
     setVerificationError(null);
 
     try {
-      const response = await fetch('https://api.z.ai/api/coding/paas/v4/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify({
-          model: 'glm-4.7',
-          messages: [{ role: 'user', content: 'test' }],
-          max_tokens: 10,
-        }),
-      });
+      const api = getElectronAPI();
+      if (!api.setup?.verifyZaiAuth) {
+        setVerificationStatus('error');
+        setVerificationError('Verification API not available');
+        return;
+      }
 
-      if (response.ok) {
+      const result = await api.setup.verifyZaiAuth(apiKey);
+
+      if (result.success && result.authenticated) {
         setVerificationStatus('verified');
         setVerificationError(null);
         toast.success('Z.ai API key verified successfully!');
       } else {
-        const errorData = await response.json().catch(() => ({}));
         setVerificationStatus('error');
-        setVerificationError(
-          `API key validation failed: ${errorData.error?.message || response.status}`
-        );
+        setVerificationError(result.error || 'Authentication failed');
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Verification failed';
       setVerificationStatus('error');
-      setVerificationError('Network error. Please check your connection.');
+      setVerificationError(errorMessage);
     }
   }, [apiKey]);
 
   // Handle save and verify
   const handleSaveAndVerify = async () => {
-    await saveToken(apiKey);
+    const saved = await saveToken(apiKey);
+    if (!saved) {
+      return;
+    }
     await verifyApiKey();
   };
 

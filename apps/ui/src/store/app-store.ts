@@ -425,6 +425,11 @@ export interface AppState {
     claude: boolean;
     zai: boolean;
   };
+  // Track if user manually touched provider toggle (to avoid auto-enabling after manual disable)
+  providerToggleTouched: {
+    claude: boolean;
+    zai: boolean;
+  };
 
   // Chat Sessions
   chatSessions: ChatSession[];
@@ -692,6 +697,7 @@ export interface AppActions {
   // Provider Configuration actions
   setEnabledProviders: (providers: Partial<{ claude: boolean; zai: boolean }>) => void;
   toggleProvider: (provider: 'claude' | 'zai') => void;
+  markProviderTouched: (provider: 'claude' | 'zai') => void;
 
   // Chat Session actions
   createChatSession: (title?: string) => ChatSession;
@@ -924,8 +930,12 @@ const initialState: AppState = {
     zai: '',
   },
   enabledProviders: {
-    claude: true,
-    zai: true,
+    claude: false,
+    zai: false,
+  },
+  providerToggleTouched: {
+    claude: false,
+    zai: false,
   },
   chatSessions: [],
   currentChatSession: null,
@@ -1303,6 +1313,14 @@ export const useAppStore = create<AppState & AppActions>()(
             ...state.enabledProviders,
             [provider]: !state.enabledProviders[provider],
           },
+          providerToggleTouched: {
+            ...state.providerToggleTouched,
+            [provider]: true,
+          },
+        })),
+      markProviderTouched: (provider) =>
+        set((state) => ({
+          providerToggleTouched: { ...state.providerToggleTouched, [provider]: true },
         })),
 
       // Chat Session actions

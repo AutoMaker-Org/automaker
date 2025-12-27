@@ -76,6 +76,8 @@ export function ProviderCard({
 }: ProviderCardProps) {
   const providerIcon = icon || providerIcons[provider];
 
+  const isKeyReady = Boolean(hasStoredKey && (enabled || testResult?.success));
+
   return (
     <div
       className={cn(
@@ -113,7 +115,12 @@ export function ProviderCard({
               </p>
             </div>
           </div>
-          <Switch checked={enabled} onCheckedChange={onToggle} data-testid={`${provider}-toggle`} />
+          <Switch
+            checked={enabled}
+            onCheckedChange={onToggle}
+            data-testid={`${provider}-toggle`}
+            disabled={!isKeyReady}
+          />
         </div>
 
         {/* API Key Input */}
@@ -129,8 +136,7 @@ export function ProviderCard({
                 value={apiKeyValue}
                 onChange={(e) => onApiKeyChange(e.target.value)}
                 placeholder={provider === 'anthropic' ? 'sk-ant-...' : 'Your API key'}
-                disabled={!enabled}
-                className="pr-10 bg-input border-border text-foreground placeholder:text-muted-foreground disabled:opacity-50"
+                className="pr-10 bg-input border-border text-foreground placeholder:text-muted-foreground"
                 data-testid={inputTestId}
               />
               <Button
@@ -140,7 +146,6 @@ export function ProviderCard({
                 className="absolute right-0 top-0 h-full px-3 text-muted-foreground hover:text-foreground hover:bg-transparent disabled:opacity-50"
                 onClick={onToggleApiKeyVisibility}
                 data-testid={toggleTestId}
-                disabled={!enabled}
               >
                 {showApiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </Button>
@@ -149,7 +154,7 @@ export function ProviderCard({
               type="button"
               variant="secondary"
               onClick={onTest}
-              disabled={!enabled || !apiKeyValue || isTesting}
+              disabled={!apiKeyValue || isTesting}
               className="bg-secondary hover:bg-accent text-secondary-foreground border border-border disabled:opacity-50"
               data-testid={testButtonTestId}
             >

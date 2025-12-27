@@ -478,6 +478,7 @@ export class HttpApiClient implements ElectronAPI {
       success: boolean;
       hasAnthropicKey: boolean;
       hasGoogleKey: boolean;
+      hasZaiKey: boolean;
     }> => this.get('/api/setup/api-keys'),
 
     getPlatform: (): Promise<{
@@ -497,6 +498,14 @@ export class HttpApiClient implements ElectronAPI {
       authenticated: boolean;
       error?: string;
     }> => this.post('/api/setup/verify-claude-auth', { authMethod }),
+
+    verifyZaiAuth: (
+      apiKey?: string
+    ): Promise<{
+      success: boolean;
+      authenticated: boolean;
+      error?: string;
+    }> => this.post('/api/setup/verify-zai-auth', apiKey ? { apiKey } : {}),
 
     getGhStatus: (): Promise<{
       success: boolean;

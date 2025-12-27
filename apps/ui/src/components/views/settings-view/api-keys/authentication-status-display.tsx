@@ -21,6 +21,8 @@ export function AuthenticationStatusDisplay({
   apiKeyStatus,
   apiKeys,
 }: AuthenticationStatusDisplayProps) {
+  const claudeConfigured = Boolean(apiKeys.anthropic || apiKeyStatus?.hasAnthropicKey);
+  const claudeAuthenticated = Boolean(claudeConfigured && claudeAuthStatus?.authenticated);
   return (
     <div className="space-y-4 pt-4 border-t border-border">
       <div className="flex items-center gap-2 mb-3">
@@ -38,7 +40,7 @@ export function AuthenticationStatusDisplay({
             <span className="text-sm font-medium text-foreground">Claude (Anthropic)</span>
           </div>
           <div className="space-y-1.5 text-xs min-h-12">
-            {claudeAuthStatus?.authenticated ? (
+            {claudeAuthenticated ? (
               <>
                 <div className="flex items-center gap-2">
                   <CheckCircle2 className="w-3 h-3 text-green-500 shrink-0" />

@@ -63,7 +63,7 @@ export function useApiKeyManagement() {
             setApiKeyStatus({
               hasAnthropicKey: status.hasAnthropicKey,
               hasGoogleKey: status.hasGoogleKey,
-              hasZaiKey: !!apiKeys.zai,
+              hasZaiKey: status.hasZaiKey,
             });
           }
         } catch (error) {
@@ -145,37 +145,25 @@ export function useApiKeyManagement() {
     }
 
     // Try to make a simple API call to verify the key
-    // Use the chat completions endpoint which is the actual endpoint used by the provider
     try {
-      const response = await fetch('https://api.z.ai/api/coding/paas/v4/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${zaiKey}`,
-        },
-        body: JSON.stringify({
-          model: 'glm-4.7',
-          messages: [{ role: 'user', content: 'test' }],
-          max_tokens: 10,
-        }),
-      });
+      const api = getElectronAPI();
+      const data = await api.setup.verifyZaiAuth?.(zaiKey);
 
-      if (response.ok) {
+      if (data?.success && data.authenticated) {
         setZaiTestResult({
           success: true,
-          message: 'Connection successful! Z.ai API key is valid.',
+          message: 'Connection successful! Z.ai responded.',
         });
       } else {
-        const errorData = await response.json().catch(() => ({}));
         setZaiTestResult({
           success: false,
-          message: `API key validation failed: ${errorData.error?.message || response.status}`,
+          message: data?.error || 'Failed to connect to Z.ai API.',
         });
       }
-    } catch {
+    } catch (error) {
       setZaiTestResult({
         success: false,
-        message: 'Network error. Please check your connection.',
+        message: error instanceof Error ? error.message : 'Network error. Please check your connection.',
       });
     } finally {
       setTestingZaiConnection(false);

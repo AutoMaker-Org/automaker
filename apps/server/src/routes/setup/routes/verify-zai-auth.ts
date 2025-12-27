@@ -46,8 +46,9 @@ function detectZaiError(text: string): string | null {
 }
 
 export function createVerifyZaiAuthHandler() {
-  return async (_req: Request, res: Response): Promise<void> => {
-    const apiKey = getApiKey('zai') || process.env.ZAI_API_KEY;
+  return async (req: Request, res: Response): Promise<void> => {
+    const { apiKey: apiKeyFromBody } = req.body as { apiKey?: string };
+    const apiKey = apiKeyFromBody || getApiKey('zai') || process.env.ZAI_API_KEY;
 
     if (!apiKey) {
       res.json({
