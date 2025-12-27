@@ -17,5 +17,8 @@ export function getProviderFromModel(model: AgentModel): ModelProvider {
   if (CURSOR_MODELS.some((option) => option.id === model)) {
     return 'cursor';
   }
+  if (CLAUDE_MODELS.some((option) => option.id === model)) {
+    return 'claude';
+  }
   return 'claude';
 }

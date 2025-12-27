@@ -75,6 +75,14 @@ export function FileBrowserDialog({
   const [error, setError] = useState('');
   const [warning, setWarning] = useState('');
   const [recentFolders, setRecentFolders] = useState<string[]>([]);
+  const isMac =
+    typeof navigator !== 'undefined' &&
+    (
+      (navigator as Navigator & { userAgentData?: { platform?: string } }).userAgentData
+        ?.platform ??
+      navigator.platform ??
+      ''
+    ).includes('Mac');
 
   // Load recent folders when dialog opens
   useEffect(() => {
@@ -367,9 +375,7 @@ export function FileBrowserDialog({
             <FolderOpen className="w-3.5 h-3.5 mr-1.5" />
             Select Current Folder
             <kbd className="ml-2 px-1.5 py-0.5 text-[10px] bg-background/50 rounded border border-border">
-              {typeof navigator !== 'undefined' && navigator.platform?.includes('Mac')
-                ? '⌘'
-                : 'Ctrl'}
+              {isMac ? '⌘' : 'Ctrl'}
               +↵
             </kbd>
           </Button>

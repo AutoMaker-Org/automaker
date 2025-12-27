@@ -431,12 +431,42 @@
   background: var(--muted);
 }
 
-:is(.dark, .retro) ::-webkit-scrollbar-thumb {
+:is(
+    .dark,
+    .retro,
+    .dracula,
+    .nord,
+    .monokai,
+    .tokyonight,
+    .solarized,
+    .gruvbox,
+    .catppuccin,
+    .onedark,
+    .synthwave,
+    .sunset,
+    .gray
+  )
+  ::-webkit-scrollbar-thumb {
   background: oklch(0.3 0 0);
   border-radius: 4px;
 }
 
-:is(.dark, .retro) ::-webkit-scrollbar-thumb:hover {
+:is(
+    .dark,
+    .retro,
+    .dracula,
+    .nord,
+    .monokai,
+    .tokyonight,
+    .solarized,
+    .gruvbox,
+    .catppuccin,
+    .onedark,
+    .synthwave,
+    .sunset,
+    .gray
+  )
+  ::-webkit-scrollbar-thumb:hover {
   background: oklch(0.4 0 0);
 }
 

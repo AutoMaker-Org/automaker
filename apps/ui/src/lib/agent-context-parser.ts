@@ -28,7 +28,7 @@ export interface AgentTaskInfo {
  * Default model used by the feature executor (display fallback only)
  * Note: actual default comes from app-store.defaultModel
  */
-export const DEFAULT_MODEL = 'auto';
+export const DEFAULT_MODEL = 'sonnet';
 
 /**
  * Formats a model name for display
@@ -41,11 +41,21 @@ export function formatModelName(model: string): string {
     if (!version) return model;
     let label = `GPT-${version}`;
     if (suffixes.includes('codex')) label += ' Codex';
+    if (suffixes.includes('turbo')) label += ' Turbo';
+    if (suffixes.includes('preview')) label += ' Preview';
+    if (suffixes.includes('instruct')) label += ' Instruct';
     if (suffixes.includes('max')) label += ' Max';
     if (suffixes.includes('mini')) label += ' Mini';
     return label;
   }
-  if (model.startsWith('glm') || model.includes('opencode/glm-4.7')) return 'GLM 4.7';
+  const glmMatch = model.match(/(?:^|\/)glm-?(\d+(?:\.\d+)?)/i);
+  if (glmMatch) return `GLM ${glmMatch[1]}`;
+  if (model.toLowerCase().includes('glm')) return 'GLM';
+  const oSeriesMatch = model.match(/^o(\d+)(?:-(.+))?$/i);
+  if (oSeriesMatch) {
+    const suffix = oSeriesMatch[2];
+    return suffix ? `O${oSeriesMatch[1]} ${suffix.replace(/-/g, ' ')}` : `O${oSeriesMatch[1]}`;
+  }
   // Claude models
   if (model.includes('opus')) return 'Opus 4.5';
   if (model.includes('sonnet')) return 'Sonnet 4.5';

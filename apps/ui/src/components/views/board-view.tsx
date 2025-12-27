@@ -9,7 +9,9 @@ import {
 import { useAppStore, Feature } from '@/store/app-store';
 import { getElectronAPI } from '@/lib/electron';
 import type { AutoModeEvent } from '@/types/electron';
+import type { BacklogPlanResult } from '@automaker/types';
 import { pathsEqual } from '@/lib/utils';
+import { toast } from 'sonner';
 import { getBlockingDependencies } from '@automaker/dependency-resolver';
 import { BoardBackgroundModal } from '@/components/dialogs/board-background-modal';
 import { RefreshCw } from 'lucide-react';
@@ -25,6 +27,7 @@ import { GraphView } from './graph-view';
 import {
   AddFeatureDialog,
   AgentOutputModal,
+  BacklogPlanDialog,
   CompletedFeaturesModal,
   ArchiveAllVerifiedDialog,
   DeleteCompletedFeatureDialog,
@@ -124,6 +127,11 @@ export function BoardView() {
     changedFilesCount?: number;
   } | null>(null);
   const [worktreeRefreshKey, setWorktreeRefreshKey] = useState(0);
+
+  // Backlog plan dialog state
+  const [showPlanDialog, setShowPlanDialog] = useState(false);
+  const [pendingBacklogPlan, setPendingBacklogPlan] = useState<BacklogPlanResult | null>(null);
+  const [isGeneratingPlan, setIsGeneratingPlan] = useState(false);
 
   // Follow-up state hook
   const {
@@ -580,6 +588,37 @@ export function BoardView() {
     return unsubscribe;
   }, [currentProject]);
 
+  // Listen for backlog plan events (for background generation)
+  useEffect(() => {
+    const api = getElectronAPI();
+    if (!api?.backlogPlan) return;
+
+    const unsubscribe = api.backlogPlan.onEvent(
+      (event: { type: string; result?: BacklogPlanResult; error?: string }) => {
+        if (event.type === 'backlog_plan_complete') {
+          setIsGeneratingPlan(false);
+          if (event.result && event.result.changes?.length > 0) {
+            setPendingBacklogPlan(event.result);
+            toast.success('Plan ready! Click to review.', {
+              duration: 10000,
+              action: {
+                label: 'Review',
+                onClick: () => setShowPlanDialog(true),
+              },
+            });
+          } else {
+            toast.info('No changes generated. Try again with a different prompt.');
+          }
+        } else if (event.type === 'backlog_plan_error') {
+          setIsGeneratingPlan(false);
+          toast.error(`Plan generation failed: ${event.error}`);
+        }
+      }
+    );
+
+    return unsubscribe;
+  }, []);
+
   useEffect(() => {
     if (!autoMode.isRunning || !currentProject) {
       return;
@@ -937,6 +976,7 @@ export function BoardView() {
           }
         }}
         onAddFeature={() => setShowAddDialog(true)}
+        onOpenPlanDialog={() => setShowPlanDialog(true)}
         addFeatureShortcut={{
           key: shortcuts.addFeature,
           action: () => setShowAddDialog(true),
@@ -1172,6 +1212,18 @@ export function BoardView() {
         setSuggestions={updateSuggestions}
         isGenerating={isGeneratingSuggestions}
         setIsGenerating={setIsGeneratingSuggestions}
+      />
+
+      {/* Backlog Plan Dialog */}
+      <BacklogPlanDialog
+        open={showPlanDialog}
+        onClose={() => setShowPlanDialog(false)}
+        projectPath={currentProject.path}
+        onPlanApplied={loadFeatures}
+        pendingPlanResult={pendingBacklogPlan}
+        setPendingPlanResult={setPendingBacklogPlan}
+        isGeneratingPlan={isGeneratingPlan}
+        setIsGeneratingPlan={setIsGeneratingPlan}
       />
 
       {/* Plan Approval Dialog */}

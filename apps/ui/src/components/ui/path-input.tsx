@@ -232,15 +232,14 @@ function PathInput({
                           {crumb.name}
                         </BreadcrumbPage>
                       ) : (
-                        <BreadcrumbLink
-                          href="#"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            handleBreadcrumbClick(crumb.path);
-                          }}
-                          className="font-mono text-xs text-muted-foreground hover:text-foreground transition-colors truncate max-w-[150px]"
-                        >
-                          {crumb.name}
+                        <BreadcrumbLink asChild>
+                          <button
+                            type="button"
+                            onClick={() => handleBreadcrumbClick(crumb.path)}
+                            className="font-mono text-xs text-muted-foreground hover:text-foreground transition-colors truncate max-w-[150px]"
+                          >
+                            {crumb.name}
+                          </button>
                         </BreadcrumbLink>
                       )}
                     </BreadcrumbItem>

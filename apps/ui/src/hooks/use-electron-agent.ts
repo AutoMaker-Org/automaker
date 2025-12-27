@@ -322,73 +322,18 @@ export function useElectronAgent({
         return;
       }
 
-      if (isProcessing) {
-        console.warn('[useElectronAgent] Already processing a message');
+      if (isProcessing || isProcessingQueue) {
+        addToQueue(content, images, textFiles);
         return;
       }
 
-      setIsProcessing(true);
-      setError(null);
-
       try {
-        console.log('[useElectronAgent] Sending message', {
-          hasImages: images && images.length > 0,
-          imageCount: images?.length || 0,
-          hasTextFiles: textFiles && textFiles.length > 0,
-          textFileCount: textFiles?.length || 0,
-        });
-
-        // Build message content with text file context prepended
-        let messageContent = content;
-        if (textFiles && textFiles.length > 0) {
-          const contextParts = textFiles.map((file) => {
-            return `<file name="${file.filename}">\n${file.content}\n</file>`;
-          });
-          const contextBlock = `Here are some files for context:\n\n${contextParts.join('\n\n')}\n\n`;
-          messageContent = contextBlock + content;
-        }
-
-        // Save images to .automaker/images and get paths
-        let imagePaths: string[] | undefined;
-        if (images && images.length > 0 && api.saveImageToTemp) {
-          imagePaths = [];
-          for (const image of images) {
-            const result = await api.saveImageToTemp(
-              image.data,
-              sanitizeFilename(image.filename),
-              image.mimeType,
-              workingDirectory // Pass workingDirectory as projectPath
-            );
-            if (result.success && result.path) {
-              imagePaths.push(result.path);
-              console.log('[useElectronAgent] Saved image to .automaker/images:', result.path);
-            } else {
-              console.error('[useElectronAgent] Failed to save image:', result.error);
-            }
-          }
-        }
-
-        const result = await api.agent!.send(
-          sessionId,
-          messageContent,
-          workingDirectory,
-          imagePaths,
-          model
-        );
-
-        if (!result.success) {
-          setError(result.error || 'Failed to send message');
-          setIsProcessing(false);
-        }
-        // Note: We don't set isProcessing to false here because
-        // it will be set by the "complete" or "error" stream event
-      } catch (err) {
-        console.error('[useElectronAgent] Failed to send message:', err);
-        setError(err instanceof Error ? err.message : 'Failed to send message');
-        setIsProcessing(false);
+        await sendMessageDirectly(content, images, textFiles);
+      } catch {
+        // sendMessageDirectly already updates error state
       }
     },
-    [sessionId, workingDirectory, model, isProcessing]
+    [addToQueue, isProcessing, isProcessingQueue, sendMessageDirectly]
   );
 
   // Stop current execution

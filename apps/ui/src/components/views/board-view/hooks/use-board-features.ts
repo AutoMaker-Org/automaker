@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useAppStore, Feature } from '@/store/app-store';
+import { ALL_MODELS } from '../shared/model-constants';
 import { getElectronAPI } from '@/lib/electron';
 import { toast } from 'sonner';
 
@@ -58,13 +59,14 @@ export function useBoardFeatures({ currentProject }: UseBoardFeaturesProps) {
       if (result.success && result.features) {
         // Get default model from store for backward compatibility
         const { defaultModel } = useAppStore.getState();
+        const validModelIds = new Set(ALL_MODELS.map((modelOption) => modelOption.id));
         const featuresWithIds = result.features.map((f: any, index: number) => ({
           ...f,
           id: f.id || `feature-${index}-${Date.now()}`,
           status: f.status || 'backlog',
           startedAt: f.startedAt, // Preserve startedAt timestamp
           // Ensure model and thinkingLevel are set for backward compatibility
-          model: f.model || defaultModel,
+          model: typeof f.model === 'string' && validModelIds.has(f.model) ? f.model : defaultModel,
           thinkingLevel: f.thinkingLevel || 'none',
         }));
         // Successfully loaded features - now safe to set them

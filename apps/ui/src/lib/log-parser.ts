@@ -55,6 +55,9 @@ const TOOL_NAME_ALIASES: Record<string, string> = {
   todowrite: 'TodoWrite',
   list: 'List',
   patch: 'Patch',
+  task: 'Task',
+  notebookedit: 'NotebookEdit',
+  killshell: 'KillShell',
 };
 
 function normalizeToolName(toolName: string): string {
@@ -264,36 +267,28 @@ export function generateToolSummary(toolName: string, content: string): string |
     const jsonStr = inputMatch[1].trim();
     const parsed = JSON.parse(jsonStr) as Record<string, unknown>;
 
+    const getFilePath = (parsedInput: Record<string, unknown>): string | undefined =>
+      (parsedInput.file_path as string | undefined) ||
+      (parsedInput.filePath as string | undefined) ||
+      (parsedInput.path as string | undefined);
+
+    const getFileName = (parsedInput: Record<string, unknown>): string => {
+      const filePath = getFilePath(parsedInput);
+      return filePath?.split('/').pop() || 'file';
+    };
+
     switch (normalizeToolName(toolName)) {
       case 'Read': {
-        const filePath =
-          (parsed.file_path as string | undefined) ||
-          (parsed.filePath as string | undefined) ||
-          (parsed.path as string | undefined);
-        return `Reading ${filePath?.split('/').pop() || 'file'}`;
+        return `Reading ${getFileName(parsed)}`;
       }
       case 'Edit': {
-        const filePath =
-          (parsed.file_path as string | undefined) ||
-          (parsed.filePath as string | undefined) ||
-          (parsed.path as string | undefined);
-        const fileName = filePath?.split('/').pop() || 'file';
-        return `Editing ${fileName}`;
+        return `Editing ${getFileName(parsed)}`;
       }
       case 'Patch': {
-        const filePath =
-          (parsed.file_path as string | undefined) ||
-          (parsed.filePath as string | undefined) ||
-          (parsed.path as string | undefined);
-        const fileName = filePath?.split('/').pop() || 'file';
-        return `Patching ${fileName}`;
+        return `Patching ${getFileName(parsed)}`;
       }
       case 'Write': {
-        const filePath =
-          (parsed.file_path as string | undefined) ||
-          (parsed.filePath as string | undefined) ||
-          (parsed.path as string | undefined);
-        return `Writing ${filePath?.split('/').pop() || 'file'}`;
+        return `Writing ${getFileName(parsed)}`;
       }
       case 'List': {
         const listPath =

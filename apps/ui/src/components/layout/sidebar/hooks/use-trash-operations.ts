@@ -20,10 +20,17 @@ export function useTrashOperations({
 
   const handleRestoreProject = useCallback(
     (projectId: string) => {
-      restoreTrashedProject(projectId);
-      toast.success('Project restored', {
-        description: 'Added back to your project list.',
-      });
+      try {
+        restoreTrashedProject(projectId);
+        toast.success('Project restored', {
+          description: 'Added back to your project list.',
+        });
+      } catch (error) {
+        console.error('[Sidebar] Failed to restore project:', error);
+        toast.error('Failed to restore project', {
+          description: error instanceof Error ? error.message : 'Unknown error',
+        });
+      }
     },
     [restoreTrashedProject]
   );
@@ -77,6 +84,11 @@ export function useTrashOperations({
     try {
       emptyTrash();
       toast.success('Recycle bin cleared');
+    } catch (error) {
+      console.error('[Sidebar] Failed to empty recycle bin:', error);
+      toast.error('Failed to clear recycle bin', {
+        description: error instanceof Error ? error.message : 'Unknown error',
+      });
     } finally {
       setIsEmptyingTrash(false);
     }
