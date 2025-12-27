@@ -9,6 +9,13 @@ interface CliStatusResult {
   version?: string;
   path?: string;
   recommendation?: string;
+  auth?: {
+    authenticated: boolean;
+    method: string;
+    hasApiKey?: boolean;
+    apiKeyValid?: boolean;
+    hasEnvApiKey?: boolean;
+  };
   installCommands?: {
     macos?: string;
     windows?: string;
@@ -19,15 +26,21 @@ interface CliStatusResult {
 }
 
 /**
- * Custom hook for managing Claude CLI status
+ * Custom hook for managing Claude, Cursor, Codex, and OpenCode CLI status
  * Handles checking CLI installation, authentication, and refresh functionality
  */
 export function useCliStatus() {
-  const { setClaudeAuthStatus } = useSetupStore();
+  const { setClaudeAuthStatus, setCursorAuthStatus } = useSetupStore();
 
   const [claudeCliStatus, setClaudeCliStatus] = useState<CliStatusResult | null>(null);
+  const [cursorCliStatus, setCursorCliStatus] = useState<CliStatusResult | null>(null);
+  const [codexCliStatus, setCodexCliStatus] = useState<CliStatusResult | null>(null);
+  const [opencodeCliStatus, setOpenCodeCliStatus] = useState<CliStatusResult | null>(null);
 
   const [isCheckingClaudeCli, setIsCheckingClaudeCli] = useState(false);
+  const [isCheckingCursorCli, setIsCheckingCursorCli] = useState(false);
+  const [isCheckingCodexCli, setIsCheckingCodexCli] = useState(false);
+  const [isCheckingOpenCodeCli, setIsCheckingOpenCodeCli] = useState(false);
 
   // Check CLI status on mount
   useEffect(() => {
@@ -41,6 +54,45 @@ export function useCliStatus() {
           setClaudeCliStatus(status);
         } catch (error) {
           console.error('Failed to check Claude CLI status:', error);
+        }
+      }
+
+      // Check Cursor CLI
+      if (api?.setup?.getCursorStatus) {
+        try {
+          const status = await api.setup.getCursorStatus();
+          setCursorCliStatus(status);
+          if (status.success && status.auth) {
+            setCursorAuthStatus({
+              authenticated: status.auth.authenticated,
+              method: status.auth.method as 'api_key_env' | 'api_key' | 'config_file' | 'none',
+              hasApiKey: status.auth.hasApiKey,
+              apiKeyValid: status.auth.apiKeyValid,
+              hasEnvApiKey: status.auth.hasEnvApiKey,
+            });
+          }
+        } catch (error) {
+          console.error('Failed to check Cursor CLI status:', error);
+        }
+      }
+
+      // Check OpenCode CLI
+      if (api?.setup?.getOpenCodeStatus) {
+        try {
+          const status = await api.setup.getOpenCodeStatus();
+          setOpenCodeCliStatus(status);
+        } catch (error) {
+          console.error('Failed to check OpenCode CLI status:', error);
+        }
+      }
+
+      // Check Codex CLI
+      if (api?.setup?.getCodexStatus) {
+        try {
+          const status = await api.setup.getCodexStatus();
+          setCodexCliStatus(status);
+        } catch (error) {
+          console.error('Failed to check Codex CLI status:', error);
         }
       }
 
@@ -90,7 +142,7 @@ export function useCliStatus() {
     };
 
     checkCliStatus();
-  }, [setClaudeAuthStatus]);
+  }, [setClaudeAuthStatus, setCursorAuthStatus]);
 
   // Refresh Claude CLI status
   const handleRefreshClaudeCli = useCallback(async () => {
@@ -108,9 +160,75 @@ export function useCliStatus() {
     }
   }, []);
 
+  // Refresh Cursor CLI status
+  const handleRefreshCursorCli = useCallback(async () => {
+    setIsCheckingCursorCli(true);
+    try {
+      const api = getElectronAPI();
+      if (api?.setup?.getCursorStatus) {
+        const status = await api.setup.getCursorStatus();
+        setCursorCliStatus(status);
+        if (status.success && status.auth) {
+          setCursorAuthStatus({
+            authenticated: status.auth.authenticated,
+            method: status.auth.method as 'api_key_env' | 'api_key' | 'config_file' | 'none',
+            hasApiKey: status.auth.hasApiKey,
+            apiKeyValid: status.auth.apiKeyValid,
+            hasEnvApiKey: status.auth.hasEnvApiKey,
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Failed to refresh Cursor CLI status:', error);
+    } finally {
+      setIsCheckingCursorCli(false);
+    }
+  }, [setCursorAuthStatus]);
+
+  // Refresh Codex CLI status
+  const handleRefreshCodexCli = useCallback(async () => {
+    setIsCheckingCodexCli(true);
+    try {
+      const api = getElectronAPI();
+      if (api?.setup?.getCodexStatus) {
+        const status = await api.setup.getCodexStatus();
+        setCodexCliStatus(status);
+      }
+    } catch (error) {
+      console.error('Failed to refresh Codex CLI status:', error);
+    } finally {
+      setIsCheckingCodexCli(false);
+    }
+  }, []);
+
+  // Refresh OpenCode CLI status
+  const handleRefreshOpenCodeCli = useCallback(async () => {
+    setIsCheckingOpenCodeCli(true);
+    try {
+      const api = getElectronAPI();
+      if (api?.setup?.getOpenCodeStatus) {
+        const status = await api.setup.getOpenCodeStatus();
+        setOpenCodeCliStatus(status);
+      }
+    } catch (error) {
+      console.error('Failed to refresh OpenCode CLI status:', error);
+    } finally {
+      setIsCheckingOpenCodeCli(false);
+    }
+  }, []);
+
   return {
     claudeCliStatus,
     isCheckingClaudeCli,
     handleRefreshClaudeCli,
+    cursorCliStatus,
+    isCheckingCursorCli,
+    handleRefreshCursorCli,
+    codexCliStatus,
+    isCheckingCodexCli,
+    handleRefreshCodexCli,
+    opencodeCliStatus,
+    isCheckingOpenCodeCli,
+    handleRefreshOpenCodeCli,
   };
 }

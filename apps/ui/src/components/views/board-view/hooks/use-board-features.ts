@@ -56,13 +56,15 @@ export function useBoardFeatures({ currentProject }: UseBoardFeaturesProps) {
       const result = await api.features.getAll(currentProject.path);
 
       if (result.success && result.features) {
+        // Get default model from store for backward compatibility
+        const { defaultModel } = useAppStore.getState();
         const featuresWithIds = result.features.map((f: any, index: number) => ({
           ...f,
           id: f.id || `feature-${index}-${Date.now()}`,
           status: f.status || 'backlog',
           startedAt: f.startedAt, // Preserve startedAt timestamp
           // Ensure model and thinkingLevel are set for backward compatibility
-          model: f.model || 'opus',
+          model: f.model || defaultModel,
           thinkingLevel: f.thinkingLevel || 'none',
         }));
         // Successfully loaded features - now safe to set them

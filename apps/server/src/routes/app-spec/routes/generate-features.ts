@@ -13,14 +13,10 @@ import {
   getErrorMessage,
 } from '../common.js';
 import { generateFeaturesFromSpec } from '../generate-features-from-spec.js';
-import type { SettingsService } from '../../../services/settings-service.js';
 
 const logger = createLogger('SpecRegeneration');
 
-export function createGenerateFeaturesHandler(
-  events: EventEmitter,
-  settingsService?: SettingsService
-) {
+export function createGenerateFeaturesHandler(events: EventEmitter) {
   return async (req: Request, res: Response): Promise<void> => {
     logger.info('========== /generate-features endpoint called ==========');
     logger.debug('Request body:', JSON.stringify(req.body, null, 2));
@@ -53,7 +49,7 @@ export function createGenerateFeaturesHandler(
       setRunningState(true, abortController);
       logger.info('Starting background feature generation task...');
 
-      generateFeaturesFromSpec(projectPath, events, abortController, maxFeatures, settingsService)
+      generateFeaturesFromSpec(projectPath, events, abortController, maxFeatures)
         .catch((error) => {
           logError(error, 'Feature generation failed with error');
           events.emit('spec-regeneration:event', {

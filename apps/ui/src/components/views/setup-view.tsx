@@ -4,6 +4,9 @@ import {
   WelcomeStep,
   ThemeStep,
   CompleteStep,
+  CursorSetupStep,
+  CodexSetupStep,
+  OpenCodeSetupStep,
   ClaudeSetupStep,
   GitHubSetupStep,
 } from './setup-view/steps';
@@ -11,12 +14,32 @@ import { useNavigate } from '@tanstack/react-router';
 
 // Main Setup View
 export function SetupView() {
-  const { currentStep, setCurrentStep, completeSetup, setSkipClaudeSetup } = useSetupStore();
+  const {
+    currentStep,
+    setCurrentStep,
+    completeSetup,
+    setSkipCursorSetup,
+    setSkipClaudeSetup,
+    setSkipOpenCodeSetup,
+    setSkipCodexSetup,
+  } = useSetupStore();
   const navigate = useNavigate();
 
-  const steps = ['welcome', 'theme', 'claude', 'github', 'complete'] as const;
+  const steps = [
+    'welcome',
+    'theme',
+    'cursor',
+    'codex',
+    'opencode',
+    'claude',
+    'github',
+    'complete',
+  ] as const;
   type StepName = (typeof steps)[number];
   const getStepName = (): StepName => {
+    if (currentStep === 'cursor_setup') return 'cursor';
+    if (currentStep === 'codex_setup') return 'codex';
+    if (currentStep === 'opencode_setup') return 'opencode';
     if (currentStep === 'claude_detect' || currentStep === 'claude_auth') return 'claude';
     if (currentStep === 'welcome') return 'welcome';
     if (currentStep === 'theme') return 'theme';
@@ -33,6 +56,18 @@ export function SetupView() {
         setCurrentStep('theme');
         break;
       case 'theme':
+        console.log('[Setup Flow] Moving to cursor_setup step');
+        setCurrentStep('cursor_setup');
+        break;
+      case 'cursor':
+        console.log('[Setup Flow] Moving to codex_setup step');
+        setCurrentStep('codex_setup');
+        break;
+      case 'codex':
+        console.log('[Setup Flow] Moving to opencode_setup step');
+        setCurrentStep('opencode_setup');
+        break;
+      case 'opencode':
         console.log('[Setup Flow] Moving to claude_detect step');
         setCurrentStep('claude_detect');
         break;
@@ -53,13 +88,40 @@ export function SetupView() {
       case 'theme':
         setCurrentStep('welcome');
         break;
-      case 'claude':
+      case 'cursor':
         setCurrentStep('theme');
+        break;
+      case 'codex':
+        setCurrentStep('cursor_setup');
+        break;
+      case 'opencode':
+        setCurrentStep('codex_setup');
+        break;
+      case 'claude':
+        setCurrentStep('opencode_setup');
         break;
       case 'github':
         setCurrentStep('claude_detect');
         break;
     }
+  };
+
+  const handleSkipCursor = () => {
+    console.log('[Setup Flow] Skipping Cursor setup');
+    setSkipCursorSetup(true);
+    setCurrentStep('codex_setup');
+  };
+
+  const handleSkipCodex = () => {
+    console.log('[Setup Flow] Skipping Codex setup');
+    setSkipCodexSetup(true);
+    setCurrentStep('opencode_setup');
+  };
+
+  const handleSkipOpenCode = () => {
+    console.log('[Setup Flow] Skipping OpenCode setup');
+    setSkipOpenCodeSetup(true);
+    setCurrentStep('claude_detect');
   };
 
   const handleSkipClaude = () => {
@@ -104,6 +166,30 @@ export function SetupView() {
 
             {currentStep === 'theme' && (
               <ThemeStep onNext={() => handleNext('theme')} onBack={() => handleBack('theme')} />
+            )}
+
+            {currentStep === 'cursor_setup' && (
+              <CursorSetupStep
+                onNext={() => handleNext('cursor')}
+                onBack={() => handleBack('cursor')}
+                onSkip={handleSkipCursor}
+              />
+            )}
+
+            {currentStep === 'codex_setup' && (
+              <CodexSetupStep
+                onNext={() => handleNext('codex')}
+                onBack={() => handleBack('codex')}
+                onSkip={handleSkipCodex}
+              />
+            )}
+
+            {currentStep === 'opencode_setup' && (
+              <OpenCodeSetupStep
+                onNext={() => handleNext('opencode')}
+                onBack={() => handleBack('opencode')}
+                onSkip={handleSkipOpenCode}
+              />
             )}
 
             {(currentStep === 'claude_detect' || currentStep === 'claude_auth') && (

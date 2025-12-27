@@ -25,14 +25,28 @@ export interface AgentTaskInfo {
 }
 
 /**
- * Default model used by the feature executor
+ * Default model used by the feature executor (display fallback only)
+ * Note: actual default comes from app-store.defaultModel
  */
-export const DEFAULT_MODEL = 'claude-opus-4-5-20251101';
+export const DEFAULT_MODEL = 'auto';
 
 /**
  * Formats a model name for display
  */
 export function formatModelName(model: string): string {
+  // Cursor/Codex models
+  if (model === 'auto') return 'Auto';
+  if (model.startsWith('gpt-')) {
+    const [, version, ...suffixes] = model.split('-');
+    if (!version) return model;
+    let label = `GPT-${version}`;
+    if (suffixes.includes('codex')) label += ' Codex';
+    if (suffixes.includes('max')) label += ' Max';
+    if (suffixes.includes('mini')) label += ' Mini';
+    return label;
+  }
+  if (model.startsWith('glm') || model.includes('opencode/glm-4.7')) return 'GLM 4.7';
+  // Claude models
   if (model.includes('opus')) return 'Opus 4.5';
   if (model.includes('sonnet')) return 'Sonnet 4.5';
   if (model.includes('haiku')) return 'Haiku 4.5';

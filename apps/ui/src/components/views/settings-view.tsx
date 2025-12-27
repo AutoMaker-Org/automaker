@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useAppStore } from '@/store/app-store';
+import { useAppStore, type ThemeMode } from '@/store/app-store';
 
 import { useCliStatus, useSettingsView } from './settings-view/hooks';
 import { NAV_ITEMS } from './settings-view/config/navigation';
@@ -10,8 +10,11 @@ import { SettingsNavigation } from './settings-view/components/settings-navigati
 import { ApiKeysSection } from './settings-view/api-keys/api-keys-section';
 import { ClaudeUsageSection } from './settings-view/api-keys/claude-usage-section';
 import { ClaudeCliStatus } from './settings-view/cli-status/claude-cli-status';
-import { ClaudeMdSettings } from './settings-view/claude/claude-md-settings';
+import { CodexCliStatus } from './settings-view/cli-status/codex-cli-status';
+import { CursorCliStatus } from './settings-view/cli-status/cursor-cli-status';
+import { OpenCodeCliStatus } from './settings-view/cli-status/opencode-cli-status';
 import { AIEnhancementSection } from './settings-view/ai-enhancement';
+import { AIProviderSection } from './settings-view/ai-provider';
 import { AppearanceSection } from './settings-view/appearance/appearance-section';
 import { TerminalSection } from './settings-view/terminal/terminal-section';
 import { AudioSection } from './settings-view/audio/audio-section';
@@ -46,10 +49,12 @@ export function SettingsView() {
     setDefaultAIProfileId,
     aiProfiles,
     apiKeys,
+    defaultProvider,
+    defaultModel,
+    setDefaultProvider,
+    setDefaultModel,
     validationModel,
     setValidationModel,
-    autoLoadClaudeMd,
-    setAutoLoadClaudeMd,
   } = useAppStore();
 
   // Hide usage tracking when using API key (only show for Claude Code CLI users)
@@ -76,17 +81,33 @@ export function SettingsView() {
 
   // Handler to set theme - always updates global theme (user's preference),
   // and also sets per-project theme if a project is selected
-  const handleSetTheme = (newTheme: typeof theme) => {
+  const handleSetTheme = (newTheme: Theme) => {
+    // Convert Theme to ThemeMode (ThemeMode is a subset of Theme)
+    // If the theme is not in ThemeMode, we'll use it as-is and let the store handle it
+    const themeMode = newTheme as ThemeMode;
     // Always update global theme so user's preference persists across all projects
-    setTheme(newTheme);
+    setTheme(themeMode);
     // Also set per-project theme if a project is selected
     if (currentProject) {
-      setProjectTheme(currentProject.id, newTheme);
+      setProjectTheme(currentProject.id, themeMode);
     }
   };
 
   // Use CLI status hook
-  const { claudeCliStatus, isCheckingClaudeCli, handleRefreshClaudeCli } = useCliStatus();
+  const {
+    claudeCliStatus,
+    isCheckingClaudeCli,
+    handleRefreshClaudeCli,
+    cursorCliStatus,
+    isCheckingCursorCli,
+    handleRefreshCursorCli,
+    codexCliStatus,
+    isCheckingCodexCli,
+    handleRefreshCodexCli,
+    opencodeCliStatus,
+    isCheckingOpenCodeCli,
+    handleRefreshOpenCodeCli,
+  } = useCliStatus();
 
   // Use settings view navigation hook
   const { activeView, navigateTo } = useSettingsView();
@@ -97,6 +118,32 @@ export function SettingsView() {
   // Render the active section based on current view
   const renderActiveSection = () => {
     switch (activeView) {
+      case 'cursor':
+        return (
+          <div className="space-y-6">
+            <AIProviderSection
+              defaultProvider={defaultProvider}
+              defaultModel={defaultModel}
+              onProviderChange={setDefaultProvider}
+              onModelChange={setDefaultModel}
+            />
+            <CursorCliStatus
+              status={cursorCliStatus}
+              isChecking={isCheckingCursorCli}
+              onRefresh={handleRefreshCursorCli}
+            />
+            <CodexCliStatus
+              status={codexCliStatus}
+              isChecking={isCheckingCodexCli}
+              onRefresh={handleRefreshCodexCli}
+            />
+            <OpenCodeCliStatus
+              status={opencodeCliStatus}
+              isChecking={isCheckingOpenCodeCli}
+              onRefresh={handleRefreshOpenCodeCli}
+            />
+          </div>
+        );
       case 'claude':
         return (
           <div className="space-y-6">
@@ -104,10 +151,6 @@ export function SettingsView() {
               status={claudeCliStatus}
               isChecking={isCheckingClaudeCli}
               onRefresh={handleRefreshClaudeCli}
-            />
-            <ClaudeMdSettings
-              autoLoadClaudeMd={autoLoadClaudeMd}
-              onAutoLoadClaudeMdChange={setAutoLoadClaudeMd}
             />
             {showUsageTracking && <ClaudeUsageSection />}
           </div>

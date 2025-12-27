@@ -118,7 +118,7 @@ export function EditFeatureDialog({
   );
 
   // Get enhancement model and worktrees setting from store
-  const { enhancementModel, useWorktrees } = useAppStore();
+  const { enhancementModel, useWorktrees, defaultModel } = useAppStore();
 
   useEffect(() => {
     setEditingFeature(feature);
@@ -148,7 +148,7 @@ export function EditFeatureDialog({
       return;
     }
 
-    const selectedModel = (editingFeature.model ?? 'opus') as AgentModel;
+    const selectedModel = (editingFeature.model ?? defaultModel) as AgentModel;
     const normalizedThinking: ThinkingLevel = modelSupportsThinking(selectedModel)
       ? (editingFeature.thinkingLevel ?? 'none')
       : 'none';
@@ -435,7 +435,7 @@ export function EditFeatureDialog({
             {/* Quick Select Profile Section */}
             <ProfileQuickSelect
               profiles={aiProfiles}
-              selectedModel={editingFeature.model ?? 'opus'}
+              selectedModel={editingFeature.model ?? defaultModel}
               selectedThinkingLevel={editingFeature.thinkingLevel ?? 'none'}
               onSelect={handleProfileSelect}
               testIdPrefix="edit-profile-quick-select"
@@ -450,7 +450,7 @@ export function EditFeatureDialog({
             {(!showProfilesOnly || showEditAdvancedOptions) && (
               <>
                 <ModelSelector
-                  selectedModel={(editingFeature.model ?? 'opus') as AgentModel}
+                  selectedModel={(editingFeature.model ?? defaultModel) as AgentModel}
                   onModelSelect={handleModelSelect}
                   testIdPrefix="edit-model-select"
                 />

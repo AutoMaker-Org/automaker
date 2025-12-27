@@ -183,6 +183,14 @@ export type AutoModeEvent =
       input: unknown;
     }
   | {
+      type: 'auto_mode_tool_result';
+      featureId: string;
+      projectId?: string;
+      projectPath?: string;
+      result: string;
+      toolUseId?: string;
+    }
+  | {
       type: 'auto_mode_feature_complete';
       featureId: string;
       projectId?: string;
@@ -954,7 +962,7 @@ export interface ModelDefinition {
   id: string;
   name: string;
   modelString: string;
-  provider: 'claude';
+  provider: 'claude' | 'cursor' | 'opencode' | 'codex';
   description?: string;
   tier?: 'basic' | 'standard' | 'premium';
   default?: boolean;

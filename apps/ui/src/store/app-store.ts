@@ -7,7 +7,12 @@ import type {
   AgentModel,
   PlanningMode,
   AIProfile,
+  ModelProvider,
+  ThinkingLevel,
 } from '@automaker/types';
+
+// Re-export for convenience
+export type { AgentModel, ModelProvider, ThinkingLevel };
 
 // Re-export ThemeMode for convenience
 export type { ThemeMode };
@@ -475,11 +480,12 @@ export interface AppState {
   // Enhancement Model Settings
   enhancementModel: AgentModel; // Model used for feature enhancement (default: sonnet)
 
+  // Default AI Provider Settings
+  defaultProvider: ModelProvider; // Default AI provider (cursor, codex, opencode, or claude)
+  defaultModel: AgentModel; // Default model for the selected provider
+
   // Validation Model Settings
   validationModel: AgentModel; // Model used for GitHub issue validation (default: opus)
-
-  // Claude Agent SDK Settings
-  autoLoadClaudeMd: boolean; // Auto-load CLAUDE.md files using SDK's settingSources option
 
   // Project Analysis
   projectAnalysis: ProjectAnalysis | null;
@@ -751,11 +757,12 @@ export interface AppActions {
   // Enhancement Model actions
   setEnhancementModel: (model: AgentModel) => void;
 
+  // Default Provider actions
+  setDefaultProvider: (provider: ModelProvider) => void;
+  setDefaultModel: (model: AgentModel) => void;
+
   // Validation Model actions
   setValidationModel: (model: AgentModel) => void;
-
-  // Claude Agent SDK Settings actions
-  setAutoLoadClaudeMd: (enabled: boolean) => Promise<void>;
 
   // AI Profile actions
   addAIProfile: (profile: Omit<AIProfile, 'id'>) => void;
@@ -927,8 +934,9 @@ const initialState: AppState = {
   keyboardShortcuts: DEFAULT_KEYBOARD_SHORTCUTS, // Default keyboard shortcuts
   muteDoneSound: false, // Default to sound enabled (not muted)
   enhancementModel: 'sonnet', // Default to sonnet for feature enhancement
+  defaultProvider: 'cursor', // Default to Cursor CLI for AI provider
+  defaultModel: 'auto', // Default to auto for Cursor
   validationModel: 'opus', // Default to opus for GitHub issue validation
-  autoLoadClaudeMd: false, // Default to disabled (user must opt-in)
   aiProfiles: DEFAULT_AI_PROFILES,
   projectAnalysis: null,
   isAnalyzing: false,
@@ -1551,16 +1559,26 @@ export const useAppStore = create<AppState & AppActions>()(
       // Enhancement Model actions
       setEnhancementModel: (model) => set({ enhancementModel: model }),
 
+      // Default Provider actions
+      setDefaultProvider: (provider) => {
+        set({ defaultProvider: provider });
+        // Sync with backend (fire and forget)
+        import('@/lib/http-api-client').then(({ getHttpApiClient }) => {
+          getHttpApiClient()
+            .setup.setDefaultProvider(provider)
+            .catch((err: Error) => {
+              console.error('[AppStore] Failed to sync provider with backend:', err);
+            });
+        });
+      },
+      setDefaultModel: (model) => {
+        set({ defaultModel: model });
+        // Log the change (backend uses defaultModel based on defaultProvider)
+        console.log('[AppStore] Default model updated:', model);
+      },
+
       // Validation Model actions
       setValidationModel: (model) => set({ validationModel: model }),
-
-      // Claude Agent SDK Settings actions
-      setAutoLoadClaudeMd: async (enabled) => {
-        set({ autoLoadClaudeMd: enabled });
-        // Sync to server settings file
-        const { syncSettingsToServer } = await import('@/hooks/use-settings-migration');
-        await syncSettingsToServer();
-      },
 
       // AI Profile actions
       addAIProfile: (profile) => {
@@ -2704,8 +2722,9 @@ export const useAppStore = create<AppState & AppActions>()(
           keyboardShortcuts: state.keyboardShortcuts,
           muteDoneSound: state.muteDoneSound,
           enhancementModel: state.enhancementModel,
+          defaultProvider: state.defaultProvider,
+          defaultModel: state.defaultModel,
           validationModel: state.validationModel,
-          autoLoadClaudeMd: state.autoLoadClaudeMd,
           // Profiles and sessions
           aiProfiles: state.aiProfiles,
           chatSessions: state.chatSessions,

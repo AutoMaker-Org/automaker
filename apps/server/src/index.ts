@@ -48,7 +48,6 @@ import { createClaudeRoutes } from './routes/claude/index.js';
 import { ClaudeUsageService } from './services/claude-usage-service.js';
 import { createGitHubRoutes } from './routes/github/index.js';
 import { createContextRoutes } from './routes/context/index.js';
-import { createBacklogPlanRoutes } from './routes/backlog-plan/index.js';
 import { cleanupStaleValidations } from './routes/github/routes/validation-common.js';
 
 // Load environment variables
@@ -113,11 +112,10 @@ app.use(express.json({ limit: '50mb' }));
 const events: EventEmitter = createEventEmitter();
 
 // Create services
-// Note: settingsService is created first so it can be injected into other services
-const settingsService = new SettingsService(DATA_DIR);
-const agentService = new AgentService(DATA_DIR, events, settingsService);
+const agentService = new AgentService(DATA_DIR, events);
 const featureLoader = new FeatureLoader();
-const autoModeService = new AutoModeService(events, settingsService);
+const autoModeService = new AutoModeService(events);
+const settingsService = new SettingsService(DATA_DIR);
 const claudeUsageService = new ClaudeUsageService();
 
 // Initialize services
@@ -150,18 +148,17 @@ app.use('/api/enhance-prompt', createEnhancePromptRoutes());
 app.use('/api/worktree', createWorktreeRoutes());
 app.use('/api/git', createGitRoutes());
 app.use('/api/setup', createSetupRoutes());
-app.use('/api/suggestions', createSuggestionsRoutes(events, settingsService));
+app.use('/api/suggestions', createSuggestionsRoutes(events));
 app.use('/api/models', createModelsRoutes());
-app.use('/api/spec-regeneration', createSpecRegenerationRoutes(events, settingsService));
+app.use('/api/spec-regeneration', createSpecRegenerationRoutes(events));
 app.use('/api/running-agents', createRunningAgentsRoutes(autoModeService));
 app.use('/api/workspace', createWorkspaceRoutes());
 app.use('/api/templates', createTemplatesRoutes());
 app.use('/api/terminal', createTerminalRoutes());
 app.use('/api/settings', createSettingsRoutes(settingsService));
 app.use('/api/claude', createClaudeRoutes(claudeUsageService));
-app.use('/api/github', createGitHubRoutes(events, settingsService));
-app.use('/api/context', createContextRoutes(settingsService));
-app.use('/api/backlog-plan', createBacklogPlanRoutes(events, settingsService));
+app.use('/api/github', createGitHubRoutes(events));
+app.use('/api/context', createContextRoutes());
 
 // Create HTTP server
 const server = createServer(app);

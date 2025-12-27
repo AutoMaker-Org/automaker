@@ -501,6 +501,55 @@ export interface ElectronAPI {
       };
       error?: string;
     }>;
+    getCursorStatus?: () => Promise<{
+      success: boolean;
+      status?: string;
+      installed?: boolean;
+      method?: string;
+      version?: string;
+      path?: string;
+      auth?: {
+        authenticated: boolean;
+        method: string;
+        hasApiKey?: boolean;
+        hasStoredApiKey?: boolean;
+        hasEnvApiKey?: boolean;
+        apiKeyValid?: boolean;
+      };
+      error?: string;
+    }>;
+    getOpenCodeStatus?: () => Promise<{
+      success: boolean;
+      status?: string;
+      installed?: boolean;
+      method?: string;
+      version?: string;
+      path?: string;
+      auth?: {
+        authenticated: boolean;
+        method: string;
+        hasApiKey?: boolean;
+        apiKeyValid?: boolean;
+        hasEnvApiKey?: boolean;
+      };
+      error?: string;
+    }>;
+    getCodexStatus?: () => Promise<{
+      success: boolean;
+      status?: string;
+      installed?: boolean;
+      method?: string;
+      version?: string;
+      path?: string;
+      auth?: {
+        authenticated: boolean;
+        method: string;
+        hasApiKey?: boolean;
+        apiKeyValid?: boolean;
+        hasEnvApiKey?: boolean;
+      };
+      error?: string;
+    }>;
     installClaude: () => Promise<{
       success: boolean;
       message?: string;
@@ -540,6 +589,19 @@ export interface ElectronAPI {
     verifyClaudeAuth: (authMethod?: 'cli' | 'api_key') => Promise<{
       success: boolean;
       authenticated: boolean;
+      error?: string;
+    }>;
+    installCursor?: () => Promise<{
+      success: boolean;
+      message?: string;
+      error?: string;
+      output?: string;
+    }>;
+    verifyCursorAuth?: (method?: 'api_key' | 'any') => Promise<{
+      success: boolean;
+      authenticated: boolean;
+      method?: string;
+      output?: string;
       error?: string;
     }>;
     getGhStatus?: () => Promise<{
@@ -1072,6 +1134,39 @@ interface SetupAPI {
     };
     error?: string;
   }>;
+  getCursorStatus?: () => Promise<{
+    success: boolean;
+    status?: string;
+    installed?: boolean;
+    method?: string;
+    version?: string;
+    path?: string;
+    auth?: {
+      authenticated: boolean;
+      method: string;
+      hasApiKey?: boolean;
+      hasStoredApiKey?: boolean;
+      hasEnvApiKey?: boolean;
+      apiKeyValid?: boolean;
+    };
+    error?: string;
+  }>;
+  getOpenCodeStatus?: () => Promise<{
+    success: boolean;
+    status?: string;
+    installed?: boolean;
+    method?: string;
+    version?: string;
+    path?: string;
+    auth?: {
+      authenticated: boolean;
+      method: string;
+      hasApiKey?: boolean;
+      apiKeyValid?: boolean;
+      hasEnvApiKey?: boolean;
+    };
+    error?: string;
+  }>;
   installClaude: () => Promise<{
     success: boolean;
     message?: string;
@@ -1110,6 +1205,19 @@ interface SetupAPI {
     authenticated: boolean;
     error?: string;
   }>;
+  installCursor?: () => Promise<{
+    success: boolean;
+    message?: string;
+    error?: string;
+    output?: string;
+  }>;
+  verifyCursorAuth?: (method?: 'api_key' | 'any') => Promise<{
+    success: boolean;
+    authenticated: boolean;
+    method?: string;
+    output?: string;
+    error?: string;
+  }>;
   getGhStatus?: () => Promise<{
     success: boolean;
     installed: boolean;
@@ -1142,11 +1250,65 @@ function createMockSetupAPI(): SetupAPI {
         },
       };
     },
+    getCursorStatus: async () => {
+      console.log('[Mock] Getting Cursor status');
+      return {
+        success: true,
+        status: 'not_installed',
+        installed: false,
+        auth: {
+          authenticated: false,
+          method: 'none',
+          hasApiKey: false,
+          hasStoredApiKey: false,
+          hasEnvApiKey: false,
+          apiKeyValid: false,
+        },
+      };
+    },
+    getOpenCodeStatus: async () => {
+      console.log('[Mock] Getting OpenCode status');
+      return {
+        success: true,
+        status: 'not_installed',
+        installed: false,
+        auth: {
+          authenticated: false,
+          method: 'none',
+          hasApiKey: false,
+          apiKeyValid: false,
+          hasEnvApiKey: false,
+        },
+      };
+    },
+    getCodexStatus: async () => {
+      console.log('[Mock] Getting Codex status');
+      return {
+        success: true,
+        status: 'not_installed',
+        installed: false,
+        auth: {
+          authenticated: false,
+          method: 'none',
+          hasApiKey: false,
+          apiKeyValid: false,
+          hasEnvApiKey: false,
+        },
+      };
+    },
 
     installClaude: async () => {
       console.log('[Mock] Installing Claude CLI');
       // Simulate installation delay
       await new Promise((resolve) => setTimeout(resolve, 1000));
+      return {
+        success: false,
+        error:
+          'CLI installation is only available in the Electron app. Please run the command manually.',
+      };
+    },
+    installCursor: async () => {
+      console.log('[Mock] Installing Cursor CLI');
       return {
         success: false,
         error:
@@ -1198,6 +1360,14 @@ function createMockSetupAPI(): SetupAPI {
     verifyClaudeAuth: async (authMethod?: 'cli' | 'api_key') => {
       console.log('[Mock] Verifying Claude auth with method:', authMethod);
       // Mock always returns not authenticated
+      return {
+        success: true,
+        authenticated: false,
+        error: 'Mock environment - authentication not available',
+      };
+    },
+    verifyCursorAuth: async (method?: 'api_key' | 'any') => {
+      console.log('[Mock] Verifying Cursor auth with method:', method);
       return {
         success: true,
         authenticated: false,
