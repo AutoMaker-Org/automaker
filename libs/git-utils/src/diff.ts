@@ -86,8 +86,9 @@ Binary file ${cleanPath} added
 `;
     }
 
-    if (stats.size > MAX_SYNTHETIC_DIFF_SIZE) {
-      const sizeKB = Math.round(stats.size / 1024);
+    const fileSize = Number(stats.size);
+    if (fileSize > MAX_SYNTHETIC_DIFF_SIZE) {
+      const sizeKB = Math.round(fileSize / 1024);
       return createNewFileDiff(cleanPath, '100644', [`[File too large to display: ${sizeKB}KB]`]);
     }
 

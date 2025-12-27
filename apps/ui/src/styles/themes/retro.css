@@ -86,6 +86,16 @@
 
 /* Theme-specific overrides */
 
+/* Retro Scrollbar - sharp edges with neon green */
+.retro ::-webkit-scrollbar-thumb {
+  background: var(--primary);
+  border-radius: 0;
+}
+
+.retro ::-webkit-scrollbar-track {
+  background: var(--background);
+}
+
 .retro .scrollbar-visible::-webkit-scrollbar-thumb {
   background: var(--primary);
   border-radius: 0;

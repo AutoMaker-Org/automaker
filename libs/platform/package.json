@@ -18,7 +18,8 @@
   "author": "AutoMaker Team",
   "license": "SEE LICENSE IN LICENSE",
   "dependencies": {
-    "@automaker/types": "^1.0.0"
+    "@automaker/types": "^1.0.0",
+    "p-limit": "^6.2.0"
   },
   "devDependencies": {
     "@types/node": "^22.10.5",
