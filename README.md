@@ -1,3 +1,6 @@
+<!-- TEST: Auto PR Creation via Workspace - Test Comment Added -->
+<!-- This comment verifies the automatic PR creation workflow -->
+
 <p align="center">
   <img src="apps/ui/public/readme_logo.png" alt="Automaker Logo" height="80" />
 </p>
