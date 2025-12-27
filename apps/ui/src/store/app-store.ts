@@ -480,6 +480,7 @@ export interface AppState {
 
   // Claude Agent SDK Settings
   autoLoadClaudeMd: boolean; // Auto-load CLAUDE.md files using SDK's settingSources option
+  enableSandboxMode: boolean; // Enable sandbox mode for bash commands (may cause issues on some systems)
 
   // Project Analysis
   projectAnalysis: ProjectAnalysis | null;
@@ -756,6 +757,7 @@ export interface AppActions {
 
   // Claude Agent SDK Settings actions
   setAutoLoadClaudeMd: (enabled: boolean) => Promise<void>;
+  setEnableSandboxMode: (enabled: boolean) => Promise<void>;
 
   // AI Profile actions
   addAIProfile: (profile: Omit<AIProfile, 'id'>) => void;
@@ -929,6 +931,7 @@ const initialState: AppState = {
   enhancementModel: 'sonnet', // Default to sonnet for feature enhancement
   validationModel: 'opus', // Default to opus for GitHub issue validation
   autoLoadClaudeMd: false, // Default to disabled (user must opt-in)
+  enableSandboxMode: true, // Default to enabled for security (can be disabled if issues occur)
   aiProfiles: DEFAULT_AI_PROFILES,
   projectAnalysis: null,
   isAnalyzing: false,
@@ -1557,6 +1560,12 @@ export const useAppStore = create<AppState & AppActions>()(
       // Claude Agent SDK Settings actions
       setAutoLoadClaudeMd: async (enabled) => {
         set({ autoLoadClaudeMd: enabled });
+        // Sync to server settings file
+        const { syncSettingsToServer } = await import('@/hooks/use-settings-migration');
+        await syncSettingsToServer();
+      },
+      setEnableSandboxMode: async (enabled) => {
+        set({ enableSandboxMode: enabled });
         // Sync to server settings file
         const { syncSettingsToServer } = await import('@/hooks/use-settings-migration');
         await syncSettingsToServer();
@@ -2706,6 +2715,7 @@ export const useAppStore = create<AppState & AppActions>()(
           enhancementModel: state.enhancementModel,
           validationModel: state.validationModel,
           autoLoadClaudeMd: state.autoLoadClaudeMd,
+          enableSandboxMode: state.enableSandboxMode,
           // Profiles and sessions
           aiProfiles: state.aiProfiles,
           chatSessions: state.chatSessions,

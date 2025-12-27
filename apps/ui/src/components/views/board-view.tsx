@@ -60,9 +60,6 @@ import {
 // Stable empty array to avoid infinite loop in selector
 const EMPTY_WORKTREES: ReturnType<ReturnType<typeof useAppStore.getState>['getWorktrees']> = [];
 
-/** Delay before starting a newly created feature to allow state to settle */
-const FEATURE_CREATION_SETTLE_DELAY_MS = 500;
-
 export function BoardView() {
   const {
     currentProject,
@@ -474,23 +471,22 @@ export function BoardView() {
         requirePlanApproval: false,
       };
 
+      // Capture existing feature IDs before adding
+      const featuresBeforeIds = new Set(useAppStore.getState().features.map((f) => f.id));
       await handleAddFeature(featureData);
 
-      // Find the newly created feature and start it
-      // We need to wait a moment for the feature to be created
-      setTimeout(async () => {
-        const latestFeatures = useAppStore.getState().features;
-        const newFeature = latestFeatures.find(
-          (f) =>
-            f.branchName === worktree.branch &&
-            f.status === 'backlog' &&
-            f.description.includes(`PR #${prNumber}`)
-        );
+      // Find the newly created feature by looking for an ID that wasn't in the original set
+      const latestFeatures = useAppStore.getState().features;
+      const newFeature = latestFeatures.find((f) => !featuresBeforeIds.has(f.id));
 
-        if (newFeature) {
-          await handleStartImplementation(newFeature);
-        }
-      }, FEATURE_CREATION_SETTLE_DELAY_MS);
+      if (newFeature) {
+        await handleStartImplementation(newFeature);
+      } else {
+        console.error('Could not find newly created feature to start it automatically.');
+        toast.error('Failed to auto-start feature', {
+          description: 'The feature was created but could not be started automatically.',
+        });
+      }
     },
     [handleAddFeature, handleStartImplementation, defaultSkipTests]
   );
@@ -516,24 +512,47 @@ export function BoardView() {
         requirePlanApproval: false,
       };
 
+      // Capture existing feature IDs before adding
+      const featuresBeforeIds = new Set(useAppStore.getState().features.map((f) => f.id));
       await handleAddFeature(featureData);
 
-      // Find the newly created feature and start it
-      setTimeout(async () => {
-        const latestFeatures = useAppStore.getState().features;
-        const newFeature = latestFeatures.find(
-          (f) =>
-            f.branchName === worktree.branch &&
-            f.status === 'backlog' &&
-            f.description.includes('Pull latest from origin/main')
-        );
+      // Find the newly created feature by looking for an ID that wasn't in the original set
+      const latestFeatures = useAppStore.getState().features;
+      const newFeature = latestFeatures.find((f) => !featuresBeforeIds.has(f.id));
 
-        if (newFeature) {
-          await handleStartImplementation(newFeature);
-        }
-      }, FEATURE_CREATION_SETTLE_DELAY_MS);
+      if (newFeature) {
+        await handleStartImplementation(newFeature);
+      } else {
+        console.error('Could not find newly created feature to start it automatically.');
+        toast.error('Failed to auto-start feature', {
+          description: 'The feature was created but could not be started automatically.',
+        });
+      }
     },
     [handleAddFeature, handleStartImplementation, defaultSkipTests]
+  );
+
+  // Handler for "Make" button - creates a feature and immediately starts it
+  const handleAddAndStartFeature = useCallback(
+    async (featureData: Parameters<typeof handleAddFeature>[0]) => {
+      // Capture existing feature IDs before adding
+      const featuresBeforeIds = new Set(useAppStore.getState().features.map((f) => f.id));
+      await handleAddFeature(featureData);
+
+      // Find the newly created feature by looking for an ID that wasn't in the original set
+      const latestFeatures = useAppStore.getState().features;
+      const newFeature = latestFeatures.find((f) => !featuresBeforeIds.has(f.id));
+
+      if (newFeature) {
+        await handleStartImplementation(newFeature);
+      } else {
+        console.error('Could not find newly created feature to start it automatically.');
+        toast.error('Failed to auto-start feature', {
+          description: 'The feature was created but could not be started automatically.',
+        });
+      }
+    },
+    [handleAddFeature, handleStartImplementation]
   );
 
   // Client-side auto mode: periodically check for backlog items and move them to in-progress
@@ -1142,6 +1161,7 @@ export function BoardView() {
           }
         }}
         onAdd={handleAddFeature}
+        onAddAndStart={handleAddAndStartFeature}
         categorySuggestions={categorySuggestions}
         branchSuggestions={branchSuggestions}
         branchCardCounts={branchCardCounts}

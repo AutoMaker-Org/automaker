@@ -73,7 +73,7 @@ describe('claude-provider.ts', () => {
           maxTurns: 10,
           cwd: '/test/dir',
           allowedTools: ['Read', 'Write'],
-          permissionMode: 'acceptEdits',
+          permissionMode: 'default',
         }),
       });
     });
@@ -100,7 +100,7 @@ describe('claude-provider.ts', () => {
       });
     });
 
-    it('should enable sandbox by default', async () => {
+    it('should pass sandbox configuration when provided', async () => {
       vi.mocked(sdk.query).mockReturnValue(
         (async function* () {
           yield { type: 'text', text: 'test' };
@@ -110,6 +110,10 @@ describe('claude-provider.ts', () => {
       const generator = provider.executeQuery({
         prompt: 'Test',
         cwd: '/test',
+        sandbox: {
+          enabled: true,
+          autoAllowBashIfSandboxed: true,
+        },
       });
 
       await collectAsyncGenerator(generator);
@@ -242,9 +246,19 @@ describe('claude-provider.ts', () => {
       });
 
       await expect(collectAsyncGenerator(generator)).rejects.toThrow('SDK execution failed');
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        '[ClaudeProvider] executeQuery() error during execution:',
+
+      // Should log error message
+      expect(consoleErrorSpy).toHaveBeenNthCalledWith(
+        1,
+        '[ClaudeProvider] ERROR: executeQuery() error during execution:',
         testError
+      );
+
+      // Should log stack trace
+      expect(consoleErrorSpy).toHaveBeenNthCalledWith(
+        2,
+        '[ClaudeProvider] ERROR stack:',
+        testError.stack
       );
 
       consoleErrorSpy.mockRestore();
