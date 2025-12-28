@@ -111,6 +111,12 @@ export class CustomStep {
           },
         });
 
+        console.log('[Custom Step] AI execution result:', {
+          status: result.status,
+          outputLength: result.output?.length || 0,
+          output: JSON.stringify(result.output?.substring(0, 200)),
+        });
+
         // Check success criteria
         const successMet = await this.checkSuccessCriteria(
           result.output,
@@ -170,10 +176,22 @@ export class CustomStep {
 
       return finalResult;
     } catch (error) {
+      console.log('[Custom Step] Caught error:', error);
+      console.log('[Custom Step] Error type:', typeof error);
+      let errorMessage: string;
+      try {
+        errorMessage =
+          error instanceof Error ? error.message || 'Unknown error' : 'Custom step failed';
+      } catch (e) {
+        console.error('[Custom Step] Error extracting message:', e);
+        errorMessage = 'Error extracting error message';
+      }
+      console.log('[Custom Step] Extracted error message:', errorMessage);
+
       return {
         status: 'failed',
-        output: error instanceof Error ? error.message : 'Custom step failed',
-        metadata: { error: error instanceof Error ? error.message : 'Unknown error' },
+        output: errorMessage,
+        metadata: { error: errorMessage },
         iterations: loopCount,
       };
     }
@@ -237,14 +255,15 @@ Please address any remaining issues.
     signal: AbortSignal
   ): Promise<boolean> {
     console.log('[Custom Step] Evaluating success criteria...');
-    const lowerOutput = output.toLowerCase();
-    const lowerCriteria = criteria.toLowerCase();
+    console.log('[Custom Step] Criteria:', criteria);
+    const safeOutput = (output || '').toLowerCase();
+    const lowerCriteria = (criteria || '').toLowerCase();
 
     // Check for explicit success indicators
     if (
-      lowerOutput.includes('success criteria met') ||
-      lowerOutput.includes('all requirements satisfied') ||
-      lowerOutput.includes('criteria fulfilled')
+      safeOutput.includes('success criteria met') ||
+      safeOutput.includes('all requirements satisfied') ||
+      safeOutput.includes('criteria fulfilled')
     ) {
       console.log('[Custom Step] Evaluation: explicit success indicators found');
       return true;
@@ -252,12 +271,27 @@ Please address any remaining issues.
 
     // Check for explicit failure indicators
     if (
-      lowerOutput.includes('criteria not met') ||
-      lowerOutput.includes('requirements not satisfied') ||
-      lowerOutput.includes('criteria failed')
+      safeOutput.includes('failed to meet') ||
+      safeOutput.includes('criteria not met') ||
+      safeOutput.includes('requirements not satisfied')
     ) {
       console.log('[Custom Step] Evaluation: explicit failure indicators found');
       return false;
+    }
+
+    // Check for each criterion
+    const criteriaList = lowerCriteria.split(',').map((c) => c.trim());
+    let metCount = 0;
+    for (const criterion of criteriaList) {
+      if (safeOutput.includes(criterion)) {
+        metCount++;
+      }
+    }
+
+    // If all criteria are met, return true
+    if (metCount === criteriaList.length) {
+      console.log('[Custom Step] Evaluation: all criteria met');
+      return true;
     }
 
     // Try to parse structured outputs (JSON/XML)
@@ -329,7 +363,7 @@ Respond with ONLY "YES" if the criteria are met, or "NO" if they are not met.`;
         },
       });
 
-      const response = evaluationResult.output.trim().toLowerCase();
+      const response = (evaluationResult.output || '').trim().toLowerCase();
       if (response === 'yes') {
         console.log('[Custom Step] Evaluation: AI evaluation returned YES');
         return true;

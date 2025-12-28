@@ -17,6 +17,8 @@ import type {
   PipelineConfig,
   PipelineStepConfig,
   PipelineStep,
+  PipelineStepResult,
+  StepStatus,
 } from '@automaker/types';
 import {
   buildPromptWithImages,
@@ -756,6 +758,13 @@ export class AutoModeService {
     // No context, start fresh - executeFeature will handle adding to runningFeatures
     // Remove the temporary entry we added
     this.runningFeatures.delete(featureId);
+
+    // Reset pipeline steps when resuming fresh
+    await this.updateFeatureStatus(projectPath, featureId, 'in_progress', {
+      pipelineSteps: {}, // Reset all pipeline steps
+      currentPipelineStep: undefined,
+    });
+
     return this.executeFeature(projectPath, featureId, useWorktrees, false);
   }
 
@@ -860,8 +869,18 @@ Address the follow-up instructions above. Review the previous work and make the 
       const model = resolveModelString(feature?.model, DEFAULT_MODELS.claude);
       console.log(`[AutoMode] Follow-up for feature ${featureId} using model: ${model}`);
 
+      // Ensure feature is in correct state
+      if (feature && feature.status === 'completed') {
+        console.log(`[AutoMode] Feature ${featureId} already completed, skipping execution`);
+        return;
+      }
+
       // Update feature status to in_progress
-      await this.updateFeatureStatus(projectPath, featureId, 'in_progress');
+      // Reset pipeline steps when restarting a feature
+      await this.updateFeatureStatus(projectPath, featureId, 'in_progress', {
+        pipelineSteps: {}, // Reset all pipeline steps
+        currentPipelineStep: undefined,
+      });
 
       // Copy follow-up images to feature folder
       const copiedImagePaths: string[] = [];
@@ -1570,6 +1589,13 @@ Format your response as a structured markdown document.`;
       feature.pipelineSteps = {};
     }
 
+    // Debug: Show current pipeline steps state
+    console.log('[Pipeline] Current pipeline steps state:', feature.pipelineSteps);
+    console.log(
+      '[Pipeline] Steps to execute:',
+      pipelineConfig.steps.map((s) => s.id)
+    );
+
     // Execute each step in order
     for (const stepConfig of pipelineConfig.steps) {
       // Check if step should be auto-triggered
@@ -1595,39 +1621,42 @@ Format your response as a structured markdown document.`;
       // Execute the step
       console.log(`[Pipeline] Executing step: ${stepConfig.name}`);
 
-      const result = await executor.executeStep({
-        feature,
-        stepConfig,
-        signal,
-        projectPath,
-        onProgress: (message) => {
-          this.emitAutoModeEvent('pipeline_step_progress', {
-            featureId: feature.id,
-            stepId: stepConfig.id,
-            message,
-            projectPath,
-          });
-        },
-        onStatusChange: (status) => {
-          // Update step status
-          if (!feature.pipelineSteps) {
-            feature.pipelineSteps = {};
-          }
-
-          feature.pipelineSteps[stepConfig.id] = {
-            id: stepConfig.id,
-            status,
-            startedAt: new Date().toISOString(),
-            completedAt:
-              status === 'passed' || status === 'failed' ? new Date().toISOString() : undefined,
-          };
-
-          this.updateFeatureStatus(projectPath!, feature.id, feature.status || 'in_progress', {
-            pipelineSteps: feature.pipelineSteps,
-            currentPipelineStep: feature.currentPipelineStep,
-          });
-        },
-      });
+      let result: PipelineStepResult;
+      try {
+        console.log('[Pipeline] About to execute step:', stepConfig.id);
+        result = await executor.executeStep({
+          feature,
+          stepConfig,
+          signal,
+          onProgress: (message: string) => {
+            console.log(`[Pipeline] Step ${stepConfig.id} progress:`, message);
+            this.emitAutoModeEvent('pipeline_step_progress', {
+              featureId: feature.id,
+              stepId: stepConfig.id,
+              message,
+              projectPath,
+            });
+          },
+          onStatusChange: (status: StepStatus) => {
+            console.log(`[Pipeline] Step ${stepConfig.id} status:`, status);
+          },
+          projectPath,
+        });
+        console.log('[Pipeline] Step execution completed:', result);
+      } catch (stepError) {
+        console.error('[Pipeline] Step execution error:', stepError);
+        console.error('[Pipeline] Step error details:', {
+          error: stepError,
+          type: typeof stepError,
+          message: stepError instanceof Error ? stepError.message : 'Not an Error instance',
+          stack: stepError instanceof Error ? stepError.stack : 'No stack trace',
+        });
+        result = {
+          status: 'failed',
+          output: stepError instanceof Error ? stepError.message : 'Step execution failed',
+          metadata: { error: stepError instanceof Error ? stepError.message : 'Unknown error' },
+        };
+      }
 
       // Store result
       if (!feature.pipelineSteps) {
@@ -1665,7 +1694,9 @@ Format your response as a structured markdown document.`;
       // Check if step failed and is required
       if (result.status === 'failed' && stepConfig.required) {
         console.log(`[Pipeline] Required step ${stepConfig.id} failed, stopping pipeline`);
-        throw new Error(`Required pipeline step ${stepConfig.name} failed: ${result.output}`);
+        console.log('[Pipeline] Result:', result);
+        const outputMsg = result.output || 'Unknown error';
+        throw new Error(`Required pipeline step ${stepConfig.name} failed: ${outputMsg}`);
       }
 
       // Emit step completion
@@ -1690,8 +1721,13 @@ Format your response as a structured markdown document.`;
    * Get the model to use for a pipeline step
    */
   getStepModel(feature: Feature, stepConfig: PipelineStepConfig): string {
+    // Default to opus if no model is specified
+    if (!stepConfig.model) {
+      return DEFAULT_MODELS.claude || 'opus';
+    }
+
     if (stepConfig.model === 'same') {
-      return (feature.model as string) || DEFAULT_MODELS.claude;
+      return (feature.model as string) || DEFAULT_MODELS.claude || 'opus';
     }
 
     if (stepConfig.model === 'different') {
@@ -1709,7 +1745,7 @@ Format your response as a structured markdown document.`;
       }
     }
 
-    return stepConfig.model as string;
+    return (stepConfig.model as string) || DEFAULT_MODELS.claude || 'opus';
   }
 
   /**
@@ -1750,7 +1786,7 @@ Format your response as a structured markdown document.`;
         if (msg.type === 'assistant' && msg.message?.content) {
           for (const block of msg.message.content) {
             if (block.type === 'text') {
-              result = block.text || '';
+              result = block.text || result;
               onProgress?.('Processing response...');
             }
           }
@@ -1761,7 +1797,7 @@ Format your response as a structured markdown document.`;
 
       return {
         status: 'passed',
-        output: result,
+        output: result || '', // Ensure output is never undefined
       };
     } catch (error) {
       return {

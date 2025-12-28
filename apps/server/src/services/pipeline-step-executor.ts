@@ -221,24 +221,31 @@ export class PipelineStepExecutor extends EventEmitter {
    * @returns PipelineStepResult The parsed result with status and structured data
    */
   private parseStepResult(output: string): PipelineStepResult {
+    // Ensure output is defined
+    const safeOutput = output || '';
+
+    // Debug logging
+    console.log('[Pipeline Step Executor] Raw output:', JSON.stringify(output));
+    console.log('[Pipeline Step Executor] Safe output length:', safeOutput.length);
+
     // Check for status markers
-    const passedMatch = output.match(/^\[(REVIEW|SECURITY|PERFORMANCE|TEST)_PASSED\]/m);
-    const failedMatch = output.match(/^\[(REVIEW|SECURITY|PERFORMANCE|TEST)_FAILED\]/m);
+    const passedMatch = safeOutput.match(/^\[(REVIEW|SECURITY|PERFORMANCE|TEST)_PASSED\]/m);
+    const failedMatch = safeOutput.match(/^\[(REVIEW|SECURITY|PERFORMANCE|TEST)_FAILED\]/m);
 
     let status: 'passed' | 'failed' = 'passed';
     if (failedMatch) {
       status = 'failed';
     } else if (!passedMatch) {
       // No explicit status marker, try to infer
-      status = output.toLowerCase().includes('no issues found') ? 'passed' : 'failed';
+      status = safeOutput.toLowerCase().includes('no issues found') ? 'passed' : 'failed';
     }
 
     // Extract issues if failed
-    const issues = this.extractIssues(output);
+    const issues = this.extractIssues(safeOutput);
 
     return {
       status,
-      output,
+      output: safeOutput,
       issues,
       metadata: {
         timestamp: new Date().toISOString(),
@@ -305,9 +312,9 @@ export class PipelineStepExecutor extends EventEmitter {
    */
   private generateIssueHash(issue: { summary: string; location?: string; type: string }): string {
     const normalized = [
-      issue.summary.toLowerCase().trim(),
-      issue.location?.toLowerCase() || '',
-      issue.type.toLowerCase(),
+      (issue.summary || '').toLowerCase().trim(),
+      (issue.location || '').toLowerCase(),
+      (issue.type || '').toLowerCase(),
     ].join('|');
 
     // Simple hash for now - could use crypto in Node environment

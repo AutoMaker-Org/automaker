@@ -18,6 +18,9 @@ export class ProviderFactory {
    * @returns Provider instance for the model
    */
   static getProviderForModel(modelId: string): BaseProvider {
+    if (!modelId) {
+      throw new Error('Model ID is required');
+    }
     const lowerModel = modelId.toLowerCase();
 
     // Claude models (claude-*, opus, sonnet, haiku)
@@ -73,6 +76,9 @@ export class ProviderFactory {
    * @returns Provider instance or null if not found
    */
   static getProviderByName(name: string): BaseProvider | null {
+    if (!name) {
+      return null;
+    }
     const lowerName = name.toLowerCase();
 
     switch (lowerName) {

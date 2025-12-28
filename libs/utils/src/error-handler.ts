@@ -27,6 +27,9 @@ export function isAbortError(error: unknown): boolean {
  * @returns True if the error is a user-initiated cancellation
  */
 export function isCancellationError(errorMessage: string): boolean {
+  if (!errorMessage || typeof errorMessage !== 'string') {
+    return false;
+  }
   const lowerMessage = errorMessage.toLowerCase();
   return (
     lowerMessage.includes('cancelled') ||
@@ -43,6 +46,9 @@ export function isCancellationError(errorMessage: string): boolean {
  * @returns True if the error is authentication-related
  */
 export function isAuthenticationError(errorMessage: string): boolean {
+  if (!errorMessage || typeof errorMessage !== 'string') {
+    return false;
+  }
   return (
     errorMessage.includes('Authentication failed') ||
     errorMessage.includes('Invalid API key') ||
@@ -58,7 +64,20 @@ export function isAuthenticationError(errorMessage: string): boolean {
  * @returns Classified error information
  */
 export function classifyError(error: unknown): ErrorInfo {
-  const message = error instanceof Error ? error.message : String(error || 'Unknown error');
+  // Log the original error for debugging
+  console.log('[classifyError] Original error:', error);
+  console.log('[classifyError] Error type:', typeof error);
+  console.log('[classifyError] Error keys:', error ? Object.keys(error) : 'N/A');
+
+  let message: string;
+  try {
+    message = error instanceof Error ? error.message : String(error || 'Unknown error');
+    console.log('[classifyError] Extracted message:', message);
+  } catch (e) {
+    console.error('[classifyError] Error converting to string:', e);
+    message = 'Error converting error to string';
+  }
+
   const isAbort = isAbortError(error);
   const isAuth = isAuthenticationError(message);
   const isCancellation = isCancellationError(message);
