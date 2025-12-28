@@ -1650,8 +1650,8 @@ export class ZaiProvider extends BaseProvider {
         modelString: 'glm-4.7',
         provider: 'zai',
         description: 'Z.ai flagship model with strong reasoning capabilities and thinking mode',
-        contextWindow: 128000,
-        maxOutputTokens: 8192,
+        contextWindow: 200000,
+        maxOutputTokens: 128000,
         supportsVision: false,
         supportsTools: true,
         supportsExtendedThinking: true, // All GLM models support thinking mode
@@ -1665,7 +1665,7 @@ export class ZaiProvider extends BaseProvider {
         provider: 'zai',
         description: 'Multimodal model with vision support and thinking mode',
         contextWindow: 128000,
-        maxOutputTokens: 8192,
+        maxOutputTokens: 96000,
         supportsVision: true,
         supportsTools: true,
         supportsExtendedThinking: true, // All GLM models support thinking mode
@@ -1678,8 +1678,8 @@ export class ZaiProvider extends BaseProvider {
         modelString: 'glm-4.6',
         provider: 'zai',
         description: 'Balanced performance with strong reasoning and thinking mode',
-        contextWindow: 128000,
-        maxOutputTokens: 8192,
+        contextWindow: 200000,
+        maxOutputTokens: 128000,
         supportsVision: false,
         supportsTools: true,
         supportsExtendedThinking: true, // All GLM models support thinking mode
@@ -1693,7 +1693,7 @@ export class ZaiProvider extends BaseProvider {
         provider: 'zai',
         description: 'Fast and efficient for simple tasks with thinking mode',
         contextWindow: 128000,
-        maxOutputTokens: 4096,
+        maxOutputTokens: 96000,
         supportsVision: false,
         supportsTools: true,
         supportsExtendedThinking: true, // All GLM models support thinking mode
