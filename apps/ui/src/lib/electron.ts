@@ -551,6 +551,20 @@ export interface ElectronAPI {
       user: string | null;
       error?: string;
     }>;
+    getCursorStatus?: () => Promise<{
+      success: boolean;
+      status?: string;
+      installed?: boolean;
+      method?: string;
+      version?: string;
+      path?: string;
+      auth?: {
+        authenticated: boolean;
+        method: string;
+        hasApiKey: boolean;
+      };
+      error?: string;
+    }>;
     onInstallProgress?: (callback: (progress: any) => void) => () => void;
     onAuthProgress?: (callback: (progress: any) => void) => () => void;
   };
@@ -1119,6 +1133,20 @@ interface SetupAPI {
     user: string | null;
     error?: string;
   }>;
+  getCursorStatus?: () => Promise<{
+    success: boolean;
+    status?: string;
+    installed?: boolean;
+    method?: string;
+    version?: string;
+    path?: string;
+    auth?: {
+      authenticated: boolean;
+      method: string;
+      hasApiKey: boolean;
+    };
+    error?: string;
+  }>;
   onInstallProgress?: (callback: (progress: any) => void) => () => void;
   onAuthProgress?: (callback: (progress: any) => void) => () => void;
 }
@@ -1214,6 +1242,20 @@ function createMockSetupAPI(): SetupAPI {
         version: null,
         path: null,
         user: null,
+      };
+    },
+
+    getCursorStatus: async () => {
+      console.log('[Mock] Getting Cursor CLI status');
+      return {
+        success: true,
+        status: 'not_installed',
+        installed: false,
+        auth: {
+          authenticated: false,
+          method: 'none',
+          hasApiKey: false,
+        },
       };
     },
 

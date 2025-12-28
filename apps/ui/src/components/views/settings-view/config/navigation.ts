@@ -21,7 +21,7 @@ export interface NavigationItem {
 // Navigation items for the settings side panel
 export const NAV_ITEMS: NavigationItem[] = [
   { id: 'api-keys', label: 'API Keys', icon: Key },
-  { id: 'claude', label: 'Claude', icon: Terminal },
+  { id: 'providers', label: 'AI Providers', icon: Terminal },
   { id: 'ai-enhancement', label: 'AI Enhancement', icon: Sparkles },
   { id: 'appearance', label: 'Appearance', icon: Palette },
   { id: 'terminal', label: 'Terminal', icon: SquareTerminal },

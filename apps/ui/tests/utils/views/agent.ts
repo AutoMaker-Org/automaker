@@ -1,6 +1,48 @@
 import { Page, Locator } from '@playwright/test';
 import { waitForElement } from '../core/waiting';
 
+// ============================================================================
+// Model Selector Operations
+// ============================================================================
+
+/**
+ * Click the model selector dropdown button
+ */
+export async function clickModelSelector(page: Page): Promise<void> {
+  const selector = page.locator('[data-testid="model-selector"]');
+  await selector.click();
+  // Wait for dropdown to open
+  await page.waitForTimeout(200);
+}
+
+/**
+ * Select a model from the agent view model dropdown
+ * @param modelId - The model ID (e.g., 'sonnet', 'cursor-sonnet', 'opus')
+ */
+export async function selectAgentModel(page: Page, modelId: string): Promise<void> {
+  await clickModelSelector(page);
+  const option = page.locator(`[data-testid="model-option-${modelId}"]`);
+  await option.click();
+  // Wait for dropdown to close
+  await page.waitForTimeout(200);
+}
+
+/**
+ * Get the currently selected model label from the selector button
+ */
+export async function getSelectedModelLabel(page: Page): Promise<string> {
+  const selector = page.locator('[data-testid="model-selector"]');
+  return (await selector.textContent()) || '';
+}
+
+/**
+ * Check if a specific model option is visible in the dropdown
+ */
+export async function isModelOptionVisible(page: Page, modelId: string): Promise<boolean> {
+  const option = page.locator(`[data-testid="model-option-${modelId}"]`);
+  return await option.isVisible();
+}
+
 /**
  * Get the session list element
  */

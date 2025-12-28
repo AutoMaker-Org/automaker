@@ -8,6 +8,7 @@
 
 import { BaseProvider } from './base-provider.js';
 import { ClaudeProvider } from './claude-provider.js';
+import { CursorProvider } from './cursor-provider.js';
 import type { InstallationStatus } from './types.js';
 
 export class ProviderFactory {
@@ -25,10 +26,12 @@ export class ProviderFactory {
       return new ClaudeProvider();
     }
 
+    // Cursor models (cursor-*)
+    if (lowerModel.startsWith('cursor-')) {
+      return new CursorProvider();
+    }
+
     // Future providers:
-    // if (lowerModel.startsWith("cursor-")) {
-    //   return new CursorProvider();
-    // }
     // if (lowerModel.startsWith("opencode-")) {
     //   return new OpenCodeProvider();
     // }
@@ -42,10 +45,7 @@ export class ProviderFactory {
    * Get all available providers
    */
   static getAllProviders(): BaseProvider[] {
-    return [
-      new ClaudeProvider(),
-      // Future providers...
-    ];
+    return [new ClaudeProvider(), new CursorProvider()];
   }
 
   /**
@@ -80,9 +80,10 @@ export class ProviderFactory {
       case 'anthropic':
         return new ClaudeProvider();
 
+      case 'cursor':
+        return new CursorProvider();
+
       // Future providers:
-      // case "cursor":
-      //   return new CursorProvider();
       // case "opencode":
       //   return new OpenCodeProvider();
 

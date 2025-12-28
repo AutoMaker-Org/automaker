@@ -441,6 +441,21 @@ export class HttpApiClient implements ElectronAPI {
       error?: string;
     }> => this.get('/api/setup/claude-status'),
 
+    getCursorStatus: (): Promise<{
+      success: boolean;
+      status?: string;
+      installed?: boolean;
+      method?: string;
+      version?: string;
+      path?: string;
+      auth?: {
+        authenticated: boolean;
+        method: string;
+        hasApiKey: boolean;
+      };
+      error?: string;
+    }> => this.get('/api/setup/cursor-status'),
+
     installClaude: (): Promise<{
       success: boolean;
       message?: string;

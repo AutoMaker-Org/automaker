@@ -18,16 +18,32 @@ interface CliStatusResult {
   error?: string;
 }
 
+interface CursorCliStatusResult {
+  success: boolean;
+  status?: string;
+  method?: string;
+  version?: string;
+  path?: string;
+  auth?: {
+    authenticated: boolean;
+    method: string;
+    hasApiKey: boolean;
+  };
+  error?: string;
+}
+
 /**
- * Custom hook for managing Claude CLI status
+ * Custom hook for managing CLI status for multiple providers
  * Handles checking CLI installation, authentication, and refresh functionality
  */
 export function useCliStatus() {
   const { setClaudeAuthStatus } = useSetupStore();
 
   const [claudeCliStatus, setClaudeCliStatus] = useState<CliStatusResult | null>(null);
+  const [cursorCliStatus, setCursorCliStatus] = useState<CursorCliStatusResult | null>(null);
 
   const [isCheckingClaudeCli, setIsCheckingClaudeCli] = useState(false);
+  const [isCheckingCursorCli, setIsCheckingCursorCli] = useState(false);
 
   // Check CLI status on mount
   useEffect(() => {
@@ -41,6 +57,16 @@ export function useCliStatus() {
           setClaudeCliStatus(status);
         } catch (error) {
           console.error('Failed to check Claude CLI status:', error);
+        }
+      }
+
+      // Check Cursor CLI
+      if (api?.setup?.getCursorStatus) {
+        try {
+          const status = await api.setup.getCursorStatus();
+          setCursorCliStatus(status);
+        } catch (error) {
+          console.error('Failed to check Cursor CLI status:', error);
         }
       }
 
@@ -108,9 +134,28 @@ export function useCliStatus() {
     }
   }, []);
 
+  // Refresh Cursor CLI status
+  const handleRefreshCursorCli = useCallback(async () => {
+    setIsCheckingCursorCli(true);
+    try {
+      const api = getElectronAPI();
+      if (api?.setup?.getCursorStatus) {
+        const status = await api.setup.getCursorStatus();
+        setCursorCliStatus(status);
+      }
+    } catch (error) {
+      console.error('Failed to refresh Cursor CLI status:', error);
+    } finally {
+      setIsCheckingCursorCli(false);
+    }
+  }, []);
+
   return {
     claudeCliStatus,
+    cursorCliStatus,
     isCheckingClaudeCli,
+    isCheckingCursorCli,
     handleRefreshClaudeCli,
+    handleRefreshCursorCli,
   };
 }

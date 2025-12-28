@@ -19,6 +19,20 @@ export interface CliStatus {
   error?: string;
 }
 
+export interface CursorCliStatus {
+  success: boolean;
+  status?: string;
+  method?: string;
+  version?: string;
+  path?: string;
+  auth?: {
+    authenticated: boolean;
+    method: string;
+    hasApiKey: boolean;
+  };
+  error?: string;
+}
+
 export type KanbanDetailLevel = 'minimal' | 'standard' | 'detailed';
 
 export interface Project {
