@@ -48,7 +48,8 @@ function detectZaiError(text: string): string | null {
 export function createVerifyZaiAuthHandler() {
   return async (req: Request, res: Response): Promise<void> => {
     const { apiKey: apiKeyFromBody } = req.body as { apiKey?: string };
-    const apiKey = apiKeyFromBody || getApiKey('zai') || process.env.ZAI_API_KEY;
+    // Priority: body key (being tested) > environment variable (source of truth) > in-memory cache (fallback)
+    const apiKey = apiKeyFromBody || process.env.ZAI_API_KEY || getApiKey('zai');
 
     if (!apiKey) {
       res.json({

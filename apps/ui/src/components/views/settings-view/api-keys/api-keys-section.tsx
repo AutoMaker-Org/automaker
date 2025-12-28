@@ -23,6 +23,7 @@ export function ApiKeysSection() {
   } = useAppStore();
   const { claudeAuthStatus, setClaudeAuthStatus, setSetupComplete } = useSetupStore();
   const [isDeletingAnthropicKey, setIsDeletingAnthropicKey] = useState(false);
+  const [isDeletingZaiKey, setIsDeletingZaiKey] = useState(false);
   const navigate = useNavigate();
 
   const { providerConfigParams, apiKeyStatus, handleSave, saved } = useApiKeyManagement();
@@ -59,7 +60,32 @@ export function ApiKeysSection() {
     } finally {
       setIsDeletingAnthropicKey(false);
     }
-  }, [apiKeys, setApiKeys, claudeAuthStatus, setClaudeAuthStatus]);
+  }, [apiKeys, setApiKeys, setEnabledProviders, claudeAuthStatus, setClaudeAuthStatus]);
+
+  // Delete ZAI API key
+  const deleteZaiKey = useCallback(async () => {
+    setIsDeletingZaiKey(true);
+    try {
+      const api = getElectronAPI();
+      if (!api.setup?.deleteApiKey) {
+        toast.error('Delete API not available');
+        return;
+      }
+
+      const result = await api.setup.deleteApiKey('zai');
+      if (result.success) {
+        setApiKeys({ ...apiKeys, zai: '' });
+        setEnabledProviders({ zai: false });
+        toast.success('Z.ai API key deleted');
+      } else {
+        toast.error(result.error || 'Failed to delete API key');
+      }
+    } catch (error) {
+      toast.error('Failed to delete API key');
+    } finally {
+      setIsDeletingZaiKey(false);
+    }
+  }, [apiKeys, setApiKeys, setEnabledProviders]);
 
   // Open setup wizard
   const openSetupWizard = useCallback(() => {
@@ -238,6 +264,23 @@ export function ApiKeysSection() {
                 <Trash2 className="w-4 h-4 mr-2" />
               )}
               Delete Anthropic Key
+            </Button>
+          )}
+
+          {apiKeys.zai && (
+            <Button
+              onClick={deleteZaiKey}
+              disabled={isDeletingZaiKey}
+              variant="outline"
+              className="h-10 border-red-500/30 text-red-500 hover:bg-red-500/10 hover:border-red-500/50"
+              data-testid="delete-zai-key"
+            >
+              {isDeletingZaiKey ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <Trash2 className="w-4 h-4 mr-2" />
+              )}
+              Delete Z.ai Key
             </Button>
           )}
         </div>

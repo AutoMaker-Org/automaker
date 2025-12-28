@@ -176,14 +176,14 @@ export async function* executeProviderQuery(
 
   logger.info(`[ProviderQuery] Using model: ${resolvedModel} for use case: ${useCase}`);
 
-  // Get the provider for this model first (to determine which API key to use)
-  const provider = ProviderFactory.getProviderForModel(resolvedModel);
-  const providerName = provider.getName();
-  logger.info(`[ProviderQuery] Using provider: ${providerName}`);
-
-  // Determine the appropriate API key for this provider
+  // Determine the provider and API key
   let apiKey: string | undefined;
   if (apiKeys) {
+    // Get provider name directly from model string to avoid instantiating twice
+    const { getProviderForModel } = await import('@automaker/model-resolver');
+    const providerName = getProviderForModel(resolvedModel);
+    logger.info(`[ProviderQuery] Using provider: ${providerName}`);
+
     // Map provider name to API key
     const apiKeyMap: Record<string, string | undefined> = {
       claude: apiKeys.anthropic,
@@ -191,13 +191,17 @@ export async function* executeProviderQuery(
       google: apiKeys.google,
       openai: apiKeys.openai,
     };
-    apiKey = apiKey ? apiKey : apiKeyMap[providerName];
+    apiKey = apiKeyMap[providerName];
     if (apiKey) {
       logger.info(`[ProviderQuery] Using API key from settings for ${providerName}`);
     }
+  } else {
+    const { getProviderForModel } = await import('@automaker/model-resolver');
+    const providerName = getProviderForModel(resolvedModel);
+    logger.info(`[ProviderQuery] Using provider: ${providerName}`);
   }
 
-  // Get provider again with API key config if available
+  // Get provider with API key config if available (instantiated only once)
   const providerWithKey = ProviderFactory.getProviderForModel(
     resolvedModel,
     apiKey ? { apiKey } : undefined

@@ -928,12 +928,8 @@ async function executeToolCall(
 }
 
 export class ZaiProvider extends BaseProvider {
-  private apiKey: string | null = null;
-
-  constructor(config?: { apiKey?: string }) {
+  constructor(config?: ProviderConfig) {
     super(config);
-    // Try to get API key from config first, then environment
-    this.apiKey = config?.apiKey || process.env.ZAI_API_KEY || null;
   }
 
   getName(): string {
@@ -944,12 +940,12 @@ export class ZaiProvider extends BaseProvider {
    * Get API key from credentials
    */
   private getApiKey(): string {
-    if (this.apiKey) {
-      return this.apiKey;
-    }
-    // Will be set via setConfig from SettingsService
+    // Try config first, then environment variable
     if (this.config.apiKey) {
       return this.config.apiKey;
+    }
+    if (process.env.ZAI_API_KEY) {
+      return process.env.ZAI_API_KEY;
     }
     throw new Error('ZAI_API_KEY not configured');
   }

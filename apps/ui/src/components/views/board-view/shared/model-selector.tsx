@@ -1,8 +1,8 @@
 import { Label } from '@/components/ui/label';
 import { Brain } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { AgentModel } from '@/store/app-store';
-import { ALL_MODELS, ModelOption } from './model-constants';
+import { AgentModel, useAppStore } from '@/store/app-store';
+import { getFilteredModels, ModelOption } from './model-constants';
 
 interface ModelSelectorProps {
   selectedModel: AgentModel;
@@ -15,6 +15,9 @@ export function ModelSelector({
   onModelSelect,
   testIdPrefix = 'model-select',
 }: ModelSelectorProps) {
+  const enabledProviders = useAppStore((state) => state.enabledProviders);
+  const filteredModels = getFilteredModels(enabledProviders);
+
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
@@ -27,7 +30,7 @@ export function ModelSelector({
         </span>
       </div>
       <div className="flex gap-2 flex-wrap">
-        {ALL_MODELS.map((option) => {
+        {filteredModels.map((option) => {
           const isSelected = selectedModel === option.id;
           const shortName = option.label.replace('Claude ', '').replace('GLM-', 'GLM ');
           return (

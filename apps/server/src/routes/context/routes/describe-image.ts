@@ -212,6 +212,12 @@ async function extractTextFromStream(
         responseText = msg.result;
       }
     }
+
+    if (msgType === 'error') {
+      // Handle error messages from the stream
+      logger.error(`[${requestId}] [Stream] error:`, msg.error);
+      throw new Error(msg.error || 'Stream error occurred');
+    }
   }
 
   logger.info(

@@ -17,7 +17,12 @@ import {
   classifyError,
   loadContextFiles,
 } from '@automaker/utils';
-import { resolveModelString, getModelForUseCase, DEFAULT_MODELS } from '@automaker/model-resolver';
+import {
+  resolveModelString,
+  getModelForUseCase,
+  DEFAULT_MODELS,
+  resolveModelWithProviderAvailability,
+} from '@automaker/model-resolver';
 import { resolveDependencies, areDependenciesSatisfied } from '@automaker/dependency-resolver';
 import { getFeatureDir, getAutomakerDir, getFeaturesDir } from '@automaker/platform';
 import { exec } from 'child_process';
@@ -1122,7 +1127,30 @@ Format your response as a structured markdown document.`;
 
     try {
       // Use default Claude model for analysis (can be overridden in the future)
-      const analysisModel = resolveModelString(undefined, DEFAULT_MODELS.claude);
+      let analysisModel = resolveModelString(undefined, DEFAULT_MODELS.claude);
+
+      // Resolve model considering enabled providers
+      if (this.settingsService) {
+        try {
+          const globalSettings = await this.settingsService.getGlobalSettings();
+          if (globalSettings.enabledProviders) {
+            const resolvedModel = resolveModelWithProviderAvailability(
+              analysisModel,
+              globalSettings.enabledProviders,
+              undefined // No explicit model to fall back to
+            );
+            if (resolvedModel !== analysisModel) {
+              console.log(
+                `[AutoMode] Analysis model substituted due to provider availability: ${analysisModel} -> ${resolvedModel}`
+              );
+            }
+            analysisModel = resolvedModel;
+          }
+        } catch (error) {
+          console.warn(`[AutoMode] Failed to load enabled providers for analysis:`, error);
+        }
+      }
+
       const provider = ProviderFactory.getProviderForModel(analysisModel);
 
       // Load autoLoadClaudeMd setting
@@ -1843,9 +1871,32 @@ This mock response was generated because AUTOMAKER_MOCK_AGENT=true was set.
     });
 
     // Extract model, maxTurns, and allowedTools from SDK options
-    const finalModel = sdkOptions.model!;
+    let finalModel = sdkOptions.model!;
     const maxTurns = sdkOptions.maxTurns;
     const allowedTools = sdkOptions.allowedTools as string[] | undefined;
+
+    // Resolve model considering enabled providers
+    if (this.settingsService) {
+      try {
+        const globalSettings = await this.settingsService.getGlobalSettings();
+        if (globalSettings.enabledProviders) {
+          const originalModel = finalModel;
+          const resolvedModel = resolveModelWithProviderAvailability(
+            finalModel,
+            globalSettings.enabledProviders,
+            model // Use explicit model as fallback if all providers disabled
+          );
+          if (resolvedModel !== finalModel) {
+            console.log(
+              `[AutoMode] Model substituted due to provider availability: ${finalModel} -> ${resolvedModel}`
+            );
+          }
+          finalModel = resolvedModel;
+        }
+      } catch (error) {
+        console.warn(`[AutoMode] Failed to load enabled providers:`, error);
+      }
+    }
 
     console.log(
       `[AutoMode] runAgent called for feature ${featureId} with model: ${finalModel}, planningMode: ${planningMode}, requiresApproval: ${requiresApproval}`

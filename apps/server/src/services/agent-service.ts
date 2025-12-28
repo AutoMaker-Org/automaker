@@ -18,6 +18,7 @@ import { createChatOptions, validateWorkingDirectory } from '../lib/sdk-options.
 import { PathNotAllowedError } from '@automaker/platform';
 import type { SettingsService } from './settings-service.js';
 import { getAutoLoadClaudeMdSetting, filterClaudeMdFromContext } from '../lib/settings-helpers.js';
+import { resolveModelWithProviderAvailability } from '@automaker/model-resolver';
 
 interface Message {
   id: string;
@@ -269,6 +270,31 @@ export class AgentService {
           }
         } catch (error) {
           console.warn(`[AgentService] Failed to load credentials:`, error);
+        }
+      }
+
+      // Resolve model considering enabled providers
+      if (this.settingsService) {
+        try {
+          const globalSettings = await this.settingsService.getGlobalSettings();
+          if (globalSettings.enabledProviders) {
+            const originalModel = effectiveModel;
+            const resolvedModel = resolveModelWithProviderAvailability(
+              effectiveModel,
+              globalSettings.enabledProviders,
+              model // Use explicit model as fallback if all providers disabled
+            );
+            if (resolvedModel !== effectiveModel) {
+              console.log(
+                `[AgentService] Model substituted due to provider availability: ${effectiveModel} -> ${resolvedModel}`
+              );
+            }
+            // Update effectiveModel for use in provider selection and execution
+            effectiveModel = resolvedModel;
+            sdkOptions.model = resolvedModel;
+          }
+        } catch (error) {
+          console.warn(`[AgentService] Failed to load enabled providers:`, error);
         }
       }
 

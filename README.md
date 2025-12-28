@@ -322,6 +322,32 @@ DATA_DIR=./data
 
 The application can store your API key securely in the settings UI. The key is persisted in the `DATA_DIR` directory.
 
+#### Option 3: Z.ai (GLM) API Key
+
+If using Z.ai GLM models, you can provide your API key using one of these methods:
+
+##### 3a. Shell Configuration
+
+Add to your `~/.bashrc` or `~/.zshrc`:
+
+```bash
+export ZAI_API_KEY="your-zai-key"
+```
+
+Then restart your terminal or run `source ~/.bashrc` (or `source ~/.zshrc`).
+
+##### 3b. .env File
+
+Add to your `.env` file in the project root:
+
+```bash
+ZAI_API_KEY=your-zai-key
+```
+
+##### 3c. In-App Storage
+
+The Z.ai API key can also be stored securely in the settings UI under API Keys.
+
 ## Features
 
 ### Core Workflow
@@ -334,7 +360,7 @@ The application can store your API key securely in the settings UI. The key is p
 
 ### AI & Planning
 
-- 🧠 **Multi-Model Support** - Choose from Claude Opus, Sonnet, and Haiku per feature
+- 🧠 **Multi-Model Support** - Choose from Claude (Opus, Sonnet, Haiku) or Z.ai (GLM-4.7, GLM-4.6v, GLM-4.6, GLM-4.5-Air) models per feature
 - 💭 **Extended Thinking** - Enable thinking modes (none, medium, deep, ultra) for complex problem-solving
 - 📝 **Planning Modes** - Four planning levels: skip (direct implementation), lite (quick plan), spec (task breakdown), full (phased execution)
 - ✅ **Plan Approval** - Review and approve AI-generated plans before implementation begins
@@ -480,7 +506,7 @@ automaker/
 ### Key Architectural Patterns
 
 - **Event-Driven Architecture** - All server operations emit events that stream to the frontend
-- **Provider Pattern** - Extensible AI provider system (currently Claude, designed for future providers)
+- **Provider Pattern** - Extensible AI provider system supporting Claude (Anthropic) and Z.ai (GLM) models
 - **Service-Oriented Backend** - Modular services for agent management, features, terminals, settings
 - **State Management** - Zustand with persistence for frontend state across restarts
 - **File-Based Storage** - No database; features stored as JSON files in `.automaker/` directory

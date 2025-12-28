@@ -66,6 +66,21 @@ export const ZAI_MODELS: ModelOption[] = [
 
 export const ALL_MODELS: ModelOption[] = [...CLAUDE_MODELS, ...ZAI_MODELS];
 
+/**
+ * Filter models by enabled providers
+ * Returns only models from providers that are currently enabled
+ */
+export function getFilteredModels(enabledProviders: {
+  claude: boolean;
+  zai: boolean;
+}): ModelOption[] {
+  return ALL_MODELS.filter(
+    (model) =>
+      (model.provider === 'claude' && enabledProviders.claude) ||
+      (model.provider === 'zai' && enabledProviders.zai)
+  );
+}
+
 export const THINKING_LEVELS: ThinkingLevel[] = ['none', 'low', 'medium', 'high', 'ultrathink'];
 
 export const THINKING_LEVEL_LABELS: Record<ThinkingLevel, string> = {

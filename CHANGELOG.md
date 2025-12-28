@@ -261,14 +261,14 @@ const model = resolveModelString(undefined, undefined, 'claude');
 
 ### Known Issues
 
-- Streaming not yet implemented for Zai (uses `stream: false`)
+- ~~Streaming not yet implemented for Zai~~ (streaming support is now implemented)
 - Tool execution uses shell commands (requires security hardening for production use)
 - Structured output for non-Claude models uses regex parsing (planned: capability flag)
 - Model display naming inconsistent between views ("Opus" vs "GLM-4.7")
 
 ### Future Enhancements
 
-- Add streaming support for Zai models
+- ~~Add streaming support for Zai models~~ (implemented)
 - Implement native structured output capability flag
 - Security hardening for tool execution
 - E2E tests for Zai integration

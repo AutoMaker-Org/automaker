@@ -64,6 +64,10 @@ async function extractTextFromStream(
       }
     } else if (msg.type === 'result' && msg.subtype === 'success') {
       responseText = msg.result || responseText;
+    } else if (msg.type === 'error') {
+      // Handle error messages from the stream
+      logger.error('[DescribeFile] Stream error:', msg.error);
+      throw new Error(msg.error || 'Stream error occurred');
     }
   }
 
