@@ -54,6 +54,7 @@ import { createContextRoutes } from './routes/context/index.js';
 import { createBeadsRoutes } from './routes/beads/index.js';
 import { BeadsService } from './services/beads-service.js';
 import { GitHubIssuePollerService } from './services/github-issue-poller-service.js';
+import { createOrchestratorRoutes } from './routes/orchestrator/index.js';
 
 // Load environment variables
 dotenv.config();
@@ -228,6 +229,7 @@ app.use(
 );
 app.use('/api/context', apiLimiter, createContextRoutes());
 app.use('/api/beads', beadsLimiter, createBeadsRoutes(beadsService));
+app.use('/api/orchestrator', apiLimiter, createOrchestratorRoutes(events));
 
 // Create HTTP server
 const server = createServer(app);
