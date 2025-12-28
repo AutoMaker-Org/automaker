@@ -39,6 +39,7 @@ export {
   ALL_MODEL_MAPS,
   DEFAULT_MODELS,
   MODEL_EQUIVALENCE,
+  PROVIDER_TO_API_KEY_NAME,
   getProviderForModel,
   type ModelAlias,
   type AgentModel,

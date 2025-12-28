@@ -77,6 +77,18 @@ export const MODEL_EQUIVALENCE: Record<string, { provider: 'claude' | 'zai'; mod
 } as const;
 
 /**
+ * Provider name to API key name mapping
+ *
+ * Maps internal provider identifiers to user-facing API key names.
+ * Users see the company name (Anthropic, ZhipuAI) while internally
+ * we use the model family name (claude, zai).
+ */
+export const PROVIDER_TO_API_KEY_NAME: Record<string, string> = {
+  claude: 'anthropic',
+  zai: 'zai',
+} as const;
+
+/**
  * Get the provider for a given model string
  *
  * @param model - Model identifier or full model string

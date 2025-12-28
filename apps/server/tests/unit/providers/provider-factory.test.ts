@@ -288,7 +288,7 @@ describe('provider-factory.ts', () => {
     it('should include models from both Claude and Zai providers', () => {
       const models = ProviderFactory.getAllAvailableModels();
 
-      const claudeModels = models.filter((m) => m.provider === 'anthropic');
+      const claudeModels = models.filter((m) => m.provider === 'claude');
       const zaiModels = models.filter((m) => m.provider === 'zai');
 
       expect(claudeModels.length).toBeGreaterThan(0);

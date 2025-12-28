@@ -116,11 +116,46 @@ export function ZaiSetupStep({ onNext, onBack, onSkip }: ZaiSetupStepProps) {
 
   // Handle save and verify
   const handleSaveAndVerify = async () => {
-    const saved = await saveToken(apiKey);
-    if (!saved) {
+    // First verify the API key before saving
+    if (!apiKey || !isValidApiKey(apiKey)) {
+      setVerificationStatus('error');
+      setVerificationError('Please enter a valid API key (at least 20 characters).');
       return;
     }
-    await verifyApiKey();
+
+    setVerificationStatus('verifying');
+    setVerificationError(null);
+
+    try {
+      const api = getElectronAPI();
+      if (!api.setup?.verifyZaiAuth) {
+        setVerificationStatus('error');
+        setVerificationError('Verification API not available');
+        return;
+      }
+
+      const result = await api.setup.verifyZaiAuth(apiKey);
+
+      if (result.success && result.authenticated) {
+        // Only save if verification succeeded
+        const saved = await saveToken(apiKey);
+        if (saved) {
+          setVerificationStatus('verified');
+          setVerificationError(null);
+          toast.success('Z.ai API key verified and saved!');
+        } else {
+          setVerificationStatus('error');
+          setVerificationError('Failed to save API key after verification');
+        }
+      } else {
+        setVerificationStatus('error');
+        setVerificationError(result.error || 'Authentication failed');
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Verification failed';
+      setVerificationStatus('error');
+      setVerificationError(errorMessage);
+    }
   };
 
   // Check if user is ready to proceed
