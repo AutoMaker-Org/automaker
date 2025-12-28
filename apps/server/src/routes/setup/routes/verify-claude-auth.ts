@@ -1,12 +1,13 @@
 /**
  * POST /verify-claude-auth endpoint - Verify Claude authentication by running a test query
- * Supports verifying either CLI auth or API key auth independently
+ * Supports verifying CLI auth, API key auth, or settings file auth independently
  */
 
 import type { Request, Response } from 'express';
 import { query } from '@anthropic-ai/claude-agent-sdk';
 import { createLogger } from '@automaker/utils';
 import { getApiKey } from '../common.js';
+import { getSettingsEnv } from '../../../lib/claude-settings.js';
 
 const logger = createLogger('Setup');
 
@@ -68,11 +69,24 @@ function containsAuthError(text: string): boolean {
   return AUTH_ERROR_PATTERNS.some((pattern) => lowerText.includes(pattern.toLowerCase()));
 }
 
+/**
+ * Get appropriate error message based on auth method
+ */
+function getAuthErrorMessage(authMethod?: 'cli' | 'api_key' | 'settings_file'): string {
+  const errorMessages = {
+    cli: "CLI authentication failed. Please run 'claude login' in your terminal to authenticate.",
+    settings_file:
+      'Authentication from ~/.claude/settings.json failed. Please check that your authentication token is valid.',
+    api_key: 'API key is invalid or has been revoked.',
+  };
+  return errorMessages[authMethod || 'api_key'];
+}
+
 export function createVerifyClaudeAuthHandler() {
   return async (req: Request, res: Response): Promise<void> => {
     try {
       // Get the auth method from the request body
-      const { authMethod } = req.body as { authMethod?: 'cli' | 'api_key' };
+      const { authMethod } = req.body as { authMethod?: 'cli' | 'api_key' | 'settings_file' };
 
       logger.info(`[Setup] Verifying Claude authentication using method: ${authMethod || 'auto'}`);
 
@@ -84,19 +98,24 @@ export function createVerifyClaudeAuthHandler() {
       let errorMessage = '';
       let receivedAnyContent = false;
 
-      // Save original env values
-      const originalAnthropicKey = process.env.ANTHROPIC_API_KEY;
+      // Save original env values for restoration later
+      const originalEnvValues: Record<string, string | undefined> = {};
+      const envKeysToRestore: string[] = [];
 
       try {
         // Configure environment based on auth method
         if (authMethod === 'cli') {
           // For CLI verification, remove any API key so it uses CLI credentials only
+          originalEnvValues.ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+          envKeysToRestore.push('ANTHROPIC_API_KEY');
           delete process.env.ANTHROPIC_API_KEY;
           logger.info('[Setup] Cleared API key environment for CLI verification');
         } else if (authMethod === 'api_key') {
           // For API key verification, ensure we're using the stored API key
           const storedApiKey = getApiKey('anthropic');
           if (storedApiKey) {
+            originalEnvValues.ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+            envKeysToRestore.push('ANTHROPIC_API_KEY');
             process.env.ANTHROPIC_API_KEY = storedApiKey;
             logger.info('[Setup] Using stored API key for verification');
           } else {
@@ -109,6 +128,36 @@ export function createVerifyClaudeAuthHandler() {
               });
               return;
             }
+          }
+        } else if (authMethod === 'settings_file') {
+          // For settings_file verification, load ALL env vars from ~/.claude/settings.json
+          const settingsEnv = await getSettingsEnv();
+          if (settingsEnv) {
+            // Save original values and apply settings env
+            for (const [key, value] of Object.entries(settingsEnv)) {
+              originalEnvValues[key] = process.env[key];
+              envKeysToRestore.push(key);
+              process.env[key] = value;
+            }
+            // Map ANTHROPIC_AUTH_TOKEN to ANTHROPIC_API_KEY if present
+            if (settingsEnv.ANTHROPIC_AUTH_TOKEN && !settingsEnv.ANTHROPIC_API_KEY) {
+              originalEnvValues.ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+              if (!envKeysToRestore.includes('ANTHROPIC_API_KEY')) {
+                envKeysToRestore.push('ANTHROPIC_API_KEY');
+              }
+              process.env.ANTHROPIC_API_KEY = settingsEnv.ANTHROPIC_AUTH_TOKEN;
+            }
+            logger.info('[Setup] Using env from ~/.claude/settings.json for verification', {
+              keys: Object.keys(settingsEnv),
+            });
+          } else {
+            res.json({
+              success: true,
+              authenticated: false,
+              error:
+                'No authentication token found in ~/.claude/settings.json. Please ensure the file exists and contains a valid authentication token.',
+            });
+            return;
           }
         }
 
@@ -143,12 +192,7 @@ export function createVerifyClaudeAuthHandler() {
           // Check if any part of the message contains auth errors
           if (containsAuthError(msgStr)) {
             logger.error('[Setup] Found auth error in message');
-            if (authMethod === 'cli') {
-              errorMessage =
-                "CLI authentication failed. Please run 'claude login' in your terminal to authenticate.";
-            } else {
-              errorMessage = 'API key is invalid or has been revoked.';
-            }
+            errorMessage = getAuthErrorMessage(authMethod);
             break;
           }
 
@@ -162,12 +206,7 @@ export function createVerifyClaudeAuthHandler() {
                   logger.info('[Setup] Assistant text:', text);
 
                   if (containsAuthError(text)) {
-                    if (authMethod === 'cli') {
-                      errorMessage =
-                        "CLI authentication failed. Please run 'claude login' in your terminal to authenticate.";
-                    } else {
-                      errorMessage = 'API key is invalid or has been revoked.';
-                    }
+                    errorMessage = getAuthErrorMessage(authMethod);
                     break;
                   }
 
@@ -200,12 +239,7 @@ export function createVerifyClaudeAuthHandler() {
               authenticated = false;
               break;
             } else if (containsAuthError(resultStr)) {
-              if (authMethod === 'cli') {
-                errorMessage =
-                  "CLI authentication failed. Please run 'claude login' in your terminal to authenticate.";
-              } else {
-                errorMessage = 'API key is invalid or has been revoked.';
-              }
+              errorMessage = getAuthErrorMessage(authMethod);
             } else {
               // Got a result without errors
               receivedAnyContent = true;
@@ -248,12 +282,7 @@ export function createVerifyClaudeAuthHandler() {
         }
         // Check for auth-related errors in exception
         else if (containsAuthError(errMessage)) {
-          if (authMethod === 'cli') {
-            errorMessage =
-              "CLI authentication failed. Please run 'claude login' in your terminal to authenticate.";
-          } else {
-            errorMessage = 'API key is invalid or has been revoked.';
-          }
+          errorMessage = getAuthErrorMessage(authMethod);
         } else if (errMessage.includes('abort') || errMessage.includes('timeout')) {
           errorMessage = 'Verification timed out. Please try again.';
         } else if (errMessage.includes('exit') && errMessage.includes('code 1')) {
@@ -271,11 +300,12 @@ export function createVerifyClaudeAuthHandler() {
       } finally {
         clearTimeout(timeoutId);
         // Restore original environment
-        if (originalAnthropicKey !== undefined) {
-          process.env.ANTHROPIC_API_KEY = originalAnthropicKey;
-        } else if (authMethod === 'cli') {
-          // If we cleared it and there was no original, keep it cleared
-          delete process.env.ANTHROPIC_API_KEY;
+        for (const key of envKeysToRestore) {
+          if (originalEnvValues[key] !== undefined) {
+            process.env[key] = originalEnvValues[key];
+          } else {
+            delete process.env[key];
+          }
         }
       }
 

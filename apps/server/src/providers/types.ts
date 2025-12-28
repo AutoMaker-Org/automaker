@@ -76,6 +76,7 @@ export interface InstallationStatus {
   method?: 'cli' | 'npm' | 'brew' | 'sdk';
   hasApiKey?: boolean;
   authenticated?: boolean;
+  authMethod?: 'settings_file' | 'api_key' | 'cli_authenticated' | 'oauth_token' | 'none';
   error?: string;
 }
 

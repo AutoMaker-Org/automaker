@@ -8,6 +8,7 @@ import os from 'os';
 import path from 'path';
 import fs from 'fs/promises';
 import { getApiKey } from './common.js';
+import { hasSettingsFileAuth } from '../../lib/claude-settings.js';
 
 const execAsync = promisify(exec);
 
@@ -90,12 +91,20 @@ export async function getClaudeStatus() {
     hasStoredOAuthToken: !!getApiKey('anthropic_oauth_token'),
     hasStoredApiKey: !!getApiKey('anthropic'),
     hasEnvApiKey: !!process.env.ANTHROPIC_API_KEY,
+    hasSettingsFileAuth: false, // NEW: Check for ~/.claude/settings.json with auth
     // Additional fields for detailed status
     oauthTokenValid: false,
     apiKeyValid: false,
     hasCliAuth: false,
     hasRecentActivity: false,
   };
+
+  // Check for ~/.claude/settings.json with auth token (highest priority for SDK usage)
+  auth.hasSettingsFileAuth = await hasSettingsFileAuth();
+  if (auth.hasSettingsFileAuth && !auth.authenticated) {
+    auth.authenticated = true;
+    auth.method = 'settings_file';
+  }
 
   const claudeDir = path.join(os.homedir(), '.claude');
 

@@ -28,6 +28,7 @@ export type ClaudeAuthMethod =
   | 'api_key' // Manually stored API key
   | 'credentials_file' // Generic credentials file detection
   | 'cli_authenticated' // Claude CLI is installed and has active sessions/activity
+  | 'settings_file' // Authentication from ~/.claude/settings.json
   | 'none';
 
 // Claude Auth Status
@@ -35,6 +36,7 @@ export interface ClaudeAuthStatus {
   authenticated: boolean;
   method: ClaudeAuthMethod;
   hasCredentialsFile?: boolean;
+  hasSettingsFileAuth?: boolean; // Has auth token in ~/.claude/settings.json
   oauthTokenValid?: boolean;
   apiKeyValid?: boolean;
   hasEnvOAuthToken?: boolean;
