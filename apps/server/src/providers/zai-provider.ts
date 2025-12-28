@@ -536,13 +536,19 @@ function sanitizeCommand(
   // Percent (%) is allowed for Windows environment variables
   // Parentheses () are allowed for subshells and command grouping
   // Brackets [] and braces {} are allowed for glob patterns and templates
-  // But dangerous combinations like ;, `, $, quotes are blocked
+  // Quotes are allowed but must be balanced for security
   // Pipe (|) and ampersands (&, &&) are extracted separately above
-  const dangerousChars = /[;`$"']/;
+  const dangerousChars = /[;`$]/;
   for (let i = 1; i < parts.length; i++) {
     const arg = parts[i];
     if (dangerousChars.test(arg)) {
       throw new Error(`Invalid characters in argument: ${arg}`);
+    }
+    // Check for balanced quotes to prevent injection via unclosed strings
+    const singleQuotes = (arg.match(/'/g) || []).length;
+    const doubleQuotes = (arg.match(/"/g) || []).length;
+    if (singleQuotes % 2 !== 0 || doubleQuotes % 2 !== 0) {
+      throw new Error(`Unbalanced quotes in argument: ${arg}`);
     }
   }
 
