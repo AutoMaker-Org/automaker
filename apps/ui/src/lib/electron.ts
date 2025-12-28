@@ -652,12 +652,12 @@ export interface ElectronAPI {
       success: boolean;
       result?: {
         updateAvailable: boolean;
-        localCommit: string;
-        localCommitShort: string;
-        remoteCommit: string | null;
-        remoteCommitShort: string | null;
-        upstreamUrl: string;
-        automakerPath: string;
+        localVersion: string;
+        localVersionShort: string;
+        remoteVersion: string | null;
+        remoteVersionShort: string | null;
+        sourceUrl: string;
+        installPath: string;
         error?: string;
       };
       error?: string;
@@ -666,10 +666,10 @@ export interface ElectronAPI {
       success: boolean;
       result?: {
         success: boolean;
-        previousCommit: string;
-        previousCommitShort: string;
-        newCommit: string;
-        newCommitShort: string;
+        previousVersion: string;
+        previousVersionShort: string;
+        newVersion: string;
+        newVersionShort: string;
         alreadyUpToDate: boolean;
         message: string;
       };
@@ -678,14 +678,14 @@ export interface ElectronAPI {
     info: () => Promise<{
       success: boolean;
       result?: {
-        automakerPath: string;
+        installPath: string;
         isGitRepo: boolean;
         gitAvailable: boolean;
-        currentCommit: string | null;
-        currentCommitShort: string | null;
+        currentVersion: string | null;
+        currentVersionShort: string | null;
         currentBranch: string | null;
         hasLocalChanges: boolean;
-        upstreamUrl: string;
+        sourceUrl: string;
         autoUpdateEnabled: boolean;
         checkIntervalMinutes: number;
       };

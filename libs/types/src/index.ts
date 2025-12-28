@@ -135,6 +135,7 @@ export type {
   BacklogPlanApplyResult,
 } from './backlog-plan.js';
 
+
 // Pipeline types
 export type {
   PipelineStep,
@@ -145,3 +146,12 @@ export type {
 
 // Port configuration
 export { STATIC_PORT, SERVER_PORT, RESERVED_PORTS } from './ports.js';
+=======
+// Updates types
+export type {
+  UpdateInfo,
+  UpdateCheckResult,
+  UpdatePullResult,
+  UpdateApiResponse,
+} from './updates.js';
+

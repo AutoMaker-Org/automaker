@@ -6,6 +6,7 @@
 
 import type { Request, Response } from 'express';
 import type { SettingsService } from '../../../services/settings-service.js';
+import type { UpdatePullResult } from '@automaker/types';
 import {
   execAsync,
   execEnv,
@@ -19,20 +20,10 @@ import {
   logError,
 } from '../common.js';
 
-export interface UpdatePullResult {
-  success: boolean;
-  previousCommit: string;
-  previousCommitShort: string;
-  newCommit: string;
-  newCommitShort: string;
-  alreadyUpToDate: boolean;
-  message: string;
-}
-
 export function createPullHandler(settingsService: SettingsService) {
   return async (_req: Request, res: Response): Promise<void> => {
     try {
-      const automakerPath = getAutomakerRoot();
+      const installPath = getAutomakerRoot();
 
       // Check if git is available
       if (!(await isGitAvailable())) {
@@ -44,7 +35,7 @@ export function createPullHandler(settingsService: SettingsService) {
       }
 
       // Check if automaker directory is a git repo
-      if (!(await isGitRepo(automakerPath))) {
+      if (!(await isGitRepo(installPath))) {
         res.status(500).json({
           success: false,
           error: 'Automaker installation is not a git repository',
@@ -53,7 +44,7 @@ export function createPullHandler(settingsService: SettingsService) {
       }
 
       // Check for local changes
-      if (await hasLocalChanges(automakerPath)) {
+      if (await hasLocalChanges(installPath)) {
         res.status(400).json({
           success: false,
           error: 'You have local uncommitted changes. Please commit or stash them before updating.',
@@ -63,12 +54,12 @@ export function createPullHandler(settingsService: SettingsService) {
 
       // Get settings for upstream URL
       const settings = await settingsService.getGlobalSettings();
-      const upstreamUrl =
+      const sourceUrl =
         settings.autoUpdate?.upstreamUrl || 'https://github.com/AutoMaker-Org/automaker.git';
 
-      // Get current commit before pull
-      const previousCommit = await getCurrentCommit(automakerPath);
-      const previousCommitShort = await getShortCommit(automakerPath);
+      // Get current version before pull
+      const previousVersion = await getCurrentCommit(installPath);
+      const previousVersionShort = await getShortCommit(installPath);
 
       // Use a temporary remote to pull from
       const tempRemoteName = 'automaker-update-pull';
@@ -77,7 +68,7 @@ export function createPullHandler(settingsService: SettingsService) {
         // Remove temp remote if it exists (ignore errors)
         try {
           await execAsync(`git remote remove ${tempRemoteName}`, {
-            cwd: automakerPath,
+            cwd: installPath,
             env: execEnv,
           });
         } catch {
@@ -85,20 +76,20 @@ export function createPullHandler(settingsService: SettingsService) {
         }
 
         // Add temporary remote
-        await execAsync(`git remote add ${tempRemoteName} "${upstreamUrl}"`, {
-          cwd: automakerPath,
+        await execAsync(`git remote add ${tempRemoteName} "${sourceUrl}"`, {
+          cwd: installPath,
           env: execEnv,
         });
 
         // Fetch first
         await execAsync(`git fetch ${tempRemoteName} main`, {
-          cwd: automakerPath,
+          cwd: installPath,
           env: execEnv,
         });
 
         // Get current branch
         const { stdout: branchOutput } = await execAsync('git rev-parse --abbrev-ref HEAD', {
-          cwd: automakerPath,
+          cwd: installPath,
           env: execEnv,
         });
         const currentBranch = branchOutput.trim();
@@ -106,32 +97,32 @@ export function createPullHandler(settingsService: SettingsService) {
         // Merge the fetched changes
         const { stdout: mergeOutput } = await execAsync(
           `git merge ${tempRemoteName}/main --ff-only`,
-          { cwd: automakerPath, env: execEnv }
+          { cwd: installPath, env: execEnv }
         );
 
         // Clean up temp remote
         await execAsync(`git remote remove ${tempRemoteName}`, {
-          cwd: automakerPath,
+          cwd: installPath,
           env: execEnv,
         });
 
-        // Get new commit after merge
-        const newCommit = await getCurrentCommit(automakerPath);
-        const newCommitShort = await getShortCommit(automakerPath);
+        // Get new version after merge
+        const newVersion = await getCurrentCommit(installPath);
+        const newVersionShort = await getShortCommit(installPath);
 
         const alreadyUpToDate =
-          mergeOutput.includes('Already up to date') || previousCommit === newCommit;
+          mergeOutput.includes('Already up to date') || previousVersion === newVersion;
 
         const result: UpdatePullResult = {
           success: true,
-          previousCommit,
-          previousCommitShort,
-          newCommit,
-          newCommitShort,
+          previousVersion,
+          previousVersionShort,
+          newVersion,
+          newVersionShort,
           alreadyUpToDate,
           message: alreadyUpToDate
             ? 'Already up to date'
-            : `Updated from ${previousCommitShort} to ${newCommitShort}`,
+            : `Updated from ${previousVersionShort} to ${newVersionShort}`,
         };
 
         res.json({
@@ -142,7 +133,7 @@ export function createPullHandler(settingsService: SettingsService) {
         // Clean up temp remote on error
         try {
           await execAsync(`git remote remove ${tempRemoteName}`, {
-            cwd: automakerPath,
+            cwd: installPath,
             env: execEnv,
           });
         } catch {

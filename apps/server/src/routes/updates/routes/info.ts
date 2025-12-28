@@ -1,11 +1,12 @@
 /**
  * GET /info endpoint - Get current installation info
  *
- * Returns current commit, branch, and configuration info.
+ * Returns current version, branch, and configuration info.
  */
 
 import type { Request, Response } from 'express';
 import type { SettingsService } from '../../../services/settings-service.js';
+import type { UpdateInfo } from '@automaker/types';
 import {
   execAsync,
   execEnv,
@@ -19,23 +20,10 @@ import {
   logError,
 } from '../common.js';
 
-export interface UpdateInfo {
-  automakerPath: string;
-  isGitRepo: boolean;
-  gitAvailable: boolean;
-  currentCommit: string | null;
-  currentCommitShort: string | null;
-  currentBranch: string | null;
-  hasLocalChanges: boolean;
-  upstreamUrl: string;
-  autoUpdateEnabled: boolean;
-  checkIntervalMinutes: number;
-}
-
 export function createInfoHandler(settingsService: SettingsService) {
   return async (_req: Request, res: Response): Promise<void> => {
     try {
-      const automakerPath = getAutomakerRoot();
+      const installPath = getAutomakerRoot();
 
       // Get settings
       const settings = await settingsService.getGlobalSettings();
@@ -50,16 +38,19 @@ export function createInfoHandler(settingsService: SettingsService) {
 
       if (!gitAvailable) {
         const result: UpdateInfo = {
-          automakerPath,
-          isGitRepo: false,
-          gitAvailable: false,
-          currentCommit: null,
-          currentCommitShort: null,
+          installPath,
+          currentVersion: null,
+          currentVersionShort: null,
           currentBranch: null,
           hasLocalChanges: false,
-          upstreamUrl: autoUpdateSettings.upstreamUrl,
+          sourceUrl: autoUpdateSettings.upstreamUrl,
           autoUpdateEnabled: autoUpdateSettings.enabled,
           checkIntervalMinutes: autoUpdateSettings.checkIntervalMinutes,
+          updateType: 'git',
+          mechanismInfo: {
+            isGitRepo: false,
+            gitAvailable: false,
+          },
         };
 
         res.json({
@@ -70,20 +61,23 @@ export function createInfoHandler(settingsService: SettingsService) {
       }
 
       // Check if it's a git repo
-      const isRepo = await isGitRepo(automakerPath);
+      const isRepo = await isGitRepo(installPath);
 
       if (!isRepo) {
         const result: UpdateInfo = {
-          automakerPath,
-          isGitRepo: false,
-          gitAvailable: true,
-          currentCommit: null,
-          currentCommitShort: null,
+          installPath,
+          currentVersion: null,
+          currentVersionShort: null,
           currentBranch: null,
           hasLocalChanges: false,
-          upstreamUrl: autoUpdateSettings.upstreamUrl,
+          sourceUrl: autoUpdateSettings.upstreamUrl,
           autoUpdateEnabled: autoUpdateSettings.enabled,
           checkIntervalMinutes: autoUpdateSettings.checkIntervalMinutes,
+          updateType: 'git',
+          mechanismInfo: {
+            isGitRepo: false,
+            gitAvailable: true,
+          },
         };
 
         res.json({
@@ -94,30 +88,33 @@ export function createInfoHandler(settingsService: SettingsService) {
       }
 
       // Get git info
-      const currentCommit = await getCurrentCommit(automakerPath);
-      const currentCommitShort = await getShortCommit(automakerPath);
+      const currentVersion = await getCurrentCommit(installPath);
+      const currentVersionShort = await getShortCommit(installPath);
 
       // Get current branch
       const { stdout: branchOutput } = await execAsync('git rev-parse --abbrev-ref HEAD', {
-        cwd: automakerPath,
+        cwd: installPath,
         env: execEnv,
       });
       const currentBranch = branchOutput.trim();
 
       // Check for local changes
-      const localChanges = await hasLocalChanges(automakerPath);
+      const localChanges = await hasLocalChanges(installPath);
 
       const result: UpdateInfo = {
-        automakerPath,
-        isGitRepo: true,
-        gitAvailable: true,
-        currentCommit,
-        currentCommitShort,
+        installPath,
+        currentVersion,
+        currentVersionShort,
         currentBranch,
         hasLocalChanges: localChanges,
-        upstreamUrl: autoUpdateSettings.upstreamUrl,
+        sourceUrl: autoUpdateSettings.upstreamUrl,
         autoUpdateEnabled: autoUpdateSettings.enabled,
         checkIntervalMinutes: autoUpdateSettings.checkIntervalMinutes,
+        updateType: 'git',
+        mechanismInfo: {
+          isGitRepo: true,
+          gitAvailable: true,
+        },
       };
 
       res.json({

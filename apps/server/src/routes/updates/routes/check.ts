@@ -1,11 +1,12 @@
 /**
  * GET /check endpoint - Check if updates are available
  *
- * Compares local HEAD commit with the remote upstream branch.
+ * Compares local version with the remote upstream version.
  */
 
 import type { Request, Response } from 'express';
 import type { SettingsService } from '../../../services/settings-service.js';
+import type { UpdateCheckResult } from '@automaker/types';
 import {
   execAsync,
   execEnv,
@@ -18,21 +19,10 @@ import {
   logError,
 } from '../common.js';
 
-export interface UpdateCheckResult {
-  updateAvailable: boolean;
-  localCommit: string;
-  localCommitShort: string;
-  remoteCommit: string | null;
-  remoteCommitShort: string | null;
-  upstreamUrl: string;
-  automakerPath: string;
-  error?: string;
-}
-
 export function createCheckHandler(settingsService: SettingsService) {
   return async (_req: Request, res: Response): Promise<void> => {
     try {
-      const automakerPath = getAutomakerRoot();
+      const installPath = getAutomakerRoot();
 
       // Check if git is available
       if (!(await isGitAvailable())) {
@@ -44,7 +34,7 @@ export function createCheckHandler(settingsService: SettingsService) {
       }
 
       // Check if automaker directory is a git repo
-      if (!(await isGitRepo(automakerPath))) {
+      if (!(await isGitRepo(installPath))) {
         res.status(500).json({
           success: false,
           error: 'Automaker installation is not a git repository',
@@ -54,12 +44,12 @@ export function createCheckHandler(settingsService: SettingsService) {
 
       // Get settings for upstream URL
       const settings = await settingsService.getGlobalSettings();
-      const upstreamUrl =
+      const sourceUrl =
         settings.autoUpdate?.upstreamUrl || 'https://github.com/AutoMaker-Org/automaker.git';
 
-      // Get local commit
-      const localCommit = await getCurrentCommit(automakerPath);
-      const localCommitShort = await getShortCommit(automakerPath);
+      // Get local version
+      const localVersion = await getCurrentCommit(installPath);
+      const localVersionShort = await getShortCommit(installPath);
 
       // Fetch from upstream (use a temporary remote name to avoid conflicts)
       const tempRemoteName = 'automaker-update-check';
@@ -68,7 +58,7 @@ export function createCheckHandler(settingsService: SettingsService) {
         // Remove temp remote if it exists (ignore errors)
         try {
           await execAsync(`git remote remove ${tempRemoteName}`, {
-            cwd: automakerPath,
+            cwd: installPath,
             env: execEnv,
           });
         } catch {
@@ -76,45 +66,45 @@ export function createCheckHandler(settingsService: SettingsService) {
         }
 
         // Add temporary remote
-        await execAsync(`git remote add ${tempRemoteName} "${upstreamUrl}"`, {
-          cwd: automakerPath,
+        await execAsync(`git remote add ${tempRemoteName} "${sourceUrl}"`, {
+          cwd: installPath,
           env: execEnv,
         });
 
         // Fetch from the temporary remote
         await execAsync(`git fetch ${tempRemoteName} main`, {
-          cwd: automakerPath,
+          cwd: installPath,
           env: execEnv,
         });
 
-        // Get remote commit
-        const { stdout: remoteCommitOutput } = await execAsync(
+        // Get remote version
+        const { stdout: remoteVersionOutput } = await execAsync(
           `git rev-parse ${tempRemoteName}/main`,
-          { cwd: automakerPath, env: execEnv }
+          { cwd: installPath, env: execEnv }
         );
-        const remoteCommit = remoteCommitOutput.trim();
+        const remoteVersion = remoteVersionOutput.trim();
 
-        // Get short remote commit
-        const { stdout: remoteCommitShortOutput } = await execAsync(
+        // Get short remote version
+        const { stdout: remoteVersionShortOutput } = await execAsync(
           `git rev-parse --short ${tempRemoteName}/main`,
-          { cwd: automakerPath, env: execEnv }
+          { cwd: installPath, env: execEnv }
         );
-        const remoteCommitShort = remoteCommitShortOutput.trim();
+        const remoteVersionShort = remoteVersionShortOutput.trim();
 
         // Clean up temp remote
         await execAsync(`git remote remove ${tempRemoteName}`, {
-          cwd: automakerPath,
+          cwd: installPath,
           env: execEnv,
         });
 
         // Check if remote is ahead of local (update available)
         // git merge-base --is-ancestor <commit1> <commit2> returns 0 if commit1 is ancestor of commit2
         let updateAvailable = false;
-        if (localCommit !== remoteCommit) {
+        if (localVersion !== remoteVersion) {
           try {
             // Check if local is already an ancestor of remote (remote is ahead)
-            await execAsync(`git merge-base --is-ancestor ${localCommit} ${remoteCommit}`, {
-              cwd: automakerPath,
+            await execAsync(`git merge-base --is-ancestor ${localVersion} ${remoteVersion}`, {
+              cwd: installPath,
               env: execEnv,
             });
             // If we get here (exit code 0), local is ancestor of remote, so update is available
@@ -129,12 +119,12 @@ export function createCheckHandler(settingsService: SettingsService) {
 
         const result: UpdateCheckResult = {
           updateAvailable,
-          localCommit,
-          localCommitShort,
-          remoteCommit,
-          remoteCommitShort,
-          upstreamUrl,
-          automakerPath,
+          localVersion,
+          localVersionShort,
+          remoteVersion,
+          remoteVersionShort,
+          sourceUrl,
+          installPath,
         };
 
         res.json({
@@ -145,7 +135,7 @@ export function createCheckHandler(settingsService: SettingsService) {
         // Clean up temp remote on error
         try {
           await execAsync(`git remote remove ${tempRemoteName}`, {
-            cwd: automakerPath,
+            cwd: installPath,
             env: execEnv,
           });
         } catch {
@@ -159,12 +149,12 @@ export function createCheckHandler(settingsService: SettingsService) {
           success: true,
           result: {
             updateAvailable: false,
-            localCommit,
-            localCommitShort,
-            remoteCommit: null,
-            remoteCommitShort: null,
-            upstreamUrl,
-            automakerPath,
+            localVersion,
+            localVersionShort,
+            remoteVersion: null,
+            remoteVersionShort: null,
+            sourceUrl,
+            installPath,
             error: `Could not fetch from upstream: ${errorMsg}`,
           } satisfies UpdateCheckResult,
         });
