@@ -1187,13 +1187,23 @@ export class ZaiProvider extends BaseProvider {
         let currentToolCalls: Map<number, { id: string; name: string; arguments: string }> =
           new Map();
         let finishReason = '';
+        let sseBuffer = ''; // Buffer for incomplete SSE lines
 
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
 
           const chunk = decoder.decode(value, { stream: true });
-          const lines = chunk.split('\n');
+          sseBuffer += chunk;
+
+          // Split into lines, keeping the last incomplete line in buffer
+          const lines = sseBuffer.split('\n');
+          if (!chunk.endsWith('\n')) {
+            // Last line is incomplete, keep it for next chunk
+            sseBuffer = lines.pop() || '';
+          } else {
+            sseBuffer = '';
+          }
 
           for (const line of lines) {
             const trimmed = line.trim();
@@ -1303,6 +1313,18 @@ export class ZaiProvider extends BaseProvider {
               break;
             }
             // Otherwise continue waiting for complete tool call data
+          }
+        }
+
+        // Safety check: if stream ended with incomplete tool calls, warn and don't execute them
+        if (finishReason === 'tool_calls' && currentToolCalls.size > 0) {
+          const allComplete = Array.from(currentToolCalls.values()).every(
+            (tc) => tc.id && tc.name && tc.arguments
+          );
+          if (!allComplete) {
+            logger.warn('[Zai] Stream ended with incomplete tool calls, skipping execution');
+            // Clear incomplete tool calls to prevent execution errors
+            currentToolCalls.clear();
           }
         }
 
@@ -1481,6 +1503,23 @@ export class ZaiProvider extends BaseProvider {
     images: Array<{ type: string; source?: object }>,
     originalPrompt: string
   ): Promise<string> {
+    // Validate image sources - only base64 is supported
+    for (const img of images) {
+      if (img.source && typeof img.source === 'object') {
+        const source = img.source as { type?: string; data?: string };
+        // Reject file:// URLs or other URL schemes
+        if (source.data && typeof source.data === 'string' && source.data.startsWith('file://')) {
+          throw new Error('file:// URLs are not supported in image sources');
+        }
+        // Reject any source type other than base64
+        if (source.type && source.type !== 'base64') {
+          throw new Error(
+            `Unsupported image source type: ${source.type}. Only base64 is supported.`
+          );
+        }
+      }
+    }
+
     const apiKey = this.getApiKey();
 
     // Build image-only content for GLM-4.6v
@@ -1672,13 +1711,13 @@ export class ZaiProvider extends BaseProvider {
    * Check if the provider supports a specific feature
    */
   supportsFeature(feature: ProviderFeature | string): boolean {
-    // Zai supports: tools, text, vision (via glm-4.6v), extended thinking (via all GLM models), structured output
+    // Zai supports: tools, text, vision (via glm-4.6v), thinking mode (via all GLM models), structured output
     // Zai does NOT support: mcp, browser (these are application-layer features)
     const supportedFeatures: ProviderFeature[] = [
       'tools',
       'text',
       'vision',
-      'extendedThinking',
+      'thinking', // Zai's thinking mode (GLM reasoning content)
       'structuredOutput',
     ];
     return supportedFeatures.includes(feature as ProviderFeature);

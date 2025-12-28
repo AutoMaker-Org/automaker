@@ -441,8 +441,8 @@ describe('zai-provider.ts', () => {
       expect(provider.supportsFeature('vision')).toBe(true);
     });
 
-    it("should support 'extendedThinking' feature", () => {
-      expect(provider.supportsFeature('extendedThinking')).toBe(true);
+    it("should support 'thinking' feature (Zai's thinking mode)", () => {
+      expect(provider.supportsFeature('thinking')).toBe(true);
     });
 
     it("should not support 'mcp' feature", () => {
@@ -851,6 +851,99 @@ describe('zai-provider.ts', () => {
           r.message?.content?.[0]?.name === 'grep_search'
       );
       expect(toolUseResult).toBeDefined();
+    });
+  });
+
+  describe('image handling', () => {
+    beforeEach(() => {
+      provider = new ZaiProvider({ apiKey: 'test-key' });
+    });
+
+    it('should detect vision support correctly for glm-4.6v', () => {
+      // @ts-expect-error - testing private method
+      expect(provider.modelSupportsVision('glm-4.6v')).toBe(true);
+      // @ts-expect-error - testing private method
+      expect(provider.modelSupportsVision('glm-4.7')).toBe(false);
+      // @ts-expect-error - testing private method
+      expect(provider.modelSupportsVision('glm-4.6')).toBe(false);
+      // @ts-expect-error - testing private method
+      expect(provider.modelSupportsVision('glm-4.5-air')).toBe(false);
+    });
+
+    it('should reject file:// URLs in image sources', async () => {
+      const images = [
+        { type: 'image', source: { type: 'base64', data: 'fake-base64-data' } },
+        { type: 'image', source: { type: 'base64', data: 'file://malicious-path' } },
+      ];
+
+      await expect(
+        // @ts-expect-error - testing private method
+        provider.describeImages(images, 'test prompt')
+      ).rejects.toThrow('file:// URLs are not supported');
+    });
+
+    it('should reject non-base64 image source types', async () => {
+      const images = [
+        { type: 'image', source: { type: 'url', data: 'http://example.com/image.png' } },
+      ];
+
+      await expect(
+        // @ts-expect-error - testing private method
+        provider.describeImages(images, 'test prompt')
+      ).rejects.toThrow('Unsupported image source type: url');
+    });
+
+    it('should handle empty images array gracefully', async () => {
+      // @ts-expect-error - testing private method
+      const result = await provider.describeImages([], 'test prompt');
+      expect(result).toBe('');
+    });
+
+    it('should include image context in prompt when images are provided', async () => {
+      const images = [
+        {
+          type: 'image',
+          source: {
+            type: 'base64',
+            data: 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+          },
+        },
+      ];
+
+      // Mock successful vision API response
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          choices: [
+            {
+              message: {
+                content: 'A 1x1 red pixel image.',
+              },
+            },
+          ],
+        }),
+      });
+
+      // @ts-expect-error - testing private method
+      const result = await provider.describeImages(images, 'What do you see?');
+
+      // Verify fetch was called
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      const fetchArgs = mockFetch.mock.calls[0];
+
+      // Verify URL is Zai API endpoint
+      expect(fetchArgs[0]).toContain('api.z.ai');
+
+      // Verify options object has correct method and contains model in body
+      expect(fetchArgs[1]).toMatchObject({
+        method: 'POST',
+      });
+      const bodyStr = fetchArgs[1]?.body;
+      expect(bodyStr).toContain('"model":"glm-4.6v"');
+
+      // Result should contain the image description (with prefix added by the method)
+      expect(result).toContain('A 1x1 red pixel image.');
     });
   });
 });

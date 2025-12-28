@@ -233,7 +233,8 @@ export interface ModelDefinition {
   maxOutputTokens?: number;
   supportsVision?: boolean;
   supportsTools?: boolean;
-  supportsExtendedThinking?: boolean; // For Claude extended thinking and Zai thinking mode
+  /** @deprecated Use provider-specific feature checks via supportsFeature() */
+  supportsExtendedThinking?: boolean; // Claude: extended thinking, Zai: thinking mode
   tier?: 'basic' | 'standard' | 'premium' | 'vision';
   default?: boolean;
 }

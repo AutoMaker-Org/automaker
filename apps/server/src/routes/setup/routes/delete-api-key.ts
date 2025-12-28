@@ -6,12 +6,9 @@ import type { Request, Response } from 'express';
 import { createLogger } from '@automaker/utils';
 import path from 'path';
 import fs from 'fs/promises';
+import { setApiKey, getProviderEnvKey } from '../common.js';
 
 const logger = createLogger('Setup');
-
-// In-memory storage reference (imported from common.ts pattern)
-// We need to modify common.ts to export a deleteApiKey function
-import { setApiKey } from '../common.js';
 
 /**
  * Remove an API key from the .env file
@@ -61,17 +58,12 @@ export function createDeleteApiKeyHandler() {
 
       logger.info(`[Setup] Deleting API key for provider: ${provider}`);
 
-      // Map provider to env key name
-      const envKeyMap: Record<string, string> = {
-        anthropic: 'ANTHROPIC_API_KEY',
-        zai: 'ZAI_API_KEY',
-      };
-
-      const envKey = envKeyMap[provider];
+      // Get env key from provider registry
+      const envKey = getProviderEnvKey(provider);
       if (!envKey) {
         res.status(400).json({
           success: false,
-          error: `Unknown provider: ${provider}. Only anthropic and zai are supported.`,
+          error: `Unknown provider: ${provider}. Supported providers: anthropic, zai.`,
         });
         return;
       }

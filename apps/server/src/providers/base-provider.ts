@@ -14,6 +14,11 @@ import type {
 /**
  * Supported provider features
  * Used to check capability compatibility between providers
+ *
+ * Feature descriptions:
+ * - extendedThinking: Claude's extended thinking mode (extended thinking with tokens)
+ * - thinking: Zai's thinking mode (GLM thinking/reasoning content)
+ * - Both features represent "thinking/reasoning" capability from different providers
  */
 export type ProviderFeature =
   | 'tools'
@@ -21,8 +26,8 @@ export type ProviderFeature =
   | 'vision'
   | 'mcp'
   | 'browser'
-  | 'extendedThinking'
-  | 'thinking'
+  | 'extendedThinking' // Claude: extended thinking
+  | 'thinking' // Zai: GLM thinking mode
   | 'structuredOutput';
 
 /**

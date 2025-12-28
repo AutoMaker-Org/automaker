@@ -247,8 +247,36 @@ export class AgentService {
       const maxTurns = sdkOptions.maxTurns;
       const allowedTools = sdkOptions.allowedTools as string[] | undefined;
 
-      // Get provider for this model
-      const provider = ProviderFactory.getProviderForModel(effectiveModel);
+      // Load credentials from SettingsService for API key
+      let apiKey: string | undefined;
+      if (this.settingsService) {
+        try {
+          const credentials = await this.settingsService.getCredentials();
+          const lowerModel = effectiveModel.toLowerCase();
+
+          // Determine the appropriate API key for this model
+          if (lowerModel.startsWith('glm-') || lowerModel === 'glm') {
+            apiKey = credentials.apiKeys?.zai;
+          } else if (
+            lowerModel.startsWith('claude-') ||
+            ['haiku', 'sonnet', 'opus'].includes(lowerModel)
+          ) {
+            apiKey = credentials.apiKeys?.anthropic;
+          }
+
+          if (apiKey) {
+            console.log(`[AgentService] Loaded API key from settings for model: ${effectiveModel}`);
+          }
+        } catch (error) {
+          console.warn(`[AgentService] Failed to load credentials:`, error);
+        }
+      }
+
+      // Get provider for this model with API key
+      const provider = ProviderFactory.getProviderForModel(
+        effectiveModel,
+        apiKey ? { apiKey } : undefined
+      );
 
       console.log(
         `[AgentService] Using provider "${provider.getName()}" for model "${effectiveModel}"`

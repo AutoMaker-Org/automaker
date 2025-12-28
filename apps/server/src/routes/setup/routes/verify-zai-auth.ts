@@ -94,6 +94,14 @@ export function createVerifyZaiAuthHandler() {
                 break;
               }
               receivedContent = true;
+            } else if (block.type === 'reasoning' && block.reasoning_content) {
+              // Check for API errors in reasoning content as well
+              const error = detectZaiError(block.reasoning_content);
+              if (error) {
+                errorMessage = error;
+                break;
+              }
+              receivedContent = true;
             }
           }
           if (errorMessage) break;

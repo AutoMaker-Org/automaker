@@ -13,6 +13,52 @@ const logger = createLogger('Setup');
 const apiKeys: Record<string, string> = {};
 
 /**
+ * Provider registry - maps provider names to their environment variable keys
+ * Add new providers here to enable API key storage/retrieval
+ */
+interface ProviderConfig {
+  envKey: string;
+  aliases: string[];
+}
+
+export const PROVIDER_REGISTRY: Record<string, ProviderConfig> = {
+  anthropic: {
+    envKey: 'ANTHROPIC_API_KEY',
+    aliases: ['anthropic_oauth_token'], // These map to the same env key
+  },
+  zai: {
+    envKey: 'ZAI_API_KEY',
+    aliases: [],
+  },
+};
+
+export type SupportedProvider = keyof typeof PROVIDER_REGISTRY;
+
+/**
+ * Check if a provider is supported
+ */
+export function isSupportedProvider(provider: string): provider is SupportedProvider {
+  return provider in PROVIDER_REGISTRY;
+}
+
+/**
+ * Get the environment variable key for a provider
+ */
+export function getProviderEnvKey(provider: string): string | null {
+  // Check direct match
+  if (provider in PROVIDER_REGISTRY) {
+    return PROVIDER_REGISTRY[provider as SupportedProvider].envKey;
+  }
+  // Check aliases
+  for (const [name, config] of Object.entries(PROVIDER_REGISTRY)) {
+    if (config.aliases.includes(provider)) {
+      return PROVIDER_REGISTRY[name as SupportedProvider].envKey;
+    }
+  }
+  return null;
+}
+
+/**
  * Get an API key for a provider
  */
 export function getApiKey(provider: string): string | undefined {

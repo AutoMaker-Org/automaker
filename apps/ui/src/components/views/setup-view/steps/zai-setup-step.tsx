@@ -13,6 +13,8 @@ import {
   ArrowLeft,
   ExternalLink,
   XCircle,
+  AlertCircle,
+  Trash2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTokenSave } from '../hooks';
@@ -33,6 +35,33 @@ export function ZaiSetupStep({ onNext, onBack, onSkip }: ZaiSetupStepProps) {
   // API Key Verification state
   const [verificationStatus, setVerificationStatus] = useState<VerificationStatus>('idle');
   const [verificationError, setVerificationError] = useState<string | null>(null);
+  const [isDeletingApiKey, setIsDeletingApiKey] = useState(false);
+
+  // Delete API Key
+  const deleteApiKey = useCallback(async () => {
+    setIsDeletingApiKey(true);
+    try {
+      const api = getElectronAPI();
+      if (!api.setup?.deleteApiKey) {
+        toast.error('Delete API not available');
+        return;
+      }
+      const result = await api.setup.deleteApiKey('zai');
+      if (result.success) {
+        setApiKey('');
+        setApiKeys({ ...apiKeys, zai: '' });
+        setVerificationStatus('idle');
+        setVerificationError(null);
+        toast.success('API key deleted successfully');
+      } else {
+        toast.error(result.error || 'Failed to delete API key');
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to delete API key');
+    } finally {
+      setIsDeletingApiKey(false);
+    }
+  }, [apiKeys, setApiKeys]);
 
   // Save API Key state
   const { isSaving, saveToken } = useTokenSave({
@@ -128,6 +157,7 @@ export function ZaiSetupStep({ onNext, onBack, onSkip }: ZaiSetupStepProps) {
     if (hasApiKey) {
       return (
         <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-yellow-500/10 text-yellow-400 border border-yellow-500/20">
+          <AlertCircle className="w-3.5 h-3.5" />
           Unverified
         </div>
       );
@@ -246,13 +276,51 @@ export function ZaiSetupStep({ onNext, onBack, onSkip }: ZaiSetupStepProps) {
 
           {/* Verify Button (if key is saved but not verified) */}
           {hasApiKey && verificationStatus !== 'verified' && verificationStatus !== 'verifying' && (
+            <div className="flex gap-2">
+              <Button
+                onClick={verifyApiKey}
+                variant="outline"
+                className="flex-1"
+                data-testid="verify-zai-button"
+              >
+                Verify API Key
+              </Button>
+              <Button
+                onClick={deleteApiKey}
+                variant="outline"
+                disabled={isDeletingApiKey}
+                className="px-3 text-destructive hover:text-destructive hover:bg-destructive/10"
+                data-testid="delete-zai-key-button"
+              >
+                {isDeletingApiKey ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Trash2 className="w-4 h-4" />
+                )}
+              </Button>
+            </div>
+          )}
+
+          {/* Delete button for verified key */}
+          {hasApiKey && verificationStatus === 'verified' && (
             <Button
-              onClick={verifyApiKey}
+              onClick={deleteApiKey}
               variant="outline"
-              className="w-full"
-              data-testid="verify-zai-button"
+              disabled={isDeletingApiKey}
+              className="w-full text-destructive hover:text-destructive hover:bg-destructive/10"
+              data-testid="delete-verified-zai-key-button"
             >
-              Verify API Key
+              {isDeletingApiKey ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Delete API Key
+                </>
+              )}
             </Button>
           )}
         </CardContent>

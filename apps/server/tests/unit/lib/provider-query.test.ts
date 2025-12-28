@@ -7,7 +7,24 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   buildStructuredOutputPrompt,
   parseJsonFromText,
+  executeProviderQuery,
 } from '../../../../src/lib/provider-query.js';
+
+// Mock secureFs
+vi.mock('../../../../src/services/secure-fs.js', () => ({
+  default: {
+    readFile: vi.fn(),
+    writeFile: vi.fn(),
+    glob: vi.fn(),
+  },
+}));
+
+// Mock validatePath
+vi.mock('../../../../src/libs/platform/src/security.js', () => ({
+  validatePath: vi.fn(() => true),
+  isPathAllowed: vi.fn(() => true),
+  ALLOWED_ROOT_DIRECTORY: '/test',
+}));
 
 // Mock provider-factory to allow importing provider-query
 vi.mock('../../../../src/providers/provider-factory.js', () => ({
@@ -238,20 +255,100 @@ describe('provider-query', () => {
     });
   });
 
-  // Integration tests for executeProviderQuery require complex mocking
-  // and are skipped for now. The core functionality (JSON parsing, prompt building)
-  // is tested above. Provider routing is tested in provider-factory.test.ts.
+  // Integration tests for executeProviderQuery
   describe('executeProviderQuery', () => {
-    it.skip('should route to Zai provider for glm models', async () => {
-      // TODO: Fix mocking for integration tests
+    // Create a mock provider
+    const createMockProvider = (name: string) => ({
+      getName: () => name,
+      executeQuery: vi.fn(async function* () {
+        yield {
+          type: 'assistant',
+          message: { role: 'assistant', content: [{ type: 'text', text: 'Test response' }] },
+        };
+        yield { type: 'result' };
+      }),
     });
 
-    it.skip('should route to Claude provider for claude models', async () => {
-      // TODO: Fix mocking for integration tests
+    beforeEach(() => {
+      const { ProviderFactory } = await import('../../../../src/providers/provider-factory.js');
+      vi.mocked(ProviderFactory.getProviderForModel).mockImplementation((model: string) => {
+        if (model.startsWith('glm') || model === 'glm') {
+          return createMockProvider('zai');
+        }
+        return createMockProvider('claude');
+      });
     });
 
-    it.skip('should add structured output prompt for non-Claude providers', async () => {
-      // TODO: Fix mocking for integration tests
+    it('should route to Zai provider for glm models', async () => {
+      const results: unknown[] = [];
+      for await (const result of executeProviderQuery({
+        prompt: 'Test prompt',
+        model: 'glm-4.7',
+        cwd: '/test',
+        apiKeys: { zai: 'test-key', anthropic: 'test-key' },
+      })) {
+        results.push(result);
+      }
+
+      // Should receive messages from the provider
+      expect(results.length).toBeGreaterThan(0);
+      expect(results[0]).toHaveProperty('type');
+    });
+
+    it('should route to Claude provider for claude models', async () => {
+      const results: unknown[] = [];
+      for await (const result of executeProviderQuery({
+        prompt: 'Test prompt',
+        model: 'claude-opus-4-5-20251101',
+        cwd: '/test',
+        apiKeys: { zai: 'test-key', anthropic: 'test-key' },
+      })) {
+        results.push(result);
+      }
+
+      // Should receive messages from the provider
+      expect(results.length).toBeGreaterThan(0);
+    });
+
+    it('should add structured output prompt for non-Claude providers', async () => {
+      // Create a mock provider that returns the prompt
+      let capturedPrompt = '';
+      const mockZaiProvider = {
+        getName: () => 'zai',
+        executeQuery: vi.fn(async function* (options: { prompt: string }) {
+          capturedPrompt = options.prompt;
+          yield {
+            type: 'assistant',
+            message: { role: 'assistant', content: [{ type: 'text', text: '{"result": "test"}' }] },
+          };
+          yield { type: 'result' };
+        }),
+      };
+
+      const { ProviderFactory } = await import('../../../../src/providers/provider-factory.js');
+      vi.mocked(ProviderFactory.getProviderForModel).mockReturnValue(mockZaiProvider as never);
+
+      const results: unknown[] = [];
+      for await (const result of executeProviderQuery({
+        prompt: 'Generate a user profile',
+        model: 'glm-4.7',
+        cwd: '/test',
+        outputFormat: {
+          type: 'json_schema',
+          schema: {
+            type: 'object',
+            properties: { name: { type: 'string' } },
+            required: ['name'],
+          },
+        },
+        apiKeys: { zai: 'test-key' },
+      })) {
+        results.push(result);
+      }
+
+      // Verify that structured output instructions were added to the prompt
+      expect(capturedPrompt).toContain('IMPORTANT: You must respond with valid JSON');
+      expect(capturedPrompt).toContain('name: string (required)');
     });
   });
 });

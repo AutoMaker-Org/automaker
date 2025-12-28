@@ -173,30 +173,32 @@ export async function* executeProviderQuery(
 
   logger.info(`[ProviderQuery] Using model: ${resolvedModel} for use case: ${useCase}`);
 
-  // Determine the appropriate API key for this model
+  // Get the provider for this model first (to determine which API key to use)
+  const provider = ProviderFactory.getProviderForModel(resolvedModel);
+  const providerName = provider.getName();
+  logger.info(`[ProviderQuery] Using provider: ${providerName}`);
+
+  // Determine the appropriate API key for this provider
   let apiKey: string | undefined;
   if (apiKeys) {
-    const lowerModel = resolvedModel.toLowerCase();
-    if (lowerModel.startsWith('glm-')) {
-      apiKey = apiKeys.zai;
-    } else if (
-      lowerModel.startsWith('claude-') ||
-      ['haiku', 'sonnet', 'opus'].includes(lowerModel)
-    ) {
-      apiKey = apiKeys.anthropic;
-    }
+    // Map provider name to API key
+    const apiKeyMap: Record<string, string | undefined> = {
+      claude: apiKeys.anthropic,
+      zai: apiKeys.zai,
+      google: apiKeys.google,
+      openai: apiKeys.openai,
+    };
+    apiKey = apiKey ? apiKey : apiKeyMap[providerName];
     if (apiKey) {
-      logger.info(`[ProviderQuery] Using API key from settings for provider`);
+      logger.info(`[ProviderQuery] Using API key from settings for ${providerName}`);
     }
   }
 
-  // Get the provider for this model with config
-  const provider = ProviderFactory.getProviderForModel(
+  // Get provider again with API key config if available
+  const providerWithKey = ProviderFactory.getProviderForModel(
     resolvedModel,
     apiKey ? { apiKey } : undefined
   );
-  const providerName = provider.getName();
-  logger.info(`[ProviderQuery] Using provider: ${providerName}`);
 
   // Build the final prompt
   let finalPrompt = prompt;
@@ -231,7 +233,7 @@ export async function* executeProviderQuery(
   let structuredOutput: unknown = null;
 
   try {
-    for await (const msg of provider.executeQuery(executeOptions)) {
+    for await (const msg of providerWithKey.executeQuery(executeOptions)) {
       // Emit the raw message
       yield msg;
 

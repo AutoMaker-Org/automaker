@@ -1116,6 +1116,11 @@ interface SetupAPI {
     authenticated: boolean;
     error?: string;
   }>;
+  verifyZaiAuth: (apiKey?: string) => Promise<{
+    success: boolean;
+    authenticated: boolean;
+    error?: string;
+  }>;
   getGhStatus?: () => Promise<{
     success: boolean;
     installed: boolean;

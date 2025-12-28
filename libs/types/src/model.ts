@@ -61,8 +61,12 @@ export const ALL_MODEL_MAPS = {
  * - Claude Sonnet (balanced) ↔ Zai GLM-4.6 (balanced)
  * - Claude Haiku (speed) ↔ Zai GLM-4.5-Air (speed)
  *
- * Note: GLM-4.6v (vision) doesn't have a direct Claude equivalent for vision,
- * but for general reasoning it maps to Sonnet.
+ * IMPORTANT ASYMMETRY:
+ * - GLM-4.6v (Zai's vision model) → Claude Sonnet (for general reasoning)
+ * - Claude Sonnet → GLM-4.6 (NOT GLM-4.6v - vision capability may be lost)
+ *
+ * This means vision use cases may lose capability when falling back from Zai to Claude.
+ * If vision is required, consider explicitly checking model capabilities before substitution.
  */
 export const MODEL_EQUIVALENCE: Record<string, { provider: 'claude' | 'zai'; model: string }> = {
   // Claude models → Zai equivalents

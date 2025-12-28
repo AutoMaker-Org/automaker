@@ -3,7 +3,14 @@
  */
 
 import type { Request, Response } from 'express';
-import { setApiKey, persistApiKeyToEnv, getErrorMessage, logError } from '../common.js';
+import {
+  setApiKey,
+  persistApiKeyToEnv,
+  getErrorMessage,
+  logError,
+  getProviderEnvKey,
+  isSupportedProvider,
+} from '../common.js';
 import { createLogger } from '@automaker/utils';
 
 const logger = createLogger('Setup');
@@ -21,29 +28,22 @@ export function createStoreApiKeyHandler() {
         return;
       }
 
+      // Validate provider against registry
+      const envKey = getProviderEnvKey(provider);
+      if (!envKey) {
+        res.status(400).json({
+          success: false,
+          error: `Unsupported provider: ${provider}. Supported providers: anthropic, zai.`,
+        });
+        return;
+      }
+
       setApiKey(provider, apiKey);
 
-      // Also set as environment variable and persist to .env
-      switch (provider) {
-        case 'anthropic':
-        case 'anthropic_oauth_token':
-          // Both API key and OAuth token use ANTHROPIC_API_KEY
-          process.env.ANTHROPIC_API_KEY = apiKey;
-          await persistApiKeyToEnv('ANTHROPIC_API_KEY', apiKey);
-          logger.info('[Setup] Stored API key as ANTHROPIC_API_KEY');
-          break;
-        case 'zai':
-          process.env.ZAI_API_KEY = apiKey;
-          await persistApiKeyToEnv('ZAI_API_KEY', apiKey);
-          logger.info('[Setup] Stored API key as ZAI_API_KEY');
-          break;
-        default:
-          res.status(400).json({
-            success: false,
-            error: `Unsupported provider: ${provider}. Only anthropic and zai are supported.`,
-          });
-          return;
-      }
+      // Set as environment variable and persist to .env
+      process.env[envKey] = apiKey;
+      await persistApiKeyToEnv(envKey, apiKey);
+      logger.info(`[Setup] Stored API key as ${envKey}`);
 
       res.json({ success: true });
     } catch (error) {
