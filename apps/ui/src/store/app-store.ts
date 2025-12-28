@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { Project, TrashedProject } from '@/lib/electron';
+import { getHttpApiClient } from '@/lib/http-api-client';
+import { isElectron } from '@/lib/electron';
 import type {
   Feature as BaseFeature,
   FeatureImagePath,
@@ -696,7 +698,7 @@ export interface AppActions {
 
   // Provider Configuration actions
   setEnabledProviders: (providers: Partial<{ claude: boolean; zai: boolean }>) => void;
-  toggleProvider: (provider: 'claude' | 'zai') => void;
+  toggleProvider: (provider: 'claude' | 'zai') => Promise<void>;
   markProviderTouched: (provider: 'claude' | 'zai') => void;
 
   // Chat Session actions
@@ -1307,17 +1309,49 @@ export const useAppStore = create<AppState & AppActions>()(
       // Provider Configuration actions
       setEnabledProviders: (providers) =>
         set({ enabledProviders: { ...get().enabledProviders, ...providers } }),
-      toggleProvider: (provider) =>
+      toggleProvider: async (provider) => {
+        // Optimistically update local state first
+        const newValue = !get().enabledProviders[provider];
         set((state) => ({
           enabledProviders: {
             ...state.enabledProviders,
-            [provider]: !state.enabledProviders[provider],
+            [provider]: newValue,
           },
           providerToggleTouched: {
             ...state.providerToggleTouched,
             [provider]: true,
           },
-        })),
+        }));
+
+        // Sync to backend if in Electron mode
+        if (isElectron()) {
+          try {
+            const api = getHttpApiClient();
+            const result = await api.settings.updateGlobal({
+              enabledProviders: { ...get().enabledProviders, [provider]: newValue },
+            });
+            if (!result.success) {
+              // Revert on failure
+              set((state) => ({
+                enabledProviders: {
+                  ...state.enabledProviders,
+                  [provider]: !newValue,
+                },
+              }));
+              console.error('[Provider Toggle] Failed to sync to backend:', result.error);
+            }
+          } catch (error) {
+            // Revert on error
+            set((state) => ({
+              enabledProviders: {
+                ...state.enabledProviders,
+                [provider]: !newValue,
+              },
+            }));
+            console.error('[Provider Toggle] Failed to sync to backend:', error);
+          }
+        }
+      },
       markProviderTouched: (provider) =>
         set((state) => ({
           providerToggleTouched: { ...state.providerToggleTouched, [provider]: true },
@@ -2741,6 +2775,8 @@ export const useAppStore = create<AppState & AppActions>()(
           boardViewMode: state.boardViewMode,
           // Settings
           apiKeys: state.apiKeys,
+          enabledProviders: state.enabledProviders,
+          providerToggleTouched: state.providerToggleTouched,
           maxConcurrency: state.maxConcurrency,
           // Note: autoModeByProject is intentionally NOT persisted
           // Auto-mode should always default to OFF on app refresh

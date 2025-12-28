@@ -935,6 +935,10 @@ export class HttpApiClient implements ElectronAPI {
         recentFolders: string[];
         worktreePanelCollapsed: boolean;
         lastSelectedSessionByProject: Record<string, string>;
+        enabledProviders?: {
+          claude: boolean;
+          zai: boolean;
+        };
       };
       error?: string;
     }> => this.get('/api/settings/global'),

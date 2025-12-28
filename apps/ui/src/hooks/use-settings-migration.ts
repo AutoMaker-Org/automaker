@@ -21,6 +21,7 @@ import { useEffect, useState, useRef } from 'react';
 import { getHttpApiClient } from '@/lib/http-api-client';
 import { isElectron } from '@/lib/electron';
 import { getItem, removeItem } from '@/lib/storage';
+import { useAppStore } from '@/store/app-store';
 
 /**
  * State returned by useSettingsMigration hook
@@ -314,4 +315,47 @@ export async function syncProjectSettingsToServer(
     console.error('[Settings Sync] Failed to sync project settings:', error);
     return false;
   }
+}
+
+/**
+ * Load enabledProviders from backend global settings
+ *
+ * Fetches the current enabledProviders state from the server and updates
+ * the app store. This should be called on app startup to restore the
+ * user's provider preferences.
+ *
+ * Only functions in Electron mode. Silently fails in web mode.
+ */
+export async function loadEnabledProviders(): Promise<void> {
+  if (!isElectron()) return;
+
+  try {
+    const api = getHttpApiClient();
+    const result = await api.settings.getGlobal();
+
+    if (result.success && result.settings?.enabledProviders) {
+      const { enabledProviders } = result.settings;
+      useAppStore.getState().setEnabledProviders(enabledProviders);
+      console.log('[Settings] Loaded enabledProviders from backend:', enabledProviders);
+    }
+  } catch (error) {
+    console.error('[Settings] Failed to load enabledProviders:', error);
+  }
+}
+
+/**
+ * Hook to load enabledProviders from backend on mount
+ *
+ * Loads the user's provider preferences from file-based storage on app startup.
+ * This ensures provider toggle state persists across app restarts.
+ */
+export function useEnabledProvidersLoader(): void {
+  const loaded = useRef(false);
+
+  useEffect(() => {
+    if (loaded.current) return;
+    loaded.current = true;
+
+    loadEnabledProviders();
+  }, []);
 }

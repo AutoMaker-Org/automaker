@@ -874,11 +874,6 @@ async function executeToolCall(
       // Sanitize command with cwd for path validation
       const sanitized = sanitizeCommand(command, resolvedCwd);
 
-      // Check for docker (disabled by default)
-      if (sanitized.command === 'docker' && !process.env.ZAI_ALLOW_DOCKER) {
-        throw new Error('Docker commands not enabled (set ZAI_ALLOW_DOCKER=1)');
-      }
-
       try {
         // Build command with sanitized arguments, redirects, and pipes
         let cmdString = sanitized.command;

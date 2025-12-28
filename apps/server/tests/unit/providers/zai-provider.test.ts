@@ -551,7 +551,6 @@ describe('zai-provider.ts', () => {
 
     afterEach(() => {
       delete process.env.ALLOWED_ROOT_DIRECTORY;
-      delete process.env.ZAI_ALLOW_DOCKER;
     });
 
     it('should reject commands with .. for path traversal', async () => {
@@ -714,64 +713,6 @@ describe('zai-provider.ts', () => {
       // Should NOT have an error (wget is no longer in a whitelist)
       const errorResult = results.find((r: StreamingTestResult) => r.type === 'error');
       expect(errorResult).toBeUndefined();
-    });
-
-    it('should reject docker commands without ZAI_ALLOW_DOCKER env var', async () => {
-      mockFetch.mockImplementation(() =>
-        createMockStreamResponse([
-          'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_123","function":{"name":"execute_command","arguments":"{\\"command\\": \\"docker ps\\"}"}}]}}]}\n\n',
-          'data: {"choices":[{"finish_reason":"tool_calls"}]}\n\n',
-          'data: [DONE]\n\n',
-        ])
-      );
-
-      delete process.env.ZAI_ALLOW_DOCKER;
-
-      const generator = provider.executeQuery({
-        prompt: 'List containers',
-        cwd: '/test/project',
-        model: 'glm-4.7',
-      });
-
-      const results = await collectAsyncGenerator(generator);
-
-      // Should get an error about docker not enabled
-      const errorResult = results.find((r: StreamingTestResult) => r.type === 'error');
-      expect(errorResult).toBeDefined();
-      expect((errorResult as any).error).toContain('Docker');
-    });
-
-    it('should allow docker commands when ZAI_ALLOW_DOCKER=1', async () => {
-      mockFetch.mockImplementation(() =>
-        createMockStreamResponse([
-          'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_123","function":{"name":"execute_command","arguments":"{\\"command\\": \\"docker ps\\"}"}}]}}]}\n\n',
-          'data: {"choices":[{"finish_reason":"tool_calls"}]}\n\n',
-          'data: [DONE]\n\n',
-        ])
-      );
-
-      process.env.ZAI_ALLOW_DOCKER = '1';
-
-      const generator = provider.executeQuery({
-        prompt: 'List containers',
-        cwd: '/test/project',
-        model: 'glm-4.7',
-      });
-
-      const results = await collectAsyncGenerator(generator);
-
-      // Should have tool_use message (docker command was not blocked)
-      const toolUseResult = results.find(
-        (r: StreamingTestResult) =>
-          r.type === 'assistant' && r.message?.content?.[0]?.type === 'tool_use'
-      );
-      expect(toolUseResult).toBeDefined();
-
-      // Should not have an error about docker being disabled
-      const errorResult = results.find((r: StreamingTestResult) => r.type === 'error');
-      expect(errorResult).toBeUndefined();
-
-      delete process.env.ZAI_ALLOW_DOCKER;
     });
 
     it('should allow safe mutating commands within project root', async () => {
