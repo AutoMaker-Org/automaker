@@ -504,30 +504,49 @@ export function validatePipelineConfig(config: any): config is PipelineConfig {
     'completed',
   ]);
 
-  return (
-    typeof config === 'object' &&
-    config !== null &&
-    typeof config.version === 'string' &&
-    typeof config.enabled === 'boolean' &&
-    Array.isArray(config.steps) &&
-    config.steps.every((step: any) => {
-      // Normalize step ID for comparison (trim and lowercase)
-      const normalizedId = step.id?.toString().trim().toLowerCase();
+  // Check if config is valid structure
+  if (
+    typeof config !== 'object' ||
+    config === null ||
+    typeof config.version !== 'string' ||
+    typeof config.enabled !== 'boolean' ||
+    !Array.isArray(config.steps)
+  ) {
+    return false;
+  }
 
-      return (
-        typeof step.id === 'string' &&
-        step.id.trim().length > 0 && // Ensure non-empty after trimming
-        !reservedNames.has(normalizedId) && // Check against reserved names
-        typeof step.type === 'string' &&
-        ['review', 'security', 'performance', 'test', 'custom'].includes(step.type) &&
-        typeof step.name === 'string' &&
-        typeof step.model === 'string' &&
-        ['opus', 'sonnet', 'haiku', 'different', 'same'].includes(step.model) &&
-        typeof step.required === 'boolean' &&
-        typeof step.autoTrigger === 'boolean' &&
-        typeof step.config === 'object' &&
-        step.config !== null
-      );
-    })
-  );
+  // Track normalized IDs to check for uniqueness
+  const normalizedIds = new Set<string>();
+
+  // Validate each step
+  for (const step of config.steps) {
+    // Normalize step ID for comparison (trim and lowercase)
+    const normalizedId = step.id?.toString().trim().toLowerCase();
+
+    // Check if normalized ID is valid
+    if (
+      typeof step.id !== 'string' ||
+      step.id.trim().length === 0 || // Ensure non-empty after trimming
+      reservedNames.has(normalizedId) || // Check against reserved names
+      typeof step.type !== 'string' ||
+      !['review', 'security', 'performance', 'test', 'custom'].includes(step.type) ||
+      typeof step.name !== 'string' ||
+      typeof step.model !== 'string' ||
+      !['opus', 'sonnet', 'haiku', 'different', 'same'].includes(step.model) ||
+      typeof step.required !== 'boolean' ||
+      typeof step.autoTrigger !== 'boolean' ||
+      typeof step.config !== 'object' ||
+      step.config === null
+    ) {
+      return false;
+    }
+
+    // Check for duplicate normalized IDs
+    if (normalizedIds.has(normalizedId)) {
+      return false; // Duplicate ID found
+    }
+    normalizedIds.add(normalizedId);
+  }
+
+  return true;
 }

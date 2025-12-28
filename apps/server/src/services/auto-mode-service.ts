@@ -1815,13 +1815,31 @@ Format your response as a structured markdown document.`;
 
       onProgress?.(`Executing ${stepConfig.name} with model ${model}...`);
 
+      // Create a proper AbortController if signal is provided
+      let abortController: AbortController | undefined;
+      if (signal) {
+        abortController = new AbortController();
+        // Wire the incoming signal to abort the new controller
+        if (signal.aborted) {
+          abortController.abort();
+        } else {
+          signal.addEventListener(
+            'abort',
+            () => {
+              abortController?.abort();
+            },
+            { once: true }
+          );
+        }
+      }
+
       const options: ExecuteOptions = {
         prompt,
         model,
         maxTurns: 1, // Single turn for pipeline steps
         cwd: projectPath || '',
         allowedTools: ['Read', 'Glob', 'Grep'],
-        abortController: signal ? ({ signal } as AbortController) : undefined,
+        abortController,
       };
 
       const stream = provider.executeQuery(options);

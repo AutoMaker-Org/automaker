@@ -64,17 +64,10 @@ export function isAuthenticationError(errorMessage: string): boolean {
  * @returns Classified error information
  */
 export function classifyError(error: unknown): ErrorInfo {
-  // Log the original error for debugging
-  console.log('[classifyError] Original error:', error);
-  console.log('[classifyError] Error type:', typeof error);
-  console.log('[classifyError] Error keys:', error ? Object.keys(error) : 'N/A');
-
   let message: string;
   try {
     message = error instanceof Error ? error.message : String(error || 'Unknown error');
-    console.log('[classifyError] Extracted message:', message);
   } catch (e) {
-    console.error('[classifyError] Error converting to string:', e);
     message = 'Error converting error to string';
   }
 
