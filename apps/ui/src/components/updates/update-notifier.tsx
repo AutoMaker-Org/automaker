@@ -129,6 +129,13 @@ export function UpdateNotifier({ onUpdateAvailable, onUpdateInstalled }: UpdateN
         label: isPulling ? 'Updating...' : 'Update Now',
         onClick: handleUpdateNow,
       },
+      cancel: {
+        label: 'Later',
+        onClick: () => {
+          // Dismiss toast, will show again on next check if update still available
+          shownToastForCommitRef.current = remoteVersionShort;
+        },
+      },
     });
   }, [
     updateAvailable,
