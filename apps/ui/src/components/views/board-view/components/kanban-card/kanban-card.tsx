@@ -26,8 +26,10 @@ interface KanbanCardProps {
   onViewPlan?: () => void;
   onApprovePlan?: () => void;
   onSpawnTask?: () => void;
+  onValidate?: () => void;
   hasContext?: boolean;
   isCurrentAutoTask?: boolean;
+  isValidatingAll?: boolean;
   shortcutKey?: string;
   contextContent?: string;
   summary?: string;
@@ -53,8 +55,10 @@ export const KanbanCard = memo(function KanbanCard({
   onViewPlan,
   onApprovePlan,
   onSpawnTask,
+  onValidate,
   hasContext,
   isCurrentAutoTask,
+  isValidatingAll,
   shortcutKey,
   contextContent,
   summary,
@@ -168,6 +172,7 @@ export const KanbanCard = memo(function KanbanCard({
           feature={feature}
           isCurrentAutoTask={!!isCurrentAutoTask}
           hasContext={hasContext}
+          isValidatingAll={isValidatingAll}
           shortcutKey={shortcutKey}
           onEdit={onEdit}
           onViewOutput={onViewOutput}
@@ -180,6 +185,7 @@ export const KanbanCard = memo(function KanbanCard({
           onComplete={onComplete}
           onViewPlan={onViewPlan}
           onApprovePlan={onApprovePlan}
+          onValidate={onValidate}
         />
       </CardContent>
     </Card>

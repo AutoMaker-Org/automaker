@@ -10,12 +10,15 @@ import {
   Eye,
   Wand2,
   Archive,
+  Check,
+  Loader2,
 } from 'lucide-react';
 
 interface CardActionsProps {
   feature: Feature;
   isCurrentAutoTask: boolean;
   hasContext?: boolean;
+  isValidatingAll?: boolean;
   shortcutKey?: string;
   onEdit: () => void;
   onViewOutput?: () => void;
@@ -28,12 +31,14 @@ interface CardActionsProps {
   onComplete?: () => void;
   onViewPlan?: () => void;
   onApprovePlan?: () => void;
+  onValidate?: () => void;
 }
 
 export function CardActions({
   feature,
   isCurrentAutoTask,
   hasContext,
+  isValidatingAll,
   shortcutKey,
   onEdit,
   onViewOutput,
@@ -46,6 +51,7 @@ export function CardActions({
   onComplete,
   onViewPlan,
   onApprovePlan,
+  onValidate,
 }: CardActionsProps) {
   return (
     <div className="flex flex-wrap gap-1.5 -mx-3 -mb-3 px-3 pb-3">
@@ -298,6 +304,29 @@ export function CardActions({
             <Edit className="w-3 h-3 mr-1" />
             Edit
           </Button>
+          {onValidate && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 text-xs px-2"
+              onClick={(e) => {
+                e.stopPropagation();
+                onValidate();
+              }}
+              onPointerDown={(e) => e.stopPropagation()}
+              data-testid={`validate-${feature.id}`}
+              title="Check if feature is already implemented"
+              disabled={
+                feature.metadata?.[`validating-${feature.id}`] === true || isValidatingAll === true
+              }
+            >
+              {feature.metadata?.[`validating-${feature.id}`] === true ? (
+                <Loader2 className="w-3 h-3 animate-spin" />
+              ) : (
+                <Check className="w-3 h-3" />
+              )}
+            </Button>
+          )}
           {feature.planSpec?.content && onViewPlan && (
             <Button
               variant="outline"

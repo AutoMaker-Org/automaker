@@ -40,6 +40,9 @@ interface UseBoardActionsProps {
   onWorktreeCreated?: () => void;
   onWorktreeAutoSelect?: (worktree: { path: string; branch: string }) => void;
   currentWorktreeBranch: string | null; // Branch name of the selected worktree for filtering
+  getColumnFeatures?: (
+    columnId: 'backlog' | 'in_progress' | 'waiting_approval' | 'verified' | 'completed'
+  ) => Feature[];
 }
 
 export function useBoardActions({
@@ -68,6 +71,7 @@ export function useBoardActions({
   onWorktreeCreated,
   onWorktreeAutoSelect,
   currentWorktreeBranch,
+  getColumnFeatures,
 }: UseBoardActionsProps) {
   const {
     addFeature,
@@ -861,6 +865,146 @@ export function useBoardActions({
     });
   }, [features, runningAutoTasks, autoMode, updateFeature, persistFeatureUpdate]);
 
+  const handleValidateFeature = useCallback(
+    async (feature: Feature) => {
+      if (!currentProject) {
+        toast.error('No project selected');
+        return;
+      }
+
+      // Set validating state
+      const validatingKey = `validating-${feature.id}`;
+      updateFeature(feature.id, {
+        metadata: {
+          ...feature.metadata,
+          [validatingKey]: true,
+        },
+      });
+
+      let wasMovedToWaitingApproval = false;
+
+      try {
+        const api = getElectronAPI();
+        if (!api?.features) {
+          console.error('Features API not available');
+          return;
+        }
+
+        console.log('[ValidateFeature] Starting validation for feature:', feature.id);
+        const response = await api.features.validateFeature(currentProject.path, feature.id);
+        console.log('[ValidateFeature] Received response:', response);
+
+        if (response.success) {
+          const { validation } = response;
+
+          // Log detailed validation results
+          console.log('[ValidateFeature] Validation results:');
+          console.log('  - Assessment:', validation.assessment);
+          console.log('  - Reasoning:', validation.reasoning);
+          console.log('  - Evidence:', validation.evidence?.substring(0, 200) + '...');
+
+          // Show validation results in toast
+          toast.info('Feature Validation Complete', {
+            description: `Assessment: ${validation.assessment}\n\nReasoning: ${validation.reasoning}\n\nEvidence: ${validation.evidence}`,
+            duration: 10000,
+          });
+
+          // If fully implemented, move to waiting approval
+          if (validation.assessment === 'FULLY_IMPLEMENTED') {
+            console.log(
+              '[ValidateFeature] Feature is fully implemented, moving to waiting approval'
+            );
+            wasMovedToWaitingApproval = true;
+            const updates = {
+              status: 'waiting_approval' as const,
+              metadata: {
+                ...feature.metadata,
+                [validatingKey]: false, // Clear validating state when moving
+              },
+            };
+            updateFeature(feature.id, updates);
+            persistFeatureUpdate(feature.id, updates);
+
+            toast.success('Feature moved to Waiting Approval', {
+              description: `"${feature.title}" has been validated and moved to Waiting Approval.`,
+            });
+          } else {
+            console.log(
+              `[ValidateFeature] Feature assessment: ${validation.assessment} - not moving to waiting approval`
+            );
+          }
+        } else {
+          console.error('[ValidateFeature] Validation API call failed:', response);
+          toast.error('Validation failed', {
+            description: response.error || 'Unknown error occurred',
+          });
+        }
+      } catch (error) {
+        console.error('[ValidateFeature] Failed to validate feature:', error);
+        toast.error('Validation failed', {
+          description: error instanceof Error ? error.message : 'Unknown error occurred',
+        });
+      } finally {
+        // Clear validating state only if feature wasn't moved to waiting approval
+        if (!wasMovedToWaitingApproval) {
+          updateFeature(feature.id, {
+            metadata: {
+              ...feature.metadata,
+              [validatingKey]: false,
+            },
+          });
+        }
+      }
+    },
+    [currentProject, updateFeature, persistFeatureUpdate]
+  );
+
+  const handleValidateAllBacklog = useCallback(async () => {
+    if (!currentProject) {
+      toast.error('No project selected');
+      return;
+    }
+
+    // Get backlog features in the correct order (as displayed on board)
+    const backlogFeatures = getColumnFeatures
+      ? getColumnFeatures('backlog')
+      : features.filter((f) => f.status === 'backlog');
+
+    if (backlogFeatures.length === 0) {
+      toast.info('No features in backlog to validate');
+      return;
+    }
+
+    toast.info(`Starting validation for ${backlogFeatures.length} backlog features...`, {
+      description: 'Validating features in board order (top to bottom). This may take a while.',
+      duration: 5000,
+    });
+
+    console.log(
+      `[ValidateAll] Starting validation for ${backlogFeatures.length} backlog features in board order`
+    );
+
+    // Validate features sequentially in the order they appear on the board
+    for (const feature of backlogFeatures) {
+      console.log(`[ValidateAll] Validating feature: ${feature.title} (${feature.id})`);
+
+      try {
+        await handleValidateFeature(feature);
+
+        // Add a small delay between validations to avoid overwhelming the API
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+      } catch (error) {
+        console.error(`[ValidateAll] Failed to validate feature ${feature.id}:`, error);
+        // Continue with next feature even if one fails
+      }
+    }
+
+    toast.success('Validation complete!', {
+      description: `Validated ${backlogFeatures.length} backlog features.`,
+      duration: 5000,
+    });
+  }, [currentProject, features, getColumnFeatures, handleValidateFeature]);
+
   return {
     handleAddFeature,
     handleUpdateFeature,
@@ -881,5 +1025,7 @@ export function useBoardActions({
     handleForceStopFeature,
     handleStartNextFeatures,
     handleArchiveAllVerified,
+    handleValidateFeature,
+    handleValidateAllBacklog,
   };
 }

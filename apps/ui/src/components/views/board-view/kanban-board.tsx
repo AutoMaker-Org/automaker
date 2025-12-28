@@ -5,10 +5,12 @@ import { Button } from '@/components/ui/button';
 import { HotkeyButton } from '@/components/ui/hotkey-button';
 import { KanbanColumn, KanbanCard } from './components';
 import { Feature } from '@/store/app-store';
-import { FastForward, Lightbulb, Archive } from 'lucide-react';
+import { FastForward, Lightbulb, Archive, CheckCircle, Loader2 } from 'lucide-react';
 import { useKeyboardShortcutsConfig } from '@/hooks/use-keyboard-shortcuts';
 import { useResponsiveKanban } from '@/hooks/use-responsive-kanban';
 import { COLUMNS, ColumnId } from './constants';
+import { useState, useCallback } from 'react';
+import { cn } from '@/lib/utils';
 
 interface KanbanBoardProps {
   sensors: any;
@@ -42,6 +44,8 @@ interface KanbanBoardProps {
   onViewPlan: (feature: Feature) => void;
   onApprovePlan: (feature: Feature) => void;
   onSpawnTask?: (feature: Feature) => void;
+  onValidate?: (feature: Feature) => void;
+  onValidateAllBacklog?: () => Promise<void>;
   featuresWithContext: Set<string>;
   runningAutoTasks: string[];
   shortcuts: ReturnType<typeof useKeyboardShortcutsConfig>;
@@ -75,6 +79,8 @@ export function KanbanBoard({
   onViewPlan,
   onApprovePlan,
   onSpawnTask,
+  onValidate,
+  onValidateAllBacklog,
   featuresWithContext,
   runningAutoTasks,
   shortcuts,
@@ -86,6 +92,21 @@ export function KanbanBoard({
   // Use responsive column widths based on window size
   // containerStyle handles centering and ensures columns fit without horizontal scroll in Electron
   const { columnWidth, containerStyle } = useResponsiveKanban(COLUMNS.length);
+
+  // State to track if validate all is in progress
+  const [isValidatingAll, setIsValidatingAll] = useState(false);
+
+  // Wrapper function to handle validate all with loading state
+  const handleValidateAllWithProgress = useCallback(async () => {
+    if (isValidatingAll || !onValidateAllBacklog) return;
+
+    setIsValidatingAll(true);
+    try {
+      await onValidateAllBacklog();
+    } finally {
+      setIsValidatingAll(false);
+    }
+  }, [isValidatingAll, onValidateAllBacklog]);
 
   return (
     <div className="flex-1 overflow-x-hidden px-5 pb-4 relative" style={backgroundImageStyle}>
@@ -142,18 +163,50 @@ export function KanbanBoard({
                         )}
                       </Button>
                       {columnFeatures.length > 0 && (
-                        <HotkeyButton
-                          variant="ghost"
-                          size="sm"
-                          className="h-6 px-2 text-xs text-primary hover:text-primary hover:bg-primary/10"
-                          onClick={onStartNextFeatures}
-                          hotkey={shortcuts.startNext}
-                          hotkeyActive={false}
-                          data-testid="start-next-button"
-                        >
-                          <FastForward className="w-3 h-3 mr-1" />
-                          Make
-                        </HotkeyButton>
+                        <>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className={cn(
+                              'h-6 px-2 text-xs hover:bg-green-500/10',
+                              isValidatingAll
+                                ? 'text-green-400 cursor-not-allowed'
+                                : 'text-green-600 hover:text-green-500'
+                            )}
+                            onClick={handleValidateAllWithProgress}
+                            title={
+                              isValidatingAll
+                                ? 'Validating features...'
+                                : 'Validate all backlog features'
+                            }
+                            data-testid="validate-all-backlog-button"
+                            disabled={isValidatingAll}
+                          >
+                            {isValidatingAll ? (
+                              <>
+                                <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                                Validating...
+                              </>
+                            ) : (
+                              <>
+                                <CheckCircle className="w-3 h-3 mr-1" />
+                                Validate
+                              </>
+                            )}
+                          </Button>
+                          <HotkeyButton
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 px-2 text-xs text-primary hover:text-primary hover:bg-primary/10"
+                            onClick={onStartNextFeatures}
+                            hotkey={shortcuts.startNext}
+                            hotkeyActive={false}
+                            data-testid="start-next-button"
+                          >
+                            <FastForward className="w-3 h-3 mr-1" />
+                            Make
+                          </HotkeyButton>
+                        </>
                       )}
                     </div>
                   ) : undefined
@@ -187,8 +240,10 @@ export function KanbanBoard({
                         onViewPlan={() => onViewPlan(feature)}
                         onApprovePlan={() => onApprovePlan(feature)}
                         onSpawnTask={() => onSpawnTask?.(feature)}
+                        onValidate={() => onValidate?.(feature)}
                         hasContext={featuresWithContext.has(feature.id)}
                         isCurrentAutoTask={runningAutoTasks.includes(feature.id)}
+                        isValidatingAll={isValidatingAll}
                         shortcutKey={shortcutKey}
                         opacity={backgroundSettings.cardOpacity}
                         glassmorphism={backgroundSettings.cardGlassmorphism}

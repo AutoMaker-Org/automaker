@@ -168,12 +168,32 @@ export class HttpApiClient implements ElectronAPI {
       headers: this.getHeaders(),
       body: body ? JSON.stringify(body) : undefined,
     });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(
+        `[HttpApiClient] POST ${endpoint} failed: ${response.status} ${response.statusText}`,
+        errorText
+      );
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
     return response.json();
   }
 
   private async get<T>(endpoint: string): Promise<T> {
     const headers = this.getHeaders();
     const response = await fetch(`${this.serverUrl}${endpoint}`, { headers });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(
+        `[HttpApiClient] GET ${endpoint} failed: ${response.status} ${response.statusText}`,
+        errorText
+      );
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
     return response.json();
   }
 
@@ -183,6 +203,16 @@ export class HttpApiClient implements ElectronAPI {
       headers: this.getHeaders(),
       body: body ? JSON.stringify(body) : undefined,
     });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(
+        `[HttpApiClient] PUT ${endpoint} failed: ${response.status} ${response.statusText}`,
+        errorText
+      );
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
     return response.json();
   }
 
@@ -191,6 +221,16 @@ export class HttpApiClient implements ElectronAPI {
       method: 'DELETE',
       headers: this.getHeaders(),
     });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(
+        `[HttpApiClient] DELETE ${endpoint} failed: ${response.status} ${response.statusText}`,
+        errorText
+      );
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
     return response.json();
   }
 
@@ -532,6 +572,8 @@ export class HttpApiClient implements ElectronAPI {
       this.post('/api/features/agent-output', { projectPath, featureId }),
     generateTitle: (description: string) =>
       this.post('/api/features/generate-title', { description }),
+    validateFeature: (projectPath: string, featureId: string) =>
+      this.post('/api/features/validate-feature', { projectPath, featureId }),
   };
 
   // Auto Mode API
