@@ -45,36 +45,51 @@ ${addedLines}
 /**
  * Generate a synthetic unified diff for an untracked (new) file
  * This is needed because `git diff HEAD` doesn't include untracked files
+ *
+ * If the path is a directory, this will recursively generate diffs for all files inside
  */
 export async function generateSyntheticDiffForNewFile(
   basePath: string,
   relativePath: string
 ): Promise<string> {
-  const fullPath = path.join(basePath, relativePath);
+  // Remove trailing slash if present (git status reports directories with trailing /)
+  const cleanPath = relativePath.endsWith('/') ? relativePath.slice(0, -1) : relativePath;
+  const fullPath = path.join(basePath, cleanPath);
 
   try {
-    // Check if it's a binary file
-    if (isBinaryFile(relativePath)) {
-      return `diff --git a/${relativePath} b/${relativePath}
-new file mode 100644
-index 0000000..0000000
-Binary file ${relativePath} added
-`;
-    }
-
     // Get file stats to check size and type
     const stats = await secureFs.stat(fullPath);
 
-    // Check if it's a directory (can happen with untracked directories from git status)
+    // Check if it's a directory first (before binary check)
+    // This handles edge cases like directories named "images.png/"
     if (stats.isDirectory()) {
-      return createNewFileDiff(relativePath, '040000', ['[Directory]']);
+      const filesInDir = await listAllFilesInDirectory(basePath, cleanPath);
+      if (filesInDir.length === 0) {
+        // Empty directory
+        return createNewFileDiff(cleanPath, '040000', ['[Empty directory]']);
+      }
+      // Generate diffs for all files in the directory sequentially
+      // Using sequential processing to avoid exhausting file descriptors on large directories
+      const diffs: string[] = [];
+      for (const filePath of filesInDir) {
+        diffs.push(await generateSyntheticDiffForNewFile(basePath, filePath));
+      }
+      return diffs.join('');
     }
 
-    if (stats.size > MAX_SYNTHETIC_DIFF_SIZE) {
-      const sizeKB = Math.round(stats.size / 1024);
-      return createNewFileDiff(relativePath, '100644', [
-        `[File too large to display: ${sizeKB}KB]`,
-      ]);
+    // Check if it's a binary file (after directory check to handle dirs with binary extensions)
+    if (isBinaryFile(cleanPath)) {
+      return `diff --git a/${cleanPath} b/${cleanPath}
+new file mode 100644
+index 0000000..0000000
+Binary file ${cleanPath} added
+`;
+    }
+
+    const fileSize = Number(stats.size);
+    if (fileSize > MAX_SYNTHETIC_DIFF_SIZE) {
+      const sizeKB = Math.round(fileSize / 1024);
+      return createNewFileDiff(cleanPath, '100644', [`[File too large to display: ${sizeKB}KB]`]);
     }
 
     // Read file content
@@ -91,11 +106,11 @@ Binary file ${relativePath} added
     const lineCount = lines.length;
     const addedLines = lines.map((line) => `+${line}`).join('\n');
 
-    let diff = `diff --git a/${relativePath} b/${relativePath}
+    let diff = `diff --git a/${cleanPath} b/${cleanPath}
 new file mode 100644
 index 0000000..0000000
 --- /dev/null
-+++ b/${relativePath}
++++ b/${cleanPath}
 @@ -0,0 +1,${lineCount} @@
 ${addedLines}`;
 
@@ -109,7 +124,7 @@ ${addedLines}`;
     // Log the error for debugging
     logger.error(`Failed to generate synthetic diff for ${fullPath}:`, error);
     // Return a placeholder diff
-    return createNewFileDiff(relativePath, '100644', ['[Unable to read file content]']);
+    return createNewFileDiff(cleanPath, '100644', ['[Unable to read file content]']);
   }
 }
 

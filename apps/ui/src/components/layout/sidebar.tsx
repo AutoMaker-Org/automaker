@@ -28,8 +28,9 @@ import {
   useNavigation,
   useProjectCreation,
   useSetupDialog,
-  useTrashDialog,
+  useTrashOperations,
   useProjectTheme,
+  useUnviewedValidations,
 } from './sidebar/hooks';
 
 export function Sidebar() {
@@ -66,6 +67,9 @@ export function Sidebar() {
 
   // State for delete project confirmation dialog
   const [showDeleteProjectDialog, setShowDeleteProjectDialog] = useState(false);
+
+  // State for trash dialog
+  const [showTrashDialog, setShowTrashDialog] = useState(false);
 
   // Project theme management (must come before useProjectCreation which uses globalTheme)
   const { globalTheme } = useProjectTheme();
@@ -127,20 +131,20 @@ export function Sidebar() {
   // Running agents count
   const { runningAgentsCount } = useRunningAgents();
 
-  // Trash dialog and operations
+  // Unviewed validations count
+  const { count: unviewedValidationsCount } = useUnviewedValidations(currentProject);
+
+  // Trash operations
   const {
-    showTrashDialog,
-    setShowTrashDialog,
     activeTrashId,
     isEmptyingTrash,
     handleRestoreProject,
     handleDeleteProjectFromDisk,
     handleEmptyTrash,
-  } = useTrashDialog({
+  } = useTrashOperations({
     restoreTrashedProject,
     deleteTrashedProject,
     emptyTrash,
-    trashedProjects,
   });
 
   // Spec regeneration events
@@ -235,6 +239,7 @@ export function Sidebar() {
     setIsProjectPickerOpen,
     cyclePrevProject,
     cycleNextProject,
+    unviewedValidationsCount,
   });
 
   // Register keyboard shortcuts

@@ -1,15 +1,5 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
-import {
-  FolderOpen,
-  Folder,
-  ChevronRight,
-  Home,
-  ArrowLeft,
-  HardDrive,
-  CornerDownLeft,
-  Clock,
-  X,
-} from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { FolderOpen, Folder, ChevronRight, HardDrive, Clock, X } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -19,9 +9,11 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { PathInput } from '@/components/ui/path-input';
+import { Kbd, KbdGroup } from '@/components/ui/kbd';
 import { getJSON, setJSON } from '@/lib/storage';
 import { getDefaultWorkspaceDirectory, saveLastProjectDirectory } from '@/lib/workspace-config';
+import { useOSDetection } from '@/hooks';
 
 interface DirectoryEntry {
   name: string;
@@ -77,8 +69,8 @@ export function FileBrowserDialog({
   description = 'Navigate to your project folder or paste a path directly',
   initialPath,
 }: FileBrowserDialogProps) {
+  const { isMac } = useOSDetection();
   const [currentPath, setCurrentPath] = useState<string>('');
-  const [pathInput, setPathInput] = useState<string>('');
   const [parentPath, setParentPath] = useState<string | null>(null);
   const [directories, setDirectories] = useState<DirectoryEntry[]>([]);
   const [drives, setDrives] = useState<string[]>([]);
@@ -86,7 +78,6 @@ export function FileBrowserDialog({
   const [error, setError] = useState('');
   const [warning, setWarning] = useState('');
   const [recentFolders, setRecentFolders] = useState<string[]>([]);
-  const pathInputRef = useRef<HTMLInputElement>(null);
 
   // Load recent folders when dialog opens
   useEffect(() => {
@@ -120,7 +111,6 @@ export function FileBrowserDialog({
 
       if (result.success) {
         setCurrentPath(result.currentPath);
-        setPathInput(result.currentPath);
         setParentPath(result.parentPath);
         setDirectories(result.directories);
         setDrives(result.drives || []);
@@ -142,11 +132,10 @@ export function FileBrowserDialog({
     [browseDirectory]
   );
 
-  // Reset current path when dialog closes
+  // Reset state when dialog closes
   useEffect(() => {
     if (!open) {
       setCurrentPath('');
-      setPathInput('');
       setParentPath(null);
       setDirectories([]);
       setError('');
@@ -172,9 +161,6 @@ export function FileBrowserDialog({
           const pathToUse = initialPath || defaultDir;
 
           if (pathToUse) {
-            // Pre-fill the path input immediately
-            setPathInput(pathToUse);
-            // Then browse to that directory
             browseDirectory(pathToUse);
           } else {
             // No default directory, browse home directory
@@ -183,7 +169,6 @@ export function FileBrowserDialog({
         } catch {
           // If config fetch fails, try initialPath or fall back to home directory
           if (initialPath) {
-            setPathInput(initialPath);
             browseDirectory(initialPath);
           } else {
             browseDirectory();
@@ -199,32 +184,19 @@ export function FileBrowserDialog({
     browseDirectory(dir.path);
   };
 
-  const handleGoToParent = () => {
-    if (parentPath) {
-      browseDirectory(parentPath);
-    }
-  };
-
-  const handleGoHome = () => {
+  const handleGoHome = useCallback(() => {
     browseDirectory();
-  };
+  }, [browseDirectory]);
+
+  const handleNavigate = useCallback(
+    (path: string) => {
+      browseDirectory(path);
+    },
+    [browseDirectory]
+  );
 
   const handleSelectDrive = (drivePath: string) => {
     browseDirectory(drivePath);
-  };
-
-  const handleGoToPath = () => {
-    const trimmedPath = pathInput.trim();
-    if (trimmedPath) {
-      browseDirectory(trimmedPath);
-    }
-  };
-
-  const handlePathInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      handleGoToPath();
-    }
   };
 
   const handleSelect = useCallback(() => {
@@ -263,7 +235,7 @@ export function FileBrowserDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-popover border-border max-w-3xl max-h-[85vh] overflow-hidden flex flex-col p-4">
+      <DialogContent className="bg-popover border-border max-w-3xl max-h-[85vh] overflow-hidden flex flex-col p-4 focus:outline-none focus-visible:outline-none">
         <DialogHeader className="pb-1">
           <DialogTitle className="flex items-center gap-2 text-base">
             <FolderOpen className="w-4 h-4 text-brand-500" />
@@ -275,31 +247,21 @@ export function FileBrowserDialog({
         </DialogHeader>
 
         <div className="flex flex-col gap-2 min-h-[350px] flex-1 overflow-hidden py-1">
-          {/* Direct path input */}
-          <div className="flex items-center gap-1.5">
-            <Input
-              ref={pathInputRef}
-              type="text"
-              placeholder="Paste or type a full path (e.g., /home/user/projects/myapp)"
-              value={pathInput}
-              onChange={(e) => setPathInput(e.target.value)}
-              onKeyDown={handlePathInputKeyDown}
-              className="flex-1 font-mono text-xs h-8"
-              data-testid="path-input"
-              disabled={loading}
-            />
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={handleGoToPath}
-              disabled={loading || !pathInput.trim()}
-              data-testid="go-to-path-button"
-              className="h-8 px-2"
-            >
-              <CornerDownLeft className="w-3.5 h-3.5 mr-1" />
-              Go
-            </Button>
-          </div>
+          {/* Path navigation */}
+          <PathInput
+            currentPath={currentPath}
+            parentPath={parentPath}
+            loading={loading}
+            error={!!error}
+            onNavigate={handleNavigate}
+            onHome={handleGoHome}
+            entries={directories.map((dir) => ({ ...dir, isDirectory: true }))}
+            onSelectEntry={(entry) => {
+              if (entry.isDirectory) {
+                handleSelectDirectory(entry);
+              }
+            }}
+          />
 
           {/* Recent folders */}
           {recentFolders.length > 0 && (
@@ -352,35 +314,8 @@ export function FileBrowserDialog({
             </div>
           )}
 
-          {/* Current path breadcrumb */}
-          <div className="flex items-center gap-1.5 p-2 rounded-md bg-sidebar-accent/10 border border-sidebar-border">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleGoHome}
-              className="h-6 px-1.5"
-              disabled={loading}
-            >
-              <Home className="w-3.5 h-3.5" />
-            </Button>
-            {parentPath && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleGoToParent}
-                className="h-6 px-1.5"
-                disabled={loading}
-              >
-                <ArrowLeft className="w-3.5 h-3.5" />
-              </Button>
-            )}
-            <div className="flex-1 font-mono text-xs truncate text-muted-foreground">
-              {currentPath || 'Loading...'}
-            </div>
-          </div>
-
           {/* Directory list */}
-          <div className="flex-1 overflow-y-auto border border-sidebar-border rounded-md">
+          <div className="flex-1 overflow-y-auto border border-sidebar-border rounded-md scrollbar-styled">
             {loading && (
               <div className="flex items-center justify-center h-full p-4">
                 <div className="text-xs text-muted-foreground">Loading directories...</div>
@@ -423,8 +358,8 @@ export function FileBrowserDialog({
           </div>
 
           <div className="text-[10px] text-muted-foreground">
-            Paste a full path above, or click on folders to navigate. Press Enter or click Go to
-            jump to a path.
+            Paste a full path above, or click on folders to navigate. Press Enter or click → to jump
+            to a path.
           </div>
         </div>
 
@@ -440,12 +375,10 @@ export function FileBrowserDialog({
           >
             <FolderOpen className="w-3.5 h-3.5 mr-1.5" />
             Select Current Folder
-            <kbd className="ml-2 px-1.5 py-0.5 text-[10px] bg-background/50 rounded border border-border">
-              {typeof navigator !== 'undefined' && navigator.platform?.includes('Mac')
-                ? '⌘'
-                : 'Ctrl'}
-              +↵
-            </kbd>
+            <KbdGroup className="ml-1">
+              <Kbd>{isMac ? '⌘' : 'Ctrl'}</Kbd>
+              <Kbd>↵</Kbd>
+            </KbdGroup>
           </Button>
         </DialogFooter>
       </DialogContent>

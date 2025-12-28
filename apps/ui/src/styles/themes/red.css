@@ -67,3 +67,17 @@
   --running-indicator: oklch(0.55 0.25 25);
   --running-indicator-text: oklch(0.6 0.23 25);
 }
+
+/* Red theme scrollbar */
+.red ::-webkit-scrollbar-thumb {
+  background: oklch(0.35 0.15 25);
+  border-radius: 4px;
+}
+
+.red ::-webkit-scrollbar-thumb:hover {
+  background: oklch(0.45 0.18 25);
+}
+
+.red ::-webkit-scrollbar-track {
+  background: oklch(0.15 0.05 25);
+}

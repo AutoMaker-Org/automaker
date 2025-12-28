@@ -98,6 +98,7 @@ export function useBoardActions({
       priority: number;
       planningMode: PlanningMode;
       requirePlanApproval: boolean;
+      dependencies?: string[];
     }) => {
       // Empty string means "unassigned" (show only on primary worktree) - convert to undefined
       // Non-empty string is the actual branch name (for non-primary worktrees)
@@ -150,6 +151,7 @@ export function useBoardActions({
         titleGenerating: needsTitleGeneration,
         status: 'backlog' as const,
         branchName: finalBranchName,
+        dependencies: featureData.dependencies || [],
       };
       const createdFeature = addFeature(newFeatureData);
       // Must await to ensure feature exists on server before user can drag it

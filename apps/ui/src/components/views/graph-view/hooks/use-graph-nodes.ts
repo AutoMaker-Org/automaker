@@ -24,6 +24,8 @@ export interface TaskNodeData extends Feature {
   onStartTask?: () => void;
   onStopTask?: () => void;
   onResumeTask?: () => void;
+  onSpawnTask?: () => void;
+  onDeleteTask?: () => void;
 }
 
 export type TaskNode = Node<TaskNodeData, 'task'>;
@@ -32,6 +34,7 @@ export type DependencyEdge = Edge<{
   targetStatus: Feature['status'];
   isHighlighted?: boolean;
   isDimmed?: boolean;
+  onDeleteDependency?: (sourceId: string, targetId: string) => void;
 }>;
 
 export interface NodeActionCallbacks {
@@ -40,6 +43,9 @@ export interface NodeActionCallbacks {
   onStartTask?: (featureId: string) => void;
   onStopTask?: (featureId: string) => void;
   onResumeTask?: (featureId: string) => void;
+  onSpawnTask?: (featureId: string) => void;
+  onDeleteTask?: (featureId: string) => void;
+  onDeleteDependency?: (sourceId: string, targetId: string) => void;
 }
 
 interface UseGraphNodesProps {
@@ -112,6 +118,12 @@ export function useGraphNodes({
           onResumeTask: actionCallbacks?.onResumeTask
             ? () => actionCallbacks.onResumeTask!(feature.id)
             : undefined,
+          onSpawnTask: actionCallbacks?.onSpawnTask
+            ? () => actionCallbacks.onSpawnTask!(feature.id)
+            : undefined,
+          onDeleteTask: actionCallbacks?.onDeleteTask
+            ? () => actionCallbacks.onDeleteTask!(feature.id)
+            : undefined,
         },
       };
 
@@ -141,6 +153,7 @@ export function useGraphNodes({
                 targetStatus: feature.status,
                 isHighlighted: edgeIsHighlighted,
                 isDimmed: edgeIsDimmed,
+                onDeleteDependency: actionCallbacks?.onDeleteDependency,
               },
             };
             edgeList.push(edge);

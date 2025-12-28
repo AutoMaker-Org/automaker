@@ -20,19 +20,29 @@ export interface ConversationMessage {
 }
 
 /**
+ * System prompt preset configuration for CLAUDE.md auto-loading
+ */
+export interface SystemPromptPreset {
+  type: 'preset';
+  preset: 'claude_code';
+  append?: string;
+}
+
+/**
  * Options for executing a query via a provider
  */
 export interface ExecuteOptions {
   prompt: string | Array<{ type: string; text?: string; source?: object }>;
   model: string;
   cwd: string;
-  systemPrompt?: string;
+  systemPrompt?: string | SystemPromptPreset;
   maxTurns?: number;
   allowedTools?: string[];
   mcpServers?: Record<string, unknown>;
   abortController?: AbortController;
   conversationHistory?: ConversationMessage[]; // Previous messages for context
   sdkSessionId?: string; // Claude SDK session ID for resuming conversations
+  settingSources?: Array<'user' | 'project' | 'local'>; // Sources for CLAUDE.md loading
 }
 
 /**
