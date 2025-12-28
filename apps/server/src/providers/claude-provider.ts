@@ -36,16 +36,32 @@ export class ClaudeProvider extends BaseProvider {
     } = options;
 
     // Build Claude SDK options
+    // MCP permission logic - determines how to handle tool permissions when MCP servers are configured.
+    // This logic mirrors buildMcpOptions() in sdk-options.ts but is applied here since
+    // the provider is the final point where SDK options are constructed.
+    const hasMcpServers = options.mcpServers && Object.keys(options.mcpServers).length > 0;
+    // Default to true - deliberate design choice for ease of use. Users can disable in settings.
+    const mcpAutoApprove = options.mcpAutoApproveTools ?? true;
+    const mcpUnrestricted = options.mcpUnrestrictedTools ?? true;
     const defaultTools = ['Read', 'Write', 'Edit', 'Glob', 'Grep', 'Bash', 'WebSearch', 'WebFetch'];
-    const toolsToUse = allowedTools || defaultTools;
+
+    // Determine permission mode based on settings
+    const shouldBypassPermissions = hasMcpServers && mcpAutoApprove;
+    // Determine if we should restrict tools (only when no MCP or unrestricted is disabled)
+    const shouldRestrictTools = !hasMcpServers || !mcpUnrestricted;
 
     const sdkOptions: Options = {
       model,
       systemPrompt,
       maxTurns,
       cwd,
-      allowedTools: toolsToUse,
-      permissionMode: 'default',
+      // Only restrict tools if explicitly set OR (no MCP / unrestricted disabled)
+      ...(allowedTools && shouldRestrictTools && { allowedTools }),
+      ...(!allowedTools && shouldRestrictTools && { allowedTools: defaultTools }),
+      // When MCP servers are configured and auto-approve is enabled, use bypassPermissions
+      permissionMode: shouldBypassPermissions ? 'bypassPermissions' : 'default',
+      // Required when using bypassPermissions mode
+      ...(shouldBypassPermissions && { allowDangerouslySkipPermissions: true }),
       abortController,
       // Resume existing SDK session if we have a session ID
       ...(sdkSessionId && conversationHistory && conversationHistory.length > 0
@@ -55,6 +71,8 @@ export class ClaudeProvider extends BaseProvider {
       ...(options.settingSources && { settingSources: options.settingSources }),
       // Forward sandbox configuration
       ...(options.sandbox && { sandbox: options.sandbox }),
+      // Forward MCP servers configuration
+      ...(options.mcpServers && { mcpServers: options.mcpServers }),
     };
 
     // Build prompt payload

@@ -13,6 +13,10 @@ export type {
   InstallationStatus,
   ValidationResult,
   ModelDefinition,
+  McpServerConfig,
+  McpStdioServerConfig,
+  McpSSEServerConfig,
+  McpHttpServerConfig,
 } from './provider.js';
 
 // Feature types
@@ -54,6 +58,8 @@ export type {
   ModelProvider,
   KeyboardShortcuts,
   AIProfile,
+  MCPToolInfo,
+  MCPServerConfig,
   ProjectRef,
   TrashedProjectRef,
   ChatSessionRef,

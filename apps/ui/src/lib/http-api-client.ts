@@ -926,6 +926,20 @@ export class HttpApiClient implements ElectronAPI {
         recentFolders: string[];
         worktreePanelCollapsed: boolean;
         lastSelectedSessionByProject: Record<string, string>;
+        mcpServers?: Array<{
+          id: string;
+          name: string;
+          description?: string;
+          type?: 'stdio' | 'sse' | 'http';
+          command?: string;
+          args?: string[];
+          env?: Record<string, string>;
+          url?: string;
+          headers?: Record<string, string>;
+          enabled?: boolean;
+        }>;
+        mcpAutoApproveTools?: boolean;
+        mcpUnrestrictedTools?: boolean;
       };
       error?: string;
     }> => this.get('/api/settings/global'),

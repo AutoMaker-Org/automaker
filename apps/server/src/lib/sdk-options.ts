@@ -18,7 +18,7 @@
 import type { Options } from '@anthropic-ai/claude-agent-sdk';
 import path from 'path';
 import { resolveModelString } from '@automaker/model-resolver';
-import { DEFAULT_MODELS, CLAUDE_MODEL_MAP } from '@automaker/types';
+import { DEFAULT_MODELS, CLAUDE_MODEL_MAP, type McpServerConfig } from '@automaker/types';
 import { isPathAllowed, PathNotAllowedError, getAllowedRootDirectory } from '@automaker/platform';
 
 /**
@@ -137,6 +137,53 @@ function getBaseOptions(): Partial<Options> {
 }
 
 /**
+ * MCP permission options result
+ */
+interface McpPermissionOptions {
+  /** Whether tools should be restricted to a preset */
+  shouldRestrictTools: boolean;
+  /** Options to spread when MCP bypass is enabled */
+  bypassOptions: Partial<Options>;
+  /** Options to spread for MCP servers */
+  mcpServerOptions: Partial<Options>;
+}
+
+/**
+ * Build MCP-related options based on configuration.
+ * Centralizes the logic for determining permission modes and tool restrictions
+ * when MCP servers are configured.
+ *
+ * @param config - The SDK options config
+ * @returns Object with MCP permission settings to spread into final options
+ */
+function buildMcpOptions(config: CreateSdkOptionsConfig): McpPermissionOptions {
+  const hasMcpServers = config.mcpServers && Object.keys(config.mcpServers).length > 0;
+  // Default to true - this is a deliberate design choice for ease of use with MCP servers.
+  // Users can disable these in settings for stricter security.
+  const mcpAutoApprove = config.mcpAutoApproveTools ?? true;
+  const mcpUnrestricted = config.mcpUnrestrictedTools ?? true;
+
+  // Determine if we should bypass permissions based on settings
+  const shouldBypassPermissions = hasMcpServers && mcpAutoApprove;
+  // Determine if we should restrict tools (only when no MCP or unrestricted is disabled)
+  const shouldRestrictTools = !hasMcpServers || !mcpUnrestricted;
+
+  return {
+    shouldRestrictTools,
+    // Only include bypass options when MCP is configured and auto-approve is enabled
+    bypassOptions: shouldBypassPermissions
+      ? {
+          permissionMode: 'bypassPermissions' as const,
+          // Required flag when using bypassPermissions mode
+          allowDangerouslySkipPermissions: true,
+        }
+      : {},
+    // Include MCP servers if configured
+    mcpServerOptions: config.mcpServers ? { mcpServers: config.mcpServers } : {},
+  };
+}
+
+/**
  * Build system prompt configuration based on autoLoadClaudeMd setting.
  * When autoLoadClaudeMd is true:
  * - Uses preset mode with 'claude_code' to enable CLAUDE.md auto-loading
@@ -219,7 +266,24 @@ export interface CreateSdkOptionsConfig {
 
   /** Enable sandbox mode for bash command isolation */
   enableSandboxMode?: boolean;
+
+  /** MCP servers to make available to the agent */
+  mcpServers?: Record<string, McpServerConfig>;
+
+  /** Auto-approve MCP tool calls without permission prompts */
+  mcpAutoApproveTools?: boolean;
+
+  /** Allow unrestricted tools when MCP servers are enabled */
+  mcpUnrestrictedTools?: boolean;
 }
+
+// Re-export MCP types from @automaker/types for convenience
+export type {
+  McpServerConfig,
+  McpStdioServerConfig,
+  McpSSEServerConfig,
+  McpHttpServerConfig,
+} from '@automaker/types';
 
 /**
  * Create SDK options for spec generation
@@ -330,12 +394,18 @@ export function createChatOptions(config: CreateSdkOptionsConfig): Options {
   // Build CLAUDE.md auto-loading options if enabled
   const claudeMdOptions = buildClaudeMdOptions(config);
 
+  // Build MCP-related options
+  const mcpOptions = buildMcpOptions(config);
+
   return {
     ...getBaseOptions(),
     model: getModelForUseCase('chat', effectiveModel),
     maxTurns: MAX_TURNS.standard,
     cwd: config.cwd,
-    allowedTools: [...TOOL_PRESETS.chat],
+    // Only restrict tools if no MCP servers configured or unrestricted is disabled
+    ...(mcpOptions.shouldRestrictTools && { allowedTools: [...TOOL_PRESETS.chat] }),
+    // Apply MCP bypass options if configured
+    ...mcpOptions.bypassOptions,
     ...(config.enableSandboxMode && {
       sandbox: {
         enabled: true,
@@ -344,6 +414,7 @@ export function createChatOptions(config: CreateSdkOptionsConfig): Options {
     }),
     ...claudeMdOptions,
     ...(config.abortController && { abortController: config.abortController }),
+    ...mcpOptions.mcpServerOptions,
   };
 }
 
@@ -364,12 +435,18 @@ export function createAutoModeOptions(config: CreateSdkOptionsConfig): Options {
   // Build CLAUDE.md auto-loading options if enabled
   const claudeMdOptions = buildClaudeMdOptions(config);
 
+  // Build MCP-related options
+  const mcpOptions = buildMcpOptions(config);
+
   return {
     ...getBaseOptions(),
     model: getModelForUseCase('auto', config.model),
     maxTurns: MAX_TURNS.maximum,
     cwd: config.cwd,
-    allowedTools: [...TOOL_PRESETS.fullAccess],
+    // Only restrict tools if no MCP servers configured or unrestricted is disabled
+    ...(mcpOptions.shouldRestrictTools && { allowedTools: [...TOOL_PRESETS.fullAccess] }),
+    // Apply MCP bypass options if configured
+    ...mcpOptions.bypassOptions,
     ...(config.enableSandboxMode && {
       sandbox: {
         enabled: true,
@@ -378,6 +455,7 @@ export function createAutoModeOptions(config: CreateSdkOptionsConfig): Options {
     }),
     ...claudeMdOptions,
     ...(config.abortController && { abortController: config.abortController }),
+    ...mcpOptions.mcpServerOptions,
   };
 }
 
@@ -400,14 +478,27 @@ export function createCustomOptions(
   // Build CLAUDE.md auto-loading options if enabled
   const claudeMdOptions = buildClaudeMdOptions(config);
 
+  // Build MCP-related options
+  const mcpOptions = buildMcpOptions(config);
+
+  // For custom options: use explicit allowedTools if provided, otherwise use preset based on MCP settings
+  const effectiveAllowedTools = config.allowedTools
+    ? [...config.allowedTools]
+    : mcpOptions.shouldRestrictTools
+      ? [...TOOL_PRESETS.readOnly]
+      : undefined;
+
   return {
     ...getBaseOptions(),
     model: getModelForUseCase('default', config.model),
     maxTurns: config.maxTurns ?? MAX_TURNS.maximum,
     cwd: config.cwd,
-    allowedTools: config.allowedTools ? [...config.allowedTools] : [...TOOL_PRESETS.readOnly],
+    ...(effectiveAllowedTools && { allowedTools: effectiveAllowedTools }),
     ...(config.sandbox && { sandbox: config.sandbox }),
+    // Apply MCP bypass options if configured
+    ...mcpOptions.bypassOptions,
     ...claudeMdOptions,
     ...(config.abortController && { abortController: config.abortController }),
+    ...mcpOptions.mcpServerOptions,
   };
 }

@@ -29,6 +29,38 @@ export interface SystemPromptPreset {
 }
 
 /**
+ * MCP server configuration types for SDK options
+ * Matches the Claude Agent SDK's McpServerConfig types
+ */
+export type McpServerConfig = McpStdioServerConfig | McpSSEServerConfig | McpHttpServerConfig;
+
+/**
+ * Stdio-based MCP server (subprocess)
+ * Note: `type` is optional and defaults to 'stdio' to match SDK behavior
+ * and allow simpler configs like { command: "node", args: ["server.js"] }
+ */
+export interface McpStdioServerConfig {
+  type?: 'stdio';
+  command: string;
+  args?: string[];
+  env?: Record<string, string>;
+}
+
+/** SSE-based MCP server */
+export interface McpSSEServerConfig {
+  type: 'sse';
+  url: string;
+  headers?: Record<string, string>;
+}
+
+/** HTTP-based MCP server */
+export interface McpHttpServerConfig {
+  type: 'http';
+  url: string;
+  headers?: Record<string, string>;
+}
+
+/**
  * Options for executing a query via a provider
  */
 export interface ExecuteOptions {
@@ -38,7 +70,9 @@ export interface ExecuteOptions {
   systemPrompt?: string | SystemPromptPreset;
   maxTurns?: number;
   allowedTools?: string[];
-  mcpServers?: Record<string, unknown>;
+  mcpServers?: Record<string, McpServerConfig>;
+  mcpAutoApproveTools?: boolean; // Auto-approve MCP tool calls without permission prompts
+  mcpUnrestrictedTools?: boolean; // Allow unrestricted tools when MCP servers are enabled
   abortController?: AbortController;
   conversationHistory?: ConversationMessage[]; // Previous messages for context
   sdkSessionId?: string; // Claude SDK session ID for resuming conversations

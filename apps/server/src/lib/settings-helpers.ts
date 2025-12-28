@@ -4,6 +4,7 @@
 
 import type { SettingsService } from '../services/settings-service.js';
 import type { ContextFilesResult, ContextFileInfo } from '@automaker/utils';
+import type { MCPServerConfig, McpServerConfig } from '@automaker/types';
 
 /**
  * Get the autoLoadClaudeMd setting, with project settings taking precedence over global.
@@ -135,4 +136,121 @@ function formatContextFileEntry(file: ContextFileInfo): string {
   const pathInfo = `**Path:** \`${file.path}\``;
   const descriptionInfo = file.description ? `\n**Purpose:** ${file.description}` : '';
   return `${header}\n${pathInfo}${descriptionInfo}\n\n${file.content}`;
+}
+
+/**
+ * Get enabled MCP servers from global settings, converted to SDK format.
+ * Returns an empty object if settings service is not available or no servers are configured.
+ *
+ * @param settingsService - Optional settings service instance
+ * @param logPrefix - Prefix for log messages (e.g., '[AgentService]')
+ * @returns Promise resolving to MCP servers in SDK format (keyed by name)
+ */
+export async function getMCPServersFromSettings(
+  settingsService?: SettingsService | null,
+  logPrefix = '[SettingsHelper]'
+): Promise<Record<string, McpServerConfig>> {
+  if (!settingsService) {
+    return {};
+  }
+
+  try {
+    const globalSettings = await settingsService.getGlobalSettings();
+    const mcpServers = globalSettings.mcpServers || [];
+
+    // Filter to only enabled servers and convert to SDK format
+    const enabledServers = mcpServers.filter((s) => s.enabled !== false);
+
+    if (enabledServers.length === 0) {
+      return {};
+    }
+
+    // Convert settings format to SDK format (keyed by name)
+    const sdkServers: Record<string, McpServerConfig> = {};
+    for (const server of enabledServers) {
+      sdkServers[server.name] = convertToSdkFormat(server);
+    }
+
+    console.log(
+      `${logPrefix} Loaded ${enabledServers.length} MCP server(s): ${enabledServers.map((s) => s.name).join(', ')}`
+    );
+
+    return sdkServers;
+  } catch (error) {
+    console.error(`${logPrefix} Failed to load MCP servers setting:`, error);
+    return {};
+  }
+}
+
+/**
+ * Get MCP permission settings from global settings.
+ *
+ * @param settingsService - Optional settings service instance
+ * @param logPrefix - Prefix for log messages (e.g., '[AgentService]')
+ * @returns Promise resolving to MCP permission settings
+ */
+export async function getMCPPermissionSettings(
+  settingsService?: SettingsService | null,
+  logPrefix = '[SettingsHelper]'
+): Promise<{ mcpAutoApproveTools: boolean; mcpUnrestrictedTools: boolean }> {
+  // Default values (both enabled for backwards compatibility)
+  const defaults = { mcpAutoApproveTools: true, mcpUnrestrictedTools: true };
+
+  if (!settingsService) {
+    return defaults;
+  }
+
+  try {
+    const globalSettings = await settingsService.getGlobalSettings();
+    const result = {
+      mcpAutoApproveTools: globalSettings.mcpAutoApproveTools ?? true,
+      mcpUnrestrictedTools: globalSettings.mcpUnrestrictedTools ?? true,
+    };
+    console.log(
+      `${logPrefix} MCP permission settings: autoApprove=${result.mcpAutoApproveTools}, unrestricted=${result.mcpUnrestrictedTools}`
+    );
+    return result;
+  } catch (error) {
+    console.error(`${logPrefix} Failed to load MCP permission settings:`, error);
+    return defaults;
+  }
+}
+
+/**
+ * Convert a settings MCPServerConfig to SDK McpServerConfig format.
+ * Validates required fields and throws informative errors if missing.
+ */
+function convertToSdkFormat(server: MCPServerConfig): McpServerConfig {
+  if (server.type === 'sse') {
+    if (!server.url) {
+      throw new Error(`SSE MCP server "${server.name}" is missing a URL.`);
+    }
+    return {
+      type: 'sse',
+      url: server.url,
+      headers: server.headers,
+    };
+  }
+
+  if (server.type === 'http') {
+    if (!server.url) {
+      throw new Error(`HTTP MCP server "${server.name}" is missing a URL.`);
+    }
+    return {
+      type: 'http',
+      url: server.url,
+      headers: server.headers,
+    };
+  }
+
+  // Default to stdio
+  if (!server.command) {
+    throw new Error(`Stdio MCP server "${server.name}" is missing a command.`);
+  }
+  return {
+    type: 'stdio',
+    command: server.command,
+    args: server.args,
+    env: server.env,
+  };
 }

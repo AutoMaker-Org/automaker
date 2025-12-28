@@ -1,41 +1,19 @@
 /**
  * Shared types for AI model providers
+ *
+ * Re-exports types from @automaker/types for consistency across the codebase.
  */
 
-/**
- * Configuration for a provider instance
- */
-export interface ProviderConfig {
-  apiKey?: string;
-  cliPath?: string;
-  env?: Record<string, string>;
-}
-
-/**
- * Message in conversation history
- */
-export interface ConversationMessage {
-  role: 'user' | 'assistant';
-  content: string | Array<{ type: string; text?: string; source?: object }>;
-}
-
-/**
- * Options for executing a query via a provider
- */
-export interface ExecuteOptions {
-  prompt: string | Array<{ type: string; text?: string; source?: object }>;
-  model: string;
-  cwd: string;
-  systemPrompt?: string | { type: 'preset'; preset: 'claude_code'; append?: string };
-  maxTurns?: number;
-  allowedTools?: string[];
-  mcpServers?: Record<string, unknown>;
-  abortController?: AbortController;
-  conversationHistory?: ConversationMessage[]; // Previous messages for context
-  sdkSessionId?: string; // Claude SDK session ID for resuming conversations
-  settingSources?: Array<'user' | 'project' | 'local'>; // Claude filesystem settings to load
-  sandbox?: { enabled: boolean; autoAllowBashIfSandboxed?: boolean }; // Sandbox configuration
-}
+// Re-export all provider types from @automaker/types
+export type {
+  ProviderConfig,
+  ConversationMessage,
+  ExecuteOptions,
+  McpServerConfig,
+  McpStdioServerConfig,
+  McpSSEServerConfig,
+  McpHttpServerConfig,
+} from '@automaker/types';
 
 /**
  * Content block in a provider message (matches Claude SDK format)

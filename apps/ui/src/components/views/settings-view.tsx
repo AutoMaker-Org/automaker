@@ -18,6 +18,7 @@ import { AudioSection } from './settings-view/audio/audio-section';
 import { KeyboardShortcutsSection } from './settings-view/keyboard-shortcuts/keyboard-shortcuts-section';
 import { FeatureDefaultsSection } from './settings-view/feature-defaults/feature-defaults-section';
 import { DangerZoneSection } from './settings-view/danger-zone/danger-zone-section';
+import { MCPServersSection } from './settings-view/mcp-servers';
 import type { Project as SettingsProject, Theme } from './settings-view/shared/types';
 import type { Project as ElectronProject } from '@/lib/electron';
 
@@ -116,6 +117,8 @@ export function SettingsView() {
             {showUsageTracking && <ClaudeUsageSection />}
           </div>
         );
+      case 'mcp-servers':
+        return <MCPServersSection />;
       case 'ai-enhancement':
         return <AIEnhancementSection />;
       case 'appearance':

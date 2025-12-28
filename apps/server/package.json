@@ -28,6 +28,7 @@
     "@automaker/prompts": "^1.0.0",
     "@automaker/types": "^1.0.0",
     "@automaker/utils": "^1.0.0",
+    "@modelcontextprotocol/sdk": "^1.25.1",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^5.2.1",
