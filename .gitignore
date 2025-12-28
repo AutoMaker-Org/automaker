@@ -80,4 +80,6 @@ blob-report/
 *.pem
 
 docker-compose.override.yml
+Dockerfile.custom
 .claude/
+
