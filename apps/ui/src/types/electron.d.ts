@@ -14,7 +14,7 @@ export interface Message {
   id: string;
   role: 'user' | 'assistant';
   content: string;
-  reasoning_content?: string; // Extended thinking/reasoning from AI provider
+  thinking?: string; // Extended thinking from AI provider (unified for Claude and Zai)
   timestamp: string;
   isError?: boolean;
   images?: ImageAttachment[];
@@ -36,7 +36,7 @@ export type StreamEvent =
       sessionId: string;
       messageId: string;
       content: string;
-      reasoning_content?: string; // Extended thinking/reasoning content
+      thinking?: string; // Extended thinking content (unified for Claude and Zai)
       isComplete: boolean;
     }
   | {

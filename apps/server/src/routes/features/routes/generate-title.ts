@@ -7,6 +7,7 @@
 import type { Request, Response } from 'express';
 import { createLogger } from '@automaker/utils';
 import { DEFAULT_MODELS } from '@automaker/types';
+import { resolveModelString } from '@automaker/model-resolver';
 import { executeProviderQuery } from '../../../lib/provider-query.js';
 import { SettingsService } from '../../../services/settings-service.js';
 
@@ -14,6 +15,7 @@ const logger = createLogger('GenerateTitle');
 
 interface GenerateTitleRequestBody {
   description: string;
+  model?: string;
 }
 
 interface GenerateTitleSuccessResponse {
@@ -40,6 +42,7 @@ async function extractTextFromStream(
     type: string;
     subtype?: string;
     result?: string;
+    error?: string;
     message?: {
       content?: Array<{ type: string; text?: string }>;
     };
@@ -71,7 +74,7 @@ export function createGenerateTitleHandler(
 ): (req: Request, res: Response) => Promise<void> {
   return async (req: Request, res: Response): Promise<void> => {
     try {
-      const { description } = req.body as GenerateTitleRequestBody;
+      const { description, model: requestedModel } = req.body as GenerateTitleRequestBody;
 
       if (!description || typeof description !== 'string') {
         const response: GenerateTitleErrorResponse = {
@@ -99,10 +102,13 @@ export function createGenerateTitleHandler(
       // Get API keys for provider authentication
       const apiKeys = settingsService ? await settingsService.getApiKeys() : undefined;
 
+      // Resolve model (provider-aware, uses requested model or defaults)
+      const resolvedModel = resolveModelString(requestedModel, undefined, 'auto');
+
       const stream = executeProviderQuery({
         cwd: process.cwd(),
         prompt: userPrompt,
-        model: DEFAULT_MODELS.claude,
+        model: resolvedModel,
         useCase: 'suggestions', // Use fast model
         maxTurns: 1,
         allowedTools: [],

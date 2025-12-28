@@ -434,10 +434,10 @@ The Zai Provider integrates ZhipuAI's GLM models through Z.ai's OpenAI-compatibl
 
 | Model         | Tier     | Context | Output | Description                          |
 | ------------- | -------- | ------- | ------ | ------------------------------------ |
-| `glm-4.7`     | Premium  | 128K    | 8K     | Flagship model, strong reasoning     |
-| `glm-4.6v`    | Vision   | 128K    | 8K     | Multimodal model with vision support |
-| `glm-4.6`     | Balanced | 128K    | 8K     | Balanced performance                 |
-| `glm-4.5-air` | Speed    | 128K    | 4K     | Fast for simple tasks                |
+| `glm-4.7`     | Premium  | 200K    | 128K   | Flagship model, strong reasoning     |
+| `glm-4.6v`    | Vision   | 128K    | 96K    | Multimodal model with vision support |
+| `glm-4.6`     | Balanced | 200K    | 128K   | Balanced performance                 |
+| `glm-4.5-air` | Speed    | 128K    | 96K    | Fast for simple tasks                |
 | `glm`         | Alias    | -       | -      | Maps to `glm-4.5-air`                |
 
 **Tool Mapping**:
@@ -616,6 +616,7 @@ type ModelProvider = 'claude' | 'zai';
 2. **Credentials** (`credentials.json`):
    - API keys for Claude, Google, OpenAI, Zai
    - Stored separately for security
+   - ⚠️ **Currently stored in plaintext** - file permissions only (see Security Considerations)
 
 3. **Project Settings** (`.automaker/settings.json`):
    - Theme overrides
@@ -735,6 +736,18 @@ tests/
 - **Server**: 60% statements, 75% functions
 - **Libraries**: 90% statements, 95% functions
 
+### ZAI Provider Test Coverage
+
+- **Current**: 53 test cases in `zai-provider.test.ts`
+- **Estimated Coverage**: 65-70% line coverage
+- **Gaps**:
+  - Tool execution edge cases (timeouts, permissions, errors)
+  - Network failures and retry logic
+  - Private method testing (`getApiKey`, `formatContent`, `describeImages`)
+  - Integration tests with real API calls
+  - Streaming abort scenarios
+  - Memory leak prevention
+
 ---
 
 ## Build and Deployment
@@ -795,6 +808,26 @@ tests/
 - Review code before use
 - Use `ALLOWED_ROOT_DIRECTORY` to restrict access
 - Keep API keys secure
+
+### Current Security Status
+
+| Area                           | Status         | Notes                                                |
+| ------------------------------ | -------------- | ---------------------------------------------------- |
+| **Path Traversal Protection**  | ✅ Implemented | `@automaker/platform` guards on all paths            |
+| **Command Injection**          | ✅ Protected   | Allowlist + metacharacter blocking                   |
+| **API Key Storage**            | ⚠️ Plaintext   | Stored in `credentials.json` (file permissions only) |
+| **API Key Validation**         | ⚠️ Basic       | Length check only; no format validation              |
+| **Rate Limiting**              | ❌ Missing     | Auth endpoints can be abused                         |
+| **Input Sanitization**         | ✅ Good        | Shell metacharacters, recursive flags blocked        |
+| **Error Message Sanitization** | ⚠️ Partial     | May expose internal error patterns                   |
+| **HTTPS Enforcement**          | ✅ Hardcoded   | API URL hardcoded to HTTPS                           |
+
+### Security Hardening Needed
+
+1. **Credential Encryption**: API keys should use system keychain or encrypted storage
+2. **Rate Limiting**: Add to `/api/setup/verify-*` endpoints
+3. **Input Validation**: Schema validation for API keys before API calls
+4. **Error Sanitization**: Filter sensitive information from error responses
 
 ---
 
@@ -984,11 +1017,15 @@ AutoMaker is a sophisticated monorepo combining modern web development with cutt
 **Zai Integration Status**: ✅ Complete
 
 - All 4 GLM models (glm-4.7, glm-4.6v, glm-4.6, glm-4.5-air) fully integrated
-- Tool calling with optional parameters
+- Tool calling with optional parameters and JSON validation
 - Vision support via GLM-4.6v (with fallback for other models)
-- Extended thinking mode with UI display
+- Extended thinking mode with UI display (unified `thinking` terminology)
 - Provider-agnostic route execution
-- Comprehensive test coverage (44 provider tests)
+- Comprehensive test coverage (53 provider tests, all passing)
+- **Streaming improvements**:
+  - SSE line buffering for handling incomplete chunks
+  - Try/finally block for reader cleanup (resource leak prevention)
+  - 5-minute streaming timeout with AbortSignal
 - **Security hardened**:
   - Command allowlist (network commands and permission modifiers removed)
   - Docker commands gated by `ZAI_ALLOW_DOCKER` environment variable
@@ -997,4 +1034,64 @@ AutoMaker is a sophisticated monorepo combining modern web development with cutt
   - `ALLOWED_ROOT_DIRECTORY` enforced via `@automaker/platform` guards
   - Symlink target validation for `ln` command
   - Tool execution guard (only executes on proper `finish_reason`)
+  - JSON validation filter for tool call arguments
+- **Configuration**:
+  - API URL configurable via `ZAI_API_BASE_URL` or `ZAI_API_URL` environment variables
+- **Type safety**:
+  - Proper streaming response types (`ZaiSseResponse`, `ZaiSseChoice`, `ZaiSseDelta`)
+  - Removed all `any` types from tests
 - **Extensibility**: Registry-based provider factory for easy additions
+
+---
+
+## Known Issues and Technical Debt
+
+### Critical Issues
+
+1. **API Keys Stored in Plaintext** (SECURITY)
+   - Location: `apps/server/src/services/settings-service.ts:222`
+   - Impact: API keys stored in `~/.config/automaker/credentials.json` without encryption
+   - Mitigation: File permissions restrict access to user only; consider system keychain integration
+
+2. **No Rate Limiting on Auth Verification** (SECURITY)
+   - Location: `apps/server/src/routes/setup/routes/verify-zai-auth.ts`
+   - Impact: Endpoint can be abused for testing stolen API keys
+   - Mitigation: Implement rate limiting middleware
+
+### High Priority Issues
+
+| Issue                    | Location             | Impact                                        |
+| ------------------------ | -------------------- | --------------------------------------------- |
+| Missing input validation | `verify-zai-auth.ts` | No API key format validation before API calls |
+
+### Medium Priority Issues
+
+| Category             | Issues                                                    |
+| -------------------- | --------------------------------------------------------- |
+| **UI/UX**            | Missing ARIA labels, inconsistent error recovery patterns |
+| **Test Coverage**    | Missing integration tests, tool execution edge cases      |
+| **Provider Factory** | No instance caching, eager loading, O(n) lookup time      |
+
+### Recently Resolved Issues (v1.0)
+
+The following issues from the initial Zai integration audit have been fixed:
+
+| Category      | Issue                                       | Fix                                                        |
+| ------------- | ------------------------------------------- | ---------------------------------------------------------- |
+| **Streaming** | SSE line buffering bug                      | Added proper line buffering with incomplete chunk handling |
+| **Streaming** | Missing stream cleanup                      | Added try/finally block with `reader.releaseLock()`        |
+| **Streaming** | No streaming timeout                        | Added 5-minute timeout with AbortSignal                    |
+| **Security**  | Incomplete tool call handling               | Added JSON validation filter for tool arguments            |
+| **Config**    | Hardcoded API URL                           | Made configurable via `ZAI_API_BASE_URL`/`ZAI_API_URL`     |
+| **Types**     | Inconsistent thinking/reasoning terminology | Unified on `thinking` across codebase                      |
+| **Types**     | Duplicate ProviderFeature values            | Consolidated to `extendedThinking` only                    |
+| **Tests**     | Excessive `any` types                       | Added proper types, removed all `any` casts                |
+
+### Recommended Improvements
+
+1. **Implement credential encryption** using system keychain (node-keytar, electron-store)
+2. **Add rate limiting** to all auth-related endpoints
+3. **Add input validation** for API keys before API calls
+4. **Add integration tests** for end-to-end provider workflows
+5. **Implement provider instance caching** in factory pattern
+6. **Refactor zai-provider.ts** (~1,800 lines) into smaller modules if it grows further

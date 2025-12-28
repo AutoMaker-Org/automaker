@@ -167,16 +167,10 @@ export interface ToolUseBlock {
   input: unknown;
 }
 
-/** Thinking content block (Claude) */
+/** Thinking content block (unified for Claude and Zai) */
 export interface ThinkingBlock {
   type: 'thinking';
   thinking: string;
-}
-
-/** Reasoning content block (Zai GLM thinking mode) */
-export interface ReasoningBlock {
-  type: 'reasoning';
-  reasoning_content: string;
 }
 
 /** Tool result content block */
@@ -188,12 +182,7 @@ export interface ToolResultBlock {
 }
 
 /** Union of all content block types */
-export type ContentBlock =
-  | TextBlock
-  | ToolUseBlock
-  | ThinkingBlock
-  | ReasoningBlock
-  | ToolResultBlock;
+export type ContentBlock = TextBlock | ToolUseBlock | ThinkingBlock | ToolResultBlock;
 
 /**
  * Message returned by a provider (matches Claude SDK streaming format)

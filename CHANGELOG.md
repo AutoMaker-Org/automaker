@@ -259,6 +259,22 @@ const model = resolveModelString(undefined, undefined, 'claude');
 // Returns: 'claude-opus-4.5-20251101'
 ```
 
+**Provider Name Change:**
+
+If your code reads `ModelDefinition.provider`, it will return `'claude'` instead of `'anthropic'`.
+Use `BaseProvider.normalizeProviderName()` for backward compatibility if needed:
+
+```typescript
+import { BaseProvider } from '@/providers/base-provider';
+
+// Legacy code expecting 'anthropic'
+const provider = model.provider; // Returns 'claude'
+
+// Normalize for backward compatibility
+const normalized = BaseProvider.normalizeProviderName(provider);
+// Returns 'anthropic' if provider is 'claude'
+```
+
 ### Known Issues
 
 - ~~Streaming not yet implemented for Zai~~ (streaming support is now implemented)

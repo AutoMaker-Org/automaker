@@ -14,6 +14,7 @@ import type { Request, Response } from 'express';
 import { createLogger, readImageAsBase64 } from '@automaker/utils';
 import { DEFAULT_MODELS } from '@automaker/types';
 import { executeProviderQuery } from '../../../lib/provider-query.js';
+import { resolveModelString } from '@automaker/model-resolver';
 import * as fs from 'fs';
 import * as path from 'path';
 import type { SettingsService } from '../../../services/settings-service.js';
@@ -103,6 +104,8 @@ function findActualFilePath(requestedPath: string): string | null {
 interface DescribeImageRequestBody {
   /** Path to the image file */
   imagePath: string;
+  /** Optional model override (defaults to provider-aware model for suggestions use case) */
+  model?: string;
 }
 
 /**
@@ -250,7 +253,7 @@ export function createDescribeImageHandler(
     logger.info(`[${requestId}] body=${JSON.stringify(req.body)}`);
 
     try {
-      const { imagePath } = req.body as DescribeImageRequestBody;
+      const { imagePath, model: requestedModel } = req.body as DescribeImageRequestBody;
 
       // Validate required fields
       if (!imagePath || typeof imagePath !== 'string') {
@@ -345,8 +348,11 @@ export function createDescribeImageHandler(
       // Get API keys for provider authentication
       const apiKeys = settingsService ? await settingsService.getApiKeys() : undefined;
 
+      // Resolve model (provider-aware, uses requested model or defaults)
+      const resolvedModel = resolveModelString(requestedModel, undefined, 'auto');
+
       logger.info(
-        `[${requestId}] Using provider-agnostic query model=${DEFAULT_MODELS.claude} maxTurns=1 allowedTools=[]`
+        `[${requestId}] Using provider-agnostic query model=${resolvedModel} maxTurns=1 allowedTools=[]`
       );
 
       logger.info(`[${requestId}] Calling executeProviderQuery()...`);
@@ -354,7 +360,7 @@ export function createDescribeImageHandler(
       const stream = executeProviderQuery({
         cwd,
         prompt: promptContent,
-        model: DEFAULT_MODELS.claude,
+        model: resolvedModel,
         useCase: 'suggestions', // Use fast model
         maxTurns: 1,
         allowedTools: [],

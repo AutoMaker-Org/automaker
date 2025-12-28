@@ -16,8 +16,21 @@ import type { ProviderMessage, ContentBlock } from '../../../providers/types.js'
 import { ProviderFactory } from '../../../providers/provider-factory.js';
 import { createLogger } from '@automaker/utils';
 import { getApiKey } from '../common.js';
+import rateLimit from 'express-rate-limit';
 
 const logger = createLogger('Setup');
+
+// Rate limit Zai auth verification to prevent abuse
+export const zaiAuthRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // Maximum 5 attempts
+  message: {
+    error: 'Too many verification attempts. Please try again in 15 minutes.',
+  },
+  standardHeaders: true, // Return rate limit info in headers
+  legacyHeaders: false,
+  skipSuccessfulRequests: true, // Don't count successful verifications
+});
 
 const AUTH_ERROR_PATTERNS = ['unauthorized', 'invalid api key', 'invalid key', 'forbidden'];
 const BILLING_ERROR_PATTERNS = ['insufficient balance', 'insufficient quota', 'credit'];
@@ -95,9 +108,9 @@ export function createVerifyZaiAuthHandler() {
                 break;
               }
               receivedContent = true;
-            } else if (block.type === 'reasoning' && block.reasoning_content) {
-              // Check for API errors in reasoning content as well
-              const error = detectZaiError(block.reasoning_content);
+            } else if (block.type === 'thinking' && block.thinking) {
+              // Check for API errors in thinking content as well
+              const error = detectZaiError(block.thinking);
               if (error) {
                 errorMessage = error;
                 break;

@@ -3,7 +3,7 @@
  *
  * Provides centralized model resolution logic:
  * - Maps Claude model aliases to full model strings
- * - Maps Z.ai model aliases to full model strings
+ * - Maps ZAI model aliases to full model strings
  * - Provides default models per provider
  * - Handles multiple model sources with priority
  */
@@ -75,7 +75,7 @@ export function resolveModelString(
     return modelKey;
   }
 
-  // Full Z.ai model string (glm-*) - pass through unchanged
+  // Full ZAI model string (glm-*) - pass through unchanged
   if (modelKey.startsWith('glm-')) {
     console.log(`[ModelResolver] Using full GLM model string: ${modelKey}`);
     return modelKey;
@@ -90,10 +90,10 @@ export function resolveModelString(
     return claudeResolved;
   }
 
-  // Look up Z.ai model alias
+  // Look up ZAI model alias
   const zaiResolved = ZAI_MODEL_MAP[modelKey];
   if (zaiResolved) {
-    console.log(`[ModelResolver] Resolved Z.ai model alias: "${modelKey}" -> "${zaiResolved}"`);
+    console.log(`[ModelResolver] Resolved ZAI model alias: "${modelKey}" -> "${zaiResolved}"`);
     return zaiResolved;
   }
 

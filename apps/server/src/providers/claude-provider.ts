@@ -174,7 +174,7 @@ export class ClaudeProvider extends BaseProvider {
    * Check if the provider supports a specific feature
    */
   supportsFeature(feature: ProviderFeature | string): boolean {
-    // Claude supports: tools, text, vision, thinking, structured output (native), mcp, browser
+    // Claude supports: tools, text, vision, extended thinking, structured output (native), mcp, browser
     const supportedFeatures: ProviderFeature[] = [
       'tools',
       'text',

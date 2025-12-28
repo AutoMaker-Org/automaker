@@ -51,227 +51,55 @@ interface ZaiSseResponse {
 }
 
 /**
- * Whitelist of allowed commands for execute_command tool
- * Commands are executed with sanitized arguments to prevent command injection
+ * Blocklist of dangerous commands for execute_command tool
+ * Only commands that can cause system-wide damage are blocked
+ * All other commands are allowed, with real security enforced by ALLOWED_ROOT_DIRECTORY
  */
-const ALLOWED_COMMANDS = new Set([
-  // File operations - note: chmod, chown removed for security (easy to misuse)
-  'ls',
-  'dir', // Windows dir = Unix ls
-  'cat',
-  'type', // Windows type = Unix cat
-  'head',
-  'powershell', // For Get-Content -Head on Windows
-  'tail', // Windows has tail in Git Bash / WSL
-  'wc',
-  'sort', // Windows has sort command
-  'uniq',
-  'find',
-  'findstr', // Windows findstr = Unix grep
-  'locate',
-  'which',
-  'where', // Windows where = Unix which
-  'whereis',
-  'mkdir',
-  'md', // Windows md = mkdir
-  'rm',
-  'del',
-  'erase',
-  'rmdir', // Windows del/erase = Unix rm
-  'cp',
-  'copy',
-  'xcopy',
-  'robocopy', // Windows copy/xcopy = Unix cp
-  'mv',
-  'move',
-  'ren',
-  'rename', // Windows move/ren = Unix mv
-  'touch',
-  'echo', // For creating files on Windows
-  'ln',
-  'mklink', // Windows mklink = Unix ln (requires admin)
-  // Development tools
-  'git',
-  'npm',
-  'npx',
-  'pnpm',
-  'yarn',
-  'bun',
-  'bunx', // bun's alternative to npx
-  'node',
-  'python',
-  'python3',
-  'pip',
-  'pip3',
-  'poetry',
-  'pipenv', // Python environment management
-  'virtualenv', // Python virtual environments
-  'conda', // Python package/environment manager
-  'cargo',
-  'rustc',
-  'rustup', // Rust toolchain installer
-  'go',
-  'gofmt',
-  'javac',
-  'java',
-  'mvn',
-  'mvnw', // Maven wrapper
-  'gradle',
-  'gradlew', // Gradle wrapper
-  'kotlinc',
-  'kotlin',
-  'dotnet',
-  'nuget',
-  'ruby',
-  'gem',
-  'bundle',
-  'php',
-  'composer',
-  // C++ package managers
-  'conan',
-  'vcpkg',
-  // Docker - disabled by default, requires ZAI_ALLOW_DOCKER=1
-  'docker',
-  'docker-compose',
-  'podman',
-  // Build tools
-  'make',
-  'cmake',
-  'ninja',
-  'meson', // Build system
-  'scons', // Build system
-  'bazel', // Google's build tool
-  'buck', // Facebook's build tool
-  'xmake', // Lua-based build tool
-  'premake', // Build configuration tool
-  'gcc',
-  'g++',
-  'clang',
-  'clang++',
-  'clang-cl', // MSVC-compatible clang
-  'cc',
-  'c++',
-  'ld', // Linker
-  'lld-link', // LLVM linker
-  'rustfmt',
-  'black',
-  'prettier',
-  'eslint',
-  // Process management
-  'kill', // Unix kill command
-  'killall', // Unix killall
-  'pkill', // Unix pkill
-  'taskkill', // Windows taskkill
-  'tasklist', // Windows tasklist (like ps)
-  'ps', // Unix process list
-  'top', // Unix process monitor
-  'htop', // Interactive process monitor
-  'pgrep', // Process grep
-  'pidof', // Find process ID
-  'nohup', // Run command immune to hangups
-  'screen', // Terminal multiplexer
-  'tmux', // Terminal multiplexer
-  // Testing tools
-  'pytest',
-  'vitest',
-  'jest',
-  'mocha',
-  'jasmine',
-  'karma',
-  'test',
-  // Build tools
-  'webpack',
-  'vite',
-  'rollup',
-  'parcel',
-  'esbuild',
-  'tsc',
-  'babel',
-  'swc',
-  // Common utilities - curl, wget removed (bypass sandbox)
-  'echo',
-  'printf',
-  'date',
-  'time',
-  'sleep',
-  'timeout', // Windows timeout = Unix sleep
-  'watch',
-  'xargs',
-  'tar',
-  'zip',
-  'unzip',
-  'gzip',
-  'gunzip',
-  'grep',
-  'findstr', // Windows findstr = Unix grep
-  'sed',
-  'awk',
-  // Network utilities
-  'netstat', // Network statistics
-  'ss', // Socket statistics (Linux)
-  'lsof', // List open files (Unix)
-  'netcat', // Network utility (nc)
-  'nc', // Netcat alias
-  'curl', // Allowed for API testing only
-  'telnet', // Network protocol
-  'ping', // ICMP ping
-  'tracert', // Windows traceroute
-  'traceroute', // Unix traceroute
-  'nslookup', // DNS lookup
-  'dig', // DNS lookup (Unix)
-  'host', // DNS lookup (Unix)
-  'ipconfig', // Windows IP config
-  'ifconfig', // Unix network config
-  'ip', // Linux network config
-  'route', // Routing table
-  'arp', // ARP table
-  'openssl', // SSL/TLS toolkit
-  'tr',
-  'cut',
-  'paste',
-  'join',
-  'pwd',
-  'cd',
-  'pushd',
-  'popd',
-  'dirs',
-  'cmd',
-  'cmd.exe', // Windows command prompt
-  'powershell',
-  'pwsh', // PowerShell (pwsh = PowerShell Core)
-  'call', // Windows call for batch scripts
-  // Shell interpreters
-  'sh',
-  'bash',
-  'zsh',
-  'fish',
-  'dash',
-  'ash',
-  // Shell builtins (needed for script execution)
-  'if',
-  'for',
-  'else',
-  'endif',
-  'do',
-  'done',
-  'then',
-  'elif',
-  'case',
-  'esac',
-  'while',
-  'until',
-  'shift',
-  'set',
-  'setlocal',
-  'endlocal',
-  'goto',
-  'call',
-  'exit',
-  'true',
-  'false',
-  'test', // Unix test command
-  '[',
+const BLOCKED_COMMANDS = new Set([
+  // Disk destruction commands
+  'format',
+  'fdisk',
+  'diskpart',
+  'diskutil',
+  // System control commands
+  'shutdown',
+  'reboot',
+  'poweroff',
+  'halt',
+  'systemctl',
+  'init',
+  'telinit',
+  // User management commands
+  'userdel',
+  'groupdel',
+  'passwd',
+  'chpasswd',
 ]);
+
+/**
+ * Dangerous patterns that could cause system-wide damage
+ * These are blocked regardless of the command used
+ */
+const DANGEROUS_PATTERNS = [
+  // Recursive delete from root
+  /rm\s+-[rf]+\s+\/$/, // rm -rf / (with / at end)
+  /rm\s+-[rf]+\s+\\$/, // rm -rf \ (Windows root)
+  /del\s+\/$/, // del / (Windows)
+  /del\s+\\$/, // del \ (Windows)
+  // Recursive delete with wildcards pointing to root
+  /rm\s+-[rf]+\s+\/\*/, // rm -rf /* (recursive from root)
+  /rm\s+-[rf]+\s+\\\*/, // rm -rf \* (Windows)
+  // format/fdisk/shutdown with any arguments
+  /format\s/, // format with any args
+  /fdisk\s/, // fdisk with any args
+  /diskpart\s/, // diskpart with any args
+  /diskutil\s/, // diskutil with any args
+  /shutdown\s+[a-z-]/i, // shutdown with any flags
+  /reboot\s/, // reboot with any args
+  /poweroff\s/, // poweroff with any args
+  /halt\s/, // halt with any args
+  /systemctl\s+(poweroff|reboot|halt)/i, // systemctl poweroff/reboot/halt
+];
 
 /**
  * File extensions for grep search - expand to cover more file types
@@ -408,11 +236,6 @@ function extractPathFromFlag(arg: string): string | null {
 }
 
 /**
- * Dangerous recursive flags to block
- */
-const RECURSIVE_FLAGS = new Set(['-R', '-r', '--recursive', '-a']);
-
-/**
  * Check if an argument looks like a file path
  */
 function looksLikePath(arg: string): boolean {
@@ -431,7 +254,7 @@ function looksLikePath(arg: string): boolean {
  * @param command - Command string to sanitize
  * @param cwd - Current working directory for path validation
  * @returns Object with command and sanitized arguments
- * @throws Error if command is not allowed or arguments contain dangerous characters
+ * @throws Error if command is blocked or contains dangerous patterns
  */
 function sanitizeCommand(
   command: string,
@@ -440,6 +263,13 @@ function sanitizeCommand(
   const trimmed = command.trim();
   if (!trimmed) {
     throw new Error('Command cannot be empty');
+  }
+
+  // Check for dangerous patterns first (before parsing)
+  for (const pattern of DANGEROUS_PATTERNS) {
+    if (pattern.test(trimmed)) {
+      throw new Error(`Dangerous command pattern blocked: ${trimmed}`);
+    }
   }
 
   // Extract shell pipes (|) before parsing arguments
@@ -521,35 +351,13 @@ function sanitizeCommand(
   // Windows is case-insensitive, also normalize .exe, .bat, .cmd extensions
   const normalizedCommand = baseCommand.toLowerCase().replace(/\.(exe|bat|cmd)$/, '');
 
-  // Check if command is in allowlist (case-insensitive for Windows)
-  const commandAllowed = Array.from(ALLOWED_COMMANDS).some(
-    (allowed) => allowed.toLowerCase().replace(/\.(exe|bat|cmd)$/, '') === normalizedCommand
+  // Check if command is in blocklist (case-insensitive for Windows)
+  const commandBlocked = Array.from(BLOCKED_COMMANDS).some(
+    (blocked) => blocked.toLowerCase() === normalizedCommand
   );
 
-  if (!commandAllowed) {
-    throw new Error(`Command not allowed: ${baseCommand}`);
-  }
-
-  // Sanitize arguments - reject shell metacharacters that could enable injection
-  // Note: < and > are allowed in arguments (e.g., HTML comparison operators)
-  // Backslash (\) is allowed for Windows paths
-  // Percent (%) is allowed for Windows environment variables
-  // Parentheses () are allowed for subshells and command grouping
-  // Brackets [] and braces {} are allowed for glob patterns and templates
-  // Quotes are allowed but must be balanced for security
-  // Pipe (|) and ampersands (&, &&) are extracted separately above
-  const dangerousChars = /[;`$]/;
-  for (let i = 1; i < parts.length; i++) {
-    const arg = parts[i];
-    if (dangerousChars.test(arg)) {
-      throw new Error(`Invalid characters in argument: ${arg}`);
-    }
-    // Check for balanced quotes to prevent injection via unclosed strings
-    const singleQuotes = (arg.match(/'/g) || []).length;
-    const doubleQuotes = (arg.match(/"/g) || []).length;
-    if (singleQuotes % 2 !== 0 || doubleQuotes % 2 !== 0) {
-      throw new Error(`Unbalanced quotes in argument: ${arg}`);
-    }
+  if (commandBlocked) {
+    throw new Error(`Command blocked for security: ${baseCommand}`);
   }
 
   // Check for path traversal in ALL arguments (including --flag=value forms)
@@ -558,14 +366,6 @@ function sanitizeCommand(
     const embeddedPath = extractPathFromFlag(arg);
     if (arg.includes('..') || (embeddedPath && embeddedPath.includes('..'))) {
       throw new Error(`Path traversal not allowed: ${arg}`);
-    }
-  }
-
-  // Block recursive/dangerous flags
-  for (let i = 1; i < parts.length; i++) {
-    const arg = parts[i];
-    if (RECURSIVE_FLAGS.has(arg)) {
-      throw new Error(`Recursive flag not allowed: ${arg}`);
     }
   }
 
@@ -1137,14 +937,27 @@ export class ZaiProvider extends BaseProvider {
     const timeoutController = new AbortController();
     const timeoutId = setTimeout(() => timeoutController.abort(), TIMEOUT_MS);
 
-    // Store timeout ID for cleanup
+    // Store timeout ID and cleanup function for proper cleanup
     (timeoutController as any)._timeoutId = timeoutId;
+    (timeoutController as any)._cleanup = () => {
+      clearTimeout(timeoutId);
+    };
 
-    if (userController) {
-      // Combine both signals - abort if either user cancels or timeout occurs
-      return AbortSignal.any([userController.signal, timeoutController.signal]);
+    // Use AbortSignal.any() if available (Node.js 20+), otherwise use fallback
+    if ('any' in AbortSignal && typeof AbortSignal.any === 'function') {
+      try {
+        if (userController) {
+          return AbortSignal.any([userController.signal, timeoutController.signal]);
+        }
+        return timeoutController.signal;
+      } catch (e) {
+        // Fallback if AbortSignal.any() fails unexpectedly
+        logger.warn('[Zai] AbortSignal.any() failed, using fallback');
+      }
     }
-    return timeoutController.signal;
+
+    // Fallback for Node.js < 20: prioritize user abort, use timeout as backup
+    return userController?.signal || timeoutController.signal;
   }
 
   /**
@@ -1159,6 +972,60 @@ export class ZaiProvider extends BaseProvider {
       return process.env.ZAI_API_KEY;
     }
     throw new Error('ZAI_API_KEY not configured');
+  }
+
+  /**
+   * Fetch with retry logic and exponential backoff
+   * Retries on network errors, 5xx errors, and 429 rate limit
+   * Does NOT retry on 4xx client errors (except 429)
+   */
+  private async fetchWithRetry(
+    url: string,
+    options: RequestInit,
+    maxRetries = 3
+  ): Promise<Response> {
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        const response = await fetch(url, options);
+
+        // Don't retry on client errors (4xx) except 429 (rate limit)
+        if (response.ok || (!response.ok && response.status < 400)) {
+          return response;
+        }
+
+        if (response.status === 429) {
+          // Rate limit - retry with backoff
+          if (attempt < maxRetries - 1) {
+            const backoffMs = Math.pow(2, attempt) * 1000;
+            logger.warn(
+              `[Zai] Rate limited, retrying in ${backoffMs}ms (attempt ${attempt + 1}/${maxRetries})`
+            );
+            await new Promise((resolve) => setTimeout(resolve, backoffMs));
+            continue;
+          }
+        }
+
+        // Don't retry on other client errors or server errors after exhausting retries
+        return response;
+      } catch (error) {
+        // Retry only on network errors
+        if (attempt === maxRetries - 1) {
+          logger.error(
+            `[Zai] Fetch failed after ${maxRetries} attempts: ${(error as Error).message}`
+          );
+          throw error;
+        }
+
+        // Network error - retry with exponential backoff
+        const backoffMs = Math.pow(2, attempt) * 1000;
+        logger.warn(
+          `[Zai] Network error, retrying in ${backoffMs}ms (attempt ${attempt + 1}/${maxRetries}): ${(error as Error).message}`
+        );
+        await new Promise((resolve) => setTimeout(resolve, backoffMs));
+      }
+    }
+
+    throw new Error('Max retries exceeded');
   }
 
   /**
@@ -1355,7 +1222,7 @@ export class ZaiProvider extends BaseProvider {
 
       try {
         // Call Z.ai API with streaming enabled
-        const response = await fetch(`${ZAI_API_BASE}/chat/completions`, {
+        const response = await this.fetchWithRetry(`${ZAI_API_BASE}/chat/completions`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -1374,6 +1241,7 @@ export class ZaiProvider extends BaseProvider {
             // Z.ai structured output support
             ...(outputFormat && { response_format: { type: 'json_object' } }),
           }),
+
           // Combine user abort controller with timeout
           signal: this.createAbortSignal(abortController),
         });
@@ -1926,16 +1794,19 @@ export class ZaiProvider extends BaseProvider {
    * Check if the provider supports a specific feature
    */
   supportsFeature(feature: ProviderFeature | string): boolean {
-    // Zai supports: tools, text, vision (via glm-4.6v), extended thinking (via all GLM models), structured output
+    // Normalize legacy feature names for backward compatibility
+    const normalizedFeature = BaseProvider.normalizeFeatureName(feature);
+
+    // Zai supports: tools, text, vision (via glm-4.6v), thinking (via all GLM models), structured output
     // Zai does NOT support: mcp, browser (these are application-layer features)
     const supportedFeatures: ProviderFeature[] = [
       'tools',
       'text',
       'vision',
-      'extendedThinking', // Zai's thinking mode (GLM reasoning content)
+      'thinking', // Zai's thinking mode (GLM reasoning content)
       'structuredOutput',
     ];
-    return supportedFeatures.includes(feature as ProviderFeature);
+    return supportedFeatures.includes(normalizedFeature);
   }
 
   /**

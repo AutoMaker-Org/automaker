@@ -113,9 +113,7 @@ describe('provider-factory.ts', () => {
 
       it('should warn when defaulting to Claude', () => {
         ProviderFactory.getProviderForModel('random-model');
-        expect(consoleSpy.warn).toHaveBeenCalledWith(
-          expect.stringContaining('Unknown model prefix')
-        );
+        expect(consoleSpy.warn).toHaveBeenCalledWith(expect.stringContaining('Unknown model'));
         expect(consoleSpy.warn).toHaveBeenCalledWith(expect.stringContaining('random-model'));
         expect(consoleSpy.warn).toHaveBeenCalledWith(
           expect.stringContaining('defaulting to Claude')

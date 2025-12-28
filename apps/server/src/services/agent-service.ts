@@ -24,7 +24,7 @@ interface Message {
   id: string;
   role: 'user' | 'assistant';
   content: string;
-  reasoning_content?: string; // Extended thinking/reasoning from AI provider
+  thinking?: string; // Extended thinking from AI provider
   images?: Array<{
     data: string;
     mimeType: string;
@@ -244,7 +244,7 @@ export class AgentService {
       });
 
       // Extract model, maxTurns, and allowedTools from SDK options
-      const effectiveModel = sdkOptions.model!;
+      let effectiveModel = sdkOptions.model!;
       const maxTurns = sdkOptions.maxTurns;
       const allowedTools = sdkOptions.allowedTools as string[] | undefined;
 
@@ -373,27 +373,27 @@ export class AgentService {
                   content: responseText,
                   isComplete: false,
                 });
-              } else if (block.type === 'reasoning' && block.reasoning_content) {
-                // Handle extended thinking/reasoning content from providers (Zai, Claude)
+              } else if (block.type === 'thinking' && block.thinking) {
+                // Handle extended thinking content from providers (Zai, Claude)
                 if (!currentAssistantMessage) {
                   currentAssistantMessage = {
                     id: this.generateId(),
                     role: 'assistant',
                     content: '',
-                    reasoning_content: block.reasoning_content,
+                    thinking: block.thinking,
                     timestamp: new Date().toISOString(),
                   };
                   session.messages.push(currentAssistantMessage);
                 } else {
-                  currentAssistantMessage.reasoning_content = block.reasoning_content;
+                  currentAssistantMessage.thinking = block.thinking;
                 }
 
-                // Emit reasoning update to UI
+                // Emit thinking update to UI
                 this.emitAgentEvent(sessionId, {
                   type: 'stream',
                   messageId: currentAssistantMessage.id,
                   content: responseText,
-                  reasoning_content: block.reasoning_content,
+                  thinking: block.thinking,
                   isComplete: false,
                 });
               } else if (block.type === 'tool_use') {

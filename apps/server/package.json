@@ -31,6 +31,7 @@
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^5.2.1",
+    "express-rate-limit": "^8.2.1",
     "morgan": "^1.10.1",
     "node-pty": "1.1.0-beta41",
     "ws": "^8.18.3"

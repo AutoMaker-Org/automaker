@@ -269,7 +269,7 @@ describe('provider-query', () => {
       }),
     });
 
-    beforeEach(() => {
+    beforeEach(async () => {
       const { ProviderFactory } = await import('../../../../src/providers/provider-factory.js');
       vi.mocked(ProviderFactory.getProviderForModel).mockImplementation((model: string) => {
         if (model.startsWith('glm') || model === 'glm') {

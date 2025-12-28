@@ -16,9 +16,7 @@ import type {
  * Used to check capability compatibility between providers
  *
  * Feature descriptions:
- * - extendedThinking: Claude's extended thinking mode (extended thinking with tokens)
- * - thinking: Zai's thinking mode (GLM thinking/reasoning content)
- * - Both features represent "thinking/reasoning" capability from different providers
+ * - thinking: Unified thinking/reasoning capability (Claude extended thinking, Zai GLM thinking mode)
  */
 export type ProviderFeature =
   | 'tools'
@@ -26,8 +24,7 @@ export type ProviderFeature =
   | 'vision'
   | 'mcp'
   | 'browser'
-  | 'extendedThinking' // Claude: extended thinking
-  | 'thinking' // Zai: GLM thinking mode
+  | 'thinking' // Unified thinking capability for both Claude and Zai
   | 'structuredOutput';
 
 /**
@@ -87,14 +84,26 @@ export abstract class BaseProvider {
   }
 
   /**
-   * Check if the provider supports a specific feature
+   * Check if provider supports a specific feature
    * @param feature Feature name (e.g., "vision", "tools", "mcp", "structuredOutput")
-   * @returns Whether the feature is supported
+   * @returns Whether of feature is supported
    */
   supportsFeature(feature: ProviderFeature | string): boolean {
+    // Normalize legacy feature names for backward compatibility
+    const normalizedFeature = BaseProvider.normalizeFeatureName(feature);
+
     // Default implementation - override in subclasses
-    const commonFeatures: ProviderFeature[] = ['tools', 'text', 'structuredOutput'];
-    return commonFeatures.includes(feature as ProviderFeature);
+    const commonFeatures: ProviderFeature[] = ['tools', 'text'];
+    return commonFeatures.includes(normalizedFeature);
+  }
+
+  /**
+   * Normalize legacy feature names to current canonical names
+   * Provides backward compatibility for code using 'extendedThinking'
+   */
+  public static normalizeFeatureName(feature: ProviderFeature | string): ProviderFeature {
+    if (feature === 'extendedThinking') return 'thinking';
+    return feature as ProviderFeature;
   }
 
   /**
@@ -109,5 +118,14 @@ export abstract class BaseProvider {
    */
   setConfig(config: Partial<ProviderConfig>): void {
     this.config = { ...this.config, ...config };
+  }
+
+  /**
+   * Normalize legacy provider names to current canonical names
+   * Provides backward compatibility for code using 'anthropic' provider name
+   */
+  public static normalizeProviderName(provider: string): string {
+    if (provider === 'anthropic') return 'claude';
+    return provider;
   }
 }

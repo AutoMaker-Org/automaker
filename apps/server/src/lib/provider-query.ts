@@ -178,26 +178,29 @@ export async function* executeProviderQuery(
 
   // Determine the provider and API key
   let apiKey: string | undefined;
+  let providerName: 'claude' | 'zai' | undefined;
   if (apiKeys) {
     // Get provider name directly from model string to avoid instantiating twice
     const { getProviderForModel } = await import('@automaker/model-resolver');
-    const providerName = getProviderForModel(resolvedModel);
+    providerName = getProviderForModel(resolvedModel);
     logger.info(`[ProviderQuery] Using provider: ${providerName}`);
 
     // Map provider name to API key
+    // Provider name normalization: canonical names map to API key names
+    // 'claude' -> anthropic (legacy), 'zai' -> zai, etc.
     const apiKeyMap: Record<string, string | undefined> = {
       claude: apiKeys.anthropic,
       zai: apiKeys.zai,
       google: apiKeys.google,
       openai: apiKeys.openai,
     };
-    apiKey = apiKeyMap[providerName];
+    apiKey = providerName ? apiKeyMap[providerName] : undefined;
     if (apiKey) {
       logger.info(`[ProviderQuery] Using API key from settings for ${providerName}`);
     }
   } else {
     const { getProviderForModel } = await import('@automaker/model-resolver');
-    const providerName = getProviderForModel(resolvedModel);
+    providerName = getProviderForModel(resolvedModel);
     logger.info(`[ProviderQuery] Using provider: ${providerName}`);
   }
 

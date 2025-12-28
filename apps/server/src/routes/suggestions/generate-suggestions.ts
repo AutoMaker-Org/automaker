@@ -182,7 +182,7 @@ The response will be automatically formatted as structured JSON.`;
   let structuredOutput: { suggestions: Array<Record<string, unknown>> } | null = null;
 
   for await (const msg of stream) {
-    if (msg.type === 'assistant' && msg.message.content) {
+    if (msg.type === 'assistant' && msg.message?.content) {
       for (const block of msg.message.content) {
         if (block.type === 'text') {
           responseText += block.text;

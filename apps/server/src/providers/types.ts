@@ -15,7 +15,6 @@ export type {
   TextBlock,
   ToolUseBlock,
   ThinkingBlock,
-  ReasoningBlock,
   ToolResultBlock,
   ContentBlock,
   LegacyContentBlock,

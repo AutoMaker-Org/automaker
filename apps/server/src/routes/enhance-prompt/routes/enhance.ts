@@ -59,6 +59,7 @@ async function extractTextFromStream(
     type: string;
     subtype?: string;
     result?: string;
+    error?: string;
     message?: {
       content?: Array<{ type: string; text?: string }>;
     };
@@ -143,8 +144,8 @@ export function createEnhanceHandler(
       // This helps the model understand this is text transformation, not a coding task
       const userPrompt = buildUserPrompt(validMode, trimmedText, true);
 
-      // Resolve the model - use the passed model, default to sonnet for quality
-      const resolvedModel = resolveModelString(model, DEFAULT_MODELS.claude);
+      // Resolve the model - use the passed model, auto-resolve provider
+      const resolvedModel = resolveModelString(model, undefined, 'auto');
 
       logger.debug(`Using model: ${resolvedModel}`);
 

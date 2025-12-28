@@ -603,7 +603,7 @@ describe('zai-provider.ts', () => {
       expect((errorResult as any).error).toMatch(/Path|not allowed/);
     });
 
-    it('should reject recursive flags like -r, -R, -a', async () => {
+    it('should allow recursive flags like -r, -R, -a (no longer blocked)', async () => {
       mockFetch.mockImplementation(() =>
         createMockStreamResponse([
           'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_123","function":{"name":"execute_command","arguments":"{\\"command\\": \\"rm -r test_dir\\"}"}}]}}]}\n\n',
@@ -620,13 +620,81 @@ describe('zai-provider.ts', () => {
 
       const results = await collectAsyncGenerator(generator);
 
-      // Should get an error about recursive flag
+      // Should NOT have an error about recursive flag (no longer blocked)
       const errorResult = results.find((r: StreamingTestResult) => r.type === 'error');
-      expect(errorResult).toBeDefined();
-      expect((errorResult as any).error).toContain('Recursive flag');
+      expect(errorResult).toBeUndefined();
     });
 
-    it('should reject commands that were removed from allowlist (wget)', async () => {
+    it('should reject commands in blocklist (format)', async () => {
+      mockFetch.mockImplementation(() =>
+        createMockStreamResponse([
+          'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_123","function":{"name":"execute_command","arguments":"{\\"command\\": \\"format c:\\"}"}}]}}]}\n\n',
+          'data: {"choices":[{"finish_reason":"tool_calls"}]}\n\n',
+          'data: [DONE]\n\n',
+        ])
+      );
+
+      const generator = provider.executeQuery({
+        prompt: 'Format disk',
+        cwd: '/test/project',
+        model: 'glm-4.7',
+      });
+
+      const results = await collectAsyncGenerator(generator);
+
+      // Should get an error about command being blocked
+      const errorResult = results.find((r: StreamingTestResult) => r.type === 'error');
+      expect(errorResult).toBeDefined();
+      expect((errorResult as any).error).toContain('blocked');
+    });
+
+    it('should reject commands in blocklist (userdel)', async () => {
+      mockFetch.mockImplementation(() =>
+        createMockStreamResponse([
+          'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_123","function":{"name":"execute_command","arguments":"{\\"command\\": \\"userdel testuser\\"}"}}]}}]}\n\n',
+          'data: {"choices":[{"finish_reason":"tool_calls"}]}\n\n',
+          'data: [DONE]\n\n',
+        ])
+      );
+
+      const generator = provider.executeQuery({
+        prompt: 'Delete user',
+        cwd: '/test/project',
+        model: 'glm-4.7',
+      });
+
+      const results = await collectAsyncGenerator(generator);
+
+      // Should get an error about command being blocked
+      const errorResult = results.find((r: StreamingTestResult) => r.type === 'error');
+      expect(errorResult).toBeDefined();
+      expect((errorResult as any).error).toContain('blocked for security');
+    });
+
+    it('should reject dangerous pattern (rm -rf /)', async () => {
+      mockFetch.mockImplementation(() =>
+        createMockStreamResponse([
+          'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_123","function":{"name":"execute_command","arguments":"{\\"command\\": \\"rm -rf /\\"}"}}]}}]}\n\n',
+          'data: {"choices":[{"finish_reason":"tool_calls"}]}\n\n',
+          'data: [DONE]\n\n',
+        ])
+      );
+
+      const generator = provider.executeQuery({
+        prompt: 'Delete everything',
+        cwd: '/test/project',
+        model: 'glm-4.7',
+      });
+
+      const results = await collectAsyncGenerator(generator);
+
+      // Should get an error about dangerous pattern
+      const errorResult = results.find((r: StreamingTestResult) => r.type === 'error');
+      expect(errorResult).toBeDefined();
+      expect((errorResult as any).error).toContain('Dangerous command pattern blocked');
+    });
+
+    it('should allow previously blocked commands like wget', async () => {
       mockFetch.mockImplementation(() =>
         createMockStreamResponse([
           'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_123","function":{"name":"execute_command","arguments":"{\\"command\\": \\"wget http://example.com\\"}"}}]}}]}\n\n',
@@ -643,10 +711,9 @@ describe('zai-provider.ts', () => {
 
       const results = await collectAsyncGenerator(generator);
 
-      // Should get an error about command not allowed
+      // Should NOT have an error (wget is no longer in a whitelist)
       const errorResult = results.find((r: StreamingTestResult) => r.type === 'error');
-      expect(errorResult).toBeDefined();
-      expect((errorResult as any).error).toContain('not allowed');
+      expect(errorResult).toBeUndefined();
     });
 
     it('should reject docker commands without ZAI_ALLOW_DOCKER env var', async () => {

@@ -338,6 +338,100 @@ enabled_tools = ["UpdateFeatureStatus"]
 
 ---
 
+## Zai Provider
+
+**Location**: `apps/server/src/providers/zai-provider.ts`
+
+Integrates with Z.ai's GLM models (glm-4.x series).
+
+### Authentication
+
+- **Method**: API key only
+- **Environment Variable**: `ZAI_API_KEY`
+- **Setup Flow**: `/setup/zai-setup-step`
+- **Key Validation**: Minimum 20 characters
+- **Verification Endpoint**: `/setup/verify-zai-auth`
+
+### Supported Models
+
+| Model       | Tier     | Vision | Context | Output | Features                |
+| ----------- | -------- | ------ | ------- | ------ | ----------------------- |
+| glm-4.7     | Premium  | No     | 200K    | 128K   | Tools, Thinking         |
+| glm-4.6v    | Vision   | Yes    | 128K    | 96K    | Tools, Vision, Thinking |
+| glm-4.6     | Standard | No     | 200K    | 128K   | Tools, Thinking         |
+| glm-4.5-air | Basic    | No     | 128K    | 96K    | Tools, Thinking         |
+
+### Features
+
+- ✅ Tool execution (all 6 tools: read_file, write_file, edit_file, glob_search, grep_search, execute_command)
+- ✅ Text generation
+- ✅ Vision (glm-4.6v only)
+- ✅ Extended thinking (reasoning_content)
+- ❌ MCP servers (not supported)
+- ❌ Browser use (not supported)
+
+### Provider Aliases
+
+- `zai`
+- `zhipuai` (Chinese company name)
+- `zhipu` (Alternative)
+- `glm` (Model family)
+
+### Implementation Notes
+
+**Streaming**: Custom SSE parsing (no SDK)
+
+```typescript
+// ZaiProvider implements streaming manually
+async *executeQuery(options: ExecuteOptions): AsyncGenerator<ProviderMessage>
+```
+
+**Tool Execution**: Native implementation with security hardening
+
+- Command allowlist: ~270+ commands (Unix and Windows variants)
+- Path traversal protection (blocks `..`)
+- Recursive flag blocking (`-r`, `-R`, `-a`)
+- Docker disabled by default (`ZAI_ALLOW_DOCKER=1` to enable)
+- Shell metacharacter blocking
+
+**Timeouts**:
+
+- Query timeout: 5 minutes (auto-abort)
+- Tool execution: 30 seconds (all tools)
+- Verification: 30 seconds
+
+**Error Handling**:
+
+- Retry logic: 3 attempts with exponential backoff (1s, 2s, 4s)
+- Rate limiting: 5 attempts per 15 minutes on verification
+- Graceful fallback for non-vision models with images
+
+**Session Management**:
+
+- Manual session ID handling (via `sdkSessionId` option)
+- No automatic session persistence
+
+### Testing
+
+- 53 unit tests (978 lines)
+- Security tests: 10 dedicated tests
+- Tool execution tests: 4 tools covered
+- SSE parsing tests
+- Image handling tests
+
+### Differences from Claude Provider
+
+| Aspect         | Claude                              | Zai                                |
+| -------------- | ----------------------------------- | ---------------------------------- |
+| SDK            | Uses @anthropic-ai/claude-agent-sdk | Custom fetch + SSE parsing         |
+| Streaming      | SDK handles                         | Manual implementation              |
+| Session        | SDK manages                         | Manual session ID                  |
+| Security       | SDK handles                         | Custom allowlist and validation    |
+| Tool Execution | SDK handles                         | Native implementation              |
+| Retry          | SDK built-in                        | Manual implementation (3 attempts) |
+
+---
+
 ## Provider Factory
 
 **Location**: `apps/server/src/providers/provider-factory.ts`

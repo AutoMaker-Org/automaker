@@ -11,7 +11,7 @@ import { createDeleteApiKeyHandler } from './routes/delete-api-key.js';
 import { createApiKeysHandler } from './routes/api-keys.js';
 import { createPlatformHandler } from './routes/platform.js';
 import { createVerifyClaudeAuthHandler } from './routes/verify-claude-auth.js';
-import { createVerifyZaiAuthHandler } from './routes/verify-zai-auth.js';
+import { createVerifyZaiAuthHandler, zaiAuthRateLimit } from './routes/verify-zai-auth.js';
 import { createGhStatusHandler } from './routes/gh-status.js';
 
 export function createSetupRoutes(): Router {
@@ -25,7 +25,7 @@ export function createSetupRoutes(): Router {
   router.get('/api-keys', createApiKeysHandler());
   router.get('/platform', createPlatformHandler());
   router.post('/verify-claude-auth', createVerifyClaudeAuthHandler());
-  router.post('/verify-zai-auth', createVerifyZaiAuthHandler());
+  router.post('/verify-zai-auth', zaiAuthRateLimit, createVerifyZaiAuthHandler());
   router.get('/gh-status', createGhStatusHandler());
 
   return router;
