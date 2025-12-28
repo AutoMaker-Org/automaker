@@ -13,6 +13,7 @@ const logger = createLogger('SpecRegeneration');
 /**
  * Clean and sanitize LLM-generated JSON
  * Handles common issues like trailing commas, comments, etc.
+ * Preserves comment-like patterns inside JSON strings.
  */
 function cleanJson(jsonString: string): string {
   let cleaned = jsonString.trim();
@@ -20,13 +21,94 @@ function cleanJson(jsonString: string): string {
   // Remove trailing commas before closing brackets/braces
   cleaned = cleaned.replace(/,\s*([}\]])/g, '$1');
 
-  // Remove single-line comments (// ...)
-  cleaned = cleaned.replace(/\/\/.*$/gm, '');
-
-  // Remove multi-line comments (/* ... */)
-  cleaned = cleaned.replace(/\/\*[\s\S]*?\*\//g, '');
+  // Remove comments while preserving string contents
+  // This implementation properly handles strings that contain // or /* */
+  cleaned = removeJsonComments(cleaned);
 
   return cleaned;
+}
+
+/**
+ * Remove JSON comments (single-line // and multi-line block comments)
+ * while preserving string contents that contain these patterns.
+ * Uses a state machine approach to track whether we're inside a string.
+ */
+function removeJsonComments(json: string): string {
+  let result = '';
+  let inString = false;
+  let inSingleLineComment = false;
+  let inMultiLineComment = false;
+  let escapeNext = false;
+
+  for (let i = 0; i < json.length; i++) {
+    const char = json[i];
+    const nextChar = json[i + 1] || '';
+
+    // Handle escape sequences
+    if (escapeNext) {
+      if (!inSingleLineComment && !inMultiLineComment) {
+        result += char;
+      }
+      escapeNext = false;
+      continue;
+    }
+
+    if (char === '\\' && inString && !inSingleLineComment && !inMultiLineComment) {
+      escapeNext = true;
+      result += char;
+      continue;
+    }
+
+    // Track string boundaries
+    if (!inSingleLineComment && !inMultiLineComment) {
+      if (char === '"') {
+        inString = !inString;
+        result += char;
+        continue;
+      }
+    }
+
+    // If we're in a string, always add the character
+    if (inString) {
+      result += char;
+      continue;
+    }
+
+    // Check for comment start
+    if (!inSingleLineComment && !inMultiLineComment) {
+      if (char === '/' && nextChar === '/') {
+        inSingleLineComment = true;
+        i++; // Skip next character
+        continue;
+      }
+      if (char === '/' && nextChar === '*') {
+        inMultiLineComment = true;
+        i++; // Skip next character
+        continue;
+      }
+    }
+
+    // Check for comment end
+    if (inSingleLineComment && (char === '\n' || char === '\r')) {
+      inSingleLineComment = false;
+      // Preserve the newline for formatting
+      result += char;
+      continue;
+    }
+
+    if (inMultiLineComment && char === '*' && nextChar === '/') {
+      inMultiLineComment = false;
+      i++; // Skip next character
+      continue;
+    }
+
+    // If not in a comment, add the character
+    if (!inSingleLineComment && !inMultiLineComment) {
+      result += char;
+    }
+  }
+
+  return result;
 }
 
 export async function parseAndCreateFeatures(

@@ -289,7 +289,8 @@ export async function* executeProviderQuery(
       type: 'error',
       error: (error as Error).message,
     };
-    throw error;
+    // Don't re-throw after yielding error - the caller already received the error
+    return;
   }
 
   logger.info(`[ProviderQuery] Query complete. Response length: ${fullResponse.length} chars`);

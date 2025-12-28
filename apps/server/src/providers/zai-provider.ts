@@ -250,16 +250,20 @@ function looksLikePath(arg: string): boolean {
 }
 
 /**
- * Validate and sanitize a shell command
- * @param command - Command string to sanitize
- * @param cwd - Current working directory for path validation
- * @returns Object with command and sanitized arguments
- * @throws Error if command is blocked or contains dangerous patterns
+ * Sanitized command segment structure
  */
-function sanitizeCommand(
-  command: string,
-  cwd: string
-): { command: string; args: string[]; redirects: string[]; pipes: string[] } {
+type SanitizedSegment = {
+  command: string;
+  args: string[];
+  redirects: string[];
+};
+
+type SanitizedPipe = SanitizedSegment & { separator: '|' | '&&' | '&' };
+
+/**
+ * Parse, validate, and sanitize a single command segment (no chaining)
+ */
+function sanitizeCommandSegment(command: string, cwd: string): SanitizedSegment {
   const trimmed = command.trim();
   if (!trimmed) {
     throw new Error('Command cannot be empty');
@@ -272,42 +276,21 @@ function sanitizeCommand(
     }
   }
 
-  // Extract shell pipes (|) before parsing arguments
-  // Pipes chain commands together: cmd1 | cmd2
-  const pipes: string[] = [];
-  let workCommand = trimmed;
-
-  // Handle pipe separators first (before ampersands)
-  const pipeParts = workCommand.split(/\|/);
-  if (pipeParts.length > 1) {
-    pipes.push(...pipeParts.slice(1).map((p) => p.trim()));
-    workCommand = pipeParts[0].trim();
-  }
-
-  // Extract Windows-style ampersand separators (&, &&)
-  // Windows: cmd1 & cmd2 runs async, cmd1 && cmd2 runs sequentially
-  // We'll treat them like pipes but they go to the pipes array
-  const ampersandParts = workCommand.split(/&&?/);
-  if (ampersandParts.length > 1) {
-    pipes.push(...ampersandParts.slice(1).map((p) => p.trim()));
-    workCommand = ampersandParts[0].trim();
-  }
-
   // Extract shell redirects before parsing arguments
   // Supported redirects: >, >>, <, 2>, 2>>, 2>&1, etc.
   const redirects: string[] = [];
-  let commandWithoutRedirects = workCommand;
+  let commandWithoutRedirects = trimmed;
 
   // Pattern to match redirect operators with their targets
   // Matches: >file, >>file, <file, 2>file, 2>>file, 2>&1, etc.
   const redirectPattern = /(\d*>&?\d*|>>?|<)\s*(\S+|&\d+)/g;
   let match;
-  while ((match = redirectPattern.exec(workCommand)) !== null) {
+  while ((match = redirectPattern.exec(trimmed)) !== null) {
     redirects.push(match[0]);
   }
 
   // Remove redirects from command for validation (we'll add them back later)
-  commandWithoutRedirects = workCommand.replace(redirectPattern, '').trim();
+  commandWithoutRedirects = trimmed.replace(redirectPattern, '').trim();
 
   // Split by whitespace but respect quotes
   const parts: string[] = [];
@@ -338,6 +321,10 @@ function sanitizeCommand(
     }
   }
 
+  if (inQuote) {
+    throw new Error('Unbalanced quotes in command');
+  }
+
   if (current) {
     parts.push(current);
   }
@@ -360,14 +347,11 @@ function sanitizeCommand(
     throw new Error(`Command blocked for security: ${baseCommand}`);
   }
 
-  // Check for path traversal in ALL arguments (including --flag=value forms)
-  for (let i = 1; i < parts.length; i++) {
-    const arg = parts[i];
-    const embeddedPath = extractPathFromFlag(arg);
-    if (arg.includes('..') || (embeddedPath && embeddedPath.includes('..'))) {
-      throw new Error(`Path traversal not allowed: ${arg}`);
-    }
-  }
+  // Note: Path traversal security is enforced below by validatePath() on all resolved paths
+  // We don't check for '..' here because:
+  // 1. Relative paths like '../file' are valid when they resolve within the allowed directory
+  // 2. Flag values like '--config=../file.ts' should be allowed
+  // 3. validatePath() will catch actual escapes outside ALLOWED_ROOT_DIRECTORY
 
   // Track symlink target for ln command (ln source target - target is 2nd path arg)
   let symlinkTargetIndex = -1;
@@ -425,7 +409,57 @@ function sanitizeCommand(
     }
   }
 
-  return { command: baseCommand, args: parts.slice(1), redirects, pipes };
+  return { command: baseCommand, args: parts.slice(1), redirects };
+}
+
+/**
+ * Validate and sanitize a shell command
+ * @param command - Command string to sanitize
+ * @param cwd - Current working directory for path validation
+ * @returns Object with command and sanitized arguments
+ * @throws Error if command is blocked or contains dangerous patterns
+ */
+function sanitizeCommand(
+  command: string,
+  cwd: string
+): { command: string; args: string[]; redirects: string[]; pipes: SanitizedPipe[] } {
+  const trimmed = command.trim();
+  if (!trimmed) {
+    throw new Error('Command cannot be empty');
+  }
+
+  // Split into command segments on pipes/ampersands
+  const tokens = trimmed.split(/(\||&&?)/);
+  const segments: string[] = [];
+  const separators: Array<'|' | '&&' | '&'> = [];
+
+  for (const token of tokens) {
+    if (!token) continue;
+    const t = token.trim();
+    if (!t) continue;
+    if (t === '|' || t === '&&' || t === '&') {
+      separators.push(t as '|' | '&&' | '&');
+    } else {
+      segments.push(t);
+    }
+  }
+
+  if (segments.length === 0) {
+    throw new Error('Command cannot be empty');
+  }
+  if (separators.length > 0 && separators.length !== segments.length - 1) {
+    throw new Error('Invalid command chaining syntax');
+  }
+
+  const head = sanitizeCommandSegment(segments[0], cwd);
+  const pipes: SanitizedPipe[] = [];
+
+  for (let i = 1; i < segments.length; i++) {
+    const seg = sanitizeCommandSegment(segments[i], cwd);
+    pipes.push({ ...seg, separator: separators[i - 1] });
+  }
+
+  return { ...head, pipes };
 }
 
 /**
@@ -592,6 +626,27 @@ function validateGlobPattern(pattern: string): void {
   if (path.isAbsolute(pattern) && !pattern.includes('*')) {
     throw new Error('Absolute paths not allowed in glob pattern');
   }
+
+  // Prevent ReDoS: Limit pattern length and consecutive wildcards
+  if (pattern.length > 500) {
+    throw new Error('Glob pattern too long (max 500 characters)');
+  }
+
+  // Count consecutive asterisks to prevent catastrophic patterns
+  const maxConsecutiveAsterisks = 10;
+  let consecutiveAsterisks = 0;
+  for (const char of pattern) {
+    if (char === '*') {
+      consecutiveAsterisks++;
+      if (consecutiveAsterisks > maxConsecutiveAsterisks) {
+        throw new Error(
+          `Too many consecutive wildcards in glob pattern (max ${maxConsecutiveAsterisks})`
+        );
+      }
+    } else {
+      consecutiveAsterisks = 0;
+    }
+  }
 }
 
 /**
@@ -670,15 +725,26 @@ async function grep(
   searchPath: string
 ): Promise<Array<{ path: string; line: number; text: string }>> {
   // Validate pattern for security
-  // Since we use native RegExp (not shell), allow most regex metacharacters
-  // Only block shell command separators that could enable injection
-  if (/[;|`]/.test(pattern)) {
-    throw new Error('Invalid characters in grep pattern');
+  // Since we use native RegExp (not shell), all regex metacharacters are safe
+  // Main concerns are ReDoS and extreme pattern lengths
+
+  // Prevent ReDoS: Limit pattern length and check for dangerous patterns
+  if (pattern.length > 500) {
+    throw new Error('Grep pattern too long (max 500 characters)');
   }
 
-  // Check for path traversal attempts in pattern
-  if (pattern.includes('..')) {
-    throw new Error('Path traversal not allowed in grep pattern');
+  // Check for nested quantifiers that can cause exponential backtracking
+  // Patterns like (a+)+, (a*)*, (a+)+?, etc.
+  const dangerousPatterns = [
+    /\(\.[\*\+]\)[\*\+]/, // (a+)+ or (a*)*
+    /\(\.[\*\+]\)\{/g, // (a+){n,
+    /\(\.[\*\+]\)\{[\d,]+,\}/, // (a+){n,}
+  ];
+
+  for (const dangerous of dangerousPatterns) {
+    if (dangerous.test(pattern)) {
+      throw new Error('Grep pattern contains nested quantifiers that may cause performance issues');
+    }
   }
 
   try {
@@ -763,8 +829,9 @@ async function safeResolvePath(
     }
 
     // Check for symlink escape attempts
+    // Use lstat instead of stat to detect symlinks (stat follows them, lstat doesn't)
     try {
-      const stat = await fs.stat(absolutePath);
+      const stat = await fs.lstat(absolutePath);
       if (stat.isSymbolicLink()) {
         const targetPath = path.resolve(
           path.dirname(absolutePath),
@@ -778,9 +845,10 @@ async function safeResolvePath(
     } catch {
       // File doesn't exist yet - allow for new file creation
       // But check parent directory for symlinks
+      // Use lstat to properly detect symlinks (stat follows them)
       try {
         const parentDir = path.dirname(absolutePath);
-        const parentStat = await fs.stat(parentDir);
+        const parentStat = await fs.lstat(parentDir);
         if (parentStat.isSymbolicLink()) {
           const targetPath = path.resolve(path.dirname(parentDir), await fs.readlink(parentDir));
           const targetRelative = path.relative(baseCwd, targetPath);
@@ -865,6 +933,17 @@ async function executeToolCall(
       const command = toolArgs.command as string;
       const commandCwd = (toolArgs.cwd as string) || baseCwd;
 
+      const buildSegmentString = (segment: SanitizedSegment): string => {
+        let cmd = segment.command;
+        if (segment.args.length > 0) {
+          cmd += ` ${segment.args.join(' ')}`;
+        }
+        if (segment.redirects.length > 0) {
+          cmd += ` ${segment.redirects.join(' ')}`;
+        }
+        return cmd;
+      };
+
       // Resolve and validate cwd using platform guard
       const resolvedCwd = path.isAbsolute(commandCwd)
         ? commandCwd
@@ -875,19 +954,10 @@ async function executeToolCall(
       const sanitized = sanitizeCommand(command, resolvedCwd);
 
       try {
-        // Build command with sanitized arguments, redirects, and pipes
-        let cmdString = sanitized.command;
-        if (sanitized.args.length > 0) {
-          cmdString += ` ${sanitized.args.join(' ')}`;
-        }
-        if (sanitized.redirects.length > 0) {
-          cmdString += ` ${sanitized.redirects.join(' ')}`;
-        }
-        if (sanitized.pipes.length > 0) {
-          // Add pipe operators and chained commands
-          for (const pipeCmd of sanitized.pipes) {
-            cmdString += ` | ${pipeCmd}`;
-          }
+        // Build command with sanitized arguments, redirects, and pipes/ampersands
+        let cmdString = buildSegmentString(sanitized);
+        for (const pipe of sanitized.pipes) {
+          cmdString += ` ${pipe.separator} ${buildSegmentString(pipe)}`;
         }
 
         const { stdout, stderr } = await execAsync(cmdString, {
@@ -1259,11 +1329,30 @@ export class ZaiProvider extends BaseProvider {
           new Map();
         let finishReason = '';
         let sseBuffer = ''; // Buffer for incomplete SSE lines
+        let emptyIterations = 0; // Track iterations without new data to prevent infinite loop
 
         try {
           while (true) {
             const { done, value } = await reader.read();
             if (done) break;
+
+            // Track if we're getting new data (prevents infinite loop on stalled streams)
+            if (!value || value.length === 0) {
+              emptyIterations++;
+              // If we've received finish_reason but no new data for 10+ iterations, stop waiting
+              if (finishReason && emptyIterations > 10) {
+                logger.warn('[Zai] Stream stalled with incomplete data, breaking out');
+                break;
+              }
+              // Safety: break after 100 empty iterations regardless
+              if (emptyIterations > 100) {
+                logger.warn('[Zai] Too many empty iterations, breaking out');
+                break;
+              }
+              continue; // Skip processing of empty chunk
+            } else {
+              emptyIterations = 0; // Reset counter when we get data
+            }
 
             const chunk = decoder.decode(value, { stream: true });
             sseBuffer += chunk;
@@ -1710,13 +1799,15 @@ export class ZaiProvider extends BaseProvider {
           error: `API key validation failed: ${response.status}`,
         };
       }
-    } catch {
-      // Network error - consider as installed but unverified
+    } catch (error) {
+      // Network error - consider as installed but NOT authenticated
+      // Don't assume API key is valid when network fails
       return {
         installed: true,
         method: 'sdk',
         hasApiKey: true,
-        authenticated: true, // Assume valid if network fails
+        authenticated: false,
+        error: `Network error during validation: ${(error as Error).message}`,
       };
     }
   }
