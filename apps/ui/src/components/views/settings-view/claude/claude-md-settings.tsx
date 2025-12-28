@@ -1,30 +1,37 @@
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
-import { FileCode } from 'lucide-react';
+import { FileCode, Shield } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface ClaudeMdSettingsProps {
   autoLoadClaudeMd: boolean;
   onAutoLoadClaudeMdChange: (enabled: boolean) => void;
+  enableSandboxMode: boolean;
+  onEnableSandboxModeChange: (enabled: boolean) => void;
 }
 
 /**
  * ClaudeMdSettings Component
  *
- * UI control for the autoLoadClaudeMd setting which enables automatic loading
- * of project instructions from .claude/CLAUDE.md files via the Claude Agent SDK.
+ * UI controls for Claude Agent SDK settings including:
+ * - Auto-loading of project instructions from .claude/CLAUDE.md files
+ * - Sandbox mode for isolated bash command execution
  *
  * Usage:
  * ```tsx
  * <ClaudeMdSettings
  *   autoLoadClaudeMd={autoLoadClaudeMd}
  *   onAutoLoadClaudeMdChange={setAutoLoadClaudeMd}
+ *   enableSandboxMode={enableSandboxMode}
+ *   onEnableSandboxModeChange={setEnableSandboxMode}
  * />
  * ```
  */
 export function ClaudeMdSettings({
   autoLoadClaudeMd,
   onAutoLoadClaudeMdChange,
+  enableSandboxMode,
+  onEnableSandboxModeChange,
 }: ClaudeMdSettingsProps) {
   return (
     <div
@@ -73,6 +80,32 @@ export function ClaudeMdSettings({
               </code>{' '}
               files. When enabled, Claude will read and follow conventions specified in your
               project&apos;s CLAUDE.md file. Project settings override global settings.
+            </p>
+          </div>
+        </div>
+
+        <div className="group flex items-start space-x-3 p-3 rounded-xl hover:bg-accent/30 transition-colors duration-200 -mx-3 mt-2">
+          <Checkbox
+            id="enable-sandbox-mode"
+            checked={enableSandboxMode}
+            onCheckedChange={(checked) => onEnableSandboxModeChange(checked === true)}
+            className="mt-1"
+            data-testid="enable-sandbox-mode-checkbox"
+          />
+          <div className="space-y-1.5">
+            <Label
+              htmlFor="enable-sandbox-mode"
+              className="text-foreground cursor-pointer font-medium flex items-center gap-2"
+            >
+              <Shield className="w-4 h-4 text-brand-500" />
+              Enable Sandbox Mode
+            </Label>
+            <p className="text-xs text-muted-foreground/80 leading-relaxed">
+              Run bash commands in an isolated sandbox environment for additional security.
+              <span className="block mt-1 text-warning/80">
+                Note: On some systems, enabling sandbox mode may cause the agent to hang without
+                responding. If you experience issues, try disabling this option.
+              </span>
             </p>
           </div>
         </div>

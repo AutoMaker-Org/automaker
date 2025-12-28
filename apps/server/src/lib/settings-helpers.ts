@@ -46,6 +46,34 @@ export async function getAutoLoadClaudeMdSetting(
 }
 
 /**
+ * Get the enableSandboxMode setting from global settings.
+ * Returns false if settings service is not available.
+ *
+ * @param settingsService - Optional settings service instance
+ * @param logPrefix - Prefix for log messages (e.g., '[AgentService]')
+ * @returns Promise resolving to the enableSandboxMode setting value
+ */
+export async function getEnableSandboxModeSetting(
+  settingsService?: SettingsService | null,
+  logPrefix = '[SettingsHelper]'
+): Promise<boolean> {
+  if (!settingsService) {
+    console.log(`${logPrefix} SettingsService not available, sandbox mode disabled`);
+    return false;
+  }
+
+  try {
+    const globalSettings = await settingsService.getGlobalSettings();
+    const result = globalSettings.enableSandboxMode ?? true;
+    console.log(`${logPrefix} enableSandboxMode from global settings: ${result}`);
+    return result;
+  } catch (error) {
+    console.error(`${logPrefix} Failed to load enableSandboxMode setting:`, error);
+    throw error;
+  }
+}
+
+/**
  * Filters out CLAUDE.md from context files when autoLoadClaudeMd is enabled
  * and rebuilds the formatted prompt without it.
  *

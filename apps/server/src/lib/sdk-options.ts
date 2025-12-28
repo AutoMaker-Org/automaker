@@ -216,6 +216,9 @@ export interface CreateSdkOptionsConfig {
 
   /** Enable auto-loading of CLAUDE.md files via SDK's settingSources */
   autoLoadClaudeMd?: boolean;
+
+  /** Enable sandbox mode for bash command isolation */
+  enableSandboxMode?: boolean;
 }
 
 /**
@@ -314,7 +317,7 @@ export function createSuggestionsOptions(config: CreateSdkOptionsConfig): Option
  * - Full tool access for code modification
  * - Standard turns for interactive sessions
  * - Model priority: explicit model > session model > chat default
- * - Sandbox enabled for bash safety
+ * - Sandbox mode controlled by enableSandboxMode setting
  * - When autoLoadClaudeMd is true, uses preset mode and settingSources for CLAUDE.md loading
  */
 export function createChatOptions(config: CreateSdkOptionsConfig): Options {
@@ -333,10 +336,12 @@ export function createChatOptions(config: CreateSdkOptionsConfig): Options {
     maxTurns: MAX_TURNS.standard,
     cwd: config.cwd,
     allowedTools: [...TOOL_PRESETS.chat],
-    sandbox: {
-      enabled: true,
-      autoAllowBashIfSandboxed: true,
-    },
+    ...(config.enableSandboxMode && {
+      sandbox: {
+        enabled: true,
+        autoAllowBashIfSandboxed: true,
+      },
+    }),
     ...claudeMdOptions,
     ...(config.abortController && { abortController: config.abortController }),
   };
@@ -349,7 +354,7 @@ export function createChatOptions(config: CreateSdkOptionsConfig): Options {
  * - Full tool access for code modification and implementation
  * - Extended turns for thorough feature implementation
  * - Uses default model (can be overridden)
- * - Sandbox enabled for bash safety
+ * - Sandbox mode controlled by enableSandboxMode setting
  * - When autoLoadClaudeMd is true, uses preset mode and settingSources for CLAUDE.md loading
  */
 export function createAutoModeOptions(config: CreateSdkOptionsConfig): Options {
@@ -365,10 +370,12 @@ export function createAutoModeOptions(config: CreateSdkOptionsConfig): Options {
     maxTurns: MAX_TURNS.maximum,
     cwd: config.cwd,
     allowedTools: [...TOOL_PRESETS.fullAccess],
-    sandbox: {
-      enabled: true,
-      autoAllowBashIfSandboxed: true,
-    },
+    ...(config.enableSandboxMode && {
+      sandbox: {
+        enabled: true,
+        autoAllowBashIfSandboxed: true,
+      },
+    }),
     ...claudeMdOptions,
     ...(config.abortController && { abortController: config.abortController }),
   };

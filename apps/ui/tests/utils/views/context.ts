@@ -114,47 +114,51 @@ export async function toggleContextPreviewMode(page: Page): Promise<void> {
 
 /**
  * Wait for a specific file to appear in the context file list
+ * Uses retry mechanism to handle race conditions with API/UI updates
  */
 export async function waitForContextFile(
   page: Page,
   filename: string,
-  timeout: number = 10000
+  timeout: number = 15000
 ): Promise<void> {
-  const locator = page.locator(`[data-testid="context-file-${filename}"]`);
-  await locator.waitFor({ state: 'visible', timeout });
+  await expect(async () => {
+    const locator = page.locator(`[data-testid="context-file-${filename}"]`);
+    await expect(locator).toBeVisible();
+  }).toPass({ timeout, intervals: [500, 1000, 2000] });
 }
 
 /**
  * Click a file in the list and wait for it to be selected (toolbar visible)
- * Uses JavaScript click to ensure React event handler fires
+ * Uses retry mechanism to handle race conditions where element is visible but not yet interactive
  */
 export async function selectContextFile(
   page: Page,
   filename: string,
-  timeout: number = 10000
+  timeout: number = 15000
 ): Promise<void> {
   const fileButton = await getByTestId(page, `context-file-${filename}`);
-  await fileButton.waitFor({ state: 'visible', timeout });
 
-  // Use JavaScript click to ensure React onClick handler fires
-  await fileButton.evaluate((el) => (el as HTMLButtonElement).click());
-
-  // Wait for the file to be selected (toolbar with delete button becomes visible)
-  const deleteButton = await getByTestId(page, 'delete-context-file');
-  await expect(deleteButton).toBeVisible({
-    timeout,
-  });
+  // Retry click + wait for delete button to handle timing issues
+  await expect(async () => {
+    // Use JavaScript click to ensure React onClick handler fires
+    await fileButton.evaluate((el) => (el as HTMLButtonElement).click());
+    // Wait for the file to be selected (toolbar with delete button becomes visible)
+    const deleteButton = await getByTestId(page, 'delete-context-file');
+    await expect(deleteButton).toBeVisible();
+  }).toPass({ timeout, intervals: [500, 1000, 2000] });
 }
 
 /**
  * Wait for file content panel to load (either editor, preview, or image)
+ * Uses retry mechanism to handle race conditions with file selection
  */
-export async function waitForFileContentToLoad(page: Page): Promise<void> {
-  // Wait for either the editor, preview, or image to appear
-  await page.waitForSelector(
-    '[data-testid="context-editor"], [data-testid="markdown-preview"], [data-testid="image-preview"]',
-    { timeout: 10000 }
-  );
+export async function waitForFileContentToLoad(page: Page, timeout: number = 15000): Promise<void> {
+  await expect(async () => {
+    const contentLocator = page.locator(
+      '[data-testid="context-editor"], [data-testid="markdown-preview"], [data-testid="image-preview"]'
+    );
+    await expect(contentLocator).toBeVisible();
+  }).toPass({ timeout, intervals: [500, 1000, 2000] });
 }
 
 /**

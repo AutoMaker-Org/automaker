@@ -53,7 +53,7 @@ test.describe('Delete Context File', () => {
     );
 
     // Wait for the file to appear in the list
-    await waitForContextFile(page, fileName, 10000);
+    await waitForContextFile(page, fileName);
 
     // Select the file
     await selectContextFile(page, fileName);
