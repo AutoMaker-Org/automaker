@@ -303,6 +303,19 @@ export class SettingsService {
     return fileExists(credentialsPath);
   }
 
+  /**
+   * Get API keys for provider authentication
+   *
+   * Convenience method that returns just the apiKeys portion of credentials.
+   * Used by routes to authenticate with AI providers.
+   *
+   * @returns Promise resolving to apiKeys object with provider credentials
+   */
+  async getApiKeys(): Promise<Credentials['apiKeys']> {
+    const credentials = await this.getCredentials();
+    return credentials.apiKeys;
+  }
+
   // ============================================================================
   // Project Settings
   // ============================================================================

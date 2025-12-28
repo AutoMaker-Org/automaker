@@ -1,13 +1,14 @@
 /**
  * POST /features/generate-title endpoint - Generate a concise title from description
  *
- * Uses Claude Haiku to generate a short, descriptive title from feature description.
+ * Uses AI providers (Claude, Zai, etc.) to generate a short, descriptive title from feature description.
  */
 
 import type { Request, Response } from 'express';
-import { query } from '@anthropic-ai/claude-agent-sdk';
 import { createLogger } from '@automaker/utils';
-import { CLAUDE_MODEL_MAP } from '@automaker/model-resolver';
+import { DEFAULT_MODELS } from '@automaker/types';
+import { executeProviderQuery } from '../../../lib/provider-query.js';
+import { SettingsService } from '../../../services/settings-service.js';
 
 const logger = createLogger('GenerateTitle');
 
@@ -61,7 +62,9 @@ async function extractTextFromStream(
   return responseText;
 }
 
-export function createGenerateTitleHandler(): (req: Request, res: Response) => Promise<void> {
+export function createGenerateTitleHandler(
+  settingsService?: SettingsService
+): (req: Request, res: Response) => Promise<void> {
   return async (req: Request, res: Response): Promise<void> => {
     try {
       const { description } = req.body as GenerateTitleRequestBody;
@@ -89,21 +92,24 @@ export function createGenerateTitleHandler(): (req: Request, res: Response) => P
 
       const userPrompt = `Generate a concise title for this feature:\n\n${trimmedDescription}`;
 
-      const stream = query({
+      // Get API keys for provider authentication
+      const apiKeys = settingsService ? await settingsService.getApiKeys() : undefined;
+
+      const stream = executeProviderQuery({
+        cwd: process.cwd(),
         prompt: userPrompt,
-        options: {
-          model: CLAUDE_MODEL_MAP.haiku,
-          systemPrompt: SYSTEM_PROMPT,
-          maxTurns: 1,
-          allowedTools: [],
-          permissionMode: 'acceptEdits',
-        },
+        model: DEFAULT_MODELS.claude,
+        useCase: 'suggestions', // Use fast model
+        maxTurns: 1,
+        allowedTools: [],
+        apiKeys,
+        systemPrompt: SYSTEM_PROMPT,
       });
 
       const title = await extractTextFromStream(stream);
 
       if (!title || title.trim().length === 0) {
-        logger.warn('Received empty response from Claude');
+        logger.warn('Received empty response from provider');
         const response: GenerateTitleErrorResponse = {
           success: false,
           error: 'Failed to generate title - empty response',

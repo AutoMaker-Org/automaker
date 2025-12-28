@@ -7,16 +7,18 @@
 
 import { Router } from 'express';
 import { createEnhanceHandler } from './routes/enhance.js';
+import type { SettingsService } from '../../services/settings-service.js';
 
 /**
  * Create the enhance-prompt router
  *
+ * @param settingsService - Optional settings service for loading API keys
  * @returns Express router with enhance-prompt endpoints
  */
-export function createEnhancePromptRoutes(): Router {
+export function createEnhancePromptRoutes(settingsService?: SettingsService): Router {
   const router = Router();
 
-  router.post('/', createEnhanceHandler());
+  router.post('/', createEnhanceHandler(settingsService));
 
   return router;
 }

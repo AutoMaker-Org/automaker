@@ -12,8 +12,12 @@ import { createUpdateHandler } from './routes/update.js';
 import { createDeleteHandler } from './routes/delete.js';
 import { createAgentOutputHandler } from './routes/agent-output.js';
 import { createGenerateTitleHandler } from './routes/generate-title.js';
+import type { SettingsService } from '../../services/settings-service.js';
 
-export function createFeaturesRoutes(featureLoader: FeatureLoader): Router {
+export function createFeaturesRoutes(
+  featureLoader: FeatureLoader,
+  settingsService?: SettingsService
+): Router {
   const router = Router();
 
   router.post('/list', validatePathParams('projectPath'), createListHandler(featureLoader));
@@ -22,7 +26,7 @@ export function createFeaturesRoutes(featureLoader: FeatureLoader): Router {
   router.post('/update', validatePathParams('projectPath'), createUpdateHandler(featureLoader));
   router.post('/delete', validatePathParams('projectPath'), createDeleteHandler(featureLoader));
   router.post('/agent-output', createAgentOutputHandler(featureLoader));
-  router.post('/generate-title', createGenerateTitleHandler());
+  router.post('/generate-title', createGenerateTitleHandler(settingsService));
 
   return router;
 }

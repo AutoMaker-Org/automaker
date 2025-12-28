@@ -84,9 +84,12 @@ async function extractTextFromStream(
 /**
  * Create the enhance request handler
  *
+ * @param settingsService - Optional settings service for loading API keys
  * @returns Express request handler for text enhancement
  */
-export function createEnhanceHandler(): (req: Request, res: Response) => Promise<void> {
+export function createEnhanceHandler(
+  settingsService?: SettingsService
+): (req: Request, res: Response) => Promise<void> {
   return async (req: Request, res: Response): Promise<void> => {
     try {
       const { originalText, enhancementMode, model } = req.body as EnhanceRequestBody;
@@ -142,7 +145,7 @@ export function createEnhanceHandler(): (req: Request, res: Response) => Promise
       logger.debug(`Using model: ${resolvedModel}`);
 
       // Get API keys for provider authentication
-      const apiKeys = await SettingsService.getApiKeys();
+      const apiKeys = settingsService ? await settingsService.getApiKeys() : undefined;
 
       // Call provider-agnostic query with minimal configuration for text transformation
       // Key: no tools, just text completion

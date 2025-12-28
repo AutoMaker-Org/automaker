@@ -28,8 +28,8 @@ const logger = createLogger('ProviderQuery');
 export interface ProviderQueryOptions {
   /** Working directory */
   cwd: string;
-  /** Prompt to send */
-  prompt: string;
+  /** Prompt to send (can be string for text or array for multimodal input with images) */
+  prompt: string | Array<{ type: string; text?: string; source?: object }>;
   /** Model to use (resolved by getModelForUseCase if not provided) */
   model?: string;
   /** Use case for model selection ('spec', 'features', 'suggestions', etc.) */
@@ -56,6 +56,8 @@ export interface ProviderQueryOptions {
   };
   /** Enabled providers (controls provider availability) */
   enabledProviders?: EnabledProviders;
+  /** System prompt to guide the model's behavior */
+  systemPrompt?: string;
 }
 
 export interface StructuredOutputInfo {
@@ -151,6 +153,7 @@ export async function* executeProviderQuery(
     outputFormat,
     apiKeys,
     enabledProviders,
+    systemPrompt: providedSystemPrompt,
   } = options;
 
   // Resolve the model to use
@@ -204,14 +207,15 @@ export async function* executeProviderQuery(
   let finalPrompt = prompt;
 
   // For non-Claude providers with structured output, modify the prompt
-  if (outputFormat && providerName !== 'claude') {
+  // Only applies to string prompts, not array prompts (which may contain images)
+  if (outputFormat && providerName !== 'claude' && typeof prompt === 'string') {
     finalPrompt = buildStructuredOutputPrompt(prompt, outputFormat.schema);
     logger.info('[ProviderQuery] Added structured output instructions to prompt');
   }
 
-  // Build system prompt if autoLoadClaudeMd is enabled (Claude only)
-  let systemPrompt: string | undefined;
-  if (autoLoadClaudeMd && providerName === 'claude') {
+  // Build system prompt: use provided one, or autoLoadClaudeMd for Claude
+  let systemPrompt: string | undefined = providedSystemPrompt;
+  if (!systemPrompt && autoLoadClaudeMd && providerName === 'claude') {
     systemPrompt =
       'You are an AI programming assistant. Use the available tools to read and analyze code.';
   }

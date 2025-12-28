@@ -1,20 +1,19 @@
 /**
  * POST /context/describe-image endpoint - Generate description for an image
  *
- * Uses Claude Haiku to analyze an image and generate a concise description
+ * Uses AI providers (Claude, Zai, etc.) to analyze an image and generate a concise description
  * suitable for context file metadata.
  *
  * IMPORTANT:
  * The agent runner (chat/auto-mode) sends images as multi-part content blocks (base64 image blocks),
- * not by asking Claude to use the Read tool to open files. This endpoint now mirrors that approach
- * so it doesn't depend on Claude's filesystem tool access or working directory restrictions.
+ * not by asking providers to use the Read tool to open files. This endpoint mirrors that approach
+ * so it doesn't depend on filesystem tool access or working directory restrictions.
  */
 
 import type { Request, Response } from 'express';
-import { query } from '@anthropic-ai/claude-agent-sdk';
 import { createLogger, readImageAsBase64 } from '@automaker/utils';
-import { CLAUDE_MODEL_MAP } from '@automaker/types';
-import { createCustomOptions } from '../../../lib/sdk-options.js';
+import { DEFAULT_MODELS } from '@automaker/types';
+import { executeProviderQuery } from '../../../lib/provider-query.js';
 import * as fs from 'fs';
 import * as path from 'path';
 import type { SettingsService } from '../../../services/settings-service.js';
@@ -124,7 +123,7 @@ interface DescribeImageErrorResponse {
 }
 
 /**
- * Map SDK/CLI errors to a stable status + user-facing message.
+ * Map provider errors to a stable status + user-facing message.
  */
 function mapDescribeImageError(rawMessage: string | undefined): {
   statusCode: number;
@@ -137,23 +136,23 @@ function mapDescribeImageError(rawMessage: string | undefined): {
 
   if (!rawMessage) return baseResponse;
 
-  if (rawMessage.includes('Claude Code process exited')) {
+  if (rawMessage.includes('process exited')) {
     return {
       statusCode: 503,
       userMessage:
-        'Claude exited unexpectedly while describing the image. Try again. If it keeps happening, re-run `claude login` or update your API key in Setup so Claude can restart cleanly.',
+        'The AI provider exited unexpectedly while describing the image. Try again. If it keeps happening, update your API key in Setup.',
     };
   }
 
   if (
-    rawMessage.includes('Failed to spawn Claude Code process') ||
-    rawMessage.includes('Claude Code executable not found') ||
-    rawMessage.includes('Claude Code native binary not found')
+    rawMessage.includes('Failed to spawn') ||
+    rawMessage.includes('executable not found') ||
+    rawMessage.includes('native binary not found')
   ) {
     return {
       statusCode: 503,
       userMessage:
-        'Claude CLI could not be launched. Make sure the Claude CLI is installed and available in PATH, then try again.',
+        'The AI provider could not be launched. Make sure the provider CLI is installed and available, then try again.',
     };
   }
 
@@ -337,35 +336,28 @@ export function createDescribeImageHandler(
         '[DescribeImage]'
       );
 
-      // Use the same centralized option builder used across the server (validates cwd)
-      const sdkOptions = createCustomOptions({
+      // Get API keys for provider authentication
+      const apiKeys = settingsService ? await settingsService.getApiKeys() : undefined;
+
+      logger.info(
+        `[${requestId}] Using provider-agnostic query model=${DEFAULT_MODELS.claude} maxTurns=1 allowedTools=[]`
+      );
+
+      logger.info(`[${requestId}] Calling executeProviderQuery()...`);
+      const queryStart = Date.now();
+      const stream = executeProviderQuery({
         cwd,
-        model: CLAUDE_MODEL_MAP.haiku,
+        prompt: promptContent,
+        model: DEFAULT_MODELS.claude,
+        useCase: 'suggestions', // Use fast model
         maxTurns: 1,
         allowedTools: [],
         autoLoadClaudeMd,
-        sandbox: { enabled: true, autoAllowBashIfSandboxed: true },
+        apiKeys,
       });
-
       logger.info(
-        `[${requestId}] SDK options model=${sdkOptions.model} maxTurns=${sdkOptions.maxTurns} allowedTools=${JSON.stringify(
-          sdkOptions.allowedTools
-        )} sandbox=${JSON.stringify(sdkOptions.sandbox)}`
+        `[${requestId}] executeProviderQuery() returned stream in ${Date.now() - queryStart}ms`
       );
-
-      const promptGenerator = (async function* () {
-        yield {
-          type: 'user' as const,
-          session_id: '',
-          message: { role: 'user' as const, content: promptContent },
-          parent_tool_use_id: null,
-        };
-      })();
-
-      logger.info(`[${requestId}] Calling query()...`);
-      const queryStart = Date.now();
-      const stream = query({ prompt: promptGenerator, options: sdkOptions });
-      logger.info(`[${requestId}] query() returned stream in ${Date.now() - queryStart}ms`);
 
       // Extract the description from the response
       const extractStart = Date.now();
@@ -373,7 +365,7 @@ export function createDescribeImageHandler(
       logger.info(`[${requestId}] extractMs=${Date.now() - extractStart}`);
 
       if (!description || description.trim().length === 0) {
-        logger.warn(`[${requestId}] Received empty response from Claude`);
+        logger.warn(`[${requestId}] Received empty response from provider`);
         const response: DescribeImageErrorResponse = {
           success: false,
           error: 'Failed to generate description - empty response',

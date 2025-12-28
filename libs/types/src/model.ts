@@ -58,20 +58,16 @@ export const ALL_MODEL_MAPS = {
  *
  * Mapping hierarchy:
  * - Claude Opus (premium) ↔ Zai GLM-4.7 (premium)
- * - Claude Sonnet (balanced) ↔ Zai GLM-4.6 (balanced)
+ * - Claude Sonnet (balanced) ↔ Zai GLM-4.6v (balanced, with vision)
  * - Claude Haiku (speed) ↔ Zai GLM-4.5-Air (speed)
  *
- * IMPORTANT ASYMMETRY:
- * - GLM-4.6v (Zai's vision model) → Claude Sonnet (for general reasoning)
- * - Claude Sonnet → GLM-4.6 (NOT GLM-4.6v - vision capability may be lost)
- *
- * This means vision use cases may lose capability when falling back from Zai to Claude.
- * If vision is required, consider explicitly checking model capabilities before substitution.
+ * NOTE: GLM-4.6 (non-vision) also exists and maps to Claude Sonnet,
+ * but Claude Sonnet maps to GLM-4.6v to preserve vision capability.
  */
 export const MODEL_EQUIVALENCE: Record<string, { provider: 'claude' | 'zai'; model: string }> = {
   // Claude models → Zai equivalents
   'claude-opus-4-5-20251101': { provider: 'zai', model: 'glm-4.7' },
-  'claude-sonnet-4-5-20250929': { provider: 'zai', model: 'glm-4.6' },
+  'claude-sonnet-4-5-20250929': { provider: 'zai', model: 'glm-4.6v' },
   'claude-haiku-4-5-20251001': { provider: 'zai', model: 'glm-4.5-air' },
   // Zai models → Claude equivalents
   'glm-4.7': { provider: 'claude', model: 'claude-opus-4-5-20251101' },

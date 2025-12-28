@@ -1,15 +1,14 @@
 /**
- * POST /validate-issue endpoint - Validate a GitHub issue using Claude SDK (async)
+ * POST /validate-issue endpoint - Validate a GitHub issue using AI providers (async)
  *
  * Scans the codebase to determine if an issue is valid, invalid, or needs clarification.
  * Runs asynchronously and emits events for progress and completion.
  */
 
 import type { Request, Response } from 'express';
-import { query } from '@anthropic-ai/claude-agent-sdk';
 import type { EventEmitter } from '../../../lib/events.js';
 import type { IssueValidationResult, IssueValidationEvent, AgentModel } from '@automaker/types';
-import { createSuggestionsOptions } from '../../../lib/sdk-options.js';
+import { executeProviderQuery } from '../../../lib/provider-query.js';
 import { writeValidation } from '../../../lib/validation-storage.js';
 import {
   issueValidationSchema,
@@ -86,9 +85,13 @@ async function runValidation(
       '[ValidateIssue]'
     );
 
-    // Create SDK options with structured output and abort controller
-    const options = createSuggestionsOptions({
+    // Get API keys for provider authentication
+    const apiKeys = settingsService ? await settingsService.getApiKeys() : undefined;
+
+    // Execute the query using provider-agnostic system
+    const stream = executeProviderQuery({
       cwd: projectPath,
+      prompt,
       model,
       systemPrompt: ISSUE_VALIDATION_SYSTEM_PROMPT,
       abortController,
@@ -97,10 +100,8 @@ async function runValidation(
         type: 'json_schema',
         schema: issueValidationSchema as Record<string, unknown>,
       },
+      apiKeys,
     });
-
-    // Execute the query
-    const stream = query({ prompt, options });
     let validationResult: IssueValidationResult | null = null;
     let responseText = '';
 
