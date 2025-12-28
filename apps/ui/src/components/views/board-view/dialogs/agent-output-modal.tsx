@@ -14,6 +14,9 @@ import { TaskProgressPanel } from '@/components/ui/task-progress-panel';
 import { useAppStore } from '@/store/app-store';
 import type { AutoModeEvent } from '@/types/electron';
 
+// Maximum output size to prevent memory leaks (500KB)
+const MAX_OUTPUT_SIZE = 500 * 1024;
+
 interface AgentOutputModalProps {
   open: boolean;
   onClose: () => void;
@@ -51,6 +54,14 @@ export function AgentOutputModal({
     }
   }, [output]);
 
+  // Clear output when modal closes to release memory
+  useEffect(() => {
+    if (!open) {
+      setOutput('');
+      setProjectPath('');
+    }
+  }, [open]);
+
   // Load existing output from file
   useEffect(() => {
     if (!open) return;
@@ -77,7 +88,16 @@ export function AgentOutputModal({
           const result = await api.features.getAgentOutput(currentProject.path, featureId);
 
           if (result.success) {
-            setOutput(result.content || '');
+            // Cap initial output size to prevent memory issues
+            let content = result.content || '';
+            if (content.length > MAX_OUTPUT_SIZE) {
+              const truncated = content.slice(-MAX_OUTPUT_SIZE);
+              const firstNewline = truncated.indexOf('\n');
+              content =
+                '[...output truncated...]\n' +
+                (firstNewline > 0 ? truncated.slice(firstNewline + 1) : truncated);
+            }
+            setOutput(content);
           } else {
             setOutput('');
           }
@@ -242,7 +262,19 @@ export function AgentOutputModal({
 
       if (newContent) {
         // Only update local state - server is the single source of truth for file writes
-        setOutput((prev) => prev + newContent);
+        // Cap output size to prevent memory leaks
+        setOutput((prev) => {
+          const combined = prev + newContent;
+          if (combined.length <= MAX_OUTPUT_SIZE) {
+            return combined;
+          }
+          // Truncate from the beginning, keeping the most recent output
+          const truncated = combined.slice(-MAX_OUTPUT_SIZE);
+          // Find the first newline to avoid cutting mid-line
+          const firstNewline = truncated.indexOf('\n');
+          const cleanStart = firstNewline > 0 ? truncated.slice(firstNewline + 1) : truncated;
+          return '[...output truncated...]\n' + cleanStart;
+        });
       }
     });
 

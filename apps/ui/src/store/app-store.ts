@@ -1497,7 +1497,11 @@ export const useAppStore = create<AppState & AppActions>()(
 
       clearAutoModeActivity: () => set({ autoModeActivityLog: [] }),
 
-      setMaxConcurrency: (max) => set({ maxConcurrency: max }),
+      setMaxConcurrency: (max) => {
+        // Cap concurrency at 5 to prevent file descriptor exhaustion (ENFILE errors)
+        const clampedMax = Math.max(1, Math.min(5, max));
+        set({ maxConcurrency: clampedMax });
+      },
 
       // Kanban Card Settings actions
       setKanbanCardDetailLevel: (level) => set({ kanbanCardDetailLevel: level }),

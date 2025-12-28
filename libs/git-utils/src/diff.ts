@@ -16,6 +16,27 @@ const logger = createLogger('GitUtils');
 // Max file size for generating synthetic diffs (1MB)
 const MAX_SYNTHETIC_DIFF_SIZE = 1024 * 1024;
 
+// Max concurrent file operations to prevent ENFILE errors
+const MAX_CONCURRENT_FILE_OPS = 20;
+
+/**
+ * Process items in batches to limit concurrent operations
+ * This prevents ENFILE (file table overflow) errors when processing many files
+ */
+async function processBatched<T, R>(
+  items: T[],
+  batchSize: number,
+  processor: (item: T) => Promise<R>
+): Promise<R[]> {
+  const results: R[] = [];
+  for (let i = 0; i < items.length; i += batchSize) {
+    const batch = items.slice(i, i + batchSize);
+    const batchResults = await Promise.all(batch.map(processor));
+    results.push(...batchResults);
+  }
+  return results;
+}
+
 /**
  * Check if a file is likely binary based on extension
  */
@@ -129,6 +150,18 @@ ${addedLines}`;
 }
 
 /**
+ * Check if a path is a file (not a directory)
+ */
+async function isFile(filePath: string): Promise<boolean> {
+  try {
+    const stats = await secureFs.stat(filePath);
+    return stats.isFile();
+  } catch {
+    return false; // If we can't stat it, skip it
+  }
+}
+
+/**
  * Generate synthetic diffs for all untracked files and combine with existing diff
  */
 export async function appendUntrackedFileDiffs(
@@ -143,9 +176,27 @@ export async function appendUntrackedFileDiffs(
     return existingDiff;
   }
 
+  // Filter out directories - only process actual files
+  // This prevents EISDIR errors when git reports untracked directories
+  // Process in batches to prevent ENFILE errors
+  const fileCheckResults = await processBatched(
+    untrackedFiles,
+    MAX_CONCURRENT_FILE_OPS,
+    async (f) => ({
+      file: f,
+      isFile: await isFile(path.join(basePath, f.path)),
+    })
+  );
+  const filesOnly = fileCheckResults.filter((r) => r.isFile).map((r) => r.file);
+
+  if (filesOnly.length === 0) {
+    return existingDiff;
+  }
+
   // Generate synthetic diffs for each untracked file
-  const syntheticDiffs = await Promise.all(
-    untrackedFiles.map((f) => generateSyntheticDiffForNewFile(basePath, f.path))
+  // Process in batches to prevent ENFILE errors
+  const syntheticDiffs = await processBatched(filesOnly, MAX_CONCURRENT_FILE_OPS, (f) =>
+    generateSyntheticDiffForNewFile(basePath, f.path)
   );
 
   // Combine existing diff with synthetic diffs
@@ -231,8 +282,9 @@ export async function generateDiffsForNonGitDirectory(
   }));
 
   // Generate synthetic diffs for all files
-  const syntheticDiffs = await Promise.all(
-    files.map((f) => generateSyntheticDiffForNewFile(basePath, f.path))
+  // Process in batches to prevent ENFILE errors
+  const syntheticDiffs = await processBatched(files, MAX_CONCURRENT_FILE_OPS, (f) =>
+    generateSyntheticDiffForNewFile(basePath, f.path)
   );
 
   return {
