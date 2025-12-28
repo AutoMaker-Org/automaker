@@ -2,10 +2,22 @@ import { Label } from '@/components/ui/label';
 import { Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAppStore } from '@/store/app-store';
-import { ALL_MODELS } from '@/components/views/board-view/shared/model-constants';
+import { getFilteredModels } from '@/components/views/board-view/shared/model-constants';
+import { autoSwitchModelIfDisabled } from '@/utils/model-utils';
+import { useEffect } from 'react';
 
 export function AIEnhancementSection() {
-  const { enhancementModel, setEnhancementModel } = useAppStore();
+  const { enhancementModel, setEnhancementModel, enabledProviders } = useAppStore();
+
+  // Auto-switch model if current model's provider is disabled
+  useEffect(() => {
+    const newModel = autoSwitchModelIfDisabled(enhancementModel, enabledProviders);
+    if (newModel !== enhancementModel) {
+      setEnhancementModel(newModel);
+    }
+  }, [enabledProviders]);
+
+  const filteredModels = getFilteredModels(enabledProviders);
 
   return (
     <div
@@ -31,7 +43,7 @@ export function AIEnhancementSection() {
         <div className="space-y-4">
           <Label className="text-foreground font-medium">Enhancement Model</Label>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            {ALL_MODELS.map(({ id, label, description, badge }) => {
+            {filteredModels.map(({ id, label, description, badge }) => {
               const isActive = enhancementModel === id;
               return (
                 <button

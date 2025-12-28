@@ -4,7 +4,21 @@ import { collectAsyncGenerator } from '../../utils/helpers.js';
 
 // Mock fetch globally
 const mockFetch = vi.fn();
-global.fetch = mockFetch as any;
+global.fetch = mockFetch as unknown as typeof fetch;
+
+// Proper type definitions for test results
+interface StreamingTestResult {
+  type: 'assistant' | 'user' | 'error' | 'result';
+  subtype?: 'success' | 'error';
+  session_id?: string;
+  message?: {
+    role: 'user' | 'assistant';
+    content: Array<{ type: string; text?: string; name?: string; input?: unknown }>;
+  };
+  result?: string;
+  error?: string;
+  parent_tool_use_id?: string | null;
+}
 
 // Mock secureFs
 vi.mock('@automaker/platform', () => ({
@@ -81,7 +95,7 @@ describe('zai-provider.ts', () => {
       expect(mockFetch).toHaveBeenCalled();
       expect(results.length).toBeGreaterThan(0);
 
-      const textResult = results.find((r: any) => r.type === 'assistant');
+      const textResult = results.find((r: StreamingTestResult) => r.type === 'assistant');
       expect(textResult).toBeDefined();
     });
 
@@ -130,7 +144,7 @@ describe('zai-provider.ts', () => {
       expect(body.messages[0].content).toContain('You are a helpful assistant');
     });
 
-    it('should handle reasoning_content from thinking mode', async () => {
+    it('should handle thinking content from thinking mode', async () => {
       mockFetch.mockImplementation(() =>
         createMockStreamResponse([
           'data: {"choices":[{"delta":{"reasoning_content":"Let me think about this..."}}]}\n\n',
@@ -147,15 +161,17 @@ describe('zai-provider.ts', () => {
 
       const results = await collectAsyncGenerator(generator);
 
-      // Should have reasoning block
-      const reasoningResult = results.find(
-        (r: any) => r.type === 'assistant' && r.message?.content?.[0]?.type === 'reasoning'
+      // Should have thinking block
+      const thinkingResult = results.find(
+        (r: StreamingTestResult) =>
+          r.type === 'assistant' && r.message?.content?.[0]?.type === 'thinking'
       );
-      expect(reasoningResult).toBeDefined();
+      expect(thinkingResult).toBeDefined();
 
       // Should have text block
       const textResult = results.find(
-        (r: any) => r.type === 'assistant' && r.message?.content?.[0]?.type === 'text'
+        (r: StreamingTestResult) =>
+          r.type === 'assistant' && r.message?.content?.[0]?.type === 'text'
       );
       expect(textResult).toBeDefined();
     });
@@ -182,13 +198,14 @@ describe('zai-provider.ts', () => {
 
       // Should have tool_use message
       const toolUseResult = results.find(
-        (r: any) => r.type === 'assistant' && r.message?.content?.[0]?.type === 'tool_use'
+        (r: StreamingTestResult) =>
+          r.type === 'assistant' && r.message?.content?.[0]?.type === 'tool_use'
       );
       expect(toolUseResult).toBeDefined();
       expect((toolUseResult as any).message?.content?.[0]?.name).toBe('read_file');
 
       // Should have result message
-      const resultMsg = results.find((r: any) => r.type === 'result');
+      const resultMsg = results.find((r: StreamingTestResult) => r.type === 'result');
       expect(resultMsg).toBeDefined();
     });
 
@@ -233,7 +250,9 @@ describe('zai-provider.ts', () => {
       const results = await collectAsyncGenerator(generator);
 
       // Should use the provided session ID
-      const sessionResult = results.find((r: any) => r.session_id === 'custom-session-123');
+      const sessionResult = results.find(
+        (r: StreamingTestResult) => r.session_id === 'custom-session-123'
+      );
       expect(sessionResult).toBeDefined();
     });
 
@@ -292,7 +311,7 @@ describe('zai-provider.ts', () => {
       const results = await collectAsyncGenerator(generator);
 
       // Should yield error and stop
-      const errorResult = results.find((r: any) => r.type === 'error');
+      const errorResult = results.find((r: StreamingTestResult) => r.type === 'error');
       expect(errorResult).toBeDefined();
       expect((errorResult as any).error).toContain('aborted');
     });
@@ -414,9 +433,16 @@ describe('zai-provider.ts', () => {
     it('should have correct context windows', () => {
       const models = provider.getAvailableModels();
 
-      models.forEach((model) => {
-        expect(model.contextWindow).toBe(128000);
-      });
+      // GLM-4.7 and GLM-4.6 have 200k context, GLM-4.6v and GLM-4.5-Air have 128k
+      const glm4_7 = models.find((m) => m.id === 'glm-4.7');
+      const glm4_6 = models.find((m) => m.id === 'glm-4.6');
+      const glm4_6v = models.find((m) => m.id === 'glm-4.6v');
+      const glm4_5_air = models.find((m) => m.id === 'glm-4.5-air');
+
+      expect(glm4_7?.contextWindow).toBe(200000);
+      expect(glm4_6?.contextWindow).toBe(200000);
+      expect(glm4_6v?.contextWindow).toBe(128000);
+      expect(glm4_5_air?.contextWindow).toBe(128000);
     });
 
     it('should have modelString field matching id', () => {
@@ -441,8 +467,8 @@ describe('zai-provider.ts', () => {
       expect(provider.supportsFeature('vision')).toBe(true);
     });
 
-    it("should support 'thinking' feature (Zai's thinking mode)", () => {
-      expect(provider.supportsFeature('thinking')).toBe(true);
+    it("should support 'extendedThinking' feature (Zai's thinking mode)", () => {
+      expect(provider.supportsFeature('extendedThinking')).toBe(true);
     });
 
     it("should not support 'mcp' feature", () => {
@@ -548,7 +574,7 @@ describe('zai-provider.ts', () => {
       const results = await collectAsyncGenerator(generator);
 
       // Should get an error about path traversal
-      const errorResult = results.find((r: any) => r.type === 'error');
+      const errorResult = results.find((r: StreamingTestResult) => r.type === 'error');
       expect(errorResult).toBeDefined();
       expect((errorResult as any).error).toContain('Path traversal');
     });
@@ -571,7 +597,7 @@ describe('zai-provider.ts', () => {
       const results = await collectAsyncGenerator(generator);
 
       // Should get an error
-      const errorResult = results.find((r: any) => r.type === 'error');
+      const errorResult = results.find((r: StreamingTestResult) => r.type === 'error');
       expect(errorResult).toBeDefined();
       // The error could be from path validation or path traversal
       expect((errorResult as any).error).toMatch(/Path|not allowed/);
@@ -595,15 +621,15 @@ describe('zai-provider.ts', () => {
       const results = await collectAsyncGenerator(generator);
 
       // Should get an error about recursive flag
-      const errorResult = results.find((r: any) => r.type === 'error');
+      const errorResult = results.find((r: StreamingTestResult) => r.type === 'error');
       expect(errorResult).toBeDefined();
       expect((errorResult as any).error).toContain('Recursive flag');
     });
 
-    it('should reject commands that were removed from allowlist (curl, wget)', async () => {
+    it('should reject commands that were removed from allowlist (wget)', async () => {
       mockFetch.mockImplementation(() =>
         createMockStreamResponse([
-          'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_123","function":{"name":"execute_command","arguments":"{\\"command\\": \\"curl http://example.com\\"}"}}]}}]}\n\n',
+          'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_123","function":{"name":"execute_command","arguments":"{\\"command\\": \\"wget http://example.com\\"}"}}]}}]}\n\n',
           'data: {"choices":[{"finish_reason":"tool_calls"}]}\n\n',
           'data: [DONE]\n\n',
         ])
@@ -618,7 +644,7 @@ describe('zai-provider.ts', () => {
       const results = await collectAsyncGenerator(generator);
 
       // Should get an error about command not allowed
-      const errorResult = results.find((r: any) => r.type === 'error');
+      const errorResult = results.find((r: StreamingTestResult) => r.type === 'error');
       expect(errorResult).toBeDefined();
       expect((errorResult as any).error).toContain('not allowed');
     });
@@ -643,7 +669,7 @@ describe('zai-provider.ts', () => {
       const results = await collectAsyncGenerator(generator);
 
       // Should get an error about docker not enabled
-      const errorResult = results.find((r: any) => r.type === 'error');
+      const errorResult = results.find((r: StreamingTestResult) => r.type === 'error');
       expect(errorResult).toBeDefined();
       expect((errorResult as any).error).toContain('Docker');
     });
@@ -669,12 +695,13 @@ describe('zai-provider.ts', () => {
 
       // Should have tool_use message (docker command was not blocked)
       const toolUseResult = results.find(
-        (r: any) => r.type === 'assistant' && r.message?.content?.[0]?.type === 'tool_use'
+        (r: StreamingTestResult) =>
+          r.type === 'assistant' && r.message?.content?.[0]?.type === 'tool_use'
       );
       expect(toolUseResult).toBeDefined();
 
       // Should not have an error about docker being disabled
-      const errorResult = results.find((r: any) => r.type === 'error');
+      const errorResult = results.find((r: StreamingTestResult) => r.type === 'error');
       expect(errorResult).toBeUndefined();
 
       delete process.env.ZAI_ALLOW_DOCKER;
@@ -700,13 +727,14 @@ describe('zai-provider.ts', () => {
 
       // Should have tool_use, no error from sanitization
       const toolUseResult = results.find(
-        (r: any) => r.type === 'assistant' && r.message?.content?.[0]?.type === 'tool_use'
+        (r: StreamingTestResult) =>
+          r.type === 'assistant' && r.message?.content?.[0]?.type === 'tool_use'
       );
       expect(toolUseResult).toBeDefined();
 
       // The tool result may have an error from actual execution (expected in test env)
       // but sanitization should not block the command
-      const toolResult = results.find((r: any) => r.type === 'result');
+      const toolResult = results.find((r: StreamingTestResult) => r.type === 'result');
       expect(toolResult).toBeDefined();
     });
 
@@ -728,11 +756,12 @@ describe('zai-provider.ts', () => {
       const results = await collectAsyncGenerator(generator);
 
       // Should succeed without error
-      const errorResult = results.find((r: any) => r.type === 'error');
+      const errorResult = results.find((r: StreamingTestResult) => r.type === 'error');
       expect(errorResult).toBeUndefined();
 
       const toolUseResult = results.find(
-        (r: any) => r.type === 'assistant' && r.message?.content?.[0]?.type === 'tool_use'
+        (r: StreamingTestResult) =>
+          r.type === 'assistant' && r.message?.content?.[0]?.type === 'tool_use'
       );
       expect(toolUseResult).toBeDefined();
     });
@@ -758,7 +787,7 @@ describe('zai-provider.ts', () => {
 
       // Should have tool_use message for write_file
       const toolUseResult = results.find(
-        (r: any) =>
+        (r: StreamingTestResult) =>
           r.type === 'assistant' &&
           r.message?.content?.[0]?.type === 'tool_use' &&
           r.message?.content?.[0]?.name === 'write_file'
@@ -787,7 +816,7 @@ describe('zai-provider.ts', () => {
 
       // Should have tool_use message for edit_file
       const toolUseResult = results.find(
-        (r: any) =>
+        (r: StreamingTestResult) =>
           r.type === 'assistant' &&
           r.message?.content?.[0]?.type === 'tool_use' &&
           r.message?.content?.[0]?.name === 'edit_file'
@@ -816,7 +845,7 @@ describe('zai-provider.ts', () => {
 
       // Should have tool_use message for glob_search
       const toolUseResult = results.find(
-        (r: any) =>
+        (r: StreamingTestResult) =>
           r.type === 'assistant' &&
           r.message?.content?.[0]?.type === 'tool_use' &&
           r.message?.content?.[0]?.name === 'glob_search'
@@ -845,7 +874,7 @@ describe('zai-provider.ts', () => {
 
       // Should have tool_use message for grep_search
       const toolUseResult = results.find(
-        (r: any) =>
+        (r: StreamingTestResult) =>
           r.type === 'assistant' &&
           r.message?.content?.[0]?.type === 'tool_use' &&
           r.message?.content?.[0]?.name === 'grep_search'

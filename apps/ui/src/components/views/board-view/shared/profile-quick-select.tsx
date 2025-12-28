@@ -1,8 +1,10 @@
 import { Label } from '@/components/ui/label';
 import { Brain, UserCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { AgentModel, ThinkingLevel, AIProfile } from '@/store/app-store';
-import { PROFILE_ICONS } from './model-constants';
+import type { AgentModel, ThinkingLevel, AIProfile } from '@automaker/types';
+import { PROFILE_ICONS, ALL_MODELS } from './model-constants';
+import { useAppStore } from '@/store/app-store';
+import { getProviderFromModel } from '../../profiles-view/utils';
 
 interface ProfileQuickSelectProps {
   profiles: AIProfile[];
@@ -23,7 +25,16 @@ export function ProfileQuickSelect({
   showManageLink = false,
   onManageLinkClick,
 }: ProfileQuickSelectProps) {
-  if (profiles.length === 0) {
+  const enabledProviders = useAppStore((s) => s.enabledProviders);
+
+  // Filter profiles by enabled provider
+  const enabledModels = new Set(
+    ALL_MODELS.filter((m) => enabledProviders[m.provider]).map((m) => m.id)
+  );
+
+  const filteredProfiles = profiles.filter((p) => enabledModels.has(p.model));
+
+  if (filteredProfiles.length === 0) {
     return null;
   }
 
@@ -39,7 +50,7 @@ export function ProfileQuickSelect({
         </span>
       </div>
       <div className="grid grid-cols-2 gap-2">
-        {profiles.slice(0, 6).map((profile) => {
+        {filteredProfiles.slice(0, 6).map((profile) => {
           const IconComponent = profile.icon ? PROFILE_ICONS[profile.icon] : Brain;
           const isSelected =
             selectedModel === profile.model && selectedThinkingLevel === profile.thinkingLevel;

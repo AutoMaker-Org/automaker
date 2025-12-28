@@ -17,12 +17,38 @@ import type {
   InstallationStatus,
   ModelDefinition,
   ContentBlock,
+  ProviderConfig,
 } from './types.js';
 import { createLogger } from '@automaker/utils';
 
 const logger = createLogger('ZaiProvider');
 
 const execAsync = promisify(exec);
+
+/**
+ * Z.ai SSE (Server-Sent Events) streaming response types
+ * Matches the format of Z.ai's OpenAI-compatible API
+ */
+interface ZaiSseToolCallDelta {
+  index: number;
+  id?: string;
+  function?: { name?: string; arguments?: string };
+}
+
+interface ZaiSseDelta {
+  content?: string;
+  reasoning_content?: string;
+  tool_calls?: ZaiSseToolCallDelta[];
+}
+
+interface ZaiSseChoice {
+  delta?: ZaiSseDelta;
+  finish_reason?: string;
+}
+
+interface ZaiSseResponse {
+  choices?: ZaiSseChoice[];
+}
 
 /**
  * Whitelist of allowed commands for execute_command tool
@@ -67,23 +93,31 @@ const ALLOWED_COMMANDS = new Set([
   // Development tools
   'git',
   'npm',
+  'npx',
   'pnpm',
   'yarn',
   'bun',
+  'bunx', // bun's alternative to npx
   'node',
   'python',
   'python3',
   'pip',
   'pip3',
   'poetry',
+  'pipenv', // Python environment management
+  'virtualenv', // Python virtual environments
+  'conda', // Python package/environment manager
   'cargo',
   'rustc',
+  'rustup', // Rust toolchain installer
   'go',
   'gofmt',
   'javac',
   'java',
   'mvn',
+  'mvnw', // Maven wrapper
   'gradle',
+  'gradlew', // Gradle wrapper
   'kotlinc',
   'kotlin',
   'dotnet',
@@ -93,6 +127,9 @@ const ALLOWED_COMMANDS = new Set([
   'bundle',
   'php',
   'composer',
+  // C++ package managers
+  'conan',
+  'vcpkg',
   // Docker - disabled by default, requires ZAI_ALLOW_DOCKER=1
   'docker',
   'docker-compose',
@@ -101,16 +138,39 @@ const ALLOWED_COMMANDS = new Set([
   'make',
   'cmake',
   'ninja',
+  'meson', // Build system
+  'scons', // Build system
+  'bazel', // Google's build tool
+  'buck', // Facebook's build tool
+  'xmake', // Lua-based build tool
+  'premake', // Build configuration tool
   'gcc',
   'g++',
   'clang',
   'clang++',
+  'clang-cl', // MSVC-compatible clang
   'cc',
   'c++',
+  'ld', // Linker
+  'lld-link', // LLVM linker
   'rustfmt',
   'black',
   'prettier',
   'eslint',
+  // Process management
+  'kill', // Unix kill command
+  'killall', // Unix killall
+  'pkill', // Unix pkill
+  'taskkill', // Windows taskkill
+  'tasklist', // Windows tasklist (like ps)
+  'ps', // Unix process list
+  'top', // Unix process monitor
+  'htop', // Interactive process monitor
+  'pgrep', // Process grep
+  'pidof', // Find process ID
+  'nohup', // Run command immune to hangups
+  'screen', // Terminal multiplexer
+  'tmux', // Terminal multiplexer
   // Testing tools
   'pytest',
   'vitest',
@@ -146,6 +206,26 @@ const ALLOWED_COMMANDS = new Set([
   'findstr', // Windows findstr = Unix grep
   'sed',
   'awk',
+  // Network utilities
+  'netstat', // Network statistics
+  'ss', // Socket statistics (Linux)
+  'lsof', // List open files (Unix)
+  'netcat', // Network utility (nc)
+  'nc', // Netcat alias
+  'curl', // Allowed for API testing only
+  'telnet', // Network protocol
+  'ping', // ICMP ping
+  'tracert', // Windows traceroute
+  'traceroute', // Unix traceroute
+  'nslookup', // DNS lookup
+  'dig', // DNS lookup (Unix)
+  'host', // DNS lookup (Unix)
+  'ipconfig', // Windows IP config
+  'ifconfig', // Unix network config
+  'ip', // Linux network config
+  'route', // Routing table
+  'arp', // ARP table
+  'openssl', // SSL/TLS toolkit
   'tr',
   'cut',
   'paste',
@@ -160,6 +240,37 @@ const ALLOWED_COMMANDS = new Set([
   'powershell',
   'pwsh', // PowerShell (pwsh = PowerShell Core)
   'call', // Windows call for batch scripts
+  // Shell interpreters
+  'sh',
+  'bash',
+  'zsh',
+  'fish',
+  'dash',
+  'ash',
+  // Shell builtins (needed for script execution)
+  'if',
+  'for',
+  'else',
+  'endif',
+  'do',
+  'done',
+  'then',
+  'elif',
+  'case',
+  'esac',
+  'while',
+  'until',
+  'shift',
+  'set',
+  'setlocal',
+  'endlocal',
+  'goto',
+  'call',
+  'exit',
+  'true',
+  'false',
+  'test', // Unix test command
+  '[',
 ]);
 
 /**
@@ -244,6 +355,7 @@ const PATH_COMMANDS = new Set<string>([
   'sed',
   'git',
   'npm',
+  'npx',
   'pnpm',
   'yarn',
   'bun',
@@ -321,11 +433,51 @@ function looksLikePath(arg: string): boolean {
  * @returns Object with command and sanitized arguments
  * @throws Error if command is not allowed or arguments contain dangerous characters
  */
-function sanitizeCommand(command: string, cwd: string): { command: string; args: string[] } {
+function sanitizeCommand(
+  command: string,
+  cwd: string
+): { command: string; args: string[]; redirects: string[]; pipes: string[] } {
   const trimmed = command.trim();
   if (!trimmed) {
     throw new Error('Command cannot be empty');
   }
+
+  // Extract shell pipes (|) before parsing arguments
+  // Pipes chain commands together: cmd1 | cmd2
+  const pipes: string[] = [];
+  let workCommand = trimmed;
+
+  // Handle pipe separators first (before ampersands)
+  const pipeParts = workCommand.split(/\|/);
+  if (pipeParts.length > 1) {
+    pipes.push(...pipeParts.slice(1).map((p) => p.trim()));
+    workCommand = pipeParts[0].trim();
+  }
+
+  // Extract Windows-style ampersand separators (&, &&)
+  // Windows: cmd1 & cmd2 runs async, cmd1 && cmd2 runs sequentially
+  // We'll treat them like pipes but they go to the pipes array
+  const ampersandParts = workCommand.split(/&&?/);
+  if (ampersandParts.length > 1) {
+    pipes.push(...ampersandParts.slice(1).map((p) => p.trim()));
+    workCommand = ampersandParts[0].trim();
+  }
+
+  // Extract shell redirects before parsing arguments
+  // Supported redirects: >, >>, <, 2>, 2>>, 2>&1, etc.
+  const redirects: string[] = [];
+  let commandWithoutRedirects = workCommand;
+
+  // Pattern to match redirect operators with their targets
+  // Matches: >file, >>file, <file, 2>file, 2>>file, 2>&1, etc.
+  const redirectPattern = /(\d*>&?\d*|>>?|<)\s*(\S+|&\d+)/g;
+  let match;
+  while ((match = redirectPattern.exec(workCommand)) !== null) {
+    redirects.push(match[0]);
+  }
+
+  // Remove redirects from command for validation (we'll add them back later)
+  commandWithoutRedirects = workCommand.replace(redirectPattern, '').trim();
 
   // Split by whitespace but respect quotes
   const parts: string[] = [];
@@ -333,8 +485,8 @@ function sanitizeCommand(command: string, cwd: string): { command: string; args:
   let inQuote = false;
   let quoteChar = '';
 
-  for (let i = 0; i < trimmed.length; i++) {
-    const char = trimmed[i];
+  for (let i = 0; i < commandWithoutRedirects.length; i++) {
+    const char = commandWithoutRedirects[i];
 
     if (inQuote) {
       if (char === quoteChar) {
@@ -366,12 +518,27 @@ function sanitizeCommand(command: string, cwd: string): { command: string; args:
 
   const baseCommand = parts[0];
 
-  if (!ALLOWED_COMMANDS.has(baseCommand)) {
+  // Windows is case-insensitive, also normalize .exe, .bat, .cmd extensions
+  const normalizedCommand = baseCommand.toLowerCase().replace(/\.(exe|bat|cmd)$/, '');
+
+  // Check if command is in allowlist (case-insensitive for Windows)
+  const commandAllowed = Array.from(ALLOWED_COMMANDS).some(
+    (allowed) => allowed.toLowerCase().replace(/\.(exe|bat|cmd)$/, '') === normalizedCommand
+  );
+
+  if (!commandAllowed) {
     throw new Error(`Command not allowed: ${baseCommand}`);
   }
 
   // Sanitize arguments - reject shell metacharacters that could enable injection
-  const dangerousChars = /[;&|`$(){}[\]<>"'\\]/;
+  // Note: < and > are allowed in arguments (e.g., HTML comparison operators)
+  // Backslash (\) is allowed for Windows paths
+  // Percent (%) is allowed for Windows environment variables
+  // Parentheses () are allowed for subshells and command grouping
+  // Brackets [] and braces {} are allowed for glob patterns and templates
+  // But dangerous combinations like ;, `, $, quotes are blocked
+  // Pipe (|) and ampersands (&, &&) are extracted separately above
+  const dangerousChars = /[;`$"']/;
   for (let i = 1; i < parts.length; i++) {
     const arg = parts[i];
     if (dangerousChars.test(arg)) {
@@ -452,13 +619,15 @@ function sanitizeCommand(command: string, cwd: string): { command: string; args:
     }
   }
 
-  return { command: baseCommand, args: parts.slice(1) };
+  return { command: baseCommand, args: parts.slice(1), redirects, pipes };
 }
 
 /**
  * Z.ai API configuration
+ * API base URL can be overridden via ZAI_API_BASE_URL or ZAI_API_URL environment variables
  */
-const ZAI_API_BASE = 'https://api.z.ai/api/coding/paas/v4';
+const ZAI_API_BASE =
+  process.env.ZAI_API_BASE_URL || process.env.ZAI_API_URL || 'https://api.z.ai/api/coding/paas/v4';
 const ZAI_MODEL = 'glm-4.7';
 
 /**
@@ -695,8 +864,15 @@ async function grep(
   searchPath: string
 ): Promise<Array<{ path: string; line: number; text: string }>> {
   // Validate pattern for security
-  if (/[;&|`$(){}[\]<>"'\\]/.test(pattern)) {
+  // Since we use native RegExp (not shell), allow most regex metacharacters
+  // Only block shell command separators that could enable injection
+  if (/[;|`]/.test(pattern)) {
     throw new Error('Invalid characters in grep pattern');
+  }
+
+  // Check for path traversal attempts in pattern
+  if (pattern.includes('..')) {
+    throw new Error('Path traversal not allowed in grep pattern');
   }
 
   try {
@@ -898,11 +1074,20 @@ async function executeToolCall(
       }
 
       try {
-        // Build command with sanitized arguments
-        const cmdString =
-          sanitized.args.length > 0
-            ? `${sanitized.command} ${sanitized.args.join(' ')}`
-            : sanitized.command;
+        // Build command with sanitized arguments, redirects, and pipes
+        let cmdString = sanitized.command;
+        if (sanitized.args.length > 0) {
+          cmdString += ` ${sanitized.args.join(' ')}`;
+        }
+        if (sanitized.redirects.length > 0) {
+          cmdString += ` ${sanitized.redirects.join(' ')}`;
+        }
+        if (sanitized.pipes.length > 0) {
+          // Add pipe operators and chained commands
+          for (const pipeCmd of sanitized.pipes) {
+            cmdString += ` | ${pipeCmd}`;
+          }
+        }
 
         const { stdout, stderr } = await execAsync(cmdString, {
           cwd: resolvedCwd,
@@ -934,6 +1119,26 @@ export class ZaiProvider extends BaseProvider {
 
   getName(): string {
     return 'zai';
+  }
+
+  /**
+   * Create an abort signal that combines user abort controller with a timeout
+   * @param userController - Optional user-provided abort controller
+   * @returns AbortSignal that aborts on user cancel or timeout (5 minutes)
+   */
+  private createAbortSignal(userController?: AbortController): AbortSignal {
+    const TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
+    const timeoutController = new AbortController();
+    const timeoutId = setTimeout(() => timeoutController.abort(), TIMEOUT_MS);
+
+    // Store timeout ID for cleanup
+    (timeoutController as any)._timeoutId = timeoutId;
+
+    if (userController) {
+      // Combine both signals - abort if either user cancels or timeout occurs
+      return AbortSignal.any([userController.signal, timeoutController.signal]);
+    }
+    return timeoutController.signal;
   }
 
   /**
@@ -1025,11 +1230,11 @@ export class ZaiProvider extends BaseProvider {
     }
 
     // Build messages array
-    // Zai supports reasoning_content for preserved thinking mode
+    // Zai supports reasoning_content for preserved thinking mode (API format)
     const messages: Array<{
       role: 'system' | 'user' | 'assistant' | 'tool';
       content?: string | Array<{ type: string; text?: string; image_url?: { url: string } }>;
-      reasoning_content?: string; // Zai thinking mode - preserved across turns
+      reasoning_content?: string; // Zai API format for thinking mode - preserved across turns
       tool_calls?: Array<{
         id: string;
         type: string;
@@ -1163,7 +1368,8 @@ export class ZaiProvider extends BaseProvider {
             // Z.ai structured output support
             ...(outputFormat && { response_format: { type: 'json_object' } }),
           }),
-          signal: abortController?.signal,
+          // Combine user abort controller with timeout
+          signal: this.createAbortSignal(abortController),
         });
 
         if (!response.ok) {
@@ -1185,131 +1391,124 @@ export class ZaiProvider extends BaseProvider {
         let finishReason = '';
         let sseBuffer = ''; // Buffer for incomplete SSE lines
 
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
 
-          const chunk = decoder.decode(value, { stream: true });
-          sseBuffer += chunk;
+            const chunk = decoder.decode(value, { stream: true });
+            sseBuffer += chunk;
 
-          // Split into lines, keeping the last incomplete line in buffer
-          const lines = sseBuffer.split('\n');
-          if (!chunk.endsWith('\n')) {
-            // Last line is incomplete, keep it for next chunk
-            sseBuffer = lines.pop() || '';
-          } else {
-            sseBuffer = '';
-          }
+            // Split into lines, keeping the last incomplete line in buffer
+            const lines = sseBuffer.split('\n');
+            if (!chunk.endsWith('\n')) {
+              // Last line is incomplete, keep it for next chunk
+              sseBuffer = lines.pop() || '';
+            } else {
+              sseBuffer = '';
+            }
 
-          for (const line of lines) {
-            const trimmed = line.trim();
-            if (!trimmed || !trimmed.startsWith('data: ')) continue;
+            for (const line of lines) {
+              const trimmed = line.trim();
+              if (!trimmed || !trimmed.startsWith('data: ')) continue;
 
-            const data = trimmed.slice(6); // Remove 'data: ' prefix
-            if (data === '[DONE]') continue;
+              const data = trimmed.slice(6); // Remove 'data: ' prefix
+              if (data === '[DONE]') continue;
 
-            try {
-              const parsed = JSON.parse(data) as {
-                choices?: Array<{
-                  delta?: {
-                    content?: string;
-                    reasoning_content?: string;
-                    tool_calls?: Array<{
-                      index: number;
-                      id?: string;
-                      function?: { name?: string; arguments?: string };
-                    }>;
+              try {
+                const parsed = JSON.parse(data) as ZaiSseResponse;
+
+                const choice = parsed.choices?.[0];
+                if (!choice) continue;
+
+                // Handle content delta
+                if (choice.delta?.content) {
+                  currentContent += choice.delta.content;
+
+                  // Yield text content incrementally
+                  yield {
+                    type: 'assistant',
+                    session_id: sessionId,
+                    message: {
+                      role: 'assistant',
+                      content: [{ type: 'text', text: choice.delta.content }],
+                    },
                   };
-                  finish_reason?: string;
-                }>;
-              };
+                }
 
-              const choice = parsed.choices?.[0];
-              if (!choice) continue;
+                // Handle reasoning content (thinking mode)
+                if (choice.delta?.reasoning_content) {
+                  currentReasoning += choice.delta.reasoning_content;
 
-              // Handle content delta
-              if (choice.delta?.content) {
-                currentContent += choice.delta.content;
+                  // Yield thinking content incrementally (unified format)
+                  yield {
+                    type: 'assistant',
+                    session_id: sessionId,
+                    message: {
+                      role: 'assistant',
+                      content: [
+                        {
+                          type: 'thinking',
+                          thinking: choice.delta.reasoning_content,
+                        },
+                      ],
+                    },
+                  };
+                }
 
-                // Yield text content incrementally
-                yield {
-                  type: 'assistant',
-                  session_id: sessionId,
-                  message: {
-                    role: 'assistant',
-                    content: [{ type: 'text', text: choice.delta.content }],
-                  },
-                };
-              }
+                // Handle tool calls in streaming
+                if (choice.delta?.tool_calls) {
+                  for (const toolCall of choice.delta.tool_calls) {
+                    const index = toolCall.index;
 
-              // Handle reasoning content (thinking mode)
-              if (choice.delta?.reasoning_content) {
-                currentReasoning += choice.delta.reasoning_content;
+                    if (!currentToolCalls.has(index)) {
+                      currentToolCalls.set(index, {
+                        id: toolCall.id || '',
+                        name: '',
+                        arguments: '',
+                      });
+                    }
 
-                // Yield reasoning content incrementally
-                yield {
-                  type: 'assistant',
-                  session_id: sessionId,
-                  message: {
-                    role: 'assistant',
-                    content: [
-                      {
-                        type: 'reasoning',
-                        reasoning_content: choice.delta.reasoning_content,
-                      },
-                    ],
-                  },
-                };
-              }
-
-              // Handle tool calls in streaming
-              if (choice.delta?.tool_calls) {
-                for (const toolCall of choice.delta.tool_calls) {
-                  const index = toolCall.index;
-
-                  if (!currentToolCalls.has(index)) {
-                    currentToolCalls.set(index, {
-                      id: toolCall.id || '',
-                      name: '',
-                      arguments: '',
-                    });
-                  }
-
-                  const current = currentToolCalls.get(index)!;
-                  if (toolCall.id) current.id = toolCall.id;
-                  if (toolCall.function?.name) current.name = toolCall.function.name;
-                  if (toolCall.function?.arguments) {
-                    current.arguments += toolCall.function.arguments;
+                    const current = currentToolCalls.get(index)!;
+                    if (toolCall.id) current.id = toolCall.id;
+                    if (toolCall.function?.name) current.name = toolCall.function.name;
+                    if (toolCall.function?.arguments) {
+                      current.arguments += toolCall.function.arguments;
+                    }
                   }
                 }
-              }
 
-              // Track finish reason
-              if (choice.finish_reason) {
-                finishReason = choice.finish_reason;
+                // Track finish reason
+                if (choice.finish_reason) {
+                  finishReason = choice.finish_reason;
+                }
+              } catch (parseError) {
+                // Skip unparseable chunks
+                logger.debug(`Failed to parse SSE chunk: ${(parseError as Error).message}`);
               }
-            } catch (parseError) {
-              // Skip unparseable chunks
-              logger.debug(`Failed to parse SSE chunk: ${(parseError as Error).message}`);
             }
-          }
 
-          // Check for completion - only break if all content has been received
-          // For 'stop': all deltas should be complete
-          // For 'tool_calls': verify all tool calls are complete before breaking
-          if (finishReason === 'stop') {
-            break;
-          }
-          if (finishReason === 'tool_calls' && currentToolCalls.size > 0) {
-            // Verify all tool calls have complete data (id, name, and arguments)
-            const allComplete = Array.from(currentToolCalls.values()).every(
-              (tc) => tc.id && tc.name && tc.arguments
-            );
-            if (allComplete) {
+            // Check for completion - only break if all content has been received
+            // For 'stop': all deltas should be complete
+            // For 'tool_calls': verify all tool calls are complete before breaking
+            if (finishReason === 'stop') {
               break;
             }
-            // Otherwise continue waiting for complete tool call data
-          }
+            if (finishReason === 'tool_calls' && currentToolCalls.size > 0) {
+              // Verify all tool calls have complete data (id, name, and arguments)
+              const allComplete = Array.from(currentToolCalls.values()).every(
+                (tc) => tc.id && tc.name && tc.arguments
+              );
+              if (allComplete) {
+                break;
+              }
+              // Otherwise continue waiting for complete tool call data
+            }
+          } // closes while loop
+        } finally {
+          // closes try block, starts finally
+          // Ensure reader is always released to prevent resource leaks
+          reader.releaseLock();
         }
 
         // Safety check: if stream ended with incomplete tool calls, warn and don't execute them
@@ -1331,14 +1530,27 @@ export class ZaiProvider extends BaseProvider {
           reasoning_content: currentReasoning || undefined,
           tool_calls:
             currentToolCalls.size > 0
-              ? Array.from(currentToolCalls.values()).map((tc) => ({
-                  id: tc.id,
-                  type: 'function',
-                  function: {
-                    name: tc.name,
-                    arguments: tc.arguments,
-                  },
-                }))
+              ? Array.from(currentToolCalls.values())
+                  .filter((tc) => {
+                    // Validate that tool call arguments are valid JSON before including
+                    try {
+                      JSON.parse(tc.arguments);
+                      return true;
+                    } catch {
+                      logger.warn(
+                        `[Zai] Discarding invalid tool call: ${tc.name} with malformed arguments`
+                      );
+                      return false;
+                    }
+                  })
+                  .map((tc) => ({
+                    id: tc.id,
+                    type: 'function',
+                    function: {
+                      name: tc.name,
+                      arguments: tc.arguments,
+                    },
+                  }))
               : undefined,
         });
 
@@ -1346,18 +1558,19 @@ export class ZaiProvider extends BaseProvider {
         // Only execute tools if we received a proper tool_calls finish reason
         if (currentToolCalls.size > 0 && finishReason === 'tool_calls') {
           for (const [index, toolCall] of currentToolCalls) {
-            const toolName = toolCall.name;
+            // Validate JSON before processing
             let toolArgs: Record<string, unknown>;
-
             try {
               toolArgs = JSON.parse(toolCall.arguments);
             } catch {
-              yield {
-                type: 'error',
-                error: `Invalid tool arguments: ${toolCall.arguments}`,
-              };
+              // Skip invalid tool calls (already filtered above, but double-check)
+              logger.warn(
+                `[Zai] Skipping tool ${toolCall.name} with invalid arguments: ${toolCall.arguments}`
+              );
               continue;
             }
+
+            const toolName = toolCall.name;
 
             // Yield tool_use message
             yield {
@@ -1707,13 +1920,13 @@ export class ZaiProvider extends BaseProvider {
    * Check if the provider supports a specific feature
    */
   supportsFeature(feature: ProviderFeature | string): boolean {
-    // Zai supports: tools, text, vision (via glm-4.6v), thinking mode (via all GLM models), structured output
+    // Zai supports: tools, text, vision (via glm-4.6v), extended thinking (via all GLM models), structured output
     // Zai does NOT support: mcp, browser (these are application-layer features)
     const supportedFeatures: ProviderFeature[] = [
       'tools',
       'text',
       'vision',
-      'thinking', // Zai's thinking mode (GLM reasoning content)
+      'extendedThinking', // Zai's thinking mode (GLM reasoning content)
       'structuredOutput',
     ];
     return supportedFeatures.includes(feature as ProviderFeature);

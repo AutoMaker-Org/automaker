@@ -8,9 +8,12 @@ import { cn, modelSupportsThinking } from '@/lib/utils';
 import { DialogFooter } from '@/components/ui/dialog';
 import { Brain } from 'lucide-react';
 import { toast } from 'sonner';
-import type { AIProfile, AgentModel, ThinkingLevel } from '@/store/app-store';
+import type { AIProfile, AgentModel, ThinkingLevel } from '@automaker/types';
 import { ALL_MODELS, THINKING_LEVELS, ICON_OPTIONS } from '../constants';
 import { getProviderFromModel } from '../utils';
+import { useAppStore } from '@/store/app-store';
+import { autoSwitchModelIfDisabled } from '@/utils/model-utils';
+import { useEffect } from 'react';
 
 interface ProfileFormProps {
   profile: Partial<AIProfile>;
@@ -27,6 +30,7 @@ export function ProfileForm({
   isEditing,
   hotkeyActive,
 }: ProfileFormProps) {
+  const enabledProviders = useAppStore((s) => s.enabledProviders);
   const [formData, setFormData] = useState({
     name: profile.name || '',
     description: profile.description || '',
@@ -35,7 +39,21 @@ export function ProfileForm({
     icon: profile.icon || 'Brain',
   });
 
+  // Auto-switch model if current model's provider is disabled
+  useEffect(() => {
+    const newModel = autoSwitchModelIfDisabled(formData.model, enabledProviders);
+    if (newModel !== formData.model) {
+      setFormData({ ...formData, model: newModel });
+    }
+  }, [enabledProviders]);
+
   const provider = getProviderFromModel(formData.model);
+
+  // Filter models based on enabled providers
+  const filteredModels = ALL_MODELS.filter((model) => {
+    const modelProvider = getProviderFromModel(model.id);
+    return modelProvider === 'claude' ? enabledProviders.claude : enabledProviders.zai;
+  });
   const supportsThinking = modelSupportsThinking(formData.model);
 
   const handleModelChange = (model: AgentModel) => {
@@ -120,7 +138,7 @@ export function ProfileForm({
             Model
           </Label>
           <div className="flex gap-2 flex-wrap">
-            {ALL_MODELS.map(({ id, label }) => (
+            {filteredModels.map(({ id, label }) => (
               <button
                 key={id}
                 type="button"

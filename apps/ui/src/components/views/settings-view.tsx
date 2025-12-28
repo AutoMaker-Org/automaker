@@ -50,6 +50,7 @@ export function SettingsView() {
     setValidationModel,
     autoLoadClaudeMd,
     setAutoLoadClaudeMd,
+    enabledProviders,
   } = useAppStore();
 
   // Hide usage tracking when using API key (only show for Claude Code CLI users)
@@ -144,6 +145,7 @@ export function SettingsView() {
             defaultAIProfileId={defaultAIProfileId}
             aiProfiles={aiProfiles}
             validationModel={validationModel}
+            enabledProviders={enabledProviders}
             onShowProfilesOnlyChange={setShowProfilesOnly}
             onDefaultSkipTestsChange={setDefaultSkipTests}
             onEnableDependencyBlockingChange={setEnableDependencyBlocking}

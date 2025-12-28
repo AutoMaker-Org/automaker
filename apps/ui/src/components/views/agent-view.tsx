@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
-import { useAppStore, type AgentModel } from '@/store/app-store';
+import { useAppStore } from '@/store/app-store';
+import type { AgentModel } from '@automaker/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ImageDropZone } from '@/components/ui/image-drop-zone';
@@ -52,11 +53,20 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { ALL_MODELS } from '@/components/views/board-view/shared/model-constants';
+import {
+  ALL_MODELS,
+  getFilteredModels,
+} from '@/components/views/board-view/shared/model-constants';
+import { autoSwitchModelIfDisabled } from '@/utils/model-utils';
 
 export function AgentView() {
-  const { currentProject, setLastSelectedSession, getLastSelectedSession, showReasoningByDefault } =
-    useAppStore();
+  const {
+    currentProject,
+    setLastSelectedSession,
+    getLastSelectedSession,
+    showReasoningByDefault,
+    enabledProviders,
+  } = useAppStore();
   const shortcuts = useKeyboardShortcutsConfig();
   const [input, setInput] = useState('');
   const [selectedImages, setSelectedImages] = useState<ImageAttachment[]>([]);
@@ -443,6 +453,14 @@ export function AgentView() {
     }
   }, [currentSessionId]);
 
+  // Auto-switch model if current model's provider is disabled
+  useEffect(() => {
+    const newModel = autoSwitchModelIfDisabled(selectedModel, enabledProviders);
+    if (newModel !== selectedModel) {
+      setSelectedModel(newModel);
+    }
+  }, [enabledProviders]);
+
   // Keyboard shortcuts for agent view
   const agentShortcuts: KeyboardShortcut[] = useMemo(() => {
     const shortcutsList: KeyboardShortcut[] = [];
@@ -633,7 +651,7 @@ export function AgentView() {
                       : 'bg-card border border-border'
                   )}
                 >
-                  {message.role === 'assistant' && message.reasoning_content && (
+                  {message.role === 'assistant' && message.thinking && (
                     <div className="mb-3 p-2.5 bg-muted/50 rounded-lg border border-border">
                       <div className="flex items-center gap-2 mb-2">
                         <Brain className="w-3.5 h-3.5 text-primary" />
@@ -642,10 +660,10 @@ export function AgentView() {
                       <details className="group" open={showReasoningByDefault}>
                         <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground list-none flex items-center gap-1">
                           <ChevronRight className="w-3 h-3 transition-transform group-open:rotate-90" />
-                          {showReasoningByDefault ? 'Hide' : 'Show'} reasoning
+                          {showReasoningByDefault ? 'Hide' : 'Show'} thinking
                         </summary>
                         <div className="mt-2 text-xs text-muted-foreground whitespace-pre-wrap font-mono">
-                          {message.reasoning_content}
+                          {message.thinking}
                         </div>
                       </details>
                     </div>
@@ -949,7 +967,7 @@ export function AgentView() {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-48">
-                  {ALL_MODELS.map((model) => (
+                  {getFilteredModels(enabledProviders).map((model) => (
                     <DropdownMenuItem
                       key={model.id}
                       onClick={() => setSelectedModel(model.id)}

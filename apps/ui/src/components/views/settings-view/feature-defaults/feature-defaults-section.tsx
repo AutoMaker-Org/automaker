@@ -22,8 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import type { AIProfile } from '@/store/app-store';
-import type { AgentModel } from '@automaker/types';
+import type { AIProfile, AgentModel } from '@automaker/types';
 
 type PlanningMode = 'skip' | 'lite' | 'spec' | 'full';
 
@@ -37,6 +36,10 @@ interface FeatureDefaultsSectionProps {
   defaultAIProfileId: string | null;
   aiProfiles: AIProfile[];
   validationModel: AgentModel;
+  enabledProviders: {
+    claude: boolean;
+    zai: boolean;
+  };
   onShowProfilesOnlyChange: (value: boolean) => void;
   onDefaultSkipTestsChange: (value: boolean) => void;
   onEnableDependencyBlockingChange: (value: boolean) => void;
@@ -49,6 +52,7 @@ interface FeatureDefaultsSectionProps {
 
 export function FeatureDefaultsSection({
   showProfilesOnly,
+  enabledProviders,
   defaultSkipTests,
   enableDependencyBlocking,
   useWorktrees,
@@ -249,28 +253,36 @@ export function FeatureDefaultsSection({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="opus">
-                    <span>Opus</span>
-                    <span className="text-[10px] text-muted-foreground ml-1">(Default)</span>
-                  </SelectItem>
-                  <SelectItem value="sonnet">
-                    <span>Sonnet</span>
-                  </SelectItem>
-                  <SelectItem value="haiku">
-                    <span>Haiku</span>
-                  </SelectItem>
-                  <SelectItem value="glm">
-                    <span>GLM-4.7</span>
-                    <span className="text-[10px] text-muted-foreground ml-1">(Z.ai)</span>
-                  </SelectItem>
-                  <SelectItem value="glm-4.6">
-                    <span>GLM-4.6</span>
-                    <span className="text-[10px] text-muted-foreground ml-1">(Balanced)</span>
-                  </SelectItem>
-                  <SelectItem value="glm-4.5-air">
-                    <span>GLM-4.5-Air</span>
-                    <span className="text-[10px] text-muted-foreground ml-1">(Fast)</span>
-                  </SelectItem>
+                  {enabledProviders.claude && (
+                    <>
+                      <SelectItem value="opus">
+                        <span>Opus</span>
+                        <span className="text-[10px] text-muted-foreground ml-1">(Default)</span>
+                      </SelectItem>
+                      <SelectItem value="sonnet">
+                        <span>Sonnet</span>
+                      </SelectItem>
+                      <SelectItem value="haiku">
+                        <span>Haiku</span>
+                      </SelectItem>
+                    </>
+                  )}
+                  {enabledProviders.zai && (
+                    <>
+                      <SelectItem value="glm">
+                        <span>GLM-4.7</span>
+                        <span className="text-[10px] text-muted-foreground ml-1">(Z.ai)</span>
+                      </SelectItem>
+                      <SelectItem value="glm-4.6">
+                        <span>GLM-4.6</span>
+                        <span className="text-[10px] text-muted-foreground ml-1">(Balanced)</span>
+                      </SelectItem>
+                      <SelectItem value="glm-4.5-air">
+                        <span>GLM-4.5-Air</span>
+                        <span className="text-[10px] text-muted-foreground ml-1">(Fast)</span>
+                      </SelectItem>
+                    </>
+                  )}
                 </SelectContent>
               </Select>
             </div>
