@@ -1,0 +1,162 @@
+/**
+ * Common utilities for update routes
+ */
+
+import { createLogger } from '@automaker/utils';
+import { exec } from 'child_process';
+import { promisify } from 'util';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { getErrorMessage as getErrorMessageShared, createLogError } from '../common.js';
+
+const logger = createLogger('Updates');
+export const execAsync = promisify(exec);
+
+// Re-export shared utilities
+export { getErrorMessageShared as getErrorMessage };
+export const logError = createLogError(logger);
+
+// ============================================================================
+// Extended PATH configuration for Electron apps
+// ============================================================================
+
+const pathSeparator = process.platform === 'win32' ? ';' : ':';
+const additionalPaths: string[] = [];
+
+if (process.platform === 'win32') {
+  // Windows paths
+  if (process.env.LOCALAPPDATA) {
+    additionalPaths.push(`${process.env.LOCALAPPDATA}\\Programs\\Git\\cmd`);
+  }
+  if (process.env.PROGRAMFILES) {
+    additionalPaths.push(`${process.env.PROGRAMFILES}\\Git\\cmd`);
+  }
+  if (process.env['ProgramFiles(x86)']) {
+    additionalPaths.push(`${process.env['ProgramFiles(x86)']}\\Git\\cmd`);
+  }
+} else {
+  // Unix/Mac paths
+  additionalPaths.push(
+    '/opt/homebrew/bin', // Homebrew on Apple Silicon
+    '/usr/local/bin', // Homebrew on Intel Mac, common Linux location
+    '/home/linuxbrew/.linuxbrew/bin' // Linuxbrew
+  );
+  // pipx, other user installs - only add if HOME is defined
+  if (process.env.HOME) {
+    additionalPaths.push(`${process.env.HOME}/.local/bin`);
+  }
+}
+
+const extendedPath = [process.env.PATH, ...additionalPaths.filter(Boolean)]
+  .filter(Boolean)
+  .join(pathSeparator);
+
+/**
+ * Environment variables with extended PATH for executing shell commands.
+ */
+export const execEnv = {
+  ...process.env,
+  PATH: extendedPath,
+};
+
+// ============================================================================
+// Automaker installation path
+// ============================================================================
+
+/**
+ * Locate the Automaker monorepo root directory.
+ *
+ * @returns Absolute path to the monorepo root directory (the directory containing the top-level `package.json`)
+ */
+export function getAutomakerRoot(): string {
+  // In ESM, we use import.meta.url to get the current file path
+  // This file is at: apps/server/src/routes/updates/common.ts
+  // So we need to go up 5 levels to get to the monorepo root
+  const __filename = fileURLToPath(import.meta.url);
+  const __dirname = path.dirname(__filename);
+
+  // Go up from: updates -> routes -> src -> server -> apps -> root
+  return path.resolve(__dirname, '..', '..', '..', '..', '..');
+}
+
+/**
+ * Determines whether Git is available on the system.
+ *
+ * @returns `true` if the `git` command is executable in the current environment, `false` otherwise.
+ */
+export async function isGitAvailable(): Promise<boolean> {
+  try {
+    await execAsync('git --version', { env: execEnv });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Determine whether the given filesystem path is a Git repository.
+ *
+ * @param repoPath - Filesystem path to check
+ * @returns `true` if the path is inside a Git working tree, `false` otherwise.
+ */
+export async function isGitRepo(repoPath: string): Promise<boolean> {
+  try {
+    await execAsync('git rev-parse --is-inside-work-tree', { cwd: repoPath, env: execEnv });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Retrieves the full commit hash pointed to by HEAD in the given repository.
+ *
+ * @param repoPath - Filesystem path of the Git repository to query
+ * @returns The full commit hash for HEAD as a trimmed string
+ */
+export async function getCurrentCommit(repoPath: string): Promise<string> {
+  const { stdout } = await execAsync('git rev-parse HEAD', { cwd: repoPath, env: execEnv });
+  return stdout.trim();
+}
+
+/**
+ * Retrieve the short commit hash of HEAD for the repository at the given path.
+ *
+ * @param repoPath - Filesystem path to the git repository
+ * @returns The short commit hash for `HEAD`
+ */
+export async function getShortCommit(repoPath: string): Promise<string> {
+  const { stdout } = await execAsync('git rev-parse --short HEAD', { cwd: repoPath, env: execEnv });
+  return stdout.trim();
+}
+
+/**
+ * Determine whether the repository contains uncommitted local changes.
+ *
+ * @param repoPath - Filesystem path to the Git repository to check
+ * @returns `true` if the repository has any uncommitted changes, `false` otherwise
+ */
+export async function hasLocalChanges(repoPath: string): Promise<boolean> {
+  const { stdout } = await execAsync('git status --porcelain', { cwd: repoPath, env: execEnv });
+  return stdout.trim().length > 0;
+}
+
+/**
+ * Determine whether a string is a well-formed git remote URL and contains no shell metacharacters.
+ *
+ * @param url - The URL to validate
+ * @returns `true` if `url` starts with a common git protocol (`https://`, `git@`, `git://`, `ssh://`) and does not contain shell metacharacters, `false` otherwise.
+ */
+export function isValidGitUrl(url: string): boolean {
+  // Allow HTTPS, SSH, and git protocols
+  const startsWithValidProtocol =
+    url.startsWith('https://') ||
+    url.startsWith('git@') ||
+    url.startsWith('git://') ||
+    url.startsWith('ssh://');
+
+  // Block shell metacharacters to prevent command injection
+  const hasShellChars = /[;`|&<>()$!\\[\] ]/.test(url);
+
+  return startsWithValidProtocol && !hasShellChars;
+}

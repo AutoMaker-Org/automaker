@@ -17,10 +17,18 @@ import { TerminalSection } from './settings-view/terminal/terminal-section';
 import { AudioSection } from './settings-view/audio/audio-section';
 import { KeyboardShortcutsSection } from './settings-view/keyboard-shortcuts/keyboard-shortcuts-section';
 import { FeatureDefaultsSection } from './settings-view/feature-defaults/feature-defaults-section';
+import { UpdatesSection } from './settings-view/updates/updates-section';
 import { DangerZoneSection } from './settings-view/danger-zone/danger-zone-section';
 import type { Project as SettingsProject, Theme } from './settings-view/shared/types';
 import type { Project as ElectronProject } from '@/lib/electron';
 
+/**
+ * Render the application settings view, including navigation, section panels, theme and project preferences, CLI status, and global dialogs.
+ *
+ * Renders the appropriate settings subsection based on the active view, wires UI controls to the app store for reading and updating settings (theme, defaults, features, updates, audio, keyboard, API keys, Claude/CLI settings, etc.), and manages visibility of the keyboard map and delete-project dialogs.
+ *
+ * @returns The settings view JSX element
+ */
 export function SettingsView() {
   const {
     theme,
@@ -52,6 +60,8 @@ export function SettingsView() {
     setAutoLoadClaudeMd,
     enableSandboxMode,
     setEnableSandboxMode,
+    autoUpdate,
+    setAutoUpdate,
   } = useAppStore();
 
   // Hide usage tracking when using API key (only show for Claude Code CLI users)
@@ -158,6 +168,8 @@ export function SettingsView() {
             onValidationModelChange={setValidationModel}
           />
         );
+      case 'updates':
+        return <UpdatesSection autoUpdate={autoUpdate} onAutoUpdateChange={setAutoUpdate} />;
       case 'danger':
         return (
           <DangerZoneSection

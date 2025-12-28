@@ -11,7 +11,17 @@ import { useSetupStore } from '@/store/setup-store';
 import { getElectronAPI } from '@/lib/electron';
 import { Toaster } from 'sonner';
 import { ThemeOption, themeOptions } from '@/config/theme-options';
+import { UpdateNotifier } from '@/components/updates';
 
+/**
+ * Render the application's root layout and manage global UI state, routing, and integrations.
+ *
+ * This component provides the main application shell: sidebar, route Outlet, a hidden streamer panel,
+ * theme application, first-run/setup routing handling, file browser binding, IPC connection testing,
+ * global keyboard shortcut handling, and global UI utilities like the Toaster and UpdateNotifier.
+ *
+ * @returns The root layout element containing the sidebar, main content Outlet, hidden streamer panel, Toaster, and UpdateNotifier.
+ */
 function RootLayoutContent() {
   const location = useLocation();
   const { setIpcConnected, currentProject, getEffectiveTheme } = useAppStore();
@@ -175,6 +185,7 @@ function RootLayoutContent() {
         }`}
       />
       <Toaster richColors position="bottom-right" />
+      <UpdateNotifier />
     </main>
   );
 }

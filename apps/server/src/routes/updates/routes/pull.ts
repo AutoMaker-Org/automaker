@@ -1,0 +1,170 @@
+/**
+ * POST /pull endpoint - Pull updates from upstream
+ *
+ * Executes git pull from the configured upstream repository.
+ */
+
+import type { Request, Response } from 'express';
+import type { SettingsService } from '../../../services/settings-service.js';
+import type { UpdatePullResult } from '@automaker/types';
+import crypto from 'crypto';
+import {
+  execAsync,
+  execEnv,
+  getAutomakerRoot,
+  getCurrentCommit,
+  getShortCommit,
+  isGitRepo,
+  isGitAvailable,
+  isValidGitUrl,
+  hasLocalChanges,
+  getErrorMessage,
+  logError,
+} from '../common.js';
+
+/**
+ * Create an Express handler for POST /pull that updates the local Automaker installation by pulling from the configured upstream Git repository.
+ *
+ * The handler validates Git availability and that the install directory is a git repository, ensures there are no local uncommitted changes, validates the upstream URL from global settings, and performs a fast-forward-only pull using a temporary remote. It returns a JSON UpdatePullResult on success, or an error JSON with appropriate HTTP status codes for invalid input, merge conflicts, non-fast-forward divergence, or unexpected failures.
+ *
+ * @param settingsService - Service used to read global settings (used to obtain the upstream URL)
+ * @returns An Express request handler that performs the safe fast-forward pull and sends a JSON response describing the result or error
+ */
+export function createPullHandler(settingsService: SettingsService) {
+  return async (_req: Request, res: Response): Promise<void> => {
+    try {
+      const installPath = getAutomakerRoot();
+
+      // Check if git is available
+      if (!(await isGitAvailable())) {
+        res.status(500).json({
+          success: false,
+          error: 'Git is not installed or not available in PATH',
+        });
+        return;
+      }
+
+      // Check if automaker directory is a git repo
+      if (!(await isGitRepo(installPath))) {
+        res.status(500).json({
+          success: false,
+          error: 'Automaker installation is not a git repository',
+        });
+        return;
+      }
+
+      // Check for local changes
+      if (await hasLocalChanges(installPath)) {
+        res.status(400).json({
+          success: false,
+          error: 'You have local uncommitted changes. Please commit or stash them before updating.',
+        });
+        return;
+      }
+
+      // Get settings for upstream URL
+      const settings = await settingsService.getGlobalSettings();
+      const sourceUrl =
+        settings.autoUpdate?.upstreamUrl || 'https://github.com/AutoMaker-Org/automaker.git';
+
+      // Validate URL to prevent command injection
+      if (!isValidGitUrl(sourceUrl)) {
+        res.status(400).json({
+          success: false,
+          error: 'Invalid upstream URL format',
+        });
+        return;
+      }
+
+      // Get current version before pull
+      const previousVersion = await getCurrentCommit(installPath);
+      const previousVersionShort = await getShortCommit(installPath);
+
+      // Use a random remote name to avoid conflicts with concurrent pulls
+      const tempRemoteName = `automaker-update-pull-${crypto.randomBytes(8).toString('hex')}`;
+
+      try {
+        // Add temporary remote
+        await execAsync(`git remote add ${tempRemoteName} "${sourceUrl}"`, {
+          cwd: installPath,
+          env: execEnv,
+        });
+
+        // Fetch first
+        await execAsync(`git fetch ${tempRemoteName} main`, {
+          cwd: installPath,
+          env: execEnv,
+        });
+
+        // Merge the fetched changes
+        const { stdout: mergeOutput } = await execAsync(
+          `git merge ${tempRemoteName}/main --ff-only`,
+          { cwd: installPath, env: execEnv }
+        );
+
+        // Get new version after merge
+        const newVersion = await getCurrentCommit(installPath);
+        const newVersionShort = await getShortCommit(installPath);
+
+        const alreadyUpToDate =
+          mergeOutput.includes('Already up to date') || previousVersion === newVersion;
+
+        const result: UpdatePullResult = {
+          success: true,
+          previousVersion,
+          previousVersionShort,
+          newVersion,
+          newVersionShort,
+          alreadyUpToDate,
+          message: alreadyUpToDate
+            ? 'Already up to date'
+            : `Updated from ${previousVersionShort} to ${newVersionShort}`,
+        };
+
+        res.json({
+          success: true,
+          result,
+        });
+      } catch (pullError) {
+        const errorMsg = getErrorMessage(pullError);
+        logError(pullError, 'Failed to pull updates');
+
+        // Check for common errors
+        if (errorMsg.includes('not possible to fast-forward')) {
+          res.status(400).json({
+            success: false,
+            error:
+              'Cannot fast-forward merge. Your local branch has diverged from upstream. Please resolve manually.',
+          });
+          return;
+        }
+
+        if (errorMsg.includes('CONFLICT')) {
+          res.status(400).json({
+            success: false,
+            error: 'Merge conflict detected. Please resolve conflicts manually.',
+          });
+          return;
+        }
+
+        res.status(500).json({
+          success: false,
+          error: `Failed to pull updates: ${errorMsg}`,
+        });
+      } finally {
+        // Always clean up temp remote
+        try {
+          await execAsync(`git remote remove ${tempRemoteName}`, {
+            cwd: installPath,
+            env: execEnv,
+          });
+        } catch {
+          // Ignore cleanup errors
+        }
+      }
+    } catch (error) {
+      logError(error, 'Update pull failed');
+      res.status(500).json({ success: false, error: getErrorMessage(error) });
+    }
+  };
+}

@@ -63,3 +63,14 @@ export const isMac =
     : typeof navigator !== 'undefined' &&
       (/Mac/.test(navigator.userAgent) ||
         (navigator.platform ? navigator.platform.toLowerCase().includes('mac') : false));
+
+/**
+ * Get the owner/repo display name from a GitHub repository URL.
+ *
+ * @param url - A repository URL (common GitHub formats like `https://github.com/owner/repo`, `git@github.com:owner/repo.git`, or `github.com/owner/repo`)
+ * @returns The `owner/repo` string when the URL is a GitHub repository, otherwise `'upstream'`
+ */
+export function getRepoDisplayName(url: string): string {
+  const match = url.match(/github\.com[/:]([^/]+\/[^/.]+)/);
+  return match ? match[1] : 'upstream';
+}

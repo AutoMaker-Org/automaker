@@ -180,17 +180,12 @@ export function useSettingsMigration(): MigrationState {
 }
 
 /**
- * Sync current global settings to file-based server storage
+ * Persist selected global settings from localStorage to the file-based server storage.
  *
- * Reads the current Zustand state from localStorage and sends all global settings
- * to the server to be written to {dataDir}/settings.json.
+ * Reads the `automaker-storage` entry (Zustand state) and sends the relevant global settings
+ * to the server so they are written to the application's settings file.
  *
- * Call this when important global settings change (theme, UI preferences, profiles, etc.)
- * Safe to call from store subscribers or change handlers.
- *
- * Only functions in Electron mode. Returns false if not in Electron or on error.
- *
- * @returns Promise resolving to true if sync succeeded, false otherwise
+ * @returns `true` if the server acknowledged the update, `false` otherwise.
  */
 export async function syncSettingsToServer(): Promise<boolean> {
   if (!isElectron()) return false;
@@ -232,6 +227,7 @@ export async function syncSettingsToServer(): Promise<boolean> {
       projectHistory: state.projectHistory,
       projectHistoryIndex: state.projectHistoryIndex,
       lastSelectedSessionByProject: state.lastSelectedSessionByProject,
+      autoUpdate: state.autoUpdate,
     };
 
     const result = await api.settings.updateGlobal(updates);
