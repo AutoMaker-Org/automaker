@@ -90,15 +90,15 @@ const DANGEROUS_PATTERNS = [
   /rm\s+-[rf]+\s+\/\*/, // rm -rf /* (recursive from root)
   /rm\s+-[rf]+\s+\\\*/, // rm -rf \* (Windows)
   // format/fdisk/shutdown with any arguments
-  /format\s/, // format with any args
-  /fdisk\s/, // fdisk with any args
-  /diskpart\s/, // diskpart with any args
-  /diskutil\s/, // diskutil with any args
-  /shutdown\s+[a-z-]/i, // shutdown with any flags
-  /reboot\s/, // reboot with any args
-  /poweroff\s/, // poweroff with any args
-  /halt\s/, // halt with any args
-  /systemctl\s+(poweroff|reboot|halt)/i, // systemctl poweroff/reboot/halt
+  /^\s*format\s/, // format command (must be at start, not --format flag)
+  /^\s*fdisk\s/, // fdisk command
+  /^\s*diskpart\s/, // diskpart command
+  /^\s*diskutil\s/, // diskutil command
+  /^\s*shutdown\s+[a-z-]/i, // shutdown with flags
+  /^\s*reboot\s/, // reboot command
+  /^\s*poweroff\s/, // poweroff command
+  /^\s*halt\s/, // halt command
+  /^\s*systemctl\s+(poweroff|reboot|halt)/i, // systemctl poweroff/reboot/halt
 ];
 
 /**
