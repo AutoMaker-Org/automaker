@@ -17,7 +17,11 @@ import { ProviderFactory } from '../providers/provider-factory.js';
 import { createChatOptions, validateWorkingDirectory } from '../lib/sdk-options.js';
 import { PathNotAllowedError } from '@automaker/platform';
 import type { SettingsService } from './settings-service.js';
-import { getAutoLoadClaudeMdSetting, filterClaudeMdFromContext } from '../lib/settings-helpers.js';
+import {
+  getAutoLoadClaudeMdSetting,
+  getEnableSandboxModeSetting,
+  filterClaudeMdFromContext,
+} from '../lib/settings-helpers.js';
 
 interface Message {
   id: string;
@@ -142,10 +146,12 @@ export class AgentService {
   }) {
     const session = this.sessions.get(sessionId);
     if (!session) {
+      console.error('[AgentService] ERROR: Session not found:', sessionId);
       throw new Error(`Session ${sessionId} not found`);
     }
 
     if (session.isRunning) {
+      console.error('[AgentService] ERROR: Agent already running for session:', sessionId);
       throw new Error('Agent is already processing a message');
     }
 
@@ -215,6 +221,12 @@ export class AgentService {
         '[AgentService]'
       );
 
+      // Load enableSandboxMode setting (global setting only)
+      const enableSandboxMode = await getEnableSandboxModeSetting(
+        this.settingsService,
+        '[AgentService]'
+      );
+
       // Load project context files (CLAUDE.md, CODE_QUALITY.md, etc.)
       const contextResult = await loadContextFiles({
         projectPath: effectiveWorkDir,
@@ -239,6 +251,7 @@ export class AgentService {
         systemPrompt: combinedSystemPrompt,
         abortController: session.abortController!,
         autoLoadClaudeMd,
+        enableSandboxMode,
       });
 
       // Extract model, maxTurns, and allowedTools from SDK options
@@ -248,10 +261,6 @@ export class AgentService {
 
       // Get provider for this model
       const provider = ProviderFactory.getProviderForModel(effectiveModel);
-
-      console.log(
-        `[AgentService] Using provider "${provider.getName()}" for model "${effectiveModel}"`
-      );
 
       // Build options for provider
       const options: ExecuteOptions = {
@@ -264,6 +273,7 @@ export class AgentService {
         abortController: session.abortController!,
         conversationHistory: conversationHistory.length > 0 ? conversationHistory : undefined,
         settingSources: sdkOptions.settingSources,
+        sandbox: sdkOptions.sandbox, // Pass sandbox configuration
         sdkSessionId: session.sdkSessionId, // Pass SDK session ID for resuming
       };
 
@@ -289,7 +299,6 @@ export class AgentService {
         // Capture SDK session ID from any message and persist it
         if (msg.session_id && !session.sdkSessionId) {
           session.sdkSessionId = msg.session_id;
-          console.log(`[AgentService] Captured SDK session ID: ${msg.session_id}`);
           // Persist the SDK session ID to ensure conversation continuity across server restarts
           await this.updateSession(sessionId, { sdkSessionId: msg.session_id });
         }
@@ -736,8 +745,6 @@ export class AgentService {
       type: 'queue_updated',
       queue: session.promptQueue,
     });
-
-    console.log(`[AgentService] Processing next queued prompt for session ${sessionId}`);
 
     try {
       await this.sendMessage({
