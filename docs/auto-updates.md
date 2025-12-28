@@ -298,3 +298,7 @@ git reset --hard origin/main  # Warning: discards local changes
 2. Verify the upstream URL is correct
 3. Check browser console for errors
 4. Try manual "Check for Updates" button
+
+---
+
+_Last updated: December 2025_
