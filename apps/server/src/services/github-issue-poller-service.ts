@@ -283,9 +283,7 @@ export class GitHubIssuePollerService {
       }
 
       // Check for claimable labels
-      const hasClaimableLabel = issue.labels.some((label) =>
-        CLAIMABLE_LABELS.includes(label.name)
-      );
+      const hasClaimableLabel = issue.labels.some((label) => CLAIMABLE_LABELS.includes(label.name));
 
       if (!hasClaimableLabel) {
         return false;
@@ -382,9 +380,7 @@ export class GitHubIssuePollerService {
     // For now, we'll generate a mock task ID
     const taskId = `task-${issue.number}-${Date.now()}`;
 
-    console.log(
-      `[GitHubPoller] Created Vibe Kanban task ${taskId} for issue #${issue.number}`
-    );
+    console.log(`[GitHubPoller] Created Vibe Kanban task ${taskId} for issue #${issue.number}`);
 
     // TODO: Integrate with Vibe Kanban MCP when available
     // const result = await mcp__vibe_kanban__create_task({
@@ -413,17 +409,12 @@ export class GitHubIssuePollerService {
   /**
    * Start a workspace session for the issue
    */
-  private async startWorkspaceSession(
-    issue: GitHubIssue,
-    taskId: string
-  ): Promise<void> {
+  private async startWorkspaceSession(issue: GitHubIssue, taskId: string): Promise<void> {
     if (!this.config) {
       throw new Error('Poller not configured');
     }
 
-    console.log(
-      `[GitHubPoller] Starting workspace session for issue #${issue.number}`
-    );
+    console.log(`[GitHubPoller] Starting workspace session for issue #${issue.number}`);
 
     // Note: This is a placeholder - actual workspace startup would happen here
     // TODO: Integrate with workspace session API when available
