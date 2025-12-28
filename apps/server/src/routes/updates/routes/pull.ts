@@ -7,7 +7,6 @@
 import type { Request, Response } from 'express';
 import type { SettingsService } from '../../../services/settings-service.js';
 import type { UpdatePullResult } from '@automaker/types';
-import crypto from 'crypto';
 import {
   execAsync,
   execEnv,
@@ -18,6 +17,7 @@ import {
   isGitAvailable,
   isValidGitUrl,
   hasLocalChanges,
+  withTempGitRemote,
   getErrorMessage,
   logError,
 } from '../common.js';
@@ -68,50 +68,43 @@ export function createPullHandler(settingsService: SettingsService) {
         return;
       }
 
-      // Get current version before pull
-      const previousVersion = await getCurrentCommit(installPath);
-      const previousVersionShort = await getShortCommit(installPath);
-
-      // Use a random remote name to avoid conflicts with concurrent pulls
-      const tempRemoteName = `automaker-update-pull-${crypto.randomBytes(8).toString('hex')}`;
-
       try {
-        // Add temporary remote
-        await execAsync(`git remote add ${tempRemoteName} "${sourceUrl}"`, {
-          cwd: installPath,
-          env: execEnv,
+        const result = await withTempGitRemote(installPath, sourceUrl, async (tempRemoteName) => {
+          // Get current version before pull
+          const previousVersion = await getCurrentCommit(installPath);
+          const previousVersionShort = await getShortCommit(installPath);
+
+          // Fetch first
+          await execAsync(`git fetch ${tempRemoteName} main`, {
+            cwd: installPath,
+            env: execEnv,
+          });
+
+          // Merge the fetched changes
+          const { stdout: mergeOutput } = await execAsync(
+            `git merge ${tempRemoteName}/main --ff-only`,
+            { cwd: installPath, env: execEnv }
+          );
+
+          // Get new version after merge
+          const newVersion = await getCurrentCommit(installPath);
+          const newVersionShort = await getShortCommit(installPath);
+
+          const alreadyUpToDate =
+            mergeOutput.includes('Already up to date') || previousVersion === newVersion;
+
+          return {
+            success: true,
+            previousVersion,
+            previousVersionShort,
+            newVersion,
+            newVersionShort,
+            alreadyUpToDate,
+            message: alreadyUpToDate
+              ? 'Already up to date'
+              : `Updated from ${previousVersionShort} to ${newVersionShort}`,
+          } satisfies UpdatePullResult;
         });
-
-        // Fetch first
-        await execAsync(`git fetch ${tempRemoteName} main`, {
-          cwd: installPath,
-          env: execEnv,
-        });
-
-        // Merge the fetched changes
-        const { stdout: mergeOutput } = await execAsync(
-          `git merge ${tempRemoteName}/main --ff-only`,
-          { cwd: installPath, env: execEnv }
-        );
-
-        // Get new version after merge
-        const newVersion = await getCurrentCommit(installPath);
-        const newVersionShort = await getShortCommit(installPath);
-
-        const alreadyUpToDate =
-          mergeOutput.includes('Already up to date') || previousVersion === newVersion;
-
-        const result: UpdatePullResult = {
-          success: true,
-          previousVersion,
-          previousVersionShort,
-          newVersion,
-          newVersionShort,
-          alreadyUpToDate,
-          message: alreadyUpToDate
-            ? 'Already up to date'
-            : `Updated from ${previousVersionShort} to ${newVersionShort}`,
-        };
 
         res.json({
           success: true,
@@ -143,16 +136,6 @@ export function createPullHandler(settingsService: SettingsService) {
           success: false,
           error: `Failed to pull updates: ${errorMsg}`,
         });
-      } finally {
-        // Always clean up temp remote
-        try {
-          await execAsync(`git remote remove ${tempRemoteName}`, {
-            cwd: installPath,
-            env: execEnv,
-          });
-        } catch {
-          // Ignore cleanup errors
-        }
       }
     } catch (error) {
       logError(error, 'Update pull failed');

@@ -7,6 +7,7 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import path from 'path';
 import fs from 'fs';
+import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 import { getErrorMessage as getErrorMessageShared, createLogError } from '../common.js';
 
@@ -159,4 +160,32 @@ export function isValidGitUrl(url: string): boolean {
   const hasShellChars = /[;`|&<>()$!\\[\] ]/.test(url);
 
   return startsWithValidProtocol && !hasShellChars;
+}
+
+/**
+ * Execute a callback with a temporary git remote, ensuring cleanup.
+ * Centralizes the pattern of adding a temp remote, doing work, and removing it.
+ */
+export async function withTempGitRemote<T>(
+  installPath: string,
+  sourceUrl: string,
+  callback: (tempRemoteName: string) => Promise<T>
+): Promise<T> {
+  const tempRemoteName = `automaker-temp-remote-${crypto.randomBytes(8).toString('hex')}`;
+  try {
+    await execAsync(`git remote add ${tempRemoteName} "${sourceUrl}"`, {
+      cwd: installPath,
+      env: execEnv,
+    });
+    return await callback(tempRemoteName);
+  } finally {
+    try {
+      await execAsync(`git remote remove ${tempRemoteName}`, {
+        cwd: installPath,
+        env: execEnv,
+      });
+    } catch {
+      // Ignore cleanup errors
+    }
+  }
 }

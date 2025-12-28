@@ -7,7 +7,6 @@
 import type { Request, Response } from 'express';
 import type { SettingsService } from '../../../services/settings-service.js';
 import type { UpdateCheckResult } from '@automaker/types';
-import crypto from 'crypto';
 import {
   execAsync,
   execEnv,
@@ -17,6 +16,7 @@ import {
   isGitRepo,
   isGitAvailable,
   isValidGitUrl,
+  withTempGitRemote,
   getErrorMessage,
   logError,
 } from '../common.js';
@@ -62,65 +62,56 @@ export function createCheckHandler(settingsService: SettingsService) {
       const localVersion = await getCurrentCommit(installPath);
       const localVersionShort = await getShortCommit(installPath);
 
-      // Use a random remote name to avoid conflicts with concurrent checks
-      const tempRemoteName = `automaker-update-check-${crypto.randomBytes(8).toString('hex')}`;
-
       try {
-        // Add temporary remote
-        await execAsync(`git remote add ${tempRemoteName} "${sourceUrl}"`, {
-          cwd: installPath,
-          env: execEnv,
-        });
+        const result = await withTempGitRemote(installPath, sourceUrl, async (tempRemoteName) => {
+          // Fetch from the temporary remote
+          await execAsync(`git fetch ${tempRemoteName} main`, {
+            cwd: installPath,
+            env: execEnv,
+          });
 
-        // Fetch from the temporary remote
-        await execAsync(`git fetch ${tempRemoteName} main`, {
-          cwd: installPath,
-          env: execEnv,
-        });
+          // Get remote version
+          const { stdout: remoteVersionOutput } = await execAsync(
+            `git rev-parse ${tempRemoteName}/main`,
+            { cwd: installPath, env: execEnv }
+          );
+          const remoteVersion = remoteVersionOutput.trim();
 
-        // Get remote version
-        const { stdout: remoteVersionOutput } = await execAsync(
-          `git rev-parse ${tempRemoteName}/main`,
-          { cwd: installPath, env: execEnv }
-        );
-        const remoteVersion = remoteVersionOutput.trim();
+          // Get short remote version
+          const { stdout: remoteVersionShortOutput } = await execAsync(
+            `git rev-parse --short ${tempRemoteName}/main`,
+            { cwd: installPath, env: execEnv }
+          );
+          const remoteVersionShort = remoteVersionShortOutput.trim();
 
-        // Get short remote version
-        const { stdout: remoteVersionShortOutput } = await execAsync(
-          `git rev-parse --short ${tempRemoteName}/main`,
-          { cwd: installPath, env: execEnv }
-        );
-        const remoteVersionShort = remoteVersionShortOutput.trim();
-
-        // Check if remote is ahead of local (update available)
-        // git merge-base --is-ancestor <commit1> <commit2> returns 0 if commit1 is ancestor of commit2
-        let updateAvailable = false;
-        if (localVersion !== remoteVersion) {
-          try {
-            // Check if local is already an ancestor of remote (remote is ahead)
-            await execAsync(`git merge-base --is-ancestor ${localVersion} ${remoteVersion}`, {
-              cwd: installPath,
-              env: execEnv,
-            });
-            // If we get here (exit code 0), local is ancestor of remote, so update is available
-            updateAvailable = true;
-          } catch {
-            // Exit code 1 means local is NOT an ancestor of remote
-            // This means either local is ahead, or branches have diverged
-            // In either case, we don't show "update available"
-            updateAvailable = false;
+          // Check if remote is ahead of local (update available)
+          let updateAvailable = false;
+          if (localVersion !== remoteVersion) {
+            try {
+              // Check if local is already an ancestor of remote (remote is ahead)
+              await execAsync(`git merge-base --is-ancestor ${localVersion} ${remoteVersion}`, {
+                cwd: installPath,
+                env: execEnv,
+              });
+              // If we get here (exit code 0), local is ancestor of remote, so update is available
+              updateAvailable = true;
+            } catch {
+              // Exit code 1 means local is NOT an ancestor of remote
+              // This means either local is ahead, or branches have diverged
+              updateAvailable = false;
+            }
           }
-        }
 
-        const result: UpdateCheckResult = {
-          updateAvailable,
-          localVersion,
-          localVersionShort,
-          remoteVersion,
-          remoteVersionShort,
-          sourceUrl,
-          installPath,
-        };
+          return {
+            updateAvailable,
+            localVersion,
+            localVersionShort,
+            remoteVersion,
+            remoteVersionShort,
+            sourceUrl,
+            installPath,
+          } satisfies UpdateCheckResult;
+        });
 
         res.json({
           success: true,
@@ -143,16 +134,6 @@ export function createCheckHandler(settingsService: SettingsService) {
             error: `Could not fetch from upstream: ${errorMsg}`,
           } satisfies UpdateCheckResult,
         });
-      } finally {
-        // Always clean up temp remote
-        try {
-          await execAsync(`git remote remove ${tempRemoteName}`, {
-            cwd: installPath,
-            env: execEnv,
-          });
-        } catch {
-          // Ignore cleanup errors
-        }
       }
     } catch (error) {
       logError(error, 'Update check failed');
