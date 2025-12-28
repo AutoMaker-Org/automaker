@@ -1657,10 +1657,13 @@ export const useAppStore = create<AppState & AppActions>()(
       },
 
       // Auto-Update Settings actions
-      setAutoUpdate: (settings) => {
+      setAutoUpdate: async (settings) => {
         set((state) => ({
           autoUpdate: { ...state.autoUpdate, ...settings },
         }));
+        // Sync to server settings file
+        const { syncSettingsToServer } = await import('@/hooks/use-settings-migration');
+        await syncSettingsToServer();
       },
 
       // AI Profile actions
