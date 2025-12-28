@@ -78,10 +78,10 @@ export function ApiKeysSection() {
     });
   }, [handleSave, anthropic, zai, setEnabledProviders]);
 
-  // Auto-enable providers when a key exists and user never disabled the switch
+  // Auto-enable providers only when a key exists AND passed the test
   useEffect(() => {
-    const claudeValidated = anthropic.result?.success || apiKeyStatus?.hasAnthropicKey;
-    const zaiValidated = zai.result?.success || apiKeyStatus?.hasZaiKey;
+    const claudeValidated = anthropic.result?.success && apiKeyStatus?.hasAnthropicKey;
+    const zaiValidated = zai.result?.success && apiKeyStatus?.hasZaiKey;
 
     if (claudeValidated && !enabledProviders.claude && !providerToggleTouched.claude) {
       setEnabledProviders({ claude: true });
