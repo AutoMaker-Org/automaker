@@ -6,7 +6,7 @@
 
 import type { Request, Response } from 'express';
 import type { SettingsService } from '../../../services/settings-service.js';
-import type { UpdateInfo } from '@automaker/types';
+import { DEFAULT_AUTO_UPDATE_SETTINGS, type UpdateInfo } from '@automaker/types';
 import {
   execAsync,
   execEnv,
@@ -27,11 +27,7 @@ export function createInfoHandler(settingsService: SettingsService) {
 
       // Get settings
       const settings = await settingsService.getGlobalSettings();
-      const autoUpdateSettings = settings.autoUpdate || {
-        enabled: true,
-        checkIntervalMinutes: 15,
-        upstreamUrl: 'https://github.com/AutoMaker-Org/automaker.git',
-      };
+      const autoUpdateSettings = settings.autoUpdate || DEFAULT_AUTO_UPDATE_SETTINGS;
 
       // Check if git is available
       const gitAvailable = await isGitAvailable();

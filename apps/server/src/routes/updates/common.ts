@@ -39,9 +39,12 @@ if (process.platform === 'win32') {
   additionalPaths.push(
     '/opt/homebrew/bin', // Homebrew on Apple Silicon
     '/usr/local/bin', // Homebrew on Intel Mac, common Linux location
-    '/home/linuxbrew/.linuxbrew/bin', // Linuxbrew
-    `${process.env.HOME}/.local/bin` // pipx, other user installs
+    '/home/linuxbrew/.linuxbrew/bin' // Linuxbrew
   );
+  // pipx, other user installs - only add if HOME is defined
+  if (process.env.HOME) {
+    additionalPaths.push(`${process.env.HOME}/.local/bin`);
+  }
 }
 
 const extendedPath = [process.env.PATH, ...additionalPaths.filter(Boolean)]
@@ -124,14 +127,19 @@ export async function hasLocalChanges(repoPath: string): Promise<boolean> {
 }
 
 /**
- * Validate that a URL looks like a valid git remote URL
+ * Validate that a URL looks like a valid git remote URL.
+ * Also blocks shell metacharacters to prevent command injection.
  */
 export function isValidGitUrl(url: string): boolean {
-  // Allow HTTPS and SSH git URLs
-  return (
+  // Allow HTTPS, SSH, and git protocols
+  const startsWithValidProtocol =
     url.startsWith('https://') ||
     url.startsWith('git@') ||
     url.startsWith('git://') ||
-    url.startsWith('ssh://')
-  );
+    url.startsWith('ssh://');
+
+  // Block shell metacharacters to prevent command injection
+  const hasShellChars = /[;`|&<>()$!\\[\] ]/.test(url);
+
+  return startsWithValidProtocol && !hasShellChars;
 }

@@ -16,7 +16,7 @@ Access update settings in **Settings > Updates**:
 | Setting                        | Description                       | Default                                          |
 | ------------------------------ | --------------------------------- | ------------------------------------------------ |
 | Enable automatic update checks | Toggle periodic checking          | `true`                                           |
-| Check interval                 | How often to check (1-60 minutes) | `5`                                              |
+| Check interval                 | How often to check (1-60 minutes) | `15`                                             |
 | Upstream repository URL        | Source repository for updates     | `https://github.com/AutoMaker-Org/automaker.git` |
 
 ## Architecture
@@ -25,7 +25,7 @@ The update system is designed with **dependency injection** in mind, making it e
 
 ### Component Overview
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────────┐
 │                         UI Layer                                │
 ├─────────────────────────────────────────────────────────────────┤
@@ -301,4 +301,4 @@ git reset --hard origin/main  # Warning: discards local changes
 
 ---
 
-_Last updated: December 2025_
+Last updated: December 2025

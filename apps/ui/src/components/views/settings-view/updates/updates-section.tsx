@@ -18,7 +18,7 @@ import {
   CheckCircle2,
   AlertCircle,
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, getRepoDisplayName } from '@/lib/utils';
 import { toast } from 'sonner';
 import { useUpdatesStore } from '@/store/updates-store';
 import type { AutoUpdateSettings } from '@automaker/types';
@@ -102,12 +102,6 @@ export function UpdatesSection({ autoUpdate, onAutoUpdateChange }: UpdatesSectio
     } else if (useUpdatesStore.getState().error) {
       toast.error(useUpdatesStore.getState().error || 'Failed to pull updates');
     }
-  };
-
-  // Extract repo name from URL for display
-  const getRepoDisplayName = (url: string) => {
-    const match = url.match(/github\.com[/:]([^/]+\/[^/.]+)/);
-    return match ? match[1] : url;
   };
 
   const isLoading = isChecking || isPulling || isLoadingInfo;

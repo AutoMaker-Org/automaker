@@ -7,6 +7,7 @@
 import type { Request, Response } from 'express';
 import type { SettingsService } from '../../../services/settings-service.js';
 import type { UpdatePullResult } from '@automaker/types';
+import crypto from 'crypto';
 import {
   execAsync,
   execEnv,
@@ -15,6 +16,7 @@ import {
   getShortCommit,
   isGitRepo,
   isGitAvailable,
+  isValidGitUrl,
   hasLocalChanges,
   getErrorMessage,
   logError,
@@ -57,24 +59,23 @@ export function createPullHandler(settingsService: SettingsService) {
       const sourceUrl =
         settings.autoUpdate?.upstreamUrl || 'https://github.com/AutoMaker-Org/automaker.git';
 
+      // Validate URL to prevent command injection
+      if (!isValidGitUrl(sourceUrl)) {
+        res.status(400).json({
+          success: false,
+          error: 'Invalid upstream URL format',
+        });
+        return;
+      }
+
       // Get current version before pull
       const previousVersion = await getCurrentCommit(installPath);
       const previousVersionShort = await getShortCommit(installPath);
 
-      // Use a temporary remote to pull from
-      const tempRemoteName = 'automaker-update-pull';
+      // Use a random remote name to avoid conflicts with concurrent pulls
+      const tempRemoteName = `automaker-update-pull-${crypto.randomBytes(8).toString('hex')}`;
 
       try {
-        // Remove temp remote if it exists (ignore errors)
-        try {
-          await execAsync(`git remote remove ${tempRemoteName}`, {
-            cwd: installPath,
-            env: execEnv,
-          });
-        } catch {
-          // Remote doesn't exist, that's fine
-        }
-
         // Add temporary remote
         await execAsync(`git remote add ${tempRemoteName} "${sourceUrl}"`, {
           cwd: installPath,
@@ -87,24 +88,11 @@ export function createPullHandler(settingsService: SettingsService) {
           env: execEnv,
         });
 
-        // Get current branch
-        const { stdout: branchOutput } = await execAsync('git rev-parse --abbrev-ref HEAD', {
-          cwd: installPath,
-          env: execEnv,
-        });
-        const currentBranch = branchOutput.trim();
-
         // Merge the fetched changes
         const { stdout: mergeOutput } = await execAsync(
           `git merge ${tempRemoteName}/main --ff-only`,
           { cwd: installPath, env: execEnv }
         );
-
-        // Clean up temp remote
-        await execAsync(`git remote remove ${tempRemoteName}`, {
-          cwd: installPath,
-          env: execEnv,
-        });
 
         // Get new version after merge
         const newVersion = await getCurrentCommit(installPath);
@@ -130,16 +118,6 @@ export function createPullHandler(settingsService: SettingsService) {
           result,
         });
       } catch (pullError) {
-        // Clean up temp remote on error
-        try {
-          await execAsync(`git remote remove ${tempRemoteName}`, {
-            cwd: installPath,
-            env: execEnv,
-          });
-        } catch {
-          // Ignore cleanup errors
-        }
-
         const errorMsg = getErrorMessage(pullError);
         logError(pullError, 'Failed to pull updates');
 
@@ -165,6 +143,16 @@ export function createPullHandler(settingsService: SettingsService) {
           success: false,
           error: `Failed to pull updates: ${errorMsg}`,
         });
+      } finally {
+        // Always clean up temp remote
+        try {
+          await execAsync(`git remote remove ${tempRemoteName}`, {
+            cwd: installPath,
+            env: execEnv,
+          });
+        } catch {
+          // Ignore cleanup errors
+        }
       }
     } catch (error) {
       logError(error, 'Update pull failed');

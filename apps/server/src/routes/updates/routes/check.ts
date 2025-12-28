@@ -7,6 +7,7 @@
 import type { Request, Response } from 'express';
 import type { SettingsService } from '../../../services/settings-service.js';
 import type { UpdateCheckResult } from '@automaker/types';
+import crypto from 'crypto';
 import {
   execAsync,
   execEnv,
@@ -15,6 +16,7 @@ import {
   getShortCommit,
   isGitRepo,
   isGitAvailable,
+  isValidGitUrl,
   getErrorMessage,
   logError,
 } from '../common.js';
@@ -47,24 +49,23 @@ export function createCheckHandler(settingsService: SettingsService) {
       const sourceUrl =
         settings.autoUpdate?.upstreamUrl || 'https://github.com/AutoMaker-Org/automaker.git';
 
+      // Validate URL to prevent command injection
+      if (!isValidGitUrl(sourceUrl)) {
+        res.status(400).json({
+          success: false,
+          error: 'Invalid upstream URL format',
+        });
+        return;
+      }
+
       // Get local version
       const localVersion = await getCurrentCommit(installPath);
       const localVersionShort = await getShortCommit(installPath);
 
-      // Fetch from upstream (use a temporary remote name to avoid conflicts)
-      const tempRemoteName = 'automaker-update-check';
+      // Use a random remote name to avoid conflicts with concurrent checks
+      const tempRemoteName = `automaker-update-check-${crypto.randomBytes(8).toString('hex')}`;
 
       try {
-        // Remove temp remote if it exists (ignore errors)
-        try {
-          await execAsync(`git remote remove ${tempRemoteName}`, {
-            cwd: installPath,
-            env: execEnv,
-          });
-        } catch {
-          // Remote doesn't exist, that's fine
-        }
-
         // Add temporary remote
         await execAsync(`git remote add ${tempRemoteName} "${sourceUrl}"`, {
           cwd: installPath,
@@ -90,12 +91,6 @@ export function createCheckHandler(settingsService: SettingsService) {
           { cwd: installPath, env: execEnv }
         );
         const remoteVersionShort = remoteVersionShortOutput.trim();
-
-        // Clean up temp remote
-        await execAsync(`git remote remove ${tempRemoteName}`, {
-          cwd: installPath,
-          env: execEnv,
-        });
 
         // Check if remote is ahead of local (update available)
         // git merge-base --is-ancestor <commit1> <commit2> returns 0 if commit1 is ancestor of commit2
@@ -132,16 +127,6 @@ export function createCheckHandler(settingsService: SettingsService) {
           result,
         });
       } catch (fetchError) {
-        // Clean up temp remote on error
-        try {
-          await execAsync(`git remote remove ${tempRemoteName}`, {
-            cwd: installPath,
-            env: execEnv,
-          });
-        } catch {
-          // Ignore cleanup errors
-        }
-
         const errorMsg = getErrorMessage(fetchError);
         logError(fetchError, 'Failed to fetch from upstream');
 
@@ -158,6 +143,16 @@ export function createCheckHandler(settingsService: SettingsService) {
             error: `Could not fetch from upstream: ${errorMsg}`,
           } satisfies UpdateCheckResult,
         });
+      } finally {
+        // Always clean up temp remote
+        try {
+          await execAsync(`git remote remove ${tempRemoteName}`, {
+            cwd: installPath,
+            env: execEnv,
+          });
+        } catch {
+          // Ignore cleanup errors
+        }
       }
     } catch (error) {
       logError(error, 'Update check failed');

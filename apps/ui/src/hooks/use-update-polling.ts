@@ -8,7 +8,7 @@
  * The actual check logic lives in the updates-store.
  */
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
 import { useAppStore } from '@/store/app-store';
 import { useUpdatesStore } from '@/store/updates-store';
 
@@ -55,7 +55,12 @@ export function useUpdatePolling(options: UseUpdatePollingOptions = {}): UseUpda
   // Allow overrides for testing
   const isEnabled = options.enabled ?? autoUpdate.enabled;
   const intervalMinutes = options.intervalMinutes ?? autoUpdate.checkIntervalMinutes;
-  const onCheck = options.onCheck ?? checkForUpdates;
+
+  // Stabilize the check function reference to prevent interval resets
+  const onCheckRef = useRef(options.onCheck ?? checkForUpdates);
+  onCheckRef.current = options.onCheck ?? checkForUpdates;
+
+  const stableOnCheck = useCallback(() => onCheckRef.current(), []);
 
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -72,11 +77,11 @@ export function useUpdatePolling(options: UseUpdatePollingOptions = {}): UseUpda
     }
 
     // Check immediately on enable
-    onCheck();
+    stableOnCheck();
 
     // Set up interval
     const intervalMs = intervalMinutes * 60 * 1000;
-    intervalRef.current = setInterval(onCheck, intervalMs);
+    intervalRef.current = setInterval(stableOnCheck, intervalMs);
 
     return () => {
       if (intervalRef.current) {
@@ -84,11 +89,11 @@ export function useUpdatePolling(options: UseUpdatePollingOptions = {}): UseUpda
         intervalRef.current = null;
       }
     };
-  }, [isEnabled, intervalMinutes, onCheck]);
+  }, [isEnabled, intervalMinutes, stableOnCheck]);
 
   return {
     isPollingActive: isEnabled,
-    checkNow: onCheck,
+    checkNow: stableOnCheck,
     lastChecked,
   };
 }

@@ -13,6 +13,7 @@ import { toast } from 'sonner';
 import { useUpdatesStore } from '@/store/updates-store';
 import { useUpdatePolling } from '@/hooks/use-update-polling';
 import { useAppStore } from '@/store/app-store';
+import { getRepoDisplayName } from '@/lib/utils';
 
 // ============================================================================
 // Types
@@ -117,9 +118,7 @@ export function UpdateNotifier({ onUpdateAvailable, onUpdateInstalled }: UpdateN
     }
 
     // Extract repo name for display
-    const upstreamUrl = autoUpdate.upstreamUrl;
-    const repoMatch = upstreamUrl.match(/github\.com[/:]([^/]+\/[^/.]+)/);
-    const repoName = repoMatch ? repoMatch[1] : 'upstream';
+    const repoName = getRepoDisplayName(autoUpdate.upstreamUrl);
 
     // Show persistent toast with update button
     toastIdRef.current = toast.info('Update Available', {
@@ -132,7 +131,7 @@ export function UpdateNotifier({ onUpdateAvailable, onUpdateInstalled }: UpdateN
       cancel: {
         label: 'Later',
         onClick: () => {
-          // Dismiss toast, will show again on next check if update still available
+          // Dismiss toast - won't show again for this version until a new version appears
           shownToastForCommitRef.current = remoteVersionShort;
         },
       },
