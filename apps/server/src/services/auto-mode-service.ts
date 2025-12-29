@@ -10,8 +10,7 @@
  */
 
 import { ProviderFactory } from '../providers/provider-factory.js';
-import type { BaseProvider } from '../providers/base-provider.js';
-import type { ExecuteOptions, Feature } from '@automaker/types';
+import type { ExecuteOptions, Feature, PipelineConfig, PipelineStep } from '@automaker/types';
 import {
   buildPromptWithImages,
   isAbortError,
@@ -55,6 +54,12 @@ import { createAutoModeOptions, validateWorkingDirectory } from '../lib/sdk-opti
 import { filterClaudeMdFromContext, getAutoLoadClaudeMdSetting } from '../lib/settings-helpers.js';
 import { FeatureLoader } from './feature-loader.js';
 import type { SettingsService } from './settings-service.js';
+import { pipelineService, PipelineService } from './pipeline-service.js';
+import {
+  getAutoLoadClaudeMdSetting,
+  getEnableSandboxModeSetting,
+  filterClaudeMdFromContext,
+} from '../lib/settings-helpers.js';
 
 const execAsync = promisify(exec);
 
@@ -681,6 +686,23 @@ export class AutoModeService {
         }
       );
 
+      // Check for pipeline steps and execute them
+      const pipelineConfig = await pipelineService.getPipelineConfig(projectPath);
+      const sortedSteps = [...(pipelineConfig?.steps || [])].sort((a, b) => a.order - b.order);
+
+      if (sortedSteps.length > 0) {
+        // Execute pipeline steps sequentially
+        await this.executePipelineSteps(
+          projectPath,
+          featureId,
+          feature,
+          sortedSteps,
+          workDir,
+          abortController,
+          autoLoadClaudeMd
+        );
+      }
+
       // Determine final status based on testing mode:
       // - skipTests=false (automated testing): go directly to 'verified' (no manual verify needed)
       // - skipTests=true (manual verification): go to 'waiting_approval' for manual review
@@ -722,6 +744,143 @@ export class AutoModeService {
       );
       this.runningFeatures.delete(featureId);
     }
+  }
+
+  /**
+   * Execute pipeline steps sequentially after initial feature implementation
+   */
+  private async executePipelineSteps(
+    projectPath: string,
+    featureId: string,
+    feature: Feature,
+    steps: PipelineStep[],
+    workDir: string,
+    abortController: AbortController,
+    autoLoadClaudeMd: boolean
+  ): Promise<void> {
+    console.log(`[AutoMode] Executing ${steps.length} pipeline step(s) for feature ${featureId}`);
+
+    // Load context files once
+    const contextResult = await loadContextFiles({
+      projectPath,
+      fsModule: secureFs as Parameters<typeof loadContextFiles>[0]['fsModule'],
+    });
+    const contextFilesPrompt = filterClaudeMdFromContext(contextResult, autoLoadClaudeMd);
+
+    // Load previous agent output for context continuity
+    const featureDir = getFeatureDir(projectPath, featureId);
+    const contextPath = path.join(featureDir, 'agent-output.md');
+    let previousContext = '';
+    try {
+      previousContext = (await secureFs.readFile(contextPath, 'utf-8')) as string;
+    } catch {
+      // No previous context
+    }
+
+    for (let i = 0; i < steps.length; i++) {
+      const step = steps[i];
+      const pipelineStatus = `pipeline_${step.id}`;
+
+      // Update feature status to current pipeline step
+      await this.updateFeatureStatus(projectPath, featureId, pipelineStatus);
+
+      this.emitAutoModeEvent('auto_mode_progress', {
+        featureId,
+        content: `Starting pipeline step ${i + 1}/${steps.length}: ${step.name}`,
+        projectPath,
+      });
+
+      this.emitAutoModeEvent('pipeline_step_started', {
+        featureId,
+        stepId: step.id,
+        stepName: step.name,
+        stepIndex: i,
+        totalSteps: steps.length,
+        projectPath,
+      });
+
+      // Build prompt for this pipeline step
+      const prompt = this.buildPipelineStepPrompt(step, feature, previousContext);
+
+      // Get model from feature
+      const model = resolveModelString(feature.model, DEFAULT_MODELS.claude);
+
+      // Run the agent for this pipeline step
+      await this.runAgent(
+        workDir,
+        featureId,
+        prompt,
+        abortController,
+        projectPath,
+        undefined, // no images for pipeline steps
+        model,
+        {
+          projectPath,
+          planningMode: 'skip', // Pipeline steps don't need planning
+          requirePlanApproval: false,
+          previousContent: previousContext,
+          systemPrompt: contextFilesPrompt || undefined,
+          autoLoadClaudeMd,
+        }
+      );
+
+      // Load updated context for next step
+      try {
+        previousContext = (await secureFs.readFile(contextPath, 'utf-8')) as string;
+      } catch {
+        // No context update
+      }
+
+      this.emitAutoModeEvent('pipeline_step_complete', {
+        featureId,
+        stepId: step.id,
+        stepName: step.name,
+        stepIndex: i,
+        totalSteps: steps.length,
+        projectPath,
+      });
+
+      console.log(
+        `[AutoMode] Pipeline step ${i + 1}/${steps.length} (${step.name}) completed for feature ${featureId}`
+      );
+    }
+
+    console.log(`[AutoMode] All pipeline steps completed for feature ${featureId}`);
+  }
+
+  /**
+   * Build the prompt for a pipeline step
+   */
+  private buildPipelineStepPrompt(
+    step: PipelineStep,
+    feature: Feature,
+    previousContext: string
+  ): string {
+    let prompt = `## Pipeline Step: ${step.name}
+
+This is an automated pipeline step following the initial feature implementation.
+
+### Feature Context
+${this.buildFeaturePrompt(feature)}
+
+`;
+
+    if (previousContext) {
+      prompt += `### Previous Work
+The following is the output from the previous work on this feature:
+
+${previousContext}
+
+`;
+    }
+
+    prompt += `### Pipeline Step Instructions
+${step.instructions}
+
+### Task
+Complete the pipeline step instructions above. Review the previous work and apply the required changes or actions.`;
+
+    return prompt;
   }
 
   /**
@@ -1204,6 +1363,8 @@ Format your response as a structured markdown document.`;
         cwd: projectPath,
         allowedTools: ['Read', 'Glob', 'Grep'],
         abortController,
+        settingSources: sdkOptions.settingSources,
+        sandbox: sdkOptions.sandbox, // Pass sandbox configuration
       };
 
       const stream = provider.executeQuery(options);
@@ -1931,13 +2092,24 @@ This mock response was generated because AUTOMAKER_MOCK_AGENT=true was set.
       return;
     }
 
+    // Load autoLoadClaudeMd setting (project setting takes precedence over global)
+    // Use provided value if available, otherwise load from settings
+    const autoLoadClaudeMd =
+      options?.autoLoadClaudeMd !== undefined
+        ? options.autoLoadClaudeMd
+        : await getAutoLoadClaudeMdSetting(finalProjectPath, this.settingsService, '[AutoMode]');
+
+    // Load enableSandboxMode setting (global setting only)
+    const enableSandboxMode = await getEnableSandboxModeSetting(this.settingsService, '[AutoMode]');
+
     // Build SDK options using centralized configuration for feature implementation
     const sdkOptions = createAutoModeOptions({
       cwd: workDir,
       model: model,
       abortController,
+      autoLoadClaudeMd,
+      enableSandboxMode,
       systemPrompt: options?.systemPrompt,
-      autoLoadClaudeMd: options?.autoLoadClaudeMd,
     });
 
     // Extract model, maxTurns, and allowedTools from SDK options
@@ -1985,6 +2157,7 @@ This mock response was generated because AUTOMAKER_MOCK_AGENT=true was set.
       abortController,
       systemPrompt: sdkOptions.systemPrompt,
       settingSources: sdkOptions.settingSources,
+      sandbox: sdkOptions.sandbox, // Pass sandbox configuration
     };
 
     // Execute via provider

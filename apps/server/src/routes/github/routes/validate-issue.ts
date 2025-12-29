@@ -8,13 +8,21 @@
 import type { Request, Response } from 'express';
 import { query } from '@anthropic-ai/claude-agent-sdk';
 import type { EventEmitter } from '../../../lib/events.js';
-import type { IssueValidationResult, IssueValidationEvent, AgentModel } from '@automaker/types';
+import type {
+  IssueValidationResult,
+  IssueValidationEvent,
+  AgentModel,
+  GitHubComment,
+  LinkedPRInfo,
+} from '@automaker/types';
 import { createSuggestionsOptions } from '../../../lib/sdk-options.js';
 import { writeValidation } from '../../../lib/validation-storage.js';
 import {
   issueValidationSchema,
   ISSUE_VALIDATION_SYSTEM_PROMPT,
   buildValidationPrompt,
+  ValidationComment,
+  ValidationLinkedPR,
 } from './validation-schema.js';
 import {
   trySetValidationRunning,
@@ -40,6 +48,10 @@ interface ValidateIssueRequestBody {
   issueLabels?: string[];
   /** Model to use for validation (opus, sonnet, haiku) */
   model?: AgentModel;
+  /** Comments to include in validation analysis */
+  comments?: GitHubComment[];
+  /** Linked pull requests for this issue */
+  linkedPRs?: LinkedPRInfo[];
 }
 
 /**
@@ -57,7 +69,9 @@ async function runValidation(
   model: AgentModel,
   events: EventEmitter,
   abortController: AbortController,
-  settingsService?: SettingsService
+  settingsService?: SettingsService,
+  comments?: ValidationComment[],
+  linkedPRs?: ValidationLinkedPR[]
 ): Promise<void> {
   // Emit start event
   const startEvent: IssueValidationEvent = {
@@ -76,8 +90,15 @@ async function runValidation(
   }, VALIDATION_TIMEOUT_MS);
 
   try {
-    // Build the prompt
-    const prompt = buildValidationPrompt(issueNumber, issueTitle, issueBody, issueLabels);
+    // Build the prompt (include comments and linked PRs if provided)
+    const prompt = buildValidationPrompt(
+      issueNumber,
+      issueTitle,
+      issueBody,
+      issueLabels,
+      comments,
+      linkedPRs
+    );
 
     // Load autoLoadClaudeMd setting
     const autoLoadClaudeMd = await getAutoLoadClaudeMdSetting(
@@ -102,16 +123,12 @@ async function runValidation(
     // Execute the query
     const stream = query({ prompt, options });
     let validationResult: IssueValidationResult | null = null;
-    let responseText = '';
 
     for await (const msg of stream) {
-      // Collect assistant text for debugging and emit progress
+      // Emit progress events for assistant text
       if (msg.type === 'assistant' && msg.message?.content) {
         for (const block of msg.message.content) {
           if (block.type === 'text') {
-            responseText += block.text;
-
-            // Emit progress event
             const progressEvent: IssueValidationEvent = {
               type: 'issue_validation_progress',
               issueNumber,
@@ -128,7 +145,6 @@ async function runValidation(
         const resultMsg = msg as { structured_output?: IssueValidationResult };
         if (resultMsg.structured_output) {
           validationResult = resultMsg.structured_output;
-          logger.debug('Received structured output:', validationResult);
         }
       }
 
@@ -148,7 +164,6 @@ async function runValidation(
     // Require structured output
     if (!validationResult) {
       logger.error('No structured output received from Claude SDK');
-      logger.debug('Raw response text:', responseText);
       throw new Error('Validation failed: no structured output received');
     }
 
@@ -214,7 +229,29 @@ export function createValidateIssueHandler(
         issueBody,
         issueLabels,
         model = 'opus',
+        comments: rawComments,
+        linkedPRs: rawLinkedPRs,
       } = req.body as ValidateIssueRequestBody;
+
+      // Transform GitHubComment[] to ValidationComment[] if provided
+      const validationComments: ValidationComment[] | undefined = rawComments?.map((c) => ({
+        author: c.author?.login || 'ghost',
+        createdAt: c.createdAt,
+        body: c.body,
+      }));
+
+      // Transform LinkedPRInfo[] to ValidationLinkedPR[] if provided
+      const validationLinkedPRs: ValidationLinkedPR[] | undefined = rawLinkedPRs?.map((pr) => ({
+        number: pr.number,
+        title: pr.title,
+        state: pr.state,
+      }));
+
+      logger.info(
+        `[ValidateIssue] Received validation request for issue #${issueNumber}` +
+          (rawComments?.length ? ` with ${rawComments.length} comments` : ' (no comments)') +
+          (rawLinkedPRs?.length ? ` and ${rawLinkedPRs.length} linked PRs` : '')
+      );
 
       // Validate required fields
       if (!projectPath) {
@@ -271,11 +308,12 @@ export function createValidateIssueHandler(
         model,
         events,
         abortController,
-        settingsService
+        settingsService,
+        validationComments,
+        validationLinkedPRs
       )
-        .catch((error) => {
+        .catch(() => {
           // Error is already handled inside runValidation (event emitted)
-          logger.debug('Validation error caught in background handler:', error);
         })
         .finally(() => {
           clearValidationStatus(projectPath, issueNumber);

@@ -58,6 +58,8 @@ export function SettingsView() {
     setValidationModel,
     autoLoadClaudeMd,
     setAutoLoadClaudeMd,
+    enableSandboxMode,
+    setEnableSandboxMode,
   } = useAppStore();
 
   // Hide usage tracking when using API key (only show for Claude Code CLI users)
@@ -158,6 +160,8 @@ export function SettingsView() {
             <ClaudeMdSettings
               autoLoadClaudeMd={autoLoadClaudeMd}
               onAutoLoadClaudeMdChange={setAutoLoadClaudeMd}
+              enableSandboxMode={enableSandboxMode}
+              onEnableSandboxModeChange={setEnableSandboxMode}
             />
             {showUsageTracking && <ClaudeUsageSection />}
           </div>

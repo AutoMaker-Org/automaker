@@ -174,14 +174,12 @@ export function useResponsiveKanban(
   // Calculate total board width for container sizing
   const totalBoardWidth = columnWidth * columnCount + gap * (columnCount - 1);
 
-  // Container style to center content
-  // Use flex layout with justify-center to naturally center columns
-  // The parent container has px-4 padding which provides equal left/right margins
+  // Container style for horizontal scrolling support
   const containerStyle: React.CSSProperties = {
     display: 'flex',
     gap: `${gap}px`,
-    height: '100%',
-    justifyContent: 'center',
+    width: 'max-content', // Expand to fit all columns, enabling horizontal scroll when needed
+    minHeight: '100%', // Ensure full height
   };
 
   return {

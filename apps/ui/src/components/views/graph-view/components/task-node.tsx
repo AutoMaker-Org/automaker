@@ -76,7 +76,10 @@ const priorityConfig = {
 };
 
 export const TaskNode = memo(function TaskNode({ data, selected }: TaskNodeProps) {
-  const config = statusConfig[data.status] || statusConfig.backlog;
+  // Handle pipeline statuses by treating them like in_progress
+  const status = data.status || 'backlog';
+  const statusKey = status.startsWith('pipeline_') ? 'in_progress' : status;
+  const config = statusConfig[statusKey as keyof typeof statusConfig] || statusConfig.backlog;
   const StatusIcon = config.icon;
   const priorityConf = data.priority ? priorityConfig[data.priority as 1 | 2 | 3] : null;
 

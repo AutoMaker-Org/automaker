@@ -8,6 +8,7 @@ import { validatePathParams } from '../../middleware/validate-paths.js';
 import { createCheckGitHubRemoteHandler } from './routes/check-github-remote.js';
 import { createListIssuesHandler } from './routes/list-issues.js';
 import { createListPRsHandler } from './routes/list-prs.js';
+import { createListCommentsHandler } from './routes/list-comments.js';
 import { createValidateIssueHandler } from './routes/validate-issue.js';
 import type { SettingsService } from '../../services/settings-service.js';
 import {
@@ -27,6 +28,7 @@ export function createGitHubRoutes(
   router.post('/check-remote', validatePathParams('projectPath'), createCheckGitHubRemoteHandler());
   router.post('/issues', validatePathParams('projectPath'), createListIssuesHandler());
   router.post('/prs', validatePathParams('projectPath'), createListPRsHandler());
+  router.post('/issue-comments', validatePathParams('projectPath'), createListCommentsHandler());
   router.post(
     '/validate-issue',
     validatePathParams('projectPath'),

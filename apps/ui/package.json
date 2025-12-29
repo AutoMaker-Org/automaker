@@ -27,7 +27,7 @@
     "build:electron:linux:dir": "node scripts/prepare-server.mjs && vite build && electron-builder --linux --dir",
     "postinstall": "electron-builder install-app-deps",
     "preview": "vite preview",
-    "lint": "eslint",
+    "lint": "npx eslint",
     "pretest": "node scripts/setup-e2e-fixtures.mjs",
     "test": "playwright test",
     "test:headed": "playwright test --headed",

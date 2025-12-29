@@ -11,8 +11,8 @@ import type {
   IssueValidationEvent,
   StoredValidation,
   AgentModel,
-  BacklogPlanResult,
-  BacklogPlanEvent,
+  GitHubComment,
+  IssueCommentsResult,
 } from '@automaker/types';
 import { getJSON, setJSON, removeItem } from './storage';
 
@@ -26,6 +26,8 @@ export type {
   IssueValidationResponse,
   IssueValidationEvent,
   StoredValidation,
+  GitHubComment,
+  IssueCommentsResult,
 };
 
 export interface FileEntry {
@@ -236,6 +238,19 @@ export interface GitHubAPI {
   ) => Promise<{ success: boolean; error?: string }>;
   /** Subscribe to validation events */
   onValidationEvent: (callback: (event: IssueValidationEvent) => void) => () => void;
+  /** Fetch comments for a specific issue */
+  getIssueComments: (
+    projectPath: string,
+    issueNumber: number,
+    cursor?: string
+  ) => Promise<{
+    success: boolean;
+    comments?: GitHubComment[];
+    totalCount?: number;
+    hasNextPage?: boolean;
+    endCursor?: string;
+    error?: string;
+  }>;
 }
 
 // Feature Suggestions types
@@ -2999,6 +3014,15 @@ function createMockGitHubAPI(): GitHubAPI {
       mockValidationCallbacks.push(callback);
       return () => {
         mockValidationCallbacks = mockValidationCallbacks.filter((cb) => cb !== callback);
+      };
+    },
+    getIssueComments: async (projectPath: string, issueNumber: number, cursor?: string) => {
+      console.log('[Mock] Getting issue comments:', { projectPath, issueNumber, cursor });
+      return {
+        success: true,
+        comments: [],
+        totalCount: 0,
+        hasNextPage: false,
       };
     },
   };

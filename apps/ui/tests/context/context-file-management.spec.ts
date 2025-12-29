@@ -50,7 +50,8 @@ test.describe('Context File Management', () => {
       { timeout: 5000 }
     );
 
-    await waitForContextFile(page, 'test-context.md', 10000);
+    await waitForNetworkIdle(page);
+    await waitForContextFile(page, 'test-context.md');
 
     const fileButton = await getByTestId(page, 'context-file-test-context.md');
     await expect(fileButton).toBeVisible();

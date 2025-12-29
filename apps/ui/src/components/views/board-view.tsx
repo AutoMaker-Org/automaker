@@ -8,6 +8,7 @@ import {
 } from '@dnd-kit/core';
 import { useAppStore, Feature } from '@/store/app-store';
 import { getElectronAPI } from '@/lib/electron';
+import { getHttpApiClient } from '@/lib/http-api-client';
 import type { AutoModeEvent } from '@/types/electron';
 import type { BacklogPlanResult } from '@automaker/types';
 import { pathsEqual } from '@/lib/utils';
@@ -36,6 +37,7 @@ import {
   FollowUpDialog,
   PlanApprovalDialog,
 } from './board-view/dialogs';
+import { PipelineSettingsDialog } from './board-view/dialogs/pipeline-settings-dialog';
 import { CreateWorktreeDialog } from './board-view/dialogs/create-worktree-dialog';
 import { DeleteWorktreeDialog } from './board-view/dialogs/delete-worktree-dialog';
 import { CommitWorktreeDialog } from './board-view/dialogs/commit-worktree-dialog';
@@ -59,9 +61,6 @@ import {
 
 // Stable empty array to avoid infinite loop in selector
 const EMPTY_WORKTREES: ReturnType<ReturnType<typeof useAppStore.getState>['getWorktrees']> = [];
-
-/** Delay before starting a newly created feature to allow state to settle */
-const FEATURE_CREATION_SETTLE_DELAY_MS = 500;
 
 export function BoardView() {
   const {
@@ -88,7 +87,10 @@ export function BoardView() {
     enableDependencyBlocking,
     isPrimaryWorktreeBranch,
     getPrimaryWorktreeBranch,
+    setPipelineConfig,
   } = useAppStore();
+  // Subscribe to pipelineConfigByProject to trigger re-renders when it changes
+  const pipelineConfigByProject = useAppStore((state) => state.pipelineConfigByProject);
   const shortcuts = useKeyboardShortcutsConfig();
   const {
     features: hookFeatures,
@@ -132,6 +134,9 @@ export function BoardView() {
   const [showPlanDialog, setShowPlanDialog] = useState(false);
   const [pendingBacklogPlan, setPendingBacklogPlan] = useState<BacklogPlanResult | null>(null);
   const [isGeneratingPlan, setIsGeneratingPlan] = useState(false);
+
+  // Pipeline settings dialog state
+  const [showPipelineSettings, setShowPipelineSettings] = useState(false);
 
   // Follow-up state hook
   const {
@@ -203,6 +208,25 @@ export function BoardView() {
     isLoading,
     setFeaturesWithContext,
   });
+
+  // Load pipeline config when project changes
+  useEffect(() => {
+    if (!currentProject?.path) return;
+
+    const loadPipelineConfig = async () => {
+      try {
+        const api = getHttpApiClient();
+        const result = await api.pipeline.getConfig(currentProject.path);
+        if (result.success && result.config) {
+          setPipelineConfig(currentProject.path, result.config);
+        }
+      } catch (error) {
+        console.error('[Board] Failed to load pipeline config:', error);
+      }
+    };
+
+    loadPipelineConfig();
+  }, [currentProject?.path, setPipelineConfig]);
 
   // Auto mode hook
   const autoMode = useAutoMode();
@@ -462,23 +486,22 @@ export function BoardView() {
         requirePlanApproval: false,
       };
 
+      // Capture existing feature IDs before adding
+      const featuresBeforeIds = new Set(useAppStore.getState().features.map((f) => f.id));
       await handleAddFeature(featureData);
 
-      // Find the newly created feature and start it
-      // We need to wait a moment for the feature to be created
-      setTimeout(async () => {
-        const latestFeatures = useAppStore.getState().features;
-        const newFeature = latestFeatures.find(
-          (f) =>
-            f.branchName === worktree.branch &&
-            f.status === 'backlog' &&
-            f.description.includes(`PR #${prNumber}`)
-        );
+      // Find the newly created feature by looking for an ID that wasn't in the original set
+      const latestFeatures = useAppStore.getState().features;
+      const newFeature = latestFeatures.find((f) => !featuresBeforeIds.has(f.id));
 
-        if (newFeature) {
-          await handleStartImplementation(newFeature);
-        }
-      }, FEATURE_CREATION_SETTLE_DELAY_MS);
+      if (newFeature) {
+        await handleStartImplementation(newFeature);
+      } else {
+        console.error('Could not find newly created feature to start it automatically.');
+        toast.error('Failed to auto-start feature', {
+          description: 'The feature was created but could not be started automatically.',
+        });
+      }
     },
     [handleAddFeature, handleStartImplementation, defaultSkipTests]
   );
@@ -505,24 +528,47 @@ export function BoardView() {
         requirePlanApproval: false,
       };
 
+      // Capture existing feature IDs before adding
+      const featuresBeforeIds = new Set(useAppStore.getState().features.map((f) => f.id));
       await handleAddFeature(featureData);
 
-      // Find the newly created feature and start it
-      setTimeout(async () => {
-        const latestFeatures = useAppStore.getState().features;
-        const newFeature = latestFeatures.find(
-          (f) =>
-            f.branchName === worktree.branch &&
-            f.status === 'backlog' &&
-            f.description.includes('Pull latest from origin/main')
-        );
+      // Find the newly created feature by looking for an ID that wasn't in the original set
+      const latestFeatures = useAppStore.getState().features;
+      const newFeature = latestFeatures.find((f) => !featuresBeforeIds.has(f.id));
 
-        if (newFeature) {
-          await handleStartImplementation(newFeature);
-        }
-      }, FEATURE_CREATION_SETTLE_DELAY_MS);
+      if (newFeature) {
+        await handleStartImplementation(newFeature);
+      } else {
+        console.error('Could not find newly created feature to start it automatically.');
+        toast.error('Failed to auto-start feature', {
+          description: 'The feature was created but could not be started automatically.',
+        });
+      }
     },
     [handleAddFeature, handleStartImplementation, defaultSkipTests]
+  );
+
+  // Handler for "Make" button - creates a feature and immediately starts it
+  const handleAddAndStartFeature = useCallback(
+    async (featureData: Parameters<typeof handleAddFeature>[0]) => {
+      // Capture existing feature IDs before adding
+      const featuresBeforeIds = new Set(useAppStore.getState().features.map((f) => f.id));
+      await handleAddFeature(featureData);
+
+      // Find the newly created feature by looking for an ID that wasn't in the original set
+      const latestFeatures = useAppStore.getState().features;
+      const newFeature = latestFeatures.find((f) => !featuresBeforeIds.has(f.id));
+
+      if (newFeature) {
+        await handleStartImplementation(newFeature);
+      } else {
+        console.error('Could not find newly created feature to start it automatically.');
+        toast.error('Failed to auto-start feature', {
+          description: 'The feature was created but could not be started automatically.',
+        });
+      }
+    },
+    [handleAddFeature, handleStartImplementation]
   );
 
   // Client-side auto mode: periodically check for backlog items and move them to in-progress
@@ -1077,6 +1123,10 @@ export function BoardView() {
             onShowSuggestions={() => setShowSuggestionsDialog(true)}
             suggestionsCount={suggestionsCount}
             onArchiveAllVerified={() => setShowArchiveAllVerifiedDialog(true)}
+            pipelineConfig={
+              currentProject?.path ? pipelineConfigByProject[currentProject.path] || null : null
+            }
+            onOpenPipelineSettings={() => setShowPipelineSettings(true)}
           />
         ) : (
           <GraphView
@@ -1139,6 +1189,7 @@ export function BoardView() {
           }
         }}
         onAdd={handleAddFeature}
+        onAddAndStart={handleAddAndStartFeature}
         categorySuggestions={categorySuggestions}
         branchSuggestions={branchSuggestions}
         branchCardCounts={branchCardCounts}
@@ -1185,6 +1236,22 @@ export function BoardView() {
         onConfirm={async () => {
           await handleArchiveAllVerified();
           setShowArchiveAllVerifiedDialog(false);
+        }}
+      />
+
+      {/* Pipeline Settings Dialog */}
+      <PipelineSettingsDialog
+        open={showPipelineSettings}
+        onClose={() => setShowPipelineSettings(false)}
+        projectPath={currentProject.path}
+        pipelineConfig={pipelineConfigByProject[currentProject.path] || null}
+        onSave={async (config) => {
+          const api = getHttpApiClient();
+          const result = await api.pipeline.saveConfig(currentProject.path, config);
+          if (!result.success) {
+            throw new Error(result.error || 'Failed to save pipeline config');
+          }
+          setPipelineConfig(currentProject.path, config);
         }}
       />
 

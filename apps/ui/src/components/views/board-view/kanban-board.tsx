@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { DndContext, DragOverlay } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -5,10 +6,11 @@ import { Button } from '@/components/ui/button';
 import { HotkeyButton } from '@/components/ui/hotkey-button';
 import { KanbanColumn, KanbanCard } from './components';
 import { Feature } from '@/store/app-store';
-import { FastForward, Lightbulb, Archive } from 'lucide-react';
+import { FastForward, Lightbulb, Archive, Plus, Settings2 } from 'lucide-react';
 import { useKeyboardShortcutsConfig } from '@/hooks/use-keyboard-shortcuts';
 import { useResponsiveKanban } from '@/hooks/use-responsive-kanban';
-import { COLUMNS, ColumnId } from './constants';
+import { getColumnsWithPipeline, type Column, type ColumnId } from './constants';
+import type { PipelineConfig } from '@automaker/types';
 
 interface KanbanBoardProps {
   sensors: any;
@@ -49,6 +51,8 @@ interface KanbanBoardProps {
   onShowSuggestions: () => void;
   suggestionsCount: number;
   onArchiveAllVerified: () => void;
+  pipelineConfig: PipelineConfig | null;
+  onOpenPipelineSettings?: () => void;
 }
 
 export function KanbanBoard({
@@ -82,13 +86,18 @@ export function KanbanBoard({
   onShowSuggestions,
   suggestionsCount,
   onArchiveAllVerified,
+  pipelineConfig,
+  onOpenPipelineSettings,
 }: KanbanBoardProps) {
+  // Generate columns including pipeline steps
+  const columns = useMemo(() => getColumnsWithPipeline(pipelineConfig), [pipelineConfig]);
+
   // Use responsive column widths based on window size
   // containerStyle handles centering and ensures columns fit without horizontal scroll in Electron
-  const { columnWidth, containerStyle } = useResponsiveKanban(COLUMNS.length);
+  const { columnWidth, containerStyle } = useResponsiveKanban(columns.length);
 
   return (
-    <div className="flex-1 overflow-x-hidden px-5 pb-4 relative" style={backgroundImageStyle}>
+    <div className="flex-1 overflow-x-auto px-5 pb-4 relative" style={backgroundImageStyle}>
       <DndContext
         sensors={sensors}
         collisionDetection={collisionDetectionStrategy}
@@ -96,8 +105,8 @@ export function KanbanBoard({
         onDragEnd={onDragEnd}
       >
         <div className="h-full py-1" style={containerStyle}>
-          {COLUMNS.map((column) => {
-            const columnFeatures = getColumnFeatures(column.id);
+          {columns.map((column) => {
+            const columnFeatures = getColumnFeatures(column.id as ColumnId);
             return (
               <KanbanColumn
                 key={column.id}
@@ -156,6 +165,28 @@ export function KanbanBoard({
                         </HotkeyButton>
                       )}
                     </div>
+                  ) : column.id === 'in_progress' ? (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
+                      onClick={onOpenPipelineSettings}
+                      title="Pipeline Settings"
+                      data-testid="pipeline-settings-button"
+                    >
+                      <Settings2 className="w-3.5 h-3.5" />
+                    </Button>
+                  ) : column.isPipelineStep ? (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
+                      onClick={onOpenPipelineSettings}
+                      title="Edit Pipeline Step"
+                      data-testid="edit-pipeline-step-button"
+                    >
+                      <Settings2 className="w-3.5 h-3.5" />
+                    </Button>
                   ) : undefined
                 }
               >

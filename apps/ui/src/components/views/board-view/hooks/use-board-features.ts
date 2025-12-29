@@ -207,6 +207,11 @@ export function useBoardFeatures({ currentProject }: UseBoardFeaturesProps) {
         // This ensures the feature card shows the "Approve Plan" button
         console.log('[Board] Plan approval required, reloading features...');
         loadFeatures();
+      } else if (event.type === 'pipeline_step_started') {
+        // Pipeline steps update the feature status to `pipeline_*` before the step runs.
+        // Reload so the card moves into the correct pipeline column immediately.
+        console.log('[Board] Pipeline step started, reloading features...');
+        loadFeatures();
       } else if (event.type === 'auto_mode_error') {
         // Reload features when an error occurs (feature moved to waiting_approval)
         console.log('[Board] Feature error, reloading features...', event.error);

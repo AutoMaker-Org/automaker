@@ -99,6 +99,9 @@ export type {
   IssueValidationVerdict,
   IssueValidationConfidence,
   IssueComplexity,
+  PRRecommendation,
+  PRAnalysis,
+  LinkedPRInfo,
   IssueValidationInput,
   IssueValidationRequest,
   IssueValidationResult,
@@ -106,6 +109,9 @@ export type {
   IssueValidationErrorResponse,
   IssueValidationEvent,
   StoredValidation,
+  GitHubCommentAuthor,
+  GitHubComment,
+  IssueCommentsResult,
 } from './issue-validation.js';
 
 // Backlog plan types
@@ -117,3 +123,11 @@ export type {
   BacklogPlanRequest,
   BacklogPlanApplyResult,
 } from './backlog-plan.js';
+
+// Pipeline types
+export type {
+  PipelineStep,
+  PipelineConfig,
+  PipelineStatus,
+  FeatureStatusWithPipeline,
+} from './pipeline.js';

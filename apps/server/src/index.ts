@@ -50,6 +50,8 @@ import { ClaudeUsageService } from './services/claude-usage-service.js';
 import { createGitHubRoutes } from './routes/github/index.js';
 import { createContextRoutes } from './routes/context/index.js';
 import { cleanupStaleValidations } from './routes/github/routes/validation-common.js';
+import { createPipelineRoutes } from './routes/pipeline/index.js';
+import { pipelineService } from './services/pipeline-service.js';
 
 // Load environment variables
 dotenv.config();
@@ -166,6 +168,8 @@ app.use('/api/settings', createSettingsRoutes(settingsService));
 app.use('/api/claude', createClaudeRoutes(claudeUsageService));
 app.use('/api/github', createGitHubRoutes(events, settingsService));
 app.use('/api/context', createContextRoutes(settingsService));
+app.use('/api/backlog-plan', createBacklogPlanRoutes(events, settingsService));
+app.use('/api/pipeline', createPipelineRoutes(pipelineService));
 
 // Create HTTP server
 const server = createServer(app);
@@ -194,12 +198,31 @@ server.on('upgrade', (request, socket, head) => {
 
 // Events WebSocket connection handler
 wss.on('connection', (ws: WebSocket) => {
-  console.log('[WebSocket] Client connected');
+  console.log('[WebSocket] Client connected, ready state:', ws.readyState);
 
   // Subscribe to all events and forward to this client
   const unsubscribe = events.subscribe((type, payload) => {
+    console.log('[WebSocket] Event received:', {
+      type,
+      hasPayload: !!payload,
+      payloadKeys: payload ? Object.keys(payload) : [],
+      wsReadyState: ws.readyState,
+      wsOpen: ws.readyState === WebSocket.OPEN,
+    });
+
     if (ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({ type, payload }));
+      const message = JSON.stringify({ type, payload });
+      console.log('[WebSocket] Sending event to client:', {
+        type,
+        messageLength: message.length,
+        sessionId: (payload as any)?.sessionId,
+      });
+      ws.send(message);
+    } else {
+      console.log(
+        '[WebSocket] WARNING: Cannot send event, WebSocket not open. ReadyState:',
+        ws.readyState
+      );
     }
   });
 
@@ -209,7 +232,7 @@ wss.on('connection', (ws: WebSocket) => {
   });
 
   ws.on('error', (error) => {
-    console.error('[WebSocket] Error:', error);
+    console.error('[WebSocket] ERROR:', error);
     unsubscribe();
   });
 });

@@ -854,6 +854,8 @@ export class HttpApiClient implements ElectronAPI {
       this.post('/api/github/validation-mark-viewed', { projectPath, issueNumber }),
     onValidationEvent: (callback: (event: IssueValidationEvent) => void) =>
       this.subscribeToEvent('issue-validation:event', callback as EventCallback),
+    getIssueComments: (projectPath: string, issueNumber: number, cursor?: string) =>
+      this.post('/api/github/issue-comments', { projectPath, issueNumber, cursor }),
   };
 
   // Workspace API
@@ -1171,6 +1173,102 @@ export class HttpApiClient implements ElectronAPI {
     onEvent: (callback: (data: unknown) => void): (() => void) => {
       return this.subscribeToEvent('backlog-plan:event', callback as EventCallback);
     },
+  };
+
+  // Pipeline API - custom workflow pipeline steps
+  pipeline = {
+    getConfig: (
+      projectPath: string
+    ): Promise<{
+      success: boolean;
+      config?: {
+        version: 1;
+        steps: Array<{
+          id: string;
+          name: string;
+          order: number;
+          instructions: string;
+          colorClass: string;
+          createdAt: string;
+          updatedAt: string;
+        }>;
+      };
+      error?: string;
+    }> => this.post('/api/pipeline/config', { projectPath }),
+
+    saveConfig: (
+      projectPath: string,
+      config: {
+        version: 1;
+        steps: Array<{
+          id: string;
+          name: string;
+          order: number;
+          instructions: string;
+          colorClass: string;
+          createdAt: string;
+          updatedAt: string;
+        }>;
+      }
+    ): Promise<{ success: boolean; error?: string }> =>
+      this.post('/api/pipeline/config/save', { projectPath, config }),
+
+    addStep: (
+      projectPath: string,
+      step: {
+        name: string;
+        order: number;
+        instructions: string;
+        colorClass: string;
+      }
+    ): Promise<{
+      success: boolean;
+      step?: {
+        id: string;
+        name: string;
+        order: number;
+        instructions: string;
+        colorClass: string;
+        createdAt: string;
+        updatedAt: string;
+      };
+      error?: string;
+    }> => this.post('/api/pipeline/steps/add', { projectPath, step }),
+
+    updateStep: (
+      projectPath: string,
+      stepId: string,
+      updates: Partial<{
+        name: string;
+        order: number;
+        instructions: string;
+        colorClass: string;
+      }>
+    ): Promise<{
+      success: boolean;
+      step?: {
+        id: string;
+        name: string;
+        order: number;
+        instructions: string;
+        colorClass: string;
+        createdAt: string;
+        updatedAt: string;
+      };
+      error?: string;
+    }> => this.post('/api/pipeline/steps/update', { projectPath, stepId, updates }),
+
+    deleteStep: (
+      projectPath: string,
+      stepId: string
+    ): Promise<{ success: boolean; error?: string }> =>
+      this.post('/api/pipeline/steps/delete', { projectPath, stepId }),
+
+    reorderSteps: (
+      projectPath: string,
+      stepIds: string[]
+    ): Promise<{ success: boolean; error?: string }> =>
+      this.post('/api/pipeline/steps/reorder', { projectPath, stepIds }),
   };
 }
 

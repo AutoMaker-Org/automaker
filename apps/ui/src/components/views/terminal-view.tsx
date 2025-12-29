@@ -240,7 +240,6 @@ export function TerminalView() {
   const [dragOverTabId, setDragOverTabId] = useState<string | null>(null);
   const lastCreateTimeRef = useRef<number>(0);
   const isCreatingRef = useRef<boolean>(false);
-  const prevProjectPathRef = useRef<string | null>(null);
   const restoringProjectPathRef = useRef<string | null>(null);
   const [newSessionIds, setNewSessionIds] = useState<Set<string>>(new Set());
   const [serverSessionInfo, setServerSessionInfo] = useState<{
@@ -524,11 +523,15 @@ export function TerminalView() {
   }, [terminalState.isUnlocked, fetchServerSettings]);
 
   // Handle project switching - save and restore terminal layouts
+  // Uses terminalState.lastActiveProjectPath (persisted in store) instead of a local ref
+  // This ensures terminals persist when navigating away from terminal route and back
   useEffect(() => {
     const currentPath = currentProject?.path || null;
-    const prevPath = prevProjectPathRef.current;
+    // Read lastActiveProjectPath directly from store to avoid dependency issues
+    const prevPath = useAppStore.getState().terminalState.lastActiveProjectPath;
 
-    // Skip if no change
+    // Skip if no change - this now correctly handles route changes within the same project
+    // because lastActiveProjectPath persists in the store across component unmount/remount
     if (currentPath === prevPath) {
       return;
     }
@@ -538,12 +541,13 @@ export function TerminalView() {
 
     // Save layout for previous project (if there was one and has terminals)
     // BUT don't save if we were mid-restore for that project (would save incomplete state)
-    if (prevPath && terminalState.tabs.length > 0 && restoringProjectPathRef.current !== prevPath) {
+    const currentTabs = useAppStore.getState().terminalState.tabs;
+    if (prevPath && currentTabs.length > 0 && restoringProjectPathRef.current !== prevPath) {
       saveTerminalLayout(prevPath);
     }
 
-    // Update the previous project ref
-    prevProjectPathRef.current = currentPath;
+    // Update the stored project path
+    useAppStore.getState().setTerminalLastActiveProjectPath(currentPath);
 
     // Helper to kill sessions and clear state
     const killAndClear = async () => {

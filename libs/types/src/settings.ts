@@ -301,6 +301,8 @@ export interface GlobalSettings {
   // Claude Agent SDK Settings
   /** Auto-load CLAUDE.md files using SDK's settingSources option */
   autoLoadClaudeMd?: boolean;
+  /** Enable sandbox mode for bash commands (default: true, disable if issues occur) */
+  enableSandboxMode?: boolean;
 }
 
 /**
@@ -459,6 +461,7 @@ export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
   worktreePanelCollapsed: false,
   lastSelectedSessionByProject: {},
   autoLoadClaudeMd: false,
+  enableSandboxMode: true,
 };
 
 /** Default credentials (empty strings - user must provide API keys) */

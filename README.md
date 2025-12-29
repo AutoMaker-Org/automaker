@@ -223,13 +223,110 @@ npm run build:electron:linux   # Linux (AppImage + DEB, x64)
 
 #### Docker Deployment
 
+Docker provides the most secure way to run Automaker by isolating it from your host filesystem.
+
 ```bash
-# Build and run with Docker Compose (recommended for security)
+# Build and run with Docker Compose
 docker-compose up -d
 
-# Access at http://localhost:3007
+# Access UI at http://localhost:3007
 # API at http://localhost:3008
+
+# View logs
+docker-compose logs -f
+
+# Stop containers
+docker-compose down
 ```
+
+##### Configuration
+
+Create a `.env` file in the project root if using API key authentication:
+
+```bash
+# Optional: Anthropic API key (not needed if using Claude CLI authentication)
+ANTHROPIC_API_KEY=sk-ant-...
+```
+
+**Note:** Most users authenticate via Claude CLI instead of API keys. See [Claude CLI Authentication](#claude-cli-authentication-optional) below.
+
+##### Working with Projects (Host Directory Access)
+
+By default, the container is isolated from your host filesystem. To work on projects from your host machine, create a `docker-compose.override.yml` file (gitignored):
+
+```yaml
+services:
+  server:
+    volumes:
+      # Mount your project directories
+      - /path/to/your/project:/projects/your-project
+```
+
+##### Claude CLI Authentication (Optional)
+
+To use Claude Code CLI authentication instead of an API key, mount your Claude CLI config directory:
+
+```yaml
+services:
+  server:
+    volumes:
+      # Linux/macOS
+      - ~/.claude:/home/automaker/.claude
+      # Windows
+      - C:/Users/YourName/.claude:/home/automaker/.claude
+```
+
+**Note:** The Claude CLI config must be writable (do not use `:ro` flag) as the CLI writes debug files.
+
+##### GitHub CLI Authentication (For Git Push/PR Operations)
+
+To enable git push and GitHub CLI operations inside the container:
+
+```yaml
+services:
+  server:
+    volumes:
+      # Mount GitHub CLI config
+      # Linux/macOS
+      - ~/.config/gh:/home/automaker/.config/gh
+      # Windows
+      - 'C:/Users/YourName/AppData/Roaming/GitHub CLI:/home/automaker/.config/gh'
+
+      # Mount git config for user identity (name, email)
+      - ~/.gitconfig:/home/automaker/.gitconfig:ro
+    environment:
+      # GitHub token (required on Windows where tokens are in Credential Manager)
+      # Get your token with: gh auth token
+      - GH_TOKEN=${GH_TOKEN}
+```
+
+Then add `GH_TOKEN` to your `.env` file:
+
+```bash
+GH_TOKEN=gho_your_github_token_here
+```
+
+##### Complete docker-compose.override.yml Example
+
+```yaml
+services:
+  server:
+    volumes:
+      # Your projects
+      - /path/to/project1:/projects/project1
+      - /path/to/project2:/projects/project2
+
+      # Authentication configs
+      - ~/.claude:/home/automaker/.claude
+      - ~/.config/gh:/home/automaker/.config/gh
+      - ~/.gitconfig:/home/automaker/.gitconfig:ro
+    environment:
+      - GH_TOKEN=${GH_TOKEN}
+```
+
+##### Architecture Support
+
+The Docker image supports both AMD64 and ARM64 architectures. The GitHub CLI and Claude CLI are automatically downloaded for the correct architecture during build.
 
 ### Testing
 
@@ -531,6 +628,7 @@ data/
 
 ### Documentation
 
+- [Contributing Guide](./CONTRIBUTING.md) - How to contribute to Automaker
 - [Project Documentation](./docs/) - Architecture guides, patterns, and developer docs
 - [Docker Isolation Guide](./docs/docker-isolation.md) - Security-focused Docker deployment
 - [Shared Packages Guide](./docs/llm-shared-packages.md) - Using monorepo packages

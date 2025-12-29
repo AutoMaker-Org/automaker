@@ -37,19 +37,13 @@ const STATIC_PORT = 3007;
 // ============================================
 // Calculation: 4 columns × 280px + 3 gaps × 20px + 40px padding = 1220px board content
 // With sidebar expanded (288px): 1220 + 288 = 1508px
-// With sidebar collapsed (64px): 1220 + 64 = 1284px
-const COLUMN_MIN_WIDTH = 280;
-const COLUMN_COUNT = 4;
-const GAP_SIZE = 20;
-const BOARD_PADDING = 40; // px-5 on both sides = 40px (matches gap between columns)
+// Minimum window dimensions - reduced to allow smaller windows since kanban now supports horizontal scrolling
 const SIDEBAR_EXPANDED = 288;
 const SIDEBAR_COLLAPSED = 64;
 
-const BOARD_CONTENT_MIN =
-  COLUMN_MIN_WIDTH * COLUMN_COUNT + GAP_SIZE * (COLUMN_COUNT - 1) + BOARD_PADDING;
-const MIN_WIDTH_EXPANDED = BOARD_CONTENT_MIN + SIDEBAR_EXPANDED; // 1500px
-const MIN_WIDTH_COLLAPSED = BOARD_CONTENT_MIN + SIDEBAR_COLLAPSED; // 1276px
-const MIN_HEIGHT = 650; // Ensures sidebar content fits without scrolling
+const MIN_WIDTH_EXPANDED = 800; // Reduced - horizontal scrolling handles overflow
+const MIN_WIDTH_COLLAPSED = 600; // Reduced - horizontal scrolling handles overflow
+const MIN_HEIGHT = 500; // Reduced to allow more flexibility
 const DEFAULT_WIDTH = 1600;
 const DEFAULT_HEIGHT = 950;
 
@@ -199,7 +193,7 @@ function validateBounds(bounds: WindowBounds): WindowBounds {
   // Ensure minimum dimensions
   return {
     ...bounds,
-    width: Math.max(bounds.width, MIN_WIDTH_EXPANDED),
+    width: Math.max(bounds.width, MIN_WIDTH_COLLAPSED),
     height: Math.max(bounds.height, MIN_HEIGHT),
   };
 }
@@ -420,7 +414,7 @@ function createWindow(): void {
     height: validBounds?.height ?? DEFAULT_HEIGHT,
     x: validBounds?.x,
     y: validBounds?.y,
-    minWidth: MIN_WIDTH_EXPANDED, // 1500px - ensures kanban columns fit with sidebar
+    minWidth: MIN_WIDTH_COLLAPSED, // Small minimum - horizontal scrolling handles overflow
     minHeight: MIN_HEIGHT,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -673,15 +667,10 @@ ipcMain.handle('server:getUrl', async () => {
 });
 
 // Window management - update minimum width based on sidebar state
-ipcMain.handle('window:updateMinWidth', (_, sidebarExpanded: boolean) => {
+// Now uses a fixed small minimum since horizontal scrolling handles overflow
+ipcMain.handle('window:updateMinWidth', (_, _sidebarExpanded: boolean) => {
   if (!mainWindow || mainWindow.isDestroyed()) return;
 
-  const minWidth = sidebarExpanded ? MIN_WIDTH_EXPANDED : MIN_WIDTH_COLLAPSED;
-  mainWindow.setMinimumSize(minWidth, MIN_HEIGHT);
-
-  // If current width is below new minimum, resize window
-  const currentBounds = mainWindow.getBounds();
-  if (currentBounds.width < minWidth) {
-    mainWindow.setSize(minWidth, currentBounds.height);
-  }
+  // Always use the smaller minimum width - horizontal scrolling handles any overflow
+  mainWindow.setMinimumSize(MIN_WIDTH_COLLAPSED, MIN_HEIGHT);
 });

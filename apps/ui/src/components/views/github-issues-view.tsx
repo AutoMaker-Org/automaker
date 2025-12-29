@@ -11,12 +11,15 @@ import { useGithubIssues, useIssueValidation } from './github-issues-view/hooks'
 import { IssueRow, IssueDetailPanel, IssuesListHeader } from './github-issues-view/components';
 import { ValidationDialog } from './github-issues-view/dialogs';
 import { formatDate, getFeaturePriority } from './github-issues-view/utils';
+import type { ValidateIssueOptions } from './github-issues-view/types';
 
 export function GitHubIssuesView() {
   const [selectedIssue, setSelectedIssue] = useState<GitHubIssue | null>(null);
   const [validationResult, setValidationResult] = useState<IssueValidationResult | null>(null);
   const [showValidationDialog, setShowValidationDialog] = useState(false);
   const [showRevalidateConfirm, setShowRevalidateConfirm] = useState(false);
+  const [pendingRevalidateOptions, setPendingRevalidateOptions] =
+    useState<ValidateIssueOptions | null>(null);
 
   const { currentProject, defaultAIProfileId, aiProfiles, getCurrentWorktree, worktreesByProject } =
     useAppStore();
@@ -203,7 +206,10 @@ export function GitHubIssuesView() {
           onViewCachedValidation={handleViewCachedValidation}
           onOpenInGitHub={handleOpenInGitHub}
           onClose={() => setSelectedIssue(null)}
-          onShowRevalidateConfirm={() => setShowRevalidateConfirm(true)}
+          onShowRevalidateConfirm={(options) => {
+            setPendingRevalidateOptions(options);
+            setShowRevalidateConfirm(true);
+          }}
           formatDate={formatDate}
         />
       )}
@@ -220,15 +226,24 @@ export function GitHubIssuesView() {
       {/* Revalidate Confirmation Dialog */}
       <ConfirmDialog
         open={showRevalidateConfirm}
-        onOpenChange={setShowRevalidateConfirm}
+        onOpenChange={(open) => {
+          setShowRevalidateConfirm(open);
+          if (!open) {
+            setPendingRevalidateOptions(null);
+          }
+        }}
         title="Re-validate Issue"
         description={`Are you sure you want to re-validate issue #${selectedIssue?.number}? This will run a new AI analysis and replace the existing validation result.`}
         icon={RefreshCw}
         iconClassName="text-primary"
         confirmText="Re-validate"
         onConfirm={() => {
-          if (selectedIssue) {
-            handleValidateIssue(selectedIssue, { forceRevalidate: true });
+          if (selectedIssue && pendingRevalidateOptions) {
+            console.log('[GitHubIssuesView] Revalidating with options:', {
+              commentsCount: pendingRevalidateOptions.comments?.length ?? 0,
+              linkedPRsCount: pendingRevalidateOptions.linkedPRs?.length ?? 0,
+            });
+            handleValidateIssue(selectedIssue, pendingRevalidateOptions);
           }
         }}
       />

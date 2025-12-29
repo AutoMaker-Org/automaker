@@ -22,6 +22,36 @@ export type IssueValidationConfidence = 'high' | 'medium' | 'low';
 export type IssueComplexity = 'trivial' | 'simple' | 'moderate' | 'complex' | 'very_complex';
 
 /**
+ * Recommendation for PR-related action
+ */
+export type PRRecommendation = 'wait_for_merge' | 'pr_needs_work' | 'no_pr';
+
+/**
+ * Analysis of a linked pull request
+ */
+export interface PRAnalysis {
+  /** Whether there is an open PR linked to this issue */
+  hasOpenPR: boolean;
+  /** Whether the PR appears to fix the issue based on the diff */
+  prFixesIssue?: boolean;
+  /** The PR number that was analyzed */
+  prNumber?: number;
+  /** Brief summary of what the PR changes */
+  prSummary?: string;
+  /** Recommendation: wait for PR to merge, PR needs more work, or no relevant PR */
+  recommendation: PRRecommendation;
+}
+
+/**
+ * Linked PR info for validation
+ */
+export interface LinkedPRInfo {
+  number: number;
+  title: string;
+  state: string;
+}
+
+/**
  * Issue data for validation (without projectPath)
  * Used by UI when calling the validation API
  */
@@ -30,6 +60,10 @@ export interface IssueValidationInput {
   issueTitle: string;
   issueBody: string;
   issueLabels?: string[];
+  /** Comments to include in validation analysis */
+  comments?: GitHubComment[];
+  /** Linked pull requests for this issue */
+  linkedPRs?: LinkedPRInfo[];
 }
 
 /**
@@ -60,6 +94,8 @@ export interface IssueValidationResult {
   missingInfo?: string[];
   /** Estimated effort to address the issue */
   estimatedComplexity?: IssueComplexity;
+  /** Analysis of linked pull requests (if any) */
+  prAnalysis?: PRAnalysis;
 }
 
 /**
@@ -132,4 +168,42 @@ export interface StoredValidation {
   result: IssueValidationResult;
   /** ISO timestamp when user viewed this validation (undefined = not yet viewed) */
   viewedAt?: string;
+}
+
+/**
+ * Author of a GitHub comment
+ */
+export interface GitHubCommentAuthor {
+  login: string;
+  avatarUrl?: string;
+}
+
+/**
+ * A comment on a GitHub issue
+ */
+export interface GitHubComment {
+  /** Unique comment ID */
+  id: string;
+  /** Author of the comment */
+  author: GitHubCommentAuthor;
+  /** Comment body (markdown) */
+  body: string;
+  /** ISO timestamp when comment was created */
+  createdAt: string;
+  /** ISO timestamp when comment was last updated */
+  updatedAt?: string;
+}
+
+/**
+ * Result from fetching issue comments
+ */
+export interface IssueCommentsResult {
+  /** List of comments */
+  comments: GitHubComment[];
+  /** Total number of comments on the issue */
+  totalCount: number;
+  /** Whether there are more comments to fetch */
+  hasNextPage: boolean;
+  /** Cursor for pagination (pass to next request) */
+  endCursor?: string;
 }

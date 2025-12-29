@@ -131,7 +131,7 @@ export function DependencyTreeDialog({
                               : 'bg-muted text-muted-foreground'
                         )}
                       >
-                        {dep.status.replace(/_/g, ' ')}
+                        {(dep.status || 'backlog').replace(/_/g, ' ')}
                       </span>
                     </div>
                   </div>
@@ -177,7 +177,7 @@ export function DependencyTreeDialog({
                               : 'bg-muted text-muted-foreground'
                         )}
                       >
-                        {dependent.status.replace(/_/g, ' ')}
+                        {(dependent.status || 'backlog').replace(/_/g, ' ')}
                       </span>
                     </div>
                   </div>

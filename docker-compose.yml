@@ -13,7 +13,8 @@ services:
   ui:
     build:
       context: .
-      dockerfile: apps/ui/Dockerfile
+      dockerfile: Dockerfile
+      target: ui
     container_name: automaker-ui
     restart: unless-stopped
     ports:
@@ -25,7 +26,8 @@ services:
   server:
     build:
       context: .
-      dockerfile: apps/server/Dockerfile
+      dockerfile: Dockerfile
+      target: server
     container_name: automaker-server
     restart: unless-stopped
     ports:

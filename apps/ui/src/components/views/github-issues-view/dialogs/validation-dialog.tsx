@@ -16,6 +16,9 @@ import {
   Lightbulb,
   AlertTriangle,
   Plus,
+  GitPullRequest,
+  Clock,
+  Wrench,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type {
@@ -149,6 +152,77 @@ export function ValidationDialog({
               </div>
             )}
 
+            {/* PR Analysis Section - Show AI's analysis of linked PRs */}
+            {validationResult.prAnalysis && validationResult.prAnalysis.hasOpenPR && (
+              <div
+                className={cn(
+                  'p-3 rounded-lg border',
+                  validationResult.prAnalysis.recommendation === 'wait_for_merge'
+                    ? 'bg-green-500/10 border-green-500/20'
+                    : validationResult.prAnalysis.recommendation === 'pr_needs_work'
+                      ? 'bg-yellow-500/10 border-yellow-500/20'
+                      : 'bg-purple-500/10 border-purple-500/20'
+                )}
+              >
+                <div className="flex items-start gap-2">
+                  {validationResult.prAnalysis.recommendation === 'wait_for_merge' ? (
+                    <Clock className="h-5 w-5 text-green-500 shrink-0 mt-0.5" />
+                  ) : validationResult.prAnalysis.recommendation === 'pr_needs_work' ? (
+                    <Wrench className="h-5 w-5 text-yellow-500 shrink-0 mt-0.5" />
+                  ) : (
+                    <GitPullRequest className="h-5 w-5 text-purple-500 shrink-0 mt-0.5" />
+                  )}
+                  <div className="flex-1">
+                    <span
+                      className={cn(
+                        'text-sm font-medium',
+                        validationResult.prAnalysis.recommendation === 'wait_for_merge'
+                          ? 'text-green-500'
+                          : validationResult.prAnalysis.recommendation === 'pr_needs_work'
+                            ? 'text-yellow-500'
+                            : 'text-purple-500'
+                      )}
+                    >
+                      {validationResult.prAnalysis.recommendation === 'wait_for_merge'
+                        ? 'Fix Ready - Wait for Merge'
+                        : validationResult.prAnalysis.recommendation === 'pr_needs_work'
+                          ? 'PR Needs Work'
+                          : 'Work in Progress'}
+                    </span>
+                    {validationResult.prAnalysis.prNumber && (
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        PR #{validationResult.prAnalysis.prNumber}
+                        {validationResult.prAnalysis.prFixesIssue && ' appears to fix this issue'}
+                      </p>
+                    )}
+                    {validationResult.prAnalysis.prSummary && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {validationResult.prAnalysis.prSummary}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Fallback Work in Progress Badge - Show when there's an open PR but no AI analysis */}
+            {!validationResult.prAnalysis?.hasOpenPR &&
+              issue.linkedPRs?.some((pr) => pr.state === 'open' || pr.state === 'OPEN') && (
+                <div className="flex items-center gap-2 p-3 rounded-lg bg-purple-500/10 border border-purple-500/20">
+                  <GitPullRequest className="h-5 w-5 text-purple-500 shrink-0" />
+                  <div className="flex-1">
+                    <span className="text-sm font-medium text-purple-500">Work in Progress</span>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {issue.linkedPRs
+                        .filter((pr) => pr.state === 'open' || pr.state === 'OPEN')
+                        .map((pr) => `PR #${pr.number}`)
+                        .join(', ')}{' '}
+                      is open for this issue
+                    </p>
+                  </div>
+                </div>
+              )}
+
             {/* Reasoning */}
             <div className="space-y-2">
               <h4 className="text-sm font-medium flex items-center gap-2">
@@ -218,12 +292,14 @@ export function ValidationDialog({
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
             Close
           </Button>
-          {validationResult?.verdict === 'valid' && onConvertToTask && (
-            <Button onClick={handleConvertToTask}>
-              <Plus className="h-4 w-4 mr-2" />
-              Convert to Task
-            </Button>
-          )}
+          {validationResult?.verdict === 'valid' &&
+            onConvertToTask &&
+            validationResult?.prAnalysis?.recommendation !== 'wait_for_merge' && (
+              <Button onClick={handleConvertToTask}>
+                <Plus className="h-4 w-4 mr-2" />
+                Convert to Task
+              </Button>
+            )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
