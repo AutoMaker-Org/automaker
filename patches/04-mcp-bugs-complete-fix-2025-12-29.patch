@@ -1,0 +1,464 @@
+diff --git a/apps/ui/src/components/views/settings-view/mcp-servers/hooks/use-mcp-servers.ts b/apps/ui/src/components/views/settings-view/mcp-servers/hooks/use-mcp-servers.ts
+index 7bf62f4..e14788d 100644
+--- a/apps/ui/src/components/views/settings-view/mcp-servers/hooks/use-mcp-servers.ts
++++ b/apps/ui/src/components/views/settings-view/mcp-servers/hooks/use-mcp-servers.ts
+@@ -276,8 +276,15 @@ export function useMCPServers() {
+     // If editing an existing server, save directly (user already approved it)
+     if (editingServer) {
+       updateMCPServer(editingServer.id, serverData);
++
++      const syncSuccess = await syncSettingsToServer();
++
++      if (!syncSuccess) {
++        toast.error('Failed to save MCP server to disk');
++        return;
++      }
++
+       toast.success('MCP server updated');
+-      await syncSettingsToServer();
+       handleCloseDialog();
+       return;
+     }
+@@ -303,14 +310,28 @@ export function useMCPServers() {
+ 
+     if (pendingServerData.type === 'add' && pendingServerData.serverData) {
+       addMCPServer(pendingServerData.serverData);
++
++      const syncSuccess = await syncSettingsToServer();
++
++      if (!syncSuccess) {
++        toast.error('Failed to save MCP server to disk');
++        return;
++      }
++
+       toast.success('MCP server added');
+-      await syncSettingsToServer();
+       handleCloseDialog();
+     } else if (pendingServerData.type === 'import' && pendingServerData.importServers) {
+       for (const serverData of pendingServerData.importServers) {
+         addMCPServer(serverData);
+       }
+-      await syncSettingsToServer();
++
++      const syncSuccess = await syncSettingsToServer();
++
++      if (!syncSuccess) {
++        toast.error('Failed to save MCP servers to disk');
++        return;
++      }
++
+       const count = pendingServerData.importServers.length;
+       toast.success(`Imported ${count} MCP server${count > 1 ? 's' : ''}`);
+       setIsImportDialogOpen(false);
+@@ -323,13 +344,27 @@ export function useMCPServers() {
+ 
+   const handleToggleEnabled = async (server: MCPServerConfig) => {
+     updateMCPServer(server.id, { enabled: !server.enabled });
+-    await syncSettingsToServer();
++
++    const syncSuccess = await syncSettingsToServer();
++
++    if (!syncSuccess) {
++      toast.error('Failed to save MCP server to disk');
++      return;
++    }
++
+     toast.success(server.enabled ? 'Server disabled' : 'Server enabled');
+   };
+ 
+   const handleDelete = async (id: string) => {
+     removeMCPServer(id);
+-    await syncSettingsToServer();
++
++    const syncSuccess = await syncSettingsToServer();
++
++    if (!syncSuccess) {
++      toast.error('Failed to save changes to disk');
++      return;
++    }
++
+     setDeleteConfirmId(null);
+     toast.success('MCP server removed');
+   };
+@@ -569,11 +604,11 @@ export function useMCPServers() {
+   };
+ 
+   const handleOpenGlobalJsonEdit = () => {
+-    // Build the full mcpServers config object
+-    const exportData: Record<string, Record<string, unknown>> = {};
+-
+-    for (const server of mcpServers) {
++    // Build array of servers with IDs preserved
++    const serversArray = mcpServers.map((server) => {
+       const serverConfig: Record<string, unknown> = {
++        id: server.id, // Preserve ID
++        name: server.name, // Preserve name
+         type: server.type || 'stdio',
+       };
+ 
+@@ -596,10 +631,10 @@ export function useMCPServers() {
+         }
+       }
+ 
+-      exportData[server.name] = serverConfig;
+-    }
++      return serverConfig;
++    });
+ 
+-    setGlobalJsonValue(JSON.stringify({ mcpServers: exportData }, null, 2));
++    setGlobalJsonValue(JSON.stringify({ mcpServers: serversArray }, null, 2));
+     setIsGlobalJsonEditOpen(true);
+   };
+ 
+@@ -607,91 +642,188 @@ export function useMCPServers() {
+     try {
+       const parsed = JSON.parse(globalJsonValue);
+ 
+-      // Support both formats
++      // Support both formats: array and object
+       const servers = parsed.mcpServers || parsed;
+ 
+-      if (typeof servers !== 'object' || Array.isArray(servers)) {
+-        toast.error('Invalid format: expected object with server configurations');
++      if (Array.isArray(servers)) {
++        // Array format (new format with IDs)
++        await handleSaveGlobalJsonArray(servers);
++      } else if (typeof servers === 'object' && servers !== null) {
++        // Object format (legacy Claude Desktop format)
++        await handleSaveGlobalJsonObject(servers);
++      } else {
++        toast.error('Invalid format: expected array or object with server configurations');
+         return;
+       }
+ 
+-      // Validate all servers first
+-      for (const [name, config] of Object.entries(servers)) {
+-        if (typeof config !== 'object' || config === null) {
+-          toast.error(`Invalid config for "${name}"`);
+-          return;
+-        }
++      const syncSuccess = await syncSettingsToServer();
+ 
+-        const serverConfig = config as Record<string, unknown>;
+-        const serverType = (serverConfig.type as string) || 'stdio';
++      if (!syncSuccess) {
++        toast.error('Failed to save MCP servers to disk');
++        return;
++      }
+ 
+-        if (serverType === 'stdio') {
+-          if (!serverConfig.command || typeof serverConfig.command !== 'string') {
+-            toast.error(`Command is required for "${name}" (stdio)`);
+-            return;
+-          }
+-        } else if (serverType === 'sse' || serverType === 'http') {
+-          if (!serverConfig.url || typeof serverConfig.url !== 'string') {
+-            toast.error(`URL is required for "${name}" (${serverType})`);
+-            return;
+-          }
++      toast.success('MCP servers configuration updated');
++      setIsGlobalJsonEditOpen(false);
++      setGlobalJsonValue('');
++    } catch (error) {
++      toast.error('Invalid JSON: ' + (error instanceof Error ? error.message : 'Parse error'));
++    }
++  };
++
++  // Helper: Process array format (with IDs)
++  const handleSaveGlobalJsonArray = async (serversArray: unknown[]) => {
++    // Validate all servers first
++    for (const config of serversArray) {
++      if (typeof config !== 'object' || config === null) {
++        toast.error('Invalid server config in array');
++        throw new Error('Invalid server config');
++      }
++
++      const serverConfig = config as Record<string, unknown>;
++      const name = serverConfig.name as string;
++      const serverType = (serverConfig.type as string) || 'stdio';
++
++      if (!name || typeof name !== 'string') {
++        toast.error('Server name is required');
++        throw new Error('Server name required');
++      }
++
++      if (serverType === 'stdio') {
++        if (!serverConfig.command || typeof serverConfig.command !== 'string') {
++          toast.error(`Command is required for "${name}" (stdio)`);
++          throw new Error('Command required');
++        }
++      } else if (serverType === 'sse' || serverType === 'http') {
++        if (!serverConfig.url || typeof serverConfig.url !== 'string') {
++          toast.error(`URL is required for "${name}" (${serverType})`);
++          throw new Error('URL required');
+         }
+       }
++    }
+ 
+-      // Create a map of existing servers by name for updating
+-      const existingByName = new Map(mcpServers.map((s) => [s.name, s]));
+-      const processedNames = new Set<string>();
++    // Create maps of existing servers by ID and name
++    const existingById = new Map(mcpServers.map((s) => [s.id, s]));
++    const existingByName = new Map(mcpServers.map((s) => [s.name, s]));
++    const processedIds = new Set<string>();
+ 
+-      // Update or add servers
+-      for (const [name, config] of Object.entries(servers)) {
+-        const serverConfig = config as Record<string, unknown>;
+-        const serverType = (serverConfig.type as ServerType) || 'stdio';
++    // Update or add servers
++    for (const config of serversArray) {
++      const serverConfig = config as Record<string, unknown>;
++      const id = serverConfig.id as string | undefined;
++      const name = serverConfig.name as string;
++      const serverType = (serverConfig.type as ServerType) || 'stdio';
+ 
+-        const serverData: Omit<MCPServerConfig, 'id'> = {
+-          name,
+-          type: serverType,
+-          description: (serverConfig.description as string) || undefined,
+-          enabled: serverConfig.enabled !== false,
+-        };
++      const serverData: Omit<MCPServerConfig, 'id'> = {
++        name,
++        type: serverType,
++        description: (serverConfig.description as string) || undefined,
++        enabled: serverConfig.enabled !== false,
++      };
+ 
+-        if (serverType === 'stdio') {
+-          serverData.command = serverConfig.command as string;
+-          if (Array.isArray(serverConfig.args)) {
+-            serverData.args = serverConfig.args as string[];
+-          }
+-          if (typeof serverConfig.env === 'object' && serverConfig.env !== null) {
+-            serverData.env = serverConfig.env as Record<string, string>;
+-          }
+-        } else {
+-          serverData.url = serverConfig.url as string;
+-          if (typeof serverConfig.headers === 'object' && serverConfig.headers !== null) {
+-            serverData.headers = serverConfig.headers as Record<string, string>;
+-          }
++      if (serverType === 'stdio') {
++        serverData.command = serverConfig.command as string;
++        if (Array.isArray(serverConfig.args)) {
++          serverData.args = serverConfig.args as string[];
++        }
++        if (typeof serverConfig.env === 'object' && serverConfig.env !== null) {
++          serverData.env = serverConfig.env as Record<string, string>;
++        }
++      } else {
++        serverData.url = serverConfig.url as string;
++        if (typeof serverConfig.headers === 'object' && serverConfig.headers !== null) {
++          serverData.headers = serverConfig.headers as Record<string, string>;
+         }
++      }
+ 
+-        const existing = existingByName.get(name);
+-        if (existing) {
+-          updateMCPServer(existing.id, serverData);
+-        } else {
+-          addMCPServer(serverData);
++      // Try to match by ID first, then by name
++      const existing = id ? existingById.get(id) : existingByName.get(name);
++      if (existing) {
++        updateMCPServer(existing.id, serverData);
++        processedIds.add(existing.id);
++      } else {
++        addMCPServer(serverData);
++      }
++    }
++
++    // Remove servers that are no longer in the JSON
++    for (const server of mcpServers) {
++      if (!processedIds.has(server.id)) {
++        removeMCPServer(server.id);
++      }
++    }
++  };
++
++  // Helper: Process object format (legacy Claude Desktop format)
++  const handleSaveGlobalJsonObject = async (servers: Record<string, unknown>) => {
++    // Validate all servers first
++    for (const [name, config] of Object.entries(servers)) {
++      if (typeof config !== 'object' || config === null) {
++        toast.error(`Invalid config for "${name}"`);
++        throw new Error('Invalid config');
++      }
++
++      const serverConfig = config as Record<string, unknown>;
++      const serverType = (serverConfig.type as string) || 'stdio';
++
++      if (serverType === 'stdio') {
++        if (!serverConfig.command || typeof serverConfig.command !== 'string') {
++          toast.error(`Command is required for "${name}" (stdio)`);
++          throw new Error('Command required');
++        }
++      } else if (serverType === 'sse' || serverType === 'http') {
++        if (!serverConfig.url || typeof serverConfig.url !== 'string') {
++          toast.error(`URL is required for "${name}" (${serverType})`);
++          throw new Error('URL required');
+         }
+-        processedNames.add(name);
+       }
++    }
++
++    // Create a map of existing servers by name for updating
++    const existingByName = new Map(mcpServers.map((s) => [s.name, s]));
++    const processedNames = new Set<string>();
+ 
+-      // Remove servers that are no longer in the JSON
+-      for (const server of mcpServers) {
+-        if (!processedNames.has(server.name)) {
+-          removeMCPServer(server.id);
++    // Update or add servers
++    for (const [name, config] of Object.entries(servers)) {
++      const serverConfig = config as Record<string, unknown>;
++      const serverType = (serverConfig.type as ServerType) || 'stdio';
++
++      const serverData: Omit<MCPServerConfig, 'id'> = {
++        name,
++        type: serverType,
++        description: (serverConfig.description as string) || undefined,
++        enabled: serverConfig.enabled !== false,
++      };
++
++      if (serverType === 'stdio') {
++        serverData.command = serverConfig.command as string;
++        if (Array.isArray(serverConfig.args)) {
++          serverData.args = serverConfig.args as string[];
++        }
++        if (typeof serverConfig.env === 'object' && serverConfig.env !== null) {
++          serverData.env = serverConfig.env as Record<string, string>;
++        }
++      } else {
++        serverData.url = serverConfig.url as string;
++        if (typeof serverConfig.headers === 'object' && serverConfig.headers !== null) {
++          serverData.headers = serverConfig.headers as Record<string, string>;
+         }
+       }
+ 
+-      await syncSettingsToServer();
++      const existing = existingByName.get(name);
++      if (existing) {
++        updateMCPServer(existing.id, serverData);
++      } else {
++        addMCPServer(serverData);
++      }
++      processedNames.add(name);
++    }
+ 
+-      toast.success('MCP servers configuration updated');
+-      setIsGlobalJsonEditOpen(false);
+-      setGlobalJsonValue('');
+-    } catch (error) {
+-      toast.error('Invalid JSON: ' + (error instanceof Error ? error.message : 'Parse error'));
++    // Remove servers that are no longer in the JSON
++    for (const server of mcpServers) {
++      if (!processedNames.has(server.name)) {
++        removeMCPServer(server.id);
++      }
+     }
+   };
+ 
+diff --git a/apps/ui/src/hooks/use-settings-migration.ts b/apps/ui/src/hooks/use-settings-migration.ts
+index 088883e..ef554ea 100644
+--- a/apps/ui/src/hooks/use-settings-migration.ts
++++ b/apps/ui/src/hooks/use-settings-migration.ts
+@@ -194,8 +194,6 @@ export function useSettingsMigration(): MigrationState {
+  * @returns Promise resolving to true if sync succeeded, false otherwise
+  */
+ export async function syncSettingsToServer(): Promise<boolean> {
+-  if (!isElectron()) return false;
+-
+   try {
+     const api = getHttpApiClient();
+     const automakerStorage = getItem('automaker-storage');
+diff --git a/apps/ui/src/lib/http-api-client.ts b/apps/ui/src/lib/http-api-client.ts
+index ba4f96a..987a994 100644
+--- a/apps/ui/src/lib/http-api-client.ts
++++ b/apps/ui/src/lib/http-api-client.ts
+@@ -168,12 +168,40 @@ export class HttpApiClient implements ElectronAPI {
+       headers: this.getHeaders(),
+       body: body ? JSON.stringify(body) : undefined,
+     });
++
++    if (!response.ok) {
++      let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
++      try {
++        const errorData = await response.json();
++        if (errorData.error) {
++          errorMessage = errorData.error;
++        }
++      } catch {
++        // If parsing JSON fails, use status text
++      }
++      throw new Error(errorMessage);
++    }
++
+     return response.json();
+   }
+ 
+   private async get<T>(endpoint: string): Promise<T> {
+     const headers = this.getHeaders();
+     const response = await fetch(`${this.serverUrl}${endpoint}`, { headers });
++
++    if (!response.ok) {
++      let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
++      try {
++        const errorData = await response.json();
++        if (errorData.error) {
++          errorMessage = errorData.error;
++        }
++      } catch {
++        // If parsing JSON fails, use status text
++      }
++      throw new Error(errorMessage);
++    }
++
+     return response.json();
+   }
+ 
+@@ -183,6 +211,20 @@ export class HttpApiClient implements ElectronAPI {
+       headers: this.getHeaders(),
+       body: body ? JSON.stringify(body) : undefined,
+     });
++
++    if (!response.ok) {
++      let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
++      try {
++        const errorData = await response.json();
++        if (errorData.error) {
++          errorMessage = errorData.error;
++        }
++      } catch {
++        // If parsing JSON fails, use status text
++      }
++      throw new Error(errorMessage);
++    }
++
+     return response.json();
+   }
+ 
+@@ -191,6 +233,20 @@ export class HttpApiClient implements ElectronAPI {
+       method: 'DELETE',
+       headers: this.getHeaders(),
+     });
++
++    if (!response.ok) {
++      let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
++      try {
++        const errorData = await response.json();
++        if (errorData.error) {
++          errorMessage = errorData.error;
++        }
++      } catch {
++        // If parsing JSON fails, use status text
++      }
++      throw new Error(errorMessage);
++    }
++
+     return response.json();
+   }
+ 

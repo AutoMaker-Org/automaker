@@ -194,8 +194,6 @@ export function useSettingsMigration(): MigrationState {
  * @returns Promise resolving to true if sync succeeded, false otherwise
  */
 export async function syncSettingsToServer(): Promise<boolean> {
-  if (!isElectron()) return false;
-
   try {
     const api = getHttpApiClient();
     const automakerStorage = getItem('automaker-storage');
