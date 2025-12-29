@@ -244,14 +244,19 @@ Before considering the fixes complete, verify:
 ## Upstream Contribution Status
 
 **Phase 1**: Local fixes applied ✅
-**Phase 2** (Current): GitHub issues created ✅
+**Phase 2**: GitHub issues created ✅
 
 - Issue #315: Fix HTTP error handling - https://github.com/AutoMaker-Org/automaker/issues/315
 - Issue #316: Fix race condition - https://github.com/AutoMaker-Org/automaker/issues/316
 - Issue #317: Fix JSON format - https://github.com/AutoMaker-Org/automaker/issues/317
 
-**Phase 3** (Next): Create Pull Requests referencing the issues above
-**Phase 4** (After merge): Remove patches if PRs are merged, or maintain permanent patches
+**Phase 3** (Current): Pull Requests created ✅
+
+- PR #318: HTTP error handling (fixes #315) - https://github.com/AutoMaker-Org/automaker/pull/318
+- PR #319: Race condition + JSON format (fixes #316, #317) - https://github.com/AutoMaker-Org/automaker/pull/319
+
+**Phase 4** (Next): Await review and merge from upstream maintainers
+**Phase 5** (After merge): Remove patches if PRs are merged, or maintain permanent patches
 
 Track contribution progress in `.plans/mcp-bugs-fix-plan.md`.
 
