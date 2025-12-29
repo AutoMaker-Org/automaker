@@ -23,6 +23,8 @@ interface AgentOutputModalProps {
   featureStatus?: string;
   /** Called when a number key (0-9) is pressed while the modal is open */
   onNumberKeyPress?: (key: string) => void;
+  /** Project path - if not provided, falls back to window.__currentProject for backward compatibility */
+  projectPath?: string;
 }
 
 type ViewMode = 'parsed' | 'raw' | 'changes';
@@ -34,6 +36,7 @@ export function AgentOutputModal({
   featureId,
   featureStatus,
   onNumberKeyPress,
+  projectPath: projectPathProp,
 }: AgentOutputModalProps) {
   const [output, setOutput] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
@@ -62,19 +65,19 @@ export function AgentOutputModal({
       setIsLoading(true);
 
       try {
-        // Get current project path from store (we'll need to pass this)
-        const currentProject = (window as any).__currentProject;
-        if (!currentProject?.path) {
+        // Use projectPath prop if provided, otherwise fall back to window.__currentProject for backward compatibility
+        const resolvedProjectPath = projectPathProp || (window as any).__currentProject?.path;
+        if (!resolvedProjectPath) {
           setIsLoading(false);
           return;
         }
 
-        projectPathRef.current = currentProject.path;
-        setProjectPath(currentProject.path);
+        projectPathRef.current = resolvedProjectPath;
+        setProjectPath(resolvedProjectPath);
 
         // Use features API to get agent output
         if (api.features) {
-          const result = await api.features.getAgentOutput(currentProject.path, featureId);
+          const result = await api.features.getAgentOutput(resolvedProjectPath, featureId);
 
           if (result.success) {
             setOutput(result.content || '');
@@ -93,7 +96,7 @@ export function AgentOutputModal({
     };
 
     loadOutput();
-  }, [open, featureId]);
+  }, [open, featureId, projectPathProp]);
 
   // Listen to auto mode events and update output
   useEffect(() => {

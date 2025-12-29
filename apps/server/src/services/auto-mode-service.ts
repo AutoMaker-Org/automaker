@@ -1374,18 +1374,43 @@ Format your response as a structured markdown document.`;
   /**
    * Get detailed info about all running agents
    */
-  getRunningAgents(): Array<{
-    featureId: string;
-    projectPath: string;
-    projectName: string;
-    isAutoMode: boolean;
-  }> {
-    return Array.from(this.runningFeatures.values()).map((rf) => ({
-      featureId: rf.featureId,
-      projectPath: rf.projectPath,
-      projectName: path.basename(rf.projectPath),
-      isAutoMode: rf.isAutoMode,
-    }));
+  async getRunningAgents(): Promise<
+    Array<{
+      featureId: string;
+      projectPath: string;
+      projectName: string;
+      isAutoMode: boolean;
+      title?: string;
+      description?: string;
+    }>
+  > {
+    const agents = await Promise.all(
+      Array.from(this.runningFeatures.values()).map(async (rf) => {
+        // Try to fetch feature data to get title and description
+        let title: string | undefined;
+        let description: string | undefined;
+
+        try {
+          const feature = await this.featureLoader.get(rf.projectPath, rf.featureId);
+          if (feature) {
+            title = feature.title;
+            description = feature.description;
+          }
+        } catch (error) {
+          // Silently ignore errors - title/description are optional
+        }
+
+        return {
+          featureId: rf.featureId,
+          projectPath: rf.projectPath,
+          projectName: path.basename(rf.projectPath),
+          isAutoMode: rf.isAutoMode,
+          title,
+          description,
+        };
+      })
+    );
+    return agents;
   }
 
   /**

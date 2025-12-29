@@ -9,8 +9,7 @@ import { getErrorMessage, logError } from '../common.js';
 export function createIndexHandler(autoModeService: AutoModeService) {
   return async (_req: Request, res: Response): Promise<void> => {
     try {
-      const runningAgents = autoModeService.getRunningAgents();
-      const status = autoModeService.getStatus();
+      const runningAgents = await autoModeService.getRunningAgents();
 
       res.json({
         success: true,

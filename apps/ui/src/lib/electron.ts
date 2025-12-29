@@ -106,6 +106,8 @@ export interface RunningAgent {
   projectPath: string;
   projectName: string;
   isAutoMode: boolean;
+  title?: string;
+  description?: string;
 }
 
 export interface RunningAgentsResult {
@@ -2687,6 +2689,8 @@ function createMockRunningAgentsAPI(): RunningAgentsAPI {
         projectPath: '/mock/project',
         projectName: 'Mock Project',
         isAutoMode: mockAutoModeRunning,
+        title: `Mock Feature Title for ${featureId}`,
+        description: 'This is a mock feature description for testing purposes.',
       }));
       return {
         success: true,
