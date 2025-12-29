@@ -27,6 +27,7 @@ import {
   ShieldCheck,
   XCircle,
   Trash2,
+  File,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { StatusBadge, TerminalOutput } from '../components';
@@ -64,6 +65,13 @@ export function ClaudeSetupStep({ onNext, onBack, onSkip }: ClaudeSetupStepProps
   const [apiKeyVerificationStatus, setApiKeyVerificationStatus] =
     useState<VerificationStatus>('idle');
   const [apiKeyVerificationError, setApiKeyVerificationError] = useState<string | null>(null);
+
+  // Settings File Verification state
+  const [settingsFileVerificationStatus, setSettingsFileVerificationStatus] =
+    useState<VerificationStatus>('idle');
+  const [settingsFileVerificationError, setSettingsFileVerificationError] = useState<string | null>(
+    null
+  );
 
   // Delete API Key state
   const [isDeletingApiKey, setIsDeletingApiKey] = useState(false);
@@ -240,6 +248,42 @@ export function ClaudeSetupStep({ onNext, onBack, onSkip }: ClaudeSetupStepProps
     }
   }, [apiKeys, setApiKeys, claudeAuthStatus, setClaudeAuthStatus]);
 
+  // Verify Settings File authentication (uses token from ~/.claude/settings.json)
+  const verifySettingsFileAuth = useCallback(async () => {
+    setSettingsFileVerificationStatus('verifying');
+    setSettingsFileVerificationError(null);
+
+    try {
+      const api = getElectronAPI();
+      if (!api.setup?.verifyClaudeAuth) {
+        setSettingsFileVerificationStatus('error');
+        setSettingsFileVerificationError('Verification API not available');
+        return;
+      }
+
+      // Pass "settings_file" to verify settings file authentication only
+      const result = await api.setup.verifyClaudeAuth('settings_file');
+
+      if (result.authenticated) {
+        setSettingsFileVerificationStatus('verified');
+        setClaudeAuthStatus({
+          authenticated: true,
+          method: 'settings_file',
+          hasCredentialsFile: false,
+          apiKeyValid: true,
+        });
+        toast.success('Settings file authentication verified!');
+      } else {
+        setSettingsFileVerificationStatus('error');
+        setSettingsFileVerificationError(result.error || 'Authentication failed');
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Verification failed';
+      setSettingsFileVerificationStatus('error');
+      setSettingsFileVerificationError(errorMessage);
+    }
+  }, [setClaudeAuthStatus]);
+
   // Sync install progress to store
   useEffect(() => {
     setClaudeInstallProgress({
@@ -263,13 +307,16 @@ export function ClaudeSetupStep({ onNext, onBack, onSkip }: ClaudeSetupStepProps
     !!apiKeys.anthropic ||
     claudeAuthStatus?.method === 'api_key' ||
     claudeAuthStatus?.method === 'api_key_env';
+  const hasSettingsFileAuth = claudeAuthStatus?.hasSettingsFileAuth || false;
   const isCliVerified = cliVerificationStatus === 'verified';
   const isApiKeyVerified = apiKeyVerificationStatus === 'verified';
-  const isReady = isCliVerified || isApiKeyVerified;
+  const isSettingsFileVerified = settingsFileVerificationStatus === 'verified';
+  const isReady = isCliVerified || isApiKeyVerified || isSettingsFileVerified;
 
   const getAuthMethodLabel = () => {
     if (isApiKeyVerified) return 'API Key';
     if (isCliVerified) return 'Claude CLI';
+    if (isSettingsFileVerified) return 'Settings File';
     return null;
   };
 
@@ -304,6 +351,21 @@ export function ClaudeSetupStep({ onNext, onBack, onSkip }: ClaudeSetupStepProps
       return <StatusBadge status="unverified" label="Unverified" />;
     }
     return <StatusBadge status="not_authenticated" label="Not Set" />;
+  };
+
+  // Helper to get status badge for Settings File
+  const getSettingsFileStatusBadge = () => {
+    if (settingsFileVerificationStatus === 'verified') {
+      return <StatusBadge status="authenticated" label="Verified" />;
+    }
+    if (settingsFileVerificationStatus === 'error') {
+      return <StatusBadge status="error" label="Error" />;
+    }
+    if (hasSettingsFileAuth) {
+      // Settings file has auth but not yet verified - show yellow unverified badge
+      return <StatusBadge status="unverified" label="Unverified" />;
+    }
+    return <StatusBadge status="not_authenticated" label="Not Available" />;
   };
 
   return (
@@ -649,6 +711,111 @@ export function ClaudeSetupStep({ onNext, onBack, onSkip }: ClaudeSetupStepProps
                       <>
                         <ShieldCheck className="w-4 h-4 mr-2" />
                         Verify API Key
+                      </>
+                    )}
+                  </Button>
+                )}
+              </AccordionContent>
+            </AccordionItem>
+
+            {/* Option 3: Settings File */}
+            <AccordionItem value="settings-file" className="border-border">
+              <AccordionTrigger className="hover:no-underline">
+                <div className="flex items-center justify-between w-full pr-4">
+                  <div className="flex items-center gap-3">
+                    <File
+                      className={`w-5 h-5 ${
+                        settingsFileVerificationStatus === 'verified'
+                          ? 'text-green-500'
+                          : 'text-muted-foreground'
+                      }`}
+                    />
+                    <div className="text-left">
+                      <p className="font-medium text-foreground">
+                        Settings File (~/.claude/settings.json)
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        Use existing Claude Code configuration
+                      </p>
+                    </div>
+                  </div>
+                  {getSettingsFileStatusBadge()}
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="pt-4 space-y-4">
+                {/* Settings File Info */}
+                <div className="space-y-4 p-4 rounded-lg bg-muted/30 border border-border">
+                  <div className="flex items-center gap-2">
+                    <Info className="w-4 h-4 text-muted-foreground" />
+                    <p className="font-medium text-foreground">About Settings File</p>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    If you have Claude Code installed and authenticated, your authentication token
+                    is stored in{' '}
+                    <code className="bg-muted px-2 py-1 rounded">~/.claude/settings.json</code>.
+                    This option will use that token for authentication.
+                  </p>
+                </div>
+
+                {/* Settings File Verification Status */}
+                {settingsFileVerificationStatus === 'verifying' && (
+                  <div className="flex items-center gap-3 p-4 rounded-lg bg-blue-500/10 border border-blue-500/20">
+                    <Loader2 className="w-5 h-5 text-blue-500 animate-spin" />
+                    <div>
+                      <p className="font-medium text-foreground">Verifying settings file...</p>
+                      <p className="text-sm text-muted-foreground">
+                        Checking ~/.claude/settings.json
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {settingsFileVerificationStatus === 'verified' && (
+                  <div className="flex items-center gap-3 p-4 rounded-lg bg-green-500/10 border border-green-500/20">
+                    <CheckCircle2 className="w-5 h-5 text-green-500" />
+                    <div>
+                      <p className="font-medium text-foreground">
+                        Settings file authentication verified!
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        Your token from ~/.claude/settings.json is working correctly.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {settingsFileVerificationStatus === 'error' && settingsFileVerificationError && (
+                  <div className="flex items-start gap-3 p-4 rounded-lg bg-red-500/10 border border-red-500/20">
+                    <XCircle className="w-5 h-5 text-red-500 shrink-0" />
+                    <div className="flex-1">
+                      <p className="font-medium text-foreground">Verification failed</p>
+                      <p className="text-sm text-red-400 mt-1">{settingsFileVerificationError}</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Settings File Verify Button - Hide if verified */}
+                {settingsFileVerificationStatus !== 'verified' && (
+                  <Button
+                    onClick={verifySettingsFileAuth}
+                    disabled={settingsFileVerificationStatus === 'verifying'}
+                    className="w-full bg-brand-500 hover:bg-brand-600 text-white"
+                    data-testid="verify-settings-file-button"
+                  >
+                    {settingsFileVerificationStatus === 'verifying' ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Verifying...
+                      </>
+                    ) : settingsFileVerificationStatus === 'error' ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 mr-2" />
+                        Retry Verification
+                      </>
+                    ) : (
+                      <>
+                        <ShieldCheck className="w-4 h-4 mr-2" />
+                        Verify Settings File
                       </>
                     )}
                   </Button>
