@@ -1,4 +1,5 @@
 import { Sparkles, Clock, Loader2 } from 'lucide-react';
+import { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -10,6 +11,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { HotkeyButton } from '@/components/ui/hotkey-button';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { FEATURE_COUNT_OPTIONS } from '../constants';
 import type { CreateSpecDialogProps, FeatureCount } from '../types';
@@ -32,7 +34,40 @@ export function CreateSpecDialog({
   title = 'Create App Specification',
   description = "We didn't find an app_spec.txt file. Let us help you generate your app_spec.txt to help describe your project for our system. We'll analyze your project's tech stack and create a comprehensive specification.",
 }: CreateSpecDialogProps) {
+  const [isCustomMode, setIsCustomMode] = useState(false);
+  const [customValue, setCustomValue] = useState<string>('');
+
+  // Determine if we're in custom mode based on featureCount
+  useEffect(() => {
+    const isCustom = !FEATURE_COUNT_OPTIONS.slice(0, -1).some((o) => o.value === featureCount);
+    setIsCustomMode(isCustom);
+    if (isCustom && featureCount > 0) {
+      setCustomValue(featureCount.toString());
+    }
+  }, [featureCount]);
+
   const selectedOption = FEATURE_COUNT_OPTIONS.find((o) => o.value === featureCount);
+
+  const handleOptionClick = (option: (typeof FEATURE_COUNT_OPTIONS)[number]) => {
+    if (option.isCustom) {
+      setIsCustomMode(true);
+      const defaultCustom = 150;
+      setCustomValue(defaultCustom.toString());
+      onFeatureCountChange(defaultCustom);
+    } else {
+      setIsCustomMode(false);
+      setCustomValue('');
+      onFeatureCountChange(option.value as FeatureCount);
+    }
+  };
+
+  const handleCustomValueChange = (value: string) => {
+    setCustomValue(value);
+    const numValue = parseInt(value, 10);
+    if (!isNaN(numValue) && numValue > 0) {
+      onFeatureCountChange(numValue);
+    }
+  };
 
   return (
     <Dialog
@@ -114,20 +149,32 @@ export function CreateSpecDialog({
           {generateFeatures && (
             <div className="space-y-2 pt-2 pl-7">
               <label className="text-sm font-medium">Number of Features</label>
-              <div className="flex gap-2">
+              <div className="flex gap-2 flex-wrap">
                 {FEATURE_COUNT_OPTIONS.map((option) => (
                   <Button
                     key={option.value}
                     type="button"
-                    variant={featureCount === option.value ? 'default' : 'outline'}
+                    variant={
+                      option.isCustom
+                        ? isCustomMode
+                          ? 'default'
+                          : 'outline'
+                        : featureCount === option.value
+                          ? 'default'
+                          : 'outline'
+                    }
                     size="sm"
-                    onClick={() => onFeatureCountChange(option.value as FeatureCount)}
+                    onClick={() => handleOptionClick(option)}
                     disabled={isCreatingSpec}
                     className={cn(
-                      'flex-1 transition-all',
-                      featureCount === option.value
-                        ? 'bg-primary hover:bg-primary/90 text-primary-foreground'
-                        : 'bg-muted/30 hover:bg-muted/50 border-border'
+                      'flex-1 min-w-[70px] transition-all',
+                      option.isCustom
+                        ? isCustomMode
+                          ? 'bg-primary hover:bg-primary/90 text-primary-foreground'
+                          : 'bg-muted/30 hover:bg-muted/50 border-border'
+                        : featureCount === option.value
+                          ? 'bg-primary hover:bg-primary/90 text-primary-foreground'
+                          : 'bg-muted/30 hover:bg-muted/50 border-border'
                     )}
                     data-testid={`feature-count-${option.value}`}
                   >
@@ -135,10 +182,35 @@ export function CreateSpecDialog({
                   </Button>
                 ))}
               </div>
-              {selectedOption?.warning && (
+              {isCustomMode && (
+                <div className="space-y-1">
+                  <label htmlFor="custom-feature-count" className="text-xs text-muted-foreground">
+                    Custom number of features:
+                  </label>
+                  <Input
+                    id="custom-feature-count"
+                    type="number"
+                    min="1"
+                    max="10000"
+                    value={customValue}
+                    onChange={(e) => handleCustomValueChange(e.target.value)}
+                    disabled={isCreatingSpec}
+                    className="w-full"
+                    placeholder="Enter number of features"
+                    autoFocus
+                  />
+                </div>
+              )}
+              {selectedOption?.warning && !isCustomMode && (
                 <p className="text-xs text-amber-500 flex items-center gap-1">
                   <Clock className="w-3 h-3" />
                   {selectedOption.warning}
+                </p>
+              )}
+              {isCustomMode && customValue && parseInt(customValue, 10) > 100 && (
+                <p className="text-xs text-amber-500 flex items-center gap-1">
+                  <Clock className="w-3 h-3" />
+                  Large number of features may take significant time to generate
                 </p>
               )}
             </div>

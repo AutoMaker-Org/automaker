@@ -1,6 +1,115 @@
 # Custom Changes to Automaker
 
-This document tracks custom bug fixes applied locally to the Automaker codebase that are pending upstream contribution.
+This document tracks custom features and bug fixes applied locally to the Automaker codebase that are pending upstream contribution or will remain fork-specific.
+
+---
+
+## Custom Feature: Extended Feature Count Options (2025-12-29)
+
+**Status**: Fork-specific feature (NOT for upstream contribution)
+
+**Files Modified**:
+
+- `apps/ui/src/components/views/spec-view/types.ts`
+- `apps/ui/src/components/views/spec-view/constants.ts`
+- `apps/ui/src/components/views/spec-view/dialogs/create-spec-dialog.tsx`
+- `apps/ui/src/components/views/spec-view/dialogs/regenerate-spec-dialog.tsx`
+
+### What Changed
+
+Added more options for the number of features to generate when creating/regenerating app specifications:
+
+**New Options**:
+
+- **200 features** - with warning "May take up to 10 minutes"
+- **500 features** - with warning "May take up to 15 minutes"
+- **Custom** - opens an input field where users can enter any number from 1 to 10,000
+
+**Previous Options** (still available):
+
+- 20 features
+- 50 features
+- 100 features
+
+### Implementation Details
+
+1. **Type Change** (`types.ts`):
+
+   ```typescript
+   // Before: export type FeatureCount = 20 | 50 | 100;
+   // After:
+   export type FeatureCount = number;
+   ```
+
+2. **New Options** (`constants.ts`):
+
+   ```typescript
+   export const FEATURE_COUNT_OPTIONS: {
+     value: FeatureCount;
+     label: string;
+     warning?: string;
+     isCustom?: boolean;
+   }[] = [
+     { value: 20, label: '20' },
+     { value: 50, label: '50', warning: 'May take up to 5 minutes' },
+     { value: 100, label: '100', warning: 'May take up to 5 minutes' },
+     { value: 200, label: '200', warning: 'May take up to 10 minutes' },
+     { value: 500, label: '500', warning: 'May take up to 15 minutes' },
+     { value: -1, label: 'Custom', isCustom: true },
+   ];
+   ```
+
+3. **Custom Input UI** (both dialog components):
+   - When "Custom" button is clicked, an input field appears
+   - User can enter any number from 1 to 10,000
+   - Default value when switching to custom: 150
+   - Shows warning for values > 100: "Large number of features may take significant time to generate"
+   - Input is disabled during spec generation
+
+### User Experience
+
+**Before**:
+
+- 3 fixed options: 20, 50, 100
+- No way to generate different quantities
+
+**After**:
+
+- 6 buttons: 20, 50, 100, 200, 500, Custom
+- Custom button opens number input field
+- Flexible: can generate any number of features from 1 to 10,000
+- Smart warnings based on quantity
+
+### Re-applying After Upstream Updates
+
+```bash
+cd N:\code\automaker-app
+
+# Apply the patch
+git apply patches/03-custom-feature-count-2025-12-29.patch
+
+# If conflicts occur, resolve manually using this documentation as reference
+```
+
+### Why Fork-Specific?
+
+This is a power-user feature that may not align with upstream's simpler UI philosophy. Keeping it fork-specific allows:
+
+- Faster iteration on custom features
+- No need to wait for upstream approval
+- Easy re-application via patch after upstream syncs
+
+### Testing
+
+- ✅ `npm run build:packages` passes
+- ✅ `npm run build` (UI) passes
+- ✅ All 6 options render correctly
+- ✅ Custom input appears when "Custom" is clicked
+- ✅ Custom input updates featureCount value
+- ✅ Warnings display correctly for each option
+- ✅ Works in both "Create Spec" and "Regenerate Spec" dialogs
+
+---
 
 ## MCP Server Bug Fixes (2025-12-29)
 

@@ -1,5 +1,5 @@
 // Feature count options for spec generation
-export type FeatureCount = 20 | 50 | 100;
+export type FeatureCount = number;
 
 // Generation phases for UI display
 export type GenerationPhase =

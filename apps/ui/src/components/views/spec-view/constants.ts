@@ -11,10 +11,14 @@ export const FEATURE_COUNT_OPTIONS: {
   value: FeatureCount;
   label: string;
   warning?: string;
+  isCustom?: boolean;
 }[] = [
   { value: 20, label: '20' },
   { value: 50, label: '50', warning: 'May take up to 5 minutes' },
   { value: 100, label: '100', warning: 'May take up to 5 minutes' },
+  { value: 200, label: '200', warning: 'May take up to 10 minutes' },
+  { value: 500, label: '500', warning: 'May take up to 15 minutes' },
+  { value: -1, label: 'Custom', isCustom: true },
 ];
 
 // Phase display labels for UI
