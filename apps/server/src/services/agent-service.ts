@@ -21,6 +21,8 @@ import {
   getAutoLoadClaudeMdSetting,
   getEnableSandboxModeSetting,
   filterClaudeMdFromContext,
+  getMCPServersFromSettings,
+  getMCPPermissionSettings,
 } from '../lib/settings-helpers.js';
 
 interface Message {
@@ -197,6 +199,11 @@ export class AgentService {
     session.isRunning = true;
     session.abortController = new AbortController();
 
+    // Emit started event so UI can show thinking indicator
+    this.emitAgentEvent(sessionId, {
+      type: 'started',
+    });
+
     // Emit user message event
     this.emitAgentEvent(sessionId, {
       type: 'message',
@@ -210,7 +217,7 @@ export class AgentService {
       const effectiveWorkDir = workingDirectory || session.workingDirectory;
 
       // Load autoLoadClaudeMd setting (project setting takes precedence over global)
-      const autoLoadClaudeMdSetting = await getAutoLoadClaudeMdSetting(
+      const autoLoadClaudeMd = await getAutoLoadClaudeMdSetting(
         effectiveWorkDir,
         this.settingsService,
         '[AgentService]'
@@ -222,17 +229,11 @@ export class AgentService {
         '[AgentService]'
       );
 
-      // Resolve provider before building CLAUDE.md options
-      const preliminaryOptions = createChatOptions({
-        cwd: effectiveWorkDir,
-        model: model,
-        sessionModel: session.model,
-        abortController: session.abortController!,
-      });
-      const preliminaryModel = preliminaryOptions.model!;
-      const preliminaryProvider = ProviderFactory.getProviderForModel(preliminaryModel);
-      const autoLoadClaudeMd =
-        autoLoadClaudeMdSetting && preliminaryProvider.getName() === 'claude';
+      // Load MCP servers from settings (global setting only)
+      const mcpServers = await getMCPServersFromSettings(this.settingsService, '[AgentService]');
+
+      // Load MCP permission settings (global setting only)
+      const mcpPermissions = await getMCPPermissionSettings(this.settingsService, '[AgentService]');
 
       // Load project context files (CLAUDE.md, CODE_QUALITY.md, etc.)
       const contextResult = await loadContextFiles({
@@ -240,7 +241,8 @@ export class AgentService {
         fsModule: secureFs as Parameters<typeof loadContextFiles>[0]['fsModule'],
       });
 
-      // When autoLoadClaudeMd is enabled for Claude, filter out CLAUDE.md to avoid duplication
+      // When autoLoadClaudeMd is enabled, filter out CLAUDE.md to avoid duplication
+      // (SDK handles CLAUDE.md via settingSources), but keep other context files like CODE_QUALITY.md
       const contextFilesPrompt = filterClaudeMdFromContext(contextResult, autoLoadClaudeMd);
 
       // Build combined system prompt with base prompt and context files
@@ -258,6 +260,9 @@ export class AgentService {
         abortController: session.abortController!,
         autoLoadClaudeMd,
         enableSandboxMode,
+        mcpServers: Object.keys(mcpServers).length > 0 ? mcpServers : undefined,
+        mcpAutoApproveTools: mcpPermissions.mcpAutoApproveTools,
+        mcpUnrestrictedTools: mcpPermissions.mcpUnrestrictedTools,
       });
 
       // Extract model, maxTurns, and allowedTools from SDK options
@@ -281,6 +286,9 @@ export class AgentService {
         settingSources: sdkOptions.settingSources,
         sandbox: sdkOptions.sandbox, // Pass sandbox configuration
         sdkSessionId: session.sdkSessionId, // Pass SDK session ID for resuming
+        mcpServers: Object.keys(mcpServers).length > 0 ? mcpServers : undefined, // Pass MCP servers configuration
+        mcpAutoApproveTools: mcpPermissions.mcpAutoApproveTools, // Pass MCP auto-approve setting
+        mcpUnrestrictedTools: mcpPermissions.mcpUnrestrictedTools, // Pass MCP unrestricted tools setting
       };
 
       // Build prompt content with images
@@ -300,8 +308,6 @@ export class AgentService {
       let currentAssistantMessage: Message | null = null;
       let responseText = '';
       const toolUses: Array<{ name: string; input: unknown }> = [];
-      let sawError = false;
-      let emittedComplete = false;
 
       for await (const msg of stream) {
         // Capture SDK session ID from any message and persist it
@@ -350,18 +356,10 @@ export class AgentService {
             }
           }
         } else if (msg.type === 'result') {
-          if (msg.subtype === 'success' && msg.result !== undefined) {
-            responseText = msg.result;
-            if (!currentAssistantMessage) {
-              currentAssistantMessage = {
-                id: this.generateId(),
-                role: 'assistant',
-                content: responseText,
-                timestamp: new Date().toISOString(),
-              };
-              session.messages.push(currentAssistantMessage);
-            } else {
-              currentAssistantMessage.content = responseText;
+          if (msg.subtype === 'success' && msg.result) {
+            if (currentAssistantMessage) {
+              currentAssistantMessage.content = msg.result;
+              responseText = msg.result;
             }
           }
 
@@ -371,20 +369,7 @@ export class AgentService {
             content: responseText,
             toolUses,
           });
-          emittedComplete = true;
-        } else if (msg.type === 'error') {
-          sawError = true;
-          throw new Error(msg.error || 'Unknown error');
         }
-      }
-
-      if (!emittedComplete && !sawError) {
-        this.emitAgentEvent(sessionId, {
-          type: 'complete',
-          messageId: currentAssistantMessage?.id,
-          content: responseText,
-          toolUses,
-        });
       }
 
       await this.saveSession(sessionId, session.messages);

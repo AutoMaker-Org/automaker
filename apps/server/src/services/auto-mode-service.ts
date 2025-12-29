@@ -1,9 +1,9 @@
 /**
- * Auto Mode Service - Autonomous feature implementation using AI providers
+ * Auto Mode Service - Autonomous feature implementation using Claude Agent SDK
  *
  * Manages:
  * - Worktree creation for isolated development
- * - Feature execution with Claude or Cursor
+ * - Feature execution with Claude
  * - Concurrent execution with max concurrency limits
  * - Progress streaming via events
  * - Verification and merge workflows
@@ -18,31 +18,6 @@ import {
   loadContextFiles,
 } from '@automaker/utils';
 import { resolveModelString, DEFAULT_MODELS } from '@automaker/model-resolver';
-import {
-  directScore,
-  pairwiseCompare,
-  generateRubric,
-  runJudgeText,
-  type GenerateRubricOutput,
-} from '../lib/llm-judge.js';
-
-/**
- * Get the default model based on the current default provider setting
- */
-function getDefaultModelForProvider(): string {
-  const provider = ProviderFactory.getDefaultProvider();
-  switch (provider) {
-    case 'cursor':
-      return DEFAULT_MODELS.cursor;
-    case 'opencode':
-      return DEFAULT_MODELS.opencode;
-    case 'codex':
-      return DEFAULT_MODELS.codex;
-    case 'claude':
-    default:
-      return DEFAULT_MODELS.claude;
-  }
-}
 import { resolveDependencies, areDependenciesSatisfied } from '@automaker/dependency-resolver';
 import { getFeatureDir, getAutomakerDir, getFeaturesDir } from '@automaker/platform';
 import { exec } from 'child_process';
@@ -50,8 +25,11 @@ import { promisify } from 'util';
 import path from 'path';
 import * as secureFs from '../lib/secure-fs.js';
 import type { EventEmitter } from '../lib/events.js';
-import { createAutoModeOptions, validateWorkingDirectory } from '../lib/sdk-options.js';
-import { filterClaudeMdFromContext, getAutoLoadClaudeMdSetting } from '../lib/settings-helpers.js';
+import {
+  createAutoModeOptions,
+  createCustomOptions,
+  validateWorkingDirectory,
+} from '../lib/sdk-options.js';
 import { FeatureLoader } from './feature-loader.js';
 import type { SettingsService } from './settings-service.js';
 import { pipelineService, PipelineService } from './pipeline-service.js';
@@ -59,38 +37,11 @@ import {
   getAutoLoadClaudeMdSetting,
   getEnableSandboxModeSetting,
   filterClaudeMdFromContext,
+  getMCPServersFromSettings,
+  getMCPPermissionSettings,
 } from '../lib/settings-helpers.js';
 
 const execAsync = promisify(exec);
-
-const JUDGE_ENABLED = process.env.AUTOMAKER_JUDGE_ENABLED !== 'false';
-const PLAN_JUDGE_ENABLED = JUDGE_ENABLED && process.env.AUTOMAKER_PLAN_JUDGE !== 'false';
-const SUMMARY_ENABLED = JUDGE_ENABLED && process.env.AUTOMAKER_CONTEXT_SUMMARY !== 'false';
-const JUDGE_WRITE_REPORTS = process.env.AUTOMAKER_JUDGE_REPORTS === 'true';
-
-const PLAN_JUDGE_THRESHOLD = readNumberEnv('AUTOMAKER_PLAN_JUDGE_THRESHOLD', 3.5);
-const SUMMARY_MIN_CHARS = readIntEnv('AUTOMAKER_CONTEXT_SUMMARY_MIN_CHARS', 6000);
-const SUMMARY_SOURCE_MAX_CHARS = readIntEnv('AUTOMAKER_CONTEXT_SUMMARY_SOURCE_MAX_CHARS', 40000);
-const SUMMARY_MAX_LINES = readIntEnv('AUTOMAKER_CONTEXT_SUMMARY_MAX_LINES', 60);
-const SUMMARY_SCORE_THRESHOLD = readNumberEnv('AUTOMAKER_CONTEXT_SUMMARY_THRESHOLD', 3.2);
-
-function readIntEnv(name: string, fallback: number): number {
-  const raw = process.env[name];
-  if (!raw) {
-    return fallback;
-  }
-  const parsed = Number.parseInt(raw, 10);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
-}
-
-function readNumberEnv(name: string, fallback: number): number {
-  const raw = process.env[name];
-  if (!raw) {
-    return fallback;
-  }
-  const parsed = Number.parseFloat(raw);
-  return Number.isFinite(parsed) ? parsed : fallback;
-}
 
 // Planning mode types for spec-driven development
 type PlanningMode = 'skip' | 'lite' | 'spec' | 'full';
@@ -403,7 +354,6 @@ export class AutoModeService {
   private autoLoopAbortController: AbortController | null = null;
   private config: AutoModeConfig | null = null;
   private pendingApprovals = new Map<string, PendingApproval>();
-  private summaryRubric: GenerateRubricOutput | null = null;
   private settingsService: SettingsService | null = null;
 
   constructor(events: EventEmitter, settingsService?: SettingsService) {
@@ -530,7 +480,6 @@ export class AutoModeService {
     providedWorktreePath?: string,
     options?: {
       continuationPrompt?: string;
-      previousContent?: string;
     }
   ): Promise<void> {
     if (this.runningFeatures.has(featureId)) {
@@ -617,19 +566,24 @@ export class AutoModeService {
       // Update feature status to in_progress
       await this.updateFeatureStatus(projectPath, featureId, 'in_progress');
 
-      // Build the prompt - use continuation prompt if provided (for recovery after plan approval)
-      let prompt: string;
-      // Load project context files (CLAUDE.md, CODE_QUALITY.md, etc.) - passed as system prompt
+      // Load autoLoadClaudeMd setting to determine context loading strategy
       const autoLoadClaudeMd = await getAutoLoadClaudeMdSetting(
         projectPath,
         this.settingsService,
         '[AutoMode]'
       );
-      const contextFilesResult = await loadContextFiles({
+
+      // Build the prompt - use continuation prompt if provided (for recovery after plan approval)
+      let prompt: string;
+      // Load project context files (CLAUDE.md, CODE_QUALITY.md, etc.) - passed as system prompt
+      const contextResult = await loadContextFiles({
         projectPath,
         fsModule: secureFs as Parameters<typeof loadContextFiles>[0]['fsModule'],
       });
-      const contextFilesPrompt = filterClaudeMdFromContext(contextFilesResult, autoLoadClaudeMd);
+
+      // When autoLoadClaudeMd is enabled, filter out CLAUDE.md to avoid duplication
+      // (SDK handles CLAUDE.md via settingSources), but keep other context files like CODE_QUALITY.md
+      const contextFilesPrompt = filterClaudeMdFromContext(contextResult, autoLoadClaudeMd);
 
       if (options?.continuationPrompt) {
         // Continuation prompt is used when recovering from a plan approval
@@ -657,13 +611,9 @@ export class AutoModeService {
         typeof img === 'string' ? img : img.path
       );
 
-      // Get model from feature, falling back to the default provider's model
-      const defaultModel = getDefaultModelForProvider();
-      const model = resolveModelString(feature.model, defaultModel);
-      const provider = ProviderFactory.getProviderForModel(model);
-      console.log(
-        `[AutoMode] Executing feature ${featureId} with model: ${model} (provider: ${provider.getName()}) in ${workDir}`
-      );
+      // Get model from feature
+      const model = resolveModelString(feature.model, DEFAULT_MODELS.claude);
+      console.log(`[AutoMode] Executing feature ${featureId} with model: ${model} in ${workDir}`);
 
       // Run the agent with the feature's model and images
       // Context files are passed as system prompt for higher priority
@@ -679,8 +629,6 @@ export class AutoModeService {
           projectPath,
           planningMode: feature.planningMode,
           requirePlanApproval: feature.requirePlanApproval,
-          previousContent: options?.previousContent,
-          featureDescription: feature.description,
           systemPrompt: contextFilesPrompt || undefined,
           autoLoadClaudeMd,
         }
@@ -922,15 +870,7 @@ Complete the pipeline step instructions above. Review the previous work and appl
     if (hasContext) {
       // Load previous context and continue
       const context = (await secureFs.readFile(contextPath, 'utf-8')) as string;
-      const summaryContext = await this.loadFeatureSummary(projectPath, featureId);
-      const contextForPrompt = summaryContext || context;
-      return this.executeFeatureWithContext(
-        projectPath,
-        featureId,
-        contextForPrompt,
-        useWorktrees,
-        context
-      );
+      return this.executeFeatureWithContext(projectPath, featureId, context, useWorktrees);
     }
 
     // No context, start fresh - executeFeature will handle adding to runningFeatures
@@ -986,20 +926,23 @@ Complete the pipeline step instructions above. Review the previous work and appl
     } catch {
       // No previous context
     }
-    const summaryContext = await this.loadFeatureSummary(projectPath, featureId);
-    const contextForPrompt = summaryContext || previousContext;
 
-    // Load project context files (CLAUDE.md, CODE_QUALITY.md, etc.) - passed as system prompt
+    // Load autoLoadClaudeMd setting to determine context loading strategy
     const autoLoadClaudeMd = await getAutoLoadClaudeMdSetting(
       projectPath,
       this.settingsService,
       '[AutoMode]'
     );
-    const contextFilesResult = await loadContextFiles({
+
+    // Load project context files (CLAUDE.md, CODE_QUALITY.md, etc.) - passed as system prompt
+    const contextResult = await loadContextFiles({
       projectPath,
       fsModule: secureFs as Parameters<typeof loadContextFiles>[0]['fsModule'],
     });
-    const contextFilesPrompt = filterClaudeMdFromContext(contextFilesResult, autoLoadClaudeMd);
+
+    // When autoLoadClaudeMd is enabled, filter out CLAUDE.md to avoid duplication
+    // (SDK handles CLAUDE.md via settingSources), but keep other context files like CODE_QUALITY.md
+    const contextFilesPrompt = filterClaudeMdFromContext(contextResult, autoLoadClaudeMd);
 
     // Build complete prompt with feature info, previous context, and follow-up instructions
     let fullPrompt = `## Follow-up on Feature Implementation
@@ -1007,12 +950,12 @@ Complete the pipeline step instructions above. Review the previous work and appl
 ${feature ? this.buildFeaturePrompt(feature) : `**Feature ID:** ${featureId}`}
 `;
 
-    if (contextForPrompt) {
+    if (previousContext) {
       fullPrompt += `
 ## Previous Agent Work
-The following is the saved context from the previous implementation attempt (may be a summary):
+The following is the output from the previous implementation attempt:
 
-${contextForPrompt}
+${previousContext}
 `;
     }
 
@@ -1044,13 +987,9 @@ Address the follow-up instructions above. Review the previous work and make the 
     });
 
     try {
-      // Get model from feature (already loaded above), falling back to default provider's model
-      const defaultModel = getDefaultModelForProvider();
-      const model = resolveModelString(feature?.model, defaultModel);
-      const provider = ProviderFactory.getProviderForModel(model);
-      console.log(
-        `[AutoMode] Follow-up for feature ${featureId} using model: ${model} (provider: ${provider.getName()})`
-      );
+      // Get model from feature (already loaded above)
+      const model = resolveModelString(feature?.model, DEFAULT_MODELS.claude);
+      console.log(`[AutoMode] Follow-up for feature ${featureId} using model: ${model}`);
 
       // Update feature status to in_progress
       await this.updateFeatureStatus(projectPath, featureId, 'in_progress');
@@ -1131,7 +1070,6 @@ Address the follow-up instructions above. Review the previous work and make the 
           projectPath,
           planningMode: 'skip', // Follow-ups don't require approval
           previousContent: previousContext || undefined,
-          featureDescription: feature?.description,
           systemPrompt: contextFilesPrompt || undefined,
           autoLoadClaudeMd,
         }
@@ -1320,11 +1258,6 @@ Address the follow-up instructions above. Review the previous work and make the 
    * Analyze project to gather context
    */
   async analyzeProject(projectPath: string): Promise<void> {
-    // Validate project path before proceeding
-    // This is called here because analyzeProject builds ExecuteOptions directly
-    // without using a factory function from sdk-options.ts
-    validateWorkingDirectory(projectPath);
-
     const abortController = new AbortController();
 
     const analysisFeatureId = `analysis-${Date.now()}`;
@@ -1348,20 +1281,33 @@ Address the follow-up instructions above. Review the previous work and make the 
 Format your response as a structured markdown document.`;
 
     try {
-      // Use default provider's model for analysis
-      const defaultModel = getDefaultModelForProvider();
-      const analysisModel = resolveModelString(undefined, defaultModel);
+      // Use default Claude model for analysis (can be overridden in the future)
+      const analysisModel = resolveModelString(undefined, DEFAULT_MODELS.claude);
       const provider = ProviderFactory.getProviderForModel(analysisModel);
-      console.log(
-        `[AutoMode] Project analysis using model: ${analysisModel} (provider: ${provider.getName()})`
+
+      // Load autoLoadClaudeMd setting
+      const autoLoadClaudeMd = await getAutoLoadClaudeMdSetting(
+        projectPath,
+        this.settingsService,
+        '[AutoMode]'
       );
+
+      // Use createCustomOptions for centralized SDK configuration with CLAUDE.md support
+      const sdkOptions = createCustomOptions({
+        cwd: projectPath,
+        model: analysisModel,
+        maxTurns: 5,
+        allowedTools: ['Read', 'Glob', 'Grep'],
+        abortController,
+        autoLoadClaudeMd,
+      });
 
       const options: ExecuteOptions = {
         prompt,
-        model: analysisModel,
-        maxTurns: 5,
-        cwd: projectPath,
-        allowedTools: ['Read', 'Glob', 'Grep'],
+        model: sdkOptions.model ?? analysisModel,
+        cwd: sdkOptions.cwd ?? projectPath,
+        maxTurns: sdkOptions.maxTurns,
+        allowedTools: sdkOptions.allowedTools as string[],
         abortController,
         settingSources: sdkOptions.settingSources,
         sandbox: sdkOptions.sandbox, // Pass sandbox configuration
@@ -1744,53 +1690,6 @@ Format your response as a structured markdown document.`;
     }
   }
 
-  private getFeatureSummaryPath(projectPath: string, featureId: string): string {
-    return path.join(getFeatureDir(projectPath, featureId), 'agent-summary.md');
-  }
-
-  private async loadFeatureSummary(projectPath: string, featureId: string): Promise<string | null> {
-    const summaryPath = this.getFeatureSummaryPath(projectPath, featureId);
-    try {
-      const content = (await secureFs.readFile(summaryPath, 'utf-8')) as string;
-      return content.trim();
-    } catch {
-      return null;
-    }
-  }
-
-  private async updateFeatureSummary(
-    projectPath: string,
-    featureId: string,
-    summary: string
-  ): Promise<void> {
-    const featurePath = path.join(projectPath, '.automaker', 'features', featureId, 'feature.json');
-    try {
-      const data = (await secureFs.readFile(featurePath, 'utf-8')) as string;
-      const feature = JSON.parse(data);
-      feature.summary = summary;
-      feature.updatedAt = new Date().toISOString();
-      await secureFs.writeFile(featurePath, JSON.stringify(feature, null, 2));
-    } catch (error) {
-      console.error(`[AutoMode] Failed to update summary for ${featureId}:`, error);
-    }
-  }
-
-  private async writeFeatureArtifact(
-    projectPath: string,
-    featureId: string,
-    fileName: string,
-    content: string
-  ): Promise<void> {
-    const featureDir = getFeatureDir(projectPath, featureId);
-    const filePath = path.join(featureDir, fileName);
-    try {
-      await secureFs.mkdir(featureDir, { recursive: true });
-      await secureFs.writeFile(filePath, content, 'utf-8');
-    } catch (error) {
-      console.warn(`[AutoMode] Failed to write ${fileName} for ${featureId}:`, error);
-    }
-  }
-
   private async loadPendingFeatures(projectPath: string): Promise<Feature[]> {
     // Features are stored in .automaker directory
     const featuresDir = getFeaturesDir(projectPath);
@@ -1931,7 +1830,6 @@ Implement this feature by:
 2. Plan your implementation approach
 3. Write the necessary code changes
 4. Ensure the code follows existing patterns and conventions
-5. Keep outputs concise and avoid restating prompts or tool logs
 
 When done, wrap your final summary in <summary> tags like this:
 
@@ -1959,7 +1857,6 @@ Implement this feature by:
 2. Plan your implementation approach
 3. Write the necessary code changes
 4. Ensure the code follows existing patterns and conventions
-5. Keep outputs concise and avoid restating prompts or tool logs
 
 ## Verification with Playwright (REQUIRED)
 
@@ -2018,7 +1915,6 @@ This helps parse your summary correctly in the output logs.`;
       requirePlanApproval?: boolean;
       previousContent?: string;
       systemPrompt?: string;
-      featureDescription?: string;
       autoLoadClaudeMd?: boolean;
     }
   ): Promise<void> {
@@ -2102,6 +1998,12 @@ This mock response was generated because AUTOMAKER_MOCK_AGENT=true was set.
     // Load enableSandboxMode setting (global setting only)
     const enableSandboxMode = await getEnableSandboxModeSetting(this.settingsService, '[AutoMode]');
 
+    // Load MCP servers from settings (global setting only)
+    const mcpServers = await getMCPServersFromSettings(this.settingsService, '[AutoMode]');
+
+    // Load MCP permission settings (global setting only)
+    const mcpPermissions = await getMCPPermissionSettings(this.settingsService, '[AutoMode]');
+
     // Build SDK options using centralized configuration for feature implementation
     const sdkOptions = createAutoModeOptions({
       cwd: workDir,
@@ -2109,7 +2011,9 @@ This mock response was generated because AUTOMAKER_MOCK_AGENT=true was set.
       abortController,
       autoLoadClaudeMd,
       enableSandboxMode,
-      systemPrompt: options?.systemPrompt,
+      mcpServers: Object.keys(mcpServers).length > 0 ? mcpServers : undefined,
+      mcpAutoApproveTools: mcpPermissions.mcpAutoApproveTools,
+      mcpUnrestrictedTools: mcpPermissions.mcpUnrestrictedTools,
     });
 
     // Extract model, maxTurns, and allowedTools from SDK options
@@ -2135,17 +2039,10 @@ This mock response was generated because AUTOMAKER_MOCK_AGENT=true was set.
     );
 
     // Debug: Log if system prompt is provided
-    if (sdkOptions.systemPrompt) {
-      if (typeof sdkOptions.systemPrompt === 'string') {
-        console.log(
-          `[AutoMode] System prompt provided (${sdkOptions.systemPrompt.length} chars), first 200 chars:\n${sdkOptions.systemPrompt.substring(0, 200)}...`
-        );
-      } else {
-        const appended = sdkOptions.systemPrompt.append || '';
-        console.log(
-          `[AutoMode] System prompt preset enabled (${sdkOptions.systemPrompt.preset}), appendLen=${appended.length}`
-        );
-      }
+    if (options?.systemPrompt) {
+      console.log(
+        `[AutoMode] System prompt provided (${options.systemPrompt.length} chars), first 200 chars:\n${options.systemPrompt.substring(0, 200)}...`
+      );
     }
 
     const executeOptions: ExecuteOptions = {
@@ -2158,6 +2055,9 @@ This mock response was generated because AUTOMAKER_MOCK_AGENT=true was set.
       systemPrompt: sdkOptions.systemPrompt,
       settingSources: sdkOptions.settingSources,
       sandbox: sdkOptions.sandbox, // Pass sandbox configuration
+      mcpServers: Object.keys(mcpServers).length > 0 ? mcpServers : undefined, // Pass MCP servers configuration
+      mcpAutoApproveTools: mcpPermissions.mcpAutoApproveTools, // Pass MCP auto-approve setting
+      mcpUnrestrictedTools: mcpPermissions.mcpUnrestrictedTools, // Pass MCP unrestricted tools setting
     };
 
     // Execute via provider
@@ -2212,12 +2112,6 @@ This mock response was generated because AUTOMAKER_MOCK_AGENT=true was set.
             }
             responseText += block.text || '';
 
-            // Emit progress event for real-time UI updates
-            this.emitAutoModeEvent('auto_mode_progress', {
-              featureId,
-              content: block.text,
-            });
-
             // Check for authentication errors in the response
             if (
               block.text &&
@@ -2244,38 +2138,18 @@ This mock response was generated because AUTOMAKER_MOCK_AGENT=true was set.
 
               // Extract plan content (everything before the marker)
               const markerIndex = responseText.indexOf('[SPEC_GENERATED]');
-              let planContent = responseText.substring(0, markerIndex).trim();
+              const planContent = responseText.substring(0, markerIndex).trim();
 
               // Parse tasks from the generated spec (for spec and full modes)
               // Use let since we may need to update this after plan revision
               let parsedTasks = parseTasksFromSpec(planContent);
-              let tasksTotal = parsedTasks.length;
+              const tasksTotal = parsedTasks.length;
 
               console.log(
                 `[AutoMode] Parsed ${tasksTotal} tasks from spec for feature ${featureId}`
               );
               if (parsedTasks.length > 0) {
                 console.log(`[AutoMode] Tasks: ${parsedTasks.map((t) => t.id).join(', ')}`);
-              }
-
-              if (PLAN_JUDGE_ENABLED && options?.featureDescription) {
-                const judgedPlan = await this.maybeRevisePlanWithJudge({
-                  planContent,
-                  featureDescription: options.featureDescription,
-                  provider,
-                  workDir,
-                  model: finalModel,
-                  maxTurns: maxTurns,
-                  allowedTools,
-                  abortController,
-                  projectPath,
-                  featureId,
-                });
-                if (judgedPlan) {
-                  planContent = judgedPlan.planContent;
-                  parsedTasks = judgedPlan.parsedTasks;
-                  tasksTotal = parsedTasks.length;
-                }
               }
 
               // Update planSpec status to 'generated' and save content with parsed tasks
@@ -2411,6 +2285,9 @@ After generating the revised spec, output:
                         cwd: workDir,
                         allowedTools: allowedTools,
                         abortController,
+                        mcpServers: Object.keys(mcpServers).length > 0 ? mcpServers : undefined,
+                        mcpAutoApproveTools: mcpPermissions.mcpAutoApproveTools,
+                        mcpUnrestrictedTools: mcpPermissions.mcpUnrestrictedTools,
                       });
 
                       let revisionText = '';
@@ -2548,6 +2425,9 @@ After generating the revised spec, output:
                     cwd: workDir,
                     allowedTools: allowedTools,
                     abortController,
+                    mcpServers: Object.keys(mcpServers).length > 0 ? mcpServers : undefined,
+                    mcpAutoApproveTools: mcpPermissions.mcpAutoApproveTools,
+                    mcpUnrestrictedTools: mcpPermissions.mcpUnrestrictedTools,
                   });
 
                   let taskOutput = '';
@@ -2637,6 +2517,9 @@ Implement all the changes described in the plan above.`;
                   cwd: workDir,
                   allowedTools: allowedTools,
                   abortController,
+                  mcpServers: Object.keys(mcpServers).length > 0 ? mcpServers : undefined,
+                  mcpAutoApproveTools: mcpPermissions.mcpAutoApproveTools,
+                  mcpUnrestrictedTools: mcpPermissions.mcpUnrestrictedTools,
                 });
 
                 for await (const msg of continuationStream) {
@@ -2668,6 +2551,14 @@ Implement all the changes described in the plan above.`;
               // Exit the original stream loop since continuation is done
               break streamLoop;
             }
+
+            // Only emit progress for non-marker text (marker was already handled above)
+            if (!specDetected) {
+              this.emitAutoModeEvent('auto_mode_progress', {
+                featureId,
+                content: block.text,
+              });
+            }
           } else if (block.type === 'tool_use') {
             // Emit event for real-time UI
             this.emitAutoModeEvent('auto_mode_tool', {
@@ -2685,22 +2576,6 @@ Implement all the changes described in the plan above.`;
               responseText += `Input: ${JSON.stringify(block.input, null, 2)}\n`;
             }
             scheduleWrite();
-          } else if (block.type === 'tool_result') {
-            const resultText = block.content ?? '';
-
-            if (resultText) {
-              this.emitAutoModeEvent('auto_mode_tool_result', {
-                featureId,
-                result: resultText,
-                toolUseId: block.tool_use_id,
-              });
-
-              if (responseText.length > 0 && !responseText.endsWith('\n')) {
-                responseText += '\n';
-              }
-              responseText += `\nResult: ${resultText}\n`;
-              scheduleWrite();
-            }
           }
         }
       } else if (msg.type === 'error') {
@@ -2720,26 +2595,13 @@ Implement all the changes described in the plan above.`;
     }
     // Final write - ensure all accumulated content is saved
     await writeToFile();
-
-    try {
-      await this.maybeGenerateContextSummary({
-        projectPath,
-        featureId,
-        workDir,
-        responseText,
-        abortController,
-      });
-    } catch (error) {
-      console.warn(`[AutoMode] Failed to generate context summary for ${featureId}:`, error);
-    }
   }
 
   private async executeFeatureWithContext(
     projectPath: string,
     featureId: string,
     context: string,
-    useWorktrees: boolean,
-    previousContent?: string
+    useWorktrees: boolean
   ): Promise<void> {
     const feature = await this.loadFeature(projectPath, featureId);
     if (!feature) {
@@ -2751,7 +2613,7 @@ Implement all the changes described in the plan above.`;
 ${this.buildFeaturePrompt(feature)}
 
 ## Previous Context
-The following is the saved context from a previous implementation attempt (may be a summary). Continue from where you left off:
+The following is the output from a previous implementation attempt. Continue from where you left off:
 
 ${context}
 
@@ -2760,327 +2622,7 @@ Review the previous work and continue the implementation. If the feature appears
 
     return this.executeFeature(projectPath, featureId, useWorktrees, false, undefined, {
       continuationPrompt: prompt,
-      previousContent,
     });
-  }
-
-  private truncateSummarySource(source: string): string {
-    if (source.length <= SUMMARY_SOURCE_MAX_CHARS) {
-      return source;
-    }
-
-    const headSize = Math.floor(SUMMARY_SOURCE_MAX_CHARS * 0.6);
-    const tailSize = SUMMARY_SOURCE_MAX_CHARS - headSize;
-    const head = source.slice(0, headSize);
-    const tail = source.slice(-tailSize);
-
-    return `${head}\n\n[TRUNCATED]\n\n${tail}`;
-  }
-
-  private async getSummaryRubric(workDir: string, abortController: AbortController) {
-    if (this.summaryRubric?.success) {
-      return this.summaryRubric;
-    }
-
-    const rubric = await generateRubric(
-      {
-        criterionName: 'Continuation summary quality',
-        criterionDescription:
-          'How well the summary supports continuing implementation (accuracy, coverage, actionability, brevity).',
-        scale: '1-5',
-        includeExamples: false,
-        strictness: 'balanced',
-      },
-      { cwd: workDir, abortController }
-    );
-
-    if (rubric.success) {
-      this.summaryRubric = rubric;
-      return rubric;
-    }
-
-    return null;
-  }
-
-  private async maybeGenerateContextSummary(args: {
-    projectPath: string;
-    featureId: string;
-    workDir: string;
-    responseText: string;
-    abortController: AbortController;
-  }): Promise<void> {
-    if (!SUMMARY_ENABLED) {
-      return;
-    }
-
-    if (args.responseText.trim().length < SUMMARY_MIN_CHARS) {
-      return;
-    }
-
-    if (args.abortController.signal.aborted) {
-      return;
-    }
-
-    const summarySource = this.truncateSummarySource(args.responseText);
-    const shortMaxLines = Math.max(12, Math.floor(SUMMARY_MAX_LINES / 2));
-    const detailedMaxLines = SUMMARY_MAX_LINES;
-
-    const systemPrompt = `You are a senior engineer summarizing an agent run for future continuation.
-Be concise, factual, and actionable. Output markdown only.`;
-
-    const basePrompt = `Summarize the agent output into a continuation note.
-
-Format:
-## Summary
-- ...
-## Files
-- path: change
-## Tests
-- ...
-## Next
-- ...
-
-Constraints:
-- Max {MAX_LINES} lines total
-- Each bullet <= 120 characters
-- Use "Unknown" when details are not present
-
-Agent output:
-${summarySource}`;
-
-    const shortPrompt = basePrompt.replace('{MAX_LINES}', String(shortMaxLines));
-    const detailedPrompt = basePrompt.replace('{MAX_LINES}', String(detailedMaxLines));
-
-    const judgeConfig = { cwd: args.workDir, abortController: args.abortController };
-
-    const shortSummary = (await runJudgeText(shortPrompt, systemPrompt, judgeConfig)).trim();
-    const detailedSummary = (await runJudgeText(detailedPrompt, systemPrompt, judgeConfig)).trim();
-
-    if (!shortSummary && !detailedSummary) {
-      return;
-    }
-
-    let chosenSummary = detailedSummary || shortSummary;
-
-    if (shortSummary && detailedSummary) {
-      const comparison = await pairwiseCompare(
-        {
-          responseA: shortSummary,
-          responseB: detailedSummary,
-          prompt: 'Select the better continuation summary for an engineer resuming work.',
-          criteria: [
-            'Coverage of decisions, files changed, and tests',
-            'Actionable next steps',
-            'Concise but complete',
-          ],
-          allowTie: true,
-          swapPositions: true,
-        },
-        judgeConfig
-      );
-
-      if (comparison.success) {
-        if (comparison.winner === 'A') {
-          chosenSummary = shortSummary;
-        } else if (comparison.winner === 'B') {
-          chosenSummary = detailedSummary;
-        }
-      }
-    }
-
-    const rubric = await this.getSummaryRubric(args.workDir, args.abortController);
-    const levelDescriptions: Record<string, string> | undefined = rubric?.levels?.reduce(
-      (acc, level) => {
-        acc[String(level.score)] = level.description;
-        return acc;
-      },
-      {} as Record<string, string>
-    );
-
-    const score = await directScore(
-      {
-        response: chosenSummary,
-        prompt: 'Create a continuation summary for an agent implementation run.',
-        context: summarySource,
-        criteria: [
-          {
-            name: 'Accuracy',
-            description: 'Matches the agent output without hallucinations.',
-            weight: 0.4,
-          },
-          {
-            name: 'Completeness',
-            description: 'Captures key decisions, files, tests, and TODOs.',
-            weight: 0.4,
-          },
-          {
-            name: 'Actionability',
-            description: 'Clear next steps for continuing the work.',
-            weight: 0.2,
-          },
-        ],
-        rubric: levelDescriptions
-          ? { scale: rubric?.scale.type ?? '1-5', levelDescriptions }
-          : { scale: '1-5' },
-      },
-      judgeConfig
-    );
-
-    if (
-      score.success &&
-      score.weightedScore < SUMMARY_SCORE_THRESHOLD &&
-      chosenSummary !== detailedSummary &&
-      detailedSummary
-    ) {
-      chosenSummary = detailedSummary;
-    }
-
-    const finalSummary = chosenSummary.trim();
-    if (!finalSummary) {
-      return;
-    }
-
-    await this.writeFeatureArtifact(
-      args.projectPath,
-      args.featureId,
-      'agent-summary.md',
-      finalSummary
-    );
-    await this.updateFeatureSummary(args.projectPath, args.featureId, finalSummary);
-
-    if (JUDGE_WRITE_REPORTS && score) {
-      await this.writeFeatureArtifact(
-        args.projectPath,
-        args.featureId,
-        'agent-summary.judge.json',
-        JSON.stringify(score, null, 2)
-      );
-    }
-  }
-
-  private async maybeRevisePlanWithJudge(args: {
-    planContent: string;
-    featureDescription: string;
-    provider: BaseProvider;
-    workDir: string;
-    model: string;
-    maxTurns?: number;
-    allowedTools?: string[];
-    abortController: AbortController;
-    projectPath: string;
-    featureId: string;
-  }): Promise<{ planContent: string; parsedTasks: ParsedTask[] } | null> {
-    try {
-      const criteria = [
-        {
-          name: 'Alignment',
-          description: 'The plan addresses the feature request and goals directly.',
-          weight: 0.4,
-        },
-        {
-          name: 'Completeness',
-          description: 'The plan covers key steps, files, and dependencies.',
-          weight: 0.4,
-        },
-        {
-          name: 'Risk awareness',
-          description: 'The plan identifies risks or edge cases to watch for.',
-          weight: 0.2,
-        },
-      ];
-
-      const rubric = {
-        scale: '1-5' as const,
-        levelDescriptions: {
-          '1': 'Missing major steps or misaligned with the request.',
-          '3': 'Mostly correct but gaps or unclear tasks remain.',
-          '5': 'Complete, actionable, and clearly aligned with the request.',
-        },
-      };
-
-      const score = await directScore(
-        {
-          response: args.planContent,
-          prompt: args.featureDescription,
-          criteria,
-          rubric,
-        },
-        { cwd: args.workDir, abortController: args.abortController }
-      );
-
-      if (JUDGE_WRITE_REPORTS && score) {
-        await this.writeFeatureArtifact(
-          args.projectPath,
-          args.featureId,
-          'plan-judge.json',
-          JSON.stringify(score, null, 2)
-        );
-      }
-
-      if (!score.success || score.weightedScore >= PLAN_JUDGE_THRESHOLD) {
-        return null;
-      }
-
-      const priorities =
-        score.summary.priorities.length > 0
-          ? score.summary.priorities.map((p) => `- ${p}`).join('\n')
-          : '- Improve completeness and clarity';
-
-      const revisionPrompt = `The plan below is under-specified based on evaluation. Improve it.
-
-## Feature Request
-${args.featureDescription}
-
-## Current Plan
-${args.planContent}
-
-## Judge Priorities
-${priorities}
-
-## Instructions
-Revise the plan to address the priorities above. Keep the same format, including the \`\`\`tasks\`\`\` block.
-After generating the revised plan, output:
-"[SPEC_GENERATED] Plan revised."`;
-
-      const revisionStream = args.provider.executeQuery({
-        prompt: revisionPrompt,
-        model: args.model,
-        maxTurns: Math.min(args.maxTurns ?? 100, 60),
-        cwd: args.workDir,
-        allowedTools: args.allowedTools,
-        abortController: args.abortController,
-      });
-
-      let revisionText = '';
-      for await (const msg of revisionStream) {
-        if (msg.type === 'assistant' && msg.message?.content) {
-          for (const block of msg.message.content) {
-            if (block.type === 'text') {
-              revisionText += block.text || '';
-            }
-          }
-        } else if (msg.type === 'error') {
-          throw new Error(msg.error || 'Error during plan judge revision');
-        } else if (msg.type === 'result' && msg.subtype === 'success') {
-          revisionText += msg.result || '';
-        }
-      }
-
-      const markerIndex = revisionText.indexOf('[SPEC_GENERATED]');
-      const revisedPlan =
-        markerIndex > 0 ? revisionText.substring(0, markerIndex).trim() : revisionText.trim();
-
-      if (!revisedPlan) {
-        return null;
-      }
-
-      const parsedTasks = parseTasksFromSpec(revisedPlan);
-      console.log(`[AutoMode] Judge revised plan for feature ${args.featureId}`);
-      return { planContent: revisedPlan, parsedTasks };
-    } catch (error) {
-      console.warn(`[AutoMode] Plan judge revision failed for ${args.featureId}:`, error);
-      return null;
-    }
   }
 
   /**
@@ -3152,7 +2694,6 @@ ${planContent}
 2. Do not work on other tasks
 3. Use the existing codebase patterns
 4. When done, summarize what you implemented
-5. Keep responses concise and avoid repeating the prompt
 
 Begin implementing task ${task.id} now.`;
 

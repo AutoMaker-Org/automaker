@@ -178,6 +178,13 @@ export function ContextView() {
       // Ensure context directory exists
       await api.mkdir(contextPath);
 
+      // Ensure metadata file exists (create empty one if not)
+      const metadataPath = `${contextPath}/context-metadata.json`;
+      const metadataExists = await api.exists(metadataPath);
+      if (!metadataExists) {
+        await api.writeFile(metadataPath, JSON.stringify({ files: {} }, null, 2));
+      }
+
       // Load metadata for descriptions
       const metadata = await loadMetadata();
 
