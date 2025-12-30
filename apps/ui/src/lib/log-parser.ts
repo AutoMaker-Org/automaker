@@ -58,12 +58,16 @@ const TOOL_CATEGORIES: Record<string, ToolCategory> = {
   Bash: 'bash',
   Grep: 'search',
   Glob: 'search',
+  Ls: 'read',
+  Delete: 'write',
   WebSearch: 'search',
   WebFetch: 'read',
   TodoWrite: 'todo',
   Task: 'task',
   NotebookEdit: 'edit',
   KillShell: 'bash',
+  SemanticSearch: 'search',
+  ReadLints: 'read',
 };
 
 /**
@@ -323,6 +327,15 @@ export function generateToolSummary(toolName: string, content: string): string |
       case 'KillShell': {
         return 'Terminating shell session';
       }
+      case 'SemanticSearch': {
+        const query = parsed.query as string | undefined;
+        return `Semantic search: "${query?.slice(0, 30) || ''}"`;
+      }
+      case 'ReadLints': {
+        const paths = parsed.paths as string[] | undefined;
+        const pathCount = paths?.length || 0;
+        return `Reading lints for ${pathCount} file(s)`;
+      }
       default:
         return undefined;
     }
@@ -363,7 +376,7 @@ function normalizeCursorToolCall(
 
   // Read tool
   if (toolCall.readToolCall) {
-    const path = toolCall.readToolCall.args.path;
+    const path = toolCall.readToolCall.args?.path || 'unknown';
     const result = toolCall.readToolCall.result?.success;
 
     return {
@@ -412,7 +425,218 @@ function normalizeCursorToolCall(
     };
   }
 
-  // Generic function tool
+  // Edit tool
+  if (toolCall.editToolCall) {
+    const path = toolCall.editToolCall.args?.path || 'unknown';
+
+    return {
+      ...baseEntry,
+      id: `${baseEntry.id}-${event.call_id}`,
+      type: 'tool_call' as LogEntryType,
+      title: isStarted ? `Editing ${path}` : `Edited ${path}`,
+      content: `Path: ${path}`,
+      collapsed: true,
+      metadata: {
+        toolName: 'Edit',
+        toolCategory: 'edit' as ToolCategory,
+        filePath: path,
+        summary: isCompleted ? `Edited file` : `Editing file...`,
+      },
+    };
+  }
+
+  // Shell/Bash tool
+  if (toolCall.shellToolCall) {
+    const command = toolCall.shellToolCall.args?.command || '';
+    const result = toolCall.shellToolCall.result;
+    const shortCmd = command.length > 50 ? command.slice(0, 50) + '...' : command;
+
+    let content = `Command: ${command}`;
+    if (isCompleted && result?.success) {
+      content += `\nExit code: ${result.success.exitCode}`;
+    } else if (isCompleted && result?.rejected) {
+      content += `\nRejected: ${result.rejected.reason}`;
+    }
+
+    return {
+      ...baseEntry,
+      id: `${baseEntry.id}-${event.call_id}`,
+      type: 'tool_call' as LogEntryType,
+      title: isStarted ? `Running: ${shortCmd}` : `Ran: ${shortCmd}`,
+      content,
+      collapsed: true,
+      metadata: {
+        toolName: 'Bash',
+        toolCategory: 'bash' as ToolCategory,
+        summary: isCompleted
+          ? result?.success
+            ? `Exit ${result.success.exitCode}`
+            : result?.rejected
+              ? 'Rejected'
+              : 'Completed'
+          : `Running...`,
+      },
+    };
+  }
+
+  // Delete tool
+  if (toolCall.deleteToolCall) {
+    const path = toolCall.deleteToolCall.args?.path || 'unknown';
+    const result = toolCall.deleteToolCall.result;
+
+    let content = `Path: ${path}`;
+    if (isCompleted && result?.rejected) {
+      content += `\nRejected: ${result.rejected.reason}`;
+    }
+
+    return {
+      ...baseEntry,
+      id: `${baseEntry.id}-${event.call_id}`,
+      type: 'tool_call' as LogEntryType,
+      title: isStarted ? `Deleting ${path}` : `Deleted ${path}`,
+      content,
+      collapsed: true,
+      metadata: {
+        toolName: 'Delete',
+        toolCategory: 'write' as ToolCategory,
+        filePath: path,
+        summary: isCompleted ? (result?.rejected ? 'Rejected' : 'Deleted') : `Deleting...`,
+      },
+    };
+  }
+
+  // Grep tool
+  if (toolCall.grepToolCall) {
+    const pattern = toolCall.grepToolCall.args?.pattern || '';
+    const searchPath = toolCall.grepToolCall.args?.path;
+    const result = toolCall.grepToolCall.result?.success;
+
+    return {
+      ...baseEntry,
+      id: `${baseEntry.id}-${event.call_id}`,
+      type: 'tool_call' as LogEntryType,
+      title: isStarted ? `Searching: "${pattern}"` : `Searched: "${pattern}"`,
+      content: `Pattern: ${pattern}${searchPath ? `\nPath: ${searchPath}` : ''}${
+        isCompleted && result ? `\nMatched ${result.matchedLines} lines` : ''
+      }`,
+      collapsed: true,
+      metadata: {
+        toolName: 'Grep',
+        toolCategory: 'search' as ToolCategory,
+        summary: isCompleted ? `Found ${result?.matchedLines || 0} matches` : `Searching...`,
+      },
+    };
+  }
+
+  // Ls tool
+  if (toolCall.lsToolCall) {
+    const path = toolCall.lsToolCall.args?.path || '.';
+    const result = toolCall.lsToolCall.result?.success;
+
+    return {
+      ...baseEntry,
+      id: `${baseEntry.id}-${event.call_id}`,
+      type: 'tool_call' as LogEntryType,
+      title: isStarted ? `Listing ${path}` : `Listed ${path}`,
+      content: `Path: ${path}${
+        isCompleted && result
+          ? `\n${result.childrenFiles} files, ${result.childrenDirs} directories`
+          : ''
+      }`,
+      collapsed: true,
+      metadata: {
+        toolName: 'Ls',
+        toolCategory: 'read' as ToolCategory,
+        filePath: path,
+        summary: isCompleted
+          ? `${result?.childrenFiles || 0} files, ${result?.childrenDirs || 0} dirs`
+          : `Listing...`,
+      },
+    };
+  }
+
+  // Glob tool
+  if (toolCall.globToolCall) {
+    const pattern = toolCall.globToolCall.args?.globPattern || '';
+    const targetDir = toolCall.globToolCall.args?.targetDirectory;
+    const result = toolCall.globToolCall.result?.success;
+
+    return {
+      ...baseEntry,
+      id: `${baseEntry.id}-${event.call_id}`,
+      type: 'tool_call' as LogEntryType,
+      title: isStarted ? `Finding: ${pattern}` : `Found: ${pattern}`,
+      content: `Pattern: ${pattern}${targetDir ? `\nDirectory: ${targetDir}` : ''}${
+        isCompleted && result ? `\nFound ${result.totalFiles} files` : ''
+      }`,
+      collapsed: true,
+      metadata: {
+        toolName: 'Glob',
+        toolCategory: 'search' as ToolCategory,
+        summary: isCompleted ? `Found ${result?.totalFiles || 0} files` : `Finding...`,
+      },
+    };
+  }
+
+  // Semantic Search tool
+  if (toolCall.semSearchToolCall) {
+    const query = toolCall.semSearchToolCall.args?.query || '';
+    const targetDirs = toolCall.semSearchToolCall.args?.targetDirectories;
+    const result = toolCall.semSearchToolCall.result?.success;
+    const shortQuery = query.length > 40 ? query.slice(0, 40) + '...' : query;
+    const resultCount = result?.codeResults?.length || 0;
+
+    return {
+      ...baseEntry,
+      id: `${baseEntry.id}-${event.call_id}`,
+      type: 'tool_call' as LogEntryType,
+      title: isStarted ? `Semantic search: "${shortQuery}"` : `Searched: "${shortQuery}"`,
+      content: `Query: ${query}${targetDirs?.length ? `\nDirectories: ${targetDirs.join(', ')}` : ''}${
+        isCompleted
+          ? `\n${resultCount > 0 ? `Found ${resultCount} result(s)` : result?.results || 'No results'}`
+          : ''
+      }`,
+      collapsed: true,
+      metadata: {
+        toolName: 'SemanticSearch',
+        toolCategory: 'search' as ToolCategory,
+        summary: isCompleted
+          ? resultCount > 0
+            ? `Found ${resultCount} result(s)`
+            : 'No results'
+          : `Searching...`,
+      },
+    };
+  }
+
+  // Read Lints tool
+  if (toolCall.readLintsToolCall) {
+    const paths = toolCall.readLintsToolCall.args?.paths || [];
+    const result = toolCall.readLintsToolCall.result?.success;
+    const pathCount = paths.length;
+
+    return {
+      ...baseEntry,
+      id: `${baseEntry.id}-${event.call_id}`,
+      type: 'tool_call' as LogEntryType,
+      title: isStarted ? `Reading lints for ${pathCount} file(s)` : `Read lints`,
+      content: `Paths: ${paths.join(', ')}${
+        isCompleted && result
+          ? `\nFound ${result.totalDiagnostics} diagnostic(s) in ${result.totalFiles} file(s)`
+          : ''
+      }`,
+      collapsed: true,
+      metadata: {
+        toolName: 'ReadLints',
+        toolCategory: 'read' as ToolCategory,
+        summary: isCompleted
+          ? `${result?.totalDiagnostics || 0} diagnostic(s)`
+          : `Reading lints...`,
+      },
+    };
+  }
+
+  // Generic function tool (fallback)
   if (toolCall.function) {
     const name = toolCall.function.name;
     const args = toolCall.function.arguments;

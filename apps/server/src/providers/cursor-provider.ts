@@ -44,6 +44,189 @@ import { spawnJSONLProcess, execInWsl } from '@automaker/platform';
 // Create logger for this module
 const logger = createLogger('CursorProvider');
 
+// =============================================================================
+// Cursor Tool Handler Registry
+// =============================================================================
+
+/**
+ * Tool handler definition for mapping Cursor tool calls to normalized format
+ */
+interface CursorToolHandler<TArgs = unknown, TResult = unknown> {
+  /** The normalized tool name (e.g., 'Read', 'Write') */
+  name: string;
+  /** Extract and normalize input from Cursor's args format */
+  mapInput: (args: TArgs) => unknown;
+  /** Format the result content for display (optional) */
+  formatResult?: (result: TResult, args?: TArgs) => string;
+  /** Format rejected result (optional) */
+  formatRejected?: (reason: string) => string;
+}
+
+/**
+ * Registry of Cursor tool handlers
+ * Each handler knows how to normalize its specific tool call type
+ */
+const CURSOR_TOOL_HANDLERS: Record<string, CursorToolHandler<any, any>> = {
+  readToolCall: {
+    name: 'Read',
+    mapInput: (args: { path: string }) => ({ file_path: args.path }),
+    formatResult: (result: { content: string }) => result.content,
+  },
+
+  writeToolCall: {
+    name: 'Write',
+    mapInput: (args: { path: string; fileText: string }) => ({
+      file_path: args.path,
+      content: args.fileText,
+    }),
+    formatResult: (result: { linesCreated: number; path: string }) =>
+      `Wrote ${result.linesCreated} lines to ${result.path}`,
+  },
+
+  editToolCall: {
+    name: 'Edit',
+    mapInput: (args: { path: string; oldText?: string; newText?: string }) => ({
+      file_path: args.path,
+      old_string: args.oldText,
+      new_string: args.newText,
+    }),
+    formatResult: (_result: unknown, args?: { path: string }) => `Edited file: ${args?.path}`,
+  },
+
+  shellToolCall: {
+    name: 'Bash',
+    mapInput: (args: { command: string }) => ({ command: args.command }),
+    formatResult: (result: { exitCode: number; stdout?: string; stderr?: string }) => {
+      let content = `Exit code: ${result.exitCode}`;
+      if (result.stdout) content += `\n${result.stdout}`;
+      if (result.stderr) content += `\nStderr: ${result.stderr}`;
+      return content;
+    },
+    formatRejected: (reason: string) => `Rejected: ${reason}`,
+  },
+
+  deleteToolCall: {
+    name: 'Delete',
+    mapInput: (args: { path: string }) => ({ file_path: args.path }),
+    formatResult: (_result: unknown, args?: { path: string }) => `Deleted: ${args?.path}`,
+    formatRejected: (reason: string) => `Delete rejected: ${reason}`,
+  },
+
+  grepToolCall: {
+    name: 'Grep',
+    mapInput: (args: { pattern: string; path?: string }) => ({
+      pattern: args.pattern,
+      path: args.path,
+    }),
+    formatResult: (result: { matchedLines: number }) =>
+      `Found ${result.matchedLines} matching lines`,
+  },
+
+  lsToolCall: {
+    name: 'Ls',
+    mapInput: (args: { path: string }) => ({ path: args.path }),
+    formatResult: (result: { childrenFiles: number; childrenDirs: number }) =>
+      `Found ${result.childrenFiles} files, ${result.childrenDirs} directories`,
+  },
+
+  globToolCall: {
+    name: 'Glob',
+    mapInput: (args: { globPattern: string; targetDirectory?: string }) => ({
+      pattern: args.globPattern,
+      path: args.targetDirectory,
+    }),
+    formatResult: (result: { totalFiles: number }) => `Found ${result.totalFiles} matching files`,
+  },
+
+  semSearchToolCall: {
+    name: 'SemanticSearch',
+    mapInput: (args: { query: string; targetDirectories?: string[]; explanation?: string }) => ({
+      query: args.query,
+      targetDirectories: args.targetDirectories,
+      explanation: args.explanation,
+    }),
+    formatResult: (result: { results: string; codeResults?: unknown[] }) => {
+      const resultCount = result.codeResults?.length || 0;
+      return resultCount > 0
+        ? `Found ${resultCount} semantic search result(s)`
+        : result.results || 'No results found';
+    },
+  },
+
+  readLintsToolCall: {
+    name: 'ReadLints',
+    mapInput: (args: { paths: string[] }) => ({ paths: args.paths }),
+    formatResult: (result: { totalDiagnostics: number; totalFiles: number }) =>
+      `Found ${result.totalDiagnostics} diagnostic(s) in ${result.totalFiles} file(s)`,
+  },
+};
+
+/**
+ * Process a Cursor tool call using the handler registry
+ * Returns { toolName, toolInput } or null if tool type is unknown
+ */
+function processCursorToolCall(
+  toolCall: CursorToolCallEvent['tool_call']
+): { toolName: string; toolInput: unknown } | null {
+  // Check each registered handler
+  for (const [key, handler] of Object.entries(CURSOR_TOOL_HANDLERS)) {
+    const toolData = toolCall[key as keyof typeof toolCall] as { args?: unknown } | undefined;
+    if (toolData) {
+      // Skip if args not yet populated (partial streaming event)
+      if (!toolData.args) return null;
+      return {
+        toolName: handler.name,
+        toolInput: handler.mapInput(toolData.args),
+      };
+    }
+  }
+
+  // Handle generic function call (fallback)
+  if (toolCall.function) {
+    let toolInput: unknown;
+    try {
+      toolInput = JSON.parse(toolCall.function.arguments || '{}');
+    } catch {
+      toolInput = { raw: toolCall.function.arguments };
+    }
+    return {
+      toolName: toolCall.function.name,
+      toolInput,
+    };
+  }
+
+  return null;
+}
+
+/**
+ * Format the result content for a completed Cursor tool call
+ */
+function formatCursorToolResult(toolCall: CursorToolCallEvent['tool_call']): string {
+  for (const [key, handler] of Object.entries(CURSOR_TOOL_HANDLERS)) {
+    const toolData = toolCall[key as keyof typeof toolCall] as
+      | {
+          args?: unknown;
+          result?: { success?: unknown; rejected?: { reason: string } };
+        }
+      | undefined;
+
+    if (toolData?.result) {
+      if (toolData.result.success && handler.formatResult) {
+        return handler.formatResult(toolData.result.success, toolData.args);
+      }
+      if (toolData.result.rejected && handler.formatRejected) {
+        return handler.formatRejected(toolData.result.rejected.reason);
+      }
+    }
+  }
+
+  return '';
+}
+
+// =============================================================================
+// Error Codes
+// =============================================================================
+
 /**
  * Cursor-specific error codes for detailed error handling
  */
@@ -198,33 +381,19 @@ export class CursorProvider extends CliProvider {
         const toolEvent = cursorEvent as CursorToolCallEvent;
         const toolCall = toolEvent.tool_call;
 
-        // Determine tool name and input
-        let toolName: string;
-        let toolInput: unknown;
-
-        if (toolCall.readToolCall) {
-          // Skip if args not yet populated (partial streaming event)
-          if (!toolCall.readToolCall.args) return null;
-          toolName = 'Read';
-          toolInput = { file_path: toolCall.readToolCall.args.path };
-        } else if (toolCall.writeToolCall) {
-          // Skip if args not yet populated (partial streaming event)
-          if (!toolCall.writeToolCall.args) return null;
-          toolName = 'Write';
-          toolInput = {
-            file_path: toolCall.writeToolCall.args.path,
-            content: toolCall.writeToolCall.args.fileText,
-          };
-        } else if (toolCall.function) {
-          toolName = toolCall.function.name;
-          try {
-            toolInput = JSON.parse(toolCall.function.arguments || '{}');
-          } catch {
-            toolInput = { raw: toolCall.function.arguments };
-          }
-        } else {
+        // Use the tool handler registry to process the tool call
+        const processed = processCursorToolCall(toolCall);
+        if (!processed) {
+          // Log unrecognized tool call structure for debugging
+          const toolCallKeys = Object.keys(toolCall);
+          logger.warn(
+            `[UNHANDLED TOOL_CALL] Unknown tool call structure. Keys: ${toolCallKeys.join(', ')}. ` +
+              `Full tool_call: ${JSON.stringify(toolCall).substring(0, 500)}`
+          );
           return null;
         }
+
+        const { toolName, toolInput } = processed;
 
         // For started events, emit tool_use
         if (toolEvent.subtype === 'started') {
@@ -247,13 +416,7 @@ export class CursorProvider extends CliProvider {
 
         // For completed events, emit both tool_use and tool_result
         if (toolEvent.subtype === 'completed') {
-          let resultContent = '';
-
-          if (toolCall.readToolCall?.result?.success) {
-            resultContent = toolCall.readToolCall.result.success.content;
-          } else if (toolCall.writeToolCall?.result?.success) {
-            resultContent = `Wrote ${toolCall.writeToolCall.result.success.linesCreated} lines to ${toolCall.writeToolCall.result.success.path}`;
-          }
+          const resultContent = formatCursorToolResult(toolCall);
 
           return {
             type: 'assistant',
@@ -469,9 +632,42 @@ export class CursorProvider extends CliProvider {
 
     logger.debug(`CursorProvider.executeQuery called with model: "${options.model}"`);
 
+    // Debug: log raw events when AUTOMAKER_DEBUG_RAW_OUTPUT is enabled
+    const debugRawEvents =
+      process.env.AUTOMAKER_DEBUG_RAW_OUTPUT === 'true' ||
+      process.env.AUTOMAKER_DEBUG_RAW_OUTPUT === '1';
+
     try {
       for await (const rawEvent of spawnJSONLProcess(subprocessOptions)) {
         const event = rawEvent as CursorStreamEvent;
+
+        // Log raw event for debugging
+        if (debugRawEvents) {
+          logger.info(`[RAW EVENT] type=${event.type} subtype=${(event as any).subtype || 'none'}`);
+          if (event.type === 'tool_call') {
+            const toolEvent = event as CursorToolCallEvent;
+            const tc = toolEvent.tool_call;
+            const toolTypes =
+              [
+                tc.readToolCall && 'read',
+                tc.writeToolCall && 'write',
+                tc.editToolCall && 'edit',
+                tc.shellToolCall && 'shell',
+                tc.deleteToolCall && 'delete',
+                tc.grepToolCall && 'grep',
+                tc.lsToolCall && 'ls',
+                tc.globToolCall && 'glob',
+                tc.function && `function:${tc.function.name}`,
+              ]
+                .filter(Boolean)
+                .join(',') || 'unknown';
+            logger.info(
+              `[RAW TOOL_CALL] call_id=${toolEvent.call_id} types=[${toolTypes}]` +
+                (tc.shellToolCall ? ` cmd="${tc.shellToolCall.args?.command}"` : '') +
+                (tc.writeToolCall ? ` path="${tc.writeToolCall.args?.path}"` : '')
+            );
+          }
+        }
 
         // Capture session ID from system init
         if (event.type === 'system' && (event as CursorSystemEvent).subtype === 'init') {
@@ -481,6 +677,9 @@ export class CursorProvider extends CliProvider {
 
         // Normalize and yield the event
         const normalized = this.normalizeEvent(event);
+        if (!normalized && debugRawEvents) {
+          logger.info(`[DROPPED EVENT] type=${event.type} - normalizeEvent returned null`);
+        }
         if (normalized) {
           // Ensure session_id is always set
           if (!normalized.session_id && sessionId) {

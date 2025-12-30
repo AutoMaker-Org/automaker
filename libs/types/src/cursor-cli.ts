@@ -264,7 +264,7 @@ export interface CursorToolCallEvent {
   call_id: string;
   tool_call: {
     readToolCall?: {
-      args: { path: string };
+      args: { path: string; offset?: number; limit?: number };
       result?: {
         success?: {
           content: string;
@@ -282,6 +282,90 @@ export interface CursorToolCallEvent {
           path: string;
           linesCreated: number;
           fileSize: number;
+        };
+      };
+    };
+    editToolCall?: {
+      args: { path: string; oldText?: string; newText?: string };
+      result?: {
+        success?: Record<string, unknown>;
+      };
+    };
+    shellToolCall?: {
+      args: { command: string };
+      result?: {
+        success?: {
+          exitCode: number;
+          stdout?: string;
+          stderr?: string;
+        };
+        rejected?: {
+          reason: string;
+        };
+      };
+    };
+    deleteToolCall?: {
+      args: { path: string };
+      result?: {
+        success?: Record<string, unknown>;
+        rejected?: {
+          reason: string;
+        };
+      };
+    };
+    grepToolCall?: {
+      args: { pattern: string; path?: string };
+      result?: {
+        success?: {
+          matchedLines: number;
+        };
+      };
+    };
+    lsToolCall?: {
+      args: { path: string; ignore?: string[] };
+      result?: {
+        success?: {
+          childrenFiles: number;
+          childrenDirs: number;
+        };
+      };
+    };
+    globToolCall?: {
+      args: { globPattern: string; targetDirectory?: string };
+      result?: {
+        success?: {
+          totalFiles: number;
+        };
+      };
+    };
+    semSearchToolCall?: {
+      args: { query: string; targetDirectories?: string[]; explanation?: string };
+      result?: {
+        success?: {
+          results: string;
+          codeResults?: Array<{
+            path: string;
+            content: string;
+            score?: number;
+          }>;
+        };
+      };
+    };
+    readLintsToolCall?: {
+      args: { paths: string[] };
+      result?: {
+        success?: {
+          fileDiagnostics: Array<{
+            path: string;
+            diagnostics: Array<{
+              message: string;
+              severity: string;
+              line?: number;
+              column?: number;
+            }>;
+          }>;
+          totalFiles: number;
+          totalDiagnostics: number;
         };
       };
     };
