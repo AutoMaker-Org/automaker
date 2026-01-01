@@ -21,7 +21,6 @@ import { ThemeOption, themeOptions } from '@/config/theme-options';
 import { SandboxRiskDialog } from '@/components/dialogs/sandbox-risk-dialog';
 import { SandboxRejectionScreen } from '@/components/dialogs/sandbox-rejection-screen';
 import { useAutoUpdate } from '@/hooks/use-auto-update';
-=======
 import { UpdateNotifier } from '@/components/updates';
 
 // Session storage key for sandbox risk acknowledgment
@@ -59,7 +58,6 @@ function RootLayoutContent() {
   // Auto-update polling - checks for updates at configured interval
   useAutoUpdate();
 
-=======
   // Hidden streamer panel - opens with "\" key
   const handleStreamerPanelShortcut = useCallback((event: KeyboardEvent) => {
     const activeElement = document.activeElement;
@@ -379,7 +377,6 @@ function RootLayoutContent() {
         onConfirm={handleSandboxConfirm}
         onDeny={handleSandboxDeny}
       />
-=======
       <UpdateNotifier />
     </main>
   );

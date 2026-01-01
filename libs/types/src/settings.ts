@@ -365,7 +365,6 @@ export interface GlobalSettings {
   // Prompt Customization
   /** Custom prompts for Auto Mode, Agent Runner, Backlog Planning, and Enhancements */
   promptCustomization?: PromptCustomization;
-=======
   // Auto-Update Settings
   /** Configuration for automatic update checking */
   autoUpdate: AutoUpdateSettings;
@@ -561,7 +560,6 @@ export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
   // via the security warning dialog that explains the risks.
   mcpAutoApproveTools: true,
   mcpUnrestrictedTools: true,
-=======
   enableSandboxMode: true,
   autoUpdate: DEFAULT_AUTO_UPDATE_SETTINGS,
 };

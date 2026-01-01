@@ -12,7 +12,6 @@ import type {
   PipelineConfig,
   PipelineStep,
   PromptCustomization,
-=======
   AutoUpdateSettings,
 } from '@automaker/types';
 import { DEFAULT_AUTO_UPDATE_SETTINGS } from '@automaker/types';
@@ -498,7 +497,6 @@ export interface AppState {
 
   // Prompt Customization
   promptCustomization: PromptCustomization; // Custom prompts for Auto Mode, Agent, Backlog Plan, Enhancement
-=======
   // Auto-Update Settings
   autoUpdate: AutoUpdateSettings; // Configuration for automatic update checking
 
@@ -989,7 +987,6 @@ const initialState: AppState = {
   mcpAutoApproveTools: true, // Default to enabled - bypass permission prompts for MCP tools
   mcpUnrestrictedTools: true, // Default to enabled - don't filter allowedTools when MCP enabled
   promptCustomization: {}, // Empty by default - all prompts use built-in defaults
-=======
   enableSandboxMode: true, // Default to enabled for security (can be disabled if issues occur)
   autoUpdate: DEFAULT_AUTO_UPDATE_SETTINGS, // Default auto-update settings
   aiProfiles: DEFAULT_AI_PROFILES,
@@ -2949,7 +2946,6 @@ export const useAppStore = create<AppState & AppActions>()(
           mcpUnrestrictedTools: state.mcpUnrestrictedTools,
           // Prompt customization
           promptCustomization: state.promptCustomization,
-=======
           autoUpdate: state.autoUpdate,
           // Profiles and sessions
           aiProfiles: state.aiProfiles,

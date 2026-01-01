@@ -171,6 +171,11 @@ export async function withTempGitRemote<T>(
   sourceUrl: string,
   callback: (tempRemoteName: string) => Promise<T>
 ): Promise<T> {
+  // Defense-in-depth: validate URL even though callers should already validate
+  if (!isValidGitUrl(sourceUrl)) {
+    throw new Error('Invalid git URL format');
+  }
+
   const tempRemoteName = `automaker-temp-remote-${crypto.randomBytes(8).toString('hex')}`;
   try {
     await execAsync(`git remote add ${tempRemoteName} "${sourceUrl}"`, {
