@@ -75,6 +75,18 @@ interface PlanSpec {
 }
 
 /**
+ * Information about pipeline status when resuming a feature
+ */
+interface PipelineStatusInfo {
+  isPipeline: boolean;
+  stepId: string | null;
+  stepIndex: number;
+  totalSteps: number;
+  step: PipelineStep | null;
+  config: PipelineConfig | null;
+}
+
+/**
  * Parse tasks from generated spec content
  * Looks for the ```tasks code block and extracts task lines
  * Format: - [ ] T###: Description | File: path/to/file
@@ -757,14 +769,7 @@ Complete the pipeline step instructions above. Review the previous work and appl
     projectPath: string,
     feature: Feature,
     useWorktrees: boolean,
-    pipelineInfo: {
-      isPipeline: boolean;
-      stepId: string | null;
-      stepIndex: number;
-      totalSteps: number;
-      step: PipelineStep | null;
-      config: PipelineConfig | null;
-    }
+    pipelineInfo: PipelineStatusInfo
   ): Promise<void> {
     const featureId = feature.id;
     console.log(
@@ -2761,14 +2766,7 @@ Review the previous work and continue the implementation. If the feature appears
     projectPath: string,
     featureId: string,
     currentStatus: FeatureStatusWithPipeline
-  ): Promise<{
-    isPipeline: boolean;
-    stepId: string | null;
-    stepIndex: number;
-    totalSteps: number;
-    step: PipelineStep | null;
-    config: PipelineConfig | null;
-  }> {
+  ): Promise<PipelineStatusInfo> {
     // Check if status is pipeline format using PipelineService
     const isPipeline = pipelineService.isPipelineStatus(currentStatus);
 
