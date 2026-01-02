@@ -1,11 +1,19 @@
 import { useMemo } from 'react';
 import { useAppStore, defaultBackgroundSettings } from '@/store/app-store';
-import { getServerUrlSync } from '@/lib/http-api-client';
+import { getAuthenticatedImageUrl } from '@/lib/api-fetch';
 
 interface UseBoardBackgroundProps {
   currentProject: { path: string; id: string } | null;
 }
 
+/**
+ * Selects the board background settings for the given project and produces a CSS style object for the project's background image when present.
+ *
+ * @param currentProject - The active project (contains `path` and `id`), or `null` if no project is selected
+ * @returns An object with:
+ *   - `backgroundSettings`: the resolved background settings for the current project or the default settings
+ *   - `backgroundImageStyle`: a React CSS properties object with `backgroundImage`, `backgroundSize`, `backgroundPosition`, and `backgroundRepeat` when an image is available, or an empty object otherwise
+ */
 export function useBoardBackground({ currentProject }: UseBoardBackgroundProps) {
   const boardBackgroundByProject = useAppStore((state) => state.boardBackgroundByProject);
 
@@ -22,14 +30,14 @@ export function useBoardBackground({ currentProject }: UseBoardBackgroundProps) 
       return {};
     }
 
+    const imageUrl = getAuthenticatedImageUrl(
+      backgroundSettings.imagePath,
+      currentProject.path,
+      backgroundSettings.imageVersion
+    );
+
     return {
-      backgroundImage: `url(${
-        import.meta.env.VITE_SERVER_URL || getServerUrlSync()
-      }/api/fs/image?path=${encodeURIComponent(
-        backgroundSettings.imagePath
-      )}&projectPath=${encodeURIComponent(currentProject.path)}${
-        backgroundSettings.imageVersion ? `&v=${backgroundSettings.imageVersion}` : ''
-      })`,
+      backgroundImage: `url(${imageUrl})`,
       backgroundSize: 'cover',
       backgroundPosition: 'center',
       backgroundRepeat: 'no-repeat',

@@ -13,7 +13,8 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils';
 import { useAppStore, defaultBackgroundSettings } from '@/store/app-store';
-import { getHttpApiClient, getServerUrlSync } from '@/lib/http-api-client';
+import { getHttpApiClient } from '@/lib/http-api-client';
+import { getAuthenticatedImageUrl } from '@/lib/api-fetch';
 import { useBoardBackgroundSettings } from '@/hooks/use-board-background-settings';
 import { toast } from 'sonner';
 import {
@@ -28,6 +29,14 @@ interface BoardBackgroundModalProps {
   onOpenChange: (open: boolean) => void;
 }
 
+/**
+ * Render a right-side modal for configuring a board's background image and appearance settings.
+ *
+ * Provides image upload (drag-and-drop or file picker), preview with cache-busting, clear/delete,
+ * and live controls for card/column opacity, column/card borders, card glassmorphism, and hiding the board scrollbar.
+ *
+ * @returns The sheet modal React element for board background settings, or `null` when no project is selected.
+ */
 export function BoardBackgroundModal({ open, onOpenChange }: BoardBackgroundModalProps) {
   const { currentProject, boardBackgroundByProject } = useAppStore();
   const {
@@ -62,12 +71,13 @@ export function BoardBackgroundModal({ open, onOpenChange }: BoardBackgroundModa
   // Update preview image when background settings change
   useEffect(() => {
     if (currentProject && backgroundSettings.imagePath) {
-      const serverUrl = import.meta.env.VITE_SERVER_URL || getServerUrlSync();
       // Add cache-busting query parameter to force browser to reload image
-      const cacheBuster = imageVersion ? `&v=${imageVersion}` : `&v=${Date.now()}`;
-      const imagePath = `${serverUrl}/api/fs/image?path=${encodeURIComponent(
-        backgroundSettings.imagePath
-      )}&projectPath=${encodeURIComponent(currentProject.path)}${cacheBuster}`;
+      const cacheBuster = imageVersion ?? Date.now().toString();
+      const imagePath = getAuthenticatedImageUrl(
+        backgroundSettings.imagePath,
+        currentProject.path,
+        cacheBuster
+      );
       setPreviewImage(imagePath);
     } else {
       setPreviewImage(null);

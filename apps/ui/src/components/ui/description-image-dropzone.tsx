@@ -3,7 +3,7 @@ import { cn } from '@/lib/utils';
 import { ImageIcon, X, Loader2, FileText } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { getElectronAPI } from '@/lib/electron';
-import { getServerUrlSync } from '@/lib/http-api-client';
+import { getAuthenticatedImageUrl } from '@/lib/api-fetch';
 import { useAppStore, type FeatureImagePath, type FeatureTextFilePath } from '@/store/app-store';
 import {
   sanitizeFilename,
@@ -46,6 +46,13 @@ interface DescriptionImageDropZoneProps {
   error?: boolean; // Show error state with red border
 }
 
+/**
+ * Textarea input that accepts image and text attachments via paste, drag-and-drop, or file browse and displays previews and removal controls.
+ *
+ * The component accepts images and text files (.txt, .md), enforces `maxFiles` and `maxFileSize`, and calls `onImagesChange` / `onTextFilesChange` with newly added items. Image previews are kept in an internal map unless an external `previewMap` and `onPreviewMapChange` are provided to control previews. Pasted clipboard images are detected and handled; text pasted without images falls back to the default paste behavior. When an image is added it is saved to a temporary path (or a fallback path) and its preview stored as base64 until a server URL is used to load it later.
+ *
+ * @returns A React element rendering the description textarea, file input/drop zone, processing state, and previews for attached images and text files.
+ */
 export function DescriptionImageDropZone({
   value,
   onChange,
@@ -94,9 +101,8 @@ export function DescriptionImageDropZone({
   // Construct server URL for loading saved images
   const getImageServerUrl = useCallback(
     (imagePath: string): string => {
-      const serverUrl = import.meta.env.VITE_SERVER_URL || getServerUrlSync();
       const projectPath = currentProject?.path || '';
-      return `${serverUrl}/api/fs/image?path=${encodeURIComponent(imagePath)}&projectPath=${encodeURIComponent(projectPath)}`;
+      return getAuthenticatedImageUrl(imagePath, projectPath);
     },
     [currentProject?.path]
   );

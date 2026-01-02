@@ -145,11 +145,48 @@ export async function apiDelete<T>(endpoint: string, options: ApiFetchOptions = 
 }
 
 /**
- * Make an authenticated DELETE request (returns raw response for status checking)
+ * Perform a DELETE request to the given endpoint and return the raw fetch response.
+ *
+ * @returns The raw `Response` from the fetch call for status and header inspection.
  */
 export async function apiDeleteRaw(
   endpoint: string,
   options: ApiFetchOptions = {}
 ): Promise<Response> {
   return apiFetch(endpoint, 'DELETE', options);
+}
+
+/**
+ * Construct a URL for loading an image that includes any necessary authentication.
+ *
+ * If an API key is available it is appended as an `apiKey` query parameter; otherwise browser cookies (session token) are relied on for authentication. Optionally includes a `v` query parameter for cache busting.
+ *
+ * @param path - The image file path on the server
+ * @param projectPath - The project namespace or folder containing the image
+ * @param version - Optional value added as the `v` query parameter to bust caches
+ * @returns The full image URL including `path`, `projectPath`, optional `v`, and `apiKey` when present
+ */
+export function getAuthenticatedImageUrl(
+  path: string,
+  projectPath: string,
+  version?: string | number
+): string {
+  const serverUrl = getServerUrl();
+  const params = new URLSearchParams({
+    path,
+    projectPath,
+  });
+
+  if (version !== undefined) {
+    params.set('v', String(version));
+  }
+
+  // Add auth credential as query param (needed for image loads that can't set headers)
+  const apiKey = getApiKey();
+  if (apiKey) {
+    params.set('apiKey', apiKey);
+  }
+  // Note: Session token auth relies on cookies which are sent automatically by the browser
+
+  return `${serverUrl}/api/fs/image?${params.toString()}`;
 }
