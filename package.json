@@ -45,7 +45,7 @@
     "test:server:coverage": "npm run test:cov --workspace=apps/server",
     "test:packages": "npm run test -w @automaker/types -w @automaker/utils -w @automaker/prompts -w @automaker/platform -w @automaker/model-resolver -w @automaker/dependency-resolver -w @automaker/git-utils --if-present",
     "test:all": "npm run test:packages && npm run test:server",
-    "lint:lockfile": "! grep -q 'git+ssh://' package-lock.json || (echo 'Error: package-lock.json contains git+ssh:// URLs. Run: git config --global url.\"https://github.com/\".insteadOf \"git@github.com:\"' && exit 1)",
+    "lint:lockfile": "node scripts/lint-lockfile.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "prepare": "husky && npm run build:packages"
