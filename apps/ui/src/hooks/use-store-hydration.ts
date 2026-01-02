@@ -1,5 +1,12 @@
 import { useEffect, useState } from 'react';
 
+interface StoreWithPersist {
+  persist?: {
+    hasHydrated?: () => boolean;
+    onFinishHydration?: (cb: () => void) => () => void;
+  };
+}
+
 /**
  * Hook for tracking store hydration status from persistence.
  *
@@ -9,7 +16,7 @@ import { useEffect, useState } from 'react';
  * @param store - The store instance with persist configuration
  * @returns Boolean indicating if the store has finished hydrating
  */
-export function useStoreHydration(store: any) {
+export function useStoreHydration(store: StoreWithPersist) {
   const [hydrated, setHydrated] = useState(() => store.persist?.hasHydrated?.() ?? false);
 
   useEffect(() => {

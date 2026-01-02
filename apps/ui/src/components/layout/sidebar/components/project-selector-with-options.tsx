@@ -1,5 +1,3 @@
-import { useState } from 'react';
-import { useNavigate } from '@tanstack/react-router';
 import {
   Folder,
   ChevronDown,
@@ -14,10 +12,8 @@ import {
   Trash2,
   Search,
 } from 'lucide-react';
-import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { formatShortcut, type ThemeMode, useAppStore } from '@/store/app-store';
-import type { Project } from '@/lib/electron';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -38,6 +34,7 @@ import { PROJECT_DARK_THEMES, PROJECT_LIGHT_THEMES } from '../constants';
 import { useProjectPicker, useDragAndDrop, useProjectTheme } from '../hooks';
 import { useKeyboardShortcutsConfig } from '@/hooks/use-keyboard-shortcuts';
 import { useValidatedProjectCycling } from '@/hooks/use-validated-project-cycling';
+import { useProjectPathValidation } from '@/hooks/use-project-path-validation';
 import { validateProjectPath } from '@/lib/validate-project-path';
 import { ProjectPathValidationDialog } from '@/components/dialogs/project-path-validation-dialog';
 
@@ -59,16 +56,20 @@ export function ProjectSelectorWithOptions({
     currentProject,
     projectHistory,
     setCurrentProject,
-    setProjects,
-    removeProject,
     reorderProjects,
     clearProjectHistory,
   } = useAppStore();
 
-  const navigate = useNavigate();
   const shortcuts = useKeyboardShortcutsConfig();
-  const [validationDialogOpen, setValidationDialogOpen] = useState(false);
-  const [invalidProject, setInvalidProject] = useState<Project | null>(null);
+
+  const {
+    validationDialogOpen,
+    setValidationDialogOpen,
+    invalidProject,
+    showValidationDialog,
+    handleRefreshPath,
+    handleRemoveProject,
+  } = useProjectPathValidation({ navigateOnRefresh: true });
 
   // Validated project cycling (automatically skips invalid paths)
   const { cyclePrevProject, cycleNextProject } = useValidatedProjectCycling();
@@ -97,39 +98,6 @@ export function ProjectSelectorWithOptions({
     handlePreviewEnter,
     handlePreviewLeave,
   } = useProjectTheme();
-
-  const handleRefreshPath = async (project: Project, newPath: string) => {
-    // Validate new path
-    const isValid = await validateProjectPath({ ...project, path: newPath });
-
-    if (!isValid) {
-      toast.error('Invalid path', {
-        description: 'Selected path does not exist or is not accessible',
-      });
-      return; // Stay on dialog
-    }
-
-    // Update project in store
-    const updatedProjects = projects.map((p) =>
-      p.id === project.id ? { ...p, path: newPath, lastOpened: new Date().toISOString() } : p
-    );
-    setProjects(updatedProjects);
-
-    setCurrentProject({ ...project, path: newPath });
-
-    // Close dialog and navigate
-    setValidationDialogOpen(false);
-    navigate({ to: '/board' });
-
-    toast.success('Project path updated');
-  };
-
-  const handleRemoveProject = (project: Project) => {
-    removeProject(project.id);
-    setCurrentProject(null);
-    navigate({ to: '/' });
-    toast.info('Project removed', { description: project.name });
-  };
 
   if (!sidebarOpen || projects.length === 0) {
     return null;
@@ -235,8 +203,7 @@ export function ProjectSelectorWithOptions({
                         const isValid = await validateProjectPath(p);
 
                         if (!isValid) {
-                          setInvalidProject(p);
-                          setValidationDialogOpen(true);
+                          showValidationDialog(p);
                         } else {
                           setCurrentProject(p);
                         }
