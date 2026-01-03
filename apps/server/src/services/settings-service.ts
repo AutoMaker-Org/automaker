@@ -124,6 +124,8 @@ export class SettingsService {
    * Missing fields are filled in from DEFAULT_GLOBAL_SETTINGS for forward/backward
    * compatibility during schema migrations.
    *
+   * Also applies version-based migrations for breaking changes.
+   *
    * @returns Promise resolving to complete GlobalSettings object
    */
   async getGlobalSettings(): Promise<GlobalSettings> {
@@ -131,7 +133,7 @@ export class SettingsService {
     const settings = await readJsonFile<GlobalSettings>(settingsPath, DEFAULT_GLOBAL_SETTINGS);
 
     // Apply any missing defaults (for backwards compatibility)
-    return {
+    let result: GlobalSettings = {
       ...DEFAULT_GLOBAL_SETTINGS,
       ...settings,
       keyboardShortcuts: {
@@ -139,6 +141,32 @@ export class SettingsService {
         ...settings.keyboardShortcuts,
       },
     };
+
+    // Version-based migrations
+    const storedVersion = settings.version || 1;
+    let needsSave = false;
+
+    // Migration v1 -> v2: Force enableSandboxMode to false for existing users
+    // Sandbox mode can cause issues on some systems, so we're disabling it by default
+    if (storedVersion < 2) {
+      logger.info('Migrating settings from v1 to v2: disabling sandbox mode');
+      result.enableSandboxMode = false;
+      result.version = SETTINGS_VERSION;
+      needsSave = true;
+    }
+
+    // Save migrated settings if needed
+    if (needsSave) {
+      try {
+        await ensureDataDir(this.dataDir);
+        await atomicWriteJson(settingsPath, result);
+        logger.info('Settings migration complete');
+      } catch (error) {
+        logger.error('Failed to save migrated settings:', error);
+      }
+    }
+
+    return result;
   }
 
   /**

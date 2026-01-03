@@ -233,6 +233,7 @@ export const useSetupStore = create<SetupState & SetupActions>()(
     }),
     {
       name: 'automaker-setup',
+      version: 1, // Add version field for proper hydration (matches app-store pattern)
       partialize: (state) => ({
         isFirstRun: state.isFirstRun,
         setupComplete: state.setupComplete,
@@ -240,6 +241,7 @@ export const useSetupStore = create<SetupState & SetupActions>()(
         skipCodexSetup: state.skipCodexSetup,
         skipOpenCodeSetup: state.skipOpenCodeSetup,
         skipClaudeSetup: state.skipClaudeSetup,
+        claudeAuthStatus: state.claudeAuthStatus,
       }),
     }
   )

@@ -32,8 +32,34 @@ import type { Feature, ClaudeUsageResponse } from '@/store/app-store';
 import type { WorktreeAPI, GitAPI, ModelDefinition, ProviderStatus } from '@/types/electron';
 import { getGlobalFileBrowser } from '@/contexts/file-browser-context';
 
-// Server URL - configurable via environment variable
+// Cached server URL (set during initialization in Electron mode)
+let cachedServerUrl: string | null = null;
+
+/**
+ * Initialize server URL from Electron IPC.
+ * Must be called early in Electron mode before making API requests.
+ */
+export const initServerUrl = async (): Promise<void> => {
+  // window.electronAPI is typed as ElectronAPI, but some Electron-only helpers
+  // (like getServerUrl) are not part of the shared interface. Narrow via `any`.
+  const electron = typeof window !== 'undefined' ? (window.electronAPI as any) : null;
+  if (electron?.getServerUrl) {
+    try {
+      cachedServerUrl = await electron.getServerUrl();
+      console.log('[HTTP Client] Server URL from Electron:', cachedServerUrl);
+    } catch (error) {
+      console.warn('[HTTP Client] Failed to get server URL from Electron:', error);
+    }
+  }
+};
+
+// Server URL - uses cached value from IPC or environment variable
 const getServerUrl = (): string => {
+  // Use cached URL from Electron IPC if available
+  if (cachedServerUrl) {
+    return cachedServerUrl;
+  }
+
   if (typeof window !== 'undefined') {
     const envUrl = import.meta.env.VITE_SERVER_URL;
     if (envUrl) return envUrl;
@@ -41,12 +67,299 @@ const getServerUrl = (): string => {
   return 'http://localhost:3008';
 };
 
-// Get API key from environment variable
-const getApiKey = (): string | null => {
-  if (typeof window !== 'undefined') {
-    return import.meta.env.VITE_AUTOMAKER_API_KEY || null;
+/**
+ * Get the server URL (exported for use in other modules)
+ */
+export const getServerUrlSync = (): string => getServerUrl();
+
+// Cached API key for authentication (Electron mode only)
+let cachedApiKey: string | null = null;
+let apiKeyInitialized = false;
+let apiKeyInitPromise: Promise<void> | null = null;
+
+// Cached session token for authentication (Web mode - explicit header auth)
+let cachedSessionToken: string | null = null;
+
+// Get API key for Electron mode (returns cached value after initialization)
+// Exported for use in WebSocket connections that need auth
+export const getApiKey = (): string | null => cachedApiKey;
+
+/**
+ * Wait for API key initialization to complete.
+ * Returns immediately if already initialized.
+ */
+export const waitForApiKeyInit = (): Promise<void> => {
+  if (apiKeyInitialized) return Promise.resolve();
+  if (apiKeyInitPromise) return apiKeyInitPromise;
+  // If not started yet, start it now
+  return initApiKey();
+};
+
+// Get session token for Web mode (returns cached value after login or token fetch)
+export const getSessionToken = (): string | null => cachedSessionToken;
+
+// Set session token (called after login or token fetch)
+export const setSessionToken = (token: string | null): void => {
+  cachedSessionToken = token;
+};
+
+// Clear session token (called on logout)
+export const clearSessionToken = (): void => {
+  cachedSessionToken = null;
+};
+
+/**
+ * Check if we're running in Electron mode
+ */
+export const isElectronMode = (): boolean => {
+  if (typeof window === 'undefined') return false;
+
+  // Prefer a stable runtime marker from preload.
+  // In some dev/electron setups, method availability can be temporarily undefined
+  // during early startup, but `isElectron` remains reliable.
+  const api = window.electronAPI as any;
+  return api?.isElectron === true || !!api?.getApiKey;
+};
+
+/**
+ * Initialize API key and server URL for Electron mode authentication.
+ * In web mode, authentication uses HTTP-only cookies instead.
+ *
+ * This should be called early in app initialization.
+ */
+export const initApiKey = async (): Promise<void> => {
+  // Return existing promise if already in progress
+  if (apiKeyInitPromise) return apiKeyInitPromise;
+
+  // Return immediately if already initialized
+  if (apiKeyInitialized) return;
+
+  // Create and store the promise so concurrent calls wait for the same initialization
+  apiKeyInitPromise = (async () => {
+    try {
+      // Initialize server URL from Electron IPC first (needed for API requests)
+      await initServerUrl();
+
+      // Only Electron mode uses API key header auth
+      if (typeof window !== 'undefined' && window.electronAPI?.getApiKey) {
+        try {
+          cachedApiKey = await window.electronAPI.getApiKey();
+          if (cachedApiKey) {
+            console.log('[HTTP Client] Using API key from Electron');
+            return;
+          }
+        } catch (error) {
+          console.warn('[HTTP Client] Failed to get API key from Electron:', error);
+        }
+      }
+
+      // In web mode, authentication is handled via HTTP-only cookies
+      console.log('[HTTP Client] Web mode - using cookie-based authentication');
+    } finally {
+      // Mark as initialized after completion, regardless of success or failure
+      apiKeyInitialized = true;
+    }
+  })();
+
+  return apiKeyInitPromise;
+};
+
+/**
+ * Check authentication status with the server
+ */
+export const checkAuthStatus = async (): Promise<{
+  authenticated: boolean;
+  required: boolean;
+}> => {
+  try {
+    const response = await fetch(`${getServerUrl()}/api/auth/status`, {
+      credentials: 'include',
+      headers: getApiKey() ? { 'X-API-Key': getApiKey()! } : undefined,
+    });
+    const data = await response.json();
+    return {
+      authenticated: data.authenticated ?? false,
+      required: data.required ?? true,
+    };
+  } catch (error) {
+    console.error('[HTTP Client] Failed to check auth status:', error);
+    return { authenticated: false, required: true };
   }
-  return null;
+};
+
+/**
+ * Login with API key (for web mode)
+ * After login succeeds, verifies the session is actually working by making
+ * a request to an authenticated endpoint.
+ */
+export const login = async (
+  apiKey: string
+): Promise<{ success: boolean; error?: string; token?: string }> => {
+  try {
+    const response = await fetch(`${getServerUrl()}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ apiKey }),
+    });
+    const data = await response.json();
+
+    // Store the session token if login succeeded
+    if (data.success && data.token) {
+      setSessionToken(data.token);
+      console.log('[HTTP Client] Session token stored after login');
+
+      // Verify the session is actually working by making a request to an authenticated endpoint
+      const verified = await verifySession();
+      if (!verified) {
+        console.error('[HTTP Client] Login appeared successful but session verification failed');
+        return {
+          success: false,
+          error: 'Session verification failed. Please try again.',
+        };
+      }
+      console.log('[HTTP Client] Login verified successfully');
+    }
+
+    return data;
+  } catch (error) {
+    console.error('[HTTP Client] Login failed:', error);
+    return { success: false, error: 'Network error' };
+  }
+};
+
+/**
+ * Check if the session cookie is still valid by making a request to an authenticated endpoint.
+ * Note: This does NOT retrieve the session token - on page refresh we rely on cookies alone.
+ * The session token is only available after a fresh login.
+ */
+export const fetchSessionToken = async (): Promise<boolean> => {
+  // On page refresh, we can't retrieve the session token (it's stored in HTTP-only cookie).
+  // We just verify the cookie is valid by checking auth status.
+  // The session token is only stored in memory after a fresh login.
+  try {
+    const response = await fetch(`${getServerUrl()}/api/auth/status`, {
+      credentials: 'include', // Send the session cookie
+    });
+
+    if (!response.ok) {
+      console.log('[HTTP Client] Failed to check auth status');
+      return false;
+    }
+
+    const data = await response.json();
+    if (data.success && data.authenticated) {
+      console.log('[HTTP Client] Session cookie is valid');
+      return true;
+    }
+
+    console.log('[HTTP Client] Session cookie is not authenticated');
+    return false;
+  } catch (error) {
+    console.error('[HTTP Client] Failed to check session:', error);
+    return false;
+  }
+};
+
+/**
+ * Logout (for web mode)
+ */
+export const logout = async (): Promise<{ success: boolean }> => {
+  try {
+    const response = await fetch(`${getServerUrl()}/api/auth/logout`, {
+      method: 'POST',
+      credentials: 'include',
+    });
+
+    // Clear the cached session token
+    clearSessionToken();
+    console.log('[HTTP Client] Session token cleared on logout');
+
+    return await response.json();
+  } catch (error) {
+    console.error('[HTTP Client] Logout failed:', error);
+    return { success: false };
+  }
+};
+
+/**
+ * Verify that the current session is still valid by making a request to an authenticated endpoint.
+ * If the session has expired or is invalid, clears the session and returns false.
+ * This should be called:
+ * 1. After login to verify the cookie was set correctly
+ * 2. On app load to verify the session hasn't expired
+ */
+export const verifySession = async (): Promise<boolean> => {
+  try {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+
+    // Add session token header if available
+    const sessionToken = getSessionToken();
+    if (sessionToken) {
+      headers['X-Session-Token'] = sessionToken;
+    }
+
+    // Make a request to an authenticated endpoint to verify the session
+    // We use /api/settings/status as it requires authentication and is lightweight
+    const response = await fetch(`${getServerUrl()}/api/settings/status`, {
+      headers,
+      credentials: 'include',
+    });
+
+    // Check for authentication errors
+    if (response.status === 401 || response.status === 403) {
+      console.warn('[HTTP Client] Session verification failed - session expired or invalid');
+      // Clear the session since it's no longer valid
+      clearSessionToken();
+      // Try to clear the cookie via logout (fire and forget)
+      fetch(`${getServerUrl()}/api/auth/logout`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: '{}',
+      }).catch(() => {});
+      return false;
+    }
+
+    if (!response.ok) {
+      console.warn('[HTTP Client] Session verification failed with status:', response.status);
+      return false;
+    }
+
+    console.log('[HTTP Client] Session verified successfully');
+    return true;
+  } catch (error) {
+    console.error('[HTTP Client] Session verification error:', error);
+    return false;
+  }
+};
+
+/**
+ * Check if the server is running in a containerized (sandbox) environment.
+ * This endpoint is unauthenticated so it can be checked before login.
+ */
+export const checkSandboxEnvironment = async (): Promise<{
+  isContainerized: boolean;
+  error?: string;
+}> => {
+  try {
+    const response = await fetch(`${getServerUrl()}/api/health/environment`, {
+      method: 'GET',
+    });
+
+    if (!response.ok) {
+      console.warn('[HTTP Client] Failed to check sandbox environment');
+      return { isContainerized: false, error: 'Failed to check environment' };
+    }
+
+    const data = await response.json();
+    return { isContainerized: data.isContainerized ?? false };
+  } catch (error) {
+    console.error('[HTTP Client] Sandbox environment check failed:', error);
+    return { isContainerized: false, error: 'Network error' };
+  }
 };
 
 type EventType =
@@ -54,7 +367,8 @@ type EventType =
   | 'auto-mode:event'
   | 'suggestions:event'
   | 'spec-regeneration:event'
-  | 'issue-validation:event';
+  | 'issue-validation:event'
+  | 'backlog-plan:event';
 
 type EventCallback = (payload: unknown) => void;
 
@@ -76,7 +390,58 @@ export class HttpApiClient implements ElectronAPI {
 
   constructor() {
     this.serverUrl = getServerUrl();
-    this.connectWebSocket();
+    // Electron mode: connect WebSocket immediately once API key is ready.
+    // Web mode: defer WebSocket connection until a consumer subscribes to events,
+    // to avoid noisy 401s on first-load/login/setup routes.
+    if (isElectronMode()) {
+      waitForApiKeyInit()
+        .then(() => {
+          this.connectWebSocket();
+        })
+        .catch((error) => {
+          console.error('[HttpApiClient] API key initialization failed:', error);
+          // Still attempt WebSocket connection - it may work with cookie auth
+          this.connectWebSocket();
+        });
+    }
+  }
+
+  /**
+   * Fetch a short-lived WebSocket token from the server
+   * Used for secure WebSocket authentication without exposing session tokens in URLs
+   */
+  private async fetchWsToken(): Promise<string | null> {
+    try {
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+
+      // Add session token header if available
+      const sessionToken = getSessionToken();
+      if (sessionToken) {
+        headers['X-Session-Token'] = sessionToken;
+      }
+
+      const response = await fetch(`${this.serverUrl}/api/auth/token`, {
+        headers,
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        console.warn('[HttpApiClient] Failed to fetch wsToken:', response.status);
+        return null;
+      }
+
+      const data = await response.json();
+      if (data.success && data.token) {
+        return data.token;
+      }
+
+      return null;
+    } catch (error) {
+      console.error('[HttpApiClient] Error fetching wsToken:', error);
+      return null;
+    }
   }
 
   private connectWebSocket(): void {
@@ -86,8 +451,52 @@ export class HttpApiClient implements ElectronAPI {
 
     this.isConnecting = true;
 
-    try {
+    // Electron mode must authenticate with the injected API key.
+    // If the key isn't ready yet, do NOT fall back to /api/auth/token (web-mode flow).
+    if (isElectronMode()) {
+      const apiKey = getApiKey();
+      if (!apiKey) {
+        console.warn(
+          '[HttpApiClient] Electron mode: API key not ready, delaying WebSocket connect'
+        );
+        this.isConnecting = false;
+        if (!this.reconnectTimer) {
+          this.reconnectTimer = setTimeout(() => {
+            this.reconnectTimer = null;
+            this.connectWebSocket();
+          }, 250);
+        }
+        return;
+      }
+
       const wsUrl = this.serverUrl.replace(/^http/, 'ws') + '/api/events';
+      this.establishWebSocket(`${wsUrl}?apiKey=${encodeURIComponent(apiKey)}`);
+      return;
+    }
+
+    // In web mode, fetch a short-lived wsToken first
+    this.fetchWsToken()
+      .then((wsToken) => {
+        const wsUrl = this.serverUrl.replace(/^http/, 'ws') + '/api/events';
+        if (wsToken) {
+          this.establishWebSocket(`${wsUrl}?wsToken=${encodeURIComponent(wsToken)}`);
+        } else {
+          // Fallback: try connecting without token (will fail if not authenticated)
+          console.warn('[HttpApiClient] No wsToken available, attempting connection anyway');
+          this.establishWebSocket(wsUrl);
+        }
+      })
+      .catch((error) => {
+        console.error('[HttpApiClient] Failed to prepare WebSocket connection:', error);
+        this.isConnecting = false;
+      });
+  }
+
+  /**
+   * Establish the actual WebSocket connection
+   */
+  private establishWebSocket(wsUrl: string): void {
+    try {
       this.ws = new WebSocket(wsUrl);
 
       this.ws.onopen = () => {
@@ -102,8 +511,17 @@ export class HttpApiClient implements ElectronAPI {
       this.ws.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
+          console.log(
+            '[HttpApiClient] WebSocket message:',
+            data.type,
+            'hasPayload:',
+            !!data.payload,
+            'callbacksRegistered:',
+            this.eventCallbacks.has(data.type)
+          );
           const callbacks = this.eventCallbacks.get(data.type);
           if (callbacks) {
+            console.log('[HttpApiClient] Dispatching to', callbacks.size, 'callbacks');
             callbacks.forEach((cb) => cb(data.payload));
           }
         } catch (error) {
@@ -155,42 +573,121 @@ export class HttpApiClient implements ElectronAPI {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
     };
+
+    // Electron mode: use API key
     const apiKey = getApiKey();
     if (apiKey) {
       headers['X-API-Key'] = apiKey;
+      return headers;
     }
+
+    // Web mode: use session token if available
+    const sessionToken = getSessionToken();
+    if (sessionToken) {
+      headers['X-Session-Token'] = sessionToken;
+    }
+
     return headers;
   }
 
   private async post<T>(endpoint: string, body?: unknown): Promise<T> {
+    // Ensure API key is initialized before making request
+    await waitForApiKeyInit();
     const response = await fetch(`${this.serverUrl}${endpoint}`, {
       method: 'POST',
       headers: this.getHeaders(),
+      credentials: 'include', // Include cookies for session auth
       body: body ? JSON.stringify(body) : undefined,
     });
+
+    if (!response.ok) {
+      let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+      try {
+        const errorData = await response.json();
+        if (errorData.error) {
+          errorMessage = errorData.error;
+        }
+      } catch {
+        // If parsing JSON fails, use status text
+      }
+      throw new Error(errorMessage);
+    }
+
     return response.json();
   }
 
   private async get<T>(endpoint: string): Promise<T> {
-    const headers = this.getHeaders();
-    const response = await fetch(`${this.serverUrl}${endpoint}`, { headers });
+    // Ensure API key is initialized before making request
+    await waitForApiKeyInit();
+    const response = await fetch(`${this.serverUrl}${endpoint}`, {
+      headers: this.getHeaders(),
+      credentials: 'include', // Include cookies for session auth
+    });
+
+    if (!response.ok) {
+      let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+      try {
+        const errorData = await response.json();
+        if (errorData.error) {
+          errorMessage = errorData.error;
+        }
+      } catch {
+        // If parsing JSON fails, use status text
+      }
+      throw new Error(errorMessage);
+    }
+
     return response.json();
   }
 
   private async put<T>(endpoint: string, body?: unknown): Promise<T> {
+    // Ensure API key is initialized before making request
+    await waitForApiKeyInit();
     const response = await fetch(`${this.serverUrl}${endpoint}`, {
       method: 'PUT',
       headers: this.getHeaders(),
+      credentials: 'include', // Include cookies for session auth
       body: body ? JSON.stringify(body) : undefined,
     });
+
+    if (!response.ok) {
+      let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+      try {
+        const errorData = await response.json();
+        if (errorData.error) {
+          errorMessage = errorData.error;
+        }
+      } catch {
+        // If parsing JSON fails, use status text
+      }
+      throw new Error(errorMessage);
+    }
+
     return response.json();
   }
 
   private async httpDelete<T>(endpoint: string): Promise<T> {
+    // Ensure API key is initialized before making request
+    await waitForApiKeyInit();
     const response = await fetch(`${this.serverUrl}${endpoint}`, {
       method: 'DELETE',
       headers: this.getHeaders(),
+      credentials: 'include', // Include cookies for session auth
     });
+
+    if (!response.ok) {
+      let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+      try {
+        const errorData = await response.json();
+        if (errorData.error) {
+          errorMessage = errorData.error;
+        }
+      } catch {
+        // If parsing JSON fails, use status text
+      }
+      throw new Error(errorMessage);
+    }
+
     return response.json();
   }
 
@@ -264,14 +761,15 @@ export class HttpApiClient implements ElectronAPI {
     const result = await this.post<{
       success: boolean;
       path?: string;
+      isAllowed?: boolean;
       error?: string;
     }>('/api/fs/validate-path', { filePath: path });
 
-    if (result.success && result.path) {
+    if (result.success && result.path && result.isAllowed !== false) {
       return { canceled: false, filePaths: [result.path] };
     }
 
-    console.error('Invalid directory:', result.error);
+    console.error('Invalid directory:', result.error || 'Path not allowed');
     return { canceled: true, filePaths: [] };
   }
 
@@ -1331,3 +1829,10 @@ export function getHttpApiClient(): HttpApiClient {
   }
   return httpApiClientInstance;
 }
+
+// Start API key initialization immediately when this module is imported
+// This ensures the init promise is created early, even before React components mount
+// The actual async work happens in the background and won't block module loading
+initApiKey().catch((error) => {
+  console.error('[HTTP Client] Failed to initialize API key:', error);
+});

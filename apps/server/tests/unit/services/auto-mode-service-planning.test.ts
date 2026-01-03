@@ -24,84 +24,87 @@ describe('auto-mode-service.ts - Planning Mode', () => {
       return svc.getPlanningPromptPrefix(feature);
     };
 
-    it('should return empty string for skip mode', () => {
+    it('should return empty string for skip mode', async () => {
       const feature = { id: 'test', planningMode: 'skip' as const };
-      const result = getPlanningPromptPrefix(service, feature);
+      const result = await getPlanningPromptPrefix(service, feature);
       expect(result).toBe('');
     });
 
-    it('should return empty string when planningMode is undefined', () => {
+    it('should return empty string when planningMode is undefined', async () => {
       const feature = { id: 'test' };
-      const result = getPlanningPromptPrefix(service, feature);
+      const result = await getPlanningPromptPrefix(service, feature);
       expect(result).toBe('');
     });
 
-    it('should return lite prompt for lite mode without approval', () => {
+    it('should return lite prompt for lite mode without approval', async () => {
       const feature = {
         id: 'test',
         planningMode: 'lite' as const,
         requirePlanApproval: false,
       };
-      const result = getPlanningPromptPrefix(service, feature);
+      const result = await getPlanningPromptPrefix(service, feature);
       expect(result).toContain('Planning Phase (Lite Mode)');
       expect(result).toContain('[PLAN_GENERATED]');
       expect(result).toContain('Feature Request');
     });
 
-    it('should return lite_with_approval prompt for lite mode with approval', () => {
+    it('should return lite_with_approval prompt for lite mode with approval', async () => {
       const feature = {
         id: 'test',
         planningMode: 'lite' as const,
         requirePlanApproval: true,
       };
-      const result = getPlanningPromptPrefix(service, feature);
-      expect(result).toContain('Planning Phase (Lite Mode)');
+      const result = await getPlanningPromptPrefix(service, feature);
+      expect(result).toContain('## Planning Phase (Lite Mode)');
       expect(result).toContain('[SPEC_GENERATED]');
-      expect(result).toContain('DO NOT proceed with implementation');
+      expect(result).toContain(
+        'DO NOT proceed with implementation until you receive explicit approval'
+      );
     });
 
-    it('should return spec prompt for spec mode', () => {
+    it('should return spec prompt for spec mode', async () => {
       const feature = {
         id: 'test',
         planningMode: 'spec' as const,
       };
-      const result = getPlanningPromptPrefix(service, feature);
-      expect(result).toContain('Specification Phase (Spec Mode)');
+      const result = await getPlanningPromptPrefix(service, feature);
+      expect(result).toContain('## Specification Phase (Spec Mode)');
       expect(result).toContain('```tasks');
       expect(result).toContain('T001');
       expect(result).toContain('[TASK_START]');
       expect(result).toContain('[TASK_COMPLETE]');
     });
 
-    it('should return full prompt for full mode', () => {
+    it('should return full prompt for full mode', async () => {
       const feature = {
         id: 'test',
         planningMode: 'full' as const,
       };
-      const result = getPlanningPromptPrefix(service, feature);
-      expect(result).toContain('Full Specification Phase (Full SDD Mode)');
+      const result = await getPlanningPromptPrefix(service, feature);
+      expect(result).toContain('## Full Specification Phase (Full SDD Mode)');
       expect(result).toContain('Phase 1: Foundation');
       expect(result).toContain('Phase 2: Core Implementation');
       expect(result).toContain('Phase 3: Integration & Testing');
     });
 
-    it('should include the separator and Feature Request header', () => {
+    it('should include the separator and Feature Request header', async () => {
       const feature = {
         id: 'test',
         planningMode: 'spec' as const,
       };
-      const result = getPlanningPromptPrefix(service, feature);
+      const result = await getPlanningPromptPrefix(service, feature);
       expect(result).toContain('---');
       expect(result).toContain('## Feature Request');
     });
 
-    it('should instruct agent to NOT output exploration text', () => {
+    it('should instruct agent to NOT output exploration text', async () => {
       const modes = ['lite', 'spec', 'full'] as const;
       for (const mode of modes) {
         const feature = { id: 'test', planningMode: mode };
-        const result = getPlanningPromptPrefix(service, feature);
-        expect(result).toContain('Do NOT output exploration text');
-        expect(result).toContain('Start DIRECTLY');
+        const result = await getPlanningPromptPrefix(service, feature);
+        // All modes should have the IMPORTANT instruction about not outputting exploration text
+        expect(result).toContain('IMPORTANT: Do NOT output exploration text');
+        expect(result).toContain('Silently analyze the codebase first');
       }
     });
   });
@@ -279,18 +282,18 @@ describe('auto-mode-service.ts - Planning Mode', () => {
       return svc.getPlanningPromptPrefix(feature);
     };
 
-    it('should have all required planning modes', () => {
+    it('should have all required planning modes', async () => {
       const modes = ['lite', 'spec', 'full'] as const;
       for (const mode of modes) {
         const feature = { id: 'test', planningMode: mode };
-        const result = getPlanningPromptPrefix(service, feature);
+        const result = await getPlanningPromptPrefix(service, feature);
         expect(result.length).toBeGreaterThan(100);
       }
     });
 
-    it('lite prompt should include correct structure', () => {
+    it('lite prompt should include correct structure', async () => {
       const feature = { id: 'test', planningMode: 'lite' as const };
-      const result = getPlanningPromptPrefix(service, feature);
+      const result = await getPlanningPromptPrefix(service, feature);
       expect(result).toContain('Goal');
       expect(result).toContain('Approach');
       expect(result).toContain('Files to Touch');
@@ -298,9 +301,9 @@ describe('auto-mode-service.ts - Planning Mode', () => {
       expect(result).toContain('Risks');
     });
 
-    it('spec prompt should include task format instructions', () => {
+    it('spec prompt should include task format instructions', async () => {
       const feature = { id: 'test', planningMode: 'spec' as const };
-      const result = getPlanningPromptPrefix(service, feature);
+      const result = await getPlanningPromptPrefix(service, feature);
       expect(result).toContain('Problem');
       expect(result).toContain('Solution');
       expect(result).toContain('Acceptance Criteria');
@@ -309,13 +312,13 @@ describe('auto-mode-service.ts - Planning Mode', () => {
       expect(result).toContain('Verification');
     });
 
-    it('full prompt should include phases', () => {
+    it('full prompt should include phases', async () => {
       const feature = { id: 'test', planningMode: 'full' as const };
-      const result = getPlanningPromptPrefix(service, feature);
-      expect(result).toContain('Problem Statement');
-      expect(result).toContain('User Story');
-      expect(result).toContain('Technical Context');
-      expect(result).toContain('Non-Goals');
+      const result = await getPlanningPromptPrefix(service, feature);
+      expect(result).toContain('1. **Problem Statement**');
+      expect(result).toContain('2. **User Story**');
+      expect(result).toContain('4. **Technical Context**');
+      expect(result).toContain('5. **Non-Goals**');
       expect(result).toContain('Phase 1');
       expect(result).toContain('Phase 2');
       expect(result).toContain('Phase 3');

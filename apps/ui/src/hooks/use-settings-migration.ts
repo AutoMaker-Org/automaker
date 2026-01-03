@@ -18,7 +18,7 @@
  */
 
 import { useEffect, useState, useRef } from 'react';
-import { getHttpApiClient } from '@/lib/http-api-client';
+import { getHttpApiClient, waitForApiKeyInit } from '@/lib/http-api-client';
 import { isElectron } from '@/lib/electron';
 import { getItem, removeItem } from '@/lib/storage';
 import { useAppStore } from '@/store/app-store';
@@ -99,6 +99,10 @@ export function useSettingsMigration(): MigrationState {
       }
 
       try {
+        // Wait for API key to be initialized before making any API calls
+        // This prevents 401 errors on startup in Electron mode
+        await waitForApiKeyInit();
+
         const api = getHttpApiClient();
 
         // Check if server has settings files
@@ -189,13 +193,9 @@ export function useSettingsMigration(): MigrationState {
  * Call this when important global settings change (theme, UI preferences, profiles, etc.)
  * Safe to call from store subscribers or change handlers.
  *
- * Only functions in Electron mode. Returns false if not in Electron or on error.
- *
  * @returns Promise resolving to true if sync succeeded, false otherwise
  */
 export async function syncSettingsToServer(): Promise<boolean> {
-  if (!isElectron()) return false;
-
   try {
     const api = getHttpApiClient();
     const automakerStorage = getItem('automaker-storage');
@@ -228,11 +228,13 @@ export async function syncSettingsToServer(): Promise<boolean> {
       validationModel: state.validationModel,
       autoLoadClaudeMd: state.autoLoadClaudeMd,
       enableSandboxMode: state.enableSandboxMode,
+      skipSandboxWarning: state.skipSandboxWarning,
       keyboardShortcuts: state.keyboardShortcuts,
       aiProfiles: state.aiProfiles,
       mcpServers: state.mcpServers,
       mcpAutoApproveTools: state.mcpAutoApproveTools,
       mcpUnrestrictedTools: state.mcpUnrestrictedTools,
+      promptCustomization: state.promptCustomization,
       projects: state.projects,
       trashedProjects: state.trashedProjects,
       projectHistory: state.projectHistory,
@@ -257,8 +259,6 @@ export async function syncSettingsToServer(): Promise<boolean> {
  * Call this when API keys are added or updated in settings UI.
  * Only requires providing the keys that have changed.
  *
- * Only functions in Electron mode. Returns false if not in Electron or on error.
- *
  * @param apiKeys - Partial credential object with optional anthropic, google, openai keys
  * @returns Promise resolving to true if sync succeeded, false otherwise
  */
@@ -267,8 +267,6 @@ export async function syncCredentialsToServer(apiKeys: {
   google?: string;
   openai?: string;
 }): Promise<boolean> {
-  if (!isElectron()) return false;
-
   try {
     const api = getHttpApiClient();
     const result = await api.settings.updateCredentials({ apiKeys });
@@ -289,7 +287,6 @@ export async function syncCredentialsToServer(apiKeys: {
  * Supports partial updates - only include fields that have changed.
  *
  * Call this when project settings are modified in the board or settings UI.
- * Only functions in Electron mode. Returns false if not in Electron or on error.
  *
  * @param projectPath - Absolute path to project directory
  * @param updates - Partial ProjectSettings with optional theme, worktree, and board settings
@@ -311,8 +308,6 @@ export async function syncProjectSettingsToServer(
     }>;
   }
 ): Promise<boolean> {
-  if (!isElectron()) return false;
-
   try {
     const api = getHttpApiClient();
     const result = await api.settings.updateProject(projectPath, updates);
@@ -330,13 +325,9 @@ export async function syncProjectSettingsToServer(
  * mcpServers state. Useful when settings were modified externally
  * (e.g., by editing the settings.json file directly).
  *
- * Only functions in Electron mode. Returns false if not in Electron or on error.
- *
  * @returns Promise resolving to true if load succeeded, false otherwise
  */
 export async function loadMCPServersFromServer(): Promise<boolean> {
-  if (!isElectron()) return false;
-
   try {
     const api = getHttpApiClient();
     const result = await api.settings.getGlobal();

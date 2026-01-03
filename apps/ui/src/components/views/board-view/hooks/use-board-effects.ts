@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { getElectronAPI } from '@/lib/electron';
 import { useAppStore } from '@/store/app-store';
 
@@ -12,6 +12,7 @@ interface UseBoardEffectsProps {
   checkContextExists: (featureId: string) => Promise<boolean>;
   features: any[];
   isLoading: boolean;
+  featuresWithContext: Set<string>;
   setFeaturesWithContext: (set: Set<string>) => void;
 }
 
@@ -25,8 +26,14 @@ export function useBoardEffects({
   checkContextExists,
   features,
   isLoading,
+  featuresWithContext,
   setFeaturesWithContext,
 }: UseBoardEffectsProps) {
+  // Keep a ref to the current featuresWithContext for use in event handlers
+  const featuresWithContextRef = useRef(featuresWithContext);
+  useEffect(() => {
+    featuresWithContextRef.current = featuresWithContext;
+  }, [featuresWithContext]);
   // Make current project available globally for modal
   useEffect(() => {
     if (currentProject) {
@@ -146,4 +153,30 @@ export function useBoardEffects({
       checkAllContexts();
     }
   }, [features, isLoading, checkContextExists, setFeaturesWithContext]);
+
+  // Re-check context when a feature stops, completes, or errors
+  // This ensures hasContext is updated even if the features array doesn't change
+  useEffect(() => {
+    const api = getElectronAPI();
+    if (!api?.autoMode) return;
+
+    const unsubscribe = api.autoMode.onEvent(async (event) => {
+      // When a feature stops (error/abort) or completes, re-check its context
+      if (
+        (event.type === 'auto_mode_error' || event.type === 'auto_mode_feature_complete') &&
+        event.featureId
+      ) {
+        const hasContext = await checkContextExists(event.featureId);
+        if (hasContext) {
+          const newSet = new Set(featuresWithContextRef.current);
+          newSet.add(event.featureId);
+          setFeaturesWithContext(newSet);
+        }
+      }
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [checkContextExists, setFeaturesWithContext]);
 }

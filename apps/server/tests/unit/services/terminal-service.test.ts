@@ -2,15 +2,57 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { TerminalService, getTerminalService } from '@/services/terminal-service.js';
 import * as pty from 'node-pty';
 import * as os from 'os';
-import * as fs from 'fs';
+import * as platform from '@automaker/platform';
+import * as secureFs from '@/lib/secure-fs.js';
 
 vi.mock('node-pty');
-vi.mock('fs');
 vi.mock('os');
+vi.mock('@automaker/platform', async () => {
+  const actual = await vi.importActual('@automaker/platform');
+  return {
+    ...actual,
+    systemPathExists: vi.fn(),
+    systemPathReadFileSync: vi.fn(),
+    getWslVersionPath: vi.fn(),
+    getShellPaths: vi.fn(), // Mock shell paths for cross-platform testing
+    isAllowedSystemPath: vi.fn(() => true), // Allow all paths in tests
+  };
+});
+vi.mock('@/lib/secure-fs.js');
 
 describe('terminal-service.ts', () => {
   let service: TerminalService;
   let mockPtyProcess: any;
+
+  // Shell paths for each platform (matching system-paths.ts)
+  const linuxShellPaths = [
+    '/bin/zsh',
+    '/bin/bash',
+    '/bin/sh',
+    '/usr/bin/zsh',
+    '/usr/bin/bash',
+    '/usr/bin/sh',
+    '/usr/local/bin/zsh',
+    '/usr/local/bin/bash',
+    '/opt/homebrew/bin/zsh',
+    '/opt/homebrew/bin/bash',
+    'zsh',
+    'bash',
+    'sh',
+  ];
+
+  const windowsShellPaths = [
+    'C:\\Program Files\\PowerShell\\7\\pwsh.exe',
+    'C:\\Program Files\\PowerShell\\7-preview\\pwsh.exe',
+    'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe',
+    'C:\\Windows\\System32\\cmd.exe',
+    'pwsh.exe',
+    'pwsh',
+    'powershell.exe',
+    'powershell',
+    'cmd.exe',
+    'cmd',
+  ];
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -29,6 +71,13 @@ describe('terminal-service.ts', () => {
     vi.mocked(os.homedir).mockReturnValue('/home/user');
     vi.mocked(os.platform).mockReturnValue('linux');
     vi.mocked(os.arch).mockReturnValue('x64');
+
+    // Default mocks for system paths and secureFs
+    vi.mocked(platform.systemPathExists).mockReturnValue(true);
+    vi.mocked(platform.systemPathReadFileSync).mockReturnValue('');
+    vi.mocked(platform.getWslVersionPath).mockReturnValue('/proc/version');
+    vi.mocked(platform.getShellPaths).mockReturnValue(linuxShellPaths); // Default to Linux paths
+    vi.mocked(secureFs.stat).mockResolvedValue({ isDirectory: () => true } as any);
   });
 
   afterEach(() => {
@@ -38,7 +87,8 @@ describe('terminal-service.ts', () => {
   describe('detectShell', () => {
     it('should detect PowerShell Core on Windows when available', () => {
       vi.mocked(os.platform).mockReturnValue('win32');
-      vi.mocked(fs.existsSync).mockImplementation((path: any) => {
+      vi.mocked(platform.getShellPaths).mockReturnValue(windowsShellPaths);
+      vi.mocked(platform.systemPathExists).mockImplementation((path: string) => {
         return path === 'C:\\Program Files\\PowerShell\\7\\pwsh.exe';
       });
 
@@ -50,7 +100,8 @@ describe('terminal-service.ts', () => {
 
     it('should fall back to PowerShell on Windows if Core not available', () => {
       vi.mocked(os.platform).mockReturnValue('win32');
-      vi.mocked(fs.existsSync).mockImplementation((path: any) => {
+      vi.mocked(platform.getShellPaths).mockReturnValue(windowsShellPaths);
+      vi.mocked(platform.systemPathExists).mockImplementation((path: string) => {
         return path === 'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe';
       });
 
@@ -62,7 +113,8 @@ describe('terminal-service.ts', () => {
 
     it('should fall back to cmd.exe on Windows if no PowerShell', () => {
       vi.mocked(os.platform).mockReturnValue('win32');
-      vi.mocked(fs.existsSync).mockReturnValue(false);
+      vi.mocked(platform.getShellPaths).mockReturnValue(windowsShellPaths);
+      vi.mocked(platform.systemPathExists).mockReturnValue(false);
 
       const result = service.detectShell();
 
@@ -73,7 +125,7 @@ describe('terminal-service.ts', () => {
     it('should detect user shell on macOS', () => {
       vi.mocked(os.platform).mockReturnValue('darwin');
       vi.spyOn(process, 'env', 'get').mockReturnValue({ SHELL: '/bin/zsh' });
-      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(platform.systemPathExists).mockReturnValue(true);
 
       const result = service.detectShell();
 
@@ -84,7 +136,7 @@ describe('terminal-service.ts', () => {
     it('should fall back to zsh on macOS if user shell not available', () => {
       vi.mocked(os.platform).mockReturnValue('darwin');
       vi.spyOn(process, 'env', 'get').mockReturnValue({});
-      vi.mocked(fs.existsSync).mockImplementation((path: any) => {
+      vi.mocked(platform.systemPathExists).mockImplementation((path: string) => {
         return path === '/bin/zsh';
       });
 
@@ -97,7 +149,10 @@ describe('terminal-service.ts', () => {
     it('should fall back to bash on macOS if zsh not available', () => {
       vi.mocked(os.platform).mockReturnValue('darwin');
       vi.spyOn(process, 'env', 'get').mockReturnValue({});
-      vi.mocked(fs.existsSync).mockReturnValue(false);
+      // zsh not available, but bash is
+      vi.mocked(platform.systemPathExists).mockImplementation((path: string) => {
+        return path === '/bin/bash';
+      });
 
       const result = service.detectShell();
 
@@ -108,7 +163,7 @@ describe('terminal-service.ts', () => {
     it('should detect user shell on Linux', () => {
       vi.mocked(os.platform).mockReturnValue('linux');
       vi.spyOn(process, 'env', 'get').mockReturnValue({ SHELL: '/bin/bash' });
-      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(platform.systemPathExists).mockReturnValue(true);
 
       const result = service.detectShell();
 
@@ -119,7 +174,7 @@ describe('terminal-service.ts', () => {
     it('should fall back to bash on Linux if user shell not available', () => {
       vi.mocked(os.platform).mockReturnValue('linux');
       vi.spyOn(process, 'env', 'get').mockReturnValue({});
-      vi.mocked(fs.existsSync).mockImplementation((path: any) => {
+      vi.mocked(platform.systemPathExists).mockImplementation((path: string) => {
         return path === '/bin/bash';
       });
 
@@ -132,7 +187,7 @@ describe('terminal-service.ts', () => {
     it('should fall back to sh on Linux if bash not available', () => {
       vi.mocked(os.platform).mockReturnValue('linux');
       vi.spyOn(process, 'env', 'get').mockReturnValue({});
-      vi.mocked(fs.existsSync).mockReturnValue(false);
+      vi.mocked(platform.systemPathExists).mockReturnValue(false);
 
       const result = service.detectShell();
 
@@ -143,8 +198,10 @@ describe('terminal-service.ts', () => {
     it('should detect WSL and use appropriate shell', () => {
       vi.mocked(os.platform).mockReturnValue('linux');
       vi.spyOn(process, 'env', 'get').mockReturnValue({ SHELL: '/bin/bash' });
-      vi.mocked(fs.existsSync).mockReturnValue(true);
-      vi.mocked(fs.readFileSync).mockReturnValue('Linux version 5.10.0-microsoft-standard-WSL2');
+      vi.mocked(platform.systemPathExists).mockReturnValue(true);
+      vi.mocked(platform.systemPathReadFileSync).mockReturnValue(
+        'Linux version 5.10.0-microsoft-standard-WSL2'
+      );
 
       const result = service.detectShell();
 
@@ -155,43 +212,45 @@ describe('terminal-service.ts', () => {
 
   describe('isWSL', () => {
     it('should return true if /proc/version contains microsoft', () => {
-      vi.mocked(fs.existsSync).mockReturnValue(true);
-      vi.mocked(fs.readFileSync).mockReturnValue('Linux version 5.10.0-microsoft-standard-WSL2');
+      vi.mocked(platform.systemPathExists).mockReturnValue(true);
+      vi.mocked(platform.systemPathReadFileSync).mockReturnValue(
+        'Linux version 5.10.0-microsoft-standard-WSL2'
+      );
 
       expect(service.isWSL()).toBe(true);
     });
 
     it('should return true if /proc/version contains wsl', () => {
-      vi.mocked(fs.existsSync).mockReturnValue(true);
-      vi.mocked(fs.readFileSync).mockReturnValue('Linux version 5.10.0-wsl2');
+      vi.mocked(platform.systemPathExists).mockReturnValue(true);
+      vi.mocked(platform.systemPathReadFileSync).mockReturnValue('Linux version 5.10.0-wsl2');
 
       expect(service.isWSL()).toBe(true);
     });
 
     it('should return true if WSL_DISTRO_NAME is set', () => {
-      vi.mocked(fs.existsSync).mockReturnValue(false);
+      vi.mocked(platform.systemPathExists).mockReturnValue(false);
       vi.spyOn(process, 'env', 'get').mockReturnValue({ WSL_DISTRO_NAME: 'Ubuntu' });
 
       expect(service.isWSL()).toBe(true);
     });
 
     it('should return true if WSLENV is set', () => {
-      vi.mocked(fs.existsSync).mockReturnValue(false);
+      vi.mocked(platform.systemPathExists).mockReturnValue(false);
       vi.spyOn(process, 'env', 'get').mockReturnValue({ WSLENV: 'PATH/l' });
 
       expect(service.isWSL()).toBe(true);
     });
 
     it('should return false if not in WSL', () => {
-      vi.mocked(fs.existsSync).mockReturnValue(false);
+      vi.mocked(platform.systemPathExists).mockReturnValue(false);
       vi.spyOn(process, 'env', 'get').mockReturnValue({});
 
       expect(service.isWSL()).toBe(false);
     });
 
     it('should return false if error reading /proc/version', () => {
-      vi.mocked(fs.existsSync).mockReturnValue(true);
-      vi.mocked(fs.readFileSync).mockImplementation(() => {
+      vi.mocked(platform.systemPathExists).mockReturnValue(true);
+      vi.mocked(platform.systemPathReadFileSync).mockImplementation(() => {
         throw new Error('Permission denied');
       });
 
@@ -203,7 +262,7 @@ describe('terminal-service.ts', () => {
     it('should return platform information', () => {
       vi.mocked(os.platform).mockReturnValue('linux');
       vi.mocked(os.arch).mockReturnValue('x64');
-      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(platform.systemPathExists).mockReturnValue(true);
       vi.spyOn(process, 'env', 'get').mockReturnValue({ SHELL: '/bin/bash' });
 
       const info = service.getPlatformInfo();
@@ -216,20 +275,21 @@ describe('terminal-service.ts', () => {
   });
 
   describe('createSession', () => {
-    it('should create a new terminal session', () => {
-      vi.mocked(fs.existsSync).mockReturnValue(true);
-      vi.mocked(fs.statSync).mockReturnValue({ isDirectory: () => true } as any);
+    it('should create a new terminal session', async () => {
+      vi.mocked(platform.systemPathExists).mockReturnValue(true);
+      vi.mocked(secureFs.stat).mockResolvedValue({ isDirectory: () => true } as any);
       vi.spyOn(process, 'env', 'get').mockReturnValue({ SHELL: '/bin/bash' });
 
-      const session = service.createSession({
+      const session = await service.createSession({
         cwd: '/test/dir',
         cols: 100,
         rows: 30,
       });
 
-      expect(session.id).toMatch(/^term-/);
-      expect(session.cwd).toBe('/test/dir');
-      expect(session.shell).toBe('/bin/bash');
+      expect(session).not.toBeNull();
+      expect(session!.id).toMatch(/^term-/);
+      expect(session!.cwd).toBe('/test/dir');
+      expect(session!.shell).toBe('/bin/bash');
       expect(pty.spawn).toHaveBeenCalledWith(
         '/bin/bash',
         ['--login'],
@@ -241,12 +301,12 @@ describe('terminal-service.ts', () => {
       );
     });
 
-    it('should use default cols and rows if not provided', () => {
-      vi.mocked(fs.existsSync).mockReturnValue(true);
-      vi.mocked(fs.statSync).mockReturnValue({ isDirectory: () => true } as any);
+    it('should use default cols and rows if not provided', async () => {
+      vi.mocked(platform.systemPathExists).mockReturnValue(true);
+      vi.mocked(secureFs.stat).mockResolvedValue({ isDirectory: () => true } as any);
       vi.spyOn(process, 'env', 'get').mockReturnValue({ SHELL: '/bin/bash' });
 
-      service.createSession();
+      await service.createSession();
 
       expect(pty.spawn).toHaveBeenCalledWith(
         expect.any(String),
@@ -258,66 +318,68 @@ describe('terminal-service.ts', () => {
       );
     });
 
-    it('should fall back to home directory if cwd does not exist', () => {
-      vi.mocked(fs.existsSync).mockReturnValue(true);
-      vi.mocked(fs.statSync).mockImplementation(() => {
-        throw new Error('ENOENT');
-      });
+    it('should fall back to home directory if cwd does not exist', async () => {
+      vi.mocked(platform.systemPathExists).mockReturnValue(true);
+      vi.mocked(secureFs.stat).mockRejectedValue(new Error('ENOENT'));
       vi.spyOn(process, 'env', 'get').mockReturnValue({ SHELL: '/bin/bash' });
 
-      const session = service.createSession({
+      const session = await service.createSession({
         cwd: '/nonexistent',
       });
 
-      expect(session.cwd).toBe('/home/user');
+      expect(session).not.toBeNull();
+      expect(session!.cwd).toBe('/home/user');
     });
 
-    it('should fall back to home directory if cwd is not a directory', () => {
-      vi.mocked(fs.existsSync).mockReturnValue(true);
-      vi.mocked(fs.statSync).mockReturnValue({ isDirectory: () => false } as any);
+    it('should fall back to home directory if cwd is not a directory', async () => {
+      vi.mocked(platform.systemPathExists).mockReturnValue(true);
+      vi.mocked(secureFs.stat).mockResolvedValue({ isDirectory: () => false } as any);
       vi.spyOn(process, 'env', 'get').mockReturnValue({ SHELL: '/bin/bash' });
 
-      const session = service.createSession({
+      const session = await service.createSession({
         cwd: '/file.txt',
       });
 
-      expect(session.cwd).toBe('/home/user');
+      expect(session).not.toBeNull();
+      expect(session!.cwd).toBe('/home/user');
     });
 
-    it('should fix double slashes in path', () => {
-      vi.mocked(fs.existsSync).mockReturnValue(true);
-      vi.mocked(fs.statSync).mockReturnValue({ isDirectory: () => true } as any);
+    it('should fix double slashes in path', async () => {
+      vi.mocked(platform.systemPathExists).mockReturnValue(true);
+      vi.mocked(secureFs.stat).mockResolvedValue({ isDirectory: () => true } as any);
       vi.spyOn(process, 'env', 'get').mockReturnValue({ SHELL: '/bin/bash' });
 
-      const session = service.createSession({
+      const session = await service.createSession({
         cwd: '//test/dir',
       });
 
-      expect(session.cwd).toBe('/test/dir');
+      expect(session).not.toBeNull();
+      expect(session!.cwd).toBe('/test/dir');
     });
 
-    it('should preserve WSL UNC paths', () => {
-      vi.mocked(fs.existsSync).mockReturnValue(true);
-      vi.mocked(fs.statSync).mockReturnValue({ isDirectory: () => true } as any);
+    it('should preserve WSL UNC paths', async () => {
+      vi.mocked(platform.systemPathExists).mockReturnValue(true);
+      vi.mocked(secureFs.stat).mockResolvedValue({ isDirectory: () => true } as any);
       vi.spyOn(process, 'env', 'get').mockReturnValue({ SHELL: '/bin/bash' });
 
-      const session = service.createSession({
+      const session = await service.createSession({
         cwd: '//wsl$/Ubuntu/home',
       });
 
-      expect(session.cwd).toBe('//wsl$/Ubuntu/home');
+      expect(session).not.toBeNull();
+      expect(session!.cwd).toBe('//wsl$/Ubuntu/home');
     });
 
-    it('should handle data events from PTY', () => {
+    it('should handle data events from PTY', async () => {
       vi.useFakeTimers();
-      vi.mocked(fs.existsSync).mockReturnValue(true);
-      vi.mocked(fs.statSync).mockReturnValue({ isDirectory: () => true } as any);
+      vi.mocked(platform.systemPathExists).mockReturnValue(true);
+      vi.mocked(secureFs.stat).mockResolvedValue({ isDirectory: () => true } as any);
       vi.spyOn(process, 'env', 'get').mockReturnValue({ SHELL: '/bin/bash' });
 
       const dataCallback = vi.fn();
       service.onData(dataCallback);
 
-      service.createSession();
+      await service.createSession();
 
       // Simulate data event
       const onDataHandler = mockPtyProcess.onData.mock.calls[0][0];
@@ -331,33 +393,34 @@ describe('terminal-service.ts', () => {
       vi.useRealTimers();
     });
 
-    it('should handle exit events from PTY', () => {
-      vi.mocked(fs.existsSync).mockReturnValue(true);
-      vi.mocked(fs.statSync).mockReturnValue({ isDirectory: () => true } as any);
+    it('should handle exit events from PTY', async () => {
+      vi.mocked(platform.systemPathExists).mockReturnValue(true);
+      vi.mocked(secureFs.stat).mockResolvedValue({ isDirectory: () => true } as any);
       vi.spyOn(process, 'env', 'get').mockReturnValue({ SHELL: '/bin/bash' });
 
       const exitCallback = vi.fn();
       service.onExit(exitCallback);
 
-      const session = service.createSession();
+      const session = await service.createSession();
 
       // Simulate exit event
       const onExitHandler = mockPtyProcess.onExit.mock.calls[0][0];
       onExitHandler({ exitCode: 0 });
 
-      expect(exitCallback).toHaveBeenCalledWith(session.id, 0);
-      expect(service.getSession(session.id)).toBeUndefined();
+      expect(session).not.toBeNull();
+      expect(exitCallback).toHaveBeenCalledWith(session!.id, 0);
+      expect(service.getSession(session!.id)).toBeUndefined();
     });
   });
 
   describe('write', () => {
-    it('should write data to existing session', () => {
-      vi.mocked(fs.existsSync).mockReturnValue(true);
-      vi.mocked(fs.statSync).mockReturnValue({ isDirectory: () => true } as any);
+    it('should write data to existing session', async () => {
+      vi.mocked(platform.systemPathExists).mockReturnValue(true);
+      vi.mocked(secureFs.stat).mockResolvedValue({ isDirectory: () => true } as any);
       vi.spyOn(process, 'env', 'get').mockReturnValue({ SHELL: '/bin/bash' });
 
-      const session = service.createSession();
-      const result = service.write(session.id, 'ls\n');
+      const session = await service.createSession();
+      const result = service.write(session!.id, 'ls\n');
 
       expect(result).toBe(true);
       expect(mockPtyProcess.write).toHaveBeenCalledWith('ls\n');
@@ -372,13 +435,13 @@ describe('terminal-service.ts', () => {
   });
 
   describe('resize', () => {
-    it('should resize existing session', () => {
-      vi.mocked(fs.existsSync).mockReturnValue(true);
-      vi.mocked(fs.statSync).mockReturnValue({ isDirectory: () => true } as any);
+    it('should resize existing session', async () => {
+      vi.mocked(platform.systemPathExists).mockReturnValue(true);
+      vi.mocked(secureFs.stat).mockResolvedValue({ isDirectory: () => true } as any);
       vi.spyOn(process, 'env', 'get').mockReturnValue({ SHELL: '/bin/bash' });
 
-      const session = service.createSession();
-      const result = service.resize(session.id, 120, 40);
+      const session = await service.createSession();
+      const result = service.resize(session!.id, 120, 40);
 
       expect(result).toBe(true);
       expect(mockPtyProcess.resize).toHaveBeenCalledWith(120, 40);
@@ -391,30 +454,30 @@ describe('terminal-service.ts', () => {
       expect(mockPtyProcess.resize).not.toHaveBeenCalled();
     });
 
-    it('should handle resize errors', () => {
-      vi.mocked(fs.existsSync).mockReturnValue(true);
-      vi.mocked(fs.statSync).mockReturnValue({ isDirectory: () => true } as any);
+    it('should handle resize errors', async () => {
+      vi.mocked(platform.systemPathExists).mockReturnValue(true);
+      vi.mocked(secureFs.stat).mockResolvedValue({ isDirectory: () => true } as any);
       vi.spyOn(process, 'env', 'get').mockReturnValue({ SHELL: '/bin/bash' });
       mockPtyProcess.resize.mockImplementation(() => {
         throw new Error('Resize failed');
       });
 
-      const session = service.createSession();
-      const result = service.resize(session.id, 120, 40);
+      const session = await service.createSession();
+      const result = service.resize(session!.id, 120, 40);
 
       expect(result).toBe(false);
     });
   });
 
   describe('killSession', () => {
-    it('should kill existing session', () => {
+    it('should kill existing session', async () => {
       vi.useFakeTimers();
-      vi.mocked(fs.existsSync).mockReturnValue(true);
-      vi.mocked(fs.statSync).mockReturnValue({ isDirectory: () => true } as any);
+      vi.mocked(platform.systemPathExists).mockReturnValue(true);
+      vi.mocked(secureFs.stat).mockResolvedValue({ isDirectory: () => true } as any);
       vi.spyOn(process, 'env', 'get').mockReturnValue({ SHELL: '/bin/bash' });
 
-      const session = service.createSession();
-      const result = service.killSession(session.id);
+      const session = await service.createSession();
+      const result = service.killSession(session!.id);
 
       expect(result).toBe(true);
       expect(mockPtyProcess.kill).toHaveBeenCalledWith('SIGTERM');
@@ -423,7 +486,7 @@ describe('terminal-service.ts', () => {
       vi.advanceTimersByTime(1000);
 
       expect(mockPtyProcess.kill).toHaveBeenCalledWith('SIGKILL');
-      expect(service.getSession(session.id)).toBeUndefined();
+      expect(service.getSession(session!.id)).toBeUndefined();
 
       vi.useRealTimers();
     });
@@ -434,29 +497,29 @@ describe('terminal-service.ts', () => {
       expect(result).toBe(false);
     });
 
-    it('should handle kill errors', () => {
-      vi.mocked(fs.existsSync).mockReturnValue(true);
-      vi.mocked(fs.statSync).mockReturnValue({ isDirectory: () => true } as any);
+    it('should handle kill errors', async () => {
+      vi.mocked(platform.systemPathExists).mockReturnValue(true);
+      vi.mocked(secureFs.stat).mockResolvedValue({ isDirectory: () => true } as any);
       vi.spyOn(process, 'env', 'get').mockReturnValue({ SHELL: '/bin/bash' });
       mockPtyProcess.kill.mockImplementation(() => {
         throw new Error('Kill failed');
       });
 
-      const session = service.createSession();
-      const result = service.killSession(session.id);
+      const session = await service.createSession();
+      const result = service.killSession(session!.id);
 
       expect(result).toBe(false);
     });
   });
 
   describe('getSession', () => {
-    it('should return existing session', () => {
-      vi.mocked(fs.existsSync).mockReturnValue(true);
-      vi.mocked(fs.statSync).mockReturnValue({ isDirectory: () => true } as any);
+    it('should return existing session', async () => {
+      vi.mocked(platform.systemPathExists).mockReturnValue(true);
+      vi.mocked(secureFs.stat).mockResolvedValue({ isDirectory: () => true } as any);
       vi.spyOn(process, 'env', 'get').mockReturnValue({ SHELL: '/bin/bash' });
 
-      const session = service.createSession();
-      const retrieved = service.getSession(session.id);
+      const session = await service.createSession();
+      const retrieved = service.getSession(session!.id);
 
       expect(retrieved).toBe(session);
     });
@@ -469,15 +532,15 @@ describe('terminal-service.ts', () => {
   });
 
   describe('getScrollback', () => {
-    it('should return scrollback buffer for existing session', () => {
-      vi.mocked(fs.existsSync).mockReturnValue(true);
-      vi.mocked(fs.statSync).mockReturnValue({ isDirectory: () => true } as any);
+    it('should return scrollback buffer for existing session', async () => {
+      vi.mocked(platform.systemPathExists).mockReturnValue(true);
+      vi.mocked(secureFs.stat).mockResolvedValue({ isDirectory: () => true } as any);
       vi.spyOn(process, 'env', 'get').mockReturnValue({ SHELL: '/bin/bash' });
 
-      const session = service.createSession();
-      session.scrollbackBuffer = 'test scrollback';
+      const session = await service.createSession();
+      session!.scrollbackBuffer = 'test scrollback';
 
-      const scrollback = service.getScrollback(session.id);
+      const scrollback = service.getScrollback(session!.id);
 
       expect(scrollback).toBe('test scrollback');
     });
@@ -490,19 +553,21 @@ describe('terminal-service.ts', () => {
   });
 
   describe('getAllSessions', () => {
-    it('should return all active sessions', () => {
-      vi.mocked(fs.existsSync).mockReturnValue(true);
-      vi.mocked(fs.statSync).mockReturnValue({ isDirectory: () => true } as any);
+    it('should return all active sessions', async () => {
+      vi.mocked(platform.systemPathExists).mockReturnValue(true);
+      vi.mocked(secureFs.stat).mockResolvedValue({ isDirectory: () => true } as any);
       vi.spyOn(process, 'env', 'get').mockReturnValue({ SHELL: '/bin/bash' });
 
-      const session1 = service.createSession({ cwd: '/dir1' });
-      const session2 = service.createSession({ cwd: '/dir2' });
+      const session1 = await service.createSession({ cwd: '/dir1' });
+      const session2 = await service.createSession({ cwd: '/dir2' });
 
       const sessions = service.getAllSessions();
 
       expect(sessions).toHaveLength(2);
-      expect(sessions[0].id).toBe(session1.id);
-      expect(sessions[1].id).toBe(session2.id);
+      expect(session1).not.toBeNull();
+      expect(session2).not.toBeNull();
+      expect(sessions[0].id).toBe(session1!.id);
+      expect(sessions[1].id).toBe(session2!.id);
       expect(sessions[0].cwd).toBe('/dir1');
       expect(sessions[1].cwd).toBe('/dir2');
     });
@@ -535,30 +600,32 @@ describe('terminal-service.ts', () => {
   });
 
   describe('cleanup', () => {
-    it('should clean up all sessions', () => {
-      vi.mocked(fs.existsSync).mockReturnValue(true);
-      vi.mocked(fs.statSync).mockReturnValue({ isDirectory: () => true } as any);
+    it('should clean up all sessions', async () => {
+      vi.mocked(platform.systemPathExists).mockReturnValue(true);
+      vi.mocked(secureFs.stat).mockResolvedValue({ isDirectory: () => true } as any);
       vi.spyOn(process, 'env', 'get').mockReturnValue({ SHELL: '/bin/bash' });
 
-      const session1 = service.createSession();
-      const session2 = service.createSession();
+      const session1 = await service.createSession();
+      const session2 = await service.createSession();
 
       service.cleanup();
 
-      expect(service.getSession(session1.id)).toBeUndefined();
-      expect(service.getSession(session2.id)).toBeUndefined();
+      expect(session1).not.toBeNull();
+      expect(session2).not.toBeNull();
+      expect(service.getSession(session1!.id)).toBeUndefined();
+      expect(service.getSession(session2!.id)).toBeUndefined();
       expect(service.getAllSessions()).toHaveLength(0);
     });
 
-    it('should handle cleanup errors gracefully', () => {
-      vi.mocked(fs.existsSync).mockReturnValue(true);
-      vi.mocked(fs.statSync).mockReturnValue({ isDirectory: () => true } as any);
+    it('should handle cleanup errors gracefully', async () => {
+      vi.mocked(platform.systemPathExists).mockReturnValue(true);
+      vi.mocked(secureFs.stat).mockResolvedValue({ isDirectory: () => true } as any);
       vi.spyOn(process, 'env', 'get').mockReturnValue({ SHELL: '/bin/bash' });
       mockPtyProcess.kill.mockImplementation(() => {
         throw new Error('Kill failed');
       });
 
-      service.createSession();
+      await service.createSession();
 
       expect(() => service.cleanup()).not.toThrow();
     });

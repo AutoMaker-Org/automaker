@@ -6,6 +6,7 @@
 import { secureFs } from '@automaker/platform';
 
 export const {
+  // Async methods
   access,
   readFile,
   writeFile,
@@ -20,4 +21,19 @@ export const {
   lstat,
   joinPath,
   resolvePath,
+  // Sync methods
+  existsSync,
+  readFileSync,
+  writeFileSync,
+  mkdirSync,
+  readdirSync,
+  statSync,
+  accessSync,
+  unlinkSync,
+  rmSync,
+  // Throttling configuration and monitoring
+  configureThrottling,
+  getThrottlingConfig,
+  getPendingOperations,
+  getActiveOperations,
 } = secureFs;

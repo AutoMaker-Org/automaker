@@ -158,8 +158,13 @@ export const logError = createLogError(logger);
 /**
  * Ensure the repository has at least one commit so git commands that rely on HEAD work.
  * Returns true if an empty commit was created, false if the repo already had commits.
+ * @param repoPath - Path to the git repository
+ * @param env - Optional environment variables to pass to git (e.g., GIT_AUTHOR_NAME, GIT_AUTHOR_EMAIL)
  */
-export async function ensureInitialCommit(repoPath: string): Promise<boolean> {
+export async function ensureInitialCommit(
+  repoPath: string,
+  env?: Record<string, string>
+): Promise<boolean> {
   try {
     await execAsync('git rev-parse --verify HEAD', { cwd: repoPath });
     return false;
@@ -167,6 +172,7 @@ export async function ensureInitialCommit(repoPath: string): Promise<boolean> {
     try {
       await execAsync(`git commit --allow-empty -m "${AUTOMAKER_INITIAL_COMMIT_MESSAGE}"`, {
         cwd: repoPath,
+        env: { ...process.env, ...env },
       });
       logger.info(`[Worktree] Created initial empty commit to enable worktrees in ${repoPath}`);
       return true;

@@ -15,6 +15,8 @@ import {
   clickAddFeature,
   fillAddFeatureDialog,
   confirmAddFeature,
+  authenticateForTests,
+  handleLoginScreenIfPresent,
 } from '../utils';
 
 const TEST_TEMP_DIR = createTempDirPath('feature-backlog-test');
@@ -61,7 +63,11 @@ test.describe('Feature Backlog', () => {
 
     await setupRealProject(page, projectPath, projectName, { setAsCurrent: true });
 
+    // Authenticate before navigating
+    await authenticateForTests(page);
     await page.goto('/board');
+    await page.waitForLoadState('load');
+    await handleLoginScreenIfPresent(page);
     await waitForNetworkIdle(page);
 
     await expect(page.locator('[data-testid="board-view"]')).toBeVisible({ timeout: 10000 });

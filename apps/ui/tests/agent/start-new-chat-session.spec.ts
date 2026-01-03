@@ -16,6 +16,7 @@ import {
   clickNewSessionButton,
   waitForNewSession,
   countSessionItems,
+  authenticateForTests,
 } from '../utils';
 
 const TEST_TEMP_DIR = createTempDirPath('agent-session-test');
@@ -61,6 +62,7 @@ test.describe('Agent Chat Session', () => {
   test('should start a new agent chat session', async ({ page }) => {
     await setupRealProject(page, projectPath, projectName, { setAsCurrent: true });
 
+    await authenticateForTests(page);
     await page.goto('/');
     await waitForNetworkIdle(page);
 

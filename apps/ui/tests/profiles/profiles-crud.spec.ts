@@ -14,12 +14,17 @@ import {
   saveProfile,
   waitForSuccessToast,
   countCustomProfiles,
+  authenticateForTests,
+  handleLoginScreenIfPresent,
 } from '../utils';
 
 test.describe('AI Profiles', () => {
   test('should create a new profile', async ({ page }) => {
     await setupMockProjectWithProfiles(page, { customProfilesCount: 0 });
+    await authenticateForTests(page);
     await page.goto('/');
+    await page.waitForLoadState('load');
+    await handleLoginScreenIfPresent(page);
     await waitForNetworkIdle(page);
     await navigateToProfiles(page);
 

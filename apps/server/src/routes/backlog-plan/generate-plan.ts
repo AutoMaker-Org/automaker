@@ -8,7 +8,7 @@ import { FeatureLoader } from '../../services/feature-loader.js';
 import { ProviderFactory } from '../../providers/provider-factory.js';
 import { logger, setRunningState, getErrorMessage } from './common.js';
 import type { SettingsService } from '../../services/settings-service.js';
-import { getAutoLoadClaudeMdSetting } from '../../lib/settings-helpers.js';
+import { getAutoLoadClaudeMdSetting, getPromptCustomization } from '../../lib/settings-helpers.js';
 
 const featureLoader = new FeatureLoader();
 
@@ -79,72 +79,17 @@ export async function generateBacklogPlan(
       content: `Loaded ${features.length} features from backlog`,
     });
 
+    // Load prompts from settings
+    const prompts = await getPromptCustomization(settingsService, '[BacklogPlan]');
+
     // Build the system prompt
-    const systemPrompt = `You are an AI assistant helping to modify a software project's feature backlog.
-You will be given the current list of features and a user request to modify the backlog.
+    const systemPrompt = prompts.backlogPlan.systemPrompt;
 
-IMPORTANT CONTEXT (automatically injected):
-- Remember to update the dependency graph if deleting existing features
-- Remember to define dependencies on new features hooked into relevant existing ones
-- Maintain dependency graph integrity (no orphaned dependencies)
-- When deleting a feature, identify which other features depend on it
-
-Your task is to analyze the request and produce a structured JSON plan with:
-1. Features to ADD (include title, description, category, and dependencies)
-2. Features to UPDATE (specify featureId and the updates)
-3. Features to DELETE (specify featureId)
-4. A summary of the changes
-5. Any dependency updates needed (removed dependencies due to deletions, new dependencies for new features)
-
-Respond with ONLY a JSON object in this exact format:
-\`\`\`json
-{
-  "changes": [
-    {
-      "type": "add",
-      "feature": {
-        "title": "Feature title",
-        "description": "Feature description",
-        "category": "Category name",
-        "dependencies": ["existing-feature-id"],
-        "priority": 1
-      },
-      "reason": "Why this feature should be added"
-    },
-    {
-      "type": "update",
-      "featureId": "existing-feature-id",
-      "feature": {
-        "title": "Updated title"
-      },
-      "reason": "Why this feature should be updated"
-    },
-    {
-      "type": "delete",
-      "featureId": "feature-id-to-delete",
-      "reason": "Why this feature should be deleted"
-    }
-  ],
-  "summary": "Brief overview of all proposed changes",
-  "dependencyUpdates": [
-    {
-      "featureId": "feature-that-depended-on-deleted",
-      "removedDependencies": ["deleted-feature-id"],
-      "addedDependencies": []
-    }
-  ]
-}
-\`\`\``;
-
-    // Build the user prompt
-    const userPrompt = `Current Features in Backlog:
-${formatFeaturesForPrompt(features)}
-
----
-
-User Request: ${prompt}
-
-Please analyze the current backlog and the user's request, then provide a JSON plan for the modifications.`;
+    // Build the user prompt from template
+    const currentFeatures = formatFeaturesForPrompt(features);
+    const userPrompt = prompts.backlogPlan.userPromptTemplate
+      .replace('{{currentFeatures}}', currentFeatures)
+      .replace('{{userRequest}}', prompt);
 
     events.emit('backlog-plan:event', {
       type: 'backlog_plan_progress',

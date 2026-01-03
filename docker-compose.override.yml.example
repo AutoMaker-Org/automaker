@@ -8,3 +8,4 @@ services:
       # Set root directory for all projects and file operations
       # Users can only create/open projects within this directory
       - ALLOWED_ROOT_DIRECTORY=/projects
+      - NODE_ENV=development

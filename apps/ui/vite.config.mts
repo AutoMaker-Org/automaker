@@ -1,4 +1,5 @@
 import * as path from 'path';
+import * as fs from 'fs';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { defineConfig } from 'vite';
@@ -7,6 +8,10 @@ import { TanStackRouterVite } from '@tanstack/router-plugin/vite';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+// Read version from package.json
+const packageJson = JSON.parse(fs.readFileSync(path.resolve(__dirname, 'package.json'), 'utf-8'));
+const appVersion = packageJson.version;
 
 export default defineConfig(({ command }) => {
   // Only skip electron plugin during dev server in CI (no display available for Electron)
@@ -64,6 +69,9 @@ export default defineConfig(({ command }) => {
     },
     build: {
       outDir: 'dist',
+    },
+    define: {
+      __APP_VERSION__: JSON.stringify(appVersion),
     },
   };
 });

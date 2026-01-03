@@ -36,7 +36,7 @@ services:
       # Required
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
 
-      # Optional - authentication (leave empty to disable)
+      # Optional - authentication, one will generate if left blank
       - AUTOMAKER_API_KEY=${AUTOMAKER_API_KEY:-}
 
       # Optional - restrict to specific directory within container only
@@ -49,7 +49,11 @@ services:
       - DATA_DIR=/data
 
       # Optional - CORS origin (default allows all)
-      - CORS_ORIGIN=${CORS_ORIGIN:-*}
+      - CORS_ORIGIN=${CORS_ORIGIN:-http://localhost:3007}
+
+      # Internal - indicates the API is running in a containerized sandbox environment
+      # This is used by the UI to determine if sandbox risk warnings should be shown
+      - IS_CONTAINERIZED=true
     volumes:
       # ONLY named volumes - these are isolated from your host filesystem
       # This volume persists data between restarts but is container-managed

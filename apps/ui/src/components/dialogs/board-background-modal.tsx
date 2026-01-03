@@ -13,7 +13,7 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils';
 import { useAppStore, defaultBackgroundSettings } from '@/store/app-store';
-import { getHttpApiClient } from '@/lib/http-api-client';
+import { getHttpApiClient, getServerUrlSync } from '@/lib/http-api-client';
 import { useBoardBackgroundSettings } from '@/hooks/use-board-background-settings';
 import { toast } from 'sonner';
 import {
@@ -62,7 +62,7 @@ export function BoardBackgroundModal({ open, onOpenChange }: BoardBackgroundModa
   // Update preview image when background settings change
   useEffect(() => {
     if (currentProject && backgroundSettings.imagePath) {
-      const serverUrl = import.meta.env.VITE_SERVER_URL || 'http://localhost:3008';
+      const serverUrl = import.meta.env.VITE_SERVER_URL || getServerUrlSync();
       // Add cache-busting query parameter to force browser to reload image
       const cacheBuster = imageVersion ? `&v=${imageVersion}` : `&v=${Date.now()}`;
       const imagePath = `${serverUrl}/api/fs/image?path=${encodeURIComponent(

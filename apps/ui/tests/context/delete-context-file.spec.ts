@@ -18,6 +18,7 @@ import {
   clickElement,
   fillInput,
   waitForNetworkIdle,
+  authenticateForTests,
 } from '../utils';
 
 test.describe('Delete Context File', () => {
@@ -33,6 +34,7 @@ test.describe('Delete Context File', () => {
     const fileName = 'to-delete.md';
 
     await setupProjectWithFixture(page, getFixturePath());
+    await authenticateForTests(page);
     await page.goto('/');
     await waitForNetworkIdle(page);
 

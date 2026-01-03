@@ -14,6 +14,7 @@ import {
   navigateToContext,
   waitForContextFile,
   waitForNetworkIdle,
+  authenticateForTests,
 } from '../utils';
 
 test.describe('Add Context Image', () => {
@@ -117,13 +118,26 @@ test.describe('Add Context Image', () => {
 
   test('should import an image file to context', async ({ page }) => {
     await setupProjectWithFixture(page, getFixturePath());
+
     await page.goto('/');
     await waitForNetworkIdle(page);
 
+    // Check if we're on the login screen and authenticate if needed
+    const loginInput = page.locator('input[type="password"][placeholder*="API key"]');
+    const isLoginScreen = await loginInput.isVisible({ timeout: 2000 }).catch(() => false);
+    if (isLoginScreen) {
+      const apiKey = process.env.AUTOMAKER_API_KEY || 'test-api-key-for-e2e-tests';
+      await loginInput.fill(apiKey);
+      await page.locator('button:has-text("Login")').click();
+      await page.waitForURL('**/', { timeout: 5000 });
+      await waitForNetworkIdle(page);
+    }
+
     await navigateToContext(page);
 
-    // Get the file input element and set the file
+    // Wait for the file input to be attached to the DOM before setting files
     const fileInput = page.locator('[data-testid="file-import-input"]');
+    await expect(fileInput).toBeAttached({ timeout: 10000 });
 
     // Use setInputFiles to upload the image
     await fileInput.setInputFiles(testImagePath);

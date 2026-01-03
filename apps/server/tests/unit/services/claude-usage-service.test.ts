@@ -485,7 +485,7 @@ Resets in 2h
       await expect(promise).rejects.toThrow('Authentication required');
     });
 
-    it('should handle timeout', async () => {
+    it('should handle timeout with no data', async () => {
       vi.useFakeTimers();
 
       mockSpawnProcess.stdout = {
@@ -619,7 +619,7 @@ Resets in 2h
       await expect(promise).rejects.toThrow('Authentication required');
     });
 
-    it('should handle timeout on Windows', async () => {
+    it('should handle timeout with no data on Windows', async () => {
       vi.useFakeTimers();
       const windowsService = new ClaudeUsageService();
 
@@ -637,6 +637,70 @@ Resets in 2h
 
       await expect(promise).rejects.toThrow('Command timed out');
       expect(mockPty.kill).toHaveBeenCalled();
+
+      vi.useRealTimers();
+    });
+
+    it('should return data on timeout if data was captured', async () => {
+      vi.useFakeTimers();
+      const windowsService = new ClaudeUsageService();
+
+      let dataCallback: Function | undefined;
+
+      const mockPty = {
+        onData: vi.fn((callback: Function) => {
+          dataCallback = callback;
+        }),
+        onExit: vi.fn(),
+        write: vi.fn(),
+        kill: vi.fn(),
+      };
+      vi.mocked(pty.spawn).mockReturnValue(mockPty as any);
+
+      const promise = windowsService.fetchUsageData();
+
+      // Simulate receiving usage data
+      dataCallback!('Current session\n65% left\nResets in 2h');
+
+      // Advance time past timeout (30 seconds)
+      vi.advanceTimersByTime(31000);
+
+      // Should resolve with data instead of rejecting
+      const result = await promise;
+      expect(result.sessionPercentage).toBe(35); // 100 - 65
+      expect(mockPty.kill).toHaveBeenCalled();
+
+      vi.useRealTimers();
+    });
+
+    it('should send SIGTERM after ESC if process does not exit', async () => {
+      vi.useFakeTimers();
+      const windowsService = new ClaudeUsageService();
+
+      let dataCallback: Function | undefined;
+
+      const mockPty = {
+        onData: vi.fn((callback: Function) => {
+          dataCallback = callback;
+        }),
+        onExit: vi.fn(),
+        write: vi.fn(),
+        kill: vi.fn(),
+      };
+      vi.mocked(pty.spawn).mockReturnValue(mockPty as any);
+
+      windowsService.fetchUsageData();
+
+      // Simulate seeing usage data
+      dataCallback!('Current session\n65% left');
+
+      // Advance 2s to trigger ESC
+      vi.advanceTimersByTime(2100);
+      expect(mockPty.write).toHaveBeenCalledWith('\x1b');
+
+      // Advance another 2s to trigger SIGTERM fallback
+      vi.advanceTimersByTime(2100);
+      expect(mockPty.kill).toHaveBeenCalledWith('SIGTERM');
 
       vi.useRealTimers();
     });

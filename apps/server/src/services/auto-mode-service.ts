@@ -39,6 +39,7 @@ import {
   filterClaudeMdFromContext,
   getMCPServersFromSettings,
   getMCPPermissionSettings,
+  getPromptCustomization,
 } from '../lib/settings-helpers.js';
 
 const execAsync = promisify(exec);
@@ -66,162 +67,6 @@ interface PlanSpec {
   currentTaskId?: string;
   tasks?: ParsedTask[];
 }
-
-const PLANNING_PROMPTS = {
-  lite: `## Planning Phase (Lite Mode)
-
-IMPORTANT: Do NOT output exploration text, tool usage, or thinking before the plan. Start DIRECTLY with the planning outline format below. Silently analyze the codebase first, then output ONLY the structured plan.
-
-Create a brief planning outline:
-
-1. **Goal**: What are we accomplishing? (1 sentence)
-2. **Approach**: How will we do it? (2-3 sentences)
-3. **Files to Touch**: List files and what changes
-4. **Tasks**: Numbered task list (3-7 items)
-5. **Risks**: Any gotchas to watch for
-
-After generating the outline, output:
-"[PLAN_GENERATED] Planning outline complete."
-
-Then proceed with implementation.`,
-
-  lite_with_approval: `## Planning Phase (Lite Mode)
-
-IMPORTANT: Do NOT output exploration text, tool usage, or thinking before the plan. Start DIRECTLY with the planning outline format below. Silently analyze the codebase first, then output ONLY the structured plan.
-
-Create a brief planning outline:
-
-1. **Goal**: What are we accomplishing? (1 sentence)
-2. **Approach**: How will we do it? (2-3 sentences)
-3. **Files to Touch**: List files and what changes
-4. **Tasks**: Numbered task list (3-7 items)
-5. **Risks**: Any gotchas to watch for
-
-After generating the outline, output:
-"[SPEC_GENERATED] Please review the planning outline above. Reply with 'approved' to proceed or provide feedback for revisions."
-
-DO NOT proceed with implementation until you receive explicit approval.`,
-
-  spec: `## Specification Phase (Spec Mode)
-
-IMPORTANT: Do NOT output exploration text, tool usage, or thinking before the spec. Start DIRECTLY with the specification format below. Silently analyze the codebase first, then output ONLY the structured specification.
-
-Generate a specification with an actionable task breakdown. WAIT for approval before implementing.
-
-### Specification Format
-
-1. **Problem**: What problem are we solving? (user perspective)
-
-2. **Solution**: Brief approach (1-2 sentences)
-
-3. **Acceptance Criteria**: 3-5 items in GIVEN-WHEN-THEN format
-   - GIVEN [context], WHEN [action], THEN [outcome]
-
-4. **Files to Modify**:
-   | File | Purpose | Action |
-   |------|---------|--------|
-   | path/to/file | description | create/modify/delete |
-
-5. **Implementation Tasks**:
-   Use this EXACT format for each task (the system will parse these):
-   \`\`\`tasks
-   - [ ] T001: [Description] | File: [path/to/file]
-   - [ ] T002: [Description] | File: [path/to/file]
-   - [ ] T003: [Description] | File: [path/to/file]
-   \`\`\`
-
-   Task ID rules:
-   - Sequential: T001, T002, T003, etc.
-   - Description: Clear action (e.g., "Create user model", "Add API endpoint")
-   - File: Primary file affected (helps with context)
-   - Order by dependencies (foundational tasks first)
-
-6. **Verification**: How to confirm feature works
-
-After generating the spec, output on its own line:
-"[SPEC_GENERATED] Please review the specification above. Reply with 'approved' to proceed or provide feedback for revisions."
-
-DO NOT proceed with implementation until you receive explicit approval.
-
-When approved, execute tasks SEQUENTIALLY in order. For each task:
-1. BEFORE starting, output: "[TASK_START] T###: Description"
-2. Implement the task
-3. AFTER completing, output: "[TASK_COMPLETE] T###: Brief summary"
-
-This allows real-time progress tracking during implementation.`,
-
-  full: `## Full Specification Phase (Full SDD Mode)
-
-IMPORTANT: Do NOT output exploration text, tool usage, or thinking before the spec. Start DIRECTLY with the specification format below. Silently analyze the codebase first, then output ONLY the structured specification.
-
-Generate a comprehensive specification with phased task breakdown. WAIT for approval before implementing.
-
-### Specification Format
-
-1. **Problem Statement**: 2-3 sentences from user perspective
-
-2. **User Story**: As a [user], I want [goal], so that [benefit]
-
-3. **Acceptance Criteria**: Multiple scenarios with GIVEN-WHEN-THEN
-   - **Happy Path**: GIVEN [context], WHEN [action], THEN [expected outcome]
-   - **Edge Cases**: GIVEN [edge condition], WHEN [action], THEN [handling]
-   - **Error Handling**: GIVEN [error condition], WHEN [action], THEN [error response]
-
-4. **Technical Context**:
-   | Aspect | Value |
-   |--------|-------|
-   | Affected Files | list of files |
-   | Dependencies | external libs if any |
-   | Constraints | technical limitations |
-   | Patterns to Follow | existing patterns in codebase |
-
-5. **Non-Goals**: What this feature explicitly does NOT include
-
-6. **Implementation Tasks**:
-   Use this EXACT format for each task (the system will parse these):
-   \`\`\`tasks
-   ## Phase 1: Foundation
-   - [ ] T001: [Description] | File: [path/to/file]
-   - [ ] T002: [Description] | File: [path/to/file]
-
-   ## Phase 2: Core Implementation
-   - [ ] T003: [Description] | File: [path/to/file]
-   - [ ] T004: [Description] | File: [path/to/file]
-
-   ## Phase 3: Integration & Testing
-   - [ ] T005: [Description] | File: [path/to/file]
-   - [ ] T006: [Description] | File: [path/to/file]
-   \`\`\`
-
-   Task ID rules:
-   - Sequential across all phases: T001, T002, T003, etc.
-   - Description: Clear action verb + target
-   - File: Primary file affected
-   - Order by dependencies within each phase
-   - Phase structure helps organize complex work
-
-7. **Success Metrics**: How we know it's done (measurable criteria)
-
-8. **Risks & Mitigations**:
-   | Risk | Mitigation |
-   |------|------------|
-   | description | approach |
-
-After generating the spec, output on its own line:
-"[SPEC_GENERATED] Please review the comprehensive specification above. Reply with 'approved' to proceed or provide feedback for revisions."
-
-DO NOT proceed with implementation until you receive explicit approval.
-
-When approved, execute tasks SEQUENTIALLY by phase. For each task:
-1. BEFORE starting, output: "[TASK_START] T###: Description"
-2. Implement the task
-3. AFTER completing, output: "[TASK_COMPLETE] T###: Brief summary"
-
-After completing all tasks in a phase, output:
-"[PHASE_COMPLETE] Phase N complete"
-
-This allows real-time progress tracking during implementation.`,
-};
 
 /**
  * Parse tasks from generated spec content
@@ -345,6 +190,10 @@ interface AutoModeConfig {
   projectPath: string;
 }
 
+// Constants for consecutive failure tracking
+const CONSECUTIVE_FAILURE_THRESHOLD = 3; // Pause after 3 consecutive failures
+const FAILURE_WINDOW_MS = 60000; // Failures within 1 minute count as consecutive
+
 export class AutoModeService {
   private events: EventEmitter;
   private runningFeatures = new Map<string, RunningFeature>();
@@ -355,10 +204,87 @@ export class AutoModeService {
   private config: AutoModeConfig | null = null;
   private pendingApprovals = new Map<string, PendingApproval>();
   private settingsService: SettingsService | null = null;
+  // Track consecutive failures to detect quota/API issues
+  private consecutiveFailures: { timestamp: number; error: string }[] = [];
+  private pausedDueToFailures = false;
 
   constructor(events: EventEmitter, settingsService?: SettingsService) {
     this.events = events;
     this.settingsService = settingsService ?? null;
+  }
+
+  /**
+   * Track a failure and check if we should pause due to consecutive failures.
+   * This handles cases where the SDK doesn't return useful error messages.
+   */
+  private trackFailureAndCheckPause(errorInfo: { type: string; message: string }): boolean {
+    const now = Date.now();
+
+    // Add this failure
+    this.consecutiveFailures.push({ timestamp: now, error: errorInfo.message });
+
+    // Remove old failures outside the window
+    this.consecutiveFailures = this.consecutiveFailures.filter(
+      (f) => now - f.timestamp < FAILURE_WINDOW_MS
+    );
+
+    // Check if we've hit the threshold
+    if (this.consecutiveFailures.length >= CONSECUTIVE_FAILURE_THRESHOLD) {
+      return true; // Should pause
+    }
+
+    // Also immediately pause for known quota/rate limit errors
+    if (errorInfo.type === 'quota_exhausted' || errorInfo.type === 'rate_limit') {
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
+   * Signal that we should pause due to repeated failures or quota exhaustion.
+   * This will pause the auto loop to prevent repeated failures.
+   */
+  private signalShouldPause(errorInfo: { type: string; message: string }): void {
+    if (this.pausedDueToFailures) {
+      return; // Already paused
+    }
+
+    this.pausedDueToFailures = true;
+    const failureCount = this.consecutiveFailures.length;
+    console.log(
+      `[AutoMode] Pausing auto loop after ${failureCount} consecutive failures. Last error: ${errorInfo.type}`
+    );
+
+    // Emit event to notify UI
+    this.emitAutoModeEvent('auto_mode_paused_failures', {
+      message:
+        failureCount >= CONSECUTIVE_FAILURE_THRESHOLD
+          ? `Auto Mode paused: ${failureCount} consecutive failures detected. This may indicate a quota limit or API issue. Please check your usage and try again.`
+          : 'Auto Mode paused: Usage limit or API error detected. Please wait for your quota to reset or check your API configuration.',
+      errorType: errorInfo.type,
+      originalError: errorInfo.message,
+      failureCount,
+      projectPath: this.config?.projectPath,
+    });
+
+    // Stop the auto loop
+    this.stopAutoLoop();
+  }
+
+  /**
+   * Reset failure tracking (called when user manually restarts auto mode)
+   */
+  private resetFailureTracking(): void {
+    this.consecutiveFailures = [];
+    this.pausedDueToFailures = false;
+  }
+
+  /**
+   * Record a successful feature completion to reset consecutive failure count
+   */
+  private recordSuccess(): void {
+    this.consecutiveFailures = [];
   }
 
   /**
@@ -368,6 +294,9 @@ export class AutoModeService {
     if (this.autoLoopRunning) {
       throw new Error('Auto mode is already running');
     }
+
+    // Reset failure tracking when user manually starts auto mode
+    this.resetFailureTracking();
 
     this.autoLoopRunning = true;
     this.autoLoopAbortController = new AbortController();
@@ -573,6 +502,9 @@ export class AutoModeService {
         '[AutoMode]'
       );
 
+      // Resolve model once so context handling can align with provider capabilities
+      const model = resolveModelString(feature.model, this.getDefaultFeatureModel());
+
       // Build the prompt - use continuation prompt if provided (for recovery after plan approval)
       let prompt: string;
       // Load project context files (CLAUDE.md, CODE_QUALITY.md, etc.) - passed as system prompt
@@ -583,7 +515,8 @@ export class AutoModeService {
 
       // When autoLoadClaudeMd is enabled, filter out CLAUDE.md to avoid duplication
       // (SDK handles CLAUDE.md via settingSources), but keep other context files like CODE_QUALITY.md
-      const contextFilesPrompt = filterClaudeMdFromContext(contextResult, autoLoadClaudeMd);
+      const shouldFilterClaudeMd = autoLoadClaudeMd && model.startsWith('claude-');
+      const contextFilesPrompt = filterClaudeMdFromContext(contextResult, shouldFilterClaudeMd);
 
       if (options?.continuationPrompt) {
         // Continuation prompt is used when recovering from a plan approval
@@ -593,7 +526,7 @@ export class AutoModeService {
       } else {
         // Normal flow: build prompt with planning phase
         const featurePrompt = this.buildFeaturePrompt(feature);
-        const planningPrefix = this.getPlanningPromptPrefix(feature);
+        const planningPrefix = await this.getPlanningPromptPrefix(feature);
         prompt = planningPrefix + featurePrompt;
 
         // Emit planning mode info
@@ -611,8 +544,6 @@ export class AutoModeService {
         typeof img === 'string' ? img : img.path
       );
 
-      // Get model from feature
-      const model = resolveModelString(feature.model, this.getDefaultFeatureModel());
       console.log(`[AutoMode] Executing feature ${featureId} with model: ${model} in ${workDir}`);
 
       // Run the agent with the feature's model and images
@@ -657,6 +588,9 @@ export class AutoModeService {
       const finalStatus = feature.skipTests ? 'waiting_approval' : 'verified';
       await this.updateFeatureStatus(projectPath, featureId, finalStatus);
 
+      // Record success to reset consecutive failure tracking
+      this.recordSuccess();
+
       this.emitAutoModeEvent('auto_mode_feature_complete', {
         featureId,
         passes: true,
@@ -684,6 +618,21 @@ export class AutoModeService {
           errorType: errorInfo.type,
           projectPath,
         });
+
+        // Track this failure and check if we should pause auto mode
+        // This handles both specific quota/rate limit errors AND generic failures
+        // that may indicate quota exhaustion (SDK doesn't always return useful errors)
+        const shouldPause = this.trackFailureAndCheckPause({
+          type: errorInfo.type,
+          message: errorInfo.message,
+        });
+
+        if (shouldPause) {
+          this.signalShouldPause({
+            type: errorInfo.type,
+            message: errorInfo.message,
+          });
+        }
       }
     } finally {
       console.log(`[AutoMode] Feature ${featureId} execution ended, cleaning up runningFeatures`);
@@ -713,7 +662,9 @@ export class AutoModeService {
       projectPath,
       fsModule: secureFs as Parameters<typeof loadContextFiles>[0]['fsModule'],
     });
-    const contextFilesPrompt = filterClaudeMdFromContext(contextResult, autoLoadClaudeMd);
+    const model = resolveModelString(feature.model, this.getDefaultFeatureModel());
+    const shouldFilterClaudeMd = autoLoadClaudeMd && model.startsWith('claude-');
+    const contextFilesPrompt = filterClaudeMdFromContext(contextResult, shouldFilterClaudeMd);
 
     // Load previous agent output for context continuity
     const featureDir = getFeatureDir(projectPath, featureId);
@@ -749,9 +700,6 @@ export class AutoModeService {
 
       // Build prompt for this pipeline step
       const prompt = this.buildPipelineStepPrompt(step, feature, previousContext);
-
-      // Get model from feature
-      const model = resolveModelString(feature.model, this.getDefaultFeatureModel());
 
       // Run the agent for this pipeline step
       await this.runAgent(
@@ -844,6 +792,11 @@ Complete the pipeline step instructions above. Review the previous work and appl
     this.cancelPlanApproval(featureId);
 
     running.abortController.abort();
+
+    // Remove from running features immediately to allow resume
+    // The abort signal will still propagate to stop any ongoing execution
+    this.runningFeatures.delete(featureId);
+
     return true;
   }
 
@@ -933,6 +886,7 @@ Complete the pipeline step instructions above. Review the previous work and appl
       this.settingsService,
       '[AutoMode]'
     );
+    const model = resolveModelString(feature?.model, this.getDefaultFeatureModel());
 
     // Load project context files (CLAUDE.md, CODE_QUALITY.md, etc.) - passed as system prompt
     const contextResult = await loadContextFiles({
@@ -942,7 +896,8 @@ Complete the pipeline step instructions above. Review the previous work and appl
 
     // When autoLoadClaudeMd is enabled, filter out CLAUDE.md to avoid duplication
     // (SDK handles CLAUDE.md via settingSources), but keep other context files like CODE_QUALITY.md
-    const contextFilesPrompt = filterClaudeMdFromContext(contextResult, autoLoadClaudeMd);
+    const shouldFilterClaudeMd = autoLoadClaudeMd && model.startsWith('claude-');
+    const contextFilesPrompt = filterClaudeMdFromContext(contextResult, shouldFilterClaudeMd);
 
     // Build complete prompt with feature info, previous context, and follow-up instructions
     let fullPrompt = `## Follow-up on Feature Implementation
@@ -987,8 +942,6 @@ Address the follow-up instructions above. Review the previous work and make the 
     });
 
     try {
-      // Get model from feature (already loaded above)
-      const model = resolveModelString(feature?.model, this.getDefaultFeatureModel());
       console.log(`[AutoMode] Follow-up for feature ${featureId} using model: ${model}`);
 
       // Update feature status to in_progress
@@ -1081,6 +1034,9 @@ Address the follow-up instructions above. Review the previous work and make the 
       const finalStatus = feature?.skipTests ? 'waiting_approval' : 'verified';
       await this.updateFeatureStatus(projectPath, featureId, finalStatus);
 
+      // Record success to reset consecutive failure tracking
+      this.recordSuccess();
+
       this.emitAutoModeEvent('auto_mode_feature_complete', {
         featureId,
         passes: true,
@@ -1096,6 +1052,19 @@ Address the follow-up instructions above. Review the previous work and make the 
           errorType: errorInfo.type,
           projectPath,
         });
+
+        // Track this failure and check if we should pause auto mode
+        const shouldPause = this.trackFailureAndCheckPause({
+          type: errorInfo.type,
+          message: errorInfo.message,
+        });
+
+        if (shouldPause) {
+          this.signalShouldPause({
+            type: errorInfo.type,
+            message: errorInfo.message,
+          });
+        }
       }
     } finally {
       this.runningFeatures.delete(featureId);
@@ -1374,18 +1343,43 @@ Format your response as a structured markdown document.`;
   /**
    * Get detailed info about all running agents
    */
-  getRunningAgents(): Array<{
-    featureId: string;
-    projectPath: string;
-    projectName: string;
-    isAutoMode: boolean;
-  }> {
-    return Array.from(this.runningFeatures.values()).map((rf) => ({
-      featureId: rf.featureId,
-      projectPath: rf.projectPath,
-      projectName: path.basename(rf.projectPath),
-      isAutoMode: rf.isAutoMode,
-    }));
+  async getRunningAgents(): Promise<
+    Array<{
+      featureId: string;
+      projectPath: string;
+      projectName: string;
+      isAutoMode: boolean;
+      title?: string;
+      description?: string;
+    }>
+  > {
+    const agents = await Promise.all(
+      Array.from(this.runningFeatures.values()).map(async (rf) => {
+        // Try to fetch feature data to get title and description
+        let title: string | undefined;
+        let description: string | undefined;
+
+        try {
+          const feature = await this.featureLoader.get(rf.projectPath, rf.featureId);
+          if (feature) {
+            title = feature.title;
+            description = feature.description;
+          }
+        } catch (error) {
+          // Silently ignore errors - title/description are optional
+        }
+
+        return {
+          featureId: rf.featureId,
+          projectPath: rf.projectPath,
+          projectName: path.basename(rf.projectPath),
+          isAutoMode: rf.isAutoMode,
+          title,
+          description,
+        };
+      })
+    );
+    return agents;
   }
 
   /**
@@ -1767,12 +1761,21 @@ Format your response as a structured markdown document.`;
   /**
    * Get the planning prompt prefix based on feature's planning mode
    */
-  private getPlanningPromptPrefix(feature: Feature): string {
+  private async getPlanningPromptPrefix(feature: Feature): Promise<string> {
     const mode = feature.planningMode || 'skip';
 
     if (mode === 'skip') {
       return ''; // No planning phase
     }
+
+    // Load prompts from settings (no caching - allows hot reload of custom prompts)
+    const prompts = await getPromptCustomization(this.settingsService, '[AutoMode]');
+    const planningPrompts: Record<string, string> = {
+      lite: prompts.autoMode.planningLite,
+      lite_with_approval: prompts.autoMode.planningLiteWithApproval,
+      spec: prompts.autoMode.planningSpec,
+      full: prompts.autoMode.planningFull,
+    };
 
     // For lite mode, use the approval variant if requirePlanApproval is true
     let promptKey: string = mode;
@@ -1780,7 +1783,7 @@ Format your response as a structured markdown document.`;
       promptKey = 'lite_with_approval';
     }
 
-    const planningPrompt = PLANNING_PROMPTS[promptKey as keyof typeof PLANNING_PROMPTS];
+    const planningPrompt = planningPrompts[promptKey];
     if (!planningPrompt) {
       return '';
     }
@@ -2017,6 +2020,7 @@ This mock response was generated because AUTOMAKER_MOCK_AGENT=true was set.
       cwd: workDir,
       model: model,
       abortController,
+      systemPrompt: options?.systemPrompt,
       autoLoadClaudeMd,
       enableSandboxMode,
       mcpServers: Object.keys(mcpServers).length > 0 ? mcpServers : undefined,
@@ -2060,7 +2064,7 @@ This mock response was generated because AUTOMAKER_MOCK_AGENT=true was set.
       cwd: workDir,
       allowedTools: allowedTools,
       abortController,
-      systemPrompt: sdkOptions.systemPrompt,
+      systemPrompt: sdkOptions.systemPrompt ?? options?.systemPrompt,
       settingSources: sdkOptions.settingSources,
       sandbox: sdkOptions.sandbox, // Pass sandbox configuration
       mcpServers: Object.keys(mcpServers).length > 0 ? mcpServers : undefined, // Pass MCP servers configuration
@@ -2069,7 +2073,9 @@ This mock response was generated because AUTOMAKER_MOCK_AGENT=true was set.
     };
 
     // Execute via provider
+    console.log(`[AutoMode] Starting stream for feature ${featureId}...`);
     const stream = provider.executeQuery(executeOptions);
+    console.log(`[AutoMode] Stream created, starting to iterate...`);
     // Initialize with previous content if this is a follow-up, with a separator
     let responseText = previousContent
       ? `${previousContent}\n\n---\n\n## Follow-up Session\n\n`
@@ -2107,6 +2113,7 @@ This mock response was generated because AUTOMAKER_MOCK_AGENT=true was set.
     };
 
     streamLoop: for await (const msg of stream) {
+      console.log(`[AutoMode] Stream message received:`, msg.type, msg.subtype || '');
       if (msg.type === 'assistant' && msg.message?.content) {
         for (const block of msg.message.content) {
           if (block.type === 'text') {
@@ -2562,6 +2569,9 @@ Implement all the changes described in the plan above.`;
 
             // Only emit progress for non-marker text (marker was already handled above)
             if (!specDetected) {
+              console.log(
+                `[AutoMode] Emitting progress event for ${featureId}, content length: ${block.text?.length || 0}`
+              );
               this.emitAutoModeEvent('auto_mode_progress', {
                 featureId,
                 content: block.text,

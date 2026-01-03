@@ -22,12 +22,12 @@ export function createSessionsListHandler() {
 }
 
 export function createSessionsCreateHandler() {
-  return (req: Request, res: Response): void => {
+  return async (req: Request, res: Response): Promise<void> => {
     try {
       const terminalService = getTerminalService();
       const { cwd, cols, rows, shell } = req.body;
 
-      const session = terminalService.createSession({
+      const session = await terminalService.createSession({
         cwd,
         cols: cols || 80,
         rows: rows || 24,

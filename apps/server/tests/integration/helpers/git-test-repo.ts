@@ -22,13 +22,21 @@ export async function createTestGitRepo(): Promise<TestRepo> {
 
   // Initialize git repo
   await execAsync('git init', { cwd: tmpDir });
-  await execAsync('git config user.email "test@example.com"', { cwd: tmpDir });
-  await execAsync('git config user.name "Test User"', { cwd: tmpDir });
+
+  // Use environment variables instead of git config to avoid affecting user's git config
+  // These env vars override git config without modifying it
+  const gitEnv = {
+    ...process.env,
+    GIT_AUTHOR_NAME: 'Test User',
+    GIT_AUTHOR_EMAIL: 'test@example.com',
+    GIT_COMMITTER_NAME: 'Test User',
+    GIT_COMMITTER_EMAIL: 'test@example.com',
+  };
 
   // Create initial commit
   await fs.writeFile(path.join(tmpDir, 'README.md'), '# Test Project\n');
-  await execAsync('git add .', { cwd: tmpDir });
-  await execAsync('git commit -m "Initial commit"', { cwd: tmpDir });
+  await execAsync('git add .', { cwd: tmpDir, env: gitEnv });
+  await execAsync('git commit -m "Initial commit"', { cwd: tmpDir, env: gitEnv });
 
   // Create main branch explicitly
   await execAsync('git branch -M main', { cwd: tmpDir });

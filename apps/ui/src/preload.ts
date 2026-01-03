@@ -19,6 +19,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Get server URL for HTTP client
   getServerUrl: (): Promise<string> => ipcRenderer.invoke('server:getUrl'),
 
+  // Get API key for authentication
+  getApiKey: (): Promise<string | null> => ipcRenderer.invoke('auth:getApiKey'),
+
   // Native dialogs - better UX than prompt()
   openDirectory: (): Promise<Electron.OpenDialogReturnValue> =>
     ipcRenderer.invoke('dialog:openDirectory'),
@@ -47,6 +50,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Window management
   updateMinWidth: (sidebarExpanded: boolean): Promise<void> =>
     ipcRenderer.invoke('window:updateMinWidth', sidebarExpanded),
+
+  // App control
+  quit: (): Promise<void> => ipcRenderer.invoke('app:quit'),
 });
 
 console.log('[Preload] Electron API exposed (TypeScript)');

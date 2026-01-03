@@ -11,7 +11,7 @@
  */
 
 import fs from 'fs/promises';
-import type { Dirent } from 'fs';
+import fsSync, { type Dirent, type Stats } from 'fs';
 import path from 'path';
 import pLimit from 'p-limit';
 import { validatePath } from './security.js';
@@ -166,16 +166,25 @@ export async function readFile(
 }
 
 /**
+ * Options for writeFile
+ */
+export interface WriteFileOptions {
+  encoding?: BufferEncoding;
+  mode?: number;
+  flag?: string;
+}
+
+/**
  * Wrapper around fs.writeFile that validates path first
  */
 export async function writeFile(
   filePath: string,
   data: string | Buffer,
-  encoding?: BufferEncoding
+  optionsOrEncoding?: BufferEncoding | WriteFileOptions
 ): Promise<void> {
   const validatedPath = validatePath(filePath);
   return executeWithRetry(
-    () => fs.writeFile(validatedPath, data, encoding),
+    () => fs.writeFile(validatedPath, data, optionsOrEncoding),
     `writeFile(${filePath})`
   );
 }
@@ -304,4 +313,317 @@ export function joinPath(...pathSegments: string[]): string {
  */
 export function resolvePath(...pathSegments: string[]): string {
   return path.resolve(...pathSegments);
+}
+
+// =============================================================================
+// Synchronous File System Methods
+// =============================================================================
+
+/**
+ * Options for writeFileSync
+ */
+export interface WriteFileSyncOptions {
+  encoding?: BufferEncoding;
+  mode?: number;
+  flag?: string;
+}
+
+/**
+ * Synchronous wrapper around fs.existsSync that validates path first
+ */
+export function existsSync(filePath: string): boolean {
+  const validatedPath = validatePath(filePath);
+  return fsSync.existsSync(validatedPath);
+}
+
+/**
+ * Synchronous wrapper around fs.readFileSync that validates path first
+ */
+export function readFileSync(filePath: string, encoding?: BufferEncoding): string | Buffer {
+  const validatedPath = validatePath(filePath);
+  if (encoding) {
+    return fsSync.readFileSync(validatedPath, encoding);
+  }
+  return fsSync.readFileSync(validatedPath);
+}
+
+/**
+ * Synchronous wrapper around fs.writeFileSync that validates path first
+ */
+export function writeFileSync(
+  filePath: string,
+  data: string | Buffer,
+  options?: WriteFileSyncOptions
+): void {
+  const validatedPath = validatePath(filePath);
+  fsSync.writeFileSync(validatedPath, data, options);
+}
+
+/**
+ * Synchronous wrapper around fs.mkdirSync that validates path first
+ */
+export function mkdirSync(
+  dirPath: string,
+  options?: { recursive?: boolean; mode?: number }
+): string | undefined {
+  const validatedPath = validatePath(dirPath);
+  return fsSync.mkdirSync(validatedPath, options);
+}
+
+/**
+ * Synchronous wrapper around fs.readdirSync that validates path first
+ */
+export function readdirSync(dirPath: string, options?: { withFileTypes?: false }): string[];
+export function readdirSync(dirPath: string, options: { withFileTypes: true }): Dirent[];
+export function readdirSync(
+  dirPath: string,
+  options?: { withFileTypes?: boolean }
+): string[] | Dirent[] {
+  const validatedPath = validatePath(dirPath);
+  if (options?.withFileTypes === true) {
+    return fsSync.readdirSync(validatedPath, { withFileTypes: true });
+  }
+  return fsSync.readdirSync(validatedPath);
+}
+
+/**
+ * Synchronous wrapper around fs.statSync that validates path first
+ */
+export function statSync(filePath: string): Stats {
+  const validatedPath = validatePath(filePath);
+  return fsSync.statSync(validatedPath);
+}
+
+/**
+ * Synchronous wrapper around fs.accessSync that validates path first
+ */
+export function accessSync(filePath: string, mode?: number): void {
+  const validatedPath = validatePath(filePath);
+  fsSync.accessSync(validatedPath, mode);
+}
+
+/**
+ * Synchronous wrapper around fs.unlinkSync that validates path first
+ */
+export function unlinkSync(filePath: string): void {
+  const validatedPath = validatePath(filePath);
+  fsSync.unlinkSync(validatedPath);
+}
+
+/**
+ * Synchronous wrapper around fs.rmSync that validates path first
+ */
+export function rmSync(filePath: string, options?: { recursive?: boolean; force?: boolean }): void {
+  const validatedPath = validatePath(filePath);
+  fsSync.rmSync(validatedPath, options);
+}
+
+// =============================================================================
+// Environment File Operations
+// =============================================================================
+
+/**
+ * Read and parse an .env file from a validated path
+ * Returns a record of key-value pairs
+ */
+export async function readEnvFile(envPath: string): Promise<Record<string, string>> {
+  const validatedPath = validatePath(envPath);
+  try {
+    const content = await executeWithRetry(
+      () => fs.readFile(validatedPath, 'utf-8'),
+      `readEnvFile(${envPath})`
+    );
+    return parseEnvContent(content);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      return {};
+    }
+    throw error;
+  }
+}
+
+/**
+ * Read and parse an .env file synchronously from a validated path
+ */
+export function readEnvFileSync(envPath: string): Record<string, string> {
+  const validatedPath = validatePath(envPath);
+  try {
+    const content = fsSync.readFileSync(validatedPath, 'utf-8');
+    return parseEnvContent(content);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      return {};
+    }
+    throw error;
+  }
+}
+
+/**
+ * Parse .env file content into a record
+ */
+function parseEnvContent(content: string): Record<string, string> {
+  const result: Record<string, string> = {};
+  const lines = content.split('\n');
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    // Skip empty lines and comments
+    if (!trimmed || trimmed.startsWith('#')) {
+      continue;
+    }
+    const equalIndex = trimmed.indexOf('=');
+    if (equalIndex > 0) {
+      const key = trimmed.slice(0, equalIndex).trim();
+      const value = trimmed.slice(equalIndex + 1).trim();
+      result[key] = value;
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Write or update a key-value pair in an .env file
+ * Preserves existing content and comments
+ */
+export async function writeEnvKey(envPath: string, key: string, value: string): Promise<void> {
+  const validatedPath = validatePath(envPath);
+
+  let content = '';
+  try {
+    content = await executeWithRetry(
+      () => fs.readFile(validatedPath, 'utf-8'),
+      `readFile(${envPath})`
+    );
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+      throw error;
+    }
+    // File doesn't exist, will create new one
+  }
+
+  const newContent = updateEnvContent(content, key, value);
+  await executeWithRetry(() => fs.writeFile(validatedPath, newContent), `writeFile(${envPath})`);
+}
+
+/**
+ * Write or update a key-value pair in an .env file (synchronous)
+ */
+export function writeEnvKeySync(envPath: string, key: string, value: string): void {
+  const validatedPath = validatePath(envPath);
+
+  let content = '';
+  try {
+    content = fsSync.readFileSync(validatedPath, 'utf-8');
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+      throw error;
+    }
+    // File doesn't exist, will create new one
+  }
+
+  const newContent = updateEnvContent(content, key, value);
+  fsSync.writeFileSync(validatedPath, newContent);
+}
+
+/**
+ * Remove a key from an .env file
+ */
+export async function removeEnvKey(envPath: string, key: string): Promise<void> {
+  const validatedPath = validatePath(envPath);
+
+  let content = '';
+  try {
+    content = await executeWithRetry(
+      () => fs.readFile(validatedPath, 'utf-8'),
+      `readFile(${envPath})`
+    );
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      return; // File doesn't exist, nothing to remove
+    }
+    throw error;
+  }
+
+  const newContent = removeEnvKeyFromContent(content, key);
+  await executeWithRetry(() => fs.writeFile(validatedPath, newContent), `writeFile(${envPath})`);
+}
+
+/**
+ * Remove a key from an .env file (synchronous)
+ */
+export function removeEnvKeySync(envPath: string, key: string): void {
+  const validatedPath = validatePath(envPath);
+
+  let content = '';
+  try {
+    content = fsSync.readFileSync(validatedPath, 'utf-8');
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      return; // File doesn't exist, nothing to remove
+    }
+    throw error;
+  }
+
+  const newContent = removeEnvKeyFromContent(content, key);
+  fsSync.writeFileSync(validatedPath, newContent);
+}
+
+/**
+ * Update .env content with a new key-value pair
+ */
+function updateEnvContent(content: string, key: string, value: string): string {
+  const lines = content.split('\n');
+  const keyPrefix = `${key}=`;
+  let found = false;
+
+  const newLines = lines.map((line) => {
+    if (line.trim().startsWith(keyPrefix)) {
+      found = true;
+      return `${key}=${value}`;
+    }
+    return line;
+  });
+
+  if (!found) {
+    // Add the key at the end
+    if (newLines.length > 0 && newLines[newLines.length - 1].trim() !== '') {
+      newLines.push(`${key}=${value}`);
+    } else {
+      // Replace last empty line or add to empty file
+      if (newLines.length === 0 || (newLines.length === 1 && newLines[0] === '')) {
+        newLines[0] = `${key}=${value}`;
+      } else {
+        newLines[newLines.length - 1] = `${key}=${value}`;
+      }
+    }
+  }
+
+  // Ensure file ends with newline
+  let result = newLines.join('\n');
+  if (!result.endsWith('\n')) {
+    result += '\n';
+  }
+  return result;
+}
+
+/**
+ * Remove a key from .env content
+ */
+function removeEnvKeyFromContent(content: string, key: string): string {
+  const lines = content.split('\n');
+  const keyPrefix = `${key}=`;
+  const newLines = lines.filter((line) => !line.trim().startsWith(keyPrefix));
+
+  // Remove trailing empty lines
+  while (newLines.length > 0 && newLines[newLines.length - 1].trim() === '') {
+    newLines.pop();
+  }
+
+  // Ensure file ends with newline if there's content
+  let result = newLines.join('\n');
+  if (result.length > 0 && !result.endsWith('\n')) {
+    result += '\n';
+  }
+  return result;
 }

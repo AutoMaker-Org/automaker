@@ -16,6 +16,8 @@ import {
   fillAddFeatureDialog,
   confirmAddFeature,
   clickElement,
+  authenticateForTests,
+  handleLoginScreenIfPresent,
 } from '../utils';
 
 const TEST_TEMP_DIR = createTempDirPath('edit-feature-test');
@@ -63,7 +65,10 @@ test.describe('Edit Feature', () => {
 
     await setupRealProject(page, projectPath, projectName, { setAsCurrent: true });
 
+    await authenticateForTests(page);
     await page.goto('/board');
+    await page.waitForLoadState('load');
+    await handleLoginScreenIfPresent(page);
     await waitForNetworkIdle(page);
 
     await expect(page.locator('[data-testid="board-view"]')).toBeVisible({ timeout: 10000 });

@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { useAppStore, defaultBackgroundSettings } from '@/store/app-store';
+import { getServerUrlSync } from '@/lib/http-api-client';
 
 interface UseBoardBackgroundProps {
   currentProject: { path: string; id: string } | null;
@@ -23,7 +24,7 @@ export function useBoardBackground({ currentProject }: UseBoardBackgroundProps) 
 
     return {
       backgroundImage: `url(${
-        import.meta.env.VITE_SERVER_URL || 'http://localhost:3008'
+        import.meta.env.VITE_SERVER_URL || getServerUrlSync()
       }/api/fs/image?path=${encodeURIComponent(
         backgroundSettings.imagePath
       )}&projectPath=${encodeURIComponent(currentProject.path)}${

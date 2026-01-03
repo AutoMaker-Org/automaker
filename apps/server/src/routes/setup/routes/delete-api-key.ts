@@ -5,40 +5,22 @@
 import type { Request, Response } from 'express';
 import { createLogger } from '@automaker/utils';
 import path from 'path';
-import fs from 'fs/promises';
+import { secureFs } from '@automaker/platform';
 
 const logger = createLogger('Setup');
 
 // In-memory storage reference (imported from common.ts pattern)
-// We need to modify common.ts to export a deleteApiKey function
 import { setApiKey } from '../common.js';
 
 /**
  * Remove an API key from the .env file
+ * Uses centralized secureFs.removeEnvKey for path validation
  */
 async function removeApiKeyFromEnv(key: string): Promise<void> {
   const envPath = path.join(process.cwd(), '.env');
 
   try {
-    let envContent = '';
-    try {
-      envContent = await fs.readFile(envPath, 'utf-8');
-    } catch {
-      // .env file doesn't exist, nothing to delete
-      return;
-    }
-
-    // Parse existing env content and remove the key
-    const lines = envContent.split('\n');
-    const keyRegex = new RegExp(`^${key}=`);
-    const newLines = lines.filter((line) => !keyRegex.test(line));
-
-    // Remove empty lines at the end
-    while (newLines.length > 0 && newLines[newLines.length - 1].trim() === '') {
-      newLines.pop();
-    }
-
-    await fs.writeFile(envPath, newLines.join('\n') + (newLines.length > 0 ? '\n' : ''));
+    await secureFs.removeEnvKey(envPath, key);
     logger.info(`[Setup] Removed ${key} from .env file`);
   } catch (error) {
     logger.error(`[Setup] Failed to remove ${key} from .env:`, error);

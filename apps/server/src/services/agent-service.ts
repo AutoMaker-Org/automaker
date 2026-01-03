@@ -12,9 +12,14 @@ import {
   buildPromptWithImages,
   isAbortError,
   loadContextFiles,
+  createLogger,
 } from '@automaker/utils';
 import { ProviderFactory } from '../providers/provider-factory.js';
-import { createChatOptions, validateWorkingDirectory } from '../lib/sdk-options.js';
+import {
+  createChatOptions,
+  getModelForUseCase,
+  validateWorkingDirectory,
+} from '../lib/sdk-options.js';
 import { PathNotAllowedError } from '@automaker/platform';
 import type { SettingsService } from './settings-service.js';
 import {
@@ -23,6 +28,7 @@ import {
   filterClaudeMdFromContext,
   getMCPServersFromSettings,
   getMCPPermissionSettings,
+  getPromptCustomization,
 } from '../lib/settings-helpers.js';
 
 interface Message {
@@ -75,6 +81,7 @@ export class AgentService {
   private metadataFile: string;
   private events: EventEmitter;
   private settingsService: SettingsService | null = null;
+  private logger = createLogger('AgentService');
 
   constructor(dataDir: string, events: EventEmitter, settingsService?: SettingsService) {
     this.stateDir = path.join(dataDir, 'agent-sessions');
@@ -148,12 +155,12 @@ export class AgentService {
   }) {
     const session = this.sessions.get(sessionId);
     if (!session) {
-      console.error('[AgentService] ERROR: Session not found:', sessionId);
+      this.logger.error('ERROR: Session not found:', sessionId);
       throw new Error(`Session ${sessionId} not found`);
     }
 
     if (session.isRunning) {
-      console.error('[AgentService] ERROR: Agent already running for session:', sessionId);
+      this.logger.error('ERROR: Agent already running for session:', sessionId);
       throw new Error('Agent is already processing a message');
     }
 
@@ -175,7 +182,7 @@ export class AgentService {
             filename: imageData.filename,
           });
         } catch (error) {
-          console.error(`[AgentService] Failed to load image ${imagePath}:`, error);
+          this.logger.error(`Failed to load image ${imagePath}:`, error);
         }
       }
     }
@@ -243,10 +250,12 @@ export class AgentService {
 
       // When autoLoadClaudeMd is enabled, filter out CLAUDE.md to avoid duplication
       // (SDK handles CLAUDE.md via settingSources), but keep other context files like CODE_QUALITY.md
-      const contextFilesPrompt = filterClaudeMdFromContext(contextResult, autoLoadClaudeMd);
+      const modelForContext = getModelForUseCase('chat', model ?? session.model);
+      const shouldFilterClaudeMd = autoLoadClaudeMd && modelForContext.startsWith('claude-');
+      const contextFilesPrompt = filterClaudeMdFromContext(contextResult, shouldFilterClaudeMd);
 
       // Build combined system prompt with base prompt and context files
-      const baseSystemPrompt = this.getSystemPrompt();
+      const baseSystemPrompt = await this.getSystemPrompt();
       const combinedSystemPrompt = contextFilesPrompt
         ? `${contextFilesPrompt}\n\n${baseSystemPrompt}`
         : baseSystemPrompt;
@@ -391,7 +400,7 @@ export class AgentService {
         return { success: false, aborted: true };
       }
 
-      console.error('[AgentService] Error:', error);
+      this.logger.error('Error:', error);
 
       session.isRunning = false;
       session.abortController = null;
@@ -485,7 +494,7 @@ export class AgentService {
       await secureFs.writeFile(sessionFile, JSON.stringify(messages, null, 2), 'utf-8');
       await this.updateSessionTimestamp(sessionId);
     } catch (error) {
-      console.error('[AgentService] Failed to save session:', error);
+      this.logger.error('Failed to save session:', error);
     }
   }
 
@@ -719,7 +728,7 @@ export class AgentService {
     try {
       await secureFs.writeFile(queueFile, JSON.stringify(queue, null, 2), 'utf-8');
     } catch (error) {
-      console.error('[AgentService] Failed to save queue state:', error);
+      this.logger.error('Failed to save queue state:', error);
     }
   }
 
@@ -768,7 +777,7 @@ export class AgentService {
         model: nextPrompt.model,
       });
     } catch (error) {
-      console.error('[AgentService] Failed to process queued prompt:', error);
+      this.logger.error('Failed to process queued prompt:', error);
       this.emitAgentEvent(sessionId, {
         type: 'queue_error',
         error: (error as Error).message,
@@ -781,38 +790,10 @@ export class AgentService {
     this.events.emit('agent:stream', { sessionId, ...data });
   }
 
-  private getSystemPrompt(): string {
-    return `You are an AI assistant helping users build software. You are part of the Automaker application,
-which is designed to help developers plan, design, and implement software projects autonomously.
-
-**Feature Storage:**
-Features are stored in .automaker/features/{id}/feature.json - each feature has its own folder.
-Use the UpdateFeatureStatus tool to manage features, not direct file edits.
-
-Your role is to:
-- Help users define their project requirements and specifications
-- Ask clarifying questions to better understand their needs
-- Suggest technical approaches and architectures
-- Guide them through the development process
-- Be conversational and helpful
-- Write, edit, and modify code files as requested
-- Execute commands and tests
-- Search and analyze the codebase
-
-When discussing projects, help users think through:
-- Core functionality and features
-- Technical stack choices
-- Data models and architecture
-- User experience considerations
-- Testing strategies
-
-You have full access to the codebase and can:
-- Read files to understand existing code
-- Write new files
-- Edit existing files
-- Run bash commands
-- Search for code patterns
-- Execute tests and builds`;
+  private async getSystemPrompt(): Promise<string> {
+    // Load from settings (no caching - allows hot reload of custom prompts)
+    const prompts = await getPromptCustomization(this.settingsService, '[AgentService]');
+    return prompts.agent.systemPrompt;
   }
 
   private generateId(): string {

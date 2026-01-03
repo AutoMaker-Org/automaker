@@ -80,13 +80,21 @@ export async function createTestGitRepo(tempDir: string): Promise<TestRepo> {
 
   // Initialize git repo
   await execAsync('git init', { cwd: tmpDir });
-  await execAsync('git config user.email "test@example.com"', { cwd: tmpDir });
-  await execAsync('git config user.name "Test User"', { cwd: tmpDir });
+
+  // Use environment variables instead of git config to avoid affecting user's git config
+  // These env vars override git config without modifying it
+  const gitEnv = {
+    ...process.env,
+    GIT_AUTHOR_NAME: 'Test User',
+    GIT_AUTHOR_EMAIL: 'test@example.com',
+    GIT_COMMITTER_NAME: 'Test User',
+    GIT_COMMITTER_EMAIL: 'test@example.com',
+  };
 
   // Create initial commit
   fs.writeFileSync(path.join(tmpDir, 'README.md'), '# Test Project\n');
-  await execAsync('git add .', { cwd: tmpDir });
-  await execAsync('git commit -m "Initial commit"', { cwd: tmpDir });
+  await execAsync('git add .', { cwd: tmpDir, env: gitEnv });
+  await execAsync('git commit -m "Initial commit"', { cwd: tmpDir, env: gitEnv });
 
   // Create main branch explicitly
   await execAsync('git branch -M main', { cwd: tmpDir });
@@ -248,9 +256,18 @@ export async function commitFile(
   content: string,
   message: string
 ): Promise<void> {
+  // Use environment variables instead of git config to avoid affecting user's git config
+  const gitEnv = {
+    ...process.env,
+    GIT_AUTHOR_NAME: 'Test User',
+    GIT_AUTHOR_EMAIL: 'test@example.com',
+    GIT_COMMITTER_NAME: 'Test User',
+    GIT_COMMITTER_EMAIL: 'test@example.com',
+  };
+
   fs.writeFileSync(path.join(repoPath, filePath), content);
-  await execAsync(`git add "${filePath}"`, { cwd: repoPath });
-  await execAsync(`git commit -m "${message}"`, { cwd: repoPath });
+  await execAsync(`git add "${filePath}"`, { cwd: repoPath, env: gitEnv });
+  await execAsync(`git commit -m "${message}"`, { cwd: repoPath, env: gitEnv });
 }
 
 /**

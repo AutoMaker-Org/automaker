@@ -1,7 +1,6 @@
 import { useMemo } from 'react';
 import { DndContext, DragOverlay } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
-import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { HotkeyButton } from '@/components/ui/hotkey-button';
 import { KanbanColumn, KanbanCard } from './components';
@@ -241,19 +240,32 @@ export function KanbanBoard({
           }}
         >
           {activeFeature && (
-            <Card
-              className="rotate-2 shadow-2xl shadow-black/25 border-primary/50 bg-card/95 backdrop-blur-sm transition-transform"
-              style={{ width: `${columnWidth}px` }}
-            >
-              <CardHeader className="p-3">
-                <CardTitle className="text-sm font-medium line-clamp-2">
-                  {activeFeature.description}
-                </CardTitle>
-                <CardDescription className="text-xs text-muted-foreground">
-                  {activeFeature.category}
-                </CardDescription>
-              </CardHeader>
-            </Card>
+            <div style={{ width: `${columnWidth}px` }}>
+              <KanbanCard
+                feature={activeFeature}
+                isOverlay
+                onEdit={() => {}}
+                onDelete={() => {}}
+                onViewOutput={() => {}}
+                onVerify={() => {}}
+                onResume={() => {}}
+                onForceStop={() => {}}
+                onManualVerify={() => {}}
+                onMoveBackToInProgress={() => {}}
+                onFollowUp={() => {}}
+                onImplement={() => {}}
+                onComplete={() => {}}
+                onViewPlan={() => {}}
+                onApprovePlan={() => {}}
+                onSpawnTask={() => {}}
+                hasContext={featuresWithContext.has(activeFeature.id)}
+                isCurrentAutoTask={runningAutoTasks.includes(activeFeature.id)}
+                opacity={backgroundSettings.cardOpacity}
+                glassmorphism={backgroundSettings.cardGlassmorphism}
+                cardBorderEnabled={backgroundSettings.cardBorderEnabled}
+                cardBorderOpacity={backgroundSettings.cardBorderOpacity}
+              />
+            </div>
           )}
         </DragOverlay>
       </DndContext>

@@ -9,10 +9,14 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import { exec } from 'child_process';
+import { promisify } from 'util';
 import type { MCPServerConfig, MCPToolInfo } from '@automaker/types';
 import type { SettingsService } from './settings-service.js';
 
+const execAsync = promisify(exec);
 const DEFAULT_TIMEOUT = 10000; // 10 seconds
+const IS_WINDOWS = process.platform === 'win32';
 
 export interface MCPTestResult {
   success: boolean;
@@ -41,6 +45,11 @@ export class MCPTestService {
   async testServer(serverConfig: MCPServerConfig): Promise<MCPTestResult> {
     const startTime = Date.now();
     let client: Client | null = null;
+    let transport:
+      | StdioClientTransport
+      | SSEClientTransport
+      | StreamableHTTPClientTransport
+      | null = null;
 
     try {
       client = new Client({
@@ -49,7 +58,7 @@ export class MCPTestService {
       });
 
       // Create transport based on server type
-      const transport = await this.createTransport(serverConfig);
+      transport = await this.createTransport(serverConfig);
 
       // Connect with timeout
       await Promise.race([
@@ -98,13 +107,47 @@ export class MCPTestService {
         connectionTime,
       };
     } finally {
-      // Clean up client connection
-      if (client) {
-        try {
-          await client.close();
-        } catch {
-          // Ignore cleanup errors
-        }
+      // Clean up client connection and ensure process termination
+      await this.cleanupConnection(client, transport);
+    }
+  }
+
+  /**
+   * Clean up MCP client connection and terminate spawned processes
+   *
+   * On Windows, child processes spawned via 'cmd /c' don't get terminated when the
+   * parent process is killed. We use taskkill with /t flag to kill the entire process tree.
+   * This prevents orphaned MCP server processes that would spam logs with ping warnings.
+   *
+   * IMPORTANT: We must run taskkill BEFORE client.close() because:
+   * - client.close() kills only the parent cmd.exe process
+   * - This orphans the child node.exe processes before we can kill them
+   * - taskkill /t needs the parent PID to exist to traverse the process tree
+   */
+  private async cleanupConnection(
+    client: Client | null,
+    transport: StdioClientTransport | SSEClientTransport | StreamableHTTPClientTransport | null
+  ): Promise<void> {
+    // Get the PID before any cleanup (only available for stdio transports)
+    const pid = transport instanceof StdioClientTransport ? transport.pid : null;
+
+    // On Windows with stdio transport, kill the entire process tree FIRST
+    // This must happen before client.close() which would orphan child processes
+    if (IS_WINDOWS && pid) {
+      try {
+        // taskkill /f = force, /t = kill process tree, /pid = process ID
+        await execAsync(`taskkill /f /t /pid ${pid}`);
+      } catch {
+        // Process may have already exited, which is fine
+      }
+    }
+
+    // Now do the standard close (may be a no-op if taskkill already killed everything)
+    if (client) {
+      try {
+        await client.close();
+      } catch {
+        // Expected if taskkill already terminated the process
       }
     }
   }

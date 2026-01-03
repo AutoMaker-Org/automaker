@@ -3,6 +3,9 @@ import {
   isAbortError,
   isCancellationError,
   isAuthenticationError,
+  isRateLimitError,
+  isQuotaExhaustedError,
+  extractRetryAfter,
   classifyError,
   getUserFriendlyErrorMessage,
 } from '../src/error-handler';
@@ -101,6 +104,112 @@ describe('error-handler.ts', () => {
     });
   });
 
+  describe('isRateLimitError', () => {
+    it('should return true for errors with 429 status code', () => {
+      const error = new Error('Error: 429 Too Many Requests');
+      expect(isRateLimitError(error)).toBe(true);
+    });
+
+    it('should return true for errors with rate_limit in message', () => {
+      const error = new Error('rate_limit_error: Too many requests');
+      expect(isRateLimitError(error)).toBe(true);
+    });
+
+    it('should return true for string errors with 429', () => {
+      expect(isRateLimitError('429 - rate limit exceeded')).toBe(true);
+    });
+
+    it('should return false for non-rate-limit errors', () => {
+      const error = new Error('Something went wrong');
+      expect(isRateLimitError(error)).toBe(false);
+    });
+
+    it('should return false for null/undefined', () => {
+      expect(isRateLimitError(null)).toBe(false);
+      expect(isRateLimitError(undefined)).toBe(false);
+    });
+  });
+
+  describe('isQuotaExhaustedError', () => {
+    it('should return true for overloaded errors', () => {
+      expect(isQuotaExhaustedError(new Error('overloaded_error: service is busy'))).toBe(true);
+      expect(isQuotaExhaustedError(new Error('Server is overloaded'))).toBe(true);
+      expect(isQuotaExhaustedError(new Error('At capacity'))).toBe(true);
+    });
+
+    it('should return true for usage limit errors', () => {
+      expect(isQuotaExhaustedError(new Error('limit reached'))).toBe(true);
+      expect(isQuotaExhaustedError(new Error('Usage limit exceeded'))).toBe(true);
+      expect(isQuotaExhaustedError(new Error('quota exceeded'))).toBe(true);
+      expect(isQuotaExhaustedError(new Error('quota_exceeded'))).toBe(true);
+      expect(isQuotaExhaustedError(new Error('session limit reached'))).toBe(true);
+      expect(isQuotaExhaustedError(new Error('weekly limit hit'))).toBe(true);
+      expect(isQuotaExhaustedError(new Error('monthly limit reached'))).toBe(true);
+    });
+
+    it('should return true for billing/credit errors', () => {
+      expect(isQuotaExhaustedError(new Error('credit balance is too low'))).toBe(true);
+      expect(isQuotaExhaustedError(new Error('insufficient credits'))).toBe(true);
+      expect(isQuotaExhaustedError(new Error('insufficient balance'))).toBe(true);
+      expect(isQuotaExhaustedError(new Error('no credits remaining'))).toBe(true);
+      expect(isQuotaExhaustedError(new Error('out of credits'))).toBe(true);
+      expect(isQuotaExhaustedError(new Error('billing issue detected'))).toBe(true);
+      expect(isQuotaExhaustedError(new Error('payment required'))).toBe(true);
+    });
+
+    it('should return true for upgrade prompts', () => {
+      expect(isQuotaExhaustedError(new Error('Please /upgrade your plan'))).toBe(true);
+      expect(isQuotaExhaustedError(new Error('extra-usage not enabled'))).toBe(true);
+    });
+
+    it('should return false for regular errors', () => {
+      expect(isQuotaExhaustedError(new Error('Something went wrong'))).toBe(false);
+      expect(isQuotaExhaustedError(new Error('Network error'))).toBe(false);
+      expect(isQuotaExhaustedError(new Error(''))).toBe(false);
+    });
+
+    it('should return false for null/undefined', () => {
+      expect(isQuotaExhaustedError(null)).toBe(false);
+      expect(isQuotaExhaustedError(undefined)).toBe(false);
+    });
+
+    it('should handle string errors', () => {
+      expect(isQuotaExhaustedError('overloaded')).toBe(true);
+      expect(isQuotaExhaustedError('regular error')).toBe(false);
+    });
+  });
+
+  describe('extractRetryAfter', () => {
+    it('should extract retry-after from error message', () => {
+      const error = new Error('Rate limit exceeded. retry-after: 60');
+      expect(extractRetryAfter(error)).toBe(60);
+    });
+
+    it('should extract from retry_after format', () => {
+      const error = new Error('retry_after: 120 seconds');
+      expect(extractRetryAfter(error)).toBe(120);
+    });
+
+    it('should extract from wait format', () => {
+      const error = new Error('Please wait: 30 seconds before retrying');
+      expect(extractRetryAfter(error)).toBe(30);
+    });
+
+    it('should return undefined for rate limit errors without explicit retry-after', () => {
+      const error = new Error('429 rate_limit_error');
+      expect(extractRetryAfter(error)).toBeUndefined();
+    });
+
+    it('should return undefined for non-rate-limit errors', () => {
+      const error = new Error('Something went wrong');
+      expect(extractRetryAfter(error)).toBeUndefined();
+    });
+
+    it('should handle string errors', () => {
+      expect(extractRetryAfter('retry-after: 45')).toBe(45);
+    });
+  });
+
   describe('classifyError', () => {
     it('should classify authentication errors', () => {
       const error = new Error('Authentication failed');
@@ -110,8 +219,55 @@ describe('error-handler.ts', () => {
       expect(result.isAuth).toBe(true);
       expect(result.isAbort).toBe(false);
       expect(result.isCancellation).toBe(false);
+      expect(result.isRateLimit).toBe(false);
+      expect(result.isQuotaExhausted).toBe(false);
       expect(result.message).toBe('Authentication failed');
       expect(result.originalError).toBe(error);
+    });
+
+    it('should classify quota exhausted errors', () => {
+      const error = new Error('overloaded_error: service is busy');
+      const result = classifyError(error);
+
+      expect(result.type).toBe('quota_exhausted');
+      expect(result.isQuotaExhausted).toBe(true);
+      expect(result.isRateLimit).toBe(false);
+      expect(result.isAuth).toBe(false);
+    });
+
+    it('should classify credit balance errors as quota exhausted', () => {
+      const error = new Error('credit balance is too low');
+      const result = classifyError(error);
+
+      expect(result.type).toBe('quota_exhausted');
+      expect(result.isQuotaExhausted).toBe(true);
+    });
+
+    it('should classify usage limit errors as quota exhausted', () => {
+      const error = new Error('usage limit reached');
+      const result = classifyError(error);
+
+      expect(result.type).toBe('quota_exhausted');
+      expect(result.isQuotaExhausted).toBe(true);
+    });
+
+    it('should classify rate limit errors', () => {
+      const error = new Error('Error: 429 rate_limit_error');
+      const result = classifyError(error);
+
+      expect(result.type).toBe('rate_limit');
+      expect(result.isRateLimit).toBe(true);
+      expect(result.isAuth).toBe(false);
+      expect(result.retryAfter).toBe(60); // Default
+    });
+
+    it('should extract retryAfter from rate limit errors', () => {
+      const error = new Error('429 - retry-after: 120');
+      const result = classifyError(error);
+
+      expect(result.type).toBe('rate_limit');
+      expect(result.isRateLimit).toBe(true);
+      expect(result.retryAfter).toBe(120);
     });
 
     it('should classify abort errors', () => {
@@ -169,6 +325,24 @@ describe('error-handler.ts', () => {
       expect(result2.message).toBe('Unknown error');
     });
 
+    it('should prioritize authentication over rate limit', () => {
+      const error = new Error('Authentication failed - 429');
+      const result = classifyError(error);
+
+      expect(result.type).toBe('authentication');
+      expect(result.isAuth).toBe(true);
+      expect(result.isRateLimit).toBe(true); // Both flags can be true
+    });
+
+    it('should prioritize rate limit over abort', () => {
+      const error = new Error('429 rate_limit - aborted');
+      const result = classifyError(error);
+
+      expect(result.type).toBe('rate_limit');
+      expect(result.isRateLimit).toBe(true);
+      expect(result.isAbort).toBe(true);
+    });
+
     it('should prioritize authentication over abort', () => {
       const error = new Error('Authentication failed - aborted');
       const result = classifyError(error);
@@ -221,6 +395,30 @@ describe('error-handler.ts', () => {
       const message = getUserFriendlyErrorMessage(error);
 
       expect(message).toBe('Authentication failed. Please check your API key.');
+    });
+
+    it('should return friendly message for quota exhausted errors', () => {
+      const error = new Error('overloaded_error');
+      const message = getUserFriendlyErrorMessage(error);
+
+      expect(message).toContain('Usage limit reached');
+      expect(message).toContain('Auto Mode has been paused');
+    });
+
+    it('should return friendly message for rate limit errors', () => {
+      const error = new Error('429 rate_limit_error');
+      const message = getUserFriendlyErrorMessage(error);
+
+      expect(message).toContain('Rate limit exceeded');
+      expect(message).toContain('60 seconds');
+    });
+
+    it('should include custom retry-after in rate limit message', () => {
+      const error = new Error('429 - retry-after: 120');
+      const message = getUserFriendlyErrorMessage(error);
+
+      expect(message).toContain('Rate limit exceeded');
+      expect(message).toContain('120 seconds');
     });
 
     it('should prioritize abort message over auth', () => {

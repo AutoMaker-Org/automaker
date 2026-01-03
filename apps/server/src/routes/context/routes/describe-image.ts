@@ -15,7 +15,7 @@ import { query } from '@anthropic-ai/claude-agent-sdk';
 import { createLogger, readImageAsBase64 } from '@automaker/utils';
 import { CLAUDE_MODEL_MAP } from '@automaker/types';
 import { createCustomOptions } from '../../../lib/sdk-options.js';
-import * as fs from 'fs';
+import * as secureFs from '../../../lib/secure-fs.js';
 import * as path from 'path';
 import type { SettingsService } from '../../../services/settings-service.js';
 import { getAutoLoadClaudeMdSetting } from '../../../lib/settings-helpers.js';
@@ -57,13 +57,13 @@ function filterSafeHeaders(headers: Record<string, unknown>): Record<string, unk
  */
 function findActualFilePath(requestedPath: string): string | null {
   // First, try the exact path
-  if (fs.existsSync(requestedPath)) {
+  if (secureFs.existsSync(requestedPath)) {
     return requestedPath;
   }
 
   // Try with Unicode normalization
   const normalizedPath = requestedPath.normalize('NFC');
-  if (fs.existsSync(normalizedPath)) {
+  if (secureFs.existsSync(normalizedPath)) {
     return normalizedPath;
   }
 
@@ -72,12 +72,12 @@ function findActualFilePath(requestedPath: string): string | null {
   const dir = path.dirname(requestedPath);
   const baseName = path.basename(requestedPath);
 
-  if (!fs.existsSync(dir)) {
+  if (!secureFs.existsSync(dir)) {
     return null;
   }
 
   try {
-    const files = fs.readdirSync(dir);
+    const files = secureFs.readdirSync(dir);
 
     // Normalize the requested basename for comparison
     // Replace various space-like characters with regular space for comparison
@@ -280,9 +280,9 @@ export function createDescribeImageHandler(
       }
 
       // Log path + stats (this is often where issues start: missing file, perms, size)
-      let stat: fs.Stats | null = null;
+      let stat: ReturnType<typeof secureFs.statSync> | null = null;
       try {
-        stat = fs.statSync(actualPath);
+        stat = secureFs.statSync(actualPath);
         logger.info(
           `[${requestId}] fileStats size=${stat.size} bytes mtime=${stat.mtime.toISOString()}`
         );

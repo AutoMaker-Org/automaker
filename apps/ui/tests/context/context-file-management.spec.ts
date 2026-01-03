@@ -18,6 +18,7 @@ import {
   getByTestId,
   waitForNetworkIdle,
   getContextEditorContent,
+  authenticateForTests,
 } from '../utils';
 
 test.describe('Context File Management', () => {
@@ -31,6 +32,7 @@ test.describe('Context File Management', () => {
 
   test('should create a new markdown context file', async ({ page }) => {
     await setupProjectWithFixture(page, getFixturePath());
+    await authenticateForTests(page);
     await page.goto('/');
     await waitForNetworkIdle(page);
 

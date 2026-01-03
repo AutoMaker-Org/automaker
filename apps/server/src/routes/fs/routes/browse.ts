@@ -6,7 +6,7 @@ import type { Request, Response } from 'express';
 import * as secureFs from '../../../lib/secure-fs.js';
 import os from 'os';
 import path from 'path';
-import { getAllowedRootDirectory, PathNotAllowedError } from '@automaker/platform';
+import { getAllowedRootDirectory, PathNotAllowedError, isPathAllowed } from '@automaker/platform';
 import { getErrorMessage, logError } from '../common.js';
 
 export function createBrowseHandler() {
@@ -40,9 +40,16 @@ export function createBrowseHandler() {
         return drives;
       };
 
-      // Get parent directory
+      // Get parent directory - only if it's within the allowed root
       const parentPath = path.dirname(targetPath);
-      const hasParent = parentPath !== targetPath;
+
+      // Determine if parent navigation should be allowed:
+      // 1. Must have a different parent (not at filesystem root)
+      // 2. If ALLOWED_ROOT_DIRECTORY is set, parent must be within it
+      const hasParent = parentPath !== targetPath && isPathAllowed(parentPath);
+
+      // Security: Don't expose parent path outside allowed root
+      const safeParentPath = hasParent ? parentPath : null;
 
       // Get available drives
       const drives = await detectDrives();
@@ -70,7 +77,7 @@ export function createBrowseHandler() {
         res.json({
           success: true,
           currentPath: targetPath,
-          parentPath: hasParent ? parentPath : null,
+          parentPath: safeParentPath,
           directories,
           drives,
         });
@@ -84,7 +91,7 @@ export function createBrowseHandler() {
           res.json({
             success: true,
             currentPath: targetPath,
-            parentPath: hasParent ? parentPath : null,
+            parentPath: safeParentPath,
             directories: [],
             drives,
             warning:

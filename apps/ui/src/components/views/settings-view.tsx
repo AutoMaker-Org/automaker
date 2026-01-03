@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useAppStore, type ThemeMode } from '@/store/app-store';
+import { useSetupStore } from '@/store/setup-store';
 
 import { useCliStatus, useSettingsView } from './settings-view/hooks';
 import { NAV_ITEMS } from './settings-view/config/navigation';
@@ -23,6 +24,7 @@ import { KeyboardShortcutsSection } from './settings-view/keyboard-shortcuts/key
 import { FeatureDefaultsSection } from './settings-view/feature-defaults/feature-defaults-section';
 import { DangerZoneSection } from './settings-view/danger-zone/danger-zone-section';
 import { MCPServersSection } from './settings-view/mcp-servers';
+import { PromptCustomizationSection } from './settings-view/prompts';
 import type { Project as SettingsProject, Theme } from './settings-view/shared/types';
 import type { Project as ElectronProject } from '@/lib/electron';
 
@@ -61,13 +63,24 @@ export function SettingsView() {
     setAutoLoadClaudeMd,
     enableSandboxMode,
     setEnableSandboxMode,
+    skipSandboxWarning,
+    setSkipSandboxWarning,
+    promptCustomization,
+    setPromptCustomization,
   } = useAppStore();
 
+  const claudeAuthStatus = useSetupStore((state) => state.claudeAuthStatus);
+
   // Hide usage tracking when using API key (only show for Claude Code CLI users)
+  // Check both user-entered API key and environment variable ANTHROPIC_API_KEY
   // Also hide on Windows for now (CLI usage command not supported)
+  // Only show if CLI has been verified/authenticated
   const isWindows =
     typeof navigator !== 'undefined' && navigator.platform?.toLowerCase().includes('win');
-  const showUsageTracking = !apiKeys.anthropic && !isWindows;
+  const hasApiKey = !!apiKeys.anthropic || !!claudeAuthStatus?.hasEnvApiKey;
+  const isCliVerified =
+    claudeAuthStatus?.authenticated && claudeAuthStatus?.method === 'cli_authenticated';
+  const showUsageTracking = !hasApiKey && !isWindows && isCliVerified;
 
   // Convert electron Project to settings-view Project type
   const convertProject = (project: ElectronProject | null): SettingsProject | null => {
@@ -169,6 +182,13 @@ export function SettingsView() {
         );
       case 'mcp-servers':
         return <MCPServersSection />;
+      case 'prompts':
+        return (
+          <PromptCustomizationSection
+            promptCustomization={promptCustomization}
+            onPromptCustomizationChange={setPromptCustomization}
+          />
+        );
       case 'ai-enhancement':
         return <AIEnhancementSection />;
       case 'appearance':
@@ -216,6 +236,8 @@ export function SettingsView() {
           <DangerZoneSection
             project={settingsProject}
             onDeleteClick={() => setShowDeleteDialog(true)}
+            skipSandboxWarning={skipSandboxWarning}
+            onResetSandboxWarning={() => setSkipSandboxWarning(false)}
           />
         );
       default:

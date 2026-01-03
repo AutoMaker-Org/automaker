@@ -7,6 +7,7 @@ import { Plus, Bot, Wand2 } from 'lucide-react';
 import { KeyboardShortcut } from '@/hooks/use-keyboard-shortcuts';
 import { ClaudeUsagePopover } from '@/components/claude-usage-popover';
 import { useAppStore } from '@/store/app-store';
+import { useSetupStore } from '@/store/setup-store';
 
 interface BoardHeaderProps {
   projectName: string;
@@ -34,13 +35,18 @@ export function BoardHeader({
   isMounted,
 }: BoardHeaderProps) {
   const apiKeys = useAppStore((state) => state.apiKeys);
-  const defaultProvider = useAppStore((state) => state.defaultProvider);
+  const claudeAuthStatus = useSetupStore((state) => state.claudeAuthStatus);
 
-  // Hide usage tracking when not using Claude, when using API key,
-  // or on Windows (CLI usage command not supported)
+  // Hide usage tracking when using API key (only show for Claude Code CLI users)
+  // Check both user-entered API key and environment variable ANTHROPIC_API_KEY
+  // Also hide on Windows for now (CLI usage command not supported)
+  // Only show if CLI has been verified/authenticated
   const isWindows =
     typeof navigator !== 'undefined' && navigator.platform?.toLowerCase().includes('win');
-  const showUsageTracking = defaultProvider === 'claude' && !apiKeys.anthropic && !isWindows;
+  const hasApiKey = !!apiKeys.anthropic || !!claudeAuthStatus?.hasEnvApiKey;
+  const isCliVerified =
+    claudeAuthStatus?.authenticated && claudeAuthStatus?.method === 'cli_authenticated';
+  const showUsageTracking = !hasApiKey && !isWindows && isCliVerified;
 
   return (
     <div className="flex items-center justify-between p-4 border-b border-border bg-glass backdrop-blur-md">

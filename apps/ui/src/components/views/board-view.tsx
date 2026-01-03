@@ -206,6 +206,7 @@ export function BoardView() {
     checkContextExists,
     features: hookFeatures,
     isLoading,
+    featuresWithContext,
     setFeaturesWithContext,
   });
 

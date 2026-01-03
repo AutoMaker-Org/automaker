@@ -3,12 +3,25 @@
  *
  * Handles finding Node.js when the app is launched from desktop environments
  * (macOS Finder, Windows Explorer, Linux desktop) where PATH may be limited.
+ *
+ * Uses centralized system-paths module for all file system access.
  */
 
 import { execSync } from 'child_process';
-import fs from 'fs';
 import path from 'path';
 import os from 'os';
+import {
+  systemPathExists,
+  systemPathIsExecutable,
+  systemPathReaddirSync,
+  systemPathReadFileSync,
+  getNvmPaths,
+  getFnmPaths,
+  getNodeSystemPaths,
+  getScoopNodePath,
+  getChocolateyNodePath,
+  getWslVersionPath,
+} from './system-paths.js';
 
 /** Pattern to match version directories (e.g., "v18.17.0", "18.17.0", "v18") */
 const VERSION_DIR_PATTERN = /^v?\d+/;
@@ -45,18 +58,11 @@ export interface NodeFinderOptions {
 
 /**
  * Check if a file exists and is executable
- * On Windows, only checks existence (X_OK is not meaningful)
+ * Uses centralized systemPathIsExecutable for path validation
  */
 function isExecutable(filePath: string): boolean {
   try {
-    if (process.platform === 'win32') {
-      // On Windows, fs.constants.X_OK is not meaningful - just check existence
-      fs.accessSync(filePath, fs.constants.F_OK);
-    } else {
-      // On Unix-like systems, check for execute permission
-      fs.accessSync(filePath, fs.constants.X_OK);
-    }
-    return true;
+    return systemPathIsExecutable(filePath);
   } catch {
     return false;
   }
@@ -71,11 +77,14 @@ function findNodeFromVersionManager(
   basePath: string,
   binSubpath: string = 'bin/node'
 ): string | null {
-  if (!fs.existsSync(basePath)) return null;
+  try {
+    if (!systemPathExists(basePath)) return null;
+  } catch {
+    return null;
+  }
 
   try {
-    const allVersions = fs
-      .readdirSync(basePath)
+    const allVersions = systemPathReaddirSync(basePath)
       .filter((v) => VERSION_DIR_PATTERN.test(v))
       // Semantic version sort - newest first using localeCompare with numeric option
       .sort((a, b) => b.localeCompare(a, undefined, { numeric: true, sensitivity: 'base' }));
@@ -101,39 +110,30 @@ function findNodeFromVersionManager(
 /**
  * Find Node.js on macOS
  */
-function findNodeMacOS(homeDir: string): NodeFinderResult | null {
-  // Check Homebrew paths in order of preference
-  const homebrewPaths = [
-    // Apple Silicon
-    '/opt/homebrew/bin/node',
-    // Intel
-    '/usr/local/bin/node',
-  ];
-
-  for (const nodePath of homebrewPaths) {
+function findNodeMacOS(_homeDir: string): NodeFinderResult | null {
+  // Check system paths (Homebrew, system)
+  const systemPaths = getNodeSystemPaths();
+  for (const nodePath of systemPaths) {
     if (isExecutable(nodePath)) {
-      return { nodePath, source: 'homebrew' };
+      // Determine source based on path
+      if (nodePath.includes('homebrew') || nodePath === '/usr/local/bin/node') {
+        return { nodePath, source: 'homebrew' };
+      }
+      return { nodePath, source: 'system' };
     }
   }
 
-  // System Node
-  if (isExecutable('/usr/bin/node')) {
-    return { nodePath: '/usr/bin/node', source: 'system' };
-  }
-
   // NVM installation
-  const nvmPath = path.join(homeDir, '.nvm', 'versions', 'node');
-  const nvmNode = findNodeFromVersionManager(nvmPath);
-  if (nvmNode) {
-    return { nodePath: nvmNode, source: 'nvm' };
+  const nvmPaths = getNvmPaths();
+  for (const nvmPath of nvmPaths) {
+    const nvmNode = findNodeFromVersionManager(nvmPath);
+    if (nvmNode) {
+      return { nodePath: nvmNode, source: 'nvm' };
+    }
   }
 
-  // fnm installation (multiple possible locations)
-  const fnmPaths = [
-    path.join(homeDir, '.local', 'share', 'fnm', 'node-versions'),
-    path.join(homeDir, 'Library', 'Application Support', 'fnm', 'node-versions'),
-  ];
-
+  // fnm installation
+  const fnmPaths = getFnmPaths();
   for (const fnmBasePath of fnmPaths) {
     const fnmNode = findNodeFromVersionManager(fnmBasePath);
     if (fnmNode) {
@@ -147,15 +147,9 @@ function findNodeMacOS(homeDir: string): NodeFinderResult | null {
 /**
  * Find Node.js on Linux
  */
-function findNodeLinux(homeDir: string): NodeFinderResult | null {
-  // Common Linux paths
-  const systemPaths = [
-    '/usr/bin/node',
-    '/usr/local/bin/node',
-    // Snap installation
-    '/snap/bin/node',
-  ];
-
+function findNodeLinux(_homeDir: string): NodeFinderResult | null {
+  // Check system paths
+  const systemPaths = getNodeSystemPaths();
   for (const nodePath of systemPaths) {
     if (isExecutable(nodePath)) {
       return { nodePath, source: 'system' };
@@ -163,18 +157,16 @@ function findNodeLinux(homeDir: string): NodeFinderResult | null {
   }
 
   // NVM installation
-  const nvmPath = path.join(homeDir, '.nvm', 'versions', 'node');
-  const nvmNode = findNodeFromVersionManager(nvmPath);
-  if (nvmNode) {
-    return { nodePath: nvmNode, source: 'nvm' };
+  const nvmPaths = getNvmPaths();
+  for (const nvmPath of nvmPaths) {
+    const nvmNode = findNodeFromVersionManager(nvmPath);
+    if (nvmNode) {
+      return { nodePath: nvmNode, source: 'nvm' };
+    }
   }
 
   // fnm installation
-  const fnmPaths = [
-    path.join(homeDir, '.local', 'share', 'fnm', 'node-versions'),
-    path.join(homeDir, '.fnm', 'node-versions'),
-  ];
-
+  const fnmPaths = getFnmPaths();
   for (const fnmBasePath of fnmPaths) {
     const fnmNode = findNodeFromVersionManager(fnmBasePath);
     if (fnmNode) {
@@ -188,40 +180,27 @@ function findNodeLinux(homeDir: string): NodeFinderResult | null {
 /**
  * Find Node.js on Windows
  */
-function findNodeWindows(homeDir: string): NodeFinderResult | null {
+function findNodeWindows(_homeDir: string): NodeFinderResult | null {
   // Program Files paths
-  const programFilesPaths = [
-    path.join(process.env.PROGRAMFILES || 'C:\\Program Files', 'nodejs', 'node.exe'),
-    path.join(process.env['PROGRAMFILES(X86)'] || 'C:\\Program Files (x86)', 'nodejs', 'node.exe'),
-  ];
-
-  for (const nodePath of programFilesPaths) {
+  const systemPaths = getNodeSystemPaths();
+  for (const nodePath of systemPaths) {
     if (isExecutable(nodePath)) {
       return { nodePath, source: 'program-files' };
     }
   }
 
   // NVM for Windows
-  const nvmWindowsPath = path.join(
-    process.env.APPDATA || path.join(homeDir, 'AppData', 'Roaming'),
-    'nvm'
-  );
-  const nvmNode = findNodeFromVersionManager(nvmWindowsPath, 'node.exe');
-  if (nvmNode) {
-    return { nodePath: nvmNode, source: 'nvm-windows' };
+  const nvmPaths = getNvmPaths();
+  for (const nvmPath of nvmPaths) {
+    const nvmNode = findNodeFromVersionManager(nvmPath, 'node.exe');
+    if (nvmNode) {
+      return { nodePath: nvmNode, source: 'nvm-windows' };
+    }
   }
 
-  // fnm on Windows (prioritize canonical installation path over shell shims)
-  const fnmWindowsPaths = [
-    path.join(homeDir, '.fnm', 'node-versions'),
-    path.join(
-      process.env.LOCALAPPDATA || path.join(homeDir, 'AppData', 'Local'),
-      'fnm',
-      'node-versions'
-    ),
-  ];
-
-  for (const fnmBasePath of fnmWindowsPaths) {
+  // fnm on Windows
+  const fnmPaths = getFnmPaths();
+  for (const fnmBasePath of fnmPaths) {
     const fnmNode = findNodeFromVersionManager(fnmBasePath, 'node.exe');
     if (fnmNode) {
       return { nodePath: fnmNode, source: 'fnm' };
@@ -229,17 +208,13 @@ function findNodeWindows(homeDir: string): NodeFinderResult | null {
   }
 
   // Scoop installation
-  const scoopPath = path.join(homeDir, 'scoop', 'apps', 'nodejs', 'current', 'node.exe');
+  const scoopPath = getScoopNodePath();
   if (isExecutable(scoopPath)) {
     return { nodePath: scoopPath, source: 'scoop' };
   }
 
   // Chocolatey installation
-  const chocoPath = path.join(
-    process.env.ChocolateyInstall || 'C:\\ProgramData\\chocolatey',
-    'bin',
-    'node.exe'
-  );
+  const chocoPath = getChocolateyNodePath();
   if (isExecutable(chocoPath)) {
     return { nodePath: chocoPath, source: 'chocolatey' };
   }

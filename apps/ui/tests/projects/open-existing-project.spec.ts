@@ -11,7 +11,13 @@
 import { test, expect } from '@playwright/test';
 import * as fs from 'fs';
 import * as path from 'path';
-import { createTempDirPath, cleanupTempDir, setupWelcomeView } from '../utils';
+import {
+  createTempDirPath,
+  cleanupTempDir,
+  setupWelcomeView,
+  authenticateForTests,
+  handleLoginScreenIfPresent,
+} from '../utils';
 
 // Create unique temp dir for this test run
 const TEST_TEMP_DIR = createTempDirPath('open-project-test');
@@ -74,8 +80,10 @@ test.describe('Open Project', () => {
     });
 
     // Navigate to the app
+    await authenticateForTests(page);
     await page.goto('/');
     await page.waitForLoadState('load');
+    await handleLoginScreenIfPresent(page);
 
     // Wait for welcome view to be visible
     await expect(page.locator('[data-testid="welcome-view"]')).toBeVisible({ timeout: 10000 });

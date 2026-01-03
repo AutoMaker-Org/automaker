@@ -551,6 +551,7 @@ export interface SubprocessOptions {
   env?: Record<string, string>;
   abortController?: AbortController;
   timeout?: number; // Milliseconds of no output before timeout
+  startupTimeout?: number; // Milliseconds to wait for first output before timeout
 }
 
 export interface SubprocessResult {
@@ -570,7 +571,8 @@ Spawns a subprocess and streams JSONL output line-by-line.
 
 - Parses each line as JSON
 - Handles abort signals
-- 30-second timeout detection for hanging processes
+- 30-second idle timeout detection for hanging processes
+- Optional startup timeout to allow long initial startup
 - Collects stderr for error reporting
 - Continues processing other lines if one fails to parse
 
@@ -596,6 +598,7 @@ const stream = spawnJSONLProcess({
   env: { OPENAI_API_KEY: 'sk-...' },
   abortController: new AbortController(),
   timeout: 30000,
+  startupTimeout: 120000,
 });
 
 for await (const event of stream) {

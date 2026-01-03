@@ -102,7 +102,6 @@ RUN git config --system --add safe.directory '*' && \
 USER automaker
 
 # Environment variables
-ENV NODE_ENV=production
 ENV PORT=3008
 ENV DATA_DIR=/data
 

@@ -1,15 +1,161 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import os from 'os';
 
 describe('sdk-options.ts', () => {
   let originalEnv: NodeJS.ProcessEnv;
+  let homedirSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
     originalEnv = { ...process.env };
     vi.resetModules();
+    // Spy on os.homedir and set default return value
+    homedirSpy = vi.spyOn(os, 'homedir').mockReturnValue('/Users/test');
   });
 
   afterEach(() => {
     process.env = originalEnv;
+    homedirSpy.mockRestore();
+  });
+
+  describe('isCloudStoragePath', () => {
+    it('should detect Dropbox paths on macOS', async () => {
+      const { isCloudStoragePath } = await import('@/lib/sdk-options.js');
+      expect(isCloudStoragePath('/Users/test/Library/CloudStorage/Dropbox-Personal/project')).toBe(
+        true
+      );
+      expect(isCloudStoragePath('/Users/test/Library/CloudStorage/Dropbox/project')).toBe(true);
+    });
+
+    it('should detect Google Drive paths on macOS', async () => {
+      const { isCloudStoragePath } = await import('@/lib/sdk-options.js');
+      expect(
+        isCloudStoragePath('/Users/test/Library/CloudStorage/GoogleDrive-user@gmail.com/project')
+      ).toBe(true);
+    });
+
+    it('should detect OneDrive paths on macOS', async () => {
+      const { isCloudStoragePath } = await import('@/lib/sdk-options.js');
+      expect(isCloudStoragePath('/Users/test/Library/CloudStorage/OneDrive-Personal/project')).toBe(
+        true
+      );
+    });
+
+    it('should detect iCloud Drive paths on macOS', async () => {
+      const { isCloudStoragePath } = await import('@/lib/sdk-options.js');
+      expect(
+        isCloudStoragePath('/Users/test/Library/Mobile Documents/com~apple~CloudDocs/project')
+      ).toBe(true);
+    });
+
+    it('should detect home-anchored Dropbox paths', async () => {
+      const { isCloudStoragePath } = await import('@/lib/sdk-options.js');
+      expect(isCloudStoragePath('/Users/test/Dropbox')).toBe(true);
+      expect(isCloudStoragePath('/Users/test/Dropbox/project')).toBe(true);
+      expect(isCloudStoragePath('/Users/test/Dropbox/nested/deep/project')).toBe(true);
+    });
+
+    it('should detect home-anchored Google Drive paths', async () => {
+      const { isCloudStoragePath } = await import('@/lib/sdk-options.js');
+      expect(isCloudStoragePath('/Users/test/Google Drive')).toBe(true);
+      expect(isCloudStoragePath('/Users/test/Google Drive/project')).toBe(true);
+    });
+
+    it('should detect home-anchored OneDrive paths', async () => {
+      const { isCloudStoragePath } = await import('@/lib/sdk-options.js');
+      expect(isCloudStoragePath('/Users/test/OneDrive')).toBe(true);
+      expect(isCloudStoragePath('/Users/test/OneDrive/project')).toBe(true);
+    });
+
+    it('should return false for local paths', async () => {
+      const { isCloudStoragePath } = await import('@/lib/sdk-options.js');
+      expect(isCloudStoragePath('/Users/test/projects/myapp')).toBe(false);
+      expect(isCloudStoragePath('/home/user/code/project')).toBe(false);
+      expect(isCloudStoragePath('/var/www/app')).toBe(false);
+    });
+
+    it('should return false for relative paths not in cloud storage', async () => {
+      const { isCloudStoragePath } = await import('@/lib/sdk-options.js');
+      expect(isCloudStoragePath('./project')).toBe(false);
+      expect(isCloudStoragePath('../other-project')).toBe(false);
+    });
+
+    // Tests for false positive prevention - paths that contain cloud storage names but aren't cloud storage
+    it('should NOT flag paths that merely contain "dropbox" in the name', async () => {
+      const { isCloudStoragePath } = await import('@/lib/sdk-options.js');
+      // Projects with dropbox-like names
+      expect(isCloudStoragePath('/home/user/my-project-about-dropbox')).toBe(false);
+      expect(isCloudStoragePath('/Users/test/projects/dropbox-clone')).toBe(false);
+      expect(isCloudStoragePath('/Users/test/projects/Dropbox-backup-tool')).toBe(false);
+      // Dropbox folder that's NOT in the home directory
+      expect(isCloudStoragePath('/var/shared/Dropbox/project')).toBe(false);
+    });
+
+    it('should NOT flag paths that merely contain "Google Drive" in the name', async () => {
+      const { isCloudStoragePath } = await import('@/lib/sdk-options.js');
+      expect(isCloudStoragePath('/Users/test/projects/google-drive-api-client')).toBe(false);
+      expect(isCloudStoragePath('/home/user/Google Drive API Tests')).toBe(false);
+    });
+
+    it('should NOT flag paths that merely contain "OneDrive" in the name', async () => {
+      const { isCloudStoragePath } = await import('@/lib/sdk-options.js');
+      expect(isCloudStoragePath('/Users/test/projects/onedrive-sync-tool')).toBe(false);
+      expect(isCloudStoragePath('/home/user/OneDrive-migration-scripts')).toBe(false);
+    });
+
+    it('should handle different home directories correctly', async () => {
+      // Change the mocked home directory
+      homedirSpy.mockReturnValue('/home/linuxuser');
+      const { isCloudStoragePath } = await import('@/lib/sdk-options.js');
+
+      // Should detect Dropbox under the Linux home directory
+      expect(isCloudStoragePath('/home/linuxuser/Dropbox/project')).toBe(true);
+      // Should NOT detect Dropbox under the old home directory (since home changed)
+      expect(isCloudStoragePath('/Users/test/Dropbox/project')).toBe(false);
+    });
+  });
+
+  describe('checkSandboxCompatibility', () => {
+    it('should return enabled=false when user disables sandbox', async () => {
+      const { checkSandboxCompatibility } = await import('@/lib/sdk-options.js');
+      const result = checkSandboxCompatibility('/Users/test/project', false);
+      expect(result.enabled).toBe(false);
+      expect(result.disabledReason).toBe('user_setting');
+    });
+
+    it('should return enabled=false for cloud storage paths even when sandbox enabled', async () => {
+      const { checkSandboxCompatibility } = await import('@/lib/sdk-options.js');
+      const result = checkSandboxCompatibility(
+        '/Users/test/Library/CloudStorage/Dropbox-Personal/project',
+        true
+      );
+      expect(result.enabled).toBe(false);
+      expect(result.disabledReason).toBe('cloud_storage');
+      expect(result.message).toContain('cloud storage');
+    });
+
+    it('should return enabled=true for local paths when sandbox enabled', async () => {
+      const { checkSandboxCompatibility } = await import('@/lib/sdk-options.js');
+      const result = checkSandboxCompatibility('/Users/test/projects/myapp', true);
+      expect(result.enabled).toBe(true);
+      expect(result.disabledReason).toBeUndefined();
+    });
+
+    it('should return enabled=true when enableSandboxMode is undefined for local paths', async () => {
+      const { checkSandboxCompatibility } = await import('@/lib/sdk-options.js');
+      const result = checkSandboxCompatibility('/Users/test/project', undefined);
+      expect(result.enabled).toBe(true);
+      expect(result.disabledReason).toBeUndefined();
+    });
+
+    it('should return enabled=false for cloud storage paths when enableSandboxMode is undefined', async () => {
+      const { checkSandboxCompatibility } = await import('@/lib/sdk-options.js');
+      const result = checkSandboxCompatibility(
+        '/Users/test/Library/CloudStorage/Dropbox-Personal/project',
+        undefined
+      );
+      expect(result.enabled).toBe(false);
+      expect(result.disabledReason).toBe('cloud_storage');
+    });
   });
 
   describe('TOOL_PRESETS', () => {
@@ -224,11 +370,25 @@ describe('sdk-options.ts', () => {
       expect(options.sandbox).toBeUndefined();
     });
 
-    it('should not set sandbox when enableSandboxMode is not provided', async () => {
+    it('should enable sandbox by default when enableSandboxMode is not provided', async () => {
       const { createChatOptions } = await import('@/lib/sdk-options.js');
 
       const options = createChatOptions({
         cwd: '/test/path',
+      });
+
+      expect(options.sandbox).toEqual({
+        enabled: true,
+        autoAllowBashIfSandboxed: true,
+      });
+    });
+
+    it('should auto-disable sandbox for cloud storage paths', async () => {
+      const { createChatOptions } = await import('@/lib/sdk-options.js');
+
+      const options = createChatOptions({
+        cwd: '/Users/test/Library/CloudStorage/Dropbox-Personal/project',
+        enableSandboxMode: true,
       });
 
       expect(options.sandbox).toBeUndefined();
@@ -285,11 +445,46 @@ describe('sdk-options.ts', () => {
       expect(options.sandbox).toBeUndefined();
     });
 
-    it('should not set sandbox when enableSandboxMode is not provided', async () => {
+    it('should enable sandbox by default when enableSandboxMode is not provided', async () => {
       const { createAutoModeOptions } = await import('@/lib/sdk-options.js');
 
       const options = createAutoModeOptions({
         cwd: '/test/path',
+      });
+
+      expect(options.sandbox).toEqual({
+        enabled: true,
+        autoAllowBashIfSandboxed: true,
+      });
+    });
+
+    it('should auto-disable sandbox for cloud storage paths', async () => {
+      const { createAutoModeOptions } = await import('@/lib/sdk-options.js');
+
+      const options = createAutoModeOptions({
+        cwd: '/Users/test/Library/CloudStorage/Dropbox-Personal/project',
+        enableSandboxMode: true,
+      });
+
+      expect(options.sandbox).toBeUndefined();
+    });
+
+    it('should auto-disable sandbox for cloud storage paths even when enableSandboxMode is not provided', async () => {
+      const { createAutoModeOptions } = await import('@/lib/sdk-options.js');
+
+      const options = createAutoModeOptions({
+        cwd: '/Users/test/Library/CloudStorage/Dropbox-Personal/project',
+      });
+
+      expect(options.sandbox).toBeUndefined();
+    });
+
+    it('should auto-disable sandbox for iCloud paths', async () => {
+      const { createAutoModeOptions } = await import('@/lib/sdk-options.js');
+
+      const options = createAutoModeOptions({
+        cwd: '/Users/test/Library/Mobile Documents/com~apple~CloudDocs/project',
+        enableSandboxMode: true,
       });
 
       expect(options.sandbox).toBeUndefined();

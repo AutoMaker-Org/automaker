@@ -1,15 +1,36 @@
 import { Page } from '@playwright/test';
 import { clickElement } from '../core/interactions';
 import { waitForElement } from '../core/waiting';
+import { authenticateForTests } from '../api/client';
 
 /**
  * Navigate to the board/kanban view
  * Note: Navigates directly to /board since index route shows WelcomeView
  */
 export async function navigateToBoard(page: Page): Promise<void> {
+  // Authenticate before navigating
+  await authenticateForTests(page);
+
   // Navigate directly to /board route
   await page.goto('/board');
   await page.waitForLoadState('load');
+
+  // Check if we're on the login screen and handle it
+  const loginInput = page
+    .locator('[data-testid="login-api-key-input"], input[type="password"][placeholder*="API key"]')
+    .first();
+  const isLoginScreen = await loginInput.isVisible({ timeout: 2000 }).catch(() => false);
+  if (isLoginScreen) {
+    const apiKey = process.env.AUTOMAKER_API_KEY || 'test-api-key-for-e2e-tests';
+    await loginInput.fill(apiKey);
+    await page.waitForTimeout(100);
+    await page
+      .locator('[data-testid="login-submit-button"], button:has-text("Login")')
+      .first()
+      .click();
+    await page.waitForURL('**/board', { timeout: 5000 });
+    await page.waitForLoadState('load');
+  }
 
   // Wait for the board view to be visible
   await waitForElement(page, 'board-view', { timeout: 10000 });
@@ -20,9 +41,29 @@ export async function navigateToBoard(page: Page): Promise<void> {
  * Note: Navigates directly to /context since index route shows WelcomeView
  */
 export async function navigateToContext(page: Page): Promise<void> {
+  // Authenticate before navigating
+  await authenticateForTests(page);
+
   // Navigate directly to /context route
   await page.goto('/context');
   await page.waitForLoadState('load');
+
+  // Check if we're on the login screen and handle it
+  const loginInputCtx = page
+    .locator('[data-testid="login-api-key-input"], input[type="password"][placeholder*="API key"]')
+    .first();
+  const isLoginScreenCtx = await loginInputCtx.isVisible({ timeout: 2000 }).catch(() => false);
+  if (isLoginScreenCtx) {
+    const apiKey = process.env.AUTOMAKER_API_KEY || 'test-api-key-for-e2e-tests';
+    await loginInputCtx.fill(apiKey);
+    await page.waitForTimeout(100);
+    await page
+      .locator('[data-testid="login-submit-button"], button:has-text("Login")')
+      .first()
+      .click();
+    await page.waitForURL('**/context', { timeout: 5000 });
+    await page.waitForLoadState('load');
+  }
 
   // Wait for loading to complete (if present)
   const loadingElement = page.locator('[data-testid="context-view-loading"]');
@@ -37,7 +78,8 @@ export async function navigateToContext(page: Page): Promise<void> {
   }
 
   // Wait for the context view to be visible
-  await waitForElement(page, 'context-view', { timeout: 10000 });
+  // Increase timeout to handle slower server startup
+  await waitForElement(page, 'context-view', { timeout: 15000 });
 }
 
 /**
@@ -45,6 +87,9 @@ export async function navigateToContext(page: Page): Promise<void> {
  * Note: Navigates directly to /spec since index route shows WelcomeView
  */
 export async function navigateToSpec(page: Page): Promise<void> {
+  // Authenticate before navigating
+  await authenticateForTests(page);
+
   // Navigate directly to /spec route
   await page.goto('/spec');
   await page.waitForLoadState('load');
@@ -75,9 +120,29 @@ export async function navigateToSpec(page: Page): Promise<void> {
  * Note: Navigates directly to /agent since index route shows WelcomeView
  */
 export async function navigateToAgent(page: Page): Promise<void> {
+  // Authenticate before navigating
+  await authenticateForTests(page);
+
   // Navigate directly to /agent route
   await page.goto('/agent');
   await page.waitForLoadState('load');
+
+  // Check if we're on the login screen and handle it
+  const loginInputAgent = page
+    .locator('[data-testid="login-api-key-input"], input[type="password"][placeholder*="API key"]')
+    .first();
+  const isLoginScreenAgent = await loginInputAgent.isVisible({ timeout: 2000 }).catch(() => false);
+  if (isLoginScreenAgent) {
+    const apiKey = process.env.AUTOMAKER_API_KEY || 'test-api-key-for-e2e-tests';
+    await loginInputAgent.fill(apiKey);
+    await page.waitForTimeout(100);
+    await page
+      .locator('[data-testid="login-submit-button"], button:has-text("Login")')
+      .first()
+      .click();
+    await page.waitForURL('**/agent', { timeout: 5000 });
+    await page.waitForLoadState('load');
+  }
 
   // Wait for the agent view to be visible
   await waitForElement(page, 'agent-view', { timeout: 10000 });
@@ -88,6 +153,9 @@ export async function navigateToAgent(page: Page): Promise<void> {
  * Note: Navigates directly to /settings since index route shows WelcomeView
  */
 export async function navigateToSettings(page: Page): Promise<void> {
+  // Authenticate before navigating
+  await authenticateForTests(page);
+
   // Navigate directly to /settings route
   await page.goto('/settings');
   await page.waitForLoadState('load');
@@ -113,8 +181,31 @@ export async function navigateToSetup(page: Page): Promise<void> {
  * Navigate to the welcome view (clear project selection)
  */
 export async function navigateToWelcome(page: Page): Promise<void> {
+  // Authenticate before navigating
+  await authenticateForTests(page);
+
   await page.goto('/');
   await page.waitForLoadState('load');
+
+  // Check if we're on the login screen and handle it
+  const loginInputWelcome = page
+    .locator('[data-testid="login-api-key-input"], input[type="password"][placeholder*="API key"]')
+    .first();
+  const isLoginScreenWelcome = await loginInputWelcome
+    .isVisible({ timeout: 2000 })
+    .catch(() => false);
+  if (isLoginScreenWelcome) {
+    const apiKey = process.env.AUTOMAKER_API_KEY || 'test-api-key-for-e2e-tests';
+    await loginInputWelcome.fill(apiKey);
+    await page.waitForTimeout(100);
+    await page
+      .locator('[data-testid="login-submit-button"], button:has-text("Login")')
+      .first()
+      .click();
+    await page.waitForURL('**/', { timeout: 5000 });
+    await page.waitForLoadState('load');
+  }
+
   await waitForElement(page, 'welcome-view', { timeout: 10000 });
 }
 

@@ -7,7 +7,13 @@
 import { test, expect } from '@playwright/test';
 import * as fs from 'fs';
 import * as path from 'path';
-import { createTempDirPath, cleanupTempDir, setupWelcomeView } from '../utils';
+import {
+  createTempDirPath,
+  cleanupTempDir,
+  setupWelcomeView,
+  authenticateForTests,
+  handleLoginScreenIfPresent,
+} from '../utils';
 
 const TEST_TEMP_DIR = createTempDirPath('project-creation-test');
 
@@ -26,8 +32,10 @@ test.describe('Project Creation', () => {
     const projectName = `test-project-${Date.now()}`;
 
     await setupWelcomeView(page, { workspaceDir: TEST_TEMP_DIR });
+    await authenticateForTests(page);
     await page.goto('/');
     await page.waitForLoadState('load');
+    await handleLoginScreenIfPresent(page);
 
     await expect(page.locator('[data-testid="welcome-view"]')).toBeVisible({ timeout: 10000 });
 

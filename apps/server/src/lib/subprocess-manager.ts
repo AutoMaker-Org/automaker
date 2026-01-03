@@ -11,6 +11,7 @@ export interface SubprocessOptions {
   env?: Record<string, string>;
   abortController?: AbortController;
   timeout?: number; // Milliseconds of no output before timing out
+  startupTimeout?: number; // Milliseconds to wait for first output before timing out
 }
 
 export interface SubprocessResult {
@@ -36,7 +37,6 @@ export async function spawnProcess(options: SubprocessOptions): Promise<Subproce
 
   child.stderr?.on('data', (chunk) => {
     stderr += chunk.toString();
-    lastOutput = Date.now();
   });
 
   let aborted = false;
@@ -64,7 +64,7 @@ export async function spawnProcess(options: SubprocessOptions): Promise<Subproce
 }
 
 export async function* spawnJSONLProcess(options: SubprocessOptions): AsyncGenerator<unknown> {
-  const { command, args, cwd, env, abortController, timeout = 30000 } = options;
+  const { command, args, cwd, env, abortController, timeout = 30000, startupTimeout } = options;
   const child = spawn(command, args, {
     cwd,
     env: { ...process.env, ...env },
@@ -76,6 +76,9 @@ export async function* spawnJSONLProcess(options: SubprocessOptions): AsyncGener
   let aborted = false;
   let timedOut = false;
   let lastOutput = Date.now();
+  let hasOutput = false;
+  const startTime = Date.now();
+  const effectiveStartupTimeout = startupTimeout ?? timeout;
 
   child.on('error', (err) => {
     spawnError = err;
@@ -83,23 +86,34 @@ export async function* spawnJSONLProcess(options: SubprocessOptions): AsyncGener
 
   child.stderr?.on('data', (chunk) => {
     stderr += chunk.toString();
+    // Treat stderr activity as output to avoid false idle timeouts.
+    lastOutput = Date.now();
+    hasOutput = true;
   });
 
   child.stdout?.on('data', () => {
     lastOutput = Date.now();
+    hasOutput = true;
   });
 
   let timeoutTimer: NodeJS.Timeout | null = null;
-  if (timeout > 0) {
-    timeoutTimer = setInterval(
-      () => {
-        if (Date.now() - lastOutput > timeout) {
+  if (timeout > 0 || effectiveStartupTimeout > 0) {
+    const intervalMs = Math.min(Math.max(timeout, effectiveStartupTimeout), 1000);
+    timeoutTimer = setInterval(() => {
+      const now = Date.now();
+      if (!hasOutput) {
+        if (effectiveStartupTimeout > 0 && now - startTime > effectiveStartupTimeout) {
           timedOut = true;
           child.kill('SIGTERM');
         }
-      },
-      Math.min(timeout, 1000)
-    );
+        return;
+      }
+
+      if (timeout > 0 && now - lastOutput > timeout) {
+        timedOut = true;
+        child.kill('SIGTERM');
+      }
+    }, intervalMs);
   }
 
   if (abortController) {
@@ -157,7 +171,9 @@ export async function* spawnJSONLProcess(options: SubprocessOptions): AsyncGener
   }
 
   if (timedOut) {
-    throw new Error(`Process timed out after ${timeout}ms without output`);
+    const timeoutMs = hasOutput ? timeout : effectiveStartupTimeout;
+    const detail = hasOutput ? 'without output' : 'without any output';
+    throw new Error(`Process timed out after ${timeoutMs}ms ${detail}`);
   }
 
   if (code && code !== 0) {

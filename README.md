@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="apps/ui/public/readme_logo.png" alt="Automaker Logo" height="80" />
+  <img src="apps/ui/public/readme_logo.svg" alt="Automaker Logo" height="80" />
 </p>
 
 > **[!TIP]**
@@ -80,22 +80,6 @@ Automaker leverages the [Claude Agent SDK](https://www.npmjs.com/package/@anthro
 ### Why This Matters
 
 The future of software development is **agentic coding**—where developers become architects directing AI agents rather than manual coders. Automaker puts this future in your hands today, letting you experience what it's like to build software 10x faster with AI agents handling the implementation while you focus on architecture and business logic.
-
----
-
-> **[!CAUTION]**
->
-> ## Security Disclaimer
->
-> **This software uses AI-powered tooling that has access to your operating system and can read, modify, and delete files. Use at your own risk.**
->
-> We have reviewed this codebase for security vulnerabilities, but you assume all risk when running this software. You should review the code yourself before running it.
->
-> **We do not recommend running Automaker directly on your local computer** due to the risk of AI agents having access to your entire file system. Please sandbox this application using Docker or a virtual machine.
->
-> **[Read the full disclaimer](./DISCLAIMER.md)**
-
----
 
 ## Community & Support
 
@@ -623,6 +607,22 @@ data/
 └── agent-sessions/        # Conversation histories
     └── {sessionId}.json
 ```
+
+---
+
+> **[!CAUTION]**
+>
+> ## Security Disclaimer
+>
+> **This software uses AI-powered tooling that has access to your operating system and can read, modify, and delete files. Use at your own risk.**
+>
+> We have reviewed this codebase for security vulnerabilities, but you assume all risk when running this software. You should review the code yourself before running it.
+>
+> **We do not recommend running Automaker directly on your local computer** due to the risk of AI agents having access to your entire file system. Please sandbox this application using Docker or a virtual machine.
+>
+> **[Read the full disclaimer](./DISCLAIMER.md)**
+
+---
 
 ## Learn More
 

@@ -10,7 +10,7 @@
  */
 
 import path from 'path';
-import fs from 'fs/promises';
+import { secureFs } from '@automaker/platform';
 
 /**
  * Metadata structure for context files
@@ -39,17 +39,23 @@ export interface ContextFilesResult {
 }
 
 /**
+ * File system module interface for context loading
+ * Compatible with secureFs from @automaker/platform
+ */
+export interface ContextFsModule {
+  access: (path: string) => Promise<void>;
+  readdir: (path: string) => Promise<string[]>;
+  readFile: (path: string, encoding?: BufferEncoding) => Promise<string | Buffer>;
+}
+
+/**
  * Options for loading context files
  */
 export interface LoadContextFilesOptions {
   /** Project path to load context from */
   projectPath: string;
   /** Optional custom secure fs module (for dependency injection) */
-  fsModule?: {
-    access: (path: string) => Promise<void>;
-    readdir: (path: string) => Promise<string[]>;
-    readFile: (path: string, encoding: string) => Promise<string>;
-  };
+  fsModule?: ContextFsModule;
 }
 
 /**
@@ -64,12 +70,12 @@ function getContextDir(projectPath: string): string {
  */
 async function loadContextMetadata(
   contextDir: string,
-  fsModule: typeof fs
+  fsModule: ContextFsModule
 ): Promise<ContextMetadata> {
   const metadataPath = path.join(contextDir, 'context-metadata.json');
   try {
     const content = await fsModule.readFile(metadataPath, 'utf-8');
-    return JSON.parse(content);
+    return JSON.parse(content as string);
   } catch {
     // Metadata file doesn't exist yet - that's fine
     return { files: {} };
@@ -148,7 +154,7 @@ ${formattedFiles.join('\n\n---\n\n')}
 export async function loadContextFiles(
   options: LoadContextFilesOptions
 ): Promise<ContextFilesResult> {
-  const { projectPath, fsModule = fs } = options;
+  const { projectPath, fsModule = secureFs } = options;
   const contextDir = path.resolve(getContextDir(projectPath));
 
   try {
@@ -169,7 +175,7 @@ export async function loadContextFiles(
     }
 
     // Load metadata for descriptions
-    const metadata = await loadContextMetadata(contextDir, fsModule as typeof fs);
+    const metadata = await loadContextMetadata(contextDir, fsModule);
 
     // Load each file with its content and metadata
     const files: ContextFileInfo[] = [];
@@ -180,7 +186,7 @@ export async function loadContextFiles(
         files.push({
           name: fileName,
           path: filePath,
-          content,
+          content: content as string,
           description: metadata.files[fileName]?.description,
         });
       } catch (error) {
@@ -209,7 +215,7 @@ export async function loadContextFiles(
 export async function getContextFilesSummary(
   options: LoadContextFilesOptions
 ): Promise<Array<{ name: string; path: string; description?: string }>> {
-  const { projectPath, fsModule = fs } = options;
+  const { projectPath, fsModule = secureFs } = options;
   const contextDir = path.resolve(getContextDir(projectPath));
 
   try {
@@ -225,7 +231,7 @@ export async function getContextFilesSummary(
       return [];
     }
 
-    const metadata = await loadContextMetadata(contextDir, fsModule as typeof fs);
+    const metadata = await loadContextMetadata(contextDir, fsModule);
 
     return textFiles.map((fileName) => ({
       name: fileName,

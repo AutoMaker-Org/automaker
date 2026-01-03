@@ -99,7 +99,7 @@ import type {
 } from '@/types/electron';
 
 // Import HTTP API client (ES module)
-import { getHttpApiClient } from './http-api-client';
+import { getHttpApiClient, getServerUrlSync } from './http-api-client';
 
 // Feature type - Import from app-store
 import type { Feature } from '@/store/app-store';
@@ -110,6 +110,8 @@ export interface RunningAgent {
   projectPath: string;
   projectName: string;
   isAutoMode: boolean;
+  title?: string;
+  description?: string;
 }
 
 export interface RunningAgentsResult {
@@ -433,6 +435,8 @@ export interface SaveImageResult {
 
 export interface ElectronAPI {
   ping: () => Promise<string>;
+  getApiKey?: () => Promise<string | null>;
+  quit?: () => Promise<void>;
   openExternalLink: (url: string) => Promise<{ success: boolean; error?: string }>;
   openDirectory: () => Promise<DialogResult>;
   openFile: (options?: object) => Promise<DialogResult>;
@@ -771,7 +775,7 @@ export const checkServerAvailable = async (): Promise<boolean> => {
 
   serverCheckPromise = (async () => {
     try {
-      const serverUrl = import.meta.env.VITE_SERVER_URL || 'http://localhost:3008';
+      const serverUrl = import.meta.env.VITE_SERVER_URL || getServerUrlSync();
       const response = await fetch(`${serverUrl}/api/health`, {
         method: 'GET',
         signal: AbortSignal.timeout(2000),
@@ -2904,6 +2908,8 @@ function createMockRunningAgentsAPI(): RunningAgentsAPI {
         projectPath: '/mock/project',
         projectName: 'Mock Project',
         isAutoMode: mockAutoModeRunning,
+        title: `Mock Feature Title for ${featureId}`,
+        description: 'This is a mock feature description for testing purposes.',
       }));
       return {
         success: true,

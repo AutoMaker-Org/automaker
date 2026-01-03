@@ -9,15 +9,19 @@
 import express from 'express';
 import cors from 'cors';
 import morgan from 'morgan';
+import cookieParser from 'cookie-parser';
+import cookie from 'cookie';
 import { WebSocketServer, WebSocket } from 'ws';
 import { createServer } from 'http';
 import dotenv from 'dotenv';
 
 import { createEventEmitter, type EventEmitter } from './lib/events.js';
 import { initAllowedPaths } from '@automaker/platform';
-import { authMiddleware, getAuthStatus } from './lib/auth.js';
+import { authMiddleware, validateWsConnectionToken, checkRawAuthentication } from './lib/auth.js';
+import { requireJsonContentType } from './middleware/require-json-content-type.js';
+import { createAuthRoutes } from './routes/auth/index.js';
 import { createFsRoutes } from './routes/fs/index.js';
-import { createHealthRoutes } from './routes/health/index.js';
+import { createHealthRoutes, createDetailedHandler } from './routes/health/index.js';
 import { createAgentRoutes } from './routes/agent/index.js';
 import { createSessionsRoutes } from './routes/sessions/index.js';
 import { createFeaturesRoutes } from './routes/features/index.js';
@@ -91,7 +95,7 @@ const app = express();
 // Middleware
 // Custom colored logger showing only endpoint and status code (configurable via ENABLE_REQUEST_LOGGING env var)
 if (ENABLE_REQUEST_LOGGING) {
-  morgan.token('status-colored', (req, res) => {
+  morgan.token('status-colored', (_req, res) => {
     const status = res.statusCode;
     if (status >= 500) return `\x1b[31m${status}\x1b[0m`; // Red for server errors
     if (status >= 400) return `\x1b[33m${status}\x1b[0m`; // Yellow for client errors
@@ -105,17 +109,47 @@ if (ENABLE_REQUEST_LOGGING) {
     })
   );
 }
-// SECURITY: Restrict CORS to localhost UI origins to prevent drive-by attacks
-// from malicious websites. MCP server endpoints can execute arbitrary commands,
-// so allowing any origin would enable RCE from any website visited while Automaker runs.
-const DEFAULT_CORS_ORIGINS = ['http://localhost:3007', 'http://127.0.0.1:3007'];
+// CORS configuration
+// When using credentials (cookies), origin cannot be '*'
+// We dynamically allow the requesting origin for local development
 app.use(
   cors({
-    origin: process.env.CORS_ORIGIN || DEFAULT_CORS_ORIGINS,
+    origin: (origin, callback) => {
+      // Allow requests with no origin (like mobile apps, curl, Electron)
+      if (!origin) {
+        callback(null, true);
+        return;
+      }
+
+      // If CORS_ORIGIN is set, use it (can be comma-separated list)
+      const allowedOrigins = process.env.CORS_ORIGIN?.split(',').map((o) => o.trim());
+      if (allowedOrigins && allowedOrigins.length > 0 && allowedOrigins[0] !== '*') {
+        if (allowedOrigins.includes(origin)) {
+          callback(null, origin);
+        } else {
+          callback(new Error('Not allowed by CORS'));
+        }
+        return;
+      }
+
+      // For local development, allow localhost origins
+      if (
+        origin.startsWith('http://localhost:') ||
+        origin.startsWith('http://127.0.0.1:') ||
+        origin.startsWith('http://[::1]:')
+      ) {
+        callback(null, origin);
+        return;
+      }
+
+      // Reject other origins by default for security
+      callback(new Error('Not allowed by CORS'));
+    },
     credentials: true,
   })
 );
 app.use(express.json({ limit: '50mb' }));
+app.use(cookieParser());
 
 // Create shared event emitter for streaming
 const events: EventEmitter = createEventEmitter();
@@ -148,11 +182,19 @@ const validationCleanupInterval = setInterval(() => {
   }
 }, VALIDATION_CLEANUP_INTERVAL_MS);
 
-// Mount API routes - health is unauthenticated for monitoring
+// Require Content-Type: application/json for all API POST/PUT/PATCH requests
+// This helps prevent CSRF and content-type confusion attacks
+app.use('/api', requireJsonContentType);
+
+// Mount API routes - health and auth are unauthenticated
 app.use('/api/health', createHealthRoutes());
+app.use('/api/auth', createAuthRoutes());
 
 // Apply authentication to all other routes
 app.use('/api', authMiddleware);
+
+// Protected health endpoint with detailed info
+app.get('/api/health/detailed', createDetailedHandler());
 
 app.use('/api/fs', createFsRoutes(events));
 app.use('/api/agent', createAgentRoutes(agentService, events));
@@ -160,7 +202,7 @@ app.use('/api/sessions', createSessionsRoutes(agentService));
 app.use('/api/features', createFeaturesRoutes(featureLoader));
 app.use('/api/backlog-plan', createBacklogPlanRoutes(events, settingsService));
 app.use('/api/auto-mode', createAutoModeRoutes(autoModeService));
-app.use('/api/enhance-prompt', createEnhancePromptRoutes());
+app.use('/api/enhance-prompt', createEnhancePromptRoutes(settingsService));
 app.use('/api/worktree', createWorktreeRoutes());
 app.use('/api/git', createGitRoutes());
 app.use('/api/setup', createSetupRoutes());
@@ -187,9 +229,54 @@ const wss = new WebSocketServer({ noServer: true });
 const terminalWss = new WebSocketServer({ noServer: true });
 const terminalService = getTerminalService();
 
+/**
+ * Authenticate WebSocket upgrade requests
+ * Checks for API key in header/query, session token in header/query, OR valid session cookie
+ */
+function authenticateWebSocket(request: import('http').IncomingMessage): boolean {
+  const url = new URL(request.url || '', `http://${request.headers.host}`);
+
+  // Convert URL search params to query object
+  const query: Record<string, string | undefined> = {};
+  url.searchParams.forEach((value, key) => {
+    query[key] = value;
+  });
+
+  // Parse cookies from header
+  const cookieHeader = request.headers.cookie;
+  const cookies = cookieHeader ? cookie.parse(cookieHeader) : {};
+
+  // Use shared authentication logic for standard auth methods
+  if (
+    checkRawAuthentication(
+      request.headers as Record<string, string | string[] | undefined>,
+      query,
+      cookies
+    )
+  ) {
+    return true;
+  }
+
+  // Additionally check for short-lived WebSocket connection token (WebSocket-specific)
+  const wsToken = url.searchParams.get('wsToken');
+  if (wsToken && validateWsConnectionToken(wsToken)) {
+    return true;
+  }
+
+  return false;
+}
+
 // Handle HTTP upgrade requests manually to route to correct WebSocket server
 server.on('upgrade', (request, socket, head) => {
   const { pathname } = new URL(request.url || '', `http://${request.headers.host}`);
+
+  // Authenticate all WebSocket connections
+  if (!authenticateWebSocket(request)) {
+    console.log('[WebSocket] Authentication failed, rejecting connection');
+    socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
+    socket.destroy();
+    return;
+  }
 
   if (pathname === '/api/events') {
     wss.handleUpgrade(request, socket, head, (ws) => {

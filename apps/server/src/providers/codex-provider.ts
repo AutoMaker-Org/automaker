@@ -1,7 +1,7 @@
 /**
  * Codex Provider - Executes queries using OpenAI Codex CLI (JSON streaming)
  *
- * Spawns `codex exec --json --sandbox <mode> --ask-for-approval never` and streams JSONL events into ProviderMessage.
+ * Spawns `codex exec --json --sandbox <mode>` (optionally with --ask-for-approval) and streams JSONL events into ProviderMessage.
  */
 
 import { exec } from 'child_process';
@@ -26,6 +26,8 @@ const execAsync = promisify(exec);
 const logger = createLogger('CodexProvider');
 
 export class CodexProvider extends BaseProvider {
+  private askForApprovalSupported: boolean | null = null;
+
   getName(): string {
     return 'codex';
   }
@@ -58,6 +60,16 @@ export class CodexProvider extends BaseProvider {
       return;
     }
 
+    const authStatus = await this.checkAuthentication();
+    if (!authStatus.authenticated) {
+      yield {
+        type: 'error',
+        error:
+          'Codex authentication required. Run: codex login or set CODEX_API_KEY/OPENAI_API_KEY.',
+      };
+      return;
+    }
+
     const promptText = this.buildPrompt(prompt, systemPrompt, conversationHistory);
 
     const configManager = new CodexConfigManager();
@@ -72,21 +84,25 @@ export class CodexProvider extends BaseProvider {
     }
 
     const sandboxMode = this.resolveSandboxMode(allowedTools, sandbox);
-    const args = [
-      'exec',
-      '--model',
-      effectiveModel,
-      '--json',
-      '--sandbox',
-      sandboxMode,
-      '--ask-for-approval',
-      'never',
-    ];
-    if (promptText.trim().length > 0) {
-      args.push(promptText);
-    }
+    const buildArgs = (includeAskForApproval: boolean) => {
+      const args: string[] = [];
+      if (includeAskForApproval) {
+        // --ask-for-approval is a global option; it must appear before the subcommand.
+        args.push('--ask-for-approval', 'never');
+      }
+      args.push('exec', '--model', effectiveModel, '--json', '--sandbox', sandboxMode);
+      if (promptText.trim().length > 0) {
+        args.push(promptText);
+      }
+      return args;
+    };
 
-    logger.info(`Executing codex exec with model: ${effectiveModel} in ${cwd}`);
+    const timeout = timeoutMs ?? this.getCliTimeoutMs();
+    const startupTimeout = this.getCliStartupTimeoutMs(timeout);
+
+    logger.info(
+      `Executing codex exec with model: ${effectiveModel} in ${cwd} (timeout=${timeout}ms, startupTimeout=${startupTimeout}ms)`
+    );
 
     let responseText = '';
     let sawResult = false;
@@ -101,14 +117,15 @@ export class CodexProvider extends BaseProvider {
       envOverrides.CODEX_API_KEY = envOverrides.OPENAI_API_KEY;
     }
 
-    try {
+    const runWithArgs = async function* (args: string[]) {
       const stream = spawnJSONLProcess({
         command: cliPath,
         args,
         cwd,
         env: envOverrides,
         abortController,
-        timeout: timeoutMs ?? this.getCliTimeoutMs(),
+        timeout,
+        startupTimeout,
       });
 
       for await (const event of stream) {
@@ -128,14 +145,39 @@ export class CodexProvider extends BaseProvider {
           yield msg;
         }
       }
-    } catch (error) {
-      const errorMsg = this.formatExecutionError(error);
-      logger.error(errorMsg);
-      yield {
-        type: 'error',
-        error: errorMsg,
-      };
-      return;
+    };
+
+    let includeAskForApproval = this.askForApprovalSupported !== false;
+    let didRetry = false;
+    while (true) {
+      responseText = '';
+      sawResult = false;
+      sawError = false;
+
+      try {
+        const args = buildArgs(includeAskForApproval);
+        for await (const msg of runWithArgs(args)) {
+          yield msg;
+        }
+        this.askForApprovalSupported = includeAskForApproval;
+        break;
+      } catch (error) {
+        const errorMsg = this.formatExecutionError(error);
+        if (includeAskForApproval && !didRetry && this.isAskForApprovalUnsupported(errorMsg)) {
+          logger.info('Codex CLI does not support --ask-for-approval; retrying without it.');
+          includeAskForApproval = false;
+          this.askForApprovalSupported = false;
+          didRetry = true;
+          continue;
+        }
+
+        logger.error(errorMsg);
+        yield {
+          type: 'error',
+          error: errorMsg,
+        };
+        return;
+      }
     }
 
     if (!sawResult && !sawError) {
@@ -145,6 +187,18 @@ export class CodexProvider extends BaseProvider {
         result: responseText,
       };
     }
+  }
+
+  private isAskForApprovalUnsupported(errorMsg: string): boolean {
+    const normalized = errorMsg.toLowerCase();
+    if (!normalized.includes('ask-for-approval')) {
+      return false;
+    }
+    return (
+      normalized.includes('unexpected argument') ||
+      normalized.includes('unknown option') ||
+      normalized.includes('unknown flag')
+    );
   }
 
   /**
@@ -813,7 +867,10 @@ export class CodexProvider extends BaseProvider {
       return 'Codex request aborted.';
     }
     if (message.toLowerCase().includes('timeout')) {
-      return 'Codex CLI timed out without output. Increase CODEX_CLI_TIMEOUT_MS if needed.';
+      return (
+        'Codex CLI timed out without output. Increase CODEX_CLI_TIMEOUT_MS ' +
+        'or CODEX_CLI_STARTUP_TIMEOUT_MS if needed.'
+      );
     }
 
     return `Codex error: ${message}`;
@@ -846,7 +903,7 @@ export class CodexProvider extends BaseProvider {
   }
 
   private getCliTimeoutMs(): number {
-    const defaultTimeoutMs = 120000;
+    const defaultTimeoutMs = 300000;
     const raw = process.env.CODEX_CLI_TIMEOUT_MS;
     if (raw === undefined || raw === '') {
       return defaultTimeoutMs;
@@ -854,6 +911,19 @@ export class CodexProvider extends BaseProvider {
     const parsed = Number(raw);
     if (!Number.isFinite(parsed) || parsed < 0) {
       return defaultTimeoutMs;
+    }
+    return parsed;
+  }
+
+  private getCliStartupTimeoutMs(timeoutMs: number): number {
+    const defaultStartupTimeoutMs = Math.max(timeoutMs, 600000);
+    const raw = process.env.CODEX_CLI_STARTUP_TIMEOUT_MS;
+    if (raw === undefined || raw === '') {
+      return defaultStartupTimeoutMs;
+    }
+    const parsed = Number(raw);
+    if (!Number.isFinite(parsed) || parsed < 0) {
+      return defaultStartupTimeoutMs;
     }
     return parsed;
   }

@@ -5,7 +5,7 @@
 import type { Request, Response } from 'express';
 import * as secureFs from '../../../lib/secure-fs.js';
 import path from 'path';
-import { isPathAllowed } from '@automaker/platform';
+import { isPathAllowed, PathNotAllowedError, getAllowedRootDirectory } from '@automaker/platform';
 import { getErrorMessage, logError } from '../common.js';
 
 export function createValidatePathHandler() {
@@ -20,6 +20,20 @@ export function createValidatePathHandler() {
 
       const resolvedPath = path.resolve(filePath);
 
+      // Validate path against ALLOWED_ROOT_DIRECTORY before checking if it exists
+      if (!isPathAllowed(resolvedPath)) {
+        const allowedRoot = getAllowedRootDirectory();
+        const errorMessage = allowedRoot
+          ? `Path not allowed: ${filePath}. Must be within ALLOWED_ROOT_DIRECTORY: ${allowedRoot}`
+          : `Path not allowed: ${filePath}`;
+        res.status(403).json({
+          success: false,
+          error: errorMessage,
+          isAllowed: false,
+        });
+        return;
+      }
+
       // Check if path exists
       try {
         const stats = await secureFs.stat(resolvedPath);
@@ -32,7 +46,7 @@ export function createValidatePathHandler() {
         res.json({
           success: true,
           path: resolvedPath,
-          isAllowed: isPathAllowed(resolvedPath),
+          isAllowed: true,
         });
       } catch {
         res.status(400).json({ success: false, error: 'Path does not exist' });

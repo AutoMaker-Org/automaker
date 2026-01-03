@@ -11,6 +11,7 @@ import {
   Sparkles,
   Plug,
   Wand2,
+  MessageSquareText,
 } from 'lucide-react';
 import type { SettingsViewId } from '../hooks/use-settings-view';
 
@@ -26,6 +27,7 @@ export const NAV_ITEMS: NavigationItem[] = [
   { id: 'ai-provider', label: 'AI Provider', icon: Wand2 },
   { id: 'claude', label: 'Claude', icon: Terminal },
   { id: 'mcp-servers', label: 'MCP Servers', icon: Plug },
+  { id: 'prompts', label: 'Prompt Customization', icon: MessageSquareText },
   { id: 'ai-enhancement', label: 'AI Enhancement', icon: Sparkles },
   { id: 'appearance', label: 'Appearance', icon: Palette },
   { id: 'terminal', label: 'Terminal', icon: SquareTerminal },

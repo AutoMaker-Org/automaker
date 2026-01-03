@@ -13,6 +13,8 @@ import {
   createTempDirPath,
   setupProjectWithPath,
   waitForBoardView,
+  authenticateForTests,
+  handleLoginScreenIfPresent,
 } from '../utils';
 
 const TEST_TEMP_DIR = createTempDirPath('worktree-tests');
@@ -47,7 +49,10 @@ test.describe('Worktree Integration', () => {
 
   test('should display worktree selector with main branch', async ({ page }) => {
     await setupProjectWithPath(page, testRepo.path);
+    await authenticateForTests(page);
     await page.goto('/');
+    await page.waitForLoadState('load');
+    await handleLoginScreenIfPresent(page);
     await waitForNetworkIdle(page);
     await waitForBoardView(page);
 

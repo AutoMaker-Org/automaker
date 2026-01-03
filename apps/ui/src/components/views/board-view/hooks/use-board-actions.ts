@@ -435,20 +435,32 @@ export function useBoardActions({
 
   const handleResumeFeature = useCallback(
     async (feature: Feature) => {
-      if (!currentProject) return;
+      console.log('[Board] handleResumeFeature called for feature:', feature.id);
+      if (!currentProject) {
+        console.error('[Board] No current project');
+        return;
+      }
 
       try {
         const api = getElectronAPI();
         if (!api?.autoMode) {
-          console.error('Auto mode API not available');
+          console.error('[Board] Auto mode API not available');
           return;
         }
+
+        console.log('[Board] Calling resumeFeature API...', {
+          projectPath: currentProject.path,
+          featureId: feature.id,
+          useWorktrees,
+        });
 
         const result = await api.autoMode.resumeFeature(
           currentProject.path,
           feature.id,
           useWorktrees
         );
+
+        console.log('[Board] resumeFeature result:', result);
 
         if (result.success) {
           console.log('[Board] Feature resume started successfully');

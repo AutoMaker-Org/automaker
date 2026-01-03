@@ -1,15 +1,17 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Bot, Folder, Loader2, RefreshCw, Square, Activity } from 'lucide-react';
+import { Bot, Folder, Loader2, RefreshCw, Square, Activity, FileText } from 'lucide-react';
 import { getElectronAPI, RunningAgent } from '@/lib/electron';
 import { useAppStore } from '@/store/app-store';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useNavigate } from '@tanstack/react-router';
+import { AgentOutputModal } from './board-view/dialogs/agent-output-modal';
 
 export function RunningAgentsView() {
   const [runningAgents, setRunningAgents] = useState<RunningAgent[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [selectedAgent, setSelectedAgent] = useState<RunningAgent | null>(null);
   const { setCurrentProject, projects } = useAppStore();
   const navigate = useNavigate();
 
@@ -94,6 +96,10 @@ export function RunningAgentsView() {
     [projects, setCurrentProject, navigate]
   );
 
+  const handleViewLogs = useCallback((agent: RunningAgent) => {
+    setSelectedAgent(agent);
+  }, []);
+
   if (loading) {
     return (
       <div className="flex-1 flex items-center justify-center">
@@ -156,15 +162,25 @@ export function RunningAgentsView() {
                   </div>
 
                   {/* Agent info */}
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                      <span className="font-medium truncate">{agent.featureId}</span>
+                      <span className="font-medium truncate" title={agent.title || agent.featureId}>
+                        {agent.title || agent.featureId}
+                      </span>
                       {agent.isAutoMode && (
                         <span className="px-2 py-0.5 text-[10px] font-medium rounded-full bg-brand-500/10 text-brand-500 border border-brand-500/30">
                           AUTO
                         </span>
                       )}
                     </div>
+                    {agent.description && (
+                      <p
+                        className="text-sm text-muted-foreground truncate max-w-md"
+                        title={agent.description}
+                      >
+                        {agent.description}
+                      </p>
+                    )}
                     <button
                       onClick={() => handleNavigateToProject(agent)}
                       className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
@@ -177,6 +193,15 @@ export function RunningAgentsView() {
 
                 {/* Actions */}
                 <div className="flex items-center gap-2 flex-shrink-0">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleViewLogs(agent)}
+                    className="text-muted-foreground hover:text-foreground"
+                  >
+                    <FileText className="h-3.5 w-3.5 mr-1.5" />
+                    View Logs
+                  </Button>
                   <Button
                     variant="ghost"
                     size="sm"
@@ -198,6 +223,20 @@ export function RunningAgentsView() {
             ))}
           </div>
         </div>
+      )}
+
+      {/* Agent Output Modal */}
+      {selectedAgent && (
+        <AgentOutputModal
+          open={true}
+          onClose={() => setSelectedAgent(null)}
+          projectPath={selectedAgent.projectPath}
+          featureDescription={
+            selectedAgent.description || selectedAgent.title || selectedAgent.featureId
+          }
+          featureId={selectedAgent.featureId}
+          featureStatus="running"
+        />
       )}
     </div>
   );

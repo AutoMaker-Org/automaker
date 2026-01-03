@@ -247,19 +247,15 @@ describe('claude-provider.ts', () => {
 
       await expect(collectAsyncGenerator(generator)).rejects.toThrow('SDK execution failed');
 
-      // Should log error message
-      expect(consoleErrorSpy).toHaveBeenNthCalledWith(
-        1,
-        '[ClaudeProvider] ERROR: executeQuery() error during execution:',
-        testError
-      );
-
-      // Should log stack trace
-      expect(consoleErrorSpy).toHaveBeenNthCalledWith(
-        2,
-        '[ClaudeProvider] ERROR stack:',
-        testError.stack
-      );
+      // Should log error with classification info (after refactoring)
+      const errorCall = consoleErrorSpy.mock.calls[0];
+      expect(errorCall[0]).toBe('[ClaudeProvider] executeQuery() error during execution:');
+      expect(errorCall[1]).toMatchObject({
+        type: expect.any(String),
+        message: 'SDK execution failed',
+        isRateLimit: false,
+        stack: expect.stringContaining('Error: SDK execution failed'),
+      });
 
       consoleErrorSpy.mockRestore();
     });

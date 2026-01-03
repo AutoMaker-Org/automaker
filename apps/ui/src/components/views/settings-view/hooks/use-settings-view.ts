@@ -5,6 +5,7 @@ export type SettingsViewId =
   | 'ai-provider'
   | 'claude'
   | 'mcp-servers'
+  | 'prompts'
   | 'ai-enhancement'
   | 'appearance'
   | 'terminal'
