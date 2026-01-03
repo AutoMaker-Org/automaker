@@ -211,10 +211,26 @@ export type AutoModeEvent =
   | {
       type: 'auto_mode_error';
       error: string;
-      errorType?: 'authentication' | 'cancellation' | 'abort' | 'execution';
+      errorType?:
+        | 'authentication'
+        | 'cancellation'
+        | 'abort'
+        | 'execution'
+        | 'rate_limit'
+        | 'quota_exhausted';
       featureId?: string;
       projectId?: string;
       projectPath?: string;
+    }
+  | {
+      type: 'auto_mode_paused_failures';
+      message: string;
+      errorType?: string;
+      originalError?: string;
+      failureCount?: number;
+      projectPath?: string;
+      suggestedResumeAt?: string;
+      lastKnownUsage?: import('@/store/app-store').ClaudeUsage;
     }
   | {
       type: 'auto_mode_phase';

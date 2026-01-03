@@ -10,6 +10,7 @@ export {
   isAuthenticationError,
   isRateLimitError,
   isQuotaExhaustedError,
+  isAmbiguousCLIExit,
   extractRetryAfter,
   classifyError,
   getUserFriendlyErrorMessage,

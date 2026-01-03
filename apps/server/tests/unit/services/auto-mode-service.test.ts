@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { AutoModeService } from '@/services/auto-mode-service.js';
+import { ClaudeUsageService } from '@/services/claude-usage-service.js';
 import type { Feature } from '@automaker/types';
 
 describe('auto-mode-service.ts', () => {
@@ -9,9 +10,30 @@ describe('auto-mode-service.ts', () => {
     emit: vi.fn(),
   };
 
+  // Mock usage data that indicates normal operation (not at limit)
+  const mockUsageOK = {
+    sessionPercentage: 50,
+    weeklyPercentage: 60,
+    sessionResetTime: null,
+    weeklyResetTime: null,
+    sonnetWeeklyPercentage: 0,
+    sessionTokensUsed: 0,
+    sessionLimit: 0,
+    costUsed: null,
+    costLimit: null,
+    costCurrency: null,
+    sessionResetText: '',
+    weeklyResetText: '',
+    userTimezone: 'UTC',
+  };
+
   beforeEach(() => {
     vi.clearAllMocks();
     service = new AutoModeService(mockEvents as any);
+
+    // Mock ClaudeUsageService to prevent usage checks from blocking tests
+    vi.spyOn(ClaudeUsageService.prototype, 'isAvailable').mockResolvedValue(true);
+    vi.spyOn(ClaudeUsageService.prototype, 'fetchUsageData').mockResolvedValue(mockUsageOK);
   });
 
   describe('constructor', () => {
@@ -25,7 +47,10 @@ describe('auto-mode-service.ts', () => {
       // Start first loop
       const promise1 = service.startAutoLoop('/test/project', 3);
 
-      // Try to start second loop
+      // Wait for the first loop to actually start (usage check + set running flag)
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      // Try to start second loop - should throw
       await expect(service.startAutoLoop('/test/project', 3)).rejects.toThrow('already running');
 
       // Cleanup
