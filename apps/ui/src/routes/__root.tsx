@@ -22,6 +22,8 @@ import { Toaster } from 'sonner';
 import { ThemeOption, themeOptions } from '@/config/theme-options';
 import { SandboxRiskDialog } from '@/components/dialogs/sandbox-risk-dialog';
 import { SandboxRejectionScreen } from '@/components/dialogs/sandbox-rejection-screen';
+import { useAutoUpdate } from '@/hooks/use-auto-update';
+import { UpdateNotifier } from '@/components/updates';
 
 function RootLayoutContent() {
   const location = useLocation();
@@ -51,6 +53,9 @@ function RootLayoutContent() {
   // Always start from pending on a fresh page load so the user sees the prompt
   // each time the app is launched/refreshed (unless running in a container).
   const [sandboxStatus, setSandboxStatus] = useState<SandboxStatus>('pending');
+
+  // Auto-update polling - checks for updates at configured interval
+  useAutoUpdate();
 
   // Hidden streamer panel - opens with "\" key
   const handleStreamerPanelShortcut = useCallback((event: KeyboardEvent) => {
@@ -412,6 +417,7 @@ function RootLayoutContent() {
         onConfirm={handleSandboxConfirm}
         onDeny={handleSandboxDeny}
       />
+      <UpdateNotifier />
     </main>
   );
 }

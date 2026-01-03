@@ -63,3 +63,13 @@ export const isMac =
     : typeof navigator !== 'undefined' &&
       (/Mac/.test(navigator.userAgent) ||
         (navigator.platform ? navigator.platform.toLowerCase().includes('mac') : false));
+
+/**
+ * Extract a display name from a git repository URL.
+ * Handles GitHub URLs and returns the owner/repo format.
+ * Falls back to 'upstream' for unrecognized URLs.
+ */
+export function getRepoDisplayName(url: string): string {
+  const match = url.match(/github\.com[/:]([^/]+\/[^/.]+)/);
+  return match ? match[1] : 'upstream';
+}

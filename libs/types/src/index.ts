@@ -83,12 +83,14 @@ export type {
   BoardBackgroundSettings,
   WorktreeInfo,
   ProjectSettings,
+  AutoUpdateSettings,
 } from './settings.js';
 export {
   DEFAULT_KEYBOARD_SHORTCUTS,
   DEFAULT_GLOBAL_SETTINGS,
   DEFAULT_CREDENTIALS,
   DEFAULT_PROJECT_SETTINGS,
+  DEFAULT_AUTO_UPDATE_SETTINGS,
   SETTINGS_VERSION,
   CREDENTIALS_VERSION,
   PROJECT_SETTINGS_VERSION,
@@ -143,3 +145,10 @@ export type {
 
 // Port configuration
 export { STATIC_PORT, SERVER_PORT, RESERVED_PORTS } from './ports.js';
+// Updates types
+export type {
+  UpdateInfo,
+  UpdateCheckResult,
+  UpdatePullResult,
+  UpdateApiResponse,
+} from './updates.js';

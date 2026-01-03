@@ -1601,6 +1601,55 @@ export class HttpApiClient implements ElectronAPI {
     }> => this.post('/api/context/describe-file', { filePath }),
   };
 
+  // Updates API
+  updates = {
+    check: (): Promise<{
+      success: boolean;
+      result?: {
+        updateAvailable: boolean;
+        localVersion: string;
+        localVersionShort: string;
+        remoteVersion: string | null;
+        remoteVersionShort: string | null;
+        sourceUrl: string;
+        installPath: string;
+        error?: string;
+      };
+      error?: string;
+    }> => this.get('/api/updates/check'),
+
+    pull: (): Promise<{
+      success: boolean;
+      result?: {
+        success: boolean;
+        previousVersion: string;
+        previousVersionShort: string;
+        newVersion: string;
+        newVersionShort: string;
+        alreadyUpToDate: boolean;
+        message: string;
+      };
+      error?: string;
+    }> => this.post('/api/updates/pull', {}),
+
+    info: (): Promise<{
+      success: boolean;
+      result?: {
+        installPath: string;
+        isGitRepo: boolean;
+        gitAvailable: boolean;
+        currentVersion: string | null;
+        currentVersionShort: string | null;
+        currentBranch: string | null;
+        hasLocalChanges: boolean;
+        sourceUrl: string;
+        autoUpdateEnabled: boolean;
+        checkIntervalMinutes: number;
+      };
+      error?: string;
+    }> => this.get('/api/updates/info'),
+  };
+
   // Backlog Plan API
   backlogPlan = {
     generate: (

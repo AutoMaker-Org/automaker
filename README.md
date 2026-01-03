@@ -53,6 +53,7 @@
   - [Security & Isolation](#security--isolation)
   - [Data Storage](#data-storage)
 - [Learn More](#learn-more)
+- [Auto-Updates](#auto-updates)
 - [License](#license)
 
 </details>
@@ -630,6 +631,7 @@ data/
 
 - [Contributing Guide](./CONTRIBUTING.md) - How to contribute to Automaker
 - [Project Documentation](./docs/) - Architecture guides, patterns, and developer docs
+- [Auto-Updates Guide](./docs/auto-updates.md) - Update system architecture and customization
 - [Docker Isolation Guide](./docs/docker-isolation.md) - Security-focused Docker deployment
 - [Shared Packages Guide](./docs/llm-shared-packages.md) - Using monorepo packages
 
@@ -662,3 +664,13 @@ This project is licensed under the **Automaker License Agreement**. See [LICENSE
   - By contributing to this repository, you grant the Core Contributors full, irrevocable rights to your code (copyright assignment).
 
 **Core Contributors** (Cody Seibert (webdevcody), SuperComboGamer (SCG), Kacper Lachowicz (Shironex, Shirone), and Ben Scott (trueheads)) are granted perpetual, royalty-free licenses for any use, including monetization.
+
+## Auto-Updates
+
+Automaker includes a built-in auto-update system with one-click updates from the upstream repository.
+
+- **Automatic Checking** - Periodic background checks (configurable interval)
+- **Toast Notifications** - "Update Available" notifications with "Update Now" button
+- **One-Click Updates** - Pull updates directly from Settings > Updates
+
+**[Read the full Auto-Updates documentation](./docs/auto-updates.md)** - includes architecture details and how to swap the update mechanism (git → releases, etc.).

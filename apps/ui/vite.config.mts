@@ -66,6 +66,14 @@ export default defineConfig(({ command }) => {
     },
     server: {
       port: parseInt(process.env.TEST_PORT || '3007', 10),
+      proxy: {
+        // Proxy API requests to the backend server
+        '/api': {
+          target: `http://localhost:${process.env.VITE_SERVER_PORT || '3008'}`,
+          changeOrigin: true,
+          ws: true, // Enable WebSocket proxying
+        },
+      },
     },
     build: {
       outDir: 'dist',
