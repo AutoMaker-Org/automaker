@@ -30,6 +30,67 @@ const ALLOWED_ENV_VARS = [
   'LANG',
   'LC_ALL',
 ];
+const MOCK_RESPONSE_TEXT = 'Mock response from Claude provider.';
+const MOCK_JSON_INDENT_SPACES = 2;
+const DEFAULT_MOCK_STRING = 'mock';
+const DEFAULT_MOCK_NUMBER = 0;
+const DEFAULT_MOCK_BOOLEAN = false;
+
+type JsonSchema = Record<string, unknown>;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function getSchemaType(schema: JsonSchema): string | undefined {
+  const rawType = schema.type;
+  if (typeof rawType === 'string') {
+    return rawType;
+  }
+  if (Array.isArray(rawType)) {
+    const firstType = rawType.find((entry) => typeof entry === 'string');
+    return typeof firstType === 'string' ? firstType : undefined;
+  }
+  return undefined;
+}
+
+function buildMockStructuredOutput(schema: JsonSchema): Record<string, unknown> {
+  const properties = isRecord(schema.properties) ? schema.properties : {};
+  const required = Array.isArray(schema.required)
+    ? schema.required.filter((entry): entry is string => typeof entry === 'string')
+    : [];
+  const keys = required.length > 0 ? required : Object.keys(properties);
+  const result: Record<string, unknown> = {};
+
+  for (const key of keys) {
+    const propertySchema = isRecord(properties[key]) ? properties[key] : {};
+    result[key] = buildMockValue(propertySchema);
+  }
+
+  return result;
+}
+
+function buildMockValue(schema: JsonSchema): unknown {
+  const schemaType = getSchemaType(schema);
+
+  if (schemaType === 'string') {
+    return DEFAULT_MOCK_STRING;
+  }
+  if (schemaType === 'number' || schemaType === 'integer') {
+    return DEFAULT_MOCK_NUMBER;
+  }
+  if (schemaType === 'boolean') {
+    return DEFAULT_MOCK_BOOLEAN;
+  }
+  if (schemaType === 'array') {
+    return [];
+  }
+  if (schemaType === 'object' || isRecord(schema.properties)) {
+    return buildMockStructuredOutput(schema);
+  }
+
+  return DEFAULT_MOCK_STRING;
+}
 
 /**
  * Build environment for the SDK with only explicitly allowed variables
@@ -53,6 +114,35 @@ export class ClaudeProvider extends BaseProvider {
    * Execute a query using Claude Agent SDK
    */
   async *executeQuery(options: ExecuteOptions): AsyncGenerator<ProviderMessage> {
+    if (process.env.AUTOMAKER_MOCK_AGENT === 'true') {
+      let responseText = MOCK_RESPONSE_TEXT;
+      let structuredOutput: Record<string, unknown> | undefined;
+
+      if (options.outputFormat?.type === 'json_schema' && isRecord(options.outputFormat.schema)) {
+        structuredOutput = buildMockStructuredOutput(options.outputFormat.schema);
+        responseText = JSON.stringify(structuredOutput, null, MOCK_JSON_INDENT_SPACES);
+      }
+
+      yield {
+        type: 'assistant',
+        message: {
+          role: 'assistant',
+          content: [{ type: 'text', text: responseText }],
+        },
+      };
+
+      const resultMessage: ProviderMessage & { structured_output?: Record<string, unknown> } = {
+        type: 'result',
+        subtype: 'success',
+        result: responseText,
+      };
+      if (structuredOutput) {
+        resultMessage.structured_output = structuredOutput;
+      }
+      yield resultMessage;
+      return;
+    }
+
     const {
       prompt,
       model,

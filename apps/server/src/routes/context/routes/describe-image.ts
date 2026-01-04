@@ -24,6 +24,7 @@ import type { SettingsService } from '../../../services/settings-service.js';
 import { getAutoLoadClaudeMdSetting } from '../../../lib/settings-helpers.js';
 
 const logger = createLogger('DescribeImage');
+const MOCK_IMAGE_DESCRIPTION = 'Mock image description for tests.';
 
 /**
  * Allowlist of safe headers to log
@@ -281,6 +282,15 @@ export function createDescribeImageHandler(
 
       if (actualPath !== imagePath) {
         logger.info(`[${requestId}] Using actual path: ${actualPath}`);
+      }
+
+      if (process.env.AUTOMAKER_MOCK_AGENT === 'true') {
+        const response: DescribeImageSuccessResponse = {
+          success: true,
+          description: MOCK_IMAGE_DESCRIPTION,
+        };
+        res.json(response);
+        return;
       }
 
       // Log path + stats (this is often where issues start: missing file, perms, size)

@@ -133,11 +133,12 @@ const ALLOWED_ENV_VARS = [
   'LC_ALL',
 ];
 
-function buildEnv(): Record<string, string | undefined> {
-  const env: Record<string, string | undefined> = {};
+function buildEnv(): Record<string, string> {
+  const env: Record<string, string> = {};
   for (const key of ALLOWED_ENV_VARS) {
-    if (process.env[key]) {
-      env[key] = process.env[key];
+    const value = process.env[key];
+    if (value) {
+      env[key] = value;
     }
   }
   return env;
@@ -566,7 +567,8 @@ export class CodexProvider extends BaseProvider {
   }
 
   async *executeQuery(options: ExecuteOptions): AsyncGenerator<ProviderMessage> {
-    const hasMcpServers = hasMcpServersConfigured(options);
+    const mcpServers = options.mcpServers ?? {};
+    const hasMcpServers = Object.keys(mcpServers).length > 0;
     const codexSettings = await loadCodexCliSettings(options.codexSettings);
     const codexInstructions = await loadCodexInstructions(
       options.cwd,
@@ -600,7 +602,7 @@ export class CodexProvider extends BaseProvider {
 
     if (hasMcpServers) {
       const configManager = new CodexConfigManager();
-      await configManager.configureMcpServers(options.cwd, options.mcpServers);
+      await configManager.configureMcpServers(options.cwd, mcpServers);
     }
 
     const toolUseTracker = new CodexToolUseTracker();

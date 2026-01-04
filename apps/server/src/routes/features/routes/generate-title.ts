@@ -12,6 +12,7 @@ import type { ProviderMessage } from '@automaker/types';
 
 const logger = createLogger('GenerateTitle');
 const TITLE_MAX_TURNS = 1;
+const MOCK_TITLE = 'Mock feature title';
 const ERROR_DESCRIPTION_REQUIRED = 'description is required and must be a string';
 const ERROR_DESCRIPTION_EMPTY = 'description cannot be empty';
 const ERROR_TITLE_EMPTY = 'Failed to generate title - empty response';
@@ -82,6 +83,15 @@ export function createGenerateTitleHandler(): (req: Request, res: Response) => P
       }
 
       logger.info(`Generating title for description: ${trimmedDescription.substring(0, 50)}...`);
+
+      if (process.env.AUTOMAKER_MOCK_AGENT === 'true') {
+        const response: GenerateTitleSuccessResponse = {
+          success: true,
+          title: MOCK_TITLE,
+        };
+        res.json(response);
+        return;
+      }
 
       const userPrompt = `Generate a concise title for this feature:\n\n${trimmedDescription}`;
 

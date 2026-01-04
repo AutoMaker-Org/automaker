@@ -24,6 +24,7 @@ import type { SettingsService } from '../../../services/settings-service.js';
 import { getAutoLoadClaudeMdSetting } from '../../../lib/settings-helpers.js';
 
 const logger = createLogger('DescribeFile');
+const MOCK_FILE_DESCRIPTION_PREFIX = 'Mock description for ';
 
 /**
  * Request body for the describe-file endpoint
@@ -144,6 +145,15 @@ export function createDescribeFileHandler(
           error: `Failed to read file: ${errorMessage}`,
         };
         res.status(500).json(response);
+        return;
+      }
+
+      if (process.env.AUTOMAKER_MOCK_AGENT === 'true') {
+        const response: DescribeFileSuccessResponse = {
+          success: true,
+          description: `${MOCK_FILE_DESCRIPTION_PREFIX}${path.basename(resolvedPath)}`,
+        };
+        res.json(response);
         return;
       }
 

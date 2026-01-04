@@ -75,6 +75,8 @@ export interface ExecuteOptions {
   maxTurns?: number;
   allowedTools?: string[];
   mcpServers?: Record<string, McpServerConfig>;
+  mcpAutoApproveTools?: boolean;
+  mcpUnrestrictedTools?: boolean;
   abortController?: AbortController;
   conversationHistory?: ConversationMessage[]; // Previous messages for context
   sdkSessionId?: string; // Claude SDK session ID for resuming conversations
