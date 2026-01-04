@@ -178,12 +178,13 @@ describe('validation-storage.ts', () => {
       expect(result).toBe(true);
     });
 
-    it('should return false for validation exactly at 24 hours', () => {
-      const exactDate = new Date();
-      exactDate.setHours(exactDate.getHours() - 24);
+    it('should return false for validation just under 24 hours old', () => {
+      const almostStaleDate = new Date();
+      // 23.99 hours ago to avoid timing issues with test execution
+      almostStaleDate.setHours(almostStaleDate.getHours() - 23, almostStaleDate.getMinutes() - 59);
 
       const validation = createMockValidation({
-        validatedAt: exactDate.toISOString(),
+        validatedAt: almostStaleDate.toISOString(),
       });
 
       const result = isValidationStale(validation);

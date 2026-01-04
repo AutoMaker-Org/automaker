@@ -275,7 +275,7 @@ export function BacklogPlanDialog({
           </div>
         );
 
-      case 'review':
+      case 'review': {
         if (!pendingPlanResult) return null;
 
         const additions = pendingPlanResult.changes.filter((c) => c.type === 'add');
@@ -381,6 +381,7 @@ export function BacklogPlanDialog({
             </div>
           </div>
         );
+      }
 
       case 'applying':
         return (

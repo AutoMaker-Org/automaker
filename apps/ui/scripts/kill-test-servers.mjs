@@ -22,14 +22,16 @@ async function killProcessOnPort(port) {
         try {
           await execAsync(`kill -9 ${pid}`);
           console.log(`[KillTestServers] Killed process ${pid}`);
-        } catch (error) {
+        } catch {
           // Process might have already exited
         }
       }
       // Wait a moment for the port to be released
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      await new Promise((resolve) => {
+        setTimeout(resolve, 500);
+      });
     }
-  } catch (error) {
+  } catch {
     // No process on port, which is fine
   }
 }

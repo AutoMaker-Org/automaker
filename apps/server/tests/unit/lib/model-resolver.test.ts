@@ -42,12 +42,20 @@ describe('model-resolver.ts', () => {
     });
 
     it('should treat unknown models as falling back to default', () => {
-      // Note: Don't include valid Cursor model IDs here (e.g., 'gpt-5.2' is in CURSOR_MODEL_MAP)
-      const models = ['o1', 'o1-mini', 'o3', 'unknown-model', 'fake-model-123'];
+      const models = ['unknown-model', 'random-string', 'not-a-valid-model'];
       models.forEach((model) => {
         const result = resolveModelString(model);
         // Should fall back to default since these aren't supported
         expect(result).toBe(DEFAULT_MODELS.claude);
+      });
+    });
+
+    it('should recognize OpenAI/Codex models', () => {
+      const models = ['o1', 'o1-mini', 'o3', 'gpt-5.2', 'gpt-4', 'gpt-3.5-turbo'];
+      models.forEach((model) => {
+        const result = resolveModelString(model);
+        // Should pass through as-is since these are valid OpenAI/Codex models
+        expect(result).toBe(model);
       });
     });
 
