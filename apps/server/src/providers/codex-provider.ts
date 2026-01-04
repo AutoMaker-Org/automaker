@@ -117,6 +117,7 @@ export class CodexProvider extends BaseProvider {
       envOverrides.CODEX_API_KEY = envOverrides.OPENAI_API_KEY;
     }
 
+    const provider = this;
     const runWithArgs = async function* (args: string[]) {
       const stream = spawnJSONLProcess({
         command: cliPath,
@@ -129,10 +130,10 @@ export class CodexProvider extends BaseProvider {
       });
 
       for await (const event of stream) {
-        const messages = this.toProviderMessages(event);
+        const messages = provider.toProviderMessages(event);
         for (const msg of messages) {
           if (msg.type === 'assistant') {
-            responseText += this.extractTextFromBlocks(msg.message?.content);
+            responseText += provider.extractTextFromBlocks(msg.message?.content);
           } else if (msg.type === 'result') {
             sawResult = true;
             if (!msg.result) {
