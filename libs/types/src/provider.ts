@@ -72,6 +72,7 @@ export interface ExecuteOptions {
   allowedTools?: string[];
   mcpServers?: Record<string, McpServerConfig>;
   abortController?: AbortController;
+  timeoutMs?: number;
   conversationHistory?: ConversationMessage[]; // Previous messages for context
   sdkSessionId?: string; // Claude SDK session ID for resuming conversations
   settingSources?: Array<'user' | 'project' | 'local'>; // Sources for CLAUDE.md loading

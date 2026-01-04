@@ -135,6 +135,12 @@ export function AgentOutputModal({
           newContent = `\n🔧 Tool: ${toolName}\n${toolInput ? `Input: ${toolInput}\n` : ''}`;
           break;
         }
+        case 'auto_mode_tool_result': {
+          if ('result' in event) {
+            newContent = `\nResult: ${event.result}\n`;
+          }
+          break;
+        }
         case 'auto_mode_phase': {
           const phaseEmoji =
             event.phase === 'planning' ? '📋' : event.phase === 'action' ? '⚡' : '✅';

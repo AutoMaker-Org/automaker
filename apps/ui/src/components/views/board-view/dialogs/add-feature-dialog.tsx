@@ -61,6 +61,7 @@ import {
   formatAncestorContextForPrompt,
   type AncestorContext,
 } from '@automaker/dependency-resolver';
+import { resolveModelString } from '@automaker/model-resolver';
 
 type FeatureData = {
   title: string;
@@ -118,6 +119,8 @@ export function AddFeatureDialog({
   const isSpawnMode = !!parentFeature;
   const navigate = useNavigate();
   const [useCurrentBranch, setUseCurrentBranch] = useState(true);
+  // Get default provider/model from store for initial state
+  const initialDefaultModel = resolveModelString(useAppStore.getState().defaultModel) as AgentModel;
   const [newFeature, setNewFeature] = useState({
     title: '',
     category: '',
@@ -126,7 +129,7 @@ export function AddFeatureDialog({
     imagePaths: [] as DescriptionImagePath[],
     textFilePaths: [] as DescriptionTextFilePath[],
     skipTests: false,
-    model: 'opus' as AgentModel,
+    model: initialDefaultModel, // Use store's default model
     thinkingLevel: 'none' as ThinkingLevel,
     branchName: '',
     priority: 2 as number, // Default to medium priority
@@ -154,6 +157,7 @@ export function AddFeatureDialog({
     defaultRequirePlanApproval,
     defaultAIProfileId,
     useWorktrees,
+    defaultModel,
   } = useAppStore();
 
   // Sync defaults when dialog opens
@@ -168,8 +172,8 @@ export function AddFeatureDialog({
         ...prev,
         skipTests: defaultSkipTests,
         branchName: defaultBranch || '',
-        // Use default profile's model/thinkingLevel if set, else fallback to defaults
-        model: defaultProfile?.model ?? 'opus',
+        // Use default profile's model/thinkingLevel if set, else fallback to store defaults
+        model: resolveModelString(defaultProfile?.model ?? defaultModel) as AgentModel,
         thinkingLevel: defaultProfile?.thinkingLevel ?? 'none',
       }));
       setUseCurrentBranch(true);
@@ -195,6 +199,7 @@ export function AddFeatureDialog({
     defaultRequirePlanApproval,
     defaultAIProfileId,
     aiProfiles,
+    defaultModel,
     parentFeature,
     allFeatures,
   ]);
@@ -212,7 +217,7 @@ export function AddFeatureDialog({
     }
 
     const category = newFeature.category || 'Uncategorized';
-    const selectedModel = newFeature.model;
+    const selectedModel = resolveModelString(newFeature.model);
     const normalizedThinking = modelSupportsThinking(selectedModel)
       ? newFeature.thinkingLevel
       : 'none';
@@ -254,7 +259,7 @@ export function AddFeatureDialog({
       imagePaths: newFeature.imagePaths,
       textFilePaths: newFeature.textFilePaths,
       skipTests: newFeature.skipTests,
-      model: selectedModel,
+      model: selectedModel as AgentModel,
       thinkingLevel: normalizedThinking,
       branchName: finalBranchName,
       priority: newFeature.priority,
@@ -274,7 +279,7 @@ export function AddFeatureDialog({
       imagePaths: [],
       textFilePaths: [],
       skipTests: defaultSkipTests,
-      model: 'opus',
+      model: resolveModelString(defaultModel) as AgentModel,
       priority: 2,
       thinkingLevel: 'none',
       branchName: '',

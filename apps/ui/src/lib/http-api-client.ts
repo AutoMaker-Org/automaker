@@ -996,6 +996,94 @@ export class HttpApiClient implements ElectronAPI {
       error?: string;
     }> => this.post('/api/setup/verify-claude-auth', { authMethod }),
 
+    // Cursor CLI methods
+    getCursorStatus: (): Promise<{
+      success: boolean;
+      status?: string;
+      installed?: boolean;
+      method?: string;
+      version?: string;
+      path?: string;
+      auth?: {
+        authenticated: boolean;
+        method: string;
+        hasApiKey?: boolean;
+        hasStoredApiKey?: boolean;
+        hasEnvApiKey?: boolean;
+        apiKeyValid?: boolean;
+      };
+      error?: string;
+    }> => this.get('/api/setup/cursor-status'),
+
+    // OpenCode CLI methods
+    getOpenCodeStatus: (): Promise<{
+      success: boolean;
+      status?: string;
+      installed?: boolean;
+      method?: string;
+      version?: string;
+      path?: string;
+      auth?: {
+        authenticated: boolean;
+        method: string;
+        hasApiKey?: boolean;
+        apiKeyValid?: boolean;
+        hasEnvApiKey?: boolean;
+      };
+      error?: string;
+    }> => this.get('/api/setup/opencode-status'),
+
+    // Codex CLI methods
+    getCodexStatus: (): Promise<{
+      success: boolean;
+      status?: string;
+      installed?: boolean;
+      method?: string;
+      version?: string;
+      path?: string;
+      auth?: {
+        authenticated: boolean;
+        method: string;
+        hasApiKey?: boolean;
+        apiKeyValid?: boolean;
+        hasEnvApiKey?: boolean;
+      };
+      error?: string;
+    }> => this.get('/api/setup/codex-status'),
+
+    installCursor: (): Promise<{
+      success: boolean;
+      message?: string;
+      error?: string;
+      output?: string;
+    }> => this.post('/api/setup/install-cursor'),
+
+    verifyCursorAuth: (
+      method?: 'api_key' | 'any'
+    ): Promise<{
+      success: boolean;
+      authenticated: boolean;
+      method?: string;
+      output?: string;
+      error?: string;
+    }> => this.post('/api/setup/verify-cursor-auth', { method }),
+
+    // Default Provider methods
+    getDefaultProvider: (): Promise<{
+      success: boolean;
+      provider: 'claude' | 'cursor' | 'opencode' | 'codex';
+      error?: string;
+    }> => this.get('/api/setup/default-provider'),
+
+    setDefaultProvider: (
+      provider: 'claude' | 'cursor' | 'opencode' | 'codex'
+    ): Promise<{
+      success: boolean;
+      provider: 'claude' | 'cursor' | 'opencode' | 'codex';
+      message?: string;
+      error?: string;
+    }> => this.post('/api/setup/default-provider', { provider }),
+
     getGhStatus: (): Promise<{
       success: boolean;
       installed: boolean;
@@ -1329,47 +1417,6 @@ export class HttpApiClient implements ElectronAPI {
     onStream: (callback: (data: unknown) => void): (() => void) => {
       return this.subscribeToEvent('agent:stream', callback as EventCallback);
     },
-
-    // Queue management
-    queueAdd: (
-      sessionId: string,
-      message: string,
-      imagePaths?: string[],
-      model?: string
-    ): Promise<{
-      success: boolean;
-      queuedPrompt?: {
-        id: string;
-        message: string;
-        imagePaths?: string[];
-        model?: string;
-        addedAt: string;
-      };
-      error?: string;
-    }> => this.post('/api/agent/queue/add', { sessionId, message, imagePaths, model }),
-
-    queueList: (
-      sessionId: string
-    ): Promise<{
-      success: boolean;
-      queue?: Array<{
-        id: string;
-        message: string;
-        imagePaths?: string[];
-        model?: string;
-        addedAt: string;
-      }>;
-      error?: string;
-    }> => this.post('/api/agent/queue/list', { sessionId }),
-
-    queueRemove: (
-      sessionId: string,
-      promptId: string
-    ): Promise<{ success: boolean; error?: string }> =>
-      this.post('/api/agent/queue/remove', { sessionId, promptId }),
-
-    queueClear: (sessionId: string): Promise<{ success: boolean; error?: string }> =>
-      this.post('/api/agent/queue/clear', { sessionId }),
   };
 
   // Templates API

@@ -86,11 +86,10 @@ ${getStructuredSpecPromptInstruction()}`;
     content: 'Starting spec generation...\n',
   });
 
-  // Load autoLoadClaudeMd setting
   const autoLoadClaudeMd = await getAutoLoadClaudeMdSetting(
     projectPath,
     settingsService,
-    '[SpecRegeneration]'
+    '[SpecGeneration]'
   );
 
   const options = createSpecGenerationOptions({

@@ -60,6 +60,7 @@ export class ClaudeProvider extends BaseProvider {
       abortController,
       conversationHistory,
       sdkSessionId,
+      settingSources,
     } = options;
 
     // Build Claude SDK options
@@ -90,7 +91,7 @@ export class ClaudeProvider extends BaseProvider {
         ? { resume: sdkSessionId }
         : {}),
       // Forward settingSources for CLAUDE.md file loading
-      ...(options.settingSources && { settingSources: options.settingSources }),
+      ...(settingSources && { settingSources }),
       // Forward sandbox configuration
       ...(options.sandbox && { sandbox: options.sandbox }),
       // Forward MCP servers configuration

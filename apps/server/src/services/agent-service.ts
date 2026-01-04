@@ -15,7 +15,11 @@ import {
   createLogger,
 } from '@automaker/utils';
 import { ProviderFactory } from '../providers/provider-factory.js';
-import { createChatOptions, validateWorkingDirectory } from '../lib/sdk-options.js';
+import {
+  createChatOptions,
+  getModelForUseCase,
+  validateWorkingDirectory,
+} from '../lib/sdk-options.js';
 import { PathNotAllowedError } from '@automaker/platform';
 import type { SettingsService } from './settings-service.js';
 import {
@@ -242,7 +246,9 @@ export class AgentService {
 
       // When autoLoadClaudeMd is enabled, filter out CLAUDE.md to avoid duplication
       // (SDK handles CLAUDE.md via settingSources), but keep other context files like CODE_QUALITY.md
-      const contextFilesPrompt = filterClaudeMdFromContext(contextResult, autoLoadClaudeMd);
+      const modelForContext = getModelForUseCase('chat', model ?? session.model);
+      const shouldFilterClaudeMd = autoLoadClaudeMd && modelForContext.startsWith('claude-');
+      const contextFilesPrompt = filterClaudeMdFromContext(contextResult, shouldFilterClaudeMd);
 
       // Build combined system prompt with base prompt and context files
       const baseSystemPrompt = await this.getSystemPrompt();

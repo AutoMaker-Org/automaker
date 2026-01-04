@@ -69,7 +69,7 @@ export type PlanningMode = 'skip' | 'lite' | 'spec' | 'full';
 export type ThinkingLevel = 'none' | 'low' | 'medium' | 'high' | 'ultrathink';
 
 /** ModelProvider - AI model provider for credentials and API key management */
-export type ModelProvider = 'claude';
+export type ModelProvider = 'claude' | 'cursor' | 'opencode' | 'codex';
 
 /**
  * WindowBounds - Electron window position and size for persistence
@@ -156,7 +156,7 @@ export interface AIProfile {
   model: AgentModel;
   /** Extended thinking level for reasoning-based tasks */
   thinkingLevel: ThinkingLevel;
-  /** Provider (currently only "claude") */
+  /** Provider for this profile */
   provider: ModelProvider;
   /** Whether this is a built-in default profile */
   isBuiltIn: boolean;
@@ -309,6 +309,10 @@ export interface GlobalSettings {
   muteDoneSound: boolean;
 
   // AI Model Selection
+  /** Default provider for feature execution */
+  defaultProvider: ModelProvider;
+  /** Default model for new features when no profile is selected */
+  defaultModel: AgentModel;
   /** Which model to use for feature name/description enhancement */
   enhancementModel: AgentModel;
   /** Which model to use for GitHub issue validation */
@@ -515,6 +519,8 @@ export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
   defaultRequirePlanApproval: false,
   defaultAIProfileId: null,
   muteDoneSound: false,
+  defaultProvider: 'claude',
+  defaultModel: 'sonnet',
   enhancementModel: 'sonnet',
   validationModel: 'opus',
   keyboardShortcuts: DEFAULT_KEYBOARD_SHORTCUTS,

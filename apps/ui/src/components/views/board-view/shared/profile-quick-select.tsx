@@ -3,6 +3,7 @@ import { Brain, UserCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { AgentModel, ThinkingLevel, AIProfile } from '@/store/app-store';
 import { PROFILE_ICONS } from './model-constants';
+import { resolveModelString } from '@automaker/model-resolver';
 
 interface ProfileQuickSelectProps {
   profiles: AIProfile[];
@@ -26,6 +27,7 @@ export function ProfileQuickSelect({
   if (profiles.length === 0) {
     return null;
   }
+  const normalizedSelectedModel = resolveModelString(selectedModel);
 
   return (
     <div className="space-y-3">
@@ -41,13 +43,15 @@ export function ProfileQuickSelect({
       <div className="grid grid-cols-2 gap-2">
         {profiles.slice(0, 6).map((profile) => {
           const IconComponent = profile.icon ? PROFILE_ICONS[profile.icon] : Brain;
+          const normalizedProfileModel = resolveModelString(profile.model);
           const isSelected =
-            selectedModel === profile.model && selectedThinkingLevel === profile.thinkingLevel;
+            normalizedSelectedModel === normalizedProfileModel &&
+            selectedThinkingLevel === profile.thinkingLevel;
           return (
             <button
               key={profile.id}
               type="button"
-              onClick={() => onSelect(profile.model, profile.thinkingLevel)}
+              onClick={() => onSelect(normalizedProfileModel as AgentModel, profile.thinkingLevel)}
               className={cn(
                 'flex items-center gap-2 p-2 rounded-lg border text-left transition-all',
                 isSelected

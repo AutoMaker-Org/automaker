@@ -455,6 +455,9 @@ export class SettingsService {
         defaultRequirePlanApproval: (appState.defaultRequirePlanApproval as boolean) || false,
         defaultAIProfileId: (appState.defaultAIProfileId as string | null) || null,
         muteDoneSound: (appState.muteDoneSound as boolean) || false,
+        defaultProvider:
+          (appState.defaultProvider as GlobalSettings['defaultProvider']) || 'claude',
+        defaultModel: (appState.defaultModel as GlobalSettings['defaultModel']) || 'sonnet',
         enhancementModel:
           (appState.enhancementModel as GlobalSettings['enhancementModel']) || 'sonnet',
         keyboardShortcuts:

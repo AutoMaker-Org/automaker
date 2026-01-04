@@ -1,0 +1,151 @@
+/**
+ * POST /test-provider endpoint - Test AI provider by writing a simple file
+ *
+ * This endpoint tests the configured provider by asking it to write
+ * a "Hello World" file in the system temp directory
+ */
+
+import type { Request, Response } from 'express';
+import os from 'os';
+import path from 'path';
+import { ProviderFactory } from '../../../providers/provider-factory.js';
+import { getErrorMessage, logError } from '../common.js';
+
+export function createTestProviderHandler() {
+  return async (req: Request, res: Response): Promise<void> => {
+    const { provider: requestedProvider } = req.body || {};
+
+    try {
+      // Get the provider to use
+      const providerName = requestedProvider || ProviderFactory.getDefaultProvider();
+      const provider = ProviderFactory.getProviderByName(providerName);
+
+      if (!provider) {
+        res.status(400).json({
+          success: false,
+          error: `Unknown provider: ${providerName}`,
+        });
+        return;
+      }
+
+      console.log(`[TestProvider] Testing provider: ${providerName}`);
+
+      // Check if provider is installed
+      const installStatus = await provider.detectInstallation();
+      if (!installStatus.installed) {
+        res.json({
+          success: false,
+          provider: providerName,
+          error: `${providerName} is not installed`,
+          installStatus,
+        });
+        return;
+      }
+
+      // Define the test prompt
+      const providerLabel =
+        providerName === 'cursor'
+          ? 'Cursor CLI'
+          : providerName === 'opencode'
+            ? 'OpenCode CLI'
+            : providerName === 'codex'
+              ? 'Codex CLI'
+              : 'Claude SDK';
+
+      const tmpDir = os.tmpdir();
+      const testFilePath = path.join(tmpDir, 'hello.md');
+      const maxOutputChars = 1024 * 1024;
+
+      const testPrompt = `Create a file at ${testFilePath} with the following content:
+
+# Hello World
+
+This file was created by **${providerLabel}** on ${new Date().toISOString()}.
+
+## Test Successful! 🎉
+
+The AI provider integration is working correctly.
+`;
+
+      // Execute the query
+      let output = '';
+      let hasError = false;
+      let errorMessage = '';
+
+      const model =
+        providerName === 'cursor'
+          ? 'auto'
+          : providerName === 'opencode'
+            ? 'glm4.7'
+            : providerName === 'codex'
+              ? 'gpt-5.2-codex'
+              : 'claude-sonnet-4-20250514';
+
+      const appendOutput = (text: string) => {
+        if (!text || output.length >= maxOutputChars) {
+          return;
+        }
+        const next = output + text;
+        output = next.length > maxOutputChars ? next.slice(0, maxOutputChars) : next;
+      };
+
+      try {
+        for await (const message of provider.executeQuery({
+          prompt: testPrompt,
+          model,
+          cwd: tmpDir,
+          maxTurns: 5,
+        })) {
+          if (message.type === 'assistant' && message.message?.content) {
+            for (const block of message.message.content) {
+              if (block.type === 'text' && block.text) {
+                appendOutput(block.text);
+              }
+            }
+          } else if (message.type === 'error') {
+            hasError = true;
+            errorMessage = message.error || 'Unknown error';
+          } else if (message.type === 'result') {
+            if (message.subtype === 'error') {
+              hasError = true;
+              errorMessage = message.error || 'Execution failed';
+            } else {
+              appendOutput(message.result || '');
+            }
+          }
+        }
+      } catch (error) {
+        hasError = true;
+        errorMessage = getErrorMessage(error);
+      }
+
+      // Check if file was created
+      const fs = await import('fs/promises');
+      let fileCreated = false;
+      let fileContent = '';
+      try {
+        fileContent = await fs.readFile(testFilePath, 'utf-8');
+        fileCreated = true;
+      } catch {
+        // File not created
+      }
+
+      res.json({
+        success: !hasError && fileCreated,
+        provider: providerName,
+        model,
+        fileCreated,
+        filePath: testFilePath,
+        fileContent: fileCreated ? fileContent : undefined,
+        output: output.slice(0, 1000), // Limit output size
+        error: hasError ? errorMessage : undefined,
+      });
+    } catch (error) {
+      logError(error, 'Test provider failed');
+      res.status(500).json({
+        success: false,
+        error: getErrorMessage(error),
+      });
+    }
+  };
+}

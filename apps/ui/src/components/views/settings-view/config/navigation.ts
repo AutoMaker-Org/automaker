@@ -10,6 +10,7 @@ import {
   Trash2,
   Sparkles,
   Plug,
+  Wand2,
   MessageSquareText,
 } from 'lucide-react';
 import type { SettingsViewId } from '../hooks/use-settings-view';
@@ -23,6 +24,7 @@ export interface NavigationItem {
 // Navigation items for the settings side panel
 export const NAV_ITEMS: NavigationItem[] = [
   { id: 'api-keys', label: 'API Keys', icon: Key },
+  { id: 'ai-provider', label: 'AI Provider', icon: Wand2 },
   { id: 'claude', label: 'Claude', icon: Terminal },
   { id: 'mcp-servers', label: 'MCP Servers', icon: Plug },
   { id: 'prompts', label: 'Prompt Customization', icon: MessageSquareText },

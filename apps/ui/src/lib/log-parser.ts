@@ -38,13 +38,39 @@ const TOOL_CATEGORIES: Record<string, ToolCategory> = {
   Task: 'task',
   NotebookEdit: 'edit',
   KillShell: 'bash',
+  List: 'read',
+  Patch: 'edit',
 };
+
+const TOOL_NAME_ALIASES: Record<string, string> = {
+  read: 'Read',
+  edit: 'Edit',
+  write: 'Write',
+  bash: 'Bash',
+  grep: 'Grep',
+  glob: 'Glob',
+  websearch: 'WebSearch',
+  webfetch: 'WebFetch',
+  todoread: 'TodoRead',
+  todowrite: 'TodoWrite',
+  list: 'List',
+  patch: 'Patch',
+  task: 'Task',
+  notebookedit: 'NotebookEdit',
+  killshell: 'KillShell',
+};
+
+function normalizeToolName(toolName: string): string {
+  const normalized = toolName.trim().toLowerCase();
+  return TOOL_NAME_ALIASES[normalized] || toolName;
+}
 
 /**
  * Categorizes a tool name into a predefined category
  */
 export function categorizeToolName(toolName: string): ToolCategory {
-  return TOOL_CATEGORIES[toolName] || 'other';
+  const normalized = normalizeToolName(toolName);
+  return TOOL_CATEGORIES[normalized] || 'other';
 }
 
 export interface LogEntryMetadata {
@@ -219,6 +245,7 @@ function extractFilePath(content: string): string | undefined {
     const parsed = JSON.parse(jsonStr) as Record<string, unknown>;
 
     if (typeof parsed.file_path === 'string') return parsed.file_path;
+    if (typeof parsed.filePath === 'string') return parsed.filePath;
     if (typeof parsed.path === 'string') return parsed.path;
     if (typeof parsed.notebook_path === 'string') return parsed.notebook_path;
 
@@ -240,19 +267,35 @@ export function generateToolSummary(toolName: string, content: string): string |
     const jsonStr = inputMatch[1].trim();
     const parsed = JSON.parse(jsonStr) as Record<string, unknown>;
 
-    switch (toolName) {
+    const getFilePath = (parsedInput: Record<string, unknown>): string | undefined =>
+      (parsedInput.file_path as string | undefined) ||
+      (parsedInput.filePath as string | undefined) ||
+      (parsedInput.path as string | undefined);
+
+    const getFileName = (parsedInput: Record<string, unknown>): string => {
+      const filePath = getFilePath(parsedInput);
+      return filePath?.split('/').pop() || 'file';
+    };
+
+    switch (normalizeToolName(toolName)) {
       case 'Read': {
-        const filePath = parsed.file_path as string | undefined;
-        return `Reading ${filePath?.split('/').pop() || 'file'}`;
+        return `Reading ${getFileName(parsed)}`;
       }
       case 'Edit': {
-        const filePath = parsed.file_path as string | undefined;
-        const fileName = filePath?.split('/').pop() || 'file';
-        return `Editing ${fileName}`;
+        return `Editing ${getFileName(parsed)}`;
+      }
+      case 'Patch': {
+        return `Patching ${getFileName(parsed)}`;
       }
       case 'Write': {
-        const filePath = parsed.file_path as string | undefined;
-        return `Writing ${filePath?.split('/').pop() || 'file'}`;
+        return `Writing ${getFileName(parsed)}`;
+      }
+      case 'List': {
+        const listPath =
+          (parsed.path as string | undefined) ||
+          (parsed.dirPath as string | undefined) ||
+          (parsed.filePath as string | undefined);
+        return `Listing ${listPath || 'directory'}`;
       }
       case 'Bash': {
         const command = parsed.command as string | undefined;

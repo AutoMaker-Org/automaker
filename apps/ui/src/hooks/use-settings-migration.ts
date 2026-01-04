@@ -223,6 +223,8 @@ export async function syncSettingsToServer(): Promise<boolean> {
       defaultAIProfileId: state.defaultAIProfileId,
       muteDoneSound: state.muteDoneSound,
       enhancementModel: state.enhancementModel,
+      defaultProvider: state.defaultProvider,
+      defaultModel: state.defaultModel,
       validationModel: state.validationModel,
       autoLoadClaudeMd: state.autoLoadClaudeMd,
       enableSandboxMode: state.enableSandboxMode,

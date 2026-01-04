@@ -18,7 +18,6 @@ import {
   ChevronDown,
   FileText,
   Square,
-  ListOrdered,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useElectronAgent } from '@/hooks/use-electron-agent';
@@ -50,8 +49,9 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { CLAUDE_MODELS } from '@/components/views/board-view/shared/model-constants';
+import { CLAUDE_MODELS } from '@automaker/types';
 import { Textarea } from '@/components/ui/textarea';
+import { resolveModelString } from '@automaker/model-resolver';
 
 export function AgentView() {
   const { currentProject, setLastSelectedSession, getLastSelectedSession } = useAppStore();
@@ -88,14 +88,10 @@ export function AgentView() {
     clearHistory,
     stopExecution,
     error: agentError,
-    serverQueue,
-    addToServerQueue,
-    removeFromServerQueue,
-    clearServerQueue,
   } = useElectronAgent({
     sessionId: currentSessionId || '',
     workingDirectory: currentProject?.path,
-    model: selectedModel,
+    model: resolveModelString(selectedModel),
     onToolUse: (toolName) => {
       setCurrentTool(toolName);
       setTimeout(() => setCurrentTool(null), 2000);
@@ -140,7 +136,11 @@ export function AgentView() {
   }, [currentProject?.path]);
 
   const handleSend = useCallback(async () => {
-    if (!input.trim() && selectedImages.length === 0 && selectedTextFiles.length === 0) return;
+    if (
+      (!input.trim() && selectedImages.length === 0 && selectedTextFiles.length === 0) ||
+      isProcessing
+    )
+      return;
 
     const messageContent = input;
     const messageImages = selectedImages;
@@ -151,13 +151,8 @@ export function AgentView() {
     setSelectedTextFiles([]);
     setShowImageDropZone(false);
 
-    // If already processing, add to server queue instead
-    if (isProcessing) {
-      await addToServerQueue(messageContent, messageImages, messageTextFiles);
-    } else {
-      await sendMessage(messageContent, messageImages, messageTextFiles);
-    }
-  }, [input, selectedImages, selectedTextFiles, isProcessing, sendMessage, addToServerQueue]);
+    await sendMessage(messageContent, messageImages, messageTextFiles);
+  }, [input, selectedImages, selectedTextFiles, isProcessing, sendMessage]);
 
   const handleImagesSelected = useCallback((images: ImageAttachment[]) => {
     setSelectedImages(images);
@@ -554,6 +549,41 @@ export function AgentView() {
 
           {/* Status indicators & actions */}
           <div className="flex items-center gap-3">
+            {/* Model Selector */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 gap-1.5 text-xs font-medium"
+                  disabled={isProcessing}
+                  data-testid="model-selector"
+                >
+                  <Bot className="w-3.5 h-3.5" />
+                  {CLAUDE_MODELS.find((m) => m.id === selectedModel)?.label.replace(
+                    'Claude ',
+                    ''
+                  ) || 'Sonnet'}
+                  <ChevronDown className="w-3 h-3 opacity-50" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                {CLAUDE_MODELS.map((model) => (
+                  <DropdownMenuItem
+                    key={model.id}
+                    onClick={() => setSelectedModel(model.id)}
+                    className={cn('cursor-pointer', selectedModel === model.id && 'bg-accent')}
+                    data-testid={`model-option-${model.id}`}
+                  >
+                    <div className="flex flex-col">
+                      <span className="font-medium">{model.label}</span>
+                      <span className="text-xs text-muted-foreground">{model.description}</span>
+                    </div>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+
             {currentTool && (
               <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/50 px-3 py-1.5 rounded-full border border-border">
                 <Wrench className="w-3 h-3 text-primary" />
@@ -743,50 +773,8 @@ export function AgentView() {
                 images={selectedImages}
                 maxFiles={5}
                 className="mb-4"
-                disabled={!isConnected}
+                disabled={isProcessing || !isConnected}
               />
-            )}
-
-            {/* Queued Prompts List */}
-            {serverQueue.length > 0 && (
-              <div className="mb-4 space-y-2">
-                <div className="flex items-center justify-between">
-                  <p className="text-xs font-medium text-muted-foreground">
-                    {serverQueue.length} prompt{serverQueue.length > 1 ? 's' : ''} queued
-                  </p>
-                  <button
-                    onClick={clearServerQueue}
-                    className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    Clear all
-                  </button>
-                </div>
-                <div className="space-y-1.5">
-                  {serverQueue.map((item, index) => (
-                    <div
-                      key={item.id}
-                      className="group flex items-center gap-2 text-sm bg-muted/50 rounded-lg px-3 py-2 border border-border"
-                    >
-                      <span className="text-xs text-muted-foreground font-medium min-w-[1.5rem]">
-                        {index + 1}.
-                      </span>
-                      <span className="flex-1 truncate text-foreground">{item.message}</span>
-                      {item.imagePaths && item.imagePaths.length > 0 && (
-                        <span className="text-xs text-muted-foreground">
-                          +{item.imagePaths.length} file{item.imagePaths.length > 1 ? 's' : ''}
-                        </span>
-                      )}
-                      <button
-                        onClick={() => removeFromServerQueue(item.id)}
-                        className="opacity-0 group-hover:opacity-100 p-1 hover:bg-destructive/10 hover:text-destructive rounded transition-all"
-                        title="Remove from queue"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
             )}
 
             {/* Selected Files Preview - only show when ImageDropZone is hidden to avoid duplicate display */}
@@ -803,6 +791,7 @@ export function AgentView() {
                       setSelectedTextFiles([]);
                     }}
                     className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                    disabled={isProcessing}
                   >
                     Clear all
                   </button>
@@ -893,17 +882,13 @@ export function AgentView() {
                 <Textarea
                   ref={inputRef}
                   placeholder={
-                    isDragOver
-                      ? 'Drop your files here...'
-                      : isProcessing
-                        ? 'Type to queue another prompt...'
-                        : 'Describe what you want to build...'
+                    isDragOver ? 'Drop your files here...' : 'Describe what you want to build...'
                   }
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={handleKeyDown}
                   onPaste={handlePaste}
-                  disabled={!isConnected}
+                  disabled={isProcessing || !isConnected}
                   data-testid="agent-input"
                   rows={1}
                   className={cn(
@@ -928,44 +913,12 @@ export function AgentView() {
                 )}
               </div>
 
-              {/* Model Selector */}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className="h-11 gap-1 text-xs font-medium rounded-xl border-border px-2.5"
-                    data-testid="model-selector"
-                  >
-                    {CLAUDE_MODELS.find((m) => m.id === selectedModel)?.label.replace(
-                      'Claude ',
-                      ''
-                    ) || 'Sonnet'}
-                    <ChevronDown className="w-3 h-3 opacity-50" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-48">
-                  {CLAUDE_MODELS.map((model) => (
-                    <DropdownMenuItem
-                      key={model.id}
-                      onClick={() => setSelectedModel(model.id)}
-                      className={cn('cursor-pointer', selectedModel === model.id && 'bg-accent')}
-                      data-testid={`model-option-${model.id}`}
-                    >
-                      <div className="flex flex-col">
-                        <span className="font-medium">{model.label}</span>
-                        <span className="text-xs text-muted-foreground">{model.description}</span>
-                      </div>
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
-
               {/* File Attachment Button */}
               <Button
                 variant="outline"
                 size="icon"
                 onClick={toggleImageDropZone}
-                disabled={!isConnected}
+                disabled={isProcessing || !isConnected}
                 className={cn(
                   'h-11 w-11 rounded-xl border-border',
                   showImageDropZone && 'bg-primary/10 text-primary border-primary/30',
@@ -977,8 +930,8 @@ export function AgentView() {
                 <Paperclip className="w-4 h-4" />
               </Button>
 
-              {/* Stop Button (only when processing) */}
-              {isProcessing && (
+              {/* Send / Stop Button */}
+              {isProcessing ? (
                 <Button
                   onClick={stopExecution}
                   disabled={!isConnected}
@@ -989,24 +942,21 @@ export function AgentView() {
                 >
                   <Square className="w-4 h-4 fill-current" />
                 </Button>
+              ) : (
+                <Button
+                  onClick={handleSend}
+                  disabled={
+                    (!input.trim() &&
+                      selectedImages.length === 0 &&
+                      selectedTextFiles.length === 0) ||
+                    !isConnected
+                  }
+                  className="h-11 px-4 rounded-xl"
+                  data-testid="send-message"
+                >
+                  <Send className="w-4 h-4" />
+                </Button>
               )}
-
-              {/* Send / Queue Button */}
-              <Button
-                onClick={handleSend}
-                disabled={
-                  (!input.trim() &&
-                    selectedImages.length === 0 &&
-                    selectedTextFiles.length === 0) ||
-                  !isConnected
-                }
-                className="h-11 px-4 rounded-xl"
-                variant={isProcessing ? 'outline' : 'default'}
-                data-testid="send-message"
-                title={isProcessing ? 'Add to queue' : 'Send message'}
-              >
-                {isProcessing ? <ListOrdered className="w-4 h-4" /> : <Send className="w-4 h-4" />}
-              </Button>
             </div>
 
             {/* Keyboard hint */}

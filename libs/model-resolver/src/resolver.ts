@@ -7,7 +7,13 @@
  * - Handles multiple model sources with priority
  */
 
-import { CLAUDE_MODEL_MAP, DEFAULT_MODELS } from '@automaker/types';
+import {
+  CLAUDE_MODEL_MAP,
+  CURSOR_MODEL_MAP,
+  OPENCODE_MODEL_MAP,
+  CODEX_MODEL_MAP,
+  DEFAULT_MODELS,
+} from '@automaker/types';
 
 /**
  * Resolve a model key/alias to a full model string
@@ -23,6 +29,15 @@ export function resolveModelString(
   // No model specified - use default
   if (!modelKey) {
     return defaultModel;
+  }
+
+  // Pass through known non-Claude model identifiers
+  if (
+    Object.values(CURSOR_MODEL_MAP).includes(modelKey) ||
+    Object.values(OPENCODE_MODEL_MAP).includes(modelKey) ||
+    Object.values(CODEX_MODEL_MAP).includes(modelKey)
+  ) {
+    return modelKey;
   }
 
   // Full Claude model string - pass through unchanged

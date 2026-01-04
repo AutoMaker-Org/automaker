@@ -104,7 +104,7 @@ async function runValidation(
     const autoLoadClaudeMd = await getAutoLoadClaudeMdSetting(
       projectPath,
       settingsService,
-      '[ValidateIssue]'
+      '[IssueValidation]'
     );
 
     // Create SDK options with structured output and abort controller

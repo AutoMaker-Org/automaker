@@ -21,6 +21,7 @@ import path from 'path';
 import { resolveModelString } from '@automaker/model-resolver';
 import { DEFAULT_MODELS, CLAUDE_MODEL_MAP, type McpServerConfig } from '@automaker/types';
 import { isPathAllowed, PathNotAllowedError, getAllowedRootDirectory } from '@automaker/platform';
+import type { SystemPromptConfig } from '../providers/types.js';
 
 /**
  * Validate that a working directory is allowed by ALLOWED_ROOT_DIRECTORY.
@@ -263,6 +264,13 @@ function getBaseOptions(): Partial<Options> {
   };
 }
 
+function isClaudeModelKey(model?: string): boolean {
+  if (!model) {
+    return true;
+  }
+  return model.includes('claude-') || Object.prototype.hasOwnProperty.call(CLAUDE_MODEL_MAP, model);
+}
+
 /**
  * MCP permission options result
  */
@@ -308,24 +316,23 @@ function buildMcpOptions(config: CreateSdkOptionsConfig): McpPermissionOptions {
 
 /**
  * Build system prompt configuration based on autoLoadClaudeMd setting.
- * When autoLoadClaudeMd is true:
+ * When autoLoadClaudeMd is true and the model is Claude:
  * - Uses preset mode with 'claude_code' to enable CLAUDE.md auto-loading
  * - If there's a custom systemPrompt, appends it to the preset
- * - Sets settingSources to ['project'] for SDK to load CLAUDE.md files
- *
- * @param config - The SDK options config
- * @returns Object with systemPrompt and settingSources for SDK options
+ * - Sets settingSources to ['user', 'project'] for SDK to load CLAUDE.md files
  */
 function buildClaudeMdOptions(config: CreateSdkOptionsConfig): {
   systemPrompt?: string | SystemPromptConfig;
   settingSources?: Array<'user' | 'project' | 'local'>;
 } {
-  if (!config.autoLoadClaudeMd) {
-    // Standard mode - just pass through the system prompt as-is
+  const candidateModel = config.model || config.sessionModel;
+  const shouldAutoLoad =
+    config.autoLoadClaudeMd && (candidateModel ? isClaudeModelKey(candidateModel) : true);
+
+  if (!shouldAutoLoad) {
     return config.systemPrompt ? { systemPrompt: config.systemPrompt } : {};
   }
 
-  // Auto-load CLAUDE.md mode - use preset with settingSources
   const result: {
     systemPrompt: SystemPromptConfig;
     settingSources: Array<'user' | 'project' | 'local'>;
@@ -334,29 +341,16 @@ function buildClaudeMdOptions(config: CreateSdkOptionsConfig): {
       type: 'preset',
       preset: 'claude_code',
     },
-    // Load both user (~/.claude/CLAUDE.md) and project (.claude/CLAUDE.md) settings
     settingSources: ['user', 'project'],
   };
 
-  // If there's a custom system prompt, append it to the preset
   if (config.systemPrompt) {
-    result.systemPrompt.append = config.systemPrompt;
+    if (typeof config.systemPrompt === 'string') {
+      result.systemPrompt.append = config.systemPrompt;
+    }
   }
 
   return result;
-}
-
-/**
- * System prompt configuration for SDK options
- * When using preset mode with claude_code, CLAUDE.md files are automatically loaded
- */
-export interface SystemPromptConfig {
-  /** Use preset mode with claude_code to enable CLAUDE.md auto-loading */
-  type: 'preset';
-  /** The preset to use - 'claude_code' enables CLAUDE.md loading */
-  preset: 'claude_code';
-  /** Optional additional prompt to append to the preset */
-  append?: string;
 }
 
 /**
@@ -373,7 +367,7 @@ export interface CreateSdkOptionsConfig {
   sessionModel?: string;
 
   /** Optional system prompt */
-  systemPrompt?: string;
+  systemPrompt?: string | SystemPromptConfig;
 
   /** Optional abort controller for cancellation */
   abortController?: AbortController;
@@ -384,7 +378,7 @@ export interface CreateSdkOptionsConfig {
     schema: Record<string, unknown>;
   };
 
-  /** Enable auto-loading of CLAUDE.md files via SDK's settingSources */
+  /** Enable auto-loading of CLAUDE.md files via SDK's settingSources option */
   autoLoadClaudeMd?: boolean;
 
   /** Enable sandbox mode for bash command isolation */
@@ -409,13 +403,11 @@ export type {
  * - Uses read-only tools for codebase analysis
  * - Extended turns for thorough exploration
  * - Opus model by default (can be overridden)
- * - When autoLoadClaudeMd is true, uses preset mode and settingSources for CLAUDE.md loading
  */
 export function createSpecGenerationOptions(config: CreateSdkOptionsConfig): Options {
   // Validate working directory before creating options
   validateWorkingDirectory(config.cwd);
 
-  // Build CLAUDE.md auto-loading options if enabled
   const claudeMdOptions = buildClaudeMdOptions(config);
 
   return {
@@ -438,13 +430,11 @@ export function createSpecGenerationOptions(config: CreateSdkOptionsConfig): Opt
  * - Uses read-only tools (just needs to read the spec)
  * - Quick turns since it's mostly JSON generation
  * - Sonnet model by default for speed
- * - When autoLoadClaudeMd is true, uses preset mode and settingSources for CLAUDE.md loading
  */
 export function createFeatureGenerationOptions(config: CreateSdkOptionsConfig): Options {
   // Validate working directory before creating options
   validateWorkingDirectory(config.cwd);
 
-  // Build CLAUDE.md auto-loading options if enabled
   const claudeMdOptions = buildClaudeMdOptions(config);
 
   return {
@@ -466,13 +456,11 @@ export function createFeatureGenerationOptions(config: CreateSdkOptionsConfig): 
  * - Uses read-only tools for analysis
  * - Standard turns to allow thorough codebase exploration and structured output generation
  * - Opus model by default for thorough analysis
- * - When autoLoadClaudeMd is true, uses preset mode and settingSources for CLAUDE.md loading
  */
 export function createSuggestionsOptions(config: CreateSdkOptionsConfig): Options {
   // Validate working directory before creating options
   validateWorkingDirectory(config.cwd);
 
-  // Build CLAUDE.md auto-loading options if enabled
   const claudeMdOptions = buildClaudeMdOptions(config);
 
   return {
@@ -503,8 +491,6 @@ export function createChatOptions(config: CreateSdkOptionsConfig): Options {
 
   // Model priority: explicit model > session model > chat default
   const effectiveModel = config.model || config.sessionModel;
-
-  // Build CLAUDE.md auto-loading options if enabled
   const claudeMdOptions = buildClaudeMdOptions(config);
 
   // Build MCP-related options
@@ -548,7 +534,6 @@ export function createAutoModeOptions(config: CreateSdkOptionsConfig): Options {
   // Validate working directory before creating options
   validateWorkingDirectory(config.cwd);
 
-  // Build CLAUDE.md auto-loading options if enabled
   const claudeMdOptions = buildClaudeMdOptions(config);
 
   // Build MCP-related options
@@ -582,7 +567,6 @@ export function createAutoModeOptions(config: CreateSdkOptionsConfig): Options {
  * Create custom SDK options with explicit configuration
  *
  * Use this when the preset options don't fit your use case.
- * When autoLoadClaudeMd is true, uses preset mode and settingSources for CLAUDE.md loading
  */
 export function createCustomOptions(
   config: CreateSdkOptionsConfig & {
@@ -594,7 +578,6 @@ export function createCustomOptions(
   // Validate working directory before creating options
   validateWorkingDirectory(config.cwd);
 
-  // Build CLAUDE.md auto-loading options if enabled
   const claudeMdOptions = buildClaudeMdOptions(config);
 
   // Build MCP-related options

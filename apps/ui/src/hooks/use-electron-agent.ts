@@ -12,15 +12,6 @@ interface UseElectronAgentOptions {
   onToolUse?: (toolName: string, toolInput: unknown) => void;
 }
 
-// Server-side queued prompt type
-interface QueuedPrompt {
-  id: string;
-  message: string;
-  imagePaths?: string[];
-  model?: string;
-  addedAt: string;
-}
-
 interface UseElectronAgentResult {
   messages: Message[];
   isProcessing: boolean;
@@ -33,7 +24,7 @@ interface UseElectronAgentResult {
   stopExecution: () => Promise<void>;
   clearHistory: () => Promise<void>;
   error: string | null;
-  // Client-side queue (local)
+  // Queue-related state
   queuedMessages: {
     id: string;
     content: string;
@@ -43,15 +34,6 @@ interface UseElectronAgentResult {
   }[];
   isQueueProcessing: boolean;
   clearMessageQueue: () => void;
-  // Server-side queue (persistent, auto-runs)
-  serverQueue: QueuedPrompt[];
-  addToServerQueue: (
-    message: string,
-    images?: ImageAttachment[],
-    textFiles?: TextFileAttachment[]
-  ) => Promise<void>;
-  removeFromServerQueue: (promptId: string) => Promise<void>;
-  clearServerQueue: () => Promise<void>;
 }
 
 /**
@@ -70,7 +52,6 @@ export function useElectronAgent({
   const [isProcessing, setIsProcessing] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [serverQueue, setServerQueue] = useState<QueuedPrompt[]>([]);
   const unsubscribeRef = useRef<(() => void) | null>(null);
   const currentMessageRef = useRef<Message | null>(null);
 
@@ -250,12 +231,6 @@ export function useElectronAgent({
       console.log('[useElectronAgent] Stream event for', sessionId, ':', event.type);
 
       switch (event.type) {
-        case 'started':
-          // Agent started processing (including from queue)
-          console.log('[useElectronAgent] Agent started processing for session:', sessionId);
-          setIsProcessing(true);
-          break;
-
         case 'message':
           // User message added
           setMessages((prev) => [...prev, event.message]);
@@ -324,18 +299,6 @@ export function useElectronAgent({
             setMessages((prev) => [...prev, errorMessage]);
           }
           break;
-
-        case 'queue_updated':
-          // Server queue was updated
-          console.log('[useElectronAgent] Queue updated:', event.queue);
-          setServerQueue(event.queue || []);
-          break;
-
-        case 'queue_error':
-          // Error processing a queued prompt
-          console.error('[useElectronAgent] Queue error:', event.error);
-          setError(event.error);
-          break;
       }
     };
 
@@ -359,73 +322,18 @@ export function useElectronAgent({
         return;
       }
 
-      if (isProcessing) {
-        console.warn('[useElectronAgent] Already processing a message');
+      if (isProcessing || isProcessingQueue) {
+        addToQueue(content, images, textFiles);
         return;
       }
 
-      setIsProcessing(true);
-      setError(null);
-
       try {
-        console.log('[useElectronAgent] Sending message', {
-          hasImages: images && images.length > 0,
-          imageCount: images?.length || 0,
-          hasTextFiles: textFiles && textFiles.length > 0,
-          textFileCount: textFiles?.length || 0,
-        });
-
-        // Build message content with text file context prepended
-        let messageContent = content;
-        if (textFiles && textFiles.length > 0) {
-          const contextParts = textFiles.map((file) => {
-            return `<file name="${file.filename}">\n${file.content}\n</file>`;
-          });
-          const contextBlock = `Here are some files for context:\n\n${contextParts.join('\n\n')}\n\n`;
-          messageContent = contextBlock + content;
-        }
-
-        // Save images to .automaker/images and get paths
-        let imagePaths: string[] | undefined;
-        if (images && images.length > 0 && api.saveImageToTemp) {
-          imagePaths = [];
-          for (const image of images) {
-            const result = await api.saveImageToTemp(
-              image.data,
-              sanitizeFilename(image.filename),
-              image.mimeType,
-              workingDirectory // Pass workingDirectory as projectPath
-            );
-            if (result.success && result.path) {
-              imagePaths.push(result.path);
-              console.log('[useElectronAgent] Saved image to .automaker/images:', result.path);
-            } else {
-              console.error('[useElectronAgent] Failed to save image:', result.error);
-            }
-          }
-        }
-
-        const result = await api.agent!.send(
-          sessionId,
-          messageContent,
-          workingDirectory,
-          imagePaths,
-          model
-        );
-
-        if (!result.success) {
-          setError(result.error || 'Failed to send message');
-          setIsProcessing(false);
-        }
-        // Note: We don't set isProcessing to false here because
-        // it will be set by the "complete" or "error" stream event
-      } catch (err) {
-        console.error('[useElectronAgent] Failed to send message:', err);
-        setError(err instanceof Error ? err.message : 'Failed to send message');
-        setIsProcessing(false);
+        await sendMessageDirectly(content, images, textFiles);
+      } catch {
+        // sendMessageDirectly already updates error state
       }
     },
-    [sessionId, workingDirectory, model, isProcessing]
+    [addToQueue, isProcessing, isProcessingQueue, sendMessageDirectly]
   );
 
   // Stop current execution
@@ -475,102 +383,6 @@ export function useElectronAgent({
     }
   }, [sessionId]);
 
-  // Add a prompt to the server queue (will auto-run when current task finishes)
-  const addToServerQueue = useCallback(
-    async (message: string, images?: ImageAttachment[], textFiles?: TextFileAttachment[]) => {
-      const api = getElectronAPI();
-      if (!api?.agent?.queueAdd) {
-        setError('Queue API not available');
-        return;
-      }
-
-      try {
-        // Build message content with text file context
-        let messageContent = message;
-        if (textFiles && textFiles.length > 0) {
-          const contextParts = textFiles.map((file) => {
-            return `<file name="${file.filename}">\n${file.content}\n</file>`;
-          });
-          const contextBlock = `Here are some files for context:\n\n${contextParts.join('\n\n')}\n\n`;
-          messageContent = contextBlock + message;
-        }
-
-        // Save images and get paths
-        let imagePaths: string[] | undefined;
-        if (images && images.length > 0 && api.saveImageToTemp) {
-          imagePaths = [];
-          for (const image of images) {
-            const result = await api.saveImageToTemp(
-              image.data,
-              sanitizeFilename(image.filename),
-              image.mimeType,
-              workingDirectory
-            );
-            if (result.success && result.path) {
-              imagePaths.push(result.path);
-            }
-          }
-        }
-
-        console.log('[useElectronAgent] Adding to server queue');
-        const result = await api.agent.queueAdd(sessionId, messageContent, imagePaths, model);
-
-        if (!result.success) {
-          setError(result.error || 'Failed to add to queue');
-        }
-      } catch (err) {
-        console.error('[useElectronAgent] Failed to add to queue:', err);
-        setError(err instanceof Error ? err.message : 'Failed to add to queue');
-      }
-    },
-    [sessionId, workingDirectory, model]
-  );
-
-  // Remove a prompt from the server queue
-  const removeFromServerQueue = useCallback(
-    async (promptId: string) => {
-      const api = getElectronAPI();
-      if (!api?.agent?.queueRemove) {
-        setError('Queue API not available');
-        return;
-      }
-
-      try {
-        console.log('[useElectronAgent] Removing from server queue:', promptId);
-        const result = await api.agent.queueRemove(sessionId, promptId);
-
-        if (!result.success) {
-          setError(result.error || 'Failed to remove from queue');
-        }
-      } catch (err) {
-        console.error('[useElectronAgent] Failed to remove from queue:', err);
-        setError(err instanceof Error ? err.message : 'Failed to remove from queue');
-      }
-    },
-    [sessionId]
-  );
-
-  // Clear the entire server queue
-  const clearServerQueue = useCallback(async () => {
-    const api = getElectronAPI();
-    if (!api?.agent?.queueClear) {
-      setError('Queue API not available');
-      return;
-    }
-
-    try {
-      console.log('[useElectronAgent] Clearing server queue');
-      const result = await api.agent.queueClear(sessionId);
-
-      if (!result.success) {
-        setError(result.error || 'Failed to clear queue');
-      }
-    } catch (err) {
-      console.error('[useElectronAgent] Failed to clear queue:', err);
-      setError(err instanceof Error ? err.message : 'Failed to clear queue');
-    }
-  }, [sessionId]);
-
   return {
     messages,
     isProcessing,
@@ -582,10 +394,5 @@ export function useElectronAgent({
     queuedMessages,
     isQueueProcessing: isProcessingQueue,
     clearMessageQueue: clearQueue,
-    // Server-side queue
-    serverQueue,
-    addToServerQueue,
-    removeFromServerQueue,
-    clearServerQueue,
   };
 }

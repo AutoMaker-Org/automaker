@@ -2,20 +2,22 @@
  * Generate features from existing app_spec.txt
  */
 
-import { query } from '@anthropic-ai/claude-agent-sdk';
 import * as secureFs from '../../lib/secure-fs.js';
 import type { EventEmitter } from '../../lib/events.js';
 import { createLogger } from '@automaker/utils';
-import { createFeatureGenerationOptions } from '../../lib/sdk-options.js';
+import { createFeatureGenerationOptions, getModelForUseCase } from '../../lib/sdk-options.js';
 import { logAuthStatus } from './common.js';
 import { parseAndCreateFeatures } from './parse-and-create-features.js';
 import { getAppSpecPath } from '@automaker/platform';
 import type { SettingsService } from '../../services/settings-service.js';
 import { getAutoLoadClaudeMdSetting } from '../../lib/settings-helpers.js';
+import { ProviderFactory } from '../../providers/provider-factory.js';
+import { DEFAULT_MODELS, type ExecuteOptions } from '@automaker/types';
 
 const logger = createLogger('SpecRegeneration');
 
 const DEFAULT_MAX_FEATURES = 50;
+const FEATURE_GENERATION_TIMEOUT_MS = 10 * 60 * 1000;
 
 export async function generateFeaturesFromSpec(
   projectPath: string,
@@ -94,30 +96,68 @@ IMPORTANT: Do not ask for clarification. The specification is provided above. Ge
     projectPath: projectPath,
   });
 
-  // Load autoLoadClaudeMd setting
   const autoLoadClaudeMd = await getAutoLoadClaudeMdSetting(
     projectPath,
     settingsService,
-    '[FeatureGeneration]'
+    '[SpecFeatures]'
   );
+
+  const hasModelOverride = !!(
+    process.env.AUTOMAKER_MODEL_FEATURES || process.env.AUTOMAKER_MODEL_DEFAULT
+  );
+  let featureModel = getModelForUseCase('features');
+  if (!hasModelOverride) {
+    const defaultProvider = ProviderFactory.getDefaultProvider();
+    if (defaultProvider !== 'claude') {
+      featureModel = DEFAULT_MODELS[defaultProvider] || DEFAULT_MODELS.claude;
+    }
+  }
 
   const options = createFeatureGenerationOptions({
     cwd: projectPath,
     abortController,
     autoLoadClaudeMd,
+    model: featureModel,
   });
 
   logger.debug('SDK Options:', JSON.stringify(options, null, 2));
-  logger.info('Calling Claude Agent SDK query() for features...');
 
-  logAuthStatus('Right before SDK query() for features');
+  const effectiveModel = options.model ?? featureModel;
+  const provider = ProviderFactory.getProviderForModel(effectiveModel);
+  const providerName = provider.getName();
+
+  logger.info(`Starting feature generation with provider: ${providerName}`);
+
+  if (providerName === 'claude') {
+    logAuthStatus('Right before SDK query() for features');
+  }
+
+  const streamOptions: ExecuteOptions = {
+    prompt,
+    model: effectiveModel,
+    cwd: projectPath,
+    maxTurns: options.maxTurns,
+    allowedTools: options.allowedTools as string[] | undefined,
+    abortController,
+  };
+
+  if (providerName === 'codex') {
+    streamOptions.timeoutMs = FEATURE_GENERATION_TIMEOUT_MS;
+  }
+
+  if (providerName === 'claude') {
+    streamOptions.systemPrompt = options.systemPrompt;
+    streamOptions.settingSources = options.settingSources;
+  } else if (typeof options.systemPrompt === 'string') {
+    streamOptions.systemPrompt = options.systemPrompt;
+  }
 
   let stream;
   try {
-    stream = query({ prompt, options });
-    logger.debug('query() returned stream successfully');
+    stream = provider.executeQuery(streamOptions);
+    logger.debug('executeQuery() returned stream successfully');
   } catch (queryError) {
-    logger.error('❌ query() threw an exception:');
+    logger.error('❌ executeQuery() threw an exception:');
     logger.error('Error:', queryError);
     throw queryError;
   }
@@ -127,6 +167,8 @@ IMPORTANT: Do not ask for clarification. The specification is provided above. Ge
 
   logger.debug('Starting to iterate over feature stream...');
 
+  let streamError: Error | null = null;
+
   try {
     for await (const msg of stream) {
       messageCount++;
@@ -135,9 +177,9 @@ IMPORTANT: Do not ask for clarification. The specification is provided above. Ge
         JSON.stringify({ type: msg.type, subtype: (msg as any).subtype }, null, 2)
       );
 
-      if (msg.type === 'assistant' && msg.message.content) {
+      if (msg.type === 'assistant' && msg.message?.content) {
         for (const block of msg.message.content) {
-          if (block.type === 'text') {
+          if (block.type === 'text' && block.text) {
             responseText += block.text;
             logger.debug(`Feature text block received (${block.text.length} chars)`);
             events.emit('spec-regeneration:event', {
@@ -147,18 +189,28 @@ IMPORTANT: Do not ask for clarification. The specification is provided above. Ge
             });
           }
         }
-      } else if (msg.type === 'result' && (msg as any).subtype === 'success') {
+      } else if (msg.type === 'result' && msg.subtype === 'success') {
         logger.debug('Received success result for features');
-        responseText = (msg as any).result || responseText;
-      } else if ((msg as { type: string }).type === 'error') {
-        logger.error('❌ Received error message from feature stream:');
-        logger.error('Error message:', JSON.stringify(msg, null, 2));
+        responseText = msg.result || responseText;
+      } else if (msg.type === 'result' && msg.subtype === 'error') {
+        streamError = new Error(msg.error || 'Feature generation failed');
+        break;
+      } else if (msg.type === 'error') {
+        streamError = new Error(msg.error || 'Feature generation failed');
+        break;
       }
     }
-  } catch (streamError) {
+  } catch (error) {
+    streamError = error as Error;
+  }
+
+  if (streamError) {
     logger.error('❌ Error while iterating feature stream:');
     logger.error('Stream error:', streamError);
-    throw streamError;
+    if (!responseText.trim()) {
+      throw streamError;
+    }
+    logger.warn('Continuing with partial feature output after stream error');
   }
 
   logger.info(`Feature stream complete. Total messages: ${messageCount}`);

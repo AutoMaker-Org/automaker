@@ -501,6 +501,9 @@ export class AutoModeService {
         '[AutoMode]'
       );
 
+      // Resolve model once so context handling can align with provider capabilities
+      const model = resolveModelString(feature.model, this.getDefaultFeatureModel());
+
       // Build the prompt - use continuation prompt if provided (for recovery after plan approval)
       let prompt: string;
       // Load project context files (CLAUDE.md, CODE_QUALITY.md, etc.) - passed as system prompt
@@ -511,7 +514,8 @@ export class AutoModeService {
 
       // When autoLoadClaudeMd is enabled, filter out CLAUDE.md to avoid duplication
       // (SDK handles CLAUDE.md via settingSources), but keep other context files like CODE_QUALITY.md
-      const contextFilesPrompt = filterClaudeMdFromContext(contextResult, autoLoadClaudeMd);
+      const shouldFilterClaudeMd = autoLoadClaudeMd && model.startsWith('claude-');
+      const contextFilesPrompt = filterClaudeMdFromContext(contextResult, shouldFilterClaudeMd);
 
       if (options?.continuationPrompt) {
         // Continuation prompt is used when recovering from a plan approval
@@ -539,8 +543,6 @@ export class AutoModeService {
         typeof img === 'string' ? img : img.path
       );
 
-      // Get model from feature
-      const model = resolveModelString(feature.model, DEFAULT_MODELS.claude);
       console.log(`[AutoMode] Executing feature ${featureId} with model: ${model} in ${workDir}`);
 
       // Run the agent with the feature's model and images
@@ -659,7 +661,9 @@ export class AutoModeService {
       projectPath,
       fsModule: secureFs as Parameters<typeof loadContextFiles>[0]['fsModule'],
     });
-    const contextFilesPrompt = filterClaudeMdFromContext(contextResult, autoLoadClaudeMd);
+    const model = resolveModelString(feature.model, this.getDefaultFeatureModel());
+    const shouldFilterClaudeMd = autoLoadClaudeMd && model.startsWith('claude-');
+    const contextFilesPrompt = filterClaudeMdFromContext(contextResult, shouldFilterClaudeMd);
 
     // Load previous agent output for context continuity
     const featureDir = getFeatureDir(projectPath, featureId);
@@ -695,9 +699,6 @@ export class AutoModeService {
 
       // Build prompt for this pipeline step
       const prompt = this.buildPipelineStepPrompt(step, feature, previousContext);
-
-      // Get model from feature
-      const model = resolveModelString(feature.model, DEFAULT_MODELS.claude);
 
       // Run the agent for this pipeline step
       await this.runAgent(
@@ -884,6 +885,7 @@ Complete the pipeline step instructions above. Review the previous work and appl
       this.settingsService,
       '[AutoMode]'
     );
+    const model = resolveModelString(feature?.model, this.getDefaultFeatureModel());
 
     // Load project context files (CLAUDE.md, CODE_QUALITY.md, etc.) - passed as system prompt
     const contextResult = await loadContextFiles({
@@ -893,7 +895,8 @@ Complete the pipeline step instructions above. Review the previous work and appl
 
     // When autoLoadClaudeMd is enabled, filter out CLAUDE.md to avoid duplication
     // (SDK handles CLAUDE.md via settingSources), but keep other context files like CODE_QUALITY.md
-    const contextFilesPrompt = filterClaudeMdFromContext(contextResult, autoLoadClaudeMd);
+    const shouldFilterClaudeMd = autoLoadClaudeMd && model.startsWith('claude-');
+    const contextFilesPrompt = filterClaudeMdFromContext(contextResult, shouldFilterClaudeMd);
 
     // Build complete prompt with feature info, previous context, and follow-up instructions
     let fullPrompt = `## Follow-up on Feature Implementation
@@ -938,8 +941,6 @@ Address the follow-up instructions above. Review the previous work and make the 
     });
 
     try {
-      // Get model from feature (already loaded above)
-      const model = resolveModelString(feature?.model, DEFAULT_MODELS.claude);
       console.log(`[AutoMode] Follow-up for feature ${featureId} using model: ${model}`);
 
       // Update feature status to in_progress
@@ -1749,6 +1750,14 @@ Format your response as a structured markdown document.`;
   }
 
   /**
+   * Determine the fallback model when a feature doesn't specify one.
+   */
+  private getDefaultFeatureModel(): string {
+    const defaultProvider = ProviderFactory.getDefaultProvider();
+    return DEFAULT_MODELS[defaultProvider] || DEFAULT_MODELS.claude;
+  }
+
+  /**
    * Get the planning prompt prefix based on feature's planning mode
    */
   private async getPlanningPromptPrefix(feature: Feature): Promise<string> {
@@ -2007,6 +2016,7 @@ This mock response was generated because AUTOMAKER_MOCK_AGENT=true was set.
       cwd: workDir,
       model: model,
       abortController,
+      systemPrompt: options?.systemPrompt,
       autoLoadClaudeMd,
       enableSandboxMode,
       mcpServers: Object.keys(mcpServers).length > 0 ? mcpServers : undefined,
@@ -2048,7 +2058,7 @@ This mock response was generated because AUTOMAKER_MOCK_AGENT=true was set.
       cwd: workDir,
       allowedTools: allowedTools,
       abortController,
-      systemPrompt: sdkOptions.systemPrompt,
+      systemPrompt: sdkOptions.systemPrompt ?? options?.systemPrompt,
       settingSources: sdkOptions.settingSources,
       sandbox: sdkOptions.sandbox, // Pass sandbox configuration
       mcpServers: Object.keys(mcpServers).length > 0 ? mcpServers : undefined, // Pass MCP servers configuration
