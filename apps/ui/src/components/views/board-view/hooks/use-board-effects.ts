@@ -130,7 +130,10 @@ export function useBoardEffects({
     const checkAllContexts = async () => {
       const featuresWithPotentialContext = features.filter(
         (f) =>
-          f.status === 'in_progress' || f.status === 'waiting_approval' || f.status === 'verified'
+          f.status === 'in_progress' ||
+          f.status === 'waiting_approval' ||
+          f.status === 'verified' ||
+          (typeof f.status === 'string' && f.status.startsWith('pipeline_'))
       );
       const contextChecks = await Promise.all(
         featuresWithPotentialContext.map(async (f) => ({
