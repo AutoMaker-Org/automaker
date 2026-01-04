@@ -73,7 +73,8 @@ describe('claude-provider.ts', () => {
           maxTurns: 10,
           cwd: '/test/dir',
           allowedTools: ['Read', 'Write'],
-          permissionMode: 'default',
+          permissionMode: 'bypassPermissions',
+          allowDangerouslySkipPermissions: true,
         }),
       });
     });
