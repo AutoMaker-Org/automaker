@@ -238,10 +238,15 @@ export class AgentService {
       // Load MCP permission settings (global setting only)
       const mcpPermissions = await getMCPPermissionSettings(this.settingsService, '[AgentService]');
 
-      // Load project context files (CLAUDE.md, CODE_QUALITY.md, etc.)
+      // Load project context files (CLAUDE.md, CODE_QUALITY.md, etc.) and memory files
+      // Use the user's message as task context for smart memory selection
       const contextResult = await loadContextFiles({
         projectPath: effectiveWorkDir,
         fsModule: secureFs as Parameters<typeof loadContextFiles>[0]['fsModule'],
+        taskContext: {
+          title: message.substring(0, 200), // Use first 200 chars as title
+          description: message,
+        },
       });
 
       // When autoLoadClaudeMd is enabled, filter out CLAUDE.md to avoid duplication
