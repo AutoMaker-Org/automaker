@@ -5,13 +5,50 @@ import { collectAsyncGenerator } from '../../utils/helpers.js';
 
 vi.mock('@anthropic-ai/claude-agent-sdk');
 
+const MOCK_RESPONSE_TEXT = 'Mock response from Claude provider.';
+const MOCK_PROMPT = 'Test';
+const MOCK_CWD = '/test';
+const MOCK_MODEL = 'claude-opus-4-5-20251101';
+const OUTPUT_FORMAT_TYPE = 'json_schema' as const;
+const SCHEMA_TYPE_OBJECT = 'object' as const;
+const SCHEMA_TYPE_STRING = 'string' as const;
+const SCHEMA_TYPE_INTEGER = 'integer' as const;
+const SCHEMA_TYPE_BOOLEAN = 'boolean' as const;
+const SCHEMA_TYPE_ARRAY = 'array' as const;
+const SCHEMA_TYPE_NUMBER = 'number' as const;
+const SCHEMA_TYPE_NULL = 'null' as const;
+const SCHEMA_KEY_TITLE = 'title';
+const SCHEMA_KEY_COUNT = 'count';
+const SCHEMA_KEY_ENABLED = 'enabled';
+const SCHEMA_KEY_TAGS = 'tags';
+const SCHEMA_KEY_DETAILS = 'details';
+const SCHEMA_KEY_METADATA = 'metadata';
+const SCHEMA_KEY_FALLBACK = 'fallback';
+const SCHEMA_KEY_NOTE = 'note';
+const SCHEMA_KEY_NAME = 'name';
+const DEFAULT_MOCK_STRING = 'mock';
+const DEFAULT_MOCK_NUMBER = 0;
+const DEFAULT_MOCK_BOOLEAN = false;
+const DEFAULT_MOCK_ARRAY: unknown[] = [];
+
 describe('claude-provider.ts', () => {
   let provider: ClaudeProvider;
+  let originalMockAgent: string | undefined;
 
   beforeEach(() => {
     vi.clearAllMocks();
     provider = new ClaudeProvider();
     delete process.env.ANTHROPIC_API_KEY;
+    originalMockAgent = process.env.AUTOMAKER_MOCK_AGENT;
+    delete process.env.AUTOMAKER_MOCK_AGENT;
+  });
+
+  afterEach(() => {
+    if (originalMockAgent === undefined) {
+      delete process.env.AUTOMAKER_MOCK_AGENT;
+    } else {
+      process.env.AUTOMAKER_MOCK_AGENT = originalMockAgent;
+    }
   });
 
   describe('getName', () => {
@@ -228,6 +265,132 @@ describe('claude-provider.ts', () => {
         options: expect.objectContaining({
           maxTurns: 20,
         }),
+      });
+    });
+
+    it('should return mock response when AUTOMAKER_MOCK_AGENT is true', async () => {
+      process.env.AUTOMAKER_MOCK_AGENT = 'true';
+
+      const generator = provider.executeQuery({
+        prompt: MOCK_PROMPT,
+        cwd: MOCK_CWD,
+        model: MOCK_MODEL,
+      });
+
+      const results = await collectAsyncGenerator(generator);
+
+      expect(sdk.query).not.toHaveBeenCalled();
+      expect(results).toHaveLength(2);
+      expect(results[0]).toMatchObject({
+        type: 'assistant',
+        message: {
+          role: 'assistant',
+          content: [{ type: 'text', text: MOCK_RESPONSE_TEXT }],
+        },
+      });
+      expect(results[1]).toMatchObject({
+        type: 'result',
+        subtype: 'success',
+        result: MOCK_RESPONSE_TEXT,
+      });
+    });
+
+    it('should return structured output when schema is provided in mock mode', async () => {
+      process.env.AUTOMAKER_MOCK_AGENT = 'true';
+
+      const outputFormat = {
+        type: OUTPUT_FORMAT_TYPE,
+        schema: {
+          type: SCHEMA_TYPE_OBJECT,
+          properties: {
+            [SCHEMA_KEY_TITLE]: { type: [SCHEMA_TYPE_STRING, SCHEMA_TYPE_NULL] },
+            [SCHEMA_KEY_COUNT]: { type: SCHEMA_TYPE_INTEGER },
+            [SCHEMA_KEY_ENABLED]: { type: SCHEMA_TYPE_BOOLEAN },
+            [SCHEMA_KEY_TAGS]: { type: SCHEMA_TYPE_ARRAY },
+            [SCHEMA_KEY_DETAILS]: {
+              type: SCHEMA_TYPE_OBJECT,
+              properties: { [SCHEMA_KEY_NOTE]: { type: SCHEMA_TYPE_STRING } },
+            },
+            [SCHEMA_KEY_METADATA]: {
+              properties: { [SCHEMA_KEY_NOTE]: { type: SCHEMA_TYPE_STRING } },
+            },
+            [SCHEMA_KEY_FALLBACK]: {},
+          },
+          required: [
+            SCHEMA_KEY_TITLE,
+            SCHEMA_KEY_COUNT,
+            SCHEMA_KEY_ENABLED,
+            SCHEMA_KEY_TAGS,
+            SCHEMA_KEY_DETAILS,
+            SCHEMA_KEY_METADATA,
+            SCHEMA_KEY_FALLBACK,
+          ],
+        },
+      } as const;
+
+      const generator = provider.executeQuery({
+        prompt: MOCK_PROMPT,
+        cwd: MOCK_CWD,
+        model: MOCK_MODEL,
+        outputFormat,
+      });
+
+      const results = await collectAsyncGenerator(generator);
+
+      const expectedOutput = {
+        [SCHEMA_KEY_TITLE]: DEFAULT_MOCK_STRING,
+        [SCHEMA_KEY_COUNT]: DEFAULT_MOCK_NUMBER,
+        [SCHEMA_KEY_ENABLED]: DEFAULT_MOCK_BOOLEAN,
+        [SCHEMA_KEY_TAGS]: DEFAULT_MOCK_ARRAY,
+        [SCHEMA_KEY_DETAILS]: { [SCHEMA_KEY_NOTE]: DEFAULT_MOCK_STRING },
+        [SCHEMA_KEY_METADATA]: { [SCHEMA_KEY_NOTE]: DEFAULT_MOCK_STRING },
+        [SCHEMA_KEY_FALLBACK]: DEFAULT_MOCK_STRING,
+      };
+
+      expect(sdk.query).not.toHaveBeenCalled();
+      expect(JSON.parse(results[1].result as string)).toEqual(expectedOutput);
+      expect(results[1]).toMatchObject({
+        type: 'result',
+        subtype: 'success',
+        structured_output: expectedOutput,
+      });
+    });
+
+    it('should use property keys when schema has no required fields in mock mode', async () => {
+      process.env.AUTOMAKER_MOCK_AGENT = 'true';
+
+      const outputFormat = {
+        type: OUTPUT_FORMAT_TYPE,
+        schema: {
+          type: SCHEMA_TYPE_OBJECT,
+          properties: {
+            [SCHEMA_KEY_NAME]: { type: SCHEMA_TYPE_STRING },
+            [SCHEMA_KEY_COUNT]: { type: SCHEMA_TYPE_NUMBER },
+          },
+        },
+      } as const;
+
+      const generator = provider.executeQuery({
+        prompt: MOCK_PROMPT,
+        cwd: MOCK_CWD,
+        model: MOCK_MODEL,
+        outputFormat,
+      });
+
+      const results = await collectAsyncGenerator(generator);
+      const parsed = JSON.parse(results[1].result as string);
+
+      expect(parsed).toEqual({
+        [SCHEMA_KEY_NAME]: DEFAULT_MOCK_STRING,
+        [SCHEMA_KEY_COUNT]: DEFAULT_MOCK_NUMBER,
+      });
+      expect(results[1]).toMatchObject({
+        type: 'result',
+        subtype: 'success',
+        structured_output: {
+          [SCHEMA_KEY_NAME]: DEFAULT_MOCK_STRING,
+          [SCHEMA_KEY_COUNT]: DEFAULT_MOCK_NUMBER,
+        },
       });
     });
 
