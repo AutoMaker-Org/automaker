@@ -2,11 +2,24 @@ import { useState, useCallback } from 'react';
 import { createLogger } from '@automaker/utils/logger';
 
 interface UseCliStatusOptions {
-  cliType: 'claude';
+  cliType: 'claude' | 'codex';
   statusApi: () => Promise<any>;
   setCliStatus: (status: any) => void;
   setAuthStatus: (status: any) => void;
 }
+
+const VALID_AUTH_METHODS = {
+  claude: [
+    'oauth_token_env',
+    'oauth_token',
+    'api_key',
+    'api_key_env',
+    'credentials_file',
+    'cli_authenticated',
+    'none',
+  ],
+  codex: ['cli_authenticated', 'api_key', 'api_key_env', 'none'],
+} as const;
 
 export function useCliStatus({
   cliType,
@@ -35,16 +48,7 @@ export function useCliStatus({
         setCliStatus(cliStatus);
 
         if (result.auth) {
-          // Validate method is one of the expected values, default to "none"
-          const validMethods = [
-            'oauth_token_env',
-            'oauth_token',
-            'api_key',
-            'api_key_env',
-            'credentials_file',
-            'cli_authenticated',
-            'none',
-          ] as const;
+          const validMethods = VALID_AUTH_METHODS[cliType];
           type AuthMethod = (typeof validMethods)[number];
           const method: AuthMethod = validMethods.includes(result.auth.method as AuthMethod)
             ? (result.auth.method as AuthMethod)
@@ -57,6 +61,9 @@ export function useCliStatus({
             apiKeyValid: result.auth.hasStoredApiKey || result.auth.hasEnvApiKey,
             hasEnvOAuthToken: result.auth.hasEnvOAuthToken,
             hasEnvApiKey: result.auth.hasEnvApiKey,
+            hasAuthFile: result.auth.hasAuthFile,
+            hasOAuthToken: result.auth.hasOAuthToken,
+            hasApiKey: result.auth.hasApiKey,
           };
           setAuthStatus(authStatus);
         }

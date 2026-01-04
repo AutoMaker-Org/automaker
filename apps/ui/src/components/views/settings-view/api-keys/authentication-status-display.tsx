@@ -1,21 +1,24 @@
 import { Label } from '@/components/ui/label';
-import { CheckCircle2, AlertCircle, Info, Terminal } from 'lucide-react';
-import type { ClaudeAuthStatus } from '@/store/setup-store';
+import { CheckCircle2, AlertCircle, Info } from 'lucide-react';
+import type { ClaudeAuthStatus, CodexAuthStatus } from '@/store/setup-store';
+import { AnthropicIcon, OpenAIIcon } from '@/components/ui/provider-icon';
 
 interface AuthenticationStatusDisplayProps {
   claudeAuthStatus: ClaudeAuthStatus | null;
+  codexAuthStatus: CodexAuthStatus | null;
   apiKeyStatus: {
     hasAnthropicKey: boolean;
-    hasGoogleKey: boolean;
+    hasOpenAIKey: boolean;
   } | null;
   apiKeys: {
     anthropic: string;
-    google: string;
+    openai: string;
   };
 }
 
 export function AuthenticationStatusDisplay({
   claudeAuthStatus,
+  codexAuthStatus,
   apiKeyStatus,
   apiKeys,
 }: AuthenticationStatusDisplayProps) {
@@ -32,7 +35,7 @@ export function AuthenticationStatusDisplay({
         {/* Claude Authentication Status */}
         <div className="p-3 rounded-lg bg-card border border-border">
           <div className="flex items-center gap-2 mb-1.5">
-            <Terminal className="w-4 h-4 text-brand-500" />
+            <AnthropicIcon className="w-4 h-4 text-brand-500" />
             <span className="text-sm font-medium text-foreground">Claude (Anthropic)</span>
           </div>
           <div className="space-y-1.5 text-xs min-h-12">
@@ -65,6 +68,51 @@ export function AuthenticationStatusDisplay({
                 <span>Using environment variable (ANTHROPIC_API_KEY)</span>
               </div>
             ) : apiKeys.anthropic ? (
+              <div className="flex items-center gap-2 text-blue-400">
+                <Info className="w-3 h-3 shrink-0" />
+                <span>Using manual API key from settings</span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1.5 text-yellow-500 py-0.5">
+                <AlertCircle className="w-3 h-3 shrink-0" />
+                <span className="text-xs">Not configured</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Codex Authentication Status */}
+        <div className="p-3 rounded-lg bg-card border border-border">
+          <div className="flex items-center gap-2 mb-1.5">
+            <OpenAIIcon className="w-4 h-4 text-brand-500" />
+            <span className="text-sm font-medium text-foreground">Codex (OpenAI)</span>
+          </div>
+          <div className="space-y-1.5 text-xs min-h-12">
+            {codexAuthStatus?.authenticated ? (
+              <>
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="w-3 h-3 text-green-500 shrink-0" />
+                  <span className="text-green-400 font-medium">Authenticated</span>
+                </div>
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <Info className="w-3 h-3 shrink-0" />
+                  <span>
+                    {codexAuthStatus.method === 'cli_authenticated'
+                      ? 'Using Codex CLI authentication'
+                      : codexAuthStatus.method === 'api_key_env'
+                        ? 'Using OPENAI_API_KEY'
+                        : codexAuthStatus.method === 'api_key'
+                          ? 'Using stored API key'
+                          : `Using ${codexAuthStatus.method || 'detected'} authentication`}
+                  </span>
+                </div>
+              </>
+            ) : apiKeyStatus?.hasOpenAIKey ? (
+              <div className="flex items-center gap-2 text-blue-400">
+                <Info className="w-3 h-3 shrink-0" />
+                <span>Using environment variable (OPENAI_API_KEY)</span>
+              </div>
+            ) : apiKeys.openai ? (
               <div className="flex items-center gap-2 text-blue-400">
                 <Info className="w-3 h-3 shrink-0" />
                 <span>Using manual API key from settings</span>

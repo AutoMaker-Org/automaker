@@ -7,6 +7,8 @@
 
 // Re-export all provider types from @automaker/types
 export type {
+  CodexApprovalPolicy,
+  CodexSandboxMode,
   ProviderConfig,
   ConversationMessage,
   ExecuteOptions,

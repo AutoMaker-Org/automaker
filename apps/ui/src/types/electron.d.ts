@@ -560,6 +560,23 @@ export interface ElectronAPI {
     error?: string;
   }>;
 
+  // Codex CLI Detection API
+  checkCodexCli: () => Promise<{
+    success: boolean;
+    status?: string;
+    method?: string;
+    version?: string;
+    path?: string;
+    recommendation?: string;
+    installCommands?: {
+      macos?: string;
+      windows?: string;
+      linux?: string;
+      npm?: string;
+    };
+    error?: string;
+  }>;
+
   // Model Management APIs
   model: {
     // Get all available models from all providers
@@ -592,6 +609,16 @@ export interface ElectronAPI {
 
   // Spec Regeneration APIs
   specRegeneration: SpecRegenerationAPI;
+
+  // Claude API
+  claude?: {
+    getUsage: () => Promise<ClaudeUsageResponse>;
+  };
+
+  // Codex API
+  codex?: {
+    getUsage: () => Promise<CodexUsageResponse>;
+  };
 }
 
 export interface WorktreeInfo {
@@ -975,7 +1002,7 @@ export interface ModelDefinition {
   id: string;
   name: string;
   modelString: string;
-  provider: 'claude';
+  provider: 'claude' | 'codex' | 'openai';
   description?: string;
   tier?: 'basic' | 'standard' | 'premium';
   default?: boolean;
@@ -983,7 +1010,10 @@ export interface ModelDefinition {
 
 // Provider status type
 export interface ProviderStatus {
-  status: 'installed' | 'not_installed' | 'api_key_only';
+  status?: 'installed' | 'not_installed' | 'api_key_only';
+  available?: boolean;
+  hasApiKey?: boolean;
+  authenticated?: boolean;
   method?: string;
   version?: string;
   path?: string;
@@ -995,6 +1025,69 @@ export interface ProviderStatus {
     npm?: string;
   };
 }
+
+export type ClaudeUsage = {
+  sessionTokensUsed: number;
+  sessionLimit: number;
+  sessionPercentage: number;
+  sessionResetTime: string;
+  sessionResetText: string;
+
+  weeklyTokensUsed: number;
+  weeklyLimit: number;
+  weeklyPercentage: number;
+  weeklyResetTime: string;
+  weeklyResetText: string;
+
+  sonnetWeeklyTokensUsed: number;
+  sonnetWeeklyPercentage: number;
+  sonnetResetText: string;
+
+  costUsed: number | null;
+  costLimit: number | null;
+  costCurrency: string | null;
+
+  lastUpdated: string;
+  userTimezone: string;
+};
+
+export type ClaudeUsageResponse = ClaudeUsage | { error: string; message?: string };
+
+export type CodexPlanType =
+  | 'free'
+  | 'plus'
+  | 'pro'
+  | 'team'
+  | 'business'
+  | 'enterprise'
+  | 'edu'
+  | 'unknown';
+
+export type CodexCreditsSnapshot = {
+  balance: string | null;
+  hasCredits: boolean;
+  unlimited: boolean;
+};
+
+export type CodexRateLimitWindow = {
+  usedPercent: number;
+  windowDurationMins: number | null;
+  resetsAt: number | null;
+};
+
+export type CodexRateLimits = {
+  primary: CodexRateLimitWindow | null;
+  secondary: CodexRateLimitWindow | null;
+  credits: CodexCreditsSnapshot | null;
+  planType: CodexPlanType | null;
+};
+
+export type CodexUsage = {
+  rateLimits: CodexRateLimits;
+  lastUpdated: string;
+};
+
+export type CodexUsageResponse = CodexUsage | { error: string; message?: string };
 
 declare global {
   interface Window {

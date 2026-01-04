@@ -5,6 +5,8 @@
 import { createLogger } from '@automaker/utils';
 
 const logger = createLogger('SpecRegeneration');
+const ANTHROPIC_API_KEY_ENV = 'ANTHROPIC_API_KEY';
+const OPENAI_API_KEY_ENV = 'OPENAI_API_KEY';
 
 // Shared state for tracking generation status - private
 let isRunning = false;
@@ -32,17 +34,27 @@ export function setRunningState(running: boolean, controller: AbortController | 
  * Helper to log authentication status
  */
 export function logAuthStatus(context: string): void {
-  const hasApiKey = !!process.env.ANTHROPIC_API_KEY;
+  const hasAnthropicKey = !!process.env[ANTHROPIC_API_KEY_ENV];
+  const hasOpenAIKey = !!process.env[OPENAI_API_KEY_ENV];
 
   logger.info(`${context} - Auth Status:`);
   logger.info(
     `  ANTHROPIC_API_KEY: ${
-      hasApiKey ? 'SET (' + process.env.ANTHROPIC_API_KEY?.substring(0, 20) + '...)' : 'NOT SET'
+      hasAnthropicKey
+        ? 'SET (' + process.env[ANTHROPIC_API_KEY_ENV]?.substring(0, 20) + '...)'
+        : 'NOT SET'
+    }`
+  );
+  logger.info(
+    `  OPENAI_API_KEY: ${
+      hasOpenAIKey
+        ? 'SET (' + process.env[OPENAI_API_KEY_ENV]?.substring(0, 20) + '...)'
+        : 'NOT SET'
     }`
   );
 
-  if (!hasApiKey) {
-    logger.warn('⚠️  WARNING: No authentication configured! SDK will fail.');
+  if (!hasAnthropicKey && !hasOpenAIKey) {
+    logger.warn('WARNING: No authentication configured! Provider calls will fail.');
   }
 }
 

@@ -19,6 +19,9 @@ import {
   type ThinkingLevel,
 } from '@automaker/types';
 
+const CODEX_MODEL_PREFIXES = ['gpt-'];
+const OPENAI_O_SERIES_PATTERN = /^o\d/;
+
 /**
  * Resolve a model key/alias to a full model string
  *
@@ -77,6 +80,15 @@ export function resolveModelString(
   if (resolved) {
     console.log(`[ModelResolver] Resolved Claude model alias: "${modelKey}" -> "${resolved}"`);
     return resolved;
+  }
+
+  // OpenAI/Codex models - pass through unchanged
+  if (
+    CODEX_MODEL_PREFIXES.some((prefix) => modelKey.startsWith(prefix)) ||
+    OPENAI_O_SERIES_PATTERN.test(modelKey)
+  ) {
+    console.log(`[ModelResolver] Using OpenAI/Codex model: ${modelKey}`);
+    return modelKey;
   }
 
   // Unknown model key - use default

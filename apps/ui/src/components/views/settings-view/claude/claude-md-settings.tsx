@@ -2,6 +2,7 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { FileCode, Shield } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { AnthropicIcon } from '@/components/ui/provider-icon';
 
 interface ClaudeMdSettingsProps {
   autoLoadClaudeMd: boolean;
@@ -46,7 +47,7 @@ export function ClaudeMdSettings({
       <div className="p-6 border-b border-border/50 bg-gradient-to-r from-transparent via-accent/5 to-transparent">
         <div className="flex items-center gap-3 mb-2">
           <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-brand-500/20 to-brand-600/10 flex items-center justify-center border border-brand-500/20">
-            <FileCode className="w-5 h-5 text-brand-500" />
+            <AnthropicIcon className="w-5 h-5 text-brand-500" />
           </div>
           <h2 className="text-lg font-semibold text-foreground tracking-tight">
             CLAUDE.md Integration

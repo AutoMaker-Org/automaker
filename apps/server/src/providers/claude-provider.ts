@@ -104,6 +104,8 @@ export class ClaudeProvider extends BaseProvider {
       ...(options.mcpServers && { mcpServers: options.mcpServers }),
       // Extended thinking configuration
       ...(maxThinkingTokens && { maxThinkingTokens }),
+      // Forward structured output configuration
+      ...(options.outputFormat && { outputFormat: options.outputFormat }),
     };
 
     // Build prompt payload

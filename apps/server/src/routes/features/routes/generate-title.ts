@@ -1,15 +1,20 @@
 /**
  * POST /features/generate-title endpoint - Generate a concise title from description
  *
- * Uses Claude Haiku to generate a short, descriptive title from feature description.
+ * Uses the configured provider to generate a short, descriptive title from feature description.
  */
 
 import type { Request, Response } from 'express';
-import { query } from '@anthropic-ai/claude-agent-sdk';
 import { createLogger } from '@automaker/utils';
 import { CLAUDE_MODEL_MAP } from '@automaker/model-resolver';
+import { ProviderFactory } from '../../../providers/provider-factory.js';
+import type { ProviderMessage } from '@automaker/types';
 
 const logger = createLogger('GenerateTitle');
+const TITLE_MAX_TURNS = 1;
+const ERROR_DESCRIPTION_REQUIRED = 'description is required and must be a string';
+const ERROR_DESCRIPTION_EMPTY = 'description cannot be empty';
+const ERROR_TITLE_EMPTY = 'Failed to generate title - empty response';
 
 interface GenerateTitleRequestBody {
   description: string;
@@ -34,16 +39,7 @@ Rules:
 - No quotes, periods, or extra formatting
 - Capture the essence of the feature in a scannable way`;
 
-async function extractTextFromStream(
-  stream: AsyncIterable<{
-    type: string;
-    subtype?: string;
-    result?: string;
-    message?: {
-      content?: Array<{ type: string; text?: string }>;
-    };
-  }>
-): Promise<string> {
+async function extractTextFromStream(stream: AsyncIterable<ProviderMessage>): Promise<string> {
   let responseText = '';
 
   for await (const msg of stream) {
@@ -69,7 +65,7 @@ export function createGenerateTitleHandler(): (req: Request, res: Response) => P
       if (!description || typeof description !== 'string') {
         const response: GenerateTitleErrorResponse = {
           success: false,
-          error: 'description is required and must be a string',
+          error: ERROR_DESCRIPTION_REQUIRED,
         };
         res.status(400).json(response);
         return;
@@ -79,7 +75,7 @@ export function createGenerateTitleHandler(): (req: Request, res: Response) => P
       if (trimmedDescription.length === 0) {
         const response: GenerateTitleErrorResponse = {
           success: false,
-          error: 'description cannot be empty',
+          error: ERROR_DESCRIPTION_EMPTY,
         };
         res.status(400).json(response);
         return;
@@ -89,24 +85,24 @@ export function createGenerateTitleHandler(): (req: Request, res: Response) => P
 
       const userPrompt = `Generate a concise title for this feature:\n\n${trimmedDescription}`;
 
-      const stream = query({
+      const model = CLAUDE_MODEL_MAP.haiku;
+      const provider = ProviderFactory.getProviderForModel(model);
+      const stream = provider.executeQuery({
         prompt: userPrompt,
-        options: {
-          model: CLAUDE_MODEL_MAP.haiku,
-          systemPrompt: SYSTEM_PROMPT,
-          maxTurns: 1,
-          allowedTools: [],
-          permissionMode: 'default',
-        },
+        model,
+        cwd: process.cwd(),
+        systemPrompt: SYSTEM_PROMPT,
+        maxTurns: TITLE_MAX_TURNS,
+        allowedTools: [],
       });
 
       const title = await extractTextFromStream(stream);
 
       if (!title || title.trim().length === 0) {
-        logger.warn('Received empty response from Claude');
+        logger.warn('Received empty response from provider');
         const response: GenerateTitleErrorResponse = {
           success: false,
-          error: 'Failed to generate title - empty response',
+          error: ERROR_TITLE_EMPTY,
         };
         res.status(500).json(response);
         return;

@@ -5,7 +5,7 @@ import { createLogger } from '@automaker/utils/logger';
 const logger = createLogger('CliInstallation');
 
 interface UseCliInstallationOptions {
-  cliType: 'claude';
+  cliType: 'claude' | 'codex';
   installApi: () => Promise<any>;
   onProgressEvent?: (callback: (progress: any) => void) => (() => void) | undefined;
   onSuccess?: () => void;
@@ -47,8 +47,8 @@ export function useCliInstallation({
       unsubscribe?.();
 
       if (result.success) {
-        if (cliType === 'claude' && onSuccess && getStoreState) {
-          // Claude-specific: retry logic to detect installation
+        if (onSuccess && getStoreState) {
+          // Retry logic to detect installation
           let retries = 5;
           let detected = false;
 

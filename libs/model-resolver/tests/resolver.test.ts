@@ -178,18 +178,26 @@ describe('model-resolver', () => {
         expect(consoleWarnSpy).toHaveBeenCalledWith(expect.stringContaining('unknown-model'));
       });
 
-      it('should use custom default for unknown model key', () => {
-        const customDefault = 'claude-opus-4-20241113';
-        const result = resolveModelString('gpt-4', customDefault);
-
-        expect(result).toBe(customDefault);
-      });
-
       it('should warn and show default being used', () => {
         const customDefault = 'claude-custom-default';
         resolveModelString('invalid-key', customDefault);
 
         expect(consoleWarnSpy).toHaveBeenCalledWith(expect.stringContaining(customDefault));
+      });
+    });
+
+    describe('with Codex/OpenAI models', () => {
+      it('should pass through gpt models unchanged', () => {
+        const result = resolveModelString('gpt-5.2');
+        expect(result).toBe('gpt-5.2');
+        expect(consoleLogSpy).toHaveBeenCalledWith(
+          expect.stringContaining('Using OpenAI/Codex model')
+        );
+      });
+
+      it('should pass through o-series models unchanged', () => {
+        const result = resolveModelString('o1');
+        expect(result).toBe('o1');
       });
     });
 

@@ -166,6 +166,16 @@ export async function* spawnJSONLProcess(options: SubprocessOptions): AsyncGener
     });
   });
 
+  // Handle stderr output even when exit code is 0
+  // Some CLIs (like Codex) exit with 0 but write auth errors to stderr
+  if (exitCode === 0 && stderrOutput) {
+    console.error(`[SubprocessManager] Process exited with code 0 but has stderr: ${stderrOutput}`);
+    yield {
+      type: 'error',
+      error: stderrOutput,
+    };
+  }
+
   // Handle non-zero exit codes
   if (exitCode !== 0 && exitCode !== null) {
     const errorMessage = stderrOutput || `Process exited with code ${exitCode}`;
@@ -176,7 +186,7 @@ export async function* spawnJSONLProcess(options: SubprocessOptions): AsyncGener
     };
   }
 
-  // Process completed successfully
+  // Process completed successfully (no errors)
   if (exitCode === 0 && !stderrOutput) {
     console.log('[SubprocessManager] Process completed successfully');
   }

@@ -19,6 +19,9 @@ export type {
   McpHttpServerConfig,
 } from './provider.js';
 
+// Codex CLI types
+export type { CodexSandboxMode, CodexApprovalPolicy } from './codex.js';
+
 // Feature types
 export type { Feature, FeatureImagePath, FeatureTextFilePath, FeatureStatus } from './feature.js';
 
@@ -37,7 +40,15 @@ export type { ErrorType, ErrorInfo } from './error.js';
 export type { ImageData, ImageContentBlock } from './image.js';
 
 // Model types and constants
-export { CLAUDE_MODEL_MAP, DEFAULT_MODELS, type ModelAlias } from './model.js';
+export {
+  CLAUDE_MODEL_MAP,
+  CODEX_MODEL_MAP,
+  CODEX_MODEL_IDS,
+  DEFAULT_MODELS,
+  type ModelAlias,
+  type CodexModelId,
+  type AgentModel,
+} from './model.js';
 
 // Event types
 export type { EventType, EventCallback } from './event.js';
@@ -106,6 +117,7 @@ export {
 export type { ModelOption, ThinkingLevelOption } from './model-display.js';
 export {
   CLAUDE_MODELS,
+  CODEX_MODELS,
   THINKING_LEVELS,
   THINKING_LEVEL_LABELS,
   getModelDisplayName,

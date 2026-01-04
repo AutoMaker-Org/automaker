@@ -223,18 +223,20 @@ for (const msg of historyMessages) {
 
 ---
 
-### 2. Codex Provider (CLI-based)
+### 2. Codex Provider (CLI + SDK hybrid)
 
 **Location**: `apps/server/src/providers/codex-provider.ts`
 
-Spawns OpenAI Codex CLI as a subprocess and converts JSONL output to provider format.
+Uses OpenAI Codex CLI for tool-enabled requests and falls back to the OpenAI SDK for
+no-tool requests (including vision prompts).
 
 #### Features
 
-- ✅ Subprocess execution (`codex exec --model <model> --json --full-auto`)
+- ✅ CLI subprocess execution (`codex exec --model <model> --json --full-auto`) for tool use
+- ✅ SDK execution for no-tool requests (Responses API)
 - ✅ JSONL stream parsing
 - ✅ Supports GPT-5.1/5.2 Codex models
-- ✅ Vision support (GPT-5.1, GPT-5.2)
+- ✅ Vision support for no-tool prompts (SDK path)
 - ✅ Tool use via MCP servers
 - ✅ Timeout detection (30s no output)
 - ✅ Abort signal handling
@@ -258,10 +260,10 @@ Routes models that:
 
 #### Authentication
 
-Supports two methods:
+Supports two methods (CLI preferred for tool-enabled workflows):
 
 1. **CLI login**: `codex login` (OAuth tokens stored in `~/.codex/auth.json`)
-2. **API key**: `OPENAI_API_KEY` environment variable
+2. **API key**: `OPENAI_API_KEY` environment variable (SDK fallback)
 
 #### Installation Detection
 

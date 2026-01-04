@@ -72,6 +72,49 @@ export function getClaudeCliPaths(): string[] {
 }
 
 /**
+ * Get common paths where Codex CLI might be installed
+ */
+export function getCodexCliPaths(): string[] {
+  const isWindows = process.platform === 'win32';
+
+  if (isWindows) {
+    const appData = process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming');
+    return [
+      path.join(os.homedir(), '.local', 'bin', 'codex.exe'),
+      path.join(appData, 'npm', 'codex.cmd'),
+      path.join(appData, 'npm', 'codex'),
+      path.join(appData, '.npm-global', 'bin', 'codex.cmd'),
+      path.join(appData, '.npm-global', 'bin', 'codex'),
+    ];
+  }
+
+  return [
+    path.join(os.homedir(), '.local', 'bin', 'codex'),
+    '/opt/homebrew/bin/codex',
+    '/usr/local/bin/codex',
+    path.join(os.homedir(), '.npm-global', 'bin', 'codex'),
+  ];
+}
+
+const CODEX_CONFIG_DIR_NAME = '.codex';
+const CODEX_AUTH_FILENAME = 'auth.json';
+const CODEX_TOKENS_KEY = 'tokens';
+
+/**
+ * Get the Codex configuration directory path
+ */
+export function getCodexConfigDir(): string {
+  return path.join(os.homedir(), CODEX_CONFIG_DIR_NAME);
+}
+
+/**
+ * Get path to Codex auth file
+ */
+export function getCodexAuthPath(): string {
+  return path.join(getCodexConfigDir(), CODEX_AUTH_FILENAME);
+}
+
+/**
  * Get the Claude configuration directory path
  */
 export function getClaudeConfigDir(): string {
@@ -407,12 +450,17 @@ function getAllAllowedSystemPaths(): string[] {
     ...getGitHubCliPaths(),
     // Claude CLI paths
     ...getClaudeCliPaths(),
+    // Codex CLI paths
+    ...getCodexCliPaths(),
     // Claude config directory and files
     getClaudeConfigDir(),
     ...getClaudeCredentialPaths(),
     getClaudeSettingsPath(),
     getClaudeStatsCachePath(),
     getClaudeProjectsDir(),
+    // Codex config directory and files
+    getCodexConfigDir(),
+    getCodexAuthPath(),
     // Shell paths
     ...getShellPaths(),
     // Node.js system paths
@@ -432,6 +480,8 @@ function getAllAllowedSystemDirs(): string[] {
     // Claude config
     getClaudeConfigDir(),
     getClaudeProjectsDir(),
+    // Codex config
+    getCodexConfigDir(),
     // Version managers (need recursive access for version directories)
     ...getNvmPaths(),
     ...getFnmPaths(),
@@ -741,6 +791,13 @@ export async function findClaudeCliPath(): Promise<string | null> {
 }
 
 /**
+ * Check if Codex CLI is installed and return its path
+ */
+export async function findCodexCliPath(): Promise<string | null> {
+  return findFirstExistingPath(getCodexCliPaths());
+}
+
+/**
  * Get Claude authentication status by checking various indicators
  */
 export interface ClaudeAuthIndicators {
@@ -808,6 +865,62 @@ export async function getClaudeAuthIndicators(): Promise<ClaudeAuthIndicators> {
     } catch {
       // Continue to next path
     }
+  }
+
+  return result;
+}
+
+/**
+ * Get Codex authentication status by checking auth file contents
+ */
+export interface CodexAuthIndicators {
+  hasAuthFile: boolean;
+  hasOAuthToken: boolean;
+  hasApiKey: boolean;
+}
+
+const CODEX_OAUTH_KEYS = ['access_token', 'oauth_token'] as const;
+const CODEX_API_KEY_KEYS = ['api_key', 'OPENAI_API_KEY'] as const;
+
+function hasNonEmptyStringField(record: Record<string, unknown>, keys: readonly string[]): boolean {
+  return keys.some((key) => typeof record[key] === 'string' && record[key]);
+}
+
+function getNestedTokens(record: Record<string, unknown>): Record<string, unknown> | null {
+  const tokens = record[CODEX_TOKENS_KEY];
+  if (tokens && typeof tokens === 'object' && !Array.isArray(tokens)) {
+    return tokens as Record<string, unknown>;
+  }
+  return null;
+}
+
+export async function getCodexAuthIndicators(): Promise<CodexAuthIndicators> {
+  const result: CodexAuthIndicators = {
+    hasAuthFile: false,
+    hasOAuthToken: false,
+    hasApiKey: false,
+  };
+
+  try {
+    const authContent = await systemPathReadFile(getCodexAuthPath());
+    result.hasAuthFile = true;
+
+    try {
+      const authJson = JSON.parse(authContent) as Record<string, unknown>;
+      result.hasOAuthToken = hasNonEmptyStringField(authJson, CODEX_OAUTH_KEYS);
+      result.hasApiKey = hasNonEmptyStringField(authJson, CODEX_API_KEY_KEYS);
+      const nestedTokens = getNestedTokens(authJson);
+      if (nestedTokens) {
+        result.hasOAuthToken =
+          result.hasOAuthToken || hasNonEmptyStringField(nestedTokens, CODEX_OAUTH_KEYS);
+        result.hasApiKey =
+          result.hasApiKey || hasNonEmptyStringField(nestedTokens, CODEX_API_KEY_KEYS);
+      }
+    } catch {
+      // Ignore parse errors; file exists but contents are unreadable
+    }
+  } catch {
+    // Auth file not found or inaccessible
   }
 
   return result;

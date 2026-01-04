@@ -187,6 +187,38 @@ describe('subprocess.ts', () => {
       );
     });
 
+    it('should yield error when exit code is 0 but stderr has content', async () => {
+      const stderrMessage =
+        '2026-01-04T12:08:06.694240Z ERROR rmcp::transport::worker: worker quit with fatal: Transport channel closed, when Auth(TokenRefreshFailed("Failed to parse server response"))';
+
+      const mockProcess = createMockProcess({
+        stdoutLines: [], // No stdout output
+        stderrLines: [stderrMessage],
+        exitCode: 0, // Success exit code, but stderr has error
+      });
+
+      vi.mocked(cp.spawn).mockReturnValue(mockProcess);
+
+      const generator = spawnJSONLProcess(baseOptions);
+      const results = await collectAsyncGenerator(generator);
+
+      // Should yield an error even though exit code is 0
+      expect(results).toHaveLength(1);
+      expect(results[0]).toMatchObject({
+        type: 'error',
+        error: expect.stringContaining('Transport channel closed'),
+      });
+      expect(results[0]).toMatchObject({
+        type: 'error',
+        error: expect.stringContaining('TokenRefreshFailed'),
+      });
+
+      // Should also log the error
+      expect(consoleSpy.error).toHaveBeenCalledWith(
+        expect.stringContaining('Process exited with code 0 but has stderr')
+      );
+    });
+
     it('should yield error on non-zero exit code', async () => {
       const mockProcess = createMockProcess({
         stdoutLines: ['{"type":"started"}'],

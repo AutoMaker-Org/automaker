@@ -1,7 +1,7 @@
 import type { Dispatch, SetStateAction } from 'react';
 import type { ApiKeys } from '@/store/app-store';
 
-export type ProviderKey = 'anthropic' | 'google';
+export type ProviderKey = 'anthropic' | 'openai';
 
 export interface ProviderConfig {
   key: ProviderKey;
@@ -41,7 +41,7 @@ export interface ProviderConfigParams {
     onTest: () => Promise<void>;
     result: { success: boolean; message: string } | null;
   };
-  google: {
+  openai: {
     value: string;
     setValue: Dispatch<SetStateAction<string>>;
     show: boolean;
@@ -55,6 +55,7 @@ export interface ProviderConfigParams {
 export const buildProviderConfigs = ({
   apiKeys,
   anthropic,
+  openai,
 }: ProviderConfigParams): ProviderConfig[] => [
   {
     key: 'anthropic',
@@ -82,30 +83,30 @@ export const buildProviderConfigs = ({
     descriptionLinkText: 'console.anthropic.com',
     descriptionSuffix: '.',
   },
-  // {
-  //   key: "google",
-  //   label: "Google API Key (Gemini)",
-  //   inputId: "google-key",
-  //   placeholder: "AIza...",
-  //   value: google.value,
-  //   setValue: google.setValue,
-  //   showValue: google.show,
-  //   setShowValue: google.setShow,
-  //   hasStoredKey: apiKeys.google,
-  //   inputTestId: "google-api-key-input",
-  //   toggleTestId: "toggle-google-visibility",
-  //   testButton: {
-  //     onClick: google.onTest,
-  //     disabled: !google.value || google.testing,
-  //     loading: google.testing,
-  //     testId: "test-gemini-connection",
-  //   },
-  //   result: google.result,
-  //   resultTestId: "gemini-test-connection-result",
-  //   resultMessageTestId: "gemini-test-connection-message",
-  //   descriptionPrefix:
-  //     "Used for Gemini AI features (including image/design prompts). Get your key at",
-  //   descriptionLinkHref: "https://makersuite.google.com/app/apikey",
-  //   descriptionLinkText: "makersuite.google.com",
-  // },
+  {
+    key: 'openai',
+    label: 'OpenAI API Key',
+    inputId: 'openai-key',
+    placeholder: 'sk-...',
+    value: openai.value,
+    setValue: openai.setValue,
+    showValue: openai.show,
+    setShowValue: openai.setShow,
+    hasStoredKey: apiKeys.openai,
+    inputTestId: 'openai-api-key-input',
+    toggleTestId: 'toggle-openai-visibility',
+    testButton: {
+      onClick: openai.onTest,
+      disabled: !openai.value || openai.testing,
+      loading: openai.testing,
+      testId: 'test-openai-connection',
+    },
+    result: openai.result,
+    resultTestId: 'test-openai-connection-result',
+    resultMessageTestId: 'test-openai-connection-message',
+    descriptionPrefix: 'Optional for Codex CLI fallback. Get your key at',
+    descriptionLinkHref: 'https://platform.openai.com/api-keys',
+    descriptionLinkText: 'platform.openai.com',
+    descriptionSuffix: '.',
+  },
 ];

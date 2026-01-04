@@ -211,13 +211,13 @@ export function WikiView() {
                 icon: Bot,
                 title: 'AI Agent Integration',
                 description:
-                  'Powered by Claude via the Agent SDK with full file, bash, and git access.',
+                  'Powered by Claude via the Agent SDK and Codex CLI with full file, bash, and git access.',
               },
               {
                 icon: Cpu,
                 title: 'Multi-Model Support',
                 description:
-                  'Claude Haiku/Sonnet/Opus models. Choose the right model for each task.',
+                  'Claude Haiku/Sonnet/Opus and Codex GPT models. Choose the right model for each task.',
               },
               {
                 icon: Brain,

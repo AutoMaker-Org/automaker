@@ -88,11 +88,14 @@ export {
   // CLI tool paths
   getGitHubCliPaths,
   getClaudeCliPaths,
+  getCodexCliPaths,
   getClaudeConfigDir,
   getClaudeCredentialPaths,
   getClaudeSettingsPath,
   getClaudeStatsCachePath,
   getClaudeProjectsDir,
+  getCodexConfigDir,
+  getCodexAuthPath,
   getShellPaths,
   getExtendedPath,
   // Node.js paths
@@ -118,8 +121,11 @@ export {
   findFirstExistingPath,
   findGitHubCliPath,
   findClaudeCliPath,
+  findCodexCliPath,
   getClaudeAuthIndicators,
   type ClaudeAuthIndicators,
+  getCodexAuthIndicators,
+  type CodexAuthIndicators,
   // Electron userData operations
   setElectronUserDataPath,
   getElectronUserDataPath,

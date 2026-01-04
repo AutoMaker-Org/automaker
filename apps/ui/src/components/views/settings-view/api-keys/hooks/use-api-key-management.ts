@@ -13,7 +13,7 @@ interface TestResult {
 
 interface ApiKeyStatus {
   hasAnthropicKey: boolean;
-  hasGoogleKey: boolean;
+  hasOpenAIKey: boolean;
 }
 
 /**
@@ -25,17 +25,17 @@ export function useApiKeyManagement() {
 
   // API key values
   const [anthropicKey, setAnthropicKey] = useState(apiKeys.anthropic);
-  const [googleKey, setGoogleKey] = useState(apiKeys.google);
+  const [openaiKey, setOpenaiKey] = useState(apiKeys.openai);
 
   // Visibility toggles
   const [showAnthropicKey, setShowAnthropicKey] = useState(false);
-  const [showGoogleKey, setShowGoogleKey] = useState(false);
+  const [showOpenaiKey, setShowOpenaiKey] = useState(false);
 
   // Test connection states
   const [testingConnection, setTestingConnection] = useState(false);
   const [testResult, setTestResult] = useState<TestResult | null>(null);
-  const [testingGeminiConnection, setTestingGeminiConnection] = useState(false);
-  const [geminiTestResult, setGeminiTestResult] = useState<TestResult | null>(null);
+  const [testingOpenaiConnection, setTestingOpenaiConnection] = useState(false);
+  const [openaiTestResult, setOpenaiTestResult] = useState<TestResult | null>(null);
 
   // API key status from environment
   const [apiKeyStatus, setApiKeyStatus] = useState<ApiKeyStatus | null>(null);
@@ -46,7 +46,7 @@ export function useApiKeyManagement() {
   // Sync local state with store
   useEffect(() => {
     setAnthropicKey(apiKeys.anthropic);
-    setGoogleKey(apiKeys.google);
+    setOpenaiKey(apiKeys.openai);
   }, [apiKeys]);
 
   // Check API key status from environment on mount
@@ -59,7 +59,7 @@ export function useApiKeyManagement() {
           if (status.success) {
             setApiKeyStatus({
               hasAnthropicKey: status.hasAnthropicKey,
-              hasGoogleKey: status.hasGoogleKey,
+              hasOpenAIKey: status.hasOpenAIKey,
             });
           }
         } catch (error) {
@@ -110,36 +110,41 @@ export function useApiKeyManagement() {
     }
   };
 
-  // Test Google/Gemini connection
-  // TODO: Add backend endpoint for Gemini API key verification
-  const handleTestGeminiConnection = async () => {
-    setTestingGeminiConnection(true);
-    setGeminiTestResult(null);
+  // Test OpenAI/Codex connection
+  const handleTestOpenaiConnection = async () => {
+    setTestingOpenaiConnection(true);
+    setOpenaiTestResult(null);
 
-    // Basic validation - check key format
-    if (!googleKey || googleKey.trim().length < 10) {
-      setGeminiTestResult({
+    try {
+      const api = getElectronAPI();
+      const data = await api.setup.verifyCodexAuth('api_key');
+
+      if (data.success && data.authenticated) {
+        setOpenaiTestResult({
+          success: true,
+          message: 'Connection successful! Codex responded.',
+        });
+      } else {
+        setOpenaiTestResult({
+          success: false,
+          message: data.error || 'Failed to connect to Codex API.',
+        });
+      }
+    } catch {
+      setOpenaiTestResult({
         success: false,
-        message: 'Please enter a valid API key.',
+        message: 'Network error. Please check your connection.',
       });
-      setTestingGeminiConnection(false);
-      return;
+    } finally {
+      setTestingOpenaiConnection(false);
     }
-
-    // For now, just validate the key format (starts with expected prefix)
-    // Full verification requires a backend endpoint
-    setGeminiTestResult({
-      success: true,
-      message: 'API key saved. Connection test not yet available.',
-    });
-    setTestingGeminiConnection(false);
   };
 
   // Save API keys
   const handleSave = () => {
     setApiKeys({
       anthropic: anthropicKey,
-      google: googleKey,
+      openai: openaiKey,
     });
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
@@ -157,14 +162,14 @@ export function useApiKeyManagement() {
       onTest: handleTestAnthropicConnection,
       result: testResult,
     },
-    google: {
-      value: googleKey,
-      setValue: setGoogleKey,
-      show: showGoogleKey,
-      setShow: setShowGoogleKey,
-      testing: testingGeminiConnection,
-      onTest: handleTestGeminiConnection,
-      result: geminiTestResult,
+    openai: {
+      value: openaiKey,
+      setValue: setOpenaiKey,
+      show: showOpenaiKey,
+      setShow: setShowOpenaiKey,
+      testing: testingOpenaiConnection,
+      onTest: handleTestOpenaiConnection,
+      result: openaiTestResult,
     },
   };
 

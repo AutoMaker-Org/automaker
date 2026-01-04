@@ -549,6 +549,16 @@ export class SettingsService {
         keyboardShortcuts:
           (appState.keyboardShortcuts as KeyboardShortcuts) ||
           DEFAULT_GLOBAL_SETTINGS.keyboardShortcuts,
+        codexAutoLoadAgents:
+          appState.codexAutoLoadAgents !== undefined
+            ? (appState.codexAutoLoadAgents as boolean)
+            : DEFAULT_GLOBAL_SETTINGS.codexAutoLoadAgents,
+        codexSandboxMode:
+          (appState.codexSandboxMode as GlobalSettings['codexSandboxMode']) ||
+          DEFAULT_GLOBAL_SETTINGS.codexSandboxMode,
+        codexApprovalPolicy:
+          (appState.codexApprovalPolicy as GlobalSettings['codexApprovalPolicy']) ||
+          DEFAULT_GLOBAL_SETTINGS.codexApprovalPolicy,
         aiProfiles: (appState.aiProfiles as AIProfile[]) || [],
         projects: (appState.projects as ProjectRef[]) || [],
         trashedProjects: (appState.trashedProjects as TrashedProjectRef[]) || [],

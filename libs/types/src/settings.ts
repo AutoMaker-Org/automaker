@@ -6,9 +6,10 @@
  * (for file I/O via SettingsService) and the UI (for state management and sync).
  */
 
-import type { ModelAlias } from './model.js';
+import type { ModelAlias, AgentModel } from './model.js';
 import type { CursorModelId } from './cursor-models.js';
 import { CURSOR_MODEL_MAP, getAllCursorModelIds } from './cursor-models.js';
+import type { CodexApprovalPolicy, CodexSandboxMode } from './codex.js';
 import type { PromptCustomization } from './prompts.js';
 
 // Re-export ModelAlias for convenience
@@ -95,6 +96,7 @@ export function getThinkingTokenBudget(level: ThinkingLevel | undefined): number
 }
 
 /** ModelProvider - AI model provider for credentials and API key management */
+<<<<<<< HEAD
 export type ModelProvider = 'claude' | 'cursor';
 
 /**
@@ -145,6 +147,13 @@ export interface PhaseModelConfig {
 
 /** Keys of PhaseModelConfig for type-safe access */
 export type PhaseModelKey = keyof PhaseModelConfig;
+=======
+export type ModelProvider = 'claude' | 'codex';
+
+const DEFAULT_CODEX_AUTO_LOAD_AGENTS = false;
+const DEFAULT_CODEX_SANDBOX_MODE: CodexSandboxMode = 'workspace-write';
+const DEFAULT_CODEX_APPROVAL_POLICY: CodexApprovalPolicy = 'on-request';
+>>>>>>> 8c8555db (Add Codex provider + CLI setup integration)
 
 /**
  * WindowBounds - Electron window position and size for persistence
@@ -227,7 +236,15 @@ export interface AIProfile {
   name: string;
   /** User-friendly description */
   description: string;
+<<<<<<< HEAD
   /** Provider selection: 'claude' or 'cursor' */
+=======
+  /** Which Claude model to use (opus, sonnet, haiku) */
+  model: AgentModel;
+  /** Extended thinking level for reasoning-based tasks */
+  thinkingLevel: ThinkingLevel;
+  /** Provider for this profile */
+>>>>>>> 8c8555db (Add Codex provider + CLI setup integration)
   provider: ModelProvider;
   /** Whether this is a built-in default profile */
   isBuiltIn: boolean;
@@ -479,6 +496,14 @@ export interface GlobalSettings {
   /** Skip showing the sandbox risk warning dialog */
   skipSandboxWarning?: boolean;
 
+  // Codex CLI Settings
+  /** Auto-load .codex/AGENTS.nd instructions into Codex prompts */
+  codexAutoLoadAgents?: boolean;
+  /** Sandbox mode for Codex CLI command execution */
+  codexSandboxMode?: CodexSandboxMode;
+  /** Approval policy for Codex CLI tool execution */
+  codexApprovalPolicy?: CodexApprovalPolicy;
+
   // MCP Server Configuration
   /** List of configured MCP servers for agent use */
   mcpServers: MCPServerConfig[];
@@ -674,6 +699,9 @@ export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
   autoLoadClaudeMd: false,
   enableSandboxMode: false,
   skipSandboxWarning: false,
+  codexAutoLoadAgents: DEFAULT_CODEX_AUTO_LOAD_AGENTS,
+  codexSandboxMode: DEFAULT_CODEX_SANDBOX_MODE,
+  codexApprovalPolicy: DEFAULT_CODEX_APPROVAL_POLICY,
   mcpServers: [],
 };
 

@@ -5,7 +5,7 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Plus, Bot, Wand2 } from 'lucide-react';
 import { KeyboardShortcut } from '@/hooks/use-keyboard-shortcuts';
-import { ClaudeUsagePopover } from '@/components/claude-usage-popover';
+import { UsagePopover } from '@/components/usage-popover';
 import { useAppStore } from '@/store/app-store';
 import { useSetupStore } from '@/store/setup-store';
 
@@ -36,6 +36,7 @@ export function BoardHeader({
 }: BoardHeaderProps) {
   const apiKeys = useAppStore((state) => state.apiKeys);
   const claudeAuthStatus = useSetupStore((state) => state.claudeAuthStatus);
+  const codexAuthStatus = useSetupStore((state) => state.codexAuthStatus);
 
   // Hide usage tracking when using API key (only show for Claude Code CLI users)
   // Check both user-entered API key and environment variable ANTHROPIC_API_KEY
@@ -46,7 +47,9 @@ export function BoardHeader({
   const hasApiKey = !!apiKeys.anthropic || !!claudeAuthStatus?.hasEnvApiKey;
   const isCliVerified =
     claudeAuthStatus?.authenticated && claudeAuthStatus?.method === 'cli_authenticated';
-  const showUsageTracking = !hasApiKey && !isWindows && isCliVerified;
+  const showClaudeUsage = !hasApiKey && !isWindows && isCliVerified;
+  const showCodexUsage = !!codexAuthStatus?.authenticated;
+  const showUsageTracking = showClaudeUsage || showCodexUsage;
 
   return (
     <div className="flex items-center justify-between p-4 border-b border-border bg-glass backdrop-blur-md">
@@ -56,7 +59,9 @@ export function BoardHeader({
       </div>
       <div className="flex gap-2 items-center">
         {/* Usage Popover - only show for CLI users (not API key users) */}
-        {isMounted && showUsageTracking && <ClaudeUsagePopover />}
+        {isMounted && showUsageTracking && (
+          <UsagePopover showClaude={showClaudeUsage} showCodex={showCodexUsage} />
+        )}
 
         {/* Concurrency Slider - only show after mount to prevent hydration issues */}
         {isMounted && (

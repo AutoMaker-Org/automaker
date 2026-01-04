@@ -1,3 +1,5 @@
+import type { CodexApprovalPolicy, CodexSandboxMode } from './codex.js';
+
 /**
  * Shared types for AI model providers
  */
@@ -90,6 +92,15 @@ export interface ExecuteOptions {
    * Only applies to Claude models; Cursor models handle thinking internally.
    */
   thinkingLevel?: ThinkingLevel;
+  codexSettings?: {
+    autoLoadAgents?: boolean;
+    sandboxMode?: CodexSandboxMode;
+    approvalPolicy?: CodexApprovalPolicy;
+  };
+  outputFormat?: {
+    type: 'json_schema';
+    schema: Record<string, unknown>;
+  };
 }
 
 /**

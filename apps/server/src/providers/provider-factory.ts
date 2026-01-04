@@ -31,12 +31,13 @@ const providerRegistry = new Map<string, ProviderRegistration>();
 /**
  * Register a provider with the factory
  *
- * @param name Provider name (e.g., 'claude', 'cursor')
+ * @param name Provider name (e.g., 'claude', 'cursor', 'codex')
  * @param registration Provider registration config
  */
 export function registerProvider(name: string, registration: ProviderRegistration): void {
   providerRegistry.set(name.toLowerCase(), registration);
 }
+
 
 export class ProviderFactory {
   /**
@@ -165,6 +166,7 @@ export class ProviderFactory {
 // Import providers for registration side-effects
 import { ClaudeProvider } from './claude-provider.js';
 import { CursorProvider } from './cursor-provider.js';
+import { CodexProvider } from './codex-provider.js';
 
 // Register Claude provider
 registerProvider('claude', {
@@ -183,4 +185,19 @@ registerProvider('cursor', {
   factory: () => new CursorProvider(),
   canHandleModel: (model: string) => isCursorModel(model),
   priority: 10, // Higher priority - check Cursor models first
+});
+
+// Register Codex provider
+registerProvider('codex', {
+  factory: () => new CodexProvider(),
+  aliases: ['openai'],
+  canHandleModel: (model: string) => {
+    const CODEX_MODEL_PREFIXES = ['gpt-'];
+    const OPENAI_O_SERIES_PATTERN = /^o\d/;
+    return (
+      CODEX_MODEL_PREFIXES.some((prefix) => model.startsWith(prefix)) ||
+      OPENAI_O_SERIES_PATTERN.test(model)
+    );
+  },
+  priority: 5, // Medium priority
 });
