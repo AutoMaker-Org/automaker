@@ -240,6 +240,7 @@ interface EditingStep {
   instructions: string;
   colorClass: string;
   order: number;
+  enableSubtaskGeneration: boolean;
 }
 
 export function PipelineSettingsDialog({
@@ -281,6 +282,7 @@ export function PipelineSettingsDialog({
       instructions: '',
       colorClass: COLOR_OPTIONS[steps.length % COLOR_OPTIONS.length].value,
       order: steps.length,
+      enableSubtaskGeneration: false,
     });
   };
 
@@ -291,6 +293,7 @@ export function PipelineSettingsDialog({
       instructions: step.instructions,
       colorClass: step.colorClass,
       order: step.order,
+      enableSubtaskGeneration: step.enableSubtaskGeneration || false,
     });
   };
 
@@ -385,6 +388,7 @@ export function PipelineSettingsDialog({
         order: steps.length,
         createdAt: now,
         updatedAt: now,
+        enableSubtaskGeneration: editingStep.enableSubtaskGeneration,
       };
       setSteps((prev) => [...prev, newStep]);
     }
@@ -421,7 +425,9 @@ export function PipelineSettingsDialog({
                     name: editingStep.name,
                     instructions: editingStep.instructions,
                     colorClass: editingStep.colorClass,
+                    colorClass: editingStep.colorClass,
                     updatedAt: now,
+                    enableSubtaskGeneration: editingStep.enableSubtaskGeneration,
                   }
                 : s
             );
@@ -436,6 +442,7 @@ export function PipelineSettingsDialog({
                 order: effectiveSteps.length,
                 createdAt: now,
                 updatedAt: now,
+                enableSubtaskGeneration: editingStep.enableSubtaskGeneration,
               },
             ];
           }
@@ -451,6 +458,7 @@ export function PipelineSettingsDialog({
               order: effectiveSteps.length,
               createdAt: now,
               updatedAt: now,
+              enableSubtaskGeneration: editingStep.enableSubtaskGeneration,
             },
           ];
         }
@@ -702,8 +710,30 @@ export function PipelineSettingsDialog({
                     )
                   }
                   rows={6}
+                  rows={6}
                   className="font-mono text-sm"
                 />
+              </div>
+
+              {/* Subtask Generation Checkbox */}
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="enableSubtaskGeneration"
+                  checked={editingStep.enableSubtaskGeneration}
+                  onChange={(e) =>
+                    setEditingStep((prev) =>
+                      prev ? { ...prev, enableSubtaskGeneration: e.target.checked } : null
+                    )
+                  }
+                  className="rounded border-gray-300 text-primary focus:ring-primary"
+                />
+                <Label htmlFor="enableSubtaskGeneration">
+                  Enable automatic subtask generation
+                  <p className="text-xs text-muted-foreground font-normal">
+                    Allows the agent to break down this step into new feature subtasks if needed.
+                  </p>
+                </Label>
               </div>
 
               <div className="flex justify-end gap-2">

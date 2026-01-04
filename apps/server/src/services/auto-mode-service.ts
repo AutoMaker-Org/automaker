@@ -41,6 +41,7 @@ import {
   getMCPPermissionSettings,
   getPromptCustomization,
 } from '../lib/settings-helpers.js';
+import { DEFAULT_SUBTASK_GENERATION_PROMPT } from '@automaker/prompts';
 
 const execAsync = promisify(exec);
 
@@ -676,6 +677,9 @@ export class AutoModeService {
       // No previous context
     }
 
+    // Fetch all features for context
+    const allFeatures = await this.featureLoader.getAll(projectPath);
+
     for (let i = 0; i < steps.length; i++) {
       const step = steps[i];
       const pipelineStatus = `pipeline_${step.id}`;
@@ -699,7 +703,7 @@ export class AutoModeService {
       });
 
       // Build prompt for this pipeline step
-      const prompt = this.buildPipelineStepPrompt(step, feature, previousContext);
+      const prompt = this.buildPipelineStepPrompt(step, feature, previousContext, allFeatures);
 
       // Run the agent for this pipeline step
       await this.runAgent(
@@ -750,11 +754,23 @@ export class AutoModeService {
   private buildPipelineStepPrompt(
     step: PipelineStep,
     feature: Feature,
-    previousContext: string
+    previousContext: string,
+    allFeatures: Feature[] = []
   ): string {
+    const featureContext = allFeatures
+      .filter((f) => f.id !== feature.id)
+      .map((f) => `- ${f.id} (${f.status || 'unknown'}): ${f.title}`)
+      .join('\n');
+
     let prompt = `## Pipeline Step: ${step.name}
 
 This is an automated pipeline step following the initial feature implementation.
+
+### Global Feature Context
+The following features already exist in the project:
+${featureContext}
+
+${step.enableSubtaskGeneration ? DEFAULT_SUBTASK_GENERATION_PROMPT : ''}
 
 ### Feature Context
 ${this.buildFeaturePrompt(feature)}

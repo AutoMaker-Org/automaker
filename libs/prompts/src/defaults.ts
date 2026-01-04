@@ -239,6 +239,31 @@ export const DEFAULT_AUTO_MODE_CONTINUATION_PROMPT_TEMPLATE = `## Continuing Fea
 Review the previous work and continue the implementation.
 `;
 
+export const DEFAULT_SUBTASK_GENERATION_PROMPT = `
+### Subtask & Dependency Generation
+If the task is complex, you can break it down into subtasks or identify dependencies.
+Analyse the current feature and the Global Feature Context to avoid duplication.
+If you identify necessary subtasks or dependencies, output a JSON block with the following format:
+
+\`\`\`json
+{
+  "subtasks": [
+    {
+      "id": "new-feature-id-kebab-case",
+      "category": "feature" | "bug" | "enhancement" | "refactor",
+      "title": "Clear Title",
+      "description": "Detailed description of the subtask",
+      "status": "backlog",
+      "priority": 2,
+      "complexity": "simple" | "medium" | "complex",
+      "dependencies": ["optional-dependency-id"]
+    }
+  ]
+}
+\`\`\`
+This will be used to create new features in the backlog.
+`;
+
 export const DEFAULT_AUTO_MODE_PIPELINE_STEP_PROMPT_TEMPLATE = `## Pipeline Step: {{stepName}}
 
 ### Feature Context
