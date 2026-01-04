@@ -10,6 +10,13 @@ export interface CliStatus {
   path?: string;
   hasApiKey?: boolean;
   recommendation?: string;
+  auth?: {
+    authenticated: boolean;
+    method: string;
+    hasApiKey?: boolean;
+    apiKeyValid?: boolean;
+    hasEnvApiKey?: boolean;
+  };
   installCommands?: {
     macos?: string;
     windows?: string;

@@ -13,10 +13,11 @@ import {
   getErrorMessage,
 } from '../common.js';
 import { generateSpec } from '../generate-spec.js';
+import type { SettingsService } from '../../../services/settings-service.js';
 
 const logger = createLogger('SpecRegeneration');
 
-export function createCreateHandler(events: EventEmitter) {
+export function createCreateHandler(events: EventEmitter, settingsService?: SettingsService) {
   return async (req: Request, res: Response): Promise<void> => {
     logger.info('========== /create endpoint called ==========');
     logger.debug('Request body:', JSON.stringify(req.body, null, 2));
@@ -68,7 +69,8 @@ export function createCreateHandler(events: EventEmitter) {
         abortController,
         generateFeatures,
         analyzeProject,
-        maxFeatures
+        maxFeatures,
+        settingsService
       )
         .catch((error) => {
           logError(error, 'Generation failed with error');

@@ -50,7 +50,11 @@ export async function generateSpec(
 - Existing technologies and frameworks
 - Project structure and architecture
 - Current features and capabilities
-- Code patterns and conventions`;
+- Code patterns and conventions
+
+IMPORTANT:
+- Use Glob or bash 'ls' to list files/directories.
+- Do NOT use the Read tool on directories - this will cause an error. Only use Read on files.`;
   } else {
     // Use default tech stack
     techStackDefaults = `Default Technology Stack:
@@ -86,11 +90,10 @@ ${getStructuredSpecPromptInstruction()}`;
     content: 'Starting spec generation...\n',
   });
 
-  // Load autoLoadClaudeMd setting
   const autoLoadClaudeMd = await getAutoLoadClaudeMdSetting(
     projectPath,
     settingsService,
-    '[SpecRegeneration]'
+    '[SpecGeneration]'
   );
 
   const options = createSpecGenerationOptions({

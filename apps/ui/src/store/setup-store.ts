@@ -42,6 +42,19 @@ export interface ClaudeAuthStatus {
   error?: string;
 }
 
+// Cursor Auth Method
+export type CursorAuthMethod = 'api_key_env' | 'api_key' | 'config_file' | 'none';
+
+// Cursor Auth Status
+export interface CursorAuthStatus {
+  authenticated: boolean;
+  method: CursorAuthMethod;
+  hasApiKey?: boolean;
+  apiKeyValid?: boolean;
+  hasEnvApiKey?: boolean;
+  error?: string;
+}
+
 // Installation Progress
 export interface InstallProgress {
   isInstalling: boolean;
@@ -54,6 +67,9 @@ export interface InstallProgress {
 export type SetupStep =
   | 'welcome'
   | 'theme'
+  | 'cursor_setup'
+  | 'codex_setup'
+  | 'opencode_setup'
   | 'claude_detect'
   | 'claude_auth'
   | 'github'
@@ -65,6 +81,11 @@ export interface SetupState {
   setupComplete: boolean;
   currentStep: SetupStep;
 
+  // Cursor CLI state
+  cursorCliStatus: CliStatus | null;
+  cursorAuthStatus: CursorAuthStatus | null;
+  cursorInstallProgress: InstallProgress;
+
   // Claude CLI state
   claudeCliStatus: CliStatus | null;
   claudeAuthStatus: ClaudeAuthStatus | null;
@@ -74,6 +95,9 @@ export interface SetupState {
   ghCliStatus: GhCliStatus | null;
 
   // Setup preferences
+  skipCursorSetup: boolean;
+  skipCodexSetup: boolean;
+  skipOpenCodeSetup: boolean;
   skipClaudeSetup: boolean;
 }
 
@@ -85,6 +109,12 @@ export interface SetupActions {
   resetSetup: () => void;
   setIsFirstRun: (isFirstRun: boolean) => void;
 
+  // Cursor CLI
+  setCursorCliStatus: (status: CliStatus | null) => void;
+  setCursorAuthStatus: (status: CursorAuthStatus | null) => void;
+  setCursorInstallProgress: (progress: Partial<InstallProgress>) => void;
+  resetCursorInstallProgress: () => void;
+
   // Claude CLI
   setClaudeCliStatus: (status: CliStatus | null) => void;
   setClaudeAuthStatus: (status: ClaudeAuthStatus | null) => void;
@@ -95,6 +125,9 @@ export interface SetupActions {
   setGhCliStatus: (status: GhCliStatus | null) => void;
 
   // Preferences
+  setSkipCursorSetup: (skip: boolean) => void;
+  setSkipCodexSetup: (skip: boolean) => void;
+  setSkipOpenCodeSetup: (skip: boolean) => void;
   setSkipClaudeSetup: (skip: boolean) => void;
 }
 
@@ -113,12 +146,19 @@ const initialState: SetupState = {
   setupComplete: shouldSkipSetup,
   currentStep: shouldSkipSetup ? 'complete' : 'welcome',
 
+  cursorCliStatus: null,
+  cursorAuthStatus: null,
+  cursorInstallProgress: { ...initialInstallProgress },
+
   claudeCliStatus: null,
   claudeAuthStatus: null,
   claudeInstallProgress: { ...initialInstallProgress },
 
   ghCliStatus: null,
 
+  skipCursorSetup: shouldSkipSetup,
+  skipCodexSetup: shouldSkipSetup,
+  skipOpenCodeSetup: shouldSkipSetup,
   skipClaudeSetup: shouldSkipSetup,
 };
 
@@ -146,6 +186,24 @@ export const useSetupStore = create<SetupState & SetupActions>()(
 
       setIsFirstRun: (isFirstRun) => set({ isFirstRun }),
 
+      // Cursor CLI
+      setCursorCliStatus: (status) => set({ cursorCliStatus: status }),
+
+      setCursorAuthStatus: (status) => set({ cursorAuthStatus: status }),
+
+      setCursorInstallProgress: (progress) =>
+        set({
+          cursorInstallProgress: {
+            ...get().cursorInstallProgress,
+            ...progress,
+          },
+        }),
+
+      resetCursorInstallProgress: () =>
+        set({
+          cursorInstallProgress: { ...initialInstallProgress },
+        }),
+
       // Claude CLI
       setClaudeCliStatus: (status) => set({ claudeCliStatus: status }),
 
@@ -168,6 +226,9 @@ export const useSetupStore = create<SetupState & SetupActions>()(
       setGhCliStatus: (status) => set({ ghCliStatus: status }),
 
       // Preferences
+      setSkipCursorSetup: (skip) => set({ skipCursorSetup: skip }),
+      setSkipCodexSetup: (skip) => set({ skipCodexSetup: skip }),
+      setSkipOpenCodeSetup: (skip) => set({ skipOpenCodeSetup: skip }),
       setSkipClaudeSetup: (skip) => set({ skipClaudeSetup: skip }),
     }),
     {
@@ -176,6 +237,9 @@ export const useSetupStore = create<SetupState & SetupActions>()(
       partialize: (state) => ({
         isFirstRun: state.isFirstRun,
         setupComplete: state.setupComplete,
+        skipCursorSetup: state.skipCursorSetup,
+        skipCodexSetup: state.skipCodexSetup,
+        skipOpenCodeSetup: state.skipOpenCodeSetup,
         skipClaudeSetup: state.skipClaudeSetup,
         claudeAuthStatus: state.claudeAuthStatus,
       }),

@@ -3,6 +3,8 @@ import {
   resolveModelString,
   getEffectiveModel,
   CLAUDE_MODEL_MAP,
+  CURSOR_MODEL_MAP,
+  CODEX_MODEL_MAP,
   DEFAULT_MODELS,
 } from '@automaker/model-resolver';
 
@@ -41,11 +43,19 @@ describe('model-resolver.ts', () => {
     });
 
     it('should treat unknown models as falling back to default', () => {
-      const models = ['o1', 'o1-mini', 'o3', 'gpt-5.2', 'unknown-model'];
+      const models = ['unknown-model', 'mystery-model'];
       models.forEach((model) => {
         const result = resolveModelString(model);
         // Should fall back to default since these aren't supported
         expect(result).toBe(DEFAULT_MODELS.claude);
+      });
+    });
+
+    it('should pass through Codex model strings', () => {
+      const models = ['gpt-5.2', 'gpt-5.1-codex', 'o1'];
+      models.forEach((model) => {
+        const result = resolveModelString(model);
+        expect(result).toBe(model);
       });
     });
 
@@ -58,6 +68,22 @@ describe('model-resolver.ts', () => {
       expect(consoleSpy.log).toHaveBeenCalledWith(
         expect.stringContaining('Using full Claude model string')
       );
+    });
+
+    it('should pass through Cursor model aliases', () => {
+      const models = Object.values(CURSOR_MODEL_MAP);
+      models.forEach((model) => {
+        const result = resolveModelString(model);
+        expect(result).toBe(model);
+      });
+    });
+
+    it('should resolve Codex model aliases', () => {
+      const models = Object.values(CODEX_MODEL_MAP);
+      models.forEach((model) => {
+        const result = resolveModelString(model);
+        expect(result).toBe(model);
+      });
     });
 
     it('should return default model when modelKey is undefined', () => {

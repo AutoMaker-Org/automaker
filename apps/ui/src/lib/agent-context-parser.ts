@@ -25,14 +25,38 @@ export interface AgentTaskInfo {
 }
 
 /**
- * Default model used by the feature executor
+ * Default model used by the feature executor (display fallback only)
+ * Note: actual default comes from app-store.defaultModel
  */
-export const DEFAULT_MODEL = 'claude-opus-4-5-20251101';
+export const DEFAULT_MODEL = 'sonnet';
 
 /**
  * Formats a model name for display
  */
 export function formatModelName(model: string): string {
+  // Cursor/Codex models
+  if (model === 'auto') return 'Auto';
+  if (model.startsWith('gpt-')) {
+    const [, version, ...suffixes] = model.split('-');
+    if (!version) return model;
+    let label = `GPT-${version}`;
+    if (suffixes.includes('codex')) label += ' Codex';
+    if (suffixes.includes('turbo')) label += ' Turbo';
+    if (suffixes.includes('preview')) label += ' Preview';
+    if (suffixes.includes('instruct')) label += ' Instruct';
+    if (suffixes.includes('max')) label += ' Max';
+    if (suffixes.includes('mini')) label += ' Mini';
+    return label;
+  }
+  const glmMatch = model.match(/(?:^|\/)glm-?(\d+(?:\.\d+)?)/i);
+  if (glmMatch) return `GLM ${glmMatch[1]}`;
+  if (model.toLowerCase().includes('glm')) return 'GLM';
+  const oSeriesMatch = model.match(/^o(\d+)(?:-(.+))?$/i);
+  if (oSeriesMatch) {
+    const suffix = oSeriesMatch[2];
+    return suffix ? `O${oSeriesMatch[1]} ${suffix.replace(/-/g, ' ')}` : `O${oSeriesMatch[1]}`;
+  }
+  // Claude models
   if (model.includes('opus')) return 'Opus 4.5';
   if (model.includes('sonnet')) return 'Sonnet 4.5';
   if (model.includes('haiku')) return 'Haiku 4.5';

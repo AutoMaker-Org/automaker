@@ -17,6 +17,18 @@ export function createProvidersHandler() {
           available: statuses.claude?.installed || false,
           hasApiKey: !!process.env.ANTHROPIC_API_KEY,
         },
+        cursor: {
+          available: statuses.cursor?.installed || false,
+          hasApiKey: !!process.env.CURSOR_API_KEY,
+        },
+        opencode: {
+          available: statuses.opencode?.installed || false,
+          hasApiKey: !!process.env.OPENCODE_API_KEY,
+        },
+        codex: {
+          available: statuses.codex?.installed || false,
+          hasApiKey: !!process.env.OPENAI_API_KEY,
+        },
       };
 
       res.json({ success: true, providers });

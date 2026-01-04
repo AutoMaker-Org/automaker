@@ -37,7 +37,19 @@ export type { ErrorType, ErrorInfo } from './error.js';
 export type { ImageData, ImageContentBlock } from './image.js';
 
 // Model types and constants
-export { CLAUDE_MODEL_MAP, DEFAULT_MODELS, type ModelAlias, type AgentModel } from './model.js';
+export {
+  CLAUDE_MODEL_MAP,
+  CURSOR_MODEL_MAP,
+  OPENCODE_MODEL_MAP,
+  CODEX_MODEL_MAP,
+  DEFAULT_MODELS,
+  type ClaudeModelAlias,
+  type CursorModelAlias,
+  type OpenCodeModelAlias,
+  type CodexModelAlias,
+  type ModelAlias,
+  type AgentModel,
+} from './model.js';
 
 // Event types
 export type { EventType, EventCallback } from './event.js';

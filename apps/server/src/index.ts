@@ -35,6 +35,7 @@ import { createModelsRoutes } from './routes/models/index.js';
 import { createRunningAgentsRoutes } from './routes/running-agents/index.js';
 import { createWorkspaceRoutes } from './routes/workspace/index.js';
 import { createTemplatesRoutes } from './routes/templates/index.js';
+import { createBacklogPlanRoutes } from './routes/backlog-plan/index.js';
 import {
   createTerminalRoutes,
   validateTerminalToken,
@@ -52,7 +53,6 @@ import { createClaudeRoutes } from './routes/claude/index.js';
 import { ClaudeUsageService } from './services/claude-usage-service.js';
 import { createGitHubRoutes } from './routes/github/index.js';
 import { createContextRoutes } from './routes/context/index.js';
-import { createBacklogPlanRoutes } from './routes/backlog-plan/index.js';
 import { cleanupStaleValidations } from './routes/github/routes/validation-common.js';
 import { createMCPRoutes } from './routes/mcp/index.js';
 import { MCPTestService } from './services/mcp-test-service.js';
@@ -155,7 +155,6 @@ app.use(cookieParser());
 const events: EventEmitter = createEventEmitter();
 
 // Create services
-// Note: settingsService is created first so it can be injected into other services
 const settingsService = new SettingsService(DATA_DIR);
 const agentService = new AgentService(DATA_DIR, events, settingsService);
 const featureLoader = new FeatureLoader();
@@ -165,13 +164,18 @@ const mcpTestService = new MCPTestService(settingsService);
 
 // Initialize services
 (async () => {
-  await agentService.initialize();
-  console.log('[Server] Agent service initialized');
+  try {
+    await agentService.initialize();
+    console.log('[Server] Agent service initialized');
+  } catch (error) {
+    console.error('[Server] Agent service initialization failed:', error);
+    process.exit(1);
+  }
 })();
 
 // Run stale validation cleanup every hour to prevent memory leaks from crashed validations
 const VALIDATION_CLEANUP_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
-setInterval(() => {
+const validationCleanupInterval = setInterval(() => {
   const cleaned = cleanupStaleValidations();
   if (cleaned > 0) {
     console.log(`[Server] Cleaned up ${cleaned} stale validation entries`);
@@ -196,6 +200,7 @@ app.use('/api/fs', createFsRoutes(events));
 app.use('/api/agent', createAgentRoutes(agentService, events));
 app.use('/api/sessions', createSessionsRoutes(agentService));
 app.use('/api/features', createFeaturesRoutes(featureLoader));
+app.use('/api/backlog-plan', createBacklogPlanRoutes(events, settingsService));
 app.use('/api/auto-mode', createAutoModeRoutes(autoModeService));
 app.use('/api/enhance-prompt', createEnhancePromptRoutes(settingsService));
 app.use('/api/worktree', createWorktreeRoutes());
@@ -583,6 +588,7 @@ startServer(PORT);
 // Graceful shutdown
 process.on('SIGTERM', () => {
   console.log('SIGTERM received, shutting down...');
+  clearInterval(validationCleanupInterval);
   terminalService.cleanup();
   server.close(() => {
     console.log('Server closed');
@@ -592,6 +598,7 @@ process.on('SIGTERM', () => {
 
 process.on('SIGINT', () => {
   console.log('SIGINT received, shutting down...');
+  clearInterval(validationCleanupInterval);
   terminalService.cleanup();
   server.close(() => {
     console.log('Server closed');

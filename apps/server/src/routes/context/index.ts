@@ -13,7 +13,6 @@ import type { SettingsService } from '../../services/settings-service.js';
 /**
  * Create the context router
  *
- * @param settingsService - Optional settings service for loading autoLoadClaudeMd setting
  * @returns Express router with context endpoints
  */
 export function createContextRoutes(settingsService?: SettingsService): Router {

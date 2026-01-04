@@ -8,6 +8,7 @@ export interface PipelineStep {
   order: number;
   instructions: string;
   colorClass: string;
+  enableSubtaskGeneration?: boolean;
   createdAt: string;
   updatedAt: string;
 }

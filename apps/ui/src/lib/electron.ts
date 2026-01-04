@@ -13,6 +13,8 @@ import type {
   AgentModel,
   GitHubComment,
   IssueCommentsResult,
+  BacklogPlanResult,
+  BacklogPlanEvent,
 } from '@automaker/types';
 import { getJSON, setJSON, removeItem } from './storage';
 
@@ -28,6 +30,8 @@ export type {
   StoredValidation,
   GitHubComment,
   IssueCommentsResult,
+  BacklogPlanResult,
+  BacklogPlanEvent,
 };
 
 export interface FileEntry {
@@ -491,6 +495,20 @@ export interface ElectronAPI {
   features?: FeaturesAPI;
   runningAgents?: RunningAgentsAPI;
   github?: GitHubAPI;
+  backlogPlan?: {
+    generate: (
+      projectPath: string,
+      prompt: string,
+      model?: string
+    ) => Promise<{ success: boolean; error?: string }>;
+    stop: () => Promise<{ success: boolean; error?: string }>;
+    status: () => Promise<{ success: boolean; isRunning?: boolean; error?: string }>;
+    apply: (
+      projectPath: string,
+      plan: BacklogPlanResult
+    ) => Promise<{ success: boolean; appliedChanges?: string[]; error?: string }>;
+    onEvent: (callback: (event: BacklogPlanEvent) => void) => () => void;
+  };
   enhancePrompt?: {
     enhance: (
       originalText: string,
@@ -519,6 +537,55 @@ export interface ElectronAPI {
         hasStoredApiKey?: boolean;
         hasEnvApiKey?: boolean;
         hasEnvOAuthToken?: boolean;
+      };
+      error?: string;
+    }>;
+    getCursorStatus?: () => Promise<{
+      success: boolean;
+      status?: string;
+      installed?: boolean;
+      method?: string;
+      version?: string;
+      path?: string;
+      auth?: {
+        authenticated: boolean;
+        method: string;
+        hasApiKey?: boolean;
+        hasStoredApiKey?: boolean;
+        hasEnvApiKey?: boolean;
+        apiKeyValid?: boolean;
+      };
+      error?: string;
+    }>;
+    getOpenCodeStatus?: () => Promise<{
+      success: boolean;
+      status?: string;
+      installed?: boolean;
+      method?: string;
+      version?: string;
+      path?: string;
+      auth?: {
+        authenticated: boolean;
+        method: string;
+        hasApiKey?: boolean;
+        apiKeyValid?: boolean;
+        hasEnvApiKey?: boolean;
+      };
+      error?: string;
+    }>;
+    getCodexStatus?: () => Promise<{
+      success: boolean;
+      status?: string;
+      installed?: boolean;
+      method?: string;
+      version?: string;
+      path?: string;
+      auth?: {
+        authenticated: boolean;
+        method: string;
+        hasApiKey?: boolean;
+        apiKeyValid?: boolean;
+        hasEnvApiKey?: boolean;
       };
       error?: string;
     }>;
@@ -561,6 +628,19 @@ export interface ElectronAPI {
     verifyClaudeAuth: (authMethod?: 'cli' | 'api_key') => Promise<{
       success: boolean;
       authenticated: boolean;
+      error?: string;
+    }>;
+    installCursor?: () => Promise<{
+      success: boolean;
+      message?: string;
+      error?: string;
+      output?: string;
+    }>;
+    verifyCursorAuth?: (method?: 'api_key' | 'any') => Promise<{
+      success: boolean;
+      authenticated: boolean;
+      method?: string;
+      output?: string;
       error?: string;
     }>;
     getGhStatus?: () => Promise<{
@@ -1093,6 +1173,55 @@ interface SetupAPI {
     };
     error?: string;
   }>;
+  getCursorStatus?: () => Promise<{
+    success: boolean;
+    status?: string;
+    installed?: boolean;
+    method?: string;
+    version?: string;
+    path?: string;
+    auth?: {
+      authenticated: boolean;
+      method: string;
+      hasApiKey?: boolean;
+      hasStoredApiKey?: boolean;
+      hasEnvApiKey?: boolean;
+      apiKeyValid?: boolean;
+    };
+    error?: string;
+  }>;
+  getOpenCodeStatus?: () => Promise<{
+    success: boolean;
+    status?: string;
+    installed?: boolean;
+    method?: string;
+    version?: string;
+    path?: string;
+    auth?: {
+      authenticated: boolean;
+      method: string;
+      hasApiKey?: boolean;
+      apiKeyValid?: boolean;
+      hasEnvApiKey?: boolean;
+    };
+    error?: string;
+  }>;
+  getCodexStatus?: () => Promise<{
+    success: boolean;
+    status?: string;
+    installed?: boolean;
+    method?: string;
+    version?: string;
+    path?: string;
+    auth?: {
+      authenticated: boolean;
+      method: string;
+      hasApiKey?: boolean;
+      apiKeyValid?: boolean;
+      hasEnvApiKey?: boolean;
+    };
+    error?: string;
+  }>;
   installClaude: () => Promise<{
     success: boolean;
     message?: string;
@@ -1131,6 +1260,25 @@ interface SetupAPI {
     authenticated: boolean;
     error?: string;
   }>;
+  installCursor?: () => Promise<{
+    success: boolean;
+    message?: string;
+    error?: string;
+    output?: string;
+  }>;
+  verifyCursorAuth?: (method?: 'api_key' | 'any') => Promise<{
+    success: boolean;
+    authenticated: boolean;
+    method?: string;
+    output?: string;
+    error?: string;
+  }>;
+  setDefaultProvider?: (provider: 'claude' | 'cursor' | 'opencode' | 'codex') => Promise<{
+    success: boolean;
+    provider?: 'claude' | 'cursor' | 'opencode' | 'codex';
+    message?: string;
+    error?: string;
+  }>;
   getGhStatus?: () => Promise<{
     success: boolean;
     installed: boolean;
@@ -1163,11 +1311,65 @@ function createMockSetupAPI(): SetupAPI {
         },
       };
     },
+    getCursorStatus: async () => {
+      console.log('[Mock] Getting Cursor status');
+      return {
+        success: true,
+        status: 'not_installed',
+        installed: false,
+        auth: {
+          authenticated: false,
+          method: 'none',
+          hasApiKey: false,
+          hasStoredApiKey: false,
+          hasEnvApiKey: false,
+          apiKeyValid: false,
+        },
+      };
+    },
+    getOpenCodeStatus: async () => {
+      console.log('[Mock] Getting OpenCode status');
+      return {
+        success: true,
+        status: 'not_installed',
+        installed: false,
+        auth: {
+          authenticated: false,
+          method: 'none',
+          hasApiKey: false,
+          apiKeyValid: false,
+          hasEnvApiKey: false,
+        },
+      };
+    },
+    getCodexStatus: async () => {
+      console.log('[Mock] Getting Codex status');
+      return {
+        success: true,
+        status: 'not_installed',
+        installed: false,
+        auth: {
+          authenticated: false,
+          method: 'none',
+          hasApiKey: false,
+          apiKeyValid: false,
+          hasEnvApiKey: false,
+        },
+      };
+    },
 
     installClaude: async () => {
       console.log('[Mock] Installing Claude CLI');
       // Simulate installation delay
       await new Promise((resolve) => setTimeout(resolve, 1000));
+      return {
+        success: false,
+        error:
+          'CLI installation is only available in the Electron app. Please run the command manually.',
+      };
+    },
+    installCursor: async () => {
+      console.log('[Mock] Installing Cursor CLI');
       return {
         success: false,
         error:
@@ -1223,6 +1425,21 @@ function createMockSetupAPI(): SetupAPI {
         success: true,
         authenticated: false,
         error: 'Mock environment - authentication not available',
+      };
+    },
+    verifyCursorAuth: async (method?: 'api_key' | 'any') => {
+      console.log('[Mock] Verifying Cursor auth with method:', method);
+      return {
+        success: true,
+        authenticated: false,
+        error: 'Mock environment - authentication not available',
+      };
+    },
+    setDefaultProvider: async (provider: 'claude' | 'cursor' | 'opencode' | 'codex') => {
+      console.log('[Mock] Setting default provider:', provider);
+      return {
+        success: true,
+        provider,
       };
     },
 

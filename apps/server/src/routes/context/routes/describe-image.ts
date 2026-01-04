@@ -228,7 +228,6 @@ async function extractTextFromStream(
  * Uses Claude SDK query with multi-part content blocks to include the image (base64),
  * matching the agent runner behavior.
  *
- * @param settingsService - Optional settings service for loading autoLoadClaudeMd setting
  * @returns Express request handler for image description
  */
 export function createDescribeImageHandler(

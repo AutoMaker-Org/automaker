@@ -74,7 +74,6 @@ async function extractTextFromStream(
 /**
  * Create the describe-file request handler
  *
- * @param settingsService - Optional settings service for loading autoLoadClaudeMd setting
  * @returns Express request handler for file description
  */
 export function createDescribeFileHandler(

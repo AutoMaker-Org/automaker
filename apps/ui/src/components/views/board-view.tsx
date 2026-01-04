@@ -470,7 +470,8 @@ export function BoardView() {
       const prNumber = prInfo.number;
       const description = `Read the review requests on PR #${prNumber} and address any feedback the best you can.`;
 
-      // Create the feature
+      // Create the feature - use defaultModel from store
+      const { defaultModel } = useAppStore.getState();
       const featureData = {
         title: `Address PR #${prNumber} Review Comments`,
         category: 'PR Review',
@@ -478,7 +479,7 @@ export function BoardView() {
         images: [],
         imagePaths: [],
         skipTests: defaultSkipTests,
-        model: 'opus' as const,
+        model: defaultModel,
         thinkingLevel: 'none' as const,
         branchName: worktree.branch,
         priority: 1, // High priority for PR feedback
@@ -511,7 +512,8 @@ export function BoardView() {
     async (worktree: WorktreeInfo) => {
       const description = `Pull latest from origin/main and resolve conflicts. Merge origin/main into the current branch (${worktree.branch}), resolving any merge conflicts that arise. After resolving conflicts, ensure the code compiles and tests pass.`;
 
-      // Create the feature
+      // Create the feature - use defaultModel from store
+      const { defaultModel: resolveConflictsModel } = useAppStore.getState();
       const featureData = {
         title: `Resolve Merge Conflicts`,
         category: 'Maintenance',
@@ -519,7 +521,7 @@ export function BoardView() {
         images: [],
         imagePaths: [],
         skipTests: defaultSkipTests,
-        model: 'opus' as const,
+        model: resolveConflictsModel,
         thinkingLevel: 'none' as const,
         branchName: worktree.branch,
         priority: 1, // High priority for conflict resolution

@@ -10,6 +10,7 @@ import { createListIssuesHandler } from './routes/list-issues.js';
 import { createListPRsHandler } from './routes/list-prs.js';
 import { createListCommentsHandler } from './routes/list-comments.js';
 import { createValidateIssueHandler } from './routes/validate-issue.js';
+import type { SettingsService } from '../../services/settings-service.js';
 import {
   createValidationStatusHandler,
   createValidationStopHandler,
@@ -17,7 +18,6 @@ import {
   createDeleteValidationHandler,
   createMarkViewedHandler,
 } from './routes/validation-endpoints.js';
-import type { SettingsService } from '../../services/settings-service.js';
 
 export function createGitHubRoutes(
   events: EventEmitter,
