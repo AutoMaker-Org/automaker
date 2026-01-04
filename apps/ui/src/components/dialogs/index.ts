@@ -1,3 +1,4 @@
+export { AutoModeResumeDialog } from './auto-mode-resume-dialog';
 export { BoardBackgroundModal } from './board-background-modal';
 export { DeleteAllArchivedSessionsDialog } from './delete-all-archived-sessions-dialog';
 export { DeleteSessionDialog } from './delete-session-dialog';

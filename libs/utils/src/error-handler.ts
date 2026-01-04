@@ -118,6 +118,38 @@ export function isQuotaExhaustedError(error: unknown): boolean {
 }
 
 /**
+ * Check if an error is an ambiguous CLI exit that might indicate quota issues
+ * This detects generic "process exited with code X" errors that don't have
+ * a clear error message, which often happen when Claude CLI hits quota limits.
+ *
+ * @param error - The error to check
+ * @returns True if the error looks like an ambiguous CLI exit
+ */
+export function isAmbiguousCLIExit(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error || '');
+  const lowerMessage = message.toLowerCase();
+
+  // Check for generic process exit patterns
+  if (
+    lowerMessage.includes('process exited with code 1') ||
+    lowerMessage.includes('claude code process exited') ||
+    (lowerMessage.includes('exited with code') && !lowerMessage.includes('code 0'))
+  ) {
+    // Make sure it's not another known error type
+    if (
+      !lowerMessage.includes('authentication') &&
+      !lowerMessage.includes('api key') &&
+      !lowerMessage.includes('cancelled') &&
+      !lowerMessage.includes('aborted')
+    ) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
  * Extract retry-after duration from rate limit error
  *
  * @param error - The error to extract retry-after from
@@ -154,13 +186,15 @@ export function classifyError(error: unknown): ErrorInfo {
   const isCancellation = isCancellationError(message);
   const isRateLimit = isRateLimitError(error);
   const isQuotaExhausted = isQuotaExhaustedError(error);
+  const isAmbiguousCLI = isAmbiguousCLIExit(error);
   const retryAfter = isRateLimit ? (extractRetryAfter(error) ?? 60) : undefined;
 
   let type: ErrorType;
   if (isAuth) {
     type = 'authentication';
-  } else if (isQuotaExhausted) {
-    // Quota exhaustion takes priority over rate limit since it's more specific
+  } else if (isQuotaExhausted || isAmbiguousCLI) {
+    // Quota exhaustion and ambiguous CLI exits take priority
+    // Ambiguous CLI exits are often quota issues in disguise
     type = 'quota_exhausted';
   } else if (isRateLimit) {
     type = 'rate_limit';
@@ -181,7 +215,7 @@ export function classifyError(error: unknown): ErrorInfo {
     isAuth,
     isCancellation,
     isRateLimit,
-    isQuotaExhausted,
+    isQuotaExhausted: isQuotaExhausted || isAmbiguousCLI,
     retryAfter,
     originalError: error,
   };

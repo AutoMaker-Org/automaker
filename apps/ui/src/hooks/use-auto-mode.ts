@@ -25,6 +25,8 @@ export function useAutoMode() {
     maxConcurrency,
     projects,
     setPendingPlanApproval,
+    setAutoModePaused,
+    openAutoModePauseDialog,
   } = useAppStore(
     useShallow((state) => ({
       autoModeByProject: state.autoModeByProject,
@@ -36,6 +38,8 @@ export function useAutoMode() {
       maxConcurrency: state.maxConcurrency,
       projects: state.projects,
       setPendingPlanApproval: state.setPendingPlanApproval,
+      setAutoModePaused: state.setAutoModePaused,
+      openAutoModePauseDialog: state.openAutoModePauseDialog,
     }))
   );
 
@@ -116,12 +120,50 @@ export function useAutoMode() {
           }
           break;
 
+        case 'auto_mode_paused_failures':
+          // Auto mode has been paused due to consecutive failures (likely usage limits)
+          console.log('[AutoMode] Paused due to failures:', event.message);
+
+          // Set auto mode to OFF for this project
+          if (eventProjectId) {
+            setAutoModeRunning(eventProjectId, false);
+
+            // Set the paused state for visibility
+            setAutoModePaused(eventProjectId, {
+              pausedAt: new Date().toISOString(),
+              reason: 'usage_limit',
+              suggestedResumeAt: event.suggestedResumeAt,
+              lastKnownUsage: event.lastKnownUsage,
+            });
+          }
+
+          // Open the pause dialog to show user-friendly message and allow scheduling resume
+          openAutoModePauseDialog({
+            message: event.message || 'Auto Mode paused due to usage limits.',
+            errorType: event.errorType || 'quota_exhausted',
+            originalError: event.originalError,
+            failureCount: event.failureCount,
+            projectPath: event.projectPath,
+            suggestedResumeAt: event.suggestedResumeAt,
+          });
+          break;
+
         case 'auto_mode_error':
           if (event.featureId && event.error) {
             // Check if this is a user-initiated cancellation or abort (not a real error)
             if (event.errorType === 'cancellation' || event.errorType === 'abort') {
               // User cancelled/aborted the feature - just log as info, not an error
               console.log('[AutoMode] Feature cancelled/aborted:', event.error);
+              // Remove from running tasks
+              if (eventProjectId) {
+                removeRunningTask(eventProjectId, event.featureId);
+              }
+              break;
+            }
+
+            // Check if this is a quota/rate limit error - defer to pause dialog instead of toast spam
+            if (event.errorType === 'rate_limit' || event.errorType === 'quota_exhausted') {
+              console.log('[AutoMode] Quota/rate limit error, deferring to pause dialog');
               // Remove from running tasks
               if (eventProjectId) {
                 removeRunningTask(eventProjectId, event.featureId);

@@ -15,6 +15,7 @@ import {
   buildPromptWithImages,
   isAbortError,
   classifyError,
+  isAmbiguousCLIExit,
   loadContextFiles,
 } from '@automaker/utils';
 import { resolveModelString, DEFAULT_MODELS } from '@automaker/model-resolver';
@@ -33,6 +34,7 @@ import {
 import { FeatureLoader } from './feature-loader.js';
 import type { SettingsService } from './settings-service.js';
 import { pipelineService, PipelineService } from './pipeline-service.js';
+import { ClaudeUsageService } from './claude-usage-service.js';
 import {
   getAutoLoadClaudeMdSetting,
   getEnableSandboxModeSetting,
@@ -237,6 +239,11 @@ export class AutoModeService {
       return true;
     }
 
+    // Immediately pause for ambiguous CLI exits (often quota issues in disguise)
+    if (isAmbiguousCLIExit(new Error(errorInfo.message))) {
+      return true;
+    }
+
     return false;
   }
 
@@ -244,7 +251,7 @@ export class AutoModeService {
    * Signal that we should pause due to repeated failures or quota exhaustion.
    * This will pause the auto loop to prevent repeated failures.
    */
-  private signalShouldPause(errorInfo: { type: string; message: string }): void {
+  private async signalShouldPause(errorInfo: { type: string; message: string }): Promise<void> {
     if (this.pausedDueToFailures) {
       return; // Already paused
     }
@@ -254,6 +261,59 @@ export class AutoModeService {
     console.log(
       `[AutoMode] Pausing auto loop after ${failureCount} consecutive failures. Last error: ${errorInfo.type}`
     );
+
+    // Fetch current usage data to provide suggested resume time
+    let suggestedResumeAt: string | undefined;
+    let lastKnownUsage: Record<string, unknown> | undefined;
+
+    try {
+      const usageService = new ClaudeUsageService();
+      if (await usageService.isAvailable()) {
+        const usage = await usageService.fetchUsageData();
+        if (usage && !('error' in usage)) {
+          lastKnownUsage = usage as Record<string, unknown>;
+          // Calculate suggested resume time based on reset times
+          const sessionReset = (usage as { sessionResetTime?: string }).sessionResetTime;
+          const sessionResetText = (usage as { sessionResetText?: string }).sessionResetText;
+          const weeklyReset = (usage as { weeklyResetTime?: string }).weeklyResetTime;
+          const weeklyResetText = (usage as { weeklyResetText?: string }).weeklyResetText;
+
+          if (sessionReset) {
+            // Check if it's already an ISO date string
+            const resetDate = new Date(sessionReset);
+            if (!isNaN(resetDate.getTime())) {
+              suggestedResumeAt = sessionReset;
+            } else if (sessionResetText) {
+              // Parse "Resets in Xh Ym" format from text
+              const match = sessionResetText.match(/(\d+)h\s*(\d+)?m?/);
+              if (match) {
+                const hours = parseInt(match[1], 10);
+                const minutes = parseInt(match[2] || '0', 10);
+                const resetMs = (hours * 60 + minutes) * 60 * 1000;
+                suggestedResumeAt = new Date(Date.now() + resetMs).toISOString();
+              }
+            }
+          } else if (weeklyReset) {
+            // Check if it's already an ISO date string
+            const resetDate = new Date(weeklyReset);
+            if (!isNaN(resetDate.getTime())) {
+              suggestedResumeAt = weeklyReset;
+            } else if (weeklyResetText) {
+              // Parse text format
+              const match = weeklyResetText.match(/(\d+)h\s*(\d+)?m?/);
+              if (match) {
+                const hours = parseInt(match[1], 10);
+                const minutes = parseInt(match[2] || '0', 10);
+                const resetMs = (hours * 60 + minutes) * 60 * 1000;
+                suggestedResumeAt = new Date(Date.now() + resetMs).toISOString();
+              }
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('[AutoMode] Failed to fetch usage data for pause info:', e);
+    }
 
     // Emit event to notify UI
     this.emitAutoModeEvent('auto_mode_paused_failures', {
@@ -265,6 +325,8 @@ export class AutoModeService {
       originalError: errorInfo.message,
       failureCount,
       projectPath: this.config?.projectPath,
+      suggestedResumeAt,
+      lastKnownUsage,
     });
 
     // Stop the auto loop
@@ -296,6 +358,73 @@ export class AutoModeService {
 
     // Reset failure tracking when user manually starts auto mode
     this.resetFailureTracking();
+
+    // Proactive usage limit check before starting the loop
+    try {
+      const usageService = new ClaudeUsageService();
+      if (await usageService.isAvailable()) {
+        const usage = await usageService.fetchUsageData();
+        if (usage && !('error' in usage)) {
+          const isAtSessionLimit = usage.sessionPercentage >= 100;
+          const isAtWeeklyLimit = usage.weeklyPercentage >= 100;
+
+          if (isAtSessionLimit || isAtWeeklyLimit) {
+            console.log('[AutoMode] Usage limit detected at startup, not starting loop');
+
+            // Use the reset time directly if it's an ISO string, otherwise parse the text
+            let suggestedResumeAt: string | undefined;
+            if (isAtSessionLimit && usage.sessionResetTime) {
+              // Check if it's already an ISO date string
+              const resetDate = new Date(usage.sessionResetTime);
+              if (!isNaN(resetDate.getTime())) {
+                suggestedResumeAt = usage.sessionResetTime;
+              } else {
+                // Try to parse "Resets in Xh Ym" format from sessionResetText
+                const match = (usage.sessionResetText || '').match(/(\d+)h\s*(\d+)?m?/);
+                if (match) {
+                  const hours = parseInt(match[1], 10);
+                  const minutes = parseInt(match[2] || '0', 10);
+                  suggestedResumeAt = new Date(
+                    Date.now() + (hours * 60 + minutes) * 60 * 1000
+                  ).toISOString();
+                }
+              }
+            } else if (isAtWeeklyLimit && usage.weeklyResetTime) {
+              // Check if it's already an ISO date string
+              const resetDate = new Date(usage.weeklyResetTime);
+              if (!isNaN(resetDate.getTime())) {
+                suggestedResumeAt = usage.weeklyResetTime;
+              } else {
+                // Try to parse text format
+                const match = (usage.weeklyResetText || '').match(/(\d+)h\s*(\d+)?m?/);
+                if (match) {
+                  const hours = parseInt(match[1], 10);
+                  const minutes = parseInt(match[2] || '0', 10);
+                  suggestedResumeAt = new Date(
+                    Date.now() + (hours * 60 + minutes) * 60 * 1000
+                  ).toISOString();
+                }
+              }
+            }
+
+            // Emit pause event instead of starting
+            this.emitAutoModeEvent('auto_mode_paused_failures', {
+              message:
+                'Auto Mode cannot start: Usage limit reached. Please wait for your quota to reset.',
+              errorType: 'quota_exhausted',
+              projectPath,
+              suggestedResumeAt,
+              lastKnownUsage: usage as Record<string, unknown>,
+            });
+
+            return; // Don't start the loop
+          }
+        }
+      }
+    } catch (error) {
+      console.warn('[AutoMode] Failed to check usage limits at startup:', error);
+      // Continue starting the loop anyway
+    }
 
     this.autoLoopRunning = true;
     this.autoLoopAbortController = new AbortController();

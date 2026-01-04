@@ -6,7 +6,7 @@ import {
   rectIntersection,
   pointerWithin,
 } from '@dnd-kit/core';
-import { useAppStore, Feature } from '@/store/app-store';
+import { useAppStore, Feature, isClaudeUsageAtLimit } from '@/store/app-store';
 import { getElectronAPI } from '@/lib/electron';
 import { getHttpApiClient } from '@/lib/http-api-client';
 import type { AutoModeEvent } from '@/types/electron';
@@ -17,6 +17,7 @@ import { getBlockingDependencies } from '@automaker/dependency-resolver';
 import { BoardBackgroundModal } from '@/components/dialogs/board-background-modal';
 import { RefreshCw } from 'lucide-react';
 import { useAutoMode } from '@/hooks/use-auto-mode';
+import { useAutoModeScheduler } from '@/hooks/use-auto-mode-scheduler';
 import { useKeyboardShortcutsConfig } from '@/hooks/use-keyboard-shortcuts';
 import { useWindowState } from '@/hooks/use-window-state';
 // Board-view specific imports
@@ -88,6 +89,12 @@ export function BoardView() {
     isPrimaryWorktreeBranch,
     getPrimaryWorktreeBranch,
     setPipelineConfig,
+    claudeUsage,
+    isAutoModePaused,
+    getAutoModePaused,
+    setAutoModePaused,
+    openAutoModePauseDialog,
+    setAutoModeRunning,
   } = useAppStore();
   // Subscribe to pipelineConfigByProject to trigger re-renders when it changes
   const pipelineConfigByProject = useAppStore((state) => state.pipelineConfigByProject);
@@ -233,6 +240,9 @@ export function BoardView() {
   const autoMode = useAutoMode();
   // Get runningTasks from the hook (scoped to current project)
   const runningAutoTasks = autoMode.runningTasks;
+
+  // Hook to manage scheduled auto mode resumes
+  useAutoModeScheduler();
 
   // Window state hook for compact dialog mode
   const { isMaximized } = useWindowState();
@@ -669,6 +679,29 @@ export function BoardView() {
       return;
     }
 
+    // Check if auto mode is paused due to usage limits
+    if (isAutoModePaused(currentProject.id)) {
+      // Auto mode is paused, don't try to pick up new features
+      return;
+    }
+
+    // Proactive usage limit check when auto mode starts
+    if (isClaudeUsageAtLimit(claudeUsage)) {
+      console.log('[BoardView] Usage limit detected, pausing auto mode');
+      setAutoModeRunning(currentProject.id, false);
+      setAutoModePaused(currentProject.id, {
+        pausedAt: new Date().toISOString(),
+        reason: 'usage_limit',
+        lastKnownUsage: claudeUsage ?? undefined,
+      });
+      openAutoModePauseDialog({
+        message: 'Usage limit reached. Auto Mode has been paused.',
+        errorType: 'quota_exhausted',
+        projectPath: currentProject.path,
+      });
+      return;
+    }
+
     let isChecking = false;
     let isActive = true; // Track if this effect is still active
 
@@ -676,6 +709,11 @@ export function BoardView() {
       // Check if auto mode is still running and effect is still active
       // Use ref to get the latest value, not the closure value
       if (!isActive || !autoModeRunningRef.current || !currentProject) {
+        return;
+      }
+
+      // Check if auto mode is paused due to usage limits
+      if (isAutoModePaused(currentProject.id)) {
         return;
       }
 
@@ -812,6 +850,12 @@ export function BoardView() {
     isPrimaryWorktreeBranch,
     enableDependencyBlocking,
     persistFeatureUpdate,
+    // Usage limit checks
+    claudeUsage,
+    isAutoModePaused,
+    setAutoModeRunning,
+    setAutoModePaused,
+    openAutoModePauseDialog,
   ]);
 
   // Use keyboard shortcuts hook (after actions hook)
@@ -1028,6 +1072,23 @@ export function BoardView() {
           description: 'Add new feature',
         }}
         isMounted={isMounted}
+        isAutoModePaused={currentProject ? isAutoModePaused(currentProject.id) : false}
+        autoModePausedState={currentProject ? getAutoModePaused(currentProject.id) : null}
+        autoModeResumeSchedule={useAppStore
+          .getState()
+          .getAutoModeResumeSchedule(currentProject?.id || '')}
+        onOpenPauseDialog={() => {
+          const pausedState = currentProject ? getAutoModePaused(currentProject.id) : null;
+          openAutoModePauseDialog({
+            message:
+              pausedState?.reason === 'usage_limit'
+                ? 'Usage limit reached. Auto Mode is paused.'
+                : 'Auto Mode is paused due to repeated failures.',
+            errorType: pausedState?.reason === 'usage_limit' ? 'quota_exhausted' : 'execution',
+            projectPath: currentProject?.path,
+            suggestedResumeAt: pausedState?.suggestedResumeAt,
+          });
+        }}
       />
 
       {/* Worktree Panel */}

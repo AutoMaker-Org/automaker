@@ -547,6 +547,26 @@ export interface AppState {
   claudeUsage: ClaudeUsage | null;
   claudeUsageLastUpdated: number | null;
 
+  // Auto Mode Resume Schedule (per-project, keyed by project ID)
+  // When usage limits are hit, user can schedule auto mode to resume at a later time
+  autoModeResumeByProject: Record<string, AutoModeResumeSchedule>;
+
+  // Auto Mode Paused State (per-project, keyed by project ID)
+  // Tracks when auto-mode is paused due to usage limits - persists even after dialog is closed
+  autoModePausedByProject: Record<string, AutoModePausedState | null>;
+
+  // Auto Mode Pause Dialog State
+  // When auto mode is paused due to usage limits, this holds the dialog state
+  autoModePauseDialogOpen: boolean;
+  autoModePauseReason: {
+    message: string;
+    errorType: string;
+    originalError?: string;
+    failureCount?: number;
+    projectPath?: string;
+    suggestedResumeAt?: string;
+  } | null;
+
   // Pipeline Configuration (per-project, keyed by project path)
   pipelineConfigByProject: Record<string, PipelineConfig>;
 }
@@ -579,6 +599,22 @@ export type ClaudeUsage = {
 
 // Response type for Claude usage API (can be success or error)
 export type ClaudeUsageResponse = ClaudeUsage | { error: string; message?: string };
+
+// Auto Mode Resume Schedule - for scheduling auto mode to resume after usage limits
+export type AutoModeResumeSchedule = {
+  resumeAt: string; // ISO timestamp when auto mode should resume
+  reason?: string; // Why the resume was scheduled (e.g., "usage_limit", "manual")
+  scheduledAt: string; // ISO timestamp when the schedule was created
+  lastKnownUsage?: ClaudeUsage; // Usage data at the time of scheduling
+};
+
+// Auto Mode Paused State - for tracking when auto-mode is paused due to limits
+export type AutoModePausedState = {
+  pausedAt: string; // ISO timestamp when auto mode was paused
+  reason: 'usage_limit' | 'failures'; // Why auto mode was paused
+  suggestedResumeAt?: string; // ISO timestamp of when limits are expected to reset
+  lastKnownUsage?: ClaudeUsage; // Usage data at the time of pausing
+};
 
 /**
  * Check if Claude usage is at its limit (any of: session >= 100%, weekly >= 100%, OR cost >= limit)
@@ -882,6 +918,26 @@ export interface AppActions {
     } | null
   ) => void;
 
+  // Claude Usage Tracking actions
+  setClaudeRefreshInterval: (interval: number) => void;
+  setClaudeUsageLastUpdated: (timestamp: number) => void;
+  setClaudeUsage: (usage: ClaudeUsage | null) => void;
+
+  // Auto Mode Resume Schedule actions
+  setAutoModeResumeSchedule: (projectId: string, schedule: AutoModeResumeSchedule | null) => void;
+  getAutoModeResumeSchedule: (projectId: string) => AutoModeResumeSchedule | null;
+  clearAutoModeResumeSchedule: (projectId: string) => void;
+
+  // Auto Mode Paused State actions
+  setAutoModePaused: (projectId: string, state: AutoModePausedState | null) => void;
+  clearAutoModePaused: (projectId: string) => void;
+  getAutoModePaused: (projectId: string) => AutoModePausedState | null;
+  isAutoModePaused: (projectId: string) => boolean;
+
+  // Auto Mode Pause Dialog actions
+  openAutoModePauseDialog: (reason: AppState['autoModePauseReason']) => void;
+  closeAutoModePauseDialog: () => void;
+
   // Pipeline actions
   setPipelineConfig: (projectPath: string, config: PipelineConfig) => void;
   getPipelineConfig: (projectPath: string) => PipelineConfig | null;
@@ -1007,6 +1063,10 @@ const initialState: AppState = {
   claudeRefreshInterval: 60,
   claudeUsage: null,
   claudeUsageLastUpdated: null,
+  autoModeResumeByProject: {},
+  autoModePausedByProject: {},
+  autoModePauseDialogOpen: false,
+  autoModePauseReason: null,
   pipelineConfigByProject: {},
 };
 
@@ -2680,6 +2740,51 @@ export const useAppStore = create<AppState & AppActions>()(
           claudeUsageLastUpdated: usage ? Date.now() : null,
         }),
 
+      // Auto Mode Resume Schedule actions
+      setAutoModeResumeSchedule: (projectId: string, schedule: AutoModeResumeSchedule | null) => {
+        const current = get().autoModeResumeByProject;
+        if (schedule === null) {
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          const { [projectId]: _, ...rest } = current;
+          set({ autoModeResumeByProject: rest });
+        } else {
+          set({ autoModeResumeByProject: { ...current, [projectId]: schedule } });
+        }
+      },
+      getAutoModeResumeSchedule: (projectId: string) =>
+        get().autoModeResumeByProject[projectId] || null,
+      clearAutoModeResumeSchedule: (projectId: string) => {
+        const current = get().autoModeResumeByProject;
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { [projectId]: _, ...rest } = current;
+        set({ autoModeResumeByProject: rest });
+      },
+
+      // Auto Mode Paused State actions
+      setAutoModePaused: (projectId: string, state: AutoModePausedState | null) => {
+        const current = get().autoModePausedByProject;
+        set({ autoModePausedByProject: { ...current, [projectId]: state } });
+      },
+      clearAutoModePaused: (projectId: string) => {
+        const current = get().autoModePausedByProject;
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { [projectId]: _, ...rest } = current;
+        set({ autoModePausedByProject: rest });
+      },
+      getAutoModePaused: (projectId: string) => get().autoModePausedByProject[projectId] || null,
+      isAutoModePaused: (projectId: string) => {
+        const paused = get().autoModePausedByProject[projectId];
+        return paused !== null && paused !== undefined;
+      },
+
+      // Auto Mode Pause Dialog actions
+      openAutoModePauseDialog: (reason: AppState['autoModePauseReason']) => {
+        set({ autoModePauseDialogOpen: true, autoModePauseReason: reason });
+      },
+      closeAutoModePauseDialog: () => {
+        set({ autoModePauseDialogOpen: false, autoModePauseReason: null });
+      },
+
       // Pipeline actions
       setPipelineConfig: (projectPath, config) => {
         set({
@@ -2937,6 +3042,10 @@ export const useAppStore = create<AppState & AppActions>()(
           defaultPlanningMode: state.defaultPlanningMode,
           defaultRequirePlanApproval: state.defaultRequirePlanApproval,
           defaultAIProfileId: state.defaultAIProfileId,
+          // Auto Mode Resume Schedule (per-project)
+          autoModeResumeByProject: state.autoModeResumeByProject,
+          // Auto Mode Paused State (per-project) - for visibility after dialog is closed
+          autoModePausedByProject: state.autoModePausedByProject,
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
         }) as any,
     }

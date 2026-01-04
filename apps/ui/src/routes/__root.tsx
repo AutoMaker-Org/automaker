@@ -22,6 +22,7 @@ import { Toaster } from 'sonner';
 import { ThemeOption, themeOptions } from '@/config/theme-options';
 import { SandboxRiskDialog } from '@/components/dialogs/sandbox-risk-dialog';
 import { SandboxRejectionScreen } from '@/components/dialogs/sandbox-rejection-screen';
+import { AutoModeResumeDialog } from '@/components/dialogs/auto-mode-resume-dialog';
 
 function RootLayoutContent() {
   const location = useLocation();
@@ -405,6 +406,9 @@ function RootLayoutContent() {
         }`}
       />
       <Toaster richColors position="bottom-right" />
+
+      {/* Auto Mode Resume Dialog */}
+      <AutoModeResumeDialog />
 
       {/* Show sandbox dialog if needed */}
       <SandboxRiskDialog

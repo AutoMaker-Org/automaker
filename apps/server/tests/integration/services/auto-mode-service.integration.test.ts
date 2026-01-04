@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { AutoModeService } from '@/services/auto-mode-service.js';
 import { ProviderFactory } from '@/providers/provider-factory.js';
 import { FeatureLoader } from '@/services/feature-loader.js';
+import { ClaudeUsageService } from '@/services/claude-usage-service.js';
 import {
   createTestGitRepo,
   createTestFeature,
@@ -29,11 +30,32 @@ describe('auto-mode-service.ts (integration)', () => {
     emit: vi.fn(),
   };
 
+  // Mock usage data that indicates normal operation (not at limit)
+  const mockUsageOK = {
+    sessionPercentage: 50,
+    weeklyPercentage: 60,
+    sessionResetTime: null,
+    weeklyResetTime: null,
+    sonnetWeeklyPercentage: 0,
+    sessionTokensUsed: 0,
+    sessionLimit: 0,
+    costUsed: null,
+    costLimit: null,
+    costCurrency: null,
+    sessionResetText: '',
+    weeklyResetText: '',
+    userTimezone: 'UTC',
+  };
+
   beforeEach(async () => {
     vi.clearAllMocks();
     service = new AutoModeService(mockEvents as any);
     featureLoader = new FeatureLoader();
     testRepo = await createTestGitRepo();
+
+    // Mock ClaudeUsageService to prevent usage checks from blocking tests
+    vi.spyOn(ClaudeUsageService.prototype, 'isAvailable').mockResolvedValue(true);
+    vi.spyOn(ClaudeUsageService.prototype, 'fetchUsageData').mockResolvedValue(mockUsageOK);
   });
 
   afterEach(async () => {
