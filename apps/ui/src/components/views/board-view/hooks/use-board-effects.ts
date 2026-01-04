@@ -16,6 +16,23 @@ interface UseBoardEffectsProps {
   setFeaturesWithContext: (set: Set<string>) => void;
 }
 
+/**
+ * Registers and manages side effects for the board view (IPC/event listeners, global exposure, and context checks).
+ *
+ * Sets up event subscriptions to suggestions, spec regeneration, and auto-mode events; exposes the current project globally for modals; syncs running tasks from the backend; and maintains the set of feature IDs that have associated context files.
+ *
+ * @param currentProject - The active project object or `null`. Exposed globally for modal use and used when syncing backend state.
+ * @param specCreatingForProject - Project path currently undergoing spec regeneration, or `null`.
+ * @param setSpecCreatingForProject - Setter to clear or set the spec-regenerating project path.
+ * @param setSuggestionsCount - Setter for the persisted number of suggestion items.
+ * @param setFeatureSuggestions - Setter for the latest suggestion payload.
+ * @param setIsGeneratingSuggestions - Setter to mark whether suggestions are being generated.
+ * @param checkContextExists - Async function that returns whether a given feature ID has context files.
+ * @param features - Array of feature records to evaluate for potential context files.
+ * @param isLoading - Flag indicating whether features are still loading; context checks run only when loading is complete.
+ * @param featuresWithContext - Set of feature IDs currently known to have context files.
+ * @param setFeaturesWithContext - Setter that replaces the set of feature IDs that have context files.
+ */
 export function useBoardEffects({
   currentProject,
   specCreatingForProject,
@@ -130,7 +147,10 @@ export function useBoardEffects({
     const checkAllContexts = async () => {
       const featuresWithPotentialContext = features.filter(
         (f) =>
-          f.status === 'in_progress' || f.status === 'waiting_approval' || f.status === 'verified'
+          f.status === 'in_progress' ||
+          f.status === 'waiting_approval' ||
+          f.status === 'verified' ||
+          (typeof f.status === 'string' && f.status.startsWith('pipeline_'))
       );
       const contextChecks = await Promise.all(
         featuresWithPotentialContext.map(async (f) => ({
