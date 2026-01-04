@@ -15,6 +15,18 @@ import {
   type ProjectSettings,
 } from '@/types/settings.js';
 
+const LEGACY_SETTINGS_VERSION = 1;
+const EXISTING_ANTHROPIC_KEY = 'sk-existing';
+const GOOGLE_TEST_KEY = 'g-test-key';
+const THEME_PROJECT_ID = 'proj-theme';
+const THEME_PROJECT_NAME = 'Theme Project';
+const THEME_PROJECT_THEME = 'dark';
+const LIGHT_THEME = 'light';
+const WORKTREE_BRANCH = 'main';
+const THEME_PROJECT_DIR = 'theme-project';
+const EMPTY_PROJECT_DIR = 'empty-project';
+const WORKTREE_DIR = 'worktree';
+
 describe('settings-service.ts', () => {
   let testDataDir: string;
   let testProjectDir: string;
@@ -89,6 +101,25 @@ describe('settings-service.ts', () => {
       expect(settings.keyboardShortcuts.agent).toBe(
         DEFAULT_GLOBAL_SETTINGS.keyboardShortcuts.agent
       );
+    });
+
+    it('should migrate legacy settings when version is below the current schema', async () => {
+      const legacySettings: GlobalSettings = {
+        ...DEFAULT_GLOBAL_SETTINGS,
+        version: LEGACY_SETTINGS_VERSION,
+        enableSandboxMode: true,
+      };
+      const settingsPath = path.join(testDataDir, 'settings.json');
+      await fs.writeFile(settingsPath, JSON.stringify(legacySettings, null, 2));
+
+      const settings = await settingsService.getGlobalSettings();
+
+      expect(settings.enableSandboxMode).toBe(false);
+      expect(settings.version).toBe(SETTINGS_VERSION);
+
+      const migrated = JSON.parse(await fs.readFile(settingsPath, 'utf-8')) as GlobalSettings;
+      expect(migrated.enableSandboxMode).toBe(false);
+      expect(migrated.version).toBe(SETTINGS_VERSION);
     });
   });
 
@@ -264,6 +295,21 @@ describe('settings-service.ts', () => {
       const updated = await settingsService.updateCredentials(updates);
 
       expect(updated.apiKeys.anthropic).toBe('sk-updated-anthropic');
+    });
+
+    it('should keep existing keys when updates omit apiKeys', async () => {
+      const initial: Credentials = {
+        ...DEFAULT_CREDENTIALS,
+        apiKeys: {
+          anthropic: EXISTING_ANTHROPIC_KEY,
+        },
+      };
+      const credentialsPath = path.join(testDataDir, 'credentials.json');
+      await fs.writeFile(credentialsPath, JSON.stringify(initial, null, 2));
+
+      const updated = await settingsService.updateCredentials({});
+
+      expect(updated.apiKeys.anthropic).toBe(EXISTING_ANTHROPIC_KEY);
     });
   });
 
@@ -549,6 +595,70 @@ describe('settings-service.ts', () => {
       expect(settings.lastProjectDir).toBe('/path/to/project');
       expect(settings.recentFolders).toEqual(['/path1', '/path2']);
       expect(settings.worktreePanelCollapsed).toBe(true);
+    });
+
+    it('should migrate project settings from root-level storage data', async () => {
+      const themeProjectPath = path.join(testProjectDir, THEME_PROJECT_DIR);
+      const emptyProjectPath = path.join(testProjectDir, EMPTY_PROJECT_DIR);
+      const worktreePath = path.join(themeProjectPath, WORKTREE_DIR);
+
+      const localStorageData = {
+        'automaker-storage': JSON.stringify({
+          theme: LIGHT_THEME,
+          defaultSkipTests: false,
+          enableDependencyBlocking: false,
+          codexAutoLoadAgents: false,
+          apiKeys: {
+            google: GOOGLE_TEST_KEY,
+          },
+          projects: [
+            {
+              id: THEME_PROJECT_ID,
+              name: THEME_PROJECT_NAME,
+              path: themeProjectPath,
+              theme: THEME_PROJECT_THEME,
+            },
+          ],
+          boardBackgroundByProject: {
+            [emptyProjectPath]: null,
+          },
+          currentWorktreeByProject: {
+            [themeProjectPath]: {
+              path: worktreePath,
+              branch: WORKTREE_BRANCH,
+            },
+          },
+          worktreesByProject: {
+            [themeProjectPath]: [
+              {
+                path: worktreePath,
+                branch: WORKTREE_BRANCH,
+              },
+            ],
+          },
+        }),
+      };
+
+      const result = await settingsService.migrateFromLocalStorage(localStorageData);
+
+      expect(result.success).toBe(true);
+      expect(result.migratedCredentials).toBe(true);
+      expect(result.migratedProjectCount).toBe(1);
+
+      const projectSettings = await settingsService.getProjectSettings(themeProjectPath);
+      expect(projectSettings.theme).toBe(THEME_PROJECT_THEME);
+      expect(projectSettings.currentWorktree?.branch).toBe(WORKTREE_BRANCH);
+      expect(projectSettings.worktrees).toHaveLength(1);
+
+      const credentials = await settingsService.getCredentials();
+      expect(credentials.apiKeys.google).toBe(GOOGLE_TEST_KEY);
+      expect(credentials.apiKeys.anthropic).toBe('');
+      expect(credentials.apiKeys.openai).toBe('');
+
+      const settings = await settingsService.getGlobalSettings();
+      expect(settings.defaultSkipTests).toBe(false);
+      expect(settings.enableDependencyBlocking).toBe(false);
+      expect(settings.codexAutoLoadAgents).toBe(false);
     });
 
     it('should handle invalid JSON gracefully', async () => {
