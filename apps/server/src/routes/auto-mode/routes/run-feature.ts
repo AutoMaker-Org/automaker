@@ -31,7 +31,7 @@ export function createRunFeatureHandler(autoModeService: AutoModeService) {
       autoModeService
         .executeFeature(projectPath, featureId, useWorktrees ?? false, false)
         .catch((error) => {
-          logger.error(`[AutoMode] Feature ${featureId} error:`, error);
+          logger.error(`Feature ${featureId} error:`, error);
         })
         .finally(() => {
           // Release the starting slot when execution completes (success or error)

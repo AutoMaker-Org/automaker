@@ -3,9 +3,10 @@ import { useState, useCallback } from 'react';
 export type SettingsViewId =
   | 'api-keys'
   | 'claude'
+  | 'providers'
   | 'mcp-servers'
   | 'prompts'
-  | 'ai-enhancement'
+  | 'model-defaults'
   | 'appearance'
   | 'terminal'
   | 'keyboard'

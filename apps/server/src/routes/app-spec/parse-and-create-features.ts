@@ -7,6 +7,7 @@ import * as secureFs from '../../lib/secure-fs.js';
 import type { EventEmitter } from '../../lib/events.js';
 import { createLogger } from '@automaker/utils';
 import { getFeaturesDir } from '@automaker/platform';
+import { extractJsonWithArray } from '../../lib/json-extractor.js';
 
 const logger = createLogger('SpecRegeneration');
 
@@ -22,23 +23,30 @@ export async function parseAndCreateFeatures(
   logger.info('========== END CONTENT ==========');
 
   try {
-    // Extract JSON from response
-    logger.info('Extracting JSON from response...');
-    logger.info(`Looking for pattern: /{[\\s\\S]*"features"[\\s\\S]*}/`);
-    const jsonMatch = content.match(/\{[\s\S]*"features"[\s\S]*\}/);
-    if (!jsonMatch) {
-      logger.error('❌ No valid JSON found in response');
+    // Extract JSON from response using shared utility
+    logger.info('Extracting JSON from response using extractJsonWithArray...');
+
+    interface FeaturesResponse {
+      features: Array<{
+        id: string;
+        category?: string;
+        title: string;
+        description: string;
+        priority?: number;
+        complexity?: string;
+        dependencies?: string[];
+      }>;
+    }
+
+    const parsed = extractJsonWithArray<FeaturesResponse>(content, 'features', { logger });
+
+    if (!parsed || !parsed.features) {
+      logger.error('❌ No valid JSON with "features" array found in response');
       logger.error('Full content received:');
       logger.error(content);
       throw new Error('No valid JSON found in response');
     }
 
-    logger.info(`JSON match found (${jsonMatch[0].length} chars)`);
-    logger.info('========== MATCHED JSON ==========');
-    logger.info(jsonMatch[0]);
-    logger.info('========== END MATCHED JSON ==========');
-
-    const parsed = JSON.parse(jsonMatch[0]);
     logger.info(`Parsed ${parsed.features?.length || 0} features`);
     logger.info('Parsed features:', JSON.stringify(parsed.features, null, 2));
 

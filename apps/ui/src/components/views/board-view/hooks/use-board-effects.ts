@@ -1,6 +1,9 @@
 import { useEffect, useRef } from 'react';
 import { getElectronAPI } from '@/lib/electron';
 import { useAppStore } from '@/store/app-store';
+import { createLogger } from '@automaker/utils/logger';
+
+const logger = createLogger('BoardEffects');
 
 interface UseBoardEffectsProps {
   currentProject: { path: string; id: string } | null;
@@ -44,12 +47,7 @@ export function useBoardEffects({
     if (!api.specRegeneration) return;
 
     const unsubscribe = api.specRegeneration.onEvent((event) => {
-      console.log(
-        '[BoardView] Spec regeneration event:',
-        event.type,
-        'for project:',
-        event.projectPath
-      );
+      logger.info('Spec regeneration event:', event.type, 'for project:', event.projectPath);
 
       if (event.projectPath !== specCreatingForProject) {
         return;
@@ -82,7 +80,7 @@ export function useBoardEffects({
           const { clearRunningTasks, addRunningTask } = useAppStore.getState();
 
           if (status.runningFeatures) {
-            console.log('[Board] Syncing running tasks from backend:', status.runningFeatures);
+            logger.info('Syncing running tasks from backend:', status.runningFeatures);
 
             clearRunningTasks(projectId);
 
@@ -92,7 +90,7 @@ export function useBoardEffects({
           }
         }
       } catch (error) {
-        console.error('[Board] Failed to sync running tasks:', error);
+        logger.error('Failed to sync running tasks:', error);
       }
     };
 

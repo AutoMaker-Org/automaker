@@ -6,7 +6,10 @@
  */
 
 import { useState } from 'react';
+import { createLogger } from '@automaker/utils/logger';
 import { ShieldAlert, Copy, Check } from 'lucide-react';
+
+const logger = createLogger('SandboxRiskDialog');
 import {
   Dialog,
   DialogContent,
@@ -43,7 +46,7 @@ export function SandboxRiskDialog({ open, onConfirm, onDeny }: SandboxRiskDialog
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
-      console.error('Failed to copy:', err);
+      logger.error('Failed to copy:', err);
     }
   };
 

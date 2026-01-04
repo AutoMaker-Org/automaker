@@ -563,27 +563,31 @@ describe('settings-service.ts', () => {
       expect(result.errors.length).toBeGreaterThan(0);
     });
 
-    it('should handle migration errors gracefully', async () => {
-      // Create a read-only directory to cause write errors
-      const readOnlyDir = path.join(os.tmpdir(), `readonly-${Date.now()}`);
-      await fs.mkdir(readOnlyDir, { recursive: true });
-      await fs.chmod(readOnlyDir, 0o444);
+    // Skip on Windows as chmod doesn't work the same way (CI runs on Linux)
+    it.skipIf(process.platform === 'win32')(
+      'should handle migration errors gracefully',
+      async () => {
+        // Create a read-only directory to cause write errors
+        const readOnlyDir = path.join(os.tmpdir(), `readonly-${Date.now()}`);
+        await fs.mkdir(readOnlyDir, { recursive: true });
+        await fs.chmod(readOnlyDir, 0o444);
 
-      const readOnlyService = new SettingsService(readOnlyDir);
-      const localStorageData = {
-        'automaker-storage': JSON.stringify({
-          state: { theme: 'light' },
-        }),
-      };
+        const readOnlyService = new SettingsService(readOnlyDir);
+        const localStorageData = {
+          'automaker-storage': JSON.stringify({
+            state: { theme: 'light' },
+          }),
+        };
 
-      const result = await readOnlyService.migrateFromLocalStorage(localStorageData);
+        const result = await readOnlyService.migrateFromLocalStorage(localStorageData);
 
-      expect(result.success).toBe(false);
-      expect(result.errors.length).toBeGreaterThan(0);
+        expect(result.success).toBe(false);
+        expect(result.errors.length).toBeGreaterThan(0);
 
-      await fs.chmod(readOnlyDir, 0o755);
-      await fs.rm(readOnlyDir, { recursive: true, force: true });
-    });
+        await fs.chmod(readOnlyDir, 0o755);
+        await fs.rm(readOnlyDir, { recursive: true, force: true });
+      }
+    );
   });
 
   describe('getDataDir', () => {
@@ -593,19 +597,187 @@ describe('settings-service.ts', () => {
     });
   });
 
-  describe('atomicWriteJson', () => {
-    it('should handle write errors and clean up temp file', async () => {
-      // Create a read-only directory to cause write errors
-      const readOnlyDir = path.join(os.tmpdir(), `readonly-${Date.now()}`);
-      await fs.mkdir(readOnlyDir, { recursive: true });
-      await fs.chmod(readOnlyDir, 0o444);
+  describe('phase model migration (v2 -> v3)', () => {
+    it('should migrate string phase models to PhaseModelEntry format', async () => {
+      // Simulate v2 format with string phase models
+      const v2Settings = {
+        version: 2,
+        theme: 'dark',
+        phaseModels: {
+          enhancementModel: 'sonnet',
+          fileDescriptionModel: 'haiku',
+          imageDescriptionModel: 'haiku',
+          validationModel: 'sonnet',
+          specGenerationModel: 'opus',
+          featureGenerationModel: 'sonnet',
+          backlogPlanningModel: 'sonnet',
+          projectAnalysisModel: 'sonnet',
+        },
+      };
+      const settingsPath = path.join(testDataDir, 'settings.json');
+      await fs.writeFile(settingsPath, JSON.stringify(v2Settings, null, 2));
 
-      const readOnlyService = new SettingsService(readOnlyDir);
+      const settings = await settingsService.getGlobalSettings();
 
-      await expect(readOnlyService.updateGlobalSettings({ theme: 'light' })).rejects.toThrow();
-
-      await fs.chmod(readOnlyDir, 0o755);
-      await fs.rm(readOnlyDir, { recursive: true, force: true });
+      // Verify all phase models are now PhaseModelEntry objects
+      expect(settings.phaseModels.enhancementModel).toEqual({ model: 'sonnet' });
+      expect(settings.phaseModels.fileDescriptionModel).toEqual({ model: 'haiku' });
+      expect(settings.phaseModels.specGenerationModel).toEqual({ model: 'opus' });
+      expect(settings.version).toBe(SETTINGS_VERSION);
     });
+
+    it('should preserve PhaseModelEntry objects during migration', async () => {
+      // Simulate v3 format (already has PhaseModelEntry objects)
+      const v3Settings = {
+        version: 3,
+        theme: 'dark',
+        phaseModels: {
+          enhancementModel: { model: 'sonnet', thinkingLevel: 'high' },
+          fileDescriptionModel: { model: 'haiku' },
+          imageDescriptionModel: { model: 'haiku', thinkingLevel: 'low' },
+          validationModel: { model: 'sonnet' },
+          specGenerationModel: { model: 'opus', thinkingLevel: 'ultrathink' },
+          featureGenerationModel: { model: 'sonnet' },
+          backlogPlanningModel: { model: 'sonnet', thinkingLevel: 'medium' },
+          projectAnalysisModel: { model: 'sonnet' },
+        },
+      };
+      const settingsPath = path.join(testDataDir, 'settings.json');
+      await fs.writeFile(settingsPath, JSON.stringify(v3Settings, null, 2));
+
+      const settings = await settingsService.getGlobalSettings();
+
+      // Verify PhaseModelEntry objects are preserved with thinkingLevel
+      expect(settings.phaseModels.enhancementModel).toEqual({
+        model: 'sonnet',
+        thinkingLevel: 'high',
+      });
+      expect(settings.phaseModels.specGenerationModel).toEqual({
+        model: 'opus',
+        thinkingLevel: 'ultrathink',
+      });
+      expect(settings.phaseModels.backlogPlanningModel).toEqual({
+        model: 'sonnet',
+        thinkingLevel: 'medium',
+      });
+    });
+
+    it('should handle mixed format (some string, some object)', async () => {
+      // Edge case: mixed format (shouldn't happen but handle gracefully)
+      const mixedSettings = {
+        version: 2,
+        theme: 'dark',
+        phaseModels: {
+          enhancementModel: 'sonnet', // string
+          fileDescriptionModel: { model: 'haiku', thinkingLevel: 'low' }, // object
+          imageDescriptionModel: 'haiku', // string
+          validationModel: { model: 'opus' }, // object without thinkingLevel
+          specGenerationModel: 'opus',
+          featureGenerationModel: 'sonnet',
+          backlogPlanningModel: 'sonnet',
+          projectAnalysisModel: 'sonnet',
+        },
+      };
+      const settingsPath = path.join(testDataDir, 'settings.json');
+      await fs.writeFile(settingsPath, JSON.stringify(mixedSettings, null, 2));
+
+      const settings = await settingsService.getGlobalSettings();
+
+      // Strings should be converted to objects
+      expect(settings.phaseModels.enhancementModel).toEqual({ model: 'sonnet' });
+      expect(settings.phaseModels.imageDescriptionModel).toEqual({ model: 'haiku' });
+      // Objects should be preserved
+      expect(settings.phaseModels.fileDescriptionModel).toEqual({
+        model: 'haiku',
+        thinkingLevel: 'low',
+      });
+      expect(settings.phaseModels.validationModel).toEqual({ model: 'opus' });
+    });
+
+    it('should migrate legacy enhancementModel/validationModel fields', async () => {
+      // Simulate v1 format with legacy fields
+      const v1Settings = {
+        version: 1,
+        theme: 'dark',
+        enhancementModel: 'haiku',
+        validationModel: 'opus',
+        // No phaseModels object
+      };
+      const settingsPath = path.join(testDataDir, 'settings.json');
+      await fs.writeFile(settingsPath, JSON.stringify(v1Settings, null, 2));
+
+      const settings = await settingsService.getGlobalSettings();
+
+      // Legacy fields should be migrated to phaseModels
+      expect(settings.phaseModels.enhancementModel).toEqual({ model: 'haiku' });
+      expect(settings.phaseModels.validationModel).toEqual({ model: 'opus' });
+      // Other fields should use defaults
+      expect(settings.phaseModels.specGenerationModel).toEqual({ model: 'opus' });
+    });
+
+    it('should use default phase models when none are configured', async () => {
+      // Simulate empty settings
+      const emptySettings = {
+        version: 1,
+        theme: 'dark',
+      };
+      const settingsPath = path.join(testDataDir, 'settings.json');
+      await fs.writeFile(settingsPath, JSON.stringify(emptySettings, null, 2));
+
+      const settings = await settingsService.getGlobalSettings();
+
+      // Should use DEFAULT_PHASE_MODELS
+      expect(settings.phaseModels.enhancementModel).toEqual({ model: 'sonnet' });
+      expect(settings.phaseModels.fileDescriptionModel).toEqual({ model: 'haiku' });
+      expect(settings.phaseModels.specGenerationModel).toEqual({ model: 'opus' });
+    });
+
+    it('should deep merge phaseModels on update', async () => {
+      // Create initial settings with some phase models
+      await settingsService.updateGlobalSettings({
+        phaseModels: {
+          enhancementModel: { model: 'sonnet', thinkingLevel: 'high' },
+        },
+      });
+
+      // Update with a different phase model
+      await settingsService.updateGlobalSettings({
+        phaseModels: {
+          specGenerationModel: { model: 'opus', thinkingLevel: 'ultrathink' },
+        },
+      });
+
+      const settings = await settingsService.getGlobalSettings();
+
+      // Both should be preserved
+      expect(settings.phaseModels.enhancementModel).toEqual({
+        model: 'sonnet',
+        thinkingLevel: 'high',
+      });
+      expect(settings.phaseModels.specGenerationModel).toEqual({
+        model: 'opus',
+        thinkingLevel: 'ultrathink',
+      });
+    });
+  });
+
+  describe('atomicWriteJson', () => {
+    // Skip on Windows as chmod doesn't work the same way (CI runs on Linux)
+    it.skipIf(process.platform === 'win32')(
+      'should handle write errors and clean up temp file',
+      async () => {
+        // Create a read-only directory to cause write errors
+        const readOnlyDir = path.join(os.tmpdir(), `readonly-${Date.now()}`);
+        await fs.mkdir(readOnlyDir, { recursive: true });
+        await fs.chmod(readOnlyDir, 0o444);
+
+        const readOnlyService = new SettingsService(readOnlyDir);
+
+        await expect(readOnlyService.updateGlobalSettings({ theme: 'light' })).rejects.toThrow();
+
+        await fs.chmod(readOnlyDir, 0o755);
+        await fs.rm(readOnlyDir, { recursive: true, force: true });
+      }
+    );
   });
 });

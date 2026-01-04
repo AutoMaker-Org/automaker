@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { TerminalService, getTerminalService } from '@/services/terminal-service.js';
 import * as pty from 'node-pty';
 import * as os from 'os';
+import * as path from 'path';
 import * as platform from '@automaker/platform';
 import * as secureFs from '@/lib/secure-fs.js';
 
@@ -288,13 +289,13 @@ describe('terminal-service.ts', () => {
 
       expect(session).not.toBeNull();
       expect(session!.id).toMatch(/^term-/);
-      expect(session!.cwd).toBe('/test/dir');
+      expect(session!.cwd).toBe(path.resolve('/test/dir'));
       expect(session!.shell).toBe('/bin/bash');
       expect(pty.spawn).toHaveBeenCalledWith(
         '/bin/bash',
         ['--login'],
         expect.objectContaining({
-          cwd: '/test/dir',
+          cwd: path.resolve('/test/dir'),
           cols: 100,
           rows: 30,
         })
@@ -354,7 +355,7 @@ describe('terminal-service.ts', () => {
       });
 
       expect(session).not.toBeNull();
-      expect(session!.cwd).toBe('/test/dir');
+      expect(session!.cwd).toBe(path.resolve('/test/dir'));
     });
 
     it('should preserve WSL UNC paths', async () => {
@@ -568,8 +569,8 @@ describe('terminal-service.ts', () => {
       expect(session2).not.toBeNull();
       expect(sessions[0].id).toBe(session1!.id);
       expect(sessions[1].id).toBe(session2!.id);
-      expect(sessions[0].cwd).toBe('/dir1');
-      expect(sessions[1].cwd).toBe('/dir2');
+      expect(sessions[0].cwd).toBe(path.resolve('/dir1'));
+      expect(sessions[1].cwd).toBe(path.resolve('/dir2'));
     });
 
     it('should return empty array if no sessions', () => {

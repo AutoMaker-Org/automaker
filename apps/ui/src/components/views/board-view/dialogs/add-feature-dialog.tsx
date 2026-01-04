@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { createLogger } from '@automaker/utils/logger';
 import {
   Dialog,
   DialogContent,
@@ -32,7 +33,7 @@ import { getElectronAPI } from '@/lib/electron';
 import { modelSupportsThinking } from '@/lib/utils';
 import {
   useAppStore,
-  AgentModel,
+  ModelAlias,
   ThinkingLevel,
   FeatureImage,
   AIProfile,
@@ -49,6 +50,7 @@ import {
   PlanningModeSelector,
   AncestorContextSection,
 } from '../shared';
+import { ModelOverrideTrigger, useModelOverride } from '@/components/shared';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -61,6 +63,9 @@ import {
   formatAncestorContextForPrompt,
   type AncestorContext,
 } from '@automaker/dependency-resolver';
+import { isCursorModel, PROVIDER_PREFIXES } from '@automaker/types';
+
+const logger = createLogger('AddFeatureDialog');
 
 type FeatureData = {
   title: string;
@@ -126,7 +131,7 @@ export function AddFeatureDialog({
     imagePaths: [] as DescriptionImagePath[],
     textFilePaths: [] as DescriptionTextFilePath[],
     skipTests: false,
-    model: 'opus' as AgentModel,
+    model: 'opus' as ModelAlias,
     thinkingLevel: 'none' as ThinkingLevel,
     branchName: '',
     priority: 2 as number, // Default to medium priority
@@ -147,14 +152,12 @@ export function AddFeatureDialog({
   const [ancestors, setAncestors] = useState<AncestorContext[]>([]);
   const [selectedAncestorIds, setSelectedAncestorIds] = useState<Set<string>>(new Set());
 
-  // Get enhancement model, planning mode defaults, and worktrees setting from store
-  const {
-    enhancementModel,
-    defaultPlanningMode,
-    defaultRequirePlanApproval,
-    defaultAIProfileId,
-    useWorktrees,
-  } = useAppStore();
+  // Get planning mode defaults and worktrees setting from store
+  const { defaultPlanningMode, defaultRequirePlanApproval, defaultAIProfileId, useWorktrees } =
+    useAppStore();
+
+  // Enhancement model override
+  const enhancementOverride = useModelOverride({ phase: 'enhancementModel' });
 
   // Sync defaults when dialog opens
   useEffect(() => {
@@ -320,7 +323,8 @@ export function AddFeatureDialog({
       const result = await api.enhancePrompt?.enhance(
         newFeature.description,
         enhancementMode,
-        enhancementModel
+        enhancementOverride.effectiveModel, // API accepts string, extract from PhaseModelEntry
+        enhancementOverride.effectiveModelEntry.thinkingLevel // Pass thinking level
       );
 
       if (result?.success && result.enhancedText) {
@@ -331,30 +335,51 @@ export function AddFeatureDialog({
         toast.error(result?.error || 'Failed to enhance description');
       }
     } catch (error) {
-      console.error('Enhancement failed:', error);
+      logger.error('Enhancement failed:', error);
       toast.error('Failed to enhance description');
     } finally {
       setIsEnhancing(false);
     }
   };
 
-  const handleModelSelect = (model: AgentModel) => {
+  const handleModelSelect = (model: string) => {
+    // For Cursor models, thinking is handled by the model itself
+    // For Claude models, check if it supports extended thinking
+    const isCursor = isCursorModel(model);
     setNewFeature({
       ...newFeature,
-      model,
-      thinkingLevel: modelSupportsThinking(model) ? newFeature.thinkingLevel : 'none',
+      model: model as ModelAlias,
+      thinkingLevel: isCursor
+        ? 'none'
+        : modelSupportsThinking(model)
+          ? newFeature.thinkingLevel
+          : 'none',
     });
   };
 
-  const handleProfileSelect = (model: AgentModel, thinkingLevel: ThinkingLevel) => {
-    setNewFeature({
-      ...newFeature,
-      model,
-      thinkingLevel,
-    });
+  const handleProfileSelect = (profile: AIProfile) => {
+    if (profile.provider === 'cursor') {
+      // Cursor profile - set cursor model
+      const cursorModel = `${PROVIDER_PREFIXES.cursor}${profile.cursorModel || 'auto'}`;
+      setNewFeature({
+        ...newFeature,
+        model: cursorModel as ModelAlias,
+        thinkingLevel: 'none', // Cursor handles thinking internally
+      });
+    } else {
+      // Claude profile
+      setNewFeature({
+        ...newFeature,
+        model: profile.model || 'sonnet',
+        thinkingLevel: profile.thinkingLevel || 'none',
+      });
+    }
   };
 
-  const newModelAllowsThinking = modelSupportsThinking(newFeature.model);
+  // Cursor models handle thinking internally, so only show thinking selector for Claude models
+  const isCurrentModelCursor = isCursorModel(newFeature.model);
+  const newModelAllowsThinking =
+    !isCurrentModelCursor && modelSupportsThinking(newFeature.model || 'sonnet');
 
   return (
     <Dialog open={open} onOpenChange={handleDialogClose}>
@@ -486,6 +511,15 @@ export function AddFeatureDialog({
                 <Sparkles className="w-4 h-4 mr-2" />
                 Enhance with AI
               </Button>
+
+              <ModelOverrideTrigger
+                currentModelEntry={enhancementOverride.effectiveModelEntry}
+                onModelChange={enhancementOverride.setOverride}
+                phase="enhancementModel"
+                isOverridden={enhancementOverride.isOverridden}
+                size="sm"
+                variant="icon"
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="category">Category (optional)</Label>
@@ -546,6 +580,7 @@ export function AddFeatureDialog({
               profiles={aiProfiles}
               selectedModel={newFeature.model}
               selectedThinkingLevel={newFeature.thinkingLevel}
+              selectedCursorModel={isCurrentModelCursor ? newFeature.model : undefined}
               onSelect={handleProfileSelect}
               showManageLink
               onManageLinkClick={() => {

@@ -6,6 +6,9 @@ import { spawn } from 'child_process';
 import type { Request, Response } from 'express';
 import { execAsync, execEnv, getErrorMessage, logError } from './common.js';
 import { checkGitHubRemote } from './check-github-remote.js';
+import { createLogger } from '@automaker/utils';
+
+const logger = createLogger('ListIssues');
 
 export interface GitHubLabel {
   name: string;
@@ -179,7 +182,7 @@ async function fetchLinkedPRs(
       }
     } catch (error) {
       // If GraphQL fails, continue without linked PRs
-      console.warn(
+      logger.warn(
         'Failed to fetch linked PRs via GraphQL:',
         error instanceof Error ? error.message : error
       );

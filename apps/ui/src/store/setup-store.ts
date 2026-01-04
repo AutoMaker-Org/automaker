@@ -20,6 +20,20 @@ export interface GhCliStatus {
   error?: string;
 }
 
+// Cursor CLI Status
+export interface CursorCliStatus {
+  installed: boolean;
+  version?: string | null;
+  path?: string | null;
+  auth?: {
+    authenticated: boolean;
+    method: string;
+  };
+  installCommand?: string;
+  loginCommand?: string;
+  error?: string;
+}
+
 // Claude Auth Method - all possible authentication sources
 export type ClaudeAuthMethod =
   | 'oauth_token_env'
@@ -56,6 +70,7 @@ export type SetupStep =
   | 'theme'
   | 'claude_detect'
   | 'claude_auth'
+  | 'cursor'
   | 'github'
   | 'complete';
 
@@ -72,6 +87,9 @@ export interface SetupState {
 
   // GitHub CLI state
   ghCliStatus: GhCliStatus | null;
+
+  // Cursor CLI state
+  cursorCliStatus: CursorCliStatus | null;
 
   // Setup preferences
   skipClaudeSetup: boolean;
@@ -93,6 +111,9 @@ export interface SetupActions {
 
   // GitHub CLI
   setGhCliStatus: (status: GhCliStatus | null) => void;
+
+  // Cursor CLI
+  setCursorCliStatus: (status: CursorCliStatus | null) => void;
 
   // Preferences
   setSkipClaudeSetup: (skip: boolean) => void;
@@ -118,6 +139,7 @@ const initialState: SetupState = {
   claudeInstallProgress: { ...initialInstallProgress },
 
   ghCliStatus: null,
+  cursorCliStatus: null,
 
   skipClaudeSetup: shouldSkipSetup,
 };
@@ -166,6 +188,9 @@ export const useSetupStore = create<SetupState & SetupActions>()(
 
       // GitHub CLI
       setGhCliStatus: (status) => set({ ghCliStatus: status }),
+
+      // Cursor CLI
+      setCursorCliStatus: (status) => set({ cursorCliStatus: status }),
 
       // Preferences
       setSkipClaudeSetup: (skip) => set({ skipClaudeSetup: skip }),

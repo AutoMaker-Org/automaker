@@ -67,6 +67,21 @@ export {
   type NodeFinderOptions,
 } from './node-finder.js';
 
+// WSL (Windows Subsystem for Linux) utilities
+export {
+  isWslAvailable,
+  clearWslCache,
+  getDefaultWslDistribution,
+  getWslDistributions,
+  findCliInWsl,
+  execInWsl,
+  createWslCommand,
+  windowsToWslPath,
+  wslToWindowsPath,
+  type WslCliResult,
+  type WslOptions,
+} from './wsl.js';
+
 // System paths for tool detection (GitHub CLI, Claude CLI, Node.js, etc.)
 export * as systemPaths from './system-paths.js';
 export {

@@ -8,6 +8,9 @@
 import * as secureFs from '../../../lib/secure-fs.js';
 import path from 'path';
 import { getBranchTrackingPath, ensureAutomakerDir } from '@automaker/platform';
+import { createLogger } from '@automaker/utils';
+
+const logger = createLogger('BranchTracking');
 
 export interface TrackedBranch {
   name: string;
@@ -32,7 +35,7 @@ export async function getTrackedBranches(projectPath: string): Promise<TrackedBr
     if (error.code === 'ENOENT') {
       return [];
     }
-    console.warn('[branch-tracking] Failed to read tracked branches:', error);
+    logger.warn('Failed to read tracked branches:', error);
     return [];
   }
 }
@@ -65,7 +68,7 @@ export async function trackBranch(projectPath: string, branchName: string): Prom
   });
 
   await saveTrackedBranches(projectPath, branches);
-  console.log(`[branch-tracking] Now tracking branch: ${branchName}`);
+  logger.info(`Now tracking branch: ${branchName}`);
 }
 
 /**
@@ -77,7 +80,7 @@ export async function untrackBranch(projectPath: string, branchName: string): Pr
 
   if (filtered.length !== branches.length) {
     await saveTrackedBranches(projectPath, filtered);
-    console.log(`[branch-tracking] Stopped tracking branch: ${branchName}`);
+    logger.info(`Stopped tracking branch: ${branchName}`);
   }
 }
 

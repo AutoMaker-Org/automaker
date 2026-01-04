@@ -1,10 +1,14 @@
 import { useState, useCallback, useEffect } from 'react';
 import { RouterProvider } from '@tanstack/react-router';
+import { createLogger } from '@automaker/utils/logger';
 import { router } from './utils/router';
 import { SplashScreen } from './components/splash-screen';
 import { useSettingsMigration } from './hooks/use-settings-migration';
+import { useCursorStatusInit } from './hooks/use-cursor-status-init';
 import './styles/global.css';
 import './styles/theme-imports';
+
+const logger = createLogger('App');
 
 export default function App() {
   const [showSplash, setShowSplash] = useState(() => {
@@ -31,8 +35,11 @@ export default function App() {
   // Run settings migration on startup (localStorage -> file storage)
   const migrationState = useSettingsMigration();
   if (migrationState.migrated) {
-    console.log('[App] Settings migrated to file storage');
+    logger.info('Settings migrated to file storage');
   }
+
+  // Initialize Cursor CLI status at startup
+  useCursorStatusInit();
 
   const handleSplashComplete = useCallback(() => {
     sessionStorage.setItem('automaker-splash-shown', 'true');

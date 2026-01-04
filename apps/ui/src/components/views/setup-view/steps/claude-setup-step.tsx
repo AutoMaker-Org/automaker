@@ -312,7 +312,7 @@ export function ClaudeSetupStep({ onNext, onBack, onSkip }: ClaudeSetupStepProps
         <div className="w-16 h-16 rounded-xl bg-brand-500/10 flex items-center justify-center mx-auto mb-4">
           <Terminal className="w-8 h-8 text-brand-500" />
         </div>
-        <h2 className="text-2xl font-bold text-foreground mb-2">API Key Setup</h2>
+        <h2 className="text-2xl font-bold text-foreground mb-2">Claude Code Setup</h2>
         <p className="text-muted-foreground">Configure for code generation</p>
       </div>
 

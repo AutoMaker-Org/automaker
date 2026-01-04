@@ -1,16 +1,86 @@
 import { Button } from '@/components/ui/button';
-import { Terminal, CheckCircle2, AlertCircle, RefreshCw } from 'lucide-react';
+import { Terminal, CheckCircle2, AlertCircle, RefreshCw, XCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { CliStatus } from '../shared/types';
+import type { ClaudeAuthStatus } from '@/store/setup-store';
 
 interface CliStatusProps {
   status: CliStatus | null;
+  authStatus?: ClaudeAuthStatus | null;
   isChecking: boolean;
   onRefresh: () => void;
 }
 
-export function ClaudeCliStatus({ status, isChecking, onRefresh }: CliStatusProps) {
-  if (!status) return null;
+function getAuthMethodLabel(method: string): string {
+  switch (method) {
+    case 'oauth_token':
+      return 'OAuth Token (Subscription)';
+    case 'oauth_token_env':
+      return 'OAuth Token (Environment)';
+    case 'api_key':
+      return 'API Key';
+    case 'api_key_env':
+      return 'API Key (Environment)';
+    case 'credentials_file':
+      return 'Credentials File';
+    case 'cli_authenticated':
+      return 'CLI Authentication';
+    default:
+      return method || 'Unknown';
+  }
+}
+
+function SkeletonPulse({ className }: { className?: string }) {
+  return <div className={cn('animate-pulse bg-muted/50 rounded', className)} />;
+}
+
+function ClaudeCliStatusSkeleton() {
+  return (
+    <div
+      className={cn(
+        'rounded-2xl overflow-hidden',
+        'border border-border/50',
+        'bg-gradient-to-br from-card/90 via-card/70 to-card/80 backdrop-blur-xl',
+        'shadow-sm shadow-black/5'
+      )}
+    >
+      <div className="p-6 border-b border-border/50 bg-gradient-to-r from-transparent via-accent/5 to-transparent">
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-3">
+            <SkeletonPulse className="w-9 h-9 rounded-xl" />
+            <SkeletonPulse className="h-6 w-36" />
+          </div>
+          <SkeletonPulse className="w-9 h-9 rounded-lg" />
+        </div>
+        <div className="ml-12">
+          <SkeletonPulse className="h-4 w-80" />
+        </div>
+      </div>
+      <div className="p-6 space-y-4">
+        {/* Installation status skeleton */}
+        <div className="flex items-center gap-3 p-4 rounded-xl border border-border/30 bg-muted/10">
+          <SkeletonPulse className="w-10 h-10 rounded-xl" />
+          <div className="flex-1 space-y-2">
+            <SkeletonPulse className="h-4 w-40" />
+            <SkeletonPulse className="h-3 w-32" />
+            <SkeletonPulse className="h-3 w-48" />
+          </div>
+        </div>
+        {/* Auth status skeleton */}
+        <div className="flex items-center gap-3 p-4 rounded-xl border border-border/30 bg-muted/10">
+          <SkeletonPulse className="w-10 h-10 rounded-xl" />
+          <div className="flex-1 space-y-2">
+            <SkeletonPulse className="h-4 w-28" />
+            <SkeletonPulse className="h-3 w-36" />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function ClaudeCliStatus({ status, authStatus, isChecking, onRefresh }: CliStatusProps) {
+  if (!status) return <ClaudeCliStatusSkeleton />;
 
   return (
     <div
@@ -80,6 +150,37 @@ export function ClaudeCliStatus({ status, isChecking, onRefresh }: CliStatusProp
                 </div>
               </div>
             </div>
+            {/* Authentication Status */}
+            {authStatus?.authenticated ? (
+              <div className="flex items-center gap-3 p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
+                <div className="w-10 h-10 rounded-xl bg-emerald-500/15 flex items-center justify-center border border-emerald-500/20 shrink-0">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-emerald-400">Authenticated</p>
+                  <div className="text-xs text-emerald-400/70 mt-1.5">
+                    <p>
+                      Method:{' '}
+                      <span className="font-mono">{getAuthMethodLabel(authStatus.method)}</span>
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-start gap-3 p-4 rounded-xl bg-amber-500/10 border border-amber-500/20">
+                <div className="w-10 h-10 rounded-xl bg-amber-500/15 flex items-center justify-center border border-amber-500/20 shrink-0 mt-0.5">
+                  <XCircle className="w-5 h-5 text-amber-500" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-amber-400">Not Authenticated</p>
+                  <p className="text-xs text-amber-400/70 mt-1">
+                    Run <code className="font-mono bg-amber-500/10 px-1 rounded">claude login</code>{' '}
+                    or set an API key to authenticate.
+                  </p>
+                </div>
+              </div>
+            )}
+
             {status.recommendation && (
               <p className="text-xs text-muted-foreground/70 ml-1">{status.recommendation}</p>
             )}

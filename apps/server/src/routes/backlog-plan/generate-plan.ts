@@ -1,11 +1,17 @@
 /**
  * Generate backlog plan using Claude AI
+ *
+ * Model is configurable via phaseModels.backlogPlanningModel in settings
+ * (defaults to Sonnet). Can be overridden per-call via model parameter.
  */
 
 import type { EventEmitter } from '../../lib/events.js';
 import type { Feature, BacklogPlanResult, BacklogChange, DependencyUpdate } from '@automaker/types';
+import { DEFAULT_PHASE_MODELS, isCursorModel, type ThinkingLevel } from '@automaker/types';
+import { resolvePhaseModel } from '@automaker/model-resolver';
 import { FeatureLoader } from '../../services/feature-loader.js';
 import { ProviderFactory } from '../../providers/provider-factory.js';
+import { extractJsonWithArray } from '../../lib/json-extractor.js';
 import { logger, setRunningState, getErrorMessage } from './common.js';
 import type { SettingsService } from '../../services/settings-service.js';
 import { getAutoLoadClaudeMdSetting, getPromptCustomization } from '../../lib/settings-helpers.js';
@@ -39,24 +45,28 @@ function formatFeaturesForPrompt(features: Feature[]): string {
  * Parse the AI response into a BacklogPlanResult
  */
 function parsePlanResponse(response: string): BacklogPlanResult {
-  try {
-    // Try to extract JSON from the response
-    const jsonMatch = response.match(/```json\n?([\s\S]*?)\n?```/);
-    if (jsonMatch) {
-      return JSON.parse(jsonMatch[1]);
-    }
+  // Use shared JSON extraction utility for robust parsing
+  // extractJsonWithArray validates that 'changes' exists AND is an array
+  const parsed = extractJsonWithArray<BacklogPlanResult>(response, 'changes', {
+    logger,
+  });
 
-    // Try to parse the whole response as JSON
-    return JSON.parse(response);
-  } catch {
-    // If parsing fails, return an empty result
-    logger.warn('[BacklogPlan] Failed to parse AI response as JSON');
-    return {
-      changes: [],
-      summary: 'Failed to parse AI response',
-      dependencyUpdates: [],
-    };
+  if (parsed) {
+    return parsed;
   }
+
+  // If parsing fails, log details and return an empty result
+  logger.warn('[BacklogPlan] Failed to parse AI response as JSON');
+  logger.warn('[BacklogPlan] Response text length:', response.length);
+  logger.warn('[BacklogPlan] Response preview:', response.slice(0, 500));
+  if (response.length === 0) {
+    logger.error('[BacklogPlan] Response text is EMPTY! No content was extracted from stream.');
+  }
+  return {
+    changes: [],
+    summary: 'Failed to parse AI response',
+    dependencyUpdates: [],
+  };
 }
 
 /**
@@ -96,8 +106,19 @@ export async function generateBacklogPlan(
       content: 'Generating plan with AI...',
     });
 
-    // Get the model to use
-    const effectiveModel = model || 'sonnet';
+    // Get the model to use from settings or provided override
+    let effectiveModel = model;
+    let thinkingLevel: ThinkingLevel | undefined;
+    if (!effectiveModel) {
+      const settings = await settingsService?.getGlobalSettings();
+      const phaseModelEntry =
+        settings?.phaseModels?.backlogPlanningModel || DEFAULT_PHASE_MODELS.backlogPlanningModel;
+      const resolved = resolvePhaseModel(phaseModelEntry);
+      effectiveModel = resolved.model;
+      thinkingLevel = resolved.thinkingLevel;
+    }
+    logger.info('[BacklogPlan] Using model:', effectiveModel);
+
     const provider = ProviderFactory.getProviderForModel(effectiveModel);
 
     // Get autoLoadClaudeMd setting
@@ -107,16 +128,38 @@ export async function generateBacklogPlan(
       '[BacklogPlan]'
     );
 
+    // For Cursor models, we need to combine prompts with explicit instructions
+    // because Cursor doesn't support systemPrompt separation like Claude SDK
+    let finalPrompt = userPrompt;
+    let finalSystemPrompt: string | undefined = systemPrompt;
+
+    if (isCursorModel(effectiveModel)) {
+      logger.info('[BacklogPlan] Using Cursor model - adding explicit no-file-write instructions');
+      finalPrompt = `${systemPrompt}
+
+CRITICAL INSTRUCTIONS:
+1. DO NOT write any files. Return the JSON in your response only.
+2. DO NOT use Write, Edit, or any file modification tools.
+3. Respond with ONLY a JSON object - no explanations, no markdown, just raw JSON.
+4. Your entire response should be valid JSON starting with { and ending with }.
+5. No text before or after the JSON object.
+
+${userPrompt}`;
+      finalSystemPrompt = undefined; // System prompt is now embedded in the user prompt
+    }
+
     // Execute the query
     const stream = provider.executeQuery({
-      prompt: userPrompt,
+      prompt: finalPrompt,
       model: effectiveModel,
       cwd: projectPath,
-      systemPrompt,
+      systemPrompt: finalSystemPrompt,
       maxTurns: 1,
       allowedTools: [], // No tools needed for this
       abortController,
       settingSources: autoLoadClaudeMd ? ['user', 'project'] : undefined,
+      readOnly: true, // Plan generation only generates text, doesn't write files
+      thinkingLevel, // Pass thinking level for extended thinking
     });
 
     let responseText = '';
@@ -133,6 +176,16 @@ export async function generateBacklogPlan(
               responseText += block.text;
             }
           }
+        }
+      } else if (msg.type === 'result' && msg.subtype === 'success' && msg.result) {
+        // Use result if it's a final accumulated message (from Cursor provider)
+        logger.info('[BacklogPlan] Received result from Cursor, length:', msg.result.length);
+        logger.info('[BacklogPlan] Previous responseText length:', responseText.length);
+        if (msg.result.length > responseText.length) {
+          logger.info('[BacklogPlan] Using Cursor result (longer than accumulated text)');
+          responseText = msg.result;
+        } else {
+          logger.info('[BacklogPlan] Keeping accumulated text (longer than Cursor result)');
         }
       }
     }

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { createLogger } from '@automaker/utils/logger';
 import {
   getElectronAPI,
   GitHubIssue,
@@ -7,10 +8,25 @@ import {
   IssueValidationEvent,
   StoredValidation,
 } from '@/lib/electron';
-import type { LinkedPRInfo } from '@automaker/types';
+import type { LinkedPRInfo, PhaseModelEntry, ModelAlias, CursorModelId } from '@automaker/types';
 import { useAppStore } from '@/store/app-store';
 import { toast } from 'sonner';
 import { isValidationStale } from '../utils';
+
+const logger = createLogger('IssueValidation');
+
+/**
+ * Extract model string from PhaseModelEntry or string (handles both formats)
+ */
+function extractModel(
+  entry: PhaseModelEntry | string | undefined
+): ModelAlias | CursorModelId | undefined {
+  if (!entry) return undefined;
+  if (typeof entry === 'string') {
+    return entry as ModelAlias | CursorModelId;
+  }
+  return entry.model;
+}
 
 interface UseIssueValidationOptions {
   selectedIssue: GitHubIssue | null;
@@ -25,7 +41,7 @@ export function useIssueValidation({
   onValidationResultChange,
   onShowValidationDialogChange,
 }: UseIssueValidationOptions) {
-  const { currentProject, validationModel, muteDoneSound } = useAppStore();
+  const { currentProject, phaseModels, muteDoneSound } = useAppStore();
   const [validatingIssues, setValidatingIssues] = useState<Set<number>>(new Set());
   const [cachedValidations, setCachedValidations] = useState<Map<number, StoredValidation>>(
     new Map()
@@ -65,7 +81,7 @@ export function useIssueValidation({
         }
       } catch (err) {
         if (isMounted) {
-          console.error('[GitHubIssuesView] Failed to load cached validations:', err);
+          logger.error('Failed to load cached validations:', err);
         }
       }
     };
@@ -94,7 +110,7 @@ export function useIssueValidation({
         }
       } catch (err) {
         if (isMounted) {
-          console.error('[GitHubIssuesView] Failed to load running validations:', err);
+          logger.error('Failed to load running validations:', err);
         }
       }
     };
@@ -211,11 +227,13 @@ export function useIssueValidation({
       issue: GitHubIssue,
       options: {
         forceRevalidate?: boolean;
+        model?: string | PhaseModelEntry; // Accept either string (backward compat) or PhaseModelEntry
+        modelEntry?: PhaseModelEntry; // New preferred way to pass model with thinking level
         comments?: GitHubComment[];
         linkedPRs?: LinkedPRInfo[];
       } = {}
     ) => {
-      const { forceRevalidate = false, comments, linkedPRs } = options;
+      const { forceRevalidate = false, model, modelEntry, comments, linkedPRs } = options;
 
       if (!currentProject?.path) {
         toast.error('No project selected');
@@ -242,6 +260,22 @@ export function useIssueValidation({
         description: 'You will be notified when the analysis is complete',
       });
 
+      // Use provided model override or fall back to phaseModels.validationModel
+      // Extract model string and thinking level from PhaseModelEntry (handles both old string format and new object format)
+      const effectiveModelEntry = modelEntry
+        ? modelEntry
+        : model
+          ? typeof model === 'string'
+            ? { model: model as ModelAlias | CursorModelId }
+            : model
+          : phaseModels.validationModel;
+      const normalizedEntry =
+        typeof effectiveModelEntry === 'string'
+          ? { model: effectiveModelEntry as ModelAlias | CursorModelId }
+          : effectiveModelEntry;
+      const modelToUse = normalizedEntry.model;
+      const thinkingLevelToUse = normalizedEntry.thinkingLevel;
+
       try {
         const api = getElectronAPI();
         if (api.github?.validateIssue) {
@@ -256,7 +290,8 @@ export function useIssueValidation({
           const result = await api.github.validateIssue(
             currentProject.path,
             validationInput,
-            validationModel
+            modelToUse,
+            thinkingLevelToUse
           );
 
           if (!result.success) {
@@ -265,7 +300,7 @@ export function useIssueValidation({
           // On success, the result will come through the event stream
         }
       } catch (err) {
-        console.error('[GitHubIssuesView] Validation error:', err);
+        logger.error('Validation error:', err);
         toast.error(err instanceof Error ? err.message : 'Failed to validate issue');
       }
     },
@@ -273,7 +308,7 @@ export function useIssueValidation({
       currentProject?.path,
       validatingIssues,
       cachedValidations,
-      validationModel,
+      phaseModels.validationModel,
       onValidationResultChange,
       onShowValidationDialogChange,
     ]
@@ -307,7 +342,7 @@ export function useIssueValidation({
               });
             }
           } catch (err) {
-            console.error('[GitHubIssuesView] Failed to mark validation as viewed:', err);
+            logger.error('Failed to mark validation as viewed:', err);
           }
         }
       }

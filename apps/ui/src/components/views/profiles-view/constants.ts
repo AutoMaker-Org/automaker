@@ -1,5 +1,5 @@
 import { Brain, Zap, Scale, Cpu, Rocket, Sparkles } from 'lucide-react';
-import type { AgentModel, ThinkingLevel } from '@/store/app-store';
+import type { ModelAlias, ThinkingLevel } from '@/store/app-store';
 
 // Icon mapping for profiles
 export const PROFILE_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -22,7 +22,7 @@ export const ICON_OPTIONS = [
 ];
 
 // Model options for the form
-export const CLAUDE_MODELS: { id: AgentModel; label: string }[] = [
+export const CLAUDE_MODELS: { id: ModelAlias; label: string }[] = [
   { id: 'haiku', label: 'Claude Haiku' },
   { id: 'sonnet', label: 'Claude Sonnet' },
   { id: 'opus', label: 'Claude Opus' },

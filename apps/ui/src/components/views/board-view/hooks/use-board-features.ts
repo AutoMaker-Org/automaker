@@ -2,6 +2,9 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { useAppStore, Feature } from '@/store/app-store';
 import { getElectronAPI } from '@/lib/electron';
 import { toast } from 'sonner';
+import { createLogger } from '@automaker/utils/logger';
+
+const logger = createLogger('BoardFeatures');
 
 interface UseBoardFeaturesProps {
   currentProject: { path: string; id: string } | null;
@@ -32,7 +35,7 @@ export function useBoardFeatures({ currentProject }: UseBoardFeaturesProps) {
     // If project switched, mark it but don't clear features yet
     // We'll clear after successful API load to prevent data loss
     if (isProjectSwitch) {
-      console.log(`[BoardView] Project switch detected: ${previousPath} -> ${currentPath}`);
+      logger.info(`Project switch detected: ${previousPath} -> ${currentPath}`);
       isSwitchingProjectRef.current = true;
       isInitialLoadRef.current = true;
     }
@@ -48,7 +51,7 @@ export function useBoardFeatures({ currentProject }: UseBoardFeaturesProps) {
     try {
       const api = getElectronAPI();
       if (!api.features) {
-        console.error('[BoardView] Features API not available');
+        logger.error('Features API not available');
         // Keep cached features if API is unavailable
         return;
       }
@@ -73,7 +76,7 @@ export function useBoardFeatures({ currentProject }: UseBoardFeaturesProps) {
           setPersistedCategories([]);
         }
       } else if (!result.success && result.error) {
-        console.error('[BoardView] API returned error:', result.error);
+        logger.error('API returned error:', result.error);
         // If it's a new project or the error indicates no features found,
         // that's expected - start with empty array
         if (isProjectSwitch) {
@@ -83,7 +86,7 @@ export function useBoardFeatures({ currentProject }: UseBoardFeaturesProps) {
         // Otherwise keep cached features
       }
     } catch (error) {
-      console.error('Failed to load features:', error);
+      logger.error('Failed to load features:', error);
       // On error, keep existing cached features for the current project
       // Only clear on project switch if we have no features from server
       if (isProjectSwitch && cachedFeatures.length === 0) {
@@ -115,7 +118,7 @@ export function useBoardFeatures({ currentProject }: UseBoardFeaturesProps) {
         setPersistedCategories([]);
       }
     } catch (error) {
-      console.error('Failed to load categories:', error);
+      logger.error('Failed to load categories:', error);
       // If file doesn't exist, ensure categories are cleared
       setPersistedCategories([]);
     }
@@ -147,7 +150,7 @@ export function useBoardFeatures({ currentProject }: UseBoardFeaturesProps) {
           setPersistedCategories(categories);
         }
       } catch (error) {
-        console.error('Failed to save category:', error);
+        logger.error('Failed to save category:', error);
       }
     },
     [currentProject, persistedCategories]
@@ -165,7 +168,7 @@ export function useBoardFeatures({ currentProject }: UseBoardFeaturesProps) {
         currentProject &&
         event.projectPath === currentProject.path
       ) {
-        console.log('[BoardView] Spec regeneration complete, refreshing features');
+        logger.info('Spec regeneration complete, refreshing features');
         loadFeatures();
       }
     });
@@ -190,27 +193,27 @@ export function useBoardFeatures({ currentProject }: UseBoardFeaturesProps) {
 
       if (event.type === 'auto_mode_feature_complete') {
         // Reload features when a feature is completed
-        console.log('[Board] Feature completed, reloading features...');
+        logger.info('Feature completed, reloading features...');
         loadFeatures();
         // Play ding sound when feature is done (unless muted)
         const { muteDoneSound } = useAppStore.getState();
         if (!muteDoneSound) {
           const audio = new Audio('/sounds/ding.mp3');
-          audio.play().catch((err) => console.warn('Could not play ding sound:', err));
+          audio.play().catch((err) => logger.warn('Could not play ding sound:', err));
         }
       } else if (event.type === 'plan_approval_required') {
         // Reload features when plan is generated and requires approval
         // This ensures the feature card shows the "Approve Plan" button
-        console.log('[Board] Plan approval required, reloading features...');
+        logger.info('Plan approval required, reloading features...');
         loadFeatures();
       } else if (event.type === 'pipeline_step_started') {
         // Pipeline steps update the feature status to `pipeline_*` before the step runs.
         // Reload so the card moves into the correct pipeline column immediately.
-        console.log('[Board] Pipeline step started, reloading features...');
+        logger.info('Pipeline step started, reloading features...');
         loadFeatures();
       } else if (event.type === 'auto_mode_error') {
         // Reload features when an error occurs (feature moved to waiting_approval)
-        console.log('[Board] Feature error, reloading features...', event.error);
+        logger.info('Feature error, reloading features...', event.error);
 
         // Remove from running tasks so it moves to the correct column
         if (event.featureId) {

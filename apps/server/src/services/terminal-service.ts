@@ -12,6 +12,9 @@ import * as path from 'path';
 // secureFs is used for user-controllable paths (working directory validation)
 // to enforce ALLOWED_ROOT_DIRECTORY security boundary
 import * as secureFs from '../lib/secure-fs.js';
+import { createLogger } from '@automaker/utils';
+
+const logger = createLogger('Terminal');
 // System paths module handles shell binary checks and WSL detection
 // These are system paths outside ALLOWED_ROOT_DIRECTORY, centralized for security auditing
 import {
@@ -219,7 +222,7 @@ export class TerminalService extends EventEmitter {
 
     // Reject paths with null bytes (could bypass path checks)
     if (cwd.includes('\0')) {
-      console.warn(`[Terminal] Rejecting path with null byte: ${cwd.replace(/\0/g, '\\0')}`);
+      logger.warn(`Rejecting path with null byte: ${cwd.replace(/\0/g, '\\0')}`);
       return homeDir;
     }
 
@@ -242,12 +245,10 @@ export class TerminalService extends EventEmitter {
       if (statResult.isDirectory()) {
         return cwd;
       }
-      console.warn(`[Terminal] Path exists but is not a directory: ${cwd}, falling back to home`);
+      logger.warn(`Path exists but is not a directory: ${cwd}, falling back to home`);
       return homeDir;
     } catch {
-      console.warn(
-        `[Terminal] Working directory does not exist or not allowed: ${cwd}, falling back to home`
-      );
+      logger.warn(`Working directory does not exist or not allowed: ${cwd}, falling back to home`);
       return homeDir;
     }
   }
@@ -272,7 +273,7 @@ export class TerminalService extends EventEmitter {
   setMaxSessions(limit: number): void {
     if (limit >= MIN_MAX_SESSIONS && limit <= MAX_MAX_SESSIONS) {
       maxSessions = limit;
-      console.log(`[Terminal] Max sessions limit updated to ${limit}`);
+      logger.info(`Max sessions limit updated to ${limit}`);
     }
   }
 
@@ -283,7 +284,7 @@ export class TerminalService extends EventEmitter {
   async createSession(options: TerminalOptions = {}): Promise<TerminalSession | null> {
     // Check session limit
     if (this.sessions.size >= maxSessions) {
-      console.error(`[Terminal] Max sessions (${maxSessions}) reached, refusing new session`);
+      logger.error(`Max sessions (${maxSessions}) reached, refusing new session`);
       return null;
     }
 
@@ -319,7 +320,7 @@ export class TerminalService extends EventEmitter {
       ...options.env,
     };
 
-    console.log(`[Terminal] Creating session ${id} with shell: ${shell} in ${cwd}`);
+    logger.info(`Creating session ${id} with shell: ${shell} in ${cwd}`);
 
     const ptyProcess = pty.spawn(shell, shellArgs, {
       name: 'xterm-256color',
@@ -391,13 +392,13 @@ export class TerminalService extends EventEmitter {
 
     // Handle exit
     ptyProcess.onExit(({ exitCode }) => {
-      console.log(`[Terminal] Session ${id} exited with code ${exitCode}`);
+      logger.info(`Session ${id} exited with code ${exitCode}`);
       this.sessions.delete(id);
       this.exitCallbacks.forEach((cb) => cb(id, exitCode));
       this.emit('exit', id, exitCode);
     });
 
-    console.log(`[Terminal] Session ${id} created successfully`);
+    logger.info(`Session ${id} created successfully`);
     return session;
   }
 
@@ -407,7 +408,7 @@ export class TerminalService extends EventEmitter {
   write(sessionId: string, data: string): boolean {
     const session = this.sessions.get(sessionId);
     if (!session) {
-      console.warn(`[Terminal] Session ${sessionId} not found`);
+      logger.warn(`Session ${sessionId} not found`);
       return false;
     }
     session.pty.write(data);
@@ -422,7 +423,7 @@ export class TerminalService extends EventEmitter {
   resize(sessionId: string, cols: number, rows: number, suppressOutput: boolean = true): boolean {
     const session = this.sessions.get(sessionId);
     if (!session) {
-      console.warn(`[Terminal] Session ${sessionId} not found for resize`);
+      logger.warn(`Session ${sessionId} not found for resize`);
       return false;
     }
     try {
@@ -448,7 +449,7 @@ export class TerminalService extends EventEmitter {
 
       return true;
     } catch (error) {
-      console.error(`[Terminal] Error resizing session ${sessionId}:`, error);
+      logger.error(`Error resizing session ${sessionId}:`, error);
       session.resizeInProgress = false; // Clear flag on error
       return false;
     }
@@ -476,14 +477,14 @@ export class TerminalService extends EventEmitter {
       }
 
       // First try graceful SIGTERM to allow process cleanup
-      console.log(`[Terminal] Session ${sessionId} sending SIGTERM`);
+      logger.info(`Session ${sessionId} sending SIGTERM`);
       session.pty.kill('SIGTERM');
 
       // Schedule SIGKILL fallback if process doesn't exit gracefully
       // The onExit handler will remove session from map when it actually exits
       setTimeout(() => {
         if (this.sessions.has(sessionId)) {
-          console.log(`[Terminal] Session ${sessionId} still alive after SIGTERM, sending SIGKILL`);
+          logger.info(`Session ${sessionId} still alive after SIGTERM, sending SIGKILL`);
           try {
             session.pty.kill('SIGKILL');
           } catch {
@@ -494,10 +495,10 @@ export class TerminalService extends EventEmitter {
         }
       }, 1000);
 
-      console.log(`[Terminal] Session ${sessionId} kill initiated`);
+      logger.info(`Session ${sessionId} kill initiated`);
       return true;
     } catch (error) {
-      console.error(`[Terminal] Error killing session ${sessionId}:`, error);
+      logger.error(`Error killing session ${sessionId}:`, error);
       // Still try to remove from map even if kill fails
       this.sessions.delete(sessionId);
       return false;
@@ -580,7 +581,7 @@ export class TerminalService extends EventEmitter {
    * Clean up all sessions
    */
   cleanup(): void {
-    console.log(`[Terminal] Cleaning up ${this.sessions.size} sessions`);
+    logger.info(`Cleaning up ${this.sessions.size} sessions`);
     this.sessions.forEach((session, id) => {
       try {
         // Clean up flush timeout

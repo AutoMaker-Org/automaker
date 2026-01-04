@@ -1,5 +1,8 @@
 import { useState, useCallback } from 'react';
+import { createLogger } from '@automaker/utils/logger';
 import { getElectronAPI } from '@/lib/electron';
+
+const logger = createLogger('SetupDialog');
 import { toast } from 'sonner';
 import type { FeatureCount } from '@/components/views/spec-view/types';
 
@@ -53,7 +56,7 @@ export function useSetupDialog({
       );
 
       if (!result.success) {
-        console.error('[SetupDialog] Failed to start spec creation:', result.error);
+        logger.error('Failed to start spec creation:', result.error);
         setSpecCreatingForProject(null);
         toast.error('Failed to create specification', {
           description: result.error,
@@ -66,7 +69,7 @@ export function useSetupDialog({
       }
       // If successful, we'll wait for the events to update the state
     } catch (error) {
-      console.error('[SetupDialog] Failed to create spec:', error);
+      logger.error('Failed to create spec:', error);
       setSpecCreatingForProject(null);
       toast.error('Failed to create specification', {
         description: error instanceof Error ? error.message : 'Unknown error',

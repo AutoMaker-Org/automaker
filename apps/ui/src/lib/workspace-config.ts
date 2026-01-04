@@ -3,10 +3,13 @@
  * Centralizes the logic for determining where projects should be created/opened
  */
 
+import { createLogger } from '@automaker/utils/logger';
 import { getHttpApiClient } from './http-api-client';
 import { getElectronAPI } from './electron';
 import { getItem, setItem } from './storage';
 import path from 'path';
+
+const logger = createLogger('WorkspaceConfig');
 
 const LAST_PROJECT_DIR_KEY = 'automaker:lastProjectDir';
 
@@ -20,9 +23,7 @@ async function getDefaultDocumentsPath(): Promise<string | null> {
     const documentsPath = await api.getPath('documents');
     return path.join(documentsPath, 'Automaker');
   } catch (error) {
-    if (typeof window !== 'undefined' && window.console) {
-      window.console.error('Failed to get documents path:', error);
-    }
+    logger.error('Failed to get documents path:', error);
     return null;
   }
 }
@@ -81,9 +82,7 @@ export async function getDefaultWorkspaceDirectory(): Promise<string | null> {
     const documentsPath = await getDefaultDocumentsPath();
     return documentsPath;
   } catch (error) {
-    if (typeof window !== 'undefined' && window.console) {
-      window.console.error('Failed to get default workspace directory:', error);
-    }
+    logger.error('Failed to get default workspace directory:', error);
 
     // On error, try last used dir and Documents
     const lastUsedDir = getItem(LAST_PROJECT_DIR_KEY);

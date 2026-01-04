@@ -1,14 +1,14 @@
 import type { LucideIcon } from 'lucide-react';
 import {
   Key,
-  Terminal,
+  Bot,
   SquareTerminal,
   Palette,
   Settings2,
   Volume2,
   FlaskConical,
   Trash2,
-  Sparkles,
+  Workflow,
   Plug,
   MessageSquareText,
 } from 'lucide-react';
@@ -23,10 +23,10 @@ export interface NavigationItem {
 // Navigation items for the settings side panel
 export const NAV_ITEMS: NavigationItem[] = [
   { id: 'api-keys', label: 'API Keys', icon: Key },
-  { id: 'claude', label: 'Claude', icon: Terminal },
+  { id: 'providers', label: 'AI Providers', icon: Bot },
   { id: 'mcp-servers', label: 'MCP Servers', icon: Plug },
   { id: 'prompts', label: 'Prompt Customization', icon: MessageSquareText },
-  { id: 'ai-enhancement', label: 'AI Enhancement', icon: Sparkles },
+  { id: 'model-defaults', label: 'Model Defaults', icon: Workflow },
   { id: 'appearance', label: 'Appearance', icon: Palette },
   { id: 'terminal', label: 'Terminal', icon: SquareTerminal },
   { id: 'keyboard', label: 'Keyboard Shortcuts', icon: Settings2 },

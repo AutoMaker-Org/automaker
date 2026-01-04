@@ -6,7 +6,10 @@
  */
 
 import { useState } from 'react';
+import { createLogger } from '@automaker/utils/logger';
 import { ShieldX, RefreshCw, Container, Copy, Check } from 'lucide-react';
+
+const logger = createLogger('SandboxRejectionScreen');
 import { Button } from '@/components/ui/button';
 
 const DOCKER_COMMAND = 'npm run dev:docker';
@@ -26,7 +29,7 @@ export function SandboxRejectionScreen() {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
-      console.error('Failed to copy:', err);
+      logger.error('Failed to copy:', err);
     }
   };
 

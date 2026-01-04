@@ -6,6 +6,9 @@
  */
 
 import { contextBridge, ipcRenderer, OpenDialogOptions, SaveDialogOptions } from 'electron';
+import { createLogger } from '@automaker/utils/logger';
+
+const logger = createLogger('Preload');
 
 // Expose minimal API for native features
 contextBridge.exposeInMainWorld('electronAPI', {
@@ -55,4 +58,4 @@ contextBridge.exposeInMainWorld('electronAPI', {
   quit: (): Promise<void> => ipcRenderer.invoke('app:quit'),
 });
 
-console.log('[Preload] Electron API exposed (TypeScript)');
+logger.info('Electron API exposed (TypeScript)');

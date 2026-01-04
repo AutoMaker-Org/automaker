@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react';
+import { createLogger } from '@automaker/utils/logger';
 import { useAppStore, FileTreeNode, ProjectAnalysis } from '@/store/app-store';
 import { getElectronAPI } from '@/lib/electron';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -20,6 +21,8 @@ import {
   ListChecks,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+
+const logger = createLogger('AnalysisView');
 
 const IGNORE_PATTERNS = [
   'node_modules',
@@ -109,7 +112,7 @@ export function AnalysisView() {
 
         return nodes;
       } catch (error) {
-        console.error('Failed to scan directory:', path, error);
+        logger.error('Failed to scan directory:', path, error);
         return [];
       }
     },
@@ -165,7 +168,7 @@ export function AnalysisView() {
 
       setProjectAnalysis(analysis);
     } catch (error) {
-      console.error('Analysis failed:', error);
+      logger.error('Analysis failed:', error);
     } finally {
       setIsAnalyzing(false);
     }
@@ -373,7 +376,7 @@ ${Object.entries(projectAnalysis.filesByExtension)
         setSpecError(writeResult.error || 'Failed to write spec file');
       }
     } catch (error) {
-      console.error('Failed to generate spec:', error);
+      logger.error('Failed to generate spec:', error);
       setSpecError(error instanceof Error ? error.message : 'Failed to generate spec');
     } finally {
       setIsGeneratingSpec(false);
@@ -644,7 +647,7 @@ ${Object.entries(projectAnalysis.filesByExtension)
 
       setFeatureListGenerated(true);
     } catch (error) {
-      console.error('Failed to generate feature list:', error);
+      logger.error('Failed to generate feature list:', error);
       setFeatureListError(
         error instanceof Error ? error.message : 'Failed to generate feature list'
       );

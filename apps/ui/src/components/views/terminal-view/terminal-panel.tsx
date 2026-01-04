@@ -1,4 +1,5 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
+import { createLogger } from '@automaker/utils/logger';
 import {
   X,
   SplitSquareHorizontal,
@@ -41,6 +42,8 @@ import {
 import { toast } from 'sonner';
 import { getElectronAPI } from '@/lib/electron';
 import { getApiKey, getSessionToken, getServerUrlSync } from '@/lib/http-api-client';
+
+const logger = createLogger('Terminal');
 
 // Font size constraints
 const MIN_FONT_SIZE = 8;
@@ -296,7 +299,7 @@ export function TerminalPanel({
       toast.success('Copied to clipboard');
       return true;
     } catch (err) {
-      console.error('[Terminal] Copy failed:', err);
+      logger.error('Copy failed:', err);
       const errorMessage = err instanceof Error ? err.message : 'Unknown error';
       toast.error('Copy failed', {
         description: errorMessage.includes('permission')
@@ -361,7 +364,7 @@ export function TerminalPanel({
 
       await sendTextInChunks(text);
     } catch (err) {
-      console.error('[Terminal] Paste failed:', err);
+      logger.error('Paste failed:', err);
       const errorMessage = err instanceof Error ? err.message : 'Unknown error';
       toast.error('Paste failed', {
         description: errorMessage.includes('permission')
@@ -504,7 +507,7 @@ export function TerminalPanel({
       });
 
       if (!response.ok) {
-        console.warn('[Terminal] Failed to fetch wsToken:', response.status);
+        logger.warn('Failed to fetch wsToken:', response.status);
         return null;
       }
 
@@ -515,7 +518,7 @@ export function TerminalPanel({
 
       return null;
     } catch (error) {
-      console.error('[Terminal] Error fetching wsToken:', error);
+      logger.error('Error fetching wsToken:', error);
       return null;
     }
   }, [serverUrl]);
@@ -595,7 +598,7 @@ export function TerminalPanel({
         const api = getElectronAPI();
         if (api?.openExternalLink) {
           api.openExternalLink(uri).catch((error) => {
-            console.error('[Terminal] Failed to open URL:', error);
+            logger.error('Failed to open URL:', error);
             // Fallback to window.open if Electron API fails
             window.open(uri, '_blank', 'noopener,noreferrer');
           });
@@ -697,7 +700,7 @@ export function TerminalPanel({
                     }
                   } catch {
                     // If we can't get home path, just use the path as-is
-                    console.warn('[Terminal] Could not resolve home directory path');
+                    logger.warn('Could not resolve home directory path');
                   }
                 } else if (!clickedPath.startsWith('/') && !clickedPath.match(/^[a-zA-Z]:\\/)) {
                   // Relative path - resolve against project path
@@ -721,7 +724,7 @@ export function TerminalPanel({
                     toast.error('Failed to open in editor', { description: result.error });
                   }
                 } catch (error) {
-                  console.error('[Terminal] Failed to open file:', error);
+                  logger.error('Failed to open file:', error);
                   toast.error('Failed to open file', {
                     description: error instanceof Error ? error.message : 'Unknown error',
                   });
@@ -744,7 +747,7 @@ export function TerminalPanel({
         });
         terminal.loadAddon(webglAddon);
       } catch {
-        console.warn('[Terminal] WebGL addon not available, falling back to canvas');
+        logger.warn('WebGL addon not available, falling back to canvas');
       }
 
       // Fit terminal to container - wait for stable dimensions
@@ -770,7 +773,7 @@ export function TerminalPanel({
           try {
             fitAddon.fit();
           } catch (err) {
-            console.error('[Terminal] Initial fit error:', err);
+            logger.error('Initial fit error:', err);
           }
           return;
         }
@@ -1000,7 +1003,7 @@ export function TerminalPanel({
       wsRef.current = ws;
 
       ws.onopen = () => {
-        console.log(`[Terminal] WebSocket connected for session ${sessionId}`);
+        logger.info(`WebSocket connected for session ${sessionId}`);
 
         setConnectionStatus('connected');
         reconnectAttemptsRef.current = 0;
@@ -1037,7 +1040,7 @@ export function TerminalPanel({
               }
               break;
             case 'connected': {
-              console.log(`[Terminal] Session connected: ${msg.shell} in ${msg.cwd}`);
+              logger.info(`Session connected: ${msg.shell} in ${msg.cwd}`);
               // Detect shell type from path
               const shellPath = (msg.shell || '').toLowerCase();
               // Windows shells use backslash paths and include powershell/pwsh/cmd
@@ -1088,16 +1091,12 @@ export function TerminalPanel({
               break;
           }
         } catch (err) {
-          console.error('[Terminal] Message parse error:', err);
+          logger.error('Message parse error:', err);
         }
       };
 
       ws.onclose = (event) => {
-        console.log(
-          `[Terminal] WebSocket closed for session ${sessionId}:`,
-          event.code,
-          event.reason
-        );
+        logger.info(`WebSocket closed for session ${sessionId}: ${event.code} ${event.reason}`);
         wsRef.current = null;
 
         // Clear heartbeat interval
@@ -1167,8 +1166,8 @@ export function TerminalPanel({
         // Attempt reconnect after exponential delay
         reconnectTimeoutRef.current = setTimeout(() => {
           if (xtermRef.current) {
-            console.log(
-              `[Terminal] Attempting reconnect for session ${sessionId} (attempt ${reconnectAttemptsRef.current}/${MAX_RECONNECT_ATTEMPTS})`
+            logger.info(
+              `Attempting reconnect for session ${sessionId} (attempt ${reconnectAttemptsRef.current}/${MAX_RECONNECT_ATTEMPTS})`
             );
             connect();
           }
@@ -1176,7 +1175,7 @@ export function TerminalPanel({
       };
 
       ws.onerror = (error) => {
-        console.error(`[Terminal] WebSocket error for session ${sessionId}:`, error);
+        logger.error(`WebSocket error for session ${sessionId}:`, error);
       };
     };
 
@@ -1234,7 +1233,7 @@ export function TerminalPanel({
           wsRef.current.send(JSON.stringify({ type: 'resize', cols, rows }));
         }
       } catch (err) {
-        console.error('[Terminal] Resize error:', err);
+        logger.error('Resize error:', err);
       }
     }, RESIZE_DEBOUNCE_MS);
   }, []);
@@ -1551,7 +1550,7 @@ export function TerminalPanel({
         const api = getElectronAPI();
         if (!api.saveImageToTemp) {
           // Fallback path when Electron API is not available (browser mode)
-          console.warn('[Terminal] saveImageToTemp not available, returning fallback path');
+          logger.warn('saveImageToTemp not available, returning fallback path');
           return `.automaker/images/${Date.now()}_${filename}`;
         }
 
@@ -1560,10 +1559,10 @@ export function TerminalPanel({
         if (result.success && result.path) {
           return result.path;
         }
-        console.error('[Terminal] Failed to save image:', result.error);
+        logger.error('Failed to save image:', result.error);
         return null;
       } catch (error) {
-        console.error('[Terminal] Error saving image:', error);
+        logger.error('Error saving image:', error);
         return null;
       }
     },
@@ -1662,7 +1661,7 @@ export function TerminalPanel({
             toast.error(`Failed to save: ${file.name}`);
           }
         } catch (error) {
-          console.error('[Terminal] Error processing image:', error);
+          logger.error('Error processing image:', error);
           toast.error(`Error processing: ${file.name}`);
         }
       }

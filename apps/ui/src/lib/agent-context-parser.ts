@@ -194,37 +194,59 @@ function getCurrentPhase(content: string): 'planning' | 'action' | 'verification
 }
 
 /**
+ * Cleans up fragmented streaming text by removing spurious newlines
+ * This handles cases where streaming providers send partial text chunks
+ * that got separated by newlines during accumulation
+ */
+function cleanFragmentedText(content: string): string {
+  // Remove newlines that break up words (newline between letters)
+  // e.g., "sum\n\nmary" -> "summary"
+  let cleaned = content.replace(/([a-zA-Z])\n+([a-zA-Z])/g, '$1$2');
+
+  // Also clean up fragmented XML-like tags
+  // e.g., "<sum\n\nmary>" -> "<summary>"
+  cleaned = cleaned.replace(/<([a-zA-Z]+)\n*([a-zA-Z]*)\n*>/g, '<$1$2>');
+  cleaned = cleaned.replace(/<\/([a-zA-Z]+)\n*([a-zA-Z]*)\n*>/g, '</$1$2>');
+
+  return cleaned;
+}
+
+/**
  * Extracts a summary from completed feature context
  * Looks for content between <summary> and </summary> tags
  */
 function extractSummary(content: string): string | undefined {
+  // First, clean up any fragmented text from streaming
+  const cleanedContent = cleanFragmentedText(content);
+
   // Look for <summary> tags - capture everything between opening and closing tags
-  const summaryTagMatch = content.match(/<summary>([\s\S]*?)<\/summary>/i);
+  const summaryTagMatch = cleanedContent.match(/<summary>([\s\S]*?)<\/summary>/i);
   if (summaryTagMatch) {
-    return summaryTagMatch[1].trim();
+    // Clean up the extracted summary content as well
+    return cleanFragmentedText(summaryTagMatch[1]).trim();
   }
 
   // Fallback: Look for summary sections - capture everything including subsections (###)
   // Stop at same-level ## sections (but not ###), or tool markers, or end
-  const summaryMatch = content.match(/## Summary[^\n]*\n([\s\S]*?)(?=\n## [^#]|\n🔧|$)/i);
+  const summaryMatch = cleanedContent.match(/## Summary[^\n]*\n([\s\S]*?)(?=\n## [^#]|\n🔧|$)/i);
   if (summaryMatch) {
-    return summaryMatch[1].trim();
+    return cleanFragmentedText(summaryMatch[1]).trim();
   }
 
   // Look for completion markers and extract surrounding text
-  const completionMatch = content.match(
+  const completionMatch = cleanedContent.match(
     /✓ (?:Feature|Verification|Task) (?:successfully|completed|verified)[^\n]*(?:\n[^\n]{1,200})?/i
   );
   if (completionMatch) {
-    return completionMatch[0].trim();
+    return cleanFragmentedText(completionMatch[0]).trim();
   }
 
   // Look for "What was done" type sections
-  const whatWasDoneMatch = content.match(
+  const whatWasDoneMatch = cleanedContent.match(
     /(?:What was done|Changes made|Implemented)[^\n]*\n([\s\S]*?)(?=\n## [^#]|\n🔧|$)/i
   );
   if (whatWasDoneMatch) {
-    return whatWasDoneMatch[1].trim();
+    return cleanFragmentedText(whatWasDoneMatch[1]).trim();
   }
 
   return undefined;

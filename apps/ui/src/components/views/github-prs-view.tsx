@@ -1,10 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
+import { createLogger } from '@automaker/utils/logger';
 import { GitPullRequest, Loader2, RefreshCw, ExternalLink, GitMerge, X } from 'lucide-react';
 import { getElectronAPI, GitHubPR } from '@/lib/electron';
 import { useAppStore } from '@/store/app-store';
 import { Button } from '@/components/ui/button';
 import { Markdown } from '@/components/ui/markdown';
 import { cn } from '@/lib/utils';
+
+const logger = createLogger('GitHubPRsView');
 
 export function GitHubPRsView() {
   const [openPRs, setOpenPRs] = useState<GitHubPR[]>([]);
@@ -35,7 +38,7 @@ export function GitHubPRsView() {
         }
       }
     } catch (err) {
-      console.error('[GitHubPRsView] Error fetching PRs:', err);
+      logger.error('Error fetching PRs:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch pull requests');
     } finally {
       setLoading(false);

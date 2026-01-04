@@ -6,11 +6,13 @@
  * (for file I/O via SettingsService) and the UI (for state management and sync).
  */
 
-import type { AgentModel } from './model.js';
+import type { ModelAlias } from './model.js';
+import type { CursorModelId } from './cursor-models.js';
+import { CURSOR_MODEL_MAP, getAllCursorModelIds } from './cursor-models.js';
 import type { PromptCustomization } from './prompts.js';
 
-// Re-export AgentModel for convenience
-export type { AgentModel };
+// Re-export ModelAlias for convenience
+export type { ModelAlias };
 
 /**
  * ThemeMode - Available color themes for the UI
@@ -68,8 +70,81 @@ export type PlanningMode = 'skip' | 'lite' | 'spec' | 'full';
 /** ThinkingLevel - Extended thinking levels for Claude models (reasoning intensity) */
 export type ThinkingLevel = 'none' | 'low' | 'medium' | 'high' | 'ultrathink';
 
+/**
+ * Thinking token budget mapping based on Claude SDK documentation.
+ * @see https://docs.anthropic.com/en/docs/build-with-claude/extended-thinking
+ *
+ * - Minimum budget: 1,024 tokens
+ * - Complex tasks starting point: 16,000+ tokens
+ * - Above 32,000: Risk of timeouts (batch processing recommended)
+ */
+export const THINKING_TOKEN_BUDGET: Record<ThinkingLevel, number | undefined> = {
+  none: undefined, // Thinking disabled
+  low: 1024, // Minimum per docs
+  medium: 10000, // Light reasoning
+  high: 16000, // Complex tasks (recommended starting point)
+  ultrathink: 32000, // Maximum safe (above this risks timeouts)
+};
+
+/**
+ * Convert thinking level to SDK maxThinkingTokens value
+ */
+export function getThinkingTokenBudget(level: ThinkingLevel | undefined): number | undefined {
+  if (!level || level === 'none') return undefined;
+  return THINKING_TOKEN_BUDGET[level];
+}
+
 /** ModelProvider - AI model provider for credentials and API key management */
-export type ModelProvider = 'claude';
+export type ModelProvider = 'claude' | 'cursor';
+
+/**
+ * PhaseModelEntry - Configuration for a single phase model
+ *
+ * Encapsulates both the model selection and optional thinking level
+ * for Claude models. Cursor models handle thinking internally.
+ */
+export interface PhaseModelEntry {
+  /** The model to use (Claude alias or Cursor model ID) */
+  model: ModelAlias | CursorModelId;
+  /** Extended thinking level (only applies to Claude models, defaults to 'none') */
+  thinkingLevel?: ThinkingLevel;
+}
+
+/**
+ * PhaseModelConfig - Configuration for AI models used in different application phases
+ *
+ * Allows users to choose which model (Claude or Cursor) to use for each distinct
+ * operation in the application. This provides fine-grained control over cost,
+ * speed, and quality tradeoffs.
+ */
+export interface PhaseModelConfig {
+  // Quick tasks - recommend fast/cheap models (Haiku, Cursor auto)
+  /** Model for enhancing feature names and descriptions */
+  enhancementModel: PhaseModelEntry;
+  /** Model for generating file context descriptions */
+  fileDescriptionModel: PhaseModelEntry;
+  /** Model for analyzing and describing context images */
+  imageDescriptionModel: PhaseModelEntry;
+
+  // Validation tasks - recommend smart models (Sonnet, Opus)
+  /** Model for validating and improving GitHub issues */
+  validationModel: PhaseModelEntry;
+
+  // Generation tasks - recommend powerful models (Opus, Sonnet)
+  /** Model for generating full application specifications */
+  specGenerationModel: PhaseModelEntry;
+  /** Model for creating features from specifications */
+  featureGenerationModel: PhaseModelEntry;
+  /** Model for reorganizing and prioritizing backlog */
+  backlogPlanningModel: PhaseModelEntry;
+  /** Model for analyzing project structure */
+  projectAnalysisModel: PhaseModelEntry;
+  /** Model for AI suggestions (feature, refactoring, security, performance) */
+  suggestionsModel: PhaseModelEntry;
+}
+
+/** Keys of PhaseModelConfig for type-safe access */
+export type PhaseModelKey = keyof PhaseModelConfig;
 
 /**
  * WindowBounds - Electron window position and size for persistence
@@ -152,16 +227,54 @@ export interface AIProfile {
   name: string;
   /** User-friendly description */
   description: string;
-  /** Which Claude model to use (opus, sonnet, haiku) */
-  model: AgentModel;
-  /** Extended thinking level for reasoning-based tasks */
-  thinkingLevel: ThinkingLevel;
-  /** Provider (currently only "claude") */
+  /** Provider selection: 'claude' or 'cursor' */
   provider: ModelProvider;
   /** Whether this is a built-in default profile */
   isBuiltIn: boolean;
   /** Optional icon identifier or emoji */
   icon?: string;
+
+  // Claude-specific settings
+  /** Which Claude model to use (opus, sonnet, haiku) - only for Claude provider */
+  model?: ModelAlias;
+  /** Extended thinking level for reasoning-based tasks - only for Claude provider */
+  thinkingLevel?: ThinkingLevel;
+
+  // Cursor-specific settings
+  /** Which Cursor model to use - only for Cursor provider
+   * Note: For Cursor, thinking is embedded in the model ID (e.g., 'claude-sonnet-4-thinking')
+   */
+  cursorModel?: CursorModelId;
+}
+
+/**
+ * Helper to determine if a profile uses thinking mode
+ */
+export function profileHasThinking(profile: AIProfile): boolean {
+  if (profile.provider === 'claude') {
+    return profile.thinkingLevel !== undefined && profile.thinkingLevel !== 'none';
+  }
+
+  if (profile.provider === 'cursor') {
+    const model = profile.cursorModel || 'auto';
+    // Check using model map for hasThinking flag, or check for 'thinking' in name
+    const modelConfig = CURSOR_MODEL_MAP[model];
+    return modelConfig?.hasThinking ?? false;
+  }
+
+  return false;
+}
+
+/**
+ * Get effective model string for execution
+ */
+export function getProfileModelString(profile: AIProfile): string {
+  if (profile.provider === 'cursor') {
+    return `cursor:${profile.cursorModel || 'auto'}`;
+  }
+
+  // Claude
+  return profile.model || 'sonnet';
 }
 
 /**
@@ -308,11 +421,21 @@ export interface GlobalSettings {
   /** Mute completion notification sound */
   muteDoneSound: boolean;
 
-  // AI Model Selection
-  /** Which model to use for feature name/description enhancement */
-  enhancementModel: AgentModel;
-  /** Which model to use for GitHub issue validation */
-  validationModel: AgentModel;
+  // AI Model Selection (per-phase configuration)
+  /** Phase-specific AI model configuration */
+  phaseModels: PhaseModelConfig;
+
+  // Legacy AI Model Selection (deprecated - use phaseModels instead)
+  /** @deprecated Use phaseModels.enhancementModel instead */
+  enhancementModel: ModelAlias;
+  /** @deprecated Use phaseModels.validationModel instead */
+  validationModel: ModelAlias;
+
+  // Cursor CLI Settings (global)
+  /** Which Cursor models are available in feature modal (empty = all) */
+  enabledCursorModels: CursorModelId[];
+  /** Default Cursor model selection when switching to Cursor CLI */
+  cursorDefaultModel: CursorModelId;
 
   // Input Configuration
   /** User's keyboard shortcut bindings */
@@ -468,8 +591,26 @@ export interface ProjectSettings {
  * Default values and constants
  */
 
+/** Default phase model configuration - sensible defaults for each task type */
+export const DEFAULT_PHASE_MODELS: PhaseModelConfig = {
+  // Quick tasks - use fast models for speed and cost
+  enhancementModel: { model: 'sonnet' },
+  fileDescriptionModel: { model: 'haiku' },
+  imageDescriptionModel: { model: 'haiku' },
+
+  // Validation - use smart models for accuracy
+  validationModel: { model: 'sonnet' },
+
+  // Generation - use powerful models for quality
+  specGenerationModel: { model: 'opus' },
+  featureGenerationModel: { model: 'sonnet' },
+  backlogPlanningModel: { model: 'sonnet' },
+  projectAnalysisModel: { model: 'sonnet' },
+  suggestionsModel: { model: 'sonnet' },
+};
+
 /** Current version of the global settings schema */
-export const SETTINGS_VERSION = 2;
+export const SETTINGS_VERSION = 3;
 /** Current version of the credentials schema */
 export const CREDENTIALS_VERSION = 1;
 /** Current version of the project settings schema */
@@ -515,8 +656,11 @@ export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
   defaultRequirePlanApproval: false,
   defaultAIProfileId: null,
   muteDoneSound: false,
+  phaseModels: DEFAULT_PHASE_MODELS,
   enhancementModel: 'sonnet',
   validationModel: 'opus',
+  enabledCursorModels: getAllCursorModelIds(),
+  cursorDefaultModel: 'auto',
   keyboardShortcuts: DEFAULT_KEYBOARD_SHORTCUTS,
   aiProfiles: [],
   projects: [],

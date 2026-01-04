@@ -2,6 +2,8 @@
  * Shared types for AI model providers
  */
 
+import type { ThinkingLevel } from './settings.js';
+
 /**
  * Configuration for a provider instance
  */
@@ -76,6 +78,18 @@ export interface ExecuteOptions {
   sdkSessionId?: string; // Claude SDK session ID for resuming conversations
   settingSources?: Array<'user' | 'project' | 'local'>; // Sources for CLAUDE.md loading
   sandbox?: { enabled: boolean; autoAllowBashIfSandboxed?: boolean }; // Sandbox configuration
+  /**
+   * If true, the provider should run in read-only mode (no file modifications).
+   * For Cursor CLI, this omits the --force flag, making it suggest-only.
+   * Default: false (allows edits)
+   */
+  readOnly?: boolean;
+  /**
+   * Extended thinking level for Claude models.
+   * Controls the amount of reasoning tokens allocated.
+   * Only applies to Claude models; Cursor models handle thinking internally.
+   */
+  thinkingLevel?: ThinkingLevel;
 }
 
 /**
@@ -114,7 +128,15 @@ export interface InstallationStatus {
   installed: boolean;
   path?: string;
   version?: string;
-  method?: 'cli' | 'npm' | 'brew' | 'sdk';
+  /**
+   * How the provider was installed/detected
+   * - cli: Direct CLI binary
+   * - wsl: CLI accessed via Windows Subsystem for Linux
+   * - npm: Installed via npm
+   * - brew: Installed via Homebrew
+   * - sdk: Using SDK library
+   */
+  method?: 'cli' | 'wsl' | 'npm' | 'brew' | 'sdk';
   hasApiKey?: boolean;
   authenticated?: boolean;
   error?: string;

@@ -3,6 +3,7 @@ import {
   resolveModelString,
   getEffectiveModel,
   CLAUDE_MODEL_MAP,
+  CURSOR_MODEL_MAP,
   DEFAULT_MODELS,
 } from '@automaker/model-resolver';
 
@@ -36,12 +37,13 @@ describe('model-resolver.ts', () => {
       const result = resolveModelString('opus');
       expect(result).toBe('claude-opus-4-5-20251101');
       expect(consoleSpy.log).toHaveBeenCalledWith(
-        expect.stringContaining('Resolved model alias: "opus"')
+        expect.stringContaining('Resolved Claude model alias: "opus"')
       );
     });
 
     it('should treat unknown models as falling back to default', () => {
-      const models = ['o1', 'o1-mini', 'o3', 'gpt-5.2', 'unknown-model'];
+      // Note: Don't include valid Cursor model IDs here (e.g., 'gpt-5.2' is in CURSOR_MODEL_MAP)
+      const models = ['o1', 'o1-mini', 'o3', 'unknown-model', 'fake-model-123'];
       models.forEach((model) => {
         const result = resolveModelString(model);
         // Should fall back to default since these aren't supported
@@ -82,6 +84,32 @@ describe('model-resolver.ts', () => {
     it('should handle empty string', () => {
       const result = resolveModelString('');
       expect(result).toBe(DEFAULT_MODELS.claude);
+    });
+
+    describe('Cursor models', () => {
+      it('should pass through cursor-prefixed models unchanged', () => {
+        const result = resolveModelString('cursor-composer-1');
+        expect(result).toBe('cursor-composer-1');
+        expect(consoleSpy.log).toHaveBeenCalledWith(expect.stringContaining('Using Cursor model'));
+      });
+
+      it('should add cursor- prefix to bare Cursor model IDs', () => {
+        const result = resolveModelString('composer-1');
+        expect(result).toBe('cursor-composer-1');
+      });
+
+      it('should handle cursor-auto model', () => {
+        const result = resolveModelString('cursor-auto');
+        expect(result).toBe('cursor-auto');
+      });
+
+      it('should handle all known Cursor model IDs with prefix', () => {
+        const cursorModelIds = Object.keys(CURSOR_MODEL_MAP);
+        cursorModelIds.forEach((modelId) => {
+          const result = resolveModelString(`cursor-${modelId}`);
+          expect(result).toBe(`cursor-${modelId}`);
+        });
+      });
     });
   });
 

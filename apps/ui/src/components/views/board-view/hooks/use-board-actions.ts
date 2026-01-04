@@ -2,7 +2,7 @@ import { useCallback } from 'react';
 import {
   Feature,
   FeatureImage,
-  AgentModel,
+  ModelAlias,
   ThinkingLevel,
   PlanningMode,
   useAppStore,
@@ -13,6 +13,9 @@ import { toast } from 'sonner';
 import { useAutoMode } from '@/hooks/use-auto-mode';
 import { truncateDescription } from '@/lib/utils';
 import { getBlockingDependencies } from '@automaker/dependency-resolver';
+import { createLogger } from '@automaker/utils/logger';
+
+const logger = createLogger('BoardActions');
 
 interface UseBoardActionsProps {
   currentProject: { path: string; id: string } | null;
@@ -92,7 +95,7 @@ export function useBoardActions({
       images: FeatureImage[];
       imagePaths: DescriptionImagePath[];
       skipTests: boolean;
-      model: AgentModel;
+      model: ModelAlias;
       thinkingLevel: ThinkingLevel;
       branchName: string;
       priority: number;
@@ -112,8 +115,8 @@ export function useBoardActions({
           if (api?.worktree?.create) {
             const result = await api.worktree.create(currentProject.path, finalBranchName);
             if (result.success && result.worktree) {
-              console.log(
-                `[Board] Worktree for branch "${finalBranchName}" ${
+              logger.info(
+                `Worktree for branch "${finalBranchName}" ${
                   result.worktree?.isNew ? 'created' : 'already exists'
                 }`
               );
@@ -125,8 +128,8 @@ export function useBoardActions({
               // Refresh worktree list in UI
               onWorktreeCreated?.();
             } else if (!result.success) {
-              console.error(
-                `[Board] Failed to create worktree for branch "${finalBranchName}":`,
+              logger.error(
+                `Failed to create worktree for branch "${finalBranchName}":`,
                 result.error
               );
               toast.error('Failed to create worktree', {
@@ -135,7 +138,7 @@ export function useBoardActions({
             }
           }
         } catch (error) {
-          console.error('[Board] Error creating worktree:', error);
+          logger.error('Error creating worktree:', error);
           toast.error('Failed to create worktree', {
             description: error instanceof Error ? error.message : 'An error occurred',
           });
@@ -180,7 +183,7 @@ export function useBoardActions({
               }
             })
             .catch((error) => {
-              console.error('[Board] Error generating title:', error);
+              logger.error('Error generating title:', error);
               // Clear generating flag on error
               const titleUpdates = { titleGenerating: false };
               updateFeature(createdFeature.id, titleUpdates);
@@ -210,7 +213,7 @@ export function useBoardActions({
         category: string;
         description: string;
         skipTests: boolean;
-        model: AgentModel;
+        model: ModelAlias;
         thinkingLevel: ThinkingLevel;
         imagePaths: DescriptionImagePath[];
         branchName: string;
@@ -229,16 +232,16 @@ export function useBoardActions({
           if (api?.worktree?.create) {
             const result = await api.worktree.create(currentProject.path, finalBranchName);
             if (result.success) {
-              console.log(
-                `[Board] Worktree for branch "${finalBranchName}" ${
+              logger.info(
+                `Worktree for branch "${finalBranchName}" ${
                   result.worktree?.isNew ? 'created' : 'already exists'
                 }`
               );
               // Refresh worktree list in UI
               onWorktreeCreated?.();
             } else {
-              console.error(
-                `[Board] Failed to create worktree for branch "${finalBranchName}":`,
+              logger.error(
+                `Failed to create worktree for branch "${finalBranchName}":`,
                 result.error
               );
               toast.error('Failed to create worktree', {
@@ -247,7 +250,7 @@ export function useBoardActions({
             }
           }
         } catch (error) {
-          console.error('[Board] Error creating worktree:', error);
+          logger.error('Error creating worktree:', error);
           toast.error('Failed to create worktree', {
             description: error instanceof Error ? error.message : 'An error occurred',
           });
@@ -292,7 +295,7 @@ export function useBoardActions({
             description: `Stopped and deleted: ${truncateDescription(feature.description)}`,
           });
         } catch (error) {
-          console.error('[Board] Error stopping feature before delete:', error);
+          logger.error('Error stopping feature before delete:', error);
           toast.error('Failed to stop agent', {
             description: 'The feature will still be deleted.',
           });
@@ -305,13 +308,13 @@ export function useBoardActions({
           for (const imagePathObj of feature.imagePaths) {
             try {
               await api.deleteFile(imagePathObj.path);
-              console.log(`[Board] Deleted image: ${imagePathObj.path}`);
+              logger.info(`Deleted image: ${imagePathObj.path}`);
             } catch (error) {
-              console.error(`[Board] Failed to delete image ${imagePathObj.path}:`, error);
+              logger.error(`Failed to delete image ${imagePathObj.path}:`, error);
             }
           }
         } catch (error) {
-          console.error(`[Board] Error deleting images for feature ${featureId}:`, error);
+          logger.error(`Error deleting images for feature ${featureId}:`, error);
         }
       }
 
@@ -328,7 +331,7 @@ export function useBoardActions({
       try {
         const api = getElectronAPI();
         if (!api?.autoMode) {
-          console.error('Auto mode API not available');
+          logger.error('Auto mode API not available');
           return;
         }
 
@@ -341,16 +344,13 @@ export function useBoardActions({
         );
 
         if (result.success) {
-          console.log(
-            '[Board] Feature run started successfully, branch:',
-            feature.branchName || 'default'
-          );
+          logger.info('Feature run started successfully, branch:', feature.branchName || 'default');
         } else {
-          console.error('[Board] Failed to run feature:', result.error);
+          logger.error('Failed to run feature:', result.error);
           await loadFeatures();
         }
       } catch (error) {
-        console.error('[Board] Error running feature:', error);
+        logger.error('Error running feature:', error);
         await loadFeatures();
       }
     },
@@ -392,7 +392,7 @@ export function useBoardActions({
       updateFeature(feature.id, updates);
       // Must await to ensure feature status is persisted before starting agent
       await persistFeatureUpdate(feature.id, updates);
-      console.log('[Board] Feature moved to in_progress, starting agent...');
+      logger.info('Feature moved to in_progress, starting agent...');
       await handleRunFeature(feature);
       return true;
     },
@@ -413,20 +413,20 @@ export function useBoardActions({
       try {
         const api = getElectronAPI();
         if (!api?.autoMode) {
-          console.error('Auto mode API not available');
+          logger.error('Auto mode API not available');
           return;
         }
 
         const result = await api.autoMode.verifyFeature(currentProject.path, feature.id);
 
         if (result.success) {
-          console.log('[Board] Feature verification started successfully');
+          logger.info('Feature verification started successfully');
         } else {
-          console.error('[Board] Failed to verify feature:', result.error);
+          logger.error('Failed to verify feature:', result.error);
           await loadFeatures();
         }
       } catch (error) {
-        console.error('[Board] Error verifying feature:', error);
+        logger.error('Error verifying feature:', error);
         await loadFeatures();
       }
     },
@@ -435,20 +435,20 @@ export function useBoardActions({
 
   const handleResumeFeature = useCallback(
     async (feature: Feature) => {
-      console.log('[Board] handleResumeFeature called for feature:', feature.id);
+      logger.info('handleResumeFeature called for feature:', feature.id);
       if (!currentProject) {
-        console.error('[Board] No current project');
+        logger.error('No current project');
         return;
       }
 
       try {
         const api = getElectronAPI();
         if (!api?.autoMode) {
-          console.error('[Board] Auto mode API not available');
+          logger.error('Auto mode API not available');
           return;
         }
 
-        console.log('[Board] Calling resumeFeature API...', {
+        logger.info('Calling resumeFeature API...', {
           projectPath: currentProject.path,
           featureId: feature.id,
           useWorktrees,
@@ -460,16 +460,16 @@ export function useBoardActions({
           useWorktrees
         );
 
-        console.log('[Board] resumeFeature result:', result);
+        logger.info('resumeFeature result:', result);
 
         if (result.success) {
-          console.log('[Board] Feature resume started successfully');
+          logger.info('Feature resume started successfully');
         } else {
-          console.error('[Board] Failed to resume feature:', result.error);
+          logger.error('Failed to resume feature:', result.error);
           await loadFeatures();
         }
       } catch (error) {
-        console.error('[Board] Error resuming feature:', error);
+        logger.error('Error resuming feature:', error);
         await loadFeatures();
       }
     },
@@ -523,7 +523,7 @@ export function useBoardActions({
 
     const api = getElectronAPI();
     if (!api?.autoMode?.followUpFeature) {
-      console.error('Follow-up feature API not available');
+      logger.error('Follow-up feature API not available');
       toast.error('Follow-up not available', {
         description: 'This feature is not available in the current version.',
       });
@@ -559,7 +559,7 @@ export function useBoardActions({
         // No worktreePath - server derives from feature.branchName
       )
       .catch((error) => {
-        console.error('[Board] Error sending follow-up:', error);
+        logger.error('Error sending follow-up:', error);
         toast.error('Failed to send follow-up', {
           description: error instanceof Error ? error.message : 'An error occurred',
         });
@@ -587,7 +587,7 @@ export function useBoardActions({
       try {
         const api = getElectronAPI();
         if (!api?.autoMode?.commitFeature) {
-          console.error('Commit feature API not available');
+          logger.error('Commit feature API not available');
           toast.error('Commit not available', {
             description: 'This feature is not available in the current version.',
           });
@@ -610,14 +610,14 @@ export function useBoardActions({
           // Refresh worktree selector to update commit counts
           onWorktreeCreated?.();
         } else {
-          console.error('[Board] Failed to commit feature:', result.error);
+          logger.error('Failed to commit feature:', result.error);
           toast.error('Failed to commit feature', {
             description: result.error || 'An error occurred',
           });
           await loadFeatures();
         }
       } catch (error) {
-        console.error('[Board] Error committing feature:', error);
+        logger.error('Error committing feature:', error);
         toast.error('Failed to commit feature', {
           description: error instanceof Error ? error.message : 'An error occurred',
         });
@@ -634,7 +634,7 @@ export function useBoardActions({
       try {
         const api = getElectronAPI();
         if (!api?.worktree?.mergeFeature) {
-          console.error('Worktree API not available');
+          logger.error('Worktree API not available');
           toast.error('Merge not available', {
             description: 'This feature is not available in the current version.',
           });
@@ -651,13 +651,13 @@ export function useBoardActions({
             )}`,
           });
         } else {
-          console.error('[Board] Failed to merge feature:', result.error);
+          logger.error('Failed to merge feature:', result.error);
           toast.error('Failed to merge feature', {
             description: result.error || 'An error occurred',
           });
         }
       } catch (error) {
-        console.error('[Board] Error merging feature:', error);
+        logger.error('Error merging feature:', error);
         toast.error('Failed to merge feature', {
           description: error instanceof Error ? error.message : 'An error occurred',
         });
@@ -747,7 +747,7 @@ export function useBoardActions({
               : `Stopped working on: ${truncateDescription(feature.description)}`,
         });
       } catch (error) {
-        console.error('[Board] Error stopping feature:', error);
+        logger.error('Error stopping feature:', error);
         toast.error('Failed to stop agent', {
           description: error instanceof Error ? error.message : 'An error occurred',
         });
@@ -857,7 +857,7 @@ export function useBoardActions({
         try {
           await autoMode.stopFeature(feature.id);
         } catch (error) {
-          console.error('[Board] Error stopping feature before archive:', error);
+          logger.error('Error stopping feature before archive:', error);
         }
       }
       // Archive the feature by setting status to completed

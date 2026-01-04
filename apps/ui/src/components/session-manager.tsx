@@ -1,5 +1,8 @@
 import { useState, useEffect } from 'react';
+import { createLogger } from '@automaker/utils/logger';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+
+const logger = createLogger('SessionManager');
 import { Button } from '@/components/ui/button';
 import { HotkeyButton } from '@/components/ui/hotkey-button';
 import { Input } from '@/components/ui/input';
@@ -126,7 +129,7 @@ export function SessionManager({
         }
       } catch (err) {
         // Ignore errors for individual session checks
-        console.warn(`[SessionManager] Failed to check running state for ${session.id}:`, err);
+        logger.warn(`Failed to check running state for ${session.id}:`, err);
       }
     }
 
@@ -227,7 +230,7 @@ export function SessionManager({
   const handleArchiveSession = async (sessionId: string) => {
     const api = getElectronAPI();
     if (!api?.sessions) {
-      console.error('[SessionManager] Sessions API not available');
+      logger.error('[SessionManager] Sessions API not available');
       return;
     }
 
@@ -240,10 +243,10 @@ export function SessionManager({
         }
         await loadSessions();
       } else {
-        console.error('[SessionManager] Archive failed:', result.error);
+        logger.error('[SessionManager] Archive failed:', result.error);
       }
     } catch (error) {
-      console.error('[SessionManager] Archive error:', error);
+      logger.error('[SessionManager] Archive error:', error);
     }
   };
 
@@ -251,7 +254,7 @@ export function SessionManager({
   const handleUnarchiveSession = async (sessionId: string) => {
     const api = getElectronAPI();
     if (!api?.sessions) {
-      console.error('[SessionManager] Sessions API not available');
+      logger.error('[SessionManager] Sessions API not available');
       return;
     }
 
@@ -260,10 +263,10 @@ export function SessionManager({
       if (result.success) {
         await loadSessions();
       } else {
-        console.error('[SessionManager] Unarchive failed:', result.error);
+        logger.error('[SessionManager] Unarchive failed:', result.error);
       }
     } catch (error) {
-      console.error('[SessionManager] Unarchive error:', error);
+      logger.error('[SessionManager] Unarchive error:', error);
     }
   };
 

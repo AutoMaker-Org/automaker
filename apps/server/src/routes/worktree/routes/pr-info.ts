@@ -11,6 +11,9 @@ import {
   isValidBranchName,
   isGhCliAvailable,
 } from '../common.js';
+import { createLogger } from '@automaker/utils';
+
+const logger = createLogger('PRInfo');
 
 export interface PRComment {
   id: number;
@@ -174,7 +177,7 @@ export function createPRInfoHandler() {
             })
           );
         } catch (error) {
-          console.warn('[PRInfo] Failed to fetch PR comments:', error);
+          logger.warn('Failed to fetch PR comments:', error);
         }
 
         // Get review comments (inline code comments)
@@ -209,10 +212,10 @@ export function createPRInfoHandler() {
               })
             );
           } catch (error) {
-            console.warn('[PRInfo] Failed to fetch review comments:', error);
+            logger.warn('Failed to fetch review comments:', error);
           }
         } else {
-          console.warn('[PRInfo] Cannot fetch review comments: repository info not available');
+          logger.warn('Cannot fetch review comments: repository info not available');
         }
 
         const prInfo: PRInfo = {

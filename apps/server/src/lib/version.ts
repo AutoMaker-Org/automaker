@@ -5,6 +5,9 @@
 import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+import { createLogger } from '@automaker/utils';
+
+const logger = createLogger('Version');
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -27,7 +30,7 @@ export function getVersion(): string {
     cachedVersion = version;
     return version;
   } catch (error) {
-    console.warn('Failed to read version from package.json:', error);
+    logger.warn('Failed to read version from package.json:', error);
     return '0.0.0';
   }
 }

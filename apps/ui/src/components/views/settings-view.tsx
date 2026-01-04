@@ -2,23 +2,21 @@ import { useState } from 'react';
 import { useAppStore } from '@/store/app-store';
 import { useSetupStore } from '@/store/setup-store';
 
-import { useCliStatus, useSettingsView } from './settings-view/hooks';
+import { useSettingsView } from './settings-view/hooks';
 import { NAV_ITEMS } from './settings-view/config/navigation';
 import { SettingsHeader } from './settings-view/components/settings-header';
 import { KeyboardMapDialog } from './settings-view/components/keyboard-map-dialog';
 import { DeleteProjectDialog } from './settings-view/components/delete-project-dialog';
 import { SettingsNavigation } from './settings-view/components/settings-navigation';
 import { ApiKeysSection } from './settings-view/api-keys/api-keys-section';
-import { ClaudeUsageSection } from './settings-view/api-keys/claude-usage-section';
-import { ClaudeCliStatus } from './settings-view/cli-status/claude-cli-status';
-import { ClaudeMdSettings } from './settings-view/claude/claude-md-settings';
-import { AIEnhancementSection } from './settings-view/ai-enhancement';
+import { ModelDefaultsSection } from './settings-view/model-defaults';
 import { AppearanceSection } from './settings-view/appearance/appearance-section';
 import { TerminalSection } from './settings-view/terminal/terminal-section';
 import { AudioSection } from './settings-view/audio/audio-section';
 import { KeyboardShortcutsSection } from './settings-view/keyboard-shortcuts/keyboard-shortcuts-section';
 import { FeatureDefaultsSection } from './settings-view/feature-defaults/feature-defaults-section';
 import { DangerZoneSection } from './settings-view/danger-zone/danger-zone-section';
+import { ProviderTabs } from './settings-view/providers';
 import { MCPServersSection } from './settings-view/mcp-servers';
 import { PromptCustomizationSection } from './settings-view/prompts';
 import type { Project as SettingsProject, Theme } from './settings-view/shared/types';
@@ -48,9 +46,6 @@ export function SettingsView() {
     defaultAIProfileId,
     setDefaultAIProfileId,
     aiProfiles,
-    apiKeys,
-    validationModel,
-    setValidationModel,
     autoLoadClaudeMd,
     setAutoLoadClaudeMd,
     enableSandboxMode,
@@ -60,19 +55,6 @@ export function SettingsView() {
     promptCustomization,
     setPromptCustomization,
   } = useAppStore();
-
-  const claudeAuthStatus = useSetupStore((state) => state.claudeAuthStatus);
-
-  // Hide usage tracking when using API key (only show for Claude Code CLI users)
-  // Check both user-entered API key and environment variable ANTHROPIC_API_KEY
-  // Also hide on Windows for now (CLI usage command not supported)
-  // Only show if CLI has been verified/authenticated
-  const isWindows =
-    typeof navigator !== 'undefined' && navigator.platform?.toLowerCase().includes('win');
-  const hasApiKey = !!apiKeys.anthropic || !!claudeAuthStatus?.hasEnvApiKey;
-  const isCliVerified =
-    claudeAuthStatus?.authenticated && claudeAuthStatus?.method === 'cli_authenticated';
-  const showUsageTracking = !hasApiKey && !isWindows && isCliVerified;
 
   // Convert electron Project to settings-view Project type
   const convertProject = (project: ElectronProject | null): SettingsProject | null => {
@@ -101,9 +83,6 @@ export function SettingsView() {
     }
   };
 
-  // Use CLI status hook
-  const { claudeCliStatus, isCheckingClaudeCli, handleRefreshClaudeCli } = useCliStatus();
-
   // Use settings view navigation hook
   const { activeView, navigateTo } = useSettingsView();
 
@@ -113,23 +92,9 @@ export function SettingsView() {
   // Render the active section based on current view
   const renderActiveSection = () => {
     switch (activeView) {
-      case 'claude':
-        return (
-          <div className="space-y-6">
-            <ClaudeCliStatus
-              status={claudeCliStatus}
-              isChecking={isCheckingClaudeCli}
-              onRefresh={handleRefreshClaudeCli}
-            />
-            <ClaudeMdSettings
-              autoLoadClaudeMd={autoLoadClaudeMd}
-              onAutoLoadClaudeMdChange={setAutoLoadClaudeMd}
-              enableSandboxMode={enableSandboxMode}
-              onEnableSandboxModeChange={setEnableSandboxMode}
-            />
-            {showUsageTracking && <ClaudeUsageSection />}
-          </div>
-        );
+      case 'providers':
+      case 'claude': // Backwards compatibility
+        return <ProviderTabs defaultTab={activeView === 'claude' ? 'claude' : undefined} />;
       case 'mcp-servers':
         return <MCPServersSection />;
       case 'prompts':
@@ -139,8 +104,8 @@ export function SettingsView() {
             onPromptCustomizationChange={setPromptCustomization}
           />
         );
-      case 'ai-enhancement':
-        return <AIEnhancementSection />;
+      case 'model-defaults':
+        return <ModelDefaultsSection />;
       case 'appearance':
         return (
           <AppearanceSection
@@ -170,7 +135,6 @@ export function SettingsView() {
             defaultRequirePlanApproval={defaultRequirePlanApproval}
             defaultAIProfileId={defaultAIProfileId}
             aiProfiles={aiProfiles}
-            validationModel={validationModel}
             onShowProfilesOnlyChange={setShowProfilesOnly}
             onDefaultSkipTestsChange={setDefaultSkipTests}
             onEnableDependencyBlockingChange={setEnableDependencyBlocking}
@@ -178,7 +142,6 @@ export function SettingsView() {
             onDefaultPlanningModeChange={setDefaultPlanningMode}
             onDefaultRequirePlanApprovalChange={setDefaultRequirePlanApproval}
             onDefaultAIProfileIdChange={setDefaultAIProfileId}
-            onValidationModelChange={setValidationModel}
           />
         );
       case 'danger':

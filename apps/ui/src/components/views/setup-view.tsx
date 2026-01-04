@@ -1,3 +1,4 @@
+import { createLogger } from '@automaker/utils/logger';
 import { useSetupStore } from '@/store/setup-store';
 import { StepIndicator } from './setup-view/components';
 import {
@@ -5,50 +6,58 @@ import {
   ThemeStep,
   CompleteStep,
   ClaudeSetupStep,
+  CursorSetupStep,
   GitHubSetupStep,
 } from './setup-view/steps';
 import { useNavigate } from '@tanstack/react-router';
+
+const logger = createLogger('SetupView');
 
 // Main Setup View
 export function SetupView() {
   const { currentStep, setCurrentStep, completeSetup, setSkipClaudeSetup } = useSetupStore();
   const navigate = useNavigate();
 
-  const steps = ['welcome', 'theme', 'claude', 'github', 'complete'] as const;
+  const steps = ['welcome', 'theme', 'claude', 'cursor', 'github', 'complete'] as const;
   type StepName = (typeof steps)[number];
   const getStepName = (): StepName => {
     if (currentStep === 'claude_detect' || currentStep === 'claude_auth') return 'claude';
     if (currentStep === 'welcome') return 'welcome';
     if (currentStep === 'theme') return 'theme';
+    if (currentStep === 'cursor') return 'cursor';
     if (currentStep === 'github') return 'github';
     return 'complete';
   };
   const currentIndex = steps.indexOf(getStepName());
 
   const handleNext = (from: string) => {
-    console.log('[Setup Flow] handleNext called from:', from, 'currentStep:', currentStep);
+    logger.debug('[Setup Flow] handleNext called from:', from, 'currentStep:', currentStep);
     switch (from) {
       case 'welcome':
-        console.log('[Setup Flow] Moving to theme step');
+        logger.debug('[Setup Flow] Moving to theme step');
         setCurrentStep('theme');
         break;
       case 'theme':
-        console.log('[Setup Flow] Moving to claude_detect step');
+        logger.debug('[Setup Flow] Moving to claude_detect step');
         setCurrentStep('claude_detect');
         break;
       case 'claude':
-        console.log('[Setup Flow] Moving to github step');
+        logger.debug('[Setup Flow] Moving to cursor step');
+        setCurrentStep('cursor');
+        break;
+      case 'cursor':
+        logger.debug('[Setup Flow] Moving to github step');
         setCurrentStep('github');
         break;
       case 'github':
-        console.log('[Setup Flow] Moving to complete step');
+        logger.debug('[Setup Flow] Moving to complete step');
         setCurrentStep('complete');
         break;
     }
   };
 
   const handleBack = (from: string) => {
-    console.log('[Setup Flow] handleBack called from:', from);
+    logger.debug('[Setup Flow] handleBack called from:', from);
     switch (from) {
       case 'theme':
         setCurrentStep('welcome');
@@ -56,27 +65,35 @@ export function SetupView() {
       case 'claude':
         setCurrentStep('theme');
         break;
-      case 'github':
+      case 'cursor':
         setCurrentStep('claude_detect');
+        break;
+      case 'github':
+        setCurrentStep('cursor');
         break;
     }
   };
 
   const handleSkipClaude = () => {
-    console.log('[Setup Flow] Skipping Claude setup');
+    logger.debug('[Setup Flow] Skipping Claude setup');
     setSkipClaudeSetup(true);
+    setCurrentStep('cursor');
+  };
+
+  const handleSkipCursor = () => {
+    logger.debug('[Setup Flow] Skipping Cursor setup');
     setCurrentStep('github');
   };
 
   const handleSkipGithub = () => {
-    console.log('[Setup Flow] Skipping GitHub setup');
+    logger.debug('[Setup Flow] Skipping GitHub setup');
     setCurrentStep('complete');
   };
 
   const handleFinish = () => {
-    console.log('[Setup Flow] handleFinish called - completing setup');
+    logger.debug('[Setup Flow] handleFinish called - completing setup');
     completeSetup();
-    console.log('[Setup Flow] Setup completed, redirecting to welcome view');
+    logger.debug('[Setup Flow] Setup completed, redirecting to welcome view');
     navigate({ to: '/' });
   };
 
@@ -111,6 +128,14 @@ export function SetupView() {
                 onNext={() => handleNext('claude')}
                 onBack={() => handleBack('claude')}
                 onSkip={handleSkipClaude}
+              />
+            )}
+
+            {currentStep === 'cursor' && (
+              <CursorSetupStep
+                onNext={() => handleNext('cursor')}
+                onBack={() => handleBack('cursor')}
+                onSkip={handleSkipCursor}
               />
             )}
 

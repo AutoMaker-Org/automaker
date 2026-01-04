@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { createLogger } from '@automaker/utils/logger';
 import {
   Dialog,
   DialogContent,
@@ -21,6 +22,8 @@ interface WorktreeInfo {
   hasChanges?: boolean;
   changedFilesCount?: number;
 }
+
+const logger = createLogger('CreateBranchDialog');
 
 interface CreateBranchDialogProps {
   open: boolean;
@@ -77,7 +80,7 @@ export function CreateBranchDialog({
         setError(result.error || 'Failed to create branch');
       }
     } catch (err) {
-      console.error('Create branch failed:', err);
+      logger.error('Create branch failed:', err);
       setError('Failed to create branch');
     } finally {
       setIsCreating(false);

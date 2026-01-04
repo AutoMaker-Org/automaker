@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { createLogger } from '@automaker/utils/logger';
 import { Bot, Folder, Loader2, RefreshCw, Square, Activity, FileText } from 'lucide-react';
 import { getElectronAPI, RunningAgent } from '@/lib/electron';
 import { useAppStore } from '@/store/app-store';
@@ -6,6 +7,8 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useNavigate } from '@tanstack/react-router';
 import { AgentOutputModal } from './board-view/dialogs/agent-output-modal';
+
+const logger = createLogger('RunningAgentsView');
 
 export function RunningAgentsView() {
   const [runningAgents, setRunningAgents] = useState<RunningAgent[]>([]);
@@ -25,7 +28,7 @@ export function RunningAgentsView() {
         }
       }
     } catch (error) {
-      console.error('[RunningAgentsView] Error fetching running agents:', error);
+      logger.error('Error fetching running agents:', error);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -78,7 +81,7 @@ export function RunningAgentsView() {
           fetchRunningAgents();
         }
       } catch (error) {
-        console.error('[RunningAgentsView] Error stopping agent:', error);
+        logger.error('Error stopping agent:', error);
       }
     },
     [fetchRunningAgents]

@@ -1,8 +1,9 @@
 /**
  * POST /context/describe-file endpoint - Generate description for a text file
  *
- * Uses Claude Haiku to analyze a text file and generate a concise description
- * suitable for context file metadata.
+ * Uses AI to analyze a text file and generate a concise description
+ * suitable for context file metadata. Model is configurable via
+ * phaseModels.fileDescriptionModel in settings (defaults to Haiku).
  *
  * SECURITY: This endpoint validates file paths against ALLOWED_ROOT_DIRECTORY
  * and reads file content directly (not via Claude's Read tool) to prevent
@@ -12,9 +13,11 @@
 import type { Request, Response } from 'express';
 import { query } from '@anthropic-ai/claude-agent-sdk';
 import { createLogger } from '@automaker/utils';
-import { CLAUDE_MODEL_MAP } from '@automaker/types';
+import { DEFAULT_PHASE_MODELS, isCursorModel } from '@automaker/types';
 import { PathNotAllowedError } from '@automaker/platform';
+import { resolvePhaseModel } from '@automaker/model-resolver';
 import { createCustomOptions } from '../../../lib/sdk-options.js';
+import { ProviderFactory } from '../../../providers/provider-factory.js';
 import * as secureFs from '../../../lib/secure-fs.js';
 import * as path from 'path';
 import type { SettingsService } from '../../../services/settings-service.js';
@@ -94,7 +97,7 @@ export function createDescribeFileHandler(
         return;
       }
 
-      logger.info(`[DescribeFile] Starting description generation for: ${filePath}`);
+      logger.info(`Starting description generation for: ${filePath}`);
 
       // Resolve the path for logging and cwd derivation
       const resolvedPath = secureFs.resolvePath(filePath);
@@ -109,7 +112,7 @@ export function createDescribeFileHandler(
       } catch (readError) {
         // Path not allowed - return 403 Forbidden
         if (readError instanceof PathNotAllowedError) {
-          logger.warn(`[DescribeFile] Path not allowed: ${filePath}`);
+          logger.warn(`Path not allowed: ${filePath}`);
           const response: DescribeFileErrorResponse = {
             success: false,
             error: 'File path is not within the allowed directory',
@@ -125,7 +128,7 @@ export function createDescribeFileHandler(
           'code' in readError &&
           readError.code === 'ENOENT'
         ) {
-          logger.warn(`[DescribeFile] File not found: ${resolvedPath}`);
+          logger.warn(`File not found: ${resolvedPath}`);
           const response: DescribeFileErrorResponse = {
             success: false,
             error: `File not found: ${filePath}`,
@@ -135,7 +138,7 @@ export function createDescribeFileHandler(
         }
 
         const errorMessage = readError instanceof Error ? readError.message : 'Unknown error';
-        logger.error(`[DescribeFile] Failed to read file: ${errorMessage}`);
+        logger.error(`Failed to read file: ${errorMessage}`);
         const response: DescribeFileErrorResponse = {
           success: false,
           error: `Failed to read file: ${errorMessage}`,
@@ -177,30 +180,76 @@ File: ${fileName}${truncated ? ' (truncated)' : ''}`;
         '[DescribeFile]'
       );
 
-      // Use centralized SDK options with proper cwd validation
-      // No tools needed since we're passing file content directly
-      const sdkOptions = createCustomOptions({
-        cwd,
-        model: CLAUDE_MODEL_MAP.haiku,
-        maxTurns: 1,
-        allowedTools: [],
-        autoLoadClaudeMd,
-        sandbox: { enabled: true, autoAllowBashIfSandboxed: true },
-      });
+      // Get model from phase settings
+      const settings = await settingsService?.getGlobalSettings();
+      logger.info(`Raw phaseModels from settings:`, JSON.stringify(settings?.phaseModels, null, 2));
+      const phaseModelEntry =
+        settings?.phaseModels?.fileDescriptionModel || DEFAULT_PHASE_MODELS.fileDescriptionModel;
+      logger.info(`fileDescriptionModel entry:`, JSON.stringify(phaseModelEntry));
+      const { model, thinkingLevel } = resolvePhaseModel(phaseModelEntry);
 
-      const promptGenerator = (async function* () {
-        yield {
-          type: 'user' as const,
-          session_id: '',
-          message: { role: 'user' as const, content: promptContent },
-          parent_tool_use_id: null,
-        };
-      })();
+      logger.info(`Resolved model: ${model}, thinkingLevel: ${thinkingLevel}`);
 
-      const stream = query({ prompt: promptGenerator, options: sdkOptions });
+      let description: string;
 
-      // Extract the description from the response
-      const description = await extractTextFromStream(stream);
+      // Route to appropriate provider based on model type
+      if (isCursorModel(model)) {
+        // Use Cursor provider for Cursor models
+        logger.info(`Using Cursor provider for model: ${model}`);
+
+        const provider = ProviderFactory.getProviderForModel(model);
+
+        // Build a simple text prompt for Cursor (no multi-part content blocks)
+        const cursorPrompt = `${instructionText}\n\n--- FILE CONTENT ---\n${contentToAnalyze}`;
+
+        let responseText = '';
+        for await (const msg of provider.executeQuery({
+          prompt: cursorPrompt,
+          model,
+          cwd,
+          maxTurns: 1,
+          allowedTools: [],
+          readOnly: true, // File description only reads, doesn't write
+        })) {
+          if (msg.type === 'assistant' && msg.message?.content) {
+            for (const block of msg.message.content) {
+              if (block.type === 'text' && block.text) {
+                responseText += block.text;
+              }
+            }
+          }
+        }
+        description = responseText;
+      } else {
+        // Use Claude SDK for Claude models
+        logger.info(`Using Claude SDK for model: ${model}`);
+
+        // Use centralized SDK options with proper cwd validation
+        // No tools needed since we're passing file content directly
+        const sdkOptions = createCustomOptions({
+          cwd,
+          model,
+          maxTurns: 1,
+          allowedTools: [],
+          autoLoadClaudeMd,
+          sandbox: { enabled: true, autoAllowBashIfSandboxed: true },
+          thinkingLevel, // Pass thinking level for extended thinking
+        });
+
+        const promptGenerator = (async function* () {
+          yield {
+            type: 'user' as const,
+            session_id: '',
+            message: { role: 'user' as const, content: promptContent },
+            parent_tool_use_id: null,
+          };
+        })();
+
+        const stream = query({ prompt: promptGenerator, options: sdkOptions });
+
+        // Extract the description from the response
+        description = await extractTextFromStream(stream);
+      }
 
       if (!description || description.trim().length === 0) {
         logger.warn('Received empty response from Claude');

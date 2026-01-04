@@ -71,10 +71,15 @@ function containsAuthError(text: string): boolean {
 export function createVerifyClaudeAuthHandler() {
   return async (req: Request, res: Response): Promise<void> => {
     try {
-      // Get the auth method from the request body
-      const { authMethod } = req.body as { authMethod?: 'cli' | 'api_key' };
+      // Get the auth method and optional API key from the request body
+      const { authMethod, apiKey } = req.body as {
+        authMethod?: 'cli' | 'api_key';
+        apiKey?: string;
+      };
 
-      logger.info(`[Setup] Verifying Claude authentication using method: ${authMethod || 'auto'}`);
+      logger.info(
+        `[Setup] Verifying Claude authentication using method: ${authMethod || 'auto'}${apiKey ? ' (with provided key)' : ''}`
+      );
 
       // Create an AbortController with a 30-second timeout
       const abortController = new AbortController();
@@ -94,14 +99,17 @@ export function createVerifyClaudeAuthHandler() {
           delete process.env.ANTHROPIC_API_KEY;
           logger.info('[Setup] Cleared API key environment for CLI verification');
         } else if (authMethod === 'api_key') {
-          // For API key verification, ensure we're using the stored API key
-          const storedApiKey = getApiKey('anthropic');
-          if (storedApiKey) {
-            process.env.ANTHROPIC_API_KEY = storedApiKey;
-            logger.info('[Setup] Using stored API key for verification');
+          // For API key verification, use provided key, stored key, or env var (in order of priority)
+          if (apiKey) {
+            // Use the provided API key (allows testing unsaved keys)
+            process.env.ANTHROPIC_API_KEY = apiKey;
+            logger.info('[Setup] Using provided API key for verification');
           } else {
-            // Check env var
-            if (!process.env.ANTHROPIC_API_KEY) {
+            const storedApiKey = getApiKey('anthropic');
+            if (storedApiKey) {
+              process.env.ANTHROPIC_API_KEY = storedApiKey;
+              logger.info('[Setup] Using stored API key for verification');
+            } else if (!process.env.ANTHROPIC_API_KEY) {
               res.json({
                 success: true,
                 authenticated: false,

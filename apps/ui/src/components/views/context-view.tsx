@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
+import { createLogger } from '@automaker/utils/logger';
 import { useAppStore } from '@/store/app-store';
 import { getElectronAPI } from '@/lib/electron';
 import { getHttpApiClient } from '@/lib/http-api-client';
@@ -38,6 +39,8 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
+
+const logger = createLogger('ContextView');
 import { sanitizeFilename } from '@/lib/image-utils';
 import { Markdown } from '../ui/markdown';
 import {
@@ -160,7 +163,7 @@ export function ContextView() {
         const metadataPath = `${contextPath}/context-metadata.json`;
         await api.writeFile(metadataPath, JSON.stringify(metadata, null, 2));
       } catch (error) {
-        console.error('Failed to save metadata:', error);
+        logger.error('Failed to save metadata:', error);
       }
     },
     [getContextPath]
@@ -202,7 +205,7 @@ export function ContextView() {
         setContextFiles(files);
       }
     } catch (error) {
-      console.error('Failed to load context files:', error);
+      logger.error('Failed to load context files:', error);
     } finally {
       setIsLoading(false);
     }
@@ -223,7 +226,7 @@ export function ContextView() {
         setHasChanges(false);
       }
     } catch (error) {
-      console.error('Failed to load file content:', error);
+      logger.error('Failed to load file content:', error);
     }
   }, []);
 
@@ -247,7 +250,7 @@ export function ContextView() {
       setSelectedFile({ ...selectedFile, content: editedContent });
       setHasChanges(false);
     } catch (error) {
-      console.error('Failed to save file:', error);
+      logger.error('Failed to save file:', error);
     } finally {
       setIsSaving(false);
     }
@@ -279,7 +282,7 @@ export function ContextView() {
         result.error || `Automaker couldn't generate a description for “${fileName}”.`;
       toast.error('Failed to generate description', { description: message });
     } catch (error) {
-      console.error('Failed to generate description:', error);
+      logger.error('Failed to generate description:', error);
       const message =
         error instanceof Error
           ? error.message
@@ -315,7 +318,7 @@ export function ContextView() {
           });
         }
       } catch (error) {
-        console.error('Failed to generate description:', error);
+        logger.error('Failed to generate description:', error);
       } finally {
         // Remove from generating set
         setGeneratingDescriptions((prev) => {
@@ -401,7 +404,7 @@ export function ContextView() {
       // For images, use the path in the images directory
       generateDescriptionAsync(imagePathForDescription || filePath, fileName, isImage);
     } catch (error) {
-      console.error('Failed to upload file:', error);
+      logger.error('Failed to upload file:', error);
       toast.error('Failed to upload file', {
         description: error instanceof Error ? error.message : 'Unknown error',
       });
@@ -492,7 +495,7 @@ export function ContextView() {
       setNewMarkdownDescription('');
       setNewMarkdownContent('');
     } catch (error) {
-      console.error('Failed to create markdown:', error);
+      logger.error('Failed to create markdown:', error);
     }
   };
 
@@ -515,7 +518,7 @@ export function ContextView() {
       setHasChanges(false);
       await loadContextFiles();
     } catch (error) {
-      console.error('Failed to delete file:', error);
+      logger.error('Failed to delete file:', error);
     }
   };
 
@@ -537,14 +540,14 @@ export function ContextView() {
       // Check if file with new name already exists
       const exists = await api.exists(newPath);
       if (exists) {
-        console.error('A file with this name already exists');
+        logger.error('A file with this name already exists');
         return;
       }
 
       // Read current file content
       const result = await api.readFile(selectedFile.path);
       if (!result.success || result.content === undefined) {
-        console.error('Failed to read file for rename');
+        logger.error('Failed to read file for rename');
         return;
       }
 
@@ -578,7 +581,7 @@ export function ContextView() {
       };
       setSelectedFile(renamedFile);
     } catch (error) {
-      console.error('Failed to rename file:', error);
+      logger.error('Failed to rename file:', error);
     }
   };
 
@@ -603,7 +606,7 @@ export function ContextView() {
       setEditDescriptionValue('');
       setEditDescriptionFileName('');
     } catch (error) {
-      console.error('Failed to save description:', error);
+      logger.error('Failed to save description:', error);
     }
   };
 
@@ -634,7 +637,7 @@ export function ContextView() {
 
       await loadContextFiles();
     } catch (error) {
-      console.error('Failed to delete file:', error);
+      logger.error('Failed to delete file:', error);
     }
   };
 

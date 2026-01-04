@@ -1,6 +1,9 @@
 import { useState, useCallback } from 'react';
+import { createLogger } from '@automaker/utils/logger';
 import { getElectronAPI } from '@/lib/electron';
 import type { BranchInfo, GitRepoStatus } from '../types';
+
+const logger = createLogger('Branches');
 
 export function useBranches() {
   const [branches, setBranches] = useState<BranchInfo[]>([]);
@@ -26,7 +29,7 @@ export function useBranches() {
       try {
         const api = getElectronAPI();
         if (!api?.worktree?.listBranches) {
-          console.warn('List branches API not available');
+          logger.warn('List branches API not available');
           return;
         }
         const result = await api.worktree.listBranches(worktreePath);
@@ -45,11 +48,11 @@ export function useBranches() {
           setGitRepoStatus({ isGitRepo: true, hasCommits: false });
         } else if (!result.success) {
           // Other errors - log them
-          console.warn('Failed to fetch branches:', result.error);
+          logger.warn('Failed to fetch branches:', result.error);
           resetBranchState();
         }
       } catch (error) {
-        console.error('Failed to fetch branches:', error);
+        logger.error('Failed to fetch branches:', error);
         resetBranchState();
         // Reset git status to unknown state on network/API errors
         setGitRepoStatus({ isGitRepo: true, hasCommits: true });

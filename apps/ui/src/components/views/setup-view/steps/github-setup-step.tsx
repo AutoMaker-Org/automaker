@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { createLogger } from '@automaker/utils/logger';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useSetupStore } from '@/store/setup-store';
@@ -17,6 +18,8 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { StatusBadge } from '../components';
+
+const logger = createLogger('GitHubSetupStep');
 
 interface GitHubSetupStepProps {
   onNext: () => void;
@@ -46,7 +49,7 @@ export function GitHubSetupStep({ onNext, onBack, onSkip }: GitHubSetupStepProps
         });
       }
     } catch (error) {
-      console.error('Failed to check gh status:', error);
+      logger.error('Failed to check gh status:', error);
     } finally {
       setIsChecking(false);
     }

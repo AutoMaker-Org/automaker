@@ -1,5 +1,8 @@
 import React, { useState, useRef, useCallback } from 'react';
+import { createLogger } from '@automaker/utils/logger';
 import { cn } from '@/lib/utils';
+
+const logger = createLogger('DescriptionImageDropZone');
 import { ImageIcon, X, Loader2, FileText } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { getElectronAPI } from '@/lib/electron';
@@ -107,7 +110,7 @@ export function DescriptionImageDropZone({
         // Check if saveImageToTemp method exists
         if (!api.saveImageToTemp) {
           // Fallback path when saveImageToTemp is not available
-          console.log('[DescriptionImageDropZone] Using fallback path for image');
+          logger.info('Using fallback path for image');
           return `.automaker/images/${Date.now()}_${filename}`;
         }
 
@@ -117,10 +120,10 @@ export function DescriptionImageDropZone({
         if (result.success && result.path) {
           return result.path;
         }
-        console.error('[DescriptionImageDropZone] Failed to save image:', result.error);
+        logger.error('Failed to save image:', result.error);
         return null;
       } catch (error) {
-        console.error('[DescriptionImageDropZone] Error saving image:', error);
+        logger.error('Error saving image:', error);
         return null;
       }
     },
@@ -215,7 +218,7 @@ export function DescriptionImageDropZone({
       }
 
       if (errors.length > 0) {
-        console.warn('File upload errors:', errors);
+        logger.warn('File upload errors:', errors);
       }
 
       if (newImages.length > 0) {

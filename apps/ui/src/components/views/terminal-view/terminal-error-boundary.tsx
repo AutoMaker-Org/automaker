@@ -1,7 +1,10 @@
 import React, { Component, ErrorInfo } from 'react';
+import { createLogger } from '@automaker/utils/logger';
 import { AlertCircle, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+
+const logger = createLogger('TerminalErrorBoundary');
 
 interface Props {
   children: React.ReactNode;
@@ -30,7 +33,7 @@ export class TerminalErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error('[TerminalErrorBoundary] Terminal crashed:', {
+    logger.error('Terminal crashed:', {
       sessionId: this.props.sessionId,
       error: error.message,
       stack: error.stack,

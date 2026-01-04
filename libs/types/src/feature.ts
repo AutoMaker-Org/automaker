@@ -2,7 +2,7 @@
  * Feature types for AutoMaker feature management
  */
 
-import type { PlanningMode } from './settings.js';
+import type { PlanningMode, ThinkingLevel } from './settings.js';
 
 export interface FeatureImagePath {
   id: string;
@@ -38,7 +38,7 @@ export interface Feature {
   // Branch info - worktree path is derived at runtime from branchName
   branchName?: string; // Name of the feature branch (undefined = use current worktree)
   skipTests?: boolean;
-  thinkingLevel?: string;
+  thinkingLevel?: ThinkingLevel;
   planningMode?: PlanningMode;
   requirePlanApproval?: boolean;
   planSpec?: {

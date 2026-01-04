@@ -1,5 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
+import { createLogger } from '@automaker/utils/logger';
 import { getElectronAPI } from '@/lib/electron';
+
+const logger = createLogger('DefaultEditor');
 
 export function useDefaultEditor() {
   const [defaultEditorName, setDefaultEditorName] = useState<string>('Editor');
@@ -15,7 +18,7 @@ export function useDefaultEditor() {
         setDefaultEditorName(result.result.editorName);
       }
     } catch (error) {
-      console.error('Failed to fetch default editor:', error);
+      logger.error('Failed to fetch default editor:', error);
     }
   }, []);
 

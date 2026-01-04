@@ -1,14 +1,41 @@
 import { Label } from '@/components/ui/label';
-import { Brain, UserCircle } from 'lucide-react';
+import { Brain, UserCircle, Terminal } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { AgentModel, ThinkingLevel, AIProfile } from '@/store/app-store';
+import type { ModelAlias, ThinkingLevel, AIProfile, CursorModelId } from '@automaker/types';
+import { CURSOR_MODEL_MAP, profileHasThinking, PROVIDER_PREFIXES } from '@automaker/types';
 import { PROFILE_ICONS } from './model-constants';
+
+/**
+ * Get display string for a profile's model configuration
+ */
+function getProfileModelDisplay(profile: AIProfile): string {
+  if (profile.provider === 'cursor') {
+    const cursorModel = profile.cursorModel || 'auto';
+    const modelConfig = CURSOR_MODEL_MAP[cursorModel];
+    return modelConfig?.label || cursorModel;
+  }
+  // Claude
+  return profile.model || 'sonnet';
+}
+
+/**
+ * Get display string for a profile's thinking configuration
+ */
+function getProfileThinkingDisplay(profile: AIProfile): string | null {
+  if (profile.provider === 'cursor') {
+    // For Cursor, thinking is embedded in the model
+    return profileHasThinking(profile) ? 'thinking' : null;
+  }
+  // Claude
+  return profile.thinkingLevel && profile.thinkingLevel !== 'none' ? profile.thinkingLevel : null;
+}
 
 interface ProfileQuickSelectProps {
   profiles: AIProfile[];
-  selectedModel: AgentModel;
+  selectedModel: ModelAlias | CursorModelId;
   selectedThinkingLevel: ThinkingLevel;
-  onSelect: (model: AgentModel, thinkingLevel: ThinkingLevel) => void;
+  selectedCursorModel?: string; // For detecting cursor profile selection
+  onSelect: (profile: AIProfile) => void; // Changed to pass full profile
   testIdPrefix?: string;
   showManageLink?: boolean;
   onManageLinkClick?: () => void;
@@ -18,14 +45,29 @@ export function ProfileQuickSelect({
   profiles,
   selectedModel,
   selectedThinkingLevel,
+  selectedCursorModel,
   onSelect,
   testIdPrefix = 'profile-quick-select',
   showManageLink = false,
   onManageLinkClick,
 }: ProfileQuickSelectProps) {
-  if (profiles.length === 0) {
+  // Show both Claude and Cursor profiles
+  const allProfiles = profiles;
+
+  if (allProfiles.length === 0) {
     return null;
   }
+
+  // Check if a profile is selected
+  const isProfileSelected = (profile: AIProfile): boolean => {
+    if (profile.provider === 'cursor') {
+      // For cursor profiles, check if cursor model matches
+      const profileCursorModel = `${PROVIDER_PREFIXES.cursor}${profile.cursorModel || 'auto'}`;
+      return selectedCursorModel === profileCursorModel;
+    }
+    // For Claude profiles
+    return selectedModel === profile.model && selectedThinkingLevel === profile.thinkingLevel;
+  };
 
   return (
     <div className="space-y-3">
@@ -39,15 +81,16 @@ export function ProfileQuickSelect({
         </span>
       </div>
       <div className="grid grid-cols-2 gap-2">
-        {profiles.slice(0, 6).map((profile) => {
+        {allProfiles.slice(0, 6).map((profile) => {
           const IconComponent = profile.icon ? PROFILE_ICONS[profile.icon] : Brain;
-          const isSelected =
-            selectedModel === profile.model && selectedThinkingLevel === profile.thinkingLevel;
+          const isSelected = isProfileSelected(profile);
+          const isCursorProfile = profile.provider === 'cursor';
+
           return (
             <button
               key={profile.id}
               type="button"
-              onClick={() => onSelect(profile.model, profile.thinkingLevel)}
+              onClick={() => onSelect(profile)}
               className={cn(
                 'flex items-center gap-2 p-2 rounded-lg border text-left transition-all',
                 isSelected
@@ -56,14 +99,23 @@ export function ProfileQuickSelect({
               )}
               data-testid={`${testIdPrefix}-${profile.id}`}
             >
-              <div className="w-7 h-7 rounded flex items-center justify-center shrink-0 bg-primary/10">
-                {IconComponent && <IconComponent className="w-4 h-4 text-primary" />}
+              <div
+                className={cn(
+                  'w-7 h-7 rounded flex items-center justify-center shrink-0',
+                  isCursorProfile ? 'bg-amber-500/10' : 'bg-primary/10'
+                )}
+              >
+                {isCursorProfile ? (
+                  <Terminal className="w-4 h-4 text-amber-500" />
+                ) : (
+                  IconComponent && <IconComponent className="w-4 h-4 text-primary" />
+                )}
               </div>
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-medium truncate">{profile.name}</p>
                 <p className="text-[10px] text-muted-foreground truncate">
-                  {profile.model}
-                  {profile.thinkingLevel !== 'none' && ` + ${profile.thinkingLevel}`}
+                  {getProfileModelDisplay(profile)}
+                  {getProfileThinkingDisplay(profile) && ` + ${getProfileThinkingDisplay(profile)}`}
                 </p>
               </div>
             </button>

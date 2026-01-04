@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { createLogger, LogLevel, getLogLevel, setLogLevel } from '../src/logger';
+import { createLogger, LogLevel, getLogLevel, setLogLevel, setColorsEnabled } from '../src/logger';
 
 describe('logger.ts', () => {
   let originalConsoleError: typeof console.error;
@@ -13,6 +13,9 @@ describe('logger.ts', () => {
     originalConsoleWarn = console.warn;
     originalConsoleLog = console.log;
     originalLogLevel = getLogLevel();
+
+    // Disable colors for predictable test output
+    setColorsEnabled(false);
 
     // Mock console methods
     console.error = vi.fn();
@@ -35,7 +38,7 @@ describe('logger.ts', () => {
 
       logger.info('test message');
 
-      expect(console.log).toHaveBeenCalledWith('[TestContext]', 'test message');
+      expect(console.log).toHaveBeenCalledWith('INFO  [TestContext]', 'test message');
     });
 
     it('should handle multiple arguments', () => {
@@ -44,7 +47,7 @@ describe('logger.ts', () => {
 
       logger.info('message', { data: 123 }, [1, 2, 3]);
 
-      expect(console.log).toHaveBeenCalledWith('[Test]', 'message', { data: 123 }, [1, 2, 3]);
+      expect(console.log).toHaveBeenCalledWith('INFO  [Test]', 'message', { data: 123 }, [1, 2, 3]);
     });
   });
 
@@ -73,8 +76,8 @@ describe('logger.ts', () => {
       logger.debug('debug message');
 
       expect(console.error).toHaveBeenCalledTimes(1);
-      expect(console.warn).toHaveBeenCalledTimes(1);
-      expect(console.log).not.toHaveBeenCalled();
+      // Note: warn uses console.log in Node.js implementation
+      expect(console.log).toHaveBeenCalledTimes(1);
     });
 
     it('should log error, warn, and info at INFO level', () => {
@@ -87,8 +90,8 @@ describe('logger.ts', () => {
       logger.debug('debug message');
 
       expect(console.error).toHaveBeenCalledTimes(1);
-      expect(console.warn).toHaveBeenCalledTimes(1);
-      expect(console.log).toHaveBeenCalledTimes(1); // Only info, not debug
+      // Note: warn and info both use console.log in Node.js implementation
+      expect(console.log).toHaveBeenCalledTimes(2); // warn + info, not debug
     });
 
     it('should log all messages at DEBUG level', () => {
@@ -101,8 +104,8 @@ describe('logger.ts', () => {
       logger.debug('debug message');
 
       expect(console.error).toHaveBeenCalledTimes(1);
-      expect(console.warn).toHaveBeenCalledTimes(1);
-      expect(console.log).toHaveBeenCalledTimes(2); // info + debug
+      // Note: warn, info, debug all use console.log in Node.js implementation
+      expect(console.log).toHaveBeenCalledTimes(3); // warn + info + debug
     });
   });
 
@@ -113,7 +116,9 @@ describe('logger.ts', () => {
 
       logger.error('error occurred', { code: 500 });
 
-      expect(console.error).toHaveBeenCalledWith('[ErrorTest]', 'error occurred', { code: 500 });
+      expect(console.error).toHaveBeenCalledWith('ERROR [ErrorTest]', 'error occurred', {
+        code: 500,
+      });
     });
 
     it('should not log when level is below ERROR', () => {
@@ -127,13 +132,14 @@ describe('logger.ts', () => {
   });
 
   describe('warn method', () => {
-    it('should use console.warn', () => {
+    it('should use console.log with WARN prefix', () => {
       const logger = createLogger('WarnTest');
       setLogLevel(LogLevel.WARN);
 
       logger.warn('warning message');
 
-      expect(console.warn).toHaveBeenCalledWith('[WarnTest]', 'warning message');
+      // Note: warn uses console.log in Node.js implementation
+      expect(console.log).toHaveBeenCalledWith('WARN  [WarnTest]', 'warning message');
     });
 
     it('should not log when level is below WARN', () => {
@@ -142,7 +148,7 @@ describe('logger.ts', () => {
 
       logger.warn('should not appear');
 
-      expect(console.warn).not.toHaveBeenCalled();
+      expect(console.log).not.toHaveBeenCalled();
     });
   });
 
@@ -153,7 +159,7 @@ describe('logger.ts', () => {
 
       logger.info('info message');
 
-      expect(console.log).toHaveBeenCalledWith('[InfoTest]', 'info message');
+      expect(console.log).toHaveBeenCalledWith('INFO  [InfoTest]', 'info message');
     });
 
     it('should not log when level is below INFO', () => {
@@ -173,7 +179,7 @@ describe('logger.ts', () => {
 
       logger.debug('debug details', { trace: '...' });
 
-      expect(console.log).toHaveBeenCalledWith('[DebugTest]', '[DEBUG]', 'debug details', {
+      expect(console.log).toHaveBeenCalledWith('DEBUG [DebugTest]', 'debug details', {
         trace: '...',
       });
     });
@@ -216,7 +222,7 @@ describe('logger.ts', () => {
 
       setLogLevel(LogLevel.INFO);
       logger.info('should log');
-      expect(console.log).toHaveBeenCalledWith('[Test]', 'should log');
+      expect(console.log).toHaveBeenCalledWith('INFO  [Test]', 'should log');
     });
   });
 
@@ -229,8 +235,8 @@ describe('logger.ts', () => {
       logger1.info('from service 1');
       logger2.info('from service 2');
 
-      expect(console.log).toHaveBeenNthCalledWith(1, '[Service1]', 'from service 1');
-      expect(console.log).toHaveBeenNthCalledWith(2, '[Service2]', 'from service 2');
+      expect(console.log).toHaveBeenNthCalledWith(1, 'INFO  [Service1]', 'from service 1');
+      expect(console.log).toHaveBeenNthCalledWith(2, 'INFO  [Service2]', 'from service 2');
     });
 
     it('should share log level setting', () => {
@@ -253,7 +259,7 @@ describe('logger.ts', () => {
 
       logger.info('message');
 
-      expect(console.log).toHaveBeenCalledWith('[]', 'message');
+      expect(console.log).toHaveBeenCalledWith('INFO  []', 'message');
     });
 
     it('should handle context with special characters', () => {
@@ -262,7 +268,7 @@ describe('logger.ts', () => {
 
       logger.info('message');
 
-      expect(console.log).toHaveBeenCalledWith('[Test-Service_v2.0]', 'message');
+      expect(console.log).toHaveBeenCalledWith('INFO  [Test-Service_v2.0]', 'message');
     });
 
     it('should handle no arguments to log methods', () => {
@@ -271,7 +277,7 @@ describe('logger.ts', () => {
 
       logger.info();
 
-      expect(console.log).toHaveBeenCalledWith('[Test]');
+      expect(console.log).toHaveBeenCalledWith('INFO  [Test]');
     });
 
     it('should handle complex object arguments', () => {
@@ -286,7 +292,7 @@ describe('logger.ts', () => {
 
       logger.info('complex', complexObj);
 
-      expect(console.log).toHaveBeenCalledWith('[Test]', 'complex', complexObj);
+      expect(console.log).toHaveBeenCalledWith('INFO  [Test]', 'complex', complexObj);
     });
   });
 });

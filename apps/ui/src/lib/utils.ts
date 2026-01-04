@@ -1,6 +1,6 @@
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import type { AgentModel } from '@/store/app-store';
+import type { ModelAlias } from '@/store/app-store';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -9,7 +9,7 @@ export function cn(...inputs: ClassValue[]) {
 /**
  * Determine if the current model supports extended thinking controls
  */
-export function modelSupportsThinking(_model?: AgentModel | string): boolean {
+export function modelSupportsThinking(_model?: ModelAlias | string): boolean {
   // All Claude models support thinking
   return true;
 }
@@ -17,7 +17,7 @@ export function modelSupportsThinking(_model?: AgentModel | string): boolean {
 /**
  * Get display name for a model
  */
-export function getModelDisplayName(model: AgentModel | string): string {
+export function getModelDisplayName(model: ModelAlias | string): string {
   const displayNames: Record<string, string> = {
     haiku: 'Claude Haiku',
     sonnet: 'Claude Sonnet',

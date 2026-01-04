@@ -1,8 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
+import { createLogger } from '@automaker/utils/logger';
 import { getElectronAPI } from '@/lib/electron';
 import { normalizePath } from '@/lib/utils';
 import { toast } from 'sonner';
 import type { DevServerInfo, WorktreeInfo } from '../types';
+
+const logger = createLogger('DevServers');
 
 interface UseDevServersOptions {
   projectPath: string;
@@ -27,7 +30,7 @@ export function useDevServers({ projectPath }: UseDevServersOptions) {
         setRunningDevServers(serversMap);
       }
     } catch (error) {
-      console.error('Failed to fetch dev servers:', error);
+      logger.error('Failed to fetch dev servers:', error);
     }
   }, []);
 
@@ -73,7 +76,7 @@ export function useDevServers({ projectPath }: UseDevServersOptions) {
           toast.error(result.error || 'Failed to start dev server');
         }
       } catch (error) {
-        console.error('Start dev server failed:', error);
+        logger.error('Start dev server failed:', error);
         toast.error('Failed to start dev server');
       } finally {
         setIsStartingDevServer(false);
@@ -105,7 +108,7 @@ export function useDevServers({ projectPath }: UseDevServersOptions) {
           toast.error(result.error || 'Failed to stop dev server');
         }
       } catch (error) {
-        console.error('Stop dev server failed:', error);
+        logger.error('Stop dev server failed:', error);
         toast.error('Failed to stop dev server');
       }
     },

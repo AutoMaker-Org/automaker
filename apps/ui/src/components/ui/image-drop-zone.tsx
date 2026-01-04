@@ -1,5 +1,8 @@
 import React, { useState, useRef, useCallback } from 'react';
+import { createLogger } from '@automaker/utils/logger';
 import { cn } from '@/lib/utils';
+
+const logger = createLogger('ImageDropZone');
 import { ImageIcon, X, Upload } from 'lucide-react';
 import type { ImageAttachment } from '@/store/app-store';
 import {
@@ -88,7 +91,7 @@ export function ImageDropZone({
       }
 
       if (errors.length > 0) {
-        console.warn('Image upload errors:', errors);
+        logger.warn('Image upload errors:', errors);
       }
 
       if (newImages.length > 0) {

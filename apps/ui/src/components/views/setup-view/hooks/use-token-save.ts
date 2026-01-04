@@ -1,6 +1,9 @@
 import { useState, useCallback } from 'react';
 import { toast } from 'sonner';
 import { getElectronAPI } from '@/lib/electron';
+import { createLogger } from '@automaker/utils/logger';
+
+const logger = createLogger('TokenSave');
 
 interface UseTokenSaveOptions {
   provider: string; // e.g., "anthropic_oauth_token", "anthropic", "openai"
@@ -24,7 +27,7 @@ export function useTokenSave({ provider, onSuccess }: UseTokenSaveOptions) {
 
         if (setupApi?.storeApiKey) {
           const result = await setupApi.storeApiKey(provider, tokenValue);
-          console.log(`[Token Save] Store result for ${provider}:`, result);
+          logger.info(`Store result for ${provider}:`, result);
 
           if (result.success) {
             const tokenType = provider.includes('oauth') ? 'subscription token' : 'API key';
@@ -42,7 +45,7 @@ export function useTokenSave({ provider, onSuccess }: UseTokenSaveOptions) {
           return true;
         }
       } catch (error) {
-        console.error(`[Token Save] Failed to save ${provider}:`, error);
+        logger.error(`Failed to save ${provider}:`, error);
         toast.error('Failed to save token');
         return false;
       } finally {

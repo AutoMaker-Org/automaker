@@ -1,5 +1,8 @@
 import { useState } from 'react';
+import { createLogger } from '@automaker/utils/logger';
 import { useAppStore } from '@/store/app-store';
+
+const logger = createLogger('SpecSave');
 import { getElectronAPI } from '@/lib/electron';
 
 export function useSpecSave() {
@@ -16,7 +19,7 @@ export function useSpecSave() {
       await api.writeFile(`${currentProject.path}/.automaker/app_spec.txt`, appSpec);
       setHasChanges(false);
     } catch (error) {
-      console.error('Failed to save spec:', error);
+      logger.error('Failed to save spec:', error);
     } finally {
       setIsSaving(false);
     }

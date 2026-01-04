@@ -1,5 +1,6 @@
 import { createRootRoute, Outlet, useLocation, useNavigate } from '@tanstack/react-router';
 import { useEffect, useState, useCallback, useDeferredValue, useRef } from 'react';
+import { createLogger } from '@automaker/utils/logger';
 import { Sidebar } from '@/components/layout/sidebar';
 import {
   FileBrowserProvider,
@@ -22,6 +23,8 @@ import { Toaster } from 'sonner';
 import { ThemeOption, themeOptions } from '@/config/theme-options';
 import { SandboxRiskDialog } from '@/components/dialogs/sandbox-risk-dialog';
 import { SandboxRejectionScreen } from '@/components/dialogs/sandbox-rejection-screen';
+
+const logger = createLogger('RootLayout');
 
 function RootLayoutContent() {
   const location = useLocation();
@@ -120,7 +123,7 @@ function RootLayoutContent() {
           setSandboxStatus('needs-confirmation');
         }
       } catch (error) {
-        console.error('[Sandbox] Failed to check environment:', error);
+        logger.error('Failed to check environment:', error);
         // On error, assume not containerized and show warning
         if (skipSandboxWarning) {
           setSandboxStatus('confirmed');
@@ -154,10 +157,10 @@ function RootLayoutContent() {
         if (electronAPI?.quit) {
           await electronAPI.quit();
         } else {
-          console.error('[Sandbox] quit() not available on electronAPI');
+          logger.error('quit() not available on electronAPI');
         }
       } catch (error) {
-        console.error('[Sandbox] Failed to quit app:', error);
+        logger.error('Failed to quit app:', error);
       }
     } else {
       // In web mode, show rejection screen
@@ -202,7 +205,7 @@ function RootLayoutContent() {
         // Session is invalid or expired - treat as not authenticated
         useAuthStore.getState().setAuthState({ isAuthenticated: false, authChecked: true });
       } catch (error) {
-        console.error('Failed to initialize auth:', error);
+        logger.error('Failed to initialize auth:', error);
         // On error, treat as not authenticated
         useAuthStore.getState().setAuthState({ isAuthenticated: false, authChecked: true });
       } finally {
@@ -282,7 +285,7 @@ function RootLayoutContent() {
         });
         setIpcConnected(response.ok);
       } catch (error) {
-        console.error('IPC connection failed:', error);
+        logger.error('IPC connection failed:', error);
         setIpcConnected(false);
       }
     };

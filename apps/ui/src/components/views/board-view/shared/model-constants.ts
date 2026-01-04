@@ -1,12 +1,15 @@
-import type { AgentModel, ThinkingLevel } from '@/store/app-store';
+import type { ModelAlias, ThinkingLevel } from '@/store/app-store';
+import type { ModelProvider } from '@automaker/types';
+import { CURSOR_MODEL_MAP } from '@automaker/types';
 import { Brain, Zap, Scale, Cpu, Rocket, Sparkles } from 'lucide-react';
 
 export type ModelOption = {
-  id: AgentModel;
+  id: string; // Claude models use ModelAlias, Cursor models use "cursor-{id}"
   label: string;
   description: string;
   badge?: string;
-  provider: 'claude';
+  provider: ModelProvider;
+  hasThinking?: boolean;
 };
 
 export const CLAUDE_MODELS: ModelOption[] = [
@@ -32,6 +35,25 @@ export const CLAUDE_MODELS: ModelOption[] = [
     provider: 'claude',
   },
 ];
+
+/**
+ * Cursor models derived from CURSOR_MODEL_MAP
+ * ID is prefixed with "cursor-" for ProviderFactory routing
+ */
+export const CURSOR_MODELS: ModelOption[] = Object.entries(CURSOR_MODEL_MAP).map(
+  ([id, config]) => ({
+    id: `cursor-${id}`,
+    label: config.label,
+    description: config.description,
+    provider: 'cursor' as ModelProvider,
+    hasThinking: config.hasThinking,
+  })
+);
+
+/**
+ * All available models (Claude + Cursor)
+ */
+export const ALL_MODELS: ModelOption[] = [...CLAUDE_MODELS, ...CURSOR_MODELS];
 
 export const THINKING_LEVELS: ThinkingLevel[] = ['none', 'low', 'medium', 'high', 'ultrathink'];
 

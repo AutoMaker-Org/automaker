@@ -4,7 +4,6 @@ import { Button } from '@/components/ui/button';
 import { Key, CheckCircle2, Settings, Trash2, Loader2 } from 'lucide-react';
 import { ApiKeyField } from './api-key-field';
 import { buildProviderConfigs } from '@/config/api-providers';
-import { AuthenticationStatusDisplay } from './authentication-status-display';
 import { SecurityNotice } from './security-notice';
 import { useApiKeyManagement } from './hooks/use-api-key-management';
 import { cn } from '@/lib/utils';
@@ -19,7 +18,7 @@ export function ApiKeysSection() {
   const [isDeletingAnthropicKey, setIsDeletingAnthropicKey] = useState(false);
   const navigate = useNavigate();
 
-  const { providerConfigParams, apiKeyStatus, handleSave, saved } = useApiKeyManagement();
+  const { providerConfigParams, handleSave, saved } = useApiKeyManagement();
 
   const providerConfigs = buildProviderConfigs(providerConfigParams);
 
@@ -83,13 +82,6 @@ export function ApiKeysSection() {
         {providerConfigs.map((provider) => (
           <ApiKeyField key={provider.key} config={provider} />
         ))}
-
-        {/* Authentication Status Display */}
-        <AuthenticationStatusDisplay
-          claudeAuthStatus={claudeAuthStatus}
-          apiKeyStatus={apiKeyStatus}
-          apiKeys={apiKeys}
-        />
 
         {/* Security Notice */}
         <SecurityNotice />

@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import { createLogger } from '@automaker/utils/logger';
 
 interface UseCliStatusOptions {
   cliType: 'claude';
@@ -14,13 +15,14 @@ export function useCliStatus({
   setAuthStatus,
 }: UseCliStatusOptions) {
   const [isChecking, setIsChecking] = useState(false);
+  const logger = createLogger('CliStatus');
 
   const checkStatus = useCallback(async () => {
-    console.log(`[${cliType} Setup] Starting status check...`);
+    logger.info(`Starting status check for ${cliType}...`);
     setIsChecking(true);
     try {
       const result = await statusApi();
-      console.log(`[${cliType} Setup] Raw status result:`, result);
+      logger.info(`Raw status result for ${cliType}:`, result);
 
       if (result.success) {
         const cliStatus = {
@@ -29,7 +31,7 @@ export function useCliStatus({
           version: result.version || null,
           method: result.method || 'none',
         };
-        console.log(`[${cliType} Setup] CLI Status:`, cliStatus);
+        logger.info(`CLI Status for ${cliType}:`, cliStatus);
         setCliStatus(cliStatus);
 
         if (result.auth) {
@@ -60,11 +62,11 @@ export function useCliStatus({
         }
       }
     } catch (error) {
-      console.error(`[${cliType} Setup] Failed to check status:`, error);
+      logger.error(`Failed to check status for ${cliType}:`, error);
     } finally {
       setIsChecking(false);
     }
-  }, [cliType, statusApi, setCliStatus, setAuthStatus]);
+  }, [cliType, statusApi, setCliStatus, setAuthStatus, logger]);
 
   return { isChecking, checkStatus };
 }

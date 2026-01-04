@@ -6,7 +6,7 @@
 import path from 'path';
 import * as secureFs from '../lib/secure-fs.js';
 import type { EventEmitter } from '../lib/events.js';
-import type { ExecuteOptions } from '@automaker/types';
+import type { ExecuteOptions, ThinkingLevel } from '@automaker/types';
 import {
   readImageAsBase64,
   buildPromptWithImages,
@@ -44,6 +44,7 @@ interface QueuedPrompt {
   message: string;
   imagePaths?: string[];
   model?: string;
+  thinkingLevel?: ThinkingLevel;
   addedAt: string;
 }
 
@@ -53,6 +54,7 @@ interface Session {
   abortController: AbortController | null;
   workingDirectory: string;
   model?: string;
+  thinkingLevel?: ThinkingLevel; // Thinking level for Claude models
   sdkSessionId?: string; // Claude SDK session ID for conversation continuity
   promptQueue: QueuedPrompt[]; // Queue of prompts to auto-run after current task
 }
@@ -141,12 +143,14 @@ export class AgentService {
     workingDirectory,
     imagePaths,
     model,
+    thinkingLevel,
   }: {
     sessionId: string;
     message: string;
     workingDirectory?: string;
     imagePaths?: string[];
     model?: string;
+    thinkingLevel?: ThinkingLevel;
   }) {
     const session = this.sessions.get(sessionId);
     if (!session) {
@@ -159,10 +163,13 @@ export class AgentService {
       throw new Error('Agent is already processing a message');
     }
 
-    // Update session model if provided
+    // Update session model and thinking level if provided
     if (model) {
       session.model = model;
       await this.updateSession(sessionId, { model });
+    }
+    if (thinkingLevel !== undefined) {
+      session.thinkingLevel = thinkingLevel;
     }
 
     // Read images and convert to base64
@@ -251,6 +258,8 @@ export class AgentService {
         : baseSystemPrompt;
 
       // Build SDK options using centralized configuration
+      // Use thinking level from request, or fall back to session's stored thinking level
+      const effectiveThinkingLevel = thinkingLevel ?? session.thinkingLevel;
       const sdkOptions = createChatOptions({
         cwd: effectiveWorkDir,
         model: model,
@@ -259,6 +268,7 @@ export class AgentService {
         abortController: session.abortController!,
         autoLoadClaudeMd,
         enableSandboxMode,
+        thinkingLevel: effectiveThinkingLevel, // Pass thinking level for Claude models
         mcpServers: Object.keys(mcpServers).length > 0 ? mcpServers : undefined,
       });
 
@@ -620,7 +630,12 @@ export class AgentService {
    */
   async addToQueue(
     sessionId: string,
-    prompt: { message: string; imagePaths?: string[]; model?: string }
+    prompt: {
+      message: string;
+      imagePaths?: string[];
+      model?: string;
+      thinkingLevel?: ThinkingLevel;
+    }
   ): Promise<{ success: boolean; queuedPrompt?: QueuedPrompt; error?: string }> {
     const session = this.sessions.get(sessionId);
     if (!session) {
@@ -632,6 +647,7 @@ export class AgentService {
       message: prompt.message,
       imagePaths: prompt.imagePaths,
       model: prompt.model,
+      thinkingLevel: prompt.thinkingLevel,
       addedAt: new Date().toISOString(),
     };
 
@@ -761,6 +777,7 @@ export class AgentService {
         message: nextPrompt.message,
         imagePaths: nextPrompt.imagePaths,
         model: nextPrompt.model,
+        thinkingLevel: nextPrompt.thinkingLevel,
       });
     } catch (error) {
       this.logger.error('Failed to process queued prompt:', error);

@@ -20,6 +20,7 @@ async function collectAsyncGenerator<T>(generator: AsyncGenerator<T>): Promise<T
 describe('subprocess.ts', () => {
   let consoleSpy: {
     log: ReturnType<typeof vi.spyOn>;
+    warn: ReturnType<typeof vi.spyOn>;
     error: ReturnType<typeof vi.spyOn>;
   };
 
@@ -27,12 +28,14 @@ describe('subprocess.ts', () => {
     vi.clearAllMocks();
     consoleSpy = {
       log: vi.spyOn(console, 'log').mockImplementation(() => {}),
+      warn: vi.spyOn(console, 'warn').mockImplementation(() => {}),
       error: vi.spyOn(console, 'error').mockImplementation(() => {}),
     };
   });
 
   afterEach(() => {
     consoleSpy.log.mockRestore();
+    consoleSpy.warn.mockRestore();
     consoleSpy.error.mockRestore();
   });
 
@@ -176,11 +179,11 @@ describe('subprocess.ts', () => {
       const generator = spawnJSONLProcess(baseOptions);
       await collectAsyncGenerator(generator);
 
-      expect(consoleSpy.error).toHaveBeenCalledWith(
-        expect.stringContaining('Warning: something happened')
+      expect(consoleSpy.warn).toHaveBeenCalledWith(
+        expect.stringContaining('[SubprocessManager] stderr: Warning: something happened')
       );
-      expect(consoleSpy.error).toHaveBeenCalledWith(
-        expect.stringContaining('Error: critical issue')
+      expect(consoleSpy.warn).toHaveBeenCalledWith(
+        expect.stringContaining('[SubprocessManager] stderr: Error: critical issue')
       );
     });
 
@@ -242,7 +245,7 @@ describe('subprocess.ts', () => {
       const mockProcess = createMockProcess({
         stdoutLines: ['{"type":"start"}'],
         exitCode: 0,
-        delayMs: 100, // Delay to allow abort
+        delayMs: 200, // Delay to allow abort
       });
 
       vi.mocked(cp.spawn).mockReturnValue(mockProcess);
@@ -255,8 +258,11 @@ describe('subprocess.ts', () => {
       // Start consuming the generator
       const promise = collectAsyncGenerator(generator);
 
-      // Abort after a short delay
-      setTimeout(() => abortController.abort(), 20);
+      // Abort after a short delay to ensure generator has started
+      // Use setImmediate to ensure the generator has started processing
+      setImmediate(() => {
+        abortController.abort();
+      });
 
       await promise;
 

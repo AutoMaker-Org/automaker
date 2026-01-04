@@ -3,6 +3,9 @@
  */
 
 import type { EventType, EventCallback } from '@automaker/types';
+import { createLogger } from '@automaker/utils';
+
+const logger = createLogger('Events');
 
 // Re-export event types from shared package
 export type { EventType, EventCallback };
@@ -21,7 +24,7 @@ export function createEventEmitter(): EventEmitter {
         try {
           callback(type, payload);
         } catch (error) {
-          console.error('Error in event subscriber:', error);
+          logger.error('Error in event subscriber:', error);
         }
       }
     },

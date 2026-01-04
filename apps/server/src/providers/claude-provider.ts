@@ -7,7 +7,10 @@
 
 import { query, type Options } from '@anthropic-ai/claude-agent-sdk';
 import { BaseProvider } from './base-provider.js';
-import { classifyError, getUserFriendlyErrorMessage } from '@automaker/utils';
+import { classifyError, getUserFriendlyErrorMessage, createLogger } from '@automaker/utils';
+
+const logger = createLogger('ClaudeProvider');
+import { getThinkingTokenBudget } from '@automaker/types';
 import type {
   ExecuteOptions,
   ProviderMessage,
@@ -60,7 +63,11 @@ export class ClaudeProvider extends BaseProvider {
       abortController,
       conversationHistory,
       sdkSessionId,
+      thinkingLevel,
     } = options;
+
+    // Convert thinking level to token budget
+    const maxThinkingTokens = getThinkingTokenBudget(thinkingLevel);
 
     // Build Claude SDK options
     // AUTONOMOUS MODE: Always bypass permissions for fully autonomous operation
@@ -95,6 +102,8 @@ export class ClaudeProvider extends BaseProvider {
       ...(options.sandbox && { sandbox: options.sandbox }),
       // Forward MCP servers configuration
       ...(options.mcpServers && { mcpServers: options.mcpServers }),
+      // Extended thinking configuration
+      ...(maxThinkingTokens && { maxThinkingTokens }),
     };
 
     // Build prompt payload
@@ -132,7 +141,7 @@ export class ClaudeProvider extends BaseProvider {
       const errorInfo = classifyError(error);
       const userMessage = getUserFriendlyErrorMessage(error);
 
-      console.error('[ClaudeProvider] executeQuery() error during execution:', {
+      logger.error('executeQuery() error during execution:', {
         type: errorInfo.type,
         message: errorInfo.message,
         isRateLimit: errorInfo.isRateLimit,

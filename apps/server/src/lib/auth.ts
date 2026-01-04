@@ -12,6 +12,9 @@ import type { Request, Response, NextFunction } from 'express';
 import crypto from 'crypto';
 import path from 'path';
 import * as secureFs from './secure-fs.js';
+import { createLogger } from '@automaker/utils';
+
+const logger = createLogger('Auth');
 
 const DATA_DIR = process.env.DATA_DIR || './data';
 const API_KEY_FILE = path.join(DATA_DIR, '.api-key');
@@ -61,11 +64,11 @@ function loadSessions(): void {
       }
 
       if (loadedCount > 0 || expiredCount > 0) {
-        console.log(`[Auth] Loaded ${loadedCount} sessions (${expiredCount} expired)`);
+        logger.info(`Loaded ${loadedCount} sessions (${expiredCount} expired)`);
       }
     }
   } catch (error) {
-    console.warn('[Auth] Error loading sessions:', error);
+    logger.warn('Error loading sessions:', error);
   }
 }
 
@@ -81,7 +84,7 @@ async function saveSessions(): Promise<void> {
       mode: 0o600,
     });
   } catch (error) {
-    console.error('[Auth] Failed to save sessions:', error);
+    logger.error('Failed to save sessions:', error);
   }
 }
 
@@ -95,7 +98,7 @@ loadSessions();
 function ensureApiKey(): string {
   // First check environment variable (Electron passes it this way)
   if (process.env.AUTOMAKER_API_KEY) {
-    console.log('[Auth] Using API key from environment variable');
+    logger.info('Using API key from environment variable');
     return process.env.AUTOMAKER_API_KEY;
   }
 
@@ -104,12 +107,12 @@ function ensureApiKey(): string {
     if (secureFs.existsSync(API_KEY_FILE)) {
       const key = (secureFs.readFileSync(API_KEY_FILE, 'utf-8') as string).trim();
       if (key) {
-        console.log('[Auth] Loaded API key from file');
+        logger.info('Loaded API key from file');
         return key;
       }
     }
   } catch (error) {
-    console.warn('[Auth] Error reading API key file:', error);
+    logger.warn('Error reading API key file:', error);
   }
 
   // Generate new key
@@ -117,9 +120,9 @@ function ensureApiKey(): string {
   try {
     secureFs.mkdirSync(path.dirname(API_KEY_FILE), { recursive: true });
     secureFs.writeFileSync(API_KEY_FILE, newKey, { encoding: 'utf-8', mode: 0o600 });
-    console.log('[Auth] Generated new API key');
+    logger.info('Generated new API key');
   } catch (error) {
-    console.error('[Auth] Failed to save API key:', error);
+    logger.error('Failed to save API key:', error);
   }
   return newKey;
 }
@@ -129,7 +132,7 @@ const API_KEY = ensureApiKey();
 
 // Print API key to console for web mode users (unless suppressed for production logging)
 if (process.env.AUTOMAKER_HIDE_API_KEY !== 'true') {
-  console.log(`
+  logger.info(`
 ╔═══════════════════════════════════════════════════════════════════════╗
 ║  🔐 API Key for Web Mode Authentication                               ║
 ╠═══════════════════════════════════════════════════════════════════════╣
@@ -142,7 +145,7 @@ if (process.env.AUTOMAKER_HIDE_API_KEY !== 'true') {
 ╚═══════════════════════════════════════════════════════════════════════╝
 `);
 } else {
-  console.log('[Auth] API key banner hidden (AUTOMAKER_HIDE_API_KEY=true)');
+  logger.info('API key banner hidden (AUTOMAKER_HIDE_API_KEY=true)');
 }
 
 /**
@@ -177,7 +180,7 @@ export function validateSession(token: string): boolean {
   if (Date.now() > session.expiresAt) {
     validSessions.delete(token);
     // Fire-and-forget: persist removal asynchronously
-    saveSessions().catch((err) => console.error('[Auth] Error saving sessions:', err));
+    saveSessions().catch((err) => logger.error('Error saving sessions:', err));
     return false;
   }
 

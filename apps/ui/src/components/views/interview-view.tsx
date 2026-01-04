@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
+import { createLogger } from '@automaker/utils/logger';
 import { useAppStore, Feature } from '@/store/app-store';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -11,6 +12,8 @@ import { useFileBrowser } from '@/contexts/file-browser-context';
 import { toast } from 'sonner';
 import { useNavigate } from '@tanstack/react-router';
 import { getDefaultWorkspaceDirectory, saveLastProjectDirectory } from '@/lib/workspace-config';
+
+const logger = createLogger('InterviewView');
 
 interface InterviewMessage {
   id: string;
@@ -97,7 +100,7 @@ export function InterviewView() {
           setProjectPath(defaultDir);
         }
       } catch (error) {
-        console.error('Failed to load default workspace directory:', error);
+        logger.error('Failed to load default workspace directory:', error);
       }
     };
 
@@ -367,7 +370,7 @@ export function InterviewView() {
       addProject(project);
       setCurrentProject(project);
     } catch (error) {
-      console.error('Failed to create project:', error);
+      logger.error('Failed to create project:', error);
       setIsGenerating(false);
     }
   };

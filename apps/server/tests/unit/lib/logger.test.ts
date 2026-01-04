@@ -1,5 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { LogLevel, createLogger, getLogLevel, setLogLevel } from '@automaker/utils';
+import {
+  LogLevel,
+  createLogger,
+  getLogLevel,
+  setLogLevel,
+  setColorsEnabled,
+  setTimestampsEnabled,
+} from '@automaker/utils';
 
 describe('logger.ts', () => {
   let consoleSpy: {
@@ -11,6 +18,9 @@ describe('logger.ts', () => {
 
   beforeEach(() => {
     originalLogLevel = getLogLevel();
+    // Disable colors and timestamps for predictable test output
+    setColorsEnabled(false);
+    setTimestampsEnabled(false);
     consoleSpy = {
       log: vi.spyOn(console, 'log').mockImplementation(() => {}),
       warn: vi.spyOn(console, 'warn').mockImplementation(() => {}),
@@ -51,7 +61,8 @@ describe('logger.ts', () => {
 
       logger.info('test message');
 
-      expect(consoleSpy.log).toHaveBeenCalledWith('[TestContext]', 'test message');
+      // New format: 'LEVEL [Context]' as first arg, then message
+      expect(consoleSpy.log).toHaveBeenCalledWith('INFO  [TestContext]', 'test message');
     });
 
     it('should log error at all log levels', () => {
@@ -59,7 +70,7 @@ describe('logger.ts', () => {
 
       setLogLevel(LogLevel.ERROR);
       logger.error('error message');
-      expect(consoleSpy.error).toHaveBeenCalledWith('[Test]', 'error message');
+      expect(consoleSpy.error).toHaveBeenCalledWith('ERROR [Test]', 'error message');
     });
 
     it('should log warn when level is WARN or higher', () => {
@@ -67,11 +78,12 @@ describe('logger.ts', () => {
 
       setLogLevel(LogLevel.ERROR);
       logger.warn('warn message 1');
-      expect(consoleSpy.warn).not.toHaveBeenCalled();
+      expect(consoleSpy.log).not.toHaveBeenCalled();
 
       setLogLevel(LogLevel.WARN);
       logger.warn('warn message 2');
-      expect(consoleSpy.warn).toHaveBeenCalledWith('[Test]', 'warn message 2');
+      // Note: warn uses console.log in Node.js implementation
+      expect(consoleSpy.log).toHaveBeenCalledWith('WARN  [Test]', 'warn message 2');
     });
 
     it('should log info when level is INFO or higher', () => {
@@ -83,7 +95,7 @@ describe('logger.ts', () => {
 
       setLogLevel(LogLevel.INFO);
       logger.info('info message 2');
-      expect(consoleSpy.log).toHaveBeenCalledWith('[Test]', 'info message 2');
+      expect(consoleSpy.log).toHaveBeenCalledWith('INFO  [Test]', 'info message 2');
     });
 
     it('should log debug only when level is DEBUG', () => {
@@ -95,7 +107,7 @@ describe('logger.ts', () => {
 
       setLogLevel(LogLevel.DEBUG);
       logger.debug('debug message 2');
-      expect(consoleSpy.log).toHaveBeenCalledWith('[Test]', '[DEBUG]', 'debug message 2');
+      expect(consoleSpy.log).toHaveBeenCalledWith('DEBUG [Test]', 'debug message 2');
     });
 
     it('should pass multiple arguments to log functions', () => {
@@ -103,7 +115,27 @@ describe('logger.ts', () => {
       const logger = createLogger('Multi');
 
       logger.info('message', { data: 'value' }, 123);
-      expect(consoleSpy.log).toHaveBeenCalledWith('[Multi]', 'message', { data: 'value' }, 123);
+      expect(consoleSpy.log).toHaveBeenCalledWith(
+        'INFO  [Multi]',
+        'message',
+        { data: 'value' },
+        123
+      );
+    });
+
+    it('should include timestamps when enabled', () => {
+      setTimestampsEnabled(true);
+      setLogLevel(LogLevel.INFO);
+      const logger = createLogger('Timestamp');
+
+      logger.info('test');
+
+      // First arg should contain ISO timestamp format
+      const firstArg = consoleSpy.log.mock.calls[0][0];
+      expect(firstArg).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z INFO  \[Timestamp\]$/);
+      expect(consoleSpy.log.mock.calls[0][1]).toBe('test');
+
+      setTimestampsEnabled(false);
     });
   });
 });

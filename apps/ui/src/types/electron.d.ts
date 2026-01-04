@@ -85,7 +85,8 @@ export interface AgentAPI {
     message: string,
     workingDirectory?: string,
     imagePaths?: string[],
-    model?: string
+    model?: string,
+    thinkingLevel?: string
   ) => Promise<{
     success: boolean;
     error?: string;

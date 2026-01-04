@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import { createLogger } from '@automaker/utils/logger';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -34,6 +35,8 @@ import { getHttpApiClient } from '@/lib/http-api-client';
 import type { StarterTemplate } from '@/lib/templates';
 import { useNavigate } from '@tanstack/react-router';
 
+const logger = createLogger('WelcomeView');
+
 export function WelcomeView() {
   const {
     projects,
@@ -65,13 +68,13 @@ export function WelcomeView() {
     const api = getElectronAPI();
 
     if (!api.autoMode?.analyzeProject) {
-      console.log('[Welcome] Auto mode API not available, skipping analysis');
+      logger.info('[Welcome] Auto mode API not available, skipping analysis');
       return;
     }
 
     setIsAnalyzing(true);
     try {
-      console.log('[Welcome] Starting project analysis for:', projectPath);
+      logger.info('[Welcome] Starting project analysis for:', projectPath);
       const result = await api.autoMode.analyzeProject(projectPath);
 
       if (result.success) {
@@ -79,10 +82,10 @@ export function WelcomeView() {
           description: 'AI agent has analyzed your project structure',
         });
       } else {
-        console.error('[Welcome] Project analysis failed:', result.error);
+        logger.error('[Welcome] Project analysis failed:', result.error);
       }
     } catch (error) {
-      console.error('[Welcome] Failed to analyze project:', error);
+      logger.error('[Welcome] Failed to analyze project:', error);
     } finally {
       setIsAnalyzing(false);
     }
@@ -125,8 +128,8 @@ export function WelcomeView() {
           setShowInitDialog(true);
 
           // Kick off agent to analyze the project and update app_spec.txt
-          console.log('[Welcome] Project initialized, created files:', initResult.createdFiles);
-          console.log('[Welcome] Kicking off project analysis agent...');
+          logger.info('[Welcome] Project initialized, created files:', initResult.createdFiles);
+          logger.info('[Welcome] Kicking off project analysis agent...');
 
           // Start analysis in background (don't await, let it run async)
           analyzeProject(path);
@@ -139,7 +142,7 @@ export function WelcomeView() {
         // Navigate to the board view
         navigate({ to: '/board' });
       } catch (error) {
-        console.error('[Welcome] Failed to open project:', error);
+        logger.error('[Welcome] Failed to open project:', error);
         toast.error('Failed to open project', {
           description: error instanceof Error ? error.message : 'Unknown error',
         });
@@ -179,7 +182,7 @@ export function WelcomeView() {
         }
       }
     } catch (error) {
-      console.error('[Welcome] Failed to check workspace config:', error);
+      logger.error('[Welcome] Failed to check workspace config:', error);
       // Fall back to current behavior on error
       const api = getElectronAPI();
       const result = await api.openDirectory();
@@ -317,7 +320,7 @@ export function WelcomeView() {
       });
       setShowInitDialog(true);
     } catch (error) {
-      console.error('Failed to create project:', error);
+      logger.error('Failed to create project:', error);
       toast.error('Failed to create project', {
         description: error instanceof Error ? error.message : 'Unknown error',
       });
@@ -418,7 +421,7 @@ export function WelcomeView() {
       // Kick off project analysis
       analyzeProject(projectPath);
     } catch (error) {
-      console.error('Failed to create project from template:', error);
+      logger.error('Failed to create project from template:', error);
       toast.error('Failed to create project', {
         description: error instanceof Error ? error.message : 'Unknown error',
       });
@@ -515,7 +518,7 @@ export function WelcomeView() {
       // Kick off project analysis
       analyzeProject(projectPath);
     } catch (error) {
-      console.error('Failed to create project from custom URL:', error);
+      logger.error('Failed to create project from custom URL:', error);
       toast.error('Failed to create project', {
         description: error instanceof Error ? error.message : 'Unknown error',
       });

@@ -1,5 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
+import { createLogger } from '@automaker/utils/logger';
 import { useSetupStore } from '@/store/setup-store';
+
+const logger = createLogger('CliStatus');
 import { getElectronAPI } from '@/lib/electron';
 
 interface CliStatusResult {
@@ -40,7 +43,7 @@ export function useCliStatus() {
           const status = await api.checkClaudeCli();
           setClaudeCliStatus(status);
         } catch (error) {
-          console.error('Failed to check Claude CLI status:', error);
+          logger.error('Failed to check Claude CLI status:', error);
         }
       }
 
@@ -84,7 +87,7 @@ export function useCliStatus() {
             setClaudeAuthStatus(authStatus);
           }
         } catch (error) {
-          console.error('Failed to check Claude auth status:', error);
+          logger.error('Failed to check Claude auth status:', error);
         }
       }
     };
@@ -102,7 +105,7 @@ export function useCliStatus() {
         setClaudeCliStatus(status);
       }
     } catch (error) {
-      console.error('Failed to refresh Claude CLI status:', error);
+      logger.error('Failed to refresh Claude CLI status:', error);
     } finally {
       setIsCheckingClaudeCli(false);
     }

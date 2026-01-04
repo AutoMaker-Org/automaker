@@ -1,5 +1,5 @@
 import type { GitHubIssue, StoredValidation, GitHubComment } from '@/lib/electron';
-import type { LinkedPRInfo } from '@automaker/types';
+import type { ModelAlias, CursorModelId, LinkedPRInfo, PhaseModelEntry } from '@automaker/types';
 
 export interface IssueRowProps {
   issue: GitHubIssue;
@@ -34,4 +34,11 @@ export interface IssueDetailPanelProps {
   /** Called when user wants to revalidate - receives the validation options including comments/linkedPRs */
   onShowRevalidateConfirm: (options: ValidateIssueOptions) => void;
   formatDate: (date: string) => string;
+  /** Model override state */
+  modelOverride: {
+    effectiveModelEntry: PhaseModelEntry;
+    effectiveModel: ModelAlias | CursorModelId;
+    isOverridden: boolean;
+    setOverride: (entry: PhaseModelEntry | null) => void;
+  };
 }

@@ -5,6 +5,7 @@
  * but communicates with the backend server via HTTP/WebSocket.
  */
 
+import { createLogger } from '@automaker/utils/logger';
 import type {
   ElectronAPI,
   FileResult,
@@ -39,6 +40,8 @@ import type { Feature, ClaudeUsageResponse } from '@/store/app-store';
 import type { WorktreeAPI, GitAPI, ModelDefinition, ProviderStatus } from '@/types/electron';
 import { getGlobalFileBrowser } from '@/contexts/file-browser-context';
 
+const logger = createLogger('HttpClient');
+
 // Cached server URL (set during initialization in Electron mode)
 let cachedServerUrl: string | null = null;
 
@@ -53,9 +56,9 @@ export const initServerUrl = async (): Promise<void> => {
   if (electron?.getServerUrl) {
     try {
       cachedServerUrl = await electron.getServerUrl();
-      console.log('[HTTP Client] Server URL from Electron:', cachedServerUrl);
+      logger.info('Server URL from Electron:', cachedServerUrl);
     } catch (error) {
-      console.warn('[HTTP Client] Failed to get server URL from Electron:', error);
+      logger.warn('Failed to get server URL from Electron:', error);
     }
   }
 };
@@ -152,16 +155,16 @@ export const initApiKey = async (): Promise<void> => {
         try {
           cachedApiKey = await window.electronAPI.getApiKey();
           if (cachedApiKey) {
-            console.log('[HTTP Client] Using API key from Electron');
+            logger.info('Using API key from Electron');
             return;
           }
         } catch (error) {
-          console.warn('[HTTP Client] Failed to get API key from Electron:', error);
+          logger.warn('Failed to get API key from Electron:', error);
         }
       }
 
       // In web mode, authentication is handled via HTTP-only cookies
-      console.log('[HTTP Client] Web mode - using cookie-based authentication');
+      logger.info('Web mode - using cookie-based authentication');
     } finally {
       // Mark as initialized after completion, regardless of success or failure
       apiKeyInitialized = true;
@@ -189,7 +192,7 @@ export const checkAuthStatus = async (): Promise<{
       required: data.required ?? true,
     };
   } catch (error) {
-    console.error('[HTTP Client] Failed to check auth status:', error);
+    logger.error('Failed to check auth status:', error);
     return { authenticated: false, required: true };
   }
 };
@@ -214,23 +217,23 @@ export const login = async (
     // Store the session token if login succeeded
     if (data.success && data.token) {
       setSessionToken(data.token);
-      console.log('[HTTP Client] Session token stored after login');
+      logger.info('Session token stored after login');
 
       // Verify the session is actually working by making a request to an authenticated endpoint
       const verified = await verifySession();
       if (!verified) {
-        console.error('[HTTP Client] Login appeared successful but session verification failed');
+        logger.error('Login appeared successful but session verification failed');
         return {
           success: false,
           error: 'Session verification failed. Please try again.',
         };
       }
-      console.log('[HTTP Client] Login verified successfully');
+      logger.info('Login verified successfully');
     }
 
     return data;
   } catch (error) {
-    console.error('[HTTP Client] Login failed:', error);
+    logger.error('Login failed:', error);
     return { success: false, error: 'Network error' };
   }
 };
@@ -250,20 +253,20 @@ export const fetchSessionToken = async (): Promise<boolean> => {
     });
 
     if (!response.ok) {
-      console.log('[HTTP Client] Failed to check auth status');
+      logger.info('Failed to check auth status');
       return false;
     }
 
     const data = await response.json();
     if (data.success && data.authenticated) {
-      console.log('[HTTP Client] Session cookie is valid');
+      logger.info('Session cookie is valid');
       return true;
     }
 
-    console.log('[HTTP Client] Session cookie is not authenticated');
+    logger.info('Session cookie is not authenticated');
     return false;
   } catch (error) {
-    console.error('[HTTP Client] Failed to check session:', error);
+    logger.error('Failed to check session:', error);
     return false;
   }
 };
@@ -280,11 +283,11 @@ export const logout = async (): Promise<{ success: boolean }> => {
 
     // Clear the cached session token
     clearSessionToken();
-    console.log('[HTTP Client] Session token cleared on logout');
+    logger.info('Session token cleared on logout');
 
     return await response.json();
   } catch (error) {
-    console.error('[HTTP Client] Logout failed:', error);
+    logger.error('Logout failed:', error);
     return { success: false };
   }
 };
@@ -317,7 +320,7 @@ export const verifySession = async (): Promise<boolean> => {
 
     // Check for authentication errors
     if (response.status === 401 || response.status === 403) {
-      console.warn('[HTTP Client] Session verification failed - session expired or invalid');
+      logger.warn('Session verification failed - session expired or invalid');
       // Clear the session since it's no longer valid
       clearSessionToken();
       // Try to clear the cookie via logout (fire and forget)
@@ -331,14 +334,14 @@ export const verifySession = async (): Promise<boolean> => {
     }
 
     if (!response.ok) {
-      console.warn('[HTTP Client] Session verification failed with status:', response.status);
+      logger.warn('Session verification failed with status:', response.status);
       return false;
     }
 
-    console.log('[HTTP Client] Session verified successfully');
+    logger.info('Session verified successfully');
     return true;
   } catch (error) {
-    console.error('[HTTP Client] Session verification error:', error);
+    logger.error('Session verification error:', error);
     return false;
   }
 };
@@ -357,14 +360,14 @@ export const checkSandboxEnvironment = async (): Promise<{
     });
 
     if (!response.ok) {
-      console.warn('[HTTP Client] Failed to check sandbox environment');
+      logger.warn('Failed to check sandbox environment');
       return { isContainerized: false, error: 'Failed to check environment' };
     }
 
     const data = await response.json();
     return { isContainerized: data.isContainerized ?? false };
   } catch (error) {
-    console.error('[HTTP Client] Sandbox environment check failed:', error);
+    logger.error('Sandbox environment check failed:', error);
     return { isContainerized: false, error: 'Network error' };
   }
 };
@@ -408,7 +411,7 @@ export class HttpApiClient implements ElectronAPI {
           this.connectWebSocket();
         })
         .catch((error) => {
-          console.error('[HttpApiClient] API key initialization failed:', error);
+          logger.error('API key initialization failed:', error);
           // Still attempt WebSocket connection - it may work with cookie auth
           this.connectWebSocket();
         });
@@ -437,7 +440,7 @@ export class HttpApiClient implements ElectronAPI {
       });
 
       if (!response.ok) {
-        console.warn('[HttpApiClient] Failed to fetch wsToken:', response.status);
+        logger.warn('Failed to fetch wsToken:', response.status);
         return null;
       }
 
@@ -448,7 +451,7 @@ export class HttpApiClient implements ElectronAPI {
 
       return null;
     } catch (error) {
-      console.error('[HttpApiClient] Error fetching wsToken:', error);
+      logger.error('Error fetching wsToken:', error);
       return null;
     }
   }
@@ -465,9 +468,7 @@ export class HttpApiClient implements ElectronAPI {
     if (isElectronMode()) {
       const apiKey = getApiKey();
       if (!apiKey) {
-        console.warn(
-          '[HttpApiClient] Electron mode: API key not ready, delaying WebSocket connect'
-        );
+        logger.warn('Electron mode: API key not ready, delaying WebSocket connect');
         this.isConnecting = false;
         if (!this.reconnectTimer) {
           this.reconnectTimer = setTimeout(() => {
@@ -491,12 +492,12 @@ export class HttpApiClient implements ElectronAPI {
           this.establishWebSocket(`${wsUrl}?wsToken=${encodeURIComponent(wsToken)}`);
         } else {
           // Fallback: try connecting without token (will fail if not authenticated)
-          console.warn('[HttpApiClient] No wsToken available, attempting connection anyway');
+          logger.warn('No wsToken available, attempting connection anyway');
           this.establishWebSocket(wsUrl);
         }
       })
       .catch((error) => {
-        console.error('[HttpApiClient] Failed to prepare WebSocket connection:', error);
+        logger.error('Failed to prepare WebSocket connection:', error);
         this.isConnecting = false;
       });
   }
@@ -509,7 +510,7 @@ export class HttpApiClient implements ElectronAPI {
       this.ws = new WebSocket(wsUrl);
 
       this.ws.onopen = () => {
-        console.log('[HttpApiClient] WebSocket connected');
+        logger.info('WebSocket connected');
         this.isConnecting = false;
         if (this.reconnectTimer) {
           clearTimeout(this.reconnectTimer);
@@ -520,8 +521,8 @@ export class HttpApiClient implements ElectronAPI {
       this.ws.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
-          console.log(
-            '[HttpApiClient] WebSocket message:',
+          logger.info(
+            'WebSocket message:',
             data.type,
             'hasPayload:',
             !!data.payload,
@@ -530,16 +531,16 @@ export class HttpApiClient implements ElectronAPI {
           );
           const callbacks = this.eventCallbacks.get(data.type);
           if (callbacks) {
-            console.log('[HttpApiClient] Dispatching to', callbacks.size, 'callbacks');
+            logger.info('Dispatching to', callbacks.size, 'callbacks');
             callbacks.forEach((cb) => cb(data.payload));
           }
         } catch (error) {
-          console.error('[HttpApiClient] Failed to parse WebSocket message:', error);
+          logger.error('Failed to parse WebSocket message:', error);
         }
       };
 
       this.ws.onclose = () => {
-        console.log('[HttpApiClient] WebSocket disconnected');
+        logger.info('WebSocket disconnected');
         this.isConnecting = false;
         this.ws = null;
         // Attempt to reconnect after 5 seconds
@@ -552,11 +553,11 @@ export class HttpApiClient implements ElectronAPI {
       };
 
       this.ws.onerror = (error) => {
-        console.error('[HttpApiClient] WebSocket error:', error);
+        logger.error('WebSocket error:', error);
         this.isConnecting = false;
       };
     } catch (error) {
-      console.error('[HttpApiClient] Failed to create WebSocket:', error);
+      logger.error('Failed to create WebSocket:', error);
       this.isConnecting = false;
     }
   }
@@ -756,7 +757,7 @@ export class HttpApiClient implements ElectronAPI {
     const fileBrowser = getGlobalFileBrowser();
 
     if (!fileBrowser) {
-      console.error('File browser not initialized');
+      logger.error('File browser not initialized');
       return { canceled: true, filePaths: [] };
     }
 
@@ -778,7 +779,7 @@ export class HttpApiClient implements ElectronAPI {
       return { canceled: false, filePaths: [result.path] };
     }
 
-    console.error('Invalid directory:', result.error || 'Path not allowed');
+    logger.error('Invalid directory:', result.error || 'Path not allowed');
     return { canceled: true, filePaths: [] };
   }
 
@@ -786,7 +787,7 @@ export class HttpApiClient implements ElectronAPI {
     const fileBrowser = getGlobalFileBrowser();
 
     if (!fileBrowser) {
-      console.error('File browser not initialized');
+      logger.error('File browser not initialized');
       return { canceled: true, filePaths: [] };
     }
 
@@ -805,7 +806,7 @@ export class HttpApiClient implements ElectronAPI {
       return { canceled: false, filePaths: [path] };
     }
 
-    console.error('File not found');
+    logger.error('File not found');
     return { canceled: true, filePaths: [] };
   }
 
@@ -998,12 +999,13 @@ export class HttpApiClient implements ElectronAPI {
     }> => this.get('/api/setup/platform'),
 
     verifyClaudeAuth: (
-      authMethod?: 'cli' | 'api_key'
+      authMethod?: 'cli' | 'api_key',
+      apiKey?: string
     ): Promise<{
       success: boolean;
       authenticated: boolean;
       error?: string;
-    }> => this.post('/api/setup/verify-claude-auth', { authMethod }),
+    }> => this.post('/api/setup/verify-claude-auth', { authMethod, apiKey }),
 
     getGhStatus: (): Promise<{
       success: boolean;
@@ -1014,6 +1016,126 @@ export class HttpApiClient implements ElectronAPI {
       user: string | null;
       error?: string;
     }> => this.get('/api/setup/gh-status'),
+
+    // Cursor CLI methods
+    getCursorStatus: (): Promise<{
+      success: boolean;
+      installed?: boolean;
+      version?: string | null;
+      path?: string | null;
+      auth?: {
+        authenticated: boolean;
+        method: string;
+      };
+      installCommand?: string;
+      loginCommand?: string;
+      error?: string;
+    }> => this.get('/api/setup/cursor-status'),
+
+    getCursorConfig: (
+      projectPath: string
+    ): Promise<{
+      success: boolean;
+      config?: {
+        defaultModel?: string;
+        models?: string[];
+        mcpServers?: string[];
+        rules?: string[];
+      };
+      availableModels?: Array<{
+        id: string;
+        label: string;
+        description: string;
+        hasThinking: boolean;
+        tier: 'free' | 'pro';
+      }>;
+      error?: string;
+    }> => this.get(`/api/setup/cursor-config?projectPath=${encodeURIComponent(projectPath)}`),
+
+    setCursorDefaultModel: (
+      projectPath: string,
+      model: string
+    ): Promise<{
+      success: boolean;
+      model?: string;
+      error?: string;
+    }> => this.post('/api/setup/cursor-config/default-model', { projectPath, model }),
+
+    setCursorModels: (
+      projectPath: string,
+      models: string[]
+    ): Promise<{
+      success: boolean;
+      models?: string[];
+      error?: string;
+    }> => this.post('/api/setup/cursor-config/models', { projectPath, models }),
+
+    // Cursor CLI Permissions
+    getCursorPermissions: (
+      projectPath?: string
+    ): Promise<{
+      success: boolean;
+      globalPermissions?: { allow: string[]; deny: string[] } | null;
+      projectPermissions?: { allow: string[]; deny: string[] } | null;
+      effectivePermissions?: { allow: string[]; deny: string[] } | null;
+      activeProfile?: 'strict' | 'development' | 'custom' | null;
+      hasProjectConfig?: boolean;
+      availableProfiles?: Array<{
+        id: string;
+        name: string;
+        description: string;
+        permissions: { allow: string[]; deny: string[] };
+      }>;
+      error?: string;
+    }> =>
+      this.get(
+        `/api/setup/cursor-permissions${projectPath ? `?projectPath=${encodeURIComponent(projectPath)}` : ''}`
+      ),
+
+    applyCursorPermissionProfile: (
+      profileId: 'strict' | 'development',
+      scope: 'global' | 'project',
+      projectPath?: string
+    ): Promise<{
+      success: boolean;
+      message?: string;
+      scope?: string;
+      profileId?: string;
+      error?: string;
+    }> => this.post('/api/setup/cursor-permissions/profile', { profileId, scope, projectPath }),
+
+    setCursorCustomPermissions: (
+      projectPath: string,
+      permissions: { allow: string[]; deny: string[] }
+    ): Promise<{
+      success: boolean;
+      message?: string;
+      permissions?: { allow: string[]; deny: string[] };
+      error?: string;
+    }> => this.post('/api/setup/cursor-permissions/custom', { projectPath, permissions }),
+
+    deleteCursorProjectPermissions: (
+      projectPath: string
+    ): Promise<{
+      success: boolean;
+      message?: string;
+      error?: string;
+    }> =>
+      this.httpDelete(
+        `/api/setup/cursor-permissions?projectPath=${encodeURIComponent(projectPath)}`
+      ),
+
+    getCursorExampleConfig: (
+      profileId?: 'strict' | 'development'
+    ): Promise<{
+      success: boolean;
+      profileId?: string;
+      config?: string;
+      error?: string;
+    }> =>
+      this.get(
+        `/api/setup/cursor-permissions/example${profileId ? `?profileId=${profileId}` : ''}`
+      ),
 
     onInstallProgress: (callback: (progress: unknown) => void) => {
       return this.subscribeToEvent('agent:stream', callback);
@@ -1116,12 +1238,14 @@ export class HttpApiClient implements ElectronAPI {
     enhance: (
       originalText: string,
       enhancementMode: string,
-      model?: string
+      model?: string,
+      thinkingLevel?: string
     ): Promise<EnhancePromptResult> =>
       this.post('/api/enhance-prompt', {
         originalText,
         enhancementMode,
         model,
+        thinkingLevel,
       }),
   };
 
@@ -1190,8 +1314,13 @@ export class HttpApiClient implements ElectronAPI {
 
   // Suggestions API
   suggestions: SuggestionsAPI = {
-    generate: (projectPath: string, suggestionType?: SuggestionType) =>
-      this.post('/api/suggestions/generate', { projectPath, suggestionType }),
+    generate: (
+      projectPath: string,
+      suggestionType?: SuggestionType,
+      model?: string,
+      thinkingLevel?: string
+    ) =>
+      this.post('/api/suggestions/generate', { projectPath, suggestionType, model, thinkingLevel }),
     stop: () => this.post('/api/suggestions/stop'),
     status: () => this.get('/api/suggestions/status'),
     onEvent: (callback: (event: SuggestionsEvent) => void) => {
@@ -1261,8 +1390,12 @@ export class HttpApiClient implements ElectronAPI {
     checkRemote: (projectPath: string) => this.post('/api/github/check-remote', { projectPath }),
     listIssues: (projectPath: string) => this.post('/api/github/issues', { projectPath }),
     listPRs: (projectPath: string) => this.post('/api/github/prs', { projectPath }),
-    validateIssue: (projectPath: string, issue: IssueValidationInput, model?: string) =>
-      this.post('/api/github/validate-issue', { projectPath, ...issue, model }),
+    validateIssue: (
+      projectPath: string,
+      issue: IssueValidationInput,
+      model?: string,
+      thinkingLevel?: string
+    ) => this.post('/api/github/validate-issue', { projectPath, ...issue, model, thinkingLevel }),
     getValidationStatus: (projectPath: string, issueNumber?: number) =>
       this.post('/api/github/validation-status', { projectPath, issueNumber }),
     stopValidation: (projectPath: string, issueNumber: number) =>
@@ -1310,7 +1443,8 @@ export class HttpApiClient implements ElectronAPI {
       message: string,
       workingDirectory?: string,
       imagePaths?: string[],
-      model?: string
+      model?: string,
+      thinkingLevel?: string
     ): Promise<{ success: boolean; error?: string }> =>
       this.post('/api/agent/send', {
         sessionId,
@@ -1318,6 +1452,7 @@ export class HttpApiClient implements ElectronAPI {
         workingDirectory,
         imagePaths,
         model,
+        thinkingLevel,
       }),
 
     getHistory: (
@@ -1344,7 +1479,8 @@ export class HttpApiClient implements ElectronAPI {
       sessionId: string,
       message: string,
       imagePaths?: string[],
-      model?: string
+      model?: string,
+      thinkingLevel?: string
     ): Promise<{
       success: boolean;
       queuedPrompt?: {
@@ -1352,10 +1488,12 @@ export class HttpApiClient implements ElectronAPI {
         message: string;
         imagePaths?: string[];
         model?: string;
+        thinkingLevel?: string;
         addedAt: string;
       };
       error?: string;
-    }> => this.post('/api/agent/queue/add', { sessionId, message, imagePaths, model }),
+    }> =>
+      this.post('/api/agent/queue/add', { sessionId, message, imagePaths, model, thinkingLevel }),
 
     queueList: (
       sessionId: string
@@ -1366,6 +1504,7 @@ export class HttpApiClient implements ElectronAPI {
         message: string;
         imagePaths?: string[];
         model?: string;
+        thinkingLevel?: string;
         addedAt: string;
       }>;
       error?: string;
@@ -1854,5 +1993,5 @@ export function getHttpApiClient(): HttpApiClient {
 // This ensures the init promise is created early, even before React components mount
 // The actual async work happens in the background and won't block module loading
 initApiKey().catch((error) => {
-  console.error('[HTTP Client] Failed to initialize API key:', error);
+  logger.error('Failed to initialize API key:', error);
 });

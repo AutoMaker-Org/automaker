@@ -1,5 +1,8 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
+import { createLogger } from '@automaker/utils/logger';
 import { ImageIcon, Upload, Loader2, Trash2 } from 'lucide-react';
+
+const logger = createLogger('BoardBackgroundModal');
 import {
   Sheet,
   SheetContent,
@@ -115,7 +118,7 @@ export function BoardBackgroundModal({ open, onOpenChange }: BoardBackgroundModa
           setPreviewImage(null);
         }
       } catch (error) {
-        console.error('Failed to process image:', error);
+        logger.error('Failed to process image:', error);
         toast.error('Failed to process image');
         setPreviewImage(null);
       } finally {
@@ -187,7 +190,7 @@ export function BoardBackgroundModal({ open, onOpenChange }: BoardBackgroundModa
         toast.error(result.error || 'Failed to clear background image');
       }
     } catch (error) {
-      console.error('Failed to clear background:', error);
+      logger.error('Failed to clear background:', error);
       toast.error('Failed to clear background');
     } finally {
       setIsProcessing(false);

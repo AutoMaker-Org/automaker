@@ -1,4 +1,5 @@
 import { useState, useCallback, useMemo } from 'react';
+import { createLogger } from '@automaker/utils/logger';
 import { CircleDot, RefreshCw } from 'lucide-react';
 import { getElectronAPI, GitHubIssue, IssueValidationResult } from '@/lib/electron';
 import { useAppStore } from '@/store/app-store';
@@ -11,7 +12,10 @@ import { useGithubIssues, useIssueValidation } from './github-issues-view/hooks'
 import { IssueRow, IssueDetailPanel, IssuesListHeader } from './github-issues-view/components';
 import { ValidationDialog } from './github-issues-view/dialogs';
 import { formatDate, getFeaturePriority } from './github-issues-view/utils';
+import { useModelOverride } from '@/components/shared';
 import type { ValidateIssueOptions } from './github-issues-view/types';
+
+const logger = createLogger('GitHubIssuesView');
 
 export function GitHubIssuesView() {
   const [selectedIssue, setSelectedIssue] = useState<GitHubIssue | null>(null);
@@ -23,6 +27,12 @@ export function GitHubIssuesView() {
 
   const { currentProject, defaultAIProfileId, aiProfiles, getCurrentWorktree, worktreesByProject } =
     useAppStore();
+
+  // Model override for validation
+  const validationModelOverride = useModelOverride({ phase: 'validationModel' });
+
+  // Extract model string for API calls (backward compatibility)
+  const validationModelString = validationModelOverride.effectiveModel;
 
   const { openIssues, closedIssues, loading, refreshing, error, refresh } = useGithubIssues();
 
@@ -88,6 +98,9 @@ export function GitHubIssuesView() {
             .filter(Boolean)
             .join('\n');
 
+          // Use profile default model
+          const featureModel = defaultProfile?.model ?? 'opus';
+
           const feature = {
             id: `issue-${issue.number}-${crypto.randomUUID()}`,
             title: issue.title,
@@ -96,7 +109,7 @@ export function GitHubIssuesView() {
             status: 'backlog' as const,
             passes: false,
             priority: getFeaturePriority(validation.estimatedComplexity),
-            model: defaultProfile?.model ?? 'opus',
+            model: featureModel,
             thinkingLevel: defaultProfile?.thinkingLevel ?? 'none',
             branchName: currentBranch,
             createdAt: new Date().toISOString(),
@@ -111,7 +124,7 @@ export function GitHubIssuesView() {
           }
         }
       } catch (err) {
-        console.error('[GitHubIssuesView] Convert to task error:', err);
+        logger.error('Convert to task error:', err);
         toast.error(err instanceof Error ? err.message : 'Failed to create task');
       }
     },
@@ -211,6 +224,7 @@ export function GitHubIssuesView() {
             setShowRevalidateConfirm(true);
           }}
           formatDate={formatDate}
+          modelOverride={validationModelOverride}
         />
       )}
 
@@ -239,11 +253,14 @@ export function GitHubIssuesView() {
         confirmText="Re-validate"
         onConfirm={() => {
           if (selectedIssue && pendingRevalidateOptions) {
-            console.log('[GitHubIssuesView] Revalidating with options:', {
+            logger.info('Revalidating with options:', {
               commentsCount: pendingRevalidateOptions.comments?.length ?? 0,
               linkedPRsCount: pendingRevalidateOptions.linkedPRs?.length ?? 0,
             });
-            handleValidateIssue(selectedIssue, pendingRevalidateOptions);
+            handleValidateIssue(selectedIssue, {
+              ...pendingRevalidateOptions,
+              forceRevalidate: true,
+            });
           }
         }}
       />

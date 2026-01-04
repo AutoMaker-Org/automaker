@@ -12,7 +12,6 @@ import {
   ScrollText,
   ShieldCheck,
   User,
-  Sparkles,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -23,7 +22,6 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import type { AIProfile } from '@/store/app-store';
-import type { AgentModel } from '@automaker/types';
 
 type PlanningMode = 'skip' | 'lite' | 'spec' | 'full';
 
@@ -36,7 +34,6 @@ interface FeatureDefaultsSectionProps {
   defaultRequirePlanApproval: boolean;
   defaultAIProfileId: string | null;
   aiProfiles: AIProfile[];
-  validationModel: AgentModel;
   onShowProfilesOnlyChange: (value: boolean) => void;
   onDefaultSkipTestsChange: (value: boolean) => void;
   onEnableDependencyBlockingChange: (value: boolean) => void;
@@ -44,7 +41,6 @@ interface FeatureDefaultsSectionProps {
   onDefaultPlanningModeChange: (value: PlanningMode) => void;
   onDefaultRequirePlanApprovalChange: (value: boolean) => void;
   onDefaultAIProfileIdChange: (value: string | null) => void;
-  onValidationModelChange: (value: AgentModel) => void;
 }
 
 export function FeatureDefaultsSection({
@@ -56,7 +52,6 @@ export function FeatureDefaultsSection({
   defaultRequirePlanApproval,
   defaultAIProfileId,
   aiProfiles,
-  validationModel,
   onShowProfilesOnlyChange,
   onDefaultSkipTestsChange,
   onEnableDependencyBlockingChange,
@@ -64,7 +59,6 @@ export function FeatureDefaultsSection({
   onDefaultPlanningModeChange,
   onDefaultRequirePlanApprovalChange,
   onDefaultAIProfileIdChange,
-  onValidationModelChange,
 }: FeatureDefaultsSectionProps) {
   // Find the selected profile name for display
   const selectedProfile = defaultAIProfileId
@@ -226,45 +220,6 @@ export function FeatureDefaultsSection({
               {selectedProfile
                 ? `New features will use the "${selectedProfile.name}" profile (${selectedProfile.model}, ${selectedProfile.thinkingLevel} thinking).`
                 : 'Pre-select an AI profile when creating new features. Choose "None" to pick manually each time.'}
-            </p>
-          </div>
-        </div>
-
-        {/* Separator */}
-        <div className="border-t border-border/30" />
-
-        {/* Issue Validation Model */}
-        <div className="group flex items-start space-x-3 p-3 rounded-xl hover:bg-accent/30 transition-colors duration-200 -mx-3">
-          <div className="w-10 h-10 mt-0.5 rounded-xl flex items-center justify-center shrink-0 bg-purple-500/10">
-            <Sparkles className="w-5 h-5 text-purple-500" />
-          </div>
-          <div className="flex-1 space-y-2">
-            <div className="flex items-center justify-between">
-              <Label className="text-foreground font-medium">Issue Validation Model</Label>
-              <Select
-                value={validationModel}
-                onValueChange={(v: string) => onValidationModelChange(v as AgentModel)}
-              >
-                <SelectTrigger className="w-[140px] h-8" data-testid="validation-model-select">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="opus">
-                    <span>Opus</span>
-                    <span className="text-[10px] text-muted-foreground ml-1">(Default)</span>
-                  </SelectItem>
-                  <SelectItem value="sonnet">
-                    <span>Sonnet</span>
-                  </SelectItem>
-                  <SelectItem value="haiku">
-                    <span>Haiku</span>
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <p className="text-xs text-muted-foreground/80 leading-relaxed">
-              Model used for validating GitHub issues. Opus provides the most thorough analysis,
-              while Haiku is faster and more cost-effective.
             </p>
           </div>
         </div>

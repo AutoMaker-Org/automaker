@@ -4,18 +4,23 @@ import type { Project, TrashedProject } from '@/lib/electron';
 import type {
   Feature as BaseFeature,
   FeatureImagePath,
-  AgentModel,
+  ModelAlias,
   PlanningMode,
   AIProfile,
+  CursorModelId,
+  PhaseModelConfig,
+  PhaseModelKey,
+  PhaseModelEntry,
   MCPServerConfig,
   FeatureStatusWithPipeline,
   PipelineConfig,
   PipelineStep,
   PromptCustomization,
 } from '@automaker/types';
+import { getAllCursorModelIds, DEFAULT_PHASE_MODELS } from '@automaker/types';
 
-// Re-export ThemeMode for convenience
-export type { ThemeMode };
+// Re-export types for convenience
+export type { ThemeMode, ModelAlias };
 
 export type ViewMode =
   | 'welcome'
@@ -486,10 +491,18 @@ export interface AppState {
   muteDoneSound: boolean; // When true, mute the notification sound when agents complete (default: false)
 
   // Enhancement Model Settings
-  enhancementModel: AgentModel; // Model used for feature enhancement (default: sonnet)
+  enhancementModel: ModelAlias; // Model used for feature enhancement (default: sonnet)
 
   // Validation Model Settings
-  validationModel: AgentModel; // Model used for GitHub issue validation (default: opus)
+  validationModel: ModelAlias; // Model used for GitHub issue validation (default: opus)
+
+  // Phase Model Settings - per-phase AI model configuration
+  phaseModels: PhaseModelConfig;
+  favoriteModels: string[];
+
+  // Cursor CLI Settings (global)
+  enabledCursorModels: CursorModelId[]; // Which Cursor models are available in feature modal
+  cursorDefaultModel: CursorModelId; // Default Cursor model selection
 
   // Claude Agent SDK Settings
   autoLoadClaudeMd: boolean; // Auto-load CLAUDE.md files using SDK's settingSources option
@@ -773,10 +786,21 @@ export interface AppActions {
   setMuteDoneSound: (muted: boolean) => void;
 
   // Enhancement Model actions
-  setEnhancementModel: (model: AgentModel) => void;
+  setEnhancementModel: (model: ModelAlias) => void;
 
   // Validation Model actions
-  setValidationModel: (model: AgentModel) => void;
+  setValidationModel: (model: ModelAlias) => void;
+
+  // Phase Model actions
+  setPhaseModel: (phase: PhaseModelKey, entry: PhaseModelEntry) => Promise<void>;
+  setPhaseModels: (models: Partial<PhaseModelConfig>) => Promise<void>;
+  resetPhaseModels: () => Promise<void>;
+  toggleFavoriteModel: (modelId: string) => void;
+
+  // Cursor CLI Settings actions
+  setEnabledCursorModels: (models: CursorModelId[]) => void;
+  setCursorDefaultModel: (model: CursorModelId) => void;
+  toggleCursorModel: (model: CursorModelId, enabled: boolean) => void;
 
   // Claude Agent SDK Settings actions
   setAutoLoadClaudeMd: (enabled: boolean) => Promise<void>;
@@ -910,6 +934,7 @@ export interface AppActions {
 
 // Default built-in AI profiles
 const DEFAULT_AI_PROFILES: AIProfile[] = [
+  // Claude profiles
   {
     id: 'profile-heavy-task',
     name: 'Heavy Task',
@@ -940,6 +965,16 @@ const DEFAULT_AI_PROFILES: AIProfile[] = [
     provider: 'claude',
     isBuiltIn: true,
     icon: 'Zap',
+  },
+  // Cursor profiles
+  {
+    id: 'profile-cursor-refactoring',
+    name: 'Cursor Refactoring',
+    description: 'Cursor Composer 1 for refactoring tasks.',
+    provider: 'cursor',
+    cursorModel: 'composer-1',
+    isBuiltIn: true,
+    icon: 'Sparkles',
   },
 ];
 
@@ -979,6 +1014,10 @@ const initialState: AppState = {
   muteDoneSound: false, // Default to sound enabled (not muted)
   enhancementModel: 'sonnet', // Default to sonnet for feature enhancement
   validationModel: 'opus', // Default to opus for GitHub issue validation
+  phaseModels: DEFAULT_PHASE_MODELS, // Phase-specific model configuration
+  favoriteModels: [],
+  enabledCursorModels: getAllCursorModelIds(), // All Cursor models enabled by default
+  cursorDefaultModel: 'auto', // Default to auto selection
   autoLoadClaudeMd: false, // Default to disabled (user must opt-in)
   enableSandboxMode: false, // Default to disabled (can be enabled for additional security)
   skipSandboxWarning: false, // Default to disabled (show sandbox warning dialog)
@@ -1613,6 +1652,54 @@ export const useAppStore = create<AppState & AppActions>()(
 
       // Validation Model actions
       setValidationModel: (model) => set({ validationModel: model }),
+
+      // Phase Model actions
+      setPhaseModel: async (phase, entry) => {
+        set((state) => ({
+          phaseModels: {
+            ...state.phaseModels,
+            [phase]: entry,
+          },
+        }));
+        // Sync to server settings file
+        const { syncSettingsToServer } = await import('@/hooks/use-settings-migration');
+        await syncSettingsToServer();
+      },
+      setPhaseModels: async (models) => {
+        set((state) => ({
+          phaseModels: {
+            ...state.phaseModels,
+            ...models,
+          },
+        }));
+        // Sync to server settings file
+        const { syncSettingsToServer } = await import('@/hooks/use-settings-migration');
+        await syncSettingsToServer();
+      },
+      resetPhaseModels: async () => {
+        set({ phaseModels: DEFAULT_PHASE_MODELS });
+        // Sync to server settings file
+        const { syncSettingsToServer } = await import('@/hooks/use-settings-migration');
+        await syncSettingsToServer();
+      },
+      toggleFavoriteModel: (modelId) => {
+        const current = get().favoriteModels;
+        if (current.includes(modelId)) {
+          set({ favoriteModels: current.filter((id) => id !== modelId) });
+        } else {
+          set({ favoriteModels: [...current, modelId] });
+        }
+      },
+
+      // Cursor CLI Settings actions
+      setEnabledCursorModels: (models) => set({ enabledCursorModels: models }),
+      setCursorDefaultModel: (model) => set({ cursorDefaultModel: model }),
+      toggleCursorModel: (model, enabled) =>
+        set((state) => ({
+          enabledCursorModels: enabled
+            ? [...state.enabledCursorModels, model]
+            : state.enabledCursorModels.filter((m) => m !== model),
+        })),
 
       // Claude Agent SDK Settings actions
       setAutoLoadClaudeMd: async (enabled) => {
@@ -2916,6 +3003,9 @@ export const useAppStore = create<AppState & AppActions>()(
           muteDoneSound: state.muteDoneSound,
           enhancementModel: state.enhancementModel,
           validationModel: state.validationModel,
+          phaseModels: state.phaseModels,
+          enabledCursorModels: state.enabledCursorModels,
+          cursorDefaultModel: state.cursorDefaultModel,
           autoLoadClaudeMd: state.autoLoadClaudeMd,
           enableSandboxMode: state.enableSandboxMode,
           skipSandboxWarning: state.skipSandboxWarning,

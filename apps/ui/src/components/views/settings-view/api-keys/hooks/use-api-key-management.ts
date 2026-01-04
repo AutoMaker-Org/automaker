@@ -1,5 +1,8 @@
 import { useState, useEffect } from 'react';
+import { createLogger } from '@automaker/utils/logger';
 import { useAppStore } from '@/store/app-store';
+
+const logger = createLogger('ApiKeyManagement');
 import { getElectronAPI } from '@/lib/electron';
 import type { ProviderConfigParams } from '@/config/api-providers';
 
@@ -60,7 +63,7 @@ export function useApiKeyManagement() {
             });
           }
         } catch (error) {
-          console.error('Failed to check API key status:', error);
+          logger.error('Failed to check API key status:', error);
         }
       }
     };
@@ -69,12 +72,22 @@ export function useApiKeyManagement() {
 
   // Test Anthropic/Claude connection
   const handleTestAnthropicConnection = async () => {
+    // Validate input first
+    if (!anthropicKey || anthropicKey.trim().length === 0) {
+      setTestResult({
+        success: false,
+        message: 'Please enter an API key to test.',
+      });
+      return;
+    }
+
     setTestingConnection(true);
     setTestResult(null);
 
     try {
       const api = getElectronAPI();
-      const data = await api.setup.verifyClaudeAuth('api_key');
+      // Pass the current input value to test unsaved keys
+      const data = await api.setup.verifyClaudeAuth('api_key', anthropicKey);
 
       if (data.success && data.authenticated) {
         setTestResult({

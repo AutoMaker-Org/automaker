@@ -1,5 +1,8 @@
 import { Router, Request, Response } from 'express';
 import { ClaudeUsageService } from '../../services/claude-usage-service.js';
+import { createLogger } from '@automaker/utils';
+
+const logger = createLogger('Claude');
 
 export function createClaudeRoutes(service: ClaudeUsageService): Router {
   const router = Router();
@@ -33,7 +36,7 @@ export function createClaudeRoutes(service: ClaudeUsageService): Router {
           message: 'The Claude CLI took too long to respond',
         });
       } else {
-        console.error('Error fetching usage:', error);
+        logger.error('Error fetching usage:', error);
         res.status(500).json({ error: message });
       }
     }

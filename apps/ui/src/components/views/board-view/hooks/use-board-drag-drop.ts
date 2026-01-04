@@ -1,9 +1,12 @@
 import { useState, useCallback } from 'react';
+import { createLogger } from '@automaker/utils/logger';
 import { DragStartEvent, DragEndEvent } from '@dnd-kit/core';
 import { Feature } from '@/store/app-store';
 import { useAppStore } from '@/store/app-store';
 import { toast } from 'sonner';
 import { COLUMNS, ColumnId } from '../constants';
+
+const logger = createLogger('BoardDragDrop');
 
 interface UseBoardDragDropProps {
   features: Feature[];
@@ -63,7 +66,7 @@ export function useBoardDragDrop({
       if (draggedFeature.status === 'in_progress') {
         // Only allow dragging in_progress if it's not currently running
         if (isRunningTask) {
-          console.log('[Board] Cannot drag feature - currently running');
+          logger.debug('Cannot drag feature - currently running');
           return;
         }
       }

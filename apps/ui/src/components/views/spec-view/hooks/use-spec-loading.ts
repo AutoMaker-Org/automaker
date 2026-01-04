@@ -1,5 +1,8 @@
 import { useEffect, useState, useCallback } from 'react';
+import { createLogger } from '@automaker/utils/logger';
 import { useAppStore } from '@/store/app-store';
+
+const logger = createLogger('SpecLoading');
 import { getElectronAPI } from '@/lib/electron';
 
 export function useSpecLoading() {
@@ -24,7 +27,7 @@ export function useSpecLoading() {
         setSpecExists(false);
       }
     } catch (error) {
-      console.error('Failed to load spec:', error);
+      logger.error('Failed to load spec:', error);
       setSpecExists(false);
     } finally {
       setIsLoading(false);

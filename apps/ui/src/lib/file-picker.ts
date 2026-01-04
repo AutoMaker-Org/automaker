@@ -10,6 +10,10 @@
  * user confirmation or server-side path resolution.
  */
 
+import { createLogger } from '@automaker/utils/logger';
+
+const logger = createLogger('FilePicker');
+
 /**
  * Directory picker result with structure information for server-side resolution
  */
@@ -65,18 +69,18 @@ export async function openDirectoryPicker(): Promise<DirectoryPickerResult | nul
         focusTimeout = null;
       }
 
-      console.log('[FilePicker] Change event fired');
+      logger.info('Change event fired');
       const files = input.files;
-      console.log('[FilePicker] Files selected:', files?.length || 0);
+      logger.info('Files selected:', files?.length || 0);
 
       if (!files || files.length === 0) {
-        console.log('[FilePicker] No files selected');
+        logger.info('No files selected');
         safeResolve(null);
         return;
       }
 
       const firstFile = files[0];
-      console.log('[FilePicker] First file:', {
+      logger.info('First file:', {
         name: firstFile.name,
         webkitRelativePath: firstFile.webkitRelativePath,
         // @ts-expect-error - path property is non-standard but available in some browsers
@@ -92,12 +96,12 @@ export async function openDirectoryPicker(): Promise<DirectoryPickerResult | nul
       if (firstFile.path) {
         // @ts-expect-error - path property is non-standard but available in some browsers
         const filePath = firstFile.path as string;
-        console.log('[FilePicker] Found file.path:', filePath);
+        logger.info('Found file.path:', filePath);
         // Extract directory path (remove filename)
         const lastSeparator = Math.max(filePath.lastIndexOf('\\'), filePath.lastIndexOf('/'));
         if (lastSeparator > 0) {
           const absolutePath = filePath.substring(0, lastSeparator);
-          console.log('[FilePicker] Found absolute path:', absolutePath);
+          logger.info('Found absolute path:', absolutePath);
           // Return as directory name for now - server can validate it directly
           directoryName = absolutePath;
         }
@@ -106,11 +110,11 @@ export async function openDirectoryPicker(): Promise<DirectoryPickerResult | nul
       // Method 2: Extract directory name from webkitRelativePath
       if (directoryName === 'Selected Directory' && firstFile.webkitRelativePath) {
         const relativePath = firstFile.webkitRelativePath;
-        console.log('[FilePicker] Using webkitRelativePath:', relativePath);
+        logger.info('Using webkitRelativePath:', relativePath);
         const pathParts = relativePath.split('/');
         if (pathParts.length > 0) {
           directoryName = pathParts[0]; // Top-level directory name
-          console.log('[FilePicker] Extracted directory name:', directoryName);
+          logger.info('Extracted directory name:', directoryName);
         }
       }
 
@@ -127,7 +131,7 @@ export async function openDirectoryPicker(): Promise<DirectoryPickerResult | nul
         }
       }
 
-      console.log('[FilePicker] Directory info:', {
+      logger.info('Directory info:', {
         directoryName,
         fileCount: files.length,
         sampleFiles: sampleFiles.slice(0, 5), // Log first 5
@@ -147,7 +151,7 @@ export async function openDirectoryPicker(): Promise<DirectoryPickerResult | nul
       // Only resolve as canceled if change event hasn't fired after a delay
       focusTimeout = setTimeout(() => {
         if (!resolved && !changeEventFired && (!input.files || input.files.length === 0)) {
-          console.log('[FilePicker] Dialog canceled (no files after focus and no change event)');
+          logger.info('Dialog canceled (no files after focus and no change event)');
           safeResolve(null);
         }
       }, 2000); // Increased timeout for Windows - give it time
@@ -155,19 +159,19 @@ export async function openDirectoryPicker(): Promise<DirectoryPickerResult | nul
 
     // Add to DOM temporarily
     document.body.appendChild(input);
-    console.log('[FilePicker] Opening directory picker...');
+    logger.info('Opening directory picker...');
 
     // Try to show picker programmatically
     if ('showPicker' in HTMLInputElement.prototype) {
       try {
         (input as any).showPicker();
-        console.log('[FilePicker] Using showPicker()');
+        logger.info('Using showPicker()');
       } catch (error) {
-        console.log('[FilePicker] showPicker() failed, using click()', error);
+        logger.info('showPicker() failed, using click()', error);
         input.click();
       }
     } else {
-      console.log('[FilePicker] Using click()');
+      logger.info('Using click()');
       input.click();
     }
 

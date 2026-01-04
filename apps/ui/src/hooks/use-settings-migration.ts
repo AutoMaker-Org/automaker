@@ -18,10 +18,13 @@
  */
 
 import { useEffect, useState, useRef } from 'react';
+import { createLogger } from '@automaker/utils/logger';
 import { getHttpApiClient, waitForApiKeyInit } from '@/lib/http-api-client';
 import { isElectron } from '@/lib/electron';
 import { getItem, removeItem } from '@/lib/storage';
 import { useAppStore } from '@/store/app-store';
+
+const logger = createLogger('SettingsMigration');
 
 /**
  * State returned by useSettingsMigration hook
@@ -109,7 +112,7 @@ export function useSettingsMigration(): MigrationState {
         const status = await api.settings.getStatus();
 
         if (!status.success) {
-          console.error('[Settings Migration] Failed to get status:', status);
+          logger.error('Failed to get status:', status);
           setState({
             checked: true,
             migrated: false,
@@ -120,7 +123,7 @@ export function useSettingsMigration(): MigrationState {
 
         // If settings files already exist, no migration needed
         if (!status.needsMigration) {
-          console.log('[Settings Migration] Settings files exist, no migration needed');
+          logger.info('Settings files exist, no migration needed');
           setState({ checked: true, migrated: false, error: null });
           return;
         }
@@ -128,12 +131,12 @@ export function useSettingsMigration(): MigrationState {
         // Check if we have localStorage data to migrate
         const automakerStorage = getItem('automaker-storage');
         if (!automakerStorage) {
-          console.log('[Settings Migration] No localStorage data to migrate');
+          logger.info('No localStorage data to migrate');
           setState({ checked: true, migrated: false, error: null });
           return;
         }
 
-        console.log('[Settings Migration] Starting migration...');
+        logger.info('Starting migration...');
 
         // Collect all localStorage data
         const localStorageData: Record<string, string> = {};
@@ -148,7 +151,7 @@ export function useSettingsMigration(): MigrationState {
         const result = await api.settings.migrate(localStorageData);
 
         if (result.success) {
-          console.log('[Settings Migration] Migration successful:', {
+          logger.info('Migration successful:', {
             globalSettings: result.migratedGlobalSettings,
             credentials: result.migratedCredentials,
             projects: result.migratedProjectCount,
@@ -161,7 +164,7 @@ export function useSettingsMigration(): MigrationState {
 
           setState({ checked: true, migrated: true, error: null });
         } else {
-          console.warn('[Settings Migration] Migration had errors:', result.errors);
+          logger.warn('Migration had errors:', result.errors);
           setState({
             checked: true,
             migrated: false,
@@ -169,7 +172,7 @@ export function useSettingsMigration(): MigrationState {
           });
         }
       } catch (error) {
-        console.error('[Settings Migration] Migration failed:', error);
+        logger.error('Migration failed:', error);
         setState({
           checked: true,
           migrated: false,
@@ -224,6 +227,7 @@ export async function syncSettingsToServer(): Promise<boolean> {
       muteDoneSound: state.muteDoneSound,
       enhancementModel: state.enhancementModel,
       validationModel: state.validationModel,
+      phaseModels: state.phaseModels,
       autoLoadClaudeMd: state.autoLoadClaudeMd,
       enableSandboxMode: state.enableSandboxMode,
       skipSandboxWarning: state.skipSandboxWarning,
@@ -241,7 +245,7 @@ export async function syncSettingsToServer(): Promise<boolean> {
     const result = await api.settings.updateGlobal(updates);
     return result.success;
   } catch (error) {
-    console.error('[Settings Sync] Failed to sync settings:', error);
+    logger.error('Failed to sync settings:', error);
     return false;
   }
 }
@@ -268,7 +272,7 @@ export async function syncCredentialsToServer(apiKeys: {
     const result = await api.settings.updateCredentials({ apiKeys });
     return result.success;
   } catch (error) {
-    console.error('[Settings Sync] Failed to sync credentials:', error);
+    logger.error('Failed to sync credentials:', error);
     return false;
   }
 }
@@ -309,7 +313,7 @@ export async function syncProjectSettingsToServer(
     const result = await api.settings.updateProject(projectPath, updates);
     return result.success;
   } catch (error) {
-    console.error('[Settings Sync] Failed to sync project settings:', error);
+    logger.error('Failed to sync project settings:', error);
     return false;
   }
 }
@@ -329,7 +333,7 @@ export async function loadMCPServersFromServer(): Promise<boolean> {
     const result = await api.settings.getGlobal();
 
     if (!result.success || !result.settings) {
-      console.error('[Settings Load] Failed to load settings:', result.error);
+      logger.error('Failed to load settings:', result.error);
       return false;
     }
 
@@ -339,10 +343,10 @@ export async function loadMCPServersFromServer(): Promise<boolean> {
     // We need to update the store directly since we can't use hooks here
     useAppStore.setState({ mcpServers });
 
-    console.log(`[Settings Load] Loaded ${mcpServers.length} MCP servers from server`);
+    logger.info(`Loaded ${mcpServers.length} MCP servers from server`);
     return true;
   } catch (error) {
-    console.error('[Settings Load] Failed to load MCP servers:', error);
+    logger.error('Failed to load MCP servers:', error);
     return false;
   }
 }
