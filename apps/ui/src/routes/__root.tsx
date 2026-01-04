@@ -22,6 +22,8 @@ import { Toaster } from 'sonner';
 import { ThemeOption, themeOptions } from '@/config/theme-options';
 import { SandboxRiskDialog } from '@/components/dialogs/sandbox-risk-dialog';
 import { SandboxRejectionScreen } from '@/components/dialogs/sandbox-rejection-screen';
+import { useStoreHydration, useProjectRestoration, useProjectPathValidation } from '@/hooks';
+import { ProjectPathValidationDialog } from '@/components/dialogs/project-path-validation-dialog';
 
 function RootLayoutContent() {
   const location = useLocation();
@@ -36,12 +38,21 @@ function RootLayoutContent() {
   const navigate = useNavigate();
   const [isMounted, setIsMounted] = useState(false);
   const [streamerPanelOpen, setStreamerPanelOpen] = useState(false);
-  const [setupHydrated, setSetupHydrated] = useState(
-    () => useSetupStore.persist?.hasHydrated?.() ?? false
-  );
+  const appHydrated = useStoreHydration(useAppStore);
+  const setupHydrated = useStoreHydration(useSetupStore);
   const authChecked = useAuthStore((s) => s.authChecked);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const { openFileBrowser } = useFileBrowser();
+
+  const {
+    validationDialogOpen,
+    setValidationDialogOpen,
+    invalidProject,
+    showValidationDialog,
+    handleRefreshPath,
+    handleRemoveProject,
+    handleDismiss,
+  } = useProjectPathValidation();
 
   const isSetupRoute = location.pathname === '/setup';
   const isLoginRoute = location.pathname === '/login';
@@ -213,24 +224,6 @@ function RootLayoutContent() {
     initAuth();
   }, []); // Runs once per load; auth state drives routing rules
 
-  // Wait for setup store hydration before enforcing routing rules
-  useEffect(() => {
-    if (useSetupStore.persist?.hasHydrated?.()) {
-      setSetupHydrated(true);
-      return;
-    }
-
-    const unsubscribe = useSetupStore.persist?.onFinishHydration?.(() => {
-      setSetupHydrated(true);
-    });
-
-    return () => {
-      if (typeof unsubscribe === 'function') {
-        unsubscribe();
-      }
-    };
-  }, []);
-
   // Routing rules (web mode):
   // - If not authenticated: force /login (even /setup is protected)
   // - If authenticated but setup incomplete: force /setup
@@ -290,12 +283,16 @@ function RootLayoutContent() {
     testConnection();
   }, [setIpcConnected]);
 
-  // Restore to board view if a project was previously open
-  useEffect(() => {
-    if (isMounted && currentProject && location.pathname === '/') {
-      navigate({ to: '/board' });
-    }
-  }, [isMounted, currentProject, location.pathname, navigate]);
+  // Restore to board view if a project was previously open (with path validation)
+  useProjectRestoration({
+    isMounted,
+    currentProject,
+    currentPathname: location.pathname,
+    isAuthenticated,
+    authChecked,
+    appHydrated,
+    onShowValidationDialog: showValidationDialog,
+  });
 
   // Apply theme class to document - use deferred value to avoid blocking UI
   useEffect(() => {
@@ -411,6 +408,15 @@ function RootLayoutContent() {
         open={sandboxStatus === 'needs-confirmation'}
         onConfirm={handleSandboxConfirm}
         onDeny={handleSandboxDeny}
+      />
+
+      <ProjectPathValidationDialog
+        open={validationDialogOpen}
+        onOpenChange={setValidationDialogOpen}
+        project={invalidProject}
+        onRefreshPath={handleRefreshPath}
+        onRemoveProject={handleRemoveProject}
+        onDismiss={handleDismiss}
       />
     </main>
   );

@@ -33,6 +33,10 @@ import { SortableProjectItem, ThemeMenuItem } from './';
 import { PROJECT_DARK_THEMES, PROJECT_LIGHT_THEMES } from '../constants';
 import { useProjectPicker, useDragAndDrop, useProjectTheme } from '../hooks';
 import { useKeyboardShortcutsConfig } from '@/hooks/use-keyboard-shortcuts';
+import { useValidatedProjectCycling } from '@/hooks/use-validated-project-cycling';
+import { useProjectPathValidation } from '@/hooks/use-project-path-validation';
+import { validateProjectPath } from '@/lib/validate-project-path';
+import { ProjectPathValidationDialog } from '@/components/dialogs/project-path-validation-dialog';
 
 interface ProjectSelectorWithOptionsProps {
   sidebarOpen: boolean;
@@ -53,12 +57,22 @@ export function ProjectSelectorWithOptions({
     projectHistory,
     setCurrentProject,
     reorderProjects,
-    cyclePrevProject,
-    cycleNextProject,
     clearProjectHistory,
   } = useAppStore();
 
   const shortcuts = useKeyboardShortcutsConfig();
+
+  const {
+    validationDialogOpen,
+    setValidationDialogOpen,
+    invalidProject,
+    showValidationDialog,
+    handleRefreshPath,
+    handleRemoveProject,
+  } = useProjectPathValidation({ navigateOnRefresh: true });
+
+  // Validated project cycling (automatically skips invalid paths)
+  const { cyclePrevProject, cycleNextProject } = useValidatedProjectCycling();
   const {
     projectSearchQuery,
     setProjectSearchQuery,
@@ -182,9 +196,17 @@ export function ProjectSelectorWithOptions({
                       project={project}
                       currentProjectId={currentProject?.id}
                       isHighlighted={index === selectedProjectIndex}
-                      onSelect={(p) => {
-                        setCurrentProject(p);
+                      onSelect={async (p) => {
                         setIsProjectPickerOpen(false);
+
+                        // Validate path before switching
+                        const isValid = await validateProjectPath(p);
+
+                        if (!isValid) {
+                          showValidationDialog(p);
+                        } else {
+                          setCurrentProject(p);
+                        }
                       }}
                     />
                   ))}
@@ -367,6 +389,14 @@ export function ProjectSelectorWithOptions({
           </DropdownMenuContent>
         </DropdownMenu>
       )}
+
+      <ProjectPathValidationDialog
+        open={validationDialogOpen}
+        onOpenChange={setValidationDialogOpen}
+        project={invalidProject}
+        onRefreshPath={handleRefreshPath}
+        onRemoveProject={handleRemoveProject}
+      />
     </div>
   );
 }

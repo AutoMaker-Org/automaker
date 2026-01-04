@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from '@tanstack/react-router';
 import { cn } from '@/lib/utils';
 import { useAppStore, type ThemeMode } from '@/store/app-store';
 import { useKeyboardShortcuts, useKeyboardShortcutsConfig } from '@/hooks/use-keyboard-shortcuts';
+import { useValidatedProjectCycling } from '@/hooks/use-validated-project-cycling';
 import { getElectronAPI } from '@/lib/electron';
 import { initializeProject, hasAppSpec, hasAutomakerDir } from '@/lib/project-init';
 import { toast } from 'sonner';
@@ -48,8 +49,6 @@ export function Sidebar() {
     restoreTrashedProject,
     deleteTrashedProject,
     emptyTrash,
-    cyclePrevProject,
-    cycleNextProject,
     moveProjectToTrash,
     specCreatingForProject,
     setSpecCreatingForProject,
@@ -70,6 +69,9 @@ export function Sidebar() {
 
   // State for trash dialog
   const [showTrashDialog, setShowTrashDialog] = useState(false);
+
+  // Validated project cycling (automatically skips invalid paths)
+  const { cyclePrevProject, cycleNextProject } = useValidatedProjectCycling();
 
   // Project theme management (must come before useProjectCreation which uses globalTheme)
   const { globalTheme } = useProjectTheme();
@@ -145,6 +147,7 @@ export function Sidebar() {
     restoreTrashedProject,
     deleteTrashedProject,
     emptyTrash,
+    trashedProjects,
   });
 
   // Spec regeneration events

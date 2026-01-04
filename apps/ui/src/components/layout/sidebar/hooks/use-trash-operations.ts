@@ -1,24 +1,43 @@
 import { useState, useCallback } from 'react';
 import { toast } from 'sonner';
 import { getElectronAPI, type TrashedProject } from '@/lib/electron';
+import { validateProjectPath } from '@/lib/validate-project-path';
 
 interface UseTrashOperationsProps {
   restoreTrashedProject: (projectId: string) => void;
   deleteTrashedProject: (projectId: string) => void;
   emptyTrash: () => void;
+  trashedProjects: TrashedProject[];
 }
 
 export function useTrashOperations({
   restoreTrashedProject,
   deleteTrashedProject,
   emptyTrash,
+  trashedProjects,
 }: UseTrashOperationsProps) {
   const [activeTrashId, setActiveTrashId] = useState<string | null>(null);
   const [isEmptyingTrash, setIsEmptyingTrash] = useState(false);
 
   const handleRestoreProject = useCallback(
-    (projectId: string) => {
+    async (projectId: string) => {
       try {
+        const project = trashedProjects.find((p) => p.id === projectId);
+        if (!project) {
+          toast.error('Project not found');
+          return;
+        }
+
+        // Validate project path before restoring
+        const isValid = await validateProjectPath(project);
+        if (!isValid) {
+          toast.error('Project path not found', {
+            description:
+              'The project directory no longer exists. Remove it from the recycle bin and re-add the project from its new location.',
+          });
+          return;
+        }
+
         restoreTrashedProject(projectId);
         toast.success('Project restored', {
           description: 'Added back to your project list.',
@@ -30,7 +49,7 @@ export function useTrashOperations({
         });
       }
     },
-    [restoreTrashedProject]
+    [restoreTrashedProject, trashedProjects]
   );
 
   const handleDeleteProjectFromDisk = useCallback(
