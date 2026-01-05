@@ -61,7 +61,7 @@ export function BoardHeader({
         {/* Concurrency Slider - only show after mount to prevent hydration issues */}
         {isMounted && (
           <div
-            className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-secondary border border-border"
+            className="flex items-center gap-1.5 px-3 h-8 rounded-md bg-secondary border border-border"
             data-testid="concurrency-slider-container"
           >
             <Bot className="w-4 h-4 text-muted-foreground" />
@@ -86,7 +86,7 @@ export function BoardHeader({
 
         {/* Auto Mode Toggle - only show after mount to prevent hydration issues */}
         {isMounted && (
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-secondary border border-border">
+          <div className="flex items-center gap-1.5 px-3 h-8 rounded-md bg-secondary border border-border">
             <Label htmlFor="auto-mode-toggle" className="text-sm font-medium cursor-pointer">
               Auto Mode
             </Label>
