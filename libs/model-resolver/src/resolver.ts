@@ -17,7 +17,19 @@ import {
   stripProviderPrefix,
   type PhaseModelEntry,
   type ThinkingLevel,
+  type ModelAlias,
 } from '@automaker/types';
+
+const MODEL_ENV_VAR_PREFIX = 'ANTHROPIC_MODEL_';
+
+function getEnvModelOverride(alias: ModelAlias): string | undefined {
+  const envKey = `${MODEL_ENV_VAR_PREFIX}${alias.toUpperCase()}`;
+  return process.env[envKey] || undefined;
+}
+
+function getDefaultModelOverride(): string | undefined {
+  return process.env[`${MODEL_ENV_VAR_PREFIX}DEFAULT`] || undefined;
+}
 
 /**
  * Resolve a model key/alias to a full model string
@@ -30,14 +42,15 @@ export function resolveModelString(
   modelKey?: string,
   defaultModel: string = DEFAULT_MODELS.claude
 ): string {
+  const effectiveDefault = getDefaultModelOverride() || defaultModel;
+
   console.log(
-    `[ModelResolver] resolveModelString called with modelKey: "${modelKey}", defaultModel: "${defaultModel}"`
+    `[ModelResolver] resolveModelString called with modelKey: "${modelKey}", defaultModel: "${effectiveDefault}"`
   );
 
-  // No model specified - use default
   if (!modelKey) {
-    console.log(`[ModelResolver] No model specified, using default: ${defaultModel}`);
-    return defaultModel;
+    console.log(`[ModelResolver] No model specified, using default: ${effectiveDefault}`);
+    return effectiveDefault;
   }
 
   // Cursor model with explicit prefix (e.g., "cursor-composer-1") - pass through unchanged
@@ -75,13 +88,20 @@ export function resolveModelString(
   // Look up Claude model alias
   const resolved = CLAUDE_MODEL_MAP[modelKey];
   if (resolved) {
+    const envOverride = getEnvModelOverride(modelKey as ModelAlias);
+    if (envOverride) {
+      console.log(`[ModelResolver] Env override for alias "${modelKey}": "${envOverride}"`);
+      return envOverride;
+    }
     console.log(`[ModelResolver] Resolved Claude model alias: "${modelKey}" -> "${resolved}"`);
     return resolved;
   }
 
-  // Unknown model key - use default
-  console.warn(`[ModelResolver] Unknown model key "${modelKey}", using default: "${defaultModel}"`);
-  return defaultModel;
+  // Unknown model key - use effective default
+  console.warn(
+    `[ModelResolver] Unknown model key "${modelKey}", using default: "${effectiveDefault}"`
+  );
+  return effectiveDefault;
 }
 
 /**

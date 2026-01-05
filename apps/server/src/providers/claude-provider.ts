@@ -22,6 +22,7 @@ import type {
 // Only these vars are passed - nothing else from process.env leaks through.
 const ALLOWED_ENV_VARS = [
   'ANTHROPIC_API_KEY',
+  'ANTHROPIC_BASE_URL',
   'PATH',
   'HOME',
   'SHELL',
@@ -70,7 +71,7 @@ export class ClaudeProvider extends BaseProvider {
     const maxThinkingTokens = getThinkingTokenBudget(thinkingLevel);
 
     // Build Claude SDK options
-    // AUTONOMOUS MODE: Always bypass permissions for fully autonomous operation
+    const baseUrl = this.config.baseUrl || process.env.ANTHROPIC_BASE_URL;
     const hasMcpServers = options.mcpServers && Object.keys(options.mcpServers).length > 0;
     const defaultTools = ['Read', 'Write', 'Edit', 'Glob', 'Grep', 'Bash', 'WebSearch', 'WebFetch'];
 
@@ -104,6 +105,7 @@ export class ClaudeProvider extends BaseProvider {
       ...(options.mcpServers && { mcpServers: options.mcpServers }),
       // Extended thinking configuration
       ...(maxThinkingTokens && { maxThinkingTokens }),
+      ...(baseUrl && { baseUrl }),
     };
 
     // Build prompt payload

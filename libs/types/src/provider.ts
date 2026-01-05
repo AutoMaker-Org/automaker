@@ -10,6 +10,7 @@ import type { ThinkingLevel } from './settings.js';
 export interface ProviderConfig {
   apiKey?: string;
   cliPath?: string;
+  baseUrl?: string;
   env?: Record<string, string>;
 }
 

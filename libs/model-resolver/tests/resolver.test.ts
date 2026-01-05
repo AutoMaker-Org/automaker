@@ -19,6 +19,10 @@ describe('model-resolver', () => {
   afterEach(() => {
     consoleLogSpy.mockRestore();
     consoleWarnSpy.mockRestore();
+    delete process.env.ANTHROPIC_MODEL_HAIKU;
+    delete process.env.ANTHROPIC_MODEL_SONNET;
+    delete process.env.ANTHROPIC_MODEL_OPUS;
+    delete process.env.ANTHROPIC_MODEL_DEFAULT;
   });
 
   describe('resolveModelString', () => {
@@ -356,6 +360,88 @@ describe('model-resolver', () => {
       expect(result).toBe(DEFAULT_MODELS.claude);
       expect(DEFAULT_MODELS.claude).toBeDefined();
       expect(DEFAULT_MODELS.claude).toContain('claude-');
+    });
+  });
+
+  describe('environment variable overrides', () => {
+    describe('ANTHROPIC_MODEL_DEFAULT', () => {
+      it('should override default model when no model specified', () => {
+        process.env.ANTHROPIC_MODEL_DEFAULT = 'proxy/claude-default';
+        const result = resolveModelString(undefined);
+        expect(result).toBe('proxy/claude-default');
+      });
+
+      it('should override default model for unknown aliases', () => {
+        process.env.ANTHROPIC_MODEL_DEFAULT = 'proxy/claude-fallback';
+        const result = resolveModelString('unknown-model');
+        expect(result).toBe('proxy/claude-fallback');
+      });
+
+      it('should not affect known aliases without their own override', () => {
+        process.env.ANTHROPIC_MODEL_DEFAULT = 'proxy/claude-default';
+        const result = resolveModelString('sonnet');
+        expect(result).toBe(CLAUDE_MODEL_MAP.sonnet);
+      });
+    });
+
+    describe('ANTHROPIC_MODEL_{ALIAS}', () => {
+      it('should override haiku alias', () => {
+        process.env.ANTHROPIC_MODEL_HAIKU = 'proxy/claude-haiku';
+        const result = resolveModelString('haiku');
+        expect(result).toBe('proxy/claude-haiku');
+      });
+
+      it('should override sonnet alias', () => {
+        process.env.ANTHROPIC_MODEL_SONNET = 'proxy/claude-sonnet';
+        const result = resolveModelString('sonnet');
+        expect(result).toBe('proxy/claude-sonnet');
+      });
+
+      it('should override opus alias', () => {
+        process.env.ANTHROPIC_MODEL_OPUS = 'proxy/claude-opus';
+        const result = resolveModelString('opus');
+        expect(result).toBe('proxy/claude-opus');
+      });
+
+      it('should not override full claude model strings', () => {
+        process.env.ANTHROPIC_MODEL_SONNET = 'proxy/claude-sonnet';
+        const result = resolveModelString('claude-sonnet-4-20250514');
+        expect(result).toBe('claude-sonnet-4-20250514');
+      });
+
+      it('should not create new aliases from env vars', () => {
+        process.env.ANTHROPIC_MODEL_CUSTOM = 'proxy/claude-custom';
+        const result = resolveModelString('custom');
+        expect(result).toBe(DEFAULT_MODELS.claude);
+      });
+    });
+
+    describe('combined overrides', () => {
+      it('should allow overriding all aliases and default', () => {
+        process.env.ANTHROPIC_MODEL_HAIKU = 'proxy/haiku';
+        process.env.ANTHROPIC_MODEL_SONNET = 'proxy/sonnet';
+        process.env.ANTHROPIC_MODEL_OPUS = 'proxy/opus';
+        process.env.ANTHROPIC_MODEL_DEFAULT = 'proxy/default';
+
+        expect(resolveModelString('haiku')).toBe('proxy/haiku');
+        expect(resolveModelString('sonnet')).toBe('proxy/sonnet');
+        expect(resolveModelString('opus')).toBe('proxy/opus');
+        expect(resolveModelString(undefined)).toBe('proxy/default');
+        expect(resolveModelString('unknown')).toBe('proxy/default');
+      });
+
+      it('should work with getEffectiveModel', () => {
+        process.env.ANTHROPIC_MODEL_OPUS = 'proxy/opus';
+        const result = getEffectiveModel('opus', 'sonnet');
+        expect(result).toBe('proxy/opus');
+      });
+
+      it('should work with resolvePhaseModel', () => {
+        process.env.ANTHROPIC_MODEL_SONNET = 'proxy/sonnet';
+        const result = resolvePhaseModel({ model: 'sonnet', thinkingLevel: 'high' });
+        expect(result.model).toBe('proxy/sonnet');
+        expect(result.thinkingLevel).toBe('high');
+      });
     });
   });
 
