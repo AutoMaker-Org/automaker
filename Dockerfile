@@ -54,7 +54,7 @@ RUN npm run build:packages && npm run build --workspace=apps/server
 FROM node:22-alpine AS server
 
 # Install git, curl, bash (for terminal), su-exec (for user switching), and GitHub CLI (pinned version, multi-arch)
-RUN apk add --no-cache git curl bash su-exec && \
+RUN apk add --no-cache git curl bash su-exec openssh-client && \
     GH_VERSION="2.63.2" && \
     ARCH=$(uname -m) && \
     case "$ARCH" in \
