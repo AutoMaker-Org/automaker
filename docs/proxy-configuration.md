@@ -1,15 +1,15 @@
 # Proxy Configuration
 
-AutoMaker supports custom API endpoints and model mapping via environment variables. This enables integration with API proxies like LiteLLM, OpenRouter, or custom endpoints.
+AutoMaker supports custom API endpoints via environment variables. This enables integration with API proxies for credential injection, request logging, or routing through corporate infrastructure.
 
 ## Environment Variables
 
 ### Base URL
 
-| Variable             | Description                |
-| -------------------- | -------------------------- |
-| `ANTHROPIC_BASE_URL` | Custom API endpoint URL    |
-| `ANTHROPIC_API_KEY`  | API key for authentication |
+| Variable             | Description                                             |
+| -------------------- | ------------------------------------------------------- |
+| `ANTHROPIC_BASE_URL` | Custom API endpoint URL (proxy receives plaintext HTTP) |
+| `ANTHROPIC_API_KEY`  | API key for authentication                              |
 
 ### Model Mapping
 
@@ -20,44 +20,74 @@ AutoMaker supports custom API endpoints and model mapping via environment variab
 | `ANTHROPIC_MODEL_OPUS`    | Override the `opus` alias   |
 | `ANTHROPIC_MODEL_DEFAULT` | Override the fallback model |
 
+## How It Works
+
+Claude Code and the Agent SDK support `ANTHROPIC_BASE_URL` for routing sampling requests through a proxy. Your proxy receives **plaintext HTTP requests**, can inspect and modify them (including injecting credentials), then forwards to the real Anthropic API.
+
+```
+Your Application
+     ↓
+AutoMaker Server
+     ↓
+Claude Agent SDK (passes ANTHROPIC_BASE_URL in env)
+     ↓
+Claude Code CLI
+     ↓
+HTTP Request → Your Proxy (ANTHROPIC_BASE_URL)
+     ↓
+Anthropic API
+```
+
 ## Configuration Examples
+
+### Credential-Injecting Proxy
+
+```bash
+# Proxy that adds API key automatically
+export ANTHROPIC_BASE_URL=http://localhost:8080
+# ANTHROPIC_API_KEY can be omitted if proxy injects it
+```
 
 ### LiteLLM Proxy
 
 ```bash
-ANTHROPIC_BASE_URL=http://localhost:4000
-ANTHROPIC_API_KEY=your-litellm-key
+export ANTHROPIC_BASE_URL=http://localhost:4000
+export ANTHROPIC_API_KEY=your-litellm-key
 
-ANTHROPIC_MODEL_HAIKU=litellm/claude-haiku
-ANTHROPIC_MODEL_SONNET=litellm/claude-sonnet
-ANTHROPIC_MODEL_OPUS=litellm/claude-opus
-ANTHROPIC_MODEL_DEFAULT=litellm/claude-sonnet
+# Model mapping (if your proxy uses different model names)
+export ANTHROPIC_MODEL_HAIKU=litellm/claude-haiku
+export ANTHROPIC_MODEL_SONNET=litellm/claude-sonnet
+export ANTHROPIC_MODEL_OPUS=litellm/claude-opus
 ```
 
-### OpenRouter
+### Corporate Proxy with Logging
 
 ```bash
-ANTHROPIC_BASE_URL=https://openrouter.ai/api/v1
-ANTHROPIC_API_KEY=your-openrouter-key
-
-ANTHROPIC_MODEL_HAIKU=anthropic/claude-3-haiku
-ANTHROPIC_MODEL_SONNET=anthropic/claude-3.5-sonnet
-ANTHROPIC_MODEL_OPUS=anthropic/claude-3-opus
-ANTHROPIC_MODEL_DEFAULT=anthropic/claude-3.5-sonnet
+# Route through corporate proxy for audit logging
+export ANTHROPIC_BASE_URL=https://ai-proxy.internal.company.com/anthropic
+export ANTHROPIC_API_KEY=internal-service-key
 ```
 
-### Custom Proxy (ProxyPal Example)
+## Supported Cloud Providers
+
+The Claude Agent SDK also supports these third-party cloud providers natively:
+
+| Provider          | Environment Variable        | Documentation                                                           |
+| ----------------- | --------------------------- | ----------------------------------------------------------------------- |
+| Amazon Bedrock    | `CLAUDE_CODE_USE_BEDROCK=1` | [Bedrock Setup](https://docs.anthropic.com/en/docs/claude-code/bedrock) |
+| Google Vertex AI  | `CLAUDE_CODE_USE_VERTEX=1`  | [Vertex Setup](https://docs.anthropic.com/en/docs/claude-code/vertex)   |
+| Microsoft Foundry | `CLAUDE_CODE_USE_FOUNDRY=1` | [Foundry Setup](https://docs.anthropic.com/en/docs/claude-code/foundry) |
+
+### Example: Amazon Bedrock
 
 ```bash
-ANTHROPIC_BASE_URL=http://localhost:8317/v1
-ANTHROPIC_API_KEY=proxypal-local
-
-ANTHROPIC_MODEL_SONNET=gemini-claude-sonnet-4-5
-ANTHROPIC_MODEL_OPUS=gemini-claude-opus-4-5-thinking
-ANTHROPIC_MODEL_DEFAULT=gemini-claude-sonnet-4-5
+export CLAUDE_CODE_USE_BEDROCK=1
+export AWS_REGION=us-east-1
+export AWS_ACCESS_KEY_ID=your-access-key
+export AWS_SECRET_ACCESS_KEY=your-secret-key
 ```
 
-## How It Works
+## Model Resolution
 
 ### Resolution Priority
 
@@ -78,19 +108,6 @@ NO  → Use hardcoded mapping (e.g., "claude-sonnet-4-5-20250929")
 API receives: final model string
 ```
 
-### Default Model Override
-
-When no model is specified or an unknown alias is used:
-
-```
-User specifies: undefined or "unknown-alias"
-     ↓
-Check: ANTHROPIC_MODEL_DEFAULT env var set?
-     ↓
-YES → Use env var value
-NO  → Use system default (claude-opus-4-5-20251101)
-```
-
 ## Provider Configuration
 
 You can also set the base URL programmatically via `ProviderConfig`:
@@ -108,33 +125,44 @@ Priority: `config.baseUrl` > `ANTHROPIC_BASE_URL` env var
 
 ## Limitations
 
-- Only known aliases (`haiku`, `sonnet`, `opus`) support env var overrides
-- Cannot add new aliases via environment variables
-- Full model IDs are not overridable (passed through as-is)
-- Cursor models are not affected by these overrides
+- Model mapping only applies to known aliases (`haiku`, `sonnet`, `opus`)
+- Full model IDs are passed through unchanged
+- Your proxy must forward requests to the Anthropic API (or be API-compatible)
+- Extended thinking and other Claude-specific features require Anthropic API compatibility
 
 ## Troubleshooting
 
 ### Verify Your Proxy
 
 ```bash
-curl -s http://localhost:8317/v1/models \
-  -H "Authorization: Bearer your-api-key"
+# Test proxy connectivity
+curl -s http://localhost:8080/v1/messages \
+  -H "Authorization: Bearer test" \
+  -H "Content-Type: application/json" \
+  -d '{"model": "claude-sonnet-4-5", "max_tokens": 10, "messages": [{"role": "user", "content": "Hi"}]}'
 ```
 
-### Check Model Resolution
-
-Enable debug logging to see model resolution:
+### Check Environment Variables
 
 ```bash
-# Model resolver logs to console
-# Look for "[ModelResolver]" prefixed messages
+# Verify env vars are set
+echo $ANTHROPIC_BASE_URL
+echo $ANTHROPIC_API_KEY
 ```
 
 ### Common Issues
 
 | Issue                 | Solution                                             |
 | --------------------- | ---------------------------------------------------- |
-| Model not found       | Verify model ID matches proxy's available models     |
-| Authentication failed | Check `ANTHROPIC_API_KEY` matches proxy requirements |
 | Connection refused    | Verify `ANTHROPIC_BASE_URL` is accessible            |
+| Authentication failed | Check `ANTHROPIC_API_KEY` or proxy credentials       |
+| Model not found       | Verify model ID matches Anthropic's supported models |
+| Timeout errors        | Check proxy latency and timeout settings             |
+
+### Debug Logging
+
+Model resolution logs are prefixed with `[ModelResolver]`:
+
+```
+[ModelResolver] Env override for alias "sonnet": "custom-model-name"
+```

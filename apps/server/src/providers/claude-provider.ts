@@ -32,22 +32,25 @@ const ALLOWED_ENV_VARS = [
   'LC_ALL',
 ];
 
-/**
- * Build environment for the SDK with only explicitly allowed variables
- */
-function buildEnv(): Record<string, string | undefined> {
-  const env: Record<string, string | undefined> = {};
-  for (const key of ALLOWED_ENV_VARS) {
-    if (process.env[key]) {
-      env[key] = process.env[key];
-    }
-  }
-  return env;
-}
-
 export class ClaudeProvider extends BaseProvider {
   getName(): string {
     return 'claude';
+  }
+
+  private buildEnv(): Record<string, string | undefined> {
+    const env: Record<string, string | undefined> = {};
+    for (const key of ALLOWED_ENV_VARS) {
+      if (process.env[key]) {
+        env[key] = process.env[key];
+      }
+    }
+    if (this.config.baseUrl && !env['ANTHROPIC_BASE_URL']) {
+      env['ANTHROPIC_BASE_URL'] = this.config.baseUrl;
+    }
+    if (this.config.apiKey && !env['ANTHROPIC_API_KEY']) {
+      env['ANTHROPIC_API_KEY'] = this.config.apiKey;
+    }
+    return env;
   }
 
   /**
@@ -71,7 +74,6 @@ export class ClaudeProvider extends BaseProvider {
     const maxThinkingTokens = getThinkingTokenBudget(thinkingLevel);
 
     // Build Claude SDK options
-    const baseUrl = this.config.baseUrl || process.env.ANTHROPIC_BASE_URL;
     const hasMcpServers = options.mcpServers && Object.keys(options.mcpServers).length > 0;
     const defaultTools = ['Read', 'Write', 'Edit', 'Glob', 'Grep', 'Bash', 'WebSearch', 'WebFetch'];
 
@@ -85,7 +87,7 @@ export class ClaudeProvider extends BaseProvider {
       maxTurns,
       cwd,
       // Pass only explicitly allowed environment variables to SDK
-      env: buildEnv(),
+      env: this.buildEnv(),
       // Only restrict tools if explicitly set OR (no MCP / unrestricted disabled)
       ...(allowedTools && shouldRestrictTools && { allowedTools }),
       ...(!allowedTools && shouldRestrictTools && { allowedTools: defaultTools }),
@@ -105,7 +107,6 @@ export class ClaudeProvider extends BaseProvider {
       ...(options.mcpServers && { mcpServers: options.mcpServers }),
       // Extended thinking configuration
       ...(maxThinkingTokens && { maxThinkingTokens }),
-      ...(baseUrl && { baseUrl }),
     };
 
     // Build prompt payload
