@@ -779,13 +779,15 @@ export async function setupMockProjectWithProfiles(
   options?: {
     customProfilesCount?: number;
     includeBuiltIn?: boolean;
+    /** Real filesystem path for the project (required to pass path validation) */
+    projectPath?: string;
   }
 ): Promise<void> {
   await page.addInitScript((opts: typeof options) => {
     const mockProject = {
       id: 'test-project-1',
       name: 'Test Project',
-      path: '/mock/test-project',
+      path: opts?.projectPath || '/mock/test-project',
       lastOpened: new Date().toISOString(),
     };
 
