@@ -72,7 +72,17 @@ export class ClaudeProvider extends BaseProvider {
     // Build Claude SDK options
     // AUTONOMOUS MODE: Always bypass permissions for fully autonomous operation
     const hasMcpServers = options.mcpServers && Object.keys(options.mcpServers).length > 0;
-    const defaultTools = ['Read', 'Write', 'Edit', 'Glob', 'Grep', 'Bash', 'WebSearch', 'WebFetch'];
+    const defaultTools = [
+      'Read',
+      'Write',
+      'Edit',
+      'Glob',
+      'Grep',
+      'Bash',
+      'WebSearch',
+      'WebFetch',
+      'Skill',
+    ];
 
     // AUTONOMOUS MODE: Always bypass permissions and allow unrestricted tools
     // Only restrict tools when no MCP servers are configured
@@ -104,6 +114,8 @@ export class ClaudeProvider extends BaseProvider {
       ...(options.mcpServers && { mcpServers: options.mcpServers }),
       // Extended thinking configuration
       ...(maxThinkingTokens && { maxThinkingTokens }),
+      // Subagents configuration for specialized task delegation
+      ...(options.agents && { agents: options.agents }),
     };
 
     // Build prompt payload

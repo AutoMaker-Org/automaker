@@ -17,6 +17,7 @@ export type {
   McpStdioServerConfig,
   McpSSEServerConfig,
   McpHttpServerConfig,
+  AgentDefinition,
 } from './provider.js';
 
 // Feature types

@@ -269,3 +269,60 @@ export async function getPromptCustomization(
     enhancement: mergeEnhancementPrompts(customization.enhancement),
   };
 }
+
+/**
+ * Get Skills configuration from settings.
+ * Returns configuration for enabling skills and which sources to load from.
+ *
+ * @param settingsService - Settings service instance
+ * @returns Skills configuration with enabled state, sources, and tool inclusion flag
+ */
+export async function getSkillsConfiguration(settingsService: SettingsService): Promise<{
+  enabled: boolean;
+  sources: Array<'user' | 'project'>;
+  shouldIncludeInTools: boolean;
+}> {
+  const settings = await settingsService.getGlobalSettings();
+  const enabled = settings.enableSkills ?? true; // Default enabled
+  const sources = settings.skillsSources ?? ['user', 'project']; // Default both sources
+
+  return {
+    enabled,
+    sources,
+    shouldIncludeInTools: enabled && sources.length > 0,
+  };
+}
+
+/**
+ * Get custom subagents from settings, merging global and project-level definitions.
+ * Project-level subagents take precedence over global ones with the same name.
+ *
+ * @param settingsService - Settings service instance
+ * @param projectPath - Path to the project for loading project-specific subagents
+ * @returns Record of agent names to definitions, or undefined if none configured
+ */
+export async function getCustomSubagents(
+  settingsService: SettingsService,
+  projectPath?: string
+): Promise<Record<string, import('@automaker/types').AgentDefinition> | undefined> {
+  // Get global subagents
+  const globalSettings = await settingsService.getGlobalSettings();
+  const globalSubagents = globalSettings.customSubagents || {};
+
+  // If no project path, return only global subagents
+  if (!projectPath) {
+    return Object.keys(globalSubagents).length > 0 ? globalSubagents : undefined;
+  }
+
+  // Get project-specific subagents
+  const projectSettings = await settingsService.getProjectSettings(projectPath);
+  const projectSubagents = projectSettings.customSubagents || {};
+
+  // Merge: project-level takes precedence
+  const merged = {
+    ...globalSubagents,
+    ...projectSubagents,
+  };
+
+  return Object.keys(merged).length > 0 ? merged : undefined;
+}

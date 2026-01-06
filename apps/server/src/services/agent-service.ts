@@ -24,6 +24,8 @@ import {
   filterClaudeMdFromContext,
   getMCPServersFromSettings,
   getPromptCustomization,
+  getSkillsConfiguration,
+  getCustomSubagents,
 } from '../lib/settings-helpers.js';
 
 interface Message {
@@ -241,6 +243,16 @@ export class AgentService {
       // Load MCP servers from settings (global setting only)
       const mcpServers = await getMCPServersFromSettings(this.settingsService, '[AgentService]');
 
+      // Get Skills configuration from settings
+      const skillsConfig = this.settingsService
+        ? await getSkillsConfiguration(this.settingsService)
+        : { enabled: false, sources: [] as Array<'user' | 'project'>, shouldIncludeInTools: false };
+
+      // Get custom subagents from settings (merge global + project-level)
+      const customSubagents = this.settingsService
+        ? await getCustomSubagents(this.settingsService, effectiveWorkDir)
+        : undefined;
+
       // Load project context files (CLAUDE.md, CODE_QUALITY.md, etc.)
       const contextResult = await loadContextFiles({
         projectPath: effectiveWorkDir,
@@ -275,7 +287,44 @@ export class AgentService {
       // Extract model, maxTurns, and allowedTools from SDK options
       const effectiveModel = sdkOptions.model!;
       const maxTurns = sdkOptions.maxTurns;
-      const allowedTools = sdkOptions.allowedTools as string[] | undefined;
+      let allowedTools = sdkOptions.allowedTools as string[] | undefined;
+
+      // Build merged settingSources array (filter to only 'user' and 'project')
+      const settingSources: Array<'user' | 'project'> = [];
+      if (sdkOptions.settingSources) {
+        sdkOptions.settingSources.forEach((source) => {
+          if (source === 'user' || source === 'project') {
+            if (!settingSources.includes(source)) {
+              settingSources.push(source);
+            }
+          }
+        });
+      }
+      // Merge skills sources (avoid duplicates)
+      if (skillsConfig.enabled && skillsConfig.sources.length > 0) {
+        skillsConfig.sources.forEach((source) => {
+          if (!settingSources.includes(source)) {
+            settingSources.push(source);
+          }
+        });
+      }
+
+      // Enhance allowedTools with Skills and Subagents tools
+      if (allowedTools) {
+        allowedTools = [...allowedTools]; // Create a copy to avoid mutating SDK options
+        // Add Skill tool if skills are enabled
+        if (skillsConfig.shouldIncludeInTools && !allowedTools.includes('Skill')) {
+          allowedTools.push('Skill');
+        }
+        // Add Task tool if custom subagents are configured
+        if (
+          customSubagents &&
+          Object.keys(customSubagents).length > 0 &&
+          !allowedTools.includes('Task')
+        ) {
+          allowedTools.push('Task');
+        }
+      }
 
       // Get provider for this model
       const provider = ProviderFactory.getProviderForModel(effectiveModel);
@@ -290,10 +339,11 @@ export class AgentService {
         allowedTools: allowedTools,
         abortController: session.abortController!,
         conversationHistory: conversationHistory.length > 0 ? conversationHistory : undefined,
-        settingSources: sdkOptions.settingSources,
+        settingSources: settingSources.length > 0 ? settingSources : undefined,
         sandbox: sdkOptions.sandbox, // Pass sandbox configuration
         sdkSessionId: session.sdkSessionId, // Pass SDK session ID for resuming
         mcpServers: Object.keys(mcpServers).length > 0 ? mcpServers : undefined, // Pass MCP servers configuration
+        agents: customSubagents, // Pass custom subagents for task delegation
       };
 
       // Build prompt content with images

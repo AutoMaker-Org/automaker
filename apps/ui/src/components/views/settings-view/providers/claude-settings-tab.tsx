@@ -4,6 +4,8 @@ import { useCliStatus } from '../hooks/use-cli-status';
 import { ClaudeCliStatus } from '../cli-status/claude-cli-status';
 import { ClaudeMdSettings } from '../claude/claude-md-settings';
 import { ClaudeUsageSection } from '../api-keys/claude-usage-section';
+import { SkillsSection } from './claude-settings-tab/skills-section';
+import { SubagentsSection } from './claude-settings-tab/subagents-section';
 import { Info } from 'lucide-react';
 
 export function ClaudeSettingsTab() {
@@ -42,6 +44,13 @@ export function ClaudeSettingsTab() {
         autoLoadClaudeMd={autoLoadClaudeMd}
         onAutoLoadClaudeMdChange={setAutoLoadClaudeMd}
       />
+
+      {/* Skills Configuration */}
+      <SkillsSection />
+
+      {/* Custom Subagents */}
+      <SubagentsSection />
+
       {showUsageTracking && <ClaudeUsageSection />}
     </div>
   );

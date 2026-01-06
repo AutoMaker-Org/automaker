@@ -23,8 +23,6 @@ import type {
   SpecRegenerationEvent,
   SuggestionType,
   GitHubAPI,
-  GitHubIssue,
-  GitHubPR,
   IssueValidationInput,
   IssueValidationEvent,
   IdeationAPI,
@@ -1677,6 +1675,26 @@ export class HttpApiClient implements ElectronAPI {
       migratedProjectCount: number;
       errors: string[];
     }> => this.post('/api/settings/migrate', { data }),
+
+    // Filesystem agents discovery (read-only)
+    discoverAgents: (
+      projectPath?: string,
+      sources?: Array<'user' | 'project'>
+    ): Promise<{
+      success: boolean;
+      agents?: Array<{
+        name: string;
+        definition: {
+          description: string;
+          prompt: string;
+          tools?: string[];
+          model?: 'sonnet' | 'opus' | 'haiku' | 'inherit';
+        };
+        source: 'user' | 'project';
+        filePath: string;
+      }>;
+      error?: string;
+    }> => this.post('/api/settings/agents/discover', { projectPath, sources }),
   };
 
   // Sessions API

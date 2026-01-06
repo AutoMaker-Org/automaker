@@ -63,6 +63,20 @@ export interface McpHttpServerConfig {
 }
 
 /**
+ * Subagent definition for specialized task delegation
+ */
+export interface AgentDefinition {
+  /** Natural language description of when to use this agent */
+  description: string;
+  /** System prompt defining the agent's role and behavior */
+  prompt: string;
+  /** Restricted tool list (if omitted, inherits all tools) */
+  tools?: string[];
+  /** Model override for this agent */
+  model?: 'sonnet' | 'opus' | 'haiku' | 'inherit';
+}
+
+/**
  * Options for executing a query via a provider
  */
 export interface ExecuteOptions {
@@ -90,6 +104,11 @@ export interface ExecuteOptions {
    * Only applies to Claude models; Cursor models handle thinking internally.
    */
   thinkingLevel?: ThinkingLevel;
+  /**
+   * Custom subagents for specialized task delegation
+   * Key: agent name, Value: agent definition
+   */
+  agents?: Record<string, AgentDefinition>;
 }
 
 /**

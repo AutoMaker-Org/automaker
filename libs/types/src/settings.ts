@@ -486,6 +486,29 @@ export interface GlobalSettings {
   // Prompt Customization
   /** Custom prompts for Auto Mode, Agent Runner, Backlog Planning, and Enhancements */
   promptCustomization?: PromptCustomization;
+
+  // Skills Configuration
+  /**
+   * Enable Skills functionality (loads from .claude/skills/ directories)
+   * @default true
+   */
+  enableSkills?: boolean;
+
+  /**
+   * Which directories to load Skills from
+   * - 'user': ~/.claude/skills/ (personal skills)
+   * - 'project': .claude/skills/ (project-specific skills)
+   * @default ['user', 'project']
+   */
+  skillsSources?: Array<'user' | 'project'>;
+
+  // Subagents Configuration
+  /**
+   * Custom subagent definitions for specialized task delegation
+   * Key: agent name (e.g., 'code-reviewer', 'test-runner')
+   * Value: agent configuration
+   */
+  customSubagents?: Record<string, import('./provider.js').AgentDefinition>;
 }
 
 /**
@@ -585,6 +608,15 @@ export interface ProjectSettings {
   // Claude Agent SDK Settings
   /** Auto-load CLAUDE.md files using SDK's settingSources option (project override) */
   autoLoadClaudeMd?: boolean;
+
+  // Subagents Configuration
+  /**
+   * Project-specific custom subagent definitions for specialized task delegation
+   * Merged with global customSubagents, project-level takes precedence
+   * Key: agent name (e.g., 'code-reviewer', 'test-runner')
+   * Value: agent configuration
+   */
+  customSubagents?: Record<string, import('./provider.js').AgentDefinition>;
 }
 
 /**
