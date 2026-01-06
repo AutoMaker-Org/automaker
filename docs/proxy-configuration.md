@@ -11,6 +11,16 @@ AutoMaker supports custom API endpoints via environment variables. This enables 
 | `ANTHROPIC_BASE_URL` | Custom API endpoint URL (proxy receives plaintext HTTP) |
 | `ANTHROPIC_API_KEY`  | API key for authentication                              |
 
+> ⚠️ **Important**: Do NOT include `/v1` in `ANTHROPIC_BASE_URL`. The Claude Agent SDK automatically appends `/v1` to the base URL. Including it will result in a double path (`/v1/v1`) and cause connection failures with "Claude Code process exited with code 1".
+>
+> ```bash
+> # ✅ Correct
+> ANTHROPIC_BASE_URL=http://localhost:8080
+>
+> # ❌ Wrong - will fail with exit code 1
+> ANTHROPIC_BASE_URL=http://localhost:8080/v1
+> ```
+
 ### Model Mapping
 
 | Variable                  | Description                 |
@@ -152,12 +162,13 @@ echo $ANTHROPIC_API_KEY
 
 ### Common Issues
 
-| Issue                 | Solution                                             |
-| --------------------- | ---------------------------------------------------- |
-| Connection refused    | Verify `ANTHROPIC_BASE_URL` is accessible            |
-| Authentication failed | Check `ANTHROPIC_API_KEY` or proxy credentials       |
-| Model not found       | Verify model ID matches Anthropic's supported models |
-| Timeout errors        | Check proxy latency and timeout settings             |
+| Issue                 | Solution                                                                        |
+| --------------------- | ------------------------------------------------------------------------------- |
+| Double `/v1` in URL   | Do NOT include `/v1` in `ANTHROPIC_BASE_URL` - the SDK appends it automatically |
+| Connection refused    | Verify `ANTHROPIC_BASE_URL` is accessible                                       |
+| Authentication failed | Check `ANTHROPIC_API_KEY` or proxy credentials                                  |
+| Model not found       | Verify model ID matches Anthropic's supported models                            |
+| Timeout errors        | Check proxy latency and timeout settings                                        |
 
 ### Debug Logging
 
