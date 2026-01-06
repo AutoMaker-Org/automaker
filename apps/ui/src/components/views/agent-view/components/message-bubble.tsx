@@ -1,4 +1,5 @@
-import { Bot, User, ImageIcon } from 'lucide-react';
+import { useState, useCallback, useEffect, useRef } from 'react';
+import { Bot, User, ImageIcon, Copy } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Markdown } from '@/components/ui/markdown';
 import type { ImageAttachment } from '@/store/app-store';
@@ -15,7 +16,68 @@ interface MessageBubbleProps {
   message: Message;
 }
 
+interface ContextMenuState {
+  show: boolean;
+  x: number;
+  y: number;
+}
+
 export function MessageBubble({ message }: MessageBubbleProps) {
+  const [contextMenu, setContextMenu] = useState<ContextMenuState>({ show: false, x: 0, y: 0 });
+  const contextMenuRef = useRef<HTMLDivElement>(null);
+
+  const handleContextMenu = useCallback(
+    (e: React.MouseEvent) => {
+      // Only show context menu for assistant messages
+      if (message.role !== 'assistant') return;
+
+      e.preventDefault();
+      setContextMenu({
+        show: true,
+        x: e.clientX,
+        y: e.clientY,
+      });
+    },
+    [message.role]
+  );
+
+  const handleCopyMessage = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(message.content);
+      setContextMenu({ show: false, x: 0, y: 0 });
+    } catch (err) {
+      console.error('Failed to copy message:', err);
+    }
+  }, [message.content]);
+
+  // Close context menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (contextMenuRef.current && !contextMenuRef.current.contains(e.target as Node)) {
+        setContextMenu({ show: false, x: 0, y: 0 });
+      }
+    };
+
+    if (contextMenu.show) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [contextMenu.show]);
+
+  // Close context menu on scroll or resize
+  useEffect(() => {
+    const handleClose = () => setContextMenu({ show: false, x: 0, y: 0 });
+
+    if (contextMenu.show) {
+      window.addEventListener('scroll', handleClose, true);
+      window.addEventListener('resize', handleClose);
+      return () => {
+        window.removeEventListener('scroll', handleClose, true);
+        window.removeEventListener('resize', handleClose);
+      };
+    }
+  }, [contextMenu.show]);
+
   return (
     <div
       className={cn(
@@ -40,70 +102,93 @@ export function MessageBubble({ message }: MessageBubbleProps) {
       </div>
 
       {/* Message Bubble */}
-      <div
-        className={cn(
-          'flex-1 max-w-[85%] rounded-2xl px-4 py-3 shadow-sm',
-          message.role === 'user'
-            ? 'bg-primary text-primary-foreground'
-            : 'bg-card border border-border'
-        )}
-      >
-        {message.role === 'assistant' ? (
-          <Markdown className="text-sm text-foreground prose-p:leading-relaxed prose-headings:text-foreground prose-strong:text-foreground prose-code:text-primary prose-code:bg-muted prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded">
-            {message.content}
-          </Markdown>
-        ) : (
-          <p className="text-sm whitespace-pre-wrap leading-relaxed">{message.content}</p>
-        )}
-
-        {/* Display attached images for user messages */}
-        {message.role === 'user' && message.images && message.images.length > 0 && (
-          <div className="mt-3 space-y-2">
-            <div className="flex items-center gap-1.5 text-xs text-primary-foreground/80">
-              <ImageIcon className="w-3 h-3" />
-              <span>
-                {message.images.length} image
-                {message.images.length > 1 ? 's' : ''} attached
-              </span>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {message.images.map((image, index) => {
-                // Construct proper data URL from base64 data and mime type
-                const dataUrl = image.data.startsWith('data:')
-                  ? image.data
-                  : `data:${image.mimeType || 'image/png'};base64,${image.data}`;
-                return (
-                  <div
-                    key={image.id || `img-${index}`}
-                    className="relative group rounded-lg overflow-hidden border border-primary-foreground/20 bg-primary-foreground/10"
-                  >
-                    <img
-                      src={dataUrl}
-                      alt={image.filename || `Attached image ${index + 1}`}
-                      className="w-20 h-20 object-cover hover:opacity-90 transition-opacity"
-                    />
-                    <div className="absolute bottom-0 left-0 right-0 bg-black/50 px-1.5 py-0.5 text-[9px] text-white truncate">
-                      {image.filename || `Image ${index + 1}`}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        <p
+      <div className={cn('flex-1 max-w-[85%]')}>
+        <div
           className={cn(
-            'text-[11px] mt-2 font-medium',
-            message.role === 'user' ? 'text-primary-foreground/70' : 'text-muted-foreground'
+            'rounded-2xl px-4 py-3 shadow-sm',
+            message.role === 'user'
+              ? 'bg-primary text-primary-foreground'
+              : 'bg-card border border-border'
           )}
+          onContextMenu={handleContextMenu}
         >
-          {new Date(message.timestamp).toLocaleTimeString([], {
-            hour: '2-digit',
-            minute: '2-digit',
-          })}
-        </p>
+          {message.role === 'assistant' ? (
+            <Markdown className="text-sm text-foreground prose-p:leading-relaxed prose-headings:text-foreground prose-strong:text-foreground prose-code:text-primary prose-code:bg-muted prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded">
+              {message.content}
+            </Markdown>
+          ) : (
+            <p className="text-sm whitespace-pre-wrap leading-relaxed">{message.content}</p>
+          )}
+
+          {/* Display attached images for user messages */}
+          {message.role === 'user' && message.images && message.images.length > 0 && (
+            <div className="mt-3 space-y-2">
+              <div className="flex items-center gap-1.5 text-xs text-primary-foreground/80">
+                <ImageIcon className="w-3 h-3" />
+                <span>
+                  {message.images.length} image
+                  {message.images.length > 1 ? 's' : ''} attached
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {message.images.map((image, index) => {
+                  // Construct proper data URL from base64 data and mime type
+                  const dataUrl = image.data.startsWith('data:')
+                    ? image.data
+                    : `data:${image.mimeType || 'image/png'};base64,${image.data}`;
+                  return (
+                    <div
+                      key={image.id || `img-${index}`}
+                      className="relative group rounded-lg overflow-hidden border border-primary-foreground/20 bg-primary-foreground/10"
+                    >
+                      <img
+                        src={dataUrl}
+                        alt={image.filename || `Attached image ${index + 1}`}
+                        className="w-20 h-20 object-cover hover:opacity-90 transition-opacity"
+                      />
+                      <div className="absolute bottom-0 left-0 right-0 bg-black/50 px-1.5 py-0.5 text-[9px] text-white truncate">
+                        {image.filename || `Image ${index + 1}`}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          <p
+            className={cn(
+              'text-[11px] mt-2 font-medium',
+              message.role === 'user' ? 'text-primary-foreground/70' : 'text-muted-foreground'
+            )}
+          >
+            {new Date(message.timestamp).toLocaleTimeString([], {
+              hour: '2-digit',
+              minute: '2-digit',
+            })}
+          </p>
+        </div>
       </div>
+
+      {/* Context Menu */}
+      {contextMenu.show && (
+        <div
+          ref={contextMenuRef}
+          className="fixed z-50 min-w-[160px] rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
+          style={{
+            left: `${contextMenu.x}px`,
+            top: `${contextMenu.y}px`,
+          }}
+        >
+          <div
+            className="relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground"
+            onClick={handleCopyMessage}
+          >
+            <Copy className="w-4 h-4 mr-2" />
+            Copy message
+          </div>
+        </div>
+      )}
     </div>
   );
 }
