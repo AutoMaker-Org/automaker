@@ -35,11 +35,7 @@ export function logAuthStatus(context: string): void {
   const hasApiKey = !!process.env.ANTHROPIC_API_KEY;
 
   logger.info(`${context} - Auth Status:`);
-  logger.info(
-    `  ANTHROPIC_API_KEY: ${
-      hasApiKey ? 'SET (' + process.env.ANTHROPIC_API_KEY?.substring(0, 20) + '...)' : 'NOT SET'
-    }`
-  );
+  logger.info(`  ANTHROPIC_API_KEY: ${hasApiKey ? 'SET' : 'NOT SET'}`);
 
   if (!hasApiKey) {
     logger.warn('⚠️  WARNING: No authentication configured! SDK will fail.');

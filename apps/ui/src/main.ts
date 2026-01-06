@@ -47,7 +47,7 @@ const VITE_DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL;
 if (isDev) {
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    require('dotenv').config({ path: path.join(__dirname, '../.env') });
+    require('dotenv').config({ path: path.join(__dirname, '../.env'), quiet: true });
   } catch (error) {
     logger.warn('dotenv not available:', (error as Error).message);
   }
@@ -485,6 +485,10 @@ async function startServer(): Promise<void> {
     NODE_PATH: serverNodeModules,
     // Pass API key to server for CSRF protection
     AUTOMAKER_API_KEY: apiKey!,
+    // Indicate Electron execution context to server
+    AUTOMAKER_ELECTRON: 'true',
+    // Suppress API key banner in Electron (auth handled automatically)
+    AUTOMAKER_HIDE_API_KEY: 'true',
     // Only set ALLOWED_ROOT_DIRECTORY if explicitly provided in environment
     // If not set, server will allow access to all paths
     ...(process.env.ALLOWED_ROOT_DIRECTORY && {
