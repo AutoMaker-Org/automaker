@@ -1,0 +1,142 @@
+# Automaker Docker Compose - Development Mode
+# Runs Automaker with live reload for development.
+# Source code is volume mounted for instant changes.
+#
+# Usage:
+#   docker compose -f docker-compose.dev.yml up
+#   Then open http://localhost:3007
+#
+# This mode:
+#   - Mounts source code as volumes (live reload)
+#   - Runs npm install inside container
+#   - Uses Vite dev server with HMR
+#   - Server runs with tsx watch for TypeScript changes
+
+services:
+  # Development server (backend API)
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: automaker-dev-server
+    restart: unless-stopped
+    ports:
+      - '3008:3008'
+    environment:
+      # Required
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+
+      # Optional - Claude CLI OAuth credentials
+      - CLAUDE_OAUTH_CREDENTIALS=${CLAUDE_OAUTH_CREDENTIALS:-}
+
+      # Optional - Cursor CLI OAuth token
+      - CURSOR_AUTH_TOKEN=${CURSOR_AUTH_TOKEN:-}
+
+      # Optional - authentication
+      - AUTOMAKER_API_KEY=${AUTOMAKER_API_KEY:-}
+
+      # Development settings
+      - NODE_ENV=development
+      - PORT=3008
+      - CORS_ORIGIN=http://localhost:3007
+
+      # Optional - restrict to specific directory within container
+      - ALLOWED_ROOT_DIRECTORY=${ALLOWED_ROOT_DIRECTORY:-/projects}
+      - DATA_DIR=/data
+
+      # Internal - indicates containerized environment
+      - IS_CONTAINERIZED=true
+    volumes:
+      # Mount source code for live reload
+      - .:/app:cached
+
+      # Use named volume for node_modules to avoid platform conflicts
+      # This ensures native modules are built for the container's architecture
+      - automaker-dev-node-modules:/app/node_modules
+
+      # Persist data across restarts
+      - automaker-data:/data
+
+      # Persist CLI configurations
+      - automaker-claude-config:/home/automaker/.claude
+      - automaker-cursor-config:/home/automaker/.cursor
+
+      # Note: Workspace mount (/projects) comes from docker-compose.override.yml
+
+    # Install deps, build packages, then start server in watch mode
+    # Note: We override the entrypoint to handle permissions properly
+    entrypoint: /bin/sh
+    command:
+      - -c
+      - |
+        # Fix permissions on node_modules (created as root by Docker volume)
+        echo 'Fixing node_modules permissions...'
+        chown -R automaker:automaker /app/node_modules 2>/dev/null || true
+
+        # Run the rest as automaker user
+        exec gosu automaker sh -c "
+          echo 'Installing dependencies...' &&
+          npm install &&
+          echo 'Building shared packages...' &&
+          npm run build:packages &&
+          echo 'Starting server in development mode...' &&
+          npm run _dev:server
+        "
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:3008/api/health']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+
+  # Development UI (frontend with HMR)
+  ui:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: automaker-dev-ui
+    restart: unless-stopped
+    ports:
+      - '3007:3007'
+    environment:
+      - NODE_ENV=development
+      - VITE_SERVER_URL=http://localhost:3008
+      - TEST_PORT=3007
+      - VITE_SKIP_ELECTRON=true
+    volumes:
+      # Mount source code for live reload
+      - .:/app:cached
+
+      # Share node_modules with server container
+      - automaker-dev-node-modules:/app/node_modules
+    depends_on:
+      server:
+        condition: service_healthy
+    working_dir: /app/apps/ui
+    # Start Vite dev server for UI with HMR
+    # --host flag makes Vite bind to 0.0.0.0 for Docker access
+    # Note: We override the entrypoint to run as automaker user
+    entrypoint: /bin/sh
+    command:
+      - -c
+      - |
+        exec gosu automaker sh -c "
+          echo 'Waiting for dependencies to be ready...' &&
+          while [ ! -d /app/node_modules/.bin ]; do sleep 2; done &&
+          echo 'Starting UI development server...' &&
+          cd /app/apps/ui && npx vite --host
+        "
+
+volumes:
+  automaker-dev-node-modules:
+    name: automaker-dev-node-modules
+    # Named volume for container-specific node_modules
+
+  automaker-data:
+    name: automaker-data
+
+  automaker-claude-config:
+    name: automaker-claude-config
+
+  automaker-cursor-config:
+    name: automaker-cursor-config

@@ -2,13 +2,11 @@ import { useMemo } from 'react';
 import { DndContext, DragOverlay } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { Button } from '@/components/ui/button';
-import { HotkeyButton } from '@/components/ui/hotkey-button';
 import { KanbanColumn, KanbanCard } from './components';
 import { Feature } from '@/store/app-store';
-import { FastForward, Archive, Plus, Settings2 } from 'lucide-react';
-import { useKeyboardShortcutsConfig } from '@/hooks/use-keyboard-shortcuts';
+import { Archive, Settings2, CheckSquare, GripVertical } from 'lucide-react';
 import { useResponsiveKanban } from '@/hooks/use-responsive-kanban';
-import { getColumnsWithPipeline, type Column, type ColumnId } from './constants';
+import { getColumnsWithPipeline, type ColumnId } from './constants';
 import type { PipelineConfig } from '@automaker/types';
 
 interface KanbanBoardProps {
@@ -37,7 +35,6 @@ interface KanbanBoardProps {
   onManualVerify: (feature: Feature) => void;
   onMoveBackToInProgress: (feature: Feature) => void;
   onFollowUp: (feature: Feature) => void;
-  onCommit: (feature: Feature) => void;
   onComplete: (feature: Feature) => void;
   onImplement: (feature: Feature) => void;
   onViewPlan: (feature: Feature) => void;
@@ -45,8 +42,6 @@ interface KanbanBoardProps {
   onSpawnTask?: (feature: Feature) => void;
   featuresWithContext: Set<string>;
   runningAutoTasks: string[];
-  shortcuts: ReturnType<typeof useKeyboardShortcutsConfig>;
-  onStartNextFeatures: () => void;
   onArchiveAllVerified: () => void;
   pipelineConfig: PipelineConfig | null;
   onOpenPipelineSettings?: () => void;
@@ -54,6 +49,7 @@ interface KanbanBoardProps {
   isSelectionMode?: boolean;
   selectedFeatureIds?: Set<string>;
   onToggleFeatureSelection?: (featureId: string) => void;
+  onToggleSelectionMode?: () => void;
 }
 
 export function KanbanBoard({
@@ -74,7 +70,6 @@ export function KanbanBoard({
   onManualVerify,
   onMoveBackToInProgress,
   onFollowUp,
-  onCommit,
   onComplete,
   onImplement,
   onViewPlan,
@@ -82,14 +77,13 @@ export function KanbanBoard({
   onSpawnTask,
   featuresWithContext,
   runningAutoTasks,
-  shortcuts,
-  onStartNextFeatures,
   onArchiveAllVerified,
   pipelineConfig,
   onOpenPipelineSettings,
   isSelectionMode = false,
   selectedFeatureIds = new Set(),
   onToggleFeatureSelection,
+  onToggleSelectionMode,
 }: KanbanBoardProps) {
   // Generate columns including pipeline steps
   const columns = useMemo(() => getColumnsWithPipeline(pipelineConfig), [pipelineConfig]);
@@ -133,20 +127,26 @@ export function KanbanBoard({
                       Complete All
                     </Button>
                   ) : column.id === 'backlog' ? (
-                    columnFeatures.length > 0 && (
-                      <HotkeyButton
-                        variant="ghost"
-                        size="sm"
-                        className="h-6 px-2 text-xs text-primary hover:text-primary hover:bg-primary/10"
-                        onClick={onStartNextFeatures}
-                        hotkey={shortcuts.startNext}
-                        hotkeyActive={false}
-                        data-testid="start-next-button"
-                      >
-                        <FastForward className="w-3 h-3 mr-1" />
-                        Make
-                      </HotkeyButton>
-                    )
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className={`h-6 px-2 text-xs ${isSelectionMode ? 'text-primary bg-primary/10' : 'text-muted-foreground hover:text-foreground'}`}
+                      onClick={onToggleSelectionMode}
+                      title={isSelectionMode ? 'Switch to Drag Mode' : 'Select Multiple'}
+                      data-testid="selection-mode-button"
+                    >
+                      {isSelectionMode ? (
+                        <>
+                          <GripVertical className="w-3.5 h-3.5 mr-1" />
+                          Drag
+                        </>
+                      ) : (
+                        <>
+                          <CheckSquare className="w-3.5 h-3.5 mr-1" />
+                          Select
+                        </>
+                      )}
+                    </Button>
                   ) : column.id === 'in_progress' ? (
                     <Button
                       variant="ghost"

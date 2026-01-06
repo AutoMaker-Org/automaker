@@ -1151,8 +1151,6 @@ export function BoardView() {
             onDetailLevelChange={setKanbanCardDetailLevel}
             boardViewMode={boardViewMode}
             onBoardViewModeChange={setBoardViewMode}
-            isSelectionMode={isSelectionMode}
-            onToggleSelectionMode={toggleSelectionMode}
           />
         </div>
         {/* View Content - Kanban or Graph */}
@@ -1175,7 +1173,6 @@ export function BoardView() {
             onManualVerify={handleManualVerify}
             onMoveBackToInProgress={handleMoveBackToInProgress}
             onFollowUp={handleOpenFollowUp}
-            onCommit={handleCommitFeature}
             onComplete={handleCompleteFeature}
             onImplement={handleStartImplementation}
             onViewPlan={(feature) => setViewPlanFeature(feature)}
@@ -1186,8 +1183,6 @@ export function BoardView() {
             }}
             featuresWithContext={featuresWithContext}
             runningAutoTasks={runningAutoTasks}
-            shortcuts={shortcuts}
-            onStartNextFeatures={handleStartNextFeatures}
             onArchiveAllVerified={() => setShowArchiveAllVerifiedDialog(true)}
             pipelineConfig={
               currentProject?.path ? pipelineConfigByProject[currentProject.path] || null : null
@@ -1196,6 +1191,7 @@ export function BoardView() {
             isSelectionMode={isSelectionMode}
             selectedFeatureIds={selectedFeatureIds}
             onToggleFeatureSelection={toggleFeatureSelection}
+            onToggleSelectionMode={toggleSelectionMode}
           />
         ) : (
           <GraphView

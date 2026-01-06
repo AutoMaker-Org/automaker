@@ -55,6 +55,10 @@ RUN npm run build:packages && npm run build --workspace=apps/server
 # =============================================================================
 FROM node:22-slim AS server
 
+# Build argument for tracking which commit this image was built from
+ARG GIT_COMMIT_SHA=unknown
+LABEL automaker.git.commit.sha="${GIT_COMMIT_SHA}"
+
 # Install git, curl, bash (for terminal), gosu (for user switching), and GitHub CLI (pinned version, multi-arch)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git curl bash gosu ca-certificates openssh-client \
@@ -183,6 +187,10 @@ RUN npm run build:packages && npm run build --workspace=apps/ui
 # UI PRODUCTION STAGE
 # =============================================================================
 FROM nginx:alpine AS ui
+
+# Build argument for tracking which commit this image was built from
+ARG GIT_COMMIT_SHA=unknown
+LABEL automaker.git.commit.sha="${GIT_COMMIT_SHA}"
 
 # Copy built files
 COPY --from=ui-builder /app/apps/ui/dist /usr/share/nginx/html

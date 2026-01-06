@@ -1,15 +1,6 @@
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import {
-  ImageIcon,
-  Archive,
-  Minimize2,
-  Square,
-  Maximize2,
-  Columns3,
-  Network,
-  CheckSquare,
-} from 'lucide-react';
+import { ImageIcon, Archive, Minimize2, Square, Maximize2, Columns3, Network } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { BoardViewMode } from '@/store/app-store';
 
@@ -22,8 +13,6 @@ interface BoardControlsProps {
   onDetailLevelChange: (level: 'minimal' | 'standard' | 'detailed') => void;
   boardViewMode: BoardViewMode;
   onBoardViewModeChange: (mode: BoardViewMode) => void;
-  isSelectionMode?: boolean;
-  onToggleSelectionMode?: () => void;
 }
 
 export function BoardControls({
@@ -35,8 +24,6 @@ export function BoardControls({
   onDetailLevelChange,
   boardViewMode,
   onBoardViewModeChange,
-  isSelectionMode = false,
-  onToggleSelectionMode,
 }: BoardControlsProps) {
   if (!isMounted) return null;
 
@@ -87,24 +74,6 @@ export function BoardControls({
             </TooltipContent>
           </Tooltip>
         </div>
-
-        {/* Selection Mode Toggle */}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant={isSelectionMode ? 'default' : 'outline'}
-              size="sm"
-              onClick={onToggleSelectionMode}
-              className={cn('h-8 px-2', isSelectionMode && 'bg-brand-500 hover:bg-brand-600')}
-              data-testid="selection-mode-button"
-            >
-              <CheckSquare className="w-4 h-4" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>{isSelectionMode ? 'Exit Select Mode' : 'Select Mode'}</p>
-          </TooltipContent>
-        </Tooltip>
 
         {/* Board Background Button */}
         <Tooltip>

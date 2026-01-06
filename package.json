@@ -13,7 +13,6 @@
     "postinstall": "node -e \"const fs=require('fs');if(process.platform==='darwin'){['darwin-arm64','darwin-x64'].forEach(a=>{const p='node_modules/node-pty/prebuilds/'+a+'/spawn-helper';if(fs.existsSync(p))fs.chmodSync(p,0o755)})}\" && node scripts/fix-lockfile-urls.mjs",
     "fix:lockfile": "node scripts/fix-lockfile-urls.mjs",
     "dev": "node dev.mjs",
-    "start": "node start.mjs",
     "_dev:web": "npm run dev:web --workspace=apps/ui",
     "_dev:electron": "npm run dev:electron --workspace=apps/ui",
     "_dev:electron:debug": "npm run dev:electron:debug --workspace=apps/ui",
@@ -27,6 +26,7 @@
     "dev:electron:wsl:gpu": "npm run build:packages && npm run _dev:electron:wsl:gpu",
     "dev:server": "npm run build:packages && npm run _dev:server",
     "dev:docker": "docker compose up",
+    "dev:docker:rebuild": "docker compose build --no-cache && docker compose up",
     "dev:full": "npm run build:packages && concurrently \"npm run _dev:server\" \"npm run _dev:web\"",
     "build": "npm run build:packages && npm run build --workspace=apps/ui",
     "build:packages": "npm run build -w @automaker/types && npm run build -w @automaker/platform && npm run build -w @automaker/utils && npm run build -w @automaker/prompts -w @automaker/model-resolver -w @automaker/dependency-resolver && npm run build -w @automaker/git-utils",
@@ -51,6 +51,7 @@
     "lint:lockfile": "node scripts/lint-lockfile.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "rebuild": "rm -rf node_modules apps/*/node_modules libs/*/node_modules && npm install",
     "prepare": "husky && npm run build:packages"
   },
   "lint-staged": {

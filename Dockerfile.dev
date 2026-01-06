@@ -1,0 +1,80 @@
+# Automaker Development Dockerfile
+# For development with live reload via volume mounting
+# Source code is NOT copied - it's mounted as a volume
+#
+# Usage:
+#   docker compose -f docker-compose.dev.yml up
+
+FROM node:22-slim
+
+# Install build dependencies for native modules (node-pty) and runtime tools
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 make g++ \
+    git curl bash gosu ca-certificates openssh-client \
+    && GH_VERSION="2.63.2" \
+    && ARCH=$(uname -m) \
+    && case "$ARCH" in \
+        x86_64) GH_ARCH="amd64" ;; \
+        aarch64|arm64) GH_ARCH="arm64" ;; \
+        *) echo "Unsupported architecture: $ARCH" && exit 1 ;; \
+    esac \
+    && curl -L "https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_linux_${GH_ARCH}.tar.gz" -o gh.tar.gz \
+    && tar -xzf gh.tar.gz \
+    && mv gh_${GH_VERSION}_linux_${GH_ARCH}/bin/gh /usr/local/bin/gh \
+    && rm -rf gh.tar.gz gh_${GH_VERSION}_linux_${GH_ARCH} \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Claude CLI globally
+RUN npm install -g @anthropic-ai/claude-code
+
+# Create non-root user
+RUN groupadd -g 1001 automaker && \
+    useradd -u 1001 -g automaker -m -d /home/automaker -s /bin/bash automaker && \
+    mkdir -p /home/automaker/.local/bin && \
+    mkdir -p /home/automaker/.cursor && \
+    chown -R automaker:automaker /home/automaker && \
+    chmod 700 /home/automaker/.cursor
+
+# Install Cursor CLI as automaker user
+USER automaker
+ENV HOME=/home/automaker
+RUN curl https://cursor.com/install -fsS | bash || true
+USER root
+
+# Add PATH to profile for Cursor CLI
+RUN mkdir -p /etc/profile.d && \
+    echo 'export PATH="/home/automaker/.local/bin:$PATH"' > /etc/profile.d/cursor-cli.sh && \
+    chmod +x /etc/profile.d/cursor-cli.sh
+
+# Add to user bashrc files
+RUN echo 'export PATH="/home/automaker/.local/bin:$PATH"' >> /home/automaker/.bashrc && \
+    chown automaker:automaker /home/automaker/.bashrc
+RUN echo 'export PATH="/home/automaker/.local/bin:$PATH"' >> /root/.bashrc
+
+WORKDIR /app
+
+# Create directories with proper permissions
+RUN mkdir -p /data /projects && chown automaker:automaker /data /projects
+
+# Configure git for mounted volumes
+RUN git config --system --add safe.directory '*' && \
+    git config --system credential.helper '!gh auth git-credential'
+
+# Copy entrypoint script
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
+# Environment variables
+ENV PORT=3008
+ENV DATA_DIR=/data
+ENV HOME=/home/automaker
+ENV PATH="/home/automaker/.local/bin:${PATH}"
+
+# Expose both dev ports
+EXPOSE 3007 3008
+
+# Use entrypoint for permission handling
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
+
+# Default command - will be overridden by docker-compose
+CMD ["npm", "run", "dev:web"]

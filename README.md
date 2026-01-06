@@ -117,23 +117,15 @@ cd automaker
 # 2. Install dependencies
 npm install
 
-# 3. Build shared packages (Now can be skipped npm install / run dev does it automaticly)
+# 3. Build shared packages (can be skipped - npm run dev does it automatically)
 npm run build:packages
 
-# 4. Start Automaker (production mode)
-npm run start
+# 4. Start Automaker
+npm run dev
 # Choose between:
 #   1. Web Application (browser at localhost:3007)
 #   2. Desktop Application (Electron - recommended)
 ```
-
-**Note:** The `npm run start` command will:
-
-- Check for dependencies and install if needed
-- Build the application if needed
-- Kill any processes on ports 3007/3008
-- Present an interactive menu to choose your run mode
-- Run in production mode (no hot reload)
 
 **Authentication Setup:** On first run, Automaker will automatically show a setup wizard where you can configure authentication. You can choose to:
 
@@ -150,7 +142,7 @@ export ANTHROPIC_API_KEY="sk-ant-..."
 echo "ANTHROPIC_API_KEY=sk-ant-..." > .env
 ```
 
-**For Development:** If you want to develop on Automaker with Vite live reload and hot module replacement, use `npm run dev` instead. This will start the development server with fast refresh and instant updates as you make changes.
+**For Development:** `npm run dev` starts the development server with Vite live reload and hot module replacement for fast refresh and instant updates as you make changes.
 
 ## How to Run
 
@@ -194,9 +186,6 @@ npm run dev:web
 ```bash
 # Build for web deployment (uses Vite)
 npm run build
-
-# Run production build
-npm run start
 ```
 
 #### Desktop Application
