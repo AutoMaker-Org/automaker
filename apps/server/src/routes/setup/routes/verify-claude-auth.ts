@@ -91,13 +91,16 @@ export function createVerifyClaudeAuthHandler() {
 
       // Save original env values
       const originalAnthropicKey = process.env.ANTHROPIC_API_KEY;
+      const originalBaseUrl = process.env.ANTHROPIC_BASE_URL;
 
       try {
         // Configure environment based on auth method
         if (authMethod === 'cli') {
           // For CLI verification, remove any API key so it uses CLI credentials only
           delete process.env.ANTHROPIC_API_KEY;
-          logger.info('[Setup] Cleared API key environment for CLI verification');
+          // CLI auth only works with standard Anthropic API, not custom endpoints
+          delete process.env.ANTHROPIC_BASE_URL;
+          logger.info('[Setup] Cleared API key and base URL for CLI verification');
         } else if (authMethod === 'api_key') {
           // For API key verification, use provided key, stored key, or env var (in order of priority)
           if (apiKey) {
@@ -284,6 +287,13 @@ export function createVerifyClaudeAuthHandler() {
         } else if (authMethod === 'cli') {
           // If we cleared it and there was no original, keep it cleared
           delete process.env.ANTHROPIC_API_KEY;
+        }
+        // Restore base URL
+        if (originalBaseUrl !== undefined) {
+          process.env.ANTHROPIC_BASE_URL = originalBaseUrl;
+        } else if (authMethod === 'cli') {
+          // If we cleared it and there was no original, keep it cleared
+          delete process.env.ANTHROPIC_BASE_URL;
         }
       }
 
