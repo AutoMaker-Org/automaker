@@ -10,13 +10,13 @@ fi
 # This allows passing OAuth tokens from host (especially macOS where they're in Keychain)
 if [ -n "$CLAUDE_OAUTH_CREDENTIALS" ]; then
     echo "$CLAUDE_OAUTH_CREDENTIALS" > /home/automaker/.claude/.credentials.json
-    chmod 600 /home/automaker/.claude/.credentials.json
+    chmod 600 /home/automaker/.claude/.credentials.json 2>/dev/null || true
 fi
 
 # Fix permissions on Claude CLI config directory
 # Suppress errors for bind-mounted host directories (macOS can't change ownership)
 chown -R automaker:automaker /home/automaker/.claude 2>/dev/null || true
-chmod 700 /home/automaker/.claude 2>/dev/null || true
+chmod -R 700 /home/automaker/.claude 2>/dev/null || true
 
 # Ensure Cursor CLI config directory exists with correct permissions
 # This handles both: mounted volumes (owned by root) and empty directories
@@ -39,8 +39,8 @@ if [ -n "$CURSOR_AUTH_TOKEN" ]; then
   "accessToken": "$CURSOR_AUTH_TOKEN"
 }
 EOF
-    chmod 600 "$CURSOR_CONFIG_DIR/auth.json"
-    chown -R automaker:automaker /home/automaker/.config
+    chmod 600 "$CURSOR_CONFIG_DIR/auth.json" 2>/dev/null || true
+    chown -R automaker:automaker /home/automaker/.config 2>/dev/null || true
 fi
 
 # Switch to automaker user and execute the command
