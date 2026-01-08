@@ -14,16 +14,18 @@ if [ -n "$CLAUDE_OAUTH_CREDENTIALS" ]; then
 fi
 
 # Fix permissions on Claude CLI config directory
-chown -R automaker:automaker /home/automaker/.claude
-chmod 700 /home/automaker/.claude
+# Suppress errors for bind-mounted host directories (macOS can't change ownership)
+chown -R automaker:automaker /home/automaker/.claude 2>/dev/null || true
+chmod 700 /home/automaker/.claude 2>/dev/null || true
 
 # Ensure Cursor CLI config directory exists with correct permissions
 # This handles both: mounted volumes (owned by root) and empty directories
 if [ ! -d "/home/automaker/.cursor" ]; then
     mkdir -p /home/automaker/.cursor
 fi
-chown -R automaker:automaker /home/automaker/.cursor
-chmod -R 700 /home/automaker/.cursor
+# Suppress errors for bind-mounted host directories (macOS can't change ownership)
+chown -R automaker:automaker /home/automaker/.cursor 2>/dev/null || true
+chmod -R 700 /home/automaker/.cursor 2>/dev/null || true
 
 # If CURSOR_AUTH_TOKEN is set, write it to the cursor auth file
 # On Linux, cursor-agent uses ~/.config/cursor/auth.json for file-based credential storage
