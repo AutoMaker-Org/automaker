@@ -22,7 +22,18 @@ import type {
   ContentBlock,
 } from '@automaker/types';
 import { stripProviderPrefix } from '@automaker/types';
-import { type SubprocessOptions } from '@automaker/platform';
+import { type SubprocessOptions, getOpenCodeAuthIndicators } from '@automaker/platform';
+
+// =============================================================================
+// OpenCode Auth Types
+// =============================================================================
+
+export interface OpenCodeAuthStatus {
+  authenticated: boolean;
+  method: 'api_key' | 'oauth' | 'none';
+  hasOAuthToken?: boolean;
+  hasApiKey?: boolean;
+}
 
 // =============================================================================
 // OpenCode Stream Event Types
@@ -584,6 +595,48 @@ export class OpencodeProvider extends CliProvider {
   }
 
   // ==========================================================================
+  // Authentication
+  // ==========================================================================
+
+  /**
+   * Check authentication status for OpenCode CLI
+   *
+   * Checks for authentication via:
+   * - OAuth token in auth file
+   * - API key in auth file
+   */
+  async checkAuth(): Promise<OpenCodeAuthStatus> {
+    const authIndicators = await getOpenCodeAuthIndicators();
+
+    // Check for OAuth token
+    if (authIndicators.hasOAuthToken) {
+      return {
+        authenticated: true,
+        method: 'oauth',
+        hasOAuthToken: true,
+        hasApiKey: authIndicators.hasApiKey,
+      };
+    }
+
+    // Check for API key
+    if (authIndicators.hasApiKey) {
+      return {
+        authenticated: true,
+        method: 'api_key',
+        hasOAuthToken: false,
+        hasApiKey: true,
+      };
+    }
+
+    return {
+      authenticated: false,
+      method: 'none',
+      hasOAuthToken: false,
+      hasApiKey: false,
+    };
+  }
+
+  // ==========================================================================
   // Installation Detection
   // ==========================================================================
 
@@ -593,16 +646,21 @@ export class OpencodeProvider extends CliProvider {
    * Checks if the opencode CLI is available either through:
    * - Direct installation (npm global)
    * - NPX (fallback on Windows)
+   * Also checks authentication status.
    */
   async detectInstallation(): Promise<InstallationStatus> {
     this.ensureCliDetected();
 
     const installed = await this.isInstalled();
+    const auth = await this.checkAuth();
 
     return {
       installed,
       path: this.cliPath || undefined,
       method: this.detectedStrategy === 'npx' ? 'npm' : 'cli',
+      authenticated: auth.authenticated,
+      hasApiKey: auth.hasApiKey,
+      hasOAuthToken: auth.hasOAuthToken,
     };
   }
 }

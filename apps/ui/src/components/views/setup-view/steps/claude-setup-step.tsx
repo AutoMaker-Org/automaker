@@ -38,6 +38,11 @@ interface ClaudeSetupStepProps {
   onSkip: () => void;
 }
 
+interface ClaudeSetupContentProps {
+  /** Hide header and navigation for embedded use */
+  embedded?: boolean;
+}
+
 type VerificationStatus = 'idle' | 'verifying' | 'verified' | 'error';
 
 // Claude Setup Step

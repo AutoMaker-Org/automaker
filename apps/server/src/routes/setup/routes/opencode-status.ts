@@ -12,7 +12,7 @@ import { getErrorMessage, logError } from '../common.js';
  */
 export function createOpencodeStatusHandler() {
   const installCommand = 'curl -fsSL https://opencode.ai/install | bash';
-  const loginCommand = 'opencode auth';
+  const loginCommand = 'opencode auth login';
 
   return async (_req: Request, res: Response): Promise<void> => {
     try {
@@ -35,11 +35,13 @@ export function createOpencodeStatusHandler() {
           method: authMethod,
           hasApiKey: status.hasApiKey || false,
           hasEnvApiKey: !!process.env.ANTHROPIC_API_KEY || !!process.env.OPENAI_API_KEY,
-          hasOAuthToken: false, // OpenCode doesn't use OAuth
+          hasOAuthToken: status.hasOAuthToken || false,
         },
         recommendation: status.installed
           ? undefined
           : 'Install OpenCode CLI to use multi-provider AI models.',
+        installCommand,
+        loginCommand,
         installCommands: {
           macos: installCommand,
           linux: installCommand,

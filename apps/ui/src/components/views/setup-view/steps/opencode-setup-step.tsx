@@ -96,7 +96,7 @@ export function OpencodeSetupStep({ onNext, onBack, onSkip }: OpencodeSetupStepP
 
     try {
       // Copy login command to clipboard and show instructions
-      const loginCommand = opencodeCliStatus?.loginCommand || 'opencode login';
+      const loginCommand = opencodeCliStatus?.loginCommand || 'opencode auth login';
       await navigator.clipboard.writeText(loginCommand);
       toast.info('Login command copied! Paste in terminal to authenticate.');
 
@@ -297,13 +297,13 @@ export function OpencodeSetupStep({ onNext, onBack, onSkip }: OpencodeSetupStepP
                   </p>
                   <div className="flex items-center gap-2">
                     <code className="flex-1 bg-muted px-3 py-2 rounded text-sm font-mono text-foreground">
-                      {opencodeCliStatus?.loginCommand || 'opencode login'}
+                      {opencodeCliStatus?.loginCommand || 'opencode auth login'}
                     </code>
                     <Button
                       variant="ghost"
                       size="icon"
                       onClick={() =>
-                        copyCommand(opencodeCliStatus?.loginCommand || 'opencode login')
+                        copyCommand(opencodeCliStatus?.loginCommand || 'opencode auth login')
                       }
                     >
                       <Copy className="w-4 h-4" />

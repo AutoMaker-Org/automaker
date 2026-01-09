@@ -1019,7 +1019,7 @@ export async function getCodexAuthIndicators(): Promise<CodexAuthIndicators> {
 // OpenCode CLI Detection
 // =============================================================================
 
-const OPENCODE_CONFIG_DIR_NAME = '.opencode';
+const OPENCODE_DATA_DIR = '.local/share/opencode';
 const OPENCODE_AUTH_FILENAME = 'auth.json';
 const OPENCODE_TOKENS_KEY = 'tokens';
 
@@ -1092,10 +1092,12 @@ export function getOpenCodeCliPaths(): string[] {
 }
 
 /**
- * Get the OpenCode configuration directory path
+ * Get the OpenCode data directory path
+ * macOS/Linux: ~/.local/share/opencode
+ * Windows: %USERPROFILE%\.local\share\opencode
  */
 export function getOpenCodeConfigDir(): string {
-  return path.join(os.homedir(), OPENCODE_CONFIG_DIR_NAME);
+  return path.join(os.homedir(), OPENCODE_DATA_DIR);
 }
 
 /**
@@ -1121,12 +1123,58 @@ export interface OpenCodeAuthIndicators {
 const OPENCODE_OAUTH_KEYS = ['access_token', 'oauth_token'] as const;
 const OPENCODE_API_KEY_KEYS = ['api_key', 'OPENAI_API_KEY', 'ANTHROPIC_API_KEY'] as const;
 
+// Provider names that OpenCode uses for provider-specific auth entries
+const OPENCODE_PROVIDERS = ['anthropic', 'openai', 'google', 'bedrock', 'amazon-bedrock'] as const;
+
 function getOpenCodeNestedTokens(record: Record<string, unknown>): Record<string, unknown> | null {
   const tokens = record[OPENCODE_TOKENS_KEY];
   if (tokens && typeof tokens === 'object' && !Array.isArray(tokens)) {
     return tokens as Record<string, unknown>;
   }
   return null;
+}
+
+/**
+ * Check if the auth JSON has provider-specific OAuth credentials
+ * OpenCode stores auth in format: { "anthropic": { "type": "oauth", "access": "...", "refresh": "..." } }
+ */
+function hasProviderOAuth(authJson: Record<string, unknown>): boolean {
+  for (const provider of OPENCODE_PROVIDERS) {
+    const providerAuth = authJson[provider];
+    if (providerAuth && typeof providerAuth === 'object' && !Array.isArray(providerAuth)) {
+      const auth = providerAuth as Record<string, unknown>;
+      // Check for OAuth type with access token
+      if (auth.type === 'oauth' && typeof auth.access === 'string' && auth.access) {
+        return true;
+      }
+      // Also check for access_token field directly
+      if (typeof auth.access_token === 'string' && auth.access_token) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+/**
+ * Check if the auth JSON has provider-specific API key credentials
+ */
+function hasProviderApiKey(authJson: Record<string, unknown>): boolean {
+  for (const provider of OPENCODE_PROVIDERS) {
+    const providerAuth = authJson[provider];
+    if (providerAuth && typeof providerAuth === 'object' && !Array.isArray(providerAuth)) {
+      const auth = providerAuth as Record<string, unknown>;
+      // Check for API key type
+      if (auth.type === 'api_key' && typeof auth.key === 'string' && auth.key) {
+        return true;
+      }
+      // Also check for api_key field directly
+      if (typeof auth.api_key === 'string' && auth.api_key) {
+        return true;
+      }
+    }
+  }
+  return false;
 }
 
 /**
@@ -1145,8 +1193,12 @@ export async function getOpenCodeAuthIndicators(): Promise<OpenCodeAuthIndicator
 
     try {
       const authJson = JSON.parse(authContent) as Record<string, unknown>;
+
+      // Check for legacy top-level keys
       result.hasOAuthToken = hasNonEmptyStringField(authJson, OPENCODE_OAUTH_KEYS);
       result.hasApiKey = hasNonEmptyStringField(authJson, OPENCODE_API_KEY_KEYS);
+
+      // Check for nested tokens object (legacy format)
       const nestedTokens = getOpenCodeNestedTokens(authJson);
       if (nestedTokens) {
         result.hasOAuthToken =
@@ -1154,6 +1206,11 @@ export async function getOpenCodeAuthIndicators(): Promise<OpenCodeAuthIndicator
         result.hasApiKey =
           result.hasApiKey || hasNonEmptyStringField(nestedTokens, OPENCODE_API_KEY_KEYS);
       }
+
+      // Check for provider-specific auth entries (current OpenCode format)
+      // Format: { "anthropic": { "type": "oauth", "access": "...", "refresh": "..." } }
+      result.hasOAuthToken = result.hasOAuthToken || hasProviderOAuth(authJson);
+      result.hasApiKey = result.hasApiKey || hasProviderApiKey(authJson);
     } catch {
       // Ignore parse errors; file exists but contents are unreadable
     }
