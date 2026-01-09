@@ -31,7 +31,7 @@ export function createResumeFeatureHandler(autoModeService: AutoModeService) {
       autoModeService
         .resumeFeature(projectPath, featureId, useWorktrees ?? false)
         .catch((error) => {
-          logger.error(`[AutoMode] Resume feature ${featureId} error:`, error);
+          logger.error(`Resume feature ${featureId} error:`, error);
         });
 
       res.json({ success: true });

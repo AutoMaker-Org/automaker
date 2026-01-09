@@ -179,8 +179,7 @@ describe('validation-storage.ts', () => {
     });
 
     it('should return false for validation exactly at 24 hours', () => {
-      const exactDate = new Date();
-      exactDate.setHours(exactDate.getHours() - 24);
+      const exactDate = new Date(Date.now() - 24 * 60 * 60 * 1000 + 100);
 
       const validation = createMockValidation({
         validatedAt: exactDate.toISOString(),

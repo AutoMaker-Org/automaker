@@ -1,5 +1,8 @@
 import { useState, useCallback } from 'react';
 import { toast } from 'sonner';
+import { createLogger } from '@automaker/utils/logger';
+
+const logger = createLogger('CliInstallation');
 
 interface UseCliInstallationOptions {
   cliType: 'claude';
@@ -82,7 +85,7 @@ export function useCliInstallation({
         toast.error('Installation failed', { description: result.error });
       }
     } catch (error) {
-      console.error(`Failed to install ${cliType}:`, error);
+      logger.error(`Failed to install ${cliType}:`, error);
       toast.error('Installation failed');
     } finally {
       setIsInstalling(false);

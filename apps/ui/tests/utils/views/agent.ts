@@ -1,5 +1,5 @@
 import { Page, Locator } from '@playwright/test';
-import { waitForElement } from '../core/waiting';
+import { waitForElement, waitForSplashScreenToDisappear } from '../core/waiting';
 
 /**
  * Get the session list element
@@ -19,6 +19,8 @@ export async function getNewSessionButton(page: Page): Promise<Locator> {
  * Click the new session button
  */
 export async function clickNewSessionButton(page: Page): Promise<void> {
+  // Wait for splash screen to disappear first (safety net)
+  await waitForSplashScreenToDisappear(page, 3000);
   const button = await getNewSessionButton(page);
   await button.click();
 }

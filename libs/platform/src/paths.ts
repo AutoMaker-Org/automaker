@@ -189,6 +189,140 @@ export async function ensureAutomakerDir(projectPath: string): Promise<string> {
 }
 
 // ============================================================================
+// Ideation Paths
+// ============================================================================
+
+/**
+ * Get the ideation directory for a project
+ *
+ * Contains ideas, sessions, and drafts for brainstorming.
+ *
+ * @param projectPath - Absolute path to project directory
+ * @returns Absolute path to {projectPath}/.automaker/ideation
+ */
+export function getIdeationDir(projectPath: string): string {
+  return path.join(getAutomakerDir(projectPath), 'ideation');
+}
+
+/**
+ * Get the ideas directory for a project
+ *
+ * Contains subdirectories for each idea, keyed by ideaId.
+ *
+ * @param projectPath - Absolute path to project directory
+ * @returns Absolute path to {projectPath}/.automaker/ideation/ideas
+ */
+export function getIdeasDir(projectPath: string): string {
+  return path.join(getIdeationDir(projectPath), 'ideas');
+}
+
+/**
+ * Get the directory for a specific idea
+ *
+ * Contains idea metadata and attachments.
+ *
+ * @param projectPath - Absolute path to project directory
+ * @param ideaId - Idea identifier
+ * @returns Absolute path to {projectPath}/.automaker/ideation/ideas/{ideaId}
+ */
+export function getIdeaDir(projectPath: string, ideaId: string): string {
+  return path.join(getIdeasDir(projectPath), ideaId);
+}
+
+/**
+ * Get the idea metadata file path
+ *
+ * Stores the idea JSON data.
+ *
+ * @param projectPath - Absolute path to project directory
+ * @param ideaId - Idea identifier
+ * @returns Absolute path to {projectPath}/.automaker/ideation/ideas/{ideaId}/idea.json
+ */
+export function getIdeaPath(projectPath: string, ideaId: string): string {
+  return path.join(getIdeaDir(projectPath, ideaId), 'idea.json');
+}
+
+/**
+ * Get the idea attachments directory
+ *
+ * Stores images and other attachments for an idea.
+ *
+ * @param projectPath - Absolute path to project directory
+ * @param ideaId - Idea identifier
+ * @returns Absolute path to {projectPath}/.automaker/ideation/ideas/{ideaId}/attachments
+ */
+export function getIdeaAttachmentsDir(projectPath: string, ideaId: string): string {
+  return path.join(getIdeaDir(projectPath, ideaId), 'attachments');
+}
+
+/**
+ * Get the ideation sessions directory for a project
+ *
+ * Contains conversation history for ideation sessions.
+ *
+ * @param projectPath - Absolute path to project directory
+ * @returns Absolute path to {projectPath}/.automaker/ideation/sessions
+ */
+export function getIdeationSessionsDir(projectPath: string): string {
+  return path.join(getIdeationDir(projectPath), 'sessions');
+}
+
+/**
+ * Get the session file path for an ideation session
+ *
+ * Stores the session messages and metadata.
+ *
+ * @param projectPath - Absolute path to project directory
+ * @param sessionId - Session identifier
+ * @returns Absolute path to {projectPath}/.automaker/ideation/sessions/{sessionId}.json
+ */
+export function getIdeationSessionPath(projectPath: string, sessionId: string): string {
+  return path.join(getIdeationSessionsDir(projectPath), `${sessionId}.json`);
+}
+
+/**
+ * Get the ideation drafts directory for a project
+ *
+ * Stores unsaved conversation drafts.
+ *
+ * @param projectPath - Absolute path to project directory
+ * @returns Absolute path to {projectPath}/.automaker/ideation/drafts
+ */
+export function getIdeationDraftsDir(projectPath: string): string {
+  return path.join(getIdeationDir(projectPath), 'drafts');
+}
+
+/**
+ * Get the project analysis result file path
+ *
+ * Stores the cached project analysis result.
+ *
+ * @param projectPath - Absolute path to project directory
+ * @returns Absolute path to {projectPath}/.automaker/ideation/analysis.json
+ */
+export function getIdeationAnalysisPath(projectPath: string): string {
+  return path.join(getIdeationDir(projectPath), 'analysis.json');
+}
+
+/**
+ * Create the ideation directory structure for a project if it doesn't exist
+ *
+ * Creates {projectPath}/.automaker/ideation with all subdirectories.
+ * Safe to call multiple times - uses recursive: true.
+ *
+ * @param projectPath - Absolute path to project directory
+ * @returns Promise resolving to the created ideation directory path
+ */
+export async function ensureIdeationDir(projectPath: string): Promise<string> {
+  const ideationDir = getIdeationDir(projectPath);
+  await secureFs.mkdir(ideationDir, { recursive: true });
+  await secureFs.mkdir(getIdeasDir(projectPath), { recursive: true });
+  await secureFs.mkdir(getIdeationSessionsDir(projectPath), { recursive: true });
+  await secureFs.mkdir(getIdeationDraftsDir(projectPath), { recursive: true });
+  return ideationDir;
+}
+
+// ============================================================================
 // Global Settings Paths (stored in DATA_DIR from app.getPath('userData'))
 // ============================================================================
 

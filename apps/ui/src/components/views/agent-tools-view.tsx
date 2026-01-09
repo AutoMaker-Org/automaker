@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import { createLogger } from '@automaker/utils/logger';
 import { useAppStore } from '@/store/app-store';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -18,6 +19,8 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getElectronAPI } from '@/lib/electron';
+
+const logger = createLogger('AgentToolsView');
 
 interface ToolResult {
   success: boolean;
@@ -62,7 +65,7 @@ export function AgentToolsView() {
 
     try {
       // Simulate agent requesting file read
-      console.log(`[Agent Tool] Requesting to read file: ${readFilePath}`);
+      logger.info(`[Agent Tool] Requesting to read file: ${readFilePath}`);
 
       const result = await api.readFile(readFilePath);
 
@@ -72,14 +75,14 @@ export function AgentToolsView() {
           output: result.content,
           timestamp: new Date(),
         });
-        console.log(`[Agent Tool] File read successful: ${readFilePath}`);
+        logger.info(`[Agent Tool] File read successful: ${readFilePath}`);
       } else {
         setReadFileResult({
           success: false,
           error: result.error || 'Failed to read file',
           timestamp: new Date(),
         });
-        console.log(`[Agent Tool] File read failed: ${result.error}`);
+        logger.info(`[Agent Tool] File read failed: ${result.error}`);
       }
     } catch (error) {
       setReadFileResult({
@@ -101,7 +104,7 @@ export function AgentToolsView() {
 
     try {
       // Simulate agent requesting file write
-      console.log(`[Agent Tool] Requesting to write file: ${writeFilePath}`);
+      logger.info(`[Agent Tool] Requesting to write file: ${writeFilePath}`);
 
       const result = await api.writeFile(writeFilePath, writeFileContent);
 
@@ -111,14 +114,14 @@ export function AgentToolsView() {
           output: `File written successfully: ${writeFilePath}`,
           timestamp: new Date(),
         });
-        console.log(`[Agent Tool] File write successful: ${writeFilePath}`);
+        logger.info(`[Agent Tool] File write successful: ${writeFilePath}`);
       } else {
         setWriteFileResult({
           success: false,
           error: result.error || 'Failed to write file',
           timestamp: new Date(),
         });
-        console.log(`[Agent Tool] File write failed: ${result.error}`);
+        logger.info(`[Agent Tool] File write failed: ${result.error}`);
       }
     } catch (error) {
       setWriteFileResult({
@@ -140,7 +143,7 @@ export function AgentToolsView() {
 
     try {
       // Terminal command simulation for demonstration purposes
-      console.log(`[Agent Tool] Simulating command: ${terminalCommand}`);
+      logger.info(`[Agent Tool] Simulating command: ${terminalCommand}`);
 
       // Simulated outputs for common commands (preview mode)
       // In production, the agent executes commands via Claude SDK
@@ -165,7 +168,7 @@ export function AgentToolsView() {
         output: output,
         timestamp: new Date(),
       });
-      console.log(`[Agent Tool] Command executed successfully: ${terminalCommand}`);
+      logger.info(`[Agent Tool] Command executed successfully: ${terminalCommand}`);
     } catch (error) {
       setTerminalResult({
         success: false,

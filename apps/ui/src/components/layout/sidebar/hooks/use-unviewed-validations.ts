@@ -1,5 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { createLogger } from '@automaker/utils/logger';
 import { getElectronAPI } from '@/lib/electron';
+
+const logger = createLogger('UnviewedValidations');
 import type { Project, StoredValidation } from '@/lib/electron';
 
 /**
@@ -38,7 +41,7 @@ export function useUnviewedValidations(currentProject: Project | null) {
         }
       }
     } catch (err) {
-      console.error('[useUnviewedValidations] Failed to load count:', err);
+      logger.error('Failed to load count:', err);
     }
   }, []);
 

@@ -3,17 +3,19 @@
  */
 
 import type { Request, Response } from 'express';
+import type { ThinkingLevel } from '@automaker/types';
 import { AgentService } from '../../../services/agent-service.js';
 import { getErrorMessage, logError } from '../common.js';
 
 export function createQueueAddHandler(agentService: AgentService) {
   return async (req: Request, res: Response): Promise<void> => {
     try {
-      const { sessionId, message, imagePaths, model } = req.body as {
+      const { sessionId, message, imagePaths, model, thinkingLevel } = req.body as {
         sessionId: string;
         message: string;
         imagePaths?: string[];
         model?: string;
+        thinkingLevel?: ThinkingLevel;
       };
 
       if (!sessionId || !message) {
@@ -24,7 +26,12 @@ export function createQueueAddHandler(agentService: AgentService) {
         return;
       }
 
-      const result = await agentService.addToQueue(sessionId, { message, imagePaths, model });
+      const result = await agentService.addToQueue(sessionId, {
+        message,
+        imagePaths,
+        model,
+        thinkingLevel,
+      });
       res.json(result);
     } catch (error) {
       logError(error, 'Add to queue failed');

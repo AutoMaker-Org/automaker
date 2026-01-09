@@ -367,6 +367,17 @@
     background-color: var(--background);
   }
 
+  /* Text selection styling for readability */
+  ::selection {
+    background-color: var(--primary);
+    color: var(--primary-foreground);
+  }
+
+  ::-moz-selection {
+    background-color: var(--primary);
+    color: var(--primary-foreground);
+  }
+
   /* Ensure all clickable elements show pointer cursor */
   button:not(:disabled),
   [role='button']:not([aria-disabled='true']),

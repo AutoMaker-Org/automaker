@@ -12,7 +12,7 @@ import {
   ScrollText,
   ShieldCheck,
   User,
-  Sparkles,
+  FastForward,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -23,7 +23,6 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import type { AIProfile } from '@/store/app-store';
-import type { AgentModel } from '@automaker/types';
 
 type PlanningMode = 'skip' | 'lite' | 'spec' | 'full';
 
@@ -31,40 +30,40 @@ interface FeatureDefaultsSectionProps {
   showProfilesOnly: boolean;
   defaultSkipTests: boolean;
   enableDependencyBlocking: boolean;
+  skipVerificationInAutoMode: boolean;
   useWorktrees: boolean;
   defaultPlanningMode: PlanningMode;
   defaultRequirePlanApproval: boolean;
   defaultAIProfileId: string | null;
   aiProfiles: AIProfile[];
-  validationModel: AgentModel;
   onShowProfilesOnlyChange: (value: boolean) => void;
   onDefaultSkipTestsChange: (value: boolean) => void;
   onEnableDependencyBlockingChange: (value: boolean) => void;
+  onSkipVerificationInAutoModeChange: (value: boolean) => void;
   onUseWorktreesChange: (value: boolean) => void;
   onDefaultPlanningModeChange: (value: PlanningMode) => void;
   onDefaultRequirePlanApprovalChange: (value: boolean) => void;
   onDefaultAIProfileIdChange: (value: string | null) => void;
-  onValidationModelChange: (value: AgentModel) => void;
 }
 
 export function FeatureDefaultsSection({
   showProfilesOnly,
   defaultSkipTests,
   enableDependencyBlocking,
+  skipVerificationInAutoMode,
   useWorktrees,
   defaultPlanningMode,
   defaultRequirePlanApproval,
   defaultAIProfileId,
   aiProfiles,
-  validationModel,
   onShowProfilesOnlyChange,
   onDefaultSkipTestsChange,
   onEnableDependencyBlockingChange,
+  onSkipVerificationInAutoModeChange,
   onUseWorktreesChange,
   onDefaultPlanningModeChange,
   onDefaultRequirePlanApprovalChange,
   onDefaultAIProfileIdChange,
-  onValidationModelChange,
 }: FeatureDefaultsSectionProps) {
   // Find the selected profile name for display
   const selectedProfile = defaultAIProfileId
@@ -233,45 +232,6 @@ export function FeatureDefaultsSection({
         {/* Separator */}
         <div className="border-t border-border/30" />
 
-        {/* Issue Validation Model */}
-        <div className="group flex items-start space-x-3 p-3 rounded-xl hover:bg-accent/30 transition-colors duration-200 -mx-3">
-          <div className="w-10 h-10 mt-0.5 rounded-xl flex items-center justify-center shrink-0 bg-purple-500/10">
-            <Sparkles className="w-5 h-5 text-purple-500" />
-          </div>
-          <div className="flex-1 space-y-2">
-            <div className="flex items-center justify-between">
-              <Label className="text-foreground font-medium">Issue Validation Model</Label>
-              <Select
-                value={validationModel}
-                onValueChange={(v: string) => onValidationModelChange(v as AgentModel)}
-              >
-                <SelectTrigger className="w-[140px] h-8" data-testid="validation-model-select">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="opus">
-                    <span>Opus</span>
-                    <span className="text-[10px] text-muted-foreground ml-1">(Default)</span>
-                  </SelectItem>
-                  <SelectItem value="sonnet">
-                    <span>Sonnet</span>
-                  </SelectItem>
-                  <SelectItem value="haiku">
-                    <span>Haiku</span>
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <p className="text-xs text-muted-foreground/80 leading-relaxed">
-              Model used for validating GitHub issues. Opus provides the most thorough analysis,
-              while Haiku is faster and more cost-effective.
-            </p>
-          </div>
-        </div>
-
-        {/* Separator */}
-        <div className="border-t border-border/30" />
-
         {/* Profiles Only Setting */}
         <div className="group flex items-start space-x-3 p-3 rounded-xl hover:bg-accent/30 transition-colors duration-200 -mx-3">
           <Checkbox
@@ -347,6 +307,34 @@ export function FeatureDefaultsSection({
               When enabled, features with incomplete dependencies will show blocked badges and
               warnings. Auto mode and backlog ordering always respect dependencies regardless of
               this setting.
+            </p>
+          </div>
+        </div>
+
+        {/* Separator */}
+        <div className="border-t border-border/30" />
+
+        {/* Skip Verification in Auto Mode Setting */}
+        <div className="group flex items-start space-x-3 p-3 rounded-xl hover:bg-accent/30 transition-colors duration-200 -mx-3">
+          <Checkbox
+            id="skip-verification-auto-mode"
+            checked={skipVerificationInAutoMode}
+            onCheckedChange={(checked) => onSkipVerificationInAutoModeChange(checked === true)}
+            className="mt-1"
+            data-testid="skip-verification-auto-mode-checkbox"
+          />
+          <div className="space-y-1.5">
+            <Label
+              htmlFor="skip-verification-auto-mode"
+              className="text-foreground cursor-pointer font-medium flex items-center gap-2"
+            >
+              <FastForward className="w-4 h-4 text-brand-500" />
+              Skip verification in auto mode
+            </Label>
+            <p className="text-xs text-muted-foreground/80 leading-relaxed">
+              When enabled, auto mode will grab features even if their dependencies are not
+              verified, as long as they are not currently running. This allows faster pipeline
+              execution without waiting for manual verification.
             </p>
           </div>
         </div>

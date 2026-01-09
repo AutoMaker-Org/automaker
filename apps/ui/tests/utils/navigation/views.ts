@@ -1,6 +1,7 @@
 import { Page } from '@playwright/test';
 import { clickElement } from '../core/interactions';
-import { waitForElement } from '../core/waiting';
+import { handleLoginScreenIfPresent } from '../core/interactions';
+import { waitForElement, waitForSplashScreenToDisappear } from '../core/waiting';
 import { authenticateForTests } from '../api/client';
 
 /**
@@ -15,22 +16,11 @@ export async function navigateToBoard(page: Page): Promise<void> {
   await page.goto('/board');
   await page.waitForLoadState('load');
 
-  // Check if we're on the login screen and handle it
-  const loginInput = page
-    .locator('[data-testid="login-api-key-input"], input[type="password"][placeholder*="API key"]')
-    .first();
-  const isLoginScreen = await loginInput.isVisible({ timeout: 2000 }).catch(() => false);
-  if (isLoginScreen) {
-    const apiKey = process.env.AUTOMAKER_API_KEY || 'test-api-key-for-e2e-tests';
-    await loginInput.fill(apiKey);
-    await page.waitForTimeout(100);
-    await page
-      .locator('[data-testid="login-submit-button"], button:has-text("Login")')
-      .first()
-      .click();
-    await page.waitForURL('**/board', { timeout: 5000 });
-    await page.waitForLoadState('load');
-  }
+  // Wait for splash screen to disappear (safety net)
+  await waitForSplashScreenToDisappear(page, 3000);
+
+  // Handle login redirect if needed
+  await handleLoginScreenIfPresent(page);
 
   // Wait for the board view to be visible
   await waitForElement(page, 'board-view', { timeout: 10000 });
@@ -48,22 +38,11 @@ export async function navigateToContext(page: Page): Promise<void> {
   await page.goto('/context');
   await page.waitForLoadState('load');
 
-  // Check if we're on the login screen and handle it
-  const loginInputCtx = page
-    .locator('[data-testid="login-api-key-input"], input[type="password"][placeholder*="API key"]')
-    .first();
-  const isLoginScreenCtx = await loginInputCtx.isVisible({ timeout: 2000 }).catch(() => false);
-  if (isLoginScreenCtx) {
-    const apiKey = process.env.AUTOMAKER_API_KEY || 'test-api-key-for-e2e-tests';
-    await loginInputCtx.fill(apiKey);
-    await page.waitForTimeout(100);
-    await page
-      .locator('[data-testid="login-submit-button"], button:has-text("Login")')
-      .first()
-      .click();
-    await page.waitForURL('**/context', { timeout: 5000 });
-    await page.waitForLoadState('load');
-  }
+  // Wait for splash screen to disappear (safety net)
+  await waitForSplashScreenToDisappear(page, 3000);
+
+  // Handle login redirect if needed
+  await handleLoginScreenIfPresent(page);
 
   // Wait for loading to complete (if present)
   const loadingElement = page.locator('[data-testid="context-view-loading"]');
@@ -93,6 +72,9 @@ export async function navigateToSpec(page: Page): Promise<void> {
   // Navigate directly to /spec route
   await page.goto('/spec');
   await page.waitForLoadState('load');
+
+  // Wait for splash screen to disappear (safety net)
+  await waitForSplashScreenToDisappear(page, 3000);
 
   // Wait for loading state to complete first (if present)
   const loadingElement = page.locator('[data-testid="spec-view-loading"]');
@@ -127,22 +109,11 @@ export async function navigateToAgent(page: Page): Promise<void> {
   await page.goto('/agent');
   await page.waitForLoadState('load');
 
-  // Check if we're on the login screen and handle it
-  const loginInputAgent = page
-    .locator('[data-testid="login-api-key-input"], input[type="password"][placeholder*="API key"]')
-    .first();
-  const isLoginScreenAgent = await loginInputAgent.isVisible({ timeout: 2000 }).catch(() => false);
-  if (isLoginScreenAgent) {
-    const apiKey = process.env.AUTOMAKER_API_KEY || 'test-api-key-for-e2e-tests';
-    await loginInputAgent.fill(apiKey);
-    await page.waitForTimeout(100);
-    await page
-      .locator('[data-testid="login-submit-button"], button:has-text("Login")')
-      .first()
-      .click();
-    await page.waitForURL('**/agent', { timeout: 5000 });
-    await page.waitForLoadState('load');
-  }
+  // Wait for splash screen to disappear (safety net)
+  await waitForSplashScreenToDisappear(page, 3000);
+
+  // Handle login redirect if needed
+  await handleLoginScreenIfPresent(page);
 
   // Wait for the agent view to be visible
   await waitForElement(page, 'agent-view', { timeout: 10000 });
@@ -159,6 +130,9 @@ export async function navigateToSettings(page: Page): Promise<void> {
   // Navigate directly to /settings route
   await page.goto('/settings');
   await page.waitForLoadState('load');
+
+  // Wait for splash screen to disappear (safety net)
+  await waitForSplashScreenToDisappear(page, 3000);
 
   // Wait for the settings view to be visible
   await waitForElement(page, 'settings-view', { timeout: 10000 });
@@ -187,24 +161,11 @@ export async function navigateToWelcome(page: Page): Promise<void> {
   await page.goto('/');
   await page.waitForLoadState('load');
 
-  // Check if we're on the login screen and handle it
-  const loginInputWelcome = page
-    .locator('[data-testid="login-api-key-input"], input[type="password"][placeholder*="API key"]')
-    .first();
-  const isLoginScreenWelcome = await loginInputWelcome
-    .isVisible({ timeout: 2000 })
-    .catch(() => false);
-  if (isLoginScreenWelcome) {
-    const apiKey = process.env.AUTOMAKER_API_KEY || 'test-api-key-for-e2e-tests';
-    await loginInputWelcome.fill(apiKey);
-    await page.waitForTimeout(100);
-    await page
-      .locator('[data-testid="login-submit-button"], button:has-text("Login")')
-      .first()
-      .click();
-    await page.waitForURL('**/', { timeout: 5000 });
-    await page.waitForLoadState('load');
-  }
+  // Wait for splash screen to disappear (safety net)
+  await waitForSplashScreenToDisappear(page, 3000);
+
+  // Handle login redirect if needed
+  await handleLoginScreenIfPresent(page);
 
   await waitForElement(page, 'welcome-view', { timeout: 10000 });
 }

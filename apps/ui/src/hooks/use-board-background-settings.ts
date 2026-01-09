@@ -1,7 +1,10 @@
 import { useCallback } from 'react';
+import { createLogger } from '@automaker/utils/logger';
 import { useAppStore } from '@/store/app-store';
 import { getHttpApiClient } from '@/lib/http-api-client';
 import { toast } from 'sonner';
+
+const logger = createLogger('BoardBackground');
 
 /**
  * Hook for managing board background settings with automatic persistence to server
@@ -19,11 +22,11 @@ export function useBoardBackgroundSettings() {
         });
 
         if (!result.success) {
-          console.error('Failed to persist settings:', result.error);
+          logger.error('Failed to persist settings:', result.error);
           toast.error('Failed to save settings');
         }
       } catch (error) {
-        console.error('Failed to persist settings:', error);
+        logger.error('Failed to persist settings:', error);
         toast.error('Failed to save settings');
       }
     },

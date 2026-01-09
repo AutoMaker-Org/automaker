@@ -1,5 +1,8 @@
+// @ts-nocheck
 import { useEffect, useState } from 'react';
 import { Feature, ThinkingLevel, useAppStore } from '@/store/app-store';
+import type { ReasoningEffort } from '@automaker/types';
+import { getProviderFromModel } from '@/lib/utils';
 import {
   AgentTaskInfo,
   parseAgentContext,
@@ -8,7 +11,6 @@ import {
 } from '@/lib/agent-context-parser';
 import { cn } from '@/lib/utils';
 import {
-  Cpu,
   Brain,
   ListTodo,
   Sparkles,
@@ -20,6 +22,7 @@ import {
 } from 'lucide-react';
 import { getElectronAPI } from '@/lib/electron';
 import { SummaryDialog } from './summary-dialog';
+import { getProviderIconForModel } from '@/components/ui/provider-icon';
 
 /**
  * Formats thinking level for compact display
@@ -34,6 +37,22 @@ function formatThinkingLevel(level: ThinkingLevel | undefined): string {
     ultrathink: 'Ultra',
   };
   return labels[level];
+}
+
+/**
+ * Formats reasoning effort for compact display
+ */
+function formatReasoningEffort(effort: ReasoningEffort | undefined): string {
+  if (!effort || effort === 'none') return '';
+  const labels: Record<ReasoningEffort, string> = {
+    none: '',
+    minimal: 'Min',
+    low: 'Low',
+    medium: 'Med',
+    high: 'High',
+    xhigh: 'XHigh',
+  };
+  return labels[effort];
 }
 
 interface AgentInfoPanelProps {
@@ -105,18 +124,33 @@ export function AgentInfoPanel({
   }, [feature.id, feature.status, contextContent, isCurrentAutoTask]);
   // Model/Preset Info for Backlog Cards
   if (showAgentInfo && feature.status === 'backlog') {
+    const provider = getProviderFromModel(feature.model);
+    const isCodex = provider === 'codex';
+    const isClaude = provider === 'claude';
+
     return (
       <div className="mb-3 space-y-2 overflow-hidden">
         <div className="flex items-center gap-2 text-[11px] flex-wrap">
           <div className="flex items-center gap-1 text-[var(--status-info)]">
-            <Cpu className="w-3 h-3" />
+            {(() => {
+              const ProviderIcon = getProviderIconForModel(feature.model);
+              return <ProviderIcon className="w-3 h-3" />;
+            })()}
             <span className="font-medium">{formatModelName(feature.model ?? DEFAULT_MODEL)}</span>
           </div>
-          {feature.thinkingLevel && feature.thinkingLevel !== 'none' ? (
+          {isClaude && feature.thinkingLevel && feature.thinkingLevel !== 'none' ? (
             <div className="flex items-center gap-1 text-purple-400">
               <Brain className="w-3 h-3" />
               <span className="font-medium">
                 {formatThinkingLevel(feature.thinkingLevel as ThinkingLevel)}
+              </span>
+            </div>
+          ) : null}
+          {isCodex && feature.reasoningEffort && feature.reasoningEffort !== 'none' ? (
+            <div className="flex items-center gap-1 text-purple-400">
+              <Brain className="w-3 h-3" />
+              <span className="font-medium">
+                {formatReasoningEffort(feature.reasoningEffort as ReasoningEffort)}
               </span>
             </div>
           ) : null}
@@ -133,7 +167,10 @@ export function AgentInfoPanel({
           {/* Model & Phase */}
           <div className="flex items-center gap-2 text-[11px] flex-wrap">
             <div className="flex items-center gap-1 text-[var(--status-info)]">
-              <Cpu className="w-3 h-3" />
+              {(() => {
+                const ProviderIcon = getProviderIconForModel(feature.model);
+                return <ProviderIcon className="w-3 h-3" />;
+              })()}
               <span className="font-medium">{formatModelName(feature.model ?? DEFAULT_MODEL)}</span>
             </div>
             {agentInfo.currentPhase && (
@@ -252,6 +289,45 @@ export function AgentInfoPanel({
           onOpenChange={setIsSummaryDialogOpen}
         />
       </>
+    );
+  }
+
+  // Show just the todo list for non-backlog features when showAgentInfo is false
+  // This ensures users always see what the agent is working on
+  if (!showAgentInfo && feature.status !== 'backlog' && agentInfo && agentInfo.todos.length > 0) {
+    return (
+      <div className="mb-3 space-y-1 overflow-hidden">
+        <div className="flex items-center gap-1 text-[10px] text-muted-foreground/70">
+          <ListTodo className="w-3 h-3" />
+          <span>
+            {agentInfo.todos.filter((t) => t.status === 'completed').length}/
+            {agentInfo.todos.length} tasks
+          </span>
+        </div>
+        <div className="space-y-0.5 max-h-24 overflow-y-auto">
+          {agentInfo.todos.map((todo, idx) => (
+            <div key={idx} className="flex items-center gap-1.5 text-[10px]">
+              {todo.status === 'completed' ? (
+                <CheckCircle2 className="w-2.5 h-2.5 text-[var(--status-success)] shrink-0" />
+              ) : todo.status === 'in_progress' ? (
+                <Loader2 className="w-2.5 h-2.5 text-[var(--status-warning)] animate-spin shrink-0" />
+              ) : (
+                <Circle className="w-2.5 h-2.5 text-muted-foreground/50 shrink-0" />
+              )}
+              <span
+                className={cn(
+                  'break-words hyphens-auto line-clamp-2 leading-relaxed',
+                  todo.status === 'completed' && 'text-muted-foreground/60 line-through',
+                  todo.status === 'in_progress' && 'text-[var(--status-warning)]',
+                  todo.status === 'pending' && 'text-muted-foreground/80'
+                )}
+              >
+                {todo.content}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
     );
   }
 

@@ -3,6 +3,7 @@ import path from 'path';
 
 export default defineConfig({
   test: {
+    name: 'server',
     reporters: ['verbose'],
     globals: true,
     environment: 'node',
@@ -19,11 +20,15 @@ export default defineConfig({
         'src/middleware/**', // Middleware needs integration tests
         'src/lib/enhancement-prompts.ts', // Prompt templates don't need unit tests
         'src/services/claude-usage-service.ts', // TODO: Add tests for usage tracking
+        'src/services/mcp-test-service.ts', // Needs MCP SDK integration tests
+        'src/providers/index.ts', // Just exports
+        'src/providers/types.ts', // Type definitions
+        'src/providers/cli-provider.ts', // CLI integration - needs integration tests
+        'src/providers/cursor-provider.ts', // Cursor CLI integration - needs integration tests
         '**/libs/**', // Exclude aliased shared packages from server coverage
       ],
       thresholds: {
-        // Increased thresholds to ensure better code quality
-        // Current coverage: 64% stmts, 56% branches, 78% funcs, 64% lines
+        // Coverage thresholds
         lines: 60,
         functions: 75,
         branches: 55,

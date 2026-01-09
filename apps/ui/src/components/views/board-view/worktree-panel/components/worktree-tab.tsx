@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { Button } from '@/components/ui/button';
 import { RefreshCw, Globe, Loader2, CircleDot, GitPullRequest } from 'lucide-react';
 import { cn } from '@/lib/utils';

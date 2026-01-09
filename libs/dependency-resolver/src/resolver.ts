@@ -174,21 +174,40 @@ function detectCycles(features: Feature[], featureMap: Map<string, Feature>): st
   return cycles;
 }
 
+export interface DependencySatisfactionOptions {
+  /** If true, only require dependencies to not be 'running' (ignore verification requirement) */
+  skipVerification?: boolean;
+}
+
 /**
  * Checks if a feature's dependencies are satisfied (all complete or verified)
  *
  * @param feature - Feature to check
  * @param allFeatures - All features in the project
+ * @param options - Optional configuration for dependency checking
  * @returns true if all dependencies are satisfied, false otherwise
  */
-export function areDependenciesSatisfied(feature: Feature, allFeatures: Feature[]): boolean {
+export function areDependenciesSatisfied(
+  feature: Feature,
+  allFeatures: Feature[],
+  options?: DependencySatisfactionOptions
+): boolean {
   if (!feature.dependencies || feature.dependencies.length === 0) {
     return true; // No dependencies = always ready
   }
 
+  const skipVerification = options?.skipVerification ?? false;
+
   return feature.dependencies.every((depId: string) => {
     const dep = allFeatures.find((f) => f.id === depId);
-    return dep && (dep.status === 'completed' || dep.status === 'verified');
+    if (!dep) return false;
+
+    if (skipVerification) {
+      // When skipping verification, only block if dependency is currently running
+      return dep.status !== 'running';
+    }
+    // Default: require 'completed' or 'verified'
+    return dep.status === 'completed' || dep.status === 'verified';
   });
 }
 

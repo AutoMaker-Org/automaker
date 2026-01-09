@@ -1,5 +1,8 @@
 import { useState, useCallback } from 'react';
+import { createLogger } from '@automaker/utils/logger';
 import type { ImageAttachment, TextFileAttachment } from '@/store/app-store';
+
+const logger = createLogger('MessageQueue');
 
 export interface QueuedMessage {
   id: string;
@@ -72,7 +75,7 @@ export function useMessageQueue({ onProcessNext }: UseMessageQueueOptions): UseM
       // Remove the processed message from queue
       setQueuedMessages((prev) => prev.slice(1));
     } catch (error) {
-      console.error('Error processing queued message:', error);
+      logger.error('Error processing queued message:', error);
       // Keep the message in queue for retry or manual removal
     } finally {
       setIsProcessingQueue(false);

@@ -1,5 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
+import { createLogger } from '@automaker/utils/logger';
 import { getElectronAPI } from '@/lib/electron';
+
+const logger = createLogger('RunningAgents');
 
 export function useRunningAgents() {
   const [runningAgentsCount, setRunningAgentsCount] = useState(0);
@@ -15,7 +18,7 @@ export function useRunningAgents() {
         }
       }
     } catch (error) {
-      console.error('[Sidebar] Error fetching running agents count:', error);
+      logger.error('Error fetching running agents count:', error);
     }
   }, []);
 

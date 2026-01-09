@@ -1,6 +1,6 @@
 {
   "name": "@automaker/ui",
-  "version": "0.7.3",
+  "version": "0.8.0",
   "description": "An autonomous AI development studio that helps you build software faster using AI-powered agents",
   "homepage": "https://github.com/AutoMaker-Org/automaker",
   "repository": {
@@ -31,6 +31,7 @@
     "postinstall": "electron-builder install-app-deps",
     "preview": "vite preview",
     "lint": "npx eslint",
+    "typecheck": "tsc --noEmit",
     "pretest": "node scripts/kill-test-servers.mjs && node scripts/setup-e2e-fixtures.mjs",
     "test": "playwright test",
     "test:headed": "playwright test --headed",

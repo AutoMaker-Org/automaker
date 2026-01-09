@@ -117,32 +117,32 @@ cd automaker
 # 2. Install dependencies
 npm install
 
-# 3. Build shared packages (Now can be skipped npm install / run dev does it automaticly)
+# 3. Build shared packages (can be skipped - npm run dev does it automatically)
 npm run build:packages
 
-# 4. Set up authentication (skip if using Claude Code CLI)
-# If using Claude Code CLI: credentials are detected automatically
-# If using API key directly, choose one method:
-
-# Option A: Environment variable
-export ANTHROPIC_API_KEY="sk-ant-..."
-
-# Option B: Create .env file in project root
-echo "ANTHROPIC_API_KEY=sk-ant-..." > .env
-
-# 5. Start Automaker (interactive launcher)
+# 4. Start Automaker
 npm run dev
 # Choose between:
 #   1. Web Application (browser at localhost:3007)
 #   2. Desktop Application (Electron - recommended)
 ```
 
-**Note:** The `npm run dev` command will:
+**Authentication Setup:** On first run, Automaker will automatically show a setup wizard where you can configure authentication. You can choose to:
 
-- Check for dependencies and install if needed
-- Install Playwright browsers for E2E tests
-- Kill any processes on ports 3007/3008
-- Present an interactive menu to choose your run mode
+- Use **Claude Code CLI** (recommended) - Automaker will detect your CLI credentials automatically
+- Enter an **API key** directly in the wizard
+
+If you prefer to set up authentication before running (e.g., for headless deployments or CI/CD), you can set it manually:
+
+```bash
+# Option A: Environment variable
+export ANTHROPIC_API_KEY="sk-ant-..."
+
+# Option B: Create .env file in project root
+echo "ANTHROPIC_API_KEY=sk-ant-..." > .env
+```
+
+**For Development:** `npm run dev` starts the development server with Vite live reload and hot module replacement for fast refresh and instant updates as you make changes.
 
 ## How to Run
 
@@ -186,9 +186,6 @@ npm run dev:web
 ```bash
 # Build for web deployment (uses Vite)
 npm run build
-
-# Run production build
-npm run start
 ```
 
 #### Desktop Application

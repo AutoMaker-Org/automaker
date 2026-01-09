@@ -56,20 +56,24 @@ describe('image-handler.ts', () => {
   });
 
   describe('readImageAsBase64', () => {
-    it('should read image and return base64 data', async () => {
-      const mockBuffer = Buffer.from(pngBase64Fixture, 'base64');
-      vi.mocked(fs.readFile).mockResolvedValue(mockBuffer);
+    // Skip on Windows as path.resolve converts Unix paths to Windows paths (CI runs on Linux)
+    it.skipIf(process.platform === 'win32')(
+      'should read image and return base64 data',
+      async () => {
+        const mockBuffer = Buffer.from(pngBase64Fixture, 'base64');
+        vi.mocked(fs.readFile).mockResolvedValue(mockBuffer);
 
-      const result = await readImageAsBase64('/path/to/test.png');
+        const result = await readImageAsBase64('/path/to/test.png');
 
-      expect(result).toMatchObject({
-        base64: pngBase64Fixture,
-        mimeType: 'image/png',
-        filename: 'test.png',
-        originalPath: '/path/to/test.png',
-      });
-      expect(fs.readFile).toHaveBeenCalledWith('/path/to/test.png');
-    });
+        expect(result).toMatchObject({
+          base64: pngBase64Fixture,
+          mimeType: 'image/png',
+          filename: 'test.png',
+          originalPath: '/path/to/test.png',
+        });
+        expect(fs.readFile).toHaveBeenCalledWith('/path/to/test.png');
+      }
+    );
 
     it('should handle different image formats', async () => {
       const mockBuffer = Buffer.from('jpeg-data');
@@ -141,14 +145,18 @@ describe('image-handler.ts', () => {
       expect(calls[0][0]).toContain('dir');
     });
 
-    it('should handle absolute paths without workDir', async () => {
-      const mockBuffer = Buffer.from('data');
-      vi.mocked(fs.readFile).mockResolvedValue(mockBuffer);
+    // Skip on Windows as path.resolve converts Unix paths to Windows paths (CI runs on Linux)
+    it.skipIf(process.platform === 'win32')(
+      'should handle absolute paths without workDir',
+      async () => {
+        const mockBuffer = Buffer.from('data');
+        vi.mocked(fs.readFile).mockResolvedValue(mockBuffer);
 
-      await convertImagesToContentBlocks(['/absolute/path.png']);
+        await convertImagesToContentBlocks(['/absolute/path.png']);
 
-      expect(fs.readFile).toHaveBeenCalledWith('/absolute/path.png');
-    });
+        expect(fs.readFile).toHaveBeenCalledWith('/absolute/path.png');
+      }
+    );
 
     it('should continue processing on individual image errors', async () => {
       vi.mocked(fs.readFile)
@@ -171,7 +179,8 @@ describe('image-handler.ts', () => {
       expect(result).toEqual([]);
     });
 
-    it('should handle undefined workDir', async () => {
+    // Skip on Windows as path.resolve converts Unix paths to Windows paths (CI runs on Linux)
+    it.skipIf(process.platform === 'win32')('should handle undefined workDir', async () => {
       const mockBuffer = Buffer.from('data');
       vi.mocked(fs.readFile).mockResolvedValue(mockBuffer);
 

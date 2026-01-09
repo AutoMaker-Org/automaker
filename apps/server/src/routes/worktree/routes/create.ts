@@ -20,6 +20,9 @@ import {
   ensureInitialCommit,
 } from '../common.js';
 import { trackBranch } from './branch-tracking.js';
+import { createLogger } from '@automaker/utils';
+
+const logger = createLogger('Worktree');
 
 const execAsync = promisify(exec);
 
@@ -114,8 +117,8 @@ export function createCreateHandler() {
       if (existingWorktree) {
         // Worktree already exists, return it as success (not an error)
         // This handles manually created worktrees or worktrees from previous runs
-        console.log(
-          `[Worktree] Found existing worktree for branch "${branchName}" at: ${existingWorktree.path}`
+        logger.info(
+          `Found existing worktree for branch "${branchName}" at: ${existingWorktree.path}`
         );
 
         // Track the branch so it persists in the UI

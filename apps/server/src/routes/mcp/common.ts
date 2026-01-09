@@ -2,6 +2,10 @@
  * Common utilities for MCP routes
  */
 
+import { createLogger } from '@automaker/utils';
+
+const logger = createLogger('MCP');
+
 /**
  * Extract error message from unknown error
  */
@@ -16,5 +20,5 @@ export function getErrorMessage(error: unknown): string {
  * Log error with prefix
  */
 export function logError(error: unknown, message: string): void {
-  console.error(`[MCP] ${message}:`, error);
+  logger.error(`${message}:`, error);
 }

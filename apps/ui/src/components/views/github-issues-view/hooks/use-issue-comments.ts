@@ -1,5 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { createLogger } from '@automaker/utils/logger';
 import { getElectronAPI, GitHubComment } from '@/lib/electron';
+
+const logger = createLogger('IssueComments');
 import { useAppStore } from '@/store/app-store';
 
 interface UseIssueCommentsResult {
@@ -69,7 +72,7 @@ export function useIssueComments(issueNumber: number | null): UseIssueCommentsRe
         }
       } catch (err) {
         if (isMountedRef.current) {
-          console.error('[useIssueComments] Error fetching comments:', err);
+          logger.error('Error fetching comments:', err);
           setError(err instanceof Error ? err.message : 'Failed to fetch comments');
         }
       } finally {

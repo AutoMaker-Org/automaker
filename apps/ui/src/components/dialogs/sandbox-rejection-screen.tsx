@@ -5,29 +5,14 @@
  * Prompts them to either restart the app in a container or reload to try again.
  */
 
-import { useState } from 'react';
-import { ShieldX, RefreshCw, Container, Copy, Check } from 'lucide-react';
+import { ShieldX, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
-const DOCKER_COMMAND = 'npm run dev:docker';
-
 export function SandboxRejectionScreen() {
-  const [copied, setCopied] = useState(false);
-
   const handleReload = () => {
     // Clear the rejection state and reload
     sessionStorage.removeItem('automaker-sandbox-denied');
     window.location.reload();
-  };
-
-  const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(DOCKER_COMMAND);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch (err) {
-      console.error('Failed to copy:', err);
-    }
   };
 
   return (
@@ -46,32 +31,10 @@ export function SandboxRejectionScreen() {
           </p>
         </div>
 
-        <div className="bg-muted/50 border border-border rounded-lg p-4 text-left space-y-3">
-          <div className="flex items-start gap-3">
-            <Container className="w-5 h-5 mt-0.5 text-primary flex-shrink-0" />
-            <div className="flex-1 space-y-2">
-              <p className="font-medium text-sm">Run in Docker (Recommended)</p>
-              <p className="text-sm text-muted-foreground">
-                Run Automaker in a containerized sandbox environment:
-              </p>
-              <div className="flex items-center gap-2 bg-background border border-border rounded-lg p-2">
-                <code className="flex-1 text-sm font-mono px-2">{DOCKER_COMMAND}</code>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleCopy}
-                  className="h-8 px-2 hover:bg-muted"
-                >
-                  {copied ? (
-                    <Check className="w-4 h-4 text-green-500" />
-                  ) : (
-                    <Copy className="w-4 h-4" />
-                  )}
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
+        <p className="text-sm text-muted-foreground">
+          For safer operation, consider running Automaker in Docker. See the README for
+          instructions.
+        </p>
 
         <div className="pt-2">
           <Button

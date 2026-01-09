@@ -229,12 +229,13 @@ export function createAuthRoutes(): Router {
       await invalidateSession(sessionToken);
     }
 
-    // Clear the cookie
-    res.clearCookie(cookieName, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      path: '/',
+    // Clear the cookie by setting it to empty with immediate expiration
+    // Using res.cookie() with maxAge: 0 is more reliable than clearCookie()
+    // in cross-origin development environments
+    res.cookie(cookieName, '', {
+      ...getSessionCookieOptions(),
+      maxAge: 0,
+      expires: new Date(0),
     });
 
     res.json({

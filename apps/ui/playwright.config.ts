@@ -3,6 +3,7 @@ import { defineConfig, devices } from '@playwright/test';
 const port = process.env.TEST_PORT || 3007;
 const serverPort = process.env.TEST_SERVER_PORT || 3008;
 const reuseServer = process.env.TEST_REUSE_SERVER === 'true';
+const useExternalBackend = !!process.env.VITE_SERVER_URL;
 // Always use mock agent for tests (disables rate limiting, uses mock Claude responses)
 const mockAgent = true;
 
@@ -33,31 +34,38 @@ export default defineConfig({
         webServer: [
           // Backend server - runs with mock agent enabled in CI
           // Uses dev:test (no file watching) to avoid port conflicts from server restarts
-          {
-            command: `cd ../server && npm run dev:test`,
-            url: `http://localhost:${serverPort}/api/health`,
-            // Don't reuse existing server to ensure we use the test API key
-            reuseExistingServer: false,
-            timeout: 60000,
-            env: {
-              ...process.env,
-              PORT: String(serverPort),
-              // Enable mock agent in CI to avoid real API calls
-              AUTOMAKER_MOCK_AGENT: mockAgent ? 'true' : 'false',
-              // Set a test API key for web mode authentication
-              AUTOMAKER_API_KEY: process.env.AUTOMAKER_API_KEY || 'test-api-key-for-e2e-tests',
-              // Hide the API key banner to reduce log noise
-              AUTOMAKER_HIDE_API_KEY: 'true',
-              // No ALLOWED_ROOT_DIRECTORY restriction - allow all paths for testing
-              // Simulate containerized environment to skip sandbox confirmation dialogs
-              IS_CONTAINERIZED: 'true',
-            },
-          },
+          ...(useExternalBackend
+            ? []
+            : [
+                {
+                  command: `cd ../server && npm run dev:test`,
+                  url: `http://localhost:${serverPort}/api/health`,
+                  // Don't reuse existing server to ensure we use the test API key
+                  reuseExistingServer: false,
+                  timeout: 60000,
+                  env: {
+                    ...process.env,
+                    PORT: String(serverPort),
+                    // Enable mock agent in CI to avoid real API calls
+                    AUTOMAKER_MOCK_AGENT: mockAgent ? 'true' : 'false',
+                    // Set a test API key for web mode authentication
+                    AUTOMAKER_API_KEY:
+                      process.env.AUTOMAKER_API_KEY || 'test-api-key-for-e2e-tests',
+                    // Hide the API key banner to reduce log noise
+                    AUTOMAKER_HIDE_API_KEY: 'true',
+                    // Explicitly unset ALLOWED_ROOT_DIRECTORY to allow all paths for testing
+                    // (prevents inheriting /projects from Docker or other environments)
+                    ALLOWED_ROOT_DIRECTORY: '',
+                    // Simulate containerized environment to skip sandbox confirmation dialogs
+                    IS_CONTAINERIZED: 'true',
+                  },
+                },
+              ]),
           // Frontend Vite dev server
           {
             command: `npm run dev`,
             url: `http://localhost:${port}`,
-            reuseExistingServer: true,
+            reuseExistingServer: false,
             timeout: 120000,
             env: {
               ...process.env,

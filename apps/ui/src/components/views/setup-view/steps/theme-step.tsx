@@ -11,7 +11,7 @@ interface ThemeStepProps {
 }
 
 export function ThemeStep({ onNext, onBack }: ThemeStepProps) {
-  const { theme, setTheme, setPreviewTheme } = useAppStore();
+  const { theme, setTheme, setPreviewTheme, currentProject, setProjectTheme } = useAppStore();
   const [activeTab, setActiveTab] = useState<'dark' | 'light'>('dark');
 
   const handleThemeHover = (themeValue: string) => {
@@ -24,6 +24,11 @@ export function ThemeStep({ onNext, onBack }: ThemeStepProps) {
 
   const handleThemeClick = (themeValue: string) => {
     setTheme(themeValue as typeof theme);
+    // Also update the current project's theme if one exists
+    // This ensures the selected theme is visible since getEffectiveTheme() prioritizes project theme
+    if (currentProject) {
+      setProjectTheme(currentProject.id, themeValue as typeof theme);
+    }
     setPreviewTheme(null);
   };
 

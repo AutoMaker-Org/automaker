@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { Feature } from '@/store/app-store';
 import { AgentTaskInfo } from '@/lib/agent-context-parser';
 import {

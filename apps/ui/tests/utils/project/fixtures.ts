@@ -89,6 +89,7 @@ export async function setupProjectWithFixture(
         currentView: 'board',
         theme: 'dark',
         sidebarOpen: true,
+        skipSandboxWarning: true,
         apiKeys: { anthropic: '', google: '' },
         chatSessions: [],
         chatHistoryOpen: false,
@@ -110,6 +111,9 @@ export async function setupProjectWithFixture(
       version: 0, // setup-store.ts doesn't specify a version, so zustand defaults to 0
     };
     localStorage.setItem('automaker-setup', JSON.stringify(setupState));
+
+    // Disable splash screen in tests
+    sessionStorage.setItem('automaker-splash-shown', 'true');
   }, projectPath);
 }
 

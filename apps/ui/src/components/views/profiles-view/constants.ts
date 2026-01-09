@@ -1,5 +1,6 @@
 import { Brain, Zap, Scale, Cpu, Rocket, Sparkles } from 'lucide-react';
-import type { AgentModel, ThinkingLevel } from '@/store/app-store';
+import type { ModelAlias, ThinkingLevel } from '@/store/app-store';
+import { AnthropicIcon, CursorIcon, OpenAIIcon } from '@/components/ui/provider-icon';
 
 // Icon mapping for profiles
 export const PROFILE_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -9,6 +10,9 @@ export const PROFILE_ICONS: Record<string, React.ComponentType<{ className?: str
   Cpu,
   Rocket,
   Sparkles,
+  Anthropic: AnthropicIcon,
+  Cursor: CursorIcon,
+  Codex: OpenAIIcon,
 };
 
 // Available icons for selection
@@ -19,10 +23,13 @@ export const ICON_OPTIONS = [
   { name: 'Cpu', icon: Cpu },
   { name: 'Rocket', icon: Rocket },
   { name: 'Sparkles', icon: Sparkles },
+  { name: 'Anthropic', icon: AnthropicIcon },
+  { name: 'Cursor', icon: CursorIcon },
+  { name: 'Codex', icon: OpenAIIcon },
 ];
 
 // Model options for the form
-export const CLAUDE_MODELS: { id: AgentModel; label: string }[] = [
+export const CLAUDE_MODELS: { id: ModelAlias; label: string }[] = [
   { id: 'haiku', label: 'Claude Haiku' },
   { id: 'sonnet', label: 'Claude Sonnet' },
   { id: 'opus', label: 'Claude Opus' },

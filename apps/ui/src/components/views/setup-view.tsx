@@ -1,82 +1,92 @@
+import { createLogger } from '@automaker/utils/logger';
 import { useSetupStore } from '@/store/setup-store';
 import { StepIndicator } from './setup-view/components';
 import {
   WelcomeStep,
   ThemeStep,
   CompleteStep,
-  ClaudeSetupStep,
+  ProvidersSetupStep,
   GitHubSetupStep,
 } from './setup-view/steps';
 import { useNavigate } from '@tanstack/react-router';
 
+const logger = createLogger('SetupView');
+
 // Main Setup View
 export function SetupView() {
-  const { currentStep, setCurrentStep, completeSetup, setSkipClaudeSetup } = useSetupStore();
+  const { currentStep, setCurrentStep, completeSetup } = useSetupStore();
   const navigate = useNavigate();
 
-  const steps = ['welcome', 'theme', 'claude', 'github', 'complete'] as const;
+  // Simplified steps: welcome, theme, providers (combined), github, complete
+  const steps = ['welcome', 'theme', 'providers', 'github', 'complete'] as const;
   type StepName = (typeof steps)[number];
+
   const getStepName = (): StepName => {
-    if (currentStep === 'claude_detect' || currentStep === 'claude_auth') return 'claude';
+    // Map old step names to new consolidated steps
     if (currentStep === 'welcome') return 'welcome';
     if (currentStep === 'theme') return 'theme';
+    if (
+      currentStep === 'claude_detect' ||
+      currentStep === 'claude_auth' ||
+      currentStep === 'cursor' ||
+      currentStep === 'codex' ||
+      currentStep === 'opencode' ||
+      currentStep === 'providers'
+    ) {
+      return 'providers';
+    }
     if (currentStep === 'github') return 'github';
     return 'complete';
   };
+
   const currentIndex = steps.indexOf(getStepName());
 
   const handleNext = (from: string) => {
-    console.log('[Setup Flow] handleNext called from:', from, 'currentStep:', currentStep);
+    logger.debug('[Setup Flow] handleNext called from:', from, 'currentStep:', currentStep);
     switch (from) {
       case 'welcome':
-        console.log('[Setup Flow] Moving to theme step');
+        logger.debug('[Setup Flow] Moving to theme step');
         setCurrentStep('theme');
         break;
       case 'theme':
-        console.log('[Setup Flow] Moving to claude_detect step');
-        setCurrentStep('claude_detect');
+        logger.debug('[Setup Flow] Moving to providers step');
+        setCurrentStep('providers');
         break;
-      case 'claude':
-        console.log('[Setup Flow] Moving to github step');
+      case 'providers':
+        logger.debug('[Setup Flow] Moving to github step');
         setCurrentStep('github');
         break;
       case 'github':
-        console.log('[Setup Flow] Moving to complete step');
+        logger.debug('[Setup Flow] Moving to complete step');
         setCurrentStep('complete');
         break;
     }
   };
 
   const handleBack = (from: string) => {
-    console.log('[Setup Flow] handleBack called from:', from);
+    logger.debug('[Setup Flow] handleBack called from:', from);
     switch (from) {
       case 'theme':
         setCurrentStep('welcome');
         break;
-      case 'claude':
+      case 'providers':
         setCurrentStep('theme');
         break;
       case 'github':
-        setCurrentStep('claude_detect');
+        setCurrentStep('providers');
         break;
     }
   };
 
-  const handleSkipClaude = () => {
-    console.log('[Setup Flow] Skipping Claude setup');
-    setSkipClaudeSetup(true);
-    setCurrentStep('github');
-  };
-
   const handleSkipGithub = () => {
-    console.log('[Setup Flow] Skipping GitHub setup');
+    logger.debug('[Setup Flow] Skipping GitHub setup');
     setCurrentStep('complete');
   };
 
   const handleFinish = () => {
-    console.log('[Setup Flow] handleFinish called - completing setup');
+    logger.debug('[Setup Flow] handleFinish called - completing setup');
     completeSetup();
-    console.log('[Setup Flow] Setup completed, redirecting to welcome view');
+    logger.debug('[Setup Flow] Setup completed, redirecting to welcome view');
     navigate({ to: '/' });
   };
 
@@ -106,11 +116,15 @@ export function SetupView() {
               <ThemeStep onNext={() => handleNext('theme')} onBack={() => handleBack('theme')} />
             )}
 
-            {(currentStep === 'claude_detect' || currentStep === 'claude_auth') && (
-              <ClaudeSetupStep
-                onNext={() => handleNext('claude')}
-                onBack={() => handleBack('claude')}
-                onSkip={handleSkipClaude}
+            {(currentStep === 'providers' ||
+              currentStep === 'claude_detect' ||
+              currentStep === 'claude_auth' ||
+              currentStep === 'cursor' ||
+              currentStep === 'codex' ||
+              currentStep === 'opencode') && (
+              <ProvidersSetupStep
+                onNext={() => handleNext('providers')}
+                onBack={() => handleBack('providers')}
               />
             )}
 

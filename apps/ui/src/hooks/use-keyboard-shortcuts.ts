@@ -1,5 +1,5 @@
-import { useEffect, useCallback } from 'react';
-import { useAppStore, parseShortcut } from '@/store/app-store';
+import { useEffect, useCallback, useMemo } from 'react';
+import { useAppStore, parseShortcut, DEFAULT_KEYBOARD_SHORTCUTS } from '@/store/app-store';
 
 export interface KeyboardShortcut {
   key: string; // Can be simple "K" or with modifiers "Shift+N", "Cmd+K"
@@ -237,8 +237,18 @@ export function useKeyboardShortcuts(shortcuts: KeyboardShortcut[]) {
 /**
  * Hook to get current keyboard shortcuts from store
  * This replaces the static constants and allows customization
+ * Merges with defaults to ensure new shortcuts are always available
  */
 export function useKeyboardShortcutsConfig() {
   const keyboardShortcuts = useAppStore((state) => state.keyboardShortcuts);
-  return keyboardShortcuts;
+
+  // Merge with defaults to ensure new shortcuts are available
+  // even if user's persisted state predates them
+  return useMemo(
+    () => ({
+      ...DEFAULT_KEYBOARD_SHORTCUTS,
+      ...keyboardShortcuts,
+    }),
+    [keyboardShortcuts]
+  );
 }

@@ -3,14 +3,21 @@ import { useState, useCallback } from 'react';
 export type SettingsViewId =
   | 'api-keys'
   | 'claude'
+  | 'providers'
+  | 'claude-provider'
+  | 'cursor-provider'
+  | 'codex-provider'
+  | 'opencode-provider'
   | 'mcp-servers'
   | 'prompts'
-  | 'ai-enhancement'
+  | 'model-defaults'
   | 'appearance'
   | 'terminal'
   | 'keyboard'
   | 'audio'
   | 'defaults'
+  | 'account'
+  | 'security'
   | 'danger';
 
 interface UseSettingsViewOptions {

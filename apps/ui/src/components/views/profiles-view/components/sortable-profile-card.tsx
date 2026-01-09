@@ -1,10 +1,12 @@
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { GripVertical, Lock, Pencil, Trash2, Brain } from 'lucide-react';
+import { GripVertical, Lock, Pencil, Trash2 } from 'lucide-react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import type { AIProfile } from '@/store/app-store';
+import type { AIProfile } from '@automaker/types';
+import { CURSOR_MODEL_MAP, profileHasThinking, getCodexModelLabel } from '@automaker/types';
 import { PROFILE_ICONS } from '../constants';
+import { AnthropicIcon, CursorIcon, OpenAIIcon } from '@/components/ui/provider-icon';
 
 interface SortableProfileCardProps {
   profile: AIProfile;
@@ -23,7 +25,13 @@ export function SortableProfileCard({ profile, onEdit, onDelete }: SortableProfi
     opacity: isDragging ? 0.5 : 1,
   };
 
-  const IconComponent = profile.icon ? PROFILE_ICONS[profile.icon] : Brain;
+  const getDefaultIcon = () => {
+    if (profile.provider === 'cursor') return CursorIcon;
+    if (profile.provider === 'codex') return OpenAIIcon;
+    return AnthropicIcon;
+  };
+
+  const IconComponent = profile.icon ? PROFILE_ICONS[profile.icon] : getDefaultIcon();
 
   return (
     <div
@@ -68,12 +76,37 @@ export function SortableProfileCard({ profile, onEdit, onDelete }: SortableProfi
         </div>
         <p className="text-sm text-muted-foreground mt-0.5 line-clamp-2">{profile.description}</p>
         <div className="flex items-center gap-2 mt-2 flex-wrap">
-          <span className="text-xs px-2 py-0.5 rounded-full border border-primary/30 text-primary bg-primary/10">
-            {profile.model}
+          {/* Provider badge */}
+          <span className="text-xs px-2 py-0.5 rounded-full border border-border text-muted-foreground bg-muted/50 flex items-center gap-1">
+            {profile.provider === 'cursor' ? (
+              <CursorIcon className="w-3 h-3" />
+            ) : profile.provider === 'codex' ? (
+              <OpenAIIcon className="w-3 h-3" />
+            ) : (
+              <AnthropicIcon className="w-3 h-3" />
+            )}
+            {profile.provider === 'cursor'
+              ? 'Cursor'
+              : profile.provider === 'codex'
+                ? 'Codex'
+                : 'Claude'}
           </span>
-          {profile.thinkingLevel !== 'none' && (
+
+          {/* Model badge */}
+          <span className="text-xs px-2 py-0.5 rounded-full border border-primary/30 text-primary bg-primary/10">
+            {profile.provider === 'cursor'
+              ? CURSOR_MODEL_MAP[profile.cursorModel || 'auto']?.label ||
+                profile.cursorModel ||
+                'auto'
+              : profile.provider === 'codex'
+                ? getCodexModelLabel(profile.codexModel || 'codex-gpt-5.2-codex')
+                : profile.model || 'sonnet'}
+          </span>
+
+          {/* Thinking badge - works for both providers */}
+          {profileHasThinking(profile) && (
             <span className="text-xs px-2 py-0.5 rounded-full border border-amber-500/30 text-amber-600 dark:text-amber-400 bg-amber-500/10">
-              {profile.thinkingLevel}
+              {profile.provider === 'cursor' ? 'Thinking' : profile.thinkingLevel}
             </span>
           )}
         </div>

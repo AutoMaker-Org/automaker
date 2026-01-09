@@ -4,8 +4,26 @@ services:
       # Mount your workspace directory to /projects inside the container
       # Example: mount your local /workspace to /projects inside the container
       - /Users/webdevcody/Workspace/automaker-workspace:/projects:rw
+
+      # ===== CLI Authentication (Optional) =====
+      # Mount host CLI credentials to avoid re-authenticating in container
+
+      # Claude CLI - mount your ~/.claude directory (Linux/Windows)
+      # This shares your 'claude login' OAuth session with the container
+      # - ~/.claude:/home/automaker/.claude
+
+      # Cursor CLI - mount your ~/.cursor directory (Linux/Windows)
+      # This shares your 'cursor-agent login' OAuth session with the container
+      # - ~/.cursor:/home/automaker/.cursor
+
     environment:
       # Set root directory for all projects and file operations
       # Users can only create/open projects within this directory
       - ALLOWED_ROOT_DIRECTORY=/projects
       - NODE_ENV=development
+
+      # ===== macOS Users =====
+      # On macOS, OAuth tokens are stored in SQLite databases, not plain files.
+      # Extract your Cursor token with: ./scripts/get-cursor-token.sh
+      # Then set it here or in your .env file:
+      # - CURSOR_API_KEY=${CURSOR_API_KEY:-}

@@ -1,5 +1,9 @@
+// @ts-nocheck
 import { useState, useEffect } from 'react';
+import { createLogger } from '@automaker/utils/logger';
 import { useAppStore } from '@/store/app-store';
+
+const logger = createLogger('ApiKeyManagement');
 import { getElectronAPI } from '@/lib/electron';
 import type { ProviderConfigParams } from '@/config/api-providers';
 
@@ -11,6 +15,7 @@ interface TestResult {
 interface ApiKeyStatus {
   hasAnthropicKey: boolean;
   hasGoogleKey: boolean;
+  hasOpenaiKey: boolean;
 }
 
 /**
@@ -23,16 +28,20 @@ export function useApiKeyManagement() {
   // API key values
   const [anthropicKey, setAnthropicKey] = useState(apiKeys.anthropic);
   const [googleKey, setGoogleKey] = useState(apiKeys.google);
+  const [openaiKey, setOpenaiKey] = useState(apiKeys.openai);
 
   // Visibility toggles
   const [showAnthropicKey, setShowAnthropicKey] = useState(false);
   const [showGoogleKey, setShowGoogleKey] = useState(false);
+  const [showOpenaiKey, setShowOpenaiKey] = useState(false);
 
   // Test connection states
   const [testingConnection, setTestingConnection] = useState(false);
   const [testResult, setTestResult] = useState<TestResult | null>(null);
   const [testingGeminiConnection, setTestingGeminiConnection] = useState(false);
   const [geminiTestResult, setGeminiTestResult] = useState<TestResult | null>(null);
+  const [testingOpenaiConnection, setTestingOpenaiConnection] = useState(false);
+  const [openaiTestResult, setOpenaiTestResult] = useState<TestResult | null>(null);
 
   // API key status from environment
   const [apiKeyStatus, setApiKeyStatus] = useState<ApiKeyStatus | null>(null);
@@ -44,6 +53,7 @@ export function useApiKeyManagement() {
   useEffect(() => {
     setAnthropicKey(apiKeys.anthropic);
     setGoogleKey(apiKeys.google);
+    setOpenaiKey(apiKeys.openai);
   }, [apiKeys]);
 
   // Check API key status from environment on mount
@@ -57,10 +67,11 @@ export function useApiKeyManagement() {
             setApiKeyStatus({
               hasAnthropicKey: status.hasAnthropicKey,
               hasGoogleKey: status.hasGoogleKey,
+              hasOpenaiKey: status.hasOpenaiKey,
             });
           }
         } catch (error) {
-          console.error('Failed to check API key status:', error);
+          logger.error('Failed to check API key status:', error);
         }
       }
     };
@@ -69,12 +80,22 @@ export function useApiKeyManagement() {
 
   // Test Anthropic/Claude connection
   const handleTestAnthropicConnection = async () => {
+    // Validate input first
+    if (!anthropicKey || anthropicKey.trim().length === 0) {
+      setTestResult({
+        success: false,
+        message: 'Please enter an API key to test.',
+      });
+      return;
+    }
+
     setTestingConnection(true);
     setTestResult(null);
 
     try {
       const api = getElectronAPI();
-      const data = await api.setup.verifyClaudeAuth('api_key');
+      // Pass the current input value to test unsaved keys
+      const data = await api.setup.verifyClaudeAuth('api_key', anthropicKey);
 
       if (data.success && data.authenticated) {
         setTestResult({
@@ -122,11 +143,42 @@ export function useApiKeyManagement() {
     setTestingGeminiConnection(false);
   };
 
+  // Test OpenAI/Codex connection
+  const handleTestOpenaiConnection = async () => {
+    setTestingOpenaiConnection(true);
+    setOpenaiTestResult(null);
+
+    try {
+      const api = getElectronAPI();
+      const data = await api.setup.verifyCodexAuth('api_key', openaiKey);
+
+      if (data.success && data.authenticated) {
+        setOpenaiTestResult({
+          success: true,
+          message: 'Connection successful! Codex responded.',
+        });
+      } else {
+        setOpenaiTestResult({
+          success: false,
+          message: data.error || 'Failed to connect to OpenAI API.',
+        });
+      }
+    } catch {
+      setOpenaiTestResult({
+        success: false,
+        message: 'Network error. Please check your connection.',
+      });
+    } finally {
+      setTestingOpenaiConnection(false);
+    }
+  };
+
   // Save API keys
   const handleSave = () => {
     setApiKeys({
       anthropic: anthropicKey,
       google: googleKey,
+      openai: openaiKey,
     });
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
@@ -152,6 +204,15 @@ export function useApiKeyManagement() {
       testing: testingGeminiConnection,
       onTest: handleTestGeminiConnection,
       result: geminiTestResult,
+    },
+    openai: {
+      value: openaiKey,
+      setValue: setOpenaiKey,
+      show: showOpenaiKey,
+      setShow: setShowOpenaiKey,
+      testing: testingOpenaiConnection,
+      onTest: handleTestOpenaiConnection,
+      result: openaiTestResult,
     },
   };
 

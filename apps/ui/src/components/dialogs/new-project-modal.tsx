@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { createLogger } from '@automaker/utils/logger';
 import {
   Dialog,
   DialogContent,
@@ -28,6 +29,8 @@ import { getElectronAPI } from '@/lib/electron';
 import { cn } from '@/lib/utils';
 import { useFileBrowser } from '@/contexts/file-browser-context';
 import { getDefaultWorkspaceDirectory, saveLastProjectDirectory } from '@/lib/workspace-config';
+
+const logger = createLogger('NewProjectModal');
 
 interface ValidationErrors {
   projectName?: boolean;
@@ -78,7 +81,7 @@ export function NewProjectModal({
           }
         })
         .catch((error) => {
-          console.error('Failed to get default workspace directory:', error);
+          logger.error('Failed to get default workspace directory:', error);
         })
         .finally(() => {
           setIsLoadingWorkspace(false);

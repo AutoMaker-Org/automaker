@@ -1,5 +1,8 @@
 import { useState, useCallback } from 'react';
+import { createLogger } from '@automaker/utils/logger';
 import { toast } from 'sonner';
+
+const logger = createLogger('TrashOperations');
 import { getElectronAPI, type TrashedProject } from '@/lib/electron';
 
 interface UseTrashOperationsProps {
@@ -24,7 +27,7 @@ export function useTrashOperations({
           description: 'Added back to your project list.',
         });
       } catch (error) {
-        console.error('[Sidebar] Failed to restore project:', error);
+        logger.error('Failed to restore project:', error);
         toast.error('Failed to restore project', {
           description: error instanceof Error ? error.message : 'Unknown error',
         });
@@ -52,7 +55,7 @@ export function useTrashOperations({
           description: trashedProject.path,
         });
       } catch (error) {
-        console.error('[Sidebar] Failed to delete project from disk:', error);
+        logger.error('Failed to delete project from disk:', error);
         toast.error('Failed to delete project folder', {
           description: error instanceof Error ? error.message : 'Unknown error',
         });
@@ -69,7 +72,7 @@ export function useTrashOperations({
       emptyTrash();
       toast.success('Recycle bin cleared');
     } catch (error) {
-      console.error('[Sidebar] Failed to empty trash:', error);
+      logger.error('Failed to empty trash:', error);
       toast.error('Failed to clear recycle bin', {
         description: error instanceof Error ? error.message : 'Unknown error',
       });

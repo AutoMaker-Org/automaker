@@ -277,7 +277,7 @@ describe('auth.ts', () => {
       const options = getSessionCookieOptions();
 
       expect(options.httpOnly).toBe(true);
-      expect(options.sameSite).toBe('strict');
+      expect(options.sameSite).toBe('lax');
       expect(options.path).toBe('/');
       expect(options.maxAge).toBeGreaterThan(0);
     });

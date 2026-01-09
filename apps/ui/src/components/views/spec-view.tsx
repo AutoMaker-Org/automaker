@@ -14,7 +14,7 @@ export function SpecView() {
   const { currentProject, appSpec } = useAppStore();
 
   // Loading state
-  const { isLoading, specExists, loadSpec } = useSpecLoading();
+  const { isLoading, specExists, isGenerationRunning, loadSpec } = useSpecLoading();
 
   // Save state
   const { isSaving, hasChanges, saveSpec, handleChange, setHasChanges } = useSpecSave();
@@ -82,15 +82,20 @@ export function SpecView() {
     );
   }
 
-  // Empty state - no spec exists
-  if (!specExists) {
+  // Empty state - no spec exists or generation is running
+  // When generation is running, we skip loading the spec to avoid 500 errors,
+  // so we show the empty state with generation indicator
+  if (!specExists || isGenerationRunning) {
+    // If generation is running (from loading hook check), ensure we show the generating UI
+    const showAsGenerating = isCreating || isGenerationRunning;
+
     return (
       <>
         <SpecEmptyState
           projectPath={currentProject.path}
-          isCreating={isCreating}
-          isRegenerating={isRegenerating}
-          currentPhase={currentPhase}
+          isCreating={showAsGenerating}
+          isRegenerating={isRegenerating || isGenerationRunning}
+          currentPhase={currentPhase || (isGenerationRunning ? 'initialization' : '')}
           errorMessage={errorMessage}
           onCreateClick={() => setShowCreateDialog(true)}
         />

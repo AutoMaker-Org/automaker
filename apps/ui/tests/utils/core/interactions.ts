@@ -1,5 +1,6 @@
 import { Page, expect } from '@playwright/test';
 import { getByTestId, getButtonByText } from './elements';
+import { waitForSplashScreenToDisappear } from './waiting';
 
 /**
  * Get the platform-specific modifier key (Meta for Mac, Control for Windows/Linux)
@@ -19,9 +20,14 @@ export async function pressModifierEnter(page: Page): Promise<void> {
 
 /**
  * Click an element by its data-testid attribute
+ * Waits for the element to be visible before clicking to avoid flaky tests
  */
 export async function clickElement(page: Page, testId: string): Promise<void> {
-  const element = await getByTestId(page, testId);
+  // Wait for splash screen to disappear first (safety net)
+  await waitForSplashScreenToDisappear(page, 5000);
+  const element = page.locator(`[data-testid="${testId}"]`);
+  // Wait for element to be visible and stable before clicking
+  await element.waitFor({ state: 'visible', timeout: 10000 });
   await element.click();
 }
 
@@ -72,15 +78,21 @@ export async function handleLoginScreenIfPresent(page: Page): Promise<boolean> {
     '[data-testid="welcome-view"], [data-testid="board-view"], [data-testid="context-view"], [data-testid="agent-view"]'
   );
 
-  // Race between login screen and actual content
+  const maxWaitMs = 15000;
+
+  // Race between login screen, a delayed redirect to /login, and actual content
   const loginVisible = await Promise.race([
+    page
+      .waitForURL((url) => url.pathname.includes('/login'), { timeout: maxWaitMs })
+      .then(() => true)
+      .catch(() => false),
     loginInput
-      .waitFor({ state: 'visible', timeout: 5000 })
+      .waitFor({ state: 'visible', timeout: maxWaitMs })
       .then(() => true)
       .catch(() => false),
     appContent
       .first()
-      .waitFor({ state: 'visible', timeout: 5000 })
+      .waitFor({ state: 'visible', timeout: maxWaitMs })
       .then(() => false)
       .catch(() => false),
   ]);
@@ -101,8 +113,8 @@ export async function handleLoginScreenIfPresent(page: Page): Promise<boolean> {
 
     // Wait for navigation away from login - either to content or URL change
     await Promise.race([
-      page.waitForURL((url) => !url.pathname.includes('/login'), { timeout: 10000 }),
-      appContent.first().waitFor({ state: 'visible', timeout: 10000 }),
+      page.waitForURL((url) => !url.pathname.includes('/login'), { timeout: 15000 }),
+      appContent.first().waitFor({ state: 'visible', timeout: 15000 }),
     ]).catch(() => {});
 
     // Wait for page to load

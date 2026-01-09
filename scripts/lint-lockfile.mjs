@@ -12,7 +12,7 @@ const lockfilePath = join(process.cwd(), 'package-lock.json');
 
 try {
   const content = readFileSync(lockfilePath, 'utf8');
-  
+
   // Check for git+ssh:// URLs
   if (content.includes('git+ssh://')) {
     console.error('Error: package-lock.json contains git+ssh:// URLs.');
@@ -20,7 +20,7 @@ try {
     console.error('Or run: npm run fix:lockfile');
     process.exit(1);
   }
-  
+
   console.log('✓ No git+ssh:// URLs found in package-lock.json');
   process.exit(0);
 } catch (error) {

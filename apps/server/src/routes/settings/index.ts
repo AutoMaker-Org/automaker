@@ -23,6 +23,7 @@ import { createGetProjectHandler } from './routes/get-project.js';
 import { createUpdateProjectHandler } from './routes/update-project.js';
 import { createMigrateHandler } from './routes/migrate.js';
 import { createStatusHandler } from './routes/status.js';
+import { createDiscoverAgentsHandler } from './routes/discover-agents.js';
 
 /**
  * Create settings router with all endpoints
@@ -39,6 +40,7 @@ import { createStatusHandler } from './routes/status.js';
  * - POST /project - Get project settings (requires projectPath in body)
  * - PUT /project - Update project settings
  * - POST /migrate - Migrate settings from localStorage
+ * - POST /agents/discover - Discover filesystem agents from .claude/agents/ (read-only)
  *
  * @param settingsService - Instance of SettingsService for file I/O
  * @returns Express Router configured with all settings endpoints
@@ -71,6 +73,9 @@ export function createSettingsRoutes(settingsService: SettingsService): Router {
 
   // Migration from localStorage
   router.post('/migrate', createMigrateHandler(settingsService));
+
+  // Filesystem agents discovery (read-only)
+  router.post('/agents/discover', createDiscoverAgentsHandler());
 
   return router;
 }

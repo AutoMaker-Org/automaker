@@ -1,7 +1,7 @@
 /**
  * POST /enhance-prompt endpoint - Enhance user input text
  *
- * Uses Claude AI to enhance text based on the specified enhancement mode.
+ * Uses Claude AI or Cursor to enhance text based on the specified enhancement mode.
  * Supports modes: improve, technical, simplify, acceptance
  */
 
@@ -9,7 +9,13 @@ import type { Request, Response } from 'express';
 import { query } from '@anthropic-ai/claude-agent-sdk';
 import { createLogger } from '@automaker/utils';
 import { resolveModelString } from '@automaker/model-resolver';
-import { CLAUDE_MODEL_MAP } from '@automaker/types';
+import {
+  CLAUDE_MODEL_MAP,
+  isCursorModel,
+  ThinkingLevel,
+  getThinkingTokenBudget,
+} from '@automaker/types';
+import { ProviderFactory } from '../../../providers/provider-factory.js';
 import type { SettingsService } from '../../../services/settings-service.js';
 import { getPromptCustomization } from '../../../lib/settings-helpers.js';
 import {
@@ -30,6 +36,8 @@ interface EnhanceRequestBody {
   enhancementMode: string;
   /** Optional model override */
   model?: string;
+  /** Optional thinking level for Claude models (ignored for Cursor models) */
+  thinkingLevel?: ThinkingLevel;
 }
 
 /**
@@ -82,6 +90,41 @@ async function extractTextFromStream(
 }
 
 /**
+ * Execute enhancement using Cursor provider
+ *
+ * @param prompt - The enhancement prompt
+ * @param model - The Cursor model to use
+ * @returns The enhanced text
+ */
+async function executeWithCursor(prompt: string, model: string): Promise<string> {
+  const provider = ProviderFactory.getProviderForModel(model);
+
+  let responseText = '';
+
+  for await (const msg of provider.executeQuery({
+    prompt,
+    model,
+    cwd: process.cwd(), // Enhancement doesn't need a specific working directory
+    readOnly: true, // Prompt enhancement only generates text, doesn't write files
+  })) {
+    if (msg.type === 'assistant' && msg.message?.content) {
+      for (const block of msg.message.content) {
+        if (block.type === 'text' && block.text) {
+          responseText += block.text;
+        }
+      }
+    } else if (msg.type === 'result' && msg.subtype === 'success' && msg.result) {
+      // Use result if it's a final accumulated message
+      if (msg.result.length > responseText.length) {
+        responseText = msg.result;
+      }
+    }
+  }
+
+  return responseText;
+}
+
+/**
  * Create the enhance request handler
  *
  * @param settingsService - Optional settings service for loading custom prompts
@@ -92,7 +135,8 @@ export function createEnhanceHandler(
 ): (req: Request, res: Response) => Promise<void> {
   return async (req: Request, res: Response): Promise<void> => {
     try {
-      const { originalText, enhancementMode, model } = req.body as EnhanceRequestBody;
+      const { originalText, enhancementMode, model, thinkingLevel } =
+        req.body as EnhanceRequestBody;
 
       // Validate required fields
       if (!originalText || typeof originalText !== 'string') {
@@ -155,24 +199,43 @@ export function createEnhanceHandler(
 
       logger.debug(`Using model: ${resolvedModel}`);
 
-      // Call Claude SDK with minimal configuration for text transformation
-      // Key: no tools, just text completion
-      const stream = query({
-        prompt: userPrompt,
-        options: {
+      let enhancedText: string;
+
+      // Route to appropriate provider based on model
+      if (isCursorModel(resolvedModel)) {
+        // Use Cursor provider for Cursor models
+        logger.info(`Using Cursor provider for model: ${resolvedModel}`);
+
+        // Cursor doesn't have a separate system prompt concept, so combine them
+        const combinedPrompt = `${systemPrompt}\n\n${userPrompt}`;
+        enhancedText = await executeWithCursor(combinedPrompt, resolvedModel);
+      } else {
+        // Use Claude SDK for Claude models
+        logger.info(`Using Claude provider for model: ${resolvedModel}`);
+
+        // Convert thinkingLevel to maxThinkingTokens for SDK
+        const maxThinkingTokens = getThinkingTokenBudget(thinkingLevel);
+        const queryOptions: Parameters<typeof query>[0]['options'] = {
           model: resolvedModel,
           systemPrompt,
           maxTurns: 1,
           allowedTools: [],
           permissionMode: 'acceptEdits',
-        },
-      });
+        };
+        if (maxThinkingTokens) {
+          queryOptions.maxThinkingTokens = maxThinkingTokens;
+        }
 
-      // Extract the enhanced text from the response
-      const enhancedText = await extractTextFromStream(stream);
+        const stream = query({
+          prompt: userPrompt,
+          options: queryOptions,
+        });
+
+        enhancedText = await extractTextFromStream(stream);
+      }
 
       if (!enhancedText || enhancedText.trim().length === 0) {
-        logger.warn('Received empty response from Claude');
+        logger.warn('Received empty response from AI');
         const response: EnhanceErrorResponse = {
           success: false,
           error: 'Failed to generate enhanced text - empty response',

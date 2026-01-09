@@ -1,0 +1,19 @@
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Build outputs
+dist/
+**/dist/
+dist-electron/
+**/dist-electron/
+build/
+**/build/
+.next/
+**/.next/
+.nuxt/
+**/.nuxt/
+out/
+**/out/
+.cache/
+**/.cache/

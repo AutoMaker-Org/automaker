@@ -75,7 +75,8 @@ test.describe('Feature Manual Review Flow', () => {
       priority: 2,
     };
 
-    fs.writeFileSync(path.join(featureDir, 'feature.json'), JSON.stringify(feature, null, 2));
+    // Note: Feature is created via HTTP API in the test itself, not in beforeAll
+    // This ensures the feature exists when the board view loads it
   });
 
   test.afterAll(async () => {
@@ -83,22 +84,91 @@ test.describe('Feature Manual Review Flow', () => {
   });
 
   test('should manually verify a feature in waiting_approval column', async ({ page }) => {
+    // Set up the project in localStorage
     await setupRealProject(page, projectPath, projectName, { setAsCurrent: true });
 
+    // Intercept settings API to ensure our test project remains current
+    // and doesn't get overridden by server settings
+    await page.route('**/api/settings/global', async (route) => {
+      const response = await route.fetch();
+      const json = await response.json();
+      if (json.settings) {
+        // Set our test project as the current project
+        const testProject = {
+          id: `project-${projectName}`,
+          name: projectName,
+          path: projectPath,
+          lastOpened: new Date().toISOString(),
+        };
+
+        // Add to projects if not already there
+        const existingProjects = json.settings.projects || [];
+        const hasProject = existingProjects.some((p: any) => p.path === projectPath);
+        if (!hasProject) {
+          json.settings.projects = [testProject, ...existingProjects];
+        }
+
+        // Set as current project
+        json.settings.currentProjectId = testProject.id;
+      }
+      await route.fulfill({ response, json });
+    });
+
     await authenticateForTests(page);
+
+    // Navigate to board
     await page.goto('/board');
     await page.waitForLoadState('load');
     await handleLoginScreenIfPresent(page);
     await waitForNetworkIdle(page);
-
     await expect(page.locator('[data-testid="board-view"]')).toBeVisible({ timeout: 10000 });
+
+    // Verify we're on the correct project
+    await expect(page.getByText(projectName).first()).toBeVisible({ timeout: 10000 });
+
+    // Create the feature via HTTP API (writes to disk)
+    const feature = {
+      id: featureId,
+      description: 'Test feature for manual review flow',
+      category: 'test',
+      status: 'waiting_approval',
+      skipTests: true,
+      model: 'sonnet',
+      thinkingLevel: 'none',
+      createdAt: new Date().toISOString(),
+      branchName: '',
+      priority: 2,
+    };
+
+    const API_BASE_URL = process.env.VITE_SERVER_URL || 'http://localhost:3008';
+    const createResponse = await page.request.post(`${API_BASE_URL}/api/features/create`, {
+      data: { projectPath, feature },
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    if (!createResponse.ok()) {
+      const error = await createResponse.text();
+      throw new Error(`Failed to create feature: ${error}`);
+    }
+
+    // Reload to pick up the new feature
+    await page.reload();
+    await page.waitForLoadState('load');
+    await handleLoginScreenIfPresent(page);
+    await waitForNetworkIdle(page);
+    await expect(page.locator('[data-testid="board-view"]')).toBeVisible({ timeout: 10000 });
+
+    // Wait for the feature card to appear (features are loaded asynchronously)
+    const featureCard = page.locator(`[data-testid="kanban-card-${featureId}"]`);
+    await expect(featureCard).toBeVisible({ timeout: 20000 });
 
     // Verify the feature appears in the waiting_approval column
     const waitingApprovalColumn = await getKanbanColumn(page, 'waiting_approval');
     await expect(waitingApprovalColumn).toBeVisible({ timeout: 5000 });
 
-    const featureCard = page.locator(`[data-testid="kanban-card-${featureId}"]`);
-    await expect(featureCard).toBeVisible({ timeout: 10000 });
+    // Verify the card is in the waiting_approval column
+    const cardInColumn = waitingApprovalColumn.locator(`[data-testid="kanban-card-${featureId}"]`);
+    await expect(cardInColumn).toBeVisible({ timeout: 5000 });
 
     // For waiting_approval features, the button is "mark-as-verified-{id}"
     const markAsVerifiedButton = page.locator(`[data-testid="mark-as-verified-${featureId}"]`);

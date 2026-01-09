@@ -40,7 +40,15 @@ export {
 } from './prompt-builder.js';
 
 // Logger
-export { createLogger, getLogLevel, setLogLevel, LogLevel } from './logger.js';
+export {
+  createLogger,
+  getLogLevel,
+  setLogLevel,
+  setColorsEnabled,
+  setTimestampsEnabled,
+  LogLevel,
+  type Logger,
+} from './logger.js';
 
 // File system utilities
 export { mkdirSafe, existsSafe } from './fs-utils.js';

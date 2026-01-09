@@ -3,6 +3,32 @@
  * Parses agent output into structured sections for display
  */
 
+import type {
+  CursorStreamEvent,
+  CursorSystemEvent,
+  CursorAssistantEvent,
+  CursorToolCallEvent,
+  CursorResultEvent,
+} from '@automaker/types';
+
+/**
+ * Cleans up fragmented streaming text by removing spurious newlines
+ * This handles cases where streaming providers send partial text chunks
+ * that got separated by newlines during accumulation
+ */
+function cleanFragmentedText(content: string): string {
+  // Remove newlines that break up words (newline between letters)
+  // e.g., "sum\n\nmary" -> "summary"
+  let cleaned = content.replace(/([a-zA-Z])\n+([a-zA-Z])/g, '$1$2');
+
+  // Also clean up fragmented XML-like tags
+  // e.g., "<sum\n\nmary>" -> "<summary>"
+  cleaned = cleaned.replace(/<([a-zA-Z]+)\n*([a-zA-Z]*)\n*>/g, '<$1$2>');
+  cleaned = cleaned.replace(/<\/([a-zA-Z]+)\n*([a-zA-Z]*)\n*>/g, '</$1$2>');
+
+  return cleaned;
+}
+
 export type LogEntryType =
   | 'prompt'
   | 'tool_call'
@@ -32,12 +58,16 @@ const TOOL_CATEGORIES: Record<string, ToolCategory> = {
   Bash: 'bash',
   Grep: 'search',
   Glob: 'search',
+  Ls: 'read',
+  Delete: 'write',
   WebSearch: 'search',
   WebFetch: 'read',
   TodoWrite: 'todo',
   Task: 'task',
   NotebookEdit: 'edit',
   KillShell: 'bash',
+  SemanticSearch: 'search',
+  ReadLints: 'read',
 };
 
 /**
@@ -92,6 +122,8 @@ const generateDeterministicId = (content: string, lineIndex: number): string => 
  */
 function detectEntryType(content: string): LogEntryType {
   const trimmed = content.trim();
+  // Clean fragmented text for pattern matching
+  const cleaned = cleanFragmentedText(trimmed);
 
   // Tool calls
   if (trimmed.startsWith('🔧 Tool:') || trimmed.match(/^Tool:\s*/)) {
@@ -134,14 +166,17 @@ function detectEntryType(content: string): LogEntryType {
   }
 
   // Success messages and summary sections
+  // Check both raw and cleaned content for summary tags (handles fragmented streaming)
   if (
     trimmed.startsWith('✅') ||
     trimmed.toLowerCase().includes('success') ||
     trimmed.toLowerCase().includes('completed') ||
-    // Summary tags (preferred format from agent)
+    // Summary tags (preferred format from agent) - check both raw and cleaned
     trimmed.startsWith('<summary>') ||
+    cleaned.startsWith('<summary>') ||
     // Markdown summary headers (fallback)
     trimmed.match(/^##\s+(Summary|Feature|Changes|Implementation)/i) ||
+    cleaned.match(/^##\s+(Summary|Feature|Changes|Implementation)/i) ||
     trimmed.match(/^(I've|I have) (successfully |now )?(completed|finished|implemented)/i)
   ) {
     return 'success';
@@ -292,12 +327,470 @@ export function generateToolSummary(toolName: string, content: string): string |
       case 'KillShell': {
         return 'Terminating shell session';
       }
+      case 'SemanticSearch': {
+        const query = parsed.query as string | undefined;
+        return `Semantic search: "${query?.slice(0, 30) || ''}"`;
+      }
+      case 'ReadLints': {
+        const paths = parsed.paths as string[] | undefined;
+        const pathCount = paths?.length || 0;
+        return `Reading lints for ${pathCount} file(s)`;
+      }
       default:
         return undefined;
     }
   } catch {
     return undefined;
   }
+}
+
+// ============================================================================
+// Cursor Event Parsing
+// ============================================================================
+
+/**
+ * Detect if a parsed JSON object is a Cursor stream event
+ */
+function isCursorEvent(obj: unknown): obj is CursorStreamEvent {
+  return (
+    obj !== null &&
+    typeof obj === 'object' &&
+    'type' in obj &&
+    'session_id' in obj &&
+    ['system', 'user', 'assistant', 'tool_call', 'result'].includes(
+      (obj as Record<string, unknown>).type as string
+    )
+  );
+}
+
+/**
+ * Normalize Cursor tool call event to log entry
+ */
+function normalizeCursorToolCall(
+  event: CursorToolCallEvent,
+  baseEntry: { id: string; timestamp: string }
+): LogEntry | null {
+  const toolCall = event.tool_call;
+  const isStarted = event.subtype === 'started';
+  const isCompleted = event.subtype === 'completed';
+
+  // Read tool
+  if (toolCall.readToolCall) {
+    const path = toolCall.readToolCall.args?.path || 'unknown';
+    const result = toolCall.readToolCall.result?.success;
+
+    return {
+      ...baseEntry,
+      id: `${baseEntry.id}-${event.call_id}`,
+      type: 'tool_call' as LogEntryType,
+      title: isStarted ? `Reading ${path}` : `Read ${path}`,
+      content:
+        isCompleted && result
+          ? `${result.totalLines} lines, ${result.totalChars} chars`
+          : `Path: ${path}`,
+      collapsed: true,
+      metadata: {
+        toolName: 'Read',
+        toolCategory: 'read' as ToolCategory,
+        filePath: path,
+        summary: isCompleted ? `Read ${result?.totalLines || 0} lines` : `Reading file...`,
+      },
+    };
+  }
+
+  // Write tool
+  if (toolCall.writeToolCall) {
+    const path =
+      toolCall.writeToolCall.args?.path ||
+      toolCall.writeToolCall.result?.success?.path ||
+      'unknown';
+    const result = toolCall.writeToolCall.result?.success;
+
+    return {
+      ...baseEntry,
+      id: `${baseEntry.id}-${event.call_id}`,
+      type: 'tool_call' as LogEntryType,
+      title: isStarted ? `Writing ${path}` : `Wrote ${path}`,
+      content:
+        isCompleted && result
+          ? `${result.linesCreated} lines, ${result.fileSize} bytes`
+          : `Path: ${path}`,
+      collapsed: true,
+      metadata: {
+        toolName: 'Write',
+        toolCategory: 'write' as ToolCategory,
+        filePath: path,
+        summary: isCompleted ? `Wrote ${result?.linesCreated || 0} lines` : `Writing file...`,
+      },
+    };
+  }
+
+  // Edit tool
+  if (toolCall.editToolCall) {
+    const path = toolCall.editToolCall.args?.path || 'unknown';
+
+    return {
+      ...baseEntry,
+      id: `${baseEntry.id}-${event.call_id}`,
+      type: 'tool_call' as LogEntryType,
+      title: isStarted ? `Editing ${path}` : `Edited ${path}`,
+      content: `Path: ${path}`,
+      collapsed: true,
+      metadata: {
+        toolName: 'Edit',
+        toolCategory: 'edit' as ToolCategory,
+        filePath: path,
+        summary: isCompleted ? `Edited file` : `Editing file...`,
+      },
+    };
+  }
+
+  // Shell/Bash tool
+  if (toolCall.shellToolCall) {
+    const command = toolCall.shellToolCall.args?.command || '';
+    const result = toolCall.shellToolCall.result;
+    const shortCmd = command.length > 50 ? command.slice(0, 50) + '...' : command;
+
+    let content = `Command: ${command}`;
+    if (isCompleted && result?.success) {
+      content += `\nExit code: ${result.success.exitCode}`;
+    } else if (isCompleted && result?.rejected) {
+      content += `\nRejected: ${result.rejected.reason}`;
+    }
+
+    return {
+      ...baseEntry,
+      id: `${baseEntry.id}-${event.call_id}`,
+      type: 'tool_call' as LogEntryType,
+      title: isStarted ? `Running: ${shortCmd}` : `Ran: ${shortCmd}`,
+      content,
+      collapsed: true,
+      metadata: {
+        toolName: 'Bash',
+        toolCategory: 'bash' as ToolCategory,
+        summary: isCompleted
+          ? result?.success
+            ? `Exit ${result.success.exitCode}`
+            : result?.rejected
+              ? 'Rejected'
+              : 'Completed'
+          : `Running...`,
+      },
+    };
+  }
+
+  // Delete tool
+  if (toolCall.deleteToolCall) {
+    const path = toolCall.deleteToolCall.args?.path || 'unknown';
+    const result = toolCall.deleteToolCall.result;
+
+    let content = `Path: ${path}`;
+    if (isCompleted && result?.rejected) {
+      content += `\nRejected: ${result.rejected.reason}`;
+    }
+
+    return {
+      ...baseEntry,
+      id: `${baseEntry.id}-${event.call_id}`,
+      type: 'tool_call' as LogEntryType,
+      title: isStarted ? `Deleting ${path}` : `Deleted ${path}`,
+      content,
+      collapsed: true,
+      metadata: {
+        toolName: 'Delete',
+        toolCategory: 'write' as ToolCategory,
+        filePath: path,
+        summary: isCompleted ? (result?.rejected ? 'Rejected' : 'Deleted') : `Deleting...`,
+      },
+    };
+  }
+
+  // Grep tool
+  if (toolCall.grepToolCall) {
+    const pattern = toolCall.grepToolCall.args?.pattern || '';
+    const searchPath = toolCall.grepToolCall.args?.path;
+    const result = toolCall.grepToolCall.result?.success;
+
+    return {
+      ...baseEntry,
+      id: `${baseEntry.id}-${event.call_id}`,
+      type: 'tool_call' as LogEntryType,
+      title: isStarted ? `Searching: "${pattern}"` : `Searched: "${pattern}"`,
+      content: `Pattern: ${pattern}${searchPath ? `\nPath: ${searchPath}` : ''}${
+        isCompleted && result ? `\nMatched ${result.matchedLines} lines` : ''
+      }`,
+      collapsed: true,
+      metadata: {
+        toolName: 'Grep',
+        toolCategory: 'search' as ToolCategory,
+        summary: isCompleted ? `Found ${result?.matchedLines || 0} matches` : `Searching...`,
+      },
+    };
+  }
+
+  // Ls tool
+  if (toolCall.lsToolCall) {
+    const path = toolCall.lsToolCall.args?.path || '.';
+    const result = toolCall.lsToolCall.result?.success;
+
+    return {
+      ...baseEntry,
+      id: `${baseEntry.id}-${event.call_id}`,
+      type: 'tool_call' as LogEntryType,
+      title: isStarted ? `Listing ${path}` : `Listed ${path}`,
+      content: `Path: ${path}${
+        isCompleted && result
+          ? `\n${result.childrenFiles} files, ${result.childrenDirs} directories`
+          : ''
+      }`,
+      collapsed: true,
+      metadata: {
+        toolName: 'Ls',
+        toolCategory: 'read' as ToolCategory,
+        filePath: path,
+        summary: isCompleted
+          ? `${result?.childrenFiles || 0} files, ${result?.childrenDirs || 0} dirs`
+          : `Listing...`,
+      },
+    };
+  }
+
+  // Glob tool
+  if (toolCall.globToolCall) {
+    const pattern = toolCall.globToolCall.args?.globPattern || '';
+    const targetDir = toolCall.globToolCall.args?.targetDirectory;
+    const result = toolCall.globToolCall.result?.success;
+
+    return {
+      ...baseEntry,
+      id: `${baseEntry.id}-${event.call_id}`,
+      type: 'tool_call' as LogEntryType,
+      title: isStarted ? `Finding: ${pattern}` : `Found: ${pattern}`,
+      content: `Pattern: ${pattern}${targetDir ? `\nDirectory: ${targetDir}` : ''}${
+        isCompleted && result ? `\nFound ${result.totalFiles} files` : ''
+      }`,
+      collapsed: true,
+      metadata: {
+        toolName: 'Glob',
+        toolCategory: 'search' as ToolCategory,
+        summary: isCompleted ? `Found ${result?.totalFiles || 0} files` : `Finding...`,
+      },
+    };
+  }
+
+  // Semantic Search tool
+  if (toolCall.semSearchToolCall) {
+    const query = toolCall.semSearchToolCall.args?.query || '';
+    const targetDirs = toolCall.semSearchToolCall.args?.targetDirectories;
+    const result = toolCall.semSearchToolCall.result?.success;
+    const shortQuery = query.length > 40 ? query.slice(0, 40) + '...' : query;
+    const resultCount = result?.codeResults?.length || 0;
+
+    return {
+      ...baseEntry,
+      id: `${baseEntry.id}-${event.call_id}`,
+      type: 'tool_call' as LogEntryType,
+      title: isStarted ? `Semantic search: "${shortQuery}"` : `Searched: "${shortQuery}"`,
+      content: `Query: ${query}${targetDirs?.length ? `\nDirectories: ${targetDirs.join(', ')}` : ''}${
+        isCompleted
+          ? `\n${resultCount > 0 ? `Found ${resultCount} result(s)` : result?.results || 'No results'}`
+          : ''
+      }`,
+      collapsed: true,
+      metadata: {
+        toolName: 'SemanticSearch',
+        toolCategory: 'search' as ToolCategory,
+        summary: isCompleted
+          ? resultCount > 0
+            ? `Found ${resultCount} result(s)`
+            : 'No results'
+          : `Searching...`,
+      },
+    };
+  }
+
+  // Read Lints tool
+  if (toolCall.readLintsToolCall) {
+    const paths = toolCall.readLintsToolCall.args?.paths || [];
+    const result = toolCall.readLintsToolCall.result?.success;
+    const pathCount = paths.length;
+
+    return {
+      ...baseEntry,
+      id: `${baseEntry.id}-${event.call_id}`,
+      type: 'tool_call' as LogEntryType,
+      title: isStarted ? `Reading lints for ${pathCount} file(s)` : `Read lints`,
+      content: `Paths: ${paths.join(', ')}${
+        isCompleted && result
+          ? `\nFound ${result.totalDiagnostics} diagnostic(s) in ${result.totalFiles} file(s)`
+          : ''
+      }`,
+      collapsed: true,
+      metadata: {
+        toolName: 'ReadLints',
+        toolCategory: 'read' as ToolCategory,
+        summary: isCompleted
+          ? `${result?.totalDiagnostics || 0} diagnostic(s)`
+          : `Reading lints...`,
+      },
+    };
+  }
+
+  // Generic function tool (fallback)
+  if (toolCall.function) {
+    const name = toolCall.function.name;
+    const args = toolCall.function.arguments;
+
+    // Determine category based on tool name
+    const category = categorizeToolName(name);
+
+    return {
+      ...baseEntry,
+      id: `${baseEntry.id}-${event.call_id}`,
+      type: 'tool_call' as LogEntryType,
+      title: `${name} ${isStarted ? 'started' : 'completed'}`,
+      content: args || '',
+      collapsed: true,
+      metadata: {
+        toolName: name,
+        toolCategory: category,
+        summary: `${name} ${event.subtype}`,
+      },
+    };
+  }
+
+  return null;
+}
+
+/**
+ * Normalize Cursor stream event to log entry
+ */
+export function normalizeCursorEvent(event: CursorStreamEvent): LogEntry | null {
+  const timestamp = new Date().toISOString();
+  const baseEntry = {
+    id: `cursor-${event.session_id}-${Date.now()}`,
+    timestamp,
+  };
+
+  switch (event.type) {
+    case 'system': {
+      const sysEvent = event as CursorSystemEvent;
+      return {
+        ...baseEntry,
+        type: 'info' as LogEntryType,
+        title: 'Session Started',
+        content: `Model: ${sysEvent.model}\nAuth: ${sysEvent.apiKeySource}\nCWD: ${sysEvent.cwd}`,
+        collapsed: true,
+        metadata: {
+          phase: 'init',
+        },
+      };
+    }
+
+    case 'assistant': {
+      const assistEvent = event as CursorAssistantEvent;
+      const text = assistEvent.message.content
+        .filter((c) => c.type === 'text')
+        .map((c) => c.text)
+        .join('');
+
+      if (!text.trim()) return null;
+
+      return {
+        ...baseEntry,
+        type: 'info' as LogEntryType,
+        title: 'Assistant',
+        content: text,
+        collapsed: false,
+      };
+    }
+
+    case 'tool_call': {
+      const toolEvent = event as CursorToolCallEvent;
+      return normalizeCursorToolCall(toolEvent, baseEntry);
+    }
+
+    case 'result': {
+      const resultEvent = event as CursorResultEvent;
+
+      if (resultEvent.is_error) {
+        return {
+          ...baseEntry,
+          type: 'error' as LogEntryType,
+          title: 'Error',
+          content: resultEvent.error || resultEvent.result || 'Unknown error',
+          collapsed: false,
+        };
+      }
+
+      return {
+        ...baseEntry,
+        type: 'success' as LogEntryType,
+        title: 'Completed',
+        content: `Duration: ${resultEvent.duration_ms}ms`,
+        collapsed: true,
+      };
+    }
+
+    default:
+      return null;
+  }
+}
+
+/**
+ * Parse a single log line into a structured entry
+ * Handles both Cursor JSON events and plain text
+ */
+export function parseLogLine(line: string): LogEntry | null {
+  if (!line.trim()) return null;
+
+  try {
+    const parsed = JSON.parse(line);
+
+    // Check if it's a Cursor stream event
+    if (isCursorEvent(parsed)) {
+      return normalizeCursorEvent(parsed);
+    }
+
+    // For other JSON, treat as debug info
+    return {
+      id: `json-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      type: 'debug',
+      title: 'Debug Info',
+      content: line,
+      timestamp: new Date().toISOString(),
+      collapsed: true,
+    };
+  } catch {
+    // Non-JSON line - treat as plain text
+    return {
+      id: `text-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      type: 'info',
+      title: 'Output',
+      content: line,
+      timestamp: new Date().toISOString(),
+      collapsed: false,
+    };
+  }
+}
+
+/**
+ * Get provider-specific styling for log entries
+ */
+export function getProviderStyle(entry: LogEntry): { badge?: string; icon?: string } {
+  // Check if entry has Cursor session ID pattern
+  if (entry.id.startsWith('cursor-')) {
+    return {
+      badge: 'Cursor',
+      icon: 'terminal',
+    };
+  }
+
+  // Default (Claude/AutoMaker)
+  return {
+    badge: 'Claude',
+    icon: 'bot',
+  };
 }
 
 /**
@@ -339,6 +832,9 @@ export function shouldCollapseByDefault(entry: LogEntry): boolean {
  * Generates a title for a log entry
  */
 function generateTitle(type: LogEntryType, content: string): string {
+  // Clean content for pattern matching
+  const cleaned = cleanFragmentedText(content);
+
   switch (type) {
     case 'tool_call': {
       const toolName = extractToolName(content);
@@ -361,11 +857,19 @@ function generateTitle(type: LogEntryType, content: string): string {
     case 'error':
       return 'Error';
     case 'success': {
-      // Check if it's a summary section
-      if (content.startsWith('<summary>') || content.includes('<summary>')) {
+      // Check if it's a summary section (check both raw and cleaned)
+      if (
+        content.startsWith('<summary>') ||
+        content.includes('<summary>') ||
+        cleaned.startsWith('<summary>') ||
+        cleaned.includes('<summary>')
+      ) {
         return 'Summary';
       }
-      if (content.match(/^##\s+(Summary|Feature|Changes|Implementation)/i)) {
+      if (
+        content.match(/^##\s+(Summary|Feature|Changes|Implementation)/i) ||
+        cleaned.match(/^##\s+(Summary|Feature|Changes|Implementation)/i)
+      ) {
         return 'Summary';
       }
       if (
@@ -489,6 +993,26 @@ export function parseLogOutput(rawOutput: string): LogEntry[] {
       continue;
     }
 
+    // Check for Cursor stream events (NDJSON lines)
+    // These are complete JSON objects on a single line
+    if (trimmedLine.startsWith('{') && trimmedLine.endsWith('}')) {
+      try {
+        const parsed = JSON.parse(trimmedLine);
+        if (isCursorEvent(parsed)) {
+          // Finalize any pending entry before adding Cursor event
+          finalizeEntry();
+          const cursorEntry = normalizeCursorEvent(parsed);
+          if (cursorEntry) {
+            entries.push(cursorEntry);
+          }
+          lineIndex++;
+          continue;
+        }
+      } catch {
+        // Not valid JSON, continue with normal parsing
+      }
+    }
+
     // If we're in JSON accumulation mode, keep accumulating until depth returns to 0
     if (inJsonAccumulation) {
       currentContent.push(line);
@@ -537,10 +1061,12 @@ export function parseLogOutput(rawOutput: string): LogEntry[] {
       trimmedLine.match(/\[Status\]/i) ||
       trimmedLine.toLowerCase().includes('ultrathink preparation') ||
       trimmedLine.match(/thinking level[:\s]*(low|medium|high|none|\d)/i) ||
-      // Summary tags (preferred format from agent)
+      // Summary tags (preferred format from agent) - check both raw and cleaned for fragmented streaming
       trimmedLine.startsWith('<summary>') ||
+      cleanFragmentedText(trimmedLine).startsWith('<summary>') ||
       // Agent summary sections (markdown headers - fallback)
       trimmedLine.match(/^##\s+(Summary|Feature|Changes|Implementation)/i) ||
+      cleanFragmentedText(trimmedLine).match(/^##\s+(Summary|Feature|Changes|Implementation)/i) ||
       // Summary introduction lines
       trimmedLine.match(/^All tasks completed/i) ||
       trimmedLine.match(/^(I've|I have) (successfully |now )?(completed|finished|implemented)/i);
@@ -568,7 +1094,13 @@ export function parseLogOutput(rawOutput: string): LogEntry[] {
       currentContent.push(trimmedLine);
 
       // If this is a <summary> tag, start summary accumulation mode
-      if (trimmedLine.startsWith('<summary>') && !trimmedLine.includes('</summary>')) {
+      // Check both raw and cleaned for fragmented streaming
+      const cleanedTrimmed = cleanFragmentedText(trimmedLine);
+      if (
+        (trimmedLine.startsWith('<summary>') || cleanedTrimmed.startsWith('<summary>')) &&
+        !trimmedLine.includes('</summary>') &&
+        !cleanedTrimmed.includes('</summary>')
+      ) {
         inSummaryAccumulation = true;
       }
     } else if (isInputLine && currentEntry) {
@@ -662,6 +1194,53 @@ function mergeConsecutiveEntries(entries: LogEntry[]): LogEntry[] {
   }
 
   return merged;
+}
+
+/**
+ * Extracts summary content from raw log output
+ * Returns the summary text if found, or null if no summary exists
+ */
+export function extractSummary(rawOutput: string): string | null {
+  if (!rawOutput || !rawOutput.trim()) {
+    return null;
+  }
+
+  // Try to find <summary> tags first (preferred format)
+  const summaryTagMatch = rawOutput.match(/<summary>([\s\S]*?)<\/summary>/);
+  if (summaryTagMatch) {
+    return summaryTagMatch[1].trim();
+  }
+
+  // Try to find markdown ## Summary section
+  const summaryHeaderMatch = rawOutput.match(/^##\s+Summary\s*\n([\s\S]*?)(?=\n##\s+|$)/m);
+  if (summaryHeaderMatch) {
+    return summaryHeaderMatch[1].trim();
+  }
+
+  // Try other summary formats (Feature, Changes, Implementation)
+  const otherHeaderMatch = rawOutput.match(
+    /^##\s+(Feature|Changes|Implementation)\s*\n([\s\S]*?)(?=\n##\s+|$)/m
+  );
+  if (otherHeaderMatch) {
+    return `## ${otherHeaderMatch[1]}\n${otherHeaderMatch[2].trim()}`;
+  }
+
+  // Try to find summary introduction lines
+  const introMatch = rawOutput.match(
+    /(^|\n)(All tasks completed[\s\S]*?)(?=\n🔧|\n📋|\n⚡|\n❌|$)/
+  );
+  if (introMatch) {
+    return introMatch[2].trim();
+  }
+
+  const completionMatch = rawOutput.match(
+    /(^|\n)((I've|I have) (successfully |now )?(completed|finished|implemented)[\s\S]*?)(?=\n🔧|\n📋|\n⚡|\n❌|$)/
+  );
+  if (completionMatch) {
+    return completionMatch[2].trim();
+  }
+
+  return null;
 }
 
 /**

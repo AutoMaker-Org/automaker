@@ -36,6 +36,17 @@ services:
       # Required
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
 
+      # Optional - Claude CLI OAuth credentials (for macOS users)
+      # Extract with: ./scripts/get-claude-token.sh
+      # This writes the OAuth tokens to ~/.claude/.credentials.json in the container
+      - CLAUDE_OAUTH_CREDENTIALS=${CLAUDE_OAUTH_CREDENTIALS:-}
+
+      # Optional - Cursor CLI OAuth token (extract from host with the command shown below)
+      # macOS: ./scripts/get-cursor-token.sh (extracts from Keychain)
+      # Linux: jq -r '.accessToken' ~/.config/cursor/auth.json
+      # Note: cursor-agent stores its OAuth tokens separately from Cursor IDE
+      - CURSOR_AUTH_TOKEN=${CURSOR_AUTH_TOKEN:-}
+
       # Optional - authentication, one will generate if left blank
       - AUTOMAKER_API_KEY=${AUTOMAKER_API_KEY:-}
 
@@ -59,6 +70,14 @@ services:
       # This volume persists data between restarts but is container-managed
       - automaker-data:/data
 
+      # Persist Claude CLI OAuth session keys across container restarts
+      # This allows 'claude login' authentication to persist between restarts
+      - automaker-claude-config:/home/automaker/.claude
+
+      # Persist Cursor CLI configuration and authentication across container restarts
+      # This allows 'cursor-agent login' authentication to persist between restarts
+      - automaker-cursor-config:/home/automaker/.cursor
+
       # NO host directory mounts - container cannot access your laptop files
       # If you need to work on a project, create it INSIDE the container
       # or use a separate docker-compose override file
@@ -72,3 +91,13 @@ volumes:
   automaker-data:
     name: automaker-data
     # Named volume - completely isolated from host filesystem
+
+  automaker-claude-config:
+    name: automaker-claude-config
+    # Named volume for Claude CLI OAuth session keys and configuration
+    # Persists authentication across container restarts
+
+  automaker-cursor-config:
+    name: automaker-cursor-config
+    # Named volume for Cursor CLI configuration and authentication
+    # Persists cursor-agent login authentication across container restarts

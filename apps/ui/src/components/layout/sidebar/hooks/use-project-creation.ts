@@ -1,5 +1,8 @@
 import { useState, useCallback } from 'react';
+import { createLogger } from '@automaker/utils/logger';
 import { getElectronAPI } from '@/lib/electron';
+
+const logger = createLogger('ProjectCreation');
 import { initializeProject } from '@/lib/project-init';
 import { toast } from 'sonner';
 import type { StarterTemplate } from '@/lib/templates';
@@ -82,7 +85,7 @@ export function useProjectCreation({
 
         toast.success('Project created successfully');
       } catch (error) {
-        console.error('[ProjectCreation] Failed to finalize project:', error);
+        logger.error('Failed to finalize project:', error);
         toast.error('Failed to initialize project', {
           description: error instanceof Error ? error.message : 'Unknown error',
         });
@@ -108,7 +111,7 @@ export function useProjectCreation({
         // Finalize project setup
         await finalizeProjectCreation(projectPath, projectName);
       } catch (error) {
-        console.error('[ProjectCreation] Failed to create blank project:', error);
+        logger.error('Failed to create blank project:', error);
         toast.error('Failed to create project', {
           description: error instanceof Error ? error.message : 'Unknown error',
         });
@@ -129,6 +132,9 @@ export function useProjectCreation({
         const api = getElectronAPI();
 
         // Clone template repository
+        if (!api.templates) {
+          throw new Error('Templates API is not available');
+        }
         const cloneResult = await api.templates.clone(template.repoUrl, projectName, parentDir);
         if (!cloneResult.success) {
           throw new Error(cloneResult.error || 'Failed to clone template');
@@ -180,7 +186,7 @@ export function useProjectCreation({
           description: `Created ${projectName} from ${template.name}`,
         });
       } catch (error) {
-        console.error('[ProjectCreation] Failed to create from template:', error);
+        logger.error('Failed to create from template:', error);
         toast.error('Failed to create project from template', {
           description: error instanceof Error ? error.message : 'Unknown error',
         });
@@ -201,6 +207,9 @@ export function useProjectCreation({
         const api = getElectronAPI();
 
         // Clone custom repository
+        if (!api.templates) {
+          throw new Error('Templates API is not available');
+        }
         const cloneResult = await api.templates.clone(repoUrl, projectName, parentDir);
         if (!cloneResult.success) {
           throw new Error(cloneResult.error || 'Failed to clone repository');
@@ -252,7 +261,7 @@ export function useProjectCreation({
           description: `Created ${projectName} from ${repoUrl}`,
         });
       } catch (error) {
-        console.error('[ProjectCreation] Failed to create from custom URL:', error);
+        logger.error('Failed to create from custom URL:', error);
         toast.error('Failed to create project from URL', {
           description: error instanceof Error ? error.message : 'Unknown error',
         });

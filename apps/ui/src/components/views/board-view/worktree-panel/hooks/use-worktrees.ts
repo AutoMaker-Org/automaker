@@ -1,8 +1,11 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { createLogger } from '@automaker/utils/logger';
 import { useAppStore } from '@/store/app-store';
 import { getElectronAPI } from '@/lib/electron';
 import { pathsEqual } from '@/lib/utils';
 import type { WorktreeInfo } from '../types';
+
+const logger = createLogger('Worktrees');
 
 interface UseWorktreesOptions {
   projectPath: string;
@@ -33,7 +36,7 @@ export function useWorktrees({
       try {
         const api = getElectronAPI();
         if (!api?.worktree?.listAll) {
-          console.warn('Worktree API not available');
+          logger.warn('Worktree API not available');
           return;
         }
         const result = await api.worktree.listAll(projectPath, true);
@@ -44,7 +47,7 @@ export function useWorktrees({
         // Return removed worktrees so they can be handled by the caller
         return result.removedWorktrees;
       } catch (error) {
-        console.error('Failed to fetch worktrees:', error);
+        logger.error('Failed to fetch worktrees:', error);
         return undefined;
       } finally {
         if (!silent) {

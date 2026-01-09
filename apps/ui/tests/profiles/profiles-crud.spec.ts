@@ -28,6 +28,9 @@ test.describe('AI Profiles', () => {
     await waitForNetworkIdle(page);
     await navigateToProfiles(page);
 
+    // Get initial custom profile count (may be 0 or more due to server settings hydration)
+    const initialCount = await countCustomProfiles(page);
+
     await clickNewProfileButton(page);
 
     await fillProfileForm(page, {
@@ -42,7 +45,15 @@ test.describe('AI Profiles', () => {
 
     await waitForSuccessToast(page, 'Profile created');
 
-    const customCount = await countCustomProfiles(page);
-    expect(customCount).toBe(1);
+    // Wait for the new profile to appear in the list (replaces arbitrary timeout)
+    // The count should increase by 1 from the initial count
+    await expect(async () => {
+      const customCount = await countCustomProfiles(page);
+      expect(customCount).toBe(initialCount + 1);
+    }).toPass({ timeout: 5000 });
+
+    // Verify the count is correct (final assertion)
+    const finalCount = await countCustomProfiles(page);
+    expect(finalCount).toBe(initialCount + 1);
   });
 });

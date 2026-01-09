@@ -1,10 +1,13 @@
 import { useEffect, useState, useCallback } from 'react';
+import { createLogger } from '@automaker/utils/logger';
 import { useAppStore } from '@/store/app-store';
 import { getElectronAPI } from '@/lib/electron';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { File, Folder, FolderOpen, ChevronRight, ChevronDown, RefreshCw, Code } from 'lucide-react';
 import { cn } from '@/lib/utils';
+
+const logger = createLogger('CodeView');
 
 interface FileTreeNode {
   name: string;
@@ -60,7 +63,7 @@ export function CodeView() {
         setFileTree(entries);
       }
     } catch (error) {
-      console.error('Failed to load file tree:', error);
+      logger.error('Failed to load file tree:', error);
     } finally {
       setIsLoading(false);
     }
@@ -91,7 +94,7 @@ export function CodeView() {
           }));
       }
     } catch (error) {
-      console.error('Failed to load subdirectory:', error);
+      logger.error('Failed to load subdirectory:', error);
     }
     return [];
   };
@@ -107,7 +110,7 @@ export function CodeView() {
         setSelectedFile(path);
       }
     } catch (error) {
-      console.error('Failed to load file:', error);
+      logger.error('Failed to load file:', error);
     }
   };
 

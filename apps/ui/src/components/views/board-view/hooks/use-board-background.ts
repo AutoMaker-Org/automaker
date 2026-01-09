@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useAppStore, defaultBackgroundSettings } from '@/store/app-store';
-import { getServerUrlSync } from '@/lib/http-api-client';
+import { getAuthenticatedImageUrl } from '@/lib/api-fetch';
 
 interface UseBoardBackgroundProps {
   currentProject: { path: string; id: string } | null;
@@ -22,14 +22,14 @@ export function useBoardBackground({ currentProject }: UseBoardBackgroundProps) 
       return {};
     }
 
+    const imageUrl = getAuthenticatedImageUrl(
+      backgroundSettings.imagePath,
+      currentProject.path,
+      backgroundSettings.imageVersion
+    );
+
     return {
-      backgroundImage: `url(${
-        import.meta.env.VITE_SERVER_URL || getServerUrlSync()
-      }/api/fs/image?path=${encodeURIComponent(
-        backgroundSettings.imagePath
-      )}&projectPath=${encodeURIComponent(currentProject.path)}${
-        backgroundSettings.imageVersion ? `&v=${backgroundSettings.imageVersion}` : ''
-      })`,
+      backgroundImage: `url(${imageUrl})`,
       backgroundSize: 'cover',
       backgroundPosition: 'center',
       backgroundRepeat: 'no-repeat',

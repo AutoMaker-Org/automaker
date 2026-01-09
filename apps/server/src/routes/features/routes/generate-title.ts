@@ -96,7 +96,7 @@ export function createGenerateTitleHandler(): (req: Request, res: Response) => P
           systemPrompt: SYSTEM_PROMPT,
           maxTurns: 1,
           allowedTools: [],
-          permissionMode: 'acceptEdits',
+          permissionMode: 'default',
         },
       });
 

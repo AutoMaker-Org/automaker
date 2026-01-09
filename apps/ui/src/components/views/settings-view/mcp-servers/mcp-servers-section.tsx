@@ -1,12 +1,7 @@
 import { Plug } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useMCPServers } from './hooks';
-import {
-  MCPServerHeader,
-  MCPPermissionSettings,
-  MCPToolsWarning,
-  MCPServerCard,
-} from './components';
+import { MCPServerHeader, MCPToolsWarning, MCPServerCard } from './components';
 import {
   AddEditServerDialog,
   DeleteServerDialog,
@@ -20,10 +15,6 @@ export function MCPServersSection() {
   const {
     // Store state
     mcpServers,
-    mcpAutoApproveTools,
-    mcpUnrestrictedTools,
-    setMcpAutoApproveTools,
-    setMcpUnrestrictedTools,
 
     // Dialog state
     isAddDialogOpen,
@@ -97,15 +88,6 @@ export function MCPServersSection() {
         onImport={() => setIsImportDialogOpen(true)}
         onAdd={handleOpenAddDialog}
       />
-
-      {mcpServers.length > 0 && (
-        <MCPPermissionSettings
-          mcpAutoApproveTools={mcpAutoApproveTools}
-          mcpUnrestrictedTools={mcpUnrestrictedTools}
-          onAutoApproveChange={setMcpAutoApproveTools}
-          onUnrestrictedChange={setMcpUnrestrictedTools}
-        />
-      )}
 
       {showToolsWarning && <MCPToolsWarning totalTools={totalToolsCount} />}
 

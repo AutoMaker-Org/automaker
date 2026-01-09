@@ -1,5 +1,8 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
+import { createLogger } from '@automaker/utils/logger';
 import { ImageIcon, Upload, Loader2, Trash2 } from 'lucide-react';
+
+const logger = createLogger('BoardBackgroundModal');
 import {
   Sheet,
   SheetContent,
@@ -13,7 +16,8 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils';
 import { useAppStore, defaultBackgroundSettings } from '@/store/app-store';
-import { getHttpApiClient, getServerUrlSync } from '@/lib/http-api-client';
+import { getHttpApiClient } from '@/lib/http-api-client';
+import { getAuthenticatedImageUrl } from '@/lib/api-fetch';
 import { useBoardBackgroundSettings } from '@/hooks/use-board-background-settings';
 import { toast } from 'sonner';
 import {
@@ -62,12 +66,13 @@ export function BoardBackgroundModal({ open, onOpenChange }: BoardBackgroundModa
   // Update preview image when background settings change
   useEffect(() => {
     if (currentProject && backgroundSettings.imagePath) {
-      const serverUrl = import.meta.env.VITE_SERVER_URL || getServerUrlSync();
       // Add cache-busting query parameter to force browser to reload image
-      const cacheBuster = imageVersion ? `&v=${imageVersion}` : `&v=${Date.now()}`;
-      const imagePath = `${serverUrl}/api/fs/image?path=${encodeURIComponent(
-        backgroundSettings.imagePath
-      )}&projectPath=${encodeURIComponent(currentProject.path)}${cacheBuster}`;
+      const cacheBuster = imageVersion ?? Date.now().toString();
+      const imagePath = getAuthenticatedImageUrl(
+        backgroundSettings.imagePath,
+        currentProject.path,
+        cacheBuster
+      );
       setPreviewImage(imagePath);
     } else {
       setPreviewImage(null);
@@ -113,7 +118,7 @@ export function BoardBackgroundModal({ open, onOpenChange }: BoardBackgroundModa
           setPreviewImage(null);
         }
       } catch (error) {
-        console.error('Failed to process image:', error);
+        logger.error('Failed to process image:', error);
         toast.error('Failed to process image');
         setPreviewImage(null);
       } finally {
@@ -185,7 +190,7 @@ export function BoardBackgroundModal({ open, onOpenChange }: BoardBackgroundModa
         toast.error(result.error || 'Failed to clear background image');
       }
     } catch (error) {
-      console.error('Failed to clear background:', error);
+      logger.error('Failed to clear background:', error);
       toast.error('Failed to clear background');
     } finally {
       setIsProcessing(false);

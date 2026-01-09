@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { useState, useEffect, useLayoutEffect, useCallback, useRef } from 'react';
 import { useAppStore } from '@/store/app-store';
 

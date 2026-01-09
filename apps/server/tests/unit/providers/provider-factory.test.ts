@@ -1,18 +1,43 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ProviderFactory } from '@/providers/provider-factory.js';
 import { ClaudeProvider } from '@/providers/claude-provider.js';
+import { CursorProvider } from '@/providers/cursor-provider.js';
+import { CodexProvider } from '@/providers/codex-provider.js';
+import { OpencodeProvider } from '@/providers/opencode-provider.js';
 
 describe('provider-factory.ts', () => {
   let consoleSpy: any;
+  let detectClaudeSpy: any;
+  let detectCursorSpy: any;
+  let detectCodexSpy: any;
+  let detectOpencodeSpy: any;
 
   beforeEach(() => {
     consoleSpy = {
       warn: vi.spyOn(console, 'warn').mockImplementation(() => {}),
     };
+
+    // Avoid hitting real CLI / filesystem checks during unit tests
+    detectClaudeSpy = vi
+      .spyOn(ClaudeProvider.prototype, 'detectInstallation')
+      .mockResolvedValue({ installed: true });
+    detectCursorSpy = vi
+      .spyOn(CursorProvider.prototype, 'detectInstallation')
+      .mockResolvedValue({ installed: true });
+    detectCodexSpy = vi
+      .spyOn(CodexProvider.prototype, 'detectInstallation')
+      .mockResolvedValue({ installed: true });
+    detectOpencodeSpy = vi
+      .spyOn(OpencodeProvider.prototype, 'detectInstallation')
+      .mockResolvedValue({ installed: true });
   });
 
   afterEach(() => {
     consoleSpy.warn.mockRestore();
+    detectClaudeSpy.mockRestore();
+    detectCursorSpy.mockRestore();
+    detectCodexSpy.mockRestore();
+    detectOpencodeSpy.mockRestore();
   });
 
   describe('getProviderForModel', () => {
@@ -65,39 +90,66 @@ describe('provider-factory.ts', () => {
       });
     });
 
+    describe('Cursor models (cursor-* prefix)', () => {
+      it('should return CursorProvider for cursor-auto', () => {
+        const provider = ProviderFactory.getProviderForModel('cursor-auto');
+        expect(provider).toBeInstanceOf(CursorProvider);
+      });
+
+      it('should return CursorProvider for cursor-sonnet-4.5', () => {
+        const provider = ProviderFactory.getProviderForModel('cursor-sonnet-4.5');
+        expect(provider).toBeInstanceOf(CursorProvider);
+      });
+
+      it('should return CursorProvider for cursor-gpt-5.2', () => {
+        const provider = ProviderFactory.getProviderForModel('cursor-gpt-5.2');
+        expect(provider).toBeInstanceOf(CursorProvider);
+      });
+
+      it('should be case-insensitive for cursor models', () => {
+        const provider = ProviderFactory.getProviderForModel('CURSOR-AUTO');
+        expect(provider).toBeInstanceOf(CursorProvider);
+      });
+
+      it('should return CursorProvider for known cursor model ID without prefix', () => {
+        const provider = ProviderFactory.getProviderForModel('auto');
+        expect(provider).toBeInstanceOf(CursorProvider);
+      });
+    });
+
     describe('Unknown models', () => {
       it('should default to ClaudeProvider for unknown model', () => {
         const provider = ProviderFactory.getProviderForModel('unknown-model-123');
         expect(provider).toBeInstanceOf(ClaudeProvider);
       });
 
-      it('should warn when defaulting to Claude', () => {
-        ProviderFactory.getProviderForModel('random-model');
-        expect(consoleSpy.warn).toHaveBeenCalledWith(
-          expect.stringContaining('Unknown model prefix')
-        );
-        expect(consoleSpy.warn).toHaveBeenCalledWith(expect.stringContaining('random-model'));
-        expect(consoleSpy.warn).toHaveBeenCalledWith(
-          expect.stringContaining('defaulting to Claude')
-        );
-      });
-
-      it('should handle empty string', () => {
+      it('should handle empty string by defaulting to ClaudeProvider', () => {
         const provider = ProviderFactory.getProviderForModel('');
         expect(provider).toBeInstanceOf(ClaudeProvider);
-        expect(consoleSpy.warn).toHaveBeenCalled();
       });
 
-      it('should default to ClaudeProvider for gpt models (not supported)', () => {
+      it('should default to ClaudeProvider for completely unknown prefixes', () => {
+        const provider = ProviderFactory.getProviderForModel('random-xyz-model');
+        expect(provider).toBeInstanceOf(ClaudeProvider);
+      });
+    });
+
+    describe('Cursor models via model ID lookup', () => {
+      it('should return CodexProvider for gpt-5.2 (Codex model, not Cursor)', () => {
+        // gpt-5.2 is in both CURSOR_MODEL_MAP and CODEX_MODEL_CONFIG_MAP
+        // It should route to Codex since Codex models take priority
         const provider = ProviderFactory.getProviderForModel('gpt-5.2');
-        expect(provider).toBeInstanceOf(ClaudeProvider);
-        expect(consoleSpy.warn).toHaveBeenCalled();
+        expect(provider).toBeInstanceOf(CodexProvider);
       });
 
-      it('should default to ClaudeProvider for o-series models (not supported)', () => {
-        const provider = ProviderFactory.getProviderForModel('o1');
-        expect(provider).toBeInstanceOf(ClaudeProvider);
-        expect(consoleSpy.warn).toHaveBeenCalled();
+      it('should return CursorProvider for grok (valid Cursor model)', () => {
+        const provider = ProviderFactory.getProviderForModel('grok');
+        expect(provider).toBeInstanceOf(CursorProvider);
+      });
+
+      it('should return CursorProvider for gemini-3-pro (valid Cursor model)', () => {
+        const provider = ProviderFactory.getProviderForModel('gemini-3-pro');
+        expect(provider).toBeInstanceOf(CursorProvider);
       });
     });
   });
@@ -114,9 +166,15 @@ describe('provider-factory.ts', () => {
       expect(hasClaudeProvider).toBe(true);
     });
 
-    it('should return exactly 1 provider', () => {
+    it('should return exactly 4 providers', () => {
       const providers = ProviderFactory.getAllProviders();
-      expect(providers).toHaveLength(1);
+      expect(providers).toHaveLength(4);
+    });
+
+    it('should include CursorProvider', () => {
+      const providers = ProviderFactory.getAllProviders();
+      const hasCursorProvider = providers.some((p) => p instanceof CursorProvider);
+      expect(hasCursorProvider).toBe(true);
     });
 
     it('should create new instances each time', () => {
@@ -145,7 +203,16 @@ describe('provider-factory.ts', () => {
       const keys = Object.keys(statuses);
 
       expect(keys).toContain('claude');
-      expect(keys).toHaveLength(1);
+      expect(keys).toContain('cursor');
+      expect(keys).toContain('codex');
+      expect(keys).toContain('opencode');
+      expect(keys).toHaveLength(4);
+    });
+
+    it('should include cursor status', async () => {
+      const statuses = await ProviderFactory.checkAllProviders();
+
+      expect(statuses.cursor).toHaveProperty('installed');
     });
   });
 
@@ -160,12 +227,19 @@ describe('provider-factory.ts', () => {
       expect(provider).toBeInstanceOf(ClaudeProvider);
     });
 
+    it("should return CursorProvider for 'cursor'", () => {
+      const provider = ProviderFactory.getProviderByName('cursor');
+      expect(provider).toBeInstanceOf(CursorProvider);
+    });
+
     it('should be case-insensitive', () => {
       const provider1 = ProviderFactory.getProviderByName('CLAUDE');
       const provider2 = ProviderFactory.getProviderByName('ANTHROPIC');
+      const provider3 = ProviderFactory.getProviderByName('CURSOR');
 
       expect(provider1).toBeInstanceOf(ClaudeProvider);
       expect(provider2).toBeInstanceOf(ClaudeProvider);
+      expect(provider3).toBeInstanceOf(CursorProvider);
     });
 
     it('should return null for unknown provider', () => {
@@ -217,6 +291,15 @@ describe('provider-factory.ts', () => {
       const hasClaudeModels = models.some((m) => m.id.toLowerCase().includes('claude'));
 
       expect(hasClaudeModels).toBe(true);
+    });
+
+    it('should include Cursor models', () => {
+      const models = ProviderFactory.getAllAvailableModels();
+
+      // Cursor models should include cursor provider
+      const hasCursorModels = models.some((m) => m.provider === 'cursor');
+
+      expect(hasCursorModels).toBe(true);
     });
   });
 });

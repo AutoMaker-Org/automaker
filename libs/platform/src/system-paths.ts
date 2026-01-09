@@ -72,6 +72,131 @@ export function getClaudeCliPaths(): string[] {
 }
 
 /**
+ * Get NVM-installed Node.js bin paths for CLI tools
+ */
+function getNvmBinPaths(): string[] {
+  const nvmDir = process.env.NVM_DIR || path.join(os.homedir(), '.nvm');
+  const versionsDir = path.join(nvmDir, 'versions', 'node');
+
+  try {
+    if (!fsSync.existsSync(versionsDir)) {
+      return [];
+    }
+    const versions = fsSync.readdirSync(versionsDir);
+    return versions.map((version) => path.join(versionsDir, version, 'bin'));
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Get fnm (Fast Node Manager) installed Node.js bin paths
+ */
+function getFnmBinPaths(): string[] {
+  const homeDir = os.homedir();
+  const possibleFnmDirs = [
+    path.join(homeDir, '.local', 'share', 'fnm', 'node-versions'),
+    path.join(homeDir, '.fnm', 'node-versions'),
+    // macOS
+    path.join(homeDir, 'Library', 'Application Support', 'fnm', 'node-versions'),
+  ];
+
+  const binPaths: string[] = [];
+
+  for (const fnmDir of possibleFnmDirs) {
+    try {
+      if (!fsSync.existsSync(fnmDir)) {
+        continue;
+      }
+      const versions = fsSync.readdirSync(fnmDir);
+      for (const version of versions) {
+        binPaths.push(path.join(fnmDir, version, 'installation', 'bin'));
+      }
+    } catch {
+      // Ignore errors for this directory
+    }
+  }
+
+  return binPaths;
+}
+
+/**
+ * Get common paths where Codex CLI might be installed
+ */
+export function getCodexCliPaths(): string[] {
+  const isWindows = process.platform === 'win32';
+  const homeDir = os.homedir();
+
+  if (isWindows) {
+    const appData = process.env.APPDATA || path.join(homeDir, 'AppData', 'Roaming');
+    const localAppData = process.env.LOCALAPPDATA || path.join(homeDir, 'AppData', 'Local');
+    return [
+      path.join(homeDir, '.local', 'bin', 'codex.exe'),
+      path.join(appData, 'npm', 'codex.cmd'),
+      path.join(appData, 'npm', 'codex'),
+      path.join(appData, '.npm-global', 'bin', 'codex.cmd'),
+      path.join(appData, '.npm-global', 'bin', 'codex'),
+      // Volta on Windows
+      path.join(homeDir, '.volta', 'bin', 'codex.exe'),
+      // pnpm on Windows
+      path.join(localAppData, 'pnpm', 'codex.cmd'),
+      path.join(localAppData, 'pnpm', 'codex'),
+    ];
+  }
+
+  // Include NVM bin paths for codex installed via npm global under NVM
+  const nvmBinPaths = getNvmBinPaths().map((binPath) => path.join(binPath, 'codex'));
+
+  // Include fnm bin paths
+  const fnmBinPaths = getFnmBinPaths().map((binPath) => path.join(binPath, 'codex'));
+
+  // pnpm global bin path
+  const pnpmHome = process.env.PNPM_HOME || path.join(homeDir, '.local', 'share', 'pnpm');
+
+  return [
+    // Standard locations
+    path.join(homeDir, '.local', 'bin', 'codex'),
+    '/opt/homebrew/bin/codex',
+    '/usr/local/bin/codex',
+    '/usr/bin/codex',
+    path.join(homeDir, '.npm-global', 'bin', 'codex'),
+    // Linuxbrew
+    '/home/linuxbrew/.linuxbrew/bin/codex',
+    // Volta
+    path.join(homeDir, '.volta', 'bin', 'codex'),
+    // pnpm global
+    path.join(pnpmHome, 'codex'),
+    // Yarn global
+    path.join(homeDir, '.yarn', 'bin', 'codex'),
+    path.join(homeDir, '.config', 'yarn', 'global', 'node_modules', '.bin', 'codex'),
+    // Snap packages
+    '/snap/bin/codex',
+    // NVM paths
+    ...nvmBinPaths,
+    // fnm paths
+    ...fnmBinPaths,
+  ];
+}
+
+const CODEX_CONFIG_DIR_NAME = '.codex';
+const CODEX_AUTH_FILENAME = 'auth.json';
+const CODEX_TOKENS_KEY = 'tokens';
+
+/**
+ * Get the Codex configuration directory path
+ */
+export function getCodexConfigDir(): string {
+  return path.join(os.homedir(), CODEX_CONFIG_DIR_NAME);
+}
+
+/**
+ * Get path to Codex auth file
+ */
+export function getCodexAuthPath(): string {
+  return path.join(getCodexConfigDir(), CODEX_AUTH_FILENAME);
+}
+
+/**
  * Get the Claude configuration directory path
  */
 export function getClaudeConfigDir(): string {
@@ -413,6 +538,16 @@ function getAllAllowedSystemPaths(): string[] {
     getClaudeSettingsPath(),
     getClaudeStatsCachePath(),
     getClaudeProjectsDir(),
+    // Codex CLI paths
+    ...getCodexCliPaths(),
+    // Codex config directory and files
+    getCodexConfigDir(),
+    getCodexAuthPath(),
+    // OpenCode CLI paths
+    ...getOpenCodeCliPaths(),
+    // OpenCode config directory and files
+    getOpenCodeConfigDir(),
+    getOpenCodeAuthPath(),
     // Shell paths
     ...getShellPaths(),
     // Node.js system paths
@@ -432,6 +567,10 @@ function getAllAllowedSystemDirs(): string[] {
     // Claude config
     getClaudeConfigDir(),
     getClaudeProjectsDir(),
+    // Codex config
+    getCodexConfigDir(),
+    // OpenCode config
+    getOpenCodeConfigDir(),
     // Version managers (need recursive access for version directories)
     ...getNvmPaths(),
     ...getFnmPaths(),
@@ -740,6 +879,10 @@ export async function findClaudeCliPath(): Promise<string | null> {
   return findFirstExistingPath(getClaudeCliPaths());
 }
 
+export async function findCodexCliPath(): Promise<string | null> {
+  return findFirstExistingPath(getCodexCliPaths());
+}
+
 /**
  * Get Claude authentication status by checking various indicators
  */
@@ -800,14 +943,279 @@ export async function getClaudeAuthIndicators(): Promise<ClaudeAuthIndicators> {
       const content = await systemPathReadFile(credPath);
       const credentials = JSON.parse(content);
       result.hasCredentialsFile = true;
+      // Support multiple credential formats:
+      // 1. Claude Code CLI format: { claudeAiOauth: { accessToken, refreshToken } }
+      // 2. Legacy format: { oauth_token } or { access_token }
+      // 3. API key format: { api_key }
+      const hasClaudeOauth = !!credentials.claudeAiOauth?.accessToken;
+      const hasLegacyOauth = !!(credentials.oauth_token || credentials.access_token);
       result.credentials = {
-        hasOAuthToken: !!(credentials.oauth_token || credentials.access_token),
+        hasOAuthToken: hasClaudeOauth || hasLegacyOauth,
         hasApiKey: !!credentials.api_key,
       };
       break;
     } catch {
       // Continue to next path
     }
+  }
+
+  return result;
+}
+
+export interface CodexAuthIndicators {
+  hasAuthFile: boolean;
+  hasOAuthToken: boolean;
+  hasApiKey: boolean;
+}
+
+const CODEX_OAUTH_KEYS = ['access_token', 'oauth_token'] as const;
+const CODEX_API_KEY_KEYS = ['api_key', 'OPENAI_API_KEY'] as const;
+
+function hasNonEmptyStringField(record: Record<string, unknown>, keys: readonly string[]): boolean {
+  return keys.some((key) => typeof record[key] === 'string' && record[key]);
+}
+
+function getNestedTokens(record: Record<string, unknown>): Record<string, unknown> | null {
+  const tokens = record[CODEX_TOKENS_KEY];
+  if (tokens && typeof tokens === 'object' && !Array.isArray(tokens)) {
+    return tokens as Record<string, unknown>;
+  }
+  return null;
+}
+
+export async function getCodexAuthIndicators(): Promise<CodexAuthIndicators> {
+  const result: CodexAuthIndicators = {
+    hasAuthFile: false,
+    hasOAuthToken: false,
+    hasApiKey: false,
+  };
+
+  try {
+    const authContent = await systemPathReadFile(getCodexAuthPath());
+    result.hasAuthFile = true;
+
+    try {
+      const authJson = JSON.parse(authContent) as Record<string, unknown>;
+      result.hasOAuthToken = hasNonEmptyStringField(authJson, CODEX_OAUTH_KEYS);
+      result.hasApiKey = hasNonEmptyStringField(authJson, CODEX_API_KEY_KEYS);
+      const nestedTokens = getNestedTokens(authJson);
+      if (nestedTokens) {
+        result.hasOAuthToken =
+          result.hasOAuthToken || hasNonEmptyStringField(nestedTokens, CODEX_OAUTH_KEYS);
+        result.hasApiKey =
+          result.hasApiKey || hasNonEmptyStringField(nestedTokens, CODEX_API_KEY_KEYS);
+      }
+    } catch {
+      // Ignore parse errors; file exists but contents are unreadable
+    }
+  } catch {
+    // Auth file not found or inaccessible
+  }
+
+  return result;
+}
+
+// =============================================================================
+// OpenCode CLI Detection
+// =============================================================================
+
+const OPENCODE_DATA_DIR = '.local/share/opencode';
+const OPENCODE_AUTH_FILENAME = 'auth.json';
+const OPENCODE_TOKENS_KEY = 'tokens';
+
+/**
+ * Get common paths where OpenCode CLI might be installed
+ */
+export function getOpenCodeCliPaths(): string[] {
+  const isWindows = process.platform === 'win32';
+  const homeDir = os.homedir();
+
+  if (isWindows) {
+    const appData = process.env.APPDATA || path.join(homeDir, 'AppData', 'Roaming');
+    const localAppData = process.env.LOCALAPPDATA || path.join(homeDir, 'AppData', 'Local');
+    return [
+      // OpenCode's default installation directory
+      path.join(homeDir, '.opencode', 'bin', 'opencode.exe'),
+      path.join(homeDir, '.local', 'bin', 'opencode.exe'),
+      path.join(appData, 'npm', 'opencode.cmd'),
+      path.join(appData, 'npm', 'opencode'),
+      path.join(appData, '.npm-global', 'bin', 'opencode.cmd'),
+      path.join(appData, '.npm-global', 'bin', 'opencode'),
+      // Volta on Windows
+      path.join(homeDir, '.volta', 'bin', 'opencode.exe'),
+      // pnpm on Windows
+      path.join(localAppData, 'pnpm', 'opencode.cmd'),
+      path.join(localAppData, 'pnpm', 'opencode'),
+      // Go installation (if OpenCode is a Go binary)
+      path.join(homeDir, 'go', 'bin', 'opencode.exe'),
+      path.join(process.env.GOPATH || path.join(homeDir, 'go'), 'bin', 'opencode.exe'),
+    ];
+  }
+
+  // Include NVM bin paths for opencode installed via npm global under NVM
+  const nvmBinPaths = getNvmBinPaths().map((binPath) => path.join(binPath, 'opencode'));
+
+  // Include fnm bin paths
+  const fnmBinPaths = getFnmBinPaths().map((binPath) => path.join(binPath, 'opencode'));
+
+  // pnpm global bin path
+  const pnpmHome = process.env.PNPM_HOME || path.join(homeDir, '.local', 'share', 'pnpm');
+
+  return [
+    // OpenCode's default installation directory
+    path.join(homeDir, '.opencode', 'bin', 'opencode'),
+    // Standard locations
+    path.join(homeDir, '.local', 'bin', 'opencode'),
+    '/opt/homebrew/bin/opencode',
+    '/usr/local/bin/opencode',
+    '/usr/bin/opencode',
+    path.join(homeDir, '.npm-global', 'bin', 'opencode'),
+    // Linuxbrew
+    '/home/linuxbrew/.linuxbrew/bin/opencode',
+    // Volta
+    path.join(homeDir, '.volta', 'bin', 'opencode'),
+    // pnpm global
+    path.join(pnpmHome, 'opencode'),
+    // Yarn global
+    path.join(homeDir, '.yarn', 'bin', 'opencode'),
+    path.join(homeDir, '.config', 'yarn', 'global', 'node_modules', '.bin', 'opencode'),
+    // Go installation (if OpenCode is a Go binary)
+    path.join(homeDir, 'go', 'bin', 'opencode'),
+    path.join(process.env.GOPATH || path.join(homeDir, 'go'), 'bin', 'opencode'),
+    // Snap packages
+    '/snap/bin/opencode',
+    // NVM paths
+    ...nvmBinPaths,
+    // fnm paths
+    ...fnmBinPaths,
+  ];
+}
+
+/**
+ * Get the OpenCode data directory path
+ * macOS/Linux: ~/.local/share/opencode
+ * Windows: %USERPROFILE%\.local\share\opencode
+ */
+export function getOpenCodeConfigDir(): string {
+  return path.join(os.homedir(), OPENCODE_DATA_DIR);
+}
+
+/**
+ * Get path to OpenCode auth file
+ */
+export function getOpenCodeAuthPath(): string {
+  return path.join(getOpenCodeConfigDir(), OPENCODE_AUTH_FILENAME);
+}
+
+/**
+ * Check if OpenCode CLI is installed and return its path
+ */
+export async function findOpenCodeCliPath(): Promise<string | null> {
+  return findFirstExistingPath(getOpenCodeCliPaths());
+}
+
+export interface OpenCodeAuthIndicators {
+  hasAuthFile: boolean;
+  hasOAuthToken: boolean;
+  hasApiKey: boolean;
+}
+
+const OPENCODE_OAUTH_KEYS = ['access_token', 'oauth_token'] as const;
+const OPENCODE_API_KEY_KEYS = ['api_key', 'OPENAI_API_KEY', 'ANTHROPIC_API_KEY'] as const;
+
+// Provider names that OpenCode uses for provider-specific auth entries
+const OPENCODE_PROVIDERS = ['anthropic', 'openai', 'google', 'bedrock', 'amazon-bedrock'] as const;
+
+function getOpenCodeNestedTokens(record: Record<string, unknown>): Record<string, unknown> | null {
+  const tokens = record[OPENCODE_TOKENS_KEY];
+  if (tokens && typeof tokens === 'object' && !Array.isArray(tokens)) {
+    return tokens as Record<string, unknown>;
+  }
+  return null;
+}
+
+/**
+ * Check if the auth JSON has provider-specific OAuth credentials
+ * OpenCode stores auth in format: { "anthropic": { "type": "oauth", "access": "...", "refresh": "..." } }
+ */
+function hasProviderOAuth(authJson: Record<string, unknown>): boolean {
+  for (const provider of OPENCODE_PROVIDERS) {
+    const providerAuth = authJson[provider];
+    if (providerAuth && typeof providerAuth === 'object' && !Array.isArray(providerAuth)) {
+      const auth = providerAuth as Record<string, unknown>;
+      // Check for OAuth type with access token
+      if (auth.type === 'oauth' && typeof auth.access === 'string' && auth.access) {
+        return true;
+      }
+      // Also check for access_token field directly
+      if (typeof auth.access_token === 'string' && auth.access_token) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+/**
+ * Check if the auth JSON has provider-specific API key credentials
+ */
+function hasProviderApiKey(authJson: Record<string, unknown>): boolean {
+  for (const provider of OPENCODE_PROVIDERS) {
+    const providerAuth = authJson[provider];
+    if (providerAuth && typeof providerAuth === 'object' && !Array.isArray(providerAuth)) {
+      const auth = providerAuth as Record<string, unknown>;
+      // Check for API key type
+      if (auth.type === 'api_key' && typeof auth.key === 'string' && auth.key) {
+        return true;
+      }
+      // Also check for api_key field directly
+      if (typeof auth.api_key === 'string' && auth.api_key) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+/**
+ * Get OpenCode authentication status by checking auth file indicators
+ */
+export async function getOpenCodeAuthIndicators(): Promise<OpenCodeAuthIndicators> {
+  const result: OpenCodeAuthIndicators = {
+    hasAuthFile: false,
+    hasOAuthToken: false,
+    hasApiKey: false,
+  };
+
+  try {
+    const authContent = await systemPathReadFile(getOpenCodeAuthPath());
+    result.hasAuthFile = true;
+
+    try {
+      const authJson = JSON.parse(authContent) as Record<string, unknown>;
+
+      // Check for legacy top-level keys
+      result.hasOAuthToken = hasNonEmptyStringField(authJson, OPENCODE_OAUTH_KEYS);
+      result.hasApiKey = hasNonEmptyStringField(authJson, OPENCODE_API_KEY_KEYS);
+
+      // Check for nested tokens object (legacy format)
+      const nestedTokens = getOpenCodeNestedTokens(authJson);
+      if (nestedTokens) {
+        result.hasOAuthToken =
+          result.hasOAuthToken || hasNonEmptyStringField(nestedTokens, OPENCODE_OAUTH_KEYS);
+        result.hasApiKey =
+          result.hasApiKey || hasNonEmptyStringField(nestedTokens, OPENCODE_API_KEY_KEYS);
+      }
+
+      // Check for provider-specific auth entries (current OpenCode format)
+      // Format: { "anthropic": { "type": "oauth", "access": "...", "refresh": "..." } }
+      result.hasOAuthToken = result.hasOAuthToken || hasProviderOAuth(authJson);
+      result.hasApiKey = result.hasApiKey || hasProviderApiKey(authJson);
+    } catch {
+      // Ignore parse errors; file exists but contents are unreadable
+    }
+  } catch {
+    // Auth file not found or inaccessible
   }
 
   return result;

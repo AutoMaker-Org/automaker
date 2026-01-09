@@ -81,6 +81,7 @@ blob-report/
 
 docker-compose.override.yml
 .claude/docker-compose.override.yml
+.claude/hans/
 
 pnpm-lock.yaml
 yarn.lock

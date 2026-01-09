@@ -8,10 +8,12 @@
 # =============================================================================
 # BASE STAGE - Common setup for all builds (DRY: defined once, used by all)
 # =============================================================================
-FROM node:22-alpine AS base
+FROM node:22-slim AS base
 
 # Install build dependencies for native modules (node-pty)
-RUN apk add --no-cache python3 make g++
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 make g++ \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
@@ -51,30 +53,63 @@ RUN npm run build:packages && npm run build --workspace=apps/server
 # =============================================================================
 # SERVER PRODUCTION STAGE
 # =============================================================================
-FROM node:22-alpine AS server
+FROM node:22-slim AS server
 
-# Install git, curl, bash (for terminal), and GitHub CLI (pinned version, multi-arch)
-RUN apk add --no-cache git curl bash && \
-    GH_VERSION="2.63.2" && \
-    ARCH=$(uname -m) && \
-    case "$ARCH" in \
+# Build argument for tracking which commit this image was built from
+ARG GIT_COMMIT_SHA=unknown
+LABEL automaker.git.commit.sha="${GIT_COMMIT_SHA}"
+
+# Install git, curl, bash (for terminal), gosu (for user switching), and GitHub CLI (pinned version, multi-arch)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git curl bash gosu ca-certificates openssh-client \
+    && GH_VERSION="2.63.2" \
+    && ARCH=$(uname -m) \
+    && case "$ARCH" in \
         x86_64) GH_ARCH="amd64" ;; \
         aarch64|arm64) GH_ARCH="arm64" ;; \
         *) echo "Unsupported architecture: $ARCH" && exit 1 ;; \
-    esac && \
-    curl -L "https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_linux_${GH_ARCH}.tar.gz" -o gh.tar.gz && \
-    tar -xzf gh.tar.gz && \
-    mv gh_${GH_VERSION}_linux_${GH_ARCH}/bin/gh /usr/local/bin/gh && \
-    rm -rf gh.tar.gz gh_${GH_VERSION}_linux_${GH_ARCH}
+    esac \
+    && curl -L "https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_linux_${GH_ARCH}.tar.gz" -o gh.tar.gz \
+    && tar -xzf gh.tar.gz \
+    && mv gh_${GH_VERSION}_linux_${GH_ARCH}/bin/gh /usr/local/bin/gh \
+    && rm -rf gh.tar.gz gh_${GH_VERSION}_linux_${GH_ARCH} \
+    && rm -rf /var/lib/apt/lists/*
 
-# Install Claude CLI globally
+# Install Claude CLI globally (available to all users via npm global bin)
 RUN npm install -g @anthropic-ai/claude-code
 
-WORKDIR /app
+# Create non-root user with home directory BEFORE installing Cursor CLI
+RUN groupadd -g 1001 automaker && \
+    useradd -u 1001 -g automaker -m -d /home/automaker -s /bin/bash automaker && \
+    mkdir -p /home/automaker/.local/bin && \
+    mkdir -p /home/automaker/.cursor && \
+    chown -R automaker:automaker /home/automaker && \
+    chmod 700 /home/automaker/.cursor
 
-# Create non-root user
-RUN addgroup -g 1001 -S automaker && \
-    adduser -S automaker -u 1001
+# Install Cursor CLI as the automaker user
+# Set HOME explicitly and install to /home/automaker/.local/bin/
+USER automaker
+ENV HOME=/home/automaker
+RUN curl https://cursor.com/install -fsS | bash && \
+    echo "=== Checking Cursor CLI installation ===" && \
+    ls -la /home/automaker/.local/bin/ && \
+    echo "=== PATH is: $PATH ===" && \
+    (which cursor-agent && cursor-agent --version) || echo "cursor-agent installed (may need auth setup)"
+USER root
+
+# Add PATH to profile so it's available in all interactive shells (for login shells)
+RUN mkdir -p /etc/profile.d && \
+    echo 'export PATH="/home/automaker/.local/bin:$PATH"' > /etc/profile.d/cursor-cli.sh && \
+    chmod +x /etc/profile.d/cursor-cli.sh
+
+# Add to automaker's .bashrc for bash interactive shells
+RUN echo 'export PATH="/home/automaker/.local/bin:$PATH"' >> /home/automaker/.bashrc && \
+    chown automaker:automaker /home/automaker/.bashrc
+
+# Also add to root's .bashrc since docker exec defaults to root
+RUN echo 'export PATH="/home/automaker/.local/bin:$PATH"' >> /root/.bashrc
+
+WORKDIR /app
 
 # Copy root package.json (needed for workspace resolution)
 COPY --from=server-builder /app/package*.json ./
@@ -98,12 +133,19 @@ RUN git config --system --add safe.directory '*' && \
     # Use gh as credential helper (works with GH_TOKEN env var)
     git config --system credential.helper '!gh auth git-credential'
 
-# Switch to non-root user
-USER automaker
+# Copy entrypoint script for fixing permissions on mounted volumes
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
+# Note: We stay as root here so entrypoint can fix permissions
+# The entrypoint script will switch to automaker user before running the command
 
 # Environment variables
 ENV PORT=3008
 ENV DATA_DIR=/data
+ENV HOME=/home/automaker
+# Add user's local bin to PATH for cursor-agent
+ENV PATH="/home/automaker/.local/bin:${PATH}"
 
 # Expose port
 EXPOSE 3008
@@ -111,6 +153,9 @@ EXPOSE 3008
 # Health check (using curl since it's already installed, more reliable than busybox wget)
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:3008/api/health || exit 1
+
+# Use entrypoint to fix permissions before starting
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 
 # Start server
 CMD ["node", "apps/server/dist/index.js"]
@@ -142,6 +187,10 @@ RUN npm run build:packages && npm run build --workspace=apps/ui
 # UI PRODUCTION STAGE
 # =============================================================================
 FROM nginx:alpine AS ui
+
+# Build argument for tracking which commit this image was built from
+ARG GIT_COMMIT_SHA=unknown
+LABEL automaker.git.commit.sha="${GIT_COMMIT_SHA}"
 
 # Copy built files
 COPY --from=ui-builder /app/apps/ui/dist /usr/share/nginx/html

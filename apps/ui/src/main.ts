@@ -13,6 +13,7 @@ import crypto from 'crypto';
 import http, { Server } from 'http';
 import net from 'net';
 import { app, BrowserWindow, ipcMain, dialog, shell, screen } from 'electron';
+import { createLogger } from '@automaker/utils/logger';
 import {
   findNodeExecutable,
   buildEnhancedPath,
@@ -35,6 +36,9 @@ import {
   systemPathExists,
 } from '@automaker/platform';
 
+const logger = createLogger('Electron');
+const serverLogger = createLogger('Server');
+
 // Development environment
 const isDev = !app.isPackaged;
 const VITE_DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL;
@@ -45,7 +49,7 @@ if (isDev) {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     require('dotenv').config({ path: path.join(__dirname, '../.env') });
   } catch (error) {
-    console.warn('[Electron] dotenv not available:', (error as Error).message);
+    logger.warn('dotenv not available:', (error as Error).message);
   }
 }
 
@@ -128,6 +132,9 @@ let saveWindowBoundsTimeout: ReturnType<typeof setTimeout> | null = null;
 // API key for CSRF protection
 let apiKey: string | null = null;
 
+// Track if we're using an external server (Docker API mode)
+let isExternalServerMode = false;
+
 /**
  * Get the relative path to API key file within userData
  */
@@ -144,21 +151,21 @@ function ensureApiKey(): string {
       const key = electronUserDataReadFileSync(API_KEY_FILENAME).trim();
       if (key) {
         apiKey = key;
-        console.log('[Electron] Loaded existing API key');
+        logger.info('Loaded existing API key');
         return apiKey;
       }
     }
   } catch (error) {
-    console.warn('[Electron] Error reading API key:', error);
+    logger.warn('Error reading API key:', error);
   }
 
   // Generate new key
   apiKey = crypto.randomUUID();
   try {
     electronUserDataWriteFileSync(API_KEY_FILENAME, apiKey, { encoding: 'utf-8', mode: 0o600 });
-    console.log('[Electron] Generated new API key');
+    logger.info('Generated new API key');
   } catch (error) {
-    console.error('[Electron] Failed to save API key:', error);
+    logger.error('Failed to save API key:', error);
   }
   return apiKey;
 }
@@ -183,11 +190,11 @@ function getIconPath(): string | null {
 
   try {
     if (!electronAppExists(iconPath)) {
-      console.warn(`[Electron] Icon not found at: ${iconPath}`);
+      logger.warn('Icon not found at:', iconPath);
       return null;
     }
   } catch (error) {
-    console.warn(`[Electron] Icon check failed: ${iconPath}`, error);
+    logger.warn('Icon check failed:', iconPath, error);
     return null;
   }
 
@@ -219,7 +226,7 @@ function loadWindowBounds(): WindowBounds | null {
       }
     }
   } catch (error) {
-    console.warn('[Electron] Failed to load window bounds:', (error as Error).message);
+    logger.warn('Failed to load window bounds:', (error as Error).message);
   }
   return null;
 }
@@ -231,9 +238,9 @@ function loadWindowBounds(): WindowBounds | null {
 function saveWindowBounds(bounds: WindowBounds): void {
   try {
     electronUserDataWriteFileSync(WINDOW_BOUNDS_FILENAME, JSON.stringify(bounds, null, 2));
-    console.log('[Electron] Window bounds saved');
+    logger.info('Window bounds saved');
   } catch (error) {
-    console.warn('[Electron] Failed to save window bounds:', (error as Error).message);
+    logger.warn('Failed to save window bounds:', (error as Error).message);
   }
 }
 
@@ -371,7 +378,7 @@ async function startStaticServer(): Promise<void> {
 
   return new Promise((resolve, reject) => {
     staticServer!.listen(staticPort, () => {
-      console.log(`[Electron] Static server running at http://localhost:${staticPort}`);
+      logger.info('Static server running at http://localhost:' + staticPort);
       resolve();
     });
     staticServer!.on('error', reject);
@@ -386,7 +393,7 @@ async function startServer(): Promise<void> {
   // Find Node.js executable (handles desktop launcher scenarios)
   const nodeResult = findNodeExecutable({
     skipSearch: isDev,
-    logger: (msg: string) => console.log(`[Electron] ${msg}`),
+    logger: (msg: string) => logger.info(msg),
   });
   const command = nodeResult.nodePath;
 
@@ -470,7 +477,7 @@ async function startServer(): Promise<void> {
   // Build enhanced PATH that includes Node.js directory (cross-platform)
   const enhancedPath = buildEnhancedPath(command, process.env.PATH || '');
   if (enhancedPath !== process.env.PATH) {
-    console.log(`[Electron] Enhanced PATH with Node directory: ${path.dirname(command)}`);
+    logger.info('Enhanced PATH with Node directory:', path.dirname(command));
   }
 
   const env = {
@@ -488,12 +495,12 @@ async function startServer(): Promise<void> {
     }),
   };
 
-  console.log(`[Electron] Server will use port ${serverPort}`);
+  logger.info('Server will use port', serverPort);
 
-  console.log('[Electron] Starting backend server...');
-  console.log('[Electron] Server path:', serverPath);
-  console.log('[Electron] Server root (cwd):', serverRoot);
-  console.log('[Electron] NODE_PATH:', serverNodeModules);
+  logger.info('Starting backend server...');
+  logger.info('Server path:', serverPath);
+  logger.info('Server root (cwd):', serverRoot);
+  logger.info('NODE_PATH:', serverNodeModules);
 
   serverProcess = spawn(command, args, {
     cwd: serverRoot,
@@ -502,20 +509,20 @@ async function startServer(): Promise<void> {
   });
 
   serverProcess.stdout?.on('data', (data) => {
-    console.log(`[Server] ${data.toString().trim()}`);
+    serverLogger.info(data.toString().trim());
   });
 
   serverProcess.stderr?.on('data', (data) => {
-    console.error(`[Server Error] ${data.toString().trim()}`);
+    serverLogger.error(data.toString().trim());
   });
 
   serverProcess.on('close', (code) => {
-    console.log(`[Server] Process exited with code ${code}`);
+    serverLogger.info('Process exited with code', code);
     serverProcess = null;
   });
 
   serverProcess.on('error', (err) => {
-    console.error(`[Server] Failed to start server process:`, err);
+    serverLogger.error('Failed to start server process:', err);
     serverProcess = null;
   });
 
@@ -542,7 +549,7 @@ async function waitForServer(maxAttempts = 30): Promise<void> {
           reject(new Error('Timeout'));
         });
       });
-      console.log('[Electron] Server is ready');
+      logger.info('Server is ready');
       return;
     } catch {
       await new Promise((r) => setTimeout(r, 500));
@@ -645,10 +652,10 @@ app.whenReady().then(async () => {
     const desiredUserDataPath = path.join(app.getPath('appData'), 'Automaker');
     if (app.getPath('userData') !== desiredUserDataPath) {
       app.setPath('userData', desiredUserDataPath);
-      console.log('[Electron] userData path set to:', desiredUserDataPath);
+      logger.info('userData path set to:', desiredUserDataPath);
     }
   } catch (error) {
-    console.warn('[Electron] Failed to set userData path:', (error as Error).message);
+    logger.warn('Failed to set userData path:', (error as Error).message);
   }
 
   // Initialize centralized path helpers for Electron
@@ -664,7 +671,7 @@ app.whenReady().then(async () => {
   } else {
     setElectronAppPaths(__dirname, process.resourcesPath);
   }
-  console.log('[Electron] Initialized path security helpers');
+  logger.info('Initialized path security helpers');
 
   // Initialize security settings for path validation
   // Set DATA_DIR before initializing so it's available for security checks
@@ -679,28 +686,45 @@ app.whenReady().then(async () => {
       try {
         app.dock.setIcon(iconPath);
       } catch (error) {
-        console.warn('[Electron] Failed to set dock icon:', (error as Error).message);
+        logger.warn('Failed to set dock icon:', (error as Error).message);
       }
     }
   }
 
-  // Generate or load API key for CSRF protection (before starting server)
-  ensureApiKey();
-
   try {
-    // Find available ports (prevents conflicts with other apps using same ports)
-    serverPort = await findAvailablePort(DEFAULT_SERVER_PORT);
-    if (serverPort !== DEFAULT_SERVER_PORT) {
-      console.log(
-        `[Electron] Default server port ${DEFAULT_SERVER_PORT} in use, using port ${serverPort}`
-      );
+    // Check if we should skip the embedded server (for Docker API mode)
+    const skipEmbeddedServer = process.env.SKIP_EMBEDDED_SERVER === 'true';
+    isExternalServerMode = skipEmbeddedServer;
+
+    if (skipEmbeddedServer) {
+      // Use the default server port (Docker container runs on 3008)
+      serverPort = DEFAULT_SERVER_PORT;
+      logger.info('SKIP_EMBEDDED_SERVER=true, using external server at port', serverPort);
+
+      // Wait for external server to be ready
+      logger.info('Waiting for external server...');
+      await waitForServer(60); // Give Docker container more time to start
+      logger.info('External server is ready');
+
+      // In external server mode, we don't set an API key here.
+      // The renderer will detect external server mode and use session-based
+      // auth like web mode, redirecting to /login where the user enters
+      // the API key from the Docker container logs.
+      logger.info('External server mode: using session-based authentication');
+    } else {
+      // Generate or load API key for CSRF protection (before starting server)
+      ensureApiKey();
+
+      // Find available ports (prevents conflicts with other apps using same ports)
+      serverPort = await findAvailablePort(DEFAULT_SERVER_PORT);
+      if (serverPort !== DEFAULT_SERVER_PORT) {
+        logger.info('Default server port', DEFAULT_SERVER_PORT, 'in use, using port', serverPort);
+      }
     }
 
     staticPort = await findAvailablePort(DEFAULT_STATIC_PORT);
     if (staticPort !== DEFAULT_STATIC_PORT) {
-      console.log(
-        `[Electron] Default static port ${DEFAULT_STATIC_PORT} in use, using port ${staticPort}`
-      );
+      logger.info('Default static port', DEFAULT_STATIC_PORT, 'in use, using port', staticPort);
     }
 
     // Start static file server in production
@@ -708,13 +732,15 @@ app.whenReady().then(async () => {
       await startStaticServer();
     }
 
-    // Start backend server
-    await startServer();
+    // Start backend server (unless using external server)
+    if (!skipEmbeddedServer) {
+      await startServer();
+    }
 
     // Create window
     createWindow();
   } catch (error) {
-    console.error('[Electron] Failed to start:', error);
+    logger.error('Failed to start:', error);
     const errorMessage = (error as Error).message;
     const isNodeError = errorMessage.includes('Node.js');
     dialog.showErrorBox(
@@ -740,12 +766,12 @@ app.on('window-all-closed', () => {
   // (standard macOS behavior). On other platforms, stop servers and quit.
   if (process.platform !== 'darwin') {
     if (serverProcess && serverProcess.pid) {
-      console.log('[Electron] All windows closed, stopping server...');
+      logger.info('All windows closed, stopping server...');
       if (process.platform === 'win32') {
         try {
           execSync(`taskkill /f /t /pid ${serverProcess.pid}`, { stdio: 'ignore' });
         } catch (error) {
-          console.error('[Electron] Failed to kill server process:', (error as Error).message);
+          logger.error('Failed to kill server process:', (error as Error).message);
         }
       } else {
         serverProcess.kill('SIGTERM');
@@ -754,7 +780,7 @@ app.on('window-all-closed', () => {
     }
 
     if (staticServer) {
-      console.log('[Electron] Stopping static server...');
+      logger.info('Stopping static server...');
       staticServer.close();
       staticServer = null;
     }
@@ -765,7 +791,7 @@ app.on('window-all-closed', () => {
 
 app.on('before-quit', () => {
   if (serverProcess && serverProcess.pid) {
-    console.log('[Electron] Stopping server...');
+    logger.info('Stopping server...');
     if (process.platform === 'win32') {
       try {
         // Windows: use taskkill with /t to kill entire process tree
@@ -773,7 +799,7 @@ app.on('before-quit', () => {
         // Using execSync to ensure process is killed before app exits
         execSync(`taskkill /f /t /pid ${serverProcess.pid}`, { stdio: 'ignore' });
       } catch (error) {
-        console.error('[Electron] Failed to kill server process:', (error as Error).message);
+        logger.error('Failed to kill server process:', (error as Error).message);
       }
     } else {
       serverProcess.kill('SIGTERM');
@@ -782,7 +808,7 @@ app.on('before-quit', () => {
   }
 
   if (staticServer) {
-    console.log('[Electron] Stopping static server...');
+    logger.info('Stopping static server...');
     staticServer.close();
     staticServer = null;
   }
@@ -909,8 +935,18 @@ ipcMain.handle('server:getUrl', async () => {
 });
 
 // Get API key for authentication
+// Returns null in external server mode to trigger session-based auth
 ipcMain.handle('auth:getApiKey', () => {
+  if (isExternalServerMode) {
+    return null;
+  }
   return apiKey;
+});
+
+// Check if running in external server mode (Docker API)
+// Used by renderer to determine auth flow
+ipcMain.handle('auth:isExternalServerMode', () => {
+  return isExternalServerMode;
 });
 
 // Window management - update minimum width based on sidebar state
@@ -924,6 +960,6 @@ ipcMain.handle('window:updateMinWidth', (_, _sidebarExpanded: boolean) => {
 
 // Quit the application (used when user denies sandbox risk confirmation)
 ipcMain.handle('app:quit', () => {
-  console.log('[Electron] Quitting application via IPC request');
+  logger.info('Quitting application via IPC request');
   app.quit();
 });

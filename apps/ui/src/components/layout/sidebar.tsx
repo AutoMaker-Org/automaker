@@ -1,5 +1,8 @@
 import { useState, useCallback } from 'react';
+import { createLogger } from '@automaker/utils/logger';
 import { useNavigate, useLocation } from '@tanstack/react-router';
+
+const logger = createLogger('Sidebar');
 import { cn } from '@/lib/utils';
 import { useAppStore, type ThemeMode } from '@/store/app-store';
 import { useKeyboardShortcuts, useKeyboardShortcutsConfig } from '@/hooks/use-keyboard-shortcuts';
@@ -215,7 +218,7 @@ export function Sidebar() {
           });
         }
       } catch (error) {
-        console.error('[Sidebar] Failed to open project:', error);
+        logger.error('Failed to open project:', error);
         toast.error('Failed to open project', {
           description: error instanceof Error ? error.message : 'Unknown error',
         });

@@ -26,5 +26,5 @@ jobs:
           check-lockfile: 'true'
 
       - name: Run npm audit
-        run: npm audit --audit-level=moderate
+        run: npm audit --audit-level=critical
         continue-on-error: false

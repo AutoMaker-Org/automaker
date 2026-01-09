@@ -2,7 +2,18 @@
  * Feature types for AutoMaker feature management
  */
 
-import type { PlanningMode } from './settings.js';
+import type { PlanningMode, ThinkingLevel } from './settings.js';
+import type { ReasoningEffort } from './provider.js';
+
+/**
+ * A single entry in the description history
+ */
+export interface DescriptionHistoryEntry {
+  description: string;
+  timestamp: string; // ISO date string
+  source: 'initial' | 'enhance' | 'edit'; // What triggered this version
+  enhancementMode?: 'improve' | 'technical' | 'simplify' | 'acceptance'; // Only for 'enhance' source
+}
 
 export interface FeatureImagePath {
   id: string;
@@ -38,7 +49,8 @@ export interface Feature {
   // Branch info - worktree path is derived at runtime from branchName
   branchName?: string; // Name of the feature branch (undefined = use current worktree)
   skipTests?: boolean;
-  thinkingLevel?: string;
+  thinkingLevel?: ThinkingLevel;
+  reasoningEffort?: ReasoningEffort;
   planningMode?: PlanningMode;
   requirePlanApproval?: boolean;
   planSpec?: {
@@ -54,6 +66,7 @@ export interface Feature {
   error?: string;
   summary?: string;
   startedAt?: string;
+  descriptionHistory?: DescriptionHistoryEntry[]; // History of description changes
   [key: string]: unknown; // Keep catch-all for extensibility
 }
 

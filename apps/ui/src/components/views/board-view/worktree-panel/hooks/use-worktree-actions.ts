@@ -1,7 +1,10 @@
 import { useState, useCallback } from 'react';
+import { createLogger } from '@automaker/utils/logger';
 import { getElectronAPI } from '@/lib/electron';
 import { toast } from 'sonner';
 import type { WorktreeInfo } from '../types';
+
+const logger = createLogger('WorktreeActions');
 
 // Error codes that need special user-friendly handling
 const GIT_STATUS_ERROR_CODES = ['NOT_GIT_REPO', 'NO_COMMITS'] as const;
@@ -56,7 +59,7 @@ export function useWorktreeActions({ fetchWorktrees, fetchBranches }: UseWorktre
           toast.error(result.error || 'Failed to switch branch');
         }
       } catch (error) {
-        console.error('Switch branch failed:', error);
+        logger.error('Switch branch failed:', error);
         toast.error('Failed to switch branch');
       } finally {
         setIsSwitching(false);
@@ -84,7 +87,7 @@ export function useWorktreeActions({ fetchWorktrees, fetchBranches }: UseWorktre
           toast.error(result.error || 'Failed to pull latest changes');
         }
       } catch (error) {
-        console.error('Pull failed:', error);
+        logger.error('Pull failed:', error);
         toast.error('Failed to pull latest changes');
       } finally {
         setIsPulling(false);
@@ -113,7 +116,7 @@ export function useWorktreeActions({ fetchWorktrees, fetchBranches }: UseWorktre
           toast.error(result.error || 'Failed to push changes');
         }
       } catch (error) {
-        console.error('Push failed:', error);
+        logger.error('Push failed:', error);
         toast.error('Failed to push changes');
       } finally {
         setIsPushing(false);
@@ -126,7 +129,7 @@ export function useWorktreeActions({ fetchWorktrees, fetchBranches }: UseWorktre
     try {
       const api = getElectronAPI();
       if (!api?.worktree?.openInEditor) {
-        console.warn('Open in editor API not available');
+        logger.warn('Open in editor API not available');
         return;
       }
       const result = await api.worktree.openInEditor(worktree.path);
@@ -136,7 +139,7 @@ export function useWorktreeActions({ fetchWorktrees, fetchBranches }: UseWorktre
         toast.error(result.error);
       }
     } catch (error) {
-      console.error('Open in editor failed:', error);
+      logger.error('Open in editor failed:', error);
     }
   }, []);
 

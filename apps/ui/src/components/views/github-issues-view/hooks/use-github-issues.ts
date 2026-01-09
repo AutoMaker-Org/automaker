@@ -1,5 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { createLogger } from '@automaker/utils/logger';
 import { getElectronAPI, GitHubIssue } from '@/lib/electron';
+
+const logger = createLogger('GitHubIssues');
 import { useAppStore } from '@/store/app-store';
 
 export function useGithubIssues() {
@@ -38,7 +41,7 @@ export function useGithubIssues() {
       }
     } catch (err) {
       if (isMountedRef.current) {
-        console.error('[GitHubIssuesView] Error fetching issues:', err);
+        logger.error('Error fetching issues:', err);
         setError(err instanceof Error ? err.message : 'Failed to fetch issues');
       }
     } finally {

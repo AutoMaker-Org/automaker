@@ -6,7 +6,7 @@
  */
 
 import { useState } from 'react';
-import { ShieldAlert, Copy, Check } from 'lucide-react';
+import { ShieldAlert } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -25,26 +25,13 @@ interface SandboxRiskDialogProps {
   onDeny: () => void;
 }
 
-const DOCKER_COMMAND = 'npm run dev:docker';
-
 export function SandboxRiskDialog({ open, onConfirm, onDeny }: SandboxRiskDialogProps) {
-  const [copied, setCopied] = useState(false);
   const [skipInFuture, setSkipInFuture] = useState(false);
 
   const handleConfirm = () => {
     onConfirm(skipInFuture);
     // Reset checkbox state after confirmation
     setSkipInFuture(false);
-  };
-
-  const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(DOCKER_COMMAND);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch (err) {
-      console.error('Failed to copy:', err);
-    }
   };
 
   return (
@@ -78,26 +65,10 @@ export function SandboxRiskDialog({ open, onConfirm, onDeny }: SandboxRiskDialog
                 </ul>
               </div>
 
-              <div className="space-y-2">
-                <p className="text-sm text-muted-foreground">
-                  For safer operation, consider running Automaker in Docker:
-                </p>
-                <div className="flex items-center gap-2 bg-muted/50 border border-border rounded-lg p-2">
-                  <code className="flex-1 text-sm font-mono px-2">{DOCKER_COMMAND}</code>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleCopy}
-                    className="h-8 px-2 hover:bg-muted"
-                  >
-                    {copied ? (
-                      <Check className="w-4 h-4 text-green-500" />
-                    ) : (
-                      <Copy className="w-4 h-4" />
-                    )}
-                  </Button>
-                </div>
-              </div>
+              <p className="text-sm text-muted-foreground">
+                For safer operation, consider running Automaker in Docker. See the README for
+                instructions.
+              </p>
             </div>
           </DialogDescription>
         </DialogHeader>

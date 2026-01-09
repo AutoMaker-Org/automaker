@@ -6,11 +6,17 @@
  * (for file I/O via SettingsService) and the UI (for state management and sync).
  */
 
-import type { AgentModel } from './model.js';
+import type { ModelAlias, AgentModel, CodexModelId } from './model.js';
+import type { CursorModelId } from './cursor-models.js';
+import { CURSOR_MODEL_MAP, getAllCursorModelIds } from './cursor-models.js';
+import type { OpencodeModelId } from './opencode-models.js';
+import { getAllOpencodeModelIds, DEFAULT_OPENCODE_MODEL } from './opencode-models.js';
 import type { PromptCustomization } from './prompts.js';
+import type { CodexSandboxMode, CodexApprovalPolicy } from './codex.js';
+import type { ReasoningEffort } from './provider.js';
 
-// Re-export AgentModel for convenience
-export type { AgentModel };
+// Re-export ModelAlias for convenience
+export type { ModelAlias };
 
 /**
  * ThemeMode - Available color themes for the UI
@@ -68,8 +74,92 @@ export type PlanningMode = 'skip' | 'lite' | 'spec' | 'full';
 /** ThinkingLevel - Extended thinking levels for Claude models (reasoning intensity) */
 export type ThinkingLevel = 'none' | 'low' | 'medium' | 'high' | 'ultrathink';
 
+/**
+ * Thinking token budget mapping based on Claude SDK documentation.
+ * @see https://docs.anthropic.com/en/docs/build-with-claude/extended-thinking
+ *
+ * - Minimum budget: 1,024 tokens
+ * - Complex tasks starting point: 16,000+ tokens
+ * - Above 32,000: Risk of timeouts (batch processing recommended)
+ */
+export const THINKING_TOKEN_BUDGET: Record<ThinkingLevel, number | undefined> = {
+  none: undefined, // Thinking disabled
+  low: 1024, // Minimum per docs
+  medium: 10000, // Light reasoning
+  high: 16000, // Complex tasks (recommended starting point)
+  ultrathink: 32000, // Maximum safe (above this risks timeouts)
+};
+
+/**
+ * Convert thinking level to SDK maxThinkingTokens value
+ */
+export function getThinkingTokenBudget(level: ThinkingLevel | undefined): number | undefined {
+  if (!level || level === 'none') return undefined;
+  return THINKING_TOKEN_BUDGET[level];
+}
+
 /** ModelProvider - AI model provider for credentials and API key management */
-export type ModelProvider = 'claude';
+export type ModelProvider = 'claude' | 'cursor' | 'codex' | 'opencode';
+
+const DEFAULT_CODEX_AUTO_LOAD_AGENTS = false;
+const DEFAULT_CODEX_SANDBOX_MODE: CodexSandboxMode = 'workspace-write';
+const DEFAULT_CODEX_APPROVAL_POLICY: CodexApprovalPolicy = 'on-request';
+const DEFAULT_CODEX_ENABLE_WEB_SEARCH = false;
+const DEFAULT_CODEX_ENABLE_IMAGES = true;
+const DEFAULT_CODEX_ADDITIONAL_DIRS: string[] = [];
+
+/**
+ * PhaseModelEntry - Configuration for a single phase model
+ *
+ * Encapsulates the model selection and optional reasoning/thinking capabilities:
+ * - Claude models: Use thinkingLevel for extended thinking
+ * - Codex models: Use reasoningEffort for reasoning intensity
+ * - Cursor models: Handle thinking internally
+ */
+export interface PhaseModelEntry {
+  /** The model to use (Claude alias, Cursor model ID, or Codex model ID) */
+  model: ModelAlias | CursorModelId | CodexModelId;
+  /** Extended thinking level (only applies to Claude models, defaults to 'none') */
+  thinkingLevel?: ThinkingLevel;
+  /** Reasoning effort level (only applies to Codex models, defaults to 'none') */
+  reasoningEffort?: ReasoningEffort;
+}
+
+/**
+ * PhaseModelConfig - Configuration for AI models used in different application phases
+ *
+ * Allows users to choose which model (Claude or Cursor) to use for each distinct
+ * operation in the application. This provides fine-grained control over cost,
+ * speed, and quality tradeoffs.
+ */
+export interface PhaseModelConfig {
+  // Quick tasks - recommend fast/cheap models (Haiku, Cursor auto)
+  /** Model for enhancing feature names and descriptions */
+  enhancementModel: PhaseModelEntry;
+  /** Model for generating file context descriptions */
+  fileDescriptionModel: PhaseModelEntry;
+  /** Model for analyzing and describing context images */
+  imageDescriptionModel: PhaseModelEntry;
+
+  // Validation tasks - recommend smart models (Sonnet, Opus)
+  /** Model for validating and improving GitHub issues */
+  validationModel: PhaseModelEntry;
+
+  // Generation tasks - recommend powerful models (Opus, Sonnet)
+  /** Model for generating full application specifications */
+  specGenerationModel: PhaseModelEntry;
+  /** Model for creating features from specifications */
+  featureGenerationModel: PhaseModelEntry;
+  /** Model for reorganizing and prioritizing backlog */
+  backlogPlanningModel: PhaseModelEntry;
+  /** Model for analyzing project structure */
+  projectAnalysisModel: PhaseModelEntry;
+  /** Model for AI suggestions (feature, refactoring, security, performance) */
+  suggestionsModel: PhaseModelEntry;
+}
+
+/** Keys of PhaseModelConfig for type-safe access */
+export type PhaseModelKey = keyof PhaseModelConfig;
 
 /**
  * WindowBounds - Electron window position and size for persistence
@@ -152,16 +242,81 @@ export interface AIProfile {
   name: string;
   /** User-friendly description */
   description: string;
-  /** Which Claude model to use (opus, sonnet, haiku) */
-  model: AgentModel;
-  /** Extended thinking level for reasoning-based tasks */
-  thinkingLevel: ThinkingLevel;
-  /** Provider (currently only "claude") */
+  /** Provider selection: 'claude', 'cursor', or 'codex' */
   provider: ModelProvider;
   /** Whether this is a built-in default profile */
   isBuiltIn: boolean;
   /** Optional icon identifier or emoji */
   icon?: string;
+
+  // Claude-specific settings
+  /** Which Claude model to use (opus, sonnet, haiku) - only for Claude provider */
+  model?: ModelAlias;
+  /** Extended thinking level for reasoning-based tasks - only for Claude provider */
+  thinkingLevel?: ThinkingLevel;
+
+  // Cursor-specific settings
+  /** Which Cursor model to use - only for Cursor provider
+   * Note: For Cursor, thinking is embedded in the model ID (e.g., 'claude-sonnet-4-thinking')
+   */
+  cursorModel?: CursorModelId;
+
+  // Codex-specific settings
+  /** Which Codex/GPT model to use - only for Codex provider */
+  codexModel?: CodexModelId;
+
+  // OpenCode-specific settings
+  /** Which OpenCode model to use - only for OpenCode provider */
+  opencodeModel?: OpencodeModelId;
+}
+
+/**
+ * Helper to determine if a profile uses thinking mode
+ */
+export function profileHasThinking(profile: AIProfile): boolean {
+  if (profile.provider === 'claude') {
+    return profile.thinkingLevel !== undefined && profile.thinkingLevel !== 'none';
+  }
+
+  if (profile.provider === 'cursor') {
+    const model = profile.cursorModel || 'auto';
+    // Check using model map for hasThinking flag, or check for 'thinking' in name
+    const modelConfig = CURSOR_MODEL_MAP[model];
+    return modelConfig?.hasThinking ?? false;
+  }
+
+  if (profile.provider === 'codex') {
+    // Codex models handle thinking internally (o-series models)
+    const model = profile.codexModel || 'codex-gpt-5.2';
+    return model.startsWith('o');
+  }
+
+  if (profile.provider === 'opencode') {
+    // OpenCode models don't expose thinking configuration
+    return false;
+  }
+
+  return false;
+}
+
+/**
+ * Get effective model string for execution
+ */
+export function getProfileModelString(profile: AIProfile): string {
+  if (profile.provider === 'cursor') {
+    return `cursor:${profile.cursorModel || 'auto'}`;
+  }
+
+  if (profile.provider === 'codex') {
+    return `codex:${profile.codexModel || 'codex-gpt-5.2'}`;
+  }
+
+  if (profile.provider === 'opencode') {
+    return `opencode:${profile.opencodeModel || DEFAULT_OPENCODE_MODEL}`;
+  }
+
+  // Claude
+  return profile.model || 'sonnet';
 }
 
 /**
@@ -274,6 +429,18 @@ export interface GlobalSettings {
   /** Version number for schema migration */
   version: number;
 
+  // Migration Tracking
+  /** Whether localStorage settings have been migrated to API storage (prevents re-migration) */
+  localStorageMigrated?: boolean;
+
+  // Onboarding / Setup Wizard
+  /** Whether the initial setup wizard has been completed */
+  setupComplete: boolean;
+  /** Whether this is the first run experience (used by UI onboarding) */
+  isFirstRun: boolean;
+  /** Whether Claude setup was skipped during onboarding */
+  skipClaudeSetup: boolean;
+
   // Theme Configuration
   /** Currently selected theme */
   theme: ThemeMode;
@@ -293,6 +460,8 @@ export interface GlobalSettings {
   defaultSkipTests: boolean;
   /** Default: enable dependency blocking */
   enableDependencyBlocking: boolean;
+  /** Skip verification requirement in auto-mode (treat 'completed' same as 'verified') */
+  skipVerificationInAutoMode: boolean;
   /** Default: use git worktrees for feature branches */
   useWorktrees: boolean;
   /** Default: only show AI profiles (hide other settings) */
@@ -308,11 +477,27 @@ export interface GlobalSettings {
   /** Mute completion notification sound */
   muteDoneSound: boolean;
 
-  // AI Model Selection
-  /** Which model to use for feature name/description enhancement */
-  enhancementModel: AgentModel;
-  /** Which model to use for GitHub issue validation */
-  validationModel: AgentModel;
+  // AI Model Selection (per-phase configuration)
+  /** Phase-specific AI model configuration */
+  phaseModels: PhaseModelConfig;
+
+  // Legacy AI Model Selection (deprecated - use phaseModels instead)
+  /** @deprecated Use phaseModels.enhancementModel instead */
+  enhancementModel: ModelAlias;
+  /** @deprecated Use phaseModels.validationModel instead */
+  validationModel: ModelAlias;
+
+  // Cursor CLI Settings (global)
+  /** Which Cursor models are available in feature modal (empty = all) */
+  enabledCursorModels: CursorModelId[];
+  /** Default Cursor model selection when switching to Cursor CLI */
+  cursorDefaultModel: CursorModelId;
+
+  // OpenCode CLI Settings (global)
+  /** Which OpenCode models are available in feature modal (empty = all) */
+  enabledOpencodeModels?: OpencodeModelId[];
+  /** Default OpenCode model selection when switching to OpenCode CLI */
+  opencodeDefaultModel?: OpencodeModelId;
 
   // Input Configuration
   /** User's keyboard shortcut bindings */
@@ -327,6 +512,8 @@ export interface GlobalSettings {
   projects: ProjectRef[];
   /** Projects in trash/recycle bin */
   trashedProjects: TrashedProjectRef[];
+  /** ID of the currently open project (null if none) */
+  currentProjectId: string | null;
   /** History of recently opened project IDs */
   projectHistory: string[];
   /** Current position in project history for navigation */
@@ -351,22 +538,69 @@ export interface GlobalSettings {
   // Claude Agent SDK Settings
   /** Auto-load CLAUDE.md files using SDK's settingSources option */
   autoLoadClaudeMd?: boolean;
-  /** Enable sandbox mode for bash commands (default: false, enable for additional security) */
-  enableSandboxMode?: boolean;
-  /** Skip showing the sandbox risk warning dialog */
+  /** Skip the sandbox environment warning dialog on startup */
   skipSandboxWarning?: boolean;
+
+  // Codex CLI Settings
+  /** Auto-load .codex/AGENTS.md instructions into Codex prompts */
+  codexAutoLoadAgents?: boolean;
+  /** Sandbox mode for Codex CLI command execution */
+  codexSandboxMode?: CodexSandboxMode;
+  /** Approval policy for Codex CLI tool execution */
+  codexApprovalPolicy?: CodexApprovalPolicy;
+  /** Enable web search capability for Codex CLI (--search flag) */
+  codexEnableWebSearch?: boolean;
+  /** Enable image attachment support for Codex CLI (-i flag) */
+  codexEnableImages?: boolean;
+  /** Additional directories with write access (--add-dir flags) */
+  codexAdditionalDirs?: string[];
+  /** Last thread ID for session resumption */
+  codexThreadId?: string;
 
   // MCP Server Configuration
   /** List of configured MCP servers for agent use */
   mcpServers: MCPServerConfig[];
-  /** Auto-approve MCP tool calls without permission prompts (uses bypassPermissions mode) */
-  mcpAutoApproveTools?: boolean;
-  /** Allow unrestricted tools when MCP servers are enabled (don't filter allowedTools) */
-  mcpUnrestrictedTools?: boolean;
 
   // Prompt Customization
   /** Custom prompts for Auto Mode, Agent Runner, Backlog Planning, and Enhancements */
   promptCustomization?: PromptCustomization;
+
+  // Skills Configuration
+  /**
+   * Enable Skills functionality (loads from .claude/skills/ directories)
+   * @default true
+   */
+  enableSkills?: boolean;
+
+  /**
+   * Which directories to load Skills from
+   * - 'user': ~/.claude/skills/ (personal skills)
+   * - 'project': .claude/skills/ (project-specific skills)
+   * @default ['user', 'project']
+   */
+  skillsSources?: Array<'user' | 'project'>;
+
+  // Subagents Configuration
+  /**
+   * Enable Custom Subagents functionality (loads from .claude/agents/ directories)
+   * @default true
+   */
+  enableSubagents?: boolean;
+
+  /**
+   * Which directories to load Subagents from
+   * - 'user': ~/.claude/agents/ (personal agents)
+   * - 'project': .claude/agents/ (project-specific agents)
+   * @default ['user', 'project']
+   */
+  subagentsSources?: Array<'user' | 'project'>;
+
+  /**
+   * Custom subagent definitions for specialized task delegation (programmatic)
+   * Key: agent name (e.g., 'code-reviewer', 'test-runner')
+   * Value: agent configuration
+   */
+  customSubagents?: Record<string, import('./provider.js').AgentDefinition>;
 }
 
 /**
@@ -466,14 +700,41 @@ export interface ProjectSettings {
   // Claude Agent SDK Settings
   /** Auto-load CLAUDE.md files using SDK's settingSources option (project override) */
   autoLoadClaudeMd?: boolean;
+
+  // Subagents Configuration
+  /**
+   * Project-specific custom subagent definitions for specialized task delegation
+   * Merged with global customSubagents, project-level takes precedence
+   * Key: agent name (e.g., 'code-reviewer', 'test-runner')
+   * Value: agent configuration
+   */
+  customSubagents?: Record<string, import('./provider.js').AgentDefinition>;
 }
 
 /**
  * Default values and constants
  */
 
+/** Default phase model configuration - sensible defaults for each task type */
+export const DEFAULT_PHASE_MODELS: PhaseModelConfig = {
+  // Quick tasks - use fast models for speed and cost
+  enhancementModel: { model: 'sonnet' },
+  fileDescriptionModel: { model: 'haiku' },
+  imageDescriptionModel: { model: 'haiku' },
+
+  // Validation - use smart models for accuracy
+  validationModel: { model: 'sonnet' },
+
+  // Generation - use powerful models for quality
+  specGenerationModel: { model: 'opus' },
+  featureGenerationModel: { model: 'sonnet' },
+  backlogPlanningModel: { model: 'sonnet' },
+  projectAnalysisModel: { model: 'sonnet' },
+  suggestionsModel: { model: 'sonnet' },
+};
+
 /** Current version of the global settings schema */
-export const SETTINGS_VERSION = 2;
+export const SETTINGS_VERSION = 4;
 /** Current version of the credentials schema */
 export const CREDENTIALS_VERSION = 1;
 /** Current version of the project settings schema */
@@ -506,6 +767,9 @@ export const DEFAULT_KEYBOARD_SHORTCUTS: KeyboardShortcuts = {
 /** Default global settings used when no settings file exists */
 export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
   version: SETTINGS_VERSION,
+  setupComplete: false,
+  isFirstRun: true,
+  skipClaudeSetup: false,
   theme: 'dark',
   sidebarOpen: true,
   chatHistoryOpen: false,
@@ -513,18 +777,25 @@ export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
   maxConcurrency: 3,
   defaultSkipTests: true,
   enableDependencyBlocking: true,
+  skipVerificationInAutoMode: false,
   useWorktrees: false,
   showProfilesOnly: false,
   defaultPlanningMode: 'skip',
   defaultRequirePlanApproval: false,
   defaultAIProfileId: null,
   muteDoneSound: false,
+  phaseModels: DEFAULT_PHASE_MODELS,
   enhancementModel: 'sonnet',
   validationModel: 'opus',
+  enabledCursorModels: getAllCursorModelIds(),
+  cursorDefaultModel: 'auto',
+  enabledOpencodeModels: getAllOpencodeModelIds(),
+  opencodeDefaultModel: DEFAULT_OPENCODE_MODEL,
   keyboardShortcuts: DEFAULT_KEYBOARD_SHORTCUTS,
   aiProfiles: [],
   projects: [],
   trashedProjects: [],
+  currentProjectId: null,
   projectHistory: [],
   projectHistoryIndex: -1,
   lastProjectDir: undefined,
@@ -532,13 +803,19 @@ export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
   worktreePanelCollapsed: false,
   lastSelectedSessionByProject: {},
   autoLoadClaudeMd: false,
-  enableSandboxMode: false,
   skipSandboxWarning: false,
+  codexAutoLoadAgents: DEFAULT_CODEX_AUTO_LOAD_AGENTS,
+  codexSandboxMode: DEFAULT_CODEX_SANDBOX_MODE,
+  codexApprovalPolicy: DEFAULT_CODEX_APPROVAL_POLICY,
+  codexEnableWebSearch: DEFAULT_CODEX_ENABLE_WEB_SEARCH,
+  codexEnableImages: DEFAULT_CODEX_ENABLE_IMAGES,
+  codexAdditionalDirs: DEFAULT_CODEX_ADDITIONAL_DIRS,
+  codexThreadId: undefined,
   mcpServers: [],
-  // Default to true for autonomous workflow. Security is enforced when adding servers
-  // via the security warning dialog that explains the risks.
-  mcpAutoApproveTools: true,
-  mcpUnrestrictedTools: true,
+  enableSkills: true,
+  skillsSources: ['user', 'project'],
+  enableSubagents: true,
+  subagentsSources: ['user', 'project'],
 };
 
 /** Default credentials (empty strings - user must provide API keys) */

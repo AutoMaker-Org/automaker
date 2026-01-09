@@ -10,11 +10,14 @@ import { getErrorMessage, logError } from '../common.js';
 export function createUpdateHandler(featureLoader: FeatureLoader) {
   return async (req: Request, res: Response): Promise<void> => {
     try {
-      const { projectPath, featureId, updates } = req.body as {
-        projectPath: string;
-        featureId: string;
-        updates: Partial<Feature>;
-      };
+      const { projectPath, featureId, updates, descriptionHistorySource, enhancementMode } =
+        req.body as {
+          projectPath: string;
+          featureId: string;
+          updates: Partial<Feature>;
+          descriptionHistorySource?: 'enhance' | 'edit';
+          enhancementMode?: 'improve' | 'technical' | 'simplify' | 'acceptance';
+        };
 
       if (!projectPath || !featureId || !updates) {
         res.status(400).json({
@@ -24,7 +27,13 @@ export function createUpdateHandler(featureLoader: FeatureLoader) {
         return;
       }
 
-      const updated = await featureLoader.update(projectPath, featureId, updates);
+      const updated = await featureLoader.update(
+        projectPath,
+        featureId,
+        updates,
+        descriptionHistorySource,
+        enhancementMode
+      );
       res.json({ success: true, feature: updated });
     } catch (error) {
       logError(error, 'Update feature failed');

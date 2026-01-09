@@ -1,27 +1,64 @@
 import { createRootRoute, Outlet, useLocation, useNavigate } from '@tanstack/react-router';
 import { useEffect, useState, useCallback, useDeferredValue, useRef } from 'react';
+import { createLogger } from '@automaker/utils/logger';
 import { Sidebar } from '@/components/layout/sidebar';
 import {
   FileBrowserProvider,
   useFileBrowser,
   setGlobalFileBrowser,
 } from '@/contexts/file-browser-context';
-import { useAppStore } from '@/store/app-store';
+import { useAppStore, getStoredTheme } from '@/store/app-store';
 import { useSetupStore } from '@/store/setup-store';
 import { useAuthStore } from '@/store/auth-store';
 import { getElectronAPI, isElectron } from '@/lib/electron';
 import { isMac } from '@/lib/utils';
 import {
   initApiKey,
-  isElectronMode,
   verifySession,
   checkSandboxEnvironment,
   getServerUrlSync,
+  getHttpApiClient,
 } from '@/lib/http-api-client';
+import {
+  hydrateStoreFromSettings,
+  signalMigrationComplete,
+  performSettingsMigration,
+} from '@/hooks/use-settings-migration';
 import { Toaster } from 'sonner';
 import { ThemeOption, themeOptions } from '@/config/theme-options';
 import { SandboxRiskDialog } from '@/components/dialogs/sandbox-risk-dialog';
 import { SandboxRejectionScreen } from '@/components/dialogs/sandbox-rejection-screen';
+import { LoadingState } from '@/components/ui/loading-state';
+import { useProjectSettingsLoader } from '@/hooks/use-project-settings-loader';
+
+const logger = createLogger('RootLayout');
+
+// Apply stored theme immediately on page load (before React hydration)
+// This prevents flash of default theme on login/setup pages
+function applyStoredTheme(): void {
+  const storedTheme = getStoredTheme();
+  if (storedTheme) {
+    const root = document.documentElement;
+    // Remove all theme classes (themeOptions doesn't include 'system' which is only in ThemeMode)
+    const themeClasses = themeOptions.map((option) => option.value);
+    root.classList.remove(...themeClasses);
+
+    // Apply the stored theme
+    if (storedTheme === 'dark') {
+      root.classList.add('dark');
+    } else if (storedTheme === 'system') {
+      const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      root.classList.add(isDark ? 'dark' : 'light');
+    } else if (storedTheme !== 'light') {
+      root.classList.add(storedTheme);
+    } else {
+      root.classList.add('light');
+    }
+  }
+}
+
+// Apply stored theme immediately (runs synchronously before render)
+applyStoredTheme();
 
 function RootLayoutContent() {
   const location = useLocation();
@@ -36,15 +73,16 @@ function RootLayoutContent() {
   const navigate = useNavigate();
   const [isMounted, setIsMounted] = useState(false);
   const [streamerPanelOpen, setStreamerPanelOpen] = useState(false);
-  const [setupHydrated, setSetupHydrated] = useState(
-    () => useSetupStore.persist?.hasHydrated?.() ?? false
-  );
   const authChecked = useAuthStore((s) => s.authChecked);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const { openFileBrowser } = useFileBrowser();
 
+  // Load project settings when switching projects
+  useProjectSettingsLoader();
+
   const isSetupRoute = location.pathname === '/setup';
   const isLoginRoute = location.pathname === '/login';
+  const isLoggedOutRoute = location.pathname === '/logged-out';
 
   // Sandbox environment check state
   type SandboxStatus = 'pending' | 'containerized' | 'needs-confirmation' | 'denied' | 'confirmed';
@@ -98,10 +136,15 @@ function RootLayoutContent() {
     setIsMounted(true);
   }, []);
 
-  // Check sandbox environment on mount
+  // Check sandbox environment only after user is authenticated and setup is complete
   useEffect(() => {
     // Skip if already decided
     if (sandboxStatus !== 'pending') {
+      return;
+    }
+
+    // Don't check sandbox until user is authenticated and has completed setup
+    if (!authChecked || !isAuthenticated || !setupComplete) {
       return;
     }
 
@@ -120,7 +163,7 @@ function RootLayoutContent() {
           setSandboxStatus('needs-confirmation');
         }
       } catch (error) {
-        console.error('[Sandbox] Failed to check environment:', error);
+        logger.error('Failed to check environment:', error);
         // On error, assume not containerized and show warning
         if (skipSandboxWarning) {
           setSandboxStatus('confirmed');
@@ -131,7 +174,7 @@ function RootLayoutContent() {
     };
 
     checkSandbox();
-  }, [sandboxStatus, skipSandboxWarning]);
+  }, [sandboxStatus, skipSandboxWarning, authChecked, isAuthenticated, setupComplete]);
 
   // Handle sandbox risk confirmation
   const handleSandboxConfirm = useCallback(
@@ -154,10 +197,10 @@ function RootLayoutContent() {
         if (electronAPI?.quit) {
           await electronAPI.quit();
         } else {
-          console.error('[Sandbox] quit() not available on electronAPI');
+          logger.error('quit() not available on electronAPI');
         }
       } catch (error) {
-        console.error('[Sandbox] Failed to quit app:', error);
+        logger.error('Failed to quit app:', error);
       }
     } else {
       // In web mode, show rejection screen
@@ -167,6 +210,24 @@ function RootLayoutContent() {
 
   // Ref to prevent concurrent auth checks from running
   const authCheckRunning = useRef(false);
+
+  // Global listener for 401/403 responses during normal app usage.
+  // This is triggered by the HTTP client whenever an authenticated request returns 401/403.
+  // Works for ALL modes (unified flow)
+  useEffect(() => {
+    const handleLoggedOut = () => {
+      useAuthStore.getState().setAuthState({ isAuthenticated: false, authChecked: true });
+
+      if (location.pathname !== '/logged-out') {
+        navigate({ to: '/logged-out' });
+      }
+    };
+
+    window.addEventListener('automaker:logged-out', handleLoggedOut);
+    return () => {
+      window.removeEventListener('automaker:logged-out', handleLoggedOut);
+    };
+  }, [location.pathname, navigate]);
 
   // Initialize authentication
   // - Electron mode: Uses API key from IPC (header-based auth)
@@ -184,27 +245,97 @@ function RootLayoutContent() {
         // Initialize API key for Electron mode
         await initApiKey();
 
-        // In Electron mode, we're always authenticated via header
-        if (isElectronMode()) {
-          useAuthStore.getState().setAuthState({ isAuthenticated: true, authChecked: true });
-          return;
+        // 1. Verify session (Single Request, ALL modes)
+        let isValid = false;
+        try {
+          isValid = await verifySession();
+        } catch (error) {
+          logger.warn('Session verification failed (likely network/server issue):', error);
+          isValid = false;
         }
-
-        // In web mode, verify the session cookie is still valid
-        // by making a request to an authenticated endpoint
-        const isValid = await verifySession();
 
         if (isValid) {
-          useAuthStore.getState().setAuthState({ isAuthenticated: true, authChecked: true });
-          return;
-        }
+          // 2. Load settings (and hydrate stores) before marking auth as checked.
+          // This prevents useSettingsSync from pushing default/empty state to the server
+          // when the backend is still starting up or temporarily unavailable.
+          const api = getHttpApiClient();
+          try {
+            const maxAttempts = 8;
+            const baseDelayMs = 250;
+            let lastError: unknown = null;
 
-        // Session is invalid or expired - treat as not authenticated
-        useAuthStore.getState().setAuthState({ isAuthenticated: false, authChecked: true });
+            for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+              try {
+                const settingsResult = await api.settings.getGlobal();
+                if (settingsResult.success && settingsResult.settings) {
+                  const { settings: finalSettings, migrated } = await performSettingsMigration(
+                    settingsResult.settings as unknown as Parameters<
+                      typeof performSettingsMigration
+                    >[0]
+                  );
+
+                  if (migrated) {
+                    logger.info('Settings migration from localStorage completed');
+                  }
+
+                  // Hydrate store with the final settings (merged if migration occurred)
+                  hydrateStoreFromSettings(finalSettings);
+
+                  // Signal that settings hydration is complete so useSettingsSync can start
+                  signalMigrationComplete();
+
+                  // Mark auth as checked only after settings hydration succeeded.
+                  useAuthStore
+                    .getState()
+                    .setAuthState({ isAuthenticated: true, authChecked: true });
+                  return;
+                }
+
+                lastError = settingsResult;
+              } catch (error) {
+                lastError = error;
+              }
+
+              const delayMs = Math.min(1500, baseDelayMs * attempt);
+              logger.warn(
+                `Settings not ready (attempt ${attempt}/${maxAttempts}); retrying in ${delayMs}ms...`,
+                lastError
+              );
+              await new Promise((resolve) => setTimeout(resolve, delayMs));
+            }
+
+            throw lastError ?? new Error('Failed to load settings');
+          } catch (error) {
+            logger.error('Failed to fetch settings after valid session:', error);
+            // If we can't load settings, we must NOT start syncing defaults to the server.
+            // Treat as not authenticated for now (backend likely unavailable) and unblock sync hook.
+            useAuthStore.getState().setAuthState({ isAuthenticated: false, authChecked: true });
+            signalMigrationComplete();
+            if (location.pathname !== '/logged-out' && location.pathname !== '/login') {
+              navigate({ to: '/logged-out' });
+            }
+            return;
+          }
+        } else {
+          // Session is invalid or expired - treat as not authenticated
+          useAuthStore.getState().setAuthState({ isAuthenticated: false, authChecked: true });
+          // Signal migration complete so sync hook doesn't hang (nothing to sync when not authenticated)
+          signalMigrationComplete();
+
+          // Redirect to logged-out if not already there or login
+          if (location.pathname !== '/logged-out' && location.pathname !== '/login') {
+            navigate({ to: '/logged-out' });
+          }
+        }
       } catch (error) {
-        console.error('Failed to initialize auth:', error);
+        logger.error('Failed to initialize auth:', error);
         // On error, treat as not authenticated
         useAuthStore.getState().setAuthState({ isAuthenticated: false, authChecked: true });
+        // Signal migration complete so sync hook doesn't hang
+        signalMigrationComplete();
+        if (location.pathname !== '/logged-out' && location.pathname !== '/login') {
+          navigate({ to: '/logged-out' });
+        }
       } finally {
         authCheckRunning.current = false;
       }
@@ -213,37 +344,21 @@ function RootLayoutContent() {
     initAuth();
   }, []); // Runs once per load; auth state drives routing rules
 
-  // Wait for setup store hydration before enforcing routing rules
-  useEffect(() => {
-    if (useSetupStore.persist?.hasHydrated?.()) {
-      setSetupHydrated(true);
-      return;
-    }
+  // Note: Settings are now loaded in __root.tsx after successful session verification
+  // This ensures a unified flow across all modes (Electron, web, external server)
 
-    const unsubscribe = useSetupStore.persist?.onFinishHydration?.(() => {
-      setSetupHydrated(true);
-    });
-
-    return () => {
-      if (typeof unsubscribe === 'function') {
-        unsubscribe();
-      }
-    };
-  }, []);
-
-  // Routing rules (web mode):
-  // - If not authenticated: force /login (even /setup is protected)
+  // Routing rules (ALL modes - unified flow):
+  // - If not authenticated: force /logged-out (even /setup is protected)
   // - If authenticated but setup incomplete: force /setup
+  // - If authenticated and setup complete: allow access to app
   useEffect(() => {
-    if (!setupHydrated) return;
-
     // Wait for auth check to complete before enforcing any redirects
-    if (!isElectronMode() && !authChecked) return;
+    if (!authChecked) return;
 
-    // Unauthenticated -> force /login
-    if (!isElectronMode() && !isAuthenticated) {
-      if (location.pathname !== '/login') {
-        navigate({ to: '/login' });
+    // Unauthenticated -> force /logged-out (but allow /login so user can authenticate)
+    if (!isAuthenticated) {
+      if (location.pathname !== '/logged-out' && location.pathname !== '/login') {
+        navigate({ to: '/logged-out' });
       }
       return;
     }
@@ -258,7 +373,7 @@ function RootLayoutContent() {
     if (setupComplete && location.pathname === '/setup') {
       navigate({ to: '/' });
     }
-  }, [authChecked, isAuthenticated, setupComplete, setupHydrated, location.pathname, navigate]);
+  }, [authChecked, isAuthenticated, setupComplete, location.pathname, navigate]);
 
   useEffect(() => {
     setGlobalFileBrowser(openFileBrowser);
@@ -282,7 +397,7 @@ function RootLayoutContent() {
         });
         setIpcConnected(response.ok);
       } catch (error) {
-        console.error('IPC connection failed:', error);
+        logger.error('IPC connection failed:', error);
         setIpcConnected(false);
       }
     };
@@ -318,50 +433,40 @@ function RootLayoutContent() {
     }
   }, [deferredTheme]);
 
-  // Show rejection screen if user denied sandbox risk (web mode only)
-  if (sandboxStatus === 'denied' && !isElectron()) {
+  // Show sandbox rejection screen if user denied the risk warning
+  if (sandboxStatus === 'denied') {
     return <SandboxRejectionScreen />;
   }
 
-  // Show loading while checking sandbox environment
-  if (sandboxStatus === 'pending') {
-    return (
-      <main className="flex h-screen items-center justify-center" data-testid="app-container">
-        <div className="text-muted-foreground">Checking environment...</div>
-      </main>
-    );
-  }
+  // Show sandbox risk dialog if not containerized and user hasn't confirmed
+  // The dialog is rendered as an overlay while the main content is blocked
+  const showSandboxDialog = sandboxStatus === 'needs-confirmation';
 
   // Show login page (full screen, no sidebar)
-  if (isLoginRoute) {
+  // Note: No sandbox dialog here - it only shows after login and setup complete
+  if (isLoginRoute || isLoggedOutRoute) {
     return (
       <main className="h-screen overflow-hidden" data-testid="app-container">
         <Outlet />
-        {/* Show sandbox dialog on top of login page if needed */}
-        <SandboxRiskDialog
-          open={sandboxStatus === 'needs-confirmation'}
-          onConfirm={handleSandboxConfirm}
-          onDeny={handleSandboxDeny}
-        />
       </main>
     );
   }
 
-  // Wait for auth check before rendering protected routes (web mode only)
-  if (!isElectronMode() && !authChecked) {
+  // Wait for auth check before rendering protected routes (ALL modes - unified flow)
+  if (!authChecked) {
     return (
       <main className="flex h-screen items-center justify-center" data-testid="app-container">
-        <div className="text-muted-foreground">Loading...</div>
+        <LoadingState message="Loading..." />
       </main>
     );
   }
 
-  // Redirect to login if not authenticated (web mode)
-  // Show loading state while navigation to login is in progress
-  if (!isElectronMode() && !isAuthenticated) {
+  // Redirect to logged-out if not authenticated (ALL modes - unified flow)
+  // Show loading state while navigation is in progress
+  if (!isAuthenticated) {
     return (
       <main className="flex h-screen items-center justify-center" data-testid="app-container">
-        <div className="text-muted-foreground">Redirecting to login...</div>
+        <LoadingState message="Redirecting..." />
       </main>
     );
   }
@@ -371,48 +476,42 @@ function RootLayoutContent() {
     return (
       <main className="h-screen overflow-hidden" data-testid="app-container">
         <Outlet />
-        {/* Show sandbox dialog on top of setup page if needed */}
-        <SandboxRiskDialog
-          open={sandboxStatus === 'needs-confirmation'}
-          onConfirm={handleSandboxConfirm}
-          onDeny={handleSandboxDeny}
-        />
       </main>
     );
   }
 
   return (
-    <main className="flex h-screen overflow-hidden" data-testid="app-container">
-      {/* Full-width titlebar drag region for Electron window dragging */}
-      {isElectron() && (
+    <>
+      <main className="flex h-screen overflow-hidden" data-testid="app-container">
+        {/* Full-width titlebar drag region for Electron window dragging */}
+        {isElectron() && (
+          <div
+            className={`fixed top-0 left-0 right-0 h-6 titlebar-drag-region z-40 pointer-events-none ${isMac ? 'pl-20' : ''}`}
+            aria-hidden="true"
+          />
+        )}
+        <Sidebar />
         <div
-          className={`fixed top-0 left-0 right-0 h-6 titlebar-drag-region z-40 pointer-events-none ${isMac ? 'pl-20' : ''}`}
-          aria-hidden="true"
+          className="flex-1 flex flex-col overflow-hidden transition-all duration-300"
+          style={{ marginRight: streamerPanelOpen ? '250px' : '0' }}
+        >
+          <Outlet />
+        </div>
+
+        {/* Hidden streamer panel - opens with "\" key, pushes content */}
+        <div
+          className={`fixed top-0 right-0 h-full w-[250px] bg-background border-l border-border transition-transform duration-300 ${
+            streamerPanelOpen ? 'translate-x-0' : 'translate-x-full'
+          }`}
         />
-      )}
-      <Sidebar />
-      <div
-        className="flex-1 flex flex-col overflow-hidden transition-all duration-300"
-        style={{ marginRight: streamerPanelOpen ? '250px' : '0' }}
-      >
-        <Outlet />
-      </div>
-
-      {/* Hidden streamer panel - opens with "\" key, pushes content */}
-      <div
-        className={`fixed top-0 right-0 h-full w-[250px] bg-background border-l border-border transition-transform duration-300 ${
-          streamerPanelOpen ? 'translate-x-0' : 'translate-x-full'
-        }`}
-      />
-      <Toaster richColors position="bottom-right" />
-
-      {/* Show sandbox dialog if needed */}
+        <Toaster richColors position="bottom-right" />
+      </main>
       <SandboxRiskDialog
-        open={sandboxStatus === 'needs-confirmation'}
+        open={showSandboxDialog}
         onConfirm={handleSandboxConfirm}
         onDeny={handleSandboxDeny}
       />
-    </main>
+    </>
   );
 }
 

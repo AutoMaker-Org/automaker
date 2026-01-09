@@ -11,15 +11,29 @@ import { getGitRepositoryDiffs } from '../../common.js';
 export function createDiffsHandler() {
   return async (req: Request, res: Response): Promise<void> => {
     try {
-      const { projectPath, featureId } = req.body as {
+      const { projectPath, featureId, useWorktrees } = req.body as {
         projectPath: string;
         featureId: string;
+        useWorktrees?: boolean;
       };
 
       if (!projectPath || !featureId) {
         res.status(400).json({
           success: false,
           error: 'projectPath and featureId required',
+        });
+        return;
+      }
+
+      // If worktrees aren't enabled, don't probe .worktrees at all.
+      // This avoids noisy logs that make it look like features are "running in worktrees".
+      if (useWorktrees === false) {
+        const result = await getGitRepositoryDiffs(projectPath);
+        res.json({
+          success: true,
+          diff: result.diff,
+          files: result.files,
+          hasChanges: result.hasChanges,
         });
         return;
       }
@@ -41,7 +55,11 @@ export function createDiffsHandler() {
         });
       } catch (innerError) {
         // Worktree doesn't exist - fallback to main project path
-        logError(innerError, 'Worktree access failed, falling back to main project');
+        const code = (innerError as NodeJS.ErrnoException | undefined)?.code;
+        // ENOENT is expected when a feature has no worktree; don't log as an error.
+        if (code && code !== 'ENOENT') {
+          logError(innerError, 'Worktree access failed, falling back to main project');
+        }
 
         try {
           const result = await getGitRepositoryDiffs(projectPath);

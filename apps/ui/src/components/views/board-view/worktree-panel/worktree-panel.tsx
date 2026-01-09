@@ -1,8 +1,8 @@
-import { useState, useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { GitBranch, Plus, RefreshCw, PanelLeftOpen, PanelLeftClose } from 'lucide-react';
 import { cn, pathsEqual } from '@/lib/utils';
-import { getItem, setItem } from '@/lib/storage';
+import { useAppStore } from '@/store/app-store';
 import type { WorktreePanelProps, WorktreeInfo } from './types';
 import {
   useWorktrees,
@@ -13,8 +13,6 @@ import {
   useRunningFeatures,
 } from './hooks';
 import { WorktreeTab } from './components';
-
-const WORKTREE_PANEL_COLLAPSED_KEY = 'worktree-panel-collapsed';
 
 export function WorktreePanel({
   projectPath,
@@ -85,17 +83,11 @@ export function WorktreePanel({
     features,
   });
 
-  // Collapse state with localStorage persistence
-  const [isCollapsed, setIsCollapsed] = useState(() => {
-    const saved = getItem(WORKTREE_PANEL_COLLAPSED_KEY);
-    return saved === 'true';
-  });
+  // Collapse state from store (synced via API)
+  const isCollapsed = useAppStore((s) => s.worktreePanelCollapsed);
+  const setWorktreePanelCollapsed = useAppStore((s) => s.setWorktreePanelCollapsed);
 
-  useEffect(() => {
-    setItem(WORKTREE_PANEL_COLLAPSED_KEY, String(isCollapsed));
-  }, [isCollapsed]);
-
-  const toggleCollapsed = () => setIsCollapsed((prev) => !prev);
+  const toggleCollapsed = () => setWorktreePanelCollapsed(!isCollapsed);
 
   // Periodic interval check (5 seconds) to detect branch changes on disk
   // Reduced from 1s to 5s to minimize GPU/CPU usage from frequent re-renders

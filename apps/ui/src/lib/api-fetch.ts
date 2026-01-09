@@ -153,3 +153,37 @@ export async function apiDeleteRaw(
 ): Promise<Response> {
   return apiFetch(endpoint, 'DELETE', options);
 }
+
+/**
+ * Build an authenticated image URL for use in <img> tags or CSS background-image
+ * Adds authentication via query parameter since headers can't be set for image loads
+ *
+ * @param path - Image path
+ * @param projectPath - Project path
+ * @param version - Optional cache-busting version
+ * @returns Full URL with auth credentials
+ */
+export function getAuthenticatedImageUrl(
+  path: string,
+  projectPath: string,
+  version?: string | number
+): string {
+  const serverUrl = getServerUrl();
+  const params = new URLSearchParams({
+    path,
+    projectPath,
+  });
+
+  if (version !== undefined) {
+    params.set('v', String(version));
+  }
+
+  // Add auth credential as query param (needed for image loads that can't set headers)
+  const apiKey = getApiKey();
+  if (apiKey) {
+    params.set('apiKey', apiKey);
+  }
+  // Note: Session token auth relies on cookies which are sent automatically by the browser
+
+  return `${serverUrl}/api/fs/image?${params.toString()}`;
+}

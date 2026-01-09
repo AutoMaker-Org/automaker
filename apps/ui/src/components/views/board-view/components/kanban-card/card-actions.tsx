@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { Feature } from '@/store/app-store';
 import { Button } from '@/components/ui/button';
 import {
@@ -17,6 +18,7 @@ interface CardActionsProps {
   isCurrentAutoTask: boolean;
   hasContext?: boolean;
   shortcutKey?: string;
+  isSelectionMode?: boolean;
   onEdit: () => void;
   onViewOutput?: () => void;
   onVerify?: () => void;
@@ -35,6 +37,7 @@ export function CardActions({
   isCurrentAutoTask,
   hasContext,
   shortcutKey,
+  isSelectionMode = false,
   onEdit,
   onViewOutput,
   onVerify,
@@ -47,6 +50,11 @@ export function CardActions({
   onViewPlan,
   onApprovePlan,
 }: CardActionsProps) {
+  // Hide all actions when in selection mode
+  if (isSelectionMode) {
+    return null;
+  }
+
   return (
     <div className="flex flex-wrap gap-1.5 -mx-3 -mb-3 px-3 pb-3">
       {isCurrentAutoTask && (

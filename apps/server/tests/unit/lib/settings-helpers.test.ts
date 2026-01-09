@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { getMCPServersFromSettings, getMCPPermissionSettings } from '@/lib/settings-helpers.js';
+import { getMCPServersFromSettings } from '@/lib/settings-helpers.js';
 import type { SettingsService } from '@/services/settings-service.js';
 
 // Mock the logger
@@ -284,95 +284,6 @@ describe('settings-helpers.ts', () => {
         args: undefined,
         env: undefined,
       });
-    });
-  });
-
-  describe('getMCPPermissionSettings', () => {
-    beforeEach(() => {
-      vi.clearAllMocks();
-    });
-
-    it('should return defaults when settingsService is null', async () => {
-      const result = await getMCPPermissionSettings(null);
-      expect(result).toEqual({
-        mcpAutoApproveTools: true,
-        mcpUnrestrictedTools: true,
-      });
-    });
-
-    it('should return defaults when settingsService is undefined', async () => {
-      const result = await getMCPPermissionSettings(undefined);
-      expect(result).toEqual({
-        mcpAutoApproveTools: true,
-        mcpUnrestrictedTools: true,
-      });
-    });
-
-    it('should return settings from service', async () => {
-      const mockSettingsService = {
-        getGlobalSettings: vi.fn().mockResolvedValue({
-          mcpAutoApproveTools: false,
-          mcpUnrestrictedTools: false,
-        }),
-      } as unknown as SettingsService;
-
-      const result = await getMCPPermissionSettings(mockSettingsService);
-      expect(result).toEqual({
-        mcpAutoApproveTools: false,
-        mcpUnrestrictedTools: false,
-      });
-    });
-
-    it('should default to true when settings are undefined', async () => {
-      const mockSettingsService = {
-        getGlobalSettings: vi.fn().mockResolvedValue({}),
-      } as unknown as SettingsService;
-
-      const result = await getMCPPermissionSettings(mockSettingsService);
-      expect(result).toEqual({
-        mcpAutoApproveTools: true,
-        mcpUnrestrictedTools: true,
-      });
-    });
-
-    it('should handle mixed settings', async () => {
-      const mockSettingsService = {
-        getGlobalSettings: vi.fn().mockResolvedValue({
-          mcpAutoApproveTools: true,
-          mcpUnrestrictedTools: false,
-        }),
-      } as unknown as SettingsService;
-
-      const result = await getMCPPermissionSettings(mockSettingsService);
-      expect(result).toEqual({
-        mcpAutoApproveTools: true,
-        mcpUnrestrictedTools: false,
-      });
-    });
-
-    it('should return defaults and log error on exception', async () => {
-      const mockSettingsService = {
-        getGlobalSettings: vi.fn().mockRejectedValue(new Error('Settings error')),
-      } as unknown as SettingsService;
-
-      const result = await getMCPPermissionSettings(mockSettingsService, '[Test]');
-      expect(result).toEqual({
-        mcpAutoApproveTools: true,
-        mcpUnrestrictedTools: true,
-      });
-      // Logger will be called with error, but we don't need to assert it
-    });
-
-    it('should use custom log prefix', async () => {
-      const mockSettingsService = {
-        getGlobalSettings: vi.fn().mockResolvedValue({
-          mcpAutoApproveTools: true,
-          mcpUnrestrictedTools: true,
-        }),
-      } as unknown as SettingsService;
-
-      await getMCPPermissionSettings(mockSettingsService, '[CustomPrefix]');
-      // Logger will be called with custom prefix, but we don't need to assert it
     });
   });
 });

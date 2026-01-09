@@ -1,0 +1,103 @@
+# Automaker Docker Compose - Server Only (Development Mode)
+# Runs only the backend API in a container for use with local Electron.
+#
+# Usage:
+#   docker compose -f docker-compose.dev-server.yml up
+#   Then run Electron locally which connects to http://localhost:3008
+#
+# This mode:
+#   - Runs only the backend server in a container
+#   - Mounts source code as volumes (live reload)
+#   - Server runs with tsx watch for TypeScript changes
+#   - Electron runs locally on host machine
+
+services:
+  # Development server (backend API only)
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: automaker-dev-server-only
+    restart: unless-stopped
+    ports:
+      - '3008:3008'
+    environment:
+      # Required
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+
+      # Optional - Claude CLI OAuth credentials
+      - CLAUDE_OAUTH_CREDENTIALS=${CLAUDE_OAUTH_CREDENTIALS:-}
+
+      # Optional - Cursor CLI OAuth token
+      - CURSOR_AUTH_TOKEN=${CURSOR_AUTH_TOKEN:-}
+
+      # Optional - authentication
+      - AUTOMAKER_API_KEY=${AUTOMAKER_API_KEY:-}
+
+      # Development settings
+      - NODE_ENV=development
+      - PORT=3008
+      - CORS_ORIGIN=http://localhost:3007
+
+      # Optional - restrict to specific directory within container
+      - ALLOWED_ROOT_DIRECTORY=${ALLOWED_ROOT_DIRECTORY:-/projects}
+      - DATA_DIR=/data
+
+      # Internal - indicates containerized environment
+      - IS_CONTAINERIZED=true
+    volumes:
+      # Mount source code for live reload
+      - .:/app:cached
+
+      # Use named volume for node_modules to avoid platform conflicts
+      # This ensures native modules are built for the container's architecture
+      - automaker-dev-node-modules:/app/node_modules
+
+      # Persist data across restarts
+      - automaker-data:/data
+
+      # Persist CLI configurations
+      - automaker-claude-config:/home/automaker/.claude
+      - automaker-cursor-config:/home/automaker/.cursor
+
+      # Note: Workspace mount (/projects) comes from docker-compose.override.yml
+
+    # Install deps, build packages, then start server in watch mode
+    # Note: We override the entrypoint to handle permissions properly
+    entrypoint: /bin/sh
+    command:
+      - -c
+      - |
+        # Fix permissions on node_modules (created as root by Docker volume)
+        echo 'Fixing node_modules permissions...'
+        chown -R automaker:automaker /app/node_modules 2>/dev/null || true
+
+        # Run the rest as automaker user
+        exec gosu automaker sh -c "
+          echo 'Installing dependencies...' &&
+          npm install &&
+          echo 'Building shared packages...' &&
+          npm run build:packages &&
+          echo 'Starting server in development mode...' &&
+          npm run _dev:server
+        "
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:3008/api/health']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+
+volumes:
+  automaker-dev-node-modules:
+    name: automaker-dev-node-modules
+    # Named volume for container-specific node_modules
+
+  automaker-data:
+    name: automaker-data
+
+  automaker-claude-config:
+    name: automaker-claude-config
+
+  automaker-cursor-config:
+    name: automaker-cursor-config

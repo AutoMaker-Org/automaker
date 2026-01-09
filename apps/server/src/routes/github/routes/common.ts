@@ -4,6 +4,9 @@
 
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { createLogger } from '@automaker/utils';
+
+const logger = createLogger('GitHub');
 
 export const execAsync = promisify(exec);
 
@@ -31,5 +34,5 @@ export function getErrorMessage(error: unknown): string {
 }
 
 export function logError(error: unknown, context: string): void {
-  console.error(`[GitHub] ${context}:`, error);
+  logger.error(`${context}:`, error);
 }

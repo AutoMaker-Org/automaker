@@ -56,34 +56,6 @@ export async function getAutoLoadClaudeMdSetting(
 }
 
 /**
- * Get the enableSandboxMode setting from global settings.
- * Returns false if settings service is not available.
- *
- * @param settingsService - Optional settings service instance
- * @param logPrefix - Prefix for log messages (e.g., '[AgentService]')
- * @returns Promise resolving to the enableSandboxMode setting value
- */
-export async function getEnableSandboxModeSetting(
-  settingsService?: SettingsService | null,
-  logPrefix = '[SettingsHelper]'
-): Promise<boolean> {
-  if (!settingsService) {
-    logger.info(`${logPrefix} SettingsService not available, sandbox mode disabled`);
-    return false;
-  }
-
-  try {
-    const globalSettings = await settingsService.getGlobalSettings();
-    const result = globalSettings.enableSandboxMode ?? false;
-    logger.info(`${logPrefix} enableSandboxMode from global settings: ${result}`);
-    return result;
-  } catch (error) {
-    logger.error(`${logPrefix} Failed to load enableSandboxMode setting:`, error);
-    throw error;
-  }
-}
-
-/**
  * Filters out CLAUDE.md from context files when autoLoadClaudeMd is enabled
  * and rebuilds the formatted prompt without it.
  *
@@ -192,41 +164,6 @@ export async function getMCPServersFromSettings(
 }
 
 /**
- * Get MCP permission settings from global settings.
- *
- * @param settingsService - Optional settings service instance
- * @param logPrefix - Prefix for log messages (e.g., '[AgentService]')
- * @returns Promise resolving to MCP permission settings
- */
-export async function getMCPPermissionSettings(
-  settingsService?: SettingsService | null,
-  logPrefix = '[SettingsHelper]'
-): Promise<{ mcpAutoApproveTools: boolean; mcpUnrestrictedTools: boolean }> {
-  // Default to true for autonomous workflow. Security is enforced when adding servers
-  // via the security warning dialog that explains the risks.
-  const defaults = { mcpAutoApproveTools: true, mcpUnrestrictedTools: true };
-
-  if (!settingsService) {
-    return defaults;
-  }
-
-  try {
-    const globalSettings = await settingsService.getGlobalSettings();
-    const result = {
-      mcpAutoApproveTools: globalSettings.mcpAutoApproveTools ?? true,
-      mcpUnrestrictedTools: globalSettings.mcpUnrestrictedTools ?? true,
-    };
-    logger.info(
-      `${logPrefix} MCP permission settings: autoApprove=${result.mcpAutoApproveTools}, unrestricted=${result.mcpUnrestrictedTools}`
-    );
-    return result;
-  } catch (error) {
-    logger.error(`${logPrefix} Failed to load MCP permission settings:`, error);
-    return defaults;
-  }
-}
-
-/**
  * Convert a settings MCPServerConfig to SDK McpServerConfig format.
  * Validates required fields and throws informative errors if missing.
  */
@@ -303,4 +240,84 @@ export async function getPromptCustomization(
     backlogPlan: mergeBacklogPlanPrompts(customization.backlogPlan),
     enhancement: mergeEnhancementPrompts(customization.enhancement),
   };
+}
+
+/**
+ * Get Skills configuration from settings.
+ * Returns configuration for enabling skills and which sources to load from.
+ *
+ * @param settingsService - Settings service instance
+ * @returns Skills configuration with enabled state, sources, and tool inclusion flag
+ */
+export async function getSkillsConfiguration(settingsService: SettingsService): Promise<{
+  enabled: boolean;
+  sources: Array<'user' | 'project'>;
+  shouldIncludeInTools: boolean;
+}> {
+  const settings = await settingsService.getGlobalSettings();
+  const enabled = settings.enableSkills ?? true; // Default enabled
+  const sources = settings.skillsSources ?? ['user', 'project']; // Default both sources
+
+  return {
+    enabled,
+    sources,
+    shouldIncludeInTools: enabled && sources.length > 0,
+  };
+}
+
+/**
+ * Get Subagents configuration from settings.
+ * Returns configuration for enabling subagents and which sources to load from.
+ *
+ * @param settingsService - Settings service instance
+ * @returns Subagents configuration with enabled state, sources, and tool inclusion flag
+ */
+export async function getSubagentsConfiguration(settingsService: SettingsService): Promise<{
+  enabled: boolean;
+  sources: Array<'user' | 'project'>;
+  shouldIncludeInTools: boolean;
+}> {
+  const settings = await settingsService.getGlobalSettings();
+  const enabled = settings.enableSubagents ?? true; // Default enabled
+  const sources = settings.subagentsSources ?? ['user', 'project']; // Default both sources
+
+  return {
+    enabled,
+    sources,
+    shouldIncludeInTools: enabled && sources.length > 0,
+  };
+}
+
+/**
+ * Get custom subagents from settings, merging global and project-level definitions.
+ * Project-level subagents take precedence over global ones with the same name.
+ *
+ * @param settingsService - Settings service instance
+ * @param projectPath - Path to the project for loading project-specific subagents
+ * @returns Record of agent names to definitions, or undefined if none configured
+ */
+export async function getCustomSubagents(
+  settingsService: SettingsService,
+  projectPath?: string
+): Promise<Record<string, import('@automaker/types').AgentDefinition> | undefined> {
+  // Get global subagents
+  const globalSettings = await settingsService.getGlobalSettings();
+  const globalSubagents = globalSettings.customSubagents || {};
+
+  // If no project path, return only global subagents
+  if (!projectPath) {
+    return Object.keys(globalSubagents).length > 0 ? globalSubagents : undefined;
+  }
+
+  // Get project-specific subagents
+  const projectSettings = await settingsService.getProjectSettings(projectPath);
+  const projectSubagents = projectSettings.customSubagents || {};
+
+  // Merge: project-level takes precedence
+  const merged = {
+    ...globalSubagents,
+    ...projectSubagents,
+  };
+
+  return Object.keys(merged).length > 0 ? merged : undefined;
 }

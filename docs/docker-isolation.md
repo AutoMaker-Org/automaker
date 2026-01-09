@@ -57,10 +57,63 @@ docker-compose -f docker-compose.yml -f docker-compose.project.yml up -d
 
 **Tip**: Use `:ro` (read-only) when possible for extra safety.
 
+## CLI Authentication (macOS)
+
+On macOS, OAuth tokens are stored in Keychain (Claude) and SQLite (Cursor). Use these scripts to extract and pass them to the container:
+
+### Claude CLI
+
+```bash
+# Extract and add to .env
+echo "CLAUDE_OAUTH_CREDENTIALS=$(./scripts/get-claude-token.sh)" >> .env
+```
+
+### Cursor CLI
+
+```bash
+# Extract and add to .env (extracts from macOS Keychain)
+echo "CURSOR_AUTH_TOKEN=$(./scripts/get-cursor-token.sh)" >> .env
+```
+
+**Note**: The cursor-agent CLI stores its OAuth tokens separately from the Cursor IDE:
+
+- **macOS**: Tokens are stored in Keychain (service: `cursor-access-token`)
+- **Linux**: Tokens are stored in `~/.config/cursor/auth.json` (not `~/.cursor`)
+
+### Apply to container
+
+```bash
+# Restart with new credentials
+docker-compose down && docker-compose up -d
+```
+
+**Note**: Tokens expire periodically. If you get authentication errors, re-run the extraction scripts.
+
+## CLI Authentication (Linux/Windows)
+
+On Linux/Windows, cursor-agent stores credentials in files, so you can either:
+
+**Option 1: Extract tokens to environment variables (recommended)**
+
+```bash
+# Linux: Extract tokens to .env
+echo "CURSOR_AUTH_TOKEN=$(jq -r '.accessToken' ~/.config/cursor/auth.json)" >> .env
+```
+
+**Option 2: Bind mount credential directories directly**
+
+```yaml
+# In docker-compose.override.yml
+volumes:
+  - ~/.claude:/home/automaker/.claude
+  - ~/.config/cursor:/home/automaker/.config/cursor
+```
+
 ## Troubleshooting
 
-| Problem               | Solution                                                                                     |
-| --------------------- | -------------------------------------------------------------------------------------------- |
-| Container won't start | Check `.env` has `ANTHROPIC_API_KEY` set. Run `docker-compose logs` for errors.              |
-| Can't access web UI   | Verify container is running with `docker ps \| grep automaker`                               |
-| Need a fresh start    | Run `docker-compose down && docker volume rm automaker-data && docker-compose up -d --build` |
+| Problem               | Solution                                                                                                                                          |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Container won't start | Check `.env` has `ANTHROPIC_API_KEY` set. Run `docker-compose logs` for errors.                                                                   |
+| Can't access web UI   | Verify container is running with `docker ps \| grep automaker`                                                                                    |
+| Need a fresh start    | Run `docker-compose down && docker volume rm automaker-data && docker-compose up -d --build`                                                      |
+| Cursor auth fails     | Re-extract token with `./scripts/get-cursor-token.sh` - tokens expire periodically. Make sure you've run `cursor-agent login` on your host first. |

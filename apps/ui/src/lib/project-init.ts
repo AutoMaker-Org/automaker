@@ -5,7 +5,10 @@
  * new or existing projects.
  */
 
+import { createLogger } from '@automaker/utils/logger';
 import { getElectronAPI } from './electron';
+
+const logger = createLogger('ProjectInit');
 
 export interface ProjectInitResult {
   success: boolean;
@@ -72,22 +75,22 @@ export async function initializeProject(projectPath: string): Promise<ProjectIni
     // Initialize git repository if it doesn't exist
     const gitDirExists = await api.exists(`${projectPath}/.git`);
     if (!gitDirExists) {
-      console.log('[project-init] Initializing git repository...');
+      logger.info('Initializing git repository...');
       try {
         // Initialize git and create an initial empty commit via server route
         const result = await api.worktree?.initGit(projectPath);
         if (result?.success && result.result?.initialized) {
           createdFiles.push('.git');
-          console.log('[project-init] Git repository initialized with initial commit');
+          logger.info('Git repository initialized with initial commit');
         } else if (result?.success && !result.result?.initialized) {
           // Git already existed (shouldn't happen since we checked, but handle it)
           existingFiles.push('.git');
-          console.log('[project-init] Git repository already exists');
+          logger.info('Git repository already exists');
         } else {
-          console.warn('[project-init] Failed to initialize git repository:', result?.error);
+          logger.warn('Failed to initialize git repository:', result?.error);
         }
       } catch (gitError) {
-        console.warn('[project-init] Failed to initialize git repository:', gitError);
+        logger.warn('Failed to initialize git repository:', gitError);
         // Don't fail the whole initialization if git init fails
       }
     } else {
@@ -123,7 +126,7 @@ export async function initializeProject(projectPath: string): Promise<ProjectIni
       existingFiles,
     };
   } catch (error) {
-    console.error('[project-init] Failed to initialize project:', error);
+    logger.error('Failed to initialize project:', error);
     return {
       success: false,
       isNewProject: false,
@@ -153,7 +156,7 @@ export async function isProjectInitialized(projectPath: string): Promise<boolean
 
     return true;
   } catch (error) {
-    console.error('[project-init] Error checking project initialization:', error);
+    logger.error('Error checking project initialization:', error);
     return false;
   }
 }
@@ -191,7 +194,7 @@ export async function getProjectInitStatus(projectPath: string): Promise<{
       existingFiles,
     };
   } catch (error) {
-    console.error('[project-init] Error getting project status:', error);
+    logger.error('Error getting project status:', error);
     return {
       initialized: false,
       missingFiles: REQUIRED_STRUCTURE.directories,
@@ -212,7 +215,7 @@ export async function hasAppSpec(projectPath: string): Promise<boolean> {
     const fullPath = `${projectPath}/.automaker/app_spec.txt`;
     return await api.exists(fullPath);
   } catch (error) {
-    console.error('[project-init] Error checking app_spec.txt:', error);
+    logger.error('Error checking app_spec.txt:', error);
     return false;
   }
 }
@@ -229,7 +232,7 @@ export async function hasAutomakerDir(projectPath: string): Promise<boolean> {
     const fullPath = `${projectPath}/.automaker`;
     return await api.exists(fullPath);
   } catch (error) {
-    console.error('[project-init] Error checking .automaker dir:', error);
+    logger.error('Error checking .automaker dir:', error);
     return false;
   }
 }

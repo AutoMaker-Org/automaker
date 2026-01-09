@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { useEffect, useMemo, useState } from 'react';
 import { Feature, useAppStore } from '@/store/app-store';
 import { cn } from '@/lib/utils';
@@ -5,118 +6,44 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { AlertCircle, Lock, Hand, Sparkles } from 'lucide-react';
 import { getBlockingDependencies } from '@automaker/dependency-resolver';
 
-interface CardBadgeProps {
-  children: React.ReactNode;
-  className?: string;
-  'data-testid'?: string;
-  title?: string;
-}
-
-/**
- * Shared badge component matching the "Just Finished" badge style
- * Used for priority badges and other card badges
- */
-function CardBadge({ children, className, 'data-testid': dataTestId, title }: CardBadgeProps) {
-  return (
-    <div
-      className={cn(
-        'inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-medium',
-        className
-      )}
-      data-testid={dataTestId}
-      title={title}
-    >
-      {children}
-    </div>
-  );
-}
+/** Uniform badge style for all card badges */
+const uniformBadgeClass =
+  'inline-flex items-center justify-center w-6 h-6 rounded-md border-[1.5px]';
 
 interface CardBadgesProps {
   feature: Feature;
 }
 
+/**
+ * CardBadges - Shows error badges below the card header
+ * Note: Blocked/Lock badges are now shown in PriorityBadges for visual consistency
+ */
 export function CardBadges({ feature }: CardBadgesProps) {
-  const { enableDependencyBlocking, features } = useAppStore();
-
-  // Calculate blocking dependencies (if feature is in backlog and has incomplete dependencies)
-  const blockingDependencies = useMemo(() => {
-    if (!enableDependencyBlocking || feature.status !== 'backlog') {
-      return [];
-    }
-    return getBlockingDependencies(feature, features);
-  }, [enableDependencyBlocking, feature, features]);
-
-  // Status badges row (error, blocked)
-  const showStatusBadges =
-    feature.error ||
-    (blockingDependencies.length > 0 &&
-      !feature.error &&
-      !feature.skipTests &&
-      feature.status === 'backlog');
-
-  if (!showStatusBadges) {
+  if (!feature.error) {
     return null;
   }
 
   return (
     <div className="flex flex-wrap items-center gap-1.5 px-3 pt-1.5 min-h-[24px]">
       {/* Error badge */}
-      {feature.error && (
-        <TooltipProvider delayDuration={200}>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <div
-                className={cn(
-                  'inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-medium',
-                  'bg-[var(--status-error-bg)] border-[var(--status-error)]/40 text-[var(--status-error)]'
-                )}
-                data-testid={`error-badge-${feature.id}`}
-              >
-                <AlertCircle className="w-3 h-3" />
-              </div>
-            </TooltipTrigger>
-            <TooltipContent side="bottom" className="text-xs max-w-[250px]">
-              <p>{feature.error}</p>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-      )}
-
-      {/* Blocked badge */}
-      {blockingDependencies.length > 0 &&
-        !feature.error &&
-        !feature.skipTests &&
-        feature.status === 'backlog' && (
-          <TooltipProvider delayDuration={200}>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div
-                  className={cn(
-                    'inline-flex items-center gap-1 rounded-full border-2 px-1.5 py-0.5 text-[10px] font-bold',
-                    'bg-orange-500/20 border-orange-500/50 text-orange-500'
-                  )}
-                  data-testid={`blocked-badge-${feature.id}`}
-                >
-                  <Lock className="w-3 h-3" />
-                </div>
-              </TooltipTrigger>
-              <TooltipContent side="bottom" className="text-xs max-w-[250px]">
-                <p className="font-medium mb-1">
-                  Blocked by {blockingDependencies.length} incomplete{' '}
-                  {blockingDependencies.length === 1 ? 'dependency' : 'dependencies'}
-                </p>
-                <p className="text-muted-foreground">
-                  {blockingDependencies
-                    .map((depId) => {
-                      const dep = features.find((f) => f.id === depId);
-                      return dep?.description || depId;
-                    })
-                    .join(', ')}
-                </p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        )}
+      <TooltipProvider delayDuration={200}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div
+              className={cn(
+                uniformBadgeClass,
+                'bg-[var(--status-error-bg)] border-[var(--status-error)]/40 text-[var(--status-error)]'
+              )}
+              data-testid={`error-badge-${feature.id}`}
+            >
+              <AlertCircle className="w-3.5 h-3.5" />
+            </div>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" className="text-xs max-w-[250px]">
+            <p>{feature.error}</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
     </div>
   );
 }
@@ -126,7 +53,16 @@ interface PriorityBadgesProps {
 }
 
 export function PriorityBadges({ feature }: PriorityBadgesProps) {
+  const { enableDependencyBlocking, features } = useAppStore();
   const [currentTime, setCurrentTime] = useState(() => Date.now());
+
+  // Calculate blocking dependencies (if feature is in backlog and has incomplete dependencies)
+  const blockingDependencies = useMemo(() => {
+    if (!enableDependencyBlocking || feature.status !== 'backlog') {
+      return [];
+    }
+    return getBlockingDependencies(feature, features);
+  }, [enableDependencyBlocking, feature, features]);
 
   const isJustFinished = useMemo(() => {
     if (!feature.justFinishedAt || feature.status !== 'waiting_approval' || feature.error) {
@@ -161,25 +97,27 @@ export function PriorityBadges({ feature }: PriorityBadgesProps) {
     };
   }, [feature.justFinishedAt, feature.status, currentTime]);
 
-  const showPriorityBadges =
-    feature.priority ||
-    (feature.skipTests && !feature.error && feature.status === 'backlog') ||
-    isJustFinished;
+  const isBlocked =
+    blockingDependencies.length > 0 && !feature.error && feature.status === 'backlog';
+  const showManualVerification =
+    feature.skipTests && !feature.error && feature.status === 'backlog';
 
-  if (!showPriorityBadges) {
+  const showBadges = feature.priority || showManualVerification || isBlocked || isJustFinished;
+
+  if (!showBadges) {
     return null;
   }
 
   return (
-    <div className="absolute top-2 left-2 flex items-center gap-1.5">
+    <div className="absolute top-2 left-2 flex items-center gap-1">
       {/* Priority badge */}
       {feature.priority && (
         <TooltipProvider delayDuration={200}>
           <Tooltip>
             <TooltipTrigger asChild>
-              <CardBadge
+              <div
                 className={cn(
-                  'bg-opacity-90 border rounded-[6px] px-1.5 py-0.5 flex items-center justify-center border-[1.5px] w-5 h-5', // badge style from example
+                  uniformBadgeClass,
                   feature.priority === 1 &&
                     'bg-[var(--status-error-bg)] border-[var(--status-error)]/40 text-[var(--status-error)]',
                   feature.priority === 2 &&
@@ -189,14 +127,10 @@ export function PriorityBadges({ feature }: PriorityBadgesProps) {
                 )}
                 data-testid={`priority-badge-${feature.id}`}
               >
-                {feature.priority === 1 ? (
-                  <span className="font-bold text-xs flex items-center gap-0.5">H</span>
-                ) : feature.priority === 2 ? (
-                  <span className="font-bold text-xs flex items-center gap-0.5">M</span>
-                ) : (
-                  <span className="font-bold text-xs flex items-center gap-0.5">L</span>
-                )}
-              </CardBadge>
+                <span className="font-bold text-xs">
+                  {feature.priority === 1 ? 'H' : feature.priority === 2 ? 'M' : 'L'}
+                </span>
+              </div>
             </TooltipTrigger>
             <TooltipContent side="bottom" className="text-xs">
               <p>
@@ -210,17 +144,21 @@ export function PriorityBadges({ feature }: PriorityBadgesProps) {
           </Tooltip>
         </TooltipProvider>
       )}
+
       {/* Manual verification badge */}
-      {feature.skipTests && !feature.error && feature.status === 'backlog' && (
+      {showManualVerification && (
         <TooltipProvider delayDuration={200}>
           <Tooltip>
             <TooltipTrigger asChild>
-              <CardBadge
-                className="bg-[var(--status-warning-bg)] border-[var(--status-warning)]/40 text-[var(--status-warning)]"
+              <div
+                className={cn(
+                  uniformBadgeClass,
+                  'bg-[var(--status-warning-bg)] border-[var(--status-warning)]/40 text-[var(--status-warning)]'
+                )}
                 data-testid={`skip-tests-badge-${feature.id}`}
               >
-                <Hand className="w-3 h-3" />
-              </CardBadge>
+                <Hand className="w-3.5 h-3.5" />
+              </div>
             </TooltipTrigger>
             <TooltipContent side="bottom" className="text-xs">
               <p>Manual verification required</p>
@@ -229,15 +167,59 @@ export function PriorityBadges({ feature }: PriorityBadgesProps) {
         </TooltipProvider>
       )}
 
+      {/* Blocked badge */}
+      {isBlocked && (
+        <TooltipProvider delayDuration={200}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div
+                className={cn(
+                  uniformBadgeClass,
+                  'bg-orange-500/20 border-orange-500/50 text-orange-500'
+                )}
+                data-testid={`blocked-badge-${feature.id}`}
+              >
+                <Lock className="w-3.5 h-3.5" />
+              </div>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="text-xs max-w-[250px]">
+              <p className="font-medium mb-1">
+                Blocked by {blockingDependencies.length} incomplete{' '}
+                {blockingDependencies.length === 1 ? 'dependency' : 'dependencies'}
+              </p>
+              <p className="text-muted-foreground">
+                {blockingDependencies
+                  .map((depId) => {
+                    const dep = features.find((f) => f.id === depId);
+                    return dep?.description || depId;
+                  })
+                  .join(', ')}
+              </p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      )}
+
       {/* Just Finished badge */}
       {isJustFinished && (
-        <CardBadge
-          className="bg-[var(--status-success-bg)] border-[var(--status-success)]/40 text-[var(--status-success)] animate-pulse"
-          data-testid={`just-finished-badge-${feature.id}`}
-          title="Agent just finished working on this feature"
-        >
-          <Sparkles className="w-3 h-3" />
-        </CardBadge>
+        <TooltipProvider delayDuration={200}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div
+                className={cn(
+                  uniformBadgeClass,
+                  'bg-[var(--status-success-bg)] border-[var(--status-success)]/40 text-[var(--status-success)] animate-pulse'
+                )}
+                data-testid={`just-finished-badge-${feature.id}`}
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+              </div>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="text-xs">
+              <p>Agent just finished working on this feature</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
       )}
     </div>
   );

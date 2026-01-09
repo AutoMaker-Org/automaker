@@ -2,6 +2,7 @@ import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   test: {
+    name: 'git-utils',
     globals: true,
     environment: 'node',
     include: ['tests/**/*.test.ts'],

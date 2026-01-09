@@ -10,6 +10,7 @@ import {
   CircleDot,
   GitPullRequest,
   Zap,
+  Lightbulb,
 } from 'lucide-react';
 import type { NavSection, NavItem } from '../types';
 import type { KeyboardShortcut } from '@/hooks/use-keyboard-shortcuts';
@@ -30,6 +31,9 @@ interface UseNavigationProps {
     agent: string;
     terminal: string;
     settings: string;
+    ideation: string;
+    githubIssues: string;
+    githubPrs: string;
   };
   hideSpecEditor: boolean;
   hideContext: boolean;
@@ -92,6 +96,12 @@ export function useNavigation({
   // Build navigation sections
   const navSections: NavSection[] = useMemo(() => {
     const allToolsItems: NavItem[] = [
+      {
+        id: 'ideation',
+        label: 'Ideation',
+        icon: Lightbulb,
+        shortcut: shortcuts.ideation,
+      },
       {
         id: 'spec',
         label: 'Spec Editor',
@@ -172,12 +182,14 @@ export function useNavigation({
             id: 'github-issues',
             label: 'Issues',
             icon: CircleDot,
+            shortcut: shortcuts.githubIssues,
             count: unviewedValidationsCount,
           },
           {
             id: 'github-prs',
             label: 'Pull Requests',
             icon: GitPullRequest,
+            shortcut: shortcuts.githubPrs,
           },
         ],
       });
@@ -242,7 +254,8 @@ export function useNavigation({
           if (item.shortcut) {
             shortcutsList.push({
               key: item.shortcut,
-              action: () => navigate({ to: `/${item.id}` as const }),
+              // Cast to router path type; ids are constrained to known routes
+              action: () => navigate({ to: `/${item.id}` as unknown as '/' }),
               description: `Navigate to ${item.label}`,
             });
           }
