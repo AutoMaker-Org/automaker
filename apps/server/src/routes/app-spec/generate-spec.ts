@@ -16,7 +16,7 @@ import {
   type SpecOutput,
 } from '../../lib/app-spec-format.js';
 import { createLogger } from '@automaker/utils';
-import { DEFAULT_PHASE_MODELS, isCursorModel } from '@automaker/types';
+import { DEFAULT_PHASE_MODELS, isCursorModel, stripProviderPrefix } from '@automaker/types';
 import { resolvePhaseModel } from '@automaker/model-resolver';
 import { createSpecGenerationOptions } from '../../lib/sdk-options.js';
 import { extractJson } from '../../lib/json-extractor.js';
@@ -118,6 +118,8 @@ ${getStructuredSpecPromptInstruction()}`;
     logger.info('[SpecGeneration] Using Cursor provider');
 
     const provider = ProviderFactory.getProviderForModel(model);
+    // Strip provider prefix - providers expect bare model IDs
+    const bareModel = stripProviderPrefix(model);
 
     // For Cursor, include the JSON schema in the prompt with clear instructions
     // to return JSON in the response (not write to a file)
@@ -134,7 +136,7 @@ Your entire response should be valid JSON starting with { and ending with }. No 
 
     for await (const msg of provider.executeQuery({
       prompt: cursorPrompt,
-      model,
+      model: bareModel,
       cwd: projectPath,
       maxTurns: 250,
       allowedTools: ['Read', 'Glob', 'Grep'],

@@ -18,7 +18,7 @@ import type {
   LinkedPRInfo,
   ThinkingLevel,
 } from '@automaker/types';
-import { isCursorModel, DEFAULT_PHASE_MODELS } from '@automaker/types';
+import { isCursorModel, DEFAULT_PHASE_MODELS, stripProviderPrefix } from '@automaker/types';
 import { resolvePhaseModel } from '@automaker/model-resolver';
 import { createSuggestionsOptions } from '../../../lib/sdk-options.js';
 import { extractJson } from '../../../lib/json-extractor.js';
@@ -120,6 +120,8 @@ async function runValidation(
       logger.info(`Using Cursor provider for validation with model: ${model}`);
 
       const provider = ProviderFactory.getProviderForModel(model);
+      // Strip provider prefix - providers expect bare model IDs
+      const bareModel = stripProviderPrefix(model);
 
       // For Cursor, include the system prompt and schema in the user prompt
       const cursorPrompt = `${ISSUE_VALIDATION_SYSTEM_PROMPT}
@@ -137,7 +139,7 @@ ${prompt}`;
 
       for await (const msg of provider.executeQuery({
         prompt: cursorPrompt,
-        model,
+        model: bareModel,
         cwd: projectPath,
         readOnly: true, // Issue validation only reads code, doesn't write
       })) {

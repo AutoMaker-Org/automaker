@@ -156,6 +156,10 @@ export interface PhaseModelConfig {
   projectAnalysisModel: PhaseModelEntry;
   /** Model for AI suggestions (feature, refactoring, security, performance) */
   suggestionsModel: PhaseModelEntry;
+
+  // Memory tasks - for learning extraction and memory operations
+  /** Model for extracting learnings from completed agent sessions */
+  memoryExtractionModel: PhaseModelEntry;
 }
 
 /** Keys of PhaseModelConfig for type-safe access */
@@ -731,6 +735,9 @@ export const DEFAULT_PHASE_MODELS: PhaseModelConfig = {
   backlogPlanningModel: { model: 'sonnet' },
   projectAnalysisModel: { model: 'sonnet' },
   suggestionsModel: { model: 'sonnet' },
+
+  // Memory - use fast model for learning extraction (cost-effective)
+  memoryExtractionModel: { model: 'haiku' },
 };
 
 /** Current version of the global settings schema */

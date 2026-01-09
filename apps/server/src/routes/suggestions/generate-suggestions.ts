@@ -8,7 +8,12 @@
 import { query } from '@anthropic-ai/claude-agent-sdk';
 import type { EventEmitter } from '../../lib/events.js';
 import { createLogger } from '@automaker/utils';
-import { DEFAULT_PHASE_MODELS, isCursorModel, type ThinkingLevel } from '@automaker/types';
+import {
+  DEFAULT_PHASE_MODELS,
+  isCursorModel,
+  stripProviderPrefix,
+  type ThinkingLevel,
+} from '@automaker/types';
 import { resolvePhaseModel } from '@automaker/model-resolver';
 import { createSuggestionsOptions } from '../../lib/sdk-options.js';
 import { extractJsonWithArray } from '../../lib/json-extractor.js';
@@ -207,6 +212,8 @@ The response will be automatically formatted as structured JSON.`;
     logger.info('[Suggestions] Using Cursor provider');
 
     const provider = ProviderFactory.getProviderForModel(model);
+    // Strip provider prefix - providers expect bare model IDs
+    const bareModel = stripProviderPrefix(model);
 
     // For Cursor, include the JSON schema in the prompt with clear instructions
     const cursorPrompt = `${prompt}
@@ -222,7 +229,7 @@ Your entire response should be valid JSON starting with { and ending with }. No 
 
     for await (const msg of provider.executeQuery({
       prompt: cursorPrompt,
-      model,
+      model: bareModel,
       cwd: projectPath,
       maxTurns: 250,
       allowedTools: ['Read', 'Glob', 'Grep'],

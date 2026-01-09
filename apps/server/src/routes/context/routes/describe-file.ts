@@ -13,7 +13,7 @@
 import type { Request, Response } from 'express';
 import { query } from '@anthropic-ai/claude-agent-sdk';
 import { createLogger } from '@automaker/utils';
-import { DEFAULT_PHASE_MODELS, isCursorModel } from '@automaker/types';
+import { DEFAULT_PHASE_MODELS, isCursorModel, stripProviderPrefix } from '@automaker/types';
 import { PathNotAllowedError } from '@automaker/platform';
 import { resolvePhaseModel } from '@automaker/model-resolver';
 import { createCustomOptions } from '../../../lib/sdk-options.js';
@@ -198,6 +198,8 @@ File: ${fileName}${truncated ? ' (truncated)' : ''}`;
         logger.info(`Using Cursor provider for model: ${model}`);
 
         const provider = ProviderFactory.getProviderForModel(model);
+        // Strip provider prefix - providers expect bare model IDs
+        const bareModel = stripProviderPrefix(model);
 
         // Build a simple text prompt for Cursor (no multi-part content blocks)
         const cursorPrompt = `${instructionText}\n\n--- FILE CONTENT ---\n${contentToAnalyze}`;
@@ -205,7 +207,7 @@ File: ${fileName}${truncated ? ' (truncated)' : ''}`;
         let responseText = '';
         for await (const msg of provider.executeQuery({
           prompt: cursorPrompt,
-          model,
+          model: bareModel,
           cwd,
           maxTurns: 1,
           allowedTools: [],

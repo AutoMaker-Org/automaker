@@ -9,7 +9,7 @@ import { query } from '@anthropic-ai/claude-agent-sdk';
 import * as secureFs from '../../lib/secure-fs.js';
 import type { EventEmitter } from '../../lib/events.js';
 import { createLogger } from '@automaker/utils';
-import { DEFAULT_PHASE_MODELS, isCursorModel } from '@automaker/types';
+import { DEFAULT_PHASE_MODELS, isCursorModel, stripProviderPrefix } from '@automaker/types';
 import { resolvePhaseModel } from '@automaker/model-resolver';
 import { createFeatureGenerationOptions } from '../../lib/sdk-options.js';
 import { ProviderFactory } from '../../providers/provider-factory.js';
@@ -124,6 +124,8 @@ IMPORTANT: Do not ask for clarification. The specification is provided above. Ge
     logger.info('[FeatureGeneration] Using Cursor provider');
 
     const provider = ProviderFactory.getProviderForModel(model);
+    // Strip provider prefix - providers expect bare model IDs
+    const bareModel = stripProviderPrefix(model);
 
     // Add explicit instructions for Cursor to return JSON in response
     const cursorPrompt = `${prompt}
@@ -135,7 +137,7 @@ CRITICAL INSTRUCTIONS:
 
     for await (const msg of provider.executeQuery({
       prompt: cursorPrompt,
-      model,
+      model: bareModel,
       cwd: projectPath,
       maxTurns: 250,
       allowedTools: ['Read', 'Glob', 'Grep'],

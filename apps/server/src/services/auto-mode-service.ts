@@ -14,15 +14,13 @@ import type {
   ExecuteOptions,
   Feature,
   ModelProvider,
-  PipelineConfig,
   PipelineStep,
   ThinkingLevel,
   PlanningMode,
 } from '@automaker/types';
-import { DEFAULT_PHASE_MODELS } from '@automaker/types';
+import { DEFAULT_PHASE_MODELS, stripProviderPrefix } from '@automaker/types';
 import {
   buildPromptWithImages,
-  isAbortError,
   classifyError,
   loadContextFiles,
   appendLearning,
@@ -2151,7 +2149,12 @@ This mock response was generated because AUTOMAKER_MOCK_AGENT=true was set.
     // Get provider for this model
     const provider = ProviderFactory.getProviderForModel(finalModel);
 
-    logger.info(`Using provider "${provider.getName()}" for model "${finalModel}"`);
+    // Strip provider prefix - providers should receive bare model IDs
+    const bareModel = stripProviderPrefix(finalModel);
+
+    logger.info(
+      `Using provider "${provider.getName()}" for model "${finalModel}" (bare: ${bareModel})`
+    );
 
     // Build prompt content with images using utility
     const { content: promptContent } = await buildPromptWithImages(
@@ -2170,7 +2173,7 @@ This mock response was generated because AUTOMAKER_MOCK_AGENT=true was set.
 
     const executeOptions: ExecuteOptions = {
       prompt: promptContent,
-      model: finalModel,
+      model: bareModel,
       maxTurns: maxTurns,
       cwd: workDir,
       allowedTools: allowedTools,
@@ -2475,7 +2478,7 @@ After generating the revised spec, output:
                         // Make revision call
                         const revisionStream = provider.executeQuery({
                           prompt: revisionPrompt,
-                          model: finalModel,
+                          model: bareModel,
                           maxTurns: maxTurns || 100,
                           cwd: workDir,
                           allowedTools: allowedTools,
@@ -2613,7 +2616,7 @@ After generating the revised spec, output:
                     // Execute task with dedicated agent
                     const taskStream = provider.executeQuery({
                       prompt: taskPrompt,
-                      model: finalModel,
+                      model: bareModel,
                       maxTurns: Math.min(maxTurns || 100, 50), // Limit turns per task
                       cwd: workDir,
                       allowedTools: allowedTools,
@@ -2701,7 +2704,7 @@ Implement all the changes described in the plan above.`;
 
                   const continuationStream = provider.executeQuery({
                     prompt: continuationPrompt,
-                    model: finalModel,
+                    model: bareModel,
                     maxTurns: maxTurns,
                     cwd: workDir,
                     allowedTools: allowedTools,
@@ -3002,11 +3005,16 @@ If nothing notable: {"learnings": []}`;
       // Import query dynamically to avoid circular dependencies
       const { query } = await import('@anthropic-ai/claude-agent-sdk');
 
-      // Use a quick model for extraction (resolveModelString is already imported at top)
+      // Get model from phase settings
+      const settings = await this.settingsService?.getGlobalSettings();
+      const phaseModelEntry =
+        settings?.phaseModels?.memoryExtractionModel || DEFAULT_PHASE_MODELS.memoryExtractionModel;
+      const { model } = resolvePhaseModel(phaseModelEntry);
+
       const stream = query({
         prompt: userPrompt,
         options: {
-          model: resolveModelString('haiku'),
+          model,
           maxTurns: 1,
           allowedTools: [],
           permissionMode: 'acceptEdits',

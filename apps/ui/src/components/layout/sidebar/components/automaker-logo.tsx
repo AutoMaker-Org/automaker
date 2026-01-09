@@ -18,57 +18,64 @@ export function AutomakerLogo({ sidebarOpen, navigate }: AutomakerLogoProps) {
       onClick={() => navigate({ to: '/' })}
       data-testid="logo-button"
     >
-      {!sidebarOpen ? (
-        <div className="relative flex flex-col items-center justify-center rounded-lg gap-0.5">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 256 256"
-            role="img"
-            aria-label="Automaker Logo"
-            className="size-8 group-hover:rotate-12 transition-transform duration-300 ease-out"
-          >
-            <defs>
-              <linearGradient
-                id="bg-collapsed"
-                x1="0"
-                y1="0"
-                x2="256"
-                y2="256"
-                gradientUnits="userSpaceOnUse"
-              >
-                <stop offset="0%" style={{ stopColor: 'var(--brand-400)' }} />
-                <stop offset="100%" style={{ stopColor: 'var(--brand-600)' }} />
-              </linearGradient>
-              <filter id="iconShadow-collapsed" x="-20%" y="-20%" width="140%" height="140%">
-                <feDropShadow
-                  dx="0"
-                  dy="4"
-                  stdDeviation="4"
-                  floodColor="#000000"
-                  floodOpacity="0.25"
-                />
-              </filter>
-            </defs>
-            <rect x="16" y="16" width="224" height="224" rx="56" fill="url(#bg-collapsed)" />
-            <g
-              fill="none"
-              stroke="#FFFFFF"
-              strokeWidth="20"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              filter="url(#iconShadow-collapsed)"
+      {/* Collapsed logo - shown when sidebar is closed OR on small screens when sidebar is open */}
+      <div
+        className={cn(
+          'relative flex flex-col items-center justify-center rounded-lg gap-0.5',
+          sidebarOpen ? 'flex lg:hidden' : 'flex'
+        )}
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 256 256"
+          role="img"
+          aria-label="Automaker Logo"
+          className="size-8 group-hover:rotate-12 transition-transform duration-300 ease-out"
+        >
+          <defs>
+            <linearGradient
+              id="bg-collapsed"
+              x1="0"
+              y1="0"
+              x2="256"
+              y2="256"
+              gradientUnits="userSpaceOnUse"
             >
-              <path d="M92 92 L52 128 L92 164" />
-              <path d="M144 72 L116 184" />
-              <path d="M164 92 L204 128 L164 164" />
-            </g>
-          </svg>
-          <span className="text-[0.625rem] text-muted-foreground leading-none font-medium">
-            v{appVersion}
-          </span>
-        </div>
-      ) : (
-        <div className={cn('flex flex-col', 'hidden lg:flex')}>
+              <stop offset="0%" style={{ stopColor: 'var(--brand-400)' }} />
+              <stop offset="100%" style={{ stopColor: 'var(--brand-600)' }} />
+            </linearGradient>
+            <filter id="iconShadow-collapsed" x="-20%" y="-20%" width="140%" height="140%">
+              <feDropShadow
+                dx="0"
+                dy="4"
+                stdDeviation="4"
+                floodColor="#000000"
+                floodOpacity="0.25"
+              />
+            </filter>
+          </defs>
+          <rect x="16" y="16" width="224" height="224" rx="56" fill="url(#bg-collapsed)" />
+          <g
+            fill="none"
+            stroke="#FFFFFF"
+            strokeWidth="20"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            filter="url(#iconShadow-collapsed)"
+          >
+            <path d="M92 92 L52 128 L92 164" />
+            <path d="M144 72 L116 184" />
+            <path d="M164 92 L204 128 L164 164" />
+          </g>
+        </svg>
+        <span className="text-[0.625rem] text-muted-foreground leading-none font-medium">
+          v{appVersion}
+        </span>
+      </div>
+
+      {/* Expanded logo - only shown when sidebar is open on large screens */}
+      {sidebarOpen && (
+        <div className="hidden lg:flex flex-col">
           <div className="flex items-center gap-1">
             <svg
               xmlns="http://www.w3.org/2000/svg"

@@ -66,6 +66,14 @@ const GENERATION_TASKS: PhaseConfig[] = [
   },
 ];
 
+const MEMORY_TASKS: PhaseConfig[] = [
+  {
+    key: 'memoryExtractionModel',
+    label: 'Memory Extraction',
+    description: 'Extracts learnings from completed agent sessions',
+  },
+];
+
 function PhaseGroup({
   title,
   subtitle,
@@ -154,6 +162,13 @@ export function ModelDefaultsSection() {
           title="Generation Tasks"
           subtitle="Powerful models recommended for quality output"
           phases={GENERATION_TASKS}
+        />
+
+        {/* Memory Tasks */}
+        <PhaseGroup
+          title="Memory Tasks"
+          subtitle="Fast models recommended for learning extraction"
+          phases={MEMORY_TASKS}
         />
       </div>
     </div>

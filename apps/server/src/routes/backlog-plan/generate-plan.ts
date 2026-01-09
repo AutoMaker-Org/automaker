@@ -7,7 +7,12 @@
 
 import type { EventEmitter } from '../../lib/events.js';
 import type { Feature, BacklogPlanResult, BacklogChange, DependencyUpdate } from '@automaker/types';
-import { DEFAULT_PHASE_MODELS, isCursorModel, type ThinkingLevel } from '@automaker/types';
+import {
+  DEFAULT_PHASE_MODELS,
+  isCursorModel,
+  stripProviderPrefix,
+  type ThinkingLevel,
+} from '@automaker/types';
 import { resolvePhaseModel } from '@automaker/model-resolver';
 import { FeatureLoader } from '../../services/feature-loader.js';
 import { ProviderFactory } from '../../providers/provider-factory.js';
@@ -120,6 +125,8 @@ export async function generateBacklogPlan(
     logger.info('[BacklogPlan] Using model:', effectiveModel);
 
     const provider = ProviderFactory.getProviderForModel(effectiveModel);
+    // Strip provider prefix - providers expect bare model IDs
+    const bareModel = stripProviderPrefix(effectiveModel);
 
     // Get autoLoadClaudeMd setting
     const autoLoadClaudeMd = await getAutoLoadClaudeMdSetting(
@@ -151,7 +158,7 @@ ${userPrompt}`;
     // Execute the query
     const stream = provider.executeQuery({
       prompt: finalPrompt,
-      model: effectiveModel,
+      model: bareModel,
       cwd: projectPath,
       systemPrompt: finalSystemPrompt,
       maxTurns: 1,

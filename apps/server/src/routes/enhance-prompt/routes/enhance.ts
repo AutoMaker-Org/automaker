@@ -12,6 +12,7 @@ import { resolveModelString } from '@automaker/model-resolver';
 import {
   CLAUDE_MODEL_MAP,
   isCursorModel,
+  stripProviderPrefix,
   ThinkingLevel,
   getThinkingTokenBudget,
 } from '@automaker/types';
@@ -98,12 +99,14 @@ async function extractTextFromStream(
  */
 async function executeWithCursor(prompt: string, model: string): Promise<string> {
   const provider = ProviderFactory.getProviderForModel(model);
+  // Strip provider prefix - providers expect bare model IDs
+  const bareModel = stripProviderPrefix(model);
 
   let responseText = '';
 
   for await (const msg of provider.executeQuery({
     prompt,
-    model,
+    model: bareModel,
     cwd: process.cwd(), // Enhancement doesn't need a specific working directory
     readOnly: true, // Prompt enhancement only generates text, doesn't write files
   })) {
