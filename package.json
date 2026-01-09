@@ -52,7 +52,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "rebuild": "rm -rf node_modules apps/*/node_modules libs/*/node_modules && npm install",
-    "prepare": "husky && npm run build:packages"
+    "prepare": "husky && node scripts/prepare-build.mjs"
   },
   "lint-staged": {
     "*.{js,jsx,ts,tsx,json,css,md,html,yml,yaml}": [

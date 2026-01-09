@@ -28,7 +28,7 @@
     "build:electron:mac:dir": "node scripts/prepare-server.mjs && vite build && electron-builder --mac --dir",
     "build:electron:linux": "node scripts/prepare-server.mjs && vite build && electron-builder --linux",
     "build:electron:linux:dir": "node scripts/prepare-server.mjs && vite build && electron-builder --linux --dir",
-    "postinstall": "electron-builder install-app-deps",
+    "postinstall": "node scripts/postinstall.mjs",
     "preview": "vite preview",
     "lint": "npx eslint",
     "typecheck": "tsc --noEmit",

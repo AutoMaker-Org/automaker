@@ -11,6 +11,16 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
+    "composite": true,
+    "paths": {
+      "@automaker/types": ["./types/src"],
+      "@automaker/platform": ["./platform/src"],
+      "@automaker/utils": ["./utils/src"],
+      "@automaker/prompts": ["./prompts/src"],
+      "@automaker/model-resolver": ["./model-resolver/src"],
+      "@automaker/dependency-resolver": ["./dependency-resolver/src"],
+      "@automaker/git-utils": ["./git-utils/src"]
+    }
   }
 }

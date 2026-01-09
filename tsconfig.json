@@ -1,0 +1,23 @@
+{
+  "files": [],
+  "references": [
+    { "path": "./libs/types" },
+    { "path": "./libs/platform" },
+    { "path": "./libs/utils" },
+    { "path": "./libs/prompts" },
+    { "path": "./libs/model-resolver" },
+    { "path": "./libs/dependency-resolver" },
+    { "path": "./libs/git-utils" }
+  ],
+  "compilerOptions": {
+    "paths": {
+      "@automaker/types": ["./libs/types/src"],
+      "@automaker/platform": ["./libs/platform/src"],
+      "@automaker/utils": ["./libs/utils/src"],
+      "@automaker/prompts": ["./libs/prompts/src"],
+      "@automaker/model-resolver": ["./libs/model-resolver/src"],
+      "@automaker/dependency-resolver": ["./libs/dependency-resolver/src"],
+      "@automaker/git-utils": ["./libs/git-utils/src"]
+    }
+  }
+}

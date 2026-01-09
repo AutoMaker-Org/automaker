@@ -1,10 +1,60 @@
 import { defineConfig, devices } from '@playwright/test';
+import { execSync } from 'child_process';
+
+/**
+ * Detects the currently active package manager
+ * Returns 'npm' | 'pnpm' | 'yarn' | 'bun'
+ */
+function detectPackageManager(): 'npm' | 'pnpm' | 'yarn' | 'bun' {
+  const { env } = process;
+
+  // Check npm config (set by npm when running scripts)
+  if (env.npm_config_user_agent?.startsWith('npm')) {
+    return 'npm';
+  }
+
+  // Check pnpm
+  if (env.npm_config_user_agent?.includes('pnpm')) {
+    return 'pnpm';
+  }
+
+  // Check Yarn
+  if (env.npm_config_user_agent?.includes('yarn')) {
+    return 'yarn';
+  }
+
+  // Check Bun
+  if (env.BUN_INSTALL_CACHE_DIR || env.npm_config_user_agent?.includes('bun')) {
+    return 'bun';
+  }
+
+  // Default to npm
+  return 'npm';
+}
+
+/**
+ * Get the appropriate run command prefix for the detected package manager
+ */
+function getRunCommand(): string {
+  const pm = detectPackageManager();
+  switch (pm) {
+    case 'bun':
+      return 'bun run';
+    case 'pnpm':
+      return 'pnpm run';
+    case 'yarn':
+      return 'yarn run';
+    default:
+      return 'npm run';
+  }
+}
 
 const port = process.env.TEST_PORT || 3007;
 const serverPort = process.env.TEST_SERVER_PORT || 3008;
 const reuseServer = process.env.TEST_REUSE_SERVER === 'true';
 // Always use mock agent for tests (disables rate limiting, uses mock Claude responses)
 const mockAgent = true;
+const runCommand = getRunCommand();
 
 export default defineConfig({
   testDir: './tests',
@@ -34,10 +84,10 @@ export default defineConfig({
           // Backend server - runs with mock agent enabled in CI
           // Uses dev:test (no file watching) to avoid port conflicts from server restarts
           {
-            command: `cd ../server && npm run dev:test`,
+            command: `cd ../server && ${runCommand} dev:test`,
             url: `http://localhost:${serverPort}/api/health`,
             // Don't reuse existing server to ensure we use the test API key
-            reuseExistingServer: false,
+            reuseExistingServer: !reuseServer,
             timeout: 60000,
             env: {
               ...process.env,
@@ -55,9 +105,9 @@ export default defineConfig({
           },
           // Frontend Vite dev server
           {
-            command: `npm run dev`,
+            command: `${runCommand} dev`,
             url: `http://localhost:${port}`,
-            reuseExistingServer: true,
+            reuseExistingServer: !reuseServer,
             timeout: 120000,
             env: {
               ...process.env,
