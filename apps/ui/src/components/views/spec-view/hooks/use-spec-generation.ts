@@ -28,6 +28,8 @@ export function useSpecGeneration({ loadSpec }: UseSpecGenerationOptions) {
   const [generateFeatures, setGenerateFeatures] = useState(true);
   const [analyzeProjectOnCreate, setAnalyzeProjectOnCreate] = useState(true);
   const [featureCountOnCreate, setFeatureCountOnCreate] = useState<FeatureCount>(50);
+  const [useWorktreeBranchOnCreate, setUseWorktreeBranchOnCreate] = useState(false);
+  const [worktreeBranchOnCreate, setWorktreeBranchOnCreate] = useState<string>('');
 
   // Regenerate spec state
   const [projectDefinition, setProjectDefinition] = useState('');
@@ -35,6 +37,8 @@ export function useSpecGeneration({ loadSpec }: UseSpecGenerationOptions) {
   const [generateFeaturesOnRegenerate, setGenerateFeaturesOnRegenerate] = useState(true);
   const [analyzeProjectOnRegenerate, setAnalyzeProjectOnRegenerate] = useState(true);
   const [featureCountOnRegenerate, setFeatureCountOnRegenerate] = useState<FeatureCount>(50);
+  const [useWorktreeBranchOnRegenerate, setUseWorktreeBranchOnRegenerate] = useState(false);
+  const [worktreeBranchOnRegenerate, setWorktreeBranchOnRegenerate] = useState<string>('');
 
   // Generate features only state
   const [isGeneratingFeatures, setIsGeneratingFeatures] = useState(false);
@@ -347,6 +351,18 @@ export function useSpecGeneration({ loadSpec }: UseSpecGenerationOptions) {
           setErrorMessage('');
           stateRestoredRef.current = false;
 
+          // Switch to target worktree if specified
+          if (event.targetBranch && event.worktreePath && currentProject) {
+            logger.info(
+              'Switching to target worktree:',
+              event.worktreePath,
+              'branch:',
+              event.targetBranch
+            );
+            const { setCurrentWorktree } = useAppStore.getState();
+            setCurrentWorktree(currentProject.path, event.worktreePath, event.targetBranch);
+          }
+
           setTimeout(() => {
             loadSpec();
           }, SPEC_FILE_WRITE_DELAY);
@@ -413,12 +429,26 @@ export function useSpecGeneration({ loadSpec }: UseSpecGenerationOptions) {
         setIsCreating(false);
         return;
       }
+
+      // Determine target branch: use current branch if checkbox is unchecked
+      let effectiveBranch = worktreeBranchOnCreate;
+      if (!useWorktreeBranchOnCreate) {
+        // Detect current branch
+        try {
+          const branchResult = await api.worktree?.getCurrentBranch?.(currentProject.path);
+          effectiveBranch = branchResult?.success ? branchResult.branch : 'main';
+        } catch {
+          effectiveBranch = 'main';
+        }
+      }
+
       const result = await api.specRegeneration.create(
         currentProject.path,
         projectOverview.trim(),
         generateFeatures,
         analyzeProjectOnCreate,
-        generateFeatures ? featureCountOnCreate : undefined
+        generateFeatures ? featureCountOnCreate : undefined,
+        effectiveBranch
       );
 
       if (!result.success) {
@@ -447,6 +477,8 @@ export function useSpecGeneration({ loadSpec }: UseSpecGenerationOptions) {
     generateFeatures,
     analyzeProjectOnCreate,
     featureCountOnCreate,
+    useWorktreeBranchOnCreate,
+    worktreeBranchOnCreate,
   ]);
 
   const handleRegenerate = useCallback(async () => {
@@ -469,12 +501,26 @@ export function useSpecGeneration({ loadSpec }: UseSpecGenerationOptions) {
         setIsRegenerating(false);
         return;
       }
+
+      // Determine target branch: use current branch if checkbox is unchecked
+      let effectiveBranch = worktreeBranchOnRegenerate;
+      if (!useWorktreeBranchOnRegenerate) {
+        // Detect current branch
+        try {
+          const branchResult = await api.worktree?.getCurrentBranch?.(currentProject.path);
+          effectiveBranch = branchResult?.success ? branchResult.branch : 'main';
+        } catch {
+          effectiveBranch = 'main';
+        }
+      }
+
       const result = await api.specRegeneration.generate(
         currentProject.path,
         projectDefinition.trim(),
         generateFeaturesOnRegenerate,
         analyzeProjectOnRegenerate,
-        generateFeaturesOnRegenerate ? featureCountOnRegenerate : undefined
+        generateFeaturesOnRegenerate ? featureCountOnRegenerate : undefined,
+        effectiveBranch
       );
 
       if (!result.success) {
@@ -503,6 +549,8 @@ export function useSpecGeneration({ loadSpec }: UseSpecGenerationOptions) {
     generateFeaturesOnRegenerate,
     analyzeProjectOnRegenerate,
     featureCountOnRegenerate,
+    useWorktreeBranchOnRegenerate,
+    worktreeBranchOnRegenerate,
   ]);
 
   const handleGenerateFeatures = useCallback(async () => {
@@ -563,6 +611,10 @@ export function useSpecGeneration({ loadSpec }: UseSpecGenerationOptions) {
     setAnalyzeProjectOnCreate,
     featureCountOnCreate,
     setFeatureCountOnCreate,
+    useWorktreeBranchOnCreate,
+    setUseWorktreeBranchOnCreate,
+    worktreeBranchOnCreate,
+    setWorktreeBranchOnCreate,
 
     // Regenerate state
     projectDefinition,
@@ -574,6 +626,10 @@ export function useSpecGeneration({ loadSpec }: UseSpecGenerationOptions) {
     setAnalyzeProjectOnRegenerate,
     featureCountOnRegenerate,
     setFeatureCountOnRegenerate,
+    useWorktreeBranchOnRegenerate,
+    setUseWorktreeBranchOnRegenerate,
+    worktreeBranchOnRegenerate,
+    setWorktreeBranchOnRegenerate,
 
     // Feature generation state
     isGeneratingFeatures,

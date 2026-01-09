@@ -1,4 +1,5 @@
 import { Sparkles, Clock, Loader2 } from 'lucide-react';
+import { useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -10,6 +11,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { HotkeyButton } from '@/components/ui/hotkey-button';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { FEATURE_COUNT_OPTIONS } from '../constants';
 import type { RegenerateSpecDialogProps, FeatureCount } from '../types';
@@ -25,11 +27,20 @@ export function RegenerateSpecDialog({
   onAnalyzeProjectChange,
   featureCount,
   onFeatureCountChange,
+  useWorktreeBranch,
+  onUseWorktreeBranchChange,
+  worktreeBranch,
+  onWorktreeBranchChange,
   onRegenerate,
   isRegenerating,
   isGeneratingFeatures = false,
 }: RegenerateSpecDialogProps) {
-  const selectedOption = FEATURE_COUNT_OPTIONS.find((o) => o.value === featureCount);
+  const [customFeatureCount, setCustomFeatureCount] = useState<string>('');
+  const [isCustom, setIsCustom] = useState(false);
+
+  const selectedOption = FEATURE_COUNT_OPTIONS.find(
+    (o) => o.value === featureCount || (isCustom && o.value === 'custom')
+  );
   const isDisabled = isRegenerating || isGeneratingFeatures;
 
   return (
@@ -65,6 +76,41 @@ export function RegenerateSpecDialog({
               placeholder="e.g., A task management app where users can create projects, add tasks with due dates, assign tasks to team members, track progress with a kanban board, and receive notifications for upcoming deadlines..."
               disabled={isDisabled}
             />
+          </div>
+
+          <div className="flex items-start space-x-3 pt-2">
+            <Checkbox
+              id="regenerate-use-worktree-branch"
+              checked={useWorktreeBranch}
+              onCheckedChange={(checked) => onUseWorktreeBranchChange(checked === true)}
+              disabled={isDisabled}
+            />
+            <div className="space-y-1 flex-1">
+              <label
+                htmlFor="regenerate-use-worktree-branch"
+                className={`text-sm font-medium ${isDisabled ? '' : 'cursor-pointer'}`}
+              >
+                Use worktree branch
+              </label>
+              <p className="text-xs text-muted-foreground">
+                If checked, create features in a separate worktree branch. If unchecked, detects and
+                uses the current branch of the selected project.
+              </p>
+
+              {useWorktreeBranch && (
+                <div className="pt-2">
+                  <Input
+                    type="text"
+                    value={worktreeBranch}
+                    onChange={(e) => onWorktreeBranchChange(e.target.value)}
+                    placeholder="e.g., test-worktree, feature-new"
+                    disabled={isDisabled}
+                    className="font-mono text-sm"
+                    data-testid="regenerate-worktree-branch-input"
+                  />
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="flex items-start space-x-3 pt-2">
@@ -115,27 +161,61 @@ export function RegenerateSpecDialog({
             <div className="space-y-2 pt-2 pl-7">
               <label className="text-sm font-medium">Number of Features</label>
               <div className="flex gap-2">
-                {FEATURE_COUNT_OPTIONS.map((option) => (
-                  <Button
-                    key={option.value}
-                    type="button"
-                    variant={featureCount === option.value ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => onFeatureCountChange(option.value as FeatureCount)}
-                    disabled={isDisabled}
-                    className={cn(
-                      'flex-1 transition-all',
-                      featureCount === option.value
-                        ? 'bg-primary hover:bg-primary/90 text-primary-foreground'
-                        : 'bg-muted/30 hover:bg-muted/50 border-border'
-                    )}
-                    data-testid={`regenerate-feature-count-${option.value}`}
-                  >
-                    {option.label}
-                  </Button>
-                ))}
+                {FEATURE_COUNT_OPTIONS.map((option) => {
+                  const isSelected =
+                    option.value === 'custom' ? isCustom : featureCount === option.value;
+                  return (
+                    <Button
+                      key={option.value}
+                      type="button"
+                      variant={isSelected ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => {
+                        if (option.value === 'custom') {
+                          setIsCustom(true);
+                          if (customFeatureCount) {
+                            onFeatureCountChange(parseInt(customFeatureCount, 10));
+                          }
+                        } else {
+                          setIsCustom(false);
+                          setCustomFeatureCount('');
+                          onFeatureCountChange(option.value as number);
+                        }
+                      }}
+                      disabled={isDisabled}
+                      className={cn(
+                        'flex-1 transition-all',
+                        isSelected
+                          ? 'bg-primary hover:bg-primary/90 text-primary-foreground'
+                          : 'bg-muted/30 hover:bg-muted/50 border-border'
+                      )}
+                      data-testid={`regenerate-feature-count-${option.value}`}
+                    >
+                      {option.label}
+                    </Button>
+                  );
+                })}
               </div>
-              {selectedOption?.warning && (
+              {isCustom && (
+                <Input
+                  type="number"
+                  min="1"
+                  max="200"
+                  value={customFeatureCount}
+                  onChange={(e) => {
+                    setCustomFeatureCount(e.target.value);
+                    const num = parseInt(e.target.value, 10);
+                    if (!isNaN(num) && num > 0) {
+                      onFeatureCountChange(num);
+                    }
+                  }}
+                  placeholder="Enter number of features (1-200)"
+                  disabled={isDisabled}
+                  className="text-sm"
+                  data-testid="regenerate-feature-count-custom-input"
+                />
+              )}
+              {selectedOption?.warning && !isCustom && (
                 <p className="text-xs text-amber-500 flex items-center gap-1">
                   <Clock className="w-3 h-3" />
                   {selectedOption.warning}
@@ -152,7 +232,11 @@ export function RegenerateSpecDialog({
             </Button>
             <HotkeyButton
               onClick={onRegenerate}
-              disabled={!projectDefinition.trim() || isDisabled}
+              disabled={
+                !projectDefinition.trim() ||
+                isDisabled ||
+                (useWorktreeBranch && !worktreeBranch.trim())
+              }
               hotkey={{ key: 'Enter', cmdCtrl: true }}
               hotkeyActive={open && !isDisabled}
             >

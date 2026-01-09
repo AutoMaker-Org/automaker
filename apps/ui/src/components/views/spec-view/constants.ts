@@ -8,13 +8,14 @@ export const STATUS_CHECK_INTERVAL_MS = 2000;
 
 // Feature count options with labels and warnings
 export const FEATURE_COUNT_OPTIONS: {
-  value: FeatureCount;
+  value: number | 'custom';
   label: string;
   warning?: string;
 }[] = [
   { value: 20, label: '20' },
   { value: 50, label: '50', warning: 'May take up to 5 minutes' },
   { value: 100, label: '100', warning: 'May take up to 5 minutes' },
+  { value: 'custom', label: 'Custom' },
 ];
 
 // Phase display labels for UI

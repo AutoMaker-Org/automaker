@@ -114,30 +114,51 @@ export async function fillAddFeatureDialog(
   const descriptionInput = page.locator('[data-testid="add-feature-dialog"] textarea').first();
   await descriptionInput.fill(description);
 
-  // Fill branch if provided (it's a combobox autocomplete)
+  // Fill branch if provided
   if (options?.branch) {
-    // First, select "Other branch" radio option if not already selected
-    const otherBranchRadio = page
-      .locator('[data-testid="feature-radio-group"]')
-      .locator('[id="feature-other"]');
-    await otherBranchRadio.waitFor({ state: 'visible', timeout: 5000 });
-    await otherBranchRadio.click();
-    // Wait for the branch input to appear
-    await page.waitForTimeout(300);
+    // Check if "Use current selected branch" option exists and matches our desired branch
+    const currentBranchRadio = page.locator('[id="feature-current"]');
+    const currentBranchLabel = page.locator('label[for="feature-current"]');
 
-    // Now click on the branch input (autocomplete)
-    const branchInput = page.locator('[data-testid="feature-input"]');
-    await branchInput.waitFor({ state: 'visible', timeout: 5000 });
-    await branchInput.click();
-    // Wait for the popover to open
-    await page.waitForTimeout(300);
-    // Type in the command input
-    const commandInput = page.locator('[cmdk-input]');
-    await commandInput.fill(options.branch);
-    // Press Enter to select/create the branch
-    await commandInput.press('Enter');
-    // Wait for popover to close
-    await page.waitForTimeout(200);
+    const currentBranchExists = await currentBranchRadio.isVisible().catch(() => false);
+    let useCurrentBranch = false;
+
+    if (currentBranchExists) {
+      const labelText = await currentBranchLabel.textContent();
+      // Check if the label contains our desired branch name
+      if (labelText?.includes(options.branch)) {
+        useCurrentBranch = true;
+      }
+    }
+
+    if (useCurrentBranch) {
+      // Select "Use current selected branch" radio option
+      await currentBranchRadio.click();
+      await page.waitForTimeout(200);
+    } else {
+      // Select "Other branch" radio option
+      const otherBranchRadio = page
+        .locator('[data-testid="feature-radio-group"]')
+        .locator('[id="feature-other"]');
+      await otherBranchRadio.waitFor({ state: 'visible', timeout: 5000 });
+      await otherBranchRadio.click();
+      // Wait for the branch input to appear
+      await page.waitForTimeout(300);
+
+      // Now click on the branch input (autocomplete)
+      const branchInput = page.locator('[data-testid="feature-input"]');
+      await branchInput.waitFor({ state: 'visible', timeout: 5000 });
+      await branchInput.click();
+      // Wait for the popover to open
+      await page.waitForTimeout(300);
+      // Type in the command input
+      const commandInput = page.locator('[cmdk-input]');
+      await commandInput.fill(options.branch);
+      // Press Enter to select/create the branch
+      await commandInput.press('Enter');
+      // Wait for popover to close
+      await page.waitForTimeout(200);
+    }
   }
 
   // Fill category if provided (it's also a combobox autocomplete)

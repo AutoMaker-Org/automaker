@@ -1,4 +1,5 @@
 import { Sparkles, Clock, Loader2 } from 'lucide-react';
+import { useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -10,6 +11,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { HotkeyButton } from '@/components/ui/hotkey-button';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { FEATURE_COUNT_OPTIONS } from '../constants';
 import type { CreateSpecDialogProps, FeatureCount } from '../types';
@@ -25,6 +27,10 @@ export function CreateSpecDialog({
   onAnalyzeProjectChange,
   featureCount,
   onFeatureCountChange,
+  useWorktreeBranch,
+  onUseWorktreeBranchChange,
+  worktreeBranch,
+  onWorktreeBranchChange,
   onCreateSpec,
   onSkip,
   isCreatingSpec,
@@ -32,7 +38,12 @@ export function CreateSpecDialog({
   title = 'Create App Specification',
   description = "We didn't find an app_spec.txt file. Let us help you generate your app_spec.txt to help describe your project for our system. We'll analyze your project's tech stack and create a comprehensive specification.",
 }: CreateSpecDialogProps) {
-  const selectedOption = FEATURE_COUNT_OPTIONS.find((o) => o.value === featureCount);
+  const [customFeatureCount, setCustomFeatureCount] = useState<string>('');
+  const [isCustom, setIsCustom] = useState(false);
+
+  const selectedOption = FEATURE_COUNT_OPTIONS.find(
+    (o) => o.value === featureCount || (isCustom && o.value === 'custom')
+  );
 
   return (
     <Dialog
@@ -65,6 +76,41 @@ export function CreateSpecDialog({
               autoFocus
               disabled={isCreatingSpec}
             />
+          </div>
+
+          <div className="flex items-start space-x-3 pt-2">
+            <Checkbox
+              id="create-use-worktree-branch"
+              checked={useWorktreeBranch}
+              onCheckedChange={(checked) => onUseWorktreeBranchChange(checked === true)}
+              disabled={isCreatingSpec}
+            />
+            <div className="space-y-1 flex-1">
+              <label
+                htmlFor="create-use-worktree-branch"
+                className={`text-sm font-medium ${isCreatingSpec ? '' : 'cursor-pointer'}`}
+              >
+                Use worktree branch
+              </label>
+              <p className="text-xs text-muted-foreground">
+                If checked, create features in a separate worktree branch. If unchecked, detects and
+                uses the current branch of the selected project.
+              </p>
+
+              {useWorktreeBranch && (
+                <div className="pt-2">
+                  <Input
+                    type="text"
+                    value={worktreeBranch}
+                    onChange={(e) => onWorktreeBranchChange(e.target.value)}
+                    placeholder="e.g., test-worktree, feature-new"
+                    disabled={isCreatingSpec}
+                    className="font-mono text-sm"
+                    data-testid="create-worktree-branch-input"
+                  />
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="flex items-start space-x-3 pt-2">
@@ -115,27 +161,61 @@ export function CreateSpecDialog({
             <div className="space-y-2 pt-2 pl-7">
               <label className="text-sm font-medium">Number of Features</label>
               <div className="flex gap-2">
-                {FEATURE_COUNT_OPTIONS.map((option) => (
-                  <Button
-                    key={option.value}
-                    type="button"
-                    variant={featureCount === option.value ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => onFeatureCountChange(option.value as FeatureCount)}
-                    disabled={isCreatingSpec}
-                    className={cn(
-                      'flex-1 transition-all',
-                      featureCount === option.value
-                        ? 'bg-primary hover:bg-primary/90 text-primary-foreground'
-                        : 'bg-muted/30 hover:bg-muted/50 border-border'
-                    )}
-                    data-testid={`feature-count-${option.value}`}
-                  >
-                    {option.label}
-                  </Button>
-                ))}
+                {FEATURE_COUNT_OPTIONS.map((option) => {
+                  const isSelected =
+                    option.value === 'custom' ? isCustom : featureCount === option.value;
+                  return (
+                    <Button
+                      key={option.value}
+                      type="button"
+                      variant={isSelected ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => {
+                        if (option.value === 'custom') {
+                          setIsCustom(true);
+                          if (customFeatureCount) {
+                            onFeatureCountChange(parseInt(customFeatureCount, 10));
+                          }
+                        } else {
+                          setIsCustom(false);
+                          setCustomFeatureCount('');
+                          onFeatureCountChange(option.value as number);
+                        }
+                      }}
+                      disabled={isCreatingSpec}
+                      className={cn(
+                        'flex-1 transition-all',
+                        isSelected
+                          ? 'bg-primary hover:bg-primary/90 text-primary-foreground'
+                          : 'bg-muted/30 hover:bg-muted/50 border-border'
+                      )}
+                      data-testid={`feature-count-${option.value}`}
+                    >
+                      {option.label}
+                    </Button>
+                  );
+                })}
               </div>
-              {selectedOption?.warning && (
+              {isCustom && (
+                <Input
+                  type="number"
+                  min="1"
+                  max="200"
+                  value={customFeatureCount}
+                  onChange={(e) => {
+                    setCustomFeatureCount(e.target.value);
+                    const num = parseInt(e.target.value, 10);
+                    if (!isNaN(num) && num > 0) {
+                      onFeatureCountChange(num);
+                    }
+                  }}
+                  placeholder="Enter number of features (1-200)"
+                  disabled={isCreatingSpec}
+                  className="text-sm"
+                  data-testid="feature-count-custom-input"
+                />
+              )}
+              {selectedOption?.warning && !isCustom && (
                 <p className="text-xs text-amber-500 flex items-center gap-1">
                   <Clock className="w-3 h-3" />
                   {selectedOption.warning}
@@ -157,7 +237,11 @@ export function CreateSpecDialog({
           )}
           <HotkeyButton
             onClick={onCreateSpec}
-            disabled={!projectOverview.trim() || isCreatingSpec}
+            disabled={
+              !projectOverview.trim() ||
+              isCreatingSpec ||
+              (useWorktreeBranch && !worktreeBranch.trim())
+            }
             hotkey={{ key: 'Enter', cmdCtrl: true }}
             hotkeyActive={open && !isCreatingSpec}
           >

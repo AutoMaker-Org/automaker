@@ -50,6 +50,7 @@ export function BranchSwitchDropdown({
             !isSelected && 'bg-secondary/50 hover:bg-secondary'
           )}
           title="Switch branch"
+          data-testid={`worktree-dropdown-trigger-${worktree.branch}`}
         >
           <GitBranch className="w-3 h-3" />
         </Button>

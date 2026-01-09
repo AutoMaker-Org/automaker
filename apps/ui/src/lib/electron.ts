@@ -408,7 +408,13 @@ export type SpecRegenerationEvent =
       input: unknown;
       projectPath: string;
     }
-  | { type: 'spec_regeneration_complete'; message: string; projectPath: string }
+  | {
+      type: 'spec_regeneration_complete';
+      message: string;
+      projectPath: string;
+      targetBranch?: string;
+      worktreePath?: string;
+    }
   | { type: 'spec_regeneration_error'; error: string; projectPath: string };
 
 export interface SpecRegenerationAPI {
@@ -417,14 +423,16 @@ export interface SpecRegenerationAPI {
     projectOverview: string,
     generateFeatures?: boolean,
     analyzeProject?: boolean,
-    maxFeatures?: number
+    maxFeatures?: number,
+    targetBranch?: string
   ) => Promise<{ success: boolean; error?: string }>;
   generate: (
     projectPath: string,
     projectDefinition: string,
     generateFeatures?: boolean,
     analyzeProject?: boolean,
-    maxFeatures?: number
+    maxFeatures?: number,
+    targetBranch?: string
   ) => Promise<{ success: boolean; error?: string }>;
   generateFeatures: (
     projectPath: string,
@@ -1364,6 +1372,11 @@ function createMockSetupAPI(): SetupAPI {
 // Mock Worktree API implementation
 function createMockWorktreeAPI(): WorktreeAPI {
   return {
+    getCurrentBranch: async (projectPath: string) => {
+      console.log('[Mock] Getting current branch:', { projectPath });
+      return { success: true, branch: 'main' };
+    },
+
     mergeFeature: async (projectPath: string, featureId: string, options?: object) => {
       console.log('[Mock] Merging feature:', {
         projectPath,

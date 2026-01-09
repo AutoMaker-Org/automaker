@@ -37,6 +37,10 @@ export function SpecView() {
     setAnalyzeProjectOnCreate,
     featureCountOnCreate,
     setFeatureCountOnCreate,
+    useWorktreeBranchOnCreate,
+    setUseWorktreeBranchOnCreate,
+    worktreeBranchOnCreate,
+    setWorktreeBranchOnCreate,
 
     // Regenerate state
     projectDefinition,
@@ -48,6 +52,10 @@ export function SpecView() {
     setAnalyzeProjectOnRegenerate,
     featureCountOnRegenerate,
     setFeatureCountOnRegenerate,
+    useWorktreeBranchOnRegenerate,
+    setUseWorktreeBranchOnRegenerate,
+    worktreeBranchOnRegenerate,
+    setWorktreeBranchOnRegenerate,
 
     // Feature generation
     isGeneratingFeatures,
@@ -111,6 +119,10 @@ export function SpecView() {
           onAnalyzeProjectChange={setAnalyzeProjectOnCreate}
           featureCount={featureCountOnCreate}
           onFeatureCountChange={setFeatureCountOnCreate}
+          useWorktreeBranch={useWorktreeBranchOnCreate}
+          onUseWorktreeBranchChange={setUseWorktreeBranchOnCreate}
+          worktreeBranch={worktreeBranchOnCreate}
+          onWorktreeBranchChange={setWorktreeBranchOnCreate}
           onCreateSpec={handleCreateSpec}
           isCreatingSpec={isCreating}
         />
@@ -147,6 +159,10 @@ export function SpecView() {
         onAnalyzeProjectChange={setAnalyzeProjectOnRegenerate}
         featureCount={featureCountOnRegenerate}
         onFeatureCountChange={setFeatureCountOnRegenerate}
+        useWorktreeBranch={useWorktreeBranchOnRegenerate}
+        onUseWorktreeBranchChange={setUseWorktreeBranchOnRegenerate}
+        worktreeBranch={worktreeBranchOnRegenerate}
+        onWorktreeBranchChange={setWorktreeBranchOnRegenerate}
         onRegenerate={handleRegenerate}
         isRegenerating={isRegenerating}
         isGeneratingFeatures={isGeneratingFeatures}

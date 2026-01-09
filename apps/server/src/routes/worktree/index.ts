@@ -30,6 +30,7 @@ import { createMigrateHandler } from './routes/migrate.js';
 import { createStartDevHandler } from './routes/start-dev.js';
 import { createStopDevHandler } from './routes/stop-dev.js';
 import { createListDevServersHandler } from './routes/list-dev-servers.js';
+import { createGetCurrentBranchHandler } from './routes/get-current-branch.js';
 
 export function createWorktreeRoutes(): Router {
   const router = Router();
@@ -37,6 +38,11 @@ export function createWorktreeRoutes(): Router {
   router.post('/info', validatePathParams('projectPath'), createInfoHandler());
   router.post('/status', validatePathParams('projectPath'), createStatusHandler());
   router.post('/list', createListHandler());
+  router.post(
+    '/current-branch',
+    validatePathParams('projectPath'),
+    createGetCurrentBranchHandler()
+  );
   router.post('/diffs', validatePathParams('projectPath'), createDiffsHandler());
   router.post('/file-diff', validatePathParams('projectPath', 'filePath'), createFileDiffHandler());
   router.post(

@@ -14,10 +14,12 @@ const logger = createLogger('SpecRegeneration');
 export async function parseAndCreateFeatures(
   projectPath: string,
   content: string,
-  events: EventEmitter
+  events: EventEmitter,
+  targetBranch?: string
 ): Promise<void> {
   logger.info('========== parseAndCreateFeatures() started ==========');
   logger.info(`Content length: ${content.length} chars`);
+  logger.info('targetBranch:', targetBranch);
   logger.info('========== CONTENT RECEIVED FOR PARSING ==========');
   logger.info(content);
   logger.info('========== END CONTENT ==========');
@@ -53,6 +55,38 @@ export async function parseAndCreateFeatures(
     const featuresDir = getFeaturesDir(projectPath);
     await secureFs.mkdir(featuresDir, { recursive: true });
 
+    // Delete existing features for this branch before creating new ones
+    if (targetBranch) {
+      logger.info(`Deleting existing features for branch '${targetBranch}'...`);
+      try {
+        const existingFeatures = await secureFs.readdir(featuresDir);
+        let deletedCount = 0;
+
+        for (const featureId of existingFeatures) {
+          const featureJsonPath = path.join(featuresDir, featureId, 'feature.json');
+          try {
+            const featureContent = await secureFs.readFile(featureJsonPath, 'utf-8');
+            const featureData = JSON.parse(featureContent);
+
+            // Delete if it matches the target branch
+            if (featureData.branchName === targetBranch) {
+              logger.info(`Deleting feature ${featureId} from branch ${targetBranch}`);
+              await secureFs.rm(path.join(featuresDir, featureId), { recursive: true });
+              deletedCount++;
+            }
+          } catch (err) {
+            // Skip if feature.json doesn't exist or can't be read
+            logger.debug(`Skipping ${featureId}: ${err}`);
+          }
+        }
+
+        logger.info(`✓ Deleted ${deletedCount} existing features for branch '${targetBranch}'`);
+      } catch (err) {
+        logger.warn('Failed to delete existing features:', err);
+        // Continue anyway - not critical
+      }
+    }
+
     const createdFeatures: Array<{ id: string; title: string }> = [];
 
     for (const feature of parsed.features) {
@@ -69,6 +103,7 @@ export async function parseAndCreateFeatures(
         priority: feature.priority || 2,
         complexity: feature.complexity || 'moderate',
         dependencies: feature.dependencies || [],
+        branchName: targetBranch || 'main',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
@@ -83,10 +118,18 @@ export async function parseAndCreateFeatures(
 
     logger.info(`✓ Created ${createdFeatures.length} features successfully`);
 
+    // Calculate worktree path for the target branch
+    let worktreePath: string | undefined;
+    if (targetBranch && targetBranch !== 'main' && targetBranch !== 'master') {
+      worktreePath = path.join(projectPath, '.worktrees', targetBranch);
+    }
+
     events.emit('spec-regeneration:event', {
       type: 'spec_regeneration_complete',
       message: `Spec regeneration complete! Created ${createdFeatures.length} features.`,
       projectPath: projectPath,
+      targetBranch: targetBranch,
+      worktreePath: worktreePath,
     });
   } catch (error) {
     logger.error('❌ parseAndCreateFeatures() failed:');

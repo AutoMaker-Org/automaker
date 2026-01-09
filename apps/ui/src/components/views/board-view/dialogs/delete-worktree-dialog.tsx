@@ -27,7 +27,11 @@ interface DeleteWorktreeDialogProps {
   onOpenChange: (open: boolean) => void;
   projectPath: string;
   worktree: WorktreeInfo | null;
-  onDeleted: (deletedWorktree: WorktreeInfo, deletedBranch: boolean) => void;
+  onDeleted: (
+    deletedWorktree: WorktreeInfo,
+    deletedBranch: boolean,
+    deleteFeatures: boolean
+  ) => void;
   /** Number of features assigned to this worktree's branch */
   affectedFeatureCount?: number;
 }
@@ -41,6 +45,7 @@ export function DeleteWorktreeDialog({
   affectedFeatureCount = 0,
 }: DeleteWorktreeDialogProps) {
   const [deleteBranch, setDeleteBranch] = useState(false);
+  const [deleteFeatures, setDeleteFeatures] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
   const handleDelete = async () => {
@@ -61,9 +66,10 @@ export function DeleteWorktreeDialog({
             ? `Branch "${worktree.branch}" was also deleted`
             : `Branch "${worktree.branch}" was kept`,
         });
-        onDeleted(worktree, deleteBranch);
+        onDeleted(worktree, deleteBranch, deleteFeatures);
         onOpenChange(false);
         setDeleteBranch(false);
+        setDeleteFeatures(false);
       } else {
         toast.error('Failed to delete worktree', {
           description: result.error,
@@ -94,7 +100,7 @@ export function DeleteWorktreeDialog({
               <code className="font-mono bg-muted px-1 rounded">{worktree.branch}</code>?
             </span>
 
-            {affectedFeatureCount > 0 && (
+            {affectedFeatureCount > 0 && !deleteFeatures && (
               <div className="flex items-start gap-2 p-3 rounded-md bg-orange-500/10 border border-orange-500/20 mt-2">
                 <FileWarning className="w-4 h-4 text-orange-500 mt-0.5 flex-shrink-0" />
                 <span className="text-orange-500 text-sm">
@@ -118,16 +124,32 @@ export function DeleteWorktreeDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex items-center space-x-2 py-4">
-          <Checkbox
-            id="delete-branch"
-            checked={deleteBranch}
-            onCheckedChange={(checked) => setDeleteBranch(checked === true)}
-          />
-          <Label htmlFor="delete-branch" className="text-sm cursor-pointer">
-            Also delete the branch{' '}
-            <code className="font-mono bg-muted px-1 rounded">{worktree.branch}</code>
-          </Label>
+        <div className="space-y-3 py-4">
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id="delete-branch"
+              checked={deleteBranch}
+              onCheckedChange={(checked) => setDeleteBranch(checked === true)}
+            />
+            <Label htmlFor="delete-branch" className="text-sm cursor-pointer">
+              Also delete the branch{' '}
+              <code className="font-mono bg-muted px-1 rounded">{worktree.branch}</code>
+            </Label>
+          </div>
+
+          {affectedFeatureCount > 0 && (
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="delete-features"
+                checked={deleteFeatures}
+                onCheckedChange={(checked) => setDeleteFeatures(checked === true)}
+              />
+              <Label htmlFor="delete-features" className="text-sm cursor-pointer text-destructive">
+                Delete backlog of this worktree ({affectedFeatureCount} feature
+                {affectedFeatureCount !== 1 ? 's' : ''})
+              </Label>
+            </div>
+          )}
         </div>
 
         <DialogFooter>

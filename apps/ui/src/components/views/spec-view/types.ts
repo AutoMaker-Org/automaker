@@ -1,5 +1,5 @@
 // Feature count options for spec generation
-export type FeatureCount = 20 | 50 | 100;
+export type FeatureCount = number;
 
 // Generation phases for UI display
 export type GenerationPhase =
@@ -23,6 +23,10 @@ export interface CreateSpecDialogProps {
   onAnalyzeProjectChange: (value: boolean) => void;
   featureCount: FeatureCount;
   onFeatureCountChange: (value: FeatureCount) => void;
+  useWorktreeBranch: boolean;
+  onUseWorktreeBranchChange: (value: boolean) => void;
+  worktreeBranch: string;
+  onWorktreeBranchChange: (value: string) => void;
   onCreateSpec: () => void;
   onSkip?: () => void;
   isCreatingSpec: boolean;
@@ -43,6 +47,10 @@ export interface RegenerateSpecDialogProps {
   onAnalyzeProjectChange: (value: boolean) => void;
   featureCount: FeatureCount;
   onFeatureCountChange: (value: FeatureCount) => void;
+  useWorktreeBranch: boolean;
+  onUseWorktreeBranchChange: (value: boolean) => void;
+  worktreeBranch: string;
+  onWorktreeBranchChange: (value: string) => void;
   onRegenerate: () => void;
   onGenerateFeaturesOnly?: () => void;
   isRegenerating: boolean;
