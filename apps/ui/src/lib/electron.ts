@@ -649,7 +649,8 @@ export interface ElectronAPI {
     }>;
     storeApiKey: (
       provider: string,
-      apiKey: string
+      apiKey: string,
+      baseUrl?: string
     ) => Promise<{ success: boolean; error?: string }>;
     deleteApiKey: (
       provider: string
@@ -1219,7 +1220,11 @@ interface SetupAPI {
     message?: string;
     output?: string;
   }>;
-  storeApiKey: (provider: string, apiKey: string) => Promise<{ success: boolean; error?: string }>;
+  storeApiKey: (
+    provider: string,
+    apiKey: string,
+    baseUrl?: string
+  ) => Promise<{ success: boolean; error?: string }>;
   getApiKeys: () => Promise<{
     success: boolean;
     hasAnthropicKey: boolean;
@@ -1295,8 +1300,9 @@ function createMockSetupAPI(): SetupAPI {
       };
     },
 
-    storeApiKey: async (provider: string, apiKey: string) => {
+    storeApiKey: async (provider: string, apiKey: string, baseUrl?: string) => {
       console.log('[Mock] Storing API key for:', provider);
+      console.log('[Mock] Base URL:', baseUrl);
       // In mock mode, we just pretend to store it (it's already in the app store)
       return { success: true };
     },

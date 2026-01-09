@@ -506,6 +506,11 @@ export interface Credentials {
     /** OpenAI API key (for compatibility or alternative providers) */
     openai: string;
   };
+  /** Custom base URLs for API providers (optional) */
+  baseUrls?: {
+    /** Custom Anthropic API base URL (sets ANTHROPIC_BASE_URL) */
+    anthropic?: string;
+  };
 }
 
 /**
@@ -684,6 +689,9 @@ export const DEFAULT_CREDENTIALS: Credentials = {
     anthropic: '',
     google: '',
     openai: '',
+  },
+  baseUrls: {
+    anthropic: undefined,
   },
 };
 

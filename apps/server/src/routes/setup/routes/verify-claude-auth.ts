@@ -10,6 +10,33 @@ import { getApiKey } from '../common.js';
 
 const logger = createLogger('Setup');
 
+// Allowed environment variables to pass to the SDK
+// Must be passed explicitly - SDK doesn't inherit from process.env
+const ALLOWED_ENV_VARS = [
+  'ANTHROPIC_API_KEY',
+  'ANTHROPIC_BASE_URL',
+  'PATH',
+  'HOME',
+  'SHELL',
+  'TERM',
+  'USER',
+  'LANG',
+  'LC_ALL',
+];
+
+/**
+ * Build environment for the SDK with only explicitly allowed variables
+ */
+function buildEnv(): Record<string, string | undefined> {
+  const env: Record<string, string | undefined> = {};
+  for (const key of ALLOWED_ENV_VARS) {
+    if (process.env[key]) {
+      env[key] = process.env[key];
+    }
+  }
+  return env;
+}
+
 // Known error patterns that indicate auth failure
 const AUTH_ERROR_PATTERNS = [
   'OAuth token revoked',
@@ -91,13 +118,16 @@ export function createVerifyClaudeAuthHandler() {
 
       // Save original env values
       const originalAnthropicKey = process.env.ANTHROPIC_API_KEY;
+      const originalBaseUrl = process.env.ANTHROPIC_BASE_URL;
 
       try {
         // Configure environment based on auth method
         if (authMethod === 'cli') {
           // For CLI verification, remove any API key so it uses CLI credentials only
           delete process.env.ANTHROPIC_API_KEY;
-          logger.info('[Setup] Cleared API key environment for CLI verification');
+          // CLI auth only works with standard Anthropic API, not custom endpoints
+          delete process.env.ANTHROPIC_BASE_URL;
+          logger.info('[Setup] Cleared API key and base URL for CLI verification');
         } else if (authMethod === 'api_key') {
           // For API key verification, use provided key, stored key, or env var (in order of priority)
           if (apiKey) {
@@ -128,6 +158,7 @@ export function createVerifyClaudeAuthHandler() {
             maxTurns: 1,
             allowedTools: [],
             abortController,
+            env: buildEnv(),
           },
         });
 
@@ -284,6 +315,13 @@ export function createVerifyClaudeAuthHandler() {
         } else if (authMethod === 'cli') {
           // If we cleared it and there was no original, keep it cleared
           delete process.env.ANTHROPIC_API_KEY;
+        }
+        // Restore base URL
+        if (originalBaseUrl !== undefined) {
+          process.env.ANTHROPIC_BASE_URL = originalBaseUrl;
+        } else if (authMethod === 'cli') {
+          // If we cleared it and there was no original, keep it cleared
+          delete process.env.ANTHROPIC_BASE_URL;
         }
       }
 

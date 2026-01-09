@@ -55,6 +55,7 @@ export function ClaudeSetupStep({ onNext, onBack, onSkip }: ClaudeSetupStepProps
   const { setApiKeys, apiKeys } = useAppStore();
 
   const [apiKey, setApiKey] = useState('');
+  const [baseUrl, setBaseUrl] = useState('');
 
   // CLI Verification state
   const [cliVerificationStatus, setCliVerificationStatus] = useState<VerificationStatus>('idle');
@@ -111,7 +112,7 @@ export function ClaudeSetupStep({ onNext, onBack, onSkip }: ClaudeSetupStepProps
         apiKeyValid: true,
       });
       setApiKeys({ ...apiKeys, anthropic: apiKey });
-      toast.success('API key saved successfully!');
+      toast.success('Anthropic configuration saved successfully!');
     },
   });
 
@@ -220,6 +221,7 @@ export function ClaudeSetupStep({ onNext, onBack, onSkip }: ClaudeSetupStepProps
       if (result.success) {
         // Clear local state
         setApiKey('');
+        setBaseUrl('');
         setApiKeys({ ...apiKeys, anthropic: '' });
         setApiKeyVerificationStatus('idle');
         setApiKeyVerificationError(null);
@@ -228,12 +230,13 @@ export function ClaudeSetupStep({ onNext, onBack, onSkip }: ClaudeSetupStepProps
           method: 'none',
           hasCredentialsFile: claudeAuthStatus?.hasCredentialsFile || false,
         });
-        toast.success('API key deleted successfully');
+        toast.success('Anthropic configuration deleted successfully');
       } else {
-        toast.error(result.error || 'Failed to delete API key');
+        toast.error(result.error || 'Failed to delete configuration');
       }
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to delete API key';
+      const errorMessage =
+        error instanceof Error ? error.message : 'Failed to delete configuration';
       toast.error(errorMessage);
     } finally {
       setIsDeletingApiKey(false);
@@ -531,7 +534,7 @@ export function ClaudeSetupStep({ onNext, onBack, onSkip }: ClaudeSetupStepProps
                 </div>
               </AccordionTrigger>
               <AccordionContent className="pt-4 space-y-4">
-                {/* API Key Input */}
+                {/* API Key Configuration */}
                 <div className="space-y-4 p-4 rounded-lg bg-muted/30 border border-border">
                   <div className="space-y-2">
                     <Label htmlFor="anthropic-key" className="text-foreground">
@@ -560,9 +563,28 @@ export function ClaudeSetupStep({ onNext, onBack, onSkip }: ClaudeSetupStepProps
                     </p>
                   </div>
 
+                  <div className="space-y-2">
+                    <Label htmlFor="anthropic-base-url" className="text-foreground">
+                      API Base URL
+                    </Label>
+                    <Input
+                      id="anthropic-base-url"
+                      type="url"
+                      placeholder="https://api.anthropic.com (leave empty for default)"
+                      value={baseUrl}
+                      onChange={(e) => setBaseUrl(e.target.value)}
+                      className="bg-input border-border text-foreground"
+                      data-testid="anthropic-base-url-input"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Optional: Set a custom API base URL for enterprise deployments or custom
+                      endpoints
+                    </p>
+                  </div>
+
                   <div className="flex gap-2">
                     <Button
-                      onClick={() => saveApiKeyToken(apiKey)}
+                      onClick={() => saveApiKeyToken(apiKey, baseUrl)}
                       disabled={isSavingApiKey || !apiKey.trim()}
                       className="flex-1 bg-brand-500 hover:bg-brand-600 text-white"
                       data-testid="save-anthropic-key-button"
@@ -573,7 +595,7 @@ export function ClaudeSetupStep({ onNext, onBack, onSkip }: ClaudeSetupStepProps
                           Saving...
                         </>
                       ) : (
-                        'Save API Key'
+                        'Save Configuration'
                       )}
                     </Button>
                     {hasApiKey && (

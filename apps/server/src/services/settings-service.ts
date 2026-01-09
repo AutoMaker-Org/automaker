@@ -334,7 +334,7 @@ export class SettingsService {
   /**
    * Update credentials with partial changes
    *
-   * Updates individual API keys. Uses deep merge for apiKeys object.
+   * Updates individual API keys. Uses deep merge for apiKeys and baseUrls objects.
    * Creates dataDir if needed. Credentials are written atomically.
    * WARNING: Use only in secure contexts - keys are unencrypted.
    *
@@ -360,6 +360,14 @@ export class SettingsService {
       };
     }
 
+    // Deep merge base URLs if provided
+    if (updates.baseUrls) {
+      updated.baseUrls = {
+        ...current.baseUrls,
+        ...updates.baseUrls,
+      };
+    }
+
     await atomicWriteJson(credentialsPath, updated);
     logger.info('Credentials updated');
 
@@ -376,7 +384,7 @@ export class SettingsService {
    * @returns Promise resolving to masked credentials object with each provider's status
    */
   async getMaskedCredentials(): Promise<{
-    anthropic: { configured: boolean; masked: string };
+    anthropic: { configured: boolean; masked: string; baseUrl?: string };
   }> {
     const credentials = await this.getCredentials();
 
@@ -389,6 +397,7 @@ export class SettingsService {
       anthropic: {
         configured: !!credentials.apiKeys.anthropic,
         masked: maskKey(credentials.apiKeys.anthropic),
+        baseUrl: credentials.baseUrls?.anthropic,
       },
     };
   }

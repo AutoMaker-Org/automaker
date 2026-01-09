@@ -22,6 +22,7 @@ import type {
 // Only these vars are passed - nothing else from process.env leaks through.
 const ALLOWED_ENV_VARS = [
   'ANTHROPIC_API_KEY',
+  'ANTHROPIC_BASE_URL',
   'PATH',
   'HOME',
   'SHELL',

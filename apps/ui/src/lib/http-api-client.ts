@@ -1011,11 +1011,12 @@ export class HttpApiClient implements ElectronAPI {
 
     storeApiKey: (
       provider: string,
-      apiKey: string
+      apiKey: string,
+      baseUrl?: string
     ): Promise<{
       success: boolean;
       error?: string;
-    }> => this.post('/api/setup/store-api-key', { provider, apiKey }),
+    }> => this.post('/api/setup/store-api-key', { provider, apiKey, baseUrl }),
 
     deleteApiKey: (
       provider: string

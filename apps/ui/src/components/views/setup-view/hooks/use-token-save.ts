@@ -14,7 +14,7 @@ export function useTokenSave({ provider, onSuccess }: UseTokenSaveOptions) {
   const [isSaving, setIsSaving] = useState(false);
 
   const saveToken = useCallback(
-    async (tokenValue: string) => {
+    async (tokenValue: string, baseUrl?: string) => {
       if (!tokenValue.trim()) {
         toast.error('Please enter a valid token');
         return false;
@@ -26,11 +26,11 @@ export function useTokenSave({ provider, onSuccess }: UseTokenSaveOptions) {
         const setupApi = api.setup;
 
         if (setupApi?.storeApiKey) {
-          const result = await setupApi.storeApiKey(provider, tokenValue);
+          const result = await setupApi.storeApiKey(provider, tokenValue, baseUrl);
           logger.info(`Store result for ${provider}:`, result);
 
           if (result.success) {
-            const tokenType = provider.includes('oauth') ? 'subscription token' : 'API key';
+            const tokenType = provider.includes('oauth') ? 'subscription token' : 'configuration';
             toast.success(`${tokenType} saved successfully`);
             onSuccess?.();
             return true;
