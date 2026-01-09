@@ -27,7 +27,7 @@ export function createGetCurrentBranchHandler() {
 
       try {
         const { stdout } = await execAsync('git branch --show-current', { cwd: projectPath });
-        const branch = stdout.trim();
+        const branch = stdout.toString().trim();
 
         if (!branch) {
           // Might be in detached HEAD state, try to get branch from symbolic-ref
@@ -35,7 +35,7 @@ export function createGetCurrentBranchHandler() {
             const { stdout: refStdout } = await execAsync('git symbolic-ref --short HEAD', {
               cwd: projectPath,
             });
-            const refBranch = refStdout.trim();
+            const refBranch = refStdout.toString().trim();
             if (refBranch) {
               res.json({ success: true, branch: refBranch });
               return;

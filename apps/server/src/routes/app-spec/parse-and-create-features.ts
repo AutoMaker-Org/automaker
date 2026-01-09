@@ -66,7 +66,7 @@ export async function parseAndCreateFeatures(
           const featureJsonPath = path.join(featuresDir, featureId, 'feature.json');
           try {
             const featureContent = await secureFs.readFile(featureJsonPath, 'utf-8');
-            const featureData = JSON.parse(featureContent);
+            const featureData = JSON.parse(featureContent.toString());
 
             // Delete if it matches the target branch
             if (featureData.branchName === targetBranch) {
