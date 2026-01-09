@@ -229,6 +229,25 @@ function RootLayoutContent() {
     };
   }, [location.pathname, navigate]);
 
+  // Global listener for server offline/connection errors.
+  // This is triggered when a connection error is detected (e.g., server stopped).
+  // Redirects to login page which will detect server is offline and show error UI.
+  useEffect(() => {
+    const handleServerOffline = () => {
+      useAuthStore.getState().setAuthState({ isAuthenticated: false, authChecked: true });
+
+      // Navigate to login - the login page will detect server is offline and show appropriate UI
+      if (location.pathname !== '/login' && location.pathname !== '/logged-out') {
+        navigate({ to: '/login' });
+      }
+    };
+
+    window.addEventListener('automaker:server-offline', handleServerOffline);
+    return () => {
+      window.removeEventListener('automaker:server-offline', handleServerOffline);
+    };
+  }, [location.pathname, navigate]);
+
   // Initialize authentication
   // - Electron mode: Uses API key from IPC (header-based auth)
   // - Web mode: Uses HTTP-only session cookie

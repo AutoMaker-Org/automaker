@@ -74,6 +74,55 @@ const handleUnauthorized = (): void => {
 };
 
 /**
+ * Notify the UI that the server is offline/unreachable.
+ * Used to redirect the user to the login page which will show server unavailable.
+ */
+const notifyServerOffline = (): void => {
+  if (typeof window === 'undefined') return;
+  try {
+    window.dispatchEvent(new CustomEvent('automaker:server-offline'));
+  } catch {
+    // Ignore
+  }
+};
+
+/**
+ * Check if an error is a connection error (server offline/unreachable).
+ * These are typically TypeError with 'Failed to fetch' or similar network errors.
+ */
+export const isConnectionError = (error: unknown): boolean => {
+  if (error instanceof TypeError) {
+    const message = error.message.toLowerCase();
+    return (
+      message.includes('failed to fetch') ||
+      message.includes('network') ||
+      message.includes('econnrefused') ||
+      message.includes('connection refused')
+    );
+  }
+  // Check for error objects with message property
+  if (error && typeof error === 'object' && 'message' in error) {
+    const message = String((error as { message: unknown }).message).toLowerCase();
+    return (
+      message.includes('failed to fetch') ||
+      message.includes('network') ||
+      message.includes('econnrefused') ||
+      message.includes('connection refused')
+    );
+  }
+  return false;
+};
+
+/**
+ * Handle a server offline error by notifying the UI to redirect.
+ * Call this when a connection error is detected.
+ */
+export const handleServerOffline = (): void => {
+  logger.error('Server appears to be offline, redirecting to login...');
+  notifyServerOffline();
+};
+
+/**
  * Initialize server URL from Electron IPC.
  * Must be called early in Electron mode before making API requests.
  */

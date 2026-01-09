@@ -11,6 +11,7 @@ import {
 import type { ReasoningEffort } from '@automaker/types';
 import { FeatureImagePath as DescriptionImagePath } from '@/components/ui/description-image-dropzone';
 import { getElectronAPI } from '@/lib/electron';
+import { isConnectionError, handleServerOffline } from '@/lib/http-api-client';
 import { toast } from 'sonner';
 import { useAutoMode } from '@/hooks/use-auto-mode';
 import { truncateDescription } from '@/lib/utils';
@@ -337,35 +338,31 @@ export function useBoardActions({
 
   const handleRunFeature = useCallback(
     async (feature: Feature) => {
-      if (!currentProject) return;
+      if (!currentProject) {
+        throw new Error('No project selected');
+      }
 
-      try {
-        const api = getElectronAPI();
-        if (!api?.autoMode) {
-          logger.error('Auto mode API not available');
-          return;
-        }
+      const api = getElectronAPI();
+      if (!api?.autoMode) {
+        throw new Error('Auto mode API not available');
+      }
 
-        // Server derives workDir from feature.branchName at execution time
-        const result = await api.autoMode.runFeature(
-          currentProject.path,
-          feature.id,
-          useWorktrees
-          // No worktreePath - server derives from feature.branchName
-        );
+      // Server derives workDir from feature.branchName at execution time
+      const result = await api.autoMode.runFeature(
+        currentProject.path,
+        feature.id,
+        useWorktrees
+        // No worktreePath - server derives from feature.branchName
+      );
 
-        if (result.success) {
-          logger.info('Feature run started successfully, branch:', feature.branchName || 'default');
-        } else {
-          logger.error('Failed to run feature:', result.error);
-          await loadFeatures();
-        }
-      } catch (error) {
-        logger.error('Error running feature:', error);
-        await loadFeatures();
+      if (result.success) {
+        logger.info('Feature run started successfully, branch:', feature.branchName || 'default');
+      } else {
+        // Throw error so caller can handle rollback
+        throw new Error(result.error || 'Failed to start feature');
       }
     },
-    [currentProject, useWorktrees, loadFeatures]
+    [currentProject, useWorktrees]
   );
 
   const handleStartImplementation = useCallback(
@@ -401,11 +398,34 @@ export function useBoardActions({
         startedAt: new Date().toISOString(),
       };
       updateFeature(feature.id, updates);
-      // Must await to ensure feature status is persisted before starting agent
-      await persistFeatureUpdate(feature.id, updates);
-      logger.info('Feature moved to in_progress, starting agent...');
-      await handleRunFeature(feature);
-      return true;
+
+      try {
+        // Must await to ensure feature status is persisted before starting agent
+        await persistFeatureUpdate(feature.id, updates);
+        logger.info('Feature moved to in_progress, starting agent...');
+        await handleRunFeature(feature);
+        return true;
+      } catch (error) {
+        // Rollback to backlog if persist or run fails (e.g., server offline)
+        logger.error('Failed to start feature, rolling back to backlog:', error);
+        const rollbackUpdates = {
+          status: 'backlog' as const,
+          startedAt: undefined,
+        };
+        updateFeature(feature.id, rollbackUpdates);
+
+        // If server is offline (connection refused), redirect to login page
+        if (isConnectionError(error)) {
+          handleServerOffline();
+          return false;
+        }
+
+        toast.error('Failed to start feature', {
+          description:
+            error instanceof Error ? error.message : 'Server may be offline. Please try again.',
+        });
+        return false;
+      }
     },
     [
       autoMode,
@@ -531,6 +551,7 @@ export function useBoardActions({
 
     const featureId = followUpFeature.id;
     const featureDescription = followUpFeature.description;
+    const previousStatus = followUpFeature.status;
 
     const api = getElectronAPI();
     if (!api?.autoMode?.followUpFeature) {
@@ -547,35 +568,53 @@ export function useBoardActions({
       justFinishedAt: undefined,
     };
     updateFeature(featureId, updates);
-    persistFeatureUpdate(featureId, updates);
 
-    setShowFollowUpDialog(false);
-    setFollowUpFeature(null);
-    setFollowUpPrompt('');
-    setFollowUpImagePaths([]);
-    setFollowUpPreviewMap(new Map());
+    try {
+      await persistFeatureUpdate(featureId, updates);
 
-    toast.success('Follow-up started', {
-      description: `Continuing work on: ${truncateDescription(featureDescription)}`,
-    });
+      setShowFollowUpDialog(false);
+      setFollowUpFeature(null);
+      setFollowUpPrompt('');
+      setFollowUpImagePaths([]);
+      setFollowUpPreviewMap(new Map());
 
-    const imagePaths = followUpImagePaths.map((img) => img.path);
-    // Server derives workDir from feature.branchName at execution time
-    api.autoMode
-      .followUpFeature(
+      toast.success('Follow-up started', {
+        description: `Continuing work on: ${truncateDescription(featureDescription)}`,
+      });
+
+      const imagePaths = followUpImagePaths.map((img) => img.path);
+      // Server derives workDir from feature.branchName at execution time
+      const result = await api.autoMode.followUpFeature(
         currentProject.path,
         followUpFeature.id,
         followUpPrompt,
         imagePaths
         // No worktreePath - server derives from feature.branchName
-      )
-      .catch((error) => {
-        logger.error('Error sending follow-up:', error);
-        toast.error('Failed to send follow-up', {
-          description: error instanceof Error ? error.message : 'An error occurred',
-        });
-        loadFeatures();
+      );
+
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to send follow-up');
+      }
+    } catch (error) {
+      // Rollback to previous status if follow-up fails
+      logger.error('Error sending follow-up, rolling back:', error);
+      const rollbackUpdates = {
+        status: previousStatus as 'backlog' | 'in_progress' | 'waiting_approval' | 'verified',
+        startedAt: undefined,
+      };
+      updateFeature(featureId, rollbackUpdates);
+
+      // If server is offline (connection refused), redirect to login page
+      if (isConnectionError(error)) {
+        handleServerOffline();
+        return;
+      }
+
+      toast.error('Failed to send follow-up', {
+        description:
+          error instanceof Error ? error.message : 'Server may be offline. Please try again.',
       });
+    }
   }, [
     currentProject,
     followUpFeature,
@@ -588,7 +627,6 @@ export function useBoardActions({
     setFollowUpPrompt,
     setFollowUpImagePaths,
     setFollowUpPreviewMap,
-    loadFeatures,
   ]);
 
   const handleCommitFeature = useCallback(
