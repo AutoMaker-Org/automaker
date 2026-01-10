@@ -1440,21 +1440,24 @@ export function BoardView() {
             (f) => f.branchName === deletedWorktree.branch
           );
 
-          if (deleteFeatures) {
-            // Remove all features from state first to prevent update race conditions
-            featuresToHandle.forEach((feature) => removeFeature(feature.id));
+          // Compute mainBranch once before processing
+          const mainBranch = worktrees.find((w) => w.isMain)?.branch || 'main';
 
+          if (deleteFeatures) {
             // Delete all features from disk in parallel
+            // handleDeleteFeature already calls removeFeature, so no need to call it separately
             await Promise.all(featuresToHandle.map((feature) => handleDeleteFeature(feature.id)));
           } else {
             // Reassign all features to main branch
-            const mainBranch = worktrees.find((w) => w.isMain)?.branch || 'main';
             const updates = { branchName: mainBranch };
 
-            featuresToHandle.forEach((feature) => {
-              updateFeature(feature.id, updates);
-              persistFeatureUpdate(feature.id, updates);
-            });
+            // Use Promise.all to await all updates in parallel
+            await Promise.all(
+              featuresToHandle.map((feature) => {
+                updateFeature(feature.id, updates);
+                return persistFeatureUpdate(feature.id, updates);
+              })
+            );
           }
 
           // Refresh worktree list after all operations complete

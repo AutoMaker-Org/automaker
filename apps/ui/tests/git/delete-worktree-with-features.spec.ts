@@ -69,7 +69,7 @@ async function createWorktree(page: any, branchName: string) {
   const branchInput = page.locator('[role="dialog"] input');
   await branchInput.waitFor({ state: 'visible', timeout: 5000 });
   await branchInput.click();
-  await page.keyboard.press('Control+a');
+  await page.keyboard.press('ControlOrMeta+a');
   await branchInput.fill(branchName);
   await page.keyboard.press('Enter');
 

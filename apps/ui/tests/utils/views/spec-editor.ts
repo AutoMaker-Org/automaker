@@ -81,9 +81,8 @@ export async function setEditorContent(page: Page, content: string): Promise<voi
   // Wait for focus
   await page.waitForTimeout(200);
 
-  // Select all content (Cmd+A on Mac, Ctrl+A on others)
-  const isMac = process.platform === 'darwin';
-  await page.keyboard.press(isMac ? 'Meta+a' : 'Control+a');
+  // Select all content
+  await page.keyboard.press('ControlOrMeta+a');
 
   // Wait for selection
   await page.waitForTimeout(100);

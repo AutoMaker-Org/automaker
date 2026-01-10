@@ -205,7 +205,7 @@ export function RegenerateSpecDialog({
                   onChange={(e) => {
                     setCustomFeatureCount(e.target.value);
                     const num = parseInt(e.target.value, 10);
-                    if (!isNaN(num) && num > 0) {
+                    if (!isNaN(num) && num >= 1 && num <= 200) {
                       onFeatureCountChange(num);
                     }
                   }}
