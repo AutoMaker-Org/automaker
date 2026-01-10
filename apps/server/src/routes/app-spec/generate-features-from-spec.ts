@@ -28,12 +28,14 @@ export async function generateFeaturesFromSpec(
   events: EventEmitter,
   abortController: AbortController,
   maxFeatures?: number,
-  settingsService?: SettingsService
+  settingsService?: SettingsService,
+  targetBranch?: string
 ): Promise<void> {
   const featureCount = maxFeatures ?? DEFAULT_MAX_FEATURES;
   logger.debug('========== generateFeaturesFromSpec() started ==========');
   logger.debug('projectPath:', projectPath);
   logger.debug('maxFeatures:', featureCount);
+  logger.debug('targetBranch:', targetBranch);
 
   // Read existing spec from .automaker directory
   const specPath = getAppSpecPath(projectPath);
@@ -235,7 +237,7 @@ CRITICAL INSTRUCTIONS:
   logger.info(responseText);
   logger.info('========== END RESPONSE TEXT ==========');
 
-  await parseAndCreateFeatures(projectPath, responseText, events);
+  await parseAndCreateFeatures(projectPath, responseText, events, targetBranch);
 
   logger.debug('========== generateFeaturesFromSpec() completed ==========');
 }

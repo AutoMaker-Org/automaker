@@ -318,6 +318,8 @@ export type SpecRegenerationEvent =
       type: 'spec_regeneration_complete';
       message: string;
       projectPath: string;
+      targetBranch?: string;
+      worktreePath?: string;
     }
   | {
       type: 'spec_regeneration_error';
@@ -331,7 +333,8 @@ export interface SpecRegenerationAPI {
     projectOverview: string,
     generateFeatures?: boolean,
     analyzeProject?: boolean,
-    maxFeatures?: number
+    maxFeatures?: number,
+    targetBranch?: string
   ) => Promise<{
     success: boolean;
     error?: string;
@@ -342,7 +345,8 @@ export interface SpecRegenerationAPI {
     projectDefinition: string,
     generateFeatures?: boolean,
     analyzeProject?: boolean,
-    maxFeatures?: number
+    maxFeatures?: number,
+    targetBranch?: string
   ) => Promise<{
     success: boolean;
     error?: string;
@@ -648,6 +652,13 @@ export interface FileDiffResult {
 }
 
 export interface WorktreeAPI {
+  // Get the current branch of a project
+  getCurrentBranch: (projectPath: string) => Promise<{
+    success: boolean;
+    branch?: string;
+    error?: string;
+  }>;
+
   // Merge feature worktree changes back to main branch
   mergeFeature: (
     projectPath: string,

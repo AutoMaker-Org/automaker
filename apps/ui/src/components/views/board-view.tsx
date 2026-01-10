@@ -84,6 +84,7 @@ export function BoardView() {
     pendingPlanApproval,
     setPendingPlanApproval,
     updateFeature,
+    removeFeature,
     getCurrentWorktree,
     setCurrentWorktree,
     getWorktrees,
@@ -1498,20 +1499,33 @@ export function BoardView() {
             ? hookFeatures.filter((f) => f.branchName === selectedWorktreeForAction.branch).length
             : 0
         }
-        onDeleted={(deletedWorktree, _deletedBranch) => {
-          // Reset features that were assigned to the deleted worktree (by branch)
-          hookFeatures.forEach((feature) => {
-            // Match by branch name since worktreePath is no longer stored
-            if (feature.branchName === deletedWorktree.branch) {
-              // Reset the feature's branch assignment - update both local state and persist
-              const updates = {
-                branchName: null as unknown as string | undefined,
-              };
-              updateFeature(feature.id, updates);
-              persistFeatureUpdate(feature.id, updates);
-            }
-          });
+        onDeleted={async (deletedWorktree, _deletedBranch, deleteFeatures) => {
+          // Handle features assigned to the deleted worktree (by branch)
+          const featuresToHandle = hookFeatures.filter(
+            (f) => f.branchName === deletedWorktree.branch
+          );
 
+          // Compute mainBranch once before processing
+          const mainBranch = worktrees.find((w) => w.isMain)?.branch || 'main';
+
+          if (deleteFeatures) {
+            // Delete all features from disk in parallel
+            // handleDeleteFeature already calls removeFeature, so no need to call it separately
+            await Promise.all(featuresToHandle.map((feature) => handleDeleteFeature(feature.id)));
+          } else {
+            // Reassign all features to main branch
+            const updates = { branchName: mainBranch };
+
+            // Use Promise.all to await all updates in parallel
+            await Promise.all(
+              featuresToHandle.map((feature) => {
+                updateFeature(feature.id, updates);
+                return persistFeatureUpdate(feature.id, updates);
+              })
+            );
+          }
+
+          // Refresh worktree list after all operations complete
           setWorktreeRefreshKey((k) => k + 1);
           setSelectedWorktreeForAction(null);
         }}

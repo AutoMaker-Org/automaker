@@ -222,6 +222,19 @@ export function useBoardFeatures({ currentProject }: UseBoardFeaturesProps) {
 
         loadFeatures();
 
+        // Check if this is a user cancellation (not a real error)
+        const isCancellation =
+          event.error &&
+          (event.error.includes('cancelled') ||
+            event.error.includes('canceled') ||
+            event.error.includes('aborted'));
+
+        // Don't show error toast for user-initiated cancellations
+        if (isCancellation) {
+          logger.info('Operation was cancelled by user');
+          return;
+        }
+
         // Check for authentication errors and show a more helpful message
         const isAuthError =
           event.errorType === 'authentication' ||

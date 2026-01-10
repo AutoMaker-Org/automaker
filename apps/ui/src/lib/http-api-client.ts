@@ -1556,6 +1556,8 @@ export class HttpApiClient implements ElectronAPI {
 
   // Worktree API
   worktree: WorktreeAPI = {
+    getCurrentBranch: (projectPath: string) =>
+      this.post('/api/worktree/current-branch', { projectPath }),
     mergeFeature: (projectPath: string, featureId: string, options?: object) =>
       this.post('/api/worktree/merge', { projectPath, featureId, options }),
     getInfo: (projectPath: string, featureId: string) =>
@@ -1640,7 +1642,8 @@ export class HttpApiClient implements ElectronAPI {
       projectOverview: string,
       generateFeatures?: boolean,
       analyzeProject?: boolean,
-      maxFeatures?: number
+      maxFeatures?: number,
+      targetBranch?: string
     ) =>
       this.post('/api/spec-regeneration/create', {
         projectPath,
@@ -1648,13 +1651,15 @@ export class HttpApiClient implements ElectronAPI {
         generateFeatures,
         analyzeProject,
         maxFeatures,
+        targetBranch,
       }),
     generate: (
       projectPath: string,
       projectDefinition: string,
       generateFeatures?: boolean,
       analyzeProject?: boolean,
-      maxFeatures?: number
+      maxFeatures?: number,
+      targetBranch?: string
     ) =>
       this.post('/api/spec-regeneration/generate', {
         projectPath,
@@ -1662,6 +1667,7 @@ export class HttpApiClient implements ElectronAPI {
         generateFeatures,
         analyzeProject,
         maxFeatures,
+        targetBranch,
       }),
     generateFeatures: (projectPath: string, maxFeatures?: number) =>
       this.post('/api/spec-regeneration/generate-features', {

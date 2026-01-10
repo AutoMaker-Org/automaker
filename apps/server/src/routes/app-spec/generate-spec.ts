@@ -26,6 +26,7 @@ import { generateFeaturesFromSpec } from './generate-features-from-spec.js';
 import { ensureAutomakerDir, getAppSpecPath } from '@automaker/platform';
 import type { SettingsService } from '../../services/settings-service.js';
 import { getAutoLoadClaudeMdSetting } from '../../lib/settings-helpers.js';
+import { validateBranchName } from '@automaker/git-utils';
 
 const logger = createLogger('SpecRegeneration');
 
@@ -37,7 +38,8 @@ export async function generateSpec(
   generateFeatures?: boolean,
   analyzeProject?: boolean,
   maxFeatures?: number,
-  settingsService?: SettingsService
+  settingsService?: SettingsService,
+  targetBranch?: string
 ): Promise<void> {
   logger.info('========== generateSpec() started ==========');
   logger.info('projectPath:', projectPath);
@@ -46,6 +48,7 @@ export async function generateSpec(
   logger.info('generateFeatures:', generateFeatures);
   logger.info('analyzeProject:', analyzeProject);
   logger.info('maxFeatures:', maxFeatures);
+  logger.info('targetBranch:', targetBranch);
 
   // Build the prompt based on whether we should analyze the project
   let analysisInstructions = '';
@@ -362,6 +365,81 @@ Your entire response should be valid JSON starting with { and ending with }. No 
     });
   }
 
+  // Create worktree for target branch if specified and doesn't exist
+  if (targetBranch && targetBranch !== 'main' && targetBranch !== 'master') {
+    try {
+      // Validate branch name to prevent command injection
+      validateBranchName(targetBranch);
+
+      logger.info(`Checking if worktree for branch '${targetBranch}' exists...`);
+      const { execFile } = await import('child_process');
+      const { promisify } = await import('util');
+      const fs = await import('fs');
+      const execFileAsync = promisify(execFile);
+
+      // Check if worktree already exists
+      const worktreePath = path.join(projectPath, '.worktrees', targetBranch);
+      const worktreeExists = fs.existsSync(worktreePath);
+
+      if (worktreeExists) {
+        logger.info(`Worktree for branch '${targetBranch}' already exists at ${worktreePath}`);
+      } else {
+        // Check if branch exists
+        let branchExists = false;
+        try {
+          await execFileAsync('git', ['rev-parse', '--verify', targetBranch], { cwd: projectPath });
+          branchExists = true;
+          logger.info(`Branch '${targetBranch}' already exists`);
+        } catch {
+          logger.info(`Branch '${targetBranch}' does not exist, will create with worktree`);
+        }
+
+        // Create .worktrees directory if it doesn't exist
+        const worktreesDir = path.join(projectPath, '.worktrees');
+        if (!fs.existsSync(worktreesDir)) {
+          fs.mkdirSync(worktreesDir, { recursive: true });
+        }
+
+        // Create worktree
+        logger.info(`Creating worktree for branch '${targetBranch}' at ${worktreePath}`);
+        if (branchExists) {
+          // Use existing branch
+          await execFileAsync('git', ['worktree', 'add', worktreePath, targetBranch], {
+            cwd: projectPath,
+          });
+        } else {
+          // Create new branch from HEAD
+          await execFileAsync(
+            'git',
+            ['worktree', 'add', '-b', targetBranch, worktreePath, 'HEAD'],
+            {
+              cwd: projectPath,
+            }
+          );
+        }
+        logger.info(`✓ Created worktree for branch '${targetBranch}'`);
+
+        // Track the branch so it persists in the UI
+        try {
+          await execFileAsync('git', ['config', `branch.${targetBranch}.remote`, 'origin'], {
+            cwd: projectPath,
+          });
+          await execFileAsync(
+            'git',
+            ['config', `branch.${targetBranch}.merge`, `refs/heads/${targetBranch}`],
+            { cwd: projectPath }
+          );
+          logger.info(`✓ Configured tracking for branch '${targetBranch}'`);
+        } catch (trackError) {
+          logger.warn(`Failed to configure tracking for branch '${targetBranch}':`, trackError);
+        }
+      }
+    } catch (worktreeError) {
+      logger.warn(`Failed to create worktree for branch '${targetBranch}':`, worktreeError);
+      // Don't throw - this is not critical, continue with feature generation
+    }
+  }
+
   // If generate features was requested, generate them from the spec
   if (generateFeatures) {
     logger.info('Starting feature generation from spec...');
@@ -373,7 +451,8 @@ Your entire response should be valid JSON starting with { and ending with }. No 
         events,
         featureAbortController,
         maxFeatures,
-        settingsService
+        settingsService,
+        targetBranch
       );
       // Final completion will be emitted by generateFeaturesFromSpec -> parseAndCreateFeatures
     } catch (featureError) {

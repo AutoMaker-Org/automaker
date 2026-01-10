@@ -17,3 +17,6 @@ export {
   generateDiffsForNonGitDirectory,
   getGitRepositoryDiffs,
 } from './diff.js';
+
+// Export branch validation utilities
+export { isSafeBranchName, validateBranchName } from './branch-validation.js';
