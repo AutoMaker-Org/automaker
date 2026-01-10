@@ -22,9 +22,6 @@ import { useAutoMode } from '@/hooks/use-auto-mode';
 import { useKeyboardShortcutsConfig } from '@/hooks/use-keyboard-shortcuts';
 import { useWindowState } from '@/hooks/use-window-state';
 // Board-view specific imports
-import { BoardHeader } from './board-view/board-header';
-import { BoardSearchBar } from './board-view/board-search-bar';
-import { BoardControls } from './board-view/board-controls';
 import { KanbanBoard } from './board-view/kanban-board';
 import { GraphView } from './graph-view';
 import {
@@ -172,8 +169,9 @@ export function BoardView() {
   } = useSelectionMode();
   const [showMassEditDialog, setShowMassEditDialog] = useState(false);
 
-  // Search filter for Kanban cards
-  const [searchQuery, setSearchQuery] = useState('');
+  // Search filter for Kanban cards - using store state for top bar integration
+  const searchQuery = useAppStore((state) => state.boardSearchQuery);
+  const setSearchQuery = useAppStore((state) => state.setBoardSearchQuery);
   // Plan approval loading state
   const [isPlanApprovalLoading, setIsPlanApprovalLoading] = useState(false);
   // Derive spec creation state from store - check if current project is the one being created
@@ -245,6 +243,26 @@ export function BoardView() {
   // Prevent hydration issues
   useEffect(() => {
     setIsMounted(true);
+  }, []);
+
+  // Listen for custom events from top bar to open dialogs
+  useEffect(() => {
+    const handleOpenAddFeature = () => setShowAddDialog(true);
+    const handleOpenPlanDialog = () => setShowPlanDialog(true);
+    const handleOpenBoardBackground = () => setShowBoardBackgroundModal(true);
+    const handleOpenCompletedFeatures = () => setShowCompletedModal(true);
+
+    window.addEventListener('automaker:open-add-feature-dialog', handleOpenAddFeature);
+    window.addEventListener('automaker:open-plan-dialog', handleOpenPlanDialog);
+    window.addEventListener('automaker:open-board-background', handleOpenBoardBackground);
+    window.addEventListener('automaker:open-completed-features', handleOpenCompletedFeatures);
+
+    return () => {
+      window.removeEventListener('automaker:open-add-feature-dialog', handleOpenAddFeature);
+      window.removeEventListener('automaker:open-plan-dialog', handleOpenPlanDialog);
+      window.removeEventListener('automaker:open-board-background', handleOpenBoardBackground);
+      window.removeEventListener('automaker:open-completed-features', handleOpenCompletedFeatures);
+    };
   }, []);
 
   const sensors = useSensors(
@@ -1138,30 +1156,6 @@ export function BoardView() {
       className="flex-1 flex flex-col overflow-hidden content-bg relative"
       data-testid="board-view"
     >
-      {/* Header */}
-      <BoardHeader
-        projectName={currentProject.name}
-        maxConcurrency={maxConcurrency}
-        runningAgentsCount={runningAutoTasks.length}
-        onConcurrencyChange={setMaxConcurrency}
-        isAutoModeRunning={autoMode.isRunning}
-        onAutoModeToggle={(enabled) => {
-          if (enabled) {
-            autoMode.start();
-          } else {
-            autoMode.stop();
-          }
-        }}
-        onAddFeature={() => setShowAddDialog(true)}
-        onOpenPlanDialog={() => setShowPlanDialog(true)}
-        addFeatureShortcut={{
-          key: shortcuts.addFeature,
-          action: () => setShowAddDialog(true),
-          description: 'Add new feature',
-        }}
-        isMounted={isMounted}
-      />
-
       {/* Worktree Panel */}
       <WorktreePanel
         refreshTrigger={worktreeRefreshKey}
@@ -1196,28 +1190,6 @@ export function BoardView() {
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Search Bar Row */}
-        <div className="px-4 pt-4 pb-2 flex items-center justify-between">
-          <BoardSearchBar
-            searchQuery={searchQuery}
-            onSearchChange={setSearchQuery}
-            isCreatingSpec={isCreatingSpec}
-            creatingSpecProjectPath={creatingSpecProjectPath ?? undefined}
-            currentProjectPath={currentProject?.path}
-          />
-
-          {/* Board Background & Detail Level Controls */}
-          <BoardControls
-            isMounted={isMounted}
-            onShowBoardBackground={() => setShowBoardBackgroundModal(true)}
-            onShowCompletedModal={() => setShowCompletedModal(true)}
-            completedCount={completedFeatures.length}
-            kanbanCardDetailLevel={kanbanCardDetailLevel}
-            onDetailLevelChange={setKanbanCardDetailLevel}
-            boardViewMode={boardViewMode}
-            onBoardViewModeChange={setBoardViewMode}
-          />
-        </div>
         {/* View Content - Kanban or Graph */}
         {boardViewMode === 'kanban' ? (
           <KanbanBoard
@@ -1257,6 +1229,7 @@ export function BoardView() {
             selectedFeatureIds={selectedFeatureIds}
             onToggleFeatureSelection={toggleFeatureSelection}
             onToggleSelectionMode={toggleSelectionMode}
+            onAddFeature={() => setShowAddDialog(true)}
           />
         ) : (
           <GraphView

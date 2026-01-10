@@ -1,7 +1,9 @@
 import { createRootRoute, Outlet, useLocation, useNavigate } from '@tanstack/react-router';
 import { useEffect, useState, useCallback, useDeferredValue, useRef } from 'react';
 import { createLogger } from '@automaker/utils/logger';
-import { Sidebar } from '@/components/layout/sidebar';
+import { TopBar } from '@/components/layout/top-bar';
+import { BottomDock, useDockState } from '@/components/layout/bottom-dock';
+import { CommandPalette } from '@/components/command-palette';
 import {
   FileBrowserProvider,
   useFileBrowser,
@@ -73,9 +75,11 @@ function RootLayoutContent() {
   const navigate = useNavigate();
   const [isMounted, setIsMounted] = useState(false);
   const [streamerPanelOpen, setStreamerPanelOpen] = useState(false);
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const authChecked = useAuthStore((s) => s.authChecked);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const { openFileBrowser } = useFileBrowser();
+  const { position: dockPosition } = useDockState();
 
   // Load project settings when switching projects
   useProjectSettingsLoader();
@@ -83,6 +87,7 @@ function RootLayoutContent() {
   const isSetupRoute = location.pathname === '/setup';
   const isLoginRoute = location.pathname === '/login';
   const isLoggedOutRoute = location.pathname === '/logged-out';
+  const isDashboardRoute = location.pathname === '/dashboard';
 
   // Sandbox environment check state
   type SandboxStatus = 'pending' | 'containerized' | 'needs-confirmation' | 'denied' | 'confirmed';
@@ -127,6 +132,21 @@ function RootLayoutContent() {
       window.removeEventListener('keydown', handleStreamerPanelShortcut);
     };
   }, [handleStreamerPanelShortcut]);
+
+  // Command palette keyboard shortcut (Cmd/Ctrl + K)
+  useEffect(() => {
+    const handleCommandPalette = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key === 'k') {
+        event.preventDefault();
+        setCommandPaletteOpen((prev) => !prev);
+      }
+    };
+
+    window.addEventListener('keydown', handleCommandPalette);
+    return () => {
+      window.removeEventListener('keydown', handleCommandPalette);
+    };
+  }, []);
 
   const effectiveTheme = getEffectiveTheme();
   // Defer the theme value to keep UI responsive during rapid hover changes
@@ -424,10 +444,14 @@ function RootLayoutContent() {
     testConnection();
   }, [setIpcConnected]);
 
-  // Restore to board view if a project was previously open
+  // Navigate to appropriate view based on project state
   useEffect(() => {
-    if (isMounted && currentProject && location.pathname === '/') {
-      navigate({ to: '/board' });
+    if (isMounted && location.pathname === '/') {
+      if (currentProject) {
+        navigate({ to: '/board' });
+      } else {
+        navigate({ to: '/dashboard' });
+      }
     }
   }, [isMounted, currentProject, location.pathname, navigate]);
 
@@ -501,7 +525,7 @@ function RootLayoutContent() {
 
   return (
     <>
-      <main className="flex h-screen overflow-hidden" data-testid="app-container">
+      <main className="flex flex-col h-screen overflow-hidden" data-testid="app-container">
         {/* Full-width titlebar drag region for Electron window dragging */}
         {isElectron() && (
           <div
@@ -509,13 +533,21 @@ function RootLayoutContent() {
             aria-hidden="true"
           />
         )}
-        <Sidebar />
+        {!isDashboardRoute && <TopBar />}
         <div
-          className="flex-1 flex flex-col overflow-hidden transition-all duration-300"
-          style={{ marginRight: streamerPanelOpen ? '250px' : '0' }}
+          className="flex-1 flex overflow-hidden transition-all duration-300"
+          style={{
+            marginRight: streamerPanelOpen ? '250px' : '0',
+            marginLeft:
+              !isDashboardRoute && currentProject && dockPosition === 'left' ? '40px' : '0',
+          }}
         >
-          <Outlet />
+          <div className="flex-1 flex flex-col overflow-hidden">
+            <Outlet />
+          </div>
         </div>
+        {/* Single BottomDock instance - handles its own positioning */}
+        {!isDashboardRoute && currentProject && <BottomDock />}
 
         {/* Hidden streamer panel - opens with "\" key, pushes content */}
         <div
@@ -530,6 +562,7 @@ function RootLayoutContent() {
         onConfirm={handleSandboxConfirm}
         onDeny={handleSandboxDeny}
       />
+      <CommandPalette open={commandPaletteOpen} onOpenChange={setCommandPaletteOpen} />
     </>
   );
 }

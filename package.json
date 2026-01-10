@@ -61,7 +61,9 @@
     ]
   },
   "dependencies": {
+    "@radix-ui/react-context-menu": "^2.2.16",
     "cross-spawn": "7.0.6",
+    "date-fns": "^4.1.0",
     "rehype-sanitize": "6.0.0",
     "tree-kill": "1.2.2"
   },

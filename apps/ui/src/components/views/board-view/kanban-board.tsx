@@ -4,7 +4,7 @@ import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { Button } from '@/components/ui/button';
 import { KanbanColumn, KanbanCard } from './components';
 import { Feature } from '@/store/app-store';
-import { Archive, Settings2, CheckSquare, GripVertical } from 'lucide-react';
+import { Archive, Settings2, CheckSquare, GripVertical, Plus } from 'lucide-react';
 import { useResponsiveKanban } from '@/hooks/use-responsive-kanban';
 import { getColumnsWithPipeline, type ColumnId } from './constants';
 import type { PipelineConfig } from '@automaker/types';
@@ -50,6 +50,8 @@ interface KanbanBoardProps {
   selectedFeatureIds?: Set<string>;
   onToggleFeatureSelection?: (featureId: string) => void;
   onToggleSelectionMode?: () => void;
+  // Add feature action
+  onAddFeature?: () => void;
 }
 
 export function KanbanBoard({
@@ -84,6 +86,7 @@ export function KanbanBoard({
   selectedFeatureIds = new Set(),
   onToggleFeatureSelection,
   onToggleSelectionMode,
+  onAddFeature,
 }: KanbanBoardProps) {
   // Generate columns including pipeline steps
   const columns = useMemo(() => getColumnsWithPipeline(pipelineConfig), [pipelineConfig]);
@@ -100,7 +103,7 @@ export function KanbanBoard({
         onDragStart={onDragStart}
         onDragEnd={onDragEnd}
       >
-        <div className="h-full py-1" style={containerStyle}>
+        <div className="h-full pt-4 pb-1" style={containerStyle}>
           {columns.map((column) => {
             const columnFeatures = getColumnFeatures(column.id as ColumnId);
             return (
@@ -127,26 +130,36 @@ export function KanbanBoard({
                       Complete All
                     </Button>
                   ) : column.id === 'backlog' ? (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className={`h-6 px-2 text-xs ${isSelectionMode ? 'text-primary bg-primary/10' : 'text-muted-foreground hover:text-foreground'}`}
-                      onClick={onToggleSelectionMode}
-                      title={isSelectionMode ? 'Switch to Drag Mode' : 'Select Multiple'}
-                      data-testid="selection-mode-button"
-                    >
-                      {isSelectionMode ? (
-                        <>
-                          <GripVertical className="w-3.5 h-3.5 mr-1" />
-                          Drag
-                        </>
-                      ) : (
-                        <>
-                          <CheckSquare className="w-3.5 h-3.5 mr-1" />
-                          Select
-                        </>
-                      )}
-                    </Button>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        size="sm"
+                        className="h-6 px-2 text-xs gap-1"
+                        onClick={onAddFeature}
+                        data-testid="backlog-add-feature-button"
+                      >
+                        <Plus className="w-3 h-3" />
+                        Add
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className={`h-6 px-2 text-xs gap-1 ${isSelectionMode ? 'text-primary bg-primary/10' : 'text-muted-foreground hover:text-foreground'}`}
+                        onClick={onToggleSelectionMode}
+                        data-testid="selection-mode-button"
+                      >
+                        {isSelectionMode ? (
+                          <>
+                            <GripVertical className="w-3 h-3" />
+                            Drag
+                          </>
+                        ) : (
+                          <>
+                            <CheckSquare className="w-3 h-3" />
+                            Select
+                          </>
+                        )}
+                      </Button>
+                    </div>
                   ) : column.id === 'in_progress' ? (
                     <Button
                       variant="ghost"

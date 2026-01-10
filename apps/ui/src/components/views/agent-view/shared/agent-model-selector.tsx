@@ -16,10 +16,24 @@ interface AgentModelSelectorProps {
   onChange: (entry: PhaseModelEntry) => void;
   /** Disabled state */
   disabled?: boolean;
+  /** Custom trigger class name */
+  triggerClassName?: string;
 }
 
-export function AgentModelSelector({ value, onChange, disabled }: AgentModelSelectorProps) {
+export function AgentModelSelector({
+  value,
+  onChange,
+  disabled,
+  triggerClassName,
+}: AgentModelSelectorProps) {
   return (
-    <PhaseModelSelector value={value} onChange={onChange} disabled={disabled} compact align="end" />
+    <PhaseModelSelector
+      value={value}
+      onChange={onChange}
+      disabled={disabled}
+      compact
+      align="end"
+      triggerClassName={triggerClassName}
+    />
   );
 }

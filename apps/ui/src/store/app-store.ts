@@ -467,6 +467,21 @@ export interface PersistedTerminalSettings {
   maxSessions: number;
 }
 
+// GitHub cache types - matching the electron API types
+export interface GitHubCacheIssue {
+  number: number;
+  title: string;
+  url: string;
+  author?: { login: string };
+}
+
+export interface GitHubCachePR {
+  number: number;
+  title: string;
+  url: string;
+  author?: { login: string };
+}
+
 export interface AppState {
   // Project state
   projects: Project[];
@@ -474,6 +489,7 @@ export interface AppState {
   trashedProjects: TrashedProject[];
   projectHistory: string[]; // Array of project IDs in MRU order (most recent first)
   projectHistoryIndex: number; // Current position in project history for cycling
+  pinnedProjectIds: string[]; // Array of project IDs that are pinned to the top bar
 
   // View state
   currentView: ViewMode;
@@ -516,6 +532,7 @@ export interface AppState {
   // Kanban Card Display Settings
   kanbanCardDetailLevel: KanbanCardDetailLevel; // Level of detail shown on kanban cards
   boardViewMode: BoardViewMode; // Whether to show kanban or dependency graph view
+  boardSearchQuery: string; // Search query for filtering kanban cards
 
   // Feature Default Settings
   defaultSkipTests: boolean; // Default value for skip tests when creating new features
@@ -662,6 +679,17 @@ export interface AppState {
   lastProjectDir: string;
   /** Recently accessed folders for quick access */
   recentFolders: string[];
+
+  // GitHub Cache (per-project, keyed by project path)
+  gitHubCacheByProject: Record<
+    string,
+    {
+      issues: GitHubCacheIssue[];
+      prs: GitHubCachePR[];
+      lastFetched: number | null; // timestamp in ms
+      isFetching: boolean;
+    }
+  >;
 }
 
 // Claude Usage interface matching the server response
@@ -822,6 +850,8 @@ export interface AppActions {
   cyclePrevProject: () => void; // Cycle back through project history (Q)
   cycleNextProject: () => void; // Cycle forward through project history (E)
   clearProjectHistory: () => void; // Clear history, keeping only current project
+  pinProject: (projectId: string) => void; // Pin a project to the top bar
+  unpinProject: (projectId: string) => void; // Unpin a project from the top bar
 
   // View actions
   setCurrentView: (view: ViewMode) => void;
@@ -877,6 +907,7 @@ export interface AppActions {
   // Kanban Card Settings actions
   setKanbanCardDetailLevel: (level: KanbanCardDetailLevel) => void;
   setBoardViewMode: (mode: BoardViewMode) => void;
+  setBoardSearchQuery: (query: string) => void;
 
   // Feature Default Settings actions
   setDefaultSkipTests: (skip: boolean) => void;
@@ -1093,6 +1124,19 @@ export interface AppActions {
   // Codex Usage Tracking actions
   setCodexUsage: (usage: CodexUsage | null) => void;
 
+  // GitHub Cache actions
+  getGitHubCache: (projectPath: string) => {
+    issues: GitHubCacheIssue[];
+    prs: GitHubCachePR[];
+    lastFetched: number | null;
+    isFetching: boolean;
+  } | null;
+  setGitHubCache: (
+    projectPath: string,
+    data: { issues: GitHubCacheIssue[]; prs: GitHubCachePR[] }
+  ) => void;
+  setGitHubCacheFetching: (projectPath: string, isFetching: boolean) => void;
+
   // Reset
   reset: () => void;
 }
@@ -1149,6 +1193,7 @@ const initialState: AppState = {
   trashedProjects: [],
   projectHistory: [],
   projectHistoryIndex: -1,
+  pinnedProjectIds: [],
   currentView: 'welcome',
   sidebarOpen: true,
   lastSelectedSessionByProject: {},
@@ -1169,6 +1214,7 @@ const initialState: AppState = {
   maxConcurrency: 3, // Default to 3 concurrent agents
   kanbanCardDetailLevel: 'standard', // Default to standard detail level
   boardViewMode: 'kanban', // Default to kanban view
+  boardSearchQuery: '', // Default to empty search
   defaultSkipTests: true, // Default to manual verification (tests disabled)
   enableDependencyBlocking: true, // Default to enabled (show dependency blocking UI)
   skipVerificationInAutoMode: false, // Default to disabled (require dependencies to be verified)
@@ -1238,6 +1284,8 @@ const initialState: AppState = {
   worktreePanelCollapsed: false,
   lastProjectDir: '',
   recentFolders: [],
+  // GitHub Cache
+  gitHubCacheByProject: {},
 };
 
 export const useAppStore = create<AppState & AppActions>()((set, get) => ({
@@ -1475,6 +1523,19 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
         projectHistoryIndex: -1,
       });
     }
+  },
+
+  pinProject: (projectId) => {
+    const { pinnedProjectIds, projects } = get();
+    // Only pin if project exists and not already pinned
+    if (projects.some((p) => p.id === projectId) && !pinnedProjectIds.includes(projectId)) {
+      set({ pinnedProjectIds: [...pinnedProjectIds, projectId] });
+    }
+  },
+
+  unpinProject: (projectId) => {
+    const { pinnedProjectIds } = get();
+    set({ pinnedProjectIds: pinnedProjectIds.filter((id) => id !== projectId) });
   },
 
   // View actions
@@ -1754,6 +1815,7 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
   // Kanban Card Settings actions
   setKanbanCardDetailLevel: (level) => set({ kanbanCardDetailLevel: level }),
   setBoardViewMode: (mode) => set({ boardViewMode: mode }),
+  setBoardSearchQuery: (query) => set({ boardSearchQuery: query }),
 
   // Feature Default Settings actions
   setDefaultSkipTests: (skip) => set({ defaultSkipTests: skip }),
@@ -3015,6 +3077,43 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
       codexUsage: usage,
       codexUsageLastUpdated: usage ? Date.now() : null,
     }),
+
+  // GitHub Cache actions
+  getGitHubCache: (projectPath: string) => {
+    return get().gitHubCacheByProject[projectPath] || null;
+  },
+
+  setGitHubCache: (
+    projectPath: string,
+    data: { issues: GitHubCacheIssue[]; prs: GitHubCachePR[] }
+  ) => {
+    set({
+      gitHubCacheByProject: {
+        ...get().gitHubCacheByProject,
+        [projectPath]: {
+          issues: data.issues,
+          prs: data.prs,
+          lastFetched: Date.now(),
+          isFetching: false,
+        },
+      },
+    });
+  },
+
+  setGitHubCacheFetching: (projectPath: string, isFetching: boolean) => {
+    const existing = get().gitHubCacheByProject[projectPath];
+    set({
+      gitHubCacheByProject: {
+        ...get().gitHubCacheByProject,
+        [projectPath]: {
+          issues: existing?.issues || [],
+          prs: existing?.prs || [],
+          lastFetched: existing?.lastFetched || null,
+          isFetching,
+        },
+      },
+    });
+  },
 
   // Pipeline actions
   setPipelineConfig: (projectPath, config) => {

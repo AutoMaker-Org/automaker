@@ -13,6 +13,7 @@ interface SettingsNavigationProps {
   activeSection: SettingsViewId;
   currentProject: Project | null;
   onNavigate: (sectionId: SettingsViewId) => void;
+  compact?: boolean;
 }
 
 function NavButton({
@@ -167,11 +168,13 @@ export function SettingsNavigation({
   activeSection,
   currentProject,
   onNavigate,
+  compact = false,
 }: SettingsNavigationProps) {
   return (
     <nav
       className={cn(
-        'hidden lg:block w-64 shrink-0 overflow-y-auto',
+        'shrink-0 overflow-y-auto',
+        compact ? 'w-56' : 'hidden lg:block w-64',
         'border-r border-border/50',
         'bg-gradient-to-b from-card/80 via-card/60 to-card/40 backdrop-blur-xl'
       )}
