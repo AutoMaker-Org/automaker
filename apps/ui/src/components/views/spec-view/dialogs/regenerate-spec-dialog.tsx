@@ -40,9 +40,14 @@ export function RegenerateSpecDialog({
 
   // Sync local state with prop when dialog opens or featureCount changes
   useEffect(() => {
-    if (open) {
-      const presetValues = [20, 50, 100];
-      const isPreset = presetValues.includes(featureCount as number);
+    if (!open) return;
+
+    const numericOptions = FEATURE_COUNT_OPTIONS.map((o) => o.value).filter(
+      (v): v is number => typeof v === 'number'
+    );
+
+    if (typeof featureCount === 'number') {
+      const isPreset = numericOptions.includes(featureCount);
       setIsCustom(!isPreset);
       setCustomFeatureCount(isPreset ? '' : String(featureCount));
     }
@@ -52,6 +57,13 @@ export function RegenerateSpecDialog({
     (o) => o.value === featureCount || (isCustom && o.value === 'custom')
   );
   const isDisabled = isRegenerating || isGeneratingFeatures;
+
+  // Validate custom feature count
+  const customCountNum = Number(customFeatureCount);
+  const isCustomCountValid =
+    !generateFeatures ||
+    !isCustom ||
+    (Number.isInteger(customCountNum) && customCountNum >= 1 && customCountNum <= 200);
 
   return (
     <Dialog
@@ -112,7 +124,8 @@ export function RegenerateSpecDialog({
                   <Input
                     type="text"
                     value={worktreeBranch}
-                    onChange={(e) => onWorktreeBranchChange(e.target.value.trim())}
+                    onChange={(e) => onWorktreeBranchChange(e.target.value)}
+                    onBlur={(e) => onWorktreeBranchChange(e.target.value.trim())}
                     placeholder="e.g., test-worktree, feature-new"
                     disabled={isDisabled}
                     className="font-mono text-sm"
@@ -207,23 +220,30 @@ export function RegenerateSpecDialog({
                 })}
               </div>
               {isCustom && (
-                <Input
-                  type="number"
-                  min="1"
-                  max="200"
-                  value={customFeatureCount}
-                  onChange={(e) => {
-                    setCustomFeatureCount(e.target.value);
-                    const num = parseInt(e.target.value, 10);
-                    if (!isNaN(num) && num >= 1 && num <= 200) {
-                      onFeatureCountChange(num);
-                    }
-                  }}
-                  placeholder="Enter number of features (1-200)"
-                  disabled={isDisabled}
-                  className="text-sm"
-                  data-testid="regenerate-feature-count-custom-input"
-                />
+                <>
+                  <Input
+                    type="number"
+                    min="1"
+                    max="200"
+                    value={customFeatureCount}
+                    onChange={(e) => {
+                      setCustomFeatureCount(e.target.value);
+                      const num = e.currentTarget.valueAsNumber;
+                      if (Number.isInteger(num) && num >= 1 && num <= 200) {
+                        onFeatureCountChange(num);
+                      }
+                    }}
+                    placeholder="Enter number of features (1-200)"
+                    disabled={isDisabled}
+                    className="text-sm"
+                    data-testid="regenerate-feature-count-custom-input"
+                  />
+                  {!isCustomCountValid && (
+                    <p className="text-xs text-destructive mt-1">
+                      Enter a whole number from 1–200.
+                    </p>
+                  )}
+                </>
               )}
               {selectedOption?.warning && !isCustom && (
                 <p className="text-xs text-amber-500 flex items-center gap-1">
@@ -245,7 +265,8 @@ export function RegenerateSpecDialog({
               disabled={
                 !projectDefinition.trim() ||
                 isDisabled ||
-                (useWorktreeBranch && !worktreeBranch.trim())
+                (useWorktreeBranch && !worktreeBranch.trim()) ||
+                !isCustomCountValid
               }
               hotkey={{ key: 'Enter', cmdCtrl: true }}
               hotkeyActive={open && !isDisabled}

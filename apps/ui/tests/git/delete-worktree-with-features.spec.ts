@@ -20,8 +20,9 @@ import {
   waitForBoardView,
   authenticateForTests,
   handleLoginScreenIfPresent,
+  addFeature,
+  getKanbanColumn,
 } from '../utils';
-import { addFeature, getKanbanColumn } from '../utils/views/board';
 
 const execAsync = promisify(exec);
 const TEST_TEMP_DIR = createTempDirPath('delete-worktree-tests');
