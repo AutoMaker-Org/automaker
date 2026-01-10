@@ -219,7 +219,7 @@ export function ProjectSelectorWithOptions({
           <DropdownMenuTrigger asChild>
             <button
               className={cn(
-                'hidden lg:flex items-center justify-center w-[42px] h-[42px] rounded-lg',
+                'flex items-center justify-center w-[42px] h-[42px] rounded-lg',
                 'text-muted-foreground hover:text-foreground',
                 'bg-transparent hover:bg-accent/60',
                 'border border-border/50 hover:border-border',
