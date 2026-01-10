@@ -12,6 +12,8 @@ describe('claude-provider.ts', () => {
     vi.clearAllMocks();
     provider = new ClaudeProvider();
     delete process.env.ANTHROPIC_API_KEY;
+    delete process.env.ANTHROPIC_BASE_URL;
+    delete process.env.ANTHROPIC_AUTH_TOKEN;
   });
 
   describe('getName', () => {
@@ -264,6 +266,93 @@ describe('claude-provider.ts', () => {
 
       expect(result.hasApiKey).toBe(false);
       expect(result.authenticated).toBe(false);
+    });
+  });
+
+  describe('environment variable passthrough', () => {
+    afterEach(() => {
+      delete process.env.ANTHROPIC_BASE_URL;
+      delete process.env.ANTHROPIC_AUTH_TOKEN;
+    });
+
+    it('should pass ANTHROPIC_BASE_URL to SDK env', async () => {
+      process.env.ANTHROPIC_BASE_URL = 'https://custom.example.com/v1';
+
+      vi.mocked(sdk.query).mockReturnValue(
+        (async function* () {
+          yield { type: 'text', text: 'test' };
+        })()
+      );
+
+      const generator = provider.executeQuery({
+        prompt: 'Test',
+        cwd: '/test',
+      });
+
+      await collectAsyncGenerator(generator);
+
+      expect(sdk.query).toHaveBeenCalledWith({
+        prompt: 'Test',
+        options: expect.objectContaining({
+          env: expect.objectContaining({
+            ANTHROPIC_BASE_URL: 'https://custom.example.com/v1',
+          }),
+        }),
+      });
+    });
+
+    it('should pass ANTHROPIC_AUTH_TOKEN to SDK env', async () => {
+      process.env.ANTHROPIC_AUTH_TOKEN = 'custom-auth-token';
+
+      vi.mocked(sdk.query).mockReturnValue(
+        (async function* () {
+          yield { type: 'text', text: 'test' };
+        })()
+      );
+
+      const generator = provider.executeQuery({
+        prompt: 'Test',
+        cwd: '/test',
+      });
+
+      await collectAsyncGenerator(generator);
+
+      expect(sdk.query).toHaveBeenCalledWith({
+        prompt: 'Test',
+        options: expect.objectContaining({
+          env: expect.objectContaining({
+            ANTHROPIC_AUTH_TOKEN: 'custom-auth-token',
+          }),
+        }),
+      });
+    });
+
+    it('should pass both custom endpoint vars together', async () => {
+      process.env.ANTHROPIC_BASE_URL = 'https://gateway.example.com';
+      process.env.ANTHROPIC_AUTH_TOKEN = 'gateway-token';
+
+      vi.mocked(sdk.query).mockReturnValue(
+        (async function* () {
+          yield { type: 'text', text: 'test' };
+        })()
+      );
+
+      const generator = provider.executeQuery({
+        prompt: 'Test',
+        cwd: '/test',
+      });
+
+      await collectAsyncGenerator(generator);
+
+      expect(sdk.query).toHaveBeenCalledWith({
+        prompt: 'Test',
+        options: expect.objectContaining({
+          env: expect.objectContaining({
+            ANTHROPIC_BASE_URL: 'https://gateway.example.com',
+            ANTHROPIC_AUTH_TOKEN: 'gateway-token',
+          }),
+        }),
+      });
     });
   });
 
