@@ -59,7 +59,7 @@ export function createCommitHandler() {
       const commitHash = hashOutput.trim().substring(0, 8);
 
       // Get branch name
-      const { stdout: branchOutput } = await execAsync('git rev-parse --abbrev-ref HEAD', {
+      const { stdout: branchOutput } = await execAsync('git symbolic-ref --short HEAD', {
         cwd: worktreePath,
       });
       const branchName = branchOutput.trim();

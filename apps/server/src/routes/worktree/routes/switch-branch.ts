@@ -87,7 +87,7 @@ export function createSwitchBranchHandler() {
       }
 
       // Get current branch
-      const { stdout: currentBranchOutput } = await execAsync('git rev-parse --abbrev-ref HEAD', {
+      const { stdout: currentBranchOutput } = await execAsync('git symbolic-ref --short HEAD', {
         cwd: worktreePath,
       });
       const previousBranch = currentBranchOutput.trim();

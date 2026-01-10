@@ -28,7 +28,7 @@ export function createPullHandler() {
       }
 
       // Get current branch name
-      const { stdout: branchOutput } = await execAsync('git rev-parse --abbrev-ref HEAD', {
+      const { stdout: branchOutput } = await execAsync('git symbolic-ref --short HEAD', {
         cwd: worktreePath,
       });
       const branchName = branchOutput.trim();

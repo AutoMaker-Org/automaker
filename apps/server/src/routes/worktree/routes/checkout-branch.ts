@@ -47,7 +47,7 @@ export function createCheckoutBranchHandler() {
       }
 
       // Get current branch for reference
-      const { stdout: currentBranchOutput } = await execAsync('git rev-parse --abbrev-ref HEAD', {
+      const { stdout: currentBranchOutput } = await execAsync('git symbolic-ref --short HEAD', {
         cwd: worktreePath,
       });
       const currentBranch = currentBranchOutput.trim();

@@ -31,7 +31,7 @@ export function createInfoHandler() {
       const worktreePath = path.join(projectPath, '.worktrees', featureId);
       try {
         await secureFs.access(worktreePath);
-        const { stdout } = await execAsync('git rev-parse --abbrev-ref HEAD', {
+        const { stdout } = await execAsync('git symbolic-ref --short HEAD', {
           cwd: worktreePath,
         });
         res.json({

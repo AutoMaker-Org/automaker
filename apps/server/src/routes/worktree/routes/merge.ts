@@ -35,7 +35,7 @@ export function createMergeHandler() {
       const worktreePath = path.join(projectPath, '.worktrees', featureId);
 
       // Get current branch
-      const { stdout: currentBranch } = await execAsync('git rev-parse --abbrev-ref HEAD', {
+      const { stdout: currentBranch } = await execAsync('git symbolic-ref --short HEAD', {
         cwd: projectPath,
       });
 

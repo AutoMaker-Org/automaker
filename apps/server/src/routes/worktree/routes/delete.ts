@@ -38,7 +38,7 @@ export function createDeleteHandler() {
       // Get branch name before removing worktree
       let branchName: string | null = null;
       try {
-        const { stdout } = await execAsync('git rev-parse --abbrev-ref HEAD', {
+        const { stdout } = await execAsync('git symbolic-ref --short HEAD', {
           cwd: worktreePath,
         });
         branchName = stdout.trim();
