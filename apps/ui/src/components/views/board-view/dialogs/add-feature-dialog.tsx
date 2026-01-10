@@ -66,6 +66,11 @@ import {
   formatAncestorContextForPrompt,
   type AncestorContext,
 } from '@automaker/dependency-resolver';
+<<<<<<< HEAD
+=======
+import { isCursorModel, isCustomModel, PROVIDER_PREFIXES } from '@automaker/types';
+import { getEndpointForModel } from '../../settings-view/providers/custom-provider-presets';
+>>>>>>> ee96e164 (feat: Add per-provider API key storage for custom endpoints)
 
 const logger = createLogger('AddFeatureDialog');
 
@@ -85,7 +90,15 @@ type FeatureData = {
   planningMode: PlanningMode;
   requirePlanApproval: boolean;
   dependencies?: string[];
+<<<<<<< HEAD
   workMode: WorkMode;
+=======
+  customEndpoint?: {
+    baseUrl: string;
+    apiKey: string;
+    model: string;
+  };
+>>>>>>> ee96e164 (feat: Add per-provider API key storage for custom endpoints)
 };
 
 interface AddFeatureDialogProps {
@@ -162,8 +175,20 @@ export function AddFeatureDialog({
   const [ancestors, setAncestors] = useState<AncestorContext[]>([]);
   const [selectedAncestorIds, setSelectedAncestorIds] = useState<Set<string>>(new Set());
 
+<<<<<<< HEAD
   // Get defaults from store
   const { defaultPlanningMode, defaultRequirePlanApproval, defaultAIProfileId } = useAppStore();
+=======
+  // Get planning mode defaults and worktrees setting from store
+  const {
+    defaultPlanningMode,
+    defaultRequirePlanApproval,
+    defaultAIProfileId,
+    useWorktrees,
+    customEndpoint,
+    customEndpointConfigs,
+  } = useAppStore();
+>>>>>>> ee96e164 (feat: Add per-provider API key storage for custom endpoints)
 
   // Enhancement model override
   const enhancementOverride = useModelOverride({ phase: 'enhancementModel' });
@@ -313,8 +338,55 @@ export function AddFeatureDialog({
       planningMode,
       requirePlanApproval,
       dependencies: isSpawnMode && parentFeature ? [parentFeature.id] : undefined,
+<<<<<<< HEAD
       workMode,
     };
+=======
+      // Include customEndpoint when using a custom model
+      // Look up the correct endpoint based on the selected model
+      customEndpoint: (() => {
+        if (!isCustomModel(selectedModel)) return undefined;
+
+        // Get the correct endpoint for this specific model
+        const modelEndpoint = getEndpointForModel(selectedModel);
+
+        // 1. Check strict per-provider config first (new way)
+        if (modelEndpoint && customEndpointConfigs) {
+          const providerConfig =
+            customEndpointConfigs[modelEndpoint.provider as 'zhipu' | 'minimax' | 'manual'];
+          if (providerConfig?.apiKey) {
+            return {
+              baseUrl: modelEndpoint.baseUrl,
+              apiKey: providerConfig.apiKey,
+              model: selectedModel.startsWith('custom-') ? selectedModel.slice(7) : selectedModel,
+            };
+          }
+        }
+
+        // 2. Fallback to old global customEndpoint if provider matches
+        if (modelEndpoint && customEndpoint?.apiKey) {
+          if (customEndpoint.provider === modelEndpoint.provider) {
+            return {
+              baseUrl: modelEndpoint.baseUrl,
+              apiKey: customEndpoint.apiKey,
+              model: selectedModel.startsWith('custom-') ? selectedModel.slice(7) : selectedModel,
+            };
+          }
+        }
+
+        // 3. Fallback to global manual config
+        if (customEndpoint) {
+          return {
+            baseUrl: customEndpoint.baseUrl,
+            apiKey: customEndpoint.apiKey,
+            model: customEndpoint.model,
+          };
+        }
+
+        return undefined;
+      })(),
+    } as FeatureData;
+>>>>>>> ee96e164 (feat: Add per-provider API key storage for custom endpoints)
   };
 
   const resetForm = () => {

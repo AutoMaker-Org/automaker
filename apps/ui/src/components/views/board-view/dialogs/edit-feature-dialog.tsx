@@ -61,6 +61,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { DependencyTreeDialog } from './dependency-tree-dialog';
+<<<<<<< HEAD
 import {
   isCursorModel,
   isClaudeModel,
@@ -68,6 +69,10 @@ import {
   supportsReasoningEffort,
 } from '@automaker/types';
 import { useNavigate } from '@tanstack/react-router';
+=======
+import { isCursorModel, isCustomModel, PROVIDER_PREFIXES } from '@automaker/types';
+import { getEndpointForModel } from '../../settings-view/providers/custom-provider-presets';
+>>>>>>> ee96e164 (feat: Add per-provider API key storage for custom endpoints)
 
 const logger = createLogger('EditFeatureDialog');
 
@@ -139,6 +144,7 @@ export function EditFeatureDialog({
     feature?.requirePlanApproval ?? false
   );
 
+<<<<<<< HEAD
   // Model selection state
   const [selectedProfileId, setSelectedProfileId] = useState<string | undefined>();
   const [modelEntry, setModelEntry] = useState<PhaseModelEntry>(() => ({
@@ -158,6 +164,10 @@ export function EditFeatureDialog({
   const [originalDescription, setOriginalDescription] = useState(feature?.description ?? '');
   // Track if history dropdown is open
   const [showHistory, setShowHistory] = useState(false);
+=======
+  // Get worktrees setting from store
+  const { useWorktrees, customEndpoint, customEndpointConfigs } = useAppStore();
+>>>>>>> ee96e164 (feat: Add per-provider API key storage for custom endpoints)
 
   // Enhancement model override
   const enhancementOverride = useModelOverride({ phase: 'enhancementModel' });
@@ -256,7 +266,53 @@ export function EditFeatureDialog({
       priority: editingFeature.priority ?? 2,
       planningMode,
       requirePlanApproval,
+<<<<<<< HEAD
       workMode,
+=======
+      // Include customEndpoint when using a custom model
+      // Look up the correct endpoint based on the selected model
+      customEndpoint: (() => {
+        if (!isCustomModel(selectedModel)) return undefined;
+
+        // Get the correct endpoint for this specific model
+        const modelEndpoint = getEndpointForModel(selectedModel);
+
+        // 1. Check strict per-provider config first (new way)
+        if (modelEndpoint && customEndpointConfigs) {
+          const providerConfig =
+            customEndpointConfigs[modelEndpoint.provider as 'zhipu' | 'minimax' | 'manual'];
+          if (providerConfig?.apiKey) {
+            return {
+              baseUrl: modelEndpoint.baseUrl,
+              apiKey: providerConfig.apiKey,
+              model: selectedModel.startsWith('custom-') ? selectedModel.slice(7) : selectedModel,
+            };
+          }
+        }
+
+        // 2. Fallback to old global customEndpoint if provider matches
+        if (modelEndpoint && customEndpoint?.apiKey) {
+          if (customEndpoint.provider === modelEndpoint.provider) {
+            return {
+              baseUrl: modelEndpoint.baseUrl,
+              apiKey: customEndpoint.apiKey,
+              model: selectedModel.startsWith('custom-') ? selectedModel.slice(7) : selectedModel,
+            };
+          }
+        }
+
+        // 3. Fallback to global manual config
+        if (customEndpoint) {
+          return {
+            baseUrl: customEndpoint.baseUrl,
+            apiKey: customEndpoint.apiKey,
+            model: customEndpoint.model,
+          };
+        }
+
+        return undefined;
+      })(),
+>>>>>>> ee96e164 (feat: Add per-provider API key storage for custom endpoints)
     };
 
     // Determine if description changed and what source to use

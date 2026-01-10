@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import type { ModelAlias } from '@/store/app-store';
 import type { ModelProvider, ThinkingLevel, ReasoningEffort } from '@automaker/types';
 import {
@@ -7,9 +8,19 @@ import {
 } from '@automaker/types';
 import { Brain, Zap, Scale, Cpu, Rocket, Sparkles } from 'lucide-react';
 import { AnthropicIcon, CursorIcon, OpenAIIcon, OpenCodeIcon } from '@/components/ui/provider-icon';
+=======
+import type { ThinkingLevel } from '@/store/app-store';
+import type { ModelProvider } from '@automaker/types';
+import { CURSOR_MODEL_MAP } from '@automaker/types';
+import { Brain, Zap, Scale, Cpu, Rocket, Sparkles } from 'lucide-react';
+import {
+  CUSTOM_ENDPOINT_PRESETS,
+  getModelSuggestions,
+} from '@/components/views/settings-view/providers/custom-provider-presets';
+>>>>>>> ee96e164 (feat: Add per-provider API key storage for custom endpoints)
 
 export type ModelOption = {
-  id: string; // Claude models use ModelAlias, Cursor models use "cursor-{id}"
+  id: string; // Claude models use ModelAlias, Cursor models use "cursor-{id}", Custom models use "custom-{id}"
   label: string;
   description: string;
   badge?: string;
@@ -56,8 +67,35 @@ export const CURSOR_MODELS: ModelOption[] = Object.entries(CURSOR_MODEL_MAP).map
 );
 
 /**
+<<<<<<< HEAD
  * Codex/OpenAI models
  * Official models from https://developers.openai.com/codex/models/
+=======
+ * Get Custom endpoint models derived from presets
+ * ID is prefixed with "custom-" for ProviderFactory routing
+ * Returns models dynamically based on configured presets
+ */
+export function getCustomModels(): ModelOption[] {
+  const allModels: ModelOption[] = [];
+  for (const preset of CUSTOM_ENDPOINT_PRESETS) {
+    if (preset.value !== 'manual') {
+      const suggestions = getModelSuggestions(preset.value);
+      for (const model of suggestions) {
+        allModels.push({
+          id: `custom-${model}`,
+          label: model,
+          description: preset.name,
+          provider: 'custom' as ModelProvider,
+        });
+      }
+    }
+  }
+  return allModels;
+}
+
+/**
+ * All available models (Claude + Cursor + Custom)
+>>>>>>> ee96e164 (feat: Add per-provider API key storage for custom endpoints)
  */
 export const CODEX_MODELS: ModelOption[] = [
   {

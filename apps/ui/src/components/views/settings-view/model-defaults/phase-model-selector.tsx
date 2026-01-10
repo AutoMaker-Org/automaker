@@ -27,11 +27,17 @@ import {
   OPENCODE_MODELS,
   THINKING_LEVELS,
   THINKING_LEVEL_LABELS,
+<<<<<<< HEAD
   REASONING_EFFORT_LEVELS,
   REASONING_EFFORT_LABELS,
 } from '@/components/views/board-view/shared/model-constants';
 import { Check, ChevronsUpDown, Star, ChevronRight } from 'lucide-react';
 import { AnthropicIcon, CursorIcon, OpenAIIcon, OpenCodeIcon } from '@/components/ui/provider-icon';
+=======
+  getCustomModels,
+} from '@/components/views/board-view/shared/model-constants';
+import { Check, ChevronsUpDown, Star, Brain, Sparkles, ChevronRight, Globe } from 'lucide-react';
+>>>>>>> ee96e164 (feat: Add per-provider API key storage for custom endpoints)
 import { Button } from '@/components/ui/button';
 import {
   Command,
@@ -80,8 +86,13 @@ export function PhaseModelSelector({
   const commandListRef = React.useRef<HTMLDivElement>(null);
   const expandedTriggerRef = React.useRef<HTMLDivElement>(null);
   const expandedClaudeTriggerRef = React.useRef<HTMLDivElement>(null);
+<<<<<<< HEAD
   const expandedCodexTriggerRef = React.useRef<HTMLDivElement>(null);
   const { enabledCursorModels, favoriteModels, toggleFavoriteModel } = useAppStore();
+=======
+  const { enabledCursorModels, favoriteModels, toggleFavoriteModel, customEndpoint } =
+    useAppStore();
+>>>>>>> ee96e164 (feat: Add per-provider API key storage for custom endpoints)
 
   // Extract model and thinking/reasoning levels from value
   const selectedModel = value.model;
@@ -163,6 +174,14 @@ export function PhaseModelSelector({
     return enabledCursorModels.includes(cursorId);
   });
 
+  // Get available custom models (only if endpoint is configured)
+  const availableCustomModels = React.useMemo(() => {
+    if (!customEndpoint?.baseUrl || !customEndpoint?.apiKey) {
+      return [];
+    }
+    return getCustomModels();
+  }, [customEndpoint]);
+
   // Helper to find current selected model details
   const currentModel = React.useMemo(() => {
     const claudeModel = CLAUDE_MODELS.find((m) => m.id === selectedModel);
@@ -183,6 +202,12 @@ export function PhaseModelSelector({
       (m) => stripProviderPrefix(m.id) === selectedModel
     );
     if (cursorModel) return { ...cursorModel, icon: CursorIcon };
+
+    // Check if selectedModel is a custom model
+    const customModel = availableCustomModels.find(
+      (m) => stripProviderPrefix(m.id) === selectedModel || m.id === selectedModel
+    );
+    if (customModel) return { ...customModel, icon: Globe };
 
     // Check if selectedModel is part of a grouped model
     const group = getModelGroup(selectedModel as CursorModelId);
@@ -206,7 +231,7 @@ export function PhaseModelSelector({
     if (opencodeModel) return { ...opencodeModel, icon: OpenCodeIcon };
 
     return null;
-  }, [selectedModel, selectedThinkingLevel, availableCursorModels]);
+  }, [selectedModel, selectedThinkingLevel, availableCursorModels, availableCustomModels]);
 
   // Compute grouped vs standalone Cursor models
   const { groupedModels, standaloneCursorModels } = React.useMemo(() => {
@@ -949,6 +974,7 @@ export function PhaseModelSelector({
             </CommandGroup>
           )}
 
+<<<<<<< HEAD
           {codex.length > 0 && (
             <CommandGroup heading="Codex Models">
               {codex.map((model) => renderCodexModelItem(model))}
@@ -958,6 +984,45 @@ export function PhaseModelSelector({
           {opencode.length > 0 && (
             <CommandGroup heading="OpenCode Models">
               {opencode.map((model) => renderOpencodeModelItem(model))}
+=======
+          {availableCustomModels.length > 0 && (
+            <CommandGroup heading="Custom Endpoint Models">
+              {availableCustomModels.map((model) => {
+                const modelValue = stripProviderPrefix(model.id);
+                const isSelected = selectedModel === modelValue || selectedModel === model.id;
+                return (
+                  <CommandItem
+                    key={model.id}
+                    value={model.label}
+                    onSelect={() => {
+                      onChange({ model: modelValue });
+                      setOpen(false);
+                    }}
+                    className="group flex items-center justify-between py-2"
+                  >
+                    <div className="flex items-center gap-3 overflow-hidden">
+                      <Globe
+                        className={cn(
+                          'h-4 w-4 shrink-0',
+                          isSelected ? 'text-primary' : 'text-muted-foreground'
+                        )}
+                      />
+                      <div className="flex flex-col truncate">
+                        <span className={cn('truncate font-medium', isSelected && 'text-primary')}>
+                          {model.label}
+                        </span>
+                        <span className="truncate text-xs text-muted-foreground">
+                          {model.description}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1 ml-2">
+                      {isSelected && <Check className="h-4 w-4 text-primary shrink-0" />}
+                    </div>
+                  </CommandItem>
+                );
+              })}
+>>>>>>> ee96e164 (feat: Add per-provider API key storage for custom endpoints)
             </CommandGroup>
           )}
         </CommandList>

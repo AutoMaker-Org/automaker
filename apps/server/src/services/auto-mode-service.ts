@@ -585,6 +585,9 @@ export class AutoModeService {
           systemPrompt: combinedSystemPrompt || undefined,
           autoLoadClaudeMd,
           thinkingLevel: feature.thinkingLevel,
+          customEndpoint: feature.customEndpoint as
+            | { baseUrl: string; apiKey: string; model: string }
+            | undefined,
         }
       );
 
@@ -2031,6 +2034,11 @@ This helps parse your summary correctly in the output logs.`;
       systemPrompt?: string;
       autoLoadClaudeMd?: boolean;
       thinkingLevel?: ThinkingLevel;
+      customEndpoint?: {
+        baseUrl: string;
+        apiKey: string;
+        model: string;
+      };
     }
   ): Promise<void> {
     const finalProjectPath = options?.projectPath || projectPath;
@@ -2182,6 +2190,7 @@ This mock response was generated because AUTOMAKER_MOCK_AGENT=true was set.
       settingSources: sdkOptions.settingSources,
       mcpServers: Object.keys(mcpServers).length > 0 ? mcpServers : undefined, // Pass MCP servers configuration
       thinkingLevel: options?.thinkingLevel, // Pass thinking level for extended thinking
+      customEndpoint: options?.customEndpoint, // Pass custom endpoint config for custom provider
     };
 
     // Execute via provider

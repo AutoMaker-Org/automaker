@@ -1,18 +1,25 @@
 // @ts-nocheck
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+<<<<<<< HEAD
 import { Brain, AlertTriangle } from 'lucide-react';
 import { AnthropicIcon, CursorIcon, OpenAIIcon } from '@/components/ui/provider-icon';
+=======
+import { Brain, Bot, Terminal, AlertTriangle, Globe } from 'lucide-react';
+>>>>>>> ee96e164 (feat: Add per-provider API key storage for custom endpoints)
 import { cn } from '@/lib/utils';
-import type { ModelAlias } from '@/store/app-store';
 import { useAppStore } from '@/store/app-store';
 import { useSetupStore } from '@/store/setup-store';
 import { getModelProvider, PROVIDER_PREFIXES, stripProviderPrefix } from '@automaker/types';
 import type { ModelProvider } from '@automaker/types';
+<<<<<<< HEAD
 import { CLAUDE_MODELS, CURSOR_MODELS, CODEX_MODELS, ModelOption } from './model-constants';
+=======
+import { CLAUDE_MODELS, CURSOR_MODELS, getCustomModels } from './model-constants';
+>>>>>>> ee96e164 (feat: Add per-provider API key storage for custom endpoints)
 
 interface ModelSelectorProps {
-  selectedModel: string; // Can be ModelAlias or "cursor-{id}"
+  selectedModel: string; // Can be ModelAlias or "cursor-{id}" or "custom-{id}"
   onModelSelect: (model: string) => void;
   testIdPrefix?: string;
 }
@@ -22,8 +29,13 @@ export function ModelSelector({
   onModelSelect,
   testIdPrefix = 'model-select',
 }: ModelSelectorProps) {
+<<<<<<< HEAD
   const { enabledCursorModels, cursorDefaultModel } = useAppStore();
   const { cursorCliStatus, codexCliStatus } = useSetupStore();
+=======
+  const { enabledCursorModels, cursorDefaultModel, customEndpoint } = useAppStore();
+  const { cursorCliStatus } = useSetupStore();
+>>>>>>> ee96e164 (feat: Add per-provider API key storage for custom endpoints)
 
   const selectedProvider = getModelProvider(selectedModel);
 
@@ -50,6 +62,10 @@ export function ModelSelector({
     } else if (provider === 'claude' && selectedProvider !== 'claude') {
       // Switch to Claude's default model
       onModelSelect('sonnet');
+    } else if (provider === 'custom' && selectedProvider !== 'custom') {
+      // Switch to Custom endpoint's model (from configuration or default)
+      const defaultModel = customEndpoint?.model || 'glm-4.7';
+      onModelSelect(`${PROVIDER_PREFIXES.custom}${defaultModel}`);
     }
   };
 
@@ -89,6 +105,7 @@ export function ModelSelector({
           </button>
           <button
             type="button"
+<<<<<<< HEAD
             onClick={() => handleProviderChange('codex')}
             className={cn(
               'flex-1 px-3 py-2 rounded-md border text-sm font-medium transition-colors flex items-center justify-center gap-2',
@@ -100,6 +117,19 @@ export function ModelSelector({
           >
             <OpenAIIcon className="w-4 h-4" />
             Codex CLI
+=======
+            onClick={() => handleProviderChange('custom')}
+            className={cn(
+              'flex-1 px-3 py-2 rounded-md border text-sm font-medium transition-colors flex items-center justify-center gap-2',
+              selectedProvider === 'custom'
+                ? 'bg-primary text-primary-foreground border-primary'
+                : 'bg-background hover:bg-accent border-border'
+            )}
+            data-testid={`${testIdPrefix}-provider-custom`}
+          >
+            <Globe className="w-4 h-4" />
+            Custom
+>>>>>>> ee96e164 (feat: Add per-provider API key storage for custom endpoints)
           </button>
         </div>
       </div>
@@ -135,6 +165,54 @@ export function ModelSelector({
                   data-testid={`${testIdPrefix}-${option.id}`}
                 >
                   {shortName}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Custom Models */}
+      {selectedProvider === 'custom' && (
+        <div className="space-y-3">
+          {/* Warning when Custom endpoint is not configured */}
+          {!customEndpoint && (
+            <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
+              <AlertTriangle className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
+              <div className="text-sm text-amber-400">
+                Custom endpoint not configured. Set it up in Settings → Providers → Custom.
+              </div>
+            </div>
+          )}
+
+          <div className="flex items-center justify-between">
+            <Label className="flex items-center gap-2">
+              <Globe className="w-4 h-4 text-primary" />
+              Custom Model
+            </Label>
+            <span className="text-[11px] px-2 py-0.5 rounded-full border border-emerald-500/40 text-emerald-600 dark:text-emerald-400">
+              API
+            </span>
+          </div>
+          <div className="flex flex-col gap-2">
+            {getCustomModels().map((option) => {
+              const isSelected = selectedModel === option.id;
+              return (
+                <button
+                  key={option.id}
+                  type="button"
+                  onClick={() => onModelSelect(option.id)}
+                  title={option.description}
+                  className={cn(
+                    'w-full px-3 py-2 rounded-md border text-sm font-medium transition-colors flex items-center justify-between',
+                    isSelected
+                      ? 'bg-primary text-primary-foreground border-primary'
+                      : 'bg-background hover:bg-accent border-border'
+                  )}
+                  data-testid={`${testIdPrefix}-${option.id}`}
+                >
+                  <span>{option.label}</span>
+                  <span className="text-xs opacity-70">{option.description}</span>
                 </button>
               );
             })}

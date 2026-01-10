@@ -183,8 +183,12 @@ export {
   PROVIDER_PREFIXES,
   isCursorModel,
   isClaudeModel,
+<<<<<<< HEAD
   isCodexModel,
   isOpencodeModel,
+=======
+  isCustomModel,
+>>>>>>> ee96e164 (feat: Add per-provider API key storage for custom endpoints)
   getModelProvider,
   stripProviderPrefix,
   addProviderPrefix,

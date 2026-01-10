@@ -68,6 +68,13 @@ export function resolveModelString(
     return modelKey;
   }
 
+  // Custom endpoint model with explicit prefix (e.g., "custom-glm-4-plus") - pass through unchanged
+  // CustomProvider will strip the prefix when making API calls
+  if (modelKey.startsWith(PROVIDER_PREFIXES.custom)) {
+    console.log(`[ModelResolver] Using custom endpoint model: ${modelKey}`);
+    return modelKey;
+  }
+
   // Full Claude model string - pass through unchanged
   if (modelKey.includes('claude-')) {
     console.log(`[ModelResolver] Using full Claude model string: ${modelKey}`);
