@@ -146,6 +146,10 @@
         "to": "server/node_modules"
       },
       {
+        "from": "server-bundle/libs",
+        "to": "server/libs"
+      },
+      {
         "from": "server-bundle/package.json",
         "to": "server/package.json"
       },
