@@ -30,10 +30,15 @@ export function ModelSelector({
   testIdPrefix = 'model-select',
 }: ModelSelectorProps) {
 <<<<<<< HEAD
+<<<<<<< HEAD
   const { enabledCursorModels, cursorDefaultModel } = useAppStore();
   const { cursorCliStatus, codexCliStatus } = useSetupStore();
 =======
   const { enabledCursorModels, cursorDefaultModel, customEndpoint } = useAppStore();
+=======
+  const { enabledCursorModels, cursorDefaultModel, customEndpoint, customEndpointConfigs } =
+    useAppStore();
+>>>>>>> 81ff1d13 (fix: Address PR #406 review comments)
   const { cursorCliStatus } = useSetupStore();
 >>>>>>> ee96e164 (feat: Add per-provider API key storage for custom endpoints)
 
@@ -176,14 +181,17 @@ export function ModelSelector({
       {selectedProvider === 'custom' && (
         <div className="space-y-3">
           {/* Warning when Custom endpoint is not configured */}
-          {!customEndpoint && (
-            <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
-              <AlertTriangle className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
-              <div className="text-sm text-amber-400">
-                Custom endpoint not configured. Set it up in Settings → Providers → Custom.
+          {!customEndpoint &&
+            !customEndpointConfigs?.zhipu?.apiKey &&
+            !customEndpointConfigs?.minimax?.apiKey &&
+            !customEndpointConfigs?.manual?.apiKey && (
+              <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                <AlertTriangle className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
+                <div className="text-sm text-amber-400">
+                  Custom endpoint not configured. Set it up in Settings → Providers → Custom.
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
           <div className="flex items-center justify-between">
             <Label className="flex items-center gap-2">

@@ -114,6 +114,15 @@ export class CustomProvider extends BaseProvider {
 
     const { baseUrl, apiKey } = customEndpoint;
 
+    // Debug: Log what config we're using (mask the API key for security)
+    console.log('[CustomProvider] Using config:', {
+      baseUrl,
+      apiKeyPresent: !!apiKey,
+      apiKeyLength: apiKey?.length || 0,
+      apiKeyPrefix: apiKey?.substring(0, 8) + '...',
+      model: options.model,
+    });
+
     if (!baseUrl || !apiKey) {
       throw new Error(
         'Custom endpoint configuration is incomplete. Please provide both Base URL and API Key.'
@@ -126,17 +135,11 @@ export class CustomProvider extends BaseProvider {
       content: string | Array<{ type: string; text?: string; source?: object }>;
     }> = [];
 
-    if (Array.isArray(prompt)) {
-      messages.push({
-        role: 'user',
-        content: prompt,
-      });
-    } else {
-      messages.push({
-        role: 'user',
-        content: prompt,
-      });
-    }
+    // Push the prompt as a user message (works for both string and array content)
+    messages.push({
+      role: 'user',
+      content: prompt,
+    });
 
     // Strip the 'custom-' prefix from model name for the API request
     const apiModel = model.startsWith('custom-') ? model.slice(7) : model;
@@ -164,6 +167,10 @@ export class CustomProvider extends BaseProvider {
       // Use /v1/messages path (standard Anthropic API format)
       const apiUrl = `${baseUrl}/v1/messages`;
       logger.info(`Making request to custom endpoint: ${apiUrl}`);
+      console.log(
+        '[CustomProvider] Request body:',
+        JSON.stringify(requestBody, null, 2).substring(0, 500)
+      );
 
       const response = await fetch(apiUrl, {
         method: 'POST',

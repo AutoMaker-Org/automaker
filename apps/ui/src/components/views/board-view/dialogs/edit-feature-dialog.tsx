@@ -95,9 +95,19 @@ interface EditFeatureDialogProps {
       priority: number;
       planningMode: PlanningMode;
       requirePlanApproval: boolean;
+<<<<<<< HEAD
     },
     descriptionHistorySource?: 'enhance' | 'edit',
     enhancementMode?: 'improve' | 'technical' | 'simplify' | 'acceptance'
+=======
+      customEndpoint?: {
+        provider?: 'zhipu' | 'minimax' | 'manual';
+        baseUrl: string;
+        apiKey: string;
+        model: string;
+      };
+    }
+>>>>>>> 81ff1d13 (fix: Address PR #406 review comments)
   ) => void;
   categorySuggestions: string[];
   branchSuggestions: string[];

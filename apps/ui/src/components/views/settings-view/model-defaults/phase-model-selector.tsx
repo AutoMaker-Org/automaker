@@ -87,12 +87,22 @@ export function PhaseModelSelector({
   const expandedTriggerRef = React.useRef<HTMLDivElement>(null);
   const expandedClaudeTriggerRef = React.useRef<HTMLDivElement>(null);
 <<<<<<< HEAD
+<<<<<<< HEAD
   const expandedCodexTriggerRef = React.useRef<HTMLDivElement>(null);
   const { enabledCursorModels, favoriteModels, toggleFavoriteModel } = useAppStore();
 =======
   const { enabledCursorModels, favoriteModels, toggleFavoriteModel, customEndpoint } =
     useAppStore();
 >>>>>>> ee96e164 (feat: Add per-provider API key storage for custom endpoints)
+=======
+  const {
+    enabledCursorModels,
+    favoriteModels,
+    toggleFavoriteModel,
+    customEndpoint,
+    customEndpointConfigs,
+  } = useAppStore();
+>>>>>>> 81ff1d13 (fix: Address PR #406 review comments)
 
   // Extract model and thinking/reasoning levels from value
   const selectedModel = value.model;
@@ -176,11 +186,16 @@ export function PhaseModelSelector({
 
   // Get available custom models (only if endpoint is configured)
   const availableCustomModels = React.useMemo(() => {
-    if (!customEndpoint?.baseUrl || !customEndpoint?.apiKey) {
+    // Check per-provider configs (new way) or global customEndpoint (legacy)
+    const hasProviderConfig =
+      customEndpointConfigs?.zhipu?.apiKey ||
+      customEndpointConfigs?.minimax?.apiKey ||
+      customEndpointConfigs?.manual?.apiKey;
+    if (!hasProviderConfig && (!customEndpoint?.baseUrl || !customEndpoint?.apiKey)) {
       return [];
     }
     return getCustomModels();
-  }, [customEndpoint]);
+  }, [customEndpoint, customEndpointConfigs]);
 
   // Helper to find current selected model details
   const currentModel = React.useMemo(() => {

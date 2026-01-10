@@ -14,13 +14,9 @@ import { OPENCODE_MODEL_CONFIG_MAP } from './opencode-models.js';
 /** Provider prefix constants */
 export const PROVIDER_PREFIXES = {
   cursor: 'cursor-',
-<<<<<<< HEAD
   codex: 'codex-',
   opencode: 'opencode-',
-=======
   custom: 'custom-',
-  // Add new provider prefixes here
->>>>>>> ee96e164 (feat: Add per-provider API key storage for custom endpoints)
 } as const;
 
 /**
@@ -65,7 +61,6 @@ export function isClaudeModel(model: string | undefined | null): boolean {
 }
 
 /**
-<<<<<<< HEAD
  * Check if a model string represents a Codex/OpenAI model
  *
  * @param model - Model string to check (e.g., "gpt-5.2", "o1", "codex-gpt-5.2")
@@ -122,7 +117,13 @@ export function isOpencodeModel(model: string | undefined | null): boolean {
   // - opencode/ = OpenCode free tier models (e.g., opencode/big-pickle)
   // - amazon-bedrock/ = AWS Bedrock models (e.g., amazon-bedrock/anthropic.claude-*)
   if (model.startsWith('opencode/') || model.startsWith('amazon-bedrock/')) {
-=======
+    return true;
+  }
+
+  return false;
+}
+
+/**
  * Check if a model string represents a Custom endpoint model
  *
  * @param model - Model string to check (e.g., "custom-glm-4-plus" or "glm-4-plus")
@@ -133,7 +134,6 @@ export function isCustomModel(model: string | undefined | null): boolean {
 
   // Check for explicit custom- prefix
   if (model.startsWith(PROVIDER_PREFIXES.custom)) {
->>>>>>> ee96e164 (feat: Add per-provider API key storage for custom endpoints)
     return true;
   }
 
@@ -141,23 +141,17 @@ export function isCustomModel(model: string | undefined | null): boolean {
 }
 
 /**
-<<<<<<< HEAD
-=======
- * Get the provider for a model string
- *
- * @param model - Model string to check
- * @returns The provider type, defaults to 'claude' for unknown models
- */
-/**
->>>>>>> ee96e164 (feat: Add per-provider API key storage for custom endpoints)
  * Get the provider for a model string
  *
  * @param model - Model string to check
  * @returns The provider type, defaults to 'claude' for unknown models
  */
 export function getModelProvider(model: string | undefined | null): ModelProvider {
-<<<<<<< HEAD
-  // Check OpenCode first since it uses provider-prefixed formats that could conflict
+  // Check Custom first since it uses explicit prefix
+  if (isCustomModel(model)) {
+    return 'custom';
+  }
+  // Check OpenCode since it uses provider-prefixed formats that could conflict
   if (isOpencodeModel(model)) {
     return 'opencode';
   }
@@ -165,10 +159,6 @@ export function getModelProvider(model: string | undefined | null): ModelProvide
   // but bare gpt-* should route to Codex
   if (isCodexModel(model)) {
     return 'codex';
-=======
-  if (isCustomModel(model)) {
-    return 'custom';
->>>>>>> ee96e164 (feat: Add per-provider API key storage for custom endpoints)
   }
   if (isCursorModel(model)) {
     return 'cursor';
@@ -225,8 +215,7 @@ export function addProviderPrefix(model: string, provider: ModelProvider): strin
     if (!model.startsWith(PROVIDER_PREFIXES.opencode)) {
       return `${PROVIDER_PREFIXES.opencode}${model}`;
     }
-  }
-  if (provider === 'custom') {
+  } else if (provider === 'custom') {
     if (!model.startsWith(PROVIDER_PREFIXES.custom)) {
       return `${PROVIDER_PREFIXES.custom}${model}`;
     }

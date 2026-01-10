@@ -94,8 +94,12 @@ export function getCustomModels(): ModelOption[] {
 }
 
 /**
+<<<<<<< HEAD
  * All available models (Claude + Cursor + Custom)
 >>>>>>> ee96e164 (feat: Add per-provider API key storage for custom endpoints)
+=======
+ * Static models (Claude + Cursor). Custom models are loaded dynamically via getCustomModels().
+>>>>>>> 81ff1d13 (fix: Address PR #406 review comments)
  */
 export const CODEX_MODELS: ModelOption[] = [
   {

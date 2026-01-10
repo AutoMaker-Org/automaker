@@ -125,7 +125,6 @@ export interface ExecuteOptions {
    */
   thinkingLevel?: ThinkingLevel;
   /**
-<<<<<<< HEAD
    * Custom subagents for specialized task delegation
    * Key: agent name, Value: agent definition
    */
@@ -154,15 +153,16 @@ export interface ExecuteOptions {
   outputFormat?: {
     type: 'json_schema';
     schema: Record<string, unknown>;
-=======
+  };
+  /**
    * Custom endpoint configuration for custom provider.
    * Includes baseUrl, apiKey, and model for Anthropic-compatible endpoints.
    */
   customEndpoint?: {
+    provider?: 'zhipu' | 'minimax' | 'manual';
     baseUrl: string;
     apiKey: string;
     model: string;
->>>>>>> ee96e164 (feat: Add per-provider API key storage for custom endpoints)
   };
 }
 

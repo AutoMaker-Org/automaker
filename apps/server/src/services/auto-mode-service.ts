@@ -2493,6 +2493,7 @@ After generating the revised spec, output:
                           allowedTools: allowedTools,
                           abortController,
                           mcpServers: Object.keys(mcpServers).length > 0 ? mcpServers : undefined,
+                          customEndpoint: options?.customEndpoint,
                         });
 
                         let revisionText = '';
@@ -2631,6 +2632,7 @@ After generating the revised spec, output:
                       allowedTools: allowedTools,
                       abortController,
                       mcpServers: Object.keys(mcpServers).length > 0 ? mcpServers : undefined,
+                      customEndpoint: options?.customEndpoint,
                     });
 
                     let taskOutput = '';
@@ -2719,6 +2721,7 @@ Implement all the changes described in the plan above.`;
                     allowedTools: allowedTools,
                     abortController,
                     mcpServers: Object.keys(mcpServers).length > 0 ? mcpServers : undefined,
+                    customEndpoint: options?.customEndpoint,
                   });
 
                   for await (const msg of continuationStream) {
