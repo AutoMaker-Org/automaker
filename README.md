@@ -240,8 +240,11 @@ services:
   server:
     volumes:
       # Mount your project directories
-      - /path/to/your/project:/projects/your-project
+      # On Fedora/RHEL with SELinux, add :z flag to allow container access
+      - /path/to/your/project:/projects/your-project:z
 ```
+
+**Note for Fedora/RHEL users:** The `:z` flag is required for SELinux to allow container access to mounted volumes. On other systems, this flag is ignored.
 
 ##### Claude CLI Authentication (Optional)
 
@@ -293,17 +296,19 @@ GH_TOKEN=gho_your_github_token_here
 services:
   server:
     volumes:
-      # Your projects
-      - /path/to/project1:/projects/project1
-      - /path/to/project2:/projects/project2
+      # Your projects (use :z flag on Fedora/RHEL for SELinux)
+      - /path/to/project1:/projects/project1:z
+      - /path/to/project2:/projects/project2:z
 
-      # Authentication configs
-      - ~/.claude:/home/automaker/.claude
-      - ~/.config/gh:/home/automaker/.config/gh
+      # Authentication configs (use :z flag on Fedora/RHEL for SELinux)
+      - ~/.claude:/home/automaker/.claude:z
+      - ~/.config/gh:/home/automaker/.config/gh:z
       - ~/.gitconfig:/home/automaker/.gitconfig:ro
     environment:
       - GH_TOKEN=${GH_TOKEN}
 ```
+
+**Note:** The `:z` flag is required on Fedora/RHEL with SELinux enforcing. On other systems it's safely ignored.
 
 ##### Architecture Support
 

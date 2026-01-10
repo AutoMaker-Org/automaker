@@ -28,6 +28,9 @@ services:
       context: .
       dockerfile: Dockerfile
       target: server
+      args:
+        USER_ID: ${USER_ID:-1000}
+        GROUP_ID: ${GROUP_ID:-1000}
     container_name: automaker-server
     restart: unless-stopped
     ports:

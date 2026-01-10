@@ -869,6 +869,9 @@ export async function launchDockerDevContainers({ baseDir, processes }) {
     cwd: baseDir,
     env: {
       ...process.env,
+      // Pass host UID/GID to avoid permission issues with volume mounts
+      USER_ID: process.getuid?.()?.toString() || '1000',
+      GROUP_ID: process.getgid?.()?.toString() || '1000',
     },
   });
 
@@ -931,6 +934,9 @@ export async function launchDockerDevServerContainer({ baseDir, processes }) {
     cwd: baseDir,
     env: {
       ...process.env,
+      // Pass host UID/GID to avoid permission issues with volume mounts
+      USER_ID: process.getuid?.()?.toString() || '1000',
+      GROUP_ID: process.getgid?.()?.toString() || '1000',
     },
   });
 
