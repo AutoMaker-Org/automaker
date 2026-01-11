@@ -13,6 +13,8 @@ interface IssuesListHeaderProps {
   onSettingsClick?: () => void;
   autoValidate?: boolean;
   onAutoValidateChange?: (enabled: boolean) => void;
+  autoConvert?: boolean;
+  onAutoConvertChange?: (enabled: boolean) => void;
 }
 
 export const IssuesListHeader = memo(function IssuesListHeader({
@@ -23,6 +25,8 @@ export const IssuesListHeader = memo(function IssuesListHeader({
   onSettingsClick,
   autoValidate = false,
   onAutoValidateChange,
+  autoConvert = false,
+  onAutoConvertChange,
 }: IssuesListHeaderProps) {
   return (
     <div className="flex items-center justify-between px-4 py-3 border-b border-border">
@@ -50,6 +54,21 @@ export const IssuesListHeader = memo(function IssuesListHeader({
             >
               <Wand2 className="h-3 w-3" />
               Auto-validate
+            </Label>
+          </div>
+        )}
+
+        {/* Auto-convert toggle - only visible when auto-validate is enabled */}
+        {autoValidate && onAutoConvertChange && (
+          <div className="flex items-center gap-2">
+            <Switch
+              id="auto-convert"
+              checked={autoConvert}
+              onCheckedChange={onAutoConvertChange}
+              className="h-4 w-8"
+            />
+            <Label htmlFor="auto-convert" className="text-xs text-muted-foreground cursor-pointer">
+              Auto-convert valid
             </Label>
           </div>
         )}

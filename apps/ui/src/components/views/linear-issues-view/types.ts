@@ -33,10 +33,4 @@ export const DEFAULT_PRESETS: FilterPreset[] = [
     icon: '🔄',
     filters: { stateType: ['started'] },
   },
-  {
-    id: 'high-priority',
-    name: 'High Priority',
-    icon: '🔥',
-    filters: { priority: [1, 2] },
-  },
 ];

@@ -42,6 +42,8 @@ interface UseLinearValidationOptions {
   showValidationDialog: boolean;
   onValidationResultChange: (result: IssueValidationResult | null) => void;
   onShowValidationDialogChange: (show: boolean) => void;
+  /** Callback when auto-convert should happen (valid issues) */
+  onAutoConvert?: (identifier: string, result: IssueValidationResult) => void;
 }
 
 export function useLinearValidation({
@@ -49,6 +51,7 @@ export function useLinearValidation({
   showValidationDialog,
   onValidationResultChange,
   onShowValidationDialogChange,
+  onAutoConvert,
 }: UseLinearValidationOptions) {
   const { currentProject, phaseModels, muteDoneSound } = useAppStore();
   // Linear uses string identifiers (e.g., "ALE-1")
@@ -220,6 +223,11 @@ export function useLinearValidation({
           ) {
             onValidationResultChange(event.result);
           }
+
+          // Trigger auto-convert callback for valid issues
+          if (onAutoConvert && event.result.verdict === 'valid') {
+            onAutoConvert(event.identifier, event.result);
+          }
           break;
 
         case 'linear_validation_error':
@@ -243,7 +251,13 @@ export function useLinearValidation({
 
     const unsubscribe = api.linear.onValidationEvent(handleValidationEvent);
     return () => unsubscribe();
-  }, [currentProject?.path, muteDoneSound, onValidationResultChange, onShowValidationDialogChange]);
+  }, [
+    currentProject?.path,
+    muteDoneSound,
+    onValidationResultChange,
+    onShowValidationDialogChange,
+    onAutoConvert,
+  ]);
 
   // Cleanup audio element on unmount to prevent memory leaks
   useEffect(() => {

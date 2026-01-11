@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { Search, X } from 'lucide-react';
+import { Search, X, Tag } from 'lucide-react';
 import { LinearTeam, LinearProject, LinearIssueFilters } from '@/lib/electron';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -43,7 +43,7 @@ export const LinearFilters = memo(function LinearFilters({
   const hasActiveFilters =
     filters.myIssuesOnly ||
     (filters.stateType && filters.stateType.length > 0) ||
-    (filters.priority && filters.priority.length > 0) ||
+    filters.labelName ||
     searchQuery;
 
   const activePreset = DEFAULT_PRESETS.find((preset) => {
@@ -55,12 +55,6 @@ export const LinearFilters = memo(function LinearFilters({
     )
       return true;
     if (preset.id === 'in-progress' && filters.stateType?.includes('started')) return true;
-    if (
-      preset.id === 'high-priority' &&
-      filters.priority?.includes(1) &&
-      filters.priority?.includes(2)
-    )
-      return true;
     return false;
   });
 
@@ -130,25 +124,46 @@ export const LinearFilters = memo(function LinearFilters({
         </Select>
       </div>
 
-      {/* Search */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Search issues..."
-          value={searchQuery}
-          onChange={(e) => onSearchChange(e.target.value)}
-          className="pl-9 pr-9"
-        />
-        {searchQuery && (
-          <Button
-            variant="ghost"
-            size="icon"
-            className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6"
-            onClick={() => onSearchChange('')}
-          >
-            <X className="h-3 w-3" />
-          </Button>
-        )}
+      {/* Search and Label filter */}
+      <div className="flex gap-2">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search issues..."
+            value={searchQuery}
+            onChange={(e) => onSearchChange(e.target.value)}
+            className="pl-9 pr-9"
+          />
+          {searchQuery && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6"
+              onClick={() => onSearchChange('')}
+            >
+              <X className="h-3 w-3" />
+            </Button>
+          )}
+        </div>
+        <div className="relative w-[160px]">
+          <Tag className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Filter by label..."
+            value={filters.labelName || ''}
+            onChange={(e) => onFiltersChange({ labelName: e.target.value || undefined })}
+            className="pl-9 pr-9"
+          />
+          {filters.labelName && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6"
+              onClick={() => onFiltersChange({ labelName: undefined })}
+            >
+              <X className="h-3 w-3" />
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Filter presets */}

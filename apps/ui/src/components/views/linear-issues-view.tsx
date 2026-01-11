@@ -49,9 +49,16 @@ export function LinearIssuesView() {
   const [validationResult, setValidationResult] = useState<IssueValidationResult | null>(null);
   const [modelOverrideEntry, setModelOverrideEntry] = useState<PhaseModelEntry | null>(null);
   const [autoValidate, setAutoValidate] = useState(false);
+  const [autoConvert, setAutoConvert] = useState(false);
 
   // Track which issues have been auto-validated this session
   const autoValidatedRef = useRef<Set<string>>(new Set());
+  // Track which issues have been auto-converted this session (prevent duplicates)
+  const autoConvertedRef = useRef<Set<string>>(new Set());
+  // Ref to hold auto-convert callback (avoids circular dependency with hooks)
+  const autoConvertCallbackRef = useRef<
+    ((identifier: string, result: IssueValidationResult) => void) | null
+  >(null);
 
   const {
     currentProject,
@@ -122,15 +129,20 @@ export function LinearIssuesView() {
     teamId: selectedTeam?.id || null,
     projectId: selectedProject?.id,
     enabled: isConnected && !!selectedTeam,
+    // Silent refresh only when auto-validate is enabled
+    autoRefresh: autoValidate,
   });
 
-  // Validation hook
+  // Validation hook - uses ref wrapper for onAutoConvert to avoid circular dependency
   const { validatingIssues, cachedValidations, handleValidateIssue, handleViewCachedValidation } =
     useLinearValidation({
       selectedIssue,
       showValidationDialog,
       onValidationResultChange: setValidationResult,
       onShowValidationDialogChange: setShowValidationDialog,
+      onAutoConvert: useCallback((identifier: string, result: IssueValidationResult) => {
+        autoConvertCallbackRef.current?.(identifier, result);
+      }, []),
     });
 
   // Auto-validate new issues when they are loaded
@@ -162,6 +174,12 @@ export function LinearIssuesView() {
     handleValidateIssue,
     effectiveModelEntry,
   ]);
+
+  // Reset tracking when team or filters change (allows re-processing same issues in new context)
+  useEffect(() => {
+    autoValidatedRef.current.clear();
+    autoConvertedRef.current.clear();
+  }, [selectedTeam?.id, selectedProject?.id, filters]);
 
   // Filter issues by search query
   const filteredIssues = useMemo(() => {
@@ -321,6 +339,48 @@ export function LinearIssuesView() {
     [currentProject?.path, defaultProfile, currentBranch]
   );
 
+  // Auto-convert callback - triggered when validation completes with 'valid' verdict
+  const handleAutoConvert = useCallback(
+    async (identifier: string, validationResult: IssueValidationResult) => {
+      // Skip if auto-convert is disabled
+      if (!autoConvert) {
+        return;
+      }
+
+      // Skip if already converted
+      if (autoConvertedRef.current.has(identifier)) {
+        logger.debug(`Auto-convert: Issue ${identifier} already converted, skipping`);
+        return;
+      }
+
+      // Find the issue by identifier
+      const issue = issues.find((i) => i.identifier === identifier);
+      if (!issue) {
+        logger.warn(`Auto-convert: Issue ${identifier} not found in current list`);
+        return;
+      }
+
+      // Mark as converted before calling to prevent duplicates
+      autoConvertedRef.current.add(identifier);
+
+      logger.info(`Auto-converting issue ${identifier} to task`);
+
+      // Reuse existing convert logic
+      await handleConvertToTask(issue, validationResult);
+
+      // Show different toast for auto-convert
+      toast.success(`Auto-converted ${identifier} to task`, {
+        description: `Priority: ${getFeaturePriority(validationResult.estimatedComplexity)}`,
+      });
+    },
+    [autoConvert, issues, handleConvertToTask]
+  );
+
+  // Keep the ref updated with the latest callback
+  useEffect(() => {
+    autoConvertCallbackRef.current = handleAutoConvert;
+  }, [handleAutoConvert]);
+
   // Loading state
   if (connectionLoading) {
     return <LoadingState />;
@@ -368,6 +428,8 @@ export function LinearIssuesView() {
           onRefresh={refresh}
           autoValidate={autoValidate}
           onAutoValidateChange={setAutoValidate}
+          autoConvert={autoConvert}
+          onAutoConvertChange={setAutoConvert}
         />
 
         {/* Filters */}
