@@ -173,6 +173,7 @@ export function KanbanBoard({
                       onClick={onOpenPipelineSettings}
                       title="Pipeline Settings"
                       data-testid="pipeline-settings-button"
+                      data-onboarding-target="pipeline-settings"
                     >
                       <Settings2 className="w-3.5 h-3.5" />
                     </Button>

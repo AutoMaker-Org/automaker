@@ -50,6 +50,7 @@ export const KanbanColumn = memo(function KanbanColumn({
       )}
       style={widthStyle}
       data-testid={`kanban-column-${id}`}
+      data-onboarding-target={id}
     >
       {/* Background layer with opacity */}
       <div

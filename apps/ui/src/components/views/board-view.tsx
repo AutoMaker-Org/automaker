@@ -72,9 +72,11 @@ import {
   useBoardPersistence,
   useFollowUpState,
   useSelectionMode,
+  useBoardOnboarding,
 } from './board-view/hooks';
-import { SelectionActionBar } from './board-view/components';
+import { SelectionActionBar, BoardOnboardingWizard } from './board-view/components';
 import { MassEditDialog } from './board-view/dialogs';
+import { generateSampleFeatures, isSampleFeature } from './board-view/constants';
 
 // Stable empty array to avoid infinite loop in selector
 const EMPTY_WORKTREES: ReturnType<ReturnType<typeof useAppStore.getState>['getWorktrees']> = [];
@@ -188,6 +190,8 @@ export function BoardView() {
   const [searchQuery, setSearchQuery] = useState('');
   // Plan approval loading state
   const [isPlanApprovalLoading, setIsPlanApprovalLoading] = useState(false);
+  // Quick start loading state for onboarding
+  const [isQuickStartLoading, setIsQuickStartLoading] = useState(false);
   // Derive spec creation state from store - check if current project is the one being created
   const isCreatingSpec = specCreatingForProject === currentProject?.path;
   const creatingSpecProjectPath = specCreatingForProject ?? undefined;
@@ -1030,6 +1034,76 @@ export function BoardView() {
     currentProject,
   });
 
+  // Use onboarding wizard hook - triggered manually via help button
+  const onboarding = useBoardOnboarding({
+    projectPath: currentProject?.path || null,
+  });
+
+  // Handler for Quick Start - create sample features
+  const handleQuickStart = useCallback(async () => {
+    if (!currentProject) return;
+
+    setIsQuickStartLoading(true);
+    try {
+      const api = getHttpApiClient();
+      const sampleFeatures = generateSampleFeatures();
+
+      // Create each sample feature
+      for (const featureData of sampleFeatures) {
+        const result = await api.features.create(currentProject.path, featureData);
+        if (result.success && result.feature) {
+          useAppStore.getState().addFeature(result.feature);
+        }
+      }
+
+      onboarding.markQuickStartUsed();
+      toast.success('Sample tasks added!', {
+        description: 'Explore the board to see tasks at different stages.',
+      });
+
+      // Reload features to ensure state is in sync
+      loadFeatures();
+    } catch (error) {
+      logger.error('Failed to create sample features:', error);
+      toast.error('Failed to add sample tasks');
+    } finally {
+      setIsQuickStartLoading(false);
+    }
+  }, [currentProject, loadFeatures, onboarding]);
+
+  // Handler for clearing sample data
+  const handleClearSampleData = useCallback(async () => {
+    if (!currentProject) return;
+
+    const sampleFeatures = hookFeatures.filter((f) => isSampleFeature(f));
+    if (sampleFeatures.length === 0) {
+      onboarding.setHasSampleData(false);
+      return;
+    }
+
+    try {
+      const api = getHttpApiClient();
+      const featureIds = sampleFeatures.map((f) => f.id);
+      const result = await api.features.bulkDelete(currentProject.path, featureIds);
+
+      if (result.success || (result.results && result.results.some((r) => r.success))) {
+        // Remove from local state
+        const successfullyDeletedIds =
+          result.results?.filter((r) => r.success).map((r) => r.featureId) ?? featureIds;
+        successfullyDeletedIds.forEach((id) => {
+          useAppStore.getState().removeFeature(id);
+        });
+
+        onboarding.setHasSampleData(false);
+        toast.success('Sample tasks removed');
+        loadFeatures();
+      }
+    } catch (error) {
+      logger.error('Failed to clear sample data:', error);
+      toast.error('Failed to remove sample tasks');
+    }
+  }, [currentProject, hookFeatures, loadFeatures, onboarding]);
+
   // Find feature for pending plan approval
   const pendingApprovalFeature = useMemo(() => {
     if (!pendingPlanApproval) return null;
@@ -1212,6 +1286,7 @@ export function BoardView() {
         onShowBoardBackground={() => setShowBoardBackgroundModal(true)}
         onShowCompletedModal={() => setShowCompletedModal(true)}
         completedCount={completedFeatures.length}
+        onStartTour={onboarding.startWizard}
       />
 
       {/* Worktree Panel - conditionally rendered based on visibility setting */}
@@ -1571,6 +1646,23 @@ export function BoardView() {
           setWorktreeRefreshKey((k) => k + 1);
           setSelectedWorktreeForAction(null);
         }}
+      />
+
+      {/* Board Onboarding Wizard */}
+      <BoardOnboardingWizard
+        isVisible={onboarding.isWizardVisible}
+        currentStep={onboarding.currentStep}
+        currentStepData={onboarding.currentStepData}
+        totalSteps={onboarding.totalSteps}
+        onNext={onboarding.goToNextStep}
+        onPrevious={onboarding.goToPreviousStep}
+        onSkip={onboarding.skipWizard}
+        onComplete={onboarding.completeWizard}
+        onQuickStart={handleQuickStart}
+        hasSampleData={onboarding.hasSampleData}
+        onClearSampleData={handleClearSampleData}
+        isQuickStartLoading={isQuickStartLoading}
+        steps={onboarding.steps}
       />
     </div>
   );
