@@ -152,7 +152,6 @@ export function useLinearIssues({
       setIssues([]);
       setInitialLoadComplete(false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [teamId, projectId, enabled]);
 
   // Refetch when filters change
@@ -163,7 +162,6 @@ export function useLinearIssues({
       setInitialLoadComplete(false);
       fetchIssues(false, false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters]);
 
   // Silent background refresh interval
