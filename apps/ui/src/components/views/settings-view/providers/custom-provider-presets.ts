@@ -23,7 +23,7 @@ export const CUSTOM_ENDPOINT_PRESETS: CustomEndpointPreset[] = [
     value: 'zhipu',
     baseUrl: 'https://api.z.ai/api/anthropic',
     defaultModel: 'glm-4.7',
-    description: 'GLM Models by Zhipu AI a chinese frontier lab',
+    description: 'GLM Models by Zhipu AI, a Chinese frontier lab',
     docs: 'https://docs.z.ai/devpack/overview',
   },
   {
