@@ -149,6 +149,44 @@ export function getValidationPath(projectPath: string, issueNumber: number): str
   return path.join(getValidationDir(projectPath, issueNumber), 'validation.json');
 }
 
+// ============================================================================
+// Linear Validation Paths
+// ============================================================================
+
+/**
+ * Get the Linear validations directory for a project
+ *
+ * @param projectPath - Absolute path to project directory
+ * @returns Absolute path to {projectPath}/.automaker/linear-validations
+ */
+export function getLinearValidationsDir(projectPath: string): string {
+  return path.join(getAutomakerDir(projectPath), 'linear-validations');
+}
+
+/**
+ * Get the directory for a specific Linear issue validation
+ *
+ * @param projectPath - Absolute path to project directory
+ * @param identifier - Linear issue identifier (e.g., "ALE-1")
+ * @returns Absolute path to {projectPath}/.automaker/linear-validations/{identifier}
+ */
+export function getLinearValidationDir(projectPath: string, identifier: string): string {
+  // Sanitize identifier for filesystem (remove special chars, keep alphanumeric and hyphens)
+  const safeIdentifier = identifier.replace(/[^a-zA-Z0-9-]/g, '_');
+  return path.join(getLinearValidationsDir(projectPath), safeIdentifier);
+}
+
+/**
+ * Get the validation result file path for a Linear issue
+ *
+ * @param projectPath - Absolute path to project directory
+ * @param identifier - Linear issue identifier (e.g., "ALE-1")
+ * @returns Absolute path to {projectPath}/.automaker/linear-validations/{identifier}/validation.json
+ */
+export function getLinearValidationPath(projectPath: string, identifier: string): string {
+  return path.join(getLinearValidationDir(projectPath, identifier), 'validation.json');
+}
+
 /**
  * Get the app spec file path for a project
  *

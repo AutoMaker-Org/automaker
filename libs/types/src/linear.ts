@@ -5,6 +5,10 @@
  * Linear uses GraphQL API, we use @linear/sdk for type-safe access.
  */
 
+import type { IssueValidationResult } from './issue-validation.js';
+import type { ModelAlias } from './model.js';
+import type { CursorModelId } from './cursor-models.js';
+
 // ============================================================================
 // Core Linear Entities
 // ============================================================================
@@ -338,6 +342,103 @@ export interface LinearImportResult {
 }
 
 // ============================================================================
+// Validation Types
+// ============================================================================
+
+/**
+ * Linear Issue validation input (for UI -> API)
+ */
+export interface LinearValidationInput {
+  /** Linear issue ID (UUID) */
+  issueId: string;
+  /** Human-readable identifier (e.g., "ALE-1") */
+  identifier: string;
+  /** Issue title */
+  issueTitle: string;
+  /** Issue description/body */
+  issueBody: string;
+  /** Issue labels */
+  issueLabels?: string[];
+}
+
+/**
+ * Events emitted during Linear issue validation
+ */
+export type LinearValidationEvent =
+  | {
+      type: 'linear_validation_start';
+      issueId: string;
+      identifier: string;
+      issueTitle: string;
+      projectPath: string;
+    }
+  | {
+      type: 'linear_validation_progress';
+      issueId: string;
+      identifier: string;
+      content: string;
+      projectPath: string;
+    }
+  | {
+      type: 'linear_validation_complete';
+      issueId: string;
+      identifier: string;
+      issueTitle: string;
+      result: IssueValidationResult;
+      projectPath: string;
+      model: ModelAlias | CursorModelId;
+    }
+  | {
+      type: 'linear_validation_error';
+      issueId: string;
+      identifier: string;
+      error: string;
+      projectPath: string;
+    }
+  | {
+      type: 'linear_validation_viewed';
+      issueId: string;
+      identifier: string;
+      projectPath: string;
+    };
+
+/**
+ * Stored Linear validation with metadata
+ */
+export interface StoredLinearValidation {
+  /** Linear issue ID (UUID) */
+  issueId: string;
+  /** Human-readable identifier (e.g., "ALE-1") */
+  identifier: string;
+  /** Issue title at time of validation */
+  issueTitle: string;
+  /** ISO timestamp when validation was performed */
+  validatedAt: string;
+  /** Model used for validation */
+  model: ModelAlias | CursorModelId;
+  /** The validation result */
+  result: IssueValidationResult;
+  /** ISO timestamp when user viewed this validation */
+  viewedAt?: string;
+}
+
+/**
+ * Linear validation status response
+ */
+export interface LinearValidationStatusResult {
+  success: boolean;
+  /** Currently running validations (issue identifiers) */
+  runningValidations?: string[];
+  /** Cached validations for requested issues */
+  cachedValidations?: Array<{
+    identifier: string;
+    validation: StoredLinearValidation;
+    isStale: boolean;
+  }>;
+  error?: string;
+}
+
+// ============================================================================
 // Settings Types
 // ============================================================================
 
@@ -373,4 +474,6 @@ export interface LinearSettings {
   autoSyncInterval?: number;
   /** Saved filter presets */
   savedPresets?: LinearFilterPreset[];
+  /** Auto-validate new issues when they are loaded */
+  autoValidateNewIssues?: boolean;
 }

@@ -17,6 +17,7 @@ import type { NavSection, NavItem } from '../types';
 import type { KeyboardShortcut } from '@/hooks/use-keyboard-shortcuts';
 import type { Project } from '@/lib/electron';
 import { getElectronAPI } from '@/lib/electron';
+import { useAppStore } from '@/store/app-store';
 
 interface UseNavigationProps {
   shortcuts: {
@@ -76,6 +77,8 @@ export function useNavigation({
   const [hasGitHubRemote, setHasGitHubRemote] = useState(false);
   // Track if Linear is connected
   const [hasLinearConnection, setHasLinearConnection] = useState(false);
+  // Get apiKeys from store to react to changes
+  const { apiKeys } = useAppStore();
 
   useEffect(() => {
     async function checkGitHubRemote() {
@@ -98,9 +101,15 @@ export function useNavigation({
     checkGitHubRemote();
   }, [currentProject?.path]);
 
-  // Check Linear connection status
+  // Check Linear connection status - re-run when API key changes
   useEffect(() => {
     async function checkLinearConnection() {
+      // If no API key, no connection
+      if (!apiKeys.linear) {
+        setHasLinearConnection(false);
+        return;
+      }
+
       try {
         const api = getElectronAPI();
         if (api.linear) {
@@ -113,7 +122,7 @@ export function useNavigation({
     }
 
     checkLinearConnection();
-  }, []);
+  }, [apiKeys.linear]);
 
   // Build navigation sections
   const navSections: NavSection[] = useMemo(() => {

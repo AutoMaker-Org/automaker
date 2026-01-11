@@ -10,8 +10,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Label } from '@/components/ui/label';
 import { DEFAULT_PRESETS, FilterPreset } from '../types';
 import { cn } from '@/lib/utils';
 
@@ -173,20 +171,6 @@ export const LinearFilters = memo(function LinearFilters({
             Clear
           </Button>
         )}
-      </div>
-
-      {/* My Issues toggle */}
-      <div className="flex items-center gap-2">
-        <Checkbox
-          id="my-issues-only"
-          checked={filters.myIssuesOnly || false}
-          onCheckedChange={(checked) => {
-            onFiltersChange({ myIssuesOnly: checked === true });
-          }}
-        />
-        <Label htmlFor="my-issues-only" className="text-sm cursor-pointer">
-          My issues only
-        </Label>
       </div>
     </div>
   );

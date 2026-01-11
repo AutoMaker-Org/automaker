@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { getElectronAPI, LinearIssue, LinearIssueFilters } from '@/lib/electron';
 import { createLogger } from '@automaker/utils/logger';
 
@@ -17,12 +17,19 @@ export function useLinearIssues({ teamId, projectId, enabled = true }: UseLinear
   const [error, setError] = useState<string | null>(null);
   const [filters, setFilters] = useState<LinearIssueFilters>({});
   const [hasMore, setHasMore] = useState(false);
-  const [cursor, setCursor] = useState<string | undefined>(undefined);
+
+  // Use ref for cursor to avoid dependency cycles
+  const cursorRef = useRef<string | undefined>(undefined);
+
+  // Track current fetch to prevent race conditions
+  const fetchIdRef = useRef(0);
 
   const fetchIssues = useCallback(
     async (isRefresh = false, loadMore = false) => {
       const api = getElectronAPI();
       if (!api.linear || !teamId || !enabled) return;
+
+      const currentFetchId = ++fetchIdRef.current;
 
       try {
         if (isRefresh) {
@@ -36,10 +43,15 @@ export function useLinearIssues({ teamId, projectId, enabled = true }: UseLinear
           ...filters,
           teamId,
           ...(projectId ? { projectId } : {}),
-          ...(loadMore && cursor ? { cursor } : {}),
+          ...(loadMore && cursorRef.current ? { cursor: cursorRef.current } : {}),
         };
 
         const result = await api.linear.getIssues(requestFilters);
+
+        // Ignore stale responses
+        if (currentFetchId !== fetchIdRef.current) {
+          return;
+        }
 
         if (result.success && result.issues) {
           if (loadMore) {
@@ -50,48 +62,57 @@ export function useLinearIssues({ teamId, projectId, enabled = true }: UseLinear
 
           if (result.pageInfo) {
             setHasMore(result.pageInfo.hasNextPage);
-            setCursor(result.pageInfo.endCursor);
+            cursorRef.current = result.pageInfo.endCursor;
           } else {
             setHasMore(false);
-            setCursor(undefined);
+            cursorRef.current = undefined;
           }
         } else {
           setError(result.error || 'Failed to fetch issues');
         }
       } catch (err) {
+        // Ignore errors from stale requests
+        if (currentFetchId !== fetchIdRef.current) {
+          return;
+        }
         logger.error('Failed to fetch issues:', err);
         setError(err instanceof Error ? err.message : 'Failed to fetch issues');
       } finally {
-        setLoading(false);
-        setRefreshing(false);
+        // Only update loading state if this is still the current request
+        if (currentFetchId === fetchIdRef.current) {
+          setLoading(false);
+          setRefreshing(false);
+        }
       }
     },
-    [teamId, projectId, filters, cursor, enabled]
+    [teamId, projectId, filters, enabled]
   );
 
   // Reset and fetch when team/project changes
   useEffect(() => {
     if (teamId && enabled) {
       setIssues([]);
-      setCursor(undefined);
+      cursorRef.current = undefined;
       setHasMore(false);
       fetchIssues(false, false);
     } else {
       setIssues([]);
     }
-  }, [teamId, projectId, enabled, fetchIssues]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [teamId, projectId, enabled]);
 
   // Refetch when filters change
   useEffect(() => {
     if (teamId && enabled) {
-      setCursor(undefined);
+      cursorRef.current = undefined;
       setHasMore(false);
       fetchIssues(false, false);
     }
-  }, [filters, teamId, enabled, fetchIssues]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters]);
 
   const refresh = useCallback(() => {
-    setCursor(undefined);
+    cursorRef.current = undefined;
     setHasMore(false);
     fetchIssues(true, false);
   }, [fetchIssues]);

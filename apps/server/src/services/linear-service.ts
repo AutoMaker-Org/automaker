@@ -118,7 +118,8 @@ export class LinearService {
   }
 
   /**
-   * Get all teams the user has access to
+   * Get all teams the user has actual API access to
+   * Verifies access by attempting to fetch issues from each team
    */
   async getTeams(): Promise<LinearTeamsResult> {
     try {
@@ -132,15 +133,55 @@ export class LinearService {
         return { success: false, error: 'Not connected to Linear' };
       }
 
+      // Get all teams in the organization
+      // Note: client.teams() returns ALL teams regardless of API key scope
+      // We need to verify actual access by trying to fetch team-specific data
       const teamsResponse = await client.teams();
-      const teams: LinearTeam[] = teamsResponse.nodes.map((team) => ({
-        id: team.id,
-        key: team.key,
-        name: team.name,
-        description: team.description ?? undefined,
-        color: team.color ?? undefined,
-        icon: team.icon ?? undefined,
-      }));
+
+      logger.debug(`Linear API returned ${teamsResponse.nodes.length} teams total`);
+
+      // Verify access to each team by attempting to fetch issues
+      // Team-scoped API keys can see team metadata and states but can't fetch issues
+      // We need to try fetching issues to verify actual access
+      const teams: LinearTeam[] = [];
+      for (const team of teamsResponse.nodes) {
+        try {
+          // Try to fetch one issue from this team - this verifies actual access
+          const testIssues = await client.issues({
+            filter: { team: { id: { eq: team.id } } },
+            first: 1,
+          });
+
+          // Check if we got a valid response (not just empty but with proper structure)
+          // For teams without access, Linear API may throw or return malformed response
+          if (testIssues && typeof testIssues.pageInfo?.hasNextPage === 'boolean') {
+            // Valid response - we have access to this team
+            logger.info(
+              `Team ${team.name} (${team.key}) - access verified (issues query succeeded)`
+            );
+            teams.push({
+              id: team.id,
+              key: team.key,
+              name: team.name,
+              description: team.description ?? undefined,
+              color: team.color ?? undefined,
+              icon: team.icon ?? undefined,
+            });
+          } else {
+            logger.info(`Skipping team ${team.name} (${team.key}) - invalid response structure`);
+          }
+        } catch (accessError) {
+          // API key doesn't have access to this team's data
+          logger.info(
+            `Skipping team ${team.name} (${team.key}) - no access: ${accessError instanceof Error ? accessError.message : accessError}`
+          );
+        }
+      }
+
+      logger.debug(`After filtering: ${teams.length} teams with actual access`);
+
+      // Sort teams alphabetically by name
+      teams.sort((a, b) => a.name.localeCompare(b.name));
 
       // Update cache
       this.teamsCache = { data: teams, timestamp: Date.now() };
@@ -227,10 +268,11 @@ export class LinearService {
 
       if (filters.stateType && filters.stateType.length > 0) {
         linearFilter.state = { type: { in: filters.stateType } };
-      } else if (!filters.includeCompleted) {
-        // By default, exclude completed and canceled issues
+      } else if (filters.includeCompleted === false) {
+        // Only exclude completed/canceled if explicitly set to false
         linearFilter.state = { type: { nin: ['completed', 'canceled'] } };
       }
+      // Default: show all issues (including completed)
 
       if (filters.assigneeId) {
         linearFilter.assignee = { id: { eq: filters.assigneeId } };
@@ -253,15 +295,21 @@ export class LinearService {
         ];
       }
 
+      logger.debug('Fetching issues with filter:', JSON.stringify(linearFilter));
+
       const issuesResponse = await client.issues({
         filter: linearFilter,
         first: filters.limit ?? 50,
         after: filters.cursor,
       });
 
+      logger.debug(`Linear API returned ${issuesResponse.nodes.length} issues`);
+
       const issues: LinearIssue[] = await Promise.all(
         issuesResponse.nodes.map(async (issue) => this.mapIssue(issue))
       );
+
+      logger.info(`Returning ${issues.length} issues for team ${filters.teamId || 'all'}`);
 
       return {
         success: true,

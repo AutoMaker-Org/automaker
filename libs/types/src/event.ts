@@ -27,6 +27,7 @@ export type EventType =
   | 'suggestions:event'
   | 'spec-regeneration:event'
   | 'issue-validation:event'
+  | 'linear-validation:event'
   | 'ideation:stream'
   | 'ideation:session-started'
   | 'ideation:session-ended'

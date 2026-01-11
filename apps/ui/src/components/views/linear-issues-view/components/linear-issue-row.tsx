@@ -1,10 +1,18 @@
 import { memo } from 'react';
-import { ExternalLink, User } from 'lucide-react';
-import { LinearIssue } from '@/lib/electron';
+import {
+  ExternalLink,
+  User,
+  Loader2,
+  CheckCircle,
+  XCircle,
+  AlertCircle,
+  Clock,
+} from 'lucide-react';
+import { LinearIssue, StoredLinearValidation } from '@/lib/electron';
 import { cn } from '@/lib/utils';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
-import { formatDate, getPriorityColor } from '../utils';
+import { formatDate, getPriorityColor, isValidationStale } from '../utils';
 
 interface LinearIssueRowProps {
   issue: LinearIssue;
@@ -13,6 +21,8 @@ interface LinearIssueRowProps {
   onClick: () => void;
   onCheckChange: (checked: boolean) => void;
   onOpenExternal: () => void;
+  isValidating?: boolean;
+  cachedValidation?: StoredLinearValidation | null;
 }
 
 export const LinearIssueRow = memo(function LinearIssueRow({
@@ -22,7 +32,47 @@ export const LinearIssueRow = memo(function LinearIssueRow({
   onClick,
   onCheckChange,
   onOpenExternal,
+  isValidating = false,
+  cachedValidation,
 }: LinearIssueRowProps) {
+  // Determine validation status for badge
+  const renderValidationBadge = () => {
+    if (isValidating) {
+      return (
+        <Loader2
+          className="h-3.5 w-3.5 text-muted-foreground animate-spin shrink-0"
+          title="Validating..."
+        />
+      );
+    }
+
+    if (!cachedValidation) {
+      return null;
+    }
+
+    const isStale = isValidationStale(cachedValidation.validatedAt);
+    const verdict = cachedValidation.result.verdict;
+
+    if (isStale) {
+      return <Clock className="h-3.5 w-3.5 text-yellow-500 shrink-0" title="Validation is stale" />;
+    }
+
+    switch (verdict) {
+      case 'valid':
+        return <CheckCircle className="h-3.5 w-3.5 text-green-500 shrink-0" title="Valid" />;
+      case 'invalid':
+        return <XCircle className="h-3.5 w-3.5 text-red-500 shrink-0" title="Invalid" />;
+      case 'needs_clarification':
+        return (
+          <AlertCircle
+            className="h-3.5 w-3.5 text-yellow-500 shrink-0"
+            title="Needs clarification"
+          />
+        );
+      default:
+        return null;
+    }
+  };
   return (
     <div
       className={cn(
@@ -70,6 +120,9 @@ export const LinearIssueRow = memo(function LinearIssueRow({
               {issue.priority === 3 && '!'}
             </span>
           )}
+
+          {/* Validation badge */}
+          {renderValidationBadge()}
         </div>
 
         {/* Meta row */}
