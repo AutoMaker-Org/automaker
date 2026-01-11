@@ -1,3 +1,13 @@
+import { VALIDATION_STALENESS_HOURS } from './constants';
+
+/**
+ * Check if a validation is stale (older than VALIDATION_STALENESS_HOURS)
+ */
+export function isValidationStale(validatedAt: string): boolean {
+  const hoursSinceValidation = (Date.now() - new Date(validatedAt).getTime()) / (1000 * 60 * 60);
+  return hoursSinceValidation > VALIDATION_STALENESS_HOURS;
+}
+
 /**
  * Format a date string to relative or absolute format
  */

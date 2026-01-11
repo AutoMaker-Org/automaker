@@ -38,6 +38,10 @@ import type {
   LinearIssueResult,
   LinearImportOptions,
   LinearImportResult,
+  // Linear validation types
+  LinearValidationInput,
+  LinearValidationEvent,
+  StoredLinearValidation,
 } from '@automaker/types';
 import { getJSON, setJSON, removeItem } from './storage';
 
@@ -85,6 +89,9 @@ export type {
   LinearIssueResult,
   LinearImportOptions,
   LinearImportResult,
+  LinearValidationInput,
+  LinearValidationEvent,
+  StoredLinearValidation,
 };
 
 // Ideation API interface
@@ -408,6 +415,52 @@ export interface LinearAPI {
   getIssue: (issueId: string) => Promise<LinearIssueResult>;
   /** Import Linear issues as features */
   importIssues: (projectPath: string, options: LinearImportOptions) => Promise<LinearImportResult>;
+  /** Start async validation of a Linear issue */
+  validateIssue: (
+    projectPath: string,
+    input: LinearValidationInput,
+    model?: AgentModel,
+    thinkingLevel?: string
+  ) => Promise<{ success: boolean; message?: string; identifier?: string; error?: string }>;
+  /** Check validation status for an issue or all issues */
+  getValidationStatus: (
+    projectPath: string,
+    identifier?: string
+  ) => Promise<{
+    success: boolean;
+    isRunning?: boolean;
+    runningIdentifiers?: string[];
+    error?: string;
+  }>;
+  /** Stop a running validation */
+  stopValidation: (
+    projectPath: string,
+    identifier: string
+  ) => Promise<{ success: boolean; message?: string; error?: string }>;
+  /** Get stored validations for a project */
+  getValidations: (
+    projectPath: string,
+    identifier?: string
+  ) => Promise<{
+    success: boolean;
+    validation?: StoredLinearValidation | null;
+    validations?: StoredLinearValidation[];
+    isStale?: boolean;
+    error?: string;
+  }>;
+  /** Delete a stored validation */
+  deleteValidation: (
+    projectPath: string,
+    identifier: string
+  ) => Promise<{ success: boolean; deleted?: boolean; error?: string }>;
+  /** Mark a validation as viewed */
+  markValidationViewed: (
+    projectPath: string,
+    identifier: string,
+    issueId?: string
+  ) => Promise<{ success: boolean; error?: string }>;
+  /** Subscribe to validation events */
+  onValidationEvent: (callback: (event: LinearValidationEvent) => void) => () => void;
 }
 
 // Feature Suggestions types
@@ -816,17 +869,20 @@ export interface ElectronAPI {
         anthropic: { configured: boolean; masked: string };
         google: { configured: boolean; masked: string };
         openai: { configured: boolean; masked: string };
+        linear: { configured: boolean; masked: string };
+        apiKeys?: { anthropic?: string; google?: string; openai?: string; linear?: string };
       };
       error?: string;
     }>;
     updateCredentials: (updates: {
-      apiKeys?: { anthropic?: string; google?: string; openai?: string };
+      apiKeys?: { anthropic?: string; google?: string; openai?: string; linear?: string };
     }) => Promise<{
       success: boolean;
       credentials?: {
         anthropic: { configured: boolean; masked: string };
         google: { configured: boolean; masked: string };
         openai: { configured: boolean; masked: string };
+        linear: { configured: boolean; masked: string };
       };
       error?: string;
     }>;
@@ -3054,6 +3110,9 @@ function createMockGitHubAPI(): GitHubAPI {
 }
 
 // Mock Linear API implementation
+// Track mock validation event callbacks for Linear
+let mockLinearValidationCallbacks: ((event: LinearValidationEvent) => void)[] = [];
+
 function createMockLinearAPI(): LinearAPI {
   return {
     checkConnection: async () => {
@@ -3097,6 +3156,56 @@ function createMockLinearAPI(): LinearAPI {
         success: false,
         importedCount: 0,
         error: 'Linear API key not configured',
+      };
+    },
+    validateIssue: async (projectPath: string, input: LinearValidationInput, model?: string) => {
+      console.log('[Mock] Validating Linear issue:', { projectPath, input, model });
+      return {
+        success: false,
+        error: 'Linear API key not configured',
+      };
+    },
+    getValidationStatus: async (projectPath: string, identifier?: string) => {
+      console.log('[Mock] Getting Linear validation status:', { projectPath, identifier });
+      return {
+        success: true,
+        isRunning: false,
+        runningIdentifiers: [],
+      };
+    },
+    stopValidation: async (projectPath: string, identifier: string) => {
+      console.log('[Mock] Stopping Linear validation:', { projectPath, identifier });
+      return {
+        success: false,
+        error: 'No validation running',
+      };
+    },
+    getValidations: async (projectPath: string, identifier?: string) => {
+      console.log('[Mock] Getting Linear validations:', { projectPath, identifier });
+      return {
+        success: true,
+        validations: [],
+      };
+    },
+    deleteValidation: async (projectPath: string, identifier: string) => {
+      console.log('[Mock] Deleting Linear validation:', { projectPath, identifier });
+      return {
+        success: true,
+        deleted: false,
+      };
+    },
+    markValidationViewed: async (projectPath: string, identifier: string) => {
+      console.log('[Mock] Marking Linear validation as viewed:', { projectPath, identifier });
+      return {
+        success: true,
+      };
+    },
+    onValidationEvent: (callback: (event: LinearValidationEvent) => void) => {
+      mockLinearValidationCallbacks.push(callback);
+      return () => {
+        mockLinearValidationCallbacks = mockLinearValidationCallbacks.filter(
+          (cb) => cb !== callback
+        );
       };
     },
   };

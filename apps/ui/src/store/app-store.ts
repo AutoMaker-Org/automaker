@@ -120,6 +120,7 @@ export interface ApiKeys {
   anthropic: string;
   google: string;
   openai: string;
+  linear: string;
 }
 
 // Keyboard Shortcut with optional modifiers
@@ -1120,6 +1121,7 @@ const initialState: AppState = {
     anthropic: '',
     google: '',
     openai: '',
+    linear: '',
   },
   chatSessions: [],
   currentChatSession: null,

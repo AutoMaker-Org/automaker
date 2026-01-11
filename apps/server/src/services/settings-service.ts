@@ -431,6 +431,10 @@ export class SettingsService {
    */
   async getMaskedCredentials(): Promise<{
     anthropic: { configured: boolean; masked: string };
+    google: { configured: boolean; masked: string };
+    openai: { configured: boolean; masked: string };
+    linear: { configured: boolean; masked: string };
+    apiKeys?: { anthropic?: string; google?: string; openai?: string; linear?: string };
   }> {
     const credentials = await this.getCredentials();
 
@@ -444,6 +448,20 @@ export class SettingsService {
         configured: !!credentials.apiKeys.anthropic,
         masked: maskKey(credentials.apiKeys.anthropic),
       },
+      google: {
+        configured: !!credentials.apiKeys.google,
+        masked: maskKey(credentials.apiKeys.google),
+      },
+      openai: {
+        configured: !!credentials.apiKeys.openai,
+        masked: maskKey(credentials.apiKeys.openai),
+      },
+      linear: {
+        configured: !!credentials.apiKeys.linear,
+        masked: maskKey(credentials.apiKeys.linear),
+      },
+      // Also return raw apiKeys for UI store hydration
+      apiKeys: credentials.apiKeys,
     };
   }
 

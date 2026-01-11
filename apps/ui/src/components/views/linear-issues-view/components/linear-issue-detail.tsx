@@ -1,24 +1,139 @@
 import { memo } from 'react';
-import { X, ExternalLink, User, Calendar, Tag, Folder, Flag, GitBranch } from 'lucide-react';
-import { LinearIssue } from '@/lib/electron';
+import {
+  X,
+  ExternalLink,
+  User,
+  Calendar,
+  Tag,
+  Folder,
+  Flag,
+  GitBranch,
+  Wand2,
+  Loader2,
+  CheckCircle,
+  Clock,
+  RefreshCw,
+} from 'lucide-react';
+import { LinearIssue, StoredLinearValidation } from '@/lib/electron';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { formatDate, getPriorityColor } from '../utils';
+import { formatDate, getPriorityColor, isValidationStale } from '../utils';
+import { ModelOverrideTrigger } from '@/components/shared';
+import type { PhaseModelEntry } from '@automaker/types';
 import ReactMarkdown from 'react-markdown';
 
 interface LinearIssueDetailProps {
   issue: LinearIssue;
   onClose: () => void;
   onOpenInLinear: () => void;
+  // Validation props
+  isValidating?: boolean;
+  cachedValidation?: StoredLinearValidation | null;
+  onValidateIssue?: (options?: { forceRevalidate?: boolean }) => void;
+  onViewCachedValidation?: () => void;
+  modelOverride?: {
+    effectiveModelEntry: PhaseModelEntry;
+    setOverride: (entry: PhaseModelEntry | null) => void;
+    isOverridden: boolean;
+  };
 }
 
 export const LinearIssueDetail = memo(function LinearIssueDetail({
   issue,
   onClose,
   onOpenInLinear,
+  isValidating = false,
+  cachedValidation,
+  onValidateIssue,
+  onViewCachedValidation,
+  modelOverride,
 }: LinearIssueDetailProps) {
+  const isStale = cachedValidation ? isValidationStale(cachedValidation.validatedAt) : false;
+
+  const renderValidationButtons = () => {
+    // If no validation handlers provided, don't show validation UI
+    if (!onValidateIssue || !modelOverride) {
+      return null;
+    }
+
+    if (isValidating) {
+      return (
+        <Button variant="default" size="sm" disabled>
+          <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+          Validating...
+        </Button>
+      );
+    }
+
+    if (cachedValidation && !isStale) {
+      return (
+        <>
+          <Button variant="outline" size="sm" onClick={onViewCachedValidation}>
+            <CheckCircle className="h-4 w-4 mr-1 text-green-500" />
+            View Result
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => onValidateIssue({ forceRevalidate: true })}
+            title="Re-validate"
+          >
+            <RefreshCw className="h-4 w-4" />
+          </Button>
+        </>
+      );
+    }
+
+    if (cachedValidation && isStale) {
+      return (
+        <>
+          <Button variant="outline" size="sm" onClick={onViewCachedValidation}>
+            <Clock className="h-4 w-4 mr-1 text-yellow-500" />
+            View (stale)
+          </Button>
+          <ModelOverrideTrigger
+            currentModelEntry={modelOverride.effectiveModelEntry}
+            onModelChange={modelOverride.setOverride}
+            phase="validationModel"
+            isOverridden={modelOverride.isOverridden}
+            size="sm"
+            variant="icon"
+            className="mx-1"
+          />
+          <Button
+            variant="default"
+            size="sm"
+            onClick={() => onValidateIssue({ forceRevalidate: true })}
+          >
+            <Wand2 className="h-4 w-4 mr-1" />
+            Re-validate
+          </Button>
+        </>
+      );
+    }
+
+    // No cached validation
+    return (
+      <>
+        <ModelOverrideTrigger
+          currentModelEntry={modelOverride.effectiveModelEntry}
+          onModelChange={modelOverride.setOverride}
+          phase="validationModel"
+          isOverridden={modelOverride.isOverridden}
+          size="sm"
+          variant="icon"
+          className="mr-1"
+        />
+        <Button variant="default" size="sm" onClick={() => onValidateIssue()}>
+          <Wand2 className="h-4 w-4 mr-1" />
+          Validate with AI
+        </Button>
+      </>
+    );
+  };
+
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
       {/* Header */}
@@ -34,6 +149,7 @@ export const LinearIssueDetail = memo(function LinearIssueDetail({
           />
         </div>
         <div className="flex items-center gap-1">
+          {renderValidationButtons()}
           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onOpenInLinear}>
             <ExternalLink className="h-4 w-4" />
           </Button>
@@ -147,12 +263,13 @@ export const LinearIssueDetail = memo(function LinearIssueDetail({
           )}
 
           {/* Parent issue */}
-          {issue.parentId && (
+          {issue.parent && (
             <>
               <Separator />
               <div className="text-sm">
                 <span className="text-muted-foreground">Parent issue: </span>
-                <span className="font-mono">{issue.parentId}</span>
+                <span className="font-mono">{issue.parent.identifier}</span>
+                <span className="text-muted-foreground ml-2">{issue.parent.title}</span>
               </div>
             </>
           )}

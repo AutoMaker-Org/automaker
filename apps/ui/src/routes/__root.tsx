@@ -302,6 +302,18 @@ function RootLayoutContent() {
                   // Hydrate store with the final settings (merged if migration occurred)
                   hydrateStoreFromSettings(finalSettings);
 
+                  // Load credentials (API keys) from server and hydrate store
+                  try {
+                    const credentialsResult = await api.settings.getCredentials();
+                    if (credentialsResult.success && credentialsResult.credentials?.apiKeys) {
+                      useAppStore.getState().setApiKeys(credentialsResult.credentials.apiKeys);
+                      logger.debug('Loaded API keys from server');
+                    }
+                  } catch (credError) {
+                    logger.warn('Failed to load credentials:', credError);
+                    // Non-fatal: continue without credentials
+                  }
+
                   // Signal that settings hydration is complete so useSettingsSync can start
                   signalMigrationComplete();
 

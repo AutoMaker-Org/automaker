@@ -261,4 +261,9 @@ export type {
   LinearImportResult,
   LinearFilterPreset,
   LinearSettings,
+  // Linear validation types
+  LinearValidationInput,
+  LinearValidationEvent,
+  StoredLinearValidation,
+  LinearValidationStatusResult,
 } from './linear.js';

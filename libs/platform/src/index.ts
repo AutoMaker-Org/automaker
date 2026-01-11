@@ -16,6 +16,10 @@ export {
   getValidationsDir,
   getValidationDir,
   getValidationPath,
+  // Linear validation paths
+  getLinearValidationsDir,
+  getLinearValidationDir,
+  getLinearValidationPath,
   getAppSpecPath,
   getBranchTrackingPath,
   getExecutionStatePath,

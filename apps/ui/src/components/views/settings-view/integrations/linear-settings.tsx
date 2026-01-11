@@ -156,6 +156,7 @@ export function LinearSettings() {
           <h2 className="text-lg font-semibold text-foreground tracking-tight">
             Linear Integration
           </h2>
+          {hasStoredKey && <CheckCircle2 className="w-5 h-5 text-green-500" />}
         </div>
         <p className="text-sm text-muted-foreground/80 ml-12">
           Connect to Linear to import issues as features to your Kanban board.
@@ -267,13 +268,11 @@ export function LinearSettings() {
           )}
         </div>
 
-        {/* Connection Status */}
+        {/* Connection Status - always show when key is configured */}
         {hasStoredKey && !testResult && (
-          <div className="text-sm text-muted-foreground">
-            <span className="inline-flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-green-500" />
-              API key configured
-            </span>
+          <div className="flex items-center gap-2 p-3 rounded-lg bg-green-500/10 border border-green-500/20">
+            <CheckCircle2 className="w-5 h-5 text-green-500 shrink-0" />
+            <span className="text-sm font-medium text-green-600">Linear API key is configured</span>
           </div>
         )}
       </div>

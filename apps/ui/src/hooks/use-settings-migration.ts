@@ -638,6 +638,7 @@ export async function syncCredentialsToServer(apiKeys: {
   anthropic?: string;
   google?: string;
   openai?: string;
+  linear?: string;
 }): Promise<boolean> {
   try {
     const api = getHttpApiClient();

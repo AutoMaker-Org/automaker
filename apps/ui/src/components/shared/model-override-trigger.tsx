@@ -1,6 +1,6 @@
 import * as React from 'react';
-import { Settings2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { AnthropicIcon } from '@/components/ui/provider-icon';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useAppStore } from '@/store/app-store';
@@ -80,27 +80,41 @@ export function ModelOverrideTrigger({
     lg: 'w-5 h-5',
   };
 
-  // For icon variant, wrap PhaseModelSelector and hide text/chevron with CSS
+  // For icon variant, show a sparkles icon that opens the model selector
   if (variant === 'icon') {
+    const [iconOpen, setIconOpen] = React.useState(false);
+
     return (
       <div className={cn('relative inline-block', className)}>
-        <div className="relative [&_button>span]:hidden [&_button>svg:last-child]:hidden [&_button]:p-0 [&_button]:min-w-0 [&_button]:w-auto [&_button]:h-auto [&_button]:border-0 [&_button]:bg-transparent">
-          <PhaseModelSelector
-            value={currentModelEntry}
-            onChange={handleChange}
-            compact
-            triggerClassName={cn(
-              'relative rounded-md',
-              'transition-colors duration-150',
-              'text-muted-foreground hover:text-foreground',
-              'hover:bg-accent/50',
-              sizeClasses[size],
-              className
-            )}
-            disabled={false}
-            align="end"
-          />
-        </div>
+        <Popover open={iconOpen} onOpenChange={setIconOpen} modal={false}>
+          <PopoverTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className={cn(
+                'transition-colors duration-150',
+                'text-muted-foreground hover:text-foreground',
+                'hover:bg-accent/50',
+                sizeClasses[size]
+              )}
+              title="Select model"
+            >
+              <AnthropicIcon className={iconSizes[size]} />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0" align="end" sideOffset={4}>
+            <PhaseModelSelector
+              value={currentModelEntry}
+              onChange={(entry) => {
+                handleChange(entry);
+                setIconOpen(false);
+              }}
+              compact
+              disabled={false}
+              align="end"
+            />
+          </PopoverContent>
+        </Popover>
         {isOverridden && (
           <div className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-brand-500 rounded-full z-10 pointer-events-none" />
         )}

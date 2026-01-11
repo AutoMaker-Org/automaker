@@ -36,6 +36,8 @@ import type {
   LinearAPI,
   LinearIssueFilters,
   LinearImportOptions,
+  LinearValidationInput,
+  LinearValidationEvent,
 } from './electron';
 import type { Message, SessionListItem } from '@/types/electron';
 import type { Feature, ClaudeUsageResponse, CodexUsageResponse } from '@/store/app-store';
@@ -1735,6 +1737,24 @@ export class HttpApiClient implements ElectronAPI {
     getIssue: (issueId: string) => this.get(`/api/linear/issues/${issueId}`),
     importIssues: (projectPath: string, options: LinearImportOptions) =>
       this.post('/api/linear/import', { projectPath, options }),
+    validateIssue: (
+      projectPath: string,
+      input: LinearValidationInput,
+      model?: string,
+      thinkingLevel?: string
+    ) => this.post('/api/linear/validate-issue', { projectPath, ...input, model, thinkingLevel }),
+    getValidationStatus: (projectPath: string, identifier?: string) =>
+      this.post('/api/linear/validation-status', { projectPath, identifier }),
+    stopValidation: (projectPath: string, identifier: string) =>
+      this.post('/api/linear/validation-stop', { projectPath, identifier }),
+    getValidations: (projectPath: string, identifier?: string) =>
+      this.post('/api/linear/validations', { projectPath, identifier }),
+    deleteValidation: (projectPath: string, identifier: string) =>
+      this.post('/api/linear/validation-delete', { projectPath, identifier }),
+    markValidationViewed: (projectPath: string, identifier: string, issueId?: string) =>
+      this.post('/api/linear/validation-mark-viewed', { projectPath, identifier, issueId }),
+    onValidationEvent: (callback: (event: LinearValidationEvent) => void) =>
+      this.subscribeToEvent('linear-validation:event', callback as EventCallback),
   };
 
   // Workspace API
@@ -1933,13 +1953,14 @@ export class HttpApiClient implements ElectronAPI {
     }> => this.get('/api/settings/credentials'),
 
     updateCredentials: (updates: {
-      apiKeys?: { anthropic?: string; google?: string; openai?: string };
+      apiKeys?: { anthropic?: string; google?: string; openai?: string; linear?: string };
     }): Promise<{
       success: boolean;
       credentials?: {
         anthropic: { configured: boolean; masked: string };
         google: { configured: boolean; masked: string };
         openai: { configured: boolean; masked: string };
+        linear: { configured: boolean; masked: string };
       };
       error?: string;
     }> => this.put('/api/settings/credentials', updates),

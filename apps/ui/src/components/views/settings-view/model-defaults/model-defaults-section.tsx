@@ -33,8 +33,8 @@ const QUICK_TASKS: PhaseConfig[] = [
 const VALIDATION_TASKS: PhaseConfig[] = [
   {
     key: 'validationModel',
-    label: 'GitHub Issue Validation',
-    description: 'Validates and improves GitHub issues',
+    label: 'Issue Validation',
+    description: 'Validates and analyzes issues from GitHub or Linear',
   },
 ];
 
