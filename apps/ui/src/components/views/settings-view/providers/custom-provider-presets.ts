@@ -102,12 +102,12 @@ export function getProviderForModel(modelName: string): 'zhipu' | 'minimax' | 'm
   const bareModel = modelName.startsWith('custom-') ? modelName.slice(7) : modelName;
 
   // Check Zhipu models (GLM family)
-  if (bareModel.startsWith('glm-') || bareModel.includes('glm')) {
+  if (bareModel.startsWith('glm-')) {
     return 'zhipu';
   }
 
   // Check MiniMax models
-  if (bareModel.startsWith('minimax-') || bareModel.includes('minimax')) {
+  if (bareModel.startsWith('minimax-')) {
     return 'minimax';
   }
 
