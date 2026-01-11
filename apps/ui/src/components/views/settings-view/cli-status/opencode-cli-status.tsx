@@ -3,6 +3,7 @@ import { Badge } from '@/components/ui/badge';
 import { CheckCircle2, AlertCircle, RefreshCw, XCircle, Bot, Cloud } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { CliStatus } from '../shared/types';
+import { OpenCodeIcon } from '@/components/ui/provider-icon';
 
 export interface OpenCodeProviderInfo {
   id: string;
@@ -202,7 +203,7 @@ export function OpencodeCliStatus({
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-brand-500/20 to-brand-600/10 flex items-center justify-center border border-brand-500/20">
-              <Bot className="w-5 h-5 text-brand-500" />
+              <OpenCodeIcon className="w-5 h-5 text-brand-500" />
             </div>
             <h2 className="text-lg font-semibold text-foreground tracking-tight">OpenCode CLI</h2>
           </div>

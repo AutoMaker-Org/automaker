@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 // Note: persist middleware removed - settings now sync via API (use-settings-sync.ts)
 import type { Project, TrashedProject } from '@/lib/electron';
+import { getElectronAPI } from '@/lib/electron';
 import { createLogger } from '@automaker/utils/logger';
 import { setItem, getItem } from '@/lib/storage';
 import type {
@@ -11,7 +12,6 @@ import type {
   PlanningMode,
   ThinkingLevel,
   ModelProvider,
-  AIProfile,
   CursorModelId,
   CodexModelId,
   OpencodeModelId,
@@ -41,7 +41,6 @@ export type {
   PlanningMode,
   ThinkingLevel,
   ModelProvider,
-  AIProfile,
   FeatureTextFilePath,
   FeatureImagePath,
 };
@@ -55,7 +54,6 @@ export type ViewMode =
   | 'settings'
   | 'interview'
   | 'context'
-  | 'profiles'
   | 'running-agents'
   | 'terminal'
   | 'wiki'
@@ -117,7 +115,11 @@ function saveThemeToStorage(theme: ThemeMode): void {
   setItem(THEME_STORAGE_KEY, theme);
 }
 
-export type KanbanCardDetailLevel = 'minimal' | 'standard' | 'detailed';
+function persistEffectiveThemeForProject(project: Project | null, fallbackTheme: ThemeMode): void {
+  const projectTheme = project?.theme as ThemeMode | undefined;
+  const themeToStore = projectTheme ?? fallbackTheme;
+  saveThemeToStorage(themeToStore);
+}
 
 export type BoardViewMode = 'kanban' | 'graph';
 
@@ -215,11 +217,12 @@ export function formatShortcut(shortcut: string | undefined | null, forDisplay =
 export interface KeyboardShortcuts {
   // Navigation shortcuts
   board: string;
+  graph: string;
   agent: string;
   spec: string;
   context: string;
+  memory: string;
   settings: string;
-  profiles: string;
   terminal: string;
   ideation: string;
   githubIssues: string;
@@ -237,7 +240,6 @@ export interface KeyboardShortcuts {
   projectPicker: string;
   cyclePrevProject: string;
   cycleNextProject: string;
-  addProfile: string;
 
   // Terminal shortcuts
   splitTerminalRight: string;
@@ -250,11 +252,12 @@ export interface KeyboardShortcuts {
 export const DEFAULT_KEYBOARD_SHORTCUTS: KeyboardShortcuts = {
   // Navigation
   board: 'K',
+  graph: 'H',
   agent: 'A',
   spec: 'D',
   context: 'C',
+  memory: 'Y',
   settings: 'S',
-  profiles: 'M',
   terminal: 'T',
   ideation: 'I',
   githubIssues: 'G',
@@ -264,7 +267,7 @@ export const DEFAULT_KEYBOARD_SHORTCUTS: KeyboardShortcuts = {
   toggleSidebar: '`',
 
   // Actions
-  // Note: Some shortcuts share the same key (e.g., "N" for addFeature, newSession, addProfile)
+  // Note: Some shortcuts share the same key (e.g., "N" for addFeature, newSession)
   // This is intentional as they are context-specific and only active in their respective views
   addFeature: 'N', // Only active in board view
   addContextFile: 'N', // Only active in context view
@@ -274,7 +277,6 @@ export const DEFAULT_KEYBOARD_SHORTCUTS: KeyboardShortcuts = {
   projectPicker: 'P', // Global shortcut
   cyclePrevProject: 'Q', // Global shortcut
   cycleNextProject: 'E', // Global shortcut
-  addProfile: 'N', // Only active in profiles view
 
   // Terminal shortcuts (only active in terminal view)
   // Using Alt modifier to avoid conflicts with both terminal signals AND browser shortcuts
@@ -515,7 +517,6 @@ export interface AppState {
   maxConcurrency: number; // Maximum number of concurrent agent tasks
 
   // Kanban Card Display Settings
-  kanbanCardDetailLevel: KanbanCardDetailLevel; // Level of detail shown on kanban cards
   boardViewMode: BoardViewMode; // Whether to show kanban or dependency graph view
 
   // Feature Default Settings
@@ -539,12 +540,6 @@ export interface AppState {
       changedFilesCount?: number;
     }>
   >;
-
-  // AI Profiles
-  aiProfiles: AIProfile[];
-
-  // Profile Display Settings
-  showProfilesOnly: boolean; // When true, hide model tweaking options and show only profile selection
 
   // Keyboard Shortcuts
   keyboardShortcuts: KeyboardShortcuts; // User-defined keyboard shortcuts
@@ -644,7 +639,6 @@ export interface AppState {
 
   defaultPlanningMode: PlanningMode;
   defaultRequirePlanApproval: boolean;
-  defaultAIProfileId: string | null;
 
   // Plan Approval State
   // When a plan requires user approval, this holds the pending approval details
@@ -664,8 +658,26 @@ export interface AppState {
   codexUsage: CodexUsage | null;
   codexUsageLastUpdated: number | null;
 
+  // Codex Models (dynamically fetched)
+  codexModels: Array<{
+    id: string;
+    label: string;
+    description: string;
+    hasThinking: boolean;
+    supportsVision: boolean;
+    tier: 'premium' | 'standard' | 'basic';
+    isDefault: boolean;
+  }>;
+  codexModelsLoading: boolean;
+  codexModelsError: string | null;
+  codexModelsLastFetched: number | null;
+
   // Pipeline Configuration (per-project, keyed by project path)
   pipelineConfigByProject: Record<string, PipelineConfig>;
+
+  // Worktree Panel Visibility (per-project, keyed by project path)
+  // Whether the worktree panel row is visible (default: true)
+  worktreePanelVisibleByProject: Record<string, boolean>;
 
   // UI State (previously in localStorage, now synced via API)
   /** Whether worktree panel is collapsed in board view */
@@ -716,12 +728,6 @@ export type CodexPlanType =
   | 'edu'
   | 'unknown';
 
-export interface CodexCreditsSnapshot {
-  balance?: string;
-  unlimited?: boolean;
-  hasCredits?: boolean;
-}
-
 export interface CodexRateLimitWindow {
   limit: number;
   used: number;
@@ -735,7 +741,6 @@ export interface CodexUsage {
   rateLimits: {
     primary?: CodexRateLimitWindow;
     secondary?: CodexRateLimitWindow;
-    credits?: CodexCreditsSnapshot;
     planType?: CodexPlanType;
   } | null;
   lastUpdated: string;
@@ -834,6 +839,7 @@ export interface AppActions {
   cyclePrevProject: () => void; // Cycle back through project history (Q)
   cycleNextProject: () => void; // Cycle forward through project history (E)
   clearProjectHistory: () => void; // Clear history, keeping only current project
+  toggleProjectFavorite: (projectId: string) => void; // Toggle project favorite status
 
   // View actions
   setCurrentView: (view: ViewMode) => void;
@@ -887,7 +893,6 @@ export interface AppActions {
   setMaxConcurrency: (max: number) => void;
 
   // Kanban Card Settings actions
-  setKanbanCardDetailLevel: (level: KanbanCardDetailLevel) => void;
   setBoardViewMode: (mode: BoardViewMode) => void;
 
   // Feature Default Settings actions
@@ -918,9 +923,6 @@ export interface AppActions {
   }>;
   isPrimaryWorktreeBranch: (projectPath: string, branchName: string) => boolean;
   getPrimaryWorktreeBranch: (projectPath: string) => string | null;
-
-  // Profile Display Settings actions
-  setShowProfilesOnly: (enabled: boolean) => void;
 
   // Keyboard Shortcuts actions
   setKeyboardShortcut: (key: keyof KeyboardShortcuts, value: string) => void;
@@ -981,13 +983,6 @@ export interface AppActions {
 
   // Prompt Customization actions
   setPromptCustomization: (customization: PromptCustomization) => Promise<void>;
-
-  // AI Profile actions
-  addAIProfile: (profile: Omit<AIProfile, 'id'>) => void;
-  updateAIProfile: (id: string, updates: Partial<AIProfile>) => void;
-  removeAIProfile: (id: string) => void;
-  reorderAIProfiles: (oldIndex: number, newIndex: number) => void;
-  resetAIProfiles: () => void;
 
   // MCP Server actions
   addMCPServer: (server: Omit<MCPServerConfig, 'id'>) => void;
@@ -1073,7 +1068,6 @@ export interface AppActions {
 
   setDefaultPlanningMode: (mode: PlanningMode) => void;
   setDefaultRequirePlanApproval: (require: boolean) => void;
-  setDefaultAIProfileId: (profileId: string | null) => void;
 
   // Plan Approval actions
   setPendingPlanApproval: (
@@ -1100,6 +1094,10 @@ export interface AppActions {
   deletePipelineStep: (projectPath: string, stepId: string) => void;
   reorderPipelineSteps: (projectPath: string, stepIds: string[]) => void;
 
+  // Worktree Panel Visibility actions (per-project)
+  setWorktreePanelVisible: (projectPath: string, visible: boolean) => void;
+  getWorktreePanelVisible: (projectPath: string) => boolean;
+
   // UI State actions (previously in localStorage, now synced via API)
   setWorktreePanelCollapsed: (collapsed: boolean) => void;
   setLastProjectDir: (dir: string) => void;
@@ -1114,55 +1112,23 @@ export interface AppActions {
   // Codex Usage Tracking actions
   setCodexUsage: (usage: CodexUsage | null) => void;
 
+  // Codex Models actions
+  fetchCodexModels: (forceRefresh?: boolean) => Promise<void>;
+  setCodexModels: (
+    models: Array<{
+      id: string;
+      label: string;
+      description: string;
+      hasThinking: boolean;
+      supportsVision: boolean;
+      tier: 'premium' | 'standard' | 'basic';
+      isDefault: boolean;
+    }>
+  ) => void;
+
   // Reset
   reset: () => void;
 }
-
-// Default built-in AI profiles
-const DEFAULT_AI_PROFILES: AIProfile[] = [
-  // Claude profiles
-  {
-    id: 'profile-heavy-task',
-    name: 'Heavy Task',
-    description:
-      'Claude Opus with Ultrathink for complex architecture, migrations, or deep debugging.',
-    model: 'opus',
-    thinkingLevel: 'ultrathink',
-    provider: 'claude',
-    isBuiltIn: true,
-    icon: 'Brain',
-  },
-  {
-    id: 'profile-balanced',
-    name: 'Balanced',
-    description: 'Claude Sonnet with medium thinking for typical development tasks.',
-    model: 'sonnet',
-    thinkingLevel: 'medium',
-    provider: 'claude',
-    isBuiltIn: true,
-    icon: 'Scale',
-  },
-  {
-    id: 'profile-quick-edit',
-    name: 'Quick Edit',
-    description: 'Claude Haiku for fast, simple edits and minor fixes.',
-    model: 'haiku',
-    thinkingLevel: 'none',
-    provider: 'claude',
-    isBuiltIn: true,
-    icon: 'Zap',
-  },
-  // Cursor profiles
-  {
-    id: 'profile-cursor-refactoring',
-    name: 'Cursor Refactoring',
-    description: 'Cursor Composer 1 for refactoring tasks.',
-    provider: 'cursor',
-    cursorModel: 'composer-1',
-    isBuiltIn: true,
-    icon: 'Sparkles',
-  },
-];
 
 const initialState: AppState = {
   projects: [],
@@ -1188,7 +1154,6 @@ const initialState: AppState = {
   autoModeByProject: {},
   autoModeActivityLog: [],
   maxConcurrency: 3, // Default to 3 concurrent agents
-  kanbanCardDetailLevel: 'standard', // Default to standard detail level
   boardViewMode: 'kanban', // Default to kanban view
   defaultSkipTests: true, // Default to manual verification (tests disabled)
   enableDependencyBlocking: true, // Default to enabled (show dependency blocking UI)
@@ -1196,7 +1161,6 @@ const initialState: AppState = {
   useWorktrees: true, // Default to enabled (git worktree isolation)
   currentWorktreeByProject: {},
   worktreesByProject: {},
-  showProfilesOnly: false, // Default to showing all options (not profiles only)
   keyboardShortcuts: DEFAULT_KEYBOARD_SHORTCUTS, // Default keyboard shortcuts
   muteDoneSound: false, // Default to sound enabled (not muted)
   enhancementModel: 'sonnet', // Default to sonnet for feature enhancement
@@ -1226,7 +1190,6 @@ const initialState: AppState = {
   enableSubagents: true, // Subagents enabled by default
   subagentsSources: ['user', 'project'] as Array<'user' | 'project'>, // Load from both sources by default
   promptCustomization: {}, // Empty by default - all prompts use built-in defaults
-  aiProfiles: DEFAULT_AI_PROFILES,
   projectAnalysis: null,
   isAnalyzing: false,
   boardBackgroundByProject: {},
@@ -1251,14 +1214,18 @@ const initialState: AppState = {
   specCreatingForProject: null,
   defaultPlanningMode: 'skip' as PlanningMode,
   defaultRequirePlanApproval: false,
-  defaultAIProfileId: null,
   pendingPlanApproval: null,
   claudeRefreshInterval: 60,
   claudeUsage: null,
   claudeUsageLastUpdated: null,
   codexUsage: null,
   codexUsageLastUpdated: null,
+  codexModels: [],
+  codexModelsLoading: false,
+  codexModelsError: null,
+  codexModelsLastFetched: null,
   pipelineConfigByProject: {},
+  worktreePanelVisibleByProject: {},
   // UI State (previously in localStorage, now synced via API)
   worktreePanelCollapsed: false,
   lastProjectDir: '',
@@ -1305,13 +1272,16 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
     };
 
     const isCurrent = get().currentProject?.id === projectId;
+    const nextCurrentProject = isCurrent ? null : get().currentProject;
 
     set({
       projects: remainingProjects,
       trashedProjects: [trashedProject, ...existingTrash],
-      currentProject: isCurrent ? null : get().currentProject,
+      currentProject: nextCurrentProject,
       currentView: isCurrent ? 'welcome' : get().currentView,
     });
+
+    persistEffectiveThemeForProject(nextCurrentProject, get().theme);
   },
 
   restoreTrashedProject: (projectId) => {
@@ -1330,6 +1300,7 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
         currentProject: samePathProject,
         currentView: 'board',
       });
+      persistEffectiveThemeForProject(samePathProject, get().theme);
       return;
     }
 
@@ -1347,6 +1318,7 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
       currentProject: restoredProject,
       currentView: 'board',
     });
+    persistEffectiveThemeForProject(restoredProject, get().theme);
   },
 
   deleteTrashedProject: (projectId) => {
@@ -1366,6 +1338,7 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
 
   setCurrentProject: (project) => {
     set({ currentProject: project });
+    persistEffectiveThemeForProject(project, get().theme);
     if (project) {
       set({ currentView: 'board' });
       // Add to project history (MRU order)
@@ -1449,6 +1422,7 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
         projectHistoryIndex: newIndex,
         currentView: 'board',
       });
+      persistEffectiveThemeForProject(targetProject, get().theme);
     }
   },
 
@@ -1482,6 +1456,7 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
         projectHistoryIndex: newIndex,
         currentView: 'board',
       });
+      persistEffectiveThemeForProject(targetProject, get().theme);
     }
   },
 
@@ -1498,6 +1473,23 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
       set({
         projectHistory: [],
         projectHistoryIndex: -1,
+      });
+    }
+  },
+
+  toggleProjectFavorite: (projectId) => {
+    const { projects, currentProject } = get();
+    const updatedProjects = projects.map((p) =>
+      p.id === projectId ? { ...p, isFavorite: !p.isFavorite } : p
+    );
+    set({ projects: updatedProjects });
+    // Also update currentProject if it matches
+    if (currentProject?.id === projectId) {
+      set({
+        currentProject: {
+          ...currentProject,
+          isFavorite: !currentProject.isFavorite,
+        },
       });
     }
   },
@@ -1524,12 +1516,14 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
     // Also update currentProject if it's the same project
     const currentProject = get().currentProject;
     if (currentProject?.id === projectId) {
+      const updatedTheme = theme === null ? undefined : theme;
       set({
         currentProject: {
           ...currentProject,
-          theme: theme === null ? undefined : theme,
+          theme: updatedTheme,
         },
       });
+      persistEffectiveThemeForProject({ ...currentProject, theme: updatedTheme }, get().theme);
     }
   },
 
@@ -1777,7 +1771,6 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
   setMaxConcurrency: (max) => set({ maxConcurrency: max }),
 
   // Kanban Card Settings actions
-  setKanbanCardDetailLevel: (level) => set({ kanbanCardDetailLevel: level }),
   setBoardViewMode: (mode) => set({ boardViewMode: mode }),
 
   // Feature Default Settings actions
@@ -1832,9 +1825,6 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
     const primary = worktrees.find((w) => w.isMain);
     return primary?.branch ?? null;
   },
-
-  // Profile Display Settings actions
-  setShowProfilesOnly: (enabled) => set({ showProfilesOnly: enabled }),
 
   // Keyboard Shortcuts actions
   setKeyboardShortcut: (key, value) => {
@@ -2014,46 +2004,6 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
     // Sync to server settings file
     const { syncSettingsToServer } = await import('@/hooks/use-settings-migration');
     await syncSettingsToServer();
-  },
-
-  // AI Profile actions
-  addAIProfile: (profile) => {
-    const id = `profile-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    set({ aiProfiles: [...get().aiProfiles, { ...profile, id }] });
-  },
-
-  updateAIProfile: (id, updates) => {
-    set({
-      aiProfiles: get().aiProfiles.map((p) => (p.id === id ? { ...p, ...updates } : p)),
-    });
-  },
-
-  removeAIProfile: (id) => {
-    // Only allow removing non-built-in profiles
-    const profile = get().aiProfiles.find((p) => p.id === id);
-    if (profile && !profile.isBuiltIn) {
-      // Clear default if this profile was selected
-      if (get().defaultAIProfileId === id) {
-        set({ defaultAIProfileId: null });
-      }
-      set({ aiProfiles: get().aiProfiles.filter((p) => p.id !== id) });
-    }
-  },
-
-  reorderAIProfiles: (oldIndex, newIndex) => {
-    const profiles = [...get().aiProfiles];
-    const [movedProfile] = profiles.splice(oldIndex, 1);
-    profiles.splice(newIndex, 0, movedProfile);
-    set({ aiProfiles: profiles });
-  },
-
-  resetAIProfiles: () => {
-    // Merge: keep user-created profiles, but refresh all built-in profiles to latest defaults
-    const defaultProfileIds = new Set(DEFAULT_AI_PROFILES.map((p) => p.id));
-    const userProfiles = get().aiProfiles.filter(
-      (p) => !p.isBuiltIn && !defaultProfileIds.has(p.id)
-    );
-    set({ aiProfiles: [...DEFAULT_AI_PROFILES, ...userProfiles] });
   },
 
   // MCP Server actions
@@ -3044,7 +2994,6 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
 
   setDefaultPlanningMode: (mode) => set({ defaultPlanningMode: mode }),
   setDefaultRequirePlanApproval: (require) => set({ defaultRequirePlanApproval: require }),
-  setDefaultAIProfileId: (profileId) => set({ defaultAIProfileId: profileId }),
 
   // Plan Approval actions
   setPendingPlanApproval: (approval) => set({ pendingPlanApproval: approval }),
@@ -3063,6 +3012,53 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
     set({
       codexUsage: usage,
       codexUsageLastUpdated: usage ? Date.now() : null,
+    }),
+
+  // Codex Models actions
+  fetchCodexModels: async (forceRefresh = false) => {
+    const { codexModelsLastFetched, codexModelsLoading } = get();
+
+    // Skip if already loading
+    if (codexModelsLoading) return;
+
+    // Skip if recently fetched (< 5 minutes ago) and not forcing refresh
+    if (!forceRefresh && codexModelsLastFetched && Date.now() - codexModelsLastFetched < 300000) {
+      return;
+    }
+
+    set({ codexModelsLoading: true, codexModelsError: null });
+
+    try {
+      const api = getElectronAPI();
+      if (!api.codex) {
+        throw new Error('Codex API not available');
+      }
+
+      const result = await api.codex.getModels(forceRefresh);
+
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to fetch Codex models');
+      }
+
+      set({
+        codexModels: result.models || [],
+        codexModelsLastFetched: Date.now(),
+        codexModelsLoading: false,
+        codexModelsError: null,
+      });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      set({
+        codexModelsError: errorMessage,
+        codexModelsLoading: false,
+      });
+    }
+  },
+
+  setCodexModels: (models) =>
+    set({
+      codexModels: models,
+      codexModelsLastFetched: Date.now(),
     }),
 
   // Pipeline actions
@@ -3162,6 +3158,21 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
         [projectPath]: { ...config, steps: reorderedSteps },
       },
     });
+  },
+
+  // Worktree Panel Visibility actions (per-project)
+  setWorktreePanelVisible: (projectPath, visible) => {
+    set({
+      worktreePanelVisibleByProject: {
+        ...get().worktreePanelVisibleByProject,
+        [projectPath]: visible,
+      },
+    });
+  },
+
+  getWorktreePanelVisible: (projectPath) => {
+    // Default to true (visible) if not set
+    return get().worktreePanelVisibleByProject[projectPath] ?? true;
   },
 
   // UI State actions (previously in localStorage, now synced via API)

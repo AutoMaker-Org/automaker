@@ -12,12 +12,14 @@ import { useSetupStore } from '@/store/setup-store';
 import { useAuthStore } from '@/store/auth-store';
 import { getElectronAPI, isElectron } from '@/lib/electron';
 import { isMac } from '@/lib/utils';
+import { initializeProject } from '@/lib/project-init';
 import {
   initApiKey,
   verifySession,
   checkSandboxEnvironment,
   getServerUrlSync,
   getHttpApiClient,
+  handleServerOffline,
 } from '@/lib/http-api-client';
 import {
   hydrateStoreFromSettings,
@@ -30,8 +32,23 @@ import { SandboxRiskDialog } from '@/components/dialogs/sandbox-risk-dialog';
 import { SandboxRejectionScreen } from '@/components/dialogs/sandbox-rejection-screen';
 import { LoadingState } from '@/components/ui/loading-state';
 import { useProjectSettingsLoader } from '@/hooks/use-project-settings-loader';
+import type { Project } from '@/lib/electron';
 
 const logger = createLogger('RootLayout');
+const SERVER_READY_MAX_ATTEMPTS = 8;
+const SERVER_READY_BACKOFF_BASE_MS = 250;
+const SERVER_READY_MAX_DELAY_MS = 1500;
+const SERVER_READY_TIMEOUT_MS = 2000;
+const NO_STORE_CACHE_MODE: RequestCache = 'no-store';
+const AUTO_OPEN_HISTORY_INDEX = 0;
+const SINGLE_PROJECT_COUNT = 1;
+const DEFAULT_LAST_OPENED_TIME_MS = 0;
+const AUTO_OPEN_STATUS = {
+  idle: 'idle',
+  opening: 'opening',
+  done: 'done',
+} as const;
+type AutoOpenStatus = (typeof AUTO_OPEN_STATUS)[keyof typeof AUTO_OPEN_STATUS];
 
 // Apply stored theme immediately on page load (before React hydration)
 // This prevents flash of default theme on login/setup pages
@@ -60,21 +77,96 @@ function applyStoredTheme(): void {
 // Apply stored theme immediately (runs synchronously before render)
 applyStoredTheme();
 
+async function waitForServerReady(): Promise<boolean> {
+  const serverUrl = getServerUrlSync();
+
+  for (let attempt = 1; attempt <= SERVER_READY_MAX_ATTEMPTS; attempt++) {
+    try {
+      const response = await fetch(`${serverUrl}/api/health`, {
+        method: 'GET',
+        signal: AbortSignal.timeout(SERVER_READY_TIMEOUT_MS),
+        cache: NO_STORE_CACHE_MODE,
+      });
+
+      if (response.ok) {
+        return true;
+      }
+    } catch (error) {
+      logger.warn(`Server readiness check failed (attempt ${attempt})`, error);
+    }
+
+    const delayMs = Math.min(SERVER_READY_MAX_DELAY_MS, SERVER_READY_BACKOFF_BASE_MS * attempt);
+    await new Promise((resolve) => setTimeout(resolve, delayMs));
+  }
+
+  return false;
+}
+
+function getProjectLastOpenedMs(project: Project): number {
+  if (!project.lastOpened) return DEFAULT_LAST_OPENED_TIME_MS;
+  const parsed = Date.parse(project.lastOpened);
+  return Number.isNaN(parsed) ? DEFAULT_LAST_OPENED_TIME_MS : parsed;
+}
+
+function selectAutoOpenProject(
+  currentProject: Project | null,
+  projects: Project[],
+  projectHistory: string[]
+): Project | null {
+  if (currentProject) return currentProject;
+
+  if (projectHistory.length > 0) {
+    const historyProjectId = projectHistory[AUTO_OPEN_HISTORY_INDEX];
+    const historyProject = projects.find((project) => project.id === historyProjectId);
+    if (historyProject) {
+      return historyProject;
+    }
+  }
+
+  if (projects.length === SINGLE_PROJECT_COUNT) {
+    return projects[AUTO_OPEN_HISTORY_INDEX] ?? null;
+  }
+
+  if (projects.length > SINGLE_PROJECT_COUNT) {
+    let latestProject: Project | null = projects[AUTO_OPEN_HISTORY_INDEX] ?? null;
+    let latestTimestamp = latestProject
+      ? getProjectLastOpenedMs(latestProject)
+      : DEFAULT_LAST_OPENED_TIME_MS;
+
+    for (const project of projects) {
+      const openedAt = getProjectLastOpenedMs(project);
+      if (openedAt > latestTimestamp) {
+        latestTimestamp = openedAt;
+        latestProject = project;
+      }
+    }
+
+    return latestProject;
+  }
+
+  return null;
+}
+
 function RootLayoutContent() {
   const location = useLocation();
   const {
     setIpcConnected,
+    projects,
     currentProject,
+    projectHistory,
+    upsertAndSetCurrentProject,
     getEffectiveTheme,
     skipSandboxWarning,
     setSkipSandboxWarning,
+    fetchCodexModels,
   } = useAppStore();
-  const { setupComplete } = useSetupStore();
+  const { setupComplete, codexCliStatus } = useSetupStore();
   const navigate = useNavigate();
   const [isMounted, setIsMounted] = useState(false);
   const [streamerPanelOpen, setStreamerPanelOpen] = useState(false);
   const authChecked = useAuthStore((s) => s.authChecked);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const settingsLoaded = useAuthStore((s) => s.settingsLoaded);
   const { openFileBrowser } = useFileBrowser();
 
   // Load project settings when switching projects
@@ -83,6 +175,23 @@ function RootLayoutContent() {
   const isSetupRoute = location.pathname === '/setup';
   const isLoginRoute = location.pathname === '/login';
   const isLoggedOutRoute = location.pathname === '/logged-out';
+  const isDashboardRoute = location.pathname === '/dashboard';
+  const isBoardRoute = location.pathname === '/board';
+  const isRootRoute = location.pathname === '/';
+  const [autoOpenStatus, setAutoOpenStatus] = useState<AutoOpenStatus>(AUTO_OPEN_STATUS.idle);
+  const autoOpenCandidate = selectAutoOpenProject(currentProject, projects, projectHistory);
+  const canAutoOpen =
+    authChecked &&
+    isAuthenticated &&
+    settingsLoaded &&
+    setupComplete &&
+    !isLoginRoute &&
+    !isLoggedOutRoute &&
+    !isSetupRoute &&
+    !!autoOpenCandidate;
+  const shouldAutoOpen = canAutoOpen && autoOpenStatus !== AUTO_OPEN_STATUS.done;
+  const shouldBlockForSettings =
+    authChecked && isAuthenticated && !settingsLoaded && !isLoginRoute && !isLoggedOutRoute;
 
   // Sandbox environment check state
   type SandboxStatus = 'pending' | 'containerized' | 'needs-confirmation' | 'denied' | 'confirmed';
@@ -216,9 +325,11 @@ function RootLayoutContent() {
   // Works for ALL modes (unified flow)
   useEffect(() => {
     const handleLoggedOut = () => {
+      logger.warn('automaker:logged-out event received!');
       useAuthStore.getState().setAuthState({ isAuthenticated: false, authChecked: true });
 
       if (location.pathname !== '/logged-out') {
+        logger.warn('Navigating to /logged-out due to logged-out event');
         navigate({ to: '/logged-out' });
       }
     };
@@ -234,6 +345,7 @@ function RootLayoutContent() {
   // Redirects to login page which will detect server is offline and show error UI.
   useEffect(() => {
     const handleServerOffline = () => {
+      logger.warn('automaker:server-offline event received!');
       useAuthStore.getState().setAuthState({ isAuthenticated: false, authChecked: true });
 
       // Navigate to login - the login page will detect server is offline and show appropriate UI
@@ -263,6 +375,12 @@ function RootLayoutContent() {
       try {
         // Initialize API key for Electron mode
         await initApiKey();
+
+        const serverReady = await waitForServerReady();
+        if (!serverReady) {
+          handleServerOffline();
+          return;
+        }
 
         // 1. Verify session (Single Request, ALL modes)
         let isValid = false;
@@ -300,13 +418,28 @@ function RootLayoutContent() {
                   // Hydrate store with the final settings (merged if migration occurred)
                   hydrateStoreFromSettings(finalSettings);
 
-                  // Signal that settings hydration is complete so useSettingsSync can start
+                  // CRITICAL: Wait for React to render the hydrated state before
+                  // signaling completion. Zustand updates are synchronous, but React
+                  // hasn't necessarily re-rendered yet. This prevents race conditions
+                  // where useSettingsSync reads state before the UI has updated.
+                  await new Promise((resolve) => setTimeout(resolve, 0));
+
+                  // Signal that settings hydration is complete FIRST.
+                  // This ensures useSettingsSync's waitForMigrationComplete() will resolve
+                  // immediately when it starts after auth state change, preventing it from
+                  // syncing default empty state to the server.
                   signalMigrationComplete();
 
-                  // Mark auth as checked only after settings hydration succeeded.
-                  useAuthStore
-                    .getState()
-                    .setAuthState({ isAuthenticated: true, authChecked: true });
+                  // Now mark auth as checked AND settings as loaded.
+                  // The settingsLoaded flag ensures useSettingsSync won't start syncing
+                  // until settings have been properly hydrated, even if authChecked was
+                  // set earlier by login-view.
+                  useAuthStore.getState().setAuthState({
+                    isAuthenticated: true,
+                    authChecked: true,
+                    settingsLoaded: true,
+                  });
+
                   return;
                 }
 
@@ -371,16 +504,37 @@ function RootLayoutContent() {
   // - If authenticated but setup incomplete: force /setup
   // - If authenticated and setup complete: allow access to app
   useEffect(() => {
+    logger.debug('Routing effect triggered:', {
+      authChecked,
+      isAuthenticated,
+      settingsLoaded,
+      setupComplete,
+      pathname: location.pathname,
+    });
+
     // Wait for auth check to complete before enforcing any redirects
-    if (!authChecked) return;
+    if (!authChecked) {
+      logger.debug('Auth not checked yet, skipping routing');
+      return;
+    }
 
     // Unauthenticated -> force /logged-out (but allow /login so user can authenticate)
     if (!isAuthenticated) {
+      logger.warn('Not authenticated, redirecting to /logged-out. Auth state:', {
+        authChecked,
+        isAuthenticated,
+        settingsLoaded,
+        currentPath: location.pathname,
+      });
       if (location.pathname !== '/logged-out' && location.pathname !== '/login') {
         navigate({ to: '/logged-out' });
       }
       return;
     }
+
+    // Wait for settings to be loaded before making setupComplete-based routing decisions
+    // This prevents redirecting to /setup before we know the actual setupComplete value
+    if (!settingsLoaded) return;
 
     // Authenticated -> determine whether setup is required
     if (!setupComplete && location.pathname !== '/setup') {
@@ -388,11 +542,50 @@ function RootLayoutContent() {
       return;
     }
 
-    // Setup complete but user is still on /setup -> go to app
+    // Setup complete but user is still on /setup -> go to dashboard
     if (setupComplete && location.pathname === '/setup') {
-      navigate({ to: '/' });
+      navigate({ to: '/dashboard' });
     }
-  }, [authChecked, isAuthenticated, setupComplete, location.pathname, navigate]);
+  }, [authChecked, isAuthenticated, settingsLoaded, setupComplete, location.pathname, navigate]);
+
+  // Fallback: If auth is checked and authenticated but settings not loaded,
+  // it means login-view or another component set auth state before __root.tsx's
+  // auth flow completed. Load settings now to prevent sync with empty state.
+  useEffect(() => {
+    // Only trigger if auth is valid but settings aren't loaded yet
+    // This handles the case where login-view sets authChecked=true before we finish our auth flow
+    if (!authChecked || !isAuthenticated || settingsLoaded) {
+      logger.debug('Fallback skipped:', { authChecked, isAuthenticated, settingsLoaded });
+      return;
+    }
+
+    logger.info('Auth valid but settings not loaded - triggering fallback load');
+
+    const loadSettings = async () => {
+      const api = getHttpApiClient();
+      try {
+        logger.debug('Fetching settings in fallback...');
+        const settingsResult = await api.settings.getGlobal();
+        logger.debug('Settings fetched:', settingsResult.success ? 'success' : 'failed');
+        if (settingsResult.success && settingsResult.settings) {
+          const { settings: finalSettings } = await performSettingsMigration(
+            settingsResult.settings as unknown as Parameters<typeof performSettingsMigration>[0]
+          );
+          logger.debug('Settings migrated, hydrating stores...');
+          hydrateStoreFromSettings(finalSettings);
+          await new Promise((resolve) => setTimeout(resolve, 0));
+          signalMigrationComplete();
+          logger.debug('Setting settingsLoaded=true');
+          useAuthStore.getState().setAuthState({ settingsLoaded: true });
+          logger.info('Fallback settings load completed successfully');
+        }
+      } catch (error) {
+        logger.error('Failed to load settings in fallback:', error);
+      }
+    };
+
+    loadSettings();
+  }, [authChecked, isAuthenticated, settingsLoaded]);
 
   useEffect(() => {
     setGlobalFileBrowser(openFileBrowser);
@@ -424,12 +617,87 @@ function RootLayoutContent() {
     testConnection();
   }, [setIpcConnected]);
 
-  // Restore to board view if a project was previously open
+  // Redirect from welcome page based on project state
   useEffect(() => {
-    if (isMounted && currentProject && location.pathname === '/') {
-      navigate({ to: '/board' });
+    if (isMounted && isRootRoute) {
+      if (!settingsLoaded || shouldAutoOpen) {
+        return;
+      }
+      if (currentProject) {
+        // Project is selected, go to board
+        navigate({ to: '/board' });
+      } else {
+        // No project selected, go to dashboard
+        navigate({ to: '/dashboard' });
+      }
     }
-  }, [isMounted, currentProject, location.pathname, navigate]);
+  }, [isMounted, currentProject, isRootRoute, navigate, shouldAutoOpen, settingsLoaded]);
+
+  // Auto-open the most recent project on startup
+  useEffect(() => {
+    if (!canAutoOpen) return;
+    if (autoOpenStatus !== AUTO_OPEN_STATUS.idle) return;
+
+    if (!autoOpenCandidate) return;
+
+    setAutoOpenStatus(AUTO_OPEN_STATUS.opening);
+
+    const openProject = async () => {
+      try {
+        const initResult = await initializeProject(autoOpenCandidate.path);
+        if (!initResult.success) {
+          logger.warn('Auto-open project failed:', initResult.error);
+          if (isRootRoute) {
+            navigate({ to: '/dashboard' });
+          }
+          return;
+        }
+
+        if (!currentProject || currentProject.id !== autoOpenCandidate.id) {
+          upsertAndSetCurrentProject(
+            autoOpenCandidate.path,
+            autoOpenCandidate.name,
+            autoOpenCandidate.theme
+          );
+        }
+
+        if (isRootRoute) {
+          navigate({ to: '/board' });
+        }
+      } catch (error) {
+        logger.error('Auto-open project crashed:', error);
+        if (isRootRoute) {
+          navigate({ to: '/dashboard' });
+        }
+      } finally {
+        setAutoOpenStatus(AUTO_OPEN_STATUS.done);
+      }
+    };
+
+    void openProject();
+  }, [
+    canAutoOpen,
+    autoOpenStatus,
+    autoOpenCandidate,
+    currentProject,
+    navigate,
+    upsertAndSetCurrentProject,
+    isRootRoute,
+  ]);
+
+  // Bootstrap Codex models on app startup (after auth completes)
+  useEffect(() => {
+    // Only fetch if authenticated and Codex CLI is available
+    if (!authChecked || !isAuthenticated) return;
+
+    const isCodexAvailable = codexCliStatus?.installed && codexCliStatus?.hasApiKey;
+    if (!isCodexAvailable) return;
+
+    // Fetch models in the background
+    fetchCodexModels().catch((error) => {
+      logger.warn('Failed to bootstrap Codex models:', error);
+    });
+  }, [authChecked, isAuthenticated, codexCliStatus, fetchCodexModels]);
 
   // Apply theme class to document - use deferred value to avoid blocking UI
   useEffect(() => {
@@ -490,12 +758,45 @@ function RootLayoutContent() {
     );
   }
 
+  if (shouldBlockForSettings) {
+    return (
+      <main className="flex h-screen items-center justify-center" data-testid="app-container">
+        <LoadingState message="Loading settings..." />
+      </main>
+    );
+  }
+
+  if (shouldAutoOpen) {
+    return (
+      <main className="flex h-screen items-center justify-center" data-testid="app-container">
+        <LoadingState message="Opening project..." />
+      </main>
+    );
+  }
+
   // Show setup page (full screen, no sidebar) - authenticated only
   if (isSetupRoute) {
     return (
       <main className="h-screen overflow-hidden" data-testid="app-container">
         <Outlet />
       </main>
+    );
+  }
+
+  // Show dashboard page (full screen, no sidebar) - authenticated only
+  if (isDashboardRoute) {
+    return (
+      <>
+        <main className="h-screen overflow-hidden" data-testid="app-container">
+          <Outlet />
+          <Toaster richColors position="bottom-right" />
+        </main>
+        <SandboxRiskDialog
+          open={showSandboxDialog}
+          onConfirm={handleSandboxConfirm}
+          onDeny={handleSandboxDeny}
+        />
+      </>
     );
   }
 

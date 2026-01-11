@@ -17,7 +17,6 @@ import { CreateSpecDialog } from '@/components/views/spec-view/dialogs';
 import {
   CollapseToggleButton,
   SidebarHeader,
-  ProjectActions,
   SidebarNavigation,
   ProjectSelectorWithOptions,
   SidebarFooter,
@@ -59,7 +58,7 @@ export function Sidebar() {
   } = useAppStore();
 
   // Environment variable flags for hiding sidebar items
-  const { hideTerminal, hideWiki, hideRunningAgents, hideContext, hideSpecEditor, hideAiProfiles } =
+  const { hideTerminal, hideWiki, hideRunningAgents, hideContext, hideSpecEditor } =
     SIDEBAR_FEATURE_FLAGS;
 
   // Get customizable keyboard shortcuts
@@ -127,6 +126,9 @@ export function Sidebar() {
   // Derive isCreatingSpec from store state
   const isCreatingSpec = specCreatingForProject !== null;
   const creatingSpecProjectPath = specCreatingForProject;
+  // Check if the current project is specifically the one generating spec
+  const isCurrentProjectGeneratingSpec =
+    specCreatingForProject !== null && specCreatingForProject === currentProject?.path;
 
   // Auto-collapse sidebar on small screens and update Electron window minWidth
   useSidebarAutoCollapse({ sidebarOpen, toggleSidebar });
@@ -232,7 +234,6 @@ export function Sidebar() {
     hideSpecEditor,
     hideContext,
     hideTerminal,
-    hideAiProfiles,
     currentProject,
     projects,
     projectHistory,
@@ -243,6 +244,7 @@ export function Sidebar() {
     cyclePrevProject,
     cycleNextProject,
     unviewedValidationsCount,
+    isSpecGenerating: isCurrentProjectGeneratingSpec,
   });
 
   // Register keyboard shortcuts
@@ -276,17 +278,6 @@ export function Sidebar() {
 
       <div className="flex-1 flex flex-col overflow-hidden">
         <SidebarHeader sidebarOpen={sidebarOpen} navigate={navigate} />
-
-        {/* Project Actions - Moved above project selector */}
-        {sidebarOpen && (
-          <ProjectActions
-            setShowNewProjectModal={setShowNewProjectModal}
-            handleOpenFolder={handleOpenFolder}
-            setShowTrashDialog={setShowTrashDialog}
-            trashedProjects={trashedProjects}
-            shortcuts={{ openProject: shortcuts.openProject }}
-          />
-        )}
 
         <ProjectSelectorWithOptions
           sidebarOpen={sidebarOpen}

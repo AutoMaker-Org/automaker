@@ -13,6 +13,8 @@ export interface NavItem {
   shortcut?: string;
   /** Optional count badge to display next to the nav item */
   count?: number;
+  /** Whether this nav item is in a loading state (shows spinner) */
+  isLoading?: boolean;
 }
 
 export interface SortableProjectItemProps {

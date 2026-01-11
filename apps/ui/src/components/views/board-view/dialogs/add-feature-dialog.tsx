@@ -21,46 +21,33 @@ import {
   FeatureTextFilePath as DescriptionTextFilePath,
   ImagePreviewMap,
 } from '@/components/ui/description-image-dropzone';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Sparkles, ChevronDown, ChevronRight, Play, Cpu, FolderKanban } from 'lucide-react';
+import { Play, Cpu, FolderKanban } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { getElectronAPI } from '@/lib/electron';
 import { modelSupportsThinking } from '@/lib/utils';
 import {
   useAppStore,
   ModelAlias,
   ThinkingLevel,
   FeatureImage,
-  AIProfile,
   PlanningMode,
   Feature,
 } from '@/store/app-store';
 import type { ReasoningEffort, PhaseModelEntry } from '@automaker/types';
-import {
-  supportsReasoningEffort,
-  PROVIDER_PREFIXES,
-  isCursorModel,
-  isClaudeModel,
-} from '@automaker/types';
+import { supportsReasoningEffort, isClaudeModel } from '@automaker/types';
 import {
   TestingTabContent,
   PrioritySelector,
   WorkModeSelector,
   PlanningModeSelect,
   AncestorContextSection,
-  ProfileTypeahead,
+  EnhanceWithAI,
+  EnhancementHistoryButton,
+  type BaseHistoryEntry,
 } from '../shared';
 import type { WorkMode } from '../shared';
 import { PhaseModelSelector } from '@/components/views/settings-view/model-defaults/phase-model-selector';
-import { ModelOverrideTrigger, useModelOverride } from '@/components/shared';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { useNavigate } from '@tanstack/react-router';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   getAncestors,
   formatAncestorContextForPrompt,
@@ -100,10 +87,15 @@ interface AddFeatureDialogProps {
   defaultBranch?: string;
   currentBranch?: string;
   isMaximized: boolean;
-  showProfilesOnly: boolean;
-  aiProfiles: AIProfile[];
   parentFeature?: Feature | null;
   allFeatures?: Feature[];
+}
+
+/**
+ * A single entry in the description history
+ */
+interface DescriptionHistoryEntry extends BaseHistoryEntry {
+  description: string;
 }
 
 export function AddFeatureDialog({
@@ -118,13 +110,10 @@ export function AddFeatureDialog({
   defaultBranch = 'main',
   currentBranch,
   isMaximized,
-  showProfilesOnly,
-  aiProfiles,
   parentFeature = null,
   allFeatures = [],
 }: AddFeatureDialogProps) {
   const isSpawnMode = !!parentFeature;
-  const navigate = useNavigate();
   const [workMode, setWorkMode] = useState<WorkMode>('current');
 
   // Form state
@@ -139,7 +128,6 @@ export function AddFeatureDialog({
   const [priority, setPriority] = useState(2);
 
   // Model selection state
-  const [selectedProfileId, setSelectedProfileId] = useState<string | undefined>();
   const [modelEntry, setModelEntry] = useState<PhaseModelEntry>({ model: 'opus' });
 
   // Check if current model supports planning mode (Claude/Anthropic only)
@@ -152,21 +140,16 @@ export function AddFeatureDialog({
   // UI state
   const [previewMap, setPreviewMap] = useState<ImagePreviewMap>(() => new Map());
   const [descriptionError, setDescriptionError] = useState(false);
-  const [isEnhancing, setIsEnhancing] = useState(false);
-  const [enhancementMode, setEnhancementMode] = useState<
-    'improve' | 'technical' | 'simplify' | 'acceptance'
-  >('improve');
-  const [enhanceOpen, setEnhanceOpen] = useState(false);
+
+  // Description history state
+  const [descriptionHistory, setDescriptionHistory] = useState<DescriptionHistoryEntry[]>([]);
 
   // Spawn mode state
   const [ancestors, setAncestors] = useState<AncestorContext[]>([]);
   const [selectedAncestorIds, setSelectedAncestorIds] = useState<Set<string>>(new Set());
 
   // Get defaults from store
-  const { defaultPlanningMode, defaultRequirePlanApproval, defaultAIProfileId } = useAppStore();
-
-  // Enhancement model override
-  const enhancementOverride = useModelOverride({ phase: 'enhancementModel' });
+  const { defaultPlanningMode, defaultRequirePlanApproval } = useAppStore();
 
   // Track previous open state to detect when dialog opens
   const wasOpenRef = useRef(false);
@@ -177,24 +160,15 @@ export function AddFeatureDialog({
     wasOpenRef.current = open;
 
     if (justOpened) {
-      const defaultProfile = defaultAIProfileId
-        ? aiProfiles.find((p) => p.id === defaultAIProfileId)
-        : null;
-
       setSkipTests(defaultSkipTests);
       setBranchName(defaultBranch || '');
       setWorkMode('current');
       setPlanningMode(defaultPlanningMode);
       setRequirePlanApproval(defaultRequirePlanApproval);
+      setModelEntry({ model: 'opus' });
 
-      // Set model from default profile or fallback
-      if (defaultProfile) {
-        setSelectedProfileId(defaultProfile.id);
-        applyProfileToModel(defaultProfile);
-      } else {
-        setSelectedProfileId(undefined);
-        setModelEntry({ model: 'opus' });
-      }
+      // Initialize description history (empty for new feature)
+      setDescriptionHistory([]);
 
       // Initialize ancestors for spawn mode
       if (parentFeature) {
@@ -212,41 +186,12 @@ export function AddFeatureDialog({
     defaultBranch,
     defaultPlanningMode,
     defaultRequirePlanApproval,
-    defaultAIProfileId,
-    aiProfiles,
     parentFeature,
     allFeatures,
   ]);
 
-  const applyProfileToModel = (profile: AIProfile) => {
-    if (profile.provider === 'cursor') {
-      const cursorModel = `${PROVIDER_PREFIXES.cursor}${profile.cursorModel || 'auto'}`;
-      setModelEntry({ model: cursorModel as ModelAlias });
-    } else if (profile.provider === 'codex') {
-      setModelEntry({
-        model: profile.codexModel || 'codex-gpt-5.2-codex',
-        reasoningEffort: 'none',
-      });
-    } else if (profile.provider === 'opencode') {
-      setModelEntry({ model: profile.opencodeModel || 'opencode/big-pickle' });
-    } else {
-      // Claude
-      setModelEntry({
-        model: profile.model || 'sonnet',
-        thinkingLevel: profile.thinkingLevel || 'none',
-      });
-    }
-  };
-
-  const handleProfileSelect = (profile: AIProfile) => {
-    setSelectedProfileId(profile.id);
-    applyProfileToModel(profile);
-  };
-
   const handleModelChange = (entry: PhaseModelEntry) => {
     setModelEntry(entry);
-    // Clear profile selection when manually changing model
-    setSelectedProfileId(undefined);
   };
 
   const buildFeatureData = (): FeatureData | null => {
@@ -327,14 +272,13 @@ export function AddFeatureDialog({
     setSkipTests(defaultSkipTests);
     setBranchName('');
     setPriority(2);
-    setSelectedProfileId(undefined);
     setModelEntry({ model: 'opus' });
     setWorkMode('current');
     setPlanningMode(defaultPlanningMode);
     setRequirePlanApproval(defaultRequirePlanApproval);
     setPreviewMap(new Map());
     setDescriptionError(false);
-    setEnhanceOpen(false);
+    setDescriptionHistory([]);
     onOpenChange(false);
   };
 
@@ -354,33 +298,6 @@ export function AddFeatureDialog({
     if (!open) {
       setPreviewMap(new Map());
       setDescriptionError(false);
-    }
-  };
-
-  const handleEnhanceDescription = async () => {
-    if (!description.trim() || isEnhancing) return;
-
-    setIsEnhancing(true);
-    try {
-      const api = getElectronAPI();
-      const result = await api.enhancePrompt?.enhance(
-        description,
-        enhancementMode,
-        enhancementOverride.effectiveModel,
-        enhancementOverride.effectiveModelEntry.thinkingLevel
-      );
-
-      if (result?.success && result.enhancedText) {
-        setDescription(result.enhancedText);
-        toast.success('Description enhanced!');
-      } else {
-        toast.error(result?.error || 'Failed to enhance description');
-      }
-    } catch (error) {
-      logger.error('Enhancement failed:', error);
-      toast.error('Failed to enhance description');
-    } finally {
-      setIsEnhancing(false);
     }
   };
 
@@ -435,7 +352,18 @@ export function AddFeatureDialog({
           {/* Task Details Section */}
           <div className={cardClass}>
             <div className="space-y-2">
-              <Label htmlFor="description">Description</Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="description">Description</Label>
+                {/* Version History Button */}
+                <EnhancementHistoryButton
+                  history={descriptionHistory}
+                  currentValue={description}
+                  onRestore={setDescription}
+                  valueAccessor={(entry) => entry.description}
+                  title="Version History"
+                  restoreMessage="Description restored from history"
+                />
+              </div>
               <DescriptionImageDropZone
                 value={description}
                 onChange={(value) => {
@@ -464,71 +392,35 @@ export function AddFeatureDialog({
               />
             </div>
 
-            {/* Collapsible Enhancement Section */}
-            <Collapsible open={enhanceOpen} onOpenChange={setEnhanceOpen}>
-              <CollapsibleTrigger asChild>
-                <button className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors w-full py-1">
-                  {enhanceOpen ? (
-                    <ChevronDown className="w-4 h-4" />
-                  ) : (
-                    <ChevronRight className="w-4 h-4" />
-                  )}
-                  <Sparkles className="w-4 h-4" />
-                  <span>Enhance with AI</span>
-                </button>
-              </CollapsibleTrigger>
-              <CollapsibleContent className="pt-3">
-                <div className="flex flex-wrap items-center gap-2 pl-6">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="outline" size="sm" className="h-8 text-xs">
-                        {enhancementMode === 'improve' && 'Improve Clarity'}
-                        {enhancementMode === 'technical' && 'Add Technical Details'}
-                        {enhancementMode === 'simplify' && 'Simplify'}
-                        {enhancementMode === 'acceptance' && 'Add Acceptance Criteria'}
-                        <ChevronDown className="w-3 h-3 ml-1" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="start">
-                      <DropdownMenuItem onClick={() => setEnhancementMode('improve')}>
-                        Improve Clarity
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => setEnhancementMode('technical')}>
-                        Add Technical Details
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => setEnhancementMode('simplify')}>
-                        Simplify
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => setEnhancementMode('acceptance')}>
-                        Add Acceptance Criteria
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-
-                  <Button
-                    type="button"
-                    variant="default"
-                    size="sm"
-                    className="h-8 text-xs"
-                    onClick={handleEnhanceDescription}
-                    disabled={!description.trim() || isEnhancing}
-                    loading={isEnhancing}
-                  >
-                    <Sparkles className="w-3 h-3 mr-1" />
-                    Enhance
-                  </Button>
-
-                  <ModelOverrideTrigger
-                    currentModelEntry={enhancementOverride.effectiveModelEntry}
-                    onModelChange={enhancementOverride.setOverride}
-                    phase="enhancementModel"
-                    isOverridden={enhancementOverride.isOverridden}
-                    size="sm"
-                    variant="icon"
-                  />
-                </div>
-              </CollapsibleContent>
-            </Collapsible>
+            {/* Enhancement Section */}
+            <EnhanceWithAI
+              value={description}
+              onChange={setDescription}
+              onHistoryAdd={({ mode, originalText, enhancedText }) => {
+                const timestamp = new Date().toISOString();
+                setDescriptionHistory((prev) => {
+                  const newHistory = [...prev];
+                  // Add original text first (so user can restore to pre-enhancement state)
+                  // Only add if it's different from the last entry to avoid duplicates
+                  const lastEntry = prev[prev.length - 1];
+                  if (!lastEntry || lastEntry.description !== originalText) {
+                    newHistory.push({
+                      description: originalText,
+                      timestamp,
+                      source: prev.length === 0 ? 'initial' : 'edit',
+                    });
+                  }
+                  // Add enhanced text
+                  newHistory.push({
+                    description: enhancedText,
+                    timestamp,
+                    source: 'enhance',
+                    enhancementMode: mode,
+                  });
+                  return newHistory;
+                });
+              }}
+            />
           </div>
 
           {/* AI & Execution Section */}
@@ -538,50 +430,54 @@ export function AddFeatureDialog({
               <span>AI & Execution</span>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label className="text-xs text-muted-foreground">Profile</Label>
-                <ProfileTypeahead
-                  profiles={aiProfiles}
-                  selectedProfileId={selectedProfileId}
-                  onSelect={handleProfileSelect}
-                  placeholder="Select profile..."
-                  showManageLink
-                  onManageLinkClick={() => {
-                    onOpenChange(false);
-                    navigate({ to: '/profiles' });
-                  }}
-                  testIdPrefix="add-feature-profile"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs text-muted-foreground">Model</Label>
-                <PhaseModelSelector
-                  value={modelEntry}
-                  onChange={handleModelChange}
-                  compact
-                  align="end"
-                />
-              </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">Model</Label>
+              <PhaseModelSelector
+                value={modelEntry}
+                onChange={handleModelChange}
+                compact
+                align="end"
+              />
             </div>
 
-            <div
-              className={cn(
-                'grid gap-3',
-                modelSupportsPlanningMode ? 'grid-cols-2' : 'grid-cols-1'
-              )}
-            >
-              {modelSupportsPlanningMode && (
-                <div className="space-y-1.5">
-                  <Label className="text-xs text-muted-foreground">Planning</Label>
+            <div className="grid gap-3 grid-cols-2">
+              <div className="space-y-1.5">
+                <Label
+                  className={cn(
+                    'text-xs text-muted-foreground',
+                    !modelSupportsPlanningMode && 'opacity-50'
+                  )}
+                >
+                  Planning
+                </Label>
+                {modelSupportsPlanningMode ? (
                   <PlanningModeSelect
                     mode={planningMode}
                     onModeChange={setPlanningMode}
                     testIdPrefix="add-feature-planning"
                     compact
                   />
-                </div>
-              )}
+                ) : (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div>
+                          <PlanningModeSelect
+                            mode="skip"
+                            onModeChange={() => {}}
+                            testIdPrefix="add-feature-planning"
+                            compact
+                            disabled
+                          />
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Planning modes are only available for Claude Provider</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
+              </div>
               <div className="space-y-1.5">
                 <Label className="text-xs text-muted-foreground">Options</Label>
                 <div className="flex flex-col gap-2 pt-1">
@@ -599,28 +495,32 @@ export function AddFeatureDialog({
                       Run tests
                     </Label>
                   </div>
-                  {modelSupportsPlanningMode && (
-                    <div className="flex items-center gap-2">
-                      <Checkbox
-                        id="add-feature-require-approval"
-                        checked={requirePlanApproval}
-                        onCheckedChange={(checked) => setRequirePlanApproval(!!checked)}
-                        disabled={planningMode === 'skip' || planningMode === 'lite'}
-                        data-testid="add-feature-require-approval-checkbox"
-                      />
-                      <Label
-                        htmlFor="add-feature-require-approval"
-                        className={cn(
-                          'text-xs font-normal',
-                          planningMode === 'skip' || planningMode === 'lite'
-                            ? 'cursor-not-allowed text-muted-foreground'
-                            : 'cursor-pointer'
-                        )}
-                      >
-                        Require approval
-                      </Label>
-                    </div>
-                  )}
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id="add-feature-require-approval"
+                      checked={requirePlanApproval}
+                      onCheckedChange={(checked) => setRequirePlanApproval(!!checked)}
+                      disabled={
+                        !modelSupportsPlanningMode ||
+                        planningMode === 'skip' ||
+                        planningMode === 'lite'
+                      }
+                      data-testid="add-feature-require-approval-checkbox"
+                    />
+                    <Label
+                      htmlFor="add-feature-require-approval"
+                      className={cn(
+                        'text-xs font-normal',
+                        !modelSupportsPlanningMode ||
+                          planningMode === 'skip' ||
+                          planningMode === 'lite'
+                          ? 'cursor-not-allowed text-muted-foreground'
+                          : 'cursor-pointer'
+                      )}
+                    >
+                      Require approval
+                    </Label>
+                  </div>
                 </div>
               </div>
             </div>

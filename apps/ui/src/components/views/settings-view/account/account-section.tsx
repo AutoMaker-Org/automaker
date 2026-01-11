@@ -8,7 +8,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { LogOut, User, Code2 } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { toast } from 'sonner';
+import { LogOut, User, Code2, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { logout } from '@/lib/http-api-client';
 import { useAuthStore } from '@/store/auth-store';
@@ -24,7 +26,7 @@ export function AccountSection() {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   // Editor settings
-  const { editors, isLoading: isLoadingEditors } = useAvailableEditors();
+  const { editors, isLoading: isLoadingEditors, isRefreshing, refresh } = useAvailableEditors();
   const defaultEditorCommand = useAppStore((s) => s.defaultEditorCommand);
   const setDefaultEditorCommand = useAppStore((s) => s.setDefaultEditorCommand);
 
@@ -38,6 +40,11 @@ export function AccountSection() {
 
   // Get icon component for the effective editor
   const EffectiveEditorIcon = effectiveEditor ? getEditorIcon(effectiveEditor.command) : null;
+
+  const handleRefreshEditors = async () => {
+    await refresh();
+    toast.success('Editor list refreshed');
+  };
 
   const handleLogout = async () => {
     setIsLoggingOut(true);
@@ -85,46 +92,66 @@ export function AccountSection() {
               </p>
             </div>
           </div>
-          <Select
-            value={selectValue}
-            onValueChange={(value) => setDefaultEditorCommand(value === 'auto' ? null : value)}
-            disabled={isLoadingEditors || editors.length === 0}
-          >
-            <SelectTrigger className="w-[180px] shrink-0">
-              <SelectValue placeholder="Select editor">
-                {effectiveEditor ? (
-                  <span className="flex items-center gap-2">
-                    {EffectiveEditorIcon && <EffectiveEditorIcon className="w-4 h-4" />}
-                    {effectiveEditor.name}
-                    {selectValue === 'auto' && (
-                      <span className="text-muted-foreground text-xs">(Auto)</span>
-                    )}
-                  </span>
-                ) : (
-                  'Select editor'
-                )}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="auto">
-                <span className="flex items-center gap-2">
-                  <Code2 className="w-4 h-4" />
-                  Auto-detect
-                </span>
-              </SelectItem>
-              {editors.map((editor) => {
-                const Icon = getEditorIcon(editor.command);
-                return (
-                  <SelectItem key={editor.command} value={editor.command}>
+          <div className="flex items-center gap-2">
+            <Select
+              value={selectValue}
+              onValueChange={(value) => setDefaultEditorCommand(value === 'auto' ? null : value)}
+              disabled={isLoadingEditors || isRefreshing || editors.length === 0}
+            >
+              <SelectTrigger className="w-[180px] shrink-0">
+                <SelectValue placeholder="Select editor">
+                  {effectiveEditor ? (
                     <span className="flex items-center gap-2">
-                      <Icon className="w-4 h-4" />
-                      {editor.name}
+                      {EffectiveEditorIcon && <EffectiveEditorIcon className="w-4 h-4" />}
+                      {effectiveEditor.name}
+                      {selectValue === 'auto' && (
+                        <span className="text-muted-foreground text-xs">(Auto)</span>
+                      )}
                     </span>
-                  </SelectItem>
-                );
-              })}
-            </SelectContent>
-          </Select>
+                  ) : (
+                    'Select editor'
+                  )}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="auto">
+                  <span className="flex items-center gap-2">
+                    <Code2 className="w-4 h-4" />
+                    Auto-detect
+                  </span>
+                </SelectItem>
+                {editors.map((editor) => {
+                  const Icon = getEditorIcon(editor.command);
+                  return (
+                    <SelectItem key={editor.command} value={editor.command}>
+                      <span className="flex items-center gap-2">
+                        <Icon className="w-4 h-4" />
+                        {editor.name}
+                      </span>
+                    </SelectItem>
+                  );
+                })}
+              </SelectContent>
+            </Select>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={handleRefreshEditors}
+                    disabled={isRefreshing || isLoadingEditors}
+                    className="shrink-0 h-9 w-9"
+                  >
+                    <RefreshCw className={cn('w-4 h-4', isRefreshing && 'animate-spin')} />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Refresh available editors</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
         </div>
 
         {/* Logout */}

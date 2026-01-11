@@ -44,7 +44,7 @@ export function GraphView({
   const { currentProject } = useAppStore();
 
   // Use the same background hook as the board view
-  const { backgroundImageStyle } = useBoardBackground({ currentProject });
+  const { backgroundImageStyle, backgroundSettings } = useBoardBackground({ currentProject });
 
   // Filter features by current worktree (same logic as board view)
   const filteredFeatures = useMemo(() => {
@@ -213,6 +213,7 @@ export function GraphView({
         nodeActionCallbacks={nodeActionCallbacks}
         onCreateDependency={handleCreateDependency}
         backgroundStyle={backgroundImageStyle}
+        backgroundSettings={backgroundSettings}
         className="h-full"
       />
     </div>

@@ -31,16 +31,13 @@ const SETTINGS_FIELDS_TO_SYNC = [
   'theme',
   'sidebarOpen',
   'chatHistoryOpen',
-  'kanbanCardDetailLevel',
   'maxConcurrency',
   'defaultSkipTests',
   'enableDependencyBlocking',
   'skipVerificationInAutoMode',
   'useWorktrees',
-  'showProfilesOnly',
   'defaultPlanningMode',
   'defaultRequirePlanApproval',
-  'defaultAIProfileId',
   'muteDoneSound',
   'enhancementModel',
   'validationModel',
@@ -49,7 +46,6 @@ const SETTINGS_FIELDS_TO_SYNC = [
   'cursorDefaultModel',
   'autoLoadClaudeMd',
   'keyboardShortcuts',
-  'aiProfiles',
   'mcpServers',
   'defaultEditorCommand',
   'promptCustomization',
@@ -94,6 +90,7 @@ export function useSettingsSync(): SettingsSyncState {
 
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const authChecked = useAuthStore((s) => s.authChecked);
+  const settingsLoaded = useAuthStore((s) => s.settingsLoaded);
 
   const syncTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSyncedRef = useRef<string>('');
@@ -122,15 +119,25 @@ export function useSettingsSync(): SettingsSyncState {
   // Debounced sync function
   const syncToServer = useCallback(async () => {
     try {
-      // Never sync when not authenticated (prevents overwriting server settings during logout/login transitions)
+      // Never sync when not authenticated or settings not loaded
+      // The settingsLoaded flag ensures we don't sync default empty state before hydration
       const auth = useAuthStore.getState();
-      if (!auth.authChecked || !auth.isAuthenticated) {
+      logger.debug('syncToServer check:', {
+        authChecked: auth.authChecked,
+        isAuthenticated: auth.isAuthenticated,
+        settingsLoaded: auth.settingsLoaded,
+        projectsCount: useAppStore.getState().projects?.length ?? 0,
+      });
+      if (!auth.authChecked || !auth.isAuthenticated || !auth.settingsLoaded) {
+        logger.debug('Sync skipped: not authenticated or settings not loaded');
         return;
       }
 
       setState((s) => ({ ...s, syncing: true }));
       const api = getHttpApiClient();
       const appState = useAppStore.getState();
+
+      logger.debug('Syncing to server:', { projectsCount: appState.projects?.length ?? 0 });
 
       // Build updates object from current state
       const updates: Record<string, unknown> = {};
@@ -152,9 +159,12 @@ export function useSettingsSync(): SettingsSyncState {
       // Create a hash of the updates to avoid redundant syncs
       const updateHash = JSON.stringify(updates);
       if (updateHash === lastSyncedRef.current) {
+        logger.debug('Sync skipped: no changes');
         setState((s) => ({ ...s, syncing: false }));
         return;
       }
+
+      logger.info('Sending settings update:', { projects: updates.projects });
 
       const result = await api.settings.updateGlobal(updates);
       if (result.success) {
@@ -189,11 +199,20 @@ export function useSettingsSync(): SettingsSyncState {
     void syncToServer();
   }, [syncToServer]);
 
-  // Initialize sync - WAIT for migration to complete first
+  // Initialize sync - WAIT for settings to be loaded and migration to complete
   useEffect(() => {
-    // Don't initialize syncing until we know auth status and are authenticated.
-    // Prevents accidental overwrites when the app boots before settings are hydrated.
-    if (!authChecked || !isAuthenticated) return;
+    // Don't initialize syncing until:
+    // 1. Auth has been checked
+    // 2. User is authenticated
+    // 3. Settings have been loaded from server (settingsLoaded flag)
+    // This prevents syncing empty/default state before hydration completes.
+    logger.debug('useSettingsSync initialization check:', {
+      authChecked,
+      isAuthenticated,
+      settingsLoaded,
+      stateLoaded: state.loaded,
+    });
+    if (!authChecked || !isAuthenticated || !settingsLoaded) return;
     if (isInitializedRef.current) return;
     isInitializedRef.current = true;
 
@@ -203,14 +222,26 @@ export function useSettingsSync(): SettingsSyncState {
         await waitForApiKeyInit();
 
         // CRITICAL: Wait for migration/hydration to complete before we start syncing
-        // This prevents overwriting server data with empty/default state
+        // This is a backup to the settingsLoaded flag for extra safety
         logger.info('Waiting for migration to complete before starting sync...');
         await waitForMigrationComplete();
+
+        // Wait for React to finish rendering after store hydration.
+        // Zustand's subscribe() fires during setState(), which happens BEFORE React's
+        // render completes. Use a small delay to ensure all pending state updates
+        // have propagated through the React tree before we read state.
+        await new Promise((resolve) => setTimeout(resolve, 50));
+
         logger.info('Migration complete, initializing sync');
+
+        // Read state - at this point React has processed the store update
+        const appState = useAppStore.getState();
+        const setupState = useSetupStore.getState();
+
+        logger.info('Initial state read:', { projectsCount: appState.projects?.length ?? 0 });
 
         // Store the initial state hash to avoid immediate re-sync
         // (migration has already hydrated the store from server/localStorage)
-        const appState = useAppStore.getState();
         const updates: Record<string, unknown> = {};
         for (const field of SETTINGS_FIELDS_TO_SYNC) {
           if (field === 'currentProjectId') {
@@ -219,7 +250,6 @@ export function useSettingsSync(): SettingsSyncState {
             updates[field] = appState[field as keyof typeof appState];
           }
         }
-        const setupState = useSetupStore.getState();
         for (const field of SETUP_FIELDS_TO_SYNC) {
           updates[field] = setupState[field as keyof typeof setupState];
         }
@@ -238,16 +268,33 @@ export function useSettingsSync(): SettingsSyncState {
     }
 
     initializeSync();
-  }, [authChecked, isAuthenticated]);
+  }, [authChecked, isAuthenticated, settingsLoaded]);
 
   // Subscribe to store changes and sync to server
   useEffect(() => {
-    if (!state.loaded || !authChecked || !isAuthenticated) return;
+    if (!state.loaded || !authChecked || !isAuthenticated || !settingsLoaded) return;
 
     // Subscribe to app store changes
     const unsubscribeApp = useAppStore.subscribe((newState, prevState) => {
+      const auth = useAuthStore.getState();
+      logger.debug('Store subscription fired:', {
+        prevProjects: prevState.projects?.length ?? 0,
+        newProjects: newState.projects?.length ?? 0,
+        authChecked: auth.authChecked,
+        isAuthenticated: auth.isAuthenticated,
+        settingsLoaded: auth.settingsLoaded,
+        loaded: state.loaded,
+      });
+
+      // Don't sync if settings not loaded yet
+      if (!auth.settingsLoaded) {
+        logger.debug('Store changed but settings not loaded, skipping sync');
+        return;
+      }
+
       // If the current project changed, sync immediately so we can restore on next launch
       if (newState.currentProject?.id !== prevState.currentProject?.id) {
+        logger.debug('Current project changed, syncing immediately');
         syncNow();
         return;
       }
@@ -271,6 +318,7 @@ export function useSettingsSync(): SettingsSyncState {
       }
 
       if (changed) {
+        logger.debug('Store changed, scheduling sync');
         scheduleSyncToServer();
       }
     });
@@ -299,11 +347,11 @@ export function useSettingsSync(): SettingsSyncState {
         clearTimeout(syncTimeoutRef.current);
       }
     };
-  }, [state.loaded, authChecked, isAuthenticated, scheduleSyncToServer, syncNow]);
+  }, [state.loaded, authChecked, isAuthenticated, settingsLoaded, scheduleSyncToServer, syncNow]);
 
   // Best-effort flush on tab close / backgrounding
   useEffect(() => {
-    if (!state.loaded || !authChecked || !isAuthenticated) return;
+    if (!state.loaded || !authChecked || !isAuthenticated || !settingsLoaded) return;
 
     const handleBeforeUnload = () => {
       // Fire-and-forget; may not complete in all browsers, but helps in Electron/webview
@@ -323,7 +371,7 @@ export function useSettingsSync(): SettingsSyncState {
       window.removeEventListener('beforeunload', handleBeforeUnload);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [state.loaded, authChecked, isAuthenticated, syncNow]);
+  }, [state.loaded, authChecked, isAuthenticated, settingsLoaded, syncNow]);
 
   return state;
 }
@@ -383,16 +431,13 @@ export async function refreshSettingsFromServer(): Promise<boolean> {
       theme: serverSettings.theme as unknown as ThemeMode,
       sidebarOpen: serverSettings.sidebarOpen,
       chatHistoryOpen: serverSettings.chatHistoryOpen,
-      kanbanCardDetailLevel: serverSettings.kanbanCardDetailLevel,
       maxConcurrency: serverSettings.maxConcurrency,
       defaultSkipTests: serverSettings.defaultSkipTests,
       enableDependencyBlocking: serverSettings.enableDependencyBlocking,
       skipVerificationInAutoMode: serverSettings.skipVerificationInAutoMode,
       useWorktrees: serverSettings.useWorktrees,
-      showProfilesOnly: serverSettings.showProfilesOnly,
       defaultPlanningMode: serverSettings.defaultPlanningMode,
       defaultRequirePlanApproval: serverSettings.defaultRequirePlanApproval,
-      defaultAIProfileId: serverSettings.defaultAIProfileId,
       muteDoneSound: serverSettings.muteDoneSound,
       enhancementModel: serverSettings.enhancementModel,
       validationModel: serverSettings.validationModel,
@@ -406,7 +451,6 @@ export async function refreshSettingsFromServer(): Promise<boolean> {
           typeof currentAppState.keyboardShortcuts
         >),
       },
-      aiProfiles: serverSettings.aiProfiles,
       mcpServers: serverSettings.mcpServers,
       defaultEditorCommand: serverSettings.defaultEditorCommand ?? null,
       promptCustomization: serverSettings.promptCustomization ?? {},

@@ -18,6 +18,7 @@ export {
   getValidationPath,
   getAppSpecPath,
   getBranchTrackingPath,
+  getExecutionStatePath,
   ensureAutomakerDir,
   getGlobalSettingsPath,
   getCredentialsPath,
@@ -156,3 +157,14 @@ export {
 
 // Port configuration
 export { STATIC_PORT, SERVER_PORT, RESERVED_PORTS } from './config/ports.js';
+
+// Editor detection and launching (cross-platform)
+export {
+  commandExists,
+  clearEditorCache,
+  detectAllEditors,
+  detectDefaultEditor,
+  findEditorByCommand,
+  openInEditor,
+  openInFileManager,
+} from './editor.js';

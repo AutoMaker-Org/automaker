@@ -168,41 +168,23 @@ describe('opencode-provider.ts', () => {
     it('should build correct args with run subcommand', () => {
       const args = provider.buildCliArgs({
         prompt: 'Hello',
+        model: 'opencode/big-pickle',
         cwd: '/tmp/project',
       });
 
       expect(args[0]).toBe('run');
     });
 
-    it('should include --format stream-json for streaming output', () => {
+    it('should include --format json for streaming output', () => {
       const args = provider.buildCliArgs({
         prompt: 'Hello',
+        model: 'opencode/big-pickle',
         cwd: '/tmp/project',
       });
 
       const formatIndex = args.indexOf('--format');
       expect(formatIndex).toBeGreaterThan(-1);
-      expect(args[formatIndex + 1]).toBe('stream-json');
-    });
-
-    it('should include -q flag for quiet mode', () => {
-      const args = provider.buildCliArgs({
-        prompt: 'Hello',
-        cwd: '/tmp/project',
-      });
-
-      expect(args).toContain('-q');
-    });
-
-    it('should include working directory with -c flag', () => {
-      const args = provider.buildCliArgs({
-        prompt: 'Hello',
-        cwd: '/tmp/my-project',
-      });
-
-      const cwdIndex = args.indexOf('-c');
-      expect(cwdIndex).toBeGreaterThan(-1);
-      expect(args[cwdIndex + 1]).toBe('/tmp/my-project');
+      expect(args[formatIndex + 1]).toBe('json');
     });
 
     it('should include model with --model flag', () => {
@@ -228,30 +210,24 @@ describe('opencode-provider.ts', () => {
       expect(args[modelIndex + 1]).toBe('anthropic/claude-sonnet-4-5');
     });
 
-    it('should include dash as final arg for stdin prompt', () => {
-      const args = provider.buildCliArgs({
-        prompt: 'Hello',
-        cwd: '/tmp/project',
-      });
-
-      expect(args[args.length - 1]).toBe('-');
-    });
-
     it('should handle missing cwd', () => {
       const args = provider.buildCliArgs({
         prompt: 'Hello',
+        model: 'opencode/big-pickle',
       });
 
       expect(args).not.toContain('-c');
     });
 
-    it('should handle missing model', () => {
+    it('should handle model from opencode provider', () => {
       const args = provider.buildCliArgs({
         prompt: 'Hello',
+        model: 'opencode/big-pickle',
         cwd: '/tmp/project',
       });
 
-      expect(args).not.toContain('--model');
+      expect(args).toContain('--model');
+      expect(args).toContain('opencode/big-pickle');
     });
   });
 
@@ -260,12 +236,15 @@ describe('opencode-provider.ts', () => {
   // ==========================================================================
 
   describe('normalizeEvent', () => {
-    describe('text-delta events', () => {
-      it('should convert text-delta to assistant message with text content', () => {
+    describe('text events (new OpenCode format)', () => {
+      it('should convert text to assistant message with text content', () => {
         const event = {
-          type: 'text-delta',
-          text: 'Hello, world!',
-          session_id: 'test-session',
+          type: 'text',
+          part: {
+            type: 'text',
+            text: 'Hello, world!',
+          },
+          sessionID: 'test-session',
         };
 
         const result = provider.normalizeEvent(event);
@@ -285,10 +264,13 @@ describe('opencode-provider.ts', () => {
         });
       });
 
-      it('should return null for empty text-delta', () => {
+      it('should return null for empty text', () => {
         const event = {
-          type: 'text-delta',
-          text: '',
+          type: 'text',
+          part: {
+            type: 'text',
+            text: '',
+          },
         };
 
         const result = provider.normalizeEvent(event);
@@ -296,22 +278,10 @@ describe('opencode-provider.ts', () => {
         expect(result).toBeNull();
       });
 
-      it('should return null for text-delta with undefined text', () => {
+      it('should return null for text with undefined text', () => {
         const event = {
-          type: 'text-delta',
-        };
-
-        const result = provider.normalizeEvent(event);
-
-        expect(result).toBeNull();
-      });
-    });
-
-    describe('text-end events', () => {
-      it('should return null for text-end events (informational)', () => {
-        const event = {
-          type: 'text-end',
-          session_id: 'test-session',
+          type: 'text',
+          part: {},
         };
 
         const result = provider.normalizeEvent(event);
@@ -320,14 +290,17 @@ describe('opencode-provider.ts', () => {
       });
     });
 
-    describe('tool-call events', () => {
-      it('should convert tool-call to assistant message with tool_use content', () => {
+    describe('tool_call events', () => {
+      it('should convert tool_call to assistant message with tool_use content', () => {
         const event = {
-          type: 'tool-call',
-          call_id: 'call-123',
-          name: 'Read',
-          args: { file_path: '/tmp/test.txt' },
-          session_id: 'test-session',
+          type: 'tool_call',
+          part: {
+            type: 'tool-call',
+            call_id: 'call-123',
+            name: 'Read',
+            args: { file_path: '/tmp/test.txt' },
+          },
+          sessionID: 'test-session',
         };
 
         const result = provider.normalizeEvent(event);
@@ -351,9 +324,12 @@ describe('opencode-provider.ts', () => {
 
       it('should generate tool_use_id when call_id is missing', () => {
         const event = {
-          type: 'tool-call',
-          name: 'Write',
-          args: { content: 'test' },
+          type: 'tool_call',
+          part: {
+            type: 'tool-call',
+            name: 'Write',
+            args: { content: 'test' },
+          },
         };
 
         const result = provider.normalizeEvent(event);
@@ -363,21 +339,27 @@ describe('opencode-provider.ts', () => {
 
         // Second call should increment
         const result2 = provider.normalizeEvent({
-          type: 'tool-call',
-          name: 'Edit',
-          args: {},
+          type: 'tool_call',
+          part: {
+            type: 'tool-call',
+            name: 'Edit',
+            args: {},
+          },
         });
         expect(result2?.message?.content[0].tool_use_id).toBe('opencode-tool-2');
       });
     });
 
-    describe('tool-result events', () => {
-      it('should convert tool-result to assistant message with tool_result content', () => {
+    describe('tool_result events', () => {
+      it('should convert tool_result to assistant message with tool_result content', () => {
         const event = {
-          type: 'tool-result',
-          call_id: 'call-123',
-          output: 'File contents here',
-          session_id: 'test-session',
+          type: 'tool_result',
+          part: {
+            type: 'tool-result',
+            call_id: 'call-123',
+            output: 'File contents here',
+          },
+          sessionID: 'test-session',
         };
 
         const result = provider.normalizeEvent(event);
@@ -398,10 +380,13 @@ describe('opencode-provider.ts', () => {
         });
       });
 
-      it('should handle tool-result without call_id', () => {
+      it('should handle tool_result without call_id', () => {
         const event = {
-          type: 'tool-result',
-          output: 'Result without ID',
+          type: 'tool_result',
+          part: {
+            type: 'tool-result',
+            output: 'Result without ID',
+          },
         };
 
         const result = provider.normalizeEvent(event);
@@ -411,13 +396,16 @@ describe('opencode-provider.ts', () => {
       });
     });
 
-    describe('tool-error events', () => {
-      it('should convert tool-error to error message', () => {
+    describe('tool_error events', () => {
+      it('should convert tool_error to error message', () => {
         const event = {
-          type: 'tool-error',
-          call_id: 'call-123',
-          error: 'File not found',
-          session_id: 'test-session',
+          type: 'tool_error',
+          part: {
+            type: 'tool-error',
+            call_id: 'call-123',
+            error: 'File not found',
+          },
+          sessionID: 'test-session',
         };
 
         const result = provider.normalizeEvent(event);
@@ -431,8 +419,11 @@ describe('opencode-provider.ts', () => {
 
       it('should provide default error message when error is missing', () => {
         const event = {
-          type: 'tool-error',
-          call_id: 'call-123',
+          type: 'tool_error',
+          part: {
+            type: 'tool-error',
+            call_id: 'call-123',
+          },
         };
 
         const result = provider.normalizeEvent(event);
@@ -442,12 +433,14 @@ describe('opencode-provider.ts', () => {
       });
     });
 
-    describe('start-step events', () => {
-      it('should return null for start-step events (informational)', () => {
+    describe('step_start events', () => {
+      it('should return null for step_start events (informational)', () => {
         const event = {
-          type: 'start-step',
-          step: 1,
-          session_id: 'test-session',
+          type: 'step_start',
+          part: {
+            type: 'step-start',
+          },
+          sessionID: 'test-session',
         };
 
         const result = provider.normalizeEvent(event);
@@ -456,14 +449,16 @@ describe('opencode-provider.ts', () => {
       });
     });
 
-    describe('finish-step events', () => {
-      it('should convert successful finish-step to result message', () => {
+    describe('step_finish events', () => {
+      it('should convert successful step_finish to result message', () => {
         const event = {
-          type: 'finish-step',
-          step: 1,
-          success: true,
-          result: 'Task completed successfully',
-          session_id: 'test-session',
+          type: 'step_finish',
+          part: {
+            type: 'step-finish',
+            reason: 'stop',
+            result: 'Task completed successfully',
+          },
+          sessionID: 'test-session',
         };
 
         const result = provider.normalizeEvent(event);
@@ -476,13 +471,15 @@ describe('opencode-provider.ts', () => {
         });
       });
 
-      it('should convert finish-step with success=false to error message', () => {
+      it('should convert step_finish with error to error message', () => {
         const event = {
-          type: 'finish-step',
-          step: 1,
-          success: false,
-          error: 'Something went wrong',
-          session_id: 'test-session',
+          type: 'step_finish',
+          part: {
+            type: 'step-finish',
+            reason: 'error',
+            error: 'Something went wrong',
+          },
+          sessionID: 'test-session',
         };
 
         const result = provider.normalizeEvent(event);
@@ -494,11 +491,13 @@ describe('opencode-provider.ts', () => {
         });
       });
 
-      it('should convert finish-step with error property to error message', () => {
+      it('should convert step_finish with error property to error message', () => {
         const event = {
-          type: 'finish-step',
-          step: 1,
-          error: 'Process failed',
+          type: 'step_finish',
+          part: {
+            type: 'step-finish',
+            error: 'Process failed',
+          },
         };
 
         const result = provider.normalizeEvent(event);
@@ -509,9 +508,11 @@ describe('opencode-provider.ts', () => {
 
       it('should provide default error message for failed step without error text', () => {
         const event = {
-          type: 'finish-step',
-          step: 1,
-          success: false,
+          type: 'step_finish',
+          part: {
+            type: 'step-finish',
+            reason: 'error',
+          },
         };
 
         const result = provider.normalizeEvent(event);
@@ -520,11 +521,14 @@ describe('opencode-provider.ts', () => {
         expect(result?.error).toBe('Step execution failed');
       });
 
-      it('should treat finish-step without success flag as success', () => {
+      it('should treat step_finish with reason=stop as success', () => {
         const event = {
-          type: 'finish-step',
-          step: 1,
-          result: 'Done',
+          type: 'step_finish',
+          part: {
+            type: 'step-finish',
+            reason: 'stop',
+            result: 'Done',
+          },
         };
 
         const result = provider.normalizeEvent(event);
@@ -586,13 +590,12 @@ describe('opencode-provider.ts', () => {
       return mockedProvider;
     }
 
-    it('should stream text-delta events as assistant messages', async () => {
+    it('should stream text events as assistant messages', async () => {
       const mockedProvider = setupMockedProvider();
 
       const mockEvents = [
-        { type: 'text-delta', text: 'Hello ' },
-        { type: 'text-delta', text: 'World!' },
-        { type: 'text-end' },
+        { type: 'text', part: { type: 'text', text: 'Hello ' } },
+        { type: 'text', part: { type: 'text', text: 'World!' } },
       ];
 
       vi.mocked(spawnJSONLProcess).mockReturnValue(
@@ -611,7 +614,6 @@ describe('opencode-provider.ts', () => {
         })
       );
 
-      // text-end should be filtered out (returns null)
       expect(results).toHaveLength(2);
       expect(results[0].type).toBe('assistant');
       expect(results[0].message?.content[0].text).toBe('Hello ');
@@ -623,15 +625,21 @@ describe('opencode-provider.ts', () => {
 
       const mockEvents = [
         {
-          type: 'tool-call',
-          call_id: 'tool-1',
-          name: 'Read',
-          args: { file_path: '/tmp/test.txt' },
+          type: 'tool_call',
+          part: {
+            type: 'tool-call',
+            call_id: 'tool-1',
+            name: 'Read',
+            args: { file_path: '/tmp/test.txt' },
+          },
         },
         {
-          type: 'tool-result',
-          call_id: 'tool-1',
-          output: 'File contents',
+          type: 'tool_result',
+          part: {
+            type: 'tool-result',
+            call_id: 'tool-1',
+            output: 'File contents',
+          },
         },
       ];
 
@@ -718,10 +726,7 @@ describe('opencode-provider.ts', () => {
       const call = vi.mocked(spawnJSONLProcess).mock.calls[0][0];
       expect(call.args).toContain('run');
       expect(call.args).toContain('--format');
-      expect(call.args).toContain('stream-json');
-      expect(call.args).toContain('-q');
-      expect(call.args).toContain('-c');
-      expect(call.args).toContain('/tmp/workspace');
+      expect(call.args).toContain('json');
       expect(call.args).toContain('--model');
       expect(call.args).toContain('anthropic/claude-opus-4-5');
     });
@@ -731,9 +736,9 @@ describe('opencode-provider.ts', () => {
 
       const mockEvents = [
         { type: 'unknown-internal-event', data: 'ignored' },
-        { type: 'text-delta', text: 'Valid text' },
+        { type: 'text', part: { type: 'text', text: 'Valid text' } },
         { type: 'another-unknown', foo: 'bar' },
-        { type: 'finish-step', result: 'Done' },
+        { type: 'step_finish', part: { type: 'step-finish', reason: 'stop', result: 'Done' } },
       ];
 
       vi.mocked(spawnJSONLProcess).mockReturnValue(
@@ -747,6 +752,7 @@ describe('opencode-provider.ts', () => {
       const results = await collectAsyncGenerator<ProviderMessage>(
         mockedProvider.executeQuery({
           prompt: 'Test',
+          model: 'opencode/big-pickle',
           cwd: '/test',
         })
       );
@@ -1039,10 +1045,22 @@ describe('opencode-provider.ts', () => {
       const sessionId = 'test-session-123';
 
       const mockEvents = [
-        { type: 'text-delta', text: 'Hello ', session_id: sessionId },
-        { type: 'tool-call', name: 'Read', args: {}, call_id: 'c1', session_id: sessionId },
-        { type: 'tool-result', call_id: 'c1', output: 'file content', session_id: sessionId },
-        { type: 'finish-step', result: 'Done', session_id: sessionId },
+        { type: 'text', part: { type: 'text', text: 'Hello ' }, sessionID: sessionId },
+        {
+          type: 'tool_call',
+          part: { type: 'tool-call', name: 'Read', args: {}, call_id: 'c1' },
+          sessionID: sessionId,
+        },
+        {
+          type: 'tool_result',
+          part: { type: 'tool-result', call_id: 'c1', output: 'file content' },
+          sessionID: sessionId,
+        },
+        {
+          type: 'step_finish',
+          part: { type: 'step-finish', reason: 'stop', result: 'Done' },
+          sessionID: sessionId,
+        },
       ];
 
       vi.mocked(spawnJSONLProcess).mockReturnValue(
@@ -1056,6 +1074,7 @@ describe('opencode-provider.ts', () => {
       const results = await collectAsyncGenerator<ProviderMessage>(
         mockedProvider.executeQuery({
           prompt: 'Test',
+          model: 'opencode/big-pickle',
           cwd: '/tmp',
         })
       );
@@ -1069,12 +1088,15 @@ describe('opencode-provider.ts', () => {
   });
 
   describe('normalizeEvent additional edge cases', () => {
-    it('should handle tool-call with empty args object', () => {
+    it('should handle tool_call with empty args object', () => {
       const event = {
-        type: 'tool-call',
-        call_id: 'call-123',
-        name: 'Glob',
-        args: {},
+        type: 'tool_call',
+        part: {
+          type: 'tool-call',
+          call_id: 'call-123',
+          name: 'Glob',
+          args: {},
+        },
       };
 
       const result = provider.normalizeEvent(event);
@@ -1083,12 +1105,15 @@ describe('opencode-provider.ts', () => {
       expect(result?.message?.content[0].input).toEqual({});
     });
 
-    it('should handle tool-call with null args', () => {
+    it('should handle tool_call with null args', () => {
       const event = {
-        type: 'tool-call',
-        call_id: 'call-123',
-        name: 'Glob',
-        args: null,
+        type: 'tool_call',
+        part: {
+          type: 'tool-call',
+          call_id: 'call-123',
+          name: 'Glob',
+          args: null,
+        },
       };
 
       const result = provider.normalizeEvent(event);
@@ -1097,18 +1122,21 @@ describe('opencode-provider.ts', () => {
       expect(result?.message?.content[0].input).toBeNull();
     });
 
-    it('should handle tool-call with complex nested args', () => {
+    it('should handle tool_call with complex nested args', () => {
       const event = {
-        type: 'tool-call',
-        call_id: 'call-123',
-        name: 'Edit',
-        args: {
-          file_path: '/tmp/test.ts',
-          changes: [
-            { line: 10, old: 'foo', new: 'bar' },
-            { line: 20, old: 'baz', new: 'qux' },
-          ],
-          options: { replace_all: true },
+        type: 'tool_call',
+        part: {
+          type: 'tool-call',
+          call_id: 'call-123',
+          name: 'Edit',
+          args: {
+            file_path: '/tmp/test.ts',
+            changes: [
+              { line: 10, old: 'foo', new: 'bar' },
+              { line: 20, old: 'baz', new: 'qux' },
+            ],
+            options: { replace_all: true },
+          },
         },
       };
 
@@ -1125,11 +1153,14 @@ describe('opencode-provider.ts', () => {
       });
     });
 
-    it('should handle tool-result with empty output', () => {
+    it('should handle tool_result with empty output', () => {
       const event = {
-        type: 'tool-result',
-        call_id: 'call-123',
-        output: '',
+        type: 'tool_result',
+        part: {
+          type: 'tool-result',
+          call_id: 'call-123',
+          output: '',
+        },
       };
 
       const result = provider.normalizeEvent(event);
@@ -1138,10 +1169,13 @@ describe('opencode-provider.ts', () => {
       expect(result?.message?.content[0].content).toBe('');
     });
 
-    it('should handle text-delta with whitespace-only text', () => {
+    it('should handle text with whitespace-only text', () => {
       const event = {
-        type: 'text-delta',
-        text: '   ',
+        type: 'text',
+        part: {
+          type: 'text',
+          text: '   ',
+        },
       };
 
       const result = provider.normalizeEvent(event);
@@ -1151,10 +1185,13 @@ describe('opencode-provider.ts', () => {
       expect(result?.message?.content[0].text).toBe('   ');
     });
 
-    it('should handle text-delta with newlines', () => {
+    it('should handle text with newlines', () => {
       const event = {
-        type: 'text-delta',
-        text: 'Line 1\nLine 2\nLine 3',
+        type: 'text',
+        part: {
+          type: 'text',
+          text: 'Line 1\nLine 2\nLine 3',
+        },
       };
 
       const result = provider.normalizeEvent(event);
@@ -1162,12 +1199,15 @@ describe('opencode-provider.ts', () => {
       expect(result?.message?.content[0].text).toBe('Line 1\nLine 2\nLine 3');
     });
 
-    it('should handle finish-step with both result and error (error takes precedence)', () => {
+    it('should handle step_finish with both result and error (error takes precedence)', () => {
       const event = {
-        type: 'finish-step',
-        result: 'Some result',
-        error: 'But also an error',
-        success: false,
+        type: 'step_finish',
+        part: {
+          type: 'step-finish',
+          reason: 'stop',
+          result: 'Some result',
+          error: 'But also an error',
+        },
       };
 
       const result = provider.normalizeEvent(event);
@@ -1231,13 +1271,14 @@ describe('opencode-provider.ts', () => {
       const longPrompt = 'a'.repeat(10000);
       const args = provider.buildCliArgs({
         prompt: longPrompt,
+        model: 'opencode/big-pickle',
         cwd: '/tmp',
       });
 
       // The prompt is NOT in args (it's passed via stdin)
       // Just verify the args structure is correct
       expect(args).toContain('run');
-      expect(args).toContain('-');
+      expect(args).not.toContain('-');
       expect(args.join(' ')).not.toContain(longPrompt);
     });
 
@@ -1245,22 +1286,25 @@ describe('opencode-provider.ts', () => {
       const specialPrompt = 'Test $HOME $(rm -rf /) `command` "quotes" \'single\'';
       const args = provider.buildCliArgs({
         prompt: specialPrompt,
+        model: 'opencode/big-pickle',
         cwd: '/tmp',
       });
 
       // Special chars in prompt should not affect args (prompt is via stdin)
       expect(args).toContain('run');
-      expect(args).toContain('-');
+      expect(args).not.toContain('-');
     });
 
     it('should handle cwd with spaces', () => {
       const args = provider.buildCliArgs({
         prompt: 'Test',
+        model: 'opencode/big-pickle',
         cwd: '/tmp/path with spaces/project',
       });
 
-      const cwdIndex = args.indexOf('-c');
-      expect(args[cwdIndex + 1]).toBe('/tmp/path with spaces/project');
+      // cwd is set at subprocess level, not via CLI args
+      expect(args).not.toContain('-c');
+      expect(args).not.toContain('/tmp/path with spaces/project');
     });
 
     it('should handle model with unusual characters', () => {

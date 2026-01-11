@@ -1,11 +1,11 @@
 import {
   findCodexCliPath,
-  spawnProcess,
   getCodexAuthPath,
   systemPathExists,
   systemPathReadFile,
 } from '@automaker/platform';
 import { createLogger } from '@automaker/utils';
+import type { CodexAppServerService } from './codex-app-server-service.js';
 
 const logger = createLogger('CodexUsage');
 
@@ -18,19 +18,12 @@ export interface CodexRateLimitWindow {
   resetsAt: number;
 }
 
-export interface CodexCreditsSnapshot {
-  balance?: string;
-  unlimited?: boolean;
-  hasCredits?: boolean;
-}
-
 export type CodexPlanType = 'free' | 'plus' | 'pro' | 'team' | 'enterprise' | 'edu' | 'unknown';
 
 export interface CodexUsageData {
   rateLimits: {
     primary?: CodexRateLimitWindow;
     secondary?: CodexRateLimitWindow;
-    credits?: CodexCreditsSnapshot;
     planType?: CodexPlanType;
   } | null;
   lastUpdated: string;
@@ -39,13 +32,24 @@ export interface CodexUsageData {
 /**
  * Codex Usage Service
  *
- * Attempts to fetch usage data from Codex CLI and OpenAI API.
- * Codex CLI doesn't provide a direct usage command, but we can:
- * 1. Parse usage info from error responses (rate limit errors contain plan info)
- * 2. Check for OpenAI API usage if API key is available
+ * Fetches usage data from Codex CLI using the app-server JSON-RPC API.
+ * Falls back to auth file parsing if app-server is unavailable.
  */
 export class CodexUsageService {
   private cachedCliPath: string | null = null;
+  private appServerService: CodexAppServerService | null = null;
+  private accountPlanTypeArray: CodexPlanType[] = [
+    'free',
+    'plus',
+    'pro',
+    'team',
+    'enterprise',
+    'edu',
+  ];
+
+  constructor(appServerService?: CodexAppServerService) {
+    this.appServerService = appServerService || null;
+  }
 
   /**
    * Check if Codex CLI is available on the system
@@ -58,60 +62,131 @@ export class CodexUsageService {
   /**
    * Attempt to fetch usage data
    *
-   * Tries multiple approaches:
-   * 1. Always try to get plan type from auth file first (authoritative source)
-   * 2. Check for OpenAI API key in environment for API usage
-   * 3. Make a test request to capture rate limit headers from CLI
-   * 4. Combine results from auth file and CLI
+   * Priority order:
+   * 1. Codex app-server JSON-RPC API (most reliable, provides real-time data)
+   * 2. Auth file JWT parsing (fallback for plan type)
    */
   async fetchUsageData(): Promise<CodexUsageData> {
+    logger.info('[fetchUsageData] Starting...');
     const cliPath = this.cachedCliPath || (await findCodexCliPath());
 
     if (!cliPath) {
+      logger.error('[fetchUsageData] Codex CLI not found');
       throw new Error('Codex CLI not found. Please install it with: npm install -g @openai/codex');
     }
 
-    // Always try to get plan type from auth file first - this is the authoritative source
-    const authPlanType = await this.getPlanTypeFromAuthFile();
+    logger.info(`[fetchUsageData] Using CLI path: ${cliPath}`);
 
-    // Check if user has an API key that we can use
-    const hasApiKey = !!process.env.OPENAI_API_KEY;
-
-    if (hasApiKey) {
-      // Try to get usage from OpenAI API
-      const openaiUsage = await this.fetchOpenAIUsage();
-      if (openaiUsage) {
-        // Merge with auth file plan type if available
-        if (authPlanType && openaiUsage.rateLimits) {
-          openaiUsage.rateLimits.planType = authPlanType;
-        }
-        return openaiUsage;
-      }
+    // Try to get usage from Codex app-server (most reliable method)
+    const appServerUsage = await this.fetchFromAppServer();
+    if (appServerUsage) {
+      logger.info('[fetchUsageData] ✓ Fetched usage from app-server');
+      return appServerUsage;
     }
 
-    // Try to get usage from Codex CLI by making a simple request
-    const codexUsage = await this.fetchCodexUsage(cliPath, authPlanType);
-    if (codexUsage) {
-      return codexUsage;
-    }
+    logger.info('[fetchUsageData] App-server failed, trying auth file fallback...');
 
-    // Fallback: try to parse full usage from auth file
+    // Fallback: try to parse usage from auth file
     const authUsage = await this.fetchFromAuthFile();
     if (authUsage) {
+      logger.info('[fetchUsageData] ✓ Fetched usage from auth file');
       return authUsage;
     }
 
-    // If all else fails, return a message with helpful information
-    throw new Error(
-      'Codex usage statistics require additional configuration. ' +
-        'To enable usage tracking:\n\n' +
-        '1. Set your OpenAI API key in the environment:\n' +
-        '   export OPENAI_API_KEY=sk-...\n\n' +
-        '2. Or check your usage at:\n' +
-        '   https://platform.openai.com/usage\n\n' +
-        'Note: If using Codex CLI with ChatGPT OAuth authentication, ' +
-        'usage data must be queried through your OpenAI account.'
-    );
+    logger.info('[fetchUsageData] All methods failed, returning unknown');
+
+    // If all else fails, return unknown
+    return {
+      rateLimits: {
+        planType: 'unknown',
+      },
+      lastUpdated: new Date().toISOString(),
+    };
+  }
+
+  /**
+   * Fetch usage data from Codex app-server using JSON-RPC API
+   * This is the most reliable method as it gets real-time data from OpenAI
+   */
+  private async fetchFromAppServer(): Promise<CodexUsageData | null> {
+    try {
+      // Use CodexAppServerService if available
+      if (!this.appServerService) {
+        return null;
+      }
+
+      // Fetch account and rate limits in parallel
+      const [accountResult, rateLimitsResult] = await Promise.all([
+        this.appServerService.getAccount(),
+        this.appServerService.getRateLimits(),
+      ]);
+
+      if (!accountResult) {
+        return null;
+      }
+
+      // Build response
+      // Prefer planType from rateLimits (more accurate/current) over account (can be stale)
+      let planType: CodexPlanType = 'unknown';
+
+      // First try rate limits planType (most accurate)
+      const rateLimitsPlanType = rateLimitsResult?.rateLimits?.planType;
+      if (rateLimitsPlanType) {
+        const normalizedType = rateLimitsPlanType.toLowerCase() as CodexPlanType;
+        if (this.accountPlanTypeArray.includes(normalizedType)) {
+          planType = normalizedType;
+        }
+      }
+
+      // Fall back to account planType if rate limits didn't have it
+      if (planType === 'unknown' && accountResult.account?.planType) {
+        const normalizedType = accountResult.account.planType.toLowerCase() as CodexPlanType;
+        if (this.accountPlanTypeArray.includes(normalizedType)) {
+          planType = normalizedType;
+        }
+      }
+
+      const result: CodexUsageData = {
+        rateLimits: {
+          planType,
+        },
+        lastUpdated: new Date().toISOString(),
+      };
+
+      // Add rate limit info if available
+      if (rateLimitsResult?.rateLimits?.primary) {
+        const primary = rateLimitsResult.rateLimits.primary;
+        result.rateLimits!.primary = {
+          limit: -1, // Not provided by API
+          used: -1, // Not provided by API
+          remaining: -1, // Not provided by API
+          usedPercent: primary.usedPercent,
+          windowDurationMins: primary.windowDurationMins,
+          resetsAt: primary.resetsAt,
+        };
+      }
+
+      // Add secondary rate limit if available
+      if (rateLimitsResult?.rateLimits?.secondary) {
+        const secondary = rateLimitsResult.rateLimits.secondary;
+        result.rateLimits!.secondary = {
+          limit: -1, // Not provided by API
+          used: -1, // Not provided by API
+          remaining: -1, // Not provided by API
+          usedPercent: secondary.usedPercent,
+          windowDurationMins: secondary.windowDurationMins,
+          resetsAt: secondary.resetsAt,
+        };
+      }
+
+      logger.info(
+        `[fetchFromAppServer] ✓ Plan: ${planType}, Primary: ${result.rateLimits?.primary?.usedPercent || 'N/A'}%, Secondary: ${result.rateLimits?.secondary?.usedPercent || 'N/A'}%`
+      );
+      return result;
+    } catch (error) {
+      logger.error('[fetchFromAppServer] Failed:', error);
+      return null;
+    }
   }
 
   /**
@@ -121,9 +196,11 @@ export class CodexUsageService {
   private async getPlanTypeFromAuthFile(): Promise<CodexPlanType> {
     try {
       const authFilePath = getCodexAuthPath();
-      const exists = await systemPathExists(authFilePath);
+      logger.info(`[getPlanTypeFromAuthFile] Auth file path: ${authFilePath}`);
+      const exists = systemPathExists(authFilePath);
 
       if (!exists) {
+        logger.warn('[getPlanTypeFromAuthFile] Auth file does not exist');
         return 'unknown';
       }
 
@@ -131,16 +208,24 @@ export class CodexUsageService {
       const authData = JSON.parse(authContent);
 
       if (!authData.tokens?.id_token) {
+        logger.info('[getPlanTypeFromAuthFile] No id_token in auth file');
         return 'unknown';
       }
 
       const claims = this.parseJwt(authData.tokens.id_token);
       if (!claims) {
+        logger.info('[getPlanTypeFromAuthFile] Failed to parse JWT');
         return 'unknown';
       }
 
+      logger.info('[getPlanTypeFromAuthFile] JWT claims keys:', Object.keys(claims));
+
       // Extract plan type from nested OpenAI auth object with type validation
       const openaiAuthClaim = claims['https://api.openai.com/auth'];
+      logger.info(
+        '[getPlanTypeFromAuthFile] OpenAI auth claim:',
+        JSON.stringify(openaiAuthClaim, null, 2)
+      );
 
       let accountType: string | undefined;
       let isSubscriptionExpired = false;
@@ -188,154 +273,23 @@ export class CodexUsageService {
       }
 
       if (accountType) {
-        const normalizedType = accountType.toLowerCase();
-        if (['free', 'plus', 'pro', 'team', 'enterprise', 'edu'].includes(normalizedType)) {
-          return normalizedType as CodexPlanType;
-        }
-      }
-    } catch (error) {
-      logger.error('Failed to get plan type from auth file:', error);
-    }
-
-    return 'unknown';
-  }
-
-  /**
-   * Try to fetch usage from OpenAI API using the API key
-   */
-  private async fetchOpenAIUsage(): Promise<CodexUsageData | null> {
-    const apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey) {
-      return null;
-    }
-
-    try {
-      const endTime = Math.floor(Date.now() / 1000);
-      const startTime = endTime - 7 * 24 * 60 * 60; // Last 7 days
-
-      const response = await fetch(
-        `https://api.openai.com/v1/organization/usage/completions?start_time=${startTime}&end_time=${endTime}&limit=1`,
-        {
-          headers: {
-            Authorization: `Bearer ${apiKey}`,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
-
-      if (response.ok) {
-        const data = await response.json();
-        return this.parseOpenAIUsage(data);
-      }
-    } catch (error) {
-      logger.error('Failed to fetch from OpenAI API:', error);
-    }
-
-    return null;
-  }
-
-  /**
-   * Parse OpenAI usage API response
-   */
-  private parseOpenAIUsage(data: any): CodexUsageData {
-    let totalInputTokens = 0;
-    let totalOutputTokens = 0;
-
-    if (data.data && Array.isArray(data.data)) {
-      for (const bucket of data.data) {
-        if (bucket.results && Array.isArray(bucket.results)) {
-          for (const result of bucket.results) {
-            totalInputTokens += result.input_tokens || 0;
-            totalOutputTokens += result.output_tokens || 0;
-          }
-        }
-      }
-    }
-
-    return {
-      rateLimits: {
-        planType: 'unknown',
-        credits: {
-          hasCredits: true,
-        },
-      },
-      lastUpdated: new Date().toISOString(),
-    };
-  }
-
-  /**
-   * Try to fetch usage by making a test request to Codex CLI
-   * and parsing rate limit information from the response
-   */
-  private async fetchCodexUsage(
-    cliPath: string,
-    authPlanType: CodexPlanType
-  ): Promise<CodexUsageData | null> {
-    try {
-      // Make a simple request to trigger rate limit info if at limit
-      const result = await spawnProcess({
-        command: cliPath,
-        args: ['exec', '--', 'echo', 'test'],
-        cwd: process.cwd(),
-        env: {
-          ...process.env,
-          TERM: 'dumb',
-        },
-        timeout: 10000,
-      });
-
-      // Parse the output for rate limit information
-      const combinedOutput = (result.stdout + result.stderr).toLowerCase();
-
-      // Check if we got a rate limit error
-      const rateLimitMatch = combinedOutput.match(
-        /usage_limit_reached.*?"plan_type":"([^"]+)".*?"resets_at":(\d+).*?"resets_in_seconds":(\d+)/
-      );
-
-      if (rateLimitMatch) {
-        // Rate limit error contains the plan type - use that as it's the most authoritative
-        const planType = rateLimitMatch[1] as CodexPlanType;
-        const resetsAt = parseInt(rateLimitMatch[2], 10);
-        const resetsInSeconds = parseInt(rateLimitMatch[3], 10);
-
+        const normalizedType = accountType.toLowerCase() as CodexPlanType;
         logger.info(
-          `Rate limit hit - plan: ${planType}, resets in ${Math.ceil(resetsInSeconds / 60)} mins`
+          `[getPlanTypeFromAuthFile] Account type: "${accountType}", normalized: "${normalizedType}"`
         );
-
-        return {
-          rateLimits: {
-            planType,
-            primary: {
-              limit: 0,
-              used: 0,
-              remaining: 0,
-              usedPercent: 100,
-              windowDurationMins: Math.ceil(resetsInSeconds / 60),
-              resetsAt,
-            },
-          },
-          lastUpdated: new Date().toISOString(),
-        };
+        if (this.accountPlanTypeArray.includes(normalizedType)) {
+          logger.info(`[getPlanTypeFromAuthFile] Returning plan type: ${normalizedType}`);
+          return normalizedType;
+        }
+      } else {
+        logger.info('[getPlanTypeFromAuthFile] No account type found in claims');
       }
-
-      // No rate limit error - use the plan type from auth file
-      const isFreePlan = authPlanType === 'free';
-
-      return {
-        rateLimits: {
-          planType: authPlanType,
-          credits: {
-            hasCredits: true,
-            unlimited: !isFreePlan && authPlanType !== 'unknown',
-          },
-        },
-        lastUpdated: new Date().toISOString(),
-      };
     } catch (error) {
-      logger.error('Failed to fetch from Codex CLI:', error);
+      logger.error('[getPlanTypeFromAuthFile] Failed to get plan type from auth file:', error);
     }
 
-    return null;
+    logger.info('[getPlanTypeFromAuthFile] Returning unknown');
+    return 'unknown';
   }
 
   /**
@@ -343,27 +297,27 @@ export class CodexUsageService {
    * Reuses getPlanTypeFromAuthFile to avoid code duplication
    */
   private async fetchFromAuthFile(): Promise<CodexUsageData | null> {
+    logger.info('[fetchFromAuthFile] Starting...');
     try {
       const planType = await this.getPlanTypeFromAuthFile();
+      logger.info(`[fetchFromAuthFile] Got plan type: ${planType}`);
 
       if (planType === 'unknown') {
+        logger.info('[fetchFromAuthFile] Plan type unknown, returning null');
         return null;
       }
 
-      const isFreePlan = planType === 'free';
-
-      return {
+      const result: CodexUsageData = {
         rateLimits: {
           planType,
-          credits: {
-            hasCredits: true,
-            unlimited: !isFreePlan,
-          },
         },
         lastUpdated: new Date().toISOString(),
       };
+
+      logger.info('[fetchFromAuthFile] Returning result:', JSON.stringify(result, null, 2));
+      return result;
     } catch (error) {
-      logger.error('Failed to parse auth file:', error);
+      logger.error('[fetchFromAuthFile] Failed to parse auth file:', error);
     }
 
     return null;
@@ -372,7 +326,7 @@ export class CodexUsageService {
   /**
    * Parse JWT token to extract claims
    */
-  private parseJwt(token: string): any {
+  private parseJwt(token: string): Record<string, unknown> | null {
     try {
       const parts = token.split('.');
 
@@ -383,18 +337,8 @@ export class CodexUsageService {
       const base64Url = parts[1];
       const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
 
-      // Use Buffer for Node.js environment instead of atob
-      let jsonPayload: string;
-      if (typeof Buffer !== 'undefined') {
-        jsonPayload = Buffer.from(base64, 'base64').toString('utf-8');
-      } else {
-        jsonPayload = decodeURIComponent(
-          atob(base64)
-            .split('')
-            .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
-            .join('')
-        );
-      }
+      // Use Buffer for Node.js environment
+      const jsonPayload = Buffer.from(base64, 'base64').toString('utf-8');
 
       return JSON.parse(jsonPayload);
     } catch {

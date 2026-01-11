@@ -20,5 +20,4 @@ export const SIDEBAR_FEATURE_FLAGS = {
   hideRunningAgents: import.meta.env.VITE_HIDE_RUNNING_AGENTS === 'true',
   hideContext: import.meta.env.VITE_HIDE_CONTEXT === 'true',
   hideSpecEditor: import.meta.env.VITE_HIDE_SPEC_EDITOR === 'true',
-  hideAiProfiles: import.meta.env.VITE_HIDE_AI_PROFILES === 'true',
 } as const;

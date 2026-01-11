@@ -433,11 +433,12 @@ export interface SpecRegenerationAPI {
     success: boolean;
     error?: string;
   }>;
-  stop: () => Promise<{ success: boolean; error?: string }>;
-  status: () => Promise<{
+  stop: (projectPath?: string) => Promise<{ success: boolean; error?: string }>;
+  status: (projectPath?: string) => Promise<{
     success: boolean;
     isRunning?: boolean;
     currentPhase?: string;
+    projectPath?: string;
     error?: string;
   }>;
   onEvent: (callback: (event: SpecRegenerationEvent) => void) => () => void;
@@ -461,7 +462,8 @@ export interface FeaturesAPI {
     featureId: string,
     updates: Partial<Feature>,
     descriptionHistorySource?: 'enhance' | 'edit',
-    enhancementMode?: 'improve' | 'technical' | 'simplify' | 'acceptance'
+    enhancementMode?: 'improve' | 'technical' | 'simplify' | 'acceptance' | 'ux-reviewer',
+    preEnhancementDescription?: string
   ) => Promise<{ success: boolean; feature?: Feature; error?: string }>;
   delete: (projectPath: string, featureId: string) => Promise<{ success: boolean; error?: string }>;
   getAgentOutput: (
@@ -532,6 +534,9 @@ export interface AutoModeAPI {
     editedPlan?: string,
     feedback?: string
   ) => Promise<{ success: boolean; error?: string }>;
+  resumeInterrupted: (
+    projectPath: string
+  ) => Promise<{ success: boolean; message?: string; error?: string }>;
   onEvent: (callback: (event: AutoModeEvent) => void) => () => void;
 }
 
@@ -608,7 +613,8 @@ export interface ElectronAPI {
     enhance: (
       originalText: string,
       enhancementMode: string,
-      model?: string
+      model?: string,
+      thinkingLevel?: string
     ) => Promise<{
       success: boolean;
       enhancedText?: string;
@@ -727,6 +733,20 @@ export interface ElectronAPI {
   ideation?: IdeationAPI;
   codex?: {
     getUsage: () => Promise<CodexUsageResponse>;
+    getModels: (refresh?: boolean) => Promise<{
+      success: boolean;
+      models?: Array<{
+        id: string;
+        label: string;
+        description: string;
+        hasThinking: boolean;
+        supportsVision: boolean;
+        tier: 'premium' | 'standard' | 'basic';
+        isDefault: boolean;
+      }>;
+      cachedAt?: number;
+      error?: string;
+    }>;
   };
   settings?: {
     getStatus: () => Promise<{
@@ -1626,6 +1646,8 @@ function createMockWorktreeAPI(): WorktreeAPI {
     },
 
     openInEditor: async (worktreePath: string, editorCommand?: string) => {
+      const ANTIGRAVITY_EDITOR_COMMAND = 'antigravity';
+      const ANTIGRAVITY_LEGACY_COMMAND = 'agy';
       // Map editor commands to display names
       const editorNameMap: Record<string, string> = {
         cursor: 'Cursor',
@@ -1638,7 +1660,8 @@ function createMockWorktreeAPI(): WorktreeAPI {
         webstorm: 'WebStorm',
         xed: 'Xcode',
         studio: 'Android Studio',
-        agy: 'Antigravity',
+        [ANTIGRAVITY_EDITOR_COMMAND]: 'Antigravity',
+        [ANTIGRAVITY_LEGACY_COMMAND]: 'Antigravity',
         open: 'Finder',
         explorer: 'Explorer',
         'xdg-open': 'File Manager',
@@ -1674,6 +1697,19 @@ function createMockWorktreeAPI(): WorktreeAPI {
             { name: 'VS Code', command: 'code' },
             { name: 'Finder', command: 'open' },
           ],
+        },
+      };
+    },
+    refreshEditors: async () => {
+      console.log('[Mock] Refreshing available editors');
+      return {
+        success: true,
+        result: {
+          editors: [
+            { name: 'VS Code', command: 'code' },
+            { name: 'Finder', command: 'open' },
+          ],
+          message: 'Found 2 available editors',
         },
       };
     },
@@ -2084,6 +2120,11 @@ function createMockAutoModeAPI(): AutoModeAPI {
         feedback,
       });
       return { success: true };
+    },
+
+    resumeInterrupted: async (projectPath: string) => {
+      console.log('[Mock] Resume interrupted features for:', projectPath);
+      return { success: true, message: 'Mock: no interrupted features' };
     },
 
     onEvent: (callback: (event: AutoModeEvent) => void) => {
@@ -2515,7 +2556,7 @@ function createMockSpecRegenerationAPI(): SpecRegenerationAPI {
       return { success: true };
     },
 
-    stop: async () => {
+    stop: async (_projectPath?: string) => {
       mockSpecRegenerationRunning = false;
       mockSpecRegenerationPhase = '';
       if (mockSpecRegenerationTimeout) {
@@ -2525,7 +2566,7 @@ function createMockSpecRegenerationAPI(): SpecRegenerationAPI {
       return { success: true };
     },
 
-    status: async () => {
+    status: async (_projectPath?: string) => {
       return {
         success: true,
         isRunning: mockSpecRegenerationRunning,
@@ -3020,6 +3061,7 @@ export interface Project {
   path: string;
   lastOpened?: string;
   theme?: string; // Per-project theme override (uses ThemeMode from app-store)
+  isFavorite?: boolean; // Pin project to top of dashboard
 }
 
 export interface TrashedProject extends Project {

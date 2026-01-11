@@ -10,6 +10,7 @@ import { createGetHandler } from './routes/get.js';
 import { createCreateHandler } from './routes/create.js';
 import { createUpdateHandler } from './routes/update.js';
 import { createBulkUpdateHandler } from './routes/bulk-update.js';
+import { createBulkDeleteHandler } from './routes/bulk-delete.js';
 import { createDeleteHandler } from './routes/delete.js';
 import { createAgentOutputHandler, createRawOutputHandler } from './routes/agent-output.js';
 import { createGenerateTitleHandler } from './routes/generate-title.js';
@@ -25,6 +26,11 @@ export function createFeaturesRoutes(featureLoader: FeatureLoader): Router {
     '/bulk-update',
     validatePathParams('projectPath'),
     createBulkUpdateHandler(featureLoader)
+  );
+  router.post(
+    '/bulk-delete',
+    validatePathParams('projectPath'),
+    createBulkDeleteHandler(featureLoader)
   );
   router.post('/delete', validatePathParams('projectPath'), createDeleteHandler(featureLoader));
   router.post('/agent-output', createAgentOutputHandler(featureLoader));

@@ -17,6 +17,7 @@ export function useProjectSettingsLoader() {
   const setCardBorderEnabled = useAppStore((state) => state.setCardBorderEnabled);
   const setCardBorderOpacity = useAppStore((state) => state.setCardBorderOpacity);
   const setHideScrollbar = useAppStore((state) => state.setHideScrollbar);
+  const setWorktreePanelVisible = useAppStore((state) => state.setWorktreePanelVisible);
 
   const loadingRef = useRef<string | null>(null);
   const currentProjectRef = useRef<string | null>(null);
@@ -71,6 +72,11 @@ export function useProjectSettingsLoader() {
             if (value !== undefined) {
               (setter as (path: string, val: typeof value) => void)(requestedProjectPath, value);
             }
+          }
+
+          // Apply worktreePanelVisible if present
+          if (result.settings.worktreePanelVisible !== undefined) {
+            setWorktreePanelVisible(requestedProjectPath, result.settings.worktreePanelVisible);
           }
         }
       } catch (error) {

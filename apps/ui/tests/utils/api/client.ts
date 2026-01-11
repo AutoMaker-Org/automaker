@@ -368,3 +368,42 @@ export async function authenticateForTests(page: Page): Promise<boolean> {
   const apiKey = process.env.AUTOMAKER_API_KEY || 'test-api-key-for-e2e-tests';
   return authenticateWithApiKey(page, apiKey);
 }
+
+/**
+ * Check if the backend server is healthy
+ * Returns true if the server responds with status 200, false otherwise
+ */
+export async function checkBackendHealth(page: Page, timeout = 5000): Promise<boolean> {
+  try {
+    const response = await page.request.get(`${API_BASE_URL}/api/health`, {
+      timeout,
+    });
+    return response.ok();
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Wait for the backend to be healthy, with retry logic
+ * Throws an error if the backend doesn't become healthy within the timeout
+ */
+export async function waitForBackendHealth(
+  page: Page,
+  maxWaitMs = 30000,
+  checkIntervalMs = 500
+): Promise<void> {
+  const startTime = Date.now();
+
+  while (Date.now() - startTime < maxWaitMs) {
+    if (await checkBackendHealth(page, checkIntervalMs)) {
+      return;
+    }
+    await page.waitForTimeout(checkIntervalMs);
+  }
+
+  throw new Error(
+    `Backend did not become healthy within ${maxWaitMs}ms. ` +
+      `Last health check failed or timed out.`
+  );
+}

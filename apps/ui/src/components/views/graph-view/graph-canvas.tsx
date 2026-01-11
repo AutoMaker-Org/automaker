@@ -15,7 +15,8 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
-import { Feature } from '@/store/app-store';
+import { Feature, useAppStore } from '@/store/app-store';
+import { themeOptions } from '@/config/theme-options';
 import {
   TaskNode,
   DependencyEdge,
@@ -47,6 +48,13 @@ const edgeTypes: any = {
   dependency: DependencyEdge,
 };
 
+interface BackgroundSettings {
+  cardOpacity: number;
+  cardGlassmorphism: boolean;
+  cardBorderEnabled: boolean;
+  cardBorderOpacity: number;
+}
+
 interface GraphCanvasProps {
   features: Feature[];
   runningAutoTasks: string[];
@@ -56,6 +64,7 @@ interface GraphCanvasProps {
   nodeActionCallbacks?: NodeActionCallbacks;
   onCreateDependency?: (sourceId: string, targetId: string) => Promise<boolean>;
   backgroundStyle?: React.CSSProperties;
+  backgroundSettings?: BackgroundSettings;
   className?: string;
 }
 
@@ -68,10 +77,41 @@ function GraphCanvasInner({
   nodeActionCallbacks,
   onCreateDependency,
   backgroundStyle,
+  backgroundSettings,
   className,
 }: GraphCanvasProps) {
   const [isLocked, setIsLocked] = useState(false);
   const [layoutDirection, setLayoutDirection] = useState<'LR' | 'TB'>('LR');
+
+  // Determine React Flow color mode based on current theme
+  const effectiveTheme = useAppStore((state) => state.getEffectiveTheme());
+  const [systemColorMode, setSystemColorMode] = useState<'dark' | 'light'>(() => {
+    if (typeof window === 'undefined') return 'dark';
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  });
+
+  useEffect(() => {
+    if (effectiveTheme !== 'system') return;
+    if (typeof window === 'undefined') return;
+
+    const mql = window.matchMedia('(prefers-color-scheme: dark)');
+    const update = () => setSystemColorMode(mql.matches ? 'dark' : 'light');
+    update();
+
+    // Safari < 14 fallback
+    if (mql.addEventListener) {
+      mql.addEventListener('change', update);
+      return () => mql.removeEventListener('change', update);
+    }
+    // eslint-disable-next-line deprecation/deprecation
+    mql.addListener(update);
+    // eslint-disable-next-line deprecation/deprecation
+    return () => mql.removeListener(update);
+  }, [effectiveTheme]);
+
+  const themeOption = themeOptions.find((t) => t.value === effectiveTheme);
+  const colorMode =
+    effectiveTheme === 'system' ? systemColorMode : themeOption?.isDark ? 'dark' : 'light';
 
   // Filter state (category, status, and negative toggle are local to graph view)
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
@@ -98,6 +138,7 @@ function GraphCanvasInner({
     runningAutoTasks,
     filterResult,
     actionCallbacks: nodeActionCallbacks,
+    backgroundSettings,
   });
 
   // Apply layout
@@ -234,6 +275,7 @@ function GraphCanvasInner({
         isValidConnection={isValidConnection}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
+        colorMode={colorMode}
         fitView
         fitViewOptions={{ padding: 0.2 }}
         minZoom={0.1}
@@ -256,7 +298,8 @@ function GraphCanvasInner({
           nodeStrokeWidth={3}
           zoomable
           pannable
-          className="!bg-popover/90 !border-border rounded-lg shadow-lg"
+          className="border-border! rounded-lg shadow-lg"
+          style={{ backgroundColor: 'color-mix(in oklch, var(--popover) 90%, transparent)' }}
         />
 
         <GraphControls
@@ -281,7 +324,10 @@ function GraphCanvasInner({
         {/* Empty state when all nodes are filtered out */}
         {filterResult.hasActiveFilter && filterResult.matchedNodeIds.size === 0 && (
           <Panel position="top-center" className="mt-20">
-            <div className="flex flex-col items-center gap-3 p-6 rounded-lg bg-popover/95 backdrop-blur-sm border border-border shadow-lg text-popover-foreground">
+            <div
+              className="flex flex-col items-center gap-3 p-6 rounded-lg backdrop-blur-sm border border-border shadow-lg text-popover-foreground"
+              style={{ backgroundColor: 'color-mix(in oklch, var(--popover) 95%, transparent)' }}
+            >
               <SearchX className="w-10 h-10 text-muted-foreground" />
               <div className="text-center">
                 <p className="text-sm font-medium">No matching tasks</p>

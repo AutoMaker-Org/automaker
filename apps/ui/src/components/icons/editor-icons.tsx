@@ -4,6 +4,9 @@ import { FolderOpen } from 'lucide-react';
 type IconProps = ComponentProps<'svg'>;
 type IconComponent = ComponentType<IconProps>;
 
+const ANTIGRAVITY_COMMANDS = ['antigravity', 'agy'] as const;
+const [PRIMARY_ANTIGRAVITY_COMMAND, LEGACY_ANTIGRAVITY_COMMAND] = ANTIGRAVITY_COMMANDS;
+
 /**
  * Cursor editor logo icon - from LobeHub icons
  */
@@ -22,6 +25,25 @@ export function VSCodeIcon(props: IconProps) {
   return (
     <svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" {...props}>
       <path d="M23.15 2.587L18.21.21a1.494 1.494 0 0 0-1.705.29l-9.46 8.63-4.12-3.128a.999.999 0 0 0-1.276.057L.327 7.261A1 1 0 0 0 .326 8.74L3.899 12 .326 15.26a1 1 0 0 0 .001 1.479L1.65 17.94a.999.999 0 0 0 1.276.057l4.12-3.128 9.46 8.63a1.492 1.492 0 0 0 1.704.29l4.942-2.377A1.5 1.5 0 0 0 24 20.06V3.939a1.5 1.5 0 0 0-.85-1.352zm-5.146 14.861L10.826 12l7.178-5.448v10.896z" />
+    </svg>
+  );
+}
+
+/**
+ * VS Code Insiders editor logo icon (same as VS Code)
+ */
+export function VSCodeInsidersIcon(props: IconProps) {
+  return <VSCodeIcon {...props} />;
+}
+
+/**
+ * Kiro editor logo icon (VS Code fork)
+ */
+export function KiroIcon(props: IconProps) {
+  return (
+    <svg viewBox="0 0 32 32" fill="currentColor" xmlns="http://www.w3.org/2000/svg" {...props}>
+      <path d="M6.594.016A7.006 7.006 0 0 0 .742 3.875a6.996 6.996 0 0 0-.726 2.793C.004 6.878 0 9.93.004 16.227c.004 8.699.008 9.265.031 9.476.113.93.324 1.652.707 2.422a6.918 6.918 0 0 0 3.172 3.148c.75.372 1.508.59 2.398.692.227.027.77.027 9.688.027 8.945 0 9.457 0 9.688-.027.917-.106 1.66-.32 2.437-.707a6.918 6.918 0 0 0 3.148-3.172c.372-.75.59-1.508.692-2.398.027-.227.027-.77.027-9.665 0-9.976.004-9.53-.07-10.03a6.993 6.993 0 0 0-3.024-4.798 6.427 6.427 0 0 0-.757-.445 7.06 7.06 0 0 0-2.774-.734c-.328-.02-18.437-.02-18.773 0Zm10.789 5.406a7.556 7.556 0 0 1 6.008 3.805c.148.257.406.796.52 1.085.394 1 .632 2.157.769 3.75.035.38.05 1.965.023 2.407-.125 2.168-.625 4.183-1.515 6.078a9.77 9.77 0 0 1-.801 1.437c-.93 1.305-2.32 2.332-3.48 2.57-.895.184-1.602-.1-2.048-.827a3.42 3.42 0 0 1-.25-.528c-.035-.097-.062-.129-.086-.09-.003.008-.09.075-.191.153-.95.722-2.02 1.175-3.059 1.293-.273.03-.859.023-1.085-.016-.715-.121-1.286-.441-1.649-.93a2.563 2.563 0 0 1-.328-.632c-.117-.36-.156-.813-.117-1.227.054-.55.226-1.184.484-1.766a.48.48 0 0 0 .043-.117 2.11 2.11 0 0 0-.137.055c-.363.16-.898.305-1.308.351-.844.098-1.426-.14-1.715-.699-.106-.203-.149-.39-.16-.676-.008-.261.008-.43.066-.656.059-.23.121-.367.403-.89.382-.72.492-.946.636-1.348.328-.899.48-1.723.688-3.754.148-1.469.254-2.14.433-2.766.028-.09.078-.277.114-.414.796-3.074 3.113-5.183 6.148-5.601.129-.016.309-.04.399-.047.238-.016.96-.02 1.195 0Zm0 0" />
+      <path d="M16.754 11.336a.815.815 0 0 0-.375.219c-.176.18-.293.441-.356.804-.039.235-.058.602-.039.868.028.406.082.64.204.894.128.262.304.426.546.496.106.031.383.031.5 0 .422-.113.703-.531.801-1.191a4.822 4.822 0 0 0-.012-.95c-.062-.378-.183-.675-.359-.863a.808.808 0 0 0-.648-.293.804.804 0 0 0-.262.016ZM20.375 11.328a1.01 1.01 0 0 0-.363.188c-.164.144-.293.402-.364.718-.05.23-.07.426-.07.743 0 .32.02.511.07.742.11.496.352.808.688.898.121.031.379.031.5 0 .402-.105.68-.5.781-1.11.035-.198.047-.648.024-.87-.063-.63-.293-1.059-.649-1.23a1.513 1.513 0 0 0-.219-.079 1.362 1.362 0 0 0-.398 0Zm0 0" />
     </svg>
   );
 }
@@ -152,6 +174,8 @@ export function getEditorIcon(command: string): IconComponent {
   const cliIcons: Record<string, IconComponent> = {
     cursor: CursorIcon,
     code: VSCodeIcon,
+    'code-insiders': VSCodeInsidersIcon,
+    kido: KiroIcon,
     zed: ZedIcon,
     subl: SublimeTextIcon,
     windsurf: WindsurfIcon,
@@ -160,7 +184,8 @@ export function getEditorIcon(command: string): IconComponent {
     webstorm: WebStormIcon,
     xed: XcodeIcon,
     studio: AndroidStudioIcon,
-    agy: AntigravityIcon,
+    [PRIMARY_ANTIGRAVITY_COMMAND]: AntigravityIcon,
+    [LEGACY_ANTIGRAVITY_COMMAND]: AntigravityIcon,
     open: FinderIcon,
     explorer: FolderOpen,
     'xdg-open': FolderOpen,
@@ -175,7 +200,9 @@ export function getEditorIcon(command: string): IconComponent {
   if (command.startsWith('open')) {
     const cmdLower = command.toLowerCase();
     if (cmdLower.includes('cursor')) return CursorIcon;
+    if (cmdLower.includes('visual studio code - insiders')) return VSCodeInsidersIcon;
     if (cmdLower.includes('visual studio code')) return VSCodeIcon;
+    if (cmdLower.includes('kiro')) return KiroIcon;
     if (cmdLower.includes('zed')) return ZedIcon;
     if (cmdLower.includes('sublime')) return SublimeTextIcon;
     if (cmdLower.includes('windsurf')) return WindsurfIcon;

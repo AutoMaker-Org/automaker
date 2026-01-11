@@ -1,150 +1,24 @@
 /**
  * POST /open-in-editor endpoint - Open a worktree directory in the default code editor
  * GET /default-editor endpoint - Get the name of the default code editor
+ * POST /refresh-editors endpoint - Clear editor cache and re-detect available editors
+ *
+ * This module uses @automaker/platform for cross-platform editor detection and launching.
  */
 
 import type { Request, Response } from 'express';
-import { execFile } from 'child_process';
-import { promisify } from 'util';
-import { homedir } from 'os';
-import { isAbsolute, join } from 'path';
-import { access } from 'fs/promises';
-import type { EditorInfo } from '@automaker/types';
+import { isAbsolute } from 'path';
+import {
+  clearEditorCache,
+  detectAllEditors,
+  detectDefaultEditor,
+  openInEditor,
+  openInFileManager,
+} from '@automaker/platform';
+import { createLogger } from '@automaker/utils';
 import { getErrorMessage, logError } from '../common.js';
 
-const execFileAsync = promisify(execFile);
-
-// Cache with TTL for editor detection
-// cachedEditors is the single source of truth; default editor is derived from it
-let cachedEditors: EditorInfo[] | null = null;
-let cacheTimestamp: number = 0;
-const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
-
-function isCacheValid(): boolean {
-  return cachedEditors !== null && Date.now() - cacheTimestamp < CACHE_TTL_MS;
-}
-
-/**
- * Check if a CLI command exists in PATH
- * Uses execFile to avoid shell injection
- */
-async function commandExists(cmd: string): Promise<boolean> {
-  try {
-    const whichCmd = process.platform === 'win32' ? 'where' : 'which';
-    await execFileAsync(whichCmd, [cmd]);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-/**
- * Check if a macOS app bundle exists and return the path if found
- * Uses Node fs methods instead of shell commands for safety
- */
-async function findMacApp(appName: string): Promise<string | null> {
-  if (process.platform !== 'darwin') return null;
-
-  // Check /Applications first
-  const systemAppPath = join('/Applications', `${appName}.app`);
-  try {
-    await access(systemAppPath);
-    return systemAppPath;
-  } catch {
-    // Not in /Applications
-  }
-
-  // Check ~/Applications (used by JetBrains Toolbox and others)
-  const userAppPath = join(homedir(), 'Applications', `${appName}.app`);
-  try {
-    await access(userAppPath);
-    return userAppPath;
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Try to find an editor - checks CLI first, then macOS app bundle
- * Returns EditorInfo if found, null otherwise
- */
-async function findEditor(
-  name: string,
-  cliCommand: string,
-  macAppName: string
-): Promise<EditorInfo | null> {
-  // Try CLI command first
-  if (await commandExists(cliCommand)) {
-    return { name, command: cliCommand };
-  }
-
-  // Try macOS app bundle (checks /Applications and ~/Applications)
-  if (process.platform === 'darwin') {
-    const appPath = await findMacApp(macAppName);
-    if (appPath) {
-      // Use 'open -a' with full path for apps not in /Applications
-      return { name, command: `open -a "${appPath}"` };
-    }
-  }
-
-  return null;
-}
-
-async function detectAllEditors(): Promise<EditorInfo[]> {
-  // Return cached result if still valid
-  if (cachedEditors && isCacheValid()) {
-    return cachedEditors;
-  }
-
-  const isMac = process.platform === 'darwin';
-
-  // Check all editors in parallel for better performance
-  const editorChecks = [
-    findEditor('Cursor', 'cursor', 'Cursor'),
-    findEditor('VS Code', 'code', 'Visual Studio Code'),
-    findEditor('Zed', 'zed', 'Zed'),
-    findEditor('Sublime Text', 'subl', 'Sublime Text'),
-    findEditor('Windsurf', 'windsurf', 'Windsurf'),
-    findEditor('Trae', 'trae', 'Trae'),
-    findEditor('Rider', 'rider', 'Rider'),
-    findEditor('WebStorm', 'webstorm', 'WebStorm'),
-    // Xcode (macOS only) - will return null on other platforms
-    isMac ? findEditor('Xcode', 'xed', 'Xcode') : Promise.resolve(null),
-    findEditor('Android Studio', 'studio', 'Android Studio'),
-    findEditor('Antigravity', 'agy', 'Antigravity'),
-  ];
-
-  // Wait for all checks to complete in parallel
-  const results = await Promise.all(editorChecks);
-
-  // Filter out null results (editors not found)
-  const editors = results.filter((e): e is EditorInfo => e !== null);
-
-  // Always add file manager as fallback
-  const platform = process.platform;
-  if (platform === 'darwin') {
-    editors.push({ name: 'Finder', command: 'open' });
-  } else if (platform === 'win32') {
-    editors.push({ name: 'Explorer', command: 'explorer' });
-  } else {
-    editors.push({ name: 'File Manager', command: 'xdg-open' });
-  }
-
-  cachedEditors = editors;
-  cacheTimestamp = Date.now();
-  return editors;
-}
-
-/**
- * Detect the default (first available) code editor on the system
- * Derives from detectAllEditors() to ensure cache consistency
- */
-async function detectDefaultEditor(): Promise<EditorInfo> {
-  // Always go through detectAllEditors() which handles cache TTL
-  const editors = await detectAllEditors();
-  // Return first editor (highest priority) - always exists due to file manager fallback
-  return editors[0];
-}
+const logger = createLogger('open-in-editor');
 
 export function createGetAvailableEditorsHandler() {
   return async (_req: Request, res: Response): Promise<void> => {
@@ -182,18 +56,32 @@ export function createGetDefaultEditorHandler() {
 }
 
 /**
- * Safely execute an editor command with a path argument
- * Uses execFile to prevent command injection
+ * Handler to refresh the editor cache and re-detect available editors
+ * Useful when the user has installed/uninstalled editors
  */
-async function safeOpenInEditor(command: string, targetPath: string): Promise<void> {
-  // Handle 'open -a "AppPath"' style commands (macOS)
-  if (command.startsWith('open -a ')) {
-    const appPath = command.replace('open -a ', '').replace(/"/g, '');
-    await execFileAsync('open', ['-a', appPath, targetPath]);
-  } else {
-    // Simple commands like 'code', 'cursor', 'zed', etc.
-    await execFileAsync(command, [targetPath]);
-  }
+export function createRefreshEditorsHandler() {
+  return async (_req: Request, res: Response): Promise<void> => {
+    try {
+      // Clear the cache
+      clearEditorCache();
+
+      // Re-detect editors (this will repopulate the cache)
+      const editors = await detectAllEditors();
+
+      logger.info(`Editor cache refreshed, found ${editors.length} editors`);
+
+      res.json({
+        success: true,
+        result: {
+          editors,
+          message: `Found ${editors.length} available editors`,
+        },
+      });
+    } catch (error) {
+      logError(error, 'Refresh editors failed');
+      res.status(500).json({ success: false, error: getErrorMessage(error) });
+    }
+  };
 }
 
 export function createOpenInEditorHandler() {
@@ -221,61 +109,35 @@ export function createOpenInEditorHandler() {
         return;
       }
 
-      // Use specified editor command or detect default
-      let editor: EditorInfo;
-      if (editorCommand) {
-        // Find the editor info from the available editors list
-        const allEditors = await detectAllEditors();
-        const specifiedEditor = allEditors.find((e) => e.command === editorCommand);
-        if (specifiedEditor) {
-          editor = specifiedEditor;
-        } else {
-          // Log warning when requested editor is not available
-          const availableCommands = allEditors.map((e) => e.command).join(', ');
-          console.warn(
-            `[open-in-editor] Requested editor '${editorCommand}' not found. ` +
-              `Available editors: [${availableCommands}]. Falling back to default editor.`
-          );
-          editor = allEditors[0]; // Fall back to default (first in priority list)
-        }
-      } else {
-        editor = await detectDefaultEditor();
-      }
-
       try {
-        await safeOpenInEditor(editor.command, worktreePath);
+        // Use the platform utility to open in editor
+        const result = await openInEditor(worktreePath, editorCommand);
         res.json({
           success: true,
           result: {
-            message: `Opened ${worktreePath} in ${editor.name}`,
-            editorName: editor.name,
+            message: `Opened ${worktreePath} in ${result.editorName}`,
+            editorName: result.editorName,
           },
         });
       } catch (editorError) {
-        // If the detected editor fails, try opening in default file manager as fallback
-        const platform = process.platform;
-        let fallbackCommand: string;
-        let fallbackName: string;
+        // If the specified editor fails, try opening in default file manager as fallback
+        logger.warn(
+          `Failed to open in editor, falling back to file manager: ${getErrorMessage(editorError)}`
+        );
 
-        if (platform === 'darwin') {
-          fallbackCommand = 'open';
-          fallbackName = 'Finder';
-        } else if (platform === 'win32') {
-          fallbackCommand = 'explorer';
-          fallbackName = 'Explorer';
-        } else {
-          fallbackCommand = 'xdg-open';
-          fallbackName = 'File Manager';
+        try {
+          const result = await openInFileManager(worktreePath);
+          res.json({
+            success: true,
+            result: {
+              message: `Opened ${worktreePath} in ${result.editorName}`,
+              editorName: result.editorName,
+            },
+          });
+        } catch (fallbackError) {
+          // Both editor and file manager failed
+          throw fallbackError;
         }
-
-        await execFileAsync(fallbackCommand, [worktreePath]);
-        res.json({
-          success: true,
-          result: {
-            message: `Opened ${worktreePath} in ${fallbackName}`,
-            editorName: fallbackName,
-          },
-        });
       }
     } catch (error) {
       logError(error, 'Open in editor failed');

@@ -6,7 +6,6 @@ import { OpenAIIcon } from '@/components/ui/provider-icon';
 import { cn } from '@/lib/utils';
 import { getElectronAPI } from '@/lib/electron';
 import {
-  formatCodexCredits,
   formatCodexPlanType,
   formatCodexResetTime,
   getCodexWindowLabel,
@@ -25,7 +24,6 @@ const UPDATED_LABEL = 'Updated';
 const CODEX_FETCH_ERROR = 'Failed to fetch usage';
 const CODEX_REFRESH_LABEL = 'Refresh Codex usage';
 const PLAN_LABEL = 'Plan';
-const CREDITS_LABEL = 'Credits';
 const WARNING_THRESHOLD = 75;
 const CAUTION_THRESHOLD = 50;
 const MAX_PERCENTAGE = 100;
@@ -49,7 +47,6 @@ export function CodexUsageSection() {
   const rateLimits = codexUsage?.rateLimits ?? null;
   const primary = rateLimits?.primary ?? null;
   const secondary = rateLimits?.secondary ?? null;
-  const credits = rateLimits?.credits ?? null;
   const planType = rateLimits?.planType ?? null;
   const rateLimitWindows = [primary, secondary].filter(isRateLimitWindow);
   const hasMetrics = rateLimitWindows.length > 0;
@@ -206,20 +203,11 @@ export function CodexUsageSection() {
             })}
           </div>
         )}
-        {(planType || credits) && (
+        {planType && (
           <div className="rounded-xl border border-border/60 bg-secondary/20 p-4 text-xs text-muted-foreground">
-            {planType && (
-              <div>
-                {PLAN_LABEL}:{' '}
-                <span className="text-foreground">{formatCodexPlanType(planType)}</span>
-              </div>
-            )}
-            {credits && (
-              <div>
-                {CREDITS_LABEL}:{' '}
-                <span className="text-foreground">{formatCodexCredits(credits)}</span>
-              </div>
-            )}
+            <div>
+              {PLAN_LABEL}: <span className="text-foreground">{formatCodexPlanType(planType)}</span>
+            </div>
           </div>
         )}
         {!hasMetrics && !error && canFetchUsage && !isLoading && (

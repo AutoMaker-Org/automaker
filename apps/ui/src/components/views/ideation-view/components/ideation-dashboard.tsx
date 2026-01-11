@@ -3,7 +3,7 @@
  * First page users see - shows all ideas ready for accept/reject
  */
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { Loader2, AlertCircle, Plus, X, Sparkles, Lightbulb } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -17,6 +17,7 @@ import type { AnalysisSuggestion } from '@automaker/types';
 
 interface IdeationDashboardProps {
   onGenerateIdeas: () => void;
+  onAcceptAllReady?: (isReady: boolean, count: number, handler: () => Promise<void>) => void;
 }
 
 function SuggestionCard({
@@ -37,14 +38,16 @@ function SuggestionCard({
       <CardContent className="p-4">
         <div className="flex items-start gap-4">
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-1">
-              <h4 className="font-medium">{suggestion.title}</h4>
-              <Badge variant="outline" className="text-xs">
-                {suggestion.priority}
-              </Badge>
-              <Badge variant="secondary" className="text-xs">
-                {job.prompt.title}
-              </Badge>
+            <div className="flex items-start gap-2 mb-1">
+              <h4 className="font-medium shrink-0">{suggestion.title}</h4>
+              <div className="flex items-center gap-2 flex-wrap">
+                <Badge variant="outline" className="text-xs whitespace-nowrap">
+                  {suggestion.priority}
+                </Badge>
+                <Badge variant="secondary" className="text-xs whitespace-nowrap">
+                  {job.prompt.title}
+                </Badge>
+              </div>
             </div>
             <p className="text-sm text-muted-foreground">{suggestion.description}</p>
             {suggestion.rationale && (
@@ -166,11 +169,12 @@ function TagFilter({
   );
 }
 
-export function IdeationDashboard({ onGenerateIdeas }: IdeationDashboardProps) {
+export function IdeationDashboard({ onGenerateIdeas, onAcceptAllReady }: IdeationDashboardProps) {
   const currentProject = useAppStore((s) => s.currentProject);
   const generationJobs = useIdeationStore((s) => s.generationJobs);
   const removeSuggestionFromJob = useIdeationStore((s) => s.removeSuggestionFromJob);
   const [addingId, setAddingId] = useState<string | null>(null);
+  const [isAcceptingAll, setIsAcceptingAll] = useState(false);
   const [selectedTags, setSelectedTags] = useState<Set<string>>(new Set());
 
   // Get jobs for current project only (memoized to prevent unnecessary re-renders)
@@ -269,6 +273,54 @@ export function IdeationDashboard({ onGenerateIdeas }: IdeationDashboardProps) {
     removeSuggestionFromJob(jobId, suggestionId);
     toast.info('Idea removed');
   };
+
+  // Accept all filtered suggestions
+  const handleAcceptAll = useCallback(async () => {
+    if (!currentProject?.path || filteredSuggestions.length === 0) {
+      return;
+    }
+
+    setIsAcceptingAll(true);
+    const api = getElectronAPI();
+    let successCount = 0;
+    let failCount = 0;
+
+    // Process all filtered suggestions
+    for (const { suggestion, job } of filteredSuggestions) {
+      try {
+        const result = await api.ideation?.addSuggestionToBoard(currentProject.path, suggestion);
+        if (result?.success) {
+          removeSuggestionFromJob(job.id, suggestion.id);
+          successCount++;
+        } else {
+          failCount++;
+        }
+      } catch (error) {
+        console.error('Failed to add suggestion to board:', error);
+        failCount++;
+      }
+    }
+
+    setIsAcceptingAll(false);
+
+    if (successCount > 0 && failCount === 0) {
+      toast.success(`Added ${successCount} idea${successCount > 1 ? 's' : ''} to board`);
+    } else if (successCount > 0 && failCount > 0) {
+      toast.warning(
+        `Added ${successCount} idea${successCount > 1 ? 's' : ''}, ${failCount} failed`
+      );
+    } else {
+      toast.error('Failed to add ideas to board');
+    }
+  }, [currentProject?.path, filteredSuggestions, removeSuggestionFromJob]);
+
+  // Notify parent about accept all readiness
+  useEffect(() => {
+    if (onAcceptAllReady) {
+      const isReady = filteredSuggestions.length > 0 && !isAcceptingAll && !addingId;
+      onAcceptAllReady(isReady, filteredSuggestions.length, handleAcceptAll);
+    }
+  }, [filteredSuggestions.length, isAcceptingAll, addingId, handleAcceptAll, onAcceptAllReady]);
 
   const isEmpty = allSuggestions.length === 0 && activeJobs.length === 0;
 

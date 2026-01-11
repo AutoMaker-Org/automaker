@@ -30,6 +30,20 @@ export type {
 } from './codex.js';
 export * from './codex-models.js';
 
+// Codex App-Server JSON-RPC types
+export type {
+  AppServerModelResponse,
+  AppServerModel,
+  AppServerReasoningEffort,
+  AppServerAccountResponse,
+  AppServerAccount,
+  AppServerRateLimitsResponse,
+  AppServerRateLimits,
+  AppServerRateLimitWindow,
+  JsonRpcRequest,
+  JsonRpcResponse,
+} from './codex-app-server.js';
+
 // Feature types
 export type {
   Feature,
@@ -95,7 +109,6 @@ export { DEFAULT_PROMPT_CUSTOMIZATION } from './prompts.js';
 // Settings types and constants
 export type {
   ThemeMode,
-  KanbanCardDetailLevel,
   PlanningMode,
   ThinkingLevel,
   ModelProvider,
@@ -103,7 +116,6 @@ export type {
   PhaseModelConfig,
   PhaseModelKey,
   KeyboardShortcuts,
-  AIProfile,
   MCPToolInfo,
   MCPServerConfig,
   ProjectRef,
@@ -125,8 +137,6 @@ export {
   CREDENTIALS_VERSION,
   PROJECT_SETTINGS_VERSION,
   THINKING_TOKEN_BUDGET,
-  profileHasThinking,
-  getProfileModelString,
   getThinkingTokenBudget,
 } from './settings.js';
 

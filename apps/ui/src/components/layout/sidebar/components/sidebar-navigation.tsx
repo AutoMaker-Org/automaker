@@ -1,4 +1,5 @@
 import type { NavigateOptions } from '@tanstack/react-router';
+import { Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatShortcut } from '@/store/app-store';
 import type { NavSection } from '../types';
@@ -80,14 +81,23 @@ export function SidebarNavigation({
                     data-testid={`nav-${item.id}`}
                   >
                     <div className="relative">
-                      <Icon
-                        className={cn(
-                          'w-[18px] h-[18px] shrink-0 transition-all duration-200',
-                          isActive
-                            ? 'text-brand-500 drop-shadow-sm'
-                            : 'group-hover:text-brand-400 group-hover:scale-110'
-                        )}
-                      />
+                      {item.isLoading ? (
+                        <Loader2
+                          className={cn(
+                            'w-[18px] h-[18px] shrink-0 animate-spin',
+                            isActive ? 'text-brand-500' : 'text-muted-foreground'
+                          )}
+                        />
+                      ) : (
+                        <Icon
+                          className={cn(
+                            'w-[18px] h-[18px] shrink-0 transition-all duration-200',
+                            isActive
+                              ? 'text-brand-500 drop-shadow-sm'
+                              : 'group-hover:text-brand-400 group-hover:scale-110'
+                          )}
+                        />
+                      )}
                       {/* Count badge for collapsed state */}
                       {!sidebarOpen && item.count !== undefined && item.count > 0 && (
                         <span

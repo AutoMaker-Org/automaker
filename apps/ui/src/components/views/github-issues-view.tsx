@@ -26,8 +26,7 @@ export function GitHubIssuesView() {
   const [pendingRevalidateOptions, setPendingRevalidateOptions] =
     useState<ValidateIssueOptions | null>(null);
 
-  const { currentProject, defaultAIProfileId, aiProfiles, getCurrentWorktree, worktreesByProject } =
-    useAppStore();
+  const { currentProject, getCurrentWorktree, worktreesByProject } = useAppStore();
 
   // Model override for validation
   const validationModelOverride = useModelOverride({ phase: 'validationModel' });
@@ -44,12 +43,6 @@ export function GitHubIssuesView() {
       onValidationResultChange: setValidationResult,
       onShowValidationDialogChange: setShowValidationDialog,
     });
-
-  // Get default AI profile for task creation
-  const defaultProfile = useMemo(() => {
-    if (!defaultAIProfileId) return null;
-    return aiProfiles.find((p) => p.id === defaultAIProfileId) ?? null;
-  }, [defaultAIProfileId, aiProfiles]);
 
   // Get current branch from selected worktree
   const currentBranch = useMemo(() => {
@@ -99,9 +92,6 @@ export function GitHubIssuesView() {
             .filter(Boolean)
             .join('\n');
 
-          // Use profile default model
-          const featureModel = defaultProfile?.model ?? 'opus';
-
           const feature = {
             id: `issue-${issue.number}-${crypto.randomUUID()}`,
             title: issue.title,
@@ -110,8 +100,8 @@ export function GitHubIssuesView() {
             status: 'backlog' as const,
             passes: false,
             priority: getFeaturePriority(validation.estimatedComplexity),
-            model: featureModel,
-            thinkingLevel: defaultProfile?.thinkingLevel ?? 'none',
+            model: 'opus',
+            thinkingLevel: 'none' as const,
             branchName: currentBranch,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
@@ -129,7 +119,7 @@ export function GitHubIssuesView() {
         toast.error(err instanceof Error ? err.message : 'Failed to create task');
       }
     },
-    [currentProject?.path, defaultProfile, currentBranch]
+    [currentProject?.path, currentBranch]
   );
 
   if (loading) {

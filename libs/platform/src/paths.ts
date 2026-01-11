@@ -174,6 +174,19 @@ export function getBranchTrackingPath(projectPath: string): string {
 }
 
 /**
+ * Get the execution state file path for a project
+ *
+ * Stores JSON metadata about auto-mode execution state for recovery on restart.
+ * Tracks which features were running and auto-loop configuration.
+ *
+ * @param projectPath - Absolute path to project directory
+ * @returns Absolute path to {projectPath}/.automaker/execution-state.json
+ */
+export function getExecutionStatePath(projectPath: string): string {
+  return path.join(getAutomakerDir(projectPath), 'execution-state.json');
+}
+
+/**
  * Create the automaker directory structure for a project if it doesn't exist
  *
  * Creates {projectPath}/.automaker with all subdirectories recursively.

@@ -12,6 +12,7 @@ export type { EditorInfo };
 export function useAvailableEditors() {
   const [editors, setEditors] = useState<EditorInfo[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const fetchAvailableEditors = useCallback(async () => {
     try {
@@ -31,6 +32,31 @@ export function useAvailableEditors() {
     }
   }, []);
 
+  /**
+   * Refresh editors by clearing the server cache and re-detecting
+   * Use this when the user has installed/uninstalled editors
+   */
+  const refresh = useCallback(async () => {
+    setIsRefreshing(true);
+    try {
+      const api = getElectronAPI();
+      if (!api?.worktree?.refreshEditors) {
+        // Fallback to regular fetch if refresh not available
+        await fetchAvailableEditors();
+        return;
+      }
+      const result = await api.worktree.refreshEditors();
+      if (result.success && result.result?.editors) {
+        setEditors(result.result.editors);
+        logger.info(`Editor cache refreshed, found ${result.result.editors.length} editors`);
+      }
+    } catch (error) {
+      logger.error('Failed to refresh editors:', error);
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [fetchAvailableEditors]);
+
   useEffect(() => {
     fetchAvailableEditors();
   }, [fetchAvailableEditors]);
@@ -38,6 +64,8 @@ export function useAvailableEditors() {
   return {
     editors,
     isLoading,
+    isRefreshing,
+    refresh,
     // Convenience property: has multiple editors (for deciding whether to show submenu)
     hasMultipleEditors: editors.length > 1,
     // The first editor is the "default" one

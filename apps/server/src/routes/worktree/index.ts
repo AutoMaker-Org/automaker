@@ -25,6 +25,7 @@ import {
   createOpenInEditorHandler,
   createGetDefaultEditorHandler,
   createGetAvailableEditorsHandler,
+  createRefreshEditorsHandler,
 } from './routes/open-in-editor.js';
 import { createInitGitHandler } from './routes/init-git.js';
 import { createMigrateHandler } from './routes/migrate.js';
@@ -79,6 +80,7 @@ export function createWorktreeRoutes(): Router {
   router.post('/open-in-editor', validatePathParams('worktreePath'), createOpenInEditorHandler());
   router.get('/default-editor', createGetDefaultEditorHandler());
   router.get('/available-editors', createGetAvailableEditorsHandler());
+  router.post('/refresh-editors', createRefreshEditorsHandler());
   router.post('/init-git', validatePathParams('projectPath'), createInitGitHandler());
   router.post('/migrate', createMigrateHandler());
   router.post(
