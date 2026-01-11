@@ -1,5 +1,5 @@
 // @ts-nocheck
-import React, { memo, useLayoutEffect, useState } from 'react';
+import React, { memo, useLayoutEffect, useState, useCallback } from 'react';
 import { useDraggable } from '@dnd-kit/core';
 import { cn } from '@/lib/utils';
 import { Card, CardContent } from '@/components/ui/card';
@@ -10,6 +10,8 @@ import { CardHeaderSection } from './card-header';
 import { CardContentSections } from './card-content-sections';
 import { AgentInfoPanel } from './agent-info-panel';
 import { CardActions } from './card-actions';
+import { ImagePreviewThumbnail } from './image-preview-thumbnail';
+import { ImagePreviewModal } from './image-preview-modal';
 
 function getCardBorderStyle(enabled: boolean, opacity: number): React.CSSProperties {
   if (!enabled) {
@@ -99,6 +101,17 @@ export const KanbanCard = memo(function KanbanCard({
 }: KanbanCardProps) {
   const { useWorktrees } = useAppStore();
   const [isLifted, setIsLifted] = useState(false);
+  const [imageModalOpen, setImageModalOpen] = useState(false);
+  const [imageModalIndex, setImageModalIndex] = useState(0);
+
+  // Get image paths from feature
+  const imagePaths = feature.imagePaths ?? [];
+  const hasImages = imagePaths.length > 0;
+
+  const handleImageClick = useCallback((index: number) => {
+    setImageModalIndex(index);
+    setImageModalOpen(true);
+  }, []);
 
   useLayoutEffect(() => {
     if (isOverlay) {
@@ -210,6 +223,17 @@ export const KanbanCard = memo(function KanbanCard({
         {/* Content Sections */}
         <CardContentSections feature={feature} useWorktrees={useWorktrees} />
 
+        {/* Image Preview Thumbnail */}
+        {hasImages && !isOverlay && (
+          <div className="mb-2">
+            <ImagePreviewThumbnail
+              imagePaths={imagePaths}
+              featureId={feature.id}
+              onImageClick={handleImageClick}
+            />
+          </div>
+        )}
+
         {/* Agent Info Panel */}
         <AgentInfoPanel
           feature={feature}
@@ -242,19 +266,32 @@ export const KanbanCard = memo(function KanbanCard({
   );
 
   return (
-    <div
-      ref={setNodeRef}
-      style={dndStyle}
-      {...attributes}
-      {...(isDraggable ? listeners : {})}
-      className={wrapperClasses}
-      data-testid={`kanban-card-${feature.id}`}
-    >
-      {isCurrentAutoTask ? (
-        <div className="animated-border-wrapper">{renderCardContent()}</div>
-      ) : (
-        renderCardContent()
+    <>
+      <div
+        ref={setNodeRef}
+        style={dndStyle}
+        {...attributes}
+        {...(isDraggable ? listeners : {})}
+        className={wrapperClasses}
+        data-testid={`kanban-card-${feature.id}`}
+      >
+        {isCurrentAutoTask ? (
+          <div className="animated-border-wrapper">{renderCardContent()}</div>
+        ) : (
+          renderCardContent()
+        )}
+      </div>
+
+      {/* Image Preview Modal */}
+      {hasImages && (
+        <ImagePreviewModal
+          open={imageModalOpen}
+          onOpenChange={setImageModalOpen}
+          imagePaths={imagePaths}
+          initialIndex={imageModalIndex}
+          featureTitle={feature.title}
+        />
       )}
-    </div>
+    </>
   );
 });
