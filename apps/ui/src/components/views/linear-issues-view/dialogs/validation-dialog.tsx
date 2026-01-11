@@ -218,12 +218,14 @@ export function LinearValidationDialog({
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
             Close
           </Button>
-          {validationResult?.verdict === 'valid' && onConvertToTask && (
-            <Button onClick={handleConvertToTask}>
-              <Plus className="h-4 w-4 mr-2" />
-              Convert to Task
-            </Button>
-          )}
+          {(validationResult?.verdict === 'valid' ||
+            validationResult?.verdict === 'needs_clarification') &&
+            onConvertToTask && (
+              <Button onClick={handleConvertToTask}>
+                <Plus className="h-4 w-4 mr-2" />
+                Convert to Task
+              </Button>
+            )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
