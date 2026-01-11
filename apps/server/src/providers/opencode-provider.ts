@@ -12,8 +12,11 @@
 
 import * as path from 'path';
 import * as os from 'os';
-import { execFileSync } from 'child_process';
+import { execFile } from 'child_process';
+import { promisify } from 'util';
 import { CliProvider, type CliSpawnConfig } from './cli-provider.js';
+
+const execFileAsync = promisify(execFile);
 import type {
   ProviderConfig,
   ExecuteOptions,
@@ -720,7 +723,7 @@ export class OpencodeProvider extends CliProvider {
   /**
    * Fetch models from OpenCode CLI using `opencode models` command
    *
-   * Uses execFileSync to avoid shell injection vulnerabilities.
+   * Uses async execFile to avoid blocking the event loop.
    */
   private async fetchModelsFromCli(): Promise<ModelDefinition[]> {
     this.ensureCliDetected();
@@ -731,44 +734,38 @@ export class OpencodeProvider extends CliProvider {
     }
 
     try {
-      let output: string;
+      let command: string;
+      let args: string[];
 
       if (this.detectedStrategy === 'npx') {
         // NPX strategy: execute npx with opencode-ai package
-        opencodeLogger.debug('Executing: npx opencode-ai@latest models');
-        output = execFileSync('npx', ['opencode-ai@latest', 'models'], {
-          encoding: 'utf-8',
-          timeout: 30000,
-          windowsHide: true,
-          stdio: ['pipe', 'pipe', 'pipe'],
-        });
+        command = 'npx';
+        args = ['opencode-ai@latest', 'models'];
+        opencodeLogger.debug(`Executing: ${command} ${args.join(' ')}`);
       } else if (this.useWsl && this.wslCliPath) {
         // WSL strategy: execute via wsl.exe
-        const wslArgs = this.wslDistribution
+        command = 'wsl.exe';
+        args = this.wslDistribution
           ? ['-d', this.wslDistribution, this.wslCliPath, 'models']
           : [this.wslCliPath, 'models'];
-        opencodeLogger.debug(`Executing: wsl.exe ${wslArgs.join(' ')}`);
-        output = execFileSync('wsl.exe', wslArgs, {
-          encoding: 'utf-8',
-          timeout: 30000,
-          windowsHide: true,
-          stdio: ['pipe', 'pipe', 'pipe'],
-        });
+        opencodeLogger.debug(`Executing: ${command} ${args.join(' ')}`);
       } else {
         // Direct CLI execution
-        opencodeLogger.debug(`Executing: ${this.cliPath} models`);
-        output = execFileSync(this.cliPath, ['models'], {
-          encoding: 'utf-8',
-          timeout: 30000,
-          windowsHide: true,
-          stdio: ['pipe', 'pipe', 'pipe'],
-        });
+        command = this.cliPath;
+        args = ['models'];
+        opencodeLogger.debug(`Executing: ${command} ${args.join(' ')}`);
       }
 
+      const { stdout } = await execFileAsync(command, args, {
+        encoding: 'utf-8',
+        timeout: 30000,
+        windowsHide: true,
+      });
+
       opencodeLogger.debug(
-        `Models output (${output.length} chars): ${output.substring(0, 200)}...`
+        `Models output (${stdout.length} chars): ${stdout.substring(0, 200)}...`
       );
-      return this.parseModelsOutput(output);
+      return this.parseModelsOutput(stdout);
     } catch (error) {
       opencodeLogger.error(`Failed to fetch models from CLI: ${error}`);
       return [];
@@ -790,6 +787,11 @@ export class OpencodeProvider extends CliProvider {
     const lines = output.split('\n');
     const models: ModelDefinition[] = [];
 
+    // Regex to validate "provider/model-name" format
+    // Provider: lowercase letters, numbers, dots, hyphens
+    // Model name: letters, numbers, dots, hyphens, underscores
+    const modelIdRegex = /^[a-z0-9.-]+\/[a-zA-Z0-9._-]+$/;
+
     for (const line of lines) {
       // Remove ANSI escape codes if any
       const cleanLine = line.replace(/\x1b\[[0-9;]*m/g, '').trim();
@@ -797,17 +799,9 @@ export class OpencodeProvider extends CliProvider {
       // Skip empty lines
       if (!cleanLine) continue;
 
-      // Parse "provider/model-name" format
-      const slashIndex = cleanLine.indexOf('/');
-      if (slashIndex > 0) {
-        const provider = cleanLine.substring(0, slashIndex);
-        const name = cleanLine.substring(slashIndex + 1);
-
-        // Skip if it looks like a path or error message
-        if (provider.includes(':') || provider.includes('\\') || name.includes(' ')) {
-          continue;
-        }
-
+      // Validate format using regex for robustness
+      if (modelIdRegex.test(cleanLine)) {
+        const [provider, name] = cleanLine.split('/');
         models.push(
           this.modelInfoToDefinition({
             id: cleanLine,
@@ -949,7 +943,7 @@ export class OpencodeProvider extends CliProvider {
    * Fetch authenticated providers from OpenCode CLI
    *
    * Runs `opencode auth list` to get the list of authenticated providers.
-   * Uses execFileSync to avoid shell injection vulnerabilities.
+   * Uses async execFile to avoid blocking the event loop.
    */
   async fetchAuthenticatedProviders(): Promise<OpenCodeProviderInfo[]> {
     this.ensureCliDetected();
@@ -960,44 +954,38 @@ export class OpencodeProvider extends CliProvider {
     }
 
     try {
-      let output: string;
+      let command: string;
+      let args: string[];
 
       if (this.detectedStrategy === 'npx') {
         // NPX strategy
-        opencodeLogger.debug('Executing: npx opencode-ai@latest auth list');
-        output = execFileSync('npx', ['opencode-ai@latest', 'auth', 'list'], {
-          encoding: 'utf-8',
-          timeout: 15000,
-          windowsHide: true,
-          stdio: ['pipe', 'pipe', 'pipe'],
-        });
+        command = 'npx';
+        args = ['opencode-ai@latest', 'auth', 'list'];
+        opencodeLogger.debug(`Executing: ${command} ${args.join(' ')}`);
       } else if (this.useWsl && this.wslCliPath) {
         // WSL strategy
-        const wslArgs = this.wslDistribution
+        command = 'wsl.exe';
+        args = this.wslDistribution
           ? ['-d', this.wslDistribution, this.wslCliPath, 'auth', 'list']
           : [this.wslCliPath, 'auth', 'list'];
-        opencodeLogger.debug(`Executing: wsl.exe ${wslArgs.join(' ')}`);
-        output = execFileSync('wsl.exe', wslArgs, {
-          encoding: 'utf-8',
-          timeout: 15000,
-          windowsHide: true,
-          stdio: ['pipe', 'pipe', 'pipe'],
-        });
+        opencodeLogger.debug(`Executing: ${command} ${args.join(' ')}`);
       } else {
         // Direct CLI execution
-        opencodeLogger.debug(`Executing: ${this.cliPath} auth list`);
-        output = execFileSync(this.cliPath, ['auth', 'list'], {
-          encoding: 'utf-8',
-          timeout: 15000,
-          windowsHide: true,
-          stdio: ['pipe', 'pipe', 'pipe'],
-        });
+        command = this.cliPath;
+        args = ['auth', 'list'];
+        opencodeLogger.debug(`Executing: ${command} ${args.join(' ')}`);
       }
 
+      const { stdout } = await execFileAsync(command, args, {
+        encoding: 'utf-8',
+        timeout: 15000,
+        windowsHide: true,
+      });
+
       opencodeLogger.debug(
-        `Auth list output (${output.length} chars): ${output.substring(0, 200)}...`
+        `Auth list output (${stdout.length} chars): ${stdout.substring(0, 200)}...`
       );
-      const providers = this.parseProvidersOutput(output);
+      const providers = this.parseProvidersOutput(stdout);
       this.cachedProviders = providers;
       return providers;
     } catch (error) {
