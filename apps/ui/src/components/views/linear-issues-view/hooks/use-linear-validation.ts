@@ -1,4 +1,4 @@
-// @ts-nocheck
+/* global HTMLAudioElement */
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { createLogger } from '@automaker/utils/logger';
 import {
@@ -22,19 +22,6 @@ function normalizePath(path: string | undefined): string {
   if (!path) return '';
   // Remove trailing slashes and normalize
   return path.replace(/\/+$/, '');
-}
-
-/**
- * Extract model string from PhaseModelEntry or string (handles both formats)
- */
-function extractModel(
-  entry: PhaseModelEntry | string | undefined
-): ModelAlias | CursorModelId | undefined {
-  if (!entry) return undefined;
-  if (typeof entry === 'string') {
-    return entry as ModelAlias | CursorModelId;
-  }
-  return entry.model;
 }
 
 interface UseLinearValidationOptions {
