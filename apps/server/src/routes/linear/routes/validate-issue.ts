@@ -149,6 +149,8 @@ interface ValidateLinearIssueRequestBody {
   issueLabels?: string[];
   model?: ModelAlias | CursorModelId;
   thinkingLevel?: ThinkingLevel;
+  /** Team ID for workflow state updates */
+  teamId?: string;
 }
 
 /**
@@ -389,7 +391,11 @@ ${prompt}`;
  */
 export function createValidateLinearIssueHandler(
   events: EventEmitter,
-  settingsService?: SettingsService
+  settingsService?: SettingsService,
+  linearService?: {
+    updateIssueState: (issueId: string, stateId: string) => Promise<{ success: boolean }>;
+    getInProgressStateId: (teamId: string) => Promise<string | null>;
+  }
 ) {
   return async (req: Request, res: Response): Promise<void> => {
     try {
@@ -402,6 +408,7 @@ export function createValidateLinearIssueHandler(
         issueLabels,
         model = 'opus',
         thinkingLevel,
+        teamId,
       } = req.body as ValidateLinearIssueRequestBody;
 
       logger.info(`[LinearValidation] Received validation request for issue ${identifier}`);
@@ -449,6 +456,29 @@ export function createValidateLinearIssueHandler(
           error: `Validation is already running for issue ${identifier}`,
         });
         return;
+      }
+
+      // Update issue status to "In Progress" if enabled
+      if (linearService && settingsService && teamId) {
+        try {
+          const globalSettings = await settingsService.getGlobalSettings();
+          if (globalSettings?.linearSettings?.updateStatusOnValidationStart) {
+            const inProgressStateId = await linearService.getInProgressStateId(teamId);
+            if (inProgressStateId) {
+              const updateResult = await linearService.updateIssueState(issueId, inProgressStateId);
+              if (updateResult.success) {
+                logger.info(`Updated issue ${identifier} status to In Progress`);
+              } else {
+                logger.warn(`Failed to update issue ${identifier} status: ${updateResult.success}`);
+              }
+            } else {
+              logger.warn(`Could not find In Progress state for team ${teamId}`);
+            }
+          }
+        } catch (err) {
+          // Don't fail validation if status update fails
+          logger.warn(`Error updating issue status:`, err);
+        }
       }
 
       // Start validation in background

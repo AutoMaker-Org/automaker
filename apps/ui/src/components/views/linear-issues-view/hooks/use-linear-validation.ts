@@ -318,11 +318,14 @@ export function useLinearValidation({
             issueBody: issue.description || '',
             issueLabels: issue.labels.map((l) => l.name),
           };
+          // Pass teamId to enable status updates in Linear when validation starts
+          const teamId = issue.team?.id;
           const result = await api.linear.validateIssue(
             currentProject.path,
             validationInput,
             modelToUse,
-            thinkingLevelToUse
+            thinkingLevelToUse,
+            teamId
           );
 
           if (!result.success) {

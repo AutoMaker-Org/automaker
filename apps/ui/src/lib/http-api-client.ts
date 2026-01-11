@@ -1779,8 +1779,16 @@ export class HttpApiClient implements ElectronAPI {
       projectPath: string,
       input: LinearValidationInput,
       model?: string,
-      thinkingLevel?: string
-    ) => this.post('/api/linear/validate-issue', { projectPath, ...input, model, thinkingLevel }),
+      thinkingLevel?: string,
+      teamId?: string
+    ) =>
+      this.post('/api/linear/validate-issue', {
+        projectPath,
+        ...input,
+        model,
+        thinkingLevel,
+        teamId,
+      }),
     getValidationStatus: (projectPath: string, identifier?: string) =>
       this.post('/api/linear/validation-status', { projectPath, identifier }),
     stopValidation: (projectPath: string, identifier: string) =>

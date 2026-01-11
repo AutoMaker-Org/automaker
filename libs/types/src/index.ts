@@ -260,6 +260,8 @@ export type {
   LinearTeamsResult,
   LinearProjectsResult,
   LinearIssueResult,
+  LinearWorkflowStatesResult,
+  LinearUpdateIssueResult,
   LinearImportOptions,
   LinearImportResult,
   LinearFilterPreset,

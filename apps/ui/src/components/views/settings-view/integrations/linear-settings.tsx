@@ -278,6 +278,37 @@ export function LinearSettings() {
           </div>
         )}
 
+        {/* Linear Workflow Integration */}
+        {hasStoredKey && (
+          <div className="space-y-4 pt-4 border-t border-border/50">
+            <div>
+              <h3 className="text-sm font-medium text-foreground mb-1">Workflow Integration</h3>
+              <p className="text-xs text-muted-foreground">
+                Configure how Automaker interacts with Linear issue states.
+              </p>
+            </div>
+
+            {/* Update Status on Validation Start */}
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label htmlFor="update-status-on-validation" className="text-sm font-normal">
+                  Update Status on Validation Start
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Automatically move issues to "In Progress" when validation starts
+                </p>
+              </div>
+              <Switch
+                id="update-status-on-validation"
+                checked={linearSettings.updateStatusOnValidationStart}
+                onCheckedChange={(checked) =>
+                  setLinearSettings({ updateStatusOnValidationStart: checked })
+                }
+              />
+            </div>
+          </div>
+        )}
+
         {/* Auto-Validate Filters Section */}
         {hasStoredKey && (
           <div className="space-y-4 pt-4 border-t border-border/50">

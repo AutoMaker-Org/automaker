@@ -53,7 +53,7 @@ export function createLinearRoutes(
   router.post(
     '/validate-issue',
     validatePathParams('projectPath'),
-    createValidateLinearIssueHandler(events, settingsService)
+    createValidateLinearIssueHandler(events, settingsService, linearService)
   );
 
   // Validation management endpoints

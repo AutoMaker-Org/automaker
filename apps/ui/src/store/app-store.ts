@@ -687,6 +687,8 @@ export interface AppState {
     autoValidateLabelFilter: string;
     /** Auto-validate only issues in these states */
     autoValidateStateTypes: Array<'backlog' | 'unstarted' | 'started'>;
+    /** Update Linear issue status to "In Progress" when validation starts */
+    updateStatusOnValidationStart: boolean;
   };
 }
 
@@ -1232,6 +1234,7 @@ const initialState: AppState = {
     autoValidateMyIssuesOnly: false,
     autoValidateLabelFilter: '',
     autoValidateStateTypes: [],
+    updateStatusOnValidationStart: false,
   },
 };
 

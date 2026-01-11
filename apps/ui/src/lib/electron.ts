@@ -420,7 +420,8 @@ export interface LinearAPI {
     projectPath: string,
     input: LinearValidationInput,
     model?: AgentModel,
-    thinkingLevel?: string
+    thinkingLevel?: string,
+    teamId?: string
   ) => Promise<{ success: boolean; message?: string; identifier?: string; error?: string }>;
   /** Check validation status for an issue or all issues */
   getValidationStatus: (
@@ -3208,8 +3209,20 @@ function createMockLinearAPI(): LinearAPI {
         error: 'Linear API key not configured',
       };
     },
-    validateIssue: async (projectPath: string, input: LinearValidationInput, model?: string) => {
-      console.log('[Mock] Validating Linear issue:', { projectPath, input, model });
+    validateIssue: async (
+      projectPath: string,
+      input: LinearValidationInput,
+      model?: string,
+      thinkingLevel?: string,
+      teamId?: string
+    ) => {
+      console.log('[Mock] Validating Linear issue:', {
+        projectPath,
+        input,
+        model,
+        thinkingLevel,
+        teamId,
+      });
       return {
         success: false,
         error: 'Linear API key not configured',

@@ -19,6 +19,8 @@ import type {
   LinearTeamsResult,
   LinearProjectsResult,
   LinearIssueResult,
+  LinearWorkflowStatesResult,
+  LinearUpdateIssueResult,
 } from '@automaker/types';
 import type { SettingsService } from './settings-service.js';
 
@@ -460,5 +462,78 @@ export class LinearService {
    */
   getCurrentUser(): LinearUser | null {
     return this.currentUser;
+  }
+
+  /**
+   * Get workflow states for a team
+   */
+  async getWorkflowStates(teamId: string): Promise<LinearWorkflowStatesResult> {
+    try {
+      const client = await this.getClient();
+      if (!client) {
+        return { success: false, error: 'Not connected to Linear' };
+      }
+
+      const team = await client.team(teamId);
+      const statesResponse = await team.states();
+
+      const states: LinearWorkflowState[] = statesResponse.nodes.map((state) => ({
+        id: state.id,
+        name: state.name,
+        color: state.color,
+        type: state.type as LinearWorkflowState['type'],
+        position: state.position,
+      }));
+
+      // Sort by position
+      states.sort((a, b) => a.position - b.position);
+
+      return { success: true, states };
+    } catch (error) {
+      logger.error('Failed to fetch workflow states:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to fetch workflow states',
+      };
+    }
+  }
+
+  /**
+   * Update issue state (e.g., to "In Progress")
+   */
+  async updateIssueState(issueId: string, stateId: string): Promise<LinearUpdateIssueResult> {
+    try {
+      const client = await this.getClient();
+      if (!client) {
+        return { success: false, error: 'Not connected to Linear' };
+      }
+
+      const issue = await client.issue(issueId);
+      await issue.update({ stateId });
+
+      logger.info(`Updated issue ${issue.identifier} state to ${stateId}`);
+
+      return { success: true };
+    } catch (error) {
+      logger.error('Failed to update issue state:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to update issue state',
+      };
+    }
+  }
+
+  /**
+   * Find the "In Progress" state for a team
+   * Returns the first state with type 'started'
+   */
+  async getInProgressStateId(teamId: string): Promise<string | null> {
+    const result = await this.getWorkflowStates(teamId);
+    if (!result.success || !result.states) {
+      return null;
+    }
+
+    const inProgressState = result.states.find((s) => s.type === 'started');
+    return inProgressState?.id ?? null;
   }
 }

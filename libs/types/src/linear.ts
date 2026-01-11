@@ -300,6 +300,30 @@ export interface LinearIssueResult {
   error?: string;
 }
 
+/**
+ * LinearWorkflowStatesResult - Workflow states list response
+ */
+export interface LinearWorkflowStatesResult {
+  /** Whether request succeeded */
+  success: boolean;
+  /** Retrieved workflow states */
+  states?: LinearWorkflowState[];
+  /** Error message if failed */
+  error?: string;
+}
+
+/**
+ * LinearUpdateIssueResult - Result of updating an issue
+ */
+export interface LinearUpdateIssueResult {
+  /** Whether update succeeded */
+  success: boolean;
+  /** Updated issue (if returned) */
+  issue?: LinearIssue;
+  /** Error message if failed */
+  error?: string;
+}
+
 // ============================================================================
 // Import Types
 // ============================================================================
@@ -492,4 +516,8 @@ export interface LinearSettings {
   autoConvertValidIssues?: boolean;
   /** Also convert issues with 'needs_clarification' verdict */
   autoConvertNeedsClarification?: boolean;
+
+  // Linear Status Update Settings
+  /** Update issue status to "In Progress" when validation starts */
+  updateStatusOnValidationStart?: boolean;
 }
