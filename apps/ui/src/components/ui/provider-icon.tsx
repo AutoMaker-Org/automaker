@@ -442,6 +442,68 @@ function getUnderlyingModelIcon(model?: AgentModel | string): ProviderIconKey {
     return 'opencode';
   }
 
+  // Check for dynamic OpenCode provider models (provider/model format)
+  // e.g., zai-coding-plan/glm-4.5, github-copilot/gpt-4o, google/gemini-2.5-pro
+  // Only handle strings with exactly one slash (not URLs or paths)
+  if (!modelStr.includes('://')) {
+    const slashIndex = modelStr.indexOf('/');
+    if (slashIndex !== -1 && slashIndex === modelStr.lastIndexOf('/')) {
+      const providerName = modelStr.slice(0, slashIndex);
+      const modelName = modelStr.slice(slashIndex + 1);
+
+      // Skip if either part is empty
+      if (providerName && modelName) {
+        // Check model name for known patterns
+        if (modelName.includes('glm')) {
+          return 'glm';
+        }
+        if (
+          modelName.includes('claude') ||
+          modelName.includes('sonnet') ||
+          modelName.includes('opus')
+        ) {
+          return 'anthropic';
+        }
+        if (modelName.includes('gpt') || modelName.includes('o1') || modelName.includes('o3')) {
+          return 'openai';
+        }
+        if (modelName.includes('gemini')) {
+          return 'gemini';
+        }
+        if (modelName.includes('grok')) {
+          return 'grok';
+        }
+        if (modelName.includes('deepseek')) {
+          return 'deepseek';
+        }
+        if (modelName.includes('llama')) {
+          return 'meta';
+        }
+        if (modelName.includes('qwen')) {
+          return 'qwen';
+        }
+        if (modelName.includes('mistral')) {
+          return 'mistral';
+        }
+        // Check provider name for hints
+        if (providerName.includes('google')) {
+          return 'gemini';
+        }
+        if (providerName.includes('anthropic')) {
+          return 'anthropic';
+        }
+        if (providerName.includes('openai')) {
+          return 'openai';
+        }
+        if (providerName.includes('xai')) {
+          return 'grok';
+        }
+        // Default for unknown dynamic models
+        return 'opencode';
+      }
+    }
+  }
+
   // Check for Cursor-specific models with underlying providers
   if (modelStr.includes('sonnet') || modelStr.includes('opus') || modelStr.includes('claude')) {
     return 'anthropic';

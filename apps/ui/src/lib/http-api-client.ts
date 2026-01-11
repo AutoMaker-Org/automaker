@@ -1436,6 +1436,67 @@ export class HttpApiClient implements ElectronAPI {
       error?: string;
     }> => this.get('/api/setup/opencode-status'),
 
+    // OpenCode Dynamic Model Discovery
+    getOpencodeModels: (
+      refresh?: boolean
+    ): Promise<{
+      success: boolean;
+      models?: Array<{
+        id: string;
+        name: string;
+        modelString: string;
+        provider: string;
+        description: string;
+        supportsTools: boolean;
+        supportsVision: boolean;
+        tier: string;
+        default?: boolean;
+      }>;
+      count?: number;
+      cached?: boolean;
+      error?: string;
+    }> => this.get(`/api/setup/opencode/models${refresh ? '?refresh=true' : ''}`),
+
+    refreshOpencodeModels: (): Promise<{
+      success: boolean;
+      models?: Array<{
+        id: string;
+        name: string;
+        modelString: string;
+        provider: string;
+        description: string;
+        supportsTools: boolean;
+        supportsVision: boolean;
+        tier: string;
+        default?: boolean;
+      }>;
+      count?: number;
+      error?: string;
+    }> => this.post('/api/setup/opencode/models/refresh'),
+
+    getOpencodeProviders: (): Promise<{
+      success: boolean;
+      providers?: Array<{
+        id: string;
+        name: string;
+        authenticated: boolean;
+        authMethod?: 'oauth' | 'api_key';
+      }>;
+      authenticated?: Array<{
+        id: string;
+        name: string;
+        authenticated: boolean;
+        authMethod?: 'oauth' | 'api_key';
+      }>;
+      error?: string;
+    }> => this.get('/api/setup/opencode/providers'),
+
+    clearOpencodeCache: (): Promise<{
+      success: boolean;
+      message?: string;
+      error?: string;
+    }> => this.post('/api/setup/opencode/cache/clear'),
+
     onInstallProgress: (callback: (progress: unknown) => void) => {
       return this.subscribeToEvent('agent:stream', callback);
     },

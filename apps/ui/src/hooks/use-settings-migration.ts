@@ -152,6 +152,8 @@ export function parseLocalStorageSettings(): Partial<GlobalSettings> | null {
       phaseModels: state.phaseModels as GlobalSettings['phaseModels'],
       enabledCursorModels: state.enabledCursorModels as GlobalSettings['enabledCursorModels'],
       cursorDefaultModel: state.cursorDefaultModel as GlobalSettings['cursorDefaultModel'],
+      enabledOpencodeModels: state.enabledOpencodeModels as GlobalSettings['enabledOpencodeModels'],
+      opencodeDefaultModel: state.opencodeDefaultModel as GlobalSettings['opencodeDefaultModel'],
       autoLoadClaudeMd: state.autoLoadClaudeMd as boolean,
       keyboardShortcuts: state.keyboardShortcuts as GlobalSettings['keyboardShortcuts'],
       mcpServers: state.mcpServers as GlobalSettings['mcpServers'],
@@ -539,6 +541,8 @@ export function hydrateStoreFromSettings(settings: GlobalSettings): void {
     phaseModels: settings.phaseModels ?? current.phaseModels,
     enabledCursorModels: settings.enabledCursorModels ?? current.enabledCursorModels,
     cursorDefaultModel: settings.cursorDefaultModel ?? 'auto',
+    enabledOpencodeModels: settings.enabledOpencodeModels ?? current.enabledOpencodeModels,
+    opencodeDefaultModel: settings.opencodeDefaultModel ?? current.opencodeDefaultModel,
     autoLoadClaudeMd: settings.autoLoadClaudeMd ?? false,
     skipSandboxWarning: settings.skipSandboxWarning ?? false,
     keyboardShortcuts: {

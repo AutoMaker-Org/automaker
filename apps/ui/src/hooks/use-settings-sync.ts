@@ -44,6 +44,8 @@ const SETTINGS_FIELDS_TO_SYNC = [
   'phaseModels',
   'enabledCursorModels',
   'cursorDefaultModel',
+  'enabledOpencodeModels',
+  'opencodeDefaultModel',
   'autoLoadClaudeMd',
   'keyboardShortcuts',
   'mcpServers',

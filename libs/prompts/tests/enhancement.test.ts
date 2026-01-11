@@ -399,7 +399,7 @@ describe('enhancement.ts', () => {
       const modes = getAvailableEnhancementModes();
 
       expect(Array.isArray(modes)).toBe(true);
-      expect(modes.length).toBe(4);
+      expect(modes.length).toBe(5);
     });
 
     it('should include all valid modes', () => {
@@ -409,6 +409,7 @@ describe('enhancement.ts', () => {
       expect(modes).toContain('technical');
       expect(modes).toContain('simplify');
       expect(modes).toContain('acceptance');
+      expect(modes).toContain('ux-reviewer');
     });
 
     it('should return modes in consistent order', () => {

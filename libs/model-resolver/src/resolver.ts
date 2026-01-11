@@ -69,8 +69,12 @@ export function resolveModelString(
     return modelKey;
   }
 
-  // OpenCode model - pass through unchanged
-  // Supports: opencode/big-pickle, opencode-sonnet, amazon-bedrock/anthropic.claude-*
+  // OpenCode model (static or dynamic) - pass through unchanged
+  // This handles models like:
+  // - opencode-* (Automaker routing prefix)
+  // - opencode/* (free tier models)
+  // - amazon-bedrock/* (AWS Bedrock models)
+  // - provider/model-name (dynamic models like github-copilot/gpt-4o, google/gemini-2.5-pro)
   if (isOpencodeModel(modelKey)) {
     console.log(`[ModelResolver] Using OpenCode model: ${modelKey}`);
     return modelKey;
