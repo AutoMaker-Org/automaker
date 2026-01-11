@@ -112,30 +112,40 @@ export function CustomSettingsTab() {
     try {
       // Simple test by making a minimal request to the endpoint
       // Use /v1/messages path if not already included, as determined by the provider
-      const testUrl = `${baseUrl}/v1/messages`;
+      const normalizedBaseUrl = baseUrl.replace(/\/+$/, '');
+      const testUrl = `${normalizedBaseUrl}/v1/messages`;
 
       // Note: We can't actually make a full valid request without a prompt,
       // but we can check if the auth works. 400 Bad Request usually means auth passed but body invalid.
       // 401/403 means auth failed.
 
-      const response = await fetch(baseUrl, {
-        method: 'GET', // Some endpoints might support GET for health check
+      const response = await fetch(testUrl, {
+        method: 'POST',
         headers: {
           'x-api-key': apiKey.trim(),
           'anthropic-version': '2023-06-01',
+          'content-type': 'application/json',
         },
-      }).catch(() => null);
+        body: JSON.stringify({
+          model: model.trim() || currentPreset?.defaultModel || 'glm-4.7',
+          max_tokens: 1,
+          messages: [{ role: 'user', content: 'ping' }],
+          stream: false,
+        }),
+      });
 
-      // If GET fails (404/405), try a dummy POST to the messages endpoint
-      if (!response || !response.ok) {
-        // ... implementation for specific provider testing could go here
-        // For now, let's assume if we saved it, we trust the user unless we build a refined tester
+      if (response.status === 401 || response.status === 403) {
+        setTestStatus('error');
+        setTestMessage('Authentication failed (401/403). Check API key.');
+        return;
       }
-
-      // For the purpose of this UI helper, we'll mark as success if we don't get a network error
-      // Ideally we would send a real dummy request
+      if (!response.ok) {
+        setTestStatus('error');
+        setTestMessage(`Endpoint reachable but returned ${response.status}. Check base URL/model.`);
+        return;
+      }
       setTestStatus('success');
-      setTestMessage('Settings saved. Please try generating in the board.');
+      setTestMessage('Connection OK.');
     } catch (error) {
       setTestStatus('error');
       setTestMessage(`Connection failed: ${(error as Error).message}`);
