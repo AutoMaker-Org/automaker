@@ -585,9 +585,15 @@ export class AutoModeService {
           systemPrompt: combinedSystemPrompt || undefined,
           autoLoadClaudeMd,
           thinkingLevel: feature.thinkingLevel,
-          customEndpoint: feature.customEndpoint as
-            | { baseUrl: string; apiKey: string; model: string }
-            | undefined,
+         {
+           projectPath,
+           planningMode: feature.planningMode,
+           requirePlanApproval: feature.requirePlanApproval,
+           systemPrompt: combinedSystemPrompt || undefined,
+           autoLoadClaudeMd,
+           thinkingLevel: feature.thinkingLevel,
+           customEndpoint: feature.customEndpoint,
+         }
         }
       );
 
