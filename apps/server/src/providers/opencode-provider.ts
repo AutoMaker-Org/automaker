@@ -182,6 +182,14 @@ export interface OpenCodeErrorEvent extends OpenCodeBaseEvent {
 }
 
 /**
+ * Tool error event - A tool execution failed
+ */
+export interface OpenCodeToolErrorEvent extends OpenCodeBaseEvent {
+  type: 'tool_error';
+  part?: OpenCodePart & { error: string };
+}
+
+/**
  * Union type of all OpenCode stream events
  */
 export type OpenCodeStreamEvent =
@@ -190,7 +198,8 @@ export type OpenCodeStreamEvent =
   | OpenCodeStepFinishEvent
   | OpenCodeToolCallEvent
   | OpenCodeToolResultEvent
-  | OpenCodeErrorEvent;
+  | OpenCodeErrorEvent
+  | OpenCodeToolErrorEvent;
 
 // =============================================================================
 // Tool Use ID Generation
