@@ -31,6 +31,9 @@ interface BoardHeaderProps {
   onShowBoardBackground: () => void;
   onShowCompletedModal: () => void;
   completedCount: number;
+  // Tour/onboarding props
+  onShowTour?: () => void;
+  canShowTour?: boolean;
 }
 
 // Shared styles for header control containers
@@ -53,6 +56,8 @@ export function BoardHeader({
   onShowBoardBackground,
   onShowCompletedModal,
   completedCount,
+  onShowTour,
+  canShowTour,
 }: BoardHeaderProps) {
   const [showAutoModeSettings, setShowAutoModeSettings] = useState(false);
   const apiKeys = useAppStore((state) => state.apiKeys);
@@ -113,6 +118,8 @@ export function BoardHeader({
           onShowBoardBackground={onShowBoardBackground}
           onShowCompletedModal={onShowCompletedModal}
           completedCount={completedCount}
+          onShowTour={onShowTour}
+          canShowTour={canShowTour}
         />
       </div>
       <div className="flex gap-2 items-center">
