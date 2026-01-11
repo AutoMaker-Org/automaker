@@ -110,7 +110,7 @@ export const OPENCODE_MODELS: ModelOption[] = OPENCODE_MODEL_CONFIGS.map((config
   label: config.label,
   description: config.description,
   badge: config.tier === 'free' ? 'Free' : config.tier === 'premium' ? 'Premium' : undefined,
-  provider: 'opencode' as ModelProvider,
+  provider: config.provider as ModelProvider,
 }));
 
 /**

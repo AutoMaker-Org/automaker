@@ -21,9 +21,9 @@ export function useSpecLoading() {
       // Check if spec generation is running before trying to load
       // This prevents showing "No App Specification Found" during generation
       if (api.specRegeneration) {
-        const status = await api.specRegeneration.status();
+        const status = await api.specRegeneration.status(currentProject.path);
         if (status.success && status.isRunning) {
-          logger.debug('Spec generation is running, skipping load');
+          logger.debug('Spec generation is running for this project, skipping load');
           setIsGenerationRunning(true);
           setIsLoading(false);
           return;

@@ -21,6 +21,7 @@ import {
   extractTextFromContent,
   classifyError,
   getUserFriendlyErrorMessage,
+  createLogger,
 } from '@automaker/utils';
 import type {
   ExecuteOptions,
@@ -658,6 +659,8 @@ async function loadCodexInstructions(cwd: string, enabled: boolean): Promise<str
     .join('\n\n');
 }
 
+const logger = createLogger('CodexProvider');
+
 export class CodexProvider extends BaseProvider {
   getName(): string {
     return 'codex';
@@ -967,20 +970,10 @@ export class CodexProvider extends BaseProvider {
   }
 
   async detectInstallation(): Promise<InstallationStatus> {
-    console.log('[CodexProvider.detectInstallation] Starting...');
-
     const cliPath = await findCodexCliPath();
     const hasApiKey = !!process.env[OPENAI_API_KEY_ENV];
     const authIndicators = await getCodexAuthIndicators();
     const installed = !!cliPath;
-
-    console.log('[CodexProvider.detectInstallation] cliPath:', cliPath);
-    console.log('[CodexProvider.detectInstallation] hasApiKey:', hasApiKey);
-    console.log(
-      '[CodexProvider.detectInstallation] authIndicators:',
-      JSON.stringify(authIndicators)
-    );
-    console.log('[CodexProvider.detectInstallation] installed:', installed);
 
     let version = '';
     if (installed) {
@@ -991,20 +984,16 @@ export class CodexProvider extends BaseProvider {
           cwd: process.cwd(),
         });
         version = result.stdout.trim();
-        console.log('[CodexProvider.detectInstallation] version:', version);
       } catch (error) {
-        console.log('[CodexProvider.detectInstallation] Error getting version:', error);
         version = '';
       }
     }
 
     // Determine auth status - always verify with CLI, never assume authenticated
-    console.log('[CodexProvider.detectInstallation] Calling checkCodexAuthentication...');
     const authCheck = await checkCodexAuthentication(cliPath);
-    console.log('[CodexProvider.detectInstallation] authCheck result:', JSON.stringify(authCheck));
     const authenticated = authCheck.authenticated;
 
-    const result = {
+    return {
       installed,
       path: cliPath || undefined,
       version: version || undefined,
@@ -1012,8 +1001,6 @@ export class CodexProvider extends BaseProvider {
       hasApiKey,
       authenticated,
     };
-    console.log('[CodexProvider.detectInstallation] Final result:', JSON.stringify(result));
-    return result;
   }
 
   getAvailableModels(): ModelDefinition[] {
@@ -1025,36 +1012,24 @@ export class CodexProvider extends BaseProvider {
    * Check authentication status for Codex CLI
    */
   async checkAuth(): Promise<CodexAuthStatus> {
-    console.log('[CodexProvider.checkAuth] Starting auth check...');
-
     const cliPath = await findCodexCliPath();
     const hasApiKey = !!process.env[OPENAI_API_KEY_ENV];
     const authIndicators = await getCodexAuthIndicators();
 
-    console.log('[CodexProvider.checkAuth] cliPath:', cliPath);
-    console.log('[CodexProvider.checkAuth] hasApiKey:', hasApiKey);
-    console.log('[CodexProvider.checkAuth] authIndicators:', JSON.stringify(authIndicators));
-
     // Check for API key in environment
     if (hasApiKey) {
-      console.log('[CodexProvider.checkAuth] Has API key, returning authenticated');
       return { authenticated: true, method: 'api_key' };
     }
 
     // Check for OAuth/token from Codex CLI
     if (authIndicators.hasOAuthToken || authIndicators.hasApiKey) {
-      console.log(
-        '[CodexProvider.checkAuth] Has OAuth token or API key in auth file, returning authenticated'
-      );
       return { authenticated: true, method: 'oauth' };
     }
 
     // CLI is installed but not authenticated via indicators - try CLI command
-    console.log('[CodexProvider.checkAuth] No indicators found, trying CLI command...');
     if (cliPath) {
       try {
         // Try 'codex login status' first (same as checkCodexAuthentication)
-        console.log('[CodexProvider.checkAuth] Running: ' + cliPath + ' login status');
         const result = await spawnProcess({
           command: cliPath || CODEX_COMMAND,
           args: ['login', 'status'],
@@ -1064,26 +1039,19 @@ export class CodexProvider extends BaseProvider {
             TERM: 'dumb',
           },
         });
-        console.log('[CodexProvider.checkAuth] login status result:');
-        console.log('[CodexProvider.checkAuth]   exitCode:', result.exitCode);
-        console.log('[CodexProvider.checkAuth]   stdout:', JSON.stringify(result.stdout));
-        console.log('[CodexProvider.checkAuth]   stderr:', JSON.stringify(result.stderr));
 
         // Check both stdout and stderr - Codex CLI outputs to stderr
         const combinedOutput = (result.stdout + result.stderr).toLowerCase();
         const isLoggedIn = combinedOutput.includes('logged in');
-        console.log('[CodexProvider.checkAuth] isLoggedIn:', isLoggedIn);
 
         if (result.exitCode === 0 && isLoggedIn) {
-          console.log('[CodexProvider.checkAuth] CLI says logged in, returning authenticated');
           return { authenticated: true, method: 'oauth' };
         }
       } catch (error) {
-        console.log('[CodexProvider.checkAuth] Error running login status:', error);
+        logger.warn('Error running login status command during auth check:', error);
       }
     }
 
-    console.log('[CodexProvider.checkAuth] Not authenticated');
     return { authenticated: false, method: 'none' };
   }
 

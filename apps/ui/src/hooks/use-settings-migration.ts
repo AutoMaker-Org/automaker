@@ -139,16 +139,13 @@ export function parseLocalStorageSettings(): Partial<GlobalSettings> | null {
       theme: state.theme as GlobalSettings['theme'],
       sidebarOpen: state.sidebarOpen as boolean,
       chatHistoryOpen: state.chatHistoryOpen as boolean,
-      kanbanCardDetailLevel: state.kanbanCardDetailLevel as GlobalSettings['kanbanCardDetailLevel'],
       maxConcurrency: state.maxConcurrency as number,
       defaultSkipTests: state.defaultSkipTests as boolean,
       enableDependencyBlocking: state.enableDependencyBlocking as boolean,
       skipVerificationInAutoMode: state.skipVerificationInAutoMode as boolean,
       useWorktrees: state.useWorktrees as boolean,
-      showProfilesOnly: state.showProfilesOnly as boolean,
       defaultPlanningMode: state.defaultPlanningMode as GlobalSettings['defaultPlanningMode'],
       defaultRequirePlanApproval: state.defaultRequirePlanApproval as boolean,
-      defaultAIProfileId: state.defaultAIProfileId as string | null,
       muteDoneSound: state.muteDoneSound as boolean,
       enhancementModel: state.enhancementModel as GlobalSettings['enhancementModel'],
       validationModel: state.validationModel as GlobalSettings['validationModel'],
@@ -157,7 +154,6 @@ export function parseLocalStorageSettings(): Partial<GlobalSettings> | null {
       cursorDefaultModel: state.cursorDefaultModel as GlobalSettings['cursorDefaultModel'],
       autoLoadClaudeMd: state.autoLoadClaudeMd as boolean,
       keyboardShortcuts: state.keyboardShortcuts as GlobalSettings['keyboardShortcuts'],
-      aiProfiles: state.aiProfiles as GlobalSettings['aiProfiles'],
       mcpServers: state.mcpServers as GlobalSettings['mcpServers'],
       promptCustomization: state.promptCustomization as GlobalSettings['promptCustomization'],
       projects: state.projects as GlobalSettings['projects'],
@@ -199,17 +195,6 @@ export function localStorageHasMoreData(
     return true;
   }
 
-  // Check if localStorage has AI profiles that server doesn't
-  const localProfiles = localSettings.aiProfiles || [];
-  const serverProfiles = serverSettings.aiProfiles || [];
-
-  if (localProfiles.length > 0 && serverProfiles.length === 0) {
-    logger.info(
-      `localStorage has ${localProfiles.length} AI profiles, server has none - will merge`
-    );
-    return true;
-  }
-
   return false;
 }
 
@@ -233,14 +218,6 @@ export function mergeSettings(
     localSettings.projects.length > 0
   ) {
     merged.projects = localSettings.projects;
-  }
-
-  if (
-    (!serverSettings.aiProfiles || serverSettings.aiProfiles.length === 0) &&
-    localSettings.aiProfiles &&
-    localSettings.aiProfiles.length > 0
-  ) {
-    merged.aiProfiles = localSettings.aiProfiles;
   }
 
   if (
@@ -313,12 +290,8 @@ export async function performSettingsMigration(
 ): Promise<{ settings: GlobalSettings; migrated: boolean }> {
   // Get localStorage data
   const localSettings = parseLocalStorageSettings();
-  logger.info(
-    `localStorage has ${localSettings?.projects?.length ?? 0} projects, ${localSettings?.aiProfiles?.length ?? 0} profiles`
-  );
-  logger.info(
-    `Server has ${serverSettings.projects?.length ?? 0} projects, ${serverSettings.aiProfiles?.length ?? 0} profiles`
-  );
+  logger.info(`localStorage has ${localSettings?.projects?.length ?? 0} projects`);
+  logger.info(`Server has ${serverSettings.projects?.length ?? 0} projects`);
 
   // Check if migration has already been completed
   if (serverSettings.localStorageMigrated) {
@@ -399,9 +372,7 @@ export function useSettingsMigration(): MigrationState {
 
         // Always try to get localStorage data first (in case we need to merge/migrate)
         const localSettings = parseLocalStorageSettings();
-        logger.info(
-          `localStorage has ${localSettings?.projects?.length ?? 0} projects, ${localSettings?.aiProfiles?.length ?? 0} profiles`
-        );
+        logger.info(`localStorage has ${localSettings?.projects?.length ?? 0} projects`);
 
         // Check if server has settings files
         const status = await api.settings.getStatus();
@@ -431,9 +402,7 @@ export function useSettingsMigration(): MigrationState {
           const global = await api.settings.getGlobal();
           if (global.success && global.settings) {
             serverSettings = global.settings as unknown as GlobalSettings;
-            logger.info(
-              `Server has ${serverSettings.projects?.length ?? 0} projects, ${serverSettings.aiProfiles?.length ?? 0} profiles`
-            );
+            logger.info(`Server has ${serverSettings.projects?.length ?? 0} projects`);
           }
         } catch (error) {
           logger.error('Failed to fetch server settings:', error);
@@ -534,6 +503,7 @@ export function hydrateStoreFromSettings(settings: GlobalSettings): void {
     path: ref.path,
     lastOpened: ref.lastOpened,
     theme: ref.theme,
+    isFavorite: ref.isFavorite,
     features: [], // Features are loaded separately when project is opened
   }));
 
@@ -547,24 +517,22 @@ export function hydrateStoreFromSettings(settings: GlobalSettings): void {
   }
 
   // Save theme to localStorage for fallback when server settings aren't available
-  if (settings.theme) {
-    setItem(THEME_STORAGE_KEY, settings.theme);
+  const storedTheme = (currentProject?.theme as string | undefined) || settings.theme;
+  if (storedTheme) {
+    setItem(THEME_STORAGE_KEY, storedTheme);
   }
 
   useAppStore.setState({
     theme: settings.theme as unknown as import('@/store/app-store').ThemeMode,
     sidebarOpen: settings.sidebarOpen ?? true,
     chatHistoryOpen: settings.chatHistoryOpen ?? false,
-    kanbanCardDetailLevel: settings.kanbanCardDetailLevel ?? 'standard',
     maxConcurrency: settings.maxConcurrency ?? 3,
     defaultSkipTests: settings.defaultSkipTests ?? true,
     enableDependencyBlocking: settings.enableDependencyBlocking ?? true,
     skipVerificationInAutoMode: settings.skipVerificationInAutoMode ?? false,
     useWorktrees: settings.useWorktrees ?? true,
-    showProfilesOnly: settings.showProfilesOnly ?? false,
     defaultPlanningMode: settings.defaultPlanningMode ?? 'skip',
     defaultRequirePlanApproval: settings.defaultRequirePlanApproval ?? false,
-    defaultAIProfileId: settings.defaultAIProfileId ?? null,
     muteDoneSound: settings.muteDoneSound ?? false,
     enhancementModel: settings.enhancementModel ?? 'sonnet',
     validationModel: settings.validationModel ?? 'opus',
@@ -577,7 +545,6 @@ export function hydrateStoreFromSettings(settings: GlobalSettings): void {
       ...current.keyboardShortcuts,
       ...(settings.keyboardShortcuts as unknown as Partial<typeof current.keyboardShortcuts>),
     },
-    aiProfiles: settings.aiProfiles ?? [],
     mcpServers: settings.mcpServers ?? [],
     promptCustomization: settings.promptCustomization ?? {},
     projects,
@@ -614,16 +581,13 @@ function buildSettingsUpdateFromStore(): Record<string, unknown> {
     theme: state.theme,
     sidebarOpen: state.sidebarOpen,
     chatHistoryOpen: state.chatHistoryOpen,
-    kanbanCardDetailLevel: state.kanbanCardDetailLevel,
     maxConcurrency: state.maxConcurrency,
     defaultSkipTests: state.defaultSkipTests,
     enableDependencyBlocking: state.enableDependencyBlocking,
     skipVerificationInAutoMode: state.skipVerificationInAutoMode,
     useWorktrees: state.useWorktrees,
-    showProfilesOnly: state.showProfilesOnly,
     defaultPlanningMode: state.defaultPlanningMode,
     defaultRequirePlanApproval: state.defaultRequirePlanApproval,
-    defaultAIProfileId: state.defaultAIProfileId,
     muteDoneSound: state.muteDoneSound,
     enhancementModel: state.enhancementModel,
     validationModel: state.validationModel,
@@ -631,7 +595,6 @@ function buildSettingsUpdateFromStore(): Record<string, unknown> {
     autoLoadClaudeMd: state.autoLoadClaudeMd,
     skipSandboxWarning: state.skipSandboxWarning,
     keyboardShortcuts: state.keyboardShortcuts,
-    aiProfiles: state.aiProfiles,
     mcpServers: state.mcpServers,
     promptCustomization: state.promptCustomization,
     projects: state.projects,

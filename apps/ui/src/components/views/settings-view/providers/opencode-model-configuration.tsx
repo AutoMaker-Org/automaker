@@ -8,11 +8,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Terminal, Cloud, Cpu, Brain, Sparkles, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { OpencodeModelId, OpencodeProvider, OpencodeModelConfig } from '@automaker/types';
 import { OPENCODE_MODELS, OPENCODE_MODEL_CONFIG_MAP } from '@automaker/types';
-import { AnthropicIcon } from '@/components/ui/provider-icon';
+import {
+  OpenCodeIcon,
+  DeepSeekIcon,
+  QwenIcon,
+  NovaIcon,
+  AnthropicIcon,
+  MistralIcon,
+  MetaIcon,
+  getProviderIconForModel,
+} from '@/components/ui/provider-icon';
 import type { ComponentType } from 'react';
 
 interface OpencodeModelConfigurationProps {
@@ -24,27 +32,10 @@ interface OpencodeModelConfigurationProps {
 }
 
 /**
- * Returns the appropriate icon component for a given OpenCode provider
+ * Returns the appropriate icon component for a given OpenCode model ID
  */
-function getProviderIcon(provider: OpencodeProvider): ComponentType<{ className?: string }> {
-  switch (provider) {
-    case 'opencode':
-      return Terminal;
-    case 'amazon-bedrock-anthropic':
-      return AnthropicIcon;
-    case 'amazon-bedrock-deepseek':
-      return Brain;
-    case 'amazon-bedrock-amazon':
-      return Cloud;
-    case 'amazon-bedrock-meta':
-      return Cpu;
-    case 'amazon-bedrock-mistral':
-      return Sparkles;
-    case 'amazon-bedrock-qwen':
-      return Zap;
-    default:
-      return Terminal;
-  }
+function getModelIcon(modelId: OpencodeModelId): ComponentType<{ className?: string }> {
+  return getProviderIconForModel(modelId);
 }
 
 /**
@@ -113,7 +104,7 @@ export function OpencodeModelConfiguration({
       <div className="p-6 border-b border-border/50 bg-gradient-to-r from-transparent via-accent/5 to-transparent">
         <div className="flex items-center gap-3 mb-2">
           <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-brand-500/20 to-brand-600/10 flex items-center justify-center border border-brand-500/20">
-            <Terminal className="w-5 h-5 text-brand-500" />
+            <OpenCodeIcon className="w-5 h-5 text-brand-500" />
           </div>
           <h2 className="text-lg font-semibold text-foreground tracking-tight">
             Model Configuration
@@ -139,11 +130,11 @@ export function OpencodeModelConfiguration({
               {enabledOpencodeModels.map((modelId) => {
                 const model = OPENCODE_MODEL_CONFIG_MAP[modelId];
                 if (!model) return null;
-                const ProviderIconComponent = getProviderIcon(model.provider);
+                const ModelIconComponent = getModelIcon(modelId);
                 return (
                   <SelectItem key={modelId} value={modelId}>
                     <div className="flex items-center gap-2">
-                      <ProviderIconComponent className="w-4 h-4" />
+                      <ModelIconComponent className="w-4 h-4" />
                       <span>{model.label}</span>
                     </div>
                   </SelectItem>
@@ -160,7 +151,9 @@ export function OpencodeModelConfiguration({
             const models = modelsByProvider[provider];
             if (!models || models.length === 0) return null;
 
-            const ProviderIconComponent = getProviderIcon(provider);
+            // Use the first model's icon as the provider icon
+            const ProviderIconComponent =
+              models.length > 0 ? getModelIcon(models[0].id) : OpenCodeIcon;
 
             return (
               <div key={provider} className="space-y-2">

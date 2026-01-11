@@ -15,6 +15,7 @@ import {
   DEFAULT_MODELS,
   PROVIDER_PREFIXES,
   isCursorModel,
+  isOpencodeModel,
   stripProviderPrefix,
   type PhaseModelEntry,
   type ThinkingLevel,
@@ -65,6 +66,13 @@ export function resolveModelString(
   // Codex model with explicit prefix (e.g., "codex-gpt-5.1-codex-max") - pass through unchanged
   if (modelKey.startsWith(PROVIDER_PREFIXES.codex)) {
     console.log(`[ModelResolver] Using Codex model: ${modelKey}`);
+    return modelKey;
+  }
+
+  // OpenCode model - pass through unchanged
+  // Supports: opencode/big-pickle, opencode-sonnet, amazon-bedrock/anthropic.claude-*
+  if (isOpencodeModel(modelKey)) {
+    console.log(`[ModelResolver] Using OpenCode model: ${modelKey}`);
     return modelKey;
   }
 

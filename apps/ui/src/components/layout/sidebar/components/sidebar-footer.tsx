@@ -72,7 +72,7 @@ export function SidebarFooter({
             <span
               className={cn(
                 'ml-3 font-medium text-sm flex-1 text-left',
-                sidebarOpen ? 'hidden lg:block' : 'hidden'
+                sidebarOpen ? 'block' : 'hidden'
               )}
             >
               Wiki
@@ -148,7 +148,7 @@ export function SidebarFooter({
             <span
               className={cn(
                 'ml-3 font-medium text-sm flex-1 text-left',
-                sidebarOpen ? 'hidden lg:block' : 'hidden'
+                sidebarOpen ? 'block' : 'hidden'
               )}
             >
               Running Agents
@@ -157,7 +157,7 @@ export function SidebarFooter({
             {sidebarOpen && runningAgentsCount > 0 && (
               <span
                 className={cn(
-                  'hidden lg:flex items-center justify-center',
+                  'flex items-center justify-center',
                   'min-w-6 h-6 px-1.5 text-xs font-semibold rounded-full',
                   'bg-brand-500 text-white shadow-sm',
                   'animate-in fade-in zoom-in duration-200',
@@ -227,7 +227,7 @@ export function SidebarFooter({
           <span
             className={cn(
               'ml-3 font-medium text-sm flex-1 text-left',
-              sidebarOpen ? 'hidden lg:block' : 'hidden'
+              sidebarOpen ? 'block' : 'hidden'
             )}
           >
             Settings
@@ -235,7 +235,7 @@ export function SidebarFooter({
           {sidebarOpen && (
             <span
               className={cn(
-                'hidden lg:flex items-center justify-center min-w-5 h-5 px-1.5 text-[10px] font-mono rounded-md transition-all duration-200',
+                'hidden sm:flex items-center justify-center min-w-5 h-5 px-1.5 text-[10px] font-mono rounded-md transition-all duration-200',
                 isActiveRoute('settings')
                   ? 'bg-brand-500/20 text-brand-400'
                   : 'bg-muted text-muted-foreground group-hover:bg-accent'

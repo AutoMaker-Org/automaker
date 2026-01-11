@@ -125,14 +125,14 @@ export function useWorktreeActions({ fetchWorktrees, fetchBranches }: UseWorktre
     [isPushing, fetchBranches, fetchWorktrees]
   );
 
-  const handleOpenInEditor = useCallback(async (worktree: WorktreeInfo) => {
+  const handleOpenInEditor = useCallback(async (worktree: WorktreeInfo, editorCommand?: string) => {
     try {
       const api = getElectronAPI();
       if (!api?.worktree?.openInEditor) {
         logger.warn('Open in editor API not available');
         return;
       }
-      const result = await api.worktree.openInEditor(worktree.path);
+      const result = await api.worktree.openInEditor(worktree.path, editorCommand);
       if (result.success && result.result) {
         toast.success(result.result.message);
       } else if (result.error) {

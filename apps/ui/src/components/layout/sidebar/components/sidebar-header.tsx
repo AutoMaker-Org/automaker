@@ -20,9 +20,9 @@ export function SidebarHeader({ sidebarOpen, navigate }: SidebarHeaderProps) {
           // Background gradient for depth
           'bg-gradient-to-b from-transparent to-background/5',
           'flex items-center',
-          sidebarOpen ? 'px-3 lg:px-5 justify-start' : 'px-3 justify-center',
-          // Add left padding on macOS to avoid overlapping with traffic light buttons (only when expanded)
-          isMac && sidebarOpen && 'pt-4 pl-20',
+          sidebarOpen ? 'px-4 lg:px-5 justify-start' : 'px-3 justify-center',
+          // Add padding on macOS to avoid overlapping with traffic light buttons
+          isMac && sidebarOpen && 'pt-4',
           // Smaller top padding on macOS when collapsed
           isMac && !sidebarOpen && 'pt-4'
         )}

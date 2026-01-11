@@ -117,7 +117,7 @@ export function ProjectSelectorWithOptions({
             </div>
             <div className="flex items-center gap-1.5">
               <span
-                className="hidden lg:flex items-center justify-center min-w-5 h-5 px-1.5 text-[10px] font-mono rounded-md bg-muted text-muted-foreground"
+                className="hidden sm:flex items-center justify-center min-w-5 h-5 px-1.5 text-[10px] font-mono rounded-md bg-muted text-muted-foreground"
                 data-testid="project-picker-shortcut"
               >
                 {formatShortcut(shortcuts.projectPicker, true)}
@@ -219,7 +219,7 @@ export function ProjectSelectorWithOptions({
           <DropdownMenuTrigger asChild>
             <button
               className={cn(
-                'hidden lg:flex items-center justify-center w-[42px] h-[42px] rounded-lg',
+                'flex items-center justify-center w-[42px] h-[42px] rounded-lg',
                 'text-muted-foreground hover:text-foreground',
                 'bg-transparent hover:bg-accent/60',
                 'border border-border/50 hover:border-border',

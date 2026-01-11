@@ -32,14 +32,14 @@ export function AutomakerLogo({ sidebarOpen, navigate }: AutomakerLogoProps) {
         'flex items-center gap-3 titlebar-no-drag cursor-pointer group',
         !sidebarOpen && 'flex-col gap-1'
       )}
-      onClick={() => navigate({ to: '/' })}
+      onClick={() => navigate({ to: '/dashboard' })}
       data-testid="logo-button"
     >
-      {/* Collapsed logo - shown when sidebar is closed OR on small screens when sidebar is open */}
+      {/* Collapsed logo - only shown when sidebar is closed */}
       <div
         className={cn(
           'relative flex flex-col items-center justify-center rounded-lg gap-0.5',
-          sidebarOpen ? 'flex lg:hidden' : 'flex'
+          sidebarOpen ? 'hidden' : 'flex'
         )}
       >
         <svg
@@ -90,16 +90,16 @@ export function AutomakerLogo({ sidebarOpen, navigate }: AutomakerLogoProps) {
         </span>
       </div>
 
-      {/* Expanded logo - only shown when sidebar is open on large screens */}
+      {/* Expanded logo - shown when sidebar is open */}
       {sidebarOpen && (
-        <div className="hidden lg:flex flex-col">
+        <div className="flex flex-col">
           <div className="flex items-center gap-1">
             <svg
               xmlns="http://www.w3.org/2000/svg"
               viewBox="0 0 256 256"
               role="img"
               aria-label="automaker"
-              className="h-[36.8px] w-[36.8px] group-hover:rotate-12 transition-transform duration-300 ease-out"
+              className="h-8 w-8 lg:h-[36.8px] lg:w-[36.8px] shrink-0 group-hover:rotate-12 transition-transform duration-300 ease-out"
             >
               <defs>
                 <linearGradient
@@ -137,11 +137,11 @@ export function AutomakerLogo({ sidebarOpen, navigate }: AutomakerLogoProps) {
                 <path d="M164 92 L204 128 L164 164" />
               </g>
             </svg>
-            <span className="font-bold text-foreground text-[1.7rem] tracking-tight leading-none translate-y-[-2px]">
+            <span className="font-bold text-foreground text-xl lg:text-[1.7rem] tracking-tight leading-none translate-y-[-2px]">
               automaker<span className="text-brand-500">.</span>
             </span>
           </div>
-          <span className="text-[0.625rem] text-muted-foreground leading-none font-medium ml-[38.8px]">
+          <span className="text-[0.625rem] text-muted-foreground leading-none font-medium ml-9 lg:ml-[38.8px]">
             v{appVersion} {versionSuffix}
           </span>
         </div>

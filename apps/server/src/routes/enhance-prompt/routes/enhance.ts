@@ -188,6 +188,7 @@ export function createEnhanceHandler(
         technical: prompts.enhancement.technicalSystemPrompt,
         simplify: prompts.enhancement.simplifySystemPrompt,
         acceptance: prompts.enhancement.acceptanceSystemPrompt,
+        'ux-reviewer': prompts.enhancement.uxReviewerSystemPrompt,
       };
       const systemPrompt = systemPromptMap[validMode];
 

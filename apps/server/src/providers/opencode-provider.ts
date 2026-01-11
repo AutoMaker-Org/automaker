@@ -41,95 +41,103 @@ export interface OpenCodeAuthStatus {
 
 /**
  * Base interface for all OpenCode stream events
+ * OpenCode uses underscore format: step_start, step_finish, text
  */
 interface OpenCodeBaseEvent {
   /** Event type identifier */
   type: string;
-  /** Optional session identifier */
-  session_id?: string;
+  /** Timestamp of the event */
+  timestamp?: number;
+  /** Session ID */
+  sessionID?: string;
+  /** Part object containing the actual event data */
+  part?: Record<string, unknown>;
 }
 
 /**
- * Text delta event - Incremental text output from the model
+ * Text event - Text output from the model
+ * Format: {"type":"text","part":{"text":"content",...}}
  */
-export interface OpenCodeTextDeltaEvent extends OpenCodeBaseEvent {
-  type: 'text-delta';
-  /** The incremental text content */
-  text: string;
-}
-
-/**
- * Text end event - Signals completion of text generation
- */
-export interface OpenCodeTextEndEvent extends OpenCodeBaseEvent {
-  type: 'text-end';
+export interface OpenCodeTextEvent extends OpenCodeBaseEvent {
+  type: 'text';
+  part: {
+    type: 'text';
+    text: string;
+    [key: string]: unknown;
+  };
 }
 
 /**
  * Tool call event - Request to execute a tool
  */
 export interface OpenCodeToolCallEvent extends OpenCodeBaseEvent {
-  type: 'tool-call';
-  /** Unique identifier for this tool call */
-  call_id?: string;
-  /** Tool name to invoke */
-  name: string;
-  /** Arguments to pass to the tool */
-  args: unknown;
+  type: 'tool_call';
+  part: {
+    type: 'tool-call';
+    name: string;
+    call_id?: string;
+    args: unknown;
+    [key: string]: unknown;
+  };
 }
 
 /**
  * Tool result event - Output from a tool execution
  */
 export interface OpenCodeToolResultEvent extends OpenCodeBaseEvent {
-  type: 'tool-result';
-  /** The tool call ID this result corresponds to */
-  call_id?: string;
-  /** Output from the tool execution */
-  output: string;
+  type: 'tool_result';
+  part: {
+    type: 'tool-result';
+    call_id?: string;
+    output: string;
+    [key: string]: unknown;
+  };
 }
 
 /**
  * Tool error event - Tool execution failed
  */
 export interface OpenCodeToolErrorEvent extends OpenCodeBaseEvent {
-  type: 'tool-error';
-  /** The tool call ID that failed */
-  call_id?: string;
-  /** Error message describing the failure */
-  error: string;
+  type: 'tool_error';
+  part: {
+    type: 'tool-error';
+    call_id?: string;
+    error: string;
+    [key: string]: unknown;
+  };
 }
 
 /**
  * Start step event - Begins an agentic loop iteration
+ * Format: {"type":"step_start","part":{...}}
  */
 export interface OpenCodeStartStepEvent extends OpenCodeBaseEvent {
-  type: 'start-step';
-  /** Step number in the agentic loop */
-  step?: number;
+  type: 'step_start';
+  part?: {
+    type: 'step-start';
+    [key: string]: unknown;
+  };
 }
 
 /**
  * Finish step event - Completes an agentic loop iteration
+ * Format: {"type":"step_finish","part":{"reason":"stop",...}}
  */
 export interface OpenCodeFinishStepEvent extends OpenCodeBaseEvent {
-  type: 'finish-step';
-  /** Step number that completed */
-  step?: number;
-  /** Whether the step completed successfully */
-  success?: boolean;
-  /** Optional result data */
-  result?: string;
-  /** Optional error if step failed */
-  error?: string;
+  type: 'step_finish';
+  part?: {
+    type: 'step-finish';
+    reason?: string;
+    error?: string;
+    [key: string]: unknown;
+  };
 }
 
 /**
  * Union type of all OpenCode stream events
  */
 export type OpenCodeStreamEvent =
-  | OpenCodeTextDeltaEvent
-  | OpenCodeTextEndEvent
+  | OpenCodeTextEvent
   | OpenCodeToolCallEvent
   | OpenCodeToolResultEvent
   | OpenCodeToolErrorEvent
@@ -219,14 +227,12 @@ export class OpencodeProvider extends CliProvider {
    *
    * Arguments built:
    * - 'run' subcommand for executing queries
-   * - '--format', 'stream-json' for JSONL streaming output
-   * - '-q' / '--quiet' to suppress spinner and interactive elements
-   * - '-c', '<cwd>' for working directory
+   * - '--format', 'json' for JSON streaming output
    * - '--model', '<model>' for model selection (if specified)
-   * - '-' as final arg to read prompt from stdin
+   * - Message passed via stdin (no positional args needed)
    *
-   * The prompt is NOT included in CLI args - it's passed via stdin to avoid
-   * shell escaping issues with special characters in content.
+   * The prompt is passed via stdin to avoid shell escaping issues.
+   * OpenCode will read from stdin when no positional message arguments are provided.
    *
    * @param options - Execution options containing model, cwd, etc.
    * @returns Array of CLI arguments for opencode run
@@ -234,27 +240,18 @@ export class OpencodeProvider extends CliProvider {
   buildCliArgs(options: ExecuteOptions): string[] {
     const args: string[] = ['run'];
 
-    // Add streaming JSON output format for JSONL parsing
-    args.push('--format', 'stream-json');
-
-    // Suppress spinner and interactive elements for non-TTY usage
-    args.push('-q');
-
-    // Set working directory
-    if (options.cwd) {
-      args.push('-c', options.cwd);
-    }
+    // Add JSON output format for streaming
+    args.push('--format', 'json');
 
     // Handle model selection
-    // Strip 'opencode-' prefix if present, OpenCode uses format like 'anthropic/claude-sonnet-4-5'
+    // Strip 'opencode-' prefix if present, OpenCode uses native format
     if (options.model) {
       const model = stripProviderPrefix(options.model);
       args.push('--model', model);
     }
 
-    // Use '-' to indicate reading prompt from stdin
-    // This avoids shell escaping issues with special characters
-    args.push('-');
+    // Note: Working directory is set via subprocess cwd option, not CLI args
+    // Note: Message is passed via stdin, OpenCode reads from stdin automatically
 
     return args;
   }
@@ -314,14 +311,12 @@ export class OpencodeProvider extends CliProvider {
    * Normalize a raw CLI event to ProviderMessage format
    *
    * Maps OpenCode event types to the standard ProviderMessage structure:
-   * - text-delta -> type: 'assistant', content with type: 'text'
-   * - text-end -> null (informational, no message needed)
-   * - tool-call -> type: 'assistant', content with type: 'tool_use'
-   * - tool-result -> type: 'assistant', content with type: 'tool_result'
-   * - tool-error -> type: 'error'
-   * - start-step -> null (informational, no message needed)
-   * - finish-step with success -> type: 'result', subtype: 'success'
-   * - finish-step with error -> type: 'error'
+   * - text -> type: 'assistant', content with type: 'text'
+   * - step_start -> null (informational, no message needed)
+   * - step_finish -> type: 'result', subtype: 'success' (or error if failed)
+   * - tool_call -> type: 'assistant', content with type: 'tool_use'
+   * - tool_result -> type: 'assistant', content with type: 'tool_result'
+   * - tool_error -> type: 'error'
    *
    * @param event - Raw event from OpenCode CLI JSONL output
    * @returns Normalized ProviderMessage or null to skip the event
@@ -334,24 +329,24 @@ export class OpencodeProvider extends CliProvider {
     const openCodeEvent = event as OpenCodeStreamEvent;
 
     switch (openCodeEvent.type) {
-      case 'text-delta': {
-        const textEvent = openCodeEvent as OpenCodeTextDeltaEvent;
+      case 'text': {
+        const textEvent = openCodeEvent as OpenCodeTextEvent;
 
-        // Skip empty text deltas
-        if (!textEvent.text) {
+        // Skip if no text content
+        if (!textEvent.part?.text) {
           return null;
         }
 
         const content: ContentBlock[] = [
           {
             type: 'text',
-            text: textEvent.text,
+            text: textEvent.part.text,
           },
         ];
 
         return {
           type: 'assistant',
-          session_id: textEvent.session_id,
+          session_id: textEvent.sessionID,
           message: {
             role: 'assistant',
             content,
@@ -359,90 +354,105 @@ export class OpencodeProvider extends CliProvider {
         };
       }
 
-      case 'text-end': {
-        // Text end is informational - no message needed
-        return null;
-      }
-
-      case 'tool-call': {
-        const toolEvent = openCodeEvent as OpenCodeToolCallEvent;
-
-        // Generate a tool use ID if not provided
-        const toolUseId = toolEvent.call_id || generateToolUseId();
-
-        const content: ContentBlock[] = [
-          {
-            type: 'tool_use',
-            name: toolEvent.name,
-            tool_use_id: toolUseId,
-            input: toolEvent.args,
-          },
-        ];
-
-        return {
-          type: 'assistant',
-          session_id: toolEvent.session_id,
-          message: {
-            role: 'assistant',
-            content,
-          },
-        };
-      }
-
-      case 'tool-result': {
-        const resultEvent = openCodeEvent as OpenCodeToolResultEvent;
-
-        const content: ContentBlock[] = [
-          {
-            type: 'tool_result',
-            tool_use_id: resultEvent.call_id,
-            content: resultEvent.output,
-          },
-        ];
-
-        return {
-          type: 'assistant',
-          session_id: resultEvent.session_id,
-          message: {
-            role: 'assistant',
-            content,
-          },
-        };
-      }
-
-      case 'tool-error': {
-        const errorEvent = openCodeEvent as OpenCodeToolErrorEvent;
-
-        return {
-          type: 'error',
-          session_id: errorEvent.session_id,
-          error: errorEvent.error || 'Tool execution failed',
-        };
-      }
-
-      case 'start-step': {
+      case 'step_start': {
         // Start step is informational - no message needed
         return null;
       }
 
-      case 'finish-step': {
+      case 'step_finish': {
         const finishEvent = openCodeEvent as OpenCodeFinishStepEvent;
 
-        // Check if the step failed
-        if (finishEvent.success === false || finishEvent.error) {
+        // Check if the step failed (either has error field or reason is 'error')
+        if (finishEvent.part?.error || finishEvent.part?.reason === 'error') {
           return {
             type: 'error',
-            session_id: finishEvent.session_id,
-            error: finishEvent.error || 'Step execution failed',
+            session_id: finishEvent.sessionID,
+            error: finishEvent.part?.error || 'Step execution failed',
           };
         }
 
         // Successful completion
+        const result: { type: 'result'; subtype: 'success'; session_id?: string; result?: string } =
+          {
+            type: 'result',
+            subtype: 'success',
+          };
+
+        if (finishEvent.sessionID) {
+          result.session_id = finishEvent.sessionID;
+        }
+
+        // Safely handle arbitrary result payloads from CLI: ensure we assign a string.
+        const rawResult =
+          (finishEvent.part && (finishEvent.part as Record<string, unknown>).result) ?? undefined;
+        if (rawResult !== undefined) {
+          result.result = typeof rawResult === 'string' ? rawResult : JSON.stringify(rawResult);
+        }
+
+        return result;
+      }
+
+      case 'tool_call': {
+        const toolEvent = openCodeEvent as OpenCodeToolCallEvent;
+
+        if (!toolEvent.part) {
+          return null;
+        }
+
+        // Generate a tool use ID if not provided
+        const toolUseId = toolEvent.part.call_id || generateToolUseId();
+
+        const content: ContentBlock[] = [
+          {
+            type: 'tool_use',
+            name: toolEvent.part.name,
+            tool_use_id: toolUseId,
+            input: toolEvent.part.args,
+          },
+        ];
+
         return {
-          type: 'result',
-          subtype: 'success',
-          session_id: finishEvent.session_id,
-          result: finishEvent.result,
+          type: 'assistant',
+          session_id: toolEvent.sessionID,
+          message: {
+            role: 'assistant',
+            content,
+          },
+        };
+      }
+
+      case 'tool_result': {
+        const resultEvent = openCodeEvent as OpenCodeToolResultEvent;
+
+        if (!resultEvent.part) {
+          return null;
+        }
+
+        const content: ContentBlock[] = [
+          {
+            type: 'tool_result',
+            tool_use_id: resultEvent.part.call_id,
+            content: resultEvent.part.output,
+          },
+        ];
+
+        return {
+          type: 'assistant',
+          session_id: resultEvent.sessionID,
+          message: {
+            role: 'assistant',
+            content,
+          },
+        };
+      }
+
+      case 'tool_error': {
+        const errorEvent = openCodeEvent as OpenCodeToolErrorEvent;
+
+        return {
+          type: 'error',
+          session_id: errorEvent.sessionID,
+          error: errorEvent.part?.error || 'Tool execution failed',
         };
       }
 

@@ -6,26 +6,57 @@ import { createLogger } from '@automaker/utils';
 
 const logger = createLogger('SpecRegeneration');
 
-// Shared state for tracking generation status - private
-let isRunning = false;
-let currentAbortController: AbortController | null = null;
+// Shared state for tracking generation status - scoped by project path
+const runningProjects = new Map<string, boolean>();
+const abortControllers = new Map<string, AbortController>();
 
 /**
- * Get the current running state
+ * Get the running state for a specific project
  */
-export function getSpecRegenerationStatus(): {
+export function getSpecRegenerationStatus(projectPath?: string): {
   isRunning: boolean;
   currentAbortController: AbortController | null;
+  projectPath?: string;
 } {
-  return { isRunning, currentAbortController };
+  if (projectPath) {
+    return {
+      isRunning: runningProjects.get(projectPath) || false,
+      currentAbortController: abortControllers.get(projectPath) || null,
+      projectPath,
+    };
+  }
+  // Fallback: check if any project is running (for backward compatibility)
+  const isAnyRunning = Array.from(runningProjects.values()).some((running) => running);
+  return { isRunning: isAnyRunning, currentAbortController: null };
 }
 
 /**
- * Set the running state and abort controller
+ * Get the project path that is currently running (if any)
  */
-export function setRunningState(running: boolean, controller: AbortController | null = null): void {
-  isRunning = running;
-  currentAbortController = controller;
+export function getRunningProjectPath(): string | null {
+  for (const [path, running] of runningProjects.entries()) {
+    if (running) return path;
+  }
+  return null;
+}
+
+/**
+ * Set the running state and abort controller for a specific project
+ */
+export function setRunningState(
+  projectPath: string,
+  running: boolean,
+  controller: AbortController | null = null
+): void {
+  if (running) {
+    runningProjects.set(projectPath, true);
+    if (controller) {
+      abortControllers.set(projectPath, controller);
+    }
+  } else {
+    runningProjects.delete(projectPath);
+    abortControllers.delete(projectPath);
+  }
 }
 
 /**

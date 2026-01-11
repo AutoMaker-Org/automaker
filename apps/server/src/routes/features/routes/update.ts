@@ -10,14 +10,21 @@ import { getErrorMessage, logError } from '../common.js';
 export function createUpdateHandler(featureLoader: FeatureLoader) {
   return async (req: Request, res: Response): Promise<void> => {
     try {
-      const { projectPath, featureId, updates, descriptionHistorySource, enhancementMode } =
-        req.body as {
-          projectPath: string;
-          featureId: string;
-          updates: Partial<Feature>;
-          descriptionHistorySource?: 'enhance' | 'edit';
-          enhancementMode?: 'improve' | 'technical' | 'simplify' | 'acceptance';
-        };
+      const {
+        projectPath,
+        featureId,
+        updates,
+        descriptionHistorySource,
+        enhancementMode,
+        preEnhancementDescription,
+      } = req.body as {
+        projectPath: string;
+        featureId: string;
+        updates: Partial<Feature>;
+        descriptionHistorySource?: 'enhance' | 'edit';
+        enhancementMode?: 'improve' | 'technical' | 'simplify' | 'acceptance' | 'ux-reviewer';
+        preEnhancementDescription?: string;
+      };
 
       if (!projectPath || !featureId || !updates) {
         res.status(400).json({
@@ -32,7 +39,8 @@ export function createUpdateHandler(featureLoader: FeatureLoader) {
         featureId,
         updates,
         descriptionHistorySource,
-        enhancementMode
+        enhancementMode,
+        preEnhancementDescription
       );
       res.json({ success: true, feature: updated });
     } catch (error) {

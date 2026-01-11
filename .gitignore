@@ -73,6 +73,9 @@ blob-report/
 !.env.example
 !.env.local.example
 
+# Codex config (contains API keys)
+.codex/config.toml
+
 # TypeScript
 *.tsbuildinfo
 
@@ -85,3 +88,11 @@ docker-compose.override.yml
 
 pnpm-lock.yaml
 yarn.lock
+
+# Fork-specific workflow files (should never be committed)
+DEVELOPMENT_WORKFLOW.md
+check-sync.sh
+# API key files
+data/.api-key
+data/credentials.json
+data/

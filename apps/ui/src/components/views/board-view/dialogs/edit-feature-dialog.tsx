@@ -21,53 +21,25 @@ import {
   FeatureTextFilePath as DescriptionTextFilePath,
   ImagePreviewMap,
 } from '@/components/ui/description-image-dropzone';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import {
-  Sparkles,
-  ChevronDown,
-  ChevronRight,
-  GitBranch,
-  History,
-  Cpu,
-  FolderKanban,
-} from 'lucide-react';
+import { GitBranch, Cpu, FolderKanban } from 'lucide-react';
 import { toast } from 'sonner';
-import { getElectronAPI } from '@/lib/electron';
 import { cn, modelSupportsThinking } from '@/lib/utils';
-import {
-  Feature,
-  ModelAlias,
-  ThinkingLevel,
-  AIProfile,
-  useAppStore,
-  PlanningMode,
-} from '@/store/app-store';
+import { Feature, ModelAlias, ThinkingLevel, useAppStore, PlanningMode } from '@/store/app-store';
 import type { ReasoningEffort, PhaseModelEntry, DescriptionHistoryEntry } from '@automaker/types';
 import {
   TestingTabContent,
   PrioritySelector,
   WorkModeSelector,
   PlanningModeSelect,
-  ProfileTypeahead,
+  EnhanceWithAI,
+  EnhancementHistoryButton,
+  type EnhancementMode,
 } from '../shared';
 import type { WorkMode } from '../shared';
 import { PhaseModelSelector } from '@/components/views/settings-view/model-defaults/phase-model-selector';
-import { ModelOverrideTrigger, useModelOverride } from '@/components/shared';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { DependencyTreeDialog } from './dependency-tree-dialog';
-import {
-  isCursorModel,
-  isClaudeModel,
-  PROVIDER_PREFIXES,
-  supportsReasoningEffort,
-} from '@automaker/types';
-import { useNavigate } from '@tanstack/react-router';
+import { isClaudeModel, supportsReasoningEffort } from '@automaker/types';
 
 const logger = createLogger('EditFeatureDialog');
 
@@ -92,15 +64,14 @@ interface EditFeatureDialogProps {
       requirePlanApproval: boolean;
     },
     descriptionHistorySource?: 'enhance' | 'edit',
-    enhancementMode?: 'improve' | 'technical' | 'simplify' | 'acceptance'
+    enhancementMode?: EnhancementMode,
+    preEnhancementDescription?: string
   ) => void;
   categorySuggestions: string[];
   branchSuggestions: string[];
   branchCardCounts?: Record<string, number>; // Map of branch name to unarchived card count
   currentBranch?: string;
   isMaximized: boolean;
-  showProfilesOnly: boolean;
-  aiProfiles: AIProfile[];
   allFeatures: Feature[];
 }
 
@@ -113,11 +84,8 @@ export function EditFeatureDialog({
   branchCardCounts,
   currentBranch,
   isMaximized,
-  showProfilesOnly,
-  aiProfiles,
   allFeatures,
 }: EditFeatureDialogProps) {
-  const navigate = useNavigate();
   const [editingFeature, setEditingFeature] = useState<Feature | null>(feature);
   // Derive initial workMode from feature's branchName
   const [workMode, setWorkMode] = useState<WorkMode>(() => {
@@ -128,11 +96,6 @@ export function EditFeatureDialog({
   const [editFeaturePreviewMap, setEditFeaturePreviewMap] = useState<ImagePreviewMap>(
     () => new Map()
   );
-  const [isEnhancing, setIsEnhancing] = useState(false);
-  const [enhancementMode, setEnhancementMode] = useState<
-    'improve' | 'technical' | 'simplify' | 'acceptance'
-  >('improve');
-  const [enhanceOpen, setEnhanceOpen] = useState(false);
   const [showDependencyTree, setShowDependencyTree] = useState(false);
   const [planningMode, setPlanningMode] = useState<PlanningMode>(feature?.planningMode ?? 'skip');
   const [requirePlanApproval, setRequirePlanApproval] = useState(
@@ -140,7 +103,6 @@ export function EditFeatureDialog({
   );
 
   // Model selection state
-  const [selectedProfileId, setSelectedProfileId] = useState<string | undefined>();
   const [modelEntry, setModelEntry] = useState<PhaseModelEntry>(() => ({
     model: (feature?.model as ModelAlias) || 'opus',
     thinkingLevel: feature?.thinkingLevel || 'none',
@@ -152,15 +114,16 @@ export function EditFeatureDialog({
 
   // Track the source of description changes for history
   const [descriptionChangeSource, setDescriptionChangeSource] = useState<
-    { source: 'enhance'; mode: 'improve' | 'technical' | 'simplify' | 'acceptance' } | 'edit' | null
+    { source: 'enhance'; mode: EnhancementMode } | 'edit' | null
   >(null);
   // Track the original description when the dialog opened for comparison
   const [originalDescription, setOriginalDescription] = useState(feature?.description ?? '');
-  // Track if history dropdown is open
-  const [showHistory, setShowHistory] = useState(false);
-
-  // Enhancement model override
-  const enhancementOverride = useModelOverride({ phase: 'enhancementModel' });
+  // Track the description before enhancement (so it can be restored)
+  const [preEnhancementDescription, setPreEnhancementDescription] = useState<string | null>(null);
+  // Local history state for real-time display (combines persisted + session history)
+  const [localHistory, setLocalHistory] = useState<DescriptionHistoryEntry[]>(
+    feature?.descriptionHistory ?? []
+  );
 
   useEffect(() => {
     setEditingFeature(feature);
@@ -172,51 +135,24 @@ export function EditFeatureDialog({
       // Reset history tracking state
       setOriginalDescription(feature.description ?? '');
       setDescriptionChangeSource(null);
-      setShowHistory(false);
-      setEnhanceOpen(false);
+      setPreEnhancementDescription(null);
+      setLocalHistory(feature.descriptionHistory ?? []);
       // Reset model entry
       setModelEntry({
         model: (feature.model as ModelAlias) || 'opus',
         thinkingLevel: feature.thinkingLevel || 'none',
         reasoningEffort: feature.reasoningEffort || 'none',
       });
-      setSelectedProfileId(undefined);
     } else {
       setEditFeaturePreviewMap(new Map());
       setDescriptionChangeSource(null);
-      setShowHistory(false);
+      setPreEnhancementDescription(null);
+      setLocalHistory([]);
     }
   }, [feature]);
 
-  const applyProfileToModel = (profile: AIProfile) => {
-    if (profile.provider === 'cursor') {
-      const cursorModel = `${PROVIDER_PREFIXES.cursor}${profile.cursorModel || 'auto'}`;
-      setModelEntry({ model: cursorModel as ModelAlias });
-    } else if (profile.provider === 'codex') {
-      setModelEntry({
-        model: profile.codexModel || 'codex-gpt-5.2-codex',
-        reasoningEffort: 'none',
-      });
-    } else if (profile.provider === 'opencode') {
-      setModelEntry({ model: profile.opencodeModel || 'opencode/big-pickle' });
-    } else {
-      // Claude
-      setModelEntry({
-        model: profile.model || 'sonnet',
-        thinkingLevel: profile.thinkingLevel || 'none',
-      });
-    }
-  };
-
-  const handleProfileSelect = (profile: AIProfile) => {
-    setSelectedProfileId(profile.id);
-    applyProfileToModel(profile);
-  };
-
   const handleModelChange = (entry: PhaseModelEntry) => {
     setModelEntry(entry);
-    // Clear profile selection when manually changing model
-    setSelectedProfileId(undefined);
   };
 
   const handleUpdate = () => {
@@ -273,7 +209,13 @@ export function EditFeatureDialog({
       }
     }
 
-    onUpdate(editingFeature.id, updates, historySource, historyEnhancementMode);
+    onUpdate(
+      editingFeature.id,
+      updates,
+      historySource,
+      historyEnhancementMode,
+      preEnhancementDescription ?? undefined
+    );
     setEditFeaturePreviewMap(new Map());
     onClose();
   };
@@ -281,36 +223,6 @@ export function EditFeatureDialog({
   const handleDialogClose = (open: boolean) => {
     if (!open) {
       onClose();
-    }
-  };
-
-  const handleEnhanceDescription = async () => {
-    if (!editingFeature?.description.trim() || isEnhancing) return;
-
-    setIsEnhancing(true);
-    try {
-      const api = getElectronAPI();
-      const result = await api.enhancePrompt?.enhance(
-        editingFeature.description,
-        enhancementMode,
-        enhancementOverride.effectiveModel, // API accepts string, extract from PhaseModelEntry
-        enhancementOverride.effectiveModelEntry.thinkingLevel // Pass thinking level
-      );
-
-      if (result?.success && result.enhancedText) {
-        const enhancedText = result.enhancedText;
-        setEditingFeature((prev) => (prev ? { ...prev, description: enhancedText } : prev));
-        // Track that this change was from enhancement
-        setDescriptionChangeSource({ source: 'enhance', mode: enhancementMode });
-        toast.success('Description enhanced!');
-      } else {
-        toast.error(result?.error || 'Failed to enhance description');
-      }
-    } catch (error) {
-      logger.error('Enhancement failed:', error);
-      toast.error('Failed to enhance description');
-    } finally {
-      setIsEnhancing(false);
     }
   };
 
@@ -351,85 +263,18 @@ export function EditFeatureDialog({
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label htmlFor="edit-description">Description</Label>
-                {/* Version History Button */}
-                {feature?.descriptionHistory && feature.descriptionHistory.length > 0 && (
-                  <Popover open={showHistory} onOpenChange={setShowHistory}>
-                    <PopoverTrigger asChild>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 gap-1.5 text-xs text-muted-foreground"
-                      >
-                        <History className="w-3.5 h-3.5" />
-                        History ({feature.descriptionHistory.length})
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-80 p-0" align="end">
-                      <div className="p-3 border-b">
-                        <h4 className="font-medium text-sm">Version History</h4>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Click a version to restore it
-                        </p>
-                      </div>
-                      <div className="max-h-64 overflow-y-auto p-2 space-y-1">
-                        {[...(feature.descriptionHistory || [])]
-                          .reverse()
-                          .map((entry: DescriptionHistoryEntry, index: number) => {
-                            const isCurrentVersion =
-                              entry.description === editingFeature.description;
-                            const date = new Date(entry.timestamp);
-                            const formattedDate = date.toLocaleDateString(undefined, {
-                              month: 'short',
-                              day: 'numeric',
-                              hour: '2-digit',
-                              minute: '2-digit',
-                            });
-                            const sourceLabel =
-                              entry.source === 'initial'
-                                ? 'Original'
-                                : entry.source === 'enhance'
-                                  ? `Enhanced (${entry.enhancementMode || 'improve'})`
-                                  : 'Edited';
-
-                            return (
-                              <button
-                                key={`${entry.timestamp}-${index}`}
-                                onClick={() => {
-                                  setEditingFeature((prev) =>
-                                    prev ? { ...prev, description: entry.description } : prev
-                                  );
-                                  // Mark as edit since user is restoring from history
-                                  setDescriptionChangeSource('edit');
-                                  setShowHistory(false);
-                                  toast.success('Description restored from history');
-                                }}
-                                className={`w-full text-left p-2 rounded-md hover:bg-muted transition-colors ${
-                                  isCurrentVersion ? 'bg-muted/50 border border-primary/20' : ''
-                                }`}
-                              >
-                                <div className="flex items-center justify-between gap-2">
-                                  <span className="text-xs font-medium">{sourceLabel}</span>
-                                  <span className="text-xs text-muted-foreground">
-                                    {formattedDate}
-                                  </span>
-                                </div>
-                                <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
-                                  {entry.description.slice(0, 100)}
-                                  {entry.description.length > 100 ? '...' : ''}
-                                </p>
-                                {isCurrentVersion && (
-                                  <span className="text-xs text-primary font-medium mt-1 block">
-                                    Current version
-                                  </span>
-                                )}
-                              </button>
-                            );
-                          })}
-                      </div>
-                    </PopoverContent>
-                  </Popover>
-                )}
+                {/* Version History Button - uses local history for real-time updates */}
+                <EnhancementHistoryButton
+                  history={localHistory}
+                  currentValue={editingFeature.description}
+                  onRestore={(description) => {
+                    setEditingFeature((prev) => (prev ? { ...prev, description } : prev));
+                    setDescriptionChangeSource('edit');
+                  }}
+                  valueAccessor={(entry) => entry.description}
+                  title="Version History"
+                  restoreMessage="Description restored from history"
+                />
               </div>
               <DescriptionImageDropZone
                 value={editingFeature.description}
@@ -480,71 +325,40 @@ export function EditFeatureDialog({
               />
             </div>
 
-            {/* Collapsible Enhancement Section */}
-            <Collapsible open={enhanceOpen} onOpenChange={setEnhanceOpen}>
-              <CollapsibleTrigger asChild>
-                <button className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors w-full py-1">
-                  {enhanceOpen ? (
-                    <ChevronDown className="w-4 h-4" />
-                  ) : (
-                    <ChevronRight className="w-4 h-4" />
-                  )}
-                  <Sparkles className="w-4 h-4" />
-                  <span>Enhance with AI</span>
-                </button>
-              </CollapsibleTrigger>
-              <CollapsibleContent className="pt-3">
-                <div className="flex flex-wrap items-center gap-2 pl-6">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="outline" size="sm" className="h-8 text-xs">
-                        {enhancementMode === 'improve' && 'Improve Clarity'}
-                        {enhancementMode === 'technical' && 'Add Technical Details'}
-                        {enhancementMode === 'simplify' && 'Simplify'}
-                        {enhancementMode === 'acceptance' && 'Add Acceptance Criteria'}
-                        <ChevronDown className="w-3 h-3 ml-1" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="start">
-                      <DropdownMenuItem onClick={() => setEnhancementMode('improve')}>
-                        Improve Clarity
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => setEnhancementMode('technical')}>
-                        Add Technical Details
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => setEnhancementMode('simplify')}>
-                        Simplify
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => setEnhancementMode('acceptance')}>
-                        Add Acceptance Criteria
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+            {/* Enhancement Section */}
+            <EnhanceWithAI
+              value={editingFeature.description}
+              onChange={(enhanced) =>
+                setEditingFeature((prev) => (prev ? { ...prev, description: enhanced } : prev))
+              }
+              onHistoryAdd={({ mode, originalText, enhancedText }) => {
+                setDescriptionChangeSource({ source: 'enhance', mode });
+                setPreEnhancementDescription(originalText);
 
-                  <Button
-                    type="button"
-                    variant="default"
-                    size="sm"
-                    className="h-8 text-xs"
-                    onClick={handleEnhanceDescription}
-                    disabled={!editingFeature.description.trim() || isEnhancing}
-                    loading={isEnhancing}
-                  >
-                    <Sparkles className="w-3 h-3 mr-1" />
-                    Enhance
-                  </Button>
-
-                  <ModelOverrideTrigger
-                    currentModelEntry={enhancementOverride.effectiveModelEntry}
-                    onModelChange={enhancementOverride.setOverride}
-                    phase="enhancementModel"
-                    isOverridden={enhancementOverride.isOverridden}
-                    size="sm"
-                    variant="icon"
-                  />
-                </div>
-              </CollapsibleContent>
-            </Collapsible>
+                // Update local history for real-time display
+                const timestamp = new Date().toISOString();
+                setLocalHistory((prev) => {
+                  const newHistory = [...prev];
+                  // Add original text first (so user can restore to pre-enhancement state)
+                  const lastEntry = prev[prev.length - 1];
+                  if (!lastEntry || lastEntry.description !== originalText) {
+                    newHistory.push({
+                      description: originalText,
+                      timestamp,
+                      source: prev.length === 0 ? 'initial' : 'edit',
+                    });
+                  }
+                  // Add enhanced text
+                  newHistory.push({
+                    description: enhancedText,
+                    timestamp,
+                    source: 'enhance',
+                    enhancementMode: mode,
+                  });
+                  return newHistory;
+                });
+              }}
+            />
           </div>
 
           {/* AI & Execution Section */}
@@ -554,50 +368,54 @@ export function EditFeatureDialog({
               <span>AI & Execution</span>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label className="text-xs text-muted-foreground">Profile</Label>
-                <ProfileTypeahead
-                  profiles={aiProfiles}
-                  selectedProfileId={selectedProfileId}
-                  onSelect={handleProfileSelect}
-                  placeholder="Select profile..."
-                  showManageLink
-                  onManageLinkClick={() => {
-                    onClose();
-                    navigate({ to: '/profiles' });
-                  }}
-                  testIdPrefix="edit-feature-profile"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs text-muted-foreground">Model</Label>
-                <PhaseModelSelector
-                  value={modelEntry}
-                  onChange={handleModelChange}
-                  compact
-                  align="end"
-                />
-              </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">Model</Label>
+              <PhaseModelSelector
+                value={modelEntry}
+                onChange={handleModelChange}
+                compact
+                align="end"
+              />
             </div>
 
-            <div
-              className={cn(
-                'grid gap-3',
-                modelSupportsPlanningMode ? 'grid-cols-2' : 'grid-cols-1'
-              )}
-            >
-              {modelSupportsPlanningMode && (
-                <div className="space-y-1.5">
-                  <Label className="text-xs text-muted-foreground">Planning</Label>
+            <div className="grid gap-3 grid-cols-2">
+              <div className="space-y-1.5">
+                <Label
+                  className={cn(
+                    'text-xs text-muted-foreground',
+                    !modelSupportsPlanningMode && 'opacity-50'
+                  )}
+                >
+                  Planning
+                </Label>
+                {modelSupportsPlanningMode ? (
                   <PlanningModeSelect
                     mode={planningMode}
                     onModeChange={setPlanningMode}
                     testIdPrefix="edit-feature-planning"
                     compact
                   />
-                </div>
-              )}
+                ) : (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div>
+                          <PlanningModeSelect
+                            mode="skip"
+                            onModeChange={() => {}}
+                            testIdPrefix="edit-feature-planning"
+                            compact
+                            disabled
+                          />
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Planning modes are only available for Claude Provider</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
+              </div>
               <div className="space-y-1.5">
                 <Label className="text-xs text-muted-foreground">Options</Label>
                 <div className="flex flex-col gap-2 pt-1">
@@ -617,28 +435,32 @@ export function EditFeatureDialog({
                       Run tests
                     </Label>
                   </div>
-                  {modelSupportsPlanningMode && (
-                    <div className="flex items-center gap-2">
-                      <Checkbox
-                        id="edit-feature-require-approval"
-                        checked={requirePlanApproval}
-                        onCheckedChange={(checked) => setRequirePlanApproval(!!checked)}
-                        disabled={planningMode === 'skip' || planningMode === 'lite'}
-                        data-testid="edit-feature-require-approval-checkbox"
-                      />
-                      <Label
-                        htmlFor="edit-feature-require-approval"
-                        className={cn(
-                          'text-xs font-normal',
-                          planningMode === 'skip' || planningMode === 'lite'
-                            ? 'cursor-not-allowed text-muted-foreground'
-                            : 'cursor-pointer'
-                        )}
-                      >
-                        Require approval
-                      </Label>
-                    </div>
-                  )}
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id="edit-feature-require-approval"
+                      checked={requirePlanApproval}
+                      onCheckedChange={(checked) => setRequirePlanApproval(!!checked)}
+                      disabled={
+                        !modelSupportsPlanningMode ||
+                        planningMode === 'skip' ||
+                        planningMode === 'lite'
+                      }
+                      data-testid="edit-feature-require-approval-checkbox"
+                    />
+                    <Label
+                      htmlFor="edit-feature-require-approval"
+                      className={cn(
+                        'text-xs font-normal',
+                        !modelSupportsPlanningMode ||
+                          planningMode === 'skip' ||
+                          planningMode === 'lite'
+                          ? 'cursor-not-allowed text-muted-foreground'
+                          : 'cursor-pointer'
+                      )}
+                    >
+                      Require approval
+                    </Label>
+                  </div>
                 </div>
               </div>
             </div>

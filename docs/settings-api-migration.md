@@ -96,16 +96,13 @@ const SETTINGS_FIELDS_TO_SYNC = [
   'theme',
   'sidebarOpen',
   'chatHistoryOpen',
-  'kanbanCardDetailLevel',
   'maxConcurrency',
   'defaultSkipTests',
   'enableDependencyBlocking',
   'skipVerificationInAutoMode',
   'useWorktrees',
-  'showProfilesOnly',
   'defaultPlanningMode',
   'defaultRequirePlanApproval',
-  'defaultAIProfileId',
   'muteDoneSound',
   'enhancementModel',
   'validationModel',
@@ -114,7 +111,6 @@ const SETTINGS_FIELDS_TO_SYNC = [
   'cursorDefaultModel',
   'autoLoadClaudeMd',
   'keyboardShortcuts',
-  'aiProfiles',
   'mcpServers',
   'promptCustomization',
   'projects',
@@ -174,7 +170,7 @@ const SETTINGS_FIELDS_TO_SYNC = [
 When merging localStorage with server data:
 
 1. **Server has data** → Use server data as base
-2. **Server missing arrays** (projects, aiProfiles, etc.) → Use localStorage arrays
+2. **Server missing arrays** (projects, mcpServers, etc.) → Use localStorage arrays
 3. **Server missing objects** (lastSelectedSessionByProject) → Use localStorage objects
 4. **Simple values** (lastProjectDir, currentProjectId) → Use localStorage if server is empty
 

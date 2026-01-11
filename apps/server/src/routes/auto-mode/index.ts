@@ -17,6 +17,7 @@ import { createAnalyzeProjectHandler } from './routes/analyze-project.js';
 import { createFollowUpFeatureHandler } from './routes/follow-up-feature.js';
 import { createCommitFeatureHandler } from './routes/commit-feature.js';
 import { createApprovePlanHandler } from './routes/approve-plan.js';
+import { createResumeInterruptedHandler } from './routes/resume-interrupted.js';
 
 export function createAutoModeRoutes(autoModeService: AutoModeService): Router {
   const router = Router();
@@ -62,6 +63,11 @@ export function createAutoModeRoutes(autoModeService: AutoModeService): Router {
     '/approve-plan',
     validatePathParams('projectPath'),
     createApprovePlanHandler(autoModeService)
+  );
+  router.post(
+    '/resume-interrupted',
+    validatePathParams('projectPath'),
+    createResumeInterruptedHandler(autoModeService)
   );
 
   return router;

@@ -2,6 +2,7 @@ import { spawn } from 'child_process';
 import * as os from 'os';
 import * as pty from 'node-pty';
 import { ClaudeUsage } from '../routes/claude/types.js';
+import { createLogger } from '@automaker/utils';
 
 /**
  * Claude Usage Service
@@ -14,6 +15,8 @@ import { ClaudeUsage } from '../routes/claude/types.js';
  * - macOS: Uses 'expect' command for PTY
  * - Windows/Linux: Uses node-pty for PTY
  */
+const logger = createLogger('ClaudeUsage');
+
 export class ClaudeUsageService {
   private claudeBinary = 'claude';
   private timeout = 30000; // 30 second timeout
@@ -164,21 +167,40 @@ export class ClaudeUsageService {
       const shell = this.isWindows ? 'cmd.exe' : '/bin/sh';
       const args = this.isWindows ? ['/c', 'claude', '/usage'] : ['-c', 'claude /usage'];
 
-      const ptyProcess = pty.spawn(shell, args, {
-        name: 'xterm-256color',
-        cols: 120,
-        rows: 30,
-        cwd: workingDirectory,
-        env: {
-          ...process.env,
-          TERM: 'xterm-256color',
-        } as Record<string, string>,
-      });
+      let ptyProcess: any = null;
+
+      try {
+        ptyProcess = pty.spawn(shell, args, {
+          name: 'xterm-256color',
+          cols: 120,
+          rows: 30,
+          cwd: workingDirectory,
+          env: {
+            ...process.env,
+            TERM: 'xterm-256color',
+          } as Record<string, string>,
+        });
+      } catch (spawnError) {
+        // pty.spawn() can throw synchronously if the native module fails to load
+        // or if PTY is not available in the current environment (e.g., containers without /dev/pts)
+        const errorMessage = spawnError instanceof Error ? spawnError.message : String(spawnError);
+        logger.error('[executeClaudeUsageCommandPty] Failed to spawn PTY:', errorMessage);
+
+        // Return a user-friendly error instead of crashing
+        reject(
+          new Error(
+            `Unable to access terminal: ${errorMessage}. Claude CLI may not be available or PTY support is limited in this environment.`
+          )
+        );
+        return;
+      }
 
       const timeoutId = setTimeout(() => {
         if (!settled) {
           settled = true;
-          ptyProcess.kill();
+          if (ptyProcess && !ptyProcess.killed) {
+            ptyProcess.kill();
+          }
           // Don't fail if we have data - return it instead
           if (output.includes('Current session')) {
             resolve(output);
@@ -188,7 +210,7 @@ export class ClaudeUsageService {
         }
       }, this.timeout);
 
-      ptyProcess.onData((data) => {
+      ptyProcess.onData((data: string) => {
         output += data;
 
         // Check if we've seen the usage data (look for "Current session")
@@ -196,12 +218,12 @@ export class ClaudeUsageService {
           hasSeenUsageData = true;
           // Wait for full output, then send escape to exit
           setTimeout(() => {
-            if (!settled) {
+            if (!settled && ptyProcess && !ptyProcess.killed) {
               ptyProcess.write('\x1b'); // Send escape key
 
               // Fallback: if ESC doesn't exit (Linux), use SIGTERM after 2s
               setTimeout(() => {
-                if (!settled) {
+                if (!settled && ptyProcess && !ptyProcess.killed) {
                   ptyProcess.kill('SIGTERM');
                 }
               }, 2000);
@@ -212,14 +234,14 @@ export class ClaudeUsageService {
         // Fallback: if we see "Esc to cancel" but haven't seen usage data yet
         if (!hasSeenUsageData && output.includes('Esc to cancel')) {
           setTimeout(() => {
-            if (!settled) {
+            if (!settled && ptyProcess && !ptyProcess.killed) {
               ptyProcess.write('\x1b'); // Send escape key
             }
           }, 3000);
         }
       });
 
-      ptyProcess.onExit(({ exitCode }) => {
+      ptyProcess.onExit(({ exitCode }: { exitCode: number }) => {
         clearTimeout(timeoutId);
         if (settled) return;
         settled = true;

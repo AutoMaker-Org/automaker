@@ -1,78 +1,40 @@
 /**
  * POST /open-in-editor endpoint - Open a worktree directory in the default code editor
  * GET /default-editor endpoint - Get the name of the default code editor
+ * POST /refresh-editors endpoint - Clear editor cache and re-detect available editors
+ *
+ * This module uses @automaker/platform for cross-platform editor detection and launching.
  */
 
 import type { Request, Response } from 'express';
-import { exec } from 'child_process';
-import { promisify } from 'util';
+import { isAbsolute } from 'path';
+import {
+  clearEditorCache,
+  detectAllEditors,
+  detectDefaultEditor,
+  openInEditor,
+  openInFileManager,
+} from '@automaker/platform';
+import { createLogger } from '@automaker/utils';
 import { getErrorMessage, logError } from '../common.js';
 
-const execAsync = promisify(exec);
+const logger = createLogger('open-in-editor');
 
-// Editor detection with caching
-interface EditorInfo {
-  name: string;
-  command: string;
-}
-
-let cachedEditor: EditorInfo | null = null;
-
-/**
- * Detect which code editor is available on the system
- */
-async function detectDefaultEditor(): Promise<EditorInfo> {
-  // Return cached result if available
-  if (cachedEditor) {
-    return cachedEditor;
-  }
-
-  // Try Cursor first (if user has Cursor, they probably prefer it)
-  try {
-    await execAsync('which cursor || where cursor');
-    cachedEditor = { name: 'Cursor', command: 'cursor' };
-    return cachedEditor;
-  } catch {
-    // Cursor not found
-  }
-
-  // Try VS Code
-  try {
-    await execAsync('which code || where code');
-    cachedEditor = { name: 'VS Code', command: 'code' };
-    return cachedEditor;
-  } catch {
-    // VS Code not found
-  }
-
-  // Try Zed
-  try {
-    await execAsync('which zed || where zed');
-    cachedEditor = { name: 'Zed', command: 'zed' };
-    return cachedEditor;
-  } catch {
-    // Zed not found
-  }
-
-  // Try Sublime Text
-  try {
-    await execAsync('which subl || where subl');
-    cachedEditor = { name: 'Sublime Text', command: 'subl' };
-    return cachedEditor;
-  } catch {
-    // Sublime not found
-  }
-
-  // Fallback to file manager
-  const platform = process.platform;
-  if (platform === 'darwin') {
-    cachedEditor = { name: 'Finder', command: 'open' };
-  } else if (platform === 'win32') {
-    cachedEditor = { name: 'Explorer', command: 'explorer' };
-  } else {
-    cachedEditor = { name: 'File Manager', command: 'xdg-open' };
-  }
-  return cachedEditor;
+export function createGetAvailableEditorsHandler() {
+  return async (_req: Request, res: Response): Promise<void> => {
+    try {
+      const editors = await detectAllEditors();
+      res.json({
+        success: true,
+        result: {
+          editors,
+        },
+      });
+    } catch (error) {
+      logError(error, 'Get available editors failed');
+      res.status(500).json({ success: false, error: getErrorMessage(error) });
+    }
+  };
 }
 
 export function createGetDefaultEditorHandler() {
@@ -93,11 +55,41 @@ export function createGetDefaultEditorHandler() {
   };
 }
 
+/**
+ * Handler to refresh the editor cache and re-detect available editors
+ * Useful when the user has installed/uninstalled editors
+ */
+export function createRefreshEditorsHandler() {
+  return async (_req: Request, res: Response): Promise<void> => {
+    try {
+      // Clear the cache
+      clearEditorCache();
+
+      // Re-detect editors (this will repopulate the cache)
+      const editors = await detectAllEditors();
+
+      logger.info(`Editor cache refreshed, found ${editors.length} editors`);
+
+      res.json({
+        success: true,
+        result: {
+          editors,
+          message: `Found ${editors.length} available editors`,
+        },
+      });
+    } catch (error) {
+      logError(error, 'Refresh editors failed');
+      res.status(500).json({ success: false, error: getErrorMessage(error) });
+    }
+  };
+}
+
 export function createOpenInEditorHandler() {
   return async (req: Request, res: Response): Promise<void> => {
     try {
-      const { worktreePath } = req.body as {
+      const { worktreePath, editorCommand } = req.body as {
         worktreePath: string;
+        editorCommand?: string;
       };
 
       if (!worktreePath) {
@@ -108,42 +100,44 @@ export function createOpenInEditorHandler() {
         return;
       }
 
-      const editor = await detectDefaultEditor();
+      // Security: Validate that worktreePath is an absolute path
+      if (!isAbsolute(worktreePath)) {
+        res.status(400).json({
+          success: false,
+          error: 'worktreePath must be an absolute path',
+        });
+        return;
+      }
 
       try {
-        await execAsync(`${editor.command} "${worktreePath}"`);
+        // Use the platform utility to open in editor
+        const result = await openInEditor(worktreePath, editorCommand);
         res.json({
           success: true,
           result: {
-            message: `Opened ${worktreePath} in ${editor.name}`,
-            editorName: editor.name,
+            message: `Opened ${worktreePath} in ${result.editorName}`,
+            editorName: result.editorName,
           },
         });
       } catch (editorError) {
-        // If the detected editor fails, try opening in default file manager as fallback
-        const platform = process.platform;
-        let openCommand: string;
-        let fallbackName: string;
+        // If the specified editor fails, try opening in default file manager as fallback
+        logger.warn(
+          `Failed to open in editor, falling back to file manager: ${getErrorMessage(editorError)}`
+        );
 
-        if (platform === 'darwin') {
-          openCommand = `open "${worktreePath}"`;
-          fallbackName = 'Finder';
-        } else if (platform === 'win32') {
-          openCommand = `explorer "${worktreePath}"`;
-          fallbackName = 'Explorer';
-        } else {
-          openCommand = `xdg-open "${worktreePath}"`;
-          fallbackName = 'File Manager';
+        try {
+          const result = await openInFileManager(worktreePath);
+          res.json({
+            success: true,
+            result: {
+              message: `Opened ${worktreePath} in ${result.editorName}`,
+              editorName: result.editorName,
+            },
+          });
+        } catch (fallbackError) {
+          // Both editor and file manager failed
+          throw fallbackError;
         }
-
-        await execAsync(openCommand);
-        res.json({
-          success: true,
-          result: {
-            message: `Opened ${worktreePath} in ${fallbackName}`,
-            editorName: fallbackName,
-          },
-        });
       }
     } catch (error) {
       logError(error, 'Open in editor failed');

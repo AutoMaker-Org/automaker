@@ -2,9 +2,9 @@ import { useMemo } from 'react';
 import { DndContext, DragOverlay } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { Button } from '@/components/ui/button';
-import { KanbanColumn, KanbanCard } from './components';
-import { Feature } from '@/store/app-store';
-import { Archive, Settings2, CheckSquare, GripVertical } from 'lucide-react';
+import { KanbanColumn, KanbanCard, EmptyStateCard } from './components';
+import { Feature, useAppStore, formatShortcut } from '@/store/app-store';
+import { Archive, Settings2, CheckSquare, GripVertical, Plus } from 'lucide-react';
 import { useResponsiveKanban } from '@/hooks/use-responsive-kanban';
 import { getColumnsWithPipeline, type ColumnId } from './constants';
 import type { PipelineConfig } from '@automaker/types';
@@ -43,6 +43,7 @@ interface KanbanBoardProps {
   featuresWithContext: Set<string>;
   runningAutoTasks: string[];
   onArchiveAllVerified: () => void;
+  onAddFeature: () => void;
   pipelineConfig: PipelineConfig | null;
   onOpenPipelineSettings?: () => void;
   // Selection mode props
@@ -50,6 +51,12 @@ interface KanbanBoardProps {
   selectedFeatureIds?: Set<string>;
   onToggleFeatureSelection?: (featureId: string) => void;
   onToggleSelectionMode?: () => void;
+  // Empty state action props
+  onAiSuggest?: () => void;
+  /** Whether currently dragging (hides empty states during drag) */
+  isDragging?: boolean;
+  /** Whether the board is in read-only mode */
+  isReadOnly?: boolean;
 }
 
 export function KanbanBoard({
@@ -78,22 +85,30 @@ export function KanbanBoard({
   featuresWithContext,
   runningAutoTasks,
   onArchiveAllVerified,
+  onAddFeature,
   pipelineConfig,
   onOpenPipelineSettings,
   isSelectionMode = false,
   selectedFeatureIds = new Set(),
   onToggleFeatureSelection,
   onToggleSelectionMode,
+  onAiSuggest,
+  isDragging = false,
+  isReadOnly = false,
 }: KanbanBoardProps) {
   // Generate columns including pipeline steps
   const columns = useMemo(() => getColumnsWithPipeline(pipelineConfig), [pipelineConfig]);
+
+  // Get the keyboard shortcut for adding features
+  const { keyboardShortcuts } = useAppStore();
+  const addFeatureShortcut = keyboardShortcuts.addFeature || 'N';
 
   // Use responsive column widths based on window size
   // containerStyle handles centering and ensures columns fit without horizontal scroll in Electron
   const { columnWidth, containerStyle } = useResponsiveKanban(columns.length);
 
   return (
-    <div className="flex-1 overflow-x-auto px-5 pb-4 relative" style={backgroundImageStyle}>
+    <div className="flex-1 overflow-x-auto px-5 pt-4 pb-4 relative" style={backgroundImageStyle}>
       <DndContext
         sensors={sensors}
         collisionDetection={collisionDetectionStrategy}
@@ -127,26 +142,38 @@ export function KanbanBoard({
                       Complete All
                     </Button>
                   ) : column.id === 'backlog' ? (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className={`h-6 px-2 text-xs ${isSelectionMode ? 'text-primary bg-primary/10' : 'text-muted-foreground hover:text-foreground'}`}
-                      onClick={onToggleSelectionMode}
-                      title={isSelectionMode ? 'Switch to Drag Mode' : 'Select Multiple'}
-                      data-testid="selection-mode-button"
-                    >
-                      {isSelectionMode ? (
-                        <>
-                          <GripVertical className="w-3.5 h-3.5 mr-1" />
-                          Drag
-                        </>
-                      ) : (
-                        <>
-                          <CheckSquare className="w-3.5 h-3.5 mr-1" />
-                          Select
-                        </>
-                      )}
-                    </Button>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="default"
+                        size="sm"
+                        className="h-6 w-6 p-0"
+                        onClick={onAddFeature}
+                        title="Add Feature"
+                        data-testid="add-feature-button"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className={`h-6 px-2 text-xs ${isSelectionMode ? 'text-primary bg-primary/10' : 'text-muted-foreground hover:text-foreground'}`}
+                        onClick={onToggleSelectionMode}
+                        title={isSelectionMode ? 'Switch to Drag Mode' : 'Select Multiple'}
+                        data-testid="selection-mode-button"
+                      >
+                        {isSelectionMode ? (
+                          <>
+                            <GripVertical className="w-3.5 h-3.5 mr-1" />
+                            Drag
+                          </>
+                        ) : (
+                          <>
+                            <CheckSquare className="w-3.5 h-3.5 mr-1" />
+                            Select
+                          </>
+                        )}
+                      </Button>
+                    </div>
                   ) : column.id === 'in_progress' ? (
                     <Button
                       variant="ghost"
@@ -171,11 +198,48 @@ export function KanbanBoard({
                     </Button>
                   ) : undefined
                 }
+                footerAction={
+                  column.id === 'backlog' ? (
+                    <Button
+                      variant="default"
+                      size="sm"
+                      className="w-full h-9 text-sm"
+                      onClick={onAddFeature}
+                      data-testid="add-feature-floating-button"
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add Feature
+                      <span className="ml-auto pl-2 text-[10px] font-mono opacity-70 bg-black/20 px-1.5 py-0.5 rounded">
+                        {formatShortcut(addFeatureShortcut, true)}
+                      </span>
+                    </Button>
+                  ) : undefined
+                }
               >
                 <SortableContext
                   items={columnFeatures.map((f) => f.id)}
                   strategy={verticalListSortingStrategy}
                 >
+                  {/* Empty state card when column has no features */}
+                  {columnFeatures.length === 0 && !isDragging && (
+                    <EmptyStateCard
+                      columnId={column.id}
+                      columnTitle={column.title}
+                      addFeatureShortcut={addFeatureShortcut}
+                      isReadOnly={isReadOnly}
+                      onAiSuggest={column.id === 'backlog' ? onAiSuggest : undefined}
+                      opacity={backgroundSettings.cardOpacity}
+                      glassmorphism={backgroundSettings.cardGlassmorphism}
+                      customConfig={
+                        column.isPipelineStep
+                          ? {
+                              title: `${column.title} Empty`,
+                              description: `Features will appear here during the ${column.title.toLowerCase()} phase of the pipeline.`,
+                            }
+                          : undefined
+                      }
+                    />
+                  )}
                   {columnFeatures.map((feature, index) => {
                     // Calculate shortcut key for in-progress cards (first 10 get 1-9, 0)
                     let shortcutKey: string | undefined;

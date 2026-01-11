@@ -1,4 +1,4 @@
-import * as React from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { useAppStore } from '@/store/app-store';
 import type {
@@ -8,8 +8,6 @@ import type {
   OpencodeModelId,
   GroupedModel,
   PhaseModelEntry,
-  ThinkingLevel,
-  ReasoningEffort,
 } from '@automaker/types';
 import {
   stripProviderPrefix,
@@ -17,13 +15,11 @@ import {
   getModelGroup,
   isGroupSelected,
   getSelectedVariant,
-  isCursorModel,
   codexModelHasThinking,
 } from '@automaker/types';
 import {
   CLAUDE_MODELS,
   CURSOR_MODELS,
-  CODEX_MODELS,
   OPENCODE_MODELS,
   THINKING_LEVELS,
   THINKING_LEVEL_LABELS,
@@ -31,7 +27,18 @@ import {
   REASONING_EFFORT_LABELS,
 } from '@/components/views/board-view/shared/model-constants';
 import { Check, ChevronsUpDown, Star, ChevronRight } from 'lucide-react';
-import { AnthropicIcon, CursorIcon, OpenAIIcon, OpenCodeIcon } from '@/components/ui/provider-icon';
+import {
+  AnthropicIcon,
+  CursorIcon,
+  OpenAIIcon,
+  OpenCodeIcon,
+  DeepSeekIcon,
+  NovaIcon,
+  QwenIcon,
+  MistralIcon,
+  MetaIcon,
+  getProviderIconForModel,
+} from '@/components/ui/provider-icon';
 import { Button } from '@/components/ui/button';
 import {
   Command,
@@ -73,23 +80,39 @@ export function PhaseModelSelector({
   align = 'end',
   disabled = false,
 }: PhaseModelSelectorProps) {
-  const [open, setOpen] = React.useState(false);
-  const [expandedGroup, setExpandedGroup] = React.useState<string | null>(null);
-  const [expandedClaudeModel, setExpandedClaudeModel] = React.useState<ModelAlias | null>(null);
-  const [expandedCodexModel, setExpandedCodexModel] = React.useState<CodexModelId | null>(null);
-  const commandListRef = React.useRef<HTMLDivElement>(null);
-  const expandedTriggerRef = React.useRef<HTMLDivElement>(null);
-  const expandedClaudeTriggerRef = React.useRef<HTMLDivElement>(null);
-  const expandedCodexTriggerRef = React.useRef<HTMLDivElement>(null);
-  const { enabledCursorModels, favoriteModels, toggleFavoriteModel } = useAppStore();
+  const [open, setOpen] = useState(false);
+  const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
+  const [expandedClaudeModel, setExpandedClaudeModel] = useState<ModelAlias | null>(null);
+  const [expandedCodexModel, setExpandedCodexModel] = useState<CodexModelId | null>(null);
+  const commandListRef = useRef<HTMLDivElement>(null);
+  const expandedTriggerRef = useRef<HTMLDivElement>(null);
+  const expandedClaudeTriggerRef = useRef<HTMLDivElement>(null);
+  const expandedCodexTriggerRef = useRef<HTMLDivElement>(null);
+  const {
+    enabledCursorModels,
+    favoriteModels,
+    toggleFavoriteModel,
+    codexModels,
+    codexModelsLoading,
+    fetchCodexModels,
+  } = useAppStore();
 
   // Extract model and thinking/reasoning levels from value
   const selectedModel = value.model;
   const selectedThinkingLevel = value.thinkingLevel || 'none';
   const selectedReasoningEffort = value.reasoningEffort || 'none';
 
+  // Fetch Codex models on mount
+  useEffect(() => {
+    if (codexModels.length === 0 && !codexModelsLoading) {
+      fetchCodexModels().catch(() => {
+        // Silently fail - user will see empty Codex section
+      });
+    }
+  }, [codexModels.length, codexModelsLoading, fetchCodexModels]);
+
   // Close expanded group when trigger scrolls out of view
-  React.useEffect(() => {
+  useEffect(() => {
     const triggerElement = expandedTriggerRef.current;
     const listElement = commandListRef.current;
     if (!triggerElement || !listElement || !expandedGroup) return;
@@ -112,7 +135,7 @@ export function PhaseModelSelector({
   }, [expandedGroup]);
 
   // Close expanded Claude model popover when trigger scrolls out of view
-  React.useEffect(() => {
+  useEffect(() => {
     const triggerElement = expandedClaudeTriggerRef.current;
     const listElement = commandListRef.current;
     if (!triggerElement || !listElement || !expandedClaudeModel) return;
@@ -135,7 +158,7 @@ export function PhaseModelSelector({
   }, [expandedClaudeModel]);
 
   // Close expanded Codex model popover when trigger scrolls out of view
-  React.useEffect(() => {
+  useEffect(() => {
     const triggerElement = expandedCodexTriggerRef.current;
     const listElement = commandListRef.current;
     if (!triggerElement || !listElement || !expandedCodexModel) return;
@@ -157,6 +180,17 @@ export function PhaseModelSelector({
     return () => observer.disconnect();
   }, [expandedCodexModel]);
 
+  // Transform dynamic Codex models from store to component format
+  const transformedCodexModels = useMemo(() => {
+    return codexModels.map((model) => ({
+      id: model.id,
+      label: model.label,
+      description: model.description,
+      provider: 'codex' as const,
+      badge: model.tier === 'premium' ? 'Premium' : model.tier === 'basic' ? 'Speed' : undefined,
+    }));
+  }, [codexModels]);
+
   // Filter Cursor models to only show enabled ones
   const availableCursorModels = CURSOR_MODELS.filter((model) => {
     const cursorId = stripProviderPrefix(model.id) as CursorModelId;
@@ -164,7 +198,7 @@ export function PhaseModelSelector({
   });
 
   // Helper to find current selected model details
-  const currentModel = React.useMemo(() => {
+  const currentModel = useMemo(() => {
     const claudeModel = CLAUDE_MODELS.find((m) => m.id === selectedModel);
     if (claudeModel) {
       // Add thinking level to label if not 'none'
@@ -198,7 +232,7 @@ export function PhaseModelSelector({
     }
 
     // Check Codex models
-    const codexModel = CODEX_MODELS.find((m) => m.id === selectedModel);
+    const codexModel = transformedCodexModels.find((m) => m.id === selectedModel);
     if (codexModel) return { ...codexModel, icon: OpenAIIcon };
 
     // Check OpenCode models
@@ -206,10 +240,10 @@ export function PhaseModelSelector({
     if (opencodeModel) return { ...opencodeModel, icon: OpenCodeIcon };
 
     return null;
-  }, [selectedModel, selectedThinkingLevel, availableCursorModels]);
+  }, [selectedModel, selectedThinkingLevel, availableCursorModels, transformedCodexModels]);
 
   // Compute grouped vs standalone Cursor models
-  const { groupedModels, standaloneCursorModels } = React.useMemo(() => {
+  const { groupedModels, standaloneCursorModels } = useMemo(() => {
     const grouped: GroupedModel[] = [];
     const standalone: typeof CURSOR_MODELS = [];
     const seenGroups = new Set<string>();
@@ -242,11 +276,11 @@ export function PhaseModelSelector({
   }, [availableCursorModels, enabledCursorModels]);
 
   // Group models
-  const { favorites, claude, cursor, codex, opencode } = React.useMemo(() => {
+  const { favorites, claude, cursor, codex, opencode } = useMemo(() => {
     const favs: typeof CLAUDE_MODELS = [];
     const cModels: typeof CLAUDE_MODELS = [];
     const curModels: typeof CURSOR_MODELS = [];
-    const codModels: typeof CODEX_MODELS = [];
+    const codModels: typeof transformedCodexModels = [];
     const ocModels: typeof OPENCODE_MODELS = [];
 
     // Process Claude Models
@@ -268,7 +302,7 @@ export function PhaseModelSelector({
     });
 
     // Process Codex Models
-    CODEX_MODELS.forEach((model) => {
+    transformedCodexModels.forEach((model) => {
       if (favoriteModels.includes(model.id)) {
         favs.push(model);
       } else {
@@ -292,10 +326,10 @@ export function PhaseModelSelector({
       codex: codModels,
       opencode: ocModels,
     };
-  }, [favoriteModels, availableCursorModels]);
+  }, [favoriteModels, availableCursorModels, transformedCodexModels]);
 
   // Render Codex model item with secondary popover for reasoning effort (only for models that support it)
-  const renderCodexModelItem = (model: (typeof CODEX_MODELS)[0]) => {
+  const renderCodexModelItem = (model: (typeof transformedCodexModels)[0]) => {
     const isSelected = selectedModel === model.id;
     const isFavorite = favoriteModels.includes(model.id);
     const hasReasoning = codexModelHasThinking(model.id as CodexModelId);
@@ -480,6 +514,9 @@ export function PhaseModelSelector({
     const isSelected = selectedModel === model.id;
     const isFavorite = favoriteModels.includes(model.id);
 
+    // Get the appropriate icon based on the specific model ID
+    const ProviderIcon = getProviderIconForModel(model.id);
+
     return (
       <CommandItem
         key={model.id}
@@ -491,7 +528,7 @@ export function PhaseModelSelector({
         className="group flex items-center justify-between py-2"
       >
         <div className="flex items-center gap-3 overflow-hidden">
-          <OpenCodeIcon
+          <ProviderIcon
             className={cn(
               'h-4 w-4 shrink-0',
               isSelected ? 'text-primary' : 'text-muted-foreground'
@@ -919,7 +956,7 @@ export function PhaseModelSelector({
                     }
                     // Codex model
                     if (model.provider === 'codex') {
-                      return renderCodexModelItem(model);
+                      return renderCodexModelItem(model as (typeof transformedCodexModels)[0]);
                     }
                     // OpenCode model
                     if (model.provider === 'opencode') {
