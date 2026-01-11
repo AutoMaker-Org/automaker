@@ -73,12 +73,9 @@ services:
     command:
       - -c
       - |
-        # Fix permissions on mounted volume and node_modules
+        # Fix permissions on node_modules (created as root by Docker volume)
         echo 'Fixing node_modules permissions...'
         chown -R automaker:automaker /app/node_modules 2>/dev/null || true
-        # Ensure automaker user can write to /app for npm operations
-        # This is safe since /app is volume-mounted from host
-        chown automaker:automaker /app 2>/dev/null || true
 
         # Run the rest as automaker user
         exec gosu automaker sh -c "

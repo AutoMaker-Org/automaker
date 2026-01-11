@@ -825,6 +825,17 @@ function checkImageExists(imageName) {
 }
 
 /**
+ * Get host user credentials for Docker volume permission matching
+ * @returns {{USER_ID: string, GROUP_ID: string}} Host user and group IDs
+ */
+function getHostUserCredentials() {
+  return {
+    USER_ID: process.getuid?.()?.toString() || '1000',
+    GROUP_ID: process.getgid?.()?.toString() || '1000',
+  };
+}
+
+/**
  * Launch Docker containers for development with live reload
  * Uses docker-compose.dev.yml which volume mounts the source code
  * Also includes docker-compose.override.yml if it exists (for workspace mounts)
@@ -870,8 +881,7 @@ export async function launchDockerDevContainers({ baseDir, processes }) {
     env: {
       ...process.env,
       // Pass host UID/GID to avoid permission issues with volume mounts
-      USER_ID: process.getuid?.()?.toString() || '1000',
-      GROUP_ID: process.getgid?.()?.toString() || '1000',
+      ...getHostUserCredentials(),
     },
   });
 
@@ -935,8 +945,7 @@ export async function launchDockerDevServerContainer({ baseDir, processes }) {
     env: {
       ...process.env,
       // Pass host UID/GID to avoid permission issues with volume mounts
-      USER_ID: process.getuid?.()?.toString() || '1000',
-      GROUP_ID: process.getgid?.()?.toString() || '1000',
+      ...getHostUserCredentials(),
     },
   });
 
@@ -1069,6 +1078,8 @@ export async function launchDockerContainers({ baseDir, processes }) {
       cwd: baseDir,
       env: {
         ...process.env,
+        // Pass host UID/GID to avoid permission issues with volume mounts
+        ...getHostUserCredentials(),
       },
     });
   } else {
@@ -1085,6 +1096,8 @@ export async function launchDockerContainers({ baseDir, processes }) {
       cwd: baseDir,
       env: {
         ...process.env,
+        // Pass host UID/GID to avoid permission issues with volume mounts
+        ...getHostUserCredentials(),
       },
     });
   }
