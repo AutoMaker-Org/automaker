@@ -1,20 +1,21 @@
 import React from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AnthropicIcon, CursorIcon, OpenAIIcon } from '@/components/ui/provider-icon';
-import { Cpu } from 'lucide-react';
+import { Cpu, Globe } from 'lucide-react';
 import { CursorSettingsTab } from './cursor-settings-tab';
 import { ClaudeSettingsTab } from './claude-settings-tab';
 import { CodexSettingsTab } from './codex-settings-tab';
 import { OpencodeSettingsTab } from './opencode-settings-tab';
+import { CustomSettingsTab } from './custom-settings-tab';
 
 interface ProviderTabsProps {
-  defaultTab?: 'claude' | 'cursor' | 'codex' | 'opencode';
+  defaultTab?: 'claude' | 'cursor' | 'codex' | 'opencode' | 'custom';
 }
 
 export function ProviderTabs({ defaultTab = 'claude' }: ProviderTabsProps) {
   return (
     <Tabs defaultValue={defaultTab} className="w-full">
-      <TabsList className="grid w-full grid-cols-4 mb-6">
+      <TabsList className="grid w-full grid-cols-5 mb-6">
         <TabsTrigger value="claude" className="flex items-center gap-2">
           <AnthropicIcon className="w-4 h-4" />
           Claude
@@ -30,6 +31,10 @@ export function ProviderTabs({ defaultTab = 'claude' }: ProviderTabsProps) {
         <TabsTrigger value="opencode" className="flex items-center gap-2">
           <Cpu className="w-4 h-4" />
           OpenCode
+        </TabsTrigger>
+        <TabsTrigger value="custom" className="flex items-center gap-2">
+          <Globe className="w-4 h-4" />
+          Custom
         </TabsTrigger>
       </TabsList>
 
@@ -47,6 +52,10 @@ export function ProviderTabs({ defaultTab = 'claude' }: ProviderTabsProps) {
 
       <TabsContent value="opencode">
         <OpencodeSettingsTab />
+      </TabsContent>
+
+      <TabsContent value="custom">
+        <CustomSettingsTab />
       </TabsContent>
     </Tabs>
   );

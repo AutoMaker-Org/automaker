@@ -65,6 +65,13 @@ export interface Feature {
   };
   error?: string;
   summary?: string;
+  // Custom endpoint configuration for custom AI providers
+  customEndpoint?: {
+    provider?: 'zhipu' | 'minimax' | 'manual';
+    baseUrl: string;
+    apiKey: string;
+    model: string;
+  };
   startedAt?: string;
   descriptionHistory?: DescriptionHistoryEntry[]; // History of description changes
   [key: string]: unknown; // Keep catch-all for extensibility

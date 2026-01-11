@@ -154,6 +154,16 @@ export interface ExecuteOptions {
     type: 'json_schema';
     schema: Record<string, unknown>;
   };
+  /**
+   * Custom endpoint configuration for custom provider.
+   * Includes baseUrl, apiKey, and model for Anthropic-compatible endpoints.
+   */
+  customEndpoint?: {
+    provider?: 'zhipu' | 'minimax' | 'manual';
+    baseUrl: string;
+    apiKey: string;
+    model: string;
+  };
 }
 
 /**

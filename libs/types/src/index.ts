@@ -185,6 +185,7 @@ export {
   isClaudeModel,
   isCodexModel,
   isOpencodeModel,
+  isCustomModel,
   getModelProvider,
   stripProviderPrefix,
   addProviderPrefix,

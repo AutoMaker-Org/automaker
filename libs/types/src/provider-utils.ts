@@ -16,6 +16,7 @@ export const PROVIDER_PREFIXES = {
   cursor: 'cursor-',
   codex: 'codex-',
   opencode: 'opencode-',
+  custom: 'custom-',
 } as const;
 
 /**
@@ -123,13 +124,34 @@ export function isOpencodeModel(model: string | undefined | null): boolean {
 }
 
 /**
+ * Check if a model string represents a Custom endpoint model
+ *
+ * @param model - Model string to check (e.g., "custom-glm-4-plus" or "glm-4-plus")
+ * @returns true if the model is a Custom endpoint model
+ */
+export function isCustomModel(model: string | undefined | null): boolean {
+  if (!model || typeof model !== 'string') return false;
+
+  // Check for explicit custom- prefix
+  if (model.startsWith(PROVIDER_PREFIXES.custom)) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
  * Get the provider for a model string
  *
  * @param model - Model string to check
  * @returns The provider type, defaults to 'claude' for unknown models
  */
 export function getModelProvider(model: string | undefined | null): ModelProvider {
-  // Check OpenCode first since it uses provider-prefixed formats that could conflict
+  // Check Custom first since it uses explicit prefix
+  if (isCustomModel(model)) {
+    return 'custom';
+  }
+  // Check OpenCode since it uses provider-prefixed formats that could conflict
   if (isOpencodeModel(model)) {
     return 'opencode';
   }
@@ -192,6 +214,10 @@ export function addProviderPrefix(model: string, provider: ModelProvider): strin
   } else if (provider === 'opencode') {
     if (!model.startsWith(PROVIDER_PREFIXES.opencode)) {
       return `${PROVIDER_PREFIXES.opencode}${model}`;
+    }
+  } else if (provider === 'custom') {
+    if (!model.startsWith(PROVIDER_PREFIXES.custom)) {
+      return `${PROVIDER_PREFIXES.custom}${model}`;
     }
   }
   // Claude models don't use prefixes

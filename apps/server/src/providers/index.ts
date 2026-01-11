@@ -28,5 +28,8 @@ export { CursorConfigManager } from './cursor-config-manager.js';
 // OpenCode provider
 export { OpencodeProvider } from './opencode-provider.js';
 
+// Custom provider (for Anthropic-compatible endpoints)
+export { CustomProvider, type CustomEndpointConfig } from './custom-provider.js';
+
 // Provider factory
 export { ProviderFactory } from './provider-factory.js';

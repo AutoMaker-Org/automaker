@@ -33,3 +33,30 @@ export interface ApiKeys {
   google: string;
   openai: string;
 }
+
+// Single provider endpoint configuration
+export interface CustomEndpointConfig {
+  provider: 'zhipu' | 'minimax' | 'manual';
+  baseUrl: string;
+  apiKey: string;
+  model: string;
+}
+
+// Per-provider endpoint configurations (stores separate API keys for each provider)
+export interface CustomEndpointConfigs {
+  zhipu?: {
+    apiKey: string;
+    model?: string; // Optional default model override
+  };
+  minimax?: {
+    apiKey: string;
+    model?: string;
+  };
+  manual?: {
+    baseUrl: string;
+    apiKey: string;
+    model: string;
+  };
+  // Currently selected provider (for settings UI)
+  selectedProvider?: 'zhipu' | 'minimax' | 'manual';
+}

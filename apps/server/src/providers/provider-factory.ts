@@ -7,7 +7,8 @@
 
 import { BaseProvider } from './base-provider.js';
 import type { InstallationStatus, ModelDefinition } from './types.js';
-import { isCursorModel, isCodexModel, isOpencodeModel, type ModelProvider } from '@automaker/types';
+import { isCursorModel, isCodexModel, isOpencodeModel, isCustomModel, type ModelProvider } from '@automaker/types';
+import type { CustomEndpointConfig } from './custom-provider.js';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -16,6 +17,7 @@ const DISCONNECTED_MARKERS: Record<string, string> = {
   codex: '.codex-disconnected',
   cursor: '.cursor-disconnected',
   opencode: '.opencode-disconnected',
+  custom: '.custom-disconnected',
 };
 
 /**
@@ -34,13 +36,23 @@ export function isProviderDisconnected(providerName: string): boolean {
  */
 interface ProviderRegistration {
   /** Factory function to create provider instance */
-  factory: () => BaseProvider;
+  factory: (options?: ProviderOptions) => BaseProvider;
   /** Aliases for this provider (e.g., 'anthropic' for 'claude') */
   aliases?: string[];
   /** Function to check if this provider can handle a model ID */
   canHandleModel?: (modelId: string) => boolean;
   /** Priority for model matching (higher = checked first) */
   priority?: number;
+}
+
+/**
+ * Options passed to provider factories
+ */
+export interface ProviderOptions {
+  /** Custom endpoint configuration (for CustomProvider) */
+  customEndpoint?: CustomEndpointConfig;
+  /** Throw error if provider is disconnected (default: true) */
+  throwOnDisconnected?: boolean;
 }
 
 /**
@@ -94,28 +106,24 @@ export class ProviderFactory {
   /**
    * Get the appropriate provider for a given model ID
    *
-   * @param modelId Model identifier (e.g., "claude-opus-4-5-20251101", "cursor-gpt-4o", "cursor-auto")
-   * @param options Optional settings
-   * @param options.throwOnDisconnected Throw error if provider is disconnected (default: true)
+   * @param modelId Model identifier (e.g., "claude-opus-4-5-20251101", "cursor-gpt-4o", "custom-glm-4")
+   * @param options Optional provider options (e.g., customEndpoint for CustomProvider)
    * @returns Provider instance for the model
    * @throws Error if provider is disconnected and throwOnDisconnected is true
    */
-  static getProviderForModel(
-    modelId: string,
-    options: { throwOnDisconnected?: boolean } = {}
-  ): BaseProvider {
-    const { throwOnDisconnected = true } = options;
-    const providerName = this.getProviderForModelName(modelId);
+  static getProviderForModel(modelId: string, options?: ProviderOptions): BaseProvider {
+    const { throwOnDisconnected = true } = options || {};
+    const providerName = this.getProviderNameForModel(modelId);
 
     // Check if provider is disconnected
     if (throwOnDisconnected && isProviderDisconnected(providerName)) {
       throw new Error(
         `${providerName.charAt(0).toUpperCase() + providerName.slice(1)} CLI is disconnected from the app. ` +
-          `Please go to Settings > Providers and click "Sign In" to reconnect.`
+        `Please go to Settings > Providers and click "Sign In" to reconnect.`
       );
     }
 
-    const provider = this.getProviderByName(providerName);
+    const provider = this.getProviderByName(providerName, options);
 
     if (!provider) {
       // Fallback to claude if provider not found
@@ -186,21 +194,22 @@ export class ProviderFactory {
    * Get provider by name (for direct access if needed)
    *
    * @param name Provider name (e.g., "claude", "cursor") or alias (e.g., "anthropic")
+   * @param options Optional provider options
    * @returns Provider instance or null if not found
    */
-  static getProviderByName(name: string): BaseProvider | null {
+  static getProviderByName(name: string, options?: ProviderOptions): BaseProvider | null {
     const lowerName = name.toLowerCase();
 
     // Direct lookup
     const directReg = providerRegistry.get(lowerName);
     if (directReg) {
-      return directReg.factory();
+      return directReg.factory(options);
     }
 
     // Check aliases
     for (const [, reg] of providerRegistry.entries()) {
       if (reg.aliases?.includes(lowerName)) {
-        return reg.factory();
+        return reg.factory(options);
       }
     }
 
@@ -267,6 +276,7 @@ import { ClaudeProvider } from './claude-provider.js';
 import { CursorProvider } from './cursor-provider.js';
 import { CodexProvider } from './codex-provider.js';
 import { OpencodeProvider } from './opencode-provider.js';
+import { CustomProvider } from './custom-provider.js';
 
 // Register Claude provider
 registerProvider('claude', {
@@ -300,4 +310,11 @@ registerProvider('opencode', {
   factory: () => new OpencodeProvider(),
   canHandleModel: (model: string) => isOpencodeModel(model),
   priority: 3, // Between codex (5) and claude (0)
+});
+
+// Register Custom provider (for Anthropic-compatible endpoints)
+registerProvider('custom', {
+  factory: (options) => new CustomProvider({ customEndpoint: options?.customEndpoint }),
+  canHandleModel: (model: string) => isCustomModel(model),
+  priority: 4, // Between codex (5) and opencode (3)
 });

@@ -4,6 +4,10 @@ import type { Project, TrashedProject } from '@/lib/electron';
 import { createLogger } from '@automaker/utils/logger';
 import { setItem, getItem } from '@/lib/storage';
 import type {
+  CustomEndpointConfig,
+  CustomEndpointConfigs,
+} from '@/components/views/settings-view/shared/types';
+import type {
   Feature as BaseFeature,
   FeatureImagePath,
   FeatureTextFilePath,
@@ -497,6 +501,11 @@ export interface AppState {
   // API Keys
   apiKeys: ApiKeys;
 
+  // Custom Endpoint Provider Configuration
+  customEndpoint?: CustomEndpointConfig;
+  // Per-provider custom endpoint configs (stores separate API keys for each provider)
+  customEndpointConfigs?: CustomEndpointConfigs;
+
   // Chat Sessions
   chatSessions: ChatSession[];
   currentChatSession: ChatSession | null;
@@ -849,6 +858,18 @@ export interface AppActions {
 
   // API Keys actions
   setApiKeys: (keys: Partial<ApiKeys>) => void;
+
+  // Custom Endpoint actions
+  setCustomEndpoint: (config: CustomEndpointConfig) => void;
+  clearCustomEndpoint: () => void;
+  // Per-provider custom endpoint actions
+  setCustomEndpointForProvider: (
+    provider: 'zhipu' | 'minimax' | 'manual',
+    config: { apiKey: string; baseUrl?: string; model?: string }
+  ) => void;
+  getCustomEndpointForProvider: (
+    provider: 'zhipu' | 'minimax' | 'manual'
+  ) => { apiKey: string; baseUrl?: string; model?: string } | undefined;
 
   // Chat Session actions
   createChatSession: (title?: string) => ChatSession;
@@ -2202,6 +2223,7 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
     });
   },
 
+<<<<<<< HEAD
   // Terminal actions
   setTerminalUnlocked: (unlocked, token) => {
     set({
@@ -2212,6 +2234,32 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
       },
     });
   },
+=======
+      // Custom Endpoint actions
+      setCustomEndpoint: (config: CustomEndpointConfig) => set({ customEndpoint: config }),
+      clearCustomEndpoint: () => set({ customEndpoint: undefined }),
+      // Per-provider custom endpoint actions
+      setCustomEndpointForProvider: (provider, config) =>
+        set((state) => ({
+          customEndpointConfigs: {
+            ...state.customEndpointConfigs,
+            [provider]: config,
+            selectedProvider: provider,
+          },
+        })),
+      getCustomEndpointForProvider: (provider) => {
+        const configs = get().customEndpointConfigs;
+        if (!configs) return undefined;
+        return configs[provider];
+      },
+
+      // Chat Session actions
+      createChatSession: (title) => {
+        const currentProject = get().currentProject;
+        if (!currentProject) {
+          throw new Error('No project selected');
+        }
+>>>>>>> ee96e164 (feat: Add per-provider API key storage for custom endpoints)
 
   setActiveTerminalSession: (sessionId) => {
     set({
@@ -2586,10 +2634,426 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
           }
           return null;
         };
+<<<<<<< HEAD
         newActiveSessionId = newActiveTab?.layout ? findFirst(newActiveTab.layout) : null;
       } else {
         newActiveSessionId = null;
       }
+=======
+
+        const newActiveSessionId = activeSessionId || findFirst(layout);
+
+        set({
+          terminalState: {
+            ...current,
+            tabs: newTabs,
+            activeTabId: tabId,
+            activeSessionId: newActiveSessionId,
+          },
+        });
+      },
+
+      updateTerminalPanelSizes: (tabId, panelKeys, sizes) => {
+        const current = get().terminalState;
+        const tab = current.tabs.find((t) => t.id === tabId);
+        if (!tab || !tab.layout) return;
+
+        // Create a map of panel key to new size
+        const sizeMap = new Map<string, number>();
+        panelKeys.forEach((key, index) => {
+          sizeMap.set(key, sizes[index]);
+        });
+
+        // Helper to generate panel key (matches getPanelKey in terminal-view.tsx)
+        const getPanelKey = (panel: TerminalPanelContent): string => {
+          if (panel.type === 'terminal') return panel.sessionId;
+          const childKeys = panel.panels.map(getPanelKey).join('-');
+          return `split-${panel.direction}-${childKeys}`;
+        };
+
+        // Recursively update sizes in the layout
+        const updateSizes = (panel: TerminalPanelContent): TerminalPanelContent => {
+          const key = getPanelKey(panel);
+          const newSize = sizeMap.get(key);
+
+          if (panel.type === 'terminal') {
+            return newSize !== undefined ? { ...panel, size: newSize } : panel;
+          }
+
+          return {
+            ...panel,
+            size: newSize !== undefined ? newSize : panel.size,
+            panels: panel.panels.map(updateSizes),
+          };
+        };
+
+        const updatedLayout = updateSizes(tab.layout);
+
+        const newTabs = current.tabs.map((t) =>
+          t.id === tabId ? { ...t, layout: updatedLayout } : t
+        );
+
+        set({
+          terminalState: { ...current, tabs: newTabs },
+        });
+      },
+
+      // Convert runtime layout to persisted format (preserves sessionIds for reconnection)
+      saveTerminalLayout: (projectPath) => {
+        const current = get().terminalState;
+        if (current.tabs.length === 0) {
+          // Nothing to save, clear any existing layout
+          const { [projectPath]: _, ...rest } = get().terminalLayoutByProject;
+          set({ terminalLayoutByProject: rest });
+          return;
+        }
+
+        // Convert TerminalPanelContent to PersistedTerminalPanel
+        // Now preserves sessionId so we can reconnect when switching back
+        const persistPanel = (panel: TerminalPanelContent): PersistedTerminalPanel => {
+          if (panel.type === 'terminal') {
+            return {
+              type: 'terminal',
+              size: panel.size,
+              fontSize: panel.fontSize,
+              sessionId: panel.sessionId, // Preserve for reconnection
+            };
+          }
+          return {
+            type: 'split',
+            id: panel.id, // Preserve stable ID
+            direction: panel.direction,
+            panels: panel.panels.map(persistPanel),
+            size: panel.size,
+          };
+        };
+
+        const persistedTabs: PersistedTerminalTab[] = current.tabs.map((tab) => ({
+          id: tab.id,
+          name: tab.name,
+          layout: tab.layout ? persistPanel(tab.layout) : null,
+        }));
+
+        const activeTabIndex = current.tabs.findIndex((t) => t.id === current.activeTabId);
+
+        const persisted: PersistedTerminalState = {
+          tabs: persistedTabs,
+          activeTabIndex: activeTabIndex >= 0 ? activeTabIndex : 0,
+          defaultFontSize: current.defaultFontSize,
+          defaultRunScript: current.defaultRunScript,
+          screenReaderMode: current.screenReaderMode,
+          fontFamily: current.fontFamily,
+          scrollbackLines: current.scrollbackLines,
+          lineHeight: current.lineHeight,
+        };
+
+        set({
+          terminalLayoutByProject: {
+            ...get().terminalLayoutByProject,
+            [projectPath]: persisted,
+          },
+        });
+      },
+
+      getPersistedTerminalLayout: (projectPath) => {
+        return get().terminalLayoutByProject[projectPath] || null;
+      },
+
+      clearPersistedTerminalLayout: (projectPath) => {
+        const { [projectPath]: _, ...rest } = get().terminalLayoutByProject;
+        set({ terminalLayoutByProject: rest });
+      },
+
+      // Spec Creation actions
+      setSpecCreatingForProject: (projectPath) => {
+        set({ specCreatingForProject: projectPath });
+      },
+
+      isSpecCreatingForProject: (projectPath) => {
+        return get().specCreatingForProject === projectPath;
+      },
+
+      setDefaultPlanningMode: (mode) => set({ defaultPlanningMode: mode }),
+      setDefaultRequirePlanApproval: (require) => set({ defaultRequirePlanApproval: require }),
+      setDefaultAIProfileId: (profileId) => set({ defaultAIProfileId: profileId }),
+
+      // Plan Approval actions
+      setPendingPlanApproval: (approval) => set({ pendingPlanApproval: approval }),
+
+      // Claude Usage Tracking actions
+      setClaudeRefreshInterval: (interval: number) => set({ claudeRefreshInterval: interval }),
+      setClaudeUsageLastUpdated: (timestamp: number) => set({ claudeUsageLastUpdated: timestamp }),
+      setClaudeUsage: (usage: ClaudeUsage | null) =>
+        set({
+          claudeUsage: usage,
+          claudeUsageLastUpdated: usage ? Date.now() : null,
+        }),
+
+      // Pipeline actions
+      setPipelineConfig: (projectPath, config) => {
+        set({
+          pipelineConfigByProject: {
+            ...get().pipelineConfigByProject,
+            [projectPath]: config,
+          },
+        });
+      },
+
+      getPipelineConfig: (projectPath) => {
+        return get().pipelineConfigByProject[projectPath] || null;
+      },
+
+      addPipelineStep: (projectPath, step) => {
+        const config = get().pipelineConfigByProject[projectPath] || { version: 1, steps: [] };
+        const now = new Date().toISOString();
+        const newStep: PipelineStep = {
+          ...step,
+          id: `step_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 8)}`,
+          createdAt: now,
+          updatedAt: now,
+        };
+
+        const newSteps = [...config.steps, newStep].sort((a, b) => a.order - b.order);
+        newSteps.forEach((s, index) => {
+          s.order = index;
+        });
+
+        set({
+          pipelineConfigByProject: {
+            ...get().pipelineConfigByProject,
+            [projectPath]: { ...config, steps: newSteps },
+          },
+        });
+
+        return newStep;
+      },
+
+      updatePipelineStep: (projectPath, stepId, updates) => {
+        const config = get().pipelineConfigByProject[projectPath];
+        if (!config) return;
+
+        const stepIndex = config.steps.findIndex((s) => s.id === stepId);
+        if (stepIndex === -1) return;
+
+        const updatedSteps = [...config.steps];
+        updatedSteps[stepIndex] = {
+          ...updatedSteps[stepIndex],
+          ...updates,
+          updatedAt: new Date().toISOString(),
+        };
+
+        set({
+          pipelineConfigByProject: {
+            ...get().pipelineConfigByProject,
+            [projectPath]: { ...config, steps: updatedSteps },
+          },
+        });
+      },
+
+      deletePipelineStep: (projectPath, stepId) => {
+        const config = get().pipelineConfigByProject[projectPath];
+        if (!config) return;
+
+        const newSteps = config.steps.filter((s) => s.id !== stepId);
+        newSteps.forEach((s, index) => {
+          s.order = index;
+        });
+
+        set({
+          pipelineConfigByProject: {
+            ...get().pipelineConfigByProject,
+            [projectPath]: { ...config, steps: newSteps },
+          },
+        });
+      },
+
+      reorderPipelineSteps: (projectPath, stepIds) => {
+        const config = get().pipelineConfigByProject[projectPath];
+        if (!config) return;
+
+        const stepMap = new Map(config.steps.map((s) => [s.id, s]));
+        const reorderedSteps = stepIds
+          .map((id, index) => {
+            const step = stepMap.get(id);
+            if (!step) return null;
+            return { ...step, order: index, updatedAt: new Date().toISOString() };
+          })
+          .filter((s): s is PipelineStep => s !== null);
+
+        set({
+          pipelineConfigByProject: {
+            ...get().pipelineConfigByProject,
+            [projectPath]: { ...config, steps: reorderedSteps },
+          },
+        });
+      },
+
+      // Reset
+      reset: () => set(initialState),
+    }),
+    {
+      name: 'automaker-storage',
+      version: 2, // Increment when making breaking changes to persisted state
+      // Custom merge function to properly restore terminal settings on every load
+      // The default shallow merge doesn't work because we persist terminalSettings
+      // separately from terminalState (to avoid persisting session data like tabs)
+      merge: (persistedState, currentState) => {
+        const persisted = persistedState as Partial<AppState> & {
+          terminalSettings?: PersistedTerminalSettings;
+        };
+        const current = currentState as AppState & AppActions;
+
+        // Start with default shallow merge
+        const merged = { ...current, ...persisted } as AppState & AppActions;
+
+        // Restore terminal settings into terminalState
+        // terminalSettings is persisted separately from terminalState to avoid
+        // persisting session data (tabs, activeSessionId, etc.)
+        if (persisted.terminalSettings) {
+          merged.terminalState = {
+            // Start with current (initial) terminalState for session fields
+            ...current.terminalState,
+            // Override with persisted settings
+            defaultFontSize:
+              persisted.terminalSettings.defaultFontSize ?? current.terminalState.defaultFontSize,
+            defaultRunScript:
+              persisted.terminalSettings.defaultRunScript ?? current.terminalState.defaultRunScript,
+            screenReaderMode:
+              persisted.terminalSettings.screenReaderMode ?? current.terminalState.screenReaderMode,
+            fontFamily: persisted.terminalSettings.fontFamily ?? current.terminalState.fontFamily,
+            scrollbackLines:
+              persisted.terminalSettings.scrollbackLines ?? current.terminalState.scrollbackLines,
+            lineHeight: persisted.terminalSettings.lineHeight ?? current.terminalState.lineHeight,
+            maxSessions:
+              persisted.terminalSettings.maxSessions ?? current.terminalState.maxSessions,
+          };
+        }
+
+        return merged;
+      },
+      migrate: (persistedState: unknown, version: number) => {
+        const state = persistedState as Partial<AppState>;
+
+        // Migration from version 0 (no version) to version 1:
+        // - Change addContextFile shortcut from "F" to "N"
+        if (version === 0) {
+          if (state.keyboardShortcuts?.addContextFile === 'F') {
+            state.keyboardShortcuts.addContextFile = 'N';
+          }
+        }
+
+        // Migration from version 1 to version 2:
+        // - Change terminal shortcut from "Cmd+`" to "T"
+        if (version <= 1) {
+          if (
+            state.keyboardShortcuts?.terminal === 'Cmd+`' ||
+            state.keyboardShortcuts?.terminal === undefined
+          ) {
+            state.keyboardShortcuts = {
+              ...DEFAULT_KEYBOARD_SHORTCUTS,
+              ...state.keyboardShortcuts,
+              terminal: 'T',
+            };
+          }
+        }
+
+        // Rehydrate terminal settings from persisted state
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const persistedSettings = (state as any).terminalSettings as
+          | PersistedTerminalSettings
+          | undefined;
+        if (persistedSettings) {
+          state.terminalState = {
+            ...state.terminalState,
+            // Preserve session state (tabs, activeTabId, etc.) but restore settings
+            isUnlocked: state.terminalState?.isUnlocked ?? false,
+            authToken: state.terminalState?.authToken ?? null,
+            tabs: state.terminalState?.tabs ?? [],
+            activeTabId: state.terminalState?.activeTabId ?? null,
+            activeSessionId: state.terminalState?.activeSessionId ?? null,
+            maximizedSessionId: state.terminalState?.maximizedSessionId ?? null,
+            lastActiveProjectPath: state.terminalState?.lastActiveProjectPath ?? null,
+            // Restore persisted settings
+            defaultFontSize: persistedSettings.defaultFontSize ?? 14,
+            defaultRunScript: persistedSettings.defaultRunScript ?? '',
+            screenReaderMode: persistedSettings.screenReaderMode ?? false,
+            fontFamily: persistedSettings.fontFamily ?? "Menlo, Monaco, 'Courier New', monospace",
+            scrollbackLines: persistedSettings.scrollbackLines ?? 5000,
+            lineHeight: persistedSettings.lineHeight ?? 1.0,
+            maxSessions: persistedSettings.maxSessions ?? 100,
+          };
+        }
+
+        return state as AppState;
+      },
+      partialize: (state) =>
+        ({
+          // Project management
+          projects: state.projects,
+          currentProject: state.currentProject,
+          trashedProjects: state.trashedProjects,
+          projectHistory: state.projectHistory,
+          projectHistoryIndex: state.projectHistoryIndex,
+          // Features - cached locally for faster hydration (authoritative source is server)
+          features: state.features,
+          // UI state
+          currentView: state.currentView,
+          theme: state.theme,
+          sidebarOpen: state.sidebarOpen,
+          chatHistoryOpen: state.chatHistoryOpen,
+          kanbanCardDetailLevel: state.kanbanCardDetailLevel,
+          boardViewMode: state.boardViewMode,
+          // Settings
+          apiKeys: state.apiKeys,
+          customEndpoint: state.customEndpoint,
+          customEndpointConfigs: state.customEndpointConfigs,
+          maxConcurrency: state.maxConcurrency,
+          // Note: autoModeByProject is intentionally NOT persisted
+          // Auto-mode should always default to OFF on app refresh
+          defaultSkipTests: state.defaultSkipTests,
+          enableDependencyBlocking: state.enableDependencyBlocking,
+          useWorktrees: state.useWorktrees,
+          currentWorktreeByProject: state.currentWorktreeByProject,
+          worktreesByProject: state.worktreesByProject,
+          showProfilesOnly: state.showProfilesOnly,
+          keyboardShortcuts: state.keyboardShortcuts,
+          muteDoneSound: state.muteDoneSound,
+          enhancementModel: state.enhancementModel,
+          validationModel: state.validationModel,
+          phaseModels: state.phaseModels,
+          enabledCursorModels: state.enabledCursorModels,
+          cursorDefaultModel: state.cursorDefaultModel,
+          autoLoadClaudeMd: state.autoLoadClaudeMd,
+          enableSandboxMode: state.enableSandboxMode,
+          skipSandboxWarning: state.skipSandboxWarning,
+          // MCP settings
+          mcpServers: state.mcpServers,
+          // Prompt customization
+          promptCustomization: state.promptCustomization,
+          // Profiles and sessions
+          aiProfiles: state.aiProfiles,
+          chatSessions: state.chatSessions,
+          lastSelectedSessionByProject: state.lastSelectedSessionByProject,
+          // Board background settings
+          boardBackgroundByProject: state.boardBackgroundByProject,
+          // Terminal layout persistence (per-project)
+          terminalLayoutByProject: state.terminalLayoutByProject,
+          // Terminal settings persistence (global)
+          terminalSettings: {
+            defaultFontSize: state.terminalState.defaultFontSize,
+            defaultRunScript: state.terminalState.defaultRunScript,
+            screenReaderMode: state.terminalState.screenReaderMode,
+            fontFamily: state.terminalState.fontFamily,
+            scrollbackLines: state.terminalState.scrollbackLines,
+            lineHeight: state.terminalState.lineHeight,
+            maxSessions: state.terminalState.maxSessions,
+          } as PersistedTerminalSettings,
+          defaultPlanningMode: state.defaultPlanningMode,
+          defaultRequirePlanApproval: state.defaultRequirePlanApproval,
+          defaultAIProfileId: state.defaultAIProfileId,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        }) as any,
+>>>>>>> ee96e164 (feat: Add per-provider API key storage for custom endpoints)
     }
 
     set({
