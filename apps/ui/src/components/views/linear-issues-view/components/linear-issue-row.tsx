@@ -39,10 +39,9 @@ export const LinearIssueRow = memo(function LinearIssueRow({
   const renderValidationBadge = () => {
     if (isValidating) {
       return (
-        <Loader2
-          className="h-3.5 w-3.5 text-muted-foreground animate-spin shrink-0"
-          title="Validating..."
-        />
+        <span title="Validating...">
+          <Loader2 className="h-3.5 w-3.5 text-muted-foreground animate-spin shrink-0" />
+        </span>
       );
     }
 
@@ -54,20 +53,31 @@ export const LinearIssueRow = memo(function LinearIssueRow({
     const verdict = cachedValidation.result.verdict;
 
     if (isStale) {
-      return <Clock className="h-3.5 w-3.5 text-yellow-500 shrink-0" title="Validation is stale" />;
+      return (
+        <span title="Validation is stale">
+          <Clock className="h-3.5 w-3.5 text-yellow-500 shrink-0" />
+        </span>
+      );
     }
 
     switch (verdict) {
       case 'valid':
-        return <CheckCircle className="h-3.5 w-3.5 text-green-500 shrink-0" title="Valid" />;
+        return (
+          <span title="Valid">
+            <CheckCircle className="h-3.5 w-3.5 text-green-500 shrink-0" />
+          </span>
+        );
       case 'invalid':
-        return <XCircle className="h-3.5 w-3.5 text-red-500 shrink-0" title="Invalid" />;
+        return (
+          <span title="Invalid">
+            <XCircle className="h-3.5 w-3.5 text-red-500 shrink-0" />
+          </span>
+        );
       case 'needs_clarification':
         return (
-          <AlertCircle
-            className="h-3.5 w-3.5 text-yellow-500 shrink-0"
-            title="Needs clarification"
-          />
+          <span title="Needs clarification">
+            <AlertCircle className="h-3.5 w-3.5 text-yellow-500 shrink-0" />
+          </span>
         );
       default:
         return null;

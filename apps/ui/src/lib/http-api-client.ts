@@ -503,6 +503,7 @@ type EventType =
   | 'suggestions:event'
   | 'spec-regeneration:event'
   | 'issue-validation:event'
+  | 'linear-validation:event'
   | 'backlog-plan:event'
   | 'ideation:stream'
   | 'ideation:analysis';
@@ -1948,6 +1949,8 @@ export class HttpApiClient implements ElectronAPI {
         anthropic: { configured: boolean; masked: string };
         google: { configured: boolean; masked: string };
         openai: { configured: boolean; masked: string };
+        linear: { configured: boolean; masked: string };
+        apiKeys?: { anthropic?: string; google?: string; openai?: string; linear?: string };
       };
       error?: string;
     }> => this.get('/api/settings/credentials'),
@@ -1961,6 +1964,7 @@ export class HttpApiClient implements ElectronAPI {
         google: { configured: boolean; masked: string };
         openai: { configured: boolean; masked: string };
         linear: { configured: boolean; masked: string };
+        apiKeys?: { anthropic?: string; google?: string; openai?: string; linear?: string };
       };
       error?: string;
     }> => this.put('/api/settings/credentials', updates),

@@ -58,6 +58,8 @@ const SETTINGS_FIELDS_TO_SYNC = [
   'worktreePanelCollapsed',
   'lastProjectDir',
   'recentFolders',
+  // Linear Integration Settings
+  'linearSettings',
 ] as const;
 
 // Fields from setup store to sync
@@ -409,6 +411,12 @@ export async function refreshSettingsFromServer(): Promise<boolean> {
       worktreePanelCollapsed: serverSettings.worktreePanelCollapsed ?? false,
       lastProjectDir: serverSettings.lastProjectDir ?? '',
       recentFolders: serverSettings.recentFolders ?? [],
+      // Linear Integration Settings
+      linearSettings: {
+        autoValidateMyIssuesOnly: serverSettings.linearSettings?.autoValidateMyIssuesOnly ?? false,
+        autoValidateLabelFilter: serverSettings.linearSettings?.autoValidateLabelFilter ?? '',
+        autoValidateStateTypes: serverSettings.linearSettings?.autoValidateStateTypes ?? [],
+      },
     });
 
     // Also refresh setup wizard state

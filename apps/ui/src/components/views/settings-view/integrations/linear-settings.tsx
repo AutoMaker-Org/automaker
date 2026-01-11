@@ -3,13 +3,15 @@ import { Link2, Eye, EyeOff, CheckCircle2, XCircle, Loader2, ExternalLink } from
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useAppStore } from '@/store/app-store';
 import { getElectronAPI } from '@/lib/electron';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
 export function LinearSettings() {
-  const { apiKeys, setApiKeys } = useAppStore();
+  const { apiKeys, setApiKeys, linearSettings, setLinearSettings } = useAppStore();
   const [linearKey, setLinearKey] = useState('');
   const [showKey, setShowKey] = useState(false);
   const [testing, setTesting] = useState(false);
@@ -273,6 +275,110 @@ export function LinearSettings() {
           <div className="flex items-center gap-2 p-3 rounded-lg bg-green-500/10 border border-green-500/20">
             <CheckCircle2 className="w-5 h-5 text-green-500 shrink-0" />
             <span className="text-sm font-medium text-green-600">Linear API key is configured</span>
+          </div>
+        )}
+
+        {/* Auto-Validate Filters Section */}
+        {hasStoredKey && (
+          <div className="space-y-4 pt-4 border-t border-border/50">
+            <div>
+              <h3 className="text-sm font-medium text-foreground mb-1">Auto-Validate Filters</h3>
+              <p className="text-xs text-muted-foreground">
+                Configure which issues should be automatically validated when Auto-Validate is
+                enabled.
+              </p>
+            </div>
+
+            {/* My Issues Only Toggle */}
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label htmlFor="auto-validate-my-issues" className="text-sm font-normal">
+                  My Issues Only
+                </Label>
+                <p className="text-xs text-muted-foreground">Only validate issues assigned to me</p>
+              </div>
+              <Switch
+                id="auto-validate-my-issues"
+                checked={linearSettings.autoValidateMyIssuesOnly}
+                onCheckedChange={(checked) =>
+                  setLinearSettings({ autoValidateMyIssuesOnly: checked })
+                }
+              />
+            </div>
+
+            {/* Label Filter */}
+            <div className="space-y-2">
+              <Label htmlFor="auto-validate-label" className="text-sm font-normal">
+                Label Filter
+              </Label>
+              <Input
+                id="auto-validate-label"
+                placeholder="e.g., bug, feature, urgent"
+                value={linearSettings.autoValidateLabelFilter}
+                onChange={(e) => setLinearSettings({ autoValidateLabelFilter: e.target.value })}
+              />
+              <p className="text-xs text-muted-foreground">
+                Only validate issues with labels containing this text (leave empty for all)
+              </p>
+            </div>
+
+            {/* State Types Filter */}
+            <div className="space-y-2">
+              <Label className="text-sm font-normal">State Types</Label>
+              <p className="text-xs text-muted-foreground mb-2">
+                Only validate issues in these states (leave all unchecked for all states)
+              </p>
+              <div className="flex flex-wrap gap-4">
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="state-backlog"
+                    checked={linearSettings.autoValidateStateTypes.includes('backlog')}
+                    onCheckedChange={(checked) => {
+                      const current = linearSettings.autoValidateStateTypes;
+                      const updated = checked
+                        ? [...current, 'backlog' as const]
+                        : current.filter((s) => s !== 'backlog');
+                      setLinearSettings({ autoValidateStateTypes: updated });
+                    }}
+                  />
+                  <Label htmlFor="state-backlog" className="text-sm font-normal cursor-pointer">
+                    Backlog
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="state-unstarted"
+                    checked={linearSettings.autoValidateStateTypes.includes('unstarted')}
+                    onCheckedChange={(checked) => {
+                      const current = linearSettings.autoValidateStateTypes;
+                      const updated = checked
+                        ? [...current, 'unstarted' as const]
+                        : current.filter((s) => s !== 'unstarted');
+                      setLinearSettings({ autoValidateStateTypes: updated });
+                    }}
+                  />
+                  <Label htmlFor="state-unstarted" className="text-sm font-normal cursor-pointer">
+                    Unstarted
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="state-started"
+                    checked={linearSettings.autoValidateStateTypes.includes('started')}
+                    onCheckedChange={(checked) => {
+                      const current = linearSettings.autoValidateStateTypes;
+                      const updated = checked
+                        ? [...current, 'started' as const]
+                        : current.filter((s) => s !== 'started');
+                      setLinearSettings({ autoValidateStateTypes: updated });
+                    }}
+                  />
+                  <Label htmlFor="state-started" className="text-sm font-normal cursor-pointer">
+                    In Progress
+                  </Label>
+                </div>
+              </div>
+            </div>
           </div>
         )}
       </div>

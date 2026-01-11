@@ -556,6 +556,12 @@ export function hydrateStoreFromSettings(settings: GlobalSettings): void {
     worktreePanelCollapsed: settings.worktreePanelCollapsed ?? false,
     lastProjectDir: settings.lastProjectDir ?? '',
     recentFolders: settings.recentFolders ?? [],
+    // Linear Integration Settings
+    linearSettings: {
+      autoValidateMyIssuesOnly: settings.linearSettings?.autoValidateMyIssuesOnly ?? false,
+      autoValidateLabelFilter: settings.linearSettings?.autoValidateLabelFilter ?? '',
+      autoValidateStateTypes: settings.linearSettings?.autoValidateStateTypes ?? [],
+    },
   });
 
   // Hydrate setup wizard state from global settings (API-backed)
@@ -605,6 +611,7 @@ function buildSettingsUpdateFromStore(): Record<string, unknown> {
     worktreePanelCollapsed: state.worktreePanelCollapsed,
     lastProjectDir: state.lastProjectDir,
     recentFolders: state.recentFolders,
+    linearSettings: state.linearSettings,
   };
 }
 

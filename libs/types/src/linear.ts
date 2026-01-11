@@ -334,7 +334,9 @@ export interface LinearImportResult {
     linearIssueId: string;
     linearIdentifier: string;
   }>;
-  /** Errors for failed imports */
+  /** General error message when import fails */
+  error?: string;
+  /** Errors for failed individual imports */
   errors?: Array<{
     linearIssueId: string;
     error: string;
@@ -476,4 +478,18 @@ export interface LinearSettings {
   savedPresets?: LinearFilterPreset[];
   /** Auto-validate new issues when they are loaded */
   autoValidateNewIssues?: boolean;
+
+  // Auto-Validate Filter Settings
+  /** Only auto-validate issues assigned to current user */
+  autoValidateMyIssuesOnly?: boolean;
+  /** Only auto-validate issues with labels containing this text */
+  autoValidateLabelFilter?: string;
+  /** Only auto-validate issues in these workflow states */
+  autoValidateStateTypes?: Array<'backlog' | 'unstarted' | 'started'>;
+
+  // Auto-Convert Settings
+  /** Automatically convert valid issues to Kanban tasks */
+  autoConvertValidIssues?: boolean;
+  /** Also convert issues with 'needs_clarification' verdict */
+  autoConvertNeedsClarification?: boolean;
 }

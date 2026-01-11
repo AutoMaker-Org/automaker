@@ -669,6 +669,16 @@ export interface AppState {
   lastProjectDir: string;
   /** Recently accessed folders for quick access */
   recentFolders: string[];
+
+  // Linear Integration Settings
+  linearSettings: {
+    /** Auto-validate only my issues */
+    autoValidateMyIssuesOnly: boolean;
+    /** Auto-validate only issues with this label */
+    autoValidateLabelFilter: string;
+    /** Auto-validate only issues in these states */
+    autoValidateStateTypes: Array<'backlog' | 'unstarted' | 'started'>;
+  };
 }
 
 // Claude Usage interface matching the server response
@@ -1078,6 +1088,9 @@ export interface AppActions {
   setRecentFolders: (folders: string[]) => void;
   addRecentFolder: (folder: string) => void;
 
+  // Linear Integration Settings actions
+  setLinearSettings: (settings: Partial<AppState['linearSettings']>) => void;
+
   // Claude Usage Tracking actions
   setClaudeRefreshInterval: (interval: number) => void;
   setClaudeUsageLastUpdated: (timestamp: number) => void;
@@ -1201,6 +1214,12 @@ const initialState: AppState = {
   worktreePanelCollapsed: false,
   lastProjectDir: '',
   recentFolders: [],
+  // Linear Integration Settings
+  linearSettings: {
+    autoValidateMyIssuesOnly: false,
+    autoValidateLabelFilter: '',
+    autoValidateStateTypes: [],
+  },
 };
 
 export const useAppStore = create<AppState & AppActions>()((set, get) => ({
@@ -3124,6 +3143,12 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
     const updated = [folder, ...filtered].slice(0, 10);
     set({ recentFolders: updated });
   },
+
+  // Linear Integration Settings
+  setLinearSettings: (settings) =>
+    set((state) => ({
+      linearSettings: { ...state.linearSettings, ...settings },
+    })),
 
   // Reset
   reset: () => set(initialState),
