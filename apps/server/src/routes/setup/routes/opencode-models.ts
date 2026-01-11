@@ -122,7 +122,6 @@ export function createRefreshOpencodeModelsHandler() {
 
       res.json(response);
     } catch (error) {
-      logger.error('Refresh OpenCode models failed:', error);
       logError(error, 'Refresh OpenCode models failed');
       res.status(500).json({
         success: false,
@@ -155,7 +154,6 @@ export function createGetOpencodeProvidersHandler() {
 
       res.json(response);
     } catch (error) {
-      logger.error('Get OpenCode providers failed:', error);
       logError(error, 'Get OpenCode providers failed');
       res.status(500).json({
         success: false,

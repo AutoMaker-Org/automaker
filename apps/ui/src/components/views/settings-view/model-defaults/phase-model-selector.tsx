@@ -237,11 +237,11 @@ export function PhaseModelSelector({
     const codexModel = transformedCodexModels.find((m) => m.id === selectedModel);
     if (codexModel) return { ...codexModel, icon: OpenAIIcon };
 
-    // Check OpenCode models (static)
+    // Check OpenCode models (static) - use dynamic icon resolution for provider-specific icons
     const opencodeModel = OPENCODE_MODELS.find((m) => m.id === selectedModel);
-    if (opencodeModel) return { ...opencodeModel, icon: OpenCodeIcon };
+    if (opencodeModel) return { ...opencodeModel, icon: getProviderIconForModel(opencodeModel.id) };
 
-    // Check dynamic OpenCode models
+    // Check dynamic OpenCode models - use dynamic icon resolution for provider-specific icons
     const dynamicModel = dynamicOpencodeModels.find((m) => m.id === selectedModel);
     if (dynamicModel) {
       return {
@@ -249,7 +249,7 @@ export function PhaseModelSelector({
         label: dynamicModel.name,
         description: dynamicModel.description,
         provider: 'opencode' as const,
-        icon: OpenCodeIcon,
+        icon: getProviderIconForModel(dynamicModel.id),
       };
     }
 
@@ -309,7 +309,8 @@ export function PhaseModelSelector({
       provider: 'opencode' as const,
     }));
 
-    // Merge, avoiding duplicates (dynamic takes precedence for same ID)
+    // Merge, avoiding duplicates (static models take precedence for same ID)
+    // In practice, static (Bedrock) and dynamic (external provider) IDs don't overlap
     const staticIds = new Set(staticModels.map((m) => m.id));
     const uniqueDynamic = dynamicModelOptions.filter((m) => !staticIds.has(m.id));
 

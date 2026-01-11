@@ -571,10 +571,13 @@ export interface AppState {
   codexEnableImages: boolean; // Enable image processing
 
   // OpenCode CLI Settings (global)
+  // Static OpenCode settings are persisted via SETTINGS_FIELDS_TO_SYNC
   enabledOpencodeModels: OpencodeModelId[]; // Which static OpenCode models are available
   opencodeDefaultModel: OpencodeModelId; // Default OpenCode model selection
+  // Dynamic models are session-only (not persisted) because they're discovered at runtime
+  // from `opencode models` CLI and depend on current provider authentication state
   dynamicOpencodeModels: ModelDefinition[]; // Dynamically discovered models from OpenCode CLI
-  enabledDynamicModelIds: string[]; // Which dynamic models are enabled (model IDs)
+  enabledDynamicModelIds: string[]; // Which dynamic models are enabled (session-only)
   cachedOpencodeProviders: Array<{
     id: string;
     name: string;
@@ -1951,6 +1954,8 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
         : state.enabledOpencodeModels.filter((m) => m !== model),
     })),
   setDynamicOpencodeModels: (models) => {
+    // Dynamic models are session-only (not persisted to server) because they depend on
+    // current CLI authentication state and are re-discovered each session
     // When setting dynamic models, auto-enable all of them if enabledDynamicModelIds is empty
     const currentEnabled = get().enabledDynamicModelIds;
     const newModelIds = models.map((m) => m.id);

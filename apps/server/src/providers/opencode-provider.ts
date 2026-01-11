@@ -245,6 +245,9 @@ export class OpencodeProvider extends CliProvider {
   /** Whether model refresh is in progress */
   private isRefreshing: boolean = false;
 
+  /** Promise that resolves when current refresh completes */
+  private refreshPromise: Promise<ModelDefinition[]> | null = null;
+
   constructor(config: ProviderConfig = {}) {
     super(config);
   }
@@ -685,19 +688,28 @@ export class OpencodeProvider extends CliProvider {
    * Returns the updated model definitions.
    */
   async refreshModels(): Promise<ModelDefinition[]> {
-    // Prevent concurrent refreshes
-    if (this.isRefreshing) {
-      opencodeLogger.debug('Model refresh already in progress, waiting...');
-      // Wait for existing refresh to complete
-      while (this.isRefreshing) {
-        await new Promise((resolve) => setTimeout(resolve, 100));
-      }
-      return this.cachedModels || this.getDefaultModels();
+    // If refresh is in progress, wait for existing promise instead of busy-waiting
+    if (this.isRefreshing && this.refreshPromise) {
+      opencodeLogger.debug('Model refresh already in progress, waiting for completion...');
+      return this.refreshPromise;
     }
 
     this.isRefreshing = true;
     opencodeLogger.debug('Starting model refresh from OpenCode CLI');
 
+    this.refreshPromise = this.doRefreshModels();
+    try {
+      return await this.refreshPromise;
+    } finally {
+      this.refreshPromise = null;
+      this.isRefreshing = false;
+    }
+  }
+
+  /**
+   * Internal method that performs the actual model refresh
+   */
+  private async doRefreshModels(): Promise<ModelDefinition[]> {
     try {
       const models = await this.fetchModelsFromCli();
 
@@ -715,8 +727,6 @@ export class OpencodeProvider extends CliProvider {
       opencodeLogger.debug(`Model refresh failed: ${error}`);
       // Return existing cache or defaults on error
       return this.cachedModels || this.getDefaultModels();
-    } finally {
-      this.isRefreshing = false;
     }
   }
 
