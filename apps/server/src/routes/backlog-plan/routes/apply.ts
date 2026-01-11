@@ -12,9 +12,10 @@ const featureLoader = new FeatureLoader();
 export function createApplyHandler() {
   return async (req: Request, res: Response): Promise<void> => {
     try {
-      const { projectPath, plan } = req.body as {
+      const { projectPath, plan, branchName } = req.body as {
         projectPath: string;
         plan: BacklogPlanResult;
+        branchName?: string;
       };
 
       if (!projectPath) {
@@ -82,6 +83,7 @@ export function createApplyHandler() {
             dependencies: change.feature.dependencies,
             priority: change.feature.priority,
             status: 'backlog',
+            branchName,
           });
 
           appliedChanges.push(`added:${newFeature.id}`);

@@ -10,9 +10,72 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { GitBranch, Loader2 } from 'lucide-react';
+import { GitBranch, Loader2, AlertCircle } from 'lucide-react';
 import { getElectronAPI } from '@/lib/electron';
 import { toast } from 'sonner';
+
+/**
+ * Parse git/worktree error messages and return user-friendly versions
+ */
+function parseWorktreeError(error: string): { title: string; description?: string } {
+  const errorLower = error.toLowerCase();
+
+  // Worktree already exists
+  if (errorLower.includes('already exists') && errorLower.includes('worktree')) {
+    return {
+      title: 'A worktree with this name already exists',
+      description: 'Try a different branch name or delete the existing worktree first.',
+    };
+  }
+
+  // Branch already checked out in another worktree
+  if (
+    errorLower.includes('already checked out') ||
+    errorLower.includes('is already used by worktree')
+  ) {
+    return {
+      title: 'This branch is already in use',
+      description: 'The branch is checked out in another worktree. Use a different branch name.',
+    };
+  }
+
+  // Branch name conflicts with existing branch
+  if (errorLower.includes('already exists') && errorLower.includes('branch')) {
+    return {
+      title: 'A branch with this name already exists',
+      description: 'The worktree will use the existing branch, or try a different name.',
+    };
+  }
+
+  // Not a git repository
+  if (errorLower.includes('not a git repository')) {
+    return {
+      title: 'Not a git repository',
+      description: 'Initialize git in this project first with "git init".',
+    };
+  }
+
+  // Lock file exists (another git operation in progress)
+  if (errorLower.includes('.lock') || errorLower.includes('lock file')) {
+    return {
+      title: 'Another git operation is in progress',
+      description: 'Wait for it to complete or remove stale lock files.',
+    };
+  }
+
+  // Permission denied
+  if (errorLower.includes('permission denied') || errorLower.includes('access denied')) {
+    return {
+      title: 'Permission denied',
+      description: 'Check file permissions for the project directory.',
+    };
+  }
+
+  // Default: return original error but cleaned up
+  return {
+    title: error.replace(/^(fatal|error):\s*/i, '').split('\n')[0],
+  };
+}
 
 interface CreatedWorktreeInfo {
   path: string;
@@ -34,20 +97,21 @@ export function CreateWorktreeDialog({
 }: CreateWorktreeDialogProps) {
   const [branchName, setBranchName] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<{ title: string; description?: string } | null>(null);
 
   const handleCreate = async () => {
     if (!branchName.trim()) {
-      setError('Branch name is required');
+      setError({ title: 'Branch name is required' });
       return;
     }
 
     // Validate branch name (git-compatible)
     const validBranchRegex = /^[a-zA-Z0-9._/-]+$/;
     if (!validBranchRegex.test(branchName)) {
-      setError(
-        'Invalid branch name. Use only letters, numbers, dots, underscores, hyphens, and slashes.'
-      );
+      setError({
+        title: 'Invalid branch name',
+        description: 'Use only letters, numbers, dots, underscores, hyphens, and slashes.',
+      });
       return;
     }
 
@@ -57,7 +121,7 @@ export function CreateWorktreeDialog({
     try {
       const api = getElectronAPI();
       if (!api?.worktree?.create) {
-        setError('Worktree API not available');
+        setError({ title: 'Worktree API not available' });
         return;
       }
       const result = await api.worktree.create(projectPath, branchName);
@@ -70,10 +134,12 @@ export function CreateWorktreeDialog({
         onOpenChange(false);
         setBranchName('');
       } else {
-        setError(result.error || 'Failed to create worktree');
+        setError(parseWorktreeError(result.error || 'Failed to create worktree'));
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create worktree');
+      setError(
+        parseWorktreeError(err instanceof Error ? err.message : 'Failed to create worktree')
+      );
     } finally {
       setIsLoading(false);
     }
@@ -114,7 +180,17 @@ export function CreateWorktreeDialog({
               className="font-mono text-sm"
               autoFocus
             />
-            {error && <p className="text-sm text-destructive">{error}</p>}
+            {error && (
+              <div className="flex items-start gap-2 p-3 rounded-md bg-destructive/10 border border-destructive/20">
+                <AlertCircle className="w-4 h-4 text-destructive mt-0.5 flex-shrink-0" />
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-destructive">{error.title}</p>
+                  {error.description && (
+                    <p className="text-xs text-destructive/80">{error.description}</p>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="text-xs text-muted-foreground space-y-1">

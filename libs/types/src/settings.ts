@@ -599,6 +599,14 @@ export interface ProjectSettings {
   // UI Visibility
   /** Whether the worktree panel row is visible (default: true) */
   worktreePanelVisible?: boolean;
+  /** Whether to show the init script indicator panel (default: true) */
+  showInitScriptIndicator?: boolean;
+
+  // Worktree Behavior
+  /** Default value for "delete branch" checkbox when deleting a worktree (default: false) */
+  defaultDeleteBranchWithWorktree?: boolean;
+  /** Auto-dismiss init script indicator after completion (default: true) */
+  autoDismissInitScriptIndicator?: boolean;
 
   // Session Tracking
   /** Last chat session selected in this project */

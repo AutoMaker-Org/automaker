@@ -9,6 +9,8 @@ import { UsagePopover } from '@/components/usage-popover';
 import { useAppStore } from '@/store/app-store';
 import { useSetupStore } from '@/store/setup-store';
 import { AutoModeSettingsDialog } from './dialogs/auto-mode-settings-dialog';
+import { WorktreeSettingsDialog } from './dialogs/worktree-settings-dialog';
+import { PlanSettingsDialog } from './dialogs/plan-settings-dialog';
 import { getHttpApiClient } from '@/lib/http-api-client';
 import { BoardSearchBar } from './board-search-bar';
 import { BoardControls } from './board-controls';
@@ -55,10 +57,22 @@ export function BoardHeader({
   completedCount,
 }: BoardHeaderProps) {
   const [showAutoModeSettings, setShowAutoModeSettings] = useState(false);
+  const [showWorktreeSettings, setShowWorktreeSettings] = useState(false);
+  const [showPlanSettings, setShowPlanSettings] = useState(false);
   const apiKeys = useAppStore((state) => state.apiKeys);
   const claudeAuthStatus = useSetupStore((state) => state.claudeAuthStatus);
   const skipVerificationInAutoMode = useAppStore((state) => state.skipVerificationInAutoMode);
   const setSkipVerificationInAutoMode = useAppStore((state) => state.setSkipVerificationInAutoMode);
+  const planUseSelectedWorktreeBranch = useAppStore((state) => state.planUseSelectedWorktreeBranch);
+  const setPlanUseSelectedWorktreeBranch = useAppStore(
+    (state) => state.setPlanUseSelectedWorktreeBranch
+  );
+  const addFeatureUseSelectedWorktreeBranch = useAppStore(
+    (state) => state.addFeatureUseSelectedWorktreeBranch
+  );
+  const setAddFeatureUseSelectedWorktreeBranch = useAppStore(
+    (state) => state.setAddFeatureUseSelectedWorktreeBranch
+  );
   const codexAuthStatus = useSetupStore((state) => state.codexAuthStatus);
 
   // Worktree panel visibility (per-project)
@@ -132,8 +146,24 @@ export function BoardHeader({
               onCheckedChange={handleWorktreePanelToggle}
               data-testid="worktrees-toggle"
             />
+            <button
+              onClick={() => setShowWorktreeSettings(true)}
+              className="p-1 rounded hover:bg-accent/50 transition-colors"
+              title="Worktree Settings"
+              data-testid="worktree-settings-button"
+            >
+              <Settings2 className="w-4 h-4 text-muted-foreground" />
+            </button>
           </div>
         )}
+
+        {/* Worktree Settings Dialog */}
+        <WorktreeSettingsDialog
+          open={showWorktreeSettings}
+          onOpenChange={setShowWorktreeSettings}
+          addFeatureUseSelectedWorktreeBranch={addFeatureUseSelectedWorktreeBranch}
+          onAddFeatureUseSelectedWorktreeBranchChange={setAddFeatureUseSelectedWorktreeBranch}
+        />
 
         {/* Concurrency Control - only show after mount to prevent hydration issues */}
         {isMounted && (
@@ -209,15 +239,33 @@ export function BoardHeader({
           onSkipVerificationChange={setSkipVerificationInAutoMode}
         />
 
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={onOpenPlanDialog}
-          data-testid="plan-backlog-button"
-        >
-          <Wand2 className="w-4 h-4 mr-2" />
-          Plan
-        </Button>
+        {/* Plan Button with Settings */}
+        <div className={controlContainerClass} data-testid="plan-button-container">
+          <button
+            onClick={onOpenPlanDialog}
+            className="flex items-center gap-1.5 hover:text-foreground transition-colors"
+            data-testid="plan-backlog-button"
+          >
+            <Wand2 className="w-4 h-4 text-muted-foreground" />
+            <span className="text-sm font-medium">Plan</span>
+          </button>
+          <button
+            onClick={() => setShowPlanSettings(true)}
+            className="p-1 rounded hover:bg-accent/50 transition-colors"
+            title="Plan Settings"
+            data-testid="plan-settings-button"
+          >
+            <Settings2 className="w-4 h-4 text-muted-foreground" />
+          </button>
+        </div>
+
+        {/* Plan Settings Dialog */}
+        <PlanSettingsDialog
+          open={showPlanSettings}
+          onOpenChange={setShowPlanSettings}
+          planUseSelectedWorktreeBranch={planUseSelectedWorktreeBranch}
+          onPlanUseSelectedWorktreeBranchChange={setPlanUseSelectedWorktreeBranch}
+        />
       </div>
     </div>
   );

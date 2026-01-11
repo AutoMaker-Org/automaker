@@ -651,7 +651,8 @@ export interface ElectronAPI {
           removedDependencies: string[];
           addedDependencies: string[];
         }>;
-      }
+      },
+      branchName?: string
     ) => Promise<{ success: boolean; appliedChanges?: string[]; error?: string }>;
     onEvent: (callback: (data: unknown) => void) => () => void;
   };
@@ -1767,6 +1768,47 @@ function createMockWorktreeAPI(): WorktreeAPI {
           hasPR: false,
           ghCliAvailable: false,
         },
+      };
+    },
+
+    getInitScript: async (projectPath: string) => {
+      console.log('[Mock] Getting init script:', { projectPath });
+      return {
+        success: true,
+        exists: false,
+        content: '',
+        path: `${projectPath}/.automaker/worktree-init.sh`,
+      };
+    },
+
+    setInitScript: async (projectPath: string, content: string) => {
+      console.log('[Mock] Setting init script:', { projectPath, content });
+      return {
+        success: true,
+        path: `${projectPath}/.automaker/worktree-init.sh`,
+      };
+    },
+
+    deleteInitScript: async (projectPath: string) => {
+      console.log('[Mock] Deleting init script:', { projectPath });
+      return {
+        success: true,
+      };
+    },
+
+    runInitScript: async (projectPath: string, worktreePath: string, branch: string) => {
+      console.log('[Mock] Running init script:', { projectPath, worktreePath, branch });
+      return {
+        success: true,
+        message: 'Init script started (mock)',
+      };
+    },
+
+    onInitScriptEvent: (callback) => {
+      console.log('[Mock] Subscribing to init script events');
+      // Return unsubscribe function
+      return () => {
+        console.log('[Mock] Unsubscribing from init script events');
       };
     },
   };

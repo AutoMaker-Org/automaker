@@ -3,15 +3,51 @@
  */
 
 import { createLogger } from '@automaker/utils';
+import { spawnProcess } from '@automaker/platform';
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import path from 'path';
 import { getErrorMessage as getErrorMessageShared, createLogError } from '../common.js';
-import { FeatureLoader } from '../../services/feature-loader.js';
 
 const logger = createLogger('Worktree');
 export const execAsync = promisify(exec);
-const featureLoader = new FeatureLoader();
+
+// ============================================================================
+// Secure Command Execution
+// ============================================================================
+
+/**
+ * Execute git command with array arguments to prevent command injection.
+ * Uses spawnProcess from @automaker/platform for secure, cross-platform execution.
+ *
+ * @param args - Array of git command arguments (e.g., ['worktree', 'add', path])
+ * @param cwd - Working directory to execute the command in
+ * @returns Promise resolving to stdout output
+ * @throws Error with stderr message if command fails
+ *
+ * @example
+ * ```typescript
+ * // Safe: no injection possible
+ * await execGitCommand(['branch', '-D', branchName], projectPath);
+ *
+ * // Instead of unsafe:
+ * // await execAsync(`git branch -D ${branchName}`, { cwd });
+ * ```
+ */
+export async function execGitCommand(args: string[], cwd: string): Promise<string> {
+  const result = await spawnProcess({
+    command: 'git',
+    args,
+    cwd,
+  });
+
+  // spawnProcess returns { stdout, stderr, exitCode }
+  if (result.exitCode === 0) {
+    return result.stdout;
+  } else {
+    const errorMessage = result.stderr || `Git command failed with code ${result.exitCode}`;
+    throw new Error(errorMessage);
+  }
+}
 
 // ============================================================================
 // Constants
@@ -97,18 +133,6 @@ export const AUTOMAKER_INITIAL_COMMIT_MESSAGE = 'chore: automaker initial commit
  */
 export function normalizePath(p: string): string {
   return p.replace(/\\/g, '/');
-}
-
-/**
- * Check if a path is a git repo
- */
-export async function isGitRepo(repoPath: string): Promise<boolean> {
-  try {
-    await execAsync('git rev-parse --is-inside-work-tree', { cwd: repoPath });
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 /**

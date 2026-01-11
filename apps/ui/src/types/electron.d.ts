@@ -1015,6 +1015,50 @@ export interface WorktreeAPI {
     };
     error?: string;
   }>;
+
+  // Get init script content for a project
+  getInitScript: (projectPath: string) => Promise<{
+    success: boolean;
+    exists: boolean;
+    content: string;
+    path: string;
+    error?: string;
+  }>;
+
+  // Set init script content for a project
+  setInitScript: (
+    projectPath: string,
+    content: string
+  ) => Promise<{
+    success: boolean;
+    path?: string;
+    error?: string;
+  }>;
+
+  // Delete init script for a project
+  deleteInitScript: (projectPath: string) => Promise<{
+    success: boolean;
+    error?: string;
+  }>;
+
+  // Run (or re-run) init script for a worktree
+  runInitScript: (
+    projectPath: string,
+    worktreePath: string,
+    branch: string
+  ) => Promise<{
+    success: boolean;
+    message?: string;
+    error?: string;
+  }>;
+
+  // Subscribe to init script events
+  onInitScriptEvent: (
+    callback: (event: {
+      type: 'worktree:init-started' | 'worktree:init-output' | 'worktree:init-completed';
+      payload: unknown;
+    }) => void
+  ) => () => void;
 }
 
 export interface GitAPI {

@@ -16,6 +16,7 @@ export type SettingsViewId =
   | 'keyboard'
   | 'audio'
   | 'defaults'
+  | 'worktrees'
   | 'account'
   | 'security'
   | 'danger';

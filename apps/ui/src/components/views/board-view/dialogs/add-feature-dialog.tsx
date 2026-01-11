@@ -56,6 +56,32 @@ import {
 
 const logger = createLogger('AddFeatureDialog');
 
+/**
+ * Determines the default work mode based on global settings and current worktree selection.
+ *
+ * Priority:
+ * 1. If forceCurrentBranchMode is true, always defaults to 'current' (work on current branch)
+ * 2. If a non-main worktree is selected in the board header, defaults to 'custom' (use that branch)
+ * 3. If useWorktrees global setting is enabled, defaults to 'auto' (automatic worktree creation)
+ * 4. Otherwise, defaults to 'current' (work on current branch without isolation)
+ */
+const getDefaultWorkMode = (
+  useWorktrees: boolean,
+  selectedNonMainWorktreeBranch?: string,
+  forceCurrentBranchMode?: boolean
+): WorkMode => {
+  // If force current branch mode is enabled (worktree setting is off), always use 'current'
+  if (forceCurrentBranchMode) {
+    return 'current';
+  }
+  // If a non-main worktree is selected, default to 'custom' mode with that branch
+  if (selectedNonMainWorktreeBranch) {
+    return 'custom';
+  }
+  // Otherwise, respect the global worktree setting
+  return useWorktrees ? 'auto' : 'current';
+};
+
 type FeatureData = {
   title: string;
   category: string;
@@ -89,6 +115,16 @@ interface AddFeatureDialogProps {
   isMaximized: boolean;
   parentFeature?: Feature | null;
   allFeatures?: Feature[];
+  /**
+   * When a non-main worktree is selected in the board header, this will be set to that worktree's branch.
+   * When set, the dialog will default to 'custom' work mode with this branch pre-filled.
+   */
+  selectedNonMainWorktreeBranch?: string;
+  /**
+   * When true, forces the dialog to default to 'current' work mode (work on current branch).
+   * This is used when the "Use selected worktree branch" setting is disabled.
+   */
+  forceCurrentBranchMode?: boolean;
 }
 
 /**
@@ -112,6 +148,8 @@ export function AddFeatureDialog({
   isMaximized,
   parentFeature = null,
   allFeatures = [],
+  selectedNonMainWorktreeBranch,
+  forceCurrentBranchMode,
 }: AddFeatureDialogProps) {
   const isSpawnMode = !!parentFeature;
   const [workMode, setWorkMode] = useState<WorkMode>('current');
@@ -149,7 +187,7 @@ export function AddFeatureDialog({
   const [selectedAncestorIds, setSelectedAncestorIds] = useState<Set<string>>(new Set());
 
   // Get defaults from store
-  const { defaultPlanningMode, defaultRequirePlanApproval } = useAppStore();
+  const { defaultPlanningMode, defaultRequirePlanApproval, useWorktrees } = useAppStore();
 
   // Track previous open state to detect when dialog opens
   const wasOpenRef = useRef(false);
@@ -161,8 +199,12 @@ export function AddFeatureDialog({
 
     if (justOpened) {
       setSkipTests(defaultSkipTests);
-      setBranchName(defaultBranch || '');
-      setWorkMode('current');
+      // When a non-main worktree is selected, use its branch name for custom mode
+      // Otherwise, use the default branch
+      setBranchName(selectedNonMainWorktreeBranch || defaultBranch || '');
+      setWorkMode(
+        getDefaultWorkMode(useWorktrees, selectedNonMainWorktreeBranch, forceCurrentBranchMode)
+      );
       setPlanningMode(defaultPlanningMode);
       setRequirePlanApproval(defaultRequirePlanApproval);
       setModelEntry({ model: 'opus' });
@@ -186,6 +228,9 @@ export function AddFeatureDialog({
     defaultBranch,
     defaultPlanningMode,
     defaultRequirePlanApproval,
+    useWorktrees,
+    selectedNonMainWorktreeBranch,
+    forceCurrentBranchMode,
     parentFeature,
     allFeatures,
   ]);
@@ -270,10 +315,13 @@ export function AddFeatureDialog({
     setImagePaths([]);
     setTextFilePaths([]);
     setSkipTests(defaultSkipTests);
-    setBranchName('');
+    // When a non-main worktree is selected, use its branch name for custom mode
+    setBranchName(selectedNonMainWorktreeBranch || '');
     setPriority(2);
     setModelEntry({ model: 'opus' });
-    setWorkMode('current');
+    setWorkMode(
+      getDefaultWorkMode(useWorktrees, selectedNonMainWorktreeBranch, forceCurrentBranchMode)
+    );
     setPlanningMode(defaultPlanningMode);
     setRequirePlanApproval(defaultRequirePlanApproval);
     setPreviewMap(new Map());

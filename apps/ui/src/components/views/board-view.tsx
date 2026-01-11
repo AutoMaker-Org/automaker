@@ -75,6 +75,8 @@ import {
 } from './board-view/hooks';
 import { SelectionActionBar } from './board-view/components';
 import { MassEditDialog } from './board-view/dialogs';
+import { InitScriptIndicator } from './board-view/init-script-indicator';
+import { useInitScriptEvents } from '@/hooks/use-init-script-events';
 
 // Stable empty array to avoid infinite loop in selector
 const EMPTY_WORKTREES: ReturnType<ReturnType<typeof useAppStore.getState>['getWorktrees']> = [];
@@ -99,6 +101,8 @@ export function BoardView() {
     useWorktrees,
     enableDependencyBlocking,
     skipVerificationInAutoMode,
+    planUseSelectedWorktreeBranch,
+    addFeatureUseSelectedWorktreeBranch,
     isPrimaryWorktreeBranch,
     getPrimaryWorktreeBranch,
     setPipelineConfig,
@@ -107,6 +111,12 @@ export function BoardView() {
   const pipelineConfigByProject = useAppStore((state) => state.pipelineConfigByProject);
   // Subscribe to worktreePanelVisibleByProject to trigger re-renders when it changes
   const worktreePanelVisibleByProject = useAppStore((state) => state.worktreePanelVisibleByProject);
+  // Subscribe to showInitScriptIndicatorByProject to trigger re-renders when it changes
+  const showInitScriptIndicatorByProject = useAppStore(
+    (state) => state.showInitScriptIndicatorByProject
+  );
+  const getShowInitScriptIndicator = useAppStore((state) => state.getShowInitScriptIndicator);
+  const getDefaultDeleteBranch = useAppStore((state) => state.getDefaultDeleteBranch);
   const shortcuts = useKeyboardShortcutsConfig();
   const {
     features: hookFeatures,
@@ -251,6 +261,9 @@ export function BoardView() {
 
   // Window state hook for compact dialog mode
   const { isMaximized } = useWindowState();
+
+  // Init script events hook - subscribe to worktree init script events
+  useInitScriptEvents(currentProject?.path ?? null);
 
   // Keyboard shortcuts hook will be initialized after actions hook
 
@@ -1361,6 +1374,14 @@ export function BoardView() {
         isMaximized={isMaximized}
         parentFeature={spawnParentFeature}
         allFeatures={hookFeatures}
+        // When setting is enabled and a non-main worktree is selected, pass its branch to default to 'custom' work mode
+        selectedNonMainWorktreeBranch={
+          addFeatureUseSelectedWorktreeBranch && currentWorktreePath !== null
+            ? currentWorktreeBranch || undefined
+            : undefined
+        }
+        // When the worktree setting is disabled, force 'current' branch mode
+        forceCurrentBranchMode={!addFeatureUseSelectedWorktreeBranch}
       />
 
       {/* Edit Feature Dialog */}
@@ -1440,6 +1461,7 @@ export function BoardView() {
         setPendingPlanResult={setPendingBacklogPlan}
         isGeneratingPlan={isGeneratingPlan}
         setIsGeneratingPlan={setIsGeneratingPlan}
+        currentBranch={planUseSelectedWorktreeBranch ? selectedWorktreeBranch : undefined}
       />
 
       {/* Plan Approval Dialog */}
@@ -1507,6 +1529,7 @@ export function BoardView() {
             ? hookFeatures.filter((f) => f.branchName === selectedWorktreeForAction.branch).length
             : 0
         }
+        defaultDeleteBranch={getDefaultDeleteBranch(currentProject.path)}
         onDeleted={(deletedWorktree, _deletedBranch) => {
           // Reset features that were assigned to the deleted worktree (by branch)
           hookFeatures.forEach((feature) => {
@@ -1574,6 +1597,11 @@ export function BoardView() {
           setSelectedWorktreeForAction(null);
         }}
       />
+
+      {/* Init Script Indicator - floating overlay for worktree init script status */}
+      {getShowInitScriptIndicator(currentProject.path) && (
+        <InitScriptIndicator projectPath={currentProject.path} />
+      )}
     </div>
   );
 }

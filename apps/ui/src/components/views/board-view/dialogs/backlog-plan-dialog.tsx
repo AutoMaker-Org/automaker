@@ -63,6 +63,8 @@ interface BacklogPlanDialogProps {
   setPendingPlanResult: (result: BacklogPlanResult | null) => void;
   isGeneratingPlan: boolean;
   setIsGeneratingPlan: (generating: boolean) => void;
+  // Branch to use for created features (defaults to main if not provided)
+  currentBranch?: string;
 }
 
 type DialogMode = 'input' | 'review' | 'applying';
@@ -76,6 +78,7 @@ export function BacklogPlanDialog({
   setPendingPlanResult,
   isGeneratingPlan,
   setIsGeneratingPlan,
+  currentBranch,
 }: BacklogPlanDialogProps) {
   const [mode, setMode] = useState<DialogMode>('input');
   const [prompt, setPrompt] = useState('');
@@ -167,7 +170,7 @@ export function BacklogPlanDialog({
         }) || [],
     };
 
-    const result = await api.backlogPlan.apply(projectPath, filteredPlanResult);
+    const result = await api.backlogPlan.apply(projectPath, filteredPlanResult, currentBranch);
     if (result.success) {
       toast.success(`Applied ${result.appliedChanges?.length || 0} changes`);
       setPendingPlanResult(null);
@@ -184,6 +187,7 @@ export function BacklogPlanDialog({
     setPendingPlanResult,
     onPlanApplied,
     onClose,
+    currentBranch,
   ]);
 
   const handleDiscard = useCallback(() => {

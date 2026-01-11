@@ -469,6 +469,14 @@ export interface PersistedTerminalSettings {
   maxSessions: number;
 }
 
+/** State for worktree init script execution */
+export interface InitScriptState {
+  status: 'idle' | 'running' | 'success' | 'failed';
+  branch: string;
+  output: string[];
+  error?: string;
+}
+
 export interface AppState {
   // Project state
   projects: Project[];
@@ -522,6 +530,8 @@ export interface AppState {
   defaultSkipTests: boolean; // Default value for skip tests when creating new features
   enableDependencyBlocking: boolean; // When true, show blocked badges and warnings for features with incomplete dependencies (default: true)
   skipVerificationInAutoMode: boolean; // When true, auto-mode grabs features even if dependencies are not verified (only checks they're not running)
+  planUseSelectedWorktreeBranch: boolean; // When true, Plan dialog creates features on the currently selected worktree branch
+  addFeatureUseSelectedWorktreeBranch: boolean; // When true, Add Feature dialog defaults to custom mode with selected worktree branch
 
   // Worktree Settings
   useWorktrees: boolean; // Whether to use git worktree isolation for features (default: true)
@@ -670,6 +680,18 @@ export interface AppState {
   // Whether the worktree panel row is visible (default: true)
   worktreePanelVisibleByProject: Record<string, boolean>;
 
+  // Init Script Indicator Visibility (per-project, keyed by project path)
+  // Whether to show the floating init script indicator panel (default: true)
+  showInitScriptIndicatorByProject: Record<string, boolean>;
+
+  // Default Delete Branch With Worktree (per-project, keyed by project path)
+  // Whether to default the "delete branch" checkbox when deleting a worktree (default: false)
+  defaultDeleteBranchByProject: Record<string, boolean>;
+
+  // Auto-dismiss Init Script Indicator (per-project, keyed by project path)
+  // Whether to auto-dismiss the indicator after completion (default: true)
+  autoDismissInitScriptIndicatorByProject: Record<string, boolean>;
+
   // UI State (previously in localStorage, now synced via API)
   /** Whether worktree panel is collapsed in board view */
   worktreePanelCollapsed: boolean;
@@ -677,6 +699,9 @@ export interface AppState {
   lastProjectDir: string;
   /** Recently accessed folders for quick access */
   recentFolders: string[];
+
+  // Init Script State (keyed by "projectPath::branch" to support concurrent scripts)
+  initScriptState: Record<string, InitScriptState>;
 }
 
 // Claude Usage interface matching the server response
@@ -890,6 +915,8 @@ export interface AppActions {
   setDefaultSkipTests: (skip: boolean) => void;
   setEnableDependencyBlocking: (enabled: boolean) => void;
   setSkipVerificationInAutoMode: (enabled: boolean) => Promise<void>;
+  setPlanUseSelectedWorktreeBranch: (enabled: boolean) => Promise<void>;
+  setAddFeatureUseSelectedWorktreeBranch: (enabled: boolean) => Promise<void>;
 
   // Worktree Settings actions
   setUseWorktrees: (enabled: boolean) => void;
@@ -1083,6 +1110,18 @@ export interface AppActions {
   setWorktreePanelVisible: (projectPath: string, visible: boolean) => void;
   getWorktreePanelVisible: (projectPath: string) => boolean;
 
+  // Init Script Indicator Visibility actions (per-project)
+  setShowInitScriptIndicator: (projectPath: string, visible: boolean) => void;
+  getShowInitScriptIndicator: (projectPath: string) => boolean;
+
+  // Default Delete Branch actions (per-project)
+  setDefaultDeleteBranch: (projectPath: string, deleteBranch: boolean) => void;
+  getDefaultDeleteBranch: (projectPath: string) => boolean;
+
+  // Auto-dismiss Init Script Indicator actions (per-project)
+  setAutoDismissInitScriptIndicator: (projectPath: string, autoDismiss: boolean) => void;
+  getAutoDismissInitScriptIndicator: (projectPath: string) => boolean;
+
   // UI State actions (previously in localStorage, now synced via API)
   setWorktreePanelCollapsed: (collapsed: boolean) => void;
   setLastProjectDir: (dir: string) => void;
@@ -1110,6 +1149,19 @@ export interface AppActions {
       isDefault: boolean;
     }>
   ) => void;
+
+  // Init Script State actions (keyed by projectPath::branch to support concurrent scripts)
+  setInitScriptState: (
+    projectPath: string,
+    branch: string,
+    state: Partial<InitScriptState>
+  ) => void;
+  appendInitScriptOutput: (projectPath: string, branch: string, content: string) => void;
+  clearInitScriptState: (projectPath: string, branch: string) => void;
+  getInitScriptState: (projectPath: string, branch: string) => InitScriptState | null;
+  getInitScriptStatesForProject: (
+    projectPath: string
+  ) => Array<{ key: string; state: InitScriptState }>;
 
   // Reset
   reset: () => void;
@@ -1143,6 +1195,8 @@ const initialState: AppState = {
   defaultSkipTests: true, // Default to manual verification (tests disabled)
   enableDependencyBlocking: true, // Default to enabled (show dependency blocking UI)
   skipVerificationInAutoMode: false, // Default to disabled (require dependencies to be verified)
+  planUseSelectedWorktreeBranch: true, // Default to enabled (Plan creates features on selected worktree branch)
+  addFeatureUseSelectedWorktreeBranch: false, // Default to disabled (Add Feature uses normal defaults)
   useWorktrees: true, // Default to enabled (git worktree isolation)
   currentWorktreeByProject: {},
   worktreesByProject: {},
@@ -1208,10 +1262,14 @@ const initialState: AppState = {
   codexModelsLastFetched: null,
   pipelineConfigByProject: {},
   worktreePanelVisibleByProject: {},
+  showInitScriptIndicatorByProject: {},
+  defaultDeleteBranchByProject: {},
+  autoDismissInitScriptIndicatorByProject: {},
   // UI State (previously in localStorage, now synced via API)
   worktreePanelCollapsed: false,
   lastProjectDir: '',
   recentFolders: [],
+  initScriptState: {},
 };
 
 export const useAppStore = create<AppState & AppActions>()((set, get) => ({
@@ -1760,6 +1818,18 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
   setEnableDependencyBlocking: (enabled) => set({ enableDependencyBlocking: enabled }),
   setSkipVerificationInAutoMode: async (enabled) => {
     set({ skipVerificationInAutoMode: enabled });
+    // Sync to server settings file
+    const { syncSettingsToServer } = await import('@/hooks/use-settings-migration');
+    await syncSettingsToServer();
+  },
+  setPlanUseSelectedWorktreeBranch: async (enabled) => {
+    set({ planUseSelectedWorktreeBranch: enabled });
+    // Sync to server settings file
+    const { syncSettingsToServer } = await import('@/hooks/use-settings-migration');
+    await syncSettingsToServer();
+  },
+  setAddFeatureUseSelectedWorktreeBranch: async (enabled) => {
+    set({ addFeatureUseSelectedWorktreeBranch: enabled });
     // Sync to server settings file
     const { syncSettingsToServer } = await import('@/hooks/use-settings-migration');
     await syncSettingsToServer();
@@ -3136,6 +3206,51 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
     return get().worktreePanelVisibleByProject[projectPath] ?? true;
   },
 
+  // Init Script Indicator Visibility actions (per-project)
+  setShowInitScriptIndicator: (projectPath, visible) => {
+    set({
+      showInitScriptIndicatorByProject: {
+        ...get().showInitScriptIndicatorByProject,
+        [projectPath]: visible,
+      },
+    });
+  },
+
+  getShowInitScriptIndicator: (projectPath) => {
+    // Default to true (visible) if not set
+    return get().showInitScriptIndicatorByProject[projectPath] ?? true;
+  },
+
+  // Default Delete Branch actions (per-project)
+  setDefaultDeleteBranch: (projectPath, deleteBranch) => {
+    set({
+      defaultDeleteBranchByProject: {
+        ...get().defaultDeleteBranchByProject,
+        [projectPath]: deleteBranch,
+      },
+    });
+  },
+
+  getDefaultDeleteBranch: (projectPath) => {
+    // Default to false (don't delete branch) if not set
+    return get().defaultDeleteBranchByProject[projectPath] ?? false;
+  },
+
+  // Auto-dismiss Init Script Indicator actions (per-project)
+  setAutoDismissInitScriptIndicator: (projectPath, autoDismiss) => {
+    set({
+      autoDismissInitScriptIndicatorByProject: {
+        ...get().autoDismissInitScriptIndicatorByProject,
+        [projectPath]: autoDismiss,
+      },
+    });
+  },
+
+  getAutoDismissInitScriptIndicator: (projectPath) => {
+    // Default to true (auto-dismiss enabled) if not set
+    return get().autoDismissInitScriptIndicatorByProject[projectPath] ?? true;
+  },
+
   // UI State actions (previously in localStorage, now synced via API)
   setWorktreePanelCollapsed: (collapsed) => set({ worktreePanelCollapsed: collapsed }),
   setLastProjectDir: (dir) => set({ lastProjectDir: dir }),
@@ -3147,6 +3262,56 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
     // Keep max 10 recent folders
     const updated = [folder, ...filtered].slice(0, 10);
     set({ recentFolders: updated });
+  },
+
+  // Init Script State actions (keyed by "projectPath::branch")
+  setInitScriptState: (projectPath, branch, state) => {
+    const key = `${projectPath}::${branch}`;
+    const current = get().initScriptState[key] || {
+      status: 'idle',
+      branch,
+      output: [],
+    };
+    set({
+      initScriptState: {
+        ...get().initScriptState,
+        [key]: { ...current, ...state },
+      },
+    });
+  },
+
+  appendInitScriptOutput: (projectPath, branch, content) => {
+    const key = `${projectPath}::${branch}`;
+    const current = get().initScriptState[key];
+    if (!current) return;
+    set({
+      initScriptState: {
+        ...get().initScriptState,
+        [key]: {
+          ...current,
+          output: [...current.output, content],
+        },
+      },
+    });
+  },
+
+  clearInitScriptState: (projectPath, branch) => {
+    const key = `${projectPath}::${branch}`;
+    const { [key]: _, ...rest } = get().initScriptState;
+    set({ initScriptState: rest });
+  },
+
+  getInitScriptState: (projectPath, branch) => {
+    const key = `${projectPath}::${branch}`;
+    return get().initScriptState[key] || null;
+  },
+
+  getInitScriptStatesForProject: (projectPath) => {
+    const prefix = `${projectPath}::`;
+    const states = get().initScriptState;
+    return Object.entries(states)
+      .filter(([key]) => key.startsWith(prefix))
+      .map(([key, state]) => ({ key, state }));
   },
 
   // Reset

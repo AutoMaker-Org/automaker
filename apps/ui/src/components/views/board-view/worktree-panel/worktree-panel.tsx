@@ -1,7 +1,9 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useCallback, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { GitBranch, Plus, RefreshCw } from 'lucide-react';
 import { cn, pathsEqual } from '@/lib/utils';
+import { toast } from 'sonner';
+import { getHttpApiClient } from '@/lib/http-api-client';
 import type { WorktreePanelProps, WorktreeInfo } from './types';
 import {
   useWorktrees,
@@ -79,6 +81,28 @@ export function WorktreePanel({
     features,
   });
 
+  // Track whether init script exists for the project
+  const [hasInitScript, setHasInitScript] = useState(false);
+
+  useEffect(() => {
+    if (!projectPath) {
+      setHasInitScript(false);
+      return;
+    }
+
+    const checkInitScript = async () => {
+      try {
+        const api = getHttpApiClient();
+        const result = await api.worktree.getInitScript(projectPath);
+        setHasInitScript(result.success && result.exists);
+      } catch {
+        setHasInitScript(false);
+      }
+    };
+
+    checkInitScript();
+  }, [projectPath]);
+
   // Periodic interval check (5 seconds) to detect branch changes on disk
   // Reduced from 1s to 5s to minimize GPU/CPU usage from frequent re-renders
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -112,6 +136,33 @@ export function WorktreePanel({
       fetchBranches(worktree.path);
     }
   };
+
+  const handleRunInitScript = useCallback(
+    async (worktree: WorktreeInfo) => {
+      if (!projectPath) return;
+
+      try {
+        const api = getHttpApiClient();
+        const result = await api.worktree.runInitScript(
+          projectPath,
+          worktree.path,
+          worktree.branch
+        );
+
+        if (!result.success) {
+          toast.error('Failed to run init script', {
+            description: result.error,
+          });
+        }
+        // Success feedback will come via WebSocket events (init-started, init-output, init-completed)
+      } catch (error) {
+        toast.error('Failed to run init script', {
+          description: error instanceof Error ? error.message : 'Unknown error',
+        });
+      }
+    },
+    [projectPath]
+  );
 
   const mainWorktree = worktrees.find((w) => w.isMain);
   const nonMainWorktrees = worktrees.filter((w) => !w.isMain);
@@ -162,6 +213,8 @@ export function WorktreePanel({
             onStartDevServer={handleStartDevServer}
             onStopDevServer={handleStopDevServer}
             onOpenDevServerUrl={handleOpenDevServerUrl}
+            onRunInitScript={handleRunInitScript}
+            hasInitScript={hasInitScript}
           />
         )}
       </div>
@@ -216,6 +269,8 @@ export function WorktreePanel({
                   onStartDevServer={handleStartDevServer}
                   onStopDevServer={handleStopDevServer}
                   onOpenDevServerUrl={handleOpenDevServerUrl}
+                  onRunInitScript={handleRunInitScript}
+                  hasInitScript={hasInitScript}
                 />
               );
             })}

@@ -14,6 +14,8 @@ import {
   MessageSquareText,
   User,
   Shield,
+  Cpu,
+  GitBranch,
 } from 'lucide-react';
 import { AnthropicIcon, CursorIcon, OpenAIIcon, OpenCodeIcon } from '@/components/ui/provider-icon';
 import type { SettingsViewId } from '../hooks/use-settings-view';
@@ -37,6 +39,7 @@ export const GLOBAL_NAV_GROUPS: NavigationGroup[] = [
     items: [
       { id: 'model-defaults', label: 'Model Defaults', icon: Workflow },
       { id: 'defaults', label: 'Feature Defaults', icon: FlaskConical },
+      { id: 'worktrees', label: 'Worktrees', icon: GitBranch },
       { id: 'prompts', label: 'Prompt Customization', icon: MessageSquareText },
       { id: 'api-keys', label: 'API Keys', icon: Key },
       {

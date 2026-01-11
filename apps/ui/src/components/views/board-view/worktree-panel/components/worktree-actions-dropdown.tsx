@@ -23,6 +23,7 @@ import {
   MessageSquare,
   GitMerge,
   AlertCircle,
+  RefreshCw,
   Copy,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -55,6 +56,8 @@ interface WorktreeActionsDropdownProps {
   onStartDevServer: (worktree: WorktreeInfo) => void;
   onStopDevServer: (worktree: WorktreeInfo) => void;
   onOpenDevServerUrl: (worktree: WorktreeInfo) => void;
+  onRunInitScript: (worktree: WorktreeInfo) => void;
+  hasInitScript: boolean;
 }
 
 export function WorktreeActionsDropdown({
@@ -80,6 +83,8 @@ export function WorktreeActionsDropdown({
   onStartDevServer,
   onStopDevServer,
   onOpenDevServerUrl,
+  onRunInitScript,
+  hasInitScript,
 }: WorktreeActionsDropdownProps) {
   // Get available editors for the "Open In" submenu
   const { editors } = useAvailableEditors();
@@ -265,6 +270,12 @@ export function WorktreeActionsDropdown({
               </DropdownMenuItem>
             </DropdownMenuSubContent>
           </DropdownMenuSub>
+        )}
+        {!worktree.isMain && hasInitScript && (
+          <DropdownMenuItem onClick={() => onRunInitScript(worktree)} className="text-xs">
+            <RefreshCw className="w-3.5 h-3.5 mr-2" />
+            Re-run Init Script
+          </DropdownMenuItem>
         )}
         <DropdownMenuSeparator />
         {worktree.hasChanges && (

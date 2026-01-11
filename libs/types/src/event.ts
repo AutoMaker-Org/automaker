@@ -39,6 +39,9 @@ export type EventType =
   | 'ideation:idea-created'
   | 'ideation:idea-updated'
   | 'ideation:idea-deleted'
-  | 'ideation:idea-converted';
+  | 'ideation:idea-converted'
+  | 'worktree:init-started'
+  | 'worktree:init-output'
+  | 'worktree:init-completed';
 
 export type EventCallback = (type: EventType, payload: unknown) => void;

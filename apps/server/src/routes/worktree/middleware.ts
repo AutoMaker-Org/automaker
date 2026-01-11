@@ -3,7 +3,8 @@
  */
 
 import type { Request, Response, NextFunction } from 'express';
-import { isGitRepo, hasCommits } from './common.js';
+import { isGitRepo } from '@automaker/git-utils';
+import { hasCommits } from './common.js';
 
 interface ValidationOptions {
   /** Check if the path is a git repository (default: true) */

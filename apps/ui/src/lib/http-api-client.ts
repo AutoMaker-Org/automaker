@@ -507,7 +507,10 @@ type EventType =
   | 'issue-validation:event'
   | 'backlog-plan:event'
   | 'ideation:stream'
-  | 'ideation:analysis';
+  | 'ideation:analysis'
+  | 'worktree:init-started'
+  | 'worktree:init-output'
+  | 'worktree:init-completed';
 
 type EventCallback = (payload: unknown) => void;
 
@@ -846,13 +849,14 @@ export class HttpApiClient implements ElectronAPI {
     return response.json();
   }
 
-  private async httpDelete<T>(endpoint: string): Promise<T> {
+  private async httpDelete<T>(endpoint: string, body?: unknown): Promise<T> {
     // Ensure API key is initialized before making request
     await waitForApiKeyInit();
     const response = await fetch(`${this.serverUrl}${endpoint}`, {
       method: 'DELETE',
       headers: this.getHeaders(),
       credentials: 'include', // Include cookies for session auth
+      body: body ? JSON.stringify(body) : undefined,
     });
 
     if (response.status === 401 || response.status === 403) {
@@ -1647,6 +1651,37 @@ export class HttpApiClient implements ElectronAPI {
     listDevServers: () => this.post('/api/worktree/list-dev-servers', {}),
     getPRInfo: (worktreePath: string, branchName: string) =>
       this.post('/api/worktree/pr-info', { worktreePath, branchName }),
+    // Init script methods
+    getInitScript: (projectPath: string) =>
+      this.get(`/api/worktree/init-script?projectPath=${encodeURIComponent(projectPath)}`),
+    setInitScript: (projectPath: string, content: string) =>
+      this.put('/api/worktree/init-script', { projectPath, content }),
+    deleteInitScript: (projectPath: string) =>
+      this.httpDelete('/api/worktree/init-script', { projectPath }),
+    runInitScript: (projectPath: string, worktreePath: string, branch: string) =>
+      this.post('/api/worktree/run-init-script', { projectPath, worktreePath, branch }),
+    onInitScriptEvent: (
+      callback: (event: {
+        type: 'worktree:init-started' | 'worktree:init-output' | 'worktree:init-completed';
+        payload: unknown;
+      }) => void
+    ) => {
+      // Note: subscribeToEvent callback receives (payload) not (_, payload)
+      const unsub1 = this.subscribeToEvent('worktree:init-started', (payload) =>
+        callback({ type: 'worktree:init-started', payload })
+      );
+      const unsub2 = this.subscribeToEvent('worktree:init-output', (payload) =>
+        callback({ type: 'worktree:init-output', payload })
+      );
+      const unsub3 = this.subscribeToEvent('worktree:init-completed', (payload) =>
+        callback({ type: 'worktree:init-completed', payload })
+      );
+      return () => {
+        unsub1();
+        unsub2();
+        unsub3();
+      };
+    },
   };
 
   // Git API
@@ -2167,9 +2202,10 @@ export class HttpApiClient implements ElectronAPI {
           removedDependencies: string[];
           addedDependencies: string[];
         }>;
-      }
+      },
+      branchName?: string
     ): Promise<{ success: boolean; appliedChanges?: string[]; error?: string }> =>
-      this.post('/api/backlog-plan/apply', { projectPath, plan }),
+      this.post('/api/backlog-plan/apply', { projectPath, plan, branchName }),
 
     onEvent: (callback: (data: unknown) => void): (() => void) => {
       return this.subscribeToEvent('backlog-plan:event', callback as EventCallback);
