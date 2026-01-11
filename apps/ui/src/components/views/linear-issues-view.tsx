@@ -1,12 +1,14 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { Link2Off, Settings } from 'lucide-react';
+import { createLogger } from '@automaker/utils/logger';
 import { getElectronAPI, LinearIssue, IssueValidationResult } from '@/lib/electron';
 import { useAppStore } from '@/store/app-store';
 import { LoadingState } from '@/components/ui/loading-state';
 import { ErrorState } from '@/components/ui/error-state';
 import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
+import { cn, pathsEqual } from '@/lib/utils';
 import { useNavigate } from '@tanstack/react-router';
+import { toast } from 'sonner';
 import type { PhaseModelEntry, ModelAlias, CursorModelId } from '@automaker/types';
 import {
   useLinearConnection,
@@ -22,6 +24,9 @@ import {
   LinearIssueDetail,
 } from './linear-issues-view/components';
 import { ImportDialog, LinearValidationDialog } from './linear-issues-view/dialogs';
+import { getFeaturePriority } from './linear-issues-view/utils';
+
+const logger = createLogger('LinearIssuesView');
 
 /**
  * Normalize PhaseModelEntry or string to PhaseModelEntry
@@ -48,7 +53,14 @@ export function LinearIssuesView() {
   // Track which issues have been auto-validated this session
   const autoValidatedRef = useRef<Set<string>>(new Set());
 
-  const { currentProject, phaseModels } = useAppStore();
+  const {
+    currentProject,
+    phaseModels,
+    defaultAIProfileId,
+    aiProfiles,
+    getCurrentWorktree,
+    worktreesByProject,
+  } = useAppStore();
   const navigate = useNavigate();
 
   // Calculate effective model entry
@@ -60,6 +72,27 @@ export function LinearIssuesView() {
   }, [modelOverrideEntry, phaseModels.validationModel]);
 
   const isModelOverridden = modelOverrideEntry !== null;
+
+  // Get default AI profile for task creation
+  const defaultProfile = useMemo(() => {
+    if (!defaultAIProfileId) return null;
+    return aiProfiles.find((p) => p.id === defaultAIProfileId) ?? null;
+  }, [defaultAIProfileId, aiProfiles]);
+
+  // Get current branch from selected worktree
+  const currentBranch = useMemo(() => {
+    if (!currentProject?.path) return '';
+    const currentWorktreeInfo = getCurrentWorktree(currentProject.path);
+    const worktrees = worktreesByProject[currentProject.path] ?? [];
+    const currentWorktreePath = currentWorktreeInfo?.path ?? null;
+
+    const selectedWorktree =
+      currentWorktreePath === null
+        ? worktrees.find((w) => w.isMain)
+        : worktrees.find((w) => !w.isMain && pathsEqual(w.path, currentWorktreePath));
+
+    return selectedWorktree?.branch || worktrees.find((w) => w.isMain)?.branch || '';
+  }, [currentProject?.path, getCurrentWorktree, worktreesByProject]);
 
   // Connection status
   const { isConnected, loading: connectionLoading, error: connectionError } = useLinearConnection();
@@ -218,6 +251,75 @@ export function LinearIssuesView() {
       handleViewCachedValidation(selectedIssue);
     }
   }, [selectedIssue, handleViewCachedValidation]);
+
+  // Convert validated issue to a task on the Kanban board
+  const handleConvertToTask = useCallback(
+    async (issue: LinearIssue, validation: IssueValidationResult) => {
+      if (!currentProject?.path) {
+        toast.error('No project selected');
+        return;
+      }
+
+      try {
+        const api = getElectronAPI();
+        if (api.features?.create) {
+          // Build description from issue body + validation info
+          const description = [
+            `**From Linear Issue [${issue.identifier}](${issue.url})**`,
+            '',
+            issue.description || 'No description provided.',
+            '',
+            '---',
+            '',
+            '**AI Validation Analysis:**',
+            validation.reasoning,
+            validation.suggestedFix ? `\n**Suggested Approach:**\n${validation.suggestedFix}` : '',
+            validation.relatedFiles?.length
+              ? `\n**Related Files:**\n${validation.relatedFiles.map((f) => `- \`${f}\``).join('\n')}`
+              : '',
+          ]
+            .filter(Boolean)
+            .join('\n');
+
+          // Use profile default model
+          const featureModel = defaultProfile?.model ?? 'opus';
+
+          const feature = {
+            id: `linear-${issue.identifier}-${crypto.randomUUID()}`,
+            title: issue.title,
+            description,
+            category: issue.labels?.[0]?.name || 'From Linear',
+            status: 'backlog' as const,
+            passes: false,
+            priority: getFeaturePriority(validation.estimatedComplexity),
+            model: featureModel,
+            thinkingLevel: defaultProfile?.thinkingLevel ?? 'none',
+            branchName: currentBranch,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            steps: [],
+            // Linear-specific metadata
+            source: 'linear' as const,
+            linearIssueId: issue.id,
+            linearIdentifier: issue.identifier,
+            linearUrl: issue.url,
+          };
+
+          const result = await api.features.create(currentProject.path, feature);
+          if (result.success) {
+            toast.success(`Created task: ${issue.title}`);
+            setShowValidationDialog(false);
+          } else {
+            toast.error(result.error || 'Failed to create task');
+          }
+        }
+      } catch (err) {
+        logger.error('Convert to task error:', err);
+        toast.error(err instanceof Error ? err.message : 'Failed to create task');
+      }
+    },
+    [currentProject?.path, defaultProfile, currentBranch]
+  );
 
   // Loading state
   if (connectionLoading) {
@@ -415,6 +517,7 @@ export function LinearIssuesView() {
         onOpenChange={setShowValidationDialog}
         issue={selectedIssue}
         validationResult={validationResult}
+        onConvertToTask={handleConvertToTask}
       />
     </div>
   );

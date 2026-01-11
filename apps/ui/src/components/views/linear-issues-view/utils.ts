@@ -1,4 +1,22 @@
 import { VALIDATION_STALENESS_HOURS } from './constants';
+import type { IssueComplexity } from '@/lib/electron';
+
+/**
+ * Map issue complexity to feature priority.
+ * Lower complexity issues get higher priority (1 = high, 2 = medium).
+ */
+export function getFeaturePriority(complexity: IssueComplexity | undefined): number {
+  switch (complexity) {
+    case 'trivial':
+    case 'simple':
+      return 1; // High priority for easy wins
+    case 'moderate':
+    case 'complex':
+    case 'very_complex':
+    default:
+      return 2; // Medium priority for larger efforts
+  }
+}
 
 /**
  * Check if a validation is stale (older than VALIDATION_STALENESS_HOURS)
