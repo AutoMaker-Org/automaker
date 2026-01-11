@@ -240,3 +240,25 @@ export type {
   IdeationStreamEvent,
   IdeationAnalysisEvent,
 } from './ideation.js';
+
+// Linear integration types
+export type {
+  LinearTeam,
+  LinearProject,
+  LinearUser,
+  LinearLabel,
+  LinearWorkflowState,
+  LinearIssue,
+  LinearAttachment,
+  LinearComment,
+  LinearConnectionStatus,
+  LinearIssueFilters,
+  LinearIssuesResult,
+  LinearTeamsResult,
+  LinearProjectsResult,
+  LinearIssueResult,
+  LinearImportOptions,
+  LinearImportResult,
+  LinearFilterPreset,
+  LinearSettings,
+} from './linear.js';

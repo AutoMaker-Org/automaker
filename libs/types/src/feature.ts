@@ -67,6 +67,19 @@ export interface Feature {
   summary?: string;
   startedAt?: string;
   descriptionHistory?: DescriptionHistoryEntry[]; // History of description changes
+
+  // Source tracking - where this feature came from
+  /** Source of the feature: manual, github, linear, or ideation */
+  source?: 'manual' | 'github' | 'linear' | 'ideation';
+
+  // Linear integration metadata (when source === 'linear')
+  /** Linear issue unique ID */
+  linearIssueId?: string;
+  /** Linear issue identifier (e.g., "ENG-123") */
+  linearIdentifier?: string;
+  /** Direct URL to the Linear issue */
+  linearUrl?: string;
+
   [key: string]: unknown; // Keep catch-all for extensibility
 }
 

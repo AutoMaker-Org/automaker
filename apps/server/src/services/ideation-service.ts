@@ -41,6 +41,7 @@ import type { FeatureLoader } from './feature-loader.js';
 import { createChatOptions, validateWorkingDirectory } from '../lib/sdk-options.js';
 import { resolveModelString } from '@automaker/model-resolver';
 import { stripProviderPrefix } from '@automaker/types';
+import { extractJsonWithArray } from '../lib/json-extractor.js';
 
 const logger = createLogger('IdeationService');
 
@@ -203,7 +204,21 @@ export class IdeationService {
       );
 
       // Resolve model alias to canonical identifier (with prefix)
-      const modelId = resolveModelString(options?.model ?? 'sonnet');
+      // Priority: explicit option -> global settings phase models -> default 'sonnet'
+      let chosenModelAlias: string | undefined = options?.model;
+      if (!chosenModelAlias && this.settingsService) {
+        try {
+          const settings = await this.settingsService.getGlobalSettings();
+          // Prefer feature generation for ideation chat; fall back to suggestions/enhancement
+          chosenModelAlias =
+            settings.phaseModels?.featureGenerationModel?.model ||
+            settings.phaseModels?.suggestionsModel?.model ||
+            settings.phaseModels?.enhancementModel?.model;
+        } catch (e) {
+          // Non-fatal: fall through to default
+        }
+      }
+      const modelId = resolveModelString(chosenModelAlias ?? 'sonnet');
 
       // Create SDK options
       const sdkOptions = createChatOptions({
@@ -214,6 +229,9 @@ export class IdeationService {
       });
 
       const provider = ProviderFactory.getProviderForModel(modelId);
+      logger.info(
+        `[Ideation] Using model ${modelId} (provider ${provider.getName()}); tools: none; maxTurns: 1`
+      );
 
       // Strip provider prefix - providers need bare model IDs
       const bareModel = stripProviderPrefix(modelId);
@@ -225,6 +243,8 @@ export class IdeationService {
         cwd: projectPath,
         systemPrompt: sdkOptions.systemPrompt,
         maxTurns: 1, // Single turn for ideation
+        // Keep ideation lightweight and deterministic: no tools, text-only
+        allowedTools: [],
         abortController: activeSession.abortController!,
         conversationHistory: conversationHistory.length > 0 ? conversationHistory : undefined,
       };
@@ -271,6 +291,9 @@ export class IdeationService {
         content: responseText,
         done: true,
       });
+      logger.info(
+        `[Ideation] Emitted message-complete for session ${sessionId}; response length=${responseText.length}`
+      );
 
       // Save session
       await this.saveSessionToDisk(projectPath, activeSession.session, activeSession.messages);
@@ -654,7 +677,17 @@ export class IdeationService {
       );
 
       // Resolve model alias to canonical identifier (with prefix)
-      const modelId = resolveModelString('sonnet');
+      // Use configured suggestions model if available; fall back to default 'sonnet'
+      let suggestionsModelAlias: string | undefined;
+      if (this.settingsService) {
+        try {
+          const settings = await this.settingsService.getGlobalSettings();
+          suggestionsModelAlias = settings.phaseModels?.suggestionsModel?.model;
+        } catch (e) {
+          // Non-fatal: fall through to default
+        }
+      }
+      const modelId = resolveModelString(suggestionsModelAlias ?? 'sonnet');
 
       // Create SDK options
       const sdkOptions = createChatOptions({
@@ -666,18 +699,65 @@ export class IdeationService {
 
       const provider = ProviderFactory.getProviderForModel(modelId);
 
+      // Build provider-specific prompt and schema
+      let promptText = prompt.prompt;
+      // Default: array schema of suggestion items
+      const arraySchema = {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            title: { type: 'string' },
+            description: { type: 'string' },
+            rationale: { type: 'string' },
+            priority: { type: 'string', enum: ['high', 'medium', 'low'] },
+          },
+          required: ['title', 'description', 'priority'],
+          additionalProperties: true,
+        },
+        minItems: 1,
+      } as const;
+      // Object schema expected by some providers (Codex) -> { suggestions: [...] }
+      const objectSchema = {
+        type: 'object',
+        properties: { suggestions: arraySchema },
+        required: ['suggestions'],
+        additionalProperties: true,
+      } as const;
+
+      let outputFormat: { type: 'json_schema'; schema: Record<string, unknown> } = {
+        type: 'json_schema',
+        schema: arraySchema as unknown as Record<string, unknown>,
+      };
+
+      if (provider.getName() === 'codex') {
+        // Codex works best when asked for a JSON object with a named property
+        promptText = `${prompt.prompt}\n\nCRITICAL INSTRUCTIONS:\n- Respond with ONLY a JSON object with a single property \"suggestions\": an array of suggestion objects.\n- No extra text before or after the JSON.\n- Each suggestion must have title, description, rationale, priority (high|medium|low).`;
+        outputFormat = {
+          type: 'json_schema',
+          schema: objectSchema as unknown as Record<string, unknown>,
+        };
+      }
+
+      const maxTurnsForProvider = provider.getName() === 'codex' ? 5 : 1;
+      logger.info(
+        `[Ideation] Suggestions using model ${modelId} (provider ${provider.getName()}); tools: none; maxTurns: ${maxTurnsForProvider}; outputFormat: json_schema (${provider.getName() === 'codex' ? 'object.suggestions' : 'array'})`
+      );
+
       // Strip provider prefix - providers need bare model IDs
       const bareModel = stripProviderPrefix(modelId);
 
       const executeOptions: ExecuteOptions = {
-        prompt: prompt.prompt,
+        prompt: promptText,
         model: bareModel,
         originalModel: modelId,
         cwd: projectPath,
         systemPrompt: sdkOptions.systemPrompt,
-        maxTurns: 1,
+        maxTurns: maxTurnsForProvider,
         // Disable all tools - we just want text generation, not codebase analysis
         allowedTools: [],
+        // Help Codex/Claude produce JSON directly when possible
+        outputFormat,
         abortController: new AbortController(),
       };
 
@@ -697,7 +777,16 @@ export class IdeationService {
       }
 
       // Parse the response into structured suggestions
-      const suggestions = this.parseSuggestionsFromResponse(responseText, category);
+      let suggestions = this.parseSuggestionsFromResponse(responseText, category);
+      if (!suggestions || suggestions.length === 0) {
+        logger.warn(
+          `No suggestions parsed from provider response (length=${responseText?.length || 0}). Using fallback suggestions.`
+        );
+        suggestions = this.generateFallbackSuggestions(category, count);
+      }
+
+      // Deduplicate suggestions by normalized title+description and cap to requested count
+      suggestions = this.deduplicateSuggestions(suggestions).slice(0, count);
 
       // Emit complete event
       this.events.emit('ideation:suggestions', {
@@ -774,6 +863,22 @@ ${contextSection}${existingWorkSection}`;
     category: IdeaCategory
   ): AnalysisSuggestion[] {
     try {
+      // First try to extract { suggestions: [...] } shape via robust extractor
+      const extracted = extractJsonWithArray<{ suggestions: any[] }>(response, 'suggestions', {
+        logger,
+      });
+      if (extracted && Array.isArray(extracted.suggestions)) {
+        return extracted.suggestions.map((item: any, index: number) => ({
+          id: this.generateId('sug'),
+          category,
+          title: item.title || `Suggestion ${index + 1}`,
+          description: item.description || '',
+          rationale: item.rationale || '',
+          priority: item.priority || 'medium',
+          relatedFiles: item.relatedFiles || [],
+        }));
+      }
+
       // Try to extract JSON from the response
       const jsonMatch = response.match(/\[[\s\S]*\]/);
       if (!jsonMatch) {
@@ -799,6 +904,180 @@ ${contextSection}${existingWorkSection}`;
       logger.warn('Failed to parse JSON response:', error);
       return this.parseTextResponse(response, category);
     }
+  }
+
+  /**
+   * Generate simple deterministic fallback suggestions when provider returns empty output
+   */
+  private generateFallbackSuggestions(
+    category: IdeaCategory,
+    count: number = 5
+  ): AnalysisSuggestion[] {
+    const bank: Record<
+      IdeaCategory,
+      Array<{
+        title: string;
+        description: string;
+        rationale: string;
+        priority: 'high' | 'medium' | 'low';
+      }>
+    > = {
+      feature: [
+        {
+          title: 'Keyboard Shortcuts Palette',
+          description: 'Add a searchable command palette with common actions and shortcuts.',
+          rationale: 'Improves productivity and discoverability for power users.',
+          priority: 'medium',
+        },
+        {
+          title: 'Export/Import Settings',
+          description: 'Allow users to export and import app settings as JSON.',
+          rationale: 'Enables easy migration and backup of preferences.',
+          priority: 'low',
+        },
+      ],
+      'ux-ui': [
+        {
+          title: 'Consistent Spacing Scale',
+          description: 'Adopt a consistent 4/8px spacing scale across components.',
+          rationale: 'Creates visual harmony and reduces UI debt.',
+          priority: 'medium',
+        },
+        {
+          title: 'Focusable States Audit',
+          description: 'Ensure interactive elements have clear focus states in light/dark modes.',
+          rationale: 'Improves usability for keyboard users and clarity overall.',
+          priority: 'high',
+        },
+      ],
+      dx: [
+        {
+          title: 'Pre-commit Lint + Type Check',
+          description: 'Run ESLint and TypeScript type checks on staged files.',
+          rationale: 'Catches issues earlier and keeps main clean.',
+          priority: 'high',
+        },
+        {
+          title: 'Storybook for UI Components',
+          description: 'Document common UI components with interactive stories.',
+          rationale: 'Improves reusability and design alignment.',
+          priority: 'medium',
+        },
+      ],
+      growth: [
+        {
+          title: 'Onboarding Checklist',
+          description: 'Guide new users through key setup steps with progress tracking.',
+          rationale: 'Improves activation and early retention.',
+          priority: 'high',
+        },
+        {
+          title: 'Invite Teammates',
+          description: 'Add an in-app invite flow with role selection.',
+          rationale: 'Encourages team onboarding and collaboration.',
+          priority: 'medium',
+        },
+      ],
+      technical: [
+        {
+          title: 'Module Boundaries Enforcement',
+          description: 'Introduce lint rules to prevent cross-layer imports.',
+          rationale: 'Maintains architecture integrity over time.',
+          priority: 'medium',
+        },
+        {
+          title: 'Observability Baseline',
+          description: 'Set up structured logging and error tracking with sampling.',
+          rationale: 'Speeds up debugging and incident response.',
+          priority: 'high',
+        },
+      ],
+      security: [
+        {
+          title: 'Dependency Vulnerability Scan',
+          description: 'Add scheduled scans and alerts for vulnerable packages.',
+          rationale: 'Reduces exposure to known CVEs.',
+          priority: 'high',
+        },
+        {
+          title: 'Secrets Hygiene',
+          description: 'Enforce .env.example and pre-commit checks for leaked secrets.',
+          rationale: 'Prevents accidental credential exposure.',
+          priority: 'high',
+        },
+      ],
+      performance: [
+        {
+          title: 'Code Splitting Audit',
+          description: 'Identify top routes for dynamic import and lazy loading.',
+          rationale: 'Improves TTI and initial bundle size.',
+          priority: 'medium',
+        },
+        {
+          title: 'DB Index Review',
+          description: 'Audit slow queries and add missing composite indexes.',
+          rationale: 'Lowers P95 latency for critical endpoints.',
+          priority: 'high',
+        },
+      ],
+      accessibility: [
+        {
+          title: 'Semantic Landmarks',
+          description: 'Ensure pages use header, main, nav, aside, and footer landmarks.',
+          rationale: 'Improves screen reader navigation and structure.',
+          priority: 'high',
+        },
+        {
+          title: 'Color Contrast Audit',
+          description: 'Enforce WCAG AA contrast and add tokens for accessible variants.',
+          rationale: 'Ensures readability across themes and devices.',
+          priority: 'high',
+        },
+      ],
+      analytics: [
+        {
+          title: 'Core Events Schema',
+          description: 'Define a minimal analytics schema for key user actions.',
+          rationale: 'Enables consistent event tracking and dashboards.',
+          priority: 'medium',
+        },
+        {
+          title: 'Funnel Dashboard',
+          description: 'Add a simple dashboard for activation and retention funnels.',
+          rationale: 'Surfaces product KPIs for the team.',
+          priority: 'low',
+        },
+      ],
+    };
+
+    const pool = bank[category] ?? bank['feature'];
+    // Do not repeat items; take up to requested count from the pool
+    const take = Math.min(Math.max(count, 1), pool.length);
+    return pool.slice(0, take).map((b) => ({
+      id: this.generateId('sug'),
+      category,
+      title: b.title,
+      description: b.description,
+      rationale: b.rationale,
+      priority: b.priority,
+    }));
+  }
+
+  /**
+   * Deduplicate suggestions based on normalized title + description
+   */
+  private deduplicateSuggestions(suggestions: AnalysisSuggestion[]): AnalysisSuggestion[] {
+    const seen = new Set<string>();
+    const norm = (s: string) => s.toLowerCase().replace(/\s+/g, ' ').trim();
+    const result: AnalysisSuggestion[] = [];
+    for (const s of suggestions) {
+      const key = `${norm(s.title)}|${norm(s.description)}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        result.push(s);
+      }
+    }
+    return result;
   }
 
   /**

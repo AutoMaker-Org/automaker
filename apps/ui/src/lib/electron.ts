@@ -25,6 +25,19 @@ import type {
   CreateIdeaInput,
   UpdateIdeaInput,
   ConvertToFeatureOptions,
+  // Linear integration types
+  LinearTeam,
+  LinearProject,
+  LinearIssue,
+  LinearUser,
+  LinearConnectionStatus,
+  LinearIssueFilters,
+  LinearIssuesResult,
+  LinearTeamsResult,
+  LinearProjectsResult,
+  LinearIssueResult,
+  LinearImportOptions,
+  LinearImportResult,
 } from '@automaker/types';
 import { getJSON, setJSON, removeItem } from './storage';
 
@@ -56,6 +69,22 @@ export type {
   CreateIdeaInput,
   UpdateIdeaInput,
   ConvertToFeatureOptions,
+};
+
+// Re-export Linear integration types
+export type {
+  LinearTeam,
+  LinearProject,
+  LinearIssue,
+  LinearUser,
+  LinearConnectionStatus,
+  LinearIssueFilters,
+  LinearIssuesResult,
+  LinearTeamsResult,
+  LinearProjectsResult,
+  LinearIssueResult,
+  LinearImportOptions,
+  LinearImportResult,
 };
 
 // Ideation API interface
@@ -365,6 +394,22 @@ export interface GitHubAPI {
   }>;
 }
 
+// Linear API interface
+export interface LinearAPI {
+  /** Check Linear API connection status */
+  checkConnection: () => Promise<LinearConnectionStatus>;
+  /** Get all accessible teams */
+  getTeams: () => Promise<LinearTeamsResult>;
+  /** Get projects for a specific team */
+  getProjects: (teamId: string) => Promise<LinearProjectsResult>;
+  /** Get issues with optional filters */
+  getIssues: (filters: LinearIssueFilters) => Promise<LinearIssuesResult>;
+  /** Get a single issue by ID */
+  getIssue: (issueId: string) => Promise<LinearIssueResult>;
+  /** Import Linear issues as features */
+  importIssues: (projectPath: string, options: LinearImportOptions) => Promise<LinearImportResult>;
+}
+
 // Feature Suggestions types
 export interface FeatureSuggestion {
   id: string;
@@ -608,6 +653,7 @@ export interface ElectronAPI {
   features?: FeaturesAPI;
   runningAgents?: RunningAgentsAPI;
   github?: GitHubAPI;
+  linear?: LinearAPI;
   enhancePrompt?: {
     enhance: (
       originalText: string,
@@ -1218,6 +1264,9 @@ const getMockElectronAPI = (): ElectronAPI => {
 
     // Mock GitHub API
     github: createMockGitHubAPI(),
+
+    // Mock Linear API
+    linear: createMockLinearAPI(),
 
     // Mock Claude API
     claude: {
@@ -2999,6 +3048,55 @@ function createMockGitHubAPI(): GitHubAPI {
         comments: [],
         totalCount: 0,
         hasNextPage: false,
+      };
+    },
+  };
+}
+
+// Mock Linear API implementation
+function createMockLinearAPI(): LinearAPI {
+  return {
+    checkConnection: async () => {
+      console.log('[Mock] Checking Linear connection');
+      return {
+        connected: false,
+        error: 'Linear API key not configured',
+      };
+    },
+    getTeams: async () => {
+      console.log('[Mock] Getting Linear teams');
+      return {
+        success: false,
+        error: 'Linear API key not configured',
+      };
+    },
+    getProjects: async (teamId: string) => {
+      console.log('[Mock] Getting Linear projects for team:', teamId);
+      return {
+        success: false,
+        error: 'Linear API key not configured',
+      };
+    },
+    getIssues: async (filters: LinearIssueFilters) => {
+      console.log('[Mock] Getting Linear issues with filters:', filters);
+      return {
+        success: false,
+        error: 'Linear API key not configured',
+      };
+    },
+    getIssue: async (issueId: string) => {
+      console.log('[Mock] Getting Linear issue:', issueId);
+      return {
+        success: false,
+        error: 'Linear API key not configured',
+      };
+    },
+    importIssues: async (projectPath: string, options: LinearImportOptions) => {
+      console.log('[Mock] Importing Linear issues:', { projectPath, options });
+      return {
+        success: false,
+        importedCount: 0,
+        error: 'Linear API key not configured',
       };
     },
   };

@@ -148,6 +148,7 @@ describe('IdeationService', () => {
 
         // Mock provider
         const mockProvider = {
+          getName: vi.fn().mockReturnValue('claude'),
           executeQuery: vi.fn().mockReturnValue({
             async *[Symbol.asyncIterator]() {
               yield {
@@ -738,6 +739,7 @@ describe('IdeationService', () => {
         vi.mocked(secureFs.readFile).mockResolvedValue(JSON.stringify({}));
 
         const mockProvider = {
+          getName: vi.fn().mockReturnValue('claude'),
           executeQuery: vi.fn().mockReturnValue({
             async *[Symbol.asyncIterator]() {
               yield {

@@ -14,6 +14,7 @@ import { getAllOpencodeModelIds, DEFAULT_OPENCODE_MODEL } from './opencode-model
 import type { PromptCustomization } from './prompts.js';
 import type { CodexSandboxMode, CodexApprovalPolicy } from './codex.js';
 import type { ReasoningEffort } from './provider.js';
+import type { LinearSettings } from './linear.js';
 
 // Re-export ModelAlias for convenience
 export type { ModelAlias };
@@ -500,6 +501,10 @@ export interface GlobalSettings {
    * Value: agent configuration
    */
   customSubagents?: Record<string, import('./provider.js').AgentDefinition>;
+
+  // Linear Integration Settings
+  /** Linear integration configuration (default team, filters, presets) */
+  linearSettings?: LinearSettings;
 }
 
 /**
@@ -519,6 +524,8 @@ export interface Credentials {
     google: string;
     /** OpenAI API key (for compatibility or alternative providers) */
     openai: string;
+    /** Linear API key for issue tracking integration */
+    linear: string;
   };
 }
 
@@ -725,6 +732,7 @@ export const DEFAULT_CREDENTIALS: Credentials = {
     anthropic: '',
     google: '',
     openai: '',
+    linear: '',
   },
 };
 

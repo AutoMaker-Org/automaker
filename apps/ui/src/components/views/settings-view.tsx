@@ -26,6 +26,7 @@ import {
 } from './settings-view/providers';
 import { MCPServersSection } from './settings-view/mcp-servers';
 import { PromptCustomizationSection } from './settings-view/prompts';
+import { LinearSettings } from './settings-view/integrations';
 import type { Project as SettingsProject, Theme } from './settings-view/shared/types';
 import type { Project as ElectronProject } from '@/lib/electron';
 
@@ -169,6 +170,8 @@ export function SettingsView() {
             onSkipSandboxWarningChange={setSkipSandboxWarning}
           />
         );
+      case 'integrations':
+        return <LinearSettings />;
       case 'danger':
         return (
           <DangerZoneSection

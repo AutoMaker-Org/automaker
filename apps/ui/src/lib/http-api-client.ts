@@ -32,6 +32,10 @@ import type {
   CreateIdeaInput,
   UpdateIdeaInput,
   ConvertToFeatureOptions,
+  // Linear integration types
+  LinearAPI,
+  LinearIssueFilters,
+  LinearImportOptions,
 } from './electron';
 import type { Message, SessionListItem } from '@/types/electron';
 import type { Feature, ClaudeUsageResponse, CodexUsageResponse } from '@/store/app-store';
@@ -1720,6 +1724,17 @@ export class HttpApiClient implements ElectronAPI {
       this.subscribeToEvent('issue-validation:event', callback as EventCallback),
     getIssueComments: (projectPath: string, issueNumber: number, cursor?: string) =>
       this.post('/api/github/issue-comments', { projectPath, issueNumber, cursor }),
+  };
+
+  // Linear API
+  linear: LinearAPI = {
+    checkConnection: () => this.get('/api/linear/connection'),
+    getTeams: () => this.get('/api/linear/teams'),
+    getProjects: (teamId: string) => this.get(`/api/linear/projects?teamId=${teamId}`),
+    getIssues: (filters: LinearIssueFilters) => this.post('/api/linear/issues', filters),
+    getIssue: (issueId: string) => this.get(`/api/linear/issues/${issueId}`),
+    importIssues: (projectPath: string, options: LinearImportOptions) =>
+      this.post('/api/linear/import', { projectPath, options }),
   };
 
   // Workspace API
