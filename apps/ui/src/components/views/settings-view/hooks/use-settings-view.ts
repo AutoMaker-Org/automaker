@@ -18,6 +18,7 @@ export type SettingsViewId =
   | 'defaults'
   | 'account'
   | 'security'
+  | 'integrations'
   | 'danger';
 
 interface UseSettingsViewOptions {

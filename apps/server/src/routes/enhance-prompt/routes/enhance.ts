@@ -6,7 +6,7 @@
  */
 
 import type { Request, Response } from 'express';
-import { query } from '@anthropic-ai/claude-agent-sdk';
+// Use provider abstraction instead of calling SDK directly
 import { createLogger } from '@automaker/utils';
 import { resolveModelString } from '@automaker/model-resolver';
 import {
@@ -14,7 +14,6 @@ import {
   isCursorModel,
   stripProviderPrefix,
   ThinkingLevel,
-  getThinkingTokenBudget,
 } from '@automaker/types';
 import { ProviderFactory } from '../../../providers/provider-factory.js';
 import type { SettingsService } from '../../../services/settings-service.js';
@@ -203,49 +202,58 @@ export function createEnhanceHandler(
 
       logger.debug(`Using model: ${resolvedModel}`);
 
-      let enhancedText: string;
+      let enhancedText = '';
 
-      // Route to appropriate provider based on model
-      if (isCursorModel(resolvedModel)) {
-        // Use Cursor provider for Cursor models
-        logger.info(`Using Cursor provider for model: ${resolvedModel}`);
+      // Use ProviderFactory to route correctly (Claude, Codex, Cursor, etc.)
+      const provider = ProviderFactory.getProviderForModel(resolvedModel);
+      const providerName = provider.getName();
+      const bareModel = stripProviderPrefix(resolvedModel);
+      logger.info(
+        `Using ${providerName.charAt(0).toUpperCase() + providerName.slice(1)} provider for model: ${resolvedModel}`
+      );
 
-        // Cursor doesn't have a separate system prompt concept, so combine them
+      if (providerName === 'cursor') {
+        // Cursor does not support a separate systemPrompt: combine it
         const combinedPrompt = `${systemPrompt}\n\n${userPrompt}`;
         enhancedText = await executeWithCursor(combinedPrompt, resolvedModel);
       } else {
-        // Use Claude SDK for Claude models
-        logger.info(`Using Claude provider for model: ${resolvedModel}`);
+        // For Codex, be explicit about response format and allow a couple of turns
+        const extraFormatInstruction =
+          providerName === 'codex'
+            ? '\n\nCRITICAL: Respond with ONLY the improved text. No JSON, no code fences, no preface.'
+            : '';
+        const providerPrompt = `${userPrompt}${extraFormatInstruction}`;
+        const maxTurns = providerName === 'codex' ? 3 : 1;
 
-        // Convert thinkingLevel to maxThinkingTokens for SDK
-        const maxThinkingTokens = getThinkingTokenBudget(thinkingLevel);
-        const queryOptions: Parameters<typeof query>[0]['options'] = {
-          model: resolvedModel,
+        for await (const msg of provider.executeQuery({
+          prompt: providerPrompt,
+          model: bareModel,
+          originalModel: resolvedModel,
+          cwd: process.cwd(),
           systemPrompt,
-          maxTurns: 1,
+          maxTurns,
           allowedTools: [],
-          permissionMode: 'acceptEdits',
-        };
-        if (maxThinkingTokens) {
-          queryOptions.maxThinkingTokens = maxThinkingTokens;
+          thinkingLevel, // Only used by Claude
+          readOnly: true,
+        })) {
+          if (msg.type === 'assistant' && msg.message?.content) {
+            for (const block of msg.message.content) {
+              if (block.type === 'text' && block.text) {
+                enhancedText += block.text;
+              }
+            }
+          } else if (msg.type === 'result' && msg.subtype === 'success' && msg.result) {
+            if (msg.result.length > enhancedText.length) {
+              enhancedText = msg.result;
+            }
+          }
         }
-
-        const stream = query({
-          prompt: userPrompt,
-          options: queryOptions,
-        });
-
-        enhancedText = await extractTextFromStream(stream);
       }
 
       if (!enhancedText || enhancedText.trim().length === 0) {
-        logger.warn('Received empty response from AI');
-        const response: EnhanceErrorResponse = {
-          success: false,
-          error: 'Failed to generate enhanced text - empty response',
-        };
-        res.status(500).json(response);
-        return;
+        // Fallback: return original text unchanged to avoid 500 for empty Codex output
+        logger.warn('Received empty response from AI, returning original text unchanged');
+        enhancedText = trimmedText;
       }
 
       logger.info(`Enhancement complete, output length: ${enhancedText.length} chars`);

@@ -667,6 +667,7 @@ export class SettingsService {
             anthropic: apiKeys.anthropic || '',
             google: apiKeys.google || '',
             openai: apiKeys.openai || '',
+            linear: '',
           },
         });
         migratedCredentials = true;

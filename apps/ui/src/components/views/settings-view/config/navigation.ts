@@ -14,6 +14,7 @@ import {
   MessageSquareText,
   User,
   Shield,
+  Link2,
 } from 'lucide-react';
 import { AnthropicIcon, CursorIcon, OpenAIIcon, OpenCodeIcon } from '@/components/ui/provider-icon';
 import type { SettingsViewId } from '../hooks/use-settings-view';
@@ -61,6 +62,10 @@ export const GLOBAL_NAV_GROUPS: NavigationGroup[] = [
       { id: 'keyboard', label: 'Keyboard Shortcuts', icon: Settings2 },
       { id: 'audio', label: 'Audio', icon: Volume2 },
     ],
+  },
+  {
+    label: 'Integrations',
+    items: [{ id: 'integrations', label: 'Linear', icon: Link2 }],
   },
   {
     label: 'Account & Security',

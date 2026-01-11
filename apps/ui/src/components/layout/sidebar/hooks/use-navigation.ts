@@ -11,6 +11,7 @@ import {
   Lightbulb,
   Brain,
   Network,
+  Link2,
 } from 'lucide-react';
 import type { NavSection, NavItem } from '../types';
 import type { KeyboardShortcut } from '@/hooks/use-keyboard-shortcuts';
@@ -73,6 +74,8 @@ export function useNavigation({
 }: UseNavigationProps) {
   // Track if current project has a GitHub remote
   const [hasGitHubRemote, setHasGitHubRemote] = useState(false);
+  // Track if Linear is connected
+  const [hasLinearConnection, setHasLinearConnection] = useState(false);
 
   useEffect(() => {
     async function checkGitHubRemote() {
@@ -94,6 +97,23 @@ export function useNavigation({
 
     checkGitHubRemote();
   }, [currentProject?.path]);
+
+  // Check Linear connection status
+  useEffect(() => {
+    async function checkLinearConnection() {
+      try {
+        const api = getElectronAPI();
+        if (api.linear) {
+          const result = await api.linear.checkConnection();
+          setHasLinearConnection(result.connected === true);
+        }
+      } catch {
+        setHasLinearConnection(false);
+      }
+    }
+
+    checkLinearConnection();
+  }, []);
 
   // Build navigation sections
   const navSections: NavSection[] = useMemo(() => {
@@ -201,6 +221,20 @@ export function useNavigation({
       });
     }
 
+    // Add Linear section if connected
+    if (hasLinearConnection) {
+      sections.push({
+        label: 'Linear',
+        items: [
+          {
+            id: 'linear',
+            label: 'Issues',
+            icon: Link2,
+          },
+        ],
+      });
+    }
+
     return sections;
   }, [
     shortcuts,
@@ -208,6 +242,7 @@ export function useNavigation({
     hideContext,
     hideTerminal,
     hasGitHubRemote,
+    hasLinearConnection,
     unviewedValidationsCount,
     isSpecGenerating,
   ]);
