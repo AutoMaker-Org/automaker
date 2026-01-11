@@ -369,6 +369,47 @@ export function PhaseModelSelector({
     };
   }, [favoriteModels, availableCursorModels, transformedCodexModels, allOpencodeModels]);
 
+  // Group OpenCode models by provider prefix for better organization
+  const groupedOpencodeModels = useMemo(() => {
+    const groups: Record<string, ModelOption[]> = {};
+    const providerDisplayNames: Record<string, string> = {
+      opencode: 'OpenCode Free Tier',
+      'amazon-bedrock': 'Amazon Bedrock',
+      'github-copilot': 'GitHub Copilot',
+      'zai-coding-plan': 'Z.AI Coding Plan',
+      google: 'Google AI',
+      anthropic: 'Anthropic',
+      openai: 'OpenAI',
+      xai: 'xAI',
+      deepseek: 'DeepSeek',
+      ollama: 'Ollama',
+      lmstudio: 'LM Studio',
+      azure: 'Azure OpenAI',
+    };
+
+    opencode.forEach((model) => {
+      // Extract provider from model ID (e.g., "github-copilot/gpt-4o" -> "github-copilot")
+      const providerKey = model.id.includes('/') ? model.id.split('/')[0] : 'opencode';
+      const groupName = providerDisplayNames[providerKey] || providerKey;
+
+      if (!groups[groupName]) {
+        groups[groupName] = [];
+      }
+      groups[groupName].push(model);
+    });
+
+    // Sort groups: OpenCode Free Tier first, then alphabetically
+    const sortedGroups = Object.entries(groups).sort(([a], [b]) => {
+      if (a === 'OpenCode Free Tier') return -1;
+      if (b === 'OpenCode Free Tier') return 1;
+      if (a === 'Amazon Bedrock') return -1;
+      if (b === 'Amazon Bedrock') return 1;
+      return a.localeCompare(b);
+    });
+
+    return sortedGroups;
+  }, [opencode]);
+
   // Render Codex model item with secondary popover for reasoning effort (only for models that support it)
   const renderCodexModelItem = (model: (typeof transformedCodexModels)[0]) => {
     const isSelected = selectedModel === model.id;
@@ -1033,11 +1074,12 @@ export function PhaseModelSelector({
             </CommandGroup>
           )}
 
-          {opencode.length > 0 && (
-            <CommandGroup heading="OpenCode Models">
-              {opencode.map((model) => renderOpencodeModelItem(model))}
-            </CommandGroup>
-          )}
+          {groupedOpencodeModels.length > 0 &&
+            groupedOpencodeModels.map(([groupName, models]) => (
+              <CommandGroup key={groupName} heading={groupName}>
+                {models.map((model) => renderOpencodeModelItem(model))}
+              </CommandGroup>
+            ))}
         </CommandList>
       </Command>
     </PopoverContent>
