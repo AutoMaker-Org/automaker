@@ -5,6 +5,7 @@
  * Results include the validation verdict, metadata, and timestamp for cache invalidation.
  */
 
+import path from 'node:path';
 import * as secureFs from './secure-fs.js';
 import {
   getLinearValidationsDir,
@@ -12,6 +13,9 @@ import {
   getLinearValidationPath,
 } from '@automaker/platform';
 import type { StoredLinearValidation } from '@automaker/types';
+import { createLogger } from '@automaker/utils';
+
+const logger = createLogger('LinearValidationStorage');
 
 // Re-export StoredLinearValidation for convenience
 export type { StoredLinearValidation };
@@ -58,8 +62,9 @@ export async function readLinearValidation(
     const validationPath = getLinearValidationPath(projectPath, identifier);
     const content = (await secureFs.readFile(validationPath, 'utf-8')) as string;
     return JSON.parse(content) as StoredLinearValidation;
-  } catch {
+  } catch (error) {
     // File doesn't exist or can't be read
+    logger.debug(`Read validation failed for ${identifier}:`, error);
     return null;
   }
 }
@@ -95,8 +100,9 @@ export async function getAllLinearValidations(
     );
 
     return validations;
-  } catch {
+  } catch (error) {
     // Directory doesn't exist
+    logger.debug(`Read validations directory failed:`, error);
     return [];
   }
 }
@@ -109,10 +115,15 @@ async function readLinearValidationByDir(
   dirName: string
 ): Promise<StoredLinearValidation | null> {
   try {
-    const validationPath = `${getLinearValidationsDir(projectPath)}/${dirName}/validation.json`;
+    const validationPath = path.join(
+      getLinearValidationsDir(projectPath),
+      dirName,
+      'validation.json'
+    );
     const content = (await secureFs.readFile(validationPath, 'utf-8')) as string;
     return JSON.parse(content) as StoredLinearValidation;
-  } catch {
+  } catch (error) {
+    logger.debug(`Read validation by dir failed for ${dirName}:`, error);
     return null;
   }
 }
@@ -132,7 +143,8 @@ export async function deleteLinearValidation(
     const validationDir = getLinearValidationDir(projectPath, identifier);
     await secureFs.rm(validationDir, { recursive: true, force: true });
     return true;
-  } catch {
+  } catch (error) {
+    logger.debug(`Delete validation failed for ${identifier}:`, error);
     return false;
   }
 }

@@ -49,6 +49,21 @@ interface LinearValidationStatus {
  */
 const linearValidationStatusMap = new Map<string, LinearValidationStatus>();
 
+// Cleanup stale validations every 10 minutes
+const CLEANUP_INTERVAL_MS = 10 * 60 * 1000;
+const MAX_VALIDATION_AGE_MS = 15 * 60 * 1000;
+
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, status] of linearValidationStatusMap.entries()) {
+    if (now - status.startedAt.getTime() > MAX_VALIDATION_AGE_MS) {
+      logger.warn(`Cleaning up stale validation: ${key}`);
+      status.abortController.abort();
+      linearValidationStatusMap.delete(key);
+    }
+  }
+}, CLEANUP_INTERVAL_MS);
+
 /**
  * Create a unique key for a Linear validation
  */
@@ -429,7 +444,7 @@ export function createValidateLinearIssueHandler(
       // Create abort controller and try to claim validation slot
       const abortController = new AbortController();
       if (!trySetLinearValidationRunning(projectPath, identifier, abortController)) {
-        res.json({
+        res.status(409).json({
           success: false,
           error: `Validation is already running for issue ${identifier}`,
         });
@@ -450,8 +465,9 @@ export function createValidateLinearIssueHandler(
         settingsService,
         thinkingLevel
       )
-        .catch(() => {
-          // Error is already handled inside runLinearValidation
+        .catch((error) => {
+          // Error is already emitted as event inside runLinearValidation
+          logger.debug(`Background validation completed with error:`, error);
         })
         .finally(() => {
           clearLinearValidationStatus(projectPath, identifier);

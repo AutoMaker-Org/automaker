@@ -364,6 +364,14 @@ export class LinearService {
     const labels = await issue.labels();
     const parent = await issue.parent;
 
+    // Log warnings for missing required data (helps debug API issues)
+    if (!state) {
+      logger.warn(`Issue ${issue.identifier} has no workflow state, using fallback`);
+    }
+    if (!team) {
+      logger.warn(`Issue ${issue.identifier} has no team, using fallback`);
+    }
+
     return {
       id: issue.id,
       identifier: issue.identifier,
