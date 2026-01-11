@@ -46,7 +46,8 @@ If you need to work on a host project, create `docker-compose.project.yml`:
 services:
   server:
     volumes:
-      - ./my-project:/projects/my-project:ro # :ro = read-only
+      # :ro,z = read-only + SELinux relabel (safe on all systems)
+      - ./my-project:/projects/my-project:ro,z
 ```
 
 Then run:
@@ -55,7 +56,11 @@ Then run:
 docker-compose -f docker-compose.yml -f docker-compose.project.yml up -d
 ```
 
-**Tip**: Use `:ro` (read-only) when possible for extra safety.
+**Tips**:
+
+- Use `:ro` (read-only) when possible for extra safety
+- **Fedora/RHEL users**: Add `:z` flag for SELinux compatibility (e.g., `./my-project:/projects/my-project:z` or `./my-project:/projects/my-project:ro,z` for read-only)
+- The `:z` flag is safely ignored on systems without SELinux
 
 ## CLI Authentication (macOS)
 
@@ -105,9 +110,12 @@ echo "CURSOR_AUTH_TOKEN=$(jq -r '.accessToken' ~/.config/cursor/auth.json)" >> .
 ```yaml
 # In docker-compose.override.yml
 volumes:
-  - ~/.claude:/home/automaker/.claude
-  - ~/.config/cursor:/home/automaker/.config/cursor
+  # On Fedora/RHEL: add :z flag for SELinux
+  - ~/.claude:/home/automaker/.claude:z
+  - ~/.config/cursor:/home/automaker/.config/cursor:z
 ```
+
+**Note for Fedora/RHEL users**: The `:z` flag is required for SELinux. On other systems it's ignored.
 
 ## Troubleshooting
 

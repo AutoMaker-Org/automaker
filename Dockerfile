@@ -78,9 +78,25 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Install Claude CLI globally (available to all users via npm global bin)
 RUN npm install -g @anthropic-ai/claude-code
 
-# Create non-root user with home directory BEFORE installing Cursor CLI
-RUN groupadd -g 1001 automaker && \
-    useradd -u 1001 -g automaker -m -d /home/automaker -s /bin/bash automaker && \
+# Create non-root user with host UID/GID to avoid permission issues when mounting volumes
+ARG USER_ID=1000
+ARG GROUP_ID=1000
+RUN set -e; \
+    # Safety: refuse to run as root
+    if [ "${USER_ID}" = "0" ] || [ "${GROUP_ID}" = "0" ]; then \
+        echo "ERROR: Cannot create container user with UID or GID 0 (root)" >&2; \
+        exit 1; \
+    fi; \
+    # Remove existing node user/group if they conflict with our desired IDs
+    if getent passwd ${USER_ID} >/dev/null 2>&1; then \
+        userdel -f $(getent passwd ${USER_ID} | cut -d: -f1) || true; \
+    fi; \
+    if getent group ${GROUP_ID} >/dev/null 2>&1; then \
+        groupdel $(getent group ${GROUP_ID} | cut -d: -f1) || true; \
+    fi; \
+    # Create automaker group and user
+    groupadd -g ${GROUP_ID} automaker && \
+    useradd -u ${USER_ID} -g automaker -m -d /home/automaker -s /bin/bash automaker && \
     mkdir -p /home/automaker/.local/bin && \
     mkdir -p /home/automaker/.cursor && \
     chown -R automaker:automaker /home/automaker && \

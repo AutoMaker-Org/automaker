@@ -18,6 +18,9 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.dev
+      args:
+        USER_ID: ${USER_ID:-1000}
+        GROUP_ID: ${GROUP_ID:-1000}
     container_name: automaker-dev-server
     restart: unless-stopped
     ports:
@@ -48,7 +51,8 @@ services:
       - IS_CONTAINERIZED=true
     volumes:
       # Mount source code for live reload
-      - .:/app:cached
+      # :z flag is required for SELinux (Fedora/RHEL) to allow container access
+      - .:/app:z
 
       # Use named volume for node_modules to avoid platform conflicts
       # This ensures native modules are built for the container's architecture
@@ -94,6 +98,9 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.dev
+      args:
+        USER_ID: ${USER_ID:-1000}
+        GROUP_ID: ${GROUP_ID:-1000}
     container_name: automaker-dev-ui
     restart: unless-stopped
     ports:
@@ -106,7 +113,8 @@ services:
       - VITE_APP_MODE=3
     volumes:
       # Mount source code for live reload
-      - .:/app:cached
+      # :z flag is required for SELinux (Fedora/RHEL) to allow container access
+      - .:/app:z
 
       # Share node_modules with server container
       - automaker-dev-node-modules:/app/node_modules

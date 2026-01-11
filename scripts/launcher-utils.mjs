@@ -825,6 +825,36 @@ function checkImageExists(imageName) {
 }
 
 /**
+ * Get host user credentials for Docker volume permission matching
+ * @returns {{USER_ID: string, GROUP_ID: string}} Host user and group IDs
+ * @throws {Error} If running as root user (UID/GID 0)
+ */
+function getHostUserCredentials() {
+  const uid = process.getuid?.();
+  const gid = process.getgid?.();
+
+  // Check if getuid/getgid are available (Linux/macOS)
+  if (uid !== undefined && gid !== undefined) {
+    // Fail if running as root - containers should not run as root
+    if (uid === 0 || gid === 0) {
+      log('ERROR: Running as root user (UID/GID 0) is not allowed.', 'red');
+      log('For security reasons, Automaker containers must run as a non-root user.', 'red');
+      log('Please run this command without sudo or as a non-root user.', 'yellow');
+      process.exit(1);
+    }
+
+    return {
+      USER_ID: uid.toString(),
+      GROUP_ID: gid.toString(),
+    };
+  }
+
+  // Fallback for Windows (getuid/getgid not available)
+  log('Using default UID/GID 1000 (Windows platform)', 'blue');
+  return { USER_ID: '1000', GROUP_ID: '1000' };
+}
+
+/**
  * Launch Docker containers for development with live reload
  * Uses docker-compose.dev.yml which volume mounts the source code
  * Also includes docker-compose.override.yml if it exists (for workspace mounts)
@@ -869,6 +899,8 @@ export async function launchDockerDevContainers({ baseDir, processes }) {
     cwd: baseDir,
     env: {
       ...process.env,
+      // Pass host UID/GID to avoid permission issues with volume mounts
+      ...getHostUserCredentials(),
     },
   });
 
@@ -931,6 +963,8 @@ export async function launchDockerDevServerContainer({ baseDir, processes }) {
     cwd: baseDir,
     env: {
       ...process.env,
+      // Pass host UID/GID to avoid permission issues with volume mounts
+      ...getHostUserCredentials(),
     },
   });
 
@@ -1063,6 +1097,8 @@ export async function launchDockerContainers({ baseDir, processes }) {
       cwd: baseDir,
       env: {
         ...process.env,
+        // Pass host UID/GID to avoid permission issues with volume mounts
+        ...getHostUserCredentials(),
       },
     });
   } else {
@@ -1079,6 +1115,8 @@ export async function launchDockerContainers({ baseDir, processes }) {
       cwd: baseDir,
       env: {
         ...process.env,
+        // Pass host UID/GID to avoid permission issues with volume mounts
+        ...getHostUserCredentials(),
       },
     });
   }
