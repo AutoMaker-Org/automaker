@@ -547,14 +547,16 @@ const startServer = (port: number) => {
         : 'enabled'
       : 'disabled';
     const portStr = port.toString().padEnd(4);
+    // Display localhost for 0.0.0.0 binding (accessible via localhost)
+    const displayHost = host === '0.0.0.0' ? 'localhost' : host;
     logger.info(`
 ╔═══════════════════════════════════════════════════════╗
 ║           Automaker Backend Server                    ║
 ╠═══════════════════════════════════════════════════════╣
-║  HTTP API:    http://localhost:${portStr}                 ║
-║  WebSocket:   ws://localhost:${portStr}/api/events        ║
-║  Terminal:    ws://localhost:${portStr}/api/terminal/ws   ║
-║  Health:      http://localhost:${portStr}/api/health      ║
+║  HTTP API:    http://${displayHost}:${portStr}                 ║
+║  WebSocket:   ws://${displayHost}:${portStr}/api/events        ║
+║  Terminal:    ws://${displayHost}:${portStr}/api/terminal/ws   ║
+║  Health:      http://${displayHost}:${portStr}/api/health      ║
 ║  Terminal:    ${terminalStatus.padEnd(37)}║
 ╚═══════════════════════════════════════════════════════╝
 `);

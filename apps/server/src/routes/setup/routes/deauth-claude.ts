@@ -8,7 +8,8 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 
 // Use DATA_DIR for Docker compatibility (fixes #395)
-const DATA_DIR = process.env.DATA_DIR || './data';
+// Default to ./data resolved to absolute path for consistent behavior
+const DATA_DIR = process.env.DATA_DIR || path.resolve('./data');
 
 export function createDeauthClaudeHandler() {
   return async (_req: Request, res: Response): Promise<void> => {
