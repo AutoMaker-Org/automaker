@@ -1178,7 +1178,7 @@ const initialState: AppState = {
   chatHistoryOpen: false,
   autoModeByProject: {},
   autoModeActivityLog: [],
-  maxConcurrency: 3, // Default to 3 concurrent agents
+  maxConcurrency: 24, // Performance Workstation: Match 24-Core CPU
   kanbanCardDetailLevel: 'standard', // Default to standard detail level
   boardViewMode: 'kanban', // Default to kanban view
   defaultSkipTests: true, // Default to manual verification (tests disabled)
