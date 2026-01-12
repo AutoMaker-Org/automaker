@@ -1,5 +1,7 @@
-import { CircleDot, RefreshCw } from 'lucide-react';
+import { CircleDot, RefreshCw, Zap, Import } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 
 interface IssuesListHeaderProps {
@@ -7,6 +9,9 @@ interface IssuesListHeaderProps {
   closedCount: number;
   refreshing: boolean;
   onRefresh: () => void;
+  autoValidate: boolean;
+  onAutoValidateChange: (enabled: boolean) => void;
+  onImportClick: () => void;
 }
 
 export function IssuesListHeader({
@@ -14,6 +19,9 @@ export function IssuesListHeader({
   closedCount,
   refreshing,
   onRefresh,
+  autoValidate,
+  onAutoValidateChange,
+  onImportClick,
 }: IssuesListHeaderProps) {
   const totalIssues = openCount + closedCount;
 
@@ -30,9 +38,55 @@ export function IssuesListHeader({
           </p>
         </div>
       </div>
-      <Button variant="outline" size="sm" onClick={onRefresh} disabled={refreshing}>
-        <RefreshCw className={cn('h-4 w-4', refreshing && 'animate-spin')} />
-      </Button>
+      <div className="flex items-center gap-3">
+        {/* Auto-validate toggle */}
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="flex items-center gap-2">
+                <Zap
+                  className={cn(
+                    'h-4 w-4',
+                    autoValidate ? 'text-yellow-500' : 'text-muted-foreground'
+                  )}
+                />
+                <Switch
+                  checked={autoValidate}
+                  onCheckedChange={onAutoValidateChange}
+                  aria-label="Auto-validate issues"
+                />
+              </div>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Auto-validate: {autoValidate ? 'ON' : 'OFF'}</p>
+              <p className="text-xs text-muted-foreground">
+                {autoValidate
+                  ? 'Issues are validated automatically when loaded'
+                  : 'Click validate button for each issue'}
+              </p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+
+        {/* Import button */}
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="outline" size="sm" onClick={onImportClick}>
+                <Import className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Import issues as tasks</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+
+        {/* Refresh button */}
+        <Button variant="outline" size="sm" onClick={onRefresh} disabled={refreshing}>
+          <RefreshCw className={cn('h-4 w-4', refreshing && 'animate-spin')} />
+        </Button>
+      </div>
     </div>
   );
 }

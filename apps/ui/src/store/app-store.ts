@@ -557,6 +557,9 @@ export interface AppState {
   // Validation Model Settings
   validationModel: ModelAlias; // Model used for GitHub issue validation (default: opus)
 
+  // GitHub Auto-Validate Settings
+  githubAutoValidate: boolean; // When true, automatically validate issues when viewing GitHub Issues tab
+
   // Phase Model Settings - per-phase AI model configuration
   phaseModels: PhaseModelConfig;
   favoriteModels: string[];
@@ -924,6 +927,9 @@ export interface AppActions {
   // Validation Model actions
   setValidationModel: (model: ModelAlias) => void;
 
+  // GitHub Auto-Validate actions
+  setGithubAutoValidate: (enabled: boolean) => void;
+
   // Phase Model actions
   setPhaseModel: (phase: PhaseModelKey, entry: PhaseModelEntry) => Promise<void>;
   setPhaseModels: (models: Partial<PhaseModelConfig>) => Promise<void>;
@@ -1180,6 +1186,7 @@ const initialState: AppState = {
   muteDoneSound: false, // Default to sound enabled (not muted)
   enhancementModel: 'sonnet', // Default to sonnet for feature enhancement
   validationModel: 'opus', // Default to opus for GitHub issue validation
+  githubAutoValidate: false, // Default to disabled (manual validation only)
   phaseModels: DEFAULT_PHASE_MODELS, // Phase-specific model configuration
   favoriteModels: [],
   enabledCursorModels: getAllCursorModelIds(), // All Cursor models enabled by default
@@ -1842,6 +1849,9 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
 
   // Validation Model actions
   setValidationModel: (model) => set({ validationModel: model }),
+
+  // GitHub Auto-Validate actions
+  setGithubAutoValidate: (enabled) => set({ githubAutoValidate: enabled }),
 
   // Phase Model actions
   setPhaseModel: async (phase, entry) => {

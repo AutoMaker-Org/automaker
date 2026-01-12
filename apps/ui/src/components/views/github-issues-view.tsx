@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { createLogger } from '@automaker/utils/logger';
 import { CircleDot, RefreshCw } from 'lucide-react';
 import { getElectronAPI, GitHubIssue, IssueValidationResult } from '@/lib/electron';
@@ -11,7 +11,7 @@ import { cn, pathsEqual } from '@/lib/utils';
 import { toast } from 'sonner';
 import { useGithubIssues, useIssueValidation } from './github-issues-view/hooks';
 import { IssueRow, IssueDetailPanel, IssuesListHeader } from './github-issues-view/components';
-import { ValidationDialog } from './github-issues-view/dialogs';
+import { ValidationDialog, ImportIssuesDialog } from './github-issues-view/dialogs';
 import { formatDate, getFeaturePriority } from './github-issues-view/utils';
 import { useModelOverride } from '@/components/shared';
 import type { ValidateIssueOptions } from './github-issues-view/types';
@@ -23,11 +23,19 @@ export function GitHubIssuesView() {
   const [validationResult, setValidationResult] = useState<IssueValidationResult | null>(null);
   const [showValidationDialog, setShowValidationDialog] = useState(false);
   const [showRevalidateConfirm, setShowRevalidateConfirm] = useState(false);
+  const [showImportDialog, setShowImportDialog] = useState(false);
   const [pendingRevalidateOptions, setPendingRevalidateOptions] =
     useState<ValidateIssueOptions | null>(null);
 
-  const { currentProject, defaultAIProfileId, aiProfiles, getCurrentWorktree, worktreesByProject } =
-    useAppStore();
+  const {
+    currentProject,
+    defaultAIProfileId,
+    aiProfiles,
+    getCurrentWorktree,
+    worktreesByProject,
+    githubAutoValidate,
+    setGithubAutoValidate,
+  } = useAppStore();
 
   // Model override for validation
   const validationModelOverride = useModelOverride({ phase: 'validationModel' });
@@ -44,6 +52,54 @@ export function GitHubIssuesView() {
       onValidationResultChange: setValidationResult,
       onShowValidationDialogChange: setShowValidationDialog,
     });
+
+  // Track which issues we've already triggered auto-validate for (to avoid duplicates)
+  const autoValidatedIssuesRef = useRef<Set<number>>(new Set());
+
+  // Auto-validate issues when enabled and issues are loaded
+  useEffect(() => {
+    if (!githubAutoValidate || loading || openIssues.length === 0) return;
+
+    // Find issues that need validation (not cached and not currently validating)
+    const issuesToValidate = openIssues.filter((issue) => {
+      // Skip if already auto-validated in this session
+      if (autoValidatedIssuesRef.current.has(issue.number)) return false;
+      // Skip if already has cached validation
+      if (cachedValidations.has(issue.number)) return false;
+      // Skip if currently validating
+      if (validatingIssues.has(issue.number)) return false;
+      return true;
+    });
+
+    // Validate up to 3 issues at a time to avoid overwhelming the system
+    const batchSize = 3;
+    const batch = issuesToValidate.slice(0, batchSize);
+
+    for (const issue of batch) {
+      autoValidatedIssuesRef.current.add(issue.number);
+      handleValidateIssue(issue);
+    }
+
+    if (batch.length > 0) {
+      logger.info(
+        `Auto-validating ${batch.length} issues (${issuesToValidate.length - batch.length} remaining)`
+      );
+    }
+  }, [
+    githubAutoValidate,
+    loading,
+    openIssues,
+    cachedValidations,
+    validatingIssues,
+    handleValidateIssue,
+  ]);
+
+  // Reset auto-validated tracking when auto-validate is toggled off
+  useEffect(() => {
+    if (!githubAutoValidate) {
+      autoValidatedIssuesRef.current.clear();
+    }
+  }, [githubAutoValidate]);
 
   // Get default AI profile for task creation
   const defaultProfile = useMemo(() => {
@@ -132,6 +188,42 @@ export function GitHubIssuesView() {
     [currentProject?.path, defaultProfile, currentBranch]
   );
 
+  // Handle bulk import of issues as tasks
+  const handleImportIssues = useCallback(
+    async (issues: GitHubIssue[]) => {
+      if (!currentProject?.path) {
+        toast.error('No project selected');
+        return;
+      }
+
+      let successCount = 0;
+      let errorCount = 0;
+
+      for (const issue of issues) {
+        const validation = cachedValidations.get(issue.number);
+        if (!validation?.result) {
+          errorCount++;
+          continue;
+        }
+
+        try {
+          await handleConvertToTask(issue, validation.result);
+          successCount++;
+        } catch {
+          errorCount++;
+        }
+      }
+
+      if (successCount > 0) {
+        toast.success(`Imported ${successCount} issue${successCount !== 1 ? 's' : ''} as tasks`);
+      }
+      if (errorCount > 0) {
+        toast.error(`Failed to import ${errorCount} issue${errorCount !== 1 ? 's' : ''}`);
+      }
+    },
+    [currentProject?.path, cachedValidations, handleConvertToTask]
+  );
+
   if (loading) {
     return <LoadingState />;
   }
@@ -157,6 +249,9 @@ export function GitHubIssuesView() {
           closedCount={closedIssues.length}
           refreshing={refreshing}
           onRefresh={refresh}
+          autoValidate={githubAutoValidate}
+          onAutoValidateChange={setGithubAutoValidate}
+          onImportClick={() => setShowImportDialog(true)}
         />
 
         {/* Issues List */}
@@ -264,6 +359,16 @@ export function GitHubIssuesView() {
             });
           }
         }}
+      />
+
+      {/* Import Issues Dialog */}
+      <ImportIssuesDialog
+        open={showImportDialog}
+        onOpenChange={setShowImportDialog}
+        issues={openIssues}
+        cachedValidations={cachedValidations}
+        validatingIssues={validatingIssues}
+        onImport={handleImportIssues}
       />
     </div>
   );
