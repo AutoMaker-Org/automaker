@@ -7,16 +7,19 @@ import { getErrorMessage, logError } from '../common.js';
 import * as fs from 'fs';
 import * as path from 'path';
 
+// Use DATA_DIR for Docker compatibility (fixes #395)
+const DATA_DIR = process.env.DATA_DIR || './data';
+
 export function createDeauthClaudeHandler() {
   return async (_req: Request, res: Response): Promise<void> => {
     try {
       // Create a marker file to indicate the CLI is disconnected from the app
-      const automakerDir = path.join(process.cwd(), '.automaker');
-      const markerPath = path.join(automakerDir, '.claude-disconnected');
+      // Use DATA_DIR instead of process.cwd() for Docker write permissions
+      const markerPath = path.join(DATA_DIR, '.claude-disconnected');
 
-      // Ensure .automaker directory exists
-      if (!fs.existsSync(automakerDir)) {
-        fs.mkdirSync(automakerDir, { recursive: true });
+      // Ensure DATA_DIR exists (fixes #395 - Docker permission error)
+      if (!fs.existsSync(DATA_DIR)) {
+        fs.mkdirSync(DATA_DIR, { recursive: true });
       }
 
       // Create the marker file with timestamp

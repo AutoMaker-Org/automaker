@@ -531,7 +531,7 @@ describe('IdeationService', () => {
         expect(feature.id).toMatch(/^feature-/);
         expect(feature.title).toBe('Add Dark Mode');
         expect(feature.description).toBe('Implement dark mode theme');
-        expect(feature.category).toBe('ui'); // features -> ui mapping
+        expect(feature.category).toBe('Feature'); // features -> Feature mapping (capitalized, fixes #396)
         expect(feature.status).toBe('backlog');
       });
 

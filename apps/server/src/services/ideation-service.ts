@@ -1682,18 +1682,19 @@ Focus on practical, implementable suggestions that would genuinely improve the p
    * Used by both idea-to-feature conversion and suggestion-to-feature conversion.
    */
   mapSuggestionCategoryToFeatureCategory(category: IdeaCategory): string {
+    // Use capitalized categories to match existing conventions (fixes #396)
     const mapping: Record<IdeaCategory, string> = {
-      feature: 'ui',
-      'ux-ui': 'enhancement',
-      dx: 'chore',
-      growth: 'feature',
-      technical: 'refactor',
-      security: 'bug',
-      performance: 'enhancement',
-      accessibility: 'enhancement',
-      analytics: 'feature',
+      feature: 'Feature',
+      'ux-ui': 'UI',
+      dx: 'DX',
+      growth: 'Growth',
+      technical: 'Technical',
+      security: 'Security',
+      performance: 'Performance',
+      accessibility: 'Accessibility',
+      analytics: 'Analytics',
     };
-    return mapping[category] || 'feature';
+    return mapping[category] || 'Feature';
   }
 
   private async saveSessionToDisk(
