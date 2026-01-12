@@ -1081,3 +1081,64 @@
     animation: none;
   }
 }
+
+/* ========================================
+   GRAPH VIEW LOD OPTIMIZATIONS
+   ======================================== */
+
+.graph-zoomed-out .react-flow__node-task {
+  /* Reduce composite layer cost */
+  will-change: transform;
+}
+
+/* Shrink and simplify the node container */
+.graph-zoomed-out .react-flow__node-task .min-w-\[240px\] {
+  min-width: 40px !important;
+  max-width: 40px !important;
+  width: 40px !important;
+  height: 16px !important;
+  padding: 0 !important;
+  border-width: 4px !important; /* Make border thicker to be visible */
+  border-radius: 4px !important;
+  background: var(--card) !important;
+  box-shadow: none !important;
+  overflow: hidden !important;
+}
+
+/* Hide all internal content when zoomed out */
+.graph-zoomed-out .react-flow__node-task .p-2,
+.graph-zoomed-out .react-flow__node-task .p-3,
+.graph-zoomed-out .react-flow__node-task .flex,
+.graph-zoomed-out .react-flow__node-task button,
+.graph-zoomed-out .react-flow__node-task p,
+.graph-zoomed-out .react-flow__node-task span,
+.graph-zoomed-out .react-flow__node-task svg {
+  display: none !important;
+}
+
+/* Simplify handles */
+.graph-zoomed-out .react-flow__handle {
+  width: 4px !important;
+  height: 4px !important;
+  border-width: 0 !important;
+  background: var(--border) !important;
+}
+
+/* Dim edges to reduce visual noise and rendering cost */
+.graph-zoomed-out .react-flow__edge {
+  opacity: 0.2 !important;
+}
+
+/* Keep highlighted elements visible */
+.graph-zoomed-out .react-flow__node.graph-node-highlighted .min-w-\[240px\],
+.graph-zoomed-out .react-flow__node.graph-node-matched .min-w-\[240px\] {
+  border-color: var(--brand-500) !important;
+  background: var(--brand-500) !important;
+  transform: scale(1.5);
+  z-index: 10;
+}
+
+.graph-zoomed-out .react-flow__edge.graph-edge-highlighted {
+  opacity: 1 !important;
+  stroke-width: 2px !important;
+}

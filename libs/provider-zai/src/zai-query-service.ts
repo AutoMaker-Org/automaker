@@ -115,11 +115,29 @@ export class ZaiQueryService implements QueryService {
         stream: true,
       });
 
+      let buffer = '';
+      let lastYieldTime = Date.now();
+      const BUFFER_SIZE = 20; // Accumulate ~20 chars
+      const BUFFER_TIME = 50; // Or every 50ms (20fps)
+
       for await (const chunk of stream) {
         const content = chunk.choices[0]?.delta?.content;
         if (content) {
-          yield content;
+          buffer += content;
+          const now = Date.now();
+
+          // Yield if buffer is large enough or enough time passed
+          if (buffer.length >= BUFFER_SIZE || now - lastYieldTime >= BUFFER_TIME) {
+            yield buffer;
+            buffer = '';
+            lastYieldTime = now;
+          }
         }
+      }
+
+      // Flush remaining buffer
+      if (buffer.length > 0) {
+        yield buffer;
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';

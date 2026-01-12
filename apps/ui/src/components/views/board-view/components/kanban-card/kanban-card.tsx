@@ -257,4 +257,44 @@ export const KanbanCard = memo(function KanbanCard({
       )}
     </div>
   );
-});
+}, areKanbanCardPropsEqual);
+
+function areKanbanCardPropsEqual(prev: KanbanCardProps, next: KanbanCardProps) {
+  try {
+    // Compare view props
+    if (prev.isCurrentAutoTask !== next.isCurrentAutoTask) return false;
+    if (prev.isSelected !== next.isSelected) return false;
+    if (prev.isSelectionMode !== next.isSelectionMode) return false;
+    if (prev.opacity !== next.opacity) return false;
+    if (prev.isOverlay !== next.isOverlay) return false;
+    if (prev.hasContext !== next.hasContext) return false;
+
+    // Compare feature identity and status
+    const p = prev.feature;
+    const n = next.feature;
+
+    // Safety check
+    if (!p || !n) return false;
+
+    if (p.id !== n.id) return false;
+    if (p.status !== n.status) return false;
+    if (p.title !== n.title) return false;
+    if (p.category !== n.category) return false;
+    if (p.priority !== n.priority) return false;
+    if (p.description !== n.description) return false;
+    if (p.error !== n.error) return false;
+
+    // Compare steps length (for progress bar)
+    if (p.steps?.length !== n.steps?.length) return false;
+
+    // Allow context content updates (summary etc)
+    if (prev.contextContent !== next.contextContent) return false;
+    if (prev.summary !== next.summary) return false;
+
+    // Ignore logs, heavy metadata, etc.
+    return true;
+  } catch (e) {
+    console.error('KanbanCard props comparison error:', e);
+    return false;
+  }
+}

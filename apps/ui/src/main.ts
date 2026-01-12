@@ -7,6 +7,10 @@
  * SECURITY: All file system access uses centralized methods from @automaker/platform.
  */
 
+// CPU MAXIMIZATION: Set thread pool size equal to core count (24) BEFORE any libs load
+// This unlocks massive parallel I/O for the Node.js backend
+process.env.UV_THREADPOOL_SIZE = '24';
+
 import path from 'path';
 import { spawn, execSync, ChildProcess } from 'child_process';
 import crypto from 'crypto';
@@ -38,6 +42,22 @@ import {
 
 const logger = createLogger('Electron');
 const serverLogger = createLogger('Server');
+
+// STABILITY MODE: Disable security features that might kill the GPU process during heavy load
+app.commandLine.appendSwitch('ignore-gpu-blacklist');
+app.commandLine.appendSwitch('disable-gpu-process-crash-limit');
+app.commandLine.appendSwitch('disable-gpu-sandbox');
+app.commandLine.appendSwitch('no-sandbox');
+app.commandLine.appendSwitch('disable-renderer-backgrounding');
+app.commandLine.appendSwitch('disable-background-timer-throttling');
+
+// UNLEASH THE BEAST: Force 24GB VRAM allocation limits (Safe now that sandbox is off)
+app.commandLine.appendSwitch('force-gpu-mem-available-mb', '24000');
+app.commandLine.appendSwitch('max-active-webgl-contexts', '32');
+app.commandLine.appendSwitch('renderer-process-limit', '100');
+
+// CPU / RAM MAXIMIZATION: Unlock V8 Heap to 64GB
+app.commandLine.appendSwitch('js-flags', '--max-old-space-size=65536');
 
 // Development environment
 const isDev = !app.isPackaged;

@@ -92,6 +92,8 @@ const priorityConfig = {
   3: { label: 'Low', colorClass: 'bg-[var(--status-info)] text-white' },
 };
 
+import { useGraphActions } from '../context/graph-actions-context';
+
 export const TaskNode = memo(function TaskNode({ data, selected }: TaskNodeProps) {
   // Handle pipeline statuses by treating them like in_progress
   const status = data.status || 'backlog';
@@ -99,6 +101,8 @@ export const TaskNode = memo(function TaskNode({ data, selected }: TaskNodeProps
   const config = statusConfig[statusKey as keyof typeof statusConfig] || statusConfig.backlog;
   const StatusIcon = config.icon;
   const priorityConf = data.priority ? priorityConfig[data.priority as 1 | 2 | 3] : null;
+
+  const actions = useGraphActions();
 
   // Filter highlight states
   const isMatched = data.isMatched ?? false;
@@ -238,7 +242,7 @@ export const TaskNode = memo(function TaskNode({ data, selected }: TaskNodeProps
                   className="text-xs cursor-pointer"
                   onClick={(e) => {
                     e.stopPropagation();
-                    data.onViewLogs?.();
+                    actions.onViewLogs?.(data.id);
                   }}
                 >
                   <Terminal className="w-3 h-3 mr-2" />
@@ -248,7 +252,7 @@ export const TaskNode = memo(function TaskNode({ data, selected }: TaskNodeProps
                   className="text-xs cursor-pointer"
                   onClick={(e) => {
                     e.stopPropagation();
-                    data.onViewDetails?.();
+                    actions.onViewDetails?.(data.id);
                   }}
                 >
                   <Eye className="w-3 h-3 mr-2" />
@@ -259,7 +263,7 @@ export const TaskNode = memo(function TaskNode({ data, selected }: TaskNodeProps
                     className="text-xs cursor-pointer"
                     onClick={(e) => {
                       e.stopPropagation();
-                      data.onStartTask?.();
+                      actions.onStartTask?.(data.id);
                     }}
                   >
                     <Play className="w-3 h-3 mr-2" />
@@ -271,7 +275,7 @@ export const TaskNode = memo(function TaskNode({ data, selected }: TaskNodeProps
                     className="text-xs text-[var(--status-error)] cursor-pointer"
                     onClick={(e) => {
                       e.stopPropagation();
-                      data.onStopTask?.();
+                      actions.onStopTask?.(data.id);
                     }}
                   >
                     <Pause className="w-3 h-3 mr-2" />
@@ -283,7 +287,7 @@ export const TaskNode = memo(function TaskNode({ data, selected }: TaskNodeProps
                     className="text-xs text-[var(--status-success)] cursor-pointer"
                     onClick={(e) => {
                       e.stopPropagation();
-                      data.onResumeTask?.();
+                      actions.onResumeTask?.(data.id);
                     }}
                   >
                     <RotateCcw className="w-3 h-3 mr-2" />
@@ -294,7 +298,7 @@ export const TaskNode = memo(function TaskNode({ data, selected }: TaskNodeProps
                   className="text-xs cursor-pointer"
                   onClick={(e) => {
                     e.stopPropagation();
-                    data.onSpawnTask?.();
+                    actions.onSpawnTask?.(data.id);
                   }}
                 >
                   <GitFork className="w-3 h-3 mr-2" />
@@ -304,9 +308,9 @@ export const TaskNode = memo(function TaskNode({ data, selected }: TaskNodeProps
                   className="text-xs cursor-pointer text-purple-500 font-medium"
                   onClick={(e) => {
                     e.stopPropagation();
-                    // We need to verify if onExpand exists on data
-                    // @ts-ignore - Triggering onExpand if it exists
-                    data.onExpand?.();
+                    // We need to verify if onExpand exists on data or actions
+                    // @ts-ignore
+                    actions.onExpand?.(data.id) ?? data.onExpand?.();
                   }}
                 >
                   <Sparkles className="w-3 h-3 mr-2" />
@@ -317,7 +321,7 @@ export const TaskNode = memo(function TaskNode({ data, selected }: TaskNodeProps
                     className="text-xs text-[var(--status-error)] cursor-pointer"
                     onClick={(e) => {
                       e.stopPropagation();
-                      data.onDeleteTask?.();
+                      actions.onDeleteTask?.(data.id);
                     }}
                   >
                     <Trash2 className="w-3 h-3 mr-2" />
@@ -399,4 +403,52 @@ export const TaskNode = memo(function TaskNode({ data, selected }: TaskNodeProps
       />
     </>
   );
-});
+}, arePropsEqual);
+
+function arePropsEqual(prev: TaskNodeProps, next: TaskNodeProps) {
+  try {
+    // Compare selected state
+    if (prev.selected !== next.selected) return false;
+
+    const p = prev.data;
+    const n = next.data;
+
+    // Safety check for missing data
+    if (!p || !n) return false;
+
+    // Compare core fields that affect rendering
+    if (p.id !== n.id) return false;
+    if (p.status !== n.status) return false;
+    if (p.title !== n.title) return false;
+    if (p.description !== n.description) return false;
+    if (p.priority !== n.priority) return false;
+    if (p.error !== n.error) return false;
+    if (p.category !== n.category) return false;
+    if (p.branchName !== n.branchName) return false;
+
+    // Compare derived/computed fields
+    if (p.isBlocked !== n.isBlocked) return false;
+    if (p.isRunning !== n.isRunning) return false;
+    if (p.isMatched !== n.isMatched) return false;
+    if (p.isHighlighted !== n.isHighlighted) return false;
+    if (p.isDimmed !== n.isDimmed) return false;
+
+    // Compare blocking dependencies (array equality)
+    if (p.blockingDependencies?.length !== n.blockingDependencies?.length) return false;
+
+    // If lengths match, check content (usually mostly static or simple)
+    // Optimization: Only check if length > 0
+    if ((p.blockingDependencies?.length || 0) > 0) {
+      if (JSON.stringify(p.blockingDependencies) !== JSON.stringify(n.blockingDependencies))
+        return false;
+    }
+
+    // IMPORTANT: We intentionally IGNORE 'logs', 'steps', 'imagePaths' etc.
+    // This prevents re-renders when backend sends large data updates that don't affect the graph node UI.
+
+    return true;
+  } catch (e) {
+    console.error('TaskNode props comparison error:', e);
+    return false; // Fail safe: re-render
+  }
+}

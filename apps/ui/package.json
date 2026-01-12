@@ -15,11 +15,11 @@
   },
   "main": "dist-electron/main.js",
   "scripts": {
-    "dev": "vite",
+    "dev": "cross-env NODE_OPTIONS=--max-old-space-size=32768 vite",
     "dev:web": "cross-env VITE_SKIP_ELECTRON=true vite --open",
     "dev:electron": "vite",
     "dev:electron:debug": "cross-env OPEN_DEVTOOLS=true vite",
-    "build": "vite build",
+    "build": "cross-env NODE_OPTIONS=--max-old-space-size=32768 vite build",
     "build:electron": "node scripts/prepare-server.mjs && vite build && electron-builder",
     "build:electron:dir": "node scripts/prepare-server.mjs && vite build && electron-builder --dir",
     "build:electron:win": "node scripts/prepare-server.mjs && vite build && electron-builder --win",

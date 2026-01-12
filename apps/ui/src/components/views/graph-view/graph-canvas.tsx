@@ -222,8 +222,20 @@ function GraphCanvasInner({
     }
   }, []);
 
+  // Track zoom level for LOD
+  const [zoomLevel, setZoomLevel] = useState(1);
+
+  const handleMoveEnd = useCallback((_event: any, viewport: { zoom: number }) => {
+    setZoomLevel(viewport.zoom);
+  }, []);
+
+  const isZoomedOut = zoomLevel < 0.6;
+
   return (
-    <div className={cn('w-full h-full', className)} style={backgroundStyle}>
+    <div
+      className={cn('w-full h-full', className, isZoomedOut && 'graph-zoomed-out')}
+      style={backgroundStyle}
+    >
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -231,6 +243,7 @@ function GraphCanvasInner({
         onEdgesChange={onEdgesChange}
         onNodeDoubleClick={handleNodeDoubleClick}
         onConnect={handleConnect}
+        onMoveEnd={handleMoveEnd}
         isValidConnection={isValidConnection}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
@@ -241,6 +254,7 @@ function GraphCanvasInner({
         selectionMode={SelectionMode.Partial}
         connectionMode={ConnectionMode.Loose}
         proOptions={{ hideAttribution: true }}
+        onlyRenderVisibleElements={true} // OPTIMIZATION: Critical for >500 nodes
         className="graph-canvas"
       >
         <Background
@@ -301,11 +315,15 @@ function GraphCanvasInner({
   );
 }
 
+import { GraphActionsContext } from './context/graph-actions-context';
+
 // Wrap with provider for hooks to work
 export function GraphCanvas(props: GraphCanvasProps) {
   return (
     <ReactFlowProvider>
-      <GraphCanvasInner {...props} />
+      <GraphActionsContext.Provider value={props.nodeActionCallbacks || {}}>
+        <GraphCanvasInner {...props} />
+      </GraphActionsContext.Provider>
     </ReactFlowProvider>
   );
 }

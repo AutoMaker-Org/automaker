@@ -102,28 +102,11 @@ export function useGraphNodes({
           isMatched,
           isHighlighted,
           isDimmed,
-          // Action callbacks (bound to this feature's ID)
-          onViewLogs: actionCallbacks?.onViewLogs
-            ? () => actionCallbacks.onViewLogs!(feature.id)
-            : undefined,
-          onViewDetails: actionCallbacks?.onViewDetails
-            ? () => actionCallbacks.onViewDetails!(feature.id)
-            : undefined,
-          onStartTask: actionCallbacks?.onStartTask
-            ? () => actionCallbacks.onStartTask!(feature.id)
-            : undefined,
-          onStopTask: actionCallbacks?.onStopTask
-            ? () => actionCallbacks.onStopTask!(feature.id)
-            : undefined,
-          onResumeTask: actionCallbacks?.onResumeTask
-            ? () => actionCallbacks.onResumeTask!(feature.id)
-            : undefined,
-          onSpawnTask: actionCallbacks?.onSpawnTask
-            ? () => actionCallbacks.onSpawnTask!(feature.id)
-            : undefined,
-          onDeleteTask: actionCallbacks?.onDeleteTask
-            ? () => actionCallbacks.onDeleteTask!(feature.id)
-            : undefined,
+          // Filter states
+          isMatched,
+          isHighlighted,
+          isDimmed,
+          // Action callbacks - REMOVED: Now handled via Context in TaskNode
         },
       };
 
@@ -153,7 +136,7 @@ export function useGraphNodes({
                 targetStatus: feature.status,
                 isHighlighted: edgeIsHighlighted,
                 isDimmed: edgeIsDimmed,
-                onDeleteDependency: actionCallbacks?.onDeleteDependency,
+                // onDeleteDependency - REMOVED: Now handled via Context
               },
             };
             edgeList.push(edge);
@@ -163,7 +146,7 @@ export function useGraphNodes({
     });
 
     return { nodes: nodeList, edges: edgeList };
-  }, [features, runningAutoTasks, filterResult, actionCallbacks]);
+  }, [features, runningAutoTasks, filterResult]); // REMOVED actionCallbacks from deps!
 
   return { nodes, edges };
 }

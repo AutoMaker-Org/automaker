@@ -5,12 +5,14 @@ import { cn } from '@/lib/utils';
 import { Feature } from '@/store/app-store';
 import { Trash2 } from 'lucide-react';
 
+import { useGraphActions } from '../context/graph-actions-context';
+
 export interface DependencyEdgeData {
   sourceStatus: Feature['status'];
   targetStatus: Feature['status'];
   isHighlighted?: boolean;
   isDimmed?: boolean;
-  onDeleteDependency?: (sourceId: string, targetId: string) => void;
+  // onDeleteDependency removed - handled via Context
 }
 
 const getEdgeColor = (sourceStatus?: Feature['status'], targetStatus?: Feature['status']) => {
@@ -46,6 +48,7 @@ export const DependencyEdge = memo(function DependencyEdge(props: EdgeProps) {
     animated,
   } = props;
 
+  const actions = useGraphActions();
   const [isHovered, setIsHovered] = useState(false);
   const edgeData = data as DependencyEdgeData | undefined;
 
@@ -74,7 +77,7 @@ export const DependencyEdge = memo(function DependencyEdge(props: EdgeProps) {
 
   const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation();
-    edgeData?.onDeleteDependency?.(source, target);
+    actions.onDeleteDependency?.(source, target);
   };
 
   return (

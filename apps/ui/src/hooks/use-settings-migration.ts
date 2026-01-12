@@ -91,7 +91,21 @@ export function waitForMigrationComplete(): Promise<void> {
       migrationCompleteResolve = resolve;
     });
   }
-  return migrationCompletePromise;
+
+  // Safety Timeout: If migration takes longer than 5 seconds, proceed anyway.
+  // This prevents the "Waiting for migration to..." freeze if the migration hook fails/hangs.
+  const timeoutPromise = new Promise<void>((resolve) => {
+    setTimeout(() => {
+      if (!migrationCompleted) {
+        logger.warn('Migration wait timed out (5s). Forcing completion signal.');
+        migrationCompleted = true;
+        if (migrationCompleteResolve) migrationCompleteResolve();
+        resolve();
+      }
+    }, 5000);
+  });
+
+  return Promise.race([migrationCompletePromise, timeoutPromise]);
 }
 
 /**
