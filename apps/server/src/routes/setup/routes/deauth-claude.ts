@@ -4,7 +4,7 @@
 
 import type { Request, Response } from 'express';
 import { getErrorMessage, logError } from '../common.js';
-import * as fs from 'fs';
+import * as fs from 'fs/promises';
 import * as path from 'path';
 
 // Use DATA_DIR for Docker compatibility (fixes #395)
@@ -18,12 +18,11 @@ export function createDeauthClaudeHandler() {
       const markerPath = path.join(DATA_DIR, '.claude-disconnected');
 
       // Ensure DATA_DIR exists (fixes #395 - Docker permission error)
-      if (!fs.existsSync(DATA_DIR)) {
-        fs.mkdirSync(DATA_DIR, { recursive: true });
-      }
+      // mkdirSync with recursive: true is idempotent, no need for existsSync check
+      await fs.mkdir(DATA_DIR, { recursive: true });
 
       // Create the marker file with timestamp
-      fs.writeFileSync(
+      await fs.writeFile(
         markerPath,
         JSON.stringify({
           disconnectedAt: new Date().toISOString(),
