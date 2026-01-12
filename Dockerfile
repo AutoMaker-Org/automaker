@@ -142,6 +142,7 @@ RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 # Environment variables
 ENV PORT=3008
+ENV HOST=0.0.0.0
 ENV DATA_DIR=/data
 ENV HOME=/home/automaker
 # Add user's local bin to PATH for cursor-agent

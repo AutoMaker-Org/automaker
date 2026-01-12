@@ -36,10 +36,22 @@ export function createDeauthClaudeHandler() {
       });
     } catch (error) {
       logError(error, 'Deauth Claude failed');
+
+      // Provide specific error messages for common file system errors
+      const nodeError = error as NodeJS.ErrnoException;
+      let message = 'Failed to disconnect Claude CLI from the app';
+      if (nodeError.code === 'EACCES') {
+        message = `Permission denied writing to DATA_DIR (${DATA_DIR}). Check directory permissions.`;
+      } else if (nodeError.code === 'ENOENT') {
+        message = `DATA_DIR path does not exist: ${DATA_DIR}`;
+      } else if (nodeError.code === 'ENOSPC') {
+        message = 'No space left on device';
+      }
+
       res.status(500).json({
         success: false,
         error: getErrorMessage(error),
-        message: 'Failed to disconnect Claude CLI from the app',
+        message,
       });
     }
   };

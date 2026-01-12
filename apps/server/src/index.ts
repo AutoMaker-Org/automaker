@@ -538,8 +538,9 @@ terminalWss.on('connection', (ws: WebSocket, req: import('http').IncomingMessage
 
 // Start server with error handling for port conflicts
 const startServer = (port: number) => {
-  // Listen on 0.0.0.0 to bind all IPv4 interfaces for Docker compatibility (fixes #428)
-  server.listen(port, '0.0.0.0', () => {
+  // Default to localhost for security, use HOST=0.0.0.0 for Docker (fixes #428)
+  const host = process.env.HOST || 'localhost';
+  server.listen(port, host, () => {
     const terminalStatus = isTerminalEnabled()
       ? isTerminalPasswordRequired()
         ? 'enabled (password protected)'
