@@ -47,9 +47,9 @@ const serverLogger = createLogger('Server');
 app.commandLine.appendSwitch('ignore-gpu-blacklist');
 app.commandLine.appendSwitch('disable-gpu-process-crash-limit');
 app.commandLine.appendSwitch('disable-gpu-sandbox');
+app.commandLine.appendSwitch('disable-gpu-sandbox');
 app.commandLine.appendSwitch('no-sandbox');
-app.commandLine.appendSwitch('disable-renderer-backgrounding');
-app.commandLine.appendSwitch('disable-background-timer-throttling');
+// REMOVED: disable-renderer-backgrounding & throttling to allow "Pause on Minimize" resource savings
 
 // UNLEASH THE BEAST: Force 24GB VRAM allocation limits (Safe now that sandbox is off)
 app.commandLine.appendSwitch('force-gpu-mem-available-mb', '24000');
