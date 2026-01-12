@@ -3,24 +3,26 @@
  */
 
 import type { Request, Response } from 'express';
-import { getErrorMessage, logError } from '../common.js';
+import { logError } from '../common.js';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 
-// Use DATA_DIR for Docker compatibility (fixes #395)
-// Default to ./data resolved to absolute path for consistent behavior
-const DATA_DIR = process.env.DATA_DIR || path.resolve('./data');
+// Marker file location must be consistent with:
+// - get-claude-status.ts (reads from .automaker/)
+// - auth-claude.ts (deletes from .automaker/)
+// - provider-factory.ts (checks in .automaker/)
+const AUTOMAKER_DIR = '.automaker';
+const DISCONNECTED_MARKER = '.claude-disconnected';
 
 export function createDeauthClaudeHandler() {
   return async (_req: Request, res: Response): Promise<void> => {
     try {
-      // Create a marker file to indicate the CLI is disconnected from the app
-      // Use DATA_DIR instead of process.cwd() for Docker write permissions
-      const markerPath = path.join(DATA_DIR, '.claude-disconnected');
+      const projectRoot = process.cwd();
+      const automakerDir = path.join(projectRoot, AUTOMAKER_DIR);
+      const markerPath = path.join(automakerDir, DISCONNECTED_MARKER);
 
-      // Ensure DATA_DIR exists (fixes #395 - Docker permission error)
-      // mkdir with recursive: true is idempotent
-      await fs.mkdir(DATA_DIR, { recursive: true });
+      // Ensure .automaker directory exists
+      await fs.mkdir(automakerDir, { recursive: true });
 
       // Create the marker file with timestamp
       await fs.writeFile(
@@ -38,21 +40,21 @@ export function createDeauthClaudeHandler() {
     } catch (error) {
       logError(error, 'Deauth Claude failed');
 
-      // Provide specific error messages for common file system errors
+      // Return generic error to client (security: don't expose paths)
+      // Detailed diagnostics are in server logs
       const nodeError = error as NodeJS.ErrnoException;
-      let message = 'Failed to disconnect Claude CLI from the app';
+      let userMessage = 'Failed to disconnect Claude CLI';
       if (nodeError.code === 'EACCES') {
-        message = `Permission denied writing to DATA_DIR (${DATA_DIR}). Check directory permissions.`;
-      } else if (nodeError.code === 'ENOENT') {
-        message = `DATA_DIR path does not exist: ${DATA_DIR}`;
+        userMessage = 'Permission denied. Check directory permissions.';
       } else if (nodeError.code === 'ENOSPC') {
-        message = 'No space left on device';
+        userMessage = 'No space left on device.';
+      } else if (nodeError.code === 'EROFS') {
+        userMessage = 'Read-only filesystem. Check volume mounts.';
       }
 
       res.status(500).json({
         success: false,
-        error: getErrorMessage(error),
-        message,
+        error: userMessage,
       });
     }
   };
