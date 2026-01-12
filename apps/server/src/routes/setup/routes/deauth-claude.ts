@@ -18,7 +18,7 @@ export function createDeauthClaudeHandler() {
       const markerPath = path.join(DATA_DIR, '.claude-disconnected');
 
       // Ensure DATA_DIR exists (fixes #395 - Docker permission error)
-      // mkdirSync with recursive: true is idempotent, no need for existsSync check
+      // mkdir with recursive: true is idempotent
       await fs.mkdir(DATA_DIR, { recursive: true });
 
       // Create the marker file with timestamp
