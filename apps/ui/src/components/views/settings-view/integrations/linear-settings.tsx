@@ -16,6 +16,7 @@ export function LinearSettings() {
   const [showKey, setShowKey] = useState(false);
   const [testing, setTesting] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [maskedKey, setMaskedKey] = useState<string>('');
   const [testResult, setTestResult] = useState<{
     success: boolean;
     user?: string;
@@ -23,12 +24,22 @@ export function LinearSettings() {
     error?: string;
   } | null>(null);
 
-  // Initialize from stored key
+  // Load masked key on mount when key is configured
   useEffect(() => {
-    if (apiKeys.linear) {
-      // Show masked value if we have a stored key
-      setLinearKey('');
-    }
+    const loadMaskedKey = async () => {
+      if (apiKeys.linear) {
+        const api = getElectronAPI();
+        try {
+          const result = await api.settings?.getCredentials?.();
+          if (result?.success && result.credentials?.linear.masked) {
+            setMaskedKey(result.credentials.linear.masked);
+          }
+        } catch {
+          // Ignore errors
+        }
+      }
+    };
+    loadMaskedKey();
   }, [apiKeys.linear]);
 
   const handleTest = useCallback(async () => {
@@ -45,16 +56,19 @@ export function LinearSettings() {
       // First save the key if changed
       if (linearKey) {
         const saveResult = await api.settings?.updateCredentials?.({
-          apiKeys: {
-            ...apiKeys,
-            linear: linearKey,
-          },
+          apiKeys: { linear: linearKey },
         });
 
         if (!saveResult?.success) {
           setTestResult({ success: false, error: 'Failed to save API key' });
           setTesting(false);
           return;
+        }
+
+        // Update store with new configured status
+        if (saveResult.credentials) {
+          setApiKeys({ linear: saveResult.credentials.linear.configured });
+          setMaskedKey(saveResult.credentials.linear.masked);
         }
       }
 
@@ -67,7 +81,8 @@ export function LinearSettings() {
           user: result.user?.name,
           organization: result.organization?.name,
         });
-        setApiKeys({ ...apiKeys, linear: linearKey || apiKeys.linear });
+        // Clear input after successful test
+        setLinearKey('');
       } else {
         setTestResult({ success: false, error: result.error });
       }
@@ -79,7 +94,7 @@ export function LinearSettings() {
     } finally {
       setTesting(false);
     }
-  }, [linearKey, apiKeys, setApiKeys]);
+  }, [linearKey, setApiKeys]);
 
   const handleSave = useCallback(async () => {
     const api = getElectronAPI();
@@ -91,14 +106,12 @@ export function LinearSettings() {
     setSaving(true);
     try {
       const result = await api.settings.updateCredentials({
-        apiKeys: {
-          ...apiKeys,
-          linear: linearKey,
-        },
+        apiKeys: { linear: linearKey },
       });
 
-      if (result.success) {
-        setApiKeys({ ...apiKeys, linear: linearKey });
+      if (result.success && result.credentials) {
+        setApiKeys({ linear: result.credentials.linear.configured });
+        setMaskedKey(result.credentials.linear.masked);
         toast.success('Linear API key saved');
         setLinearKey('');
       } else {
@@ -109,7 +122,7 @@ export function LinearSettings() {
     } finally {
       setSaving(false);
     }
-  }, [linearKey, apiKeys, setApiKeys]);
+  }, [linearKey, setApiKeys]);
 
   const handleDelete = useCallback(async () => {
     const api = getElectronAPI();
@@ -120,14 +133,12 @@ export function LinearSettings() {
 
     try {
       const result = await api.settings.updateCredentials({
-        apiKeys: {
-          ...apiKeys,
-          linear: '',
-        },
+        apiKeys: { linear: '' },
       });
 
-      if (result.success) {
-        setApiKeys({ ...apiKeys, linear: '' });
+      if (result.success && result.credentials) {
+        setApiKeys({ linear: result.credentials.linear.configured });
+        setMaskedKey('');
         setLinearKey('');
         setTestResult(null);
         toast.success('Linear API key deleted');
@@ -137,199 +148,129 @@ export function LinearSettings() {
     } catch {
       toast.error('Failed to delete API key');
     }
-  }, [apiKeys, setApiKeys]);
+  }, [setApiKeys]);
 
-  const hasStoredKey = !!apiKeys.linear;
+  const hasStoredKey = apiKeys.linear;
 
   return (
-    <div
-      className={cn(
-        'rounded-2xl overflow-hidden',
-        'border border-border/50',
-        'bg-gradient-to-br from-card/90 via-card/70 to-card/80 backdrop-blur-xl',
-        'shadow-sm shadow-black/5'
-      )}
-    >
-      <div className="p-6 border-b border-border/50 bg-gradient-to-r from-transparent via-accent/5 to-transparent">
-        <div className="flex items-center gap-3 mb-2">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500/20 to-indigo-600/10 flex items-center justify-center border border-indigo-500/20">
-            <Link2 className="w-5 h-5 text-indigo-500" />
-          </div>
-          <h2 className="text-lg font-semibold text-foreground tracking-tight">
-            Linear Integration
-          </h2>
-          {hasStoredKey && <CheckCircle2 className="w-5 h-5 text-green-500" />}
+    <div className="space-y-6">
+      {/* API Key Section */}
+      <div className="space-y-4">
+        <div className="flex items-center gap-2">
+          <Link2 className="h-5 w-5 text-muted-foreground" />
+          <h3 className="text-lg font-medium">Linear Integration</h3>
         </div>
-        <p className="text-sm text-muted-foreground/80 ml-12">
-          Connect to Linear to import issues as features to your Kanban board.
-        </p>
-      </div>
 
-      <div className="p-6 space-y-4">
-        {/* API Key Input */}
+        <p className="text-sm text-muted-foreground">
+          Connect to Linear to import issues and sync task status. Get your API key from{' '}
+          <a
+            href="https://linear.app/settings/api"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-primary hover:underline inline-flex items-center gap-1"
+          >
+            Linear Settings
+            <ExternalLink className="h-3 w-3" />
+          </a>
+        </p>
+
         <div className="space-y-2">
-          <Label htmlFor="linear-key">Linear API Key</Label>
+          <Label htmlFor="linear-key">API Key</Label>
           <div className="flex gap-2">
             <div className="relative flex-1">
               <Input
                 id="linear-key"
                 type={showKey ? 'text' : 'password'}
-                placeholder={hasStoredKey ? '••••••••••••••••' : 'lin_api_...'}
                 value={linearKey}
                 onChange={(e) => setLinearKey(e.target.value)}
+                placeholder={hasStoredKey ? maskedKey || '••••••••' : 'lin_api_...'}
                 className="pr-10"
               />
-              <Button
+              <button
                 type="button"
-                variant="ghost"
-                size="icon"
-                className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7"
                 onClick={() => setShowKey(!showKey)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
               >
                 {showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-              </Button>
+              </button>
             </div>
             <Button
-              onClick={handleTest}
-              disabled={(!linearKey && !hasStoredKey) || testing}
               variant="outline"
+              onClick={handleTest}
+              disabled={testing || (!linearKey && !hasStoredKey)}
             >
-              {testing ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Test Connection'}
+              {testing ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Test'}
+            </Button>
+            <Button onClick={handleSave} disabled={saving || !linearKey}>
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Save'}
             </Button>
           </div>
-          <p className="text-xs text-muted-foreground">
-            Get your API key from{' '}
-            <a
-              href="https://linear.app/settings/api"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-primary hover:underline inline-flex items-center gap-1"
-            >
-              linear.app/settings/api
-              <ExternalLink className="h-3 w-3" />
-            </a>
-          </p>
-        </div>
 
-        {/* Test Result */}
-        {testResult && (
-          <div
-            className={cn(
-              'flex items-start gap-2 p-3 rounded-lg',
-              testResult.success ? 'bg-green-500/10' : 'bg-red-500/10'
-            )}
-          >
-            {testResult.success ? (
-              <CheckCircle2 className="h-5 w-5 text-green-500 shrink-0 mt-0.5" />
-            ) : (
-              <XCircle className="h-5 w-5 text-red-500 shrink-0 mt-0.5" />
-            )}
-            <div className="text-sm">
+          {/* Connection Status */}
+          {testResult && (
+            <div
+              className={cn(
+                'flex items-start gap-2 rounded-md p-3 text-sm',
+                testResult.success
+                  ? 'bg-green-500/10 text-green-600 dark:text-green-400'
+                  : 'bg-red-500/10 text-red-600 dark:text-red-400'
+              )}
+            >
               {testResult.success ? (
                 <>
-                  <p className="font-medium text-green-500">Connected successfully!</p>
-                  <p className="text-muted-foreground">
-                    Signed in as {testResult.user} ({testResult.organization})
-                  </p>
+                  <CheckCircle2 className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="font-medium">Connected to Linear</p>
+                    {testResult.user && <p>User: {testResult.user}</p>}
+                    {testResult.organization && <p>Organization: {testResult.organization}</p>}
+                  </div>
                 </>
               ) : (
                 <>
-                  <p className="font-medium text-red-500">Connection failed</p>
-                  <p className="text-muted-foreground">{testResult.error}</p>
+                  <XCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                  <p>{testResult.error || 'Connection failed'}</p>
                 </>
               )}
             </div>
-          </div>
-        )}
-
-        {/* Action Buttons */}
-        <div className="flex items-center gap-3 pt-2">
-          {linearKey && (
-            <Button
-              onClick={handleSave}
-              disabled={saving || !linearKey}
-              className={cn(
-                'min-w-[100px]',
-                'bg-gradient-to-r from-indigo-500 to-indigo-600',
-                'hover:from-indigo-600 hover:to-indigo-600',
-                'text-white font-medium border-0'
-              )}
-            >
-              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Save Key'}
-            </Button>
           )}
 
-          {hasStoredKey && (
-            <Button
-              onClick={handleDelete}
-              variant="outline"
-              className="border-red-500/30 text-red-500 hover:bg-red-500/10"
-            >
-              Delete Key
-            </Button>
+          {/* Stored Key Indicator */}
+          {hasStoredKey && !testResult && (
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-muted-foreground">
+                API key configured {maskedKey && `(${maskedKey})`}
+              </p>
+              <Button variant="ghost" size="sm" onClick={handleDelete} className="text-destructive">
+                Delete Key
+              </Button>
+            </div>
           )}
         </div>
+      </div>
 
-        {/* Connection Status - always show when key is configured */}
-        {hasStoredKey && !testResult && (
-          <div className="flex items-center gap-2 p-3 rounded-lg bg-green-500/10 border border-green-500/20">
-            <CheckCircle2 className="w-5 h-5 text-green-500 shrink-0" />
-            <span className="text-sm font-medium text-green-600">Linear API key is configured</span>
+      {/* Auto-Validation Settings */}
+      {hasStoredKey && (
+        <div className="space-y-4 pt-4 border-t border-border/50">
+          <div>
+            <h3 className="text-sm font-medium text-foreground mb-1">Auto-Validation</h3>
+            <p className="text-xs text-muted-foreground">
+              Automatically validate Linear issues when the view is opened
+            </p>
           </div>
-        )}
 
-        {/* Linear Workflow Integration */}
-        {hasStoredKey && (
-          <div className="space-y-4 pt-4 border-t border-border/50">
-            <div>
-              <h3 className="text-sm font-medium text-foreground mb-1">Workflow Integration</h3>
-              <p className="text-xs text-muted-foreground">
-                Configure how Automaker interacts with Linear issue states.
-              </p>
-            </div>
-
-            {/* Update Status on Validation Start */}
+          <div className="space-y-3">
+            {/* My Issues Only */}
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
-                <Label htmlFor="update-status-on-validation" className="text-sm font-normal">
-                  Update Status on Validation Start
+                <Label htmlFor="auto-validate-mine" className="text-sm font-normal">
+                  Only my issues
                 </Label>
                 <p className="text-xs text-muted-foreground">
-                  Automatically move issues to "In Progress" when validation starts
+                  Only auto-validate issues assigned to me
                 </p>
               </div>
               <Switch
-                id="update-status-on-validation"
-                checked={linearSettings.updateStatusOnValidationStart}
-                onCheckedChange={(checked) =>
-                  setLinearSettings({ updateStatusOnValidationStart: checked })
-                }
-              />
-            </div>
-          </div>
-        )}
-
-        {/* Auto-Validate Filters Section */}
-        {hasStoredKey && (
-          <div className="space-y-4 pt-4 border-t border-border/50">
-            <div>
-              <h3 className="text-sm font-medium text-foreground mb-1">Auto-Validate Filters</h3>
-              <p className="text-xs text-muted-foreground">
-                Configure which issues should be automatically validated when Auto-Validate is
-                enabled.
-              </p>
-            </div>
-
-            {/* My Issues Only Toggle */}
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label htmlFor="auto-validate-my-issues" className="text-sm font-normal">
-                  My Issues Only
-                </Label>
-                <p className="text-xs text-muted-foreground">Only validate issues assigned to me</p>
-              </div>
-              <Switch
-                id="auto-validate-my-issues"
+                id="auto-validate-mine"
                 checked={linearSettings.autoValidateMyIssuesOnly}
                 onCheckedChange={(checked) =>
                   setLinearSettings({ autoValidateMyIssuesOnly: checked })
@@ -338,81 +279,79 @@ export function LinearSettings() {
             </div>
 
             {/* Label Filter */}
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <Label htmlFor="auto-validate-label" className="text-sm font-normal">
-                Label Filter
+                Label filter (optional)
               </Label>
               <Input
                 id="auto-validate-label"
-                placeholder="e.g., bug, feature, urgent"
+                type="text"
                 value={linearSettings.autoValidateLabelFilter}
                 onChange={(e) => setLinearSettings({ autoValidateLabelFilter: e.target.value })}
+                placeholder="e.g., automaker, ready-for-ai"
+                className="h-8"
               />
               <p className="text-xs text-muted-foreground">
-                Only validate issues with labels containing this text (leave empty for all)
+                Only auto-validate issues with this label (leave empty for all)
               </p>
             </div>
 
-            {/* State Types Filter */}
+            {/* State Types */}
             <div className="space-y-2">
-              <Label className="text-sm font-normal">State Types</Label>
-              <p className="text-xs text-muted-foreground mb-2">
-                Only validate issues in these states (leave all unchecked for all states)
-              </p>
+              <Label className="text-sm font-normal">Issue states to auto-validate</Label>
               <div className="flex flex-wrap gap-4">
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="state-backlog"
-                    checked={linearSettings.autoValidateStateTypes.includes('backlog')}
-                    onCheckedChange={(checked) => {
-                      const current = linearSettings.autoValidateStateTypes;
-                      const updated = checked
-                        ? [...current, 'backlog' as const]
-                        : current.filter((s) => s !== 'backlog');
-                      setLinearSettings({ autoValidateStateTypes: updated });
-                    }}
-                  />
-                  <Label htmlFor="state-backlog" className="text-sm font-normal cursor-pointer">
-                    Backlog
-                  </Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="state-unstarted"
-                    checked={linearSettings.autoValidateStateTypes.includes('unstarted')}
-                    onCheckedChange={(checked) => {
-                      const current = linearSettings.autoValidateStateTypes;
-                      const updated = checked
-                        ? [...current, 'unstarted' as const]
-                        : current.filter((s) => s !== 'unstarted');
-                      setLinearSettings({ autoValidateStateTypes: updated });
-                    }}
-                  />
-                  <Label htmlFor="state-unstarted" className="text-sm font-normal cursor-pointer">
-                    Unstarted
-                  </Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="state-started"
-                    checked={linearSettings.autoValidateStateTypes.includes('started')}
-                    onCheckedChange={(checked) => {
-                      const current = linearSettings.autoValidateStateTypes;
-                      const updated = checked
-                        ? [...current, 'started' as const]
-                        : current.filter((s) => s !== 'started');
-                      setLinearSettings({ autoValidateStateTypes: updated });
-                    }}
-                  />
-                  <Label htmlFor="state-started" className="text-sm font-normal cursor-pointer">
-                    In Progress
-                  </Label>
-                </div>
+                {(['backlog', 'unstarted', 'started'] as const).map((state) => (
+                  <div key={state} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={`state-${state}`}
+                      checked={linearSettings.autoValidateStateTypes.includes(state)}
+                      onCheckedChange={(checked) => {
+                        const newStates = checked
+                          ? [...linearSettings.autoValidateStateTypes, state]
+                          : linearSettings.autoValidateStateTypes.filter((s) => s !== state);
+                        setLinearSettings({ autoValidateStateTypes: newStates });
+                      }}
+                    />
+                    <Label htmlFor={`state-${state}`} className="text-sm font-normal capitalize">
+                      {state}
+                    </Label>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
+
+      {/* Linear Workflow Integration */}
+      {hasStoredKey && (
+        <div className="space-y-4 pt-4 border-t border-border/50">
+          <div>
+            <h3 className="text-sm font-medium text-foreground mb-1">Workflow Integration</h3>
+            <p className="text-xs text-muted-foreground">
+              Automatically update Linear issue status based on Automaker actions
+            </p>
+          </div>
+
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <Label htmlFor="update-status-on-validation" className="text-sm font-normal">
+                Update Status on Validation Start
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                Move issues to &quot;In Progress&quot; when validation starts
+              </p>
+            </div>
+            <Switch
+              id="update-status-on-validation"
+              checked={linearSettings.updateStatusOnValidationStart}
+              onCheckedChange={(checked) =>
+                setLinearSettings({ updateStatusOnValidationStart: checked })
+              }
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -49,20 +49,27 @@ interface LinearValidationStatus {
  */
 const linearValidationStatusMap = new Map<string, LinearValidationStatus>();
 
-// Cleanup stale validations every 10 minutes
-const CLEANUP_INTERVAL_MS = 10 * 60 * 1000;
+// Max age for stale validations (15 minutes)
 const MAX_VALIDATION_AGE_MS = 15 * 60 * 1000;
 
-setInterval(() => {
+/**
+ * Cleanup stale Linear validations.
+ * Called from centralized cleanup in index.ts (alongside GitHub validation cleanup).
+ * @returns Number of cleaned up entries
+ */
+export function cleanupLinearValidations(): number {
   const now = Date.now();
+  let cleaned = 0;
   for (const [key, status] of linearValidationStatusMap.entries()) {
     if (now - status.startedAt.getTime() > MAX_VALIDATION_AGE_MS) {
-      logger.warn(`Cleaning up stale validation: ${key}`);
+      logger.warn(`Cleaning up stale Linear validation: ${key}`);
       status.abortController.abort();
       linearValidationStatusMap.delete(key);
+      cleaned++;
     }
   }
-}, CLEANUP_INTERVAL_MS);
+  return cleaned;
+}
 
 /**
  * Create a unique key for a Linear validation
@@ -149,8 +156,27 @@ interface ValidateLinearIssueRequestBody {
   issueLabels?: string[];
   model?: ModelAlias | CursorModelId;
   thinkingLevel?: ThinkingLevel;
-  /** Team ID for workflow state updates */
   teamId?: string;
+}
+
+/**
+ * Emit a progress event for Linear validation
+ */
+function emitProgressEvent(
+  events: EventEmitter,
+  issueId: string,
+  identifier: string,
+  content: string,
+  projectPath: string
+): void {
+  const progressEvent: LinearValidationEvent = {
+    type: 'linear_validation_progress',
+    issueId,
+    identifier,
+    content,
+    projectPath,
+  };
+  events.emit('linear-validation:event', progressEvent);
 }
 
 /**
@@ -247,15 +273,7 @@ ${prompt}`;
           for (const block of msg.message.content) {
             if (block.type === 'text' && block.text) {
               responseText += block.text;
-
-              const progressEvent: LinearValidationEvent = {
-                type: 'linear_validation_progress',
-                issueId,
-                identifier,
-                content: block.text,
-                projectPath,
-              };
-              events.emit('linear-validation:event', progressEvent);
+              emitProgressEvent(events, issueId, identifier, block.text, projectPath);
             }
           }
         } else if (msg.type === 'result' && msg.subtype === 'success' && msg.result) {
@@ -306,30 +324,19 @@ ${prompt}`;
           for (const block of msg.message.content) {
             if (block.type === 'text') {
               responseText += block.text;
-
-              const progressEvent: LinearValidationEvent = {
-                type: 'linear_validation_progress',
-                issueId,
-                identifier,
-                content: block.text,
-                projectPath,
-              };
-              events.emit('linear-validation:event', progressEvent);
+              emitProgressEvent(events, issueId, identifier, block.text, projectPath);
             }
           }
         }
 
-        if (msg.type === 'result' && msg.subtype === 'success') {
-          const resultMsg = msg as { structured_output?: IssueValidationResult };
-          if (resultMsg.structured_output) {
-            validationResult = resultMsg.structured_output;
-            logger.debug('Received structured output:', validationResult);
-          }
-        }
-
         if (msg.type === 'result') {
-          const resultMsg = msg as { subtype?: string };
-          if (resultMsg.subtype === 'error_max_structured_output_retries') {
+          if (msg.subtype === 'success') {
+            const resultMsg = msg as Record<string, unknown>;
+            if (resultMsg.structured_output && typeof resultMsg.structured_output === 'object') {
+              validationResult = resultMsg.structured_output as IssueValidationResult;
+              logger.debug('Received structured output:', validationResult);
+            }
+          } else if (msg.subtype === 'error_max_structured_output_retries') {
             logger.error('Failed to produce valid structured output after retries');
             throw new Error('Could not produce valid validation output');
           }
@@ -393,7 +400,10 @@ export function createValidateLinearIssueHandler(
   events: EventEmitter,
   settingsService?: SettingsService,
   linearService?: {
-    updateIssueState: (issueId: string, stateId: string) => Promise<{ success: boolean }>;
+    updateIssueState: (
+      issueId: string,
+      stateId: string
+    ) => Promise<{ success: boolean; error?: string }>;
     getInProgressStateId: (teamId: string) => Promise<string | null>;
   }
 ) {
@@ -414,24 +424,18 @@ export function createValidateLinearIssueHandler(
       logger.info(`[LinearValidation] Received validation request for issue ${identifier}`);
 
       // Validate required fields
-      if (!projectPath) {
-        res.status(400).json({ success: false, error: 'projectPath is required' });
-        return;
-      }
+      const requiredFields = [
+        { name: 'projectPath', value: projectPath },
+        { name: 'issueId', value: issueId },
+        { name: 'identifier', value: identifier },
+        { name: 'issueTitle', value: issueTitle },
+      ] as const;
 
-      if (!issueId || typeof issueId !== 'string') {
-        res.status(400).json({ success: false, error: 'issueId is required' });
-        return;
-      }
-
-      if (!identifier || typeof identifier !== 'string') {
-        res.status(400).json({ success: false, error: 'identifier is required' });
-        return;
-      }
-
-      if (!issueTitle || typeof issueTitle !== 'string') {
-        res.status(400).json({ success: false, error: 'issueTitle is required' });
-        return;
+      for (const { name, value } of requiredFields) {
+        if (!value || typeof value !== 'string') {
+          res.status(400).json({ success: false, error: `${name} is required` });
+          return;
+        }
       }
 
       // Validate model parameter
@@ -469,7 +473,9 @@ export function createValidateLinearIssueHandler(
               if (updateResult.success) {
                 logger.info(`Updated issue ${identifier} status to In Progress`);
               } else {
-                logger.warn(`Failed to update issue ${identifier} status: ${updateResult.success}`);
+                logger.warn(
+                  `Failed to update issue ${identifier} status: ${updateResult.error || 'Unknown error'}`
+                );
               }
             } else {
               logger.warn(`Could not find In Progress state for team ${teamId}`);

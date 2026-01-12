@@ -1,34 +1,43 @@
-// @ts-nocheck
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { createLogger } from '@automaker/utils/logger';
 import { useAppStore } from '@/store/app-store';
-
-const logger = createLogger('ApiKeyManagement');
 import { getElectronAPI } from '@/lib/electron';
 import type { ProviderConfigParams } from '@/config/api-providers';
+
+const logger = createLogger('ApiKeyManagement');
 
 interface TestResult {
   success: boolean;
   message: string;
 }
 
-interface ApiKeyStatus {
-  hasAnthropicKey: boolean;
-  hasGoogleKey: boolean;
-  hasOpenaiKey: boolean;
+interface MaskedCredentials {
+  anthropic: { configured: boolean; masked: string };
+  google: { configured: boolean; masked: string };
+  openai: { configured: boolean; masked: string };
+  linear: { configured: boolean; masked: string };
 }
 
 /**
  * Custom hook for managing API key state and operations
  * Handles input values, visibility toggles, connection testing, and saving
+ *
+ * Note: This hook does NOT store raw API keys in memory.
+ * It only stores:
+ * - Empty strings as initial values for input fields
+ * - User-entered values temporarily until saved
+ * - Boolean flags indicating whether keys are configured (from server)
  */
 export function useApiKeyManagement() {
   const { apiKeys, setApiKeys } = useAppStore();
 
-  // API key values
-  const [anthropicKey, setAnthropicKey] = useState(apiKeys.anthropic);
-  const [googleKey, setGoogleKey] = useState(apiKeys.google);
-  const [openaiKey, setOpenaiKey] = useState(apiKeys.openai);
+  // API key input values - start empty, user enters new values to update
+  const [anthropicKey, setAnthropicKey] = useState('');
+  const [googleKey, setGoogleKey] = useState('');
+  const [openaiKey, setOpenaiKey] = useState('');
+
+  // Masked credentials from server (for display purposes)
+  const [maskedCredentials, setMaskedCredentials] = useState<MaskedCredentials | null>(null);
 
   // Visibility toggles
   const [showAnthropicKey, setShowAnthropicKey] = useState(false);
@@ -43,39 +52,24 @@ export function useApiKeyManagement() {
   const [testingOpenaiConnection, setTestingOpenaiConnection] = useState(false);
   const [openaiTestResult, setOpenaiTestResult] = useState<TestResult | null>(null);
 
-  // API key status from environment
-  const [apiKeyStatus, setApiKeyStatus] = useState<ApiKeyStatus | null>(null);
-
   // Save state
   const [saved, setSaved] = useState(false);
 
-  // Sync local state with store
+  // Load masked credentials on mount
   useEffect(() => {
-    setAnthropicKey(apiKeys.anthropic);
-    setGoogleKey(apiKeys.google);
-    setOpenaiKey(apiKeys.openai);
-  }, [apiKeys]);
-
-  // Check API key status from environment on mount
-  useEffect(() => {
-    const checkApiKeyStatus = async () => {
+    const loadMaskedCredentials = async () => {
       const api = getElectronAPI();
-      if (api?.setup?.getApiKeys) {
-        try {
-          const status = await api.setup.getApiKeys();
-          if (status.success) {
-            setApiKeyStatus({
-              hasAnthropicKey: status.hasAnthropicKey,
-              hasGoogleKey: status.hasGoogleKey,
-              hasOpenaiKey: status.hasOpenaiKey,
-            });
-          }
-        } catch (error) {
-          logger.error('Failed to check API key status:', error);
+      if (!api.settings) return;
+      try {
+        const result = await api.settings.getCredentials();
+        if (result.success && result.credentials) {
+          setMaskedCredentials(result.credentials);
         }
+      } catch (error) {
+        logger.error('Failed to load masked credentials:', error);
       }
     };
-    checkApiKeyStatus();
+    loadMaskedCredentials();
   }, []);
 
   // Test Anthropic/Claude connection
@@ -173,20 +167,49 @@ export function useApiKeyManagement() {
     }
   };
 
-  // Save API keys
-  const handleSave = () => {
-    setApiKeys({
-      anthropic: anthropicKey,
-      google: googleKey,
-      openai: openaiKey,
-    });
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
-  };
+  // Save API keys to server
+  const handleSave = useCallback(async () => {
+    const api = getElectronAPI();
+    if (!api.settings) return;
+    const updates: { anthropic?: string; google?: string; openai?: string } = {};
+
+    // Only include keys that have been entered
+    if (anthropicKey.trim()) updates.anthropic = anthropicKey;
+    if (googleKey.trim()) updates.google = googleKey;
+    if (openaiKey.trim()) updates.openai = openaiKey;
+
+    if (Object.keys(updates).length === 0) {
+      return; // Nothing to save
+    }
+
+    try {
+      const result = await api.settings.updateCredentials({ apiKeys: updates });
+      if (result.success && result.credentials) {
+        // Update store with new configured status
+        setApiKeys({
+          anthropic: result.credentials.anthropic.configured,
+          google: result.credentials.google.configured,
+          openai: result.credentials.openai.configured,
+          linear: result.credentials.linear.configured,
+        });
+        // Update masked credentials for display
+        setMaskedCredentials(result.credentials);
+        // Clear input fields after successful save
+        setAnthropicKey('');
+        setGoogleKey('');
+        setOpenaiKey('');
+        setSaved(true);
+        setTimeout(() => setSaved(false), 2000);
+      }
+    } catch (error) {
+      logger.error('Failed to save credentials:', error);
+    }
+  }, [anthropicKey, googleKey, openaiKey, setApiKeys]);
 
   // Build provider config params for buildProviderConfigs
   const providerConfigParams: ProviderConfigParams = {
     apiKeys,
+    maskedCredentials,
     anthropic: {
       value: anthropicKey,
       setValue: setAnthropicKey,
@@ -217,13 +240,8 @@ export function useApiKeyManagement() {
   };
 
   return {
-    // Provider config params for buildProviderConfigs
     providerConfigParams,
-
-    // API key status from environment
-    apiKeyStatus,
-
-    // Save handler and state
+    maskedCredentials,
     handleSave,
     saved,
   };

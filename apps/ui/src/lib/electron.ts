@@ -873,7 +873,6 @@ export interface ElectronAPI {
         google: { configured: boolean; masked: string };
         openai: { configured: boolean; masked: string };
         linear: { configured: boolean; masked: string };
-        apiKeys?: { anthropic?: string; google?: string; openai?: string; linear?: string };
       };
       error?: string;
     }>;
@@ -886,7 +885,6 @@ export interface ElectronAPI {
         google: { configured: boolean; masked: string };
         openai: { configured: boolean; masked: string };
         linear: { configured: boolean; masked: string };
-        apiKeys?: { anthropic?: string; google?: string; openai?: string; linear?: string };
       };
       error?: string;
     }>;

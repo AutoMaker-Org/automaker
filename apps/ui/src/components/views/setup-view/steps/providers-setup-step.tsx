@@ -168,7 +168,7 @@ function ClaudeContent() {
         hasCredentialsFile: false,
         apiKeyValid: true,
       });
-      setApiKeys({ ...apiKeys, anthropic: apiKey });
+      setApiKeys({ ...apiKeys, anthropic: true });
       toast.success('API key saved successfully!');
     },
   });
@@ -184,7 +184,7 @@ function ClaudeContent() {
       const result = await api.setup.deleteApiKey('anthropic');
       if (result.success) {
         setApiKey('');
-        setApiKeys({ ...apiKeys, anthropic: '' });
+        setApiKeys({ ...apiKeys, anthropic: false });
         // Use getState() to avoid dependency on claudeAuthStatus
         const currentAuthStatus = useSetupStore.getState().claudeAuthStatus;
         setClaudeAuthStatus({
@@ -222,8 +222,6 @@ function ClaudeContent() {
     claudeAuthStatus?.method === 'api_key_env';
 
   const isCliAuthenticated = claudeAuthStatus?.method === 'cli_authenticated';
-  const isApiKeyAuthenticated =
-    claudeAuthStatus?.method === 'api_key' || claudeAuthStatus?.method === 'api_key_env';
   const isReady = claudeCliStatus?.installed && claudeAuthStatus?.authenticated;
 
   return (
@@ -744,7 +742,7 @@ function CodexContent() {
       }
       const result = await api.setup.saveApiKey('openai', apiKey);
       if (result.success) {
-        setApiKeys({ ...apiKeys, openai: apiKey });
+        setApiKeys({ ...apiKeys, openai: true });
         setCodexAuthStatus({ authenticated: true, method: 'api_key' });
         toast.success('API key saved successfully!');
       }
@@ -1408,7 +1406,7 @@ export function ProvidersSetupStep({ onNext, onBack }: ProvidersSetupStepProps) 
     },
   ];
 
-  const renderStatusIcon = (status: ProviderStatus) => {
+  function renderStatusIcon(status: ProviderStatus): React.ReactNode {
     switch (status) {
       case 'authenticated':
         return (
@@ -1425,7 +1423,20 @@ export function ProvidersSetupStep({ onNext, onBack }: ProvidersSetupStepProps) 
       default:
         return null;
     }
-  };
+  }
+
+  function getIconColorClass(status: ProviderStatus, brandColor: string): string {
+    switch (status) {
+      case 'authenticated':
+        return brandColor;
+      case 'verifying':
+        return 'text-blue-500';
+      case 'installed_not_auth':
+        return 'text-amber-500';
+      default:
+        return 'text-muted-foreground';
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -1456,16 +1467,7 @@ export function ProvidersSetupStep({ onNext, onBack }: ProvidersSetupStepProps) 
               >
                 <div className="relative">
                   <Icon
-                    className={cn(
-                      'w-5 h-5',
-                      provider.status === 'authenticated'
-                        ? provider.color
-                        : provider.status === 'verifying'
-                          ? 'text-blue-500'
-                          : provider.status === 'installed_not_auth'
-                            ? 'text-amber-500'
-                            : 'text-muted-foreground'
-                    )}
+                    className={cn('w-5 h-5', getIconColorClass(provider.status, provider.color))}
                   />
                   {!isInitialChecking && renderStatusIcon(provider.status)}
                 </div>

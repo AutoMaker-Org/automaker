@@ -434,7 +434,6 @@ export class SettingsService {
     google: { configured: boolean; masked: string };
     openai: { configured: boolean; masked: string };
     linear: { configured: boolean; masked: string };
-    apiKeys?: { anthropic?: string; google?: string; openai?: string; linear?: string };
   }> {
     const credentials = await this.getCredentials();
 
@@ -460,8 +459,6 @@ export class SettingsService {
         configured: !!credentials.apiKeys.linear,
         masked: maskKey(credentials.apiKeys.linear),
       },
-      // Also return raw apiKeys for UI store hydration
-      apiKeys: credentials.apiKeys,
     };
   }
 

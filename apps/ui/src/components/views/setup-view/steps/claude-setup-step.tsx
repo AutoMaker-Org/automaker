@@ -38,11 +38,6 @@ interface ClaudeSetupStepProps {
   onSkip: () => void;
 }
 
-interface ClaudeSetupContentProps {
-  /** Hide header and navigation for embedded use */
-  embedded?: boolean;
-}
-
 type VerificationStatus = 'idle' | 'verifying' | 'verified' | 'error';
 
 // Claude Setup Step
@@ -115,7 +110,7 @@ export function ClaudeSetupStep({ onNext, onBack, onSkip }: ClaudeSetupStepProps
         hasCredentialsFile: false,
         apiKeyValid: true,
       });
-      setApiKeys({ ...apiKeys, anthropic: apiKey });
+      setApiKeys({ ...apiKeys, anthropic: true });
       toast.success('API key saved successfully!');
     },
   });
@@ -225,7 +220,7 @@ export function ClaudeSetupStep({ onNext, onBack, onSkip }: ClaudeSetupStepProps
       if (result.success) {
         // Clear local state
         setApiKey('');
-        setApiKeys({ ...apiKeys, anthropic: '' });
+        setApiKeys({ ...apiKeys, anthropic: false });
         setApiKeyVerificationStatus('idle');
         setApiKeyVerificationError(null);
         setClaudeAuthStatus({
@@ -272,14 +267,8 @@ export function ClaudeSetupStep({ onNext, onBack, onSkip }: ClaudeSetupStepProps
   const isApiKeyVerified = apiKeyVerificationStatus === 'verified';
   const isReady = isCliVerified || isApiKeyVerified;
 
-  const getAuthMethodLabel = () => {
-    if (isApiKeyVerified) return 'API Key';
-    if (isCliVerified) return 'Claude CLI';
-    return null;
-  };
-
   // Helper to get status badge for CLI
-  const getCliStatusBadge = () => {
+  function getCliStatusBadge(): React.ReactElement {
     if (cliVerificationStatus === 'verified') {
       return <StatusBadge status="authenticated" label="Verified" />;
     }
@@ -290,14 +279,13 @@ export function ClaudeSetupStep({ onNext, onBack, onSkip }: ClaudeSetupStepProps
       return <StatusBadge status="checking" label="Checking..." />;
     }
     if (claudeCliStatus?.installed) {
-      // Installed but not yet verified - show yellow unverified badge
       return <StatusBadge status="unverified" label="Unverified" />;
     }
     return <StatusBadge status="not_installed" label="Not Installed" />;
-  };
+  }
 
   // Helper to get status badge for API Key
-  const getApiKeyStatusBadge = () => {
+  function getApiKeyStatusBadge(): React.ReactElement {
     if (apiKeyVerificationStatus === 'verified') {
       return <StatusBadge status="authenticated" label="Verified" />;
     }
@@ -305,11 +293,10 @@ export function ClaudeSetupStep({ onNext, onBack, onSkip }: ClaudeSetupStepProps
       return <StatusBadge status="error" label="Error" />;
     }
     if (hasApiKey) {
-      // API key configured but not yet verified - show yellow unverified badge
       return <StatusBadge status="unverified" label="Unverified" />;
     }
     return <StatusBadge status="not_authenticated" label="Not Set" />;
-  };
+  }
 
   return (
     <div className="space-y-6">

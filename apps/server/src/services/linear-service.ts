@@ -5,7 +5,7 @@
  * Uses @linear/sdk for type-safe GraphQL API access.
  */
 
-import { LinearClient, type Issue, type Team, type Project } from '@linear/sdk';
+import { LinearClient, type Issue } from '@linear/sdk';
 import { createLogger } from '@automaker/utils';
 import type {
   LinearTeam,

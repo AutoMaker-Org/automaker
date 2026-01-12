@@ -94,8 +94,8 @@ export function getStoredTheme(): ThemeMode | null {
   try {
     const legacy = getItem('automaker-storage');
     if (!legacy) return null;
-    const parsed = JSON.parse(legacy) as { state?: { theme?: unknown } } | { theme?: unknown };
-    const theme = (parsed as any)?.state?.theme ?? (parsed as any)?.theme;
+    const parsed = JSON.parse(legacy) as { state?: { theme?: unknown }; theme?: unknown };
+    const theme = parsed.state?.theme ?? parsed.theme;
     if (typeof theme === 'string' && theme.length > 0) {
       return theme as ThemeMode;
     }
@@ -123,10 +123,10 @@ function persistEffectiveThemeForProject(project: Project | null, fallbackTheme:
 export type BoardViewMode = 'kanban' | 'graph';
 
 export interface ApiKeys {
-  anthropic: string;
-  google: string;
-  openai: string;
-  linear: string;
+  anthropic: boolean;
+  google: boolean;
+  openai: boolean;
+  linear: boolean;
 }
 
 // Keyboard Shortcut with optional modifiers
@@ -680,17 +680,28 @@ export interface AppState {
   recentFolders: string[];
 
   // Linear Integration Settings
-  linearSettings: {
-    /** Auto-validate only my issues */
-    autoValidateMyIssuesOnly: boolean;
-    /** Auto-validate only issues with this label */
-    autoValidateLabelFilter: string;
-    /** Auto-validate only issues in these states */
-    autoValidateStateTypes: Array<'backlog' | 'unstarted' | 'started'>;
-    /** Update Linear issue status to "In Progress" when validation starts */
-    updateStatusOnValidationStart: boolean;
-  };
+  linearSettings: LinearSettings;
 }
+
+/** Linear integration settings type */
+export interface LinearSettings {
+  /** Auto-validate only my issues */
+  autoValidateMyIssuesOnly: boolean;
+  /** Auto-validate only issues with this label */
+  autoValidateLabelFilter: string;
+  /** Auto-validate only issues in these states */
+  autoValidateStateTypes: Array<'backlog' | 'unstarted' | 'started'>;
+  /** Update Linear issue status to "In Progress" when validation starts */
+  updateStatusOnValidationStart: boolean;
+}
+
+/** Default Linear settings - exported for use in hydration/refresh functions */
+export const DEFAULT_LINEAR_SETTINGS: LinearSettings = {
+  autoValidateMyIssuesOnly: false,
+  autoValidateLabelFilter: '',
+  autoValidateStateTypes: [],
+  updateStatusOnValidationStart: false,
+};
 
 // Claude Usage interface matching the server response
 export type ClaudeUsage = {
@@ -1145,10 +1156,10 @@ const initialState: AppState = {
   appSpec: '',
   ipcConnected: false,
   apiKeys: {
-    anthropic: '',
-    google: '',
-    openai: '',
-    linear: '',
+    anthropic: false,
+    google: false,
+    openai: false,
+    linear: false,
   },
   chatSessions: [],
   currentChatSession: null,
@@ -1230,12 +1241,7 @@ const initialState: AppState = {
   lastProjectDir: '',
   recentFolders: [],
   // Linear Integration Settings
-  linearSettings: {
-    autoValidateMyIssuesOnly: false,
-    autoValidateLabelFilter: '',
-    autoValidateStateTypes: [],
-    updateStatusOnValidationStart: false,
-  },
+  linearSettings: DEFAULT_LINEAR_SETTINGS,
 };
 
 export const useAppStore = create<AppState & AppActions>()((set, get) => ({

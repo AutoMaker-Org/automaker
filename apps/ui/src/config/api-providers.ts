@@ -12,7 +12,8 @@ export interface ProviderConfig {
   setValue: Dispatch<SetStateAction<string>>;
   showValue: boolean;
   setShowValue: Dispatch<SetStateAction<boolean>>;
-  hasStoredKey: string | null | undefined;
+  hasStoredKey: boolean;
+  maskedKey?: string;
   inputTestId: string;
   toggleTestId: string;
   testButton: {
@@ -30,8 +31,16 @@ export interface ProviderConfig {
   descriptionSuffix?: string;
 }
 
+interface MaskedCredentials {
+  anthropic: { configured: boolean; masked: string };
+  google: { configured: boolean; masked: string };
+  openai: { configured: boolean; masked: string };
+  linear: { configured: boolean; masked: string };
+}
+
 export interface ProviderConfigParams {
   apiKeys: ApiKeys;
+  maskedCredentials?: MaskedCredentials | null;
   anthropic: {
     value: string;
     setValue: Dispatch<SetStateAction<string>>;
@@ -63,6 +72,7 @@ export interface ProviderConfigParams {
 
 export const buildProviderConfigs = ({
   apiKeys,
+  maskedCredentials,
   anthropic,
   openai,
 }: ProviderConfigParams): ProviderConfig[] => [
@@ -76,6 +86,7 @@ export const buildProviderConfigs = ({
     showValue: anthropic.show,
     setShowValue: anthropic.setShow,
     hasStoredKey: apiKeys.anthropic,
+    maskedKey: maskedCredentials?.anthropic.masked,
     inputTestId: 'anthropic-api-key-input',
     toggleTestId: 'toggle-anthropic-visibility',
     testButton: {
@@ -102,6 +113,7 @@ export const buildProviderConfigs = ({
     showValue: openai.show,
     setShowValue: openai.setShow,
     hasStoredKey: apiKeys.openai,
+    maskedKey: maskedCredentials?.openai.masked,
     inputTestId: 'openai-api-key-input',
     toggleTestId: 'toggle-openai-visibility',
     testButton: {

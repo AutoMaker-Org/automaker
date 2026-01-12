@@ -11,73 +11,57 @@ import { useState, useCallback } from 'react';
 import { getElectronAPI } from '@/lib/electron';
 import { toast } from 'sonner';
 
+type ApiKeyProvider = 'anthropic' | 'openai';
+
 export function ApiKeysSection() {
   const { apiKeys, setApiKeys } = useAppStore();
-  const { claudeAuthStatus, setClaudeAuthStatus, codexAuthStatus, setCodexAuthStatus } =
-    useSetupStore();
-  const [isDeletingAnthropicKey, setIsDeletingAnthropicKey] = useState(false);
-  const [isDeletingOpenaiKey, setIsDeletingOpenaiKey] = useState(false);
+  const { claudeAuthStatus, setClaudeAuthStatus, setCodexAuthStatus } = useSetupStore();
+  const [deletingKey, setDeletingKey] = useState<ApiKeyProvider | null>(null);
 
   const { providerConfigParams, handleSave, saved } = useApiKeyManagement();
 
   const providerConfigs = buildProviderConfigs(providerConfigParams);
 
-  // Delete Anthropic API key
-  const deleteAnthropicKey = useCallback(async () => {
-    setIsDeletingAnthropicKey(true);
-    try {
-      const api = getElectronAPI();
-      if (!api.setup?.deleteApiKey) {
-        toast.error('Delete API not available');
-        return;
-      }
+  const deleteApiKey = useCallback(
+    async (provider: ApiKeyProvider) => {
+      setDeletingKey(provider);
+      try {
+        const api = getElectronAPI();
+        if (!api.setup?.deleteApiKey) {
+          toast.error('Delete API not available');
+          return;
+        }
 
-      const result = await api.setup.deleteApiKey('anthropic');
-      if (result.success) {
-        setApiKeys({ ...apiKeys, anthropic: '' });
-        setClaudeAuthStatus({
-          authenticated: false,
-          method: 'none',
-          hasCredentialsFile: claudeAuthStatus?.hasCredentialsFile || false,
-        });
-        toast.success('Anthropic API key deleted');
-      } else {
-        toast.error(result.error || 'Failed to delete API key');
-      }
-    } catch (error) {
-      toast.error('Failed to delete API key');
-    } finally {
-      setIsDeletingAnthropicKey(false);
-    }
-  }, [apiKeys, setApiKeys, claudeAuthStatus, setClaudeAuthStatus]);
+        const result = await api.setup.deleteApiKey(provider);
+        if (result.success) {
+          setApiKeys({ ...apiKeys, [provider]: false });
 
-  // Delete OpenAI API key
-  const deleteOpenaiKey = useCallback(async () => {
-    setIsDeletingOpenaiKey(true);
-    try {
-      const api = getElectronAPI();
-      if (!api.setup?.deleteApiKey) {
-        toast.error('Delete API not available');
-        return;
-      }
+          if (provider === 'anthropic') {
+            setClaudeAuthStatus({
+              authenticated: false,
+              method: 'none',
+              hasCredentialsFile: claudeAuthStatus?.hasCredentialsFile || false,
+            });
+          } else {
+            setCodexAuthStatus({
+              authenticated: false,
+              method: 'none',
+            });
+          }
 
-      const result = await api.setup.deleteApiKey('openai');
-      if (result.success) {
-        setApiKeys({ ...apiKeys, openai: '' });
-        setCodexAuthStatus({
-          authenticated: false,
-          method: 'none',
-        });
-        toast.success('OpenAI API key deleted');
-      } else {
-        toast.error(result.error || 'Failed to delete API key');
+          const providerLabel = provider === 'anthropic' ? 'Anthropic' : 'OpenAI';
+          toast.success(`${providerLabel} API key deleted`);
+        } else {
+          toast.error(result.error || 'Failed to delete API key');
+        }
+      } catch {
+        toast.error('Failed to delete API key');
+      } finally {
+        setDeletingKey(null);
       }
-    } catch (error) {
-      toast.error('Failed to delete API key');
-    } finally {
-      setIsDeletingOpenaiKey(false);
-    }
-  }, [apiKeys, setApiKeys, setCodexAuthStatus]);
+    },
+    [apiKeys, setApiKeys, claudeAuthStatus, setClaudeAuthStatus, setCodexAuthStatus]
+  );
 
   return (
     <div
@@ -135,13 +119,13 @@ export function ApiKeysSection() {
 
           {apiKeys.anthropic && (
             <Button
-              onClick={deleteAnthropicKey}
-              disabled={isDeletingAnthropicKey}
+              onClick={() => deleteApiKey('anthropic')}
+              disabled={deletingKey === 'anthropic'}
               variant="outline"
               className="h-10 border-red-500/30 text-red-500 hover:bg-red-500/10 hover:border-red-500/50"
               data-testid="delete-anthropic-key"
             >
-              {isDeletingAnthropicKey ? (
+              {deletingKey === 'anthropic' ? (
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
               ) : (
                 <Trash2 className="w-4 h-4 mr-2" />
@@ -152,13 +136,13 @@ export function ApiKeysSection() {
 
           {apiKeys.openai && (
             <Button
-              onClick={deleteOpenaiKey}
-              disabled={isDeletingOpenaiKey}
+              onClick={() => deleteApiKey('openai')}
+              disabled={deletingKey === 'openai'}
               variant="outline"
               className="h-10 border-red-500/30 text-red-500 hover:bg-red-500/10 hover:border-red-500/50"
               data-testid="delete-openai-key"
             >
-              {isDeletingOpenaiKey ? (
+              {deletingKey === 'openai' ? (
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
               ) : (
                 <Trash2 className="w-4 h-4 mr-2" />

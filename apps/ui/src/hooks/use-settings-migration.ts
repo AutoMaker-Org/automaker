@@ -26,7 +26,7 @@ import { useEffect, useState, useRef } from 'react';
 import { createLogger } from '@automaker/utils/logger';
 import { getHttpApiClient, waitForApiKeyInit } from '@/lib/http-api-client';
 import { getItem, setItem } from '@/lib/storage';
-import { useAppStore, THEME_STORAGE_KEY } from '@/store/app-store';
+import { useAppStore, THEME_STORAGE_KEY, DEFAULT_LINEAR_SETTINGS } from '@/store/app-store';
 import { useSetupStore } from '@/store/setup-store';
 import type { GlobalSettings } from '@automaker/types';
 
@@ -43,17 +43,6 @@ interface MigrationState {
   /** Error message if migration failed (null if success/no-op) */
   error: string | null;
 }
-
-/**
- * localStorage keys that may contain settings to migrate
- */
-const LOCALSTORAGE_KEYS = [
-  'automaker-storage',
-  'automaker-setup',
-  'worktree-panel-collapsed',
-  'file-browser-recent-folders',
-  'automaker:lastProjectDir',
-] as const;
 
 // NOTE: We intentionally do NOT clear any localStorage keys after migration.
 // This allows users to switch back to older versions of Automaker that relied on localStorage.
@@ -199,6 +188,33 @@ export function localStorageHasMoreData(
 }
 
 /**
+ * Helper to merge an array field: use local value if server is empty, fallback to empty array
+ */
+function mergeArrayField<T>(serverValue: T[] | undefined, localValue: T[] | undefined): T[] {
+  const serverEmpty = !serverValue || serverValue.length === 0;
+  const localHasData = localValue && localValue.length > 0;
+  if (serverEmpty && localHasData) {
+    return localValue;
+  }
+  return serverValue ?? [];
+}
+
+/**
+ * Helper to merge an object field: use local value if server is empty, fallback to empty object
+ */
+function mergeObjectField<T extends Record<string, unknown>>(
+  serverValue: T | undefined,
+  localValue: T | undefined
+): T {
+  const serverEmpty = !serverValue || Object.keys(serverValue).length === 0;
+  const localHasData = localValue && Object.keys(localValue).length > 0;
+  if (serverEmpty && localHasData) {
+    return localValue;
+  }
+  return serverValue ?? ({} as T);
+}
+
+/**
  * Merge localStorage settings with server settings
  * Prefers server data, but uses localStorage for missing arrays/objects
  */
@@ -208,67 +224,37 @@ export function mergeSettings(
 ): GlobalSettings {
   if (!localSettings) return serverSettings;
 
-  // Start with server settings
   const merged = { ...serverSettings };
 
-  // For arrays, prefer the one with more items (if server is empty, use local)
-  if (
-    (!serverSettings.projects || serverSettings.projects.length === 0) &&
-    localSettings.projects &&
-    localSettings.projects.length > 0
-  ) {
-    merged.projects = localSettings.projects;
-  }
+  // Merge array fields (use local if server is empty)
+  merged.projects = mergeArrayField(serverSettings.projects, localSettings.projects);
+  merged.trashedProjects = mergeArrayField(
+    serverSettings.trashedProjects,
+    localSettings.trashedProjects
+  );
+  merged.mcpServers = mergeArrayField(serverSettings.mcpServers, localSettings.mcpServers);
+  merged.recentFolders = mergeArrayField(serverSettings.recentFolders, localSettings.recentFolders);
 
-  if (
-    (!serverSettings.trashedProjects || serverSettings.trashedProjects.length === 0) &&
-    localSettings.trashedProjects &&
-    localSettings.trashedProjects.length > 0
-  ) {
-    merged.trashedProjects = localSettings.trashedProjects;
-  }
-
-  if (
-    (!serverSettings.mcpServers || serverSettings.mcpServers.length === 0) &&
-    localSettings.mcpServers &&
-    localSettings.mcpServers.length > 0
-  ) {
-    merged.mcpServers = localSettings.mcpServers;
-  }
-
-  if (
-    (!serverSettings.recentFolders || serverSettings.recentFolders.length === 0) &&
-    localSettings.recentFolders &&
-    localSettings.recentFolders.length > 0
-  ) {
-    merged.recentFolders = localSettings.recentFolders;
-  }
-
-  if (
-    (!serverSettings.projectHistory || serverSettings.projectHistory.length === 0) &&
-    localSettings.projectHistory &&
-    localSettings.projectHistory.length > 0
-  ) {
-    merged.projectHistory = localSettings.projectHistory;
+  // Project history requires special handling for the index
+  const mergedHistory = mergeArrayField(
+    serverSettings.projectHistory,
+    localSettings.projectHistory
+  );
+  if (mergedHistory !== serverSettings.projectHistory) {
+    merged.projectHistory = mergedHistory;
     merged.projectHistoryIndex = localSettings.projectHistoryIndex ?? -1;
   }
 
-  // For objects, merge if server is empty
-  if (
-    (!serverSettings.lastSelectedSessionByProject ||
-      Object.keys(serverSettings.lastSelectedSessionByProject).length === 0) &&
-    localSettings.lastSelectedSessionByProject &&
-    Object.keys(localSettings.lastSelectedSessionByProject).length > 0
-  ) {
-    merged.lastSelectedSessionByProject = localSettings.lastSelectedSessionByProject;
-  }
+  // Merge object fields (use local if server is empty)
+  merged.lastSelectedSessionByProject = mergeObjectField(
+    serverSettings.lastSelectedSessionByProject,
+    localSettings.lastSelectedSessionByProject
+  );
 
-  // For simple values, use localStorage if server value is default/undefined
+  // Merge simple values (use local if server is undefined/empty)
   if (!serverSettings.lastProjectDir && localSettings.lastProjectDir) {
     merged.lastProjectDir = localSettings.lastProjectDir;
   }
-
-  // Preserve current project ID from localStorage if server doesn't have one
   if (!serverSettings.currentProjectId && localSettings.currentProjectId) {
     merged.currentProjectId = localSettings.currentProjectId;
   }
@@ -559,9 +545,8 @@ export function hydrateStoreFromSettings(settings: GlobalSettings): void {
     recentFolders: settings.recentFolders ?? [],
     // Linear Integration Settings
     linearSettings: {
-      autoValidateMyIssuesOnly: settings.linearSettings?.autoValidateMyIssuesOnly ?? false,
-      autoValidateLabelFilter: settings.linearSettings?.autoValidateLabelFilter ?? '',
-      autoValidateStateTypes: settings.linearSettings?.autoValidateStateTypes ?? [],
+      ...DEFAULT_LINEAR_SETTINGS,
+      ...settings.linearSettings,
     },
   });
 

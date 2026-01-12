@@ -15,7 +15,12 @@ import { useEffect, useRef, useCallback, useState } from 'react';
 import { createLogger } from '@automaker/utils/logger';
 import { getHttpApiClient, waitForApiKeyInit } from '@/lib/http-api-client';
 import { setItem } from '@/lib/storage';
-import { useAppStore, type ThemeMode, THEME_STORAGE_KEY } from '@/store/app-store';
+import {
+  useAppStore,
+  type ThemeMode,
+  THEME_STORAGE_KEY,
+  DEFAULT_LINEAR_SETTINGS,
+} from '@/store/app-store';
 import { useSetupStore } from '@/store/setup-store';
 import { useAuthStore } from '@/store/auth-store';
 import { waitForMigrationComplete, resetMigrationState } from './use-settings-migration';
@@ -65,6 +70,34 @@ const SETTINGS_FIELDS_TO_SYNC = [
 
 // Fields from setup store to sync
 const SETUP_FIELDS_TO_SYNC = ['isFirstRun', 'setupComplete', 'skipClaudeSetup'] as const;
+
+/**
+ * Build the settings update object from current store state.
+ * Extracts all synced fields from both app store and setup store.
+ */
+function buildUpdatesFromState(): Record<string, unknown> {
+  const appState = useAppStore.getState();
+  const setupState = useSetupStore.getState();
+
+  const updates: Record<string, unknown> = {};
+
+  // App store fields
+  for (const field of SETTINGS_FIELDS_TO_SYNC) {
+    if (field === 'currentProjectId') {
+      // Special handling: extract ID from currentProject object
+      updates[field] = appState.currentProject?.id ?? null;
+    } else {
+      updates[field] = appState[field as keyof typeof appState];
+    }
+  }
+
+  // Setup store fields
+  for (const field of SETUP_FIELDS_TO_SYNC) {
+    updates[field] = setupState[field as keyof typeof setupState];
+  }
+
+  return updates;
+}
 
 interface SettingsSyncState {
   /** Whether initial settings have been loaded from API */
@@ -137,26 +170,12 @@ export function useSettingsSync(): SettingsSyncState {
 
       setState((s) => ({ ...s, syncing: true }));
       const api = getHttpApiClient();
-      const appState = useAppStore.getState();
 
-      logger.debug('Syncing to server:', { projectsCount: appState.projects?.length ?? 0 });
+      logger.debug('Syncing to server:', {
+        projectsCount: useAppStore.getState().projects?.length ?? 0,
+      });
 
-      // Build updates object from current state
-      const updates: Record<string, unknown> = {};
-      for (const field of SETTINGS_FIELDS_TO_SYNC) {
-        if (field === 'currentProjectId') {
-          // Special handling: extract ID from currentProject object
-          updates[field] = appState.currentProject?.id ?? null;
-        } else {
-          updates[field] = appState[field as keyof typeof appState];
-        }
-      }
-
-      // Include setup wizard state (lives in a separate store)
-      const setupState = useSetupStore.getState();
-      for (const field of SETUP_FIELDS_TO_SYNC) {
-        updates[field] = setupState[field as keyof typeof setupState];
-      }
+      const updates = buildUpdatesFromState();
 
       // Create a hash of the updates to avoid redundant syncs
       const updateHash = JSON.stringify(updates);
@@ -237,25 +256,13 @@ export function useSettingsSync(): SettingsSyncState {
         logger.info('Migration complete, initializing sync');
 
         // Read state - at this point React has processed the store update
-        const appState = useAppStore.getState();
-        const setupState = useSetupStore.getState();
-
-        logger.info('Initial state read:', { projectsCount: appState.projects?.length ?? 0 });
+        logger.info('Initial state read:', {
+          projectsCount: useAppStore.getState().projects?.length ?? 0,
+        });
 
         // Store the initial state hash to avoid immediate re-sync
         // (migration has already hydrated the store from server/localStorage)
-        const updates: Record<string, unknown> = {};
-        for (const field of SETTINGS_FIELDS_TO_SYNC) {
-          if (field === 'currentProjectId') {
-            updates[field] = appState.currentProject?.id ?? null;
-          } else {
-            updates[field] = appState[field as keyof typeof appState];
-          }
-        }
-        for (const field of SETUP_FIELDS_TO_SYNC) {
-          updates[field] = setupState[field as keyof typeof setupState];
-        }
-        lastSyncedRef.current = JSON.stringify(updates);
+        lastSyncedRef.current = JSON.stringify(buildUpdatesFromState());
 
         logger.info('Settings sync initialized');
         setState({ loaded: true, error: null, syncing: false });
@@ -385,22 +392,7 @@ export function useSettingsSync(): SettingsSyncState {
 export async function forceSyncSettingsToServer(): Promise<boolean> {
   try {
     const api = getHttpApiClient();
-    const appState = useAppStore.getState();
-
-    const updates: Record<string, unknown> = {};
-    for (const field of SETTINGS_FIELDS_TO_SYNC) {
-      if (field === 'currentProjectId') {
-        updates[field] = appState.currentProject?.id ?? null;
-      } else {
-        updates[field] = appState[field as keyof typeof appState];
-      }
-    }
-    const setupState = useSetupStore.getState();
-    for (const field of SETUP_FIELDS_TO_SYNC) {
-      updates[field] = setupState[field as keyof typeof setupState];
-    }
-
-    const result = await api.settings.updateGlobal(updates);
+    const result = await api.settings.updateGlobal(buildUpdatesFromState());
     return result.success;
   } catch (error) {
     logger.error('Failed to force sync settings:', error);
@@ -467,9 +459,8 @@ export async function refreshSettingsFromServer(): Promise<boolean> {
       recentFolders: serverSettings.recentFolders ?? [],
       // Linear Integration Settings
       linearSettings: {
-        autoValidateMyIssuesOnly: serverSettings.linearSettings?.autoValidateMyIssuesOnly ?? false,
-        autoValidateLabelFilter: serverSettings.linearSettings?.autoValidateLabelFilter ?? '',
-        autoValidateStateTypes: serverSettings.linearSettings?.autoValidateStateTypes ?? [],
+        ...DEFAULT_LINEAR_SETTINGS,
+        ...serverSettings.linearSettings,
       },
     });
 

@@ -7,7 +7,7 @@ import {
   useFileBrowser,
   setGlobalFileBrowser,
 } from '@/contexts/file-browser-context';
-import { useAppStore, getStoredTheme } from '@/store/app-store';
+import { useAppStore, getStoredTheme, type ThemeMode } from '@/store/app-store';
 import { useSetupStore } from '@/store/setup-store';
 import { useAuthStore } from '@/store/auth-store';
 import { getElectronAPI, isElectron } from '@/lib/electron';
@@ -421,12 +421,19 @@ function RootLayoutContent() {
                   // Hydrate store with the final settings (merged if migration occurred)
                   hydrateStoreFromSettings(finalSettings);
 
-                  // Load credentials (API keys) from server and hydrate store
+                  // Load credentials status from server and hydrate store
                   try {
                     const credentialsResult = await api.settings.getCredentials();
-                    if (credentialsResult.success && credentialsResult.credentials?.apiKeys) {
-                      useAppStore.getState().setApiKeys(credentialsResult.credentials.apiKeys);
-                      logger.debug('Loaded API keys from server');
+                    if (credentialsResult.success && credentialsResult.credentials) {
+                      // Store only boolean flags indicating whether each key is configured
+                      const { anthropic, google, openai, linear } = credentialsResult.credentials;
+                      useAppStore.getState().setApiKeys({
+                        anthropic: anthropic.configured,
+                        google: google.configured,
+                        openai: openai.configured,
+                        linear: linear.configured,
+                      });
+                      logger.debug('Loaded API key status from server');
                     }
                   } catch (credError) {
                     logger.warn('Failed to load credentials:', credError);
@@ -672,7 +679,7 @@ function RootLayoutContent() {
           upsertAndSetCurrentProject(
             autoOpenCandidate.path,
             autoOpenCandidate.name,
-            autoOpenCandidate.theme
+            autoOpenCandidate.theme as ThemeMode | undefined
           );
         }
 

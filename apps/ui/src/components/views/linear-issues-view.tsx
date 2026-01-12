@@ -60,14 +60,7 @@ export function LinearIssuesView() {
     ((identifier: string, result: IssueValidationResult) => void) | null
   >(null);
 
-  const {
-    currentProject,
-    phaseModels,
-    defaultAIProfileId,
-    aiProfiles,
-    getCurrentWorktree,
-    worktreesByProject,
-  } = useAppStore();
+  const { currentProject, phaseModels, getCurrentWorktree, worktreesByProject } = useAppStore();
   const navigate = useNavigate();
 
   // Calculate effective model entry
@@ -79,12 +72,6 @@ export function LinearIssuesView() {
   }, [modelOverrideEntry, phaseModels.validationModel]);
 
   const isModelOverridden = modelOverrideEntry !== null;
-
-  // Get default AI profile for task creation
-  const defaultProfile = useMemo(() => {
-    if (!defaultAIProfileId) return null;
-    return aiProfiles.find((p) => p.id === defaultAIProfileId) ?? null;
-  }, [defaultAIProfileId, aiProfiles]);
 
   // Get current branch from selected worktree
   const currentBranch = useMemo(() => {
@@ -299,8 +286,8 @@ export function LinearIssuesView() {
             .filter(Boolean)
             .join('\n');
 
-          // Use profile default model
-          const featureModel = defaultProfile?.model ?? 'opus';
+          // Use default model (AI profiles not yet implemented)
+          const featureModel = 'opus';
 
           const feature = {
             id: `linear-${issue.identifier}-${crypto.randomUUID()}`,
@@ -311,7 +298,7 @@ export function LinearIssuesView() {
             passes: false,
             priority: getFeaturePriority(validation.estimatedComplexity),
             model: featureModel,
-            thinkingLevel: defaultProfile?.thinkingLevel ?? 'none',
+            thinkingLevel: 'none' as const,
             branchName: currentBranch,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
@@ -336,7 +323,7 @@ export function LinearIssuesView() {
         toast.error(err instanceof Error ? err.message : 'Failed to create task');
       }
     },
-    [currentProject?.path, defaultProfile, currentBranch]
+    [currentProject?.path, currentBranch]
   );
 
   // Auto-convert callback - triggered when validation completes with 'valid' verdict

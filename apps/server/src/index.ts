@@ -62,6 +62,7 @@ import { createLinearRoutes } from './routes/linear/index.js';
 import { createContextRoutes } from './routes/context/index.js';
 import { createBacklogPlanRoutes } from './routes/backlog-plan/index.js';
 import { cleanupStaleValidations } from './routes/github/routes/validation-common.js';
+import { cleanupLinearValidations } from './routes/linear/routes/validate-issue.js';
 import { createMCPRoutes } from './routes/mcp/index.js';
 import { MCPTestService } from './services/mcp-test-service.js';
 import { createPipelineRoutes } from './routes/pipeline/index.js';
@@ -191,9 +192,11 @@ const ideationService = new IdeationService(events, settingsService, featureLoad
 // Run stale validation cleanup every hour to prevent memory leaks from crashed validations
 const VALIDATION_CLEANUP_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
 setInterval(() => {
-  const cleaned = cleanupStaleValidations();
-  if (cleaned > 0) {
-    logger.info(`Cleaned up ${cleaned} stale validation entries`);
+  const githubCleaned = cleanupStaleValidations();
+  const linearCleaned = cleanupLinearValidations();
+  const totalCleaned = githubCleaned + linearCleaned;
+  if (totalCleaned > 0) {
+    logger.info(`Cleaned up ${githubCleaned} GitHub + ${linearCleaned} Linear stale validations`);
   }
 }, VALIDATION_CLEANUP_INTERVAL_MS);
 
