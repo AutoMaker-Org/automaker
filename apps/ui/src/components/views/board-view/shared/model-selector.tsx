@@ -32,15 +32,19 @@ export function ModelSelector({
     codexModelsError,
     fetchCodexModels,
   } = useAppStore();
-  const { cursorCliStatus, codexCliStatus } = useSetupStore();
+  const { cursorCliStatus, codexCliStatus, opencodeCliStatus } = useSetupStore();
 
   const selectedProvider = getModelProvider(selectedModel);
 
-  // Check if Cursor CLI is available
+  // Check if Cursor CLI is available (installed AND authenticated)
   const isCursorAvailable = cursorCliStatus?.installed && cursorCliStatus?.auth?.authenticated;
 
-  // Check if Codex CLI is available
+  // Check if Codex CLI is available (installed AND authenticated)
   const isCodexAvailable = codexCliStatus?.installed && codexCliStatus?.auth?.authenticated;
+
+  // Check if OpenCode CLI is available (installed AND authenticated)
+  const isOpencodeAvailable =
+    opencodeCliStatus?.installed && opencodeCliStatus?.auth?.authenticated;
 
   // Fetch Codex models on mount
   useEffect(() => {
@@ -48,6 +52,17 @@ export function ModelSelector({
       fetchCodexModels();
     }
   }, [isCodexAvailable, codexModels.length, codexModelsLoading, fetchCodexModels]);
+
+  // Fall back to Claude if selected provider is no longer available
+  useEffect(() => {
+    if (selectedProvider === 'cursor' && !isCursorAvailable) {
+      onModelSelect('sonnet');
+    } else if (selectedProvider === 'codex' && !isCodexAvailable) {
+      onModelSelect('sonnet');
+    } else if (selectedProvider === 'opencode' && !isOpencodeAvailable) {
+      onModelSelect('sonnet');
+    }
+  }, [selectedProvider, isCursorAvailable, isCodexAvailable, isOpencodeAvailable, onModelSelect]);
 
   // Transform codex models from store to ModelOption format
   const dynamicCodexModels: ModelOption[] = codexModels.map((model) => {
@@ -95,6 +110,7 @@ export function ModelSelector({
       <div className="space-y-2">
         <Label>AI Provider</Label>
         <div className="flex gap-2">
+          {/* Claude is always available (uses API key or SDK auth) */}
           <button
             type="button"
             onClick={() => handleProviderChange('claude')}
@@ -109,34 +125,40 @@ export function ModelSelector({
             <AnthropicIcon className="w-4 h-4" />
             Claude
           </button>
-          <button
-            type="button"
-            onClick={() => handleProviderChange('cursor')}
-            className={cn(
-              'flex-1 px-3 py-2 rounded-md border text-sm font-medium transition-colors flex items-center justify-center gap-2',
-              selectedProvider === 'cursor'
-                ? 'bg-primary text-primary-foreground border-primary'
-                : 'bg-background hover:bg-accent border-border'
-            )}
-            data-testid={`${testIdPrefix}-provider-cursor`}
-          >
-            <CursorIcon className="w-4 h-4" />
-            Cursor CLI
-          </button>
-          <button
-            type="button"
-            onClick={() => handleProviderChange('codex')}
-            className={cn(
-              'flex-1 px-3 py-2 rounded-md border text-sm font-medium transition-colors flex items-center justify-center gap-2',
-              selectedProvider === 'codex'
-                ? 'bg-primary text-primary-foreground border-primary'
-                : 'bg-background hover:bg-accent border-border'
-            )}
-            data-testid={`${testIdPrefix}-provider-codex`}
-          >
-            <OpenAIIcon className="w-4 h-4" />
-            Codex CLI
-          </button>
+          {/* Only show Cursor when installed AND authenticated */}
+          {isCursorAvailable && (
+            <button
+              type="button"
+              onClick={() => handleProviderChange('cursor')}
+              className={cn(
+                'flex-1 px-3 py-2 rounded-md border text-sm font-medium transition-colors flex items-center justify-center gap-2',
+                selectedProvider === 'cursor'
+                  ? 'bg-primary text-primary-foreground border-primary'
+                  : 'bg-background hover:bg-accent border-border'
+              )}
+              data-testid={`${testIdPrefix}-provider-cursor`}
+            >
+              <CursorIcon className="w-4 h-4" />
+              Cursor CLI
+            </button>
+          )}
+          {/* Only show Codex when installed AND authenticated */}
+          {isCodexAvailable && (
+            <button
+              type="button"
+              onClick={() => handleProviderChange('codex')}
+              className={cn(
+                'flex-1 px-3 py-2 rounded-md border text-sm font-medium transition-colors flex items-center justify-center gap-2',
+                selectedProvider === 'codex'
+                  ? 'bg-primary text-primary-foreground border-primary'
+                  : 'bg-background hover:bg-accent border-border'
+              )}
+              data-testid={`${testIdPrefix}-provider-codex`}
+            >
+              <OpenAIIcon className="w-4 h-4" />
+              Codex CLI
+            </button>
+          )}
         </div>
       </div>
 
@@ -178,20 +200,9 @@ export function ModelSelector({
         </div>
       )}
 
-      {/* Cursor Models */}
-      {selectedProvider === 'cursor' && (
+      {/* Cursor Models - only shown when authenticated */}
+      {selectedProvider === 'cursor' && isCursorAvailable && (
         <div className="space-y-3">
-          {/* Warning when Cursor CLI is not available */}
-          {!isCursorAvailable && (
-            <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
-              <AlertTriangle className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
-              <div className="text-sm text-amber-400">
-                Cursor CLI is not installed or authenticated. Configure it in Settings → AI
-                Providers.
-              </div>
-            </div>
-          )}
-
           <div className="flex items-center justify-between">
             <Label className="flex items-center gap-2">
               <CursorIcon className="w-4 h-4 text-primary" />
@@ -247,20 +258,9 @@ export function ModelSelector({
         </div>
       )}
 
-      {/* Codex Models */}
-      {selectedProvider === 'codex' && (
+      {/* Codex Models - only shown when authenticated */}
+      {selectedProvider === 'codex' && isCodexAvailable && (
         <div className="space-y-3">
-          {/* Warning when Codex CLI is not available */}
-          {!isCodexAvailable && (
-            <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
-              <AlertTriangle className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
-              <div className="text-sm text-amber-400">
-                Codex CLI is not installed or authenticated. Configure it in Settings → AI
-                Providers.
-              </div>
-            </div>
-          )}
-
           <div className="flex items-center justify-between">
             <Label className="flex items-center gap-2">
               <OpenAIIcon className="w-4 h-4 text-primary" />

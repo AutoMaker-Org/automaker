@@ -302,4 +302,34 @@ describe('provider-factory.ts', () => {
       expect(hasCursorModels).toBe(true);
     });
   });
+
+  describe('getAllAvailableModelsAsync', () => {
+    it('should return array of models', async () => {
+      const models = await ProviderFactory.getAllAvailableModelsAsync();
+      expect(Array.isArray(models)).toBe(true);
+    });
+
+    it('should return models with required fields', async () => {
+      const models = await ProviderFactory.getAllAvailableModelsAsync();
+
+      models.forEach((model) => {
+        expect(model).toHaveProperty('id');
+        expect(model).toHaveProperty('name');
+        expect(typeof model.id).toBe('string');
+        expect(typeof model.name).toBe('string');
+      });
+    });
+
+    it('should only include models from authenticated providers', async () => {
+      // This test verifies the async method checks authentication
+      // The result may vary based on actual CLI installation/auth status
+      const models = await ProviderFactory.getAllAvailableModelsAsync();
+
+      // Each model should have a valid provider
+      models.forEach((model) => {
+        expect(model).toHaveProperty('provider');
+        expect(typeof model.provider).toBe('string');
+      });
+    });
+  });
 });

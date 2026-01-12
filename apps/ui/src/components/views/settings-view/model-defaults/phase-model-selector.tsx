@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { useAppStore } from '@/store/app-store';
+import { useSetupStore } from '@/store/setup-store';
 import type {
   ModelAlias,
   CursorModelId,
@@ -99,19 +100,27 @@ export function PhaseModelSelector({
     dynamicOpencodeModels,
   } = useAppStore();
 
+  const { cursorCliStatus, codexCliStatus, opencodeCliStatus } = useSetupStore();
+
+  // Check provider authentication status
+  const isCursorAvailable = cursorCliStatus?.installed && cursorCliStatus?.auth?.authenticated;
+  const isCodexAvailable = codexCliStatus?.installed && codexCliStatus?.auth?.authenticated;
+  const isOpencodeAvailable =
+    opencodeCliStatus?.installed && opencodeCliStatus?.auth?.authenticated;
+
   // Extract model and thinking/reasoning levels from value
   const selectedModel = value.model;
   const selectedThinkingLevel = value.thinkingLevel || 'none';
   const selectedReasoningEffort = value.reasoningEffort || 'none';
 
-  // Fetch Codex models on mount
+  // Fetch Codex models on mount (only if authenticated)
   useEffect(() => {
-    if (codexModels.length === 0 && !codexModelsLoading) {
+    if (isCodexAvailable && codexModels.length === 0 && !codexModelsLoading) {
       fetchCodexModels().catch(() => {
         // Silently fail - user will see empty Codex section
       });
     }
-  }, [codexModels.length, codexModelsLoading, fetchCodexModels]);
+  }, [isCodexAvailable, codexModels.length, codexModelsLoading, fetchCodexModels]);
 
   // Close expanded group when trigger scrolls out of view
   useEffect(() => {
@@ -182,8 +191,9 @@ export function PhaseModelSelector({
     return () => observer.disconnect();
   }, [expandedCodexModel]);
 
-  // Transform dynamic Codex models from store to component format
+  // Transform dynamic Codex models from store to component format (only if authenticated)
   const transformedCodexModels = useMemo(() => {
+    if (!isCodexAvailable) return [];
     return codexModels.map((model) => ({
       id: model.id,
       label: model.label,
@@ -191,13 +201,15 @@ export function PhaseModelSelector({
       provider: 'codex' as const,
       badge: model.tier === 'premium' ? 'Premium' : model.tier === 'basic' ? 'Speed' : undefined,
     }));
-  }, [codexModels]);
+  }, [codexModels, isCodexAvailable]);
 
-  // Filter Cursor models to only show enabled ones
-  const availableCursorModels = CURSOR_MODELS.filter((model) => {
-    const cursorId = stripProviderPrefix(model.id) as CursorModelId;
-    return enabledCursorModels.includes(cursorId);
-  });
+  // Filter Cursor models to only show enabled ones (and only if authenticated)
+  const availableCursorModels = isCursorAvailable
+    ? CURSOR_MODELS.filter((model) => {
+        const cursorId = stripProviderPrefix(model.id) as CursorModelId;
+        return enabledCursorModels.includes(cursorId);
+      })
+    : [];
 
   // Helper to find current selected model details
   const currentModel = useMemo(() => {
@@ -295,8 +307,10 @@ export function PhaseModelSelector({
     return { groupedModels: grouped, standaloneCursorModels: standalone };
   }, [availableCursorModels, enabledCursorModels]);
 
-  // Combine static and dynamic OpenCode models
+  // Combine static and dynamic OpenCode models (only if authenticated)
   const allOpencodeModels: ModelOption[] = useMemo(() => {
+    if (!isOpencodeAvailable) return [];
+
     // Start with static models
     const staticModels = [...OPENCODE_MODELS];
 
@@ -315,7 +329,7 @@ export function PhaseModelSelector({
     const uniqueDynamic = dynamicModelOptions.filter((m) => !staticIds.has(m.id));
 
     return [...staticModels, ...uniqueDynamic];
-  }, [dynamicOpencodeModels]);
+  }, [dynamicOpencodeModels, isOpencodeAvailable]);
 
   // Group models
   const { favorites, claude, cursor, codex, opencode } = useMemo(() => {

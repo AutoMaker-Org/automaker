@@ -209,10 +209,47 @@ export class ProviderFactory {
 
   /**
    * Get all available models from all providers
+   * @deprecated Use getAllAvailableModelsAsync() instead to properly check authentication
    */
   static getAllAvailableModels(): ModelDefinition[] {
     const providers = this.getAllProviders();
     return providers.flatMap((p) => p.getAvailableModels());
+  }
+
+  /**
+   * Get all available models from all providers (async version)
+   *
+   * This method checks authentication status for each provider before including its models.
+   * Providers that are disconnected or not authenticated will not have their models included.
+   *
+   * @returns Promise resolving to array of available model definitions
+   */
+  static async getAllAvailableModelsAsync(): Promise<ModelDefinition[]> {
+    const allModels: ModelDefinition[] = [];
+
+    for (const [name, reg] of providerRegistry.entries()) {
+      // Skip if provider is disconnected via marker file
+      if (isProviderDisconnected(name)) {
+        continue;
+      }
+
+      const provider = reg.factory();
+
+      // Check installation and authentication status
+      try {
+        const status = await provider.detectInstallation();
+
+        // Only include models if provider is installed AND authenticated
+        if (status.installed && status.authenticated) {
+          allModels.push(...provider.getAvailableModels());
+        }
+      } catch (error) {
+        // If we can't detect installation status, skip this provider
+        console.warn(`Failed to detect installation status for ${name}:`, error);
+      }
+    }
+
+    return allModels;
   }
 
   /**
