@@ -1,11 +1,12 @@
 import { Button } from '@/components/ui/button';
-import { Pencil, X, CheckSquare } from 'lucide-react';
+import { Pencil, X, CheckSquare, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface SelectionActionBarProps {
   selectedCount: number;
   totalCount: number;
   onEdit: () => void;
+  onDelete: () => void;
   onClear: () => void;
   onSelectAll: () => void;
 }
@@ -14,6 +15,7 @@ export function SelectionActionBar({
   selectedCount,
   totalCount,
   onEdit,
+  onDelete,
   onClear,
   onSelectAll,
 }: SelectionActionBarProps) {
@@ -47,6 +49,17 @@ export function SelectionActionBar({
         >
           <Pencil className="w-4 h-4 mr-1.5" />
           Edit Selected
+        </Button>
+
+        <Button
+          variant="destructive"
+          size="sm"
+          onClick={onDelete}
+          className="h-8"
+          data-testid="selection-delete-button"
+        >
+          <Trash2 className="w-4 h-4 mr-1.5" />
+          Delete Selected
         </Button>
 
         {!allSelected && (

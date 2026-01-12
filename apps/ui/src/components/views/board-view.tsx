@@ -38,6 +38,7 @@ import {
   FollowUpDialog,
   PlanApprovalDialog,
 } from './board-view/dialogs';
+import { DeleteConfirmDialog } from '@/components/ui/delete-confirm-dialog';
 import { PipelineSettingsDialog } from './board-view/dialogs/pipeline-settings-dialog';
 import { CreateWorktreeDialog } from './board-view/dialogs/create-worktree-dialog';
 import { DeleteWorktreeDialog } from './board-view/dialogs/delete-worktree-dialog';
@@ -171,6 +172,7 @@ export function BoardView() {
     exitSelectionMode,
   } = useSelectionMode();
   const [showMassEditDialog, setShowMassEditDialog] = useState(false);
+  const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
 
   // Search filter for Kanban cards
   const [searchQuery, setSearchQuery] = useState('');
@@ -494,6 +496,64 @@ export function BoardView() {
     },
     [currentProject, selectedFeatureIds, updateFeature, exitSelectionMode]
   );
+
+  // Handler for bulk deleting selected features
+  const handleDeleteSelected = useCallback(async () => {
+    if (!currentProject || selectedFeatureIds.size === 0) return;
+
+    try {
+      const featureIds = Array.from(selectedFeatureIds);
+      const featuresToDelete = hookFeatures.filter((f) => selectedFeatureIds.has(f.id));
+
+      // Stop any running features first
+      const runningFeatures = featuresToDelete.filter((f) => runningAutoTasks.includes(f.id));
+      for (const feature of runningFeatures) {
+        try {
+          await autoMode.stopFeature(feature.id);
+          logger.info(`Stopped running feature before deletion: ${feature.id}`);
+        } catch (error) {
+          logger.error(`Error stopping feature ${feature.id} before delete:`, error);
+        }
+      }
+
+      // Delete images associated with features
+      const api = getElectronAPI();
+      for (const feature of featuresToDelete) {
+        if (feature.imagePaths && feature.imagePaths.length > 0) {
+          for (const imagePathObj of feature.imagePaths) {
+            try {
+              await api.deleteFile(imagePathObj.path);
+              logger.info(`Deleted image: ${imagePathObj.path}`);
+            } catch (error) {
+              logger.error(`Failed to delete image ${imagePathObj.path}:`, error);
+            }
+          }
+        }
+      }
+
+      // Delete features from local state
+      featureIds.forEach((featureId) => {
+        useAppStore.getState().removeFeature(featureId);
+      });
+
+      // Delete features from persistence
+      await Promise.all(featureIds.map((featureId) => persistFeatureDelete(featureId)));
+
+      toast.success(`Deleted ${featureIds.length} feature${featureIds.length !== 1 ? 's' : ''}`);
+      exitSelectionMode();
+    } catch (error) {
+      logger.error('Bulk delete failed:', error);
+      toast.error('Failed to delete features');
+    }
+  }, [
+    currentProject,
+    selectedFeatureIds,
+    hookFeatures,
+    runningAutoTasks,
+    autoMode,
+    persistFeatureDelete,
+    exitSelectionMode,
+  ]);
 
   // Get selected features for mass edit dialog
   const selectedFeatures = useMemo(() => {
@@ -1288,6 +1348,7 @@ export function BoardView() {
           selectedCount={selectedCount}
           totalCount={allSelectableFeatureIds.length}
           onEdit={() => setShowMassEditDialog(true)}
+          onDelete={() => setShowBulkDeleteDialog(true)}
           onClear={clearSelection}
           onSelectAll={() => selectAll(allSelectableFeatureIds)}
         />
@@ -1301,6 +1362,18 @@ export function BoardView() {
         onApply={handleBulkUpdate}
         showProfilesOnly={showProfilesOnly}
         aiProfiles={aiProfiles}
+      />
+
+      {/* Bulk Delete Confirmation Dialog */}
+      <DeleteConfirmDialog
+        open={showBulkDeleteDialog}
+        onOpenChange={setShowBulkDeleteDialog}
+        onConfirm={handleDeleteSelected}
+        title="Delete Selected Features"
+        description={`Are you sure you want to delete ${selectedFeatureIds.size} selected feature${selectedFeatureIds.size !== 1 ? 's' : ''}? This action cannot be undone.`}
+        confirmText="Delete All"
+        testId="bulk-delete-dialog"
+        confirmTestId="confirm-bulk-delete-button"
       />
 
       {/* Board Background Modal */}
