@@ -4,7 +4,7 @@ import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { Button } from '@/components/ui/button';
 import { KanbanColumn, KanbanCard } from './components';
 import { Feature } from '@/store/app-store';
-import { Archive, Settings2, CheckSquare, GripVertical } from 'lucide-react';
+import { Archive, Settings2, CheckSquare, GripVertical, LayoutList } from 'lucide-react';
 import { useResponsiveKanban } from '@/hooks/use-responsive-kanban';
 import { getColumnsWithPipeline, type ColumnId } from './constants';
 import type { PipelineConfig } from '@automaker/types';
@@ -50,6 +50,8 @@ interface KanbanBoardProps {
   selectedFeatureIds?: Set<string>;
   onToggleFeatureSelection?: (featureId: string) => void;
   onToggleSelectionMode?: () => void;
+  // Backlog manager navigation
+  onManageBacklog?: () => void;
 }
 
 export function KanbanBoard({
@@ -84,6 +86,7 @@ export function KanbanBoard({
   selectedFeatureIds = new Set(),
   onToggleFeatureSelection,
   onToggleSelectionMode,
+  onManageBacklog,
 }: KanbanBoardProps) {
   // Generate columns including pipeline steps
   const columns = useMemo(() => getColumnsWithPipeline(pipelineConfig), [pipelineConfig]);
@@ -127,26 +130,38 @@ export function KanbanBoard({
                       Complete All
                     </Button>
                   ) : column.id === 'backlog' ? (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className={`h-6 px-2 text-xs ${isSelectionMode ? 'text-primary bg-primary/10' : 'text-muted-foreground hover:text-foreground'}`}
-                      onClick={onToggleSelectionMode}
-                      title={isSelectionMode ? 'Switch to Drag Mode' : 'Select Multiple'}
-                      data-testid="selection-mode-button"
-                    >
-                      {isSelectionMode ? (
-                        <>
-                          <GripVertical className="w-3.5 h-3.5 mr-1" />
-                          Drag
-                        </>
-                      ) : (
-                        <>
-                          <CheckSquare className="w-3.5 h-3.5 mr-1" />
-                          Select
-                        </>
-                      )}
-                    </Button>
+                    <>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
+                        onClick={onManageBacklog}
+                        title="Manage backlog"
+                        data-testid="manage-backlog-button"
+                      >
+                        <LayoutList className="w-3.5 h-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className={`h-6 px-2 text-xs ${isSelectionMode ? 'text-primary bg-primary/10' : 'text-muted-foreground hover:text-foreground'}`}
+                        onClick={onToggleSelectionMode}
+                        title={isSelectionMode ? 'Switch to Drag Mode' : 'Select Multiple'}
+                        data-testid="selection-mode-button"
+                      >
+                        {isSelectionMode ? (
+                          <>
+                            <GripVertical className="w-3.5 h-3.5 mr-1" />
+                            Drag
+                          </>
+                        ) : (
+                          <>
+                            <CheckSquare className="w-3.5 h-3.5 mr-1" />
+                            Select
+                          </>
+                        )}
+                      </Button>
+                    </>
                   ) : column.id === 'in_progress' ? (
                     <Button
                       variant="ghost"
