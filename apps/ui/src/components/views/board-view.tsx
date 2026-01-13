@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
+import { useEffect, useState, useCallback, useMemo, useRef, lazy, Suspense } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { createLogger } from '@automaker/utils/logger';
 import {
@@ -34,7 +34,67 @@ import type { ModelAlias, CursorModelId, BacklogPlanResult } from '@automaker/ty
 import { pathsEqual } from '@/lib/utils';
 import { toast } from 'sonner';
 import { getBlockingDependencies } from '@automaker/dependency-resolver';
-import { BoardBackgroundModal } from '@/components/dialogs/board-background-modal';
+// Lazy load dialogs to reduce initial bundle size and improve board-view startup time
+const BoardBackgroundModal = lazy(() =>
+  import('@/components/dialogs/board-background-modal').then((m) => ({
+    default: m.BoardBackgroundModal,
+  }))
+);
+const AddFeatureDialog = lazy(() =>
+  import('./board-view/dialogs').then((m) => ({ default: m.AddFeatureDialog }))
+);
+const AgentOutputModal = lazy(() =>
+  import('./board-view/dialogs').then((m) => ({ default: m.AgentOutputModal }))
+);
+const BacklogPlanDialog = lazy(() =>
+  import('./board-view/dialogs').then((m) => ({ default: m.BacklogPlanDialog }))
+);
+const CompletedFeaturesModal = lazy(() =>
+  import('./board-view/dialogs').then((m) => ({ default: m.CompletedFeaturesModal }))
+);
+const ArchiveAllVerifiedDialog = lazy(() =>
+  import('./board-view/dialogs').then((m) => ({ default: m.ArchiveAllVerifiedDialog }))
+);
+const DeleteCompletedFeatureDialog = lazy(() =>
+  import('./board-view/dialogs').then((m) => ({ default: m.DeleteCompletedFeatureDialog }))
+);
+const EditFeatureDialog = lazy(() =>
+  import('./board-view/dialogs').then((m) => ({ default: m.EditFeatureDialog }))
+);
+const FollowUpDialog = lazy(() =>
+  import('./board-view/dialogs').then((m) => ({ default: m.FollowUpDialog }))
+);
+const PlanApprovalDialog = lazy(() =>
+  import('./board-view/dialogs').then((m) => ({ default: m.PlanApprovalDialog }))
+);
+const PipelineSettingsDialog = lazy(() =>
+  import('./board-view/dialogs/pipeline-settings-dialog').then((m) => ({
+    default: m.PipelineSettingsDialog,
+  }))
+);
+const CreateWorktreeDialog = lazy(() =>
+  import('./board-view/dialogs/create-worktree-dialog').then((m) => ({
+    default: m.CreateWorktreeDialog,
+  }))
+);
+const DeleteWorktreeDialog = lazy(() =>
+  import('./board-view/dialogs/delete-worktree-dialog').then((m) => ({
+    default: m.DeleteWorktreeDialog,
+  }))
+);
+const CommitWorktreeDialog = lazy(() =>
+  import('./board-view/dialogs/commit-worktree-dialog').then((m) => ({
+    default: m.CommitWorktreeDialog,
+  }))
+);
+const CreatePRDialog = lazy(() =>
+  import('./board-view/dialogs/create-pr-dialog').then((m) => ({ default: m.CreatePRDialog }))
+);
+const CreateBranchDialog = lazy(() =>
+  import('./board-view/dialogs/create-branch-dialog').then((m) => ({
+    default: m.CreateBranchDialog,
+  }))
+);
 import { RefreshCw } from 'lucide-react';
 import { useAutoMode } from '@/hooks/use-auto-mode';
 import { useKeyboardShortcutsConfig } from '@/hooks/use-keyboard-shortcuts';
@@ -42,23 +102,6 @@ import { useWindowState } from '@/hooks/use-window-state';
 // Board-view specific imports
 import { BoardHeader } from './board-view/board-header';
 import { KanbanBoard } from './board-view/kanban-board';
-import {
-  AddFeatureDialog,
-  AgentOutputModal,
-  BacklogPlanDialog,
-  CompletedFeaturesModal,
-  ArchiveAllVerifiedDialog,
-  DeleteCompletedFeatureDialog,
-  EditFeatureDialog,
-  FollowUpDialog,
-  PlanApprovalDialog,
-} from './board-view/dialogs';
-import { PipelineSettingsDialog } from './board-view/dialogs/pipeline-settings-dialog';
-import { CreateWorktreeDialog } from './board-view/dialogs/create-worktree-dialog';
-import { DeleteWorktreeDialog } from './board-view/dialogs/delete-worktree-dialog';
-import { CommitWorktreeDialog } from './board-view/dialogs/commit-worktree-dialog';
-import { CreatePRDialog } from './board-view/dialogs/create-pr-dialog';
-import { CreateBranchDialog } from './board-view/dialogs/create-branch-dialog';
 import { WorktreePanel } from './board-view/worktree-panel';
 import type { PRInfo, WorktreeInfo } from './board-view/worktree-panel/types';
 import { COLUMNS } from './board-view/constants';
@@ -74,8 +117,14 @@ import {
   useFollowUpState,
   useSelectionMode,
 } from './board-view/hooks';
-import { SelectionActionBar } from './board-view/components';
-import { MassEditDialog } from './board-view/dialogs';
+
+// Lazy load components shown only in selection mode
+const SelectionActionBar = lazy(() =>
+  import('./board-view/components').then((m) => ({ default: m.SelectionActionBar }))
+);
+const MassEditDialog = lazy(() =>
+  import('./board-view/dialogs').then((m) => ({ default: m.MassEditDialog }))
+);
 import { InitScriptIndicator } from './board-view/init-script-indicator';
 import { useInitScriptEvents } from '@/hooks/use-init-script-events';
 
@@ -201,6 +250,44 @@ export function BoardView() {
     exitSelectionMode,
   } = useSelectionMode();
   const [showMassEditDialog, setShowMassEditDialog] = useState(false);
+
+  // Memoized callbacks for KanbanBoard to prevent unnecessary re-renders of feature cards
+  // These prevent child components from re-rendering when parent updates other state
+  const handleOnEdit = useCallback((feature: Feature) => setEditingFeature(feature), []);
+  const handleOnViewPlan = useCallback((feature: Feature) => setViewPlanFeature(feature), []);
+  const handleOnArchiveAllVerified = useCallback(() => setShowArchiveAllVerifiedDialog(true), []);
+  const handleOnAddFeature = useCallback(() => setShowAddDialog(true), []);
+  const handleOnOpenPipelineSettings = useCallback(() => setShowPipelineSettings(true), []);
+  const handleOnAiSuggest = useCallback(() => setShowPlanDialog(true), []);
+  const handleOnSpawnTask = useCallback((feature: Feature) => {
+    setSpawnParentFeature(feature);
+    setShowAddDialog(true);
+  }, []);
+  const handleOnToggleFeatureSelection = useCallback(
+    (featureId: string) => toggleFeatureSelection(featureId),
+    []
+  );
+  const handleOnToggleSelectionMode = useCallback(() => toggleSelectionMode(), []);
+  const handleMassEditDialogClose = useCallback(() => setShowMassEditDialog(false), []);
+  const handleMassEditDialogOpen = useCallback(() => setShowMassEditDialog(true), []);
+  const handleCompletedFeatureDelete = useCallback(
+    (feature: Feature) => setDeleteCompletedFeature(feature),
+    []
+  );
+  const handleDeleteCompletedFeatureClose = useCallback(() => setDeleteCompletedFeature(null), []);
+  const handleEditFeatureClose = useCallback(() => setEditingFeature(null), []);
+  const handleOutputModalClose = useCallback(() => setShowOutputModal(false), []);
+  const handlePipelineSettingsClose = useCallback(() => setShowPipelineSettings(false), []);
+  const handlePlanDialogClose = useCallback(() => setShowPlanDialog(false), []);
+  const handleViewPlanFeatureClose = useCallback(() => setViewPlanFeature(null), []);
+  const handleViewPlanApprove = useCallback(() => setViewPlanFeature(null), []);
+  const handleViewPlanReject = useCallback(() => setViewPlanFeature(null), []);
+  const handleAddFeatureDialogOpenChange = useCallback((open: boolean) => {
+    setShowAddDialog(open);
+    if (!open) {
+      setSpawnParentFeature(null);
+    }
+  }, []);
 
   // Search filter for Kanban cards
   const [searchQuery, setSearchQuery] = useState('');
@@ -1281,8 +1368,8 @@ export function BoardView() {
           getColumnFeatures={getColumnFeatures}
           backgroundImageStyle={backgroundImageStyle}
           backgroundSettings={backgroundSettings}
-          onEdit={(feature) => setEditingFeature(feature)}
-          onDelete={(featureId) => handleDeleteFeature(featureId)}
+          onEdit={handleOnEdit}
+          onDelete={handleOnDelete}
           onViewOutput={handleViewOutput}
           onVerify={handleVerifyFeature}
           onResume={handleResumeFeature}
@@ -1292,319 +1379,316 @@ export function BoardView() {
           onFollowUp={handleOpenFollowUp}
           onComplete={handleCompleteFeature}
           onImplement={handleStartImplementation}
-          onViewPlan={(feature) => setViewPlanFeature(feature)}
+          onViewPlan={handleOnViewPlan}
           onApprovePlan={handleOpenApprovalDialog}
-          onSpawnTask={(feature) => {
-            setSpawnParentFeature(feature);
-            setShowAddDialog(true);
-          }}
+          onSpawnTask={handleOnSpawnTask}
           featuresWithContext={featuresWithContext}
           runningAutoTasks={runningAutoTasks}
-          onArchiveAllVerified={() => setShowArchiveAllVerifiedDialog(true)}
-          onAddFeature={() => setShowAddDialog(true)}
+          onArchiveAllVerified={handleOnArchiveAllVerified}
+          onAddFeature={handleOnAddFeature}
           pipelineConfig={
             currentProject?.path ? pipelineConfigByProject[currentProject.path] || null : null
           }
-          onOpenPipelineSettings={() => setShowPipelineSettings(true)}
+          onOpenPipelineSettings={handleOnOpenPipelineSettings}
           isSelectionMode={isSelectionMode}
           selectedFeatureIds={selectedFeatureIds}
-          onToggleFeatureSelection={toggleFeatureSelection}
-          onToggleSelectionMode={toggleSelectionMode}
+          onToggleFeatureSelection={handleOnToggleFeatureSelection}
+          onToggleSelectionMode={handleOnToggleSelectionMode}
           isDragging={activeFeature !== null}
-          onAiSuggest={() => setShowPlanDialog(true)}
+          onAiSuggest={handleOnAiSuggest}
         />
       </div>
 
-      {/* Selection Action Bar */}
-      {isSelectionMode && (
-        <SelectionActionBar
-          selectedCount={selectedCount}
-          totalCount={allSelectableFeatureIds.length}
-          onEdit={() => setShowMassEditDialog(true)}
-          onDelete={handleBulkDelete}
-          onClear={clearSelection}
-          onSelectAll={() => selectAll(allSelectableFeatureIds)}
+      {/* Selection Action Bar - Lazy loaded (only shown in selection mode) */}
+      <Suspense fallback={null}>
+        {isSelectionMode && (
+          <SelectionActionBar
+            selectedCount={selectedCount}
+            totalCount={allSelectableFeatureIds.length}
+            onEdit={handleMassEditDialogOpen}
+            onDelete={handleBulkDelete}
+            onClear={clearSelection}
+            onSelectAll={() => selectAll(allSelectableFeatureIds)}
+          />
+        )}
+
+        {/* Mass Edit Dialog - Lazy loaded */}
+        <MassEditDialog
+          open={showMassEditDialog}
+          onClose={handleMassEditDialogClose}
+          selectedFeatures={selectedFeatures}
+          onApply={handleBulkUpdate}
         />
-      )}
+      </Suspense>
 
-      {/* Mass Edit Dialog */}
-      <MassEditDialog
-        open={showMassEditDialog}
-        onClose={() => setShowMassEditDialog(false)}
-        selectedFeatures={selectedFeatures}
-        onApply={handleBulkUpdate}
-      />
-
-      {/* Board Background Modal */}
-      <BoardBackgroundModal
-        open={showBoardBackgroundModal}
-        onOpenChange={setShowBoardBackgroundModal}
-      />
-
-      {/* Completed Features Modal */}
-      <CompletedFeaturesModal
-        open={showCompletedModal}
-        onOpenChange={setShowCompletedModal}
-        completedFeatures={completedFeatures}
-        onUnarchive={handleUnarchiveFeature}
-        onDelete={(feature) => setDeleteCompletedFeature(feature)}
-      />
-
-      {/* Delete Completed Feature Confirmation Dialog */}
-      <DeleteCompletedFeatureDialog
-        feature={deleteCompletedFeature}
-        onClose={() => setDeleteCompletedFeature(null)}
-        onConfirm={async () => {
-          if (deleteCompletedFeature) {
-            await handleDeleteFeature(deleteCompletedFeature.id);
-            setDeleteCompletedFeature(null);
-          }
-        }}
-      />
-
-      {/* Add Feature Dialog */}
-      <AddFeatureDialog
-        open={showAddDialog}
-        onOpenChange={(open) => {
-          setShowAddDialog(open);
-          if (!open) {
-            setSpawnParentFeature(null);
-          }
-        }}
-        onAdd={handleAddFeature}
-        onAddAndStart={handleAddAndStartFeature}
-        categorySuggestions={categorySuggestions}
-        branchSuggestions={branchSuggestions}
-        branchCardCounts={branchCardCounts}
-        defaultSkipTests={defaultSkipTests}
-        defaultBranch={selectedWorktreeBranch}
-        currentBranch={currentWorktreeBranch || undefined}
-        isMaximized={isMaximized}
-        parentFeature={spawnParentFeature}
-        allFeatures={hookFeatures}
-        // When setting is enabled and a non-main worktree is selected, pass its branch to default to 'custom' work mode
-        selectedNonMainWorktreeBranch={
-          addFeatureUseSelectedWorktreeBranch && currentWorktreePath !== null
-            ? currentWorktreeBranch || undefined
-            : undefined
-        }
-        // When the worktree setting is disabled, force 'current' branch mode
-        forceCurrentBranchMode={!addFeatureUseSelectedWorktreeBranch}
-      />
-
-      {/* Edit Feature Dialog */}
-      <EditFeatureDialog
-        feature={editingFeature}
-        onClose={() => setEditingFeature(null)}
-        onUpdate={handleUpdateFeature}
-        categorySuggestions={categorySuggestions}
-        branchSuggestions={branchSuggestions}
-        branchCardCounts={branchCardCounts}
-        currentBranch={currentWorktreeBranch || undefined}
-        isMaximized={isMaximized}
-        allFeatures={hookFeatures}
-      />
-
-      {/* Agent Output Modal */}
-      <AgentOutputModal
-        open={showOutputModal}
-        onClose={() => setShowOutputModal(false)}
-        featureDescription={outputFeature?.description || ''}
-        featureId={outputFeature?.id || ''}
-        featureStatus={outputFeature?.status}
-        onNumberKeyPress={handleOutputModalNumberKeyPress}
-      />
-
-      {/* Archive All Verified Dialog */}
-      <ArchiveAllVerifiedDialog
-        open={showArchiveAllVerifiedDialog}
-        onOpenChange={setShowArchiveAllVerifiedDialog}
-        verifiedCount={getColumnFeatures('verified').length}
-        onConfirm={async () => {
-          await handleArchiveAllVerified();
-          setShowArchiveAllVerifiedDialog(false);
-        }}
-      />
-
-      {/* Pipeline Settings Dialog */}
-      <PipelineSettingsDialog
-        open={showPipelineSettings}
-        onClose={() => setShowPipelineSettings(false)}
-        projectPath={currentProject.path}
-        pipelineConfig={pipelineConfigByProject[currentProject.path] || null}
-        onSave={async (config) => {
-          const api = getHttpApiClient();
-          const result = await api.pipeline.saveConfig(currentProject.path, config);
-          if (!result.success) {
-            throw new Error(result.error || 'Failed to save pipeline config');
-          }
-          setPipelineConfig(currentProject.path, config);
-        }}
-      />
-
-      {/* Follow-Up Prompt Dialog */}
-      <FollowUpDialog
-        open={showFollowUpDialog}
-        onOpenChange={handleFollowUpDialogChange}
-        feature={followUpFeature}
-        prompt={followUpPrompt}
-        imagePaths={followUpImagePaths}
-        previewMap={followUpPreviewMap}
-        onPromptChange={setFollowUpPrompt}
-        onImagePathsChange={setFollowUpImagePaths}
-        onPreviewMapChange={setFollowUpPreviewMap}
-        onSend={handleSendFollowUp}
-        isMaximized={isMaximized}
-        promptHistory={followUpPromptHistory}
-        onHistoryAdd={addToPromptHistory}
-      />
-
-      {/* Backlog Plan Dialog */}
-      <BacklogPlanDialog
-        open={showPlanDialog}
-        onClose={() => setShowPlanDialog(false)}
-        projectPath={currentProject.path}
-        onPlanApplied={loadFeatures}
-        pendingPlanResult={pendingBacklogPlan}
-        setPendingPlanResult={setPendingBacklogPlan}
-        isGeneratingPlan={isGeneratingPlan}
-        setIsGeneratingPlan={setIsGeneratingPlan}
-        currentBranch={planUseSelectedWorktreeBranch ? selectedWorktreeBranch : undefined}
-      />
-
-      {/* Plan Approval Dialog */}
-      <PlanApprovalDialog
-        open={pendingPlanApproval !== null}
-        onOpenChange={(open) => {
-          if (!open) {
-            setPendingPlanApproval(null);
-          }
-        }}
-        feature={pendingApprovalFeature}
-        planContent={pendingPlanApproval?.planContent || ''}
-        onApprove={handlePlanApprove}
-        onReject={handlePlanReject}
-        isLoading={isPlanApprovalLoading}
-      />
-
-      {/* View Plan Dialog (read-only) */}
-      {viewPlanFeature && viewPlanFeature.planSpec?.content && (
-        <PlanApprovalDialog
-          open={true}
-          onOpenChange={(open) => !open && setViewPlanFeature(null)}
-          feature={viewPlanFeature}
-          planContent={viewPlanFeature.planSpec.content}
-          onApprove={() => setViewPlanFeature(null)}
-          onReject={() => setViewPlanFeature(null)}
-          viewOnly={true}
+      {/* All remaining dialogs - lazy loaded with Suspense fallback */}
+      <Suspense fallback={null}>
+        {/* Board Background Modal */}
+        <BoardBackgroundModal
+          open={showBoardBackgroundModal}
+          onOpenChange={setShowBoardBackgroundModal}
         />
-      )}
 
-      {/* Create Worktree Dialog */}
-      <CreateWorktreeDialog
-        open={showCreateWorktreeDialog}
-        onOpenChange={setShowCreateWorktreeDialog}
-        projectPath={currentProject.path}
-        onCreated={(newWorktree) => {
-          // Add the new worktree to the store immediately to avoid race condition
-          // when deriving currentWorktreeBranch for filtering
-          const currentWorktrees = getWorktrees(currentProject.path);
-          const newWorktreeInfo = {
-            path: newWorktree.path,
-            branch: newWorktree.branch,
-            isMain: false,
-            isCurrent: false,
-            hasWorktree: true,
-          };
-          setWorktrees(currentProject.path, [...currentWorktrees, newWorktreeInfo]);
+        {/* Completed Features Modal */}
+        <CompletedFeaturesModal
+          open={showCompletedModal}
+          onOpenChange={setShowCompletedModal}
+          completedFeatures={completedFeatures}
+          onUnarchive={handleUnarchiveFeature}
+          onDelete={handleCompletedFeatureDelete}
+        />
 
-          // Now set the current worktree with both path and branch
-          setCurrentWorktree(currentProject.path, newWorktree.path, newWorktree.branch);
-
-          // Trigger refresh to get full worktree details (hasChanges, etc.)
-          setWorktreeRefreshKey((k) => k + 1);
-        }}
-      />
-
-      {/* Delete Worktree Dialog */}
-      <DeleteWorktreeDialog
-        open={showDeleteWorktreeDialog}
-        onOpenChange={setShowDeleteWorktreeDialog}
-        projectPath={currentProject.path}
-        worktree={selectedWorktreeForAction}
-        affectedFeatureCount={
-          selectedWorktreeForAction
-            ? hookFeatures.filter((f) => f.branchName === selectedWorktreeForAction.branch).length
-            : 0
-        }
-        defaultDeleteBranch={getDefaultDeleteBranch(currentProject.path)}
-        onDeleted={(deletedWorktree, _deletedBranch) => {
-          // Reset features that were assigned to the deleted worktree (by branch)
-          hookFeatures.forEach((feature) => {
-            // Match by branch name since worktreePath is no longer stored
-            if (feature.branchName === deletedWorktree.branch) {
-              // Reset the feature's branch assignment - update both local state and persist
-              const updates = {
-                branchName: null as unknown as string | undefined,
-              };
-              updateFeature(feature.id, updates);
-              persistFeatureUpdate(feature.id, updates);
+        {/* Delete Completed Feature Confirmation Dialog */}
+        <DeleteCompletedFeatureDialog
+          feature={deleteCompletedFeature}
+          onClose={handleDeleteCompletedFeatureClose}
+          onConfirm={useCallback(async () => {
+            if (deleteCompletedFeature) {
+              await handleDeleteFeature(deleteCompletedFeature.id);
+              setDeleteCompletedFeature(null);
             }
-          });
+          }, [deleteCompletedFeature])}
+        />
 
-          setWorktreeRefreshKey((k) => k + 1);
-          setSelectedWorktreeForAction(null);
-        }}
-      />
+        {/* Add Feature Dialog */}
+        <AddFeatureDialog
+          open={showAddDialog}
+          onOpenChange={handleAddFeatureDialogOpenChange}
+          onAdd={handleAddFeature}
+          onAddAndStart={handleAddAndStartFeature}
+          categorySuggestions={categorySuggestions}
+          branchSuggestions={branchSuggestions}
+          branchCardCounts={branchCardCounts}
+          defaultSkipTests={defaultSkipTests}
+          defaultBranch={selectedWorktreeBranch}
+          currentBranch={currentWorktreeBranch || undefined}
+          isMaximized={isMaximized}
+          parentFeature={spawnParentFeature}
+          allFeatures={hookFeatures}
+          // When setting is enabled and a non-main worktree is selected, pass its branch to default to 'custom' work mode
+          selectedNonMainWorktreeBranch={
+            addFeatureUseSelectedWorktreeBranch && currentWorktreePath !== null
+              ? currentWorktreeBranch || undefined
+              : undefined
+          }
+          // When the worktree setting is disabled, force 'current' branch mode
+          forceCurrentBranchMode={!addFeatureUseSelectedWorktreeBranch}
+        />
 
-      {/* Commit Worktree Dialog */}
-      <CommitWorktreeDialog
-        open={showCommitWorktreeDialog}
-        onOpenChange={setShowCommitWorktreeDialog}
-        worktree={selectedWorktreeForAction}
-        onCommitted={() => {
-          setWorktreeRefreshKey((k) => k + 1);
-          setSelectedWorktreeForAction(null);
-        }}
-      />
+        {/* Edit Feature Dialog */}
+        <EditFeatureDialog
+          feature={editingFeature}
+          onClose={handleEditFeatureClose}
+          onUpdate={handleUpdateFeature}
+          categorySuggestions={categorySuggestions}
+          branchSuggestions={branchSuggestions}
+          branchCardCounts={branchCardCounts}
+          currentBranch={currentWorktreeBranch || undefined}
+          isMaximized={isMaximized}
+          allFeatures={hookFeatures}
+        />
 
-      {/* Create PR Dialog */}
-      <CreatePRDialog
-        open={showCreatePRDialog}
-        onOpenChange={setShowCreatePRDialog}
-        worktree={selectedWorktreeForAction}
-        projectPath={currentProject?.path || null}
-        onCreated={(prUrl) => {
-          // If a PR was created and we have the worktree branch, update all features on that branch with the PR URL
-          if (prUrl && selectedWorktreeForAction?.branch) {
-            const branchName = selectedWorktreeForAction.branch;
-            const featuresToUpdate = hookFeatures.filter((f) => f.branchName === branchName);
+        {/* Agent Output Modal */}
+        <AgentOutputModal
+          open={showOutputModal}
+          onClose={handleOutputModalClose}
+          featureDescription={outputFeature?.description || ''}
+          featureId={outputFeature?.id || ''}
+          featureStatus={outputFeature?.status}
+          onNumberKeyPress={handleOutputModalNumberKeyPress}
+        />
 
-            // Update local state synchronously
-            featuresToUpdate.forEach((feature) => {
-              updateFeature(feature.id, { prUrl });
+        {/* Archive All Verified Dialog */}
+        <ArchiveAllVerifiedDialog
+          open={showArchiveAllVerifiedDialog}
+          onOpenChange={setShowArchiveAllVerifiedDialog}
+          verifiedCount={getColumnFeatures('verified').length}
+          onConfirm={async () => {
+            await handleArchiveAllVerified();
+            setShowArchiveAllVerifiedDialog(false);
+          }}
+        />
+
+        {/* Pipeline Settings Dialog */}
+        <PipelineSettingsDialog
+          open={showPipelineSettings}
+          onClose={() => setShowPipelineSettings(false)}
+          projectPath={currentProject.path}
+          pipelineConfig={pipelineConfigByProject[currentProject.path] || null}
+          onSave={async (config) => {
+            const api = getHttpApiClient();
+            const result = await api.pipeline.saveConfig(currentProject.path, config);
+            if (!result.success) {
+              throw new Error(result.error || 'Failed to save pipeline config');
+            }
+            setPipelineConfig(currentProject.path, config);
+          }}
+        />
+
+        {/* Follow-Up Prompt Dialog */}
+        <FollowUpDialog
+          open={showFollowUpDialog}
+          onOpenChange={handleFollowUpDialogChange}
+          feature={followUpFeature}
+          prompt={followUpPrompt}
+          imagePaths={followUpImagePaths}
+          previewMap={followUpPreviewMap}
+          onPromptChange={setFollowUpPrompt}
+          onImagePathsChange={setFollowUpImagePaths}
+          onPreviewMapChange={setFollowUpPreviewMap}
+          onSend={handleSendFollowUp}
+          isMaximized={isMaximized}
+          promptHistory={followUpPromptHistory}
+          onHistoryAdd={addToPromptHistory}
+        />
+
+        {/* Backlog Plan Dialog */}
+        <BacklogPlanDialog
+          open={showPlanDialog}
+          onClose={handlePlanDialogClose}
+          projectPath={currentProject.path}
+          onPlanApplied={loadFeatures}
+          pendingPlanResult={pendingBacklogPlan}
+          setPendingPlanResult={setPendingBacklogPlan}
+          isGeneratingPlan={isGeneratingPlan}
+          setIsGeneratingPlan={setIsGeneratingPlan}
+          currentBranch={planUseSelectedWorktreeBranch ? selectedWorktreeBranch : undefined}
+        />
+
+        {/* Plan Approval Dialog */}
+        <PlanApprovalDialog
+          open={pendingPlanApproval !== null}
+          onOpenChange={(open) => {
+            if (!open) {
+              setPendingPlanApproval(null);
+            }
+          }}
+          feature={pendingApprovalFeature}
+          planContent={pendingPlanApproval?.planContent || ''}
+          onApprove={handlePlanApprove}
+          onReject={handlePlanReject}
+          isLoading={isPlanApprovalLoading}
+        />
+
+        {/* View Plan Dialog (read-only) */}
+        {viewPlanFeature && viewPlanFeature.planSpec?.content && (
+          <PlanApprovalDialog
+            open={true}
+            onOpenChange={useCallback((open) => !open && setViewPlanFeature(null), [])}
+            feature={viewPlanFeature}
+            planContent={viewPlanFeature.planSpec.content}
+            onApprove={handleViewPlanApprove}
+            onReject={handleViewPlanReject}
+            viewOnly={true}
+          />
+        )}
+
+        {/* Create Worktree Dialog */}
+        <CreateWorktreeDialog
+          open={showCreateWorktreeDialog}
+          onOpenChange={setShowCreateWorktreeDialog}
+          projectPath={currentProject.path}
+          onCreated={(newWorktree) => {
+            // Add the new worktree to the store immediately to avoid race condition
+            // when deriving currentWorktreeBranch for filtering
+            const currentWorktrees = getWorktrees(currentProject.path);
+            const newWorktreeInfo = {
+              path: newWorktree.path,
+              branch: newWorktree.branch,
+              isMain: false,
+              isCurrent: false,
+              hasWorktree: true,
+            };
+            setWorktrees(currentProject.path, [...currentWorktrees, newWorktreeInfo]);
+
+            // Now set the current worktree with both path and branch
+            setCurrentWorktree(currentProject.path, newWorktree.path, newWorktree.branch);
+
+            // Trigger refresh to get full worktree details (hasChanges, etc.)
+            setWorktreeRefreshKey((k) => k + 1);
+          }}
+        />
+
+        {/* Delete Worktree Dialog */}
+        <DeleteWorktreeDialog
+          open={showDeleteWorktreeDialog}
+          onOpenChange={setShowDeleteWorktreeDialog}
+          projectPath={currentProject.path}
+          worktree={selectedWorktreeForAction}
+          affectedFeatureCount={
+            selectedWorktreeForAction
+              ? hookFeatures.filter((f) => f.branchName === selectedWorktreeForAction.branch).length
+              : 0
+          }
+          defaultDeleteBranch={getDefaultDeleteBranch(currentProject.path)}
+          onDeleted={(deletedWorktree, _deletedBranch) => {
+            // Reset features that were assigned to the deleted worktree (by branch)
+            hookFeatures.forEach((feature) => {
+              // Match by branch name since worktreePath is no longer stored
+              if (feature.branchName === deletedWorktree.branch) {
+                // Reset the feature's branch assignment - update both local state and persist
+                const updates = {
+                  branchName: null as unknown as string | undefined,
+                };
+                updateFeature(feature.id, updates);
+                persistFeatureUpdate(feature.id, updates);
+              }
             });
 
-            // Persist changes asynchronously and in parallel
-            Promise.all(
-              featuresToUpdate.map((feature) => persistFeatureUpdate(feature.id, { prUrl }))
-            ).catch((err) => logger.error('Error in handleMove:', err));
-          }
-          setWorktreeRefreshKey((k) => k + 1);
-          setSelectedWorktreeForAction(null);
-        }}
-      />
+            setWorktreeRefreshKey((k) => k + 1);
+            setSelectedWorktreeForAction(null);
+          }}
+        />
 
-      {/* Create Branch Dialog */}
-      <CreateBranchDialog
-        open={showCreateBranchDialog}
-        onOpenChange={setShowCreateBranchDialog}
-        worktree={selectedWorktreeForAction}
-        onCreated={() => {
-          setWorktreeRefreshKey((k) => k + 1);
-          setSelectedWorktreeForAction(null);
-        }}
-      />
+        {/* Commit Worktree Dialog */}
+        <CommitWorktreeDialog
+          open={showCommitWorktreeDialog}
+          onOpenChange={setShowCommitWorktreeDialog}
+          worktree={selectedWorktreeForAction}
+          onCommitted={() => {
+            setWorktreeRefreshKey((k) => k + 1);
+            setSelectedWorktreeForAction(null);
+          }}
+        />
+
+        {/* Create PR Dialog */}
+        <CreatePRDialog
+          open={showCreatePRDialog}
+          onOpenChange={setShowCreatePRDialog}
+          worktree={selectedWorktreeForAction}
+          projectPath={currentProject?.path || null}
+          onCreated={(prUrl) => {
+            // If a PR was created and we have the worktree branch, update all features on that branch with the PR URL
+            if (prUrl && selectedWorktreeForAction?.branch) {
+              const branchName = selectedWorktreeForAction.branch;
+              const featuresToUpdate = hookFeatures.filter((f) => f.branchName === branchName);
+
+              // Update local state synchronously
+              featuresToUpdate.forEach((feature) => {
+                updateFeature(feature.id, { prUrl });
+              });
+
+              // Persist changes asynchronously and in parallel
+              Promise.all(
+                featuresToUpdate.map((feature) => persistFeatureUpdate(feature.id, { prUrl }))
+              ).catch((err) => logger.error('Error in handleMove:', err));
+            }
+            setWorktreeRefreshKey((k) => k + 1);
+            setSelectedWorktreeForAction(null);
+          }}
+        />
+
+        {/* Create Branch Dialog */}
+        <CreateBranchDialog
+          open={showCreateBranchDialog}
+          onOpenChange={setShowCreateBranchDialog}
+          worktree={selectedWorktreeForAction}
+          onCreated={() => {
+            setWorktreeRefreshKey((k) => k + 1);
+            setSelectedWorktreeForAction(null);
+          }}
+        />
+      </Suspense>
 
       {/* Init Script Indicator - floating overlay for worktree init script status */}
       {getShowInitScriptIndicator(currentProject.path) && (
