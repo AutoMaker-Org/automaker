@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useAppStore } from '@/store/app-store';
+import { useBoardSettingsStore } from '@/store/board-settings-store';
 import { getHttpApiClient } from '@/lib/http-api-client';
 
 /**
@@ -9,14 +10,18 @@ import { getHttpApiClient } from '@/lib/http-api-client';
  */
 export function useProjectSettingsLoader() {
   const currentProject = useAppStore((state) => state.currentProject);
-  const setBoardBackground = useAppStore((state) => state.setBoardBackground);
-  const setCardOpacity = useAppStore((state) => state.setCardOpacity);
-  const setColumnOpacity = useAppStore((state) => state.setColumnOpacity);
-  const setColumnBorderEnabled = useAppStore((state) => state.setColumnBorderEnabled);
-  const setCardGlassmorphism = useAppStore((state) => state.setCardGlassmorphism);
-  const setCardBorderEnabled = useAppStore((state) => state.setCardBorderEnabled);
-  const setCardBorderOpacity = useAppStore((state) => state.setCardBorderOpacity);
-  const setHideScrollbar = useAppStore((state) => state.setHideScrollbar);
+
+  // Use board-settings store for board background actions
+  const setBoardBackground = useBoardSettingsStore((state) => state.setBoardBackground);
+  const setCardOpacity = useBoardSettingsStore((state) => state.setCardOpacity);
+  const setColumnOpacity = useBoardSettingsStore((state) => state.setColumnOpacity);
+  const setColumnBorderEnabled = useBoardSettingsStore((state) => state.setColumnBorderEnabled);
+  const setCardGlassmorphism = useBoardSettingsStore((state) => state.setCardGlassmorphism);
+  const setCardBorderEnabled = useBoardSettingsStore((state) => state.setCardBorderEnabled);
+  const setCardBorderOpacity = useBoardSettingsStore((state) => state.setCardBorderOpacity);
+  const setHideScrollbar = useBoardSettingsStore((state) => state.setHideScrollbar);
+
+  // Keep worktree-related settings in app-store for now
   const setWorktreePanelVisible = useAppStore((state) => state.setWorktreePanelVisible);
   const setShowInitScriptIndicator = useAppStore((state) => state.setShowInitScriptIndicator);
   const setDefaultDeleteBranch = useAppStore((state) => state.setDefaultDeleteBranch);

@@ -11,6 +11,7 @@ import cors from 'cors';
 import morgan from 'morgan';
 import cookieParser from 'cookie-parser';
 import cookie from 'cookie';
+import compression from 'compression';
 import { WebSocketServer, WebSocket } from 'ws';
 import { createServer } from 'http';
 import dotenv from 'dotenv';
@@ -157,6 +158,15 @@ app.use(
     credentials: true,
   })
 );
+
+// Enable gzip compression for all responses (70-85% size reduction for JSON)
+app.use(
+  compression({
+    threshold: 1024, // Only compress responses larger than 1KB
+    level: 6, // Balance between compression ratio and speed (1-9)
+  })
+);
+
 app.use(express.json({ limit: '50mb' }));
 app.use(cookieParser());
 

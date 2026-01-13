@@ -393,6 +393,19 @@ export class TerminalService extends EventEmitter {
     // Handle exit
     ptyProcess.onExit(({ exitCode }) => {
       logger.info(`Session ${id} exited with code ${exitCode}`);
+
+      // Clear any pending flush timeout to prevent memory leaks
+      if (session.flushTimeout) {
+        clearTimeout(session.flushTimeout);
+        session.flushTimeout = null;
+      }
+
+      // Clear resize debounce timeout if set
+      if (session.resizeDebounceTimeout) {
+        clearTimeout(session.resizeDebounceTimeout);
+        session.resizeDebounceTimeout = null;
+      }
+
       this.sessions.delete(id);
       this.exitCallbacks.forEach((cb) => cb(id, exitCode));
       this.emit('exit', id, exitCode);

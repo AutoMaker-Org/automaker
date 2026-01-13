@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback, memo } from 'react';
 import { toast } from 'sonner';
 import { useAppStore } from '@/store/app-store';
 import type { CursorModelId } from '@automaker/types';
@@ -13,7 +13,7 @@ import { useCursorPermissions } from '../hooks/use-cursor-permissions';
 import { CursorPermissionsSection } from './cursor-permissions-section';
 import { CursorModelConfiguration } from './cursor-model-configuration';
 
-export function CursorSettingsTab() {
+function CursorSettingsTabImpl() {
   // Global settings from store
   const {
     enabledCursorModels,
@@ -38,28 +38,35 @@ export function CursorSettingsTab() {
   // Local state for model configuration saving
   const [isSaving, setIsSaving] = useState(false);
 
-  const handleDefaultModelChange = (model: CursorModelId) => {
-    setIsSaving(true);
-    try {
-      setCursorDefaultModel(model);
-      toast.success('Default model updated');
-    } catch (error) {
-      toast.error('Failed to update default model');
-    } finally {
-      setIsSaving(false);
-    }
-  };
+  // Memoize callbacks to prevent unnecessary re-renders of child components
+  const handleDefaultModelChange = useCallback(
+    (model: CursorModelId) => {
+      setIsSaving(true);
+      try {
+        setCursorDefaultModel(model);
+        toast.success('Default model updated');
+      } catch (error) {
+        toast.error('Failed to update default model');
+      } finally {
+        setIsSaving(false);
+      }
+    },
+    [setCursorDefaultModel]
+  );
 
-  const handleModelToggle = (model: CursorModelId, enabled: boolean) => {
-    setIsSaving(true);
-    try {
-      toggleCursorModel(model, enabled);
-    } catch (error) {
-      toast.error('Failed to update models');
-    } finally {
-      setIsSaving(false);
-    }
-  };
+  const handleModelToggle = useCallback(
+    (model: CursorModelId, enabled: boolean) => {
+      setIsSaving(true);
+      try {
+        toggleCursorModel(model, enabled);
+      } catch (error) {
+        toast.error('Failed to update models');
+      } finally {
+        setIsSaving(false);
+      }
+    },
+    [toggleCursorModel]
+  );
 
   if (isLoading) {
     return (
@@ -102,5 +109,8 @@ export function CursorSettingsTab() {
     </div>
   );
 }
+
+// Memoize the component to prevent unnecessary re-renders when parent updates
+export const CursorSettingsTab = memo(CursorSettingsTabImpl);
 
 export default CursorSettingsTab;

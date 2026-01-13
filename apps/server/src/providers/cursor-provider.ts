@@ -908,6 +908,9 @@ export class CursorProvider extends CliProvider {
 
   /**
    * Check authentication status
+   *
+   * OPTIMIZATION: Wraps auth check with a 2-second timeout to avoid blocking settings page load.
+   * Returns unauthenticated status if auth check takes too long rather than waiting full 10 seconds.
    */
   async checkAuth(): Promise<CursorAuthStatus> {
     this.ensureCliDetected();
@@ -915,7 +918,7 @@ export class CursorProvider extends CliProvider {
       return { authenticated: false, method: 'none' };
     }
 
-    // Check for API key in environment with validation
+    // Check for API key in environment with validation (fast path, < 50ms)
     if (process.env.CURSOR_API_KEY) {
       const validation = validateApiKey(process.env.CURSOR_API_KEY, 'cursor');
       if (!validation.isValid) {
@@ -925,77 +928,80 @@ export class CursorProvider extends CliProvider {
       return { authenticated: true, method: 'api_key' };
     }
 
-    // For WSL mode, check credentials inside WSL
-    if (this.useWsl && this.wslCliPath) {
-      const wslOpts = { timeout: 5000, distribution: this.wslDistribution };
+    // Wrap all checks in a timeout promise to avoid blocking for 5-10+ seconds
+    const authCheckPromise = this.performAuthCheck();
+    const timeoutMs = 2000; // 2 second timeout for UI responsiveness
 
-      // Check for credentials file inside WSL
+    try {
+      return await Promise.race([
+        authCheckPromise,
+        new Promise<CursorAuthStatus>((_, reject) =>
+          setTimeout(() => reject(new Error('Auth check timeout')), timeoutMs)
+        ),
+      ]);
+    } catch (error) {
+      // If auth check times out or fails, return unauthenticated status
+      logger.warn('Auth check timed out or failed, returning unauthenticated', error);
+      return { authenticated: false, method: 'none' };
+    }
+  }
+
+  /**
+   * Internal method to perform actual auth checks without timeout
+   * Called by checkAuth() which wraps it with a 2-second timeout
+   */
+  private async performAuthCheck(): Promise<CursorAuthStatus> {
+    // For WSL mode, check credentials inside WSL (fast path)
+    if (this.useWsl && this.wslCliPath) {
+      // Only check credentials files in WSL (fast, < 100ms), skip CLI execution (slow, 10s+)
       const wslCredPaths = [
         '$HOME/.cursor/credentials.json',
         '$HOME/.config/cursor/credentials.json',
       ];
 
       for (const credPath of wslCredPaths) {
-        const content = execInWsl(`sh -c "cat ${credPath} 2>/dev/null || echo ''"`, wslOpts);
-        if (content && content.trim()) {
-          try {
+        try {
+          const content = execInWsl(`sh -c "cat ${credPath} 2>/dev/null || echo ''"`, {
+            timeout: 1000, // 1 second max per file read
+            distribution: this.wslDistribution,
+          });
+          if (content && content.trim()) {
             const creds = JSON.parse(content);
             if (creds.accessToken || creds.token) {
               return { authenticated: true, method: 'login', hasCredentialsFile: true };
             }
-          } catch {
-            // Invalid credentials file
           }
+        } catch {
+          // Continue to next path
         }
       }
 
-      // Try running --version to check if CLI works
-      const versionResult = execInWsl(`${this.wslCliPath} --version`, {
-        timeout: 10000,
-        distribution: this.wslDistribution,
-      });
-      if (versionResult) {
-        return { authenticated: true, method: 'login' };
-      }
-
+      // If no credentials found in files, return unauthenticated
+      // (don't try slow CLI execution that can timeout)
       return { authenticated: false, method: 'none' };
     }
 
-    // Native mode (Linux/macOS) - check local credentials
+    // Native mode (Linux/macOS) - check local credentials (very fast)
     const credentialPaths = [
       path.join(os.homedir(), '.cursor', 'credentials.json'),
       path.join(os.homedir(), '.config', 'cursor', 'credentials.json'),
     ];
 
     for (const credPath of credentialPaths) {
-      if (fs.existsSync(credPath)) {
-        try {
+      try {
+        if (fs.existsSync(credPath)) {
           const content = fs.readFileSync(credPath, 'utf8');
           const creds = JSON.parse(content);
           if (creds.accessToken || creds.token) {
             return { authenticated: true, method: 'login', hasCredentialsFile: true };
           }
-        } catch {
-          // Invalid credentials file
         }
+      } catch {
+        // Continue to next path
       }
     }
 
-    // Try running a simple command to check auth
-    try {
-      execSync(`"${this.cliPath}" --version`, {
-        encoding: 'utf8',
-        timeout: 10000,
-        env: { ...process.env },
-      });
-      return { authenticated: true, method: 'login' };
-    } catch (error: unknown) {
-      const execError = error as { stderr?: string };
-      if (execError.stderr?.includes('not authenticated') || execError.stderr?.includes('log in')) {
-        return { authenticated: false, method: 'none' };
-      }
-    }
-
+    // All checks passed with no auth found
     return { authenticated: false, method: 'none' };
   }
 

@@ -7,58 +7,88 @@ export interface KeyboardShortcut {
   description?: string;
 }
 
+// Cache for DOM query results with 100ms TTL to avoid excessive querying
+// At 60fps (16ms per frame), this caches across ~6 frames of keyboard events
+let inputFocusedCache = false;
+let lastInputFocusedCheckTime = 0;
+const INPUT_FOCUS_CACHE_TTL_MS = 100;
+
 /**
  * Check if the currently focused element is an input, textarea, or contenteditable element
  * or if an autocomplete/typeahead dropdown is open
+ *
+ * Results are cached for 50ms to avoid excessive DOM queries on every keystroke.
+ * The cache is automatically invalidated after the TTL expires.
  */
 function isInputFocused(): boolean {
+  const now = Date.now();
+
+  // Return cached result if still valid
+  if (now - lastInputFocusedCheckTime < INPUT_FOCUS_CACHE_TTL_MS) {
+    return inputFocusedCache;
+  }
+
+  // Update cache timestamp
+  lastInputFocusedCheckTime = now;
+
   const activeElement = document.activeElement;
-  if (!activeElement) return false;
+  if (!activeElement) {
+    inputFocusedCache = false;
+    return false;
+  }
 
   // Check if it's a form input element
   const tagName = activeElement.tagName.toLowerCase();
   if (tagName === 'input' || tagName === 'textarea' || tagName === 'select') {
+    inputFocusedCache = true;
     return true;
   }
 
   // Check if it's a contenteditable element
   if (activeElement.getAttribute('contenteditable') === 'true') {
+    inputFocusedCache = true;
     return true;
   }
 
   // Check if it has a role of textbox or searchbox
   const role = activeElement.getAttribute('role');
   if (role === 'textbox' || role === 'searchbox' || role === 'combobox') {
+    inputFocusedCache = true;
     return true;
   }
 
   // Check if focus is inside an xterm terminal (they use a hidden textarea)
   const xtermContainer = activeElement.closest('.xterm');
   if (xtermContainer) {
+    inputFocusedCache = true;
     return true;
   }
 
   // Also check if any parent has data-terminal-container attribute
   const terminalContainer = activeElement.closest('[data-terminal-container]');
   if (terminalContainer) {
+    inputFocusedCache = true;
     return true;
   }
 
   // Check for autocomplete/typeahead dropdowns being open
   const autocompleteList = document.querySelector('[data-testid="category-autocomplete-list"]');
   if (autocompleteList) {
+    inputFocusedCache = true;
     return true;
   }
 
   // Check for any open dialogs
   const dialog = document.querySelector('[role="dialog"][data-state="open"]');
   if (dialog) {
+    inputFocusedCache = true;
     return true;
   }
 
   // Check for project picker dropdown being open
   const projectPickerDropdown = document.querySelector('[data-testid="project-picker-dropdown"]');
   if (projectPickerDropdown) {
+    inputFocusedCache = true;
     return true;
   }
 
@@ -66,9 +96,11 @@ function isInputFocused(): boolean {
   // This prevents shortcuts from firing when user is typing in dropdown filters
   const dropdownMenu = document.querySelector('[role="menu"]');
   if (dropdownMenu) {
+    inputFocusedCache = true;
     return true;
   }
 
+  inputFocusedCache = false;
   return false;
 }
 

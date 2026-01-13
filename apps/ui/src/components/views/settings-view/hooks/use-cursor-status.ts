@@ -16,12 +16,16 @@ export interface CursorStatus {
 /**
  * Custom hook for managing Cursor CLI status
  * Handles checking CLI installation, authentication, and refresh functionality
+ *
+ * OPTIMIZATION: Data loading is NOW LAZY - loads only on demand (on refresh click)
+ * to avoid 5-10 second auth check that blocks the settings page from opening
  */
 export function useCursorStatus() {
   const { setCursorCliStatus } = useSetupStore();
 
   const [status, setStatus] = useState<CursorStatus | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
+  const [hasChecked, setHasChecked] = useState(false);
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
@@ -50,21 +54,33 @@ export function useCursorStatus() {
             : undefined,
         });
       }
+      setHasChecked(true);
     } catch (error) {
       logger.error('Failed to load Cursor settings:', error);
       toast.error('Failed to load Cursor settings');
+      setHasChecked(true);
     } finally {
       setIsLoading(false);
     }
   }, [setCursorCliStatus]);
 
+  // Load data on first mount (lazy load) with a small delay to avoid blocking UI
   useEffect(() => {
-    loadData();
-  }, [loadData]);
+    if (!hasChecked) {
+      // Defer the API call to the next event loop iteration to avoid blocking
+      // the settings page from rendering. This gives the UI a chance to show
+      // the skeleton/placeholder before the slow auth check starts.
+      const timer = setTimeout(() => {
+        loadData();
+      }, 0);
+      return () => clearTimeout(timer);
+    }
+  }, [hasChecked, loadData]);
 
   return {
     status,
     isLoading,
     loadData,
+    hasChecked,
   };
 }

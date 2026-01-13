@@ -19,7 +19,50 @@ const logger = createLogger('FeatureLoader');
 // Re-export Feature type for convenience
 export type { Feature };
 
+/**
+ * Simple concurrency limiter to prevent EMFILE errors
+ * Limits concurrent file operations to 8 at a time
+ */
+class ConcurrencyLimiter {
+  private running = 0;
+  private queue: Array<() => Promise<unknown>> = [];
+
+  constructor(private readonly limit: number = 8) {}
+
+  async run<T>(fn: () => Promise<T>): Promise<T> {
+    while (this.running >= this.limit) {
+      // Wait for a slot to free up
+      await new Promise((resolve) => setTimeout(resolve, 1));
+    }
+
+    this.running++;
+    try {
+      return await fn();
+    } finally {
+      this.running--;
+    }
+  }
+}
+
+// Simple LRU cache for feature lists - invalidates when features are saved
+interface CacheEntry {
+  features: Feature[];
+  timestamp: number;
+}
+
+const FEATURE_LIST_CACHE_TTL_MS = 30000; // 30 second cache for getAll results (invalidates on mutations)
+
 export class FeatureLoader {
+  private cache: Map<string, CacheEntry> = new Map();
+
+  /**
+   * Invalidate the feature list cache for a project
+   * Call this whenever features are created, updated, or deleted
+   */
+  private invalidateCache(projectPath: string): void {
+    this.cache.delete(projectPath);
+  }
+
   /**
    * Get the features directory path
    */
@@ -67,6 +110,7 @@ export class FeatureLoader {
 
   /**
    * Copy images from temp directory to feature directory and update paths
+   * Uses concurrency limiter (max 8 concurrent) to prevent EMFILE errors
    */
   private async migrateImages(
     projectPath: string,
@@ -80,61 +124,66 @@ export class FeatureLoader {
     const featureImagesDir = this.getFeatureImagesDir(projectPath, featureId);
     await secureFs.mkdir(featureImagesDir, { recursive: true });
 
-    const updatedPaths: Array<string | { path: string; [key: string]: unknown }> = [];
+    // Use concurrency limiter to prevent EMFILE: too many open files
+    const limiter = new ConcurrencyLimiter(8);
 
-    for (const imagePath of imagePaths) {
-      try {
-        const originalPath = typeof imagePath === 'string' ? imagePath : imagePath.path;
-
-        // Skip if already in feature directory (already absolute path in external storage)
-        if (originalPath.includes(`/features/${featureId}/images/`)) {
-          updatedPaths.push(imagePath);
-          continue;
-        }
-
-        // Resolve the full path
-        const fullOriginalPath = path.isAbsolute(originalPath)
-          ? originalPath
-          : path.join(projectPath, originalPath);
-
-        // Check if file exists
+    // Process all images with concurrency control
+    const migrationPromises = imagePaths.map((imagePath) =>
+      limiter.run(async () => {
         try {
-          await secureFs.access(fullOriginalPath);
-        } catch {
-          logger.warn(`Image not found, skipping: ${fullOriginalPath}`);
-          continue;
+          const originalPath = typeof imagePath === 'string' ? imagePath : imagePath.path;
+
+          // Skip if already in feature directory (already absolute path in external storage)
+          if (originalPath.includes(`/features/${featureId}/images/`)) {
+            return imagePath;
+          }
+
+          // Resolve the full path
+          const fullOriginalPath = path.isAbsolute(originalPath)
+            ? originalPath
+            : path.join(projectPath, originalPath);
+
+          // Check if file exists
+          try {
+            await secureFs.access(fullOriginalPath);
+          } catch {
+            logger.warn(`Image not found, skipping: ${fullOriginalPath}`);
+            return null; // Skip this image
+          }
+
+          // Get filename and create new path in external storage
+          const filename = path.basename(originalPath);
+          const newPath = path.join(featureImagesDir, filename);
+
+          // Copy the file
+          await secureFs.copyFile(fullOriginalPath, newPath);
+          logger.info(`Copied image: ${originalPath} -> ${newPath}`);
+
+          // Try to delete the original temp file (non-blocking)
+          secureFs.unlink(fullOriginalPath).catch(() => {
+            // Ignore errors when deleting temp file
+          });
+
+          // Update the path in the result (use absolute path)
+          if (typeof imagePath === 'string') {
+            return newPath;
+          } else {
+            return { ...imagePath, path: newPath };
+          }
+        } catch (error) {
+          logger.error(`Failed to migrate image:`, error);
+          // Rethrow error to let caller decide how to handle it
+          // Keeping original path could lead to broken references
+          throw error;
         }
+      })
+    );
 
-        // Get filename and create new path in external storage
-        const filename = path.basename(originalPath);
-        const newPath = path.join(featureImagesDir, filename);
-
-        // Copy the file
-        await secureFs.copyFile(fullOriginalPath, newPath);
-        logger.info(`Copied image: ${originalPath} -> ${newPath}`);
-
-        // Try to delete the original temp file
-        try {
-          await secureFs.unlink(fullOriginalPath);
-        } catch {
-          // Ignore errors when deleting temp file
-        }
-
-        // Update the path in the result (use absolute path)
-        if (typeof imagePath === 'string') {
-          updatedPaths.push(newPath);
-        } else {
-          updatedPaths.push({ ...imagePath, path: newPath });
-        }
-      } catch (error) {
-        logger.error(`Failed to migrate image:`, error);
-        // Rethrow error to let caller decide how to handle it
-        // Keeping original path could lead to broken references
-        throw error;
-      }
-    }
-
-    return updatedPaths;
+    const results = await Promise.all(migrationPromises);
+    // Filter out null entries (skipped images)
+    return results.filter(
+      (result): result is string | { path: string; [key: string]: unknown } => result !== null
+    );
   }
 
   /**
@@ -176,6 +225,13 @@ export class FeatureLoader {
    * Get all features for a project
    */
   async getAll(projectPath: string): Promise<Feature[]> {
+    // Check if cache is still valid
+    const now = Date.now();
+    const cached = this.cache.get(projectPath);
+    if (cached && now - cached.timestamp < FEATURE_LIST_CACHE_TTL_MS) {
+      return cached.features;
+    }
+
     try {
       const featuresDir = this.getFeaturesDir(projectPath);
 
@@ -228,6 +284,9 @@ export class FeatureLoader {
         const bTime = b.id ? parseInt(b.id.split('-')[1] || '0') : 0;
         return aTime - bTime;
       });
+
+      // Update cache
+      this.cache.set(projectPath, { features, timestamp: now });
 
       return features;
     } catch (error) {
@@ -295,7 +354,10 @@ export class FeatureLoader {
     };
 
     // Write feature.json
-    await secureFs.writeFile(featureJsonPath, JSON.stringify(feature, null, 2), 'utf-8');
+    await secureFs.writeFile(featureJsonPath, JSON.stringify(feature), 'utf-8');
+
+    // Invalidate cache since we created a new feature
+    this.invalidateCache(projectPath);
 
     logger.info(`Created feature ${featureId}`);
     return feature;
@@ -381,7 +443,10 @@ export class FeatureLoader {
 
     // Write back to file
     const featureJsonPath = this.getFeatureJsonPath(projectPath, featureId);
-    await secureFs.writeFile(featureJsonPath, JSON.stringify(updatedFeature, null, 2), 'utf-8');
+    await secureFs.writeFile(featureJsonPath, JSON.stringify(updatedFeature), 'utf-8');
+
+    // Invalidate cache since we updated a feature
+    this.invalidateCache(projectPath);
 
     logger.info(`Updated feature ${featureId}`);
     return updatedFeature;
@@ -394,6 +459,10 @@ export class FeatureLoader {
     try {
       const featureDir = this.getFeatureDir(projectPath, featureId);
       await secureFs.rm(featureDir, { recursive: true, force: true });
+
+      // Invalidate cache since we deleted a feature
+      this.invalidateCache(projectPath);
+
       logger.info(`Deleted feature ${featureId}`);
       return true;
     } catch (error) {

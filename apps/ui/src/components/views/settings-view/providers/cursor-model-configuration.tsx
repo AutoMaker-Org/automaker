@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -13,6 +14,9 @@ import { cn } from '@/lib/utils';
 import type { CursorModelId, CursorModelConfig } from '@automaker/types';
 import { CURSOR_MODEL_MAP } from '@automaker/types';
 
+// Pre-compute available models to avoid recreating on every render
+const AVAILABLE_MODELS: CursorModelConfig[] = Object.values(CURSOR_MODEL_MAP);
+
 interface CursorModelConfigurationProps {
   enabledCursorModels: CursorModelId[];
   cursorDefaultModel: CursorModelId;
@@ -21,16 +25,13 @@ interface CursorModelConfigurationProps {
   onModelToggle: (model: CursorModelId, enabled: boolean) => void;
 }
 
-export function CursorModelConfiguration({
+function CursorModelConfigurationImpl({
   enabledCursorModels,
   cursorDefaultModel,
   isSaving,
   onDefaultModelChange,
   onModelToggle,
 }: CursorModelConfigurationProps) {
-  // All available models from the model map
-  const availableModels: CursorModelConfig[] = Object.values(CURSOR_MODEL_MAP);
-
   return (
     <div
       className={cn(
@@ -90,7 +91,7 @@ export function CursorModelConfiguration({
         <div className="space-y-3">
           <Label>Available Models</Label>
           <div className="grid gap-3">
-            {availableModels.map((model) => {
+            {AVAILABLE_MODELS.map((model) => {
               const isEnabled = enabledCursorModels.includes(model.id);
               const isAuto = model.id === 'auto';
 
@@ -126,3 +127,6 @@ export function CursorModelConfiguration({
     </div>
   );
 }
+
+// Memoize to prevent re-renders when parent updates but props haven't changed
+export const CursorModelConfiguration = memo(CursorModelConfigurationImpl);

@@ -3409,3 +3409,20 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
   // Reset
   reset: () => set(initialState),
 }));
+
+// Re-export domain-specific stores for new code (gradual migration path)
+// Existing code continues using useAppStore, but new code should use these specialized stores
+export {
+  useProjectStore,
+  type ProjectStore,
+  type ProjectState,
+  type ProjectActions,
+} from './project-store';
+export { useModelStore, type ModelStore, type ModelState, type ModelActions } from './model-store';
+export {
+  useBoardSettingsStore,
+  type BoardSettingsStore,
+  type BoardSettingsState,
+  type BoardSettingsActions,
+  type BoardBackground,
+} from './board-settings-store';

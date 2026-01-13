@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { createLogger } from '@automaker/utils/logger';
 import {
   PointerSensor,
@@ -107,16 +108,23 @@ export function BoardView() {
     getPrimaryWorktreeBranch,
     setPipelineConfig,
   } = useAppStore();
-  // Subscribe to pipelineConfigByProject to trigger re-renders when it changes
-  const pipelineConfigByProject = useAppStore((state) => state.pipelineConfigByProject);
-  // Subscribe to worktreePanelVisibleByProject to trigger re-renders when it changes
-  const worktreePanelVisibleByProject = useAppStore((state) => state.worktreePanelVisibleByProject);
-  // Subscribe to showInitScriptIndicatorByProject to trigger re-renders when it changes
-  const showInitScriptIndicatorByProject = useAppStore(
-    (state) => state.showInitScriptIndicatorByProject
+  // Subscribe to multiple related state fields using useShallow to avoid re-renders
+  // when unrelated state changes
+  const {
+    pipelineConfigByProject,
+    worktreePanelVisibleByProject,
+    showInitScriptIndicatorByProject,
+    getShowInitScriptIndicator,
+    getDefaultDeleteBranch,
+  } = useAppStore(
+    useShallow((state) => ({
+      pipelineConfigByProject: state.pipelineConfigByProject,
+      worktreePanelVisibleByProject: state.worktreePanelVisibleByProject,
+      showInitScriptIndicatorByProject: state.showInitScriptIndicatorByProject,
+      getShowInitScriptIndicator: state.getShowInitScriptIndicator,
+      getDefaultDeleteBranch: state.getDefaultDeleteBranch,
+    }))
   );
-  const getShowInitScriptIndicator = useAppStore((state) => state.getShowInitScriptIndicator);
-  const getDefaultDeleteBranch = useAppStore((state) => state.getDefaultDeleteBranch);
   const shortcuts = useKeyboardShortcutsConfig();
   const {
     features: hookFeatures,

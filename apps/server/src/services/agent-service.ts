@@ -618,7 +618,7 @@ export class AgentService {
     const sessionFile = path.join(this.stateDir, `${sessionId}.json`);
 
     try {
-      await secureFs.writeFile(sessionFile, JSON.stringify(messages, null, 2), 'utf-8');
+      await secureFs.writeFile(sessionFile, JSON.stringify(messages), 'utf-8');
       await this.updateSessionTimestamp(sessionId);
     } catch (error) {
       this.logger.error('Failed to save session:', error);
@@ -635,7 +635,7 @@ export class AgentService {
   }
 
   async saveMetadata(metadata: Record<string, SessionMetadata>): Promise<void> {
-    await secureFs.writeFile(this.metadataFile, JSON.stringify(metadata, null, 2), 'utf-8');
+    await secureFs.writeFile(this.metadataFile, JSON.stringify(metadata), 'utf-8');
   }
 
   async updateSessionTimestamp(sessionId: string): Promise<void> {
@@ -859,7 +859,7 @@ export class AgentService {
   private async saveQueueState(sessionId: string, queue: QueuedPrompt[]): Promise<void> {
     const queueFile = path.join(this.stateDir, `${sessionId}-queue.json`);
     try {
-      await secureFs.writeFile(queueFile, JSON.stringify(queue, null, 2), 'utf-8');
+      await secureFs.writeFile(queueFile, JSON.stringify(queue), 'utf-8');
     } catch (error) {
       this.logger.error('Failed to save queue state:', error);
     }

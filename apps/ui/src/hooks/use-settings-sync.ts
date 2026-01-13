@@ -102,6 +102,8 @@ export function useSettingsSync(): SettingsSyncState {
   const syncTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSyncedRef = useRef<string>('');
   const isInitializedRef = useRef(false);
+  // Track previous state to calculate differential updates (only send changed fields)
+  const previousStateRef = useRef<Record<string, unknown>>({});
 
   // If auth is lost (logout / session expired), immediately stop syncing and
   // reset initialization so we can safely re-init after the next login.
@@ -146,36 +148,52 @@ export function useSettingsSync(): SettingsSyncState {
 
       logger.debug('Syncing to server:', { projectsCount: appState.projects?.length ?? 0 });
 
-      // Build updates object from current state
+      // Build updates object from current state - ONLY INCLUDE CHANGED FIELDS
       const updates: Record<string, unknown> = {};
+      const currentState: Record<string, unknown> = {};
+
+      // Collect app state fields
       for (const field of SETTINGS_FIELDS_TO_SYNC) {
+        let fieldValue: unknown;
         if (field === 'currentProjectId') {
-          // Special handling: extract ID from currentProject object
-          updates[field] = appState.currentProject?.id ?? null;
+          fieldValue = appState.currentProject?.id ?? null;
         } else {
-          updates[field] = appState[field as keyof typeof appState];
+          fieldValue = appState[field as keyof typeof appState];
+        }
+        currentState[field] = fieldValue;
+
+        // Only include in updates if the value changed
+        if (previousStateRef.current[field] !== fieldValue) {
+          updates[field] = fieldValue;
         }
       }
 
       // Include setup wizard state (lives in a separate store)
       const setupState = useSetupStore.getState();
       for (const field of SETUP_FIELDS_TO_SYNC) {
-        updates[field] = setupState[field as keyof typeof setupState];
+        const fieldValue = setupState[field as keyof typeof setupState];
+        currentState[field] = fieldValue;
+
+        // Only include in updates if the value changed
+        if (previousStateRef.current[field] !== fieldValue) {
+          updates[field] = fieldValue;
+        }
       }
 
-      // Create a hash of the updates to avoid redundant syncs
-      const updateHash = JSON.stringify(updates);
-      if (updateHash === lastSyncedRef.current) {
-        logger.debug('Sync skipped: no changes');
+      // If no fields changed, skip the API call
+      if (Object.keys(updates).length === 0) {
+        logger.debug('Sync skipped: no changes to any fields');
         setState((s) => ({ ...s, syncing: false }));
         return;
       }
 
-      logger.info('Sending settings update:', { projects: updates.projects });
+      // Update previous state for next comparison
+      previousStateRef.current = currentState;
+
+      logger.info('Sending differential settings update:', { changedFields: Object.keys(updates) });
 
       const result = await api.settings.updateGlobal(updates);
       if (result.success) {
-        lastSyncedRef.current = updateHash;
         logger.debug('Settings synced to server');
       } else {
         logger.error('Failed to sync settings:', result.error);
@@ -247,20 +265,20 @@ export function useSettingsSync(): SettingsSyncState {
 
         logger.info('Initial state read:', { projectsCount: appState.projects?.length ?? 0 });
 
-        // Store the initial state hash to avoid immediate re-sync
+        // Initialize previous state for differential updates
         // (migration has already hydrated the store from server/localStorage)
-        const updates: Record<string, unknown> = {};
+        const initialState: Record<string, unknown> = {};
         for (const field of SETTINGS_FIELDS_TO_SYNC) {
           if (field === 'currentProjectId') {
-            updates[field] = appState.currentProject?.id ?? null;
+            initialState[field] = appState.currentProject?.id ?? null;
           } else {
-            updates[field] = appState[field as keyof typeof appState];
+            initialState[field] = appState[field as keyof typeof appState];
           }
         }
         for (const field of SETUP_FIELDS_TO_SYNC) {
-          updates[field] = setupState[field as keyof typeof setupState];
+          initialState[field] = setupState[field as keyof typeof setupState];
         }
-        lastSyncedRef.current = JSON.stringify(updates);
+        previousStateRef.current = initialState;
 
         logger.info('Settings sync initialized');
         setState({ loaded: true, error: null, syncing: false });
@@ -281,17 +299,48 @@ export function useSettingsSync(): SettingsSyncState {
   useEffect(() => {
     if (!state.loaded || !authChecked || !isAuthenticated || !settingsLoaded) return;
 
-    // Subscribe to app store changes
-    const unsubscribeApp = useAppStore.subscribe((newState, prevState) => {
+    // OPTIMIZATION: Use a selector to only subscribe to relevant fields
+    // This prevents callback from firing when unrelated fields (like features) change
+    const selectSettingsFields = (state: ReturnType<typeof useAppStore.getState>) => ({
+      projects: state.projects,
+      theme: state.theme,
+      sidebarOpen: state.sidebarOpen,
+      chatHistoryOpen: state.chatHistoryOpen,
+      maxConcurrency: state.maxConcurrency,
+      defaultSkipTests: state.defaultSkipTests,
+      enableDependencyBlocking: state.enableDependencyBlocking,
+      skipVerificationInAutoMode: state.skipVerificationInAutoMode,
+      useWorktrees: state.useWorktrees,
+      defaultPlanningMode: state.defaultPlanningMode,
+      defaultRequirePlanApproval: state.defaultRequirePlanApproval,
+      muteDoneSound: state.muteDoneSound,
+      enhancementModel: state.enhancementModel,
+      validationModel: state.validationModel,
+      phaseModels: state.phaseModels,
+      enabledCursorModels: state.enabledCursorModels,
+      cursorDefaultModel: state.cursorDefaultModel,
+      enabledOpencodeModels: state.enabledOpencodeModels,
+      opencodeDefaultModel: state.opencodeDefaultModel,
+      enabledDynamicModelIds: state.enabledDynamicModelIds,
+      autoLoadClaudeMd: state.autoLoadClaudeMd,
+      keyboardShortcuts: state.keyboardShortcuts,
+      mcpServers: state.mcpServers,
+      defaultEditorCommand: state.defaultEditorCommand,
+      promptCustomization: state.promptCustomization,
+      trashedProjects: state.trashedProjects,
+      currentProjectId: state.currentProject?.id ?? null,
+      projectHistory: state.projectHistory,
+      projectHistoryIndex: state.projectHistoryIndex,
+      lastSelectedSessionByProject: state.lastSelectedSessionByProject,
+      worktreePanelCollapsed: state.worktreePanelCollapsed,
+      lastProjectDir: state.lastProjectDir,
+      recentFolders: state.recentFolders,
+    });
+
+    // Subscribe to app store changes WITH SELECTOR
+    const unsubscribeApp = useAppStore.subscribe(selectSettingsFields, (newState, prevState) => {
       const auth = useAuthStore.getState();
-      logger.debug('Store subscription fired:', {
-        prevProjects: prevState.projects?.length ?? 0,
-        newProjects: newState.projects?.length ?? 0,
-        authChecked: auth.authChecked,
-        isAuthenticated: auth.isAuthenticated,
-        settingsLoaded: auth.settingsLoaded,
-        loaded: state.loaded,
-      });
+      logger.debug('Settings fields changed, evaluating sync');
 
       // Don't sync if settings not loaded yet
       if (!auth.settingsLoaded) {
@@ -300,34 +349,14 @@ export function useSettingsSync(): SettingsSyncState {
       }
 
       // If the current project changed, sync immediately so we can restore on next launch
-      if (newState.currentProject?.id !== prevState.currentProject?.id) {
+      if (newState.currentProjectId !== prevState.currentProjectId) {
         logger.debug('Current project changed, syncing immediately');
         syncNow();
         return;
       }
 
-      // Check if any synced field changed
-      let changed = false;
-      for (const field of SETTINGS_FIELDS_TO_SYNC) {
-        if (field === 'currentProjectId') {
-          // Special handling: compare currentProject IDs
-          if (newState.currentProject?.id !== prevState.currentProject?.id) {
-            changed = true;
-            break;
-          }
-        } else {
-          const key = field as keyof typeof newState;
-          if (newState[key] !== prevState[key]) {
-            changed = true;
-            break;
-          }
-        }
-      }
-
-      if (changed) {
-        logger.debug('Store changed, scheduling sync');
-        scheduleSyncToServer();
-      }
+      logger.debug('Settings changed, scheduling sync');
+      scheduleSyncToServer();
     });
 
     // Subscribe to setup store changes

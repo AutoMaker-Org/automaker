@@ -46,7 +46,7 @@ const logger = createLogger('SettingsService');
  */
 async function atomicWriteJson(filePath: string, data: unknown): Promise<void> {
   const tempPath = `${filePath}.tmp.${Date.now()}`;
-  const content = JSON.stringify(data, null, 2);
+  const content = JSON.stringify(data);
 
   try {
     await secureFs.writeFile(tempPath, content, 'utf-8');
