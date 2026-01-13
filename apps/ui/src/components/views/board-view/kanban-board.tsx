@@ -2,9 +2,11 @@ import { useMemo } from 'react';
 import { DndContext, DragOverlay } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { Button } from '@/components/ui/button';
+
 import { KanbanColumn, KanbanCard, EmptyStateCard } from './components';
 import { Feature, useAppStore, formatShortcut } from '@/store/app-store';
-import { Archive, Settings2, CheckSquare, GripVertical, Plus } from 'lucide-react';
+import { Archive, Settings2, CheckSquare, GripVertical, LayoutList, Plus } from 'lucide-react';
+
 import { useResponsiveKanban } from '@/hooks/use-responsive-kanban';
 import { getColumnsWithPipeline, type ColumnId } from './constants';
 import type { PipelineConfig } from '@automaker/types';
@@ -46,12 +48,17 @@ interface KanbanBoardProps {
   onAddFeature: () => void;
   pipelineConfig: PipelineConfig | null;
   onOpenPipelineSettings?: () => void;
+
   // Selection mode props
   isSelectionMode?: boolean;
   selectedFeatureIds?: Set<string>;
   onToggleFeatureSelection?: (featureId: string) => void;
   onToggleSelectionMode?: () => void;
-  // Empty state action props
+
+  // Backlog manager navigation (yours)
+  onManageBacklog?: () => void;
+
+  // Empty state action props (main)
   onAiSuggest?: () => void;
   /** Whether currently dragging (hides empty states during drag) */
   isDragging?: boolean;
@@ -92,19 +99,16 @@ export function KanbanBoard({
   selectedFeatureIds = new Set(),
   onToggleFeatureSelection,
   onToggleSelectionMode,
+  onManageBacklog,
   onAiSuggest,
   isDragging = false,
   isReadOnly = false,
 }: KanbanBoardProps) {
-  // Generate columns including pipeline steps
   const columns = useMemo(() => getColumnsWithPipeline(pipelineConfig), [pipelineConfig]);
 
-  // Get the keyboard shortcut for adding features
   const { keyboardShortcuts } = useAppStore();
   const addFeatureShortcut = keyboardShortcuts.addFeature || 'N';
 
-  // Use responsive column widths based on window size
-  // containerStyle handles centering and ensures columns fit without horizontal scroll in Electron
   const { columnWidth, containerStyle } = useResponsiveKanban(columns.length);
 
   return (
@@ -118,6 +122,7 @@ export function KanbanBoard({
         <div className="h-full py-1" style={containerStyle}>
           {columns.map((column) => {
             const columnFeatures = getColumnFeatures(column.id as ColumnId);
+
             return (
               <KanbanColumn
                 key={column.id}
@@ -143,6 +148,20 @@ export function KanbanBoard({
                     </Button>
                   ) : column.id === 'backlog' ? (
                     <div className="flex items-center gap-1">
+                      {/* Your Manage Backlog button */}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
+                        onClick={onManageBacklog}
+                        title="Manage backlog"
+                        data-testid="manage-backlog-button"
+                        disabled={!onManageBacklog}
+                      >
+                        <LayoutList className="w-3.5 h-3.5" />
+                      </Button>
+
+                      {/* Main Add Feature button */}
                       <Button
                         variant="default"
                         size="sm"
@@ -153,6 +172,8 @@ export function KanbanBoard({
                       >
                         <Plus className="w-3.5 h-3.5" />
                       </Button>
+
+                      {/* Selection toggle */}
                       <Button
                         variant="ghost"
                         size="sm"
@@ -206,6 +227,7 @@ export function KanbanBoard({
                       className="w-full h-9 text-sm"
                       onClick={onAddFeature}
                       data-testid="add-feature-floating-button"
+                      disabled={isReadOnly}
                     >
                       <Plus className="w-4 h-4 mr-2" />
                       Add Feature
@@ -220,7 +242,6 @@ export function KanbanBoard({
                   items={columnFeatures.map((f) => f.id)}
                   strategy={verticalListSortingStrategy}
                 >
-                  {/* Empty state card when column has no features */}
                   {columnFeatures.length === 0 && !isDragging && (
                     <EmptyStateCard
                       columnId={column.id}
@@ -240,12 +261,13 @@ export function KanbanBoard({
                       }
                     />
                   )}
+
                   {columnFeatures.map((feature, index) => {
-                    // Calculate shortcut key for in-progress cards (first 10 get 1-9, 0)
                     let shortcutKey: string | undefined;
                     if (column.id === 'in_progress' && index < 10) {
                       shortcutKey = index === 9 ? '0' : String(index + 1);
                     }
+
                     return (
                       <KanbanCard
                         key={feature.id}
@@ -284,10 +306,7 @@ export function KanbanBoard({
         </div>
 
         <DragOverlay
-          dropAnimation={{
-            duration: 200,
-            easing: 'cubic-bezier(0.18, 0.67, 0.6, 1.22)',
-          }}
+          dropAnimation={{ duration: 200, easing: 'cubic-bezier(0.18, 0.67, 0.6, 1.22)' }}
         >
           {activeFeature && (
             <div style={{ width: `${columnWidth}px` }}>
