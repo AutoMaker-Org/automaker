@@ -415,6 +415,7 @@ import {
   TECHNICAL_SYSTEM_PROMPT,
   SIMPLIFY_SYSTEM_PROMPT,
   ACCEPTANCE_SYSTEM_PROMPT,
+  UX_REVIEWER_SYSTEM_PROMPT,
 } from './enhancement.js';
 
 /**
@@ -425,6 +426,7 @@ export const DEFAULT_ENHANCEMENT_PROMPTS: ResolvedEnhancementPrompts = {
   technicalSystemPrompt: TECHNICAL_SYSTEM_PROMPT,
   simplifySystemPrompt: SIMPLIFY_SYSTEM_PROMPT,
   acceptanceSystemPrompt: ACCEPTANCE_SYSTEM_PROMPT,
+  uxReviewerSystemPrompt: UX_REVIEWER_SYSTEM_PROMPT,
 };
 
 /**

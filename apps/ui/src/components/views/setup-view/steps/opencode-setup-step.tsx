@@ -182,7 +182,7 @@ export function OpencodeSetupStep({ onNext, onBack, onSkip }: OpencodeSetupStepP
             <div>
               <p className="font-medium text-foreground">This step is optional</p>
               <p className="text-sm text-muted-foreground mt-1">
-                Configure OpenCode CLI for access to free tier models and AWS Bedrock models. You
+                Configure OpenCode CLI for access to free tier models and connected providers. You
                 can skip this and use other providers, or configure it later in Settings.
               </p>
             </div>
@@ -241,7 +241,7 @@ export function OpencodeSetupStep({ onNext, onBack, onSkip }: OpencodeSetupStepP
                 <div className="flex-1">
                   <p className="font-medium text-foreground">OpenCode CLI not found</p>
                   <p className="text-sm text-muted-foreground mt-1">
-                    Install the OpenCode CLI to use free tier and AWS Bedrock models.
+                    Install the OpenCode CLI to use free tier models and connected providers.
                   </p>
                 </div>
               </div>

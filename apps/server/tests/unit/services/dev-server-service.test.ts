@@ -8,6 +8,7 @@ import fs from 'fs/promises';
 vi.mock('child_process', () => ({
   spawn: vi.fn(),
   execSync: vi.fn(),
+  execFile: vi.fn(),
 }));
 
 // Mock secure-fs

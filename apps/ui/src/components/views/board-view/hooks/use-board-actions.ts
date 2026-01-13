@@ -30,7 +30,8 @@ interface UseBoardActionsProps {
     featureId: string,
     updates: Partial<Feature>,
     descriptionHistorySource?: 'enhance' | 'edit',
-    enhancementMode?: 'improve' | 'technical' | 'simplify' | 'acceptance'
+    enhancementMode?: 'improve' | 'technical' | 'simplify' | 'acceptance' | 'ux-reviewer',
+    preEnhancementDescription?: string
   ) => Promise<void>;
   persistFeatureDelete: (featureId: string) => Promise<void>;
   saveCategory: (category: string) => Promise<void>;
@@ -251,7 +252,8 @@ export function useBoardActions({
         workMode?: 'current' | 'auto' | 'custom';
       },
       descriptionHistorySource?: 'enhance' | 'edit',
-      enhancementMode?: 'improve' | 'technical' | 'simplify' | 'acceptance'
+      enhancementMode?: 'improve' | 'technical' | 'simplify' | 'acceptance' | 'ux-reviewer',
+      preEnhancementDescription?: string
     ) => {
       const workMode = updates.workMode || 'current';
 
@@ -308,7 +310,13 @@ export function useBoardActions({
       };
 
       updateFeature(featureId, finalUpdates);
-      persistFeatureUpdate(featureId, finalUpdates, descriptionHistorySource, enhancementMode);
+      persistFeatureUpdate(
+        featureId,
+        finalUpdates,
+        descriptionHistorySource,
+        enhancementMode,
+        preEnhancementDescription
+      );
       if (updates.category) {
         saveCategory(updates.category);
       }

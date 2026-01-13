@@ -75,6 +75,17 @@ export function useBoardFeatures({ currentProject }: UseBoardFeaturesProps) {
         if (isProjectSwitch) {
           setPersistedCategories([]);
         }
+
+        // Check for interrupted features and resume them
+        // This handles server restarts where features were in pipeline steps
+        if (api.autoMode?.resumeInterrupted) {
+          try {
+            await api.autoMode.resumeInterrupted(currentProject.path);
+            logger.info('Checked for interrupted features');
+          } catch (resumeError) {
+            logger.warn('Failed to check for interrupted features:', resumeError);
+          }
+        }
       } else if (!result.success && result.error) {
         logger.error('API returned error:', result.error);
         // If it's a new project or the error indicates no features found,

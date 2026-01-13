@@ -1119,7 +1119,7 @@ function OpencodeContent() {
               <div className="flex-1">
                 <p className="font-medium text-foreground">OpenCode CLI not found</p>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Install the OpenCode CLI for free tier and AWS Bedrock models.
+                  Install the OpenCode CLI for free tier models and connected providers.
                 </p>
               </div>
             </div>

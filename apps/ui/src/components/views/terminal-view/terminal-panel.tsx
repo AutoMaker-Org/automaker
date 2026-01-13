@@ -44,6 +44,7 @@ import { getElectronAPI } from '@/lib/electron';
 import { getApiKey, getSessionToken, getServerUrlSync } from '@/lib/http-api-client';
 
 const logger = createLogger('Terminal');
+const NO_STORE_CACHE_MODE: RequestCache = 'no-store';
 
 // Font size constraints
 const MIN_FONT_SIZE = 8;
@@ -504,6 +505,7 @@ export function TerminalPanel({
       const response = await fetch(`${serverUrl}/api/auth/token`, {
         headers,
         credentials: 'include',
+        cache: NO_STORE_CACHE_MODE,
       });
 
       if (!response.ok) {

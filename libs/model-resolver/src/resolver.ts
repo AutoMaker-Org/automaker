@@ -15,6 +15,7 @@ import {
   DEFAULT_MODELS,
   PROVIDER_PREFIXES,
   isCursorModel,
+  isOpencodeModel,
   stripProviderPrefix,
   type PhaseModelEntry,
   type ThinkingLevel,
@@ -65,6 +66,17 @@ export function resolveModelString(
   // Codex model with explicit prefix (e.g., "codex-gpt-5.1-codex-max") - pass through unchanged
   if (modelKey.startsWith(PROVIDER_PREFIXES.codex)) {
     console.log(`[ModelResolver] Using Codex model: ${modelKey}`);
+    return modelKey;
+  }
+
+  // OpenCode model (static or dynamic) - pass through unchanged
+  // This handles models like:
+  // - opencode-* (Automaker routing prefix)
+  // - opencode/* (free tier models)
+  // - amazon-bedrock/* (AWS Bedrock models)
+  // - provider/model-name (dynamic models like github-copilot/gpt-4o, google/gemini-2.5-pro)
+  if (isOpencodeModel(modelKey)) {
+    console.log(`[ModelResolver] Using OpenCode model: ${modelKey}`);
     return modelKey;
   }
 

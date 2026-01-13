@@ -298,7 +298,14 @@
   }
 }
 
-.light {
+/* IMPORTANT:
+ * Theme classes like `.light` are applied to `:root` (html).
+ * Some third-party libraries (e.g. React Flow) also add `.light`/`.dark` classes
+ * to nested containers. If we define CSS variables on `.light` broadly, those
+ * nested containers will override the app theme and cause "white cards" in dark themes.
+ * Scoping to `:root.light` ensures only the root theme toggle controls variables.
+ */
+:root.light {
   /* Explicit light mode - same as root but ensures it overrides any dark defaults */
   --background: oklch(1 0 0); /* White */
   --background-50: oklch(1 0 0 / 0.5);

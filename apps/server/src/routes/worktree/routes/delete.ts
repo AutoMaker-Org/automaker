@@ -6,9 +6,11 @@ import type { Request, Response } from 'express';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { isGitRepo } from '@automaker/git-utils';
-import { getErrorMessage, logError } from '../common.js';
+import { getErrorMessage, logError, isValidBranchName, execGitCommand } from '../common.js';
+import { createLogger } from '@automaker/utils';
 
 const execAsync = promisify(exec);
+const logger = createLogger('Worktree');
 
 export function createDeleteHandler() {
   return async (req: Request, res: Response): Promise<void> => {
@@ -46,22 +48,28 @@ export function createDeleteHandler() {
         // Could not get branch name
       }
 
-      // Remove the worktree
+      // Remove the worktree (using array arguments to prevent injection)
       try {
-        await execAsync(`git worktree remove "${worktreePath}" --force`, {
-          cwd: projectPath,
-        });
+        await execGitCommand(['worktree', 'remove', worktreePath, '--force'], projectPath);
       } catch (error) {
         // Try with prune if remove fails
-        await execAsync('git worktree prune', { cwd: projectPath });
+        await execGitCommand(['worktree', 'prune'], projectPath);
       }
 
       // Optionally delete the branch
+      let branchDeleted = false;
       if (deleteBranch && branchName && branchName !== 'main' && branchName !== 'master') {
-        try {
-          await execAsync(`git branch -D ${branchName}`, { cwd: projectPath });
-        } catch {
-          // Branch deletion failed, not critical
+        // Validate branch name to prevent command injection
+        if (!isValidBranchName(branchName)) {
+          logger.warn(`Invalid branch name detected, skipping deletion: ${branchName}`);
+        } else {
+          try {
+            await execGitCommand(['branch', '-D', branchName], projectPath);
+            branchDeleted = true;
+          } catch {
+            // Branch deletion failed, not critical
+            logger.warn(`Failed to delete branch: ${branchName}`);
+          }
         }
       }
 
@@ -69,7 +77,8 @@ export function createDeleteHandler() {
         success: true,
         deleted: {
           worktreePath,
-          branch: deleteBranch ? branchName : null,
+          branch: branchDeleted ? branchName : null,
+          branchDeleted,
         },
       });
     } catch (error) {

@@ -95,8 +95,9 @@ export function isCodexModel(model: string | undefined | null): boolean {
  * - 'opencode/' prefix (OpenCode free tier models)
  * - 'amazon-bedrock/' prefix (AWS Bedrock models via OpenCode)
  * - Full model ID from OPENCODE_MODEL_CONFIG_MAP
+ * - Dynamic models from OpenCode CLI with provider/model format (e.g., "github-copilot/gpt-4o", "google/gemini-2.5-pro")
  *
- * @param model - Model string to check (e.g., "opencode-sonnet", "opencode/big-pickle", "amazon-bedrock/anthropic.claude-sonnet-4-5-20250929-v1:0")
+ * @param model - Model string to check
  * @returns true if the model is an OpenCode model
  */
 export function isOpencodeModel(model: string | undefined | null): boolean {
@@ -113,10 +114,24 @@ export function isOpencodeModel(model: string | undefined | null): boolean {
   }
 
   // Check for OpenCode native model prefixes
-  // - opencode/ = OpenCode free tier models (e.g., opencode/big-pickle)
-  // - amazon-bedrock/ = AWS Bedrock models (e.g., amazon-bedrock/anthropic.claude-*)
+  // - opencode/ = OpenCode free tier models
+  // - amazon-bedrock/ = AWS Bedrock models
   if (model.startsWith('opencode/') || model.startsWith('amazon-bedrock/')) {
     return true;
+  }
+
+  // Check for dynamic models from OpenCode CLI with provider/model format
+  // These are models discovered dynamically from authenticated providers like:
+  // - github-copilot/gpt-4o
+  // - google/gemini-2.5-pro
+  // - xai/grok-3
+  // Pattern: provider-id/model-name (must have exactly one / and not be a URL)
+  if (model.includes('/') && !model.includes('://')) {
+    const parts = model.split('/');
+    // Valid dynamic model format: provider/model-name (exactly 2 parts)
+    if (parts.length === 2 && parts[0].length > 0 && parts[1].length > 0) {
+      return true;
+    }
   }
 
   return false;

@@ -81,7 +81,7 @@ export function useSpecGeneration({ loadSpec }: UseSpecGenerationOptions) {
           return;
         }
 
-        const status = await api.specRegeneration.status();
+        const status = await api.specRegeneration.status(currentProject.path);
         logger.debug(
           '[useSpecGeneration] Status check on mount:',
           status,
@@ -90,9 +90,7 @@ export function useSpecGeneration({ loadSpec }: UseSpecGenerationOptions) {
         );
 
         if (status.success && status.isRunning) {
-          logger.debug(
-            '[useSpecGeneration] Spec generation is running globally. Tentatively showing loader.'
-          );
+          logger.debug('[useSpecGeneration] Spec generation is running for this project.');
 
           setIsCreating(true);
           setIsRegenerating(true);
@@ -143,7 +141,7 @@ export function useSpecGeneration({ loadSpec }: UseSpecGenerationOptions) {
           const api = getElectronAPI();
           if (!api.specRegeneration) return;
 
-          const status = await api.specRegeneration.status();
+          const status = await api.specRegeneration.status(currentProject.path);
           logger.debug('[useSpecGeneration] Visibility change - status check:', status);
 
           if (!status.isRunning) {
@@ -180,7 +178,7 @@ export function useSpecGeneration({ loadSpec }: UseSpecGenerationOptions) {
         const api = getElectronAPI();
         if (!api.specRegeneration) return;
 
-        const status = await api.specRegeneration.status();
+        const status = await api.specRegeneration.status(currentProject.path);
 
         if (!status.isRunning) {
           logger.debug(

@@ -12,7 +12,7 @@ export interface DescriptionHistoryEntry {
   description: string;
   timestamp: string; // ISO date string
   source: 'initial' | 'enhance' | 'edit'; // What triggered this version
-  enhancementMode?: 'improve' | 'technical' | 'simplify' | 'acceptance'; // Only for 'enhance' source
+  enhancementMode?: 'improve' | 'technical' | 'simplify' | 'acceptance' | 'ux-reviewer'; // Only for 'enhance' source
 }
 
 export interface FeatureImagePath {

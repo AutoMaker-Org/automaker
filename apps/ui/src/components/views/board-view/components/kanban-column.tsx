@@ -10,6 +10,8 @@ interface KanbanColumnProps {
   count: number;
   children: ReactNode;
   headerAction?: ReactNode;
+  /** Floating action button at the bottom of the column */
+  footerAction?: ReactNode;
   opacity?: number;
   showBorder?: boolean;
   hideScrollbar?: boolean;
@@ -24,6 +26,7 @@ export const KanbanColumn = memo(function KanbanColumn({
   count,
   children,
   headerAction,
+  footerAction,
   opacity = 100,
   showBorder = true,
   hideScrollbar = false,
@@ -79,11 +82,20 @@ export const KanbanColumn = memo(function KanbanColumn({
           hideScrollbar &&
             '[&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]',
           // Smooth scrolling
-          'scroll-smooth'
+          'scroll-smooth',
+          // Add padding at bottom if there's a footer action
+          footerAction && 'pb-14'
         )}
       >
         {children}
       </div>
+
+      {/* Floating Footer Action */}
+      {footerAction && (
+        <div className="absolute bottom-0 left-0 right-0 z-20 p-2 bg-gradient-to-t from-card/95 via-card/80 to-transparent pt-6">
+          {footerAction}
+        </div>
+      )}
 
       {/* Drop zone indicator when dragging over */}
       {isOver && (

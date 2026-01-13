@@ -17,7 +17,6 @@ import { CreateSpecDialog } from '@/components/views/spec-view/dialogs';
 import {
   CollapseToggleButton,
   SidebarHeader,
-  ProjectActions,
   SidebarNavigation,
   ProjectSelectorWithOptions,
   SidebarFooter,
@@ -59,7 +58,7 @@ export function Sidebar() {
   } = useAppStore();
 
   // Environment variable flags for hiding sidebar items
-  const { hideTerminal, hideWiki, hideRunningAgents, hideContext, hideSpecEditor, hideAiProfiles } =
+  const { hideTerminal, hideWiki, hideRunningAgents, hideContext, hideSpecEditor } =
     SIDEBAR_FEATURE_FLAGS;
 
   // Get customizable keyboard shortcuts
@@ -127,6 +126,9 @@ export function Sidebar() {
   // Derive isCreatingSpec from store state
   const isCreatingSpec = specCreatingForProject !== null;
   const creatingSpecProjectPath = specCreatingForProject;
+  // Check if the current project is specifically the one generating spec
+  const isCurrentProjectGeneratingSpec =
+    specCreatingForProject !== null && specCreatingForProject === currentProject?.path;
 
   // Auto-collapse sidebar on small screens and update Electron window minWidth
   useSidebarAutoCollapse({ sidebarOpen, toggleSidebar });
@@ -232,7 +234,6 @@ export function Sidebar() {
     hideSpecEditor,
     hideContext,
     hideTerminal,
-    hideAiProfiles,
     currentProject,
     projects,
     projectHistory,
@@ -243,6 +244,7 @@ export function Sidebar() {
     cyclePrevProject,
     cycleNextProject,
     unviewedValidationsCount,
+    isSpecGenerating: isCurrentProjectGeneratingSpec,
   });
 
   // Register keyboard shortcuts
@@ -255,121 +257,122 @@ export function Sidebar() {
   };
 
   return (
-    <aside
-      className={cn(
-        'flex-shrink-0 flex flex-col z-30 relative',
-        // Glass morphism background with gradient
-        'bg-gradient-to-b from-sidebar/95 via-sidebar/85 to-sidebar/90 backdrop-blur-2xl',
-        // Premium border with subtle glow
-        'border-r border-border/60 shadow-[1px_0_20px_-5px_rgba(0,0,0,0.1)]',
-        // Smooth width transition
-        'transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]',
-        sidebarOpen ? 'w-16 lg:w-72' : 'w-16'
+    <>
+      {/* Mobile overlay backdrop */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+          onClick={toggleSidebar}
+          aria-hidden="true"
+        />
       )}
-      data-testid="sidebar"
-    >
-      <CollapseToggleButton
-        sidebarOpen={sidebarOpen}
-        toggleSidebar={toggleSidebar}
-        shortcut={shortcuts.toggleSidebar}
-      />
-
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <SidebarHeader sidebarOpen={sidebarOpen} navigate={navigate} />
-
-        {/* Project Actions - Moved above project selector */}
-        {sidebarOpen && (
-          <ProjectActions
-            setShowNewProjectModal={setShowNewProjectModal}
-            handleOpenFolder={handleOpenFolder}
-            setShowTrashDialog={setShowTrashDialog}
-            trashedProjects={trashedProjects}
-            shortcuts={{ openProject: shortcuts.openProject }}
-          />
+      <aside
+        className={cn(
+          'flex-shrink-0 flex flex-col z-50 relative',
+          // Glass morphism background with gradient
+          'bg-gradient-to-b from-sidebar/95 via-sidebar/85 to-sidebar/90 backdrop-blur-2xl',
+          // Premium border with subtle glow
+          'border-r border-border/60 shadow-[1px_0_20px_-5px_rgba(0,0,0,0.1)]',
+          // Smooth width transition
+          'transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]',
+          // Mobile: hidden when closed, full width overlay when open
+          // Desktop: always visible, toggle between narrow and wide
+          sidebarOpen ? 'fixed lg:relative left-0 top-0 h-full w-72' : 'hidden lg:flex w-16'
         )}
-
-        <ProjectSelectorWithOptions
+        data-testid="sidebar"
+      >
+        <CollapseToggleButton
           sidebarOpen={sidebarOpen}
-          isProjectPickerOpen={isProjectPickerOpen}
-          setIsProjectPickerOpen={setIsProjectPickerOpen}
-          setShowDeleteProjectDialog={setShowDeleteProjectDialog}
+          toggleSidebar={toggleSidebar}
+          shortcut={shortcuts.toggleSidebar}
         />
 
-        <SidebarNavigation
-          currentProject={currentProject}
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <SidebarHeader sidebarOpen={sidebarOpen} navigate={navigate} />
+
+          <ProjectSelectorWithOptions
+            sidebarOpen={sidebarOpen}
+            isProjectPickerOpen={isProjectPickerOpen}
+            setIsProjectPickerOpen={setIsProjectPickerOpen}
+            setShowDeleteProjectDialog={setShowDeleteProjectDialog}
+          />
+
+          <SidebarNavigation
+            currentProject={currentProject}
+            sidebarOpen={sidebarOpen}
+            navSections={navSections}
+            isActiveRoute={isActiveRoute}
+            navigate={navigate}
+          />
+        </div>
+
+        <SidebarFooter
           sidebarOpen={sidebarOpen}
-          navSections={navSections}
           isActiveRoute={isActiveRoute}
           navigate={navigate}
+          hideWiki={hideWiki}
+          hideRunningAgents={hideRunningAgents}
+          runningAgentsCount={runningAgentsCount}
+          shortcuts={{ settings: shortcuts.settings }}
         />
-      </div>
+        <TrashDialog
+          open={showTrashDialog}
+          onOpenChange={setShowTrashDialog}
+          trashedProjects={trashedProjects}
+          activeTrashId={activeTrashId}
+          handleRestoreProject={handleRestoreProject}
+          handleDeleteProjectFromDisk={handleDeleteProjectFromDisk}
+          deleteTrashedProject={deleteTrashedProject}
+          handleEmptyTrash={handleEmptyTrash}
+          isEmptyingTrash={isEmptyingTrash}
+        />
 
-      <SidebarFooter
-        sidebarOpen={sidebarOpen}
-        isActiveRoute={isActiveRoute}
-        navigate={navigate}
-        hideWiki={hideWiki}
-        hideRunningAgents={hideRunningAgents}
-        runningAgentsCount={runningAgentsCount}
-        shortcuts={{ settings: shortcuts.settings }}
-      />
-      <TrashDialog
-        open={showTrashDialog}
-        onOpenChange={setShowTrashDialog}
-        trashedProjects={trashedProjects}
-        activeTrashId={activeTrashId}
-        handleRestoreProject={handleRestoreProject}
-        handleDeleteProjectFromDisk={handleDeleteProjectFromDisk}
-        deleteTrashedProject={deleteTrashedProject}
-        handleEmptyTrash={handleEmptyTrash}
-        isEmptyingTrash={isEmptyingTrash}
-      />
+        {/* New Project Setup Dialog */}
+        <CreateSpecDialog
+          open={showSetupDialog}
+          onOpenChange={setShowSetupDialog}
+          projectOverview={projectOverview}
+          onProjectOverviewChange={setProjectOverview}
+          generateFeatures={generateFeatures}
+          onGenerateFeaturesChange={setGenerateFeatures}
+          analyzeProject={analyzeProject}
+          onAnalyzeProjectChange={setAnalyzeProject}
+          featureCount={featureCount}
+          onFeatureCountChange={setFeatureCount}
+          onCreateSpec={handleCreateInitialSpec}
+          onSkip={handleSkipSetup}
+          isCreatingSpec={isCreatingSpec}
+          showSkipButton={true}
+          title="Set Up Your Project"
+          description="We didn't find an app_spec.txt file. Let us help you generate your app_spec.txt to help describe your project for our system. We'll analyze your project's tech stack and create a comprehensive specification."
+        />
 
-      {/* New Project Setup Dialog */}
-      <CreateSpecDialog
-        open={showSetupDialog}
-        onOpenChange={setShowSetupDialog}
-        projectOverview={projectOverview}
-        onProjectOverviewChange={setProjectOverview}
-        generateFeatures={generateFeatures}
-        onGenerateFeaturesChange={setGenerateFeatures}
-        analyzeProject={analyzeProject}
-        onAnalyzeProjectChange={setAnalyzeProject}
-        featureCount={featureCount}
-        onFeatureCountChange={setFeatureCount}
-        onCreateSpec={handleCreateInitialSpec}
-        onSkip={handleSkipSetup}
-        isCreatingSpec={isCreatingSpec}
-        showSkipButton={true}
-        title="Set Up Your Project"
-        description="We didn't find an app_spec.txt file. Let us help you generate your app_spec.txt to help describe your project for our system. We'll analyze your project's tech stack and create a comprehensive specification."
-      />
+        <OnboardingDialog
+          open={showOnboardingDialog}
+          onOpenChange={setShowOnboardingDialog}
+          newProjectName={newProjectName}
+          onSkip={handleOnboardingSkip}
+          onGenerateSpec={handleOnboardingGenerateSpec}
+        />
 
-      <OnboardingDialog
-        open={showOnboardingDialog}
-        onOpenChange={setShowOnboardingDialog}
-        newProjectName={newProjectName}
-        onSkip={handleOnboardingSkip}
-        onGenerateSpec={handleOnboardingGenerateSpec}
-      />
+        {/* Delete Project Confirmation Dialog */}
+        <DeleteProjectDialog
+          open={showDeleteProjectDialog}
+          onOpenChange={setShowDeleteProjectDialog}
+          project={currentProject}
+          onConfirm={moveProjectToTrash}
+        />
 
-      {/* Delete Project Confirmation Dialog */}
-      <DeleteProjectDialog
-        open={showDeleteProjectDialog}
-        onOpenChange={setShowDeleteProjectDialog}
-        project={currentProject}
-        onConfirm={moveProjectToTrash}
-      />
-
-      {/* New Project Modal */}
-      <NewProjectModal
-        open={showNewProjectModal}
-        onOpenChange={setShowNewProjectModal}
-        onCreateBlankProject={handleCreateBlankProject}
-        onCreateFromTemplate={handleCreateFromTemplate}
-        onCreateFromCustomUrl={handleCreateFromCustomUrl}
-        isCreating={isCreatingProject}
-      />
-    </aside>
+        {/* New Project Modal */}
+        <NewProjectModal
+          open={showNewProjectModal}
+          onOpenChange={setShowNewProjectModal}
+          onCreateBlankProject={handleCreateBlankProject}
+          onCreateFromTemplate={handleCreateFromTemplate}
+          onCreateFromCustomUrl={handleCreateFromCustomUrl}
+          isCreating={isCreatingProject}
+        />
+      </aside>
+    </>
   );
 }

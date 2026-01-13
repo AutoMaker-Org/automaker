@@ -1,6 +1,6 @@
 // @ts-nocheck
 import { useEffect, useState } from 'react';
-import { Feature, ThinkingLevel, useAppStore } from '@/store/app-store';
+import { Feature, ThinkingLevel } from '@/store/app-store';
 import type { ReasoningEffort } from '@automaker/types';
 import { getProviderFromModel } from '@/lib/utils';
 import {
@@ -68,11 +68,9 @@ export function AgentInfoPanel({
   summary,
   isCurrentAutoTask,
 }: AgentInfoPanelProps) {
-  const { kanbanCardDetailLevel } = useAppStore();
   const [agentInfo, setAgentInfo] = useState<AgentTaskInfo | null>(null);
   const [isSummaryDialogOpen, setIsSummaryDialogOpen] = useState(false);
-
-  const showAgentInfo = kanbanCardDetailLevel === 'detailed';
+  const [isTodosExpanded, setIsTodosExpanded] = useState(false);
 
   useEffect(() => {
     const loadContext = async () => {
@@ -123,7 +121,7 @@ export function AgentInfoPanel({
     }
   }, [feature.id, feature.status, contextContent, isCurrentAutoTask]);
   // Model/Preset Info for Backlog Cards
-  if (showAgentInfo && feature.status === 'backlog') {
+  if (feature.status === 'backlog') {
     const provider = getProviderFromModel(feature.model);
     const isCodex = provider === 'codex';
     const isClaude = provider === 'claude';
@@ -160,7 +158,7 @@ export function AgentInfoPanel({
   }
 
   // Agent Info Panel for non-backlog cards
-  if (showAgentInfo && feature.status !== 'backlog' && agentInfo) {
+  if (feature.status !== 'backlog' && agentInfo) {
     return (
       <>
         <div className="mb-3 space-y-2 overflow-hidden">
@@ -200,32 +198,47 @@ export function AgentInfoPanel({
                   {agentInfo.todos.length} tasks
                 </span>
               </div>
-              <div className="space-y-0.5 max-h-16 overflow-y-auto">
-                {agentInfo.todos.slice(0, 3).map((todo, idx) => (
-                  <div key={idx} className="flex items-center gap-1.5 text-[10px]">
-                    {todo.status === 'completed' ? (
-                      <CheckCircle2 className="w-2.5 h-2.5 text-[var(--status-success)] shrink-0" />
-                    ) : todo.status === 'in_progress' ? (
-                      <Loader2 className="w-2.5 h-2.5 text-[var(--status-warning)] animate-spin shrink-0" />
-                    ) : (
-                      <Circle className="w-2.5 h-2.5 text-muted-foreground/50 shrink-0" />
-                    )}
-                    <span
-                      className={cn(
-                        'break-words hyphens-auto line-clamp-2 leading-relaxed',
-                        todo.status === 'completed' && 'text-muted-foreground/60 line-through',
-                        todo.status === 'in_progress' && 'text-[var(--status-warning)]',
-                        todo.status === 'pending' && 'text-muted-foreground/80'
+              <div
+                className={cn(
+                  'space-y-0.5 overflow-y-auto',
+                  isTodosExpanded ? 'max-h-40' : 'max-h-16'
+                )}
+              >
+                {(isTodosExpanded ? agentInfo.todos : agentInfo.todos.slice(0, 3)).map(
+                  (todo, idx) => (
+                    <div key={idx} className="flex items-center gap-1.5 text-[10px]">
+                      {todo.status === 'completed' ? (
+                        <CheckCircle2 className="w-2.5 h-2.5 text-[var(--status-success)] shrink-0" />
+                      ) : todo.status === 'in_progress' ? (
+                        <Loader2 className="w-2.5 h-2.5 text-[var(--status-warning)] animate-spin shrink-0" />
+                      ) : (
+                        <Circle className="w-2.5 h-2.5 text-muted-foreground/50 shrink-0" />
                       )}
-                    >
-                      {todo.content}
-                    </span>
-                  </div>
-                ))}
+                      <span
+                        className={cn(
+                          'break-words hyphens-auto line-clamp-2 leading-relaxed',
+                          todo.status === 'completed' && 'text-muted-foreground/60 line-through',
+                          todo.status === 'in_progress' && 'text-[var(--status-warning)]',
+                          todo.status === 'pending' && 'text-muted-foreground/80'
+                        )}
+                      >
+                        {todo.content}
+                      </span>
+                    </div>
+                  )
+                )}
                 {agentInfo.todos.length > 3 && (
-                  <p className="text-[10px] text-muted-foreground/60 pl-4">
-                    +{agentInfo.todos.length - 3} more
-                  </p>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsTodosExpanded(!isTodosExpanded);
+                    }}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    className="text-[10px] text-muted-foreground/60 pl-4 hover:text-muted-foreground transition-colors cursor-pointer"
+                  >
+                    {isTodosExpanded ? 'Show less' : `+${agentInfo.todos.length - 3} more`}
+                  </button>
                 )}
               </div>
             </div>
@@ -255,7 +268,11 @@ export function AgentInfoPanel({
                       <Expand className="w-3 h-3" />
                     </button>
                   </div>
-                  <p className="text-[10px] text-muted-foreground/70 line-clamp-3 break-words hyphens-auto leading-relaxed overflow-hidden">
+                  <p
+                    className="text-[10px] text-muted-foreground/70 line-clamp-3 break-words hyphens-auto leading-relaxed overflow-hidden select-text cursor-text"
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onMouseDown={(e) => e.stopPropagation()}
+                  >
                     {feature.summary || summary || agentInfo.summary}
                   </p>
                 </div>
@@ -292,58 +309,15 @@ export function AgentInfoPanel({
     );
   }
 
-  // Show just the todo list for non-backlog features when showAgentInfo is false
-  // This ensures users always see what the agent is working on
-  if (!showAgentInfo && feature.status !== 'backlog' && agentInfo && agentInfo.todos.length > 0) {
-    return (
-      <div className="mb-3 space-y-1 overflow-hidden">
-        <div className="flex items-center gap-1 text-[10px] text-muted-foreground/70">
-          <ListTodo className="w-3 h-3" />
-          <span>
-            {agentInfo.todos.filter((t) => t.status === 'completed').length}/
-            {agentInfo.todos.length} tasks
-          </span>
-        </div>
-        <div className="space-y-0.5 max-h-24 overflow-y-auto">
-          {agentInfo.todos.map((todo, idx) => (
-            <div key={idx} className="flex items-center gap-1.5 text-[10px]">
-              {todo.status === 'completed' ? (
-                <CheckCircle2 className="w-2.5 h-2.5 text-[var(--status-success)] shrink-0" />
-              ) : todo.status === 'in_progress' ? (
-                <Loader2 className="w-2.5 h-2.5 text-[var(--status-warning)] animate-spin shrink-0" />
-              ) : (
-                <Circle className="w-2.5 h-2.5 text-muted-foreground/50 shrink-0" />
-              )}
-              <span
-                className={cn(
-                  'break-words hyphens-auto line-clamp-2 leading-relaxed',
-                  todo.status === 'completed' && 'text-muted-foreground/60 line-through',
-                  todo.status === 'in_progress' && 'text-[var(--status-warning)]',
-                  todo.status === 'pending' && 'text-muted-foreground/80'
-                )}
-              >
-                {todo.content}
-              </span>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  // Always render SummaryDialog if showAgentInfo is true (even if no agentInfo yet)
+  // Always render SummaryDialog (even if no agentInfo yet)
   // This ensures the dialog can be opened from the expand button
   return (
-    <>
-      {showAgentInfo && (
-        <SummaryDialog
-          feature={feature}
-          agentInfo={agentInfo}
-          summary={summary}
-          isOpen={isSummaryDialogOpen}
-          onOpenChange={setIsSummaryDialogOpen}
-        />
-      )}
-    </>
+    <SummaryDialog
+      feature={feature}
+      agentInfo={agentInfo}
+      summary={summary}
+      isOpen={isSummaryDialogOpen}
+      onOpenChange={setIsSummaryDialogOpen}
+    />
   );
 }

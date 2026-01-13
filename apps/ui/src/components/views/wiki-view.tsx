@@ -20,7 +20,6 @@ import {
   Image,
   TestTube,
   Brain,
-  Users,
 } from 'lucide-react';
 
 interface WikiSection {
@@ -237,12 +236,6 @@ export function WikiView() {
                   'Each feature runs in its own git worktree for safe parallel development.',
               },
               {
-                icon: Users,
-                title: 'AI Profiles',
-                description:
-                  'Pre-configured model + thinking level combinations for different task types.',
-              },
-              {
                 icon: Terminal,
                 title: 'Integrated Terminal',
                 description: 'Built-in terminal with tab support and split panes.',
@@ -425,10 +418,6 @@ export function WikiView() {
                 desc: 'Integrated terminal with splits and tabs',
               },
               {
-                file: 'views/profiles-view.tsx',
-                desc: 'AI profile management (model + thinking presets)',
-              },
-              {
                 file: 'store/app-store.ts',
                 desc: 'Central Zustand state management',
               },
@@ -529,12 +518,6 @@ export function WikiView() {
               </p>
             </li>
             <li className="text-foreground">
-              <strong>Configure AI Profile</strong>
-              <p className="text-muted-foreground ml-5 mt-1">
-                Choose an AI profile or customize model/thinking settings per feature
-              </p>
-            </li>
-            <li className="text-foreground">
               <strong>Start Implementation</strong>
               <p className="text-muted-foreground ml-5 mt-1">
                 Drag features to "In Progress" or enable auto mode to let AI work
@@ -555,9 +538,6 @@ export function WikiView() {
                 <code className="px-1 py-0.5 bg-brand-500/20 rounded">?</code> to see all)
               </li>
               <li>Enable git worktree isolation for parallel feature development</li>
-              <li>
-                Start with "Quick Edit" profile for simple tasks, use "Heavy Task" for complex work
-              </li>
               <li>Keep your app spec up to date as your project evolves</li>
             </ul>
           </div>

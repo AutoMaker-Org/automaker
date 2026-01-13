@@ -13,7 +13,15 @@
 
 import { useReducer, useEffect, useRef } from 'react';
 import { useNavigate } from '@tanstack/react-router';
-import { login, getHttpApiClient, getServerUrlSync } from '@/lib/http-api-client';
+import {
+  login,
+  getHttpApiClient,
+  getServerUrlSync,
+  getApiKey,
+  getSessionToken,
+  initApiKey,
+  waitForApiKeyInit,
+} from '@/lib/http-api-client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { KeyRound, AlertCircle, Loader2, RefreshCw, ServerCrash } from 'lucide-react';
@@ -92,6 +100,7 @@ function reducer(state: State, action: Action): State {
 
 const MAX_RETRIES = 5;
 const BACKOFF_BASE_MS = 400;
+const NO_STORE_CACHE_MODE: RequestCache = 'no-store';
 
 // =============================================================================
 // Imperative Flow Logic (runs once on mount)
@@ -102,7 +111,9 @@ const BACKOFF_BASE_MS = 400;
  * Unlike the httpClient methods, this does NOT call handleUnauthorized()
  * which would navigate us away to /logged-out.
  *
- * Relies on HTTP-only session cookie being sent via credentials: 'include'.
+ * Supports both:
+ * - Electron mode: Uses X-API-Key header (API key from IPC)
+ * - Web mode: Uses HTTP-only session cookie
  *
  * Returns: { authenticated: true } or { authenticated: false }
  * Throws: on network errors (for retry logic)
@@ -110,9 +121,31 @@ const BACKOFF_BASE_MS = 400;
 async function checkAuthStatusSafe(): Promise<{ authenticated: boolean }> {
   const serverUrl = getServerUrlSync();
 
+  // Wait for API key to be initialized before checking auth
+  // This ensures we have a valid API key to send in the header
+  await waitForApiKeyInit();
+
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+
+  // Electron mode: use API key header
+  const apiKey = getApiKey();
+  if (apiKey) {
+    headers['X-API-Key'] = apiKey;
+  }
+
+  // Add session token header if available (web mode)
+  const sessionToken = getSessionToken();
+  if (sessionToken) {
+    headers['X-Session-Token'] = sessionToken;
+  }
+
   const response = await fetch(`${serverUrl}/api/auth/status`, {
-    credentials: 'include', // Send HTTP-only session cookie
+    headers,
+    credentials: 'include',
     signal: AbortSignal.timeout(5000),
+    cache: NO_STORE_CACHE_MODE,
   });
 
   // Any response means server is reachable
@@ -245,6 +278,14 @@ export function LoginView() {
   const setAuthState = useAuthStore((s) => s.setAuthState);
   const [state, dispatch] = useReducer(reducer, initialState);
   const retryControllerRef = useRef<AbortController | null>(null);
+
+  // Initialize API key before checking session
+  // This ensures getApiKey() returns a valid value in checkAuthStatusSafe()
+  useEffect(() => {
+    initApiKey().catch((error) => {
+      console.warn('Failed to initialize API key:', error);
+    });
+  }, []);
 
   // Run initial server/session check on mount.
   // IMPORTANT: Do not "run once" via a ref guard here.

@@ -31,7 +31,10 @@ export function GraphControls({
   return (
     <Panel position="bottom-left" className="flex flex-col gap-2">
       <TooltipProvider delayDuration={200}>
-        <div className="flex flex-col gap-1 p-1.5 rounded-lg bg-popover/90 backdrop-blur-sm border border-border shadow-lg text-popover-foreground">
+        <div
+          className="flex flex-col gap-1 p-1.5 rounded-lg backdrop-blur-sm border border-border shadow-lg text-popover-foreground"
+          style={{ backgroundColor: 'color-mix(in oklch, var(--popover) 90%, transparent)' }}
+        >
           {/* Zoom controls */}
           <Tooltip>
             <TooltipTrigger asChild>

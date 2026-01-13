@@ -18,6 +18,11 @@ export interface TaskNodeData extends Feature {
   isMatched?: boolean;
   isHighlighted?: boolean;
   isDimmed?: boolean;
+  // Background/theme settings
+  cardOpacity?: number;
+  cardGlassmorphism?: boolean;
+  cardBorderEnabled?: boolean;
+  cardBorderOpacity?: number;
   // Action callbacks
   onViewLogs?: () => void;
   onViewDetails?: () => void;
@@ -48,11 +53,19 @@ export interface NodeActionCallbacks {
   onDeleteDependency?: (sourceId: string, targetId: string) => void;
 }
 
+interface BackgroundSettings {
+  cardOpacity: number;
+  cardGlassmorphism: boolean;
+  cardBorderEnabled: boolean;
+  cardBorderOpacity: number;
+}
+
 interface UseGraphNodesProps {
   features: Feature[];
   runningAutoTasks: string[];
   filterResult?: GraphFilterResult;
   actionCallbacks?: NodeActionCallbacks;
+  backgroundSettings?: BackgroundSettings;
 }
 
 /**
@@ -64,6 +77,7 @@ export function useGraphNodes({
   runningAutoTasks,
   filterResult,
   actionCallbacks,
+  backgroundSettings,
 }: UseGraphNodesProps) {
   const { nodes, edges } = useMemo(() => {
     const nodeList: TaskNode[] = [];
@@ -102,6 +116,11 @@ export function useGraphNodes({
           isMatched,
           isHighlighted,
           isDimmed,
+          // Background/theme settings
+          cardOpacity: backgroundSettings?.cardOpacity,
+          cardGlassmorphism: backgroundSettings?.cardGlassmorphism,
+          cardBorderEnabled: backgroundSettings?.cardBorderEnabled,
+          cardBorderOpacity: backgroundSettings?.cardBorderOpacity,
           // Action callbacks (bound to this feature's ID)
           onViewLogs: actionCallbacks?.onViewLogs
             ? () => actionCallbacks.onViewLogs!(feature.id)
@@ -163,7 +182,7 @@ export function useGraphNodes({
     });
 
     return { nodes: nodeList, edges: edgeList };
-  }, [features, runningAutoTasks, filterResult, actionCallbacks]);
+  }, [features, runningAutoTasks, filterResult, actionCallbacks, backgroundSettings]);
 
   return { nodes, edges };
 }

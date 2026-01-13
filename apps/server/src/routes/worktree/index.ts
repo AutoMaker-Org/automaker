@@ -3,6 +3,7 @@
  */
 
 import { Router } from 'express';
+import type { EventEmitter } from '../../lib/events.js';
 import { validatePathParams } from '../../middleware/validate-paths.js';
 import { requireValidWorktree, requireValidProject, requireGitRepoOnly } from './middleware.js';
 import { createInfoHandler } from './routes/info.js';
@@ -24,14 +25,22 @@ import { createSwitchBranchHandler } from './routes/switch-branch.js';
 import {
   createOpenInEditorHandler,
   createGetDefaultEditorHandler,
+  createGetAvailableEditorsHandler,
+  createRefreshEditorsHandler,
 } from './routes/open-in-editor.js';
 import { createInitGitHandler } from './routes/init-git.js';
 import { createMigrateHandler } from './routes/migrate.js';
 import { createStartDevHandler } from './routes/start-dev.js';
 import { createStopDevHandler } from './routes/stop-dev.js';
 import { createListDevServersHandler } from './routes/list-dev-servers.js';
+import {
+  createGetInitScriptHandler,
+  createPutInitScriptHandler,
+  createDeleteInitScriptHandler,
+  createRunInitScriptHandler,
+} from './routes/init-script.js';
 
-export function createWorktreeRoutes(): Router {
+export function createWorktreeRoutes(events: EventEmitter): Router {
   const router = Router();
 
   router.post('/info', validatePathParams('projectPath'), createInfoHandler());
@@ -45,7 +54,7 @@ export function createWorktreeRoutes(): Router {
     requireValidProject,
     createMergeHandler()
   );
-  router.post('/create', validatePathParams('projectPath'), createCreateHandler());
+  router.post('/create', validatePathParams('projectPath'), createCreateHandler(events));
   router.post('/delete', validatePathParams('projectPath', 'worktreePath'), createDeleteHandler());
   router.post('/create-pr', createCreatePRHandler());
   router.post('/pr-info', createPRInfoHandler());
@@ -77,6 +86,8 @@ export function createWorktreeRoutes(): Router {
   router.post('/switch-branch', requireValidWorktree, createSwitchBranchHandler());
   router.post('/open-in-editor', validatePathParams('worktreePath'), createOpenInEditorHandler());
   router.get('/default-editor', createGetDefaultEditorHandler());
+  router.get('/available-editors', createGetAvailableEditorsHandler());
+  router.post('/refresh-editors', createRefreshEditorsHandler());
   router.post('/init-git', validatePathParams('projectPath'), createInitGitHandler());
   router.post('/migrate', createMigrateHandler());
   router.post(
@@ -86,6 +97,16 @@ export function createWorktreeRoutes(): Router {
   );
   router.post('/stop-dev', createStopDevHandler());
   router.post('/list-dev-servers', createListDevServersHandler());
+
+  // Init script routes
+  router.get('/init-script', createGetInitScriptHandler());
+  router.put('/init-script', validatePathParams('projectPath'), createPutInitScriptHandler());
+  router.delete('/init-script', validatePathParams('projectPath'), createDeleteInitScriptHandler());
+  router.post(
+    '/run-init-script',
+    validatePathParams('projectPath', 'worktreePath'),
+    createRunInitScriptHandler(events)
+  );
 
   return router;
 }

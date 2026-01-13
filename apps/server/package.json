@@ -1,6 +1,6 @@
 {
   "name": "@automaker/server",
-  "version": "0.9.0",
+  "version": "0.10.0",
   "description": "Backend server for Automaker - provides API for both web and Electron modes",
   "author": "AutoMaker Team",
   "license": "SEE LICENSE IN LICENSE",

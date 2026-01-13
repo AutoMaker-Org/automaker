@@ -431,6 +431,16 @@ export function PromptCustomizationSection({
                   updatePrompt('enhancement', 'acceptanceSystemPrompt', value)
                 }
               />
+
+              <PromptField
+                label="User Experience Mode"
+                description="Review and enhance from a user experience and design perspective"
+                defaultValue={DEFAULT_ENHANCEMENT_PROMPTS.uxReviewerSystemPrompt}
+                customValue={promptCustomization?.enhancement?.uxReviewerSystemPrompt}
+                onCustomValueChange={(value) =>
+                  updatePrompt('enhancement', 'uxReviewerSystemPrompt', value)
+                }
+              />
             </div>
           </TabsContent>
         </Tabs>

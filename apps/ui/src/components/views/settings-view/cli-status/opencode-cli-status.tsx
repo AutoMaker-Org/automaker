@@ -1,7 +1,39 @@
 import { Button } from '@/components/ui/button';
-import { CheckCircle2, AlertCircle, RefreshCw, XCircle, Bot } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { CheckCircle2, AlertCircle, RefreshCw, Bot, Cloud } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { CliStatus } from '../shared/types';
+import { OpenCodeIcon } from '@/components/ui/provider-icon';
+
+export interface OpenCodeProviderInfo {
+  id: string;
+  name: string;
+  authenticated: boolean;
+  authMethod?: 'oauth' | 'api_key';
+}
+
+/**
+ * Provider display configuration
+ */
+const PROVIDER_DISPLAY: Record<string, string> = {
+  copilot: 'GitHub Copilot',
+  'github-copilot': 'GitHub Copilot',
+  anthropic: 'Anthropic',
+  openai: 'OpenAI',
+  openrouter: 'OpenRouter',
+  google: 'Google AI',
+  'amazon-bedrock': 'AWS Bedrock',
+  azure: 'Azure OpenAI',
+  ollama: 'Ollama',
+  lmstudio: 'LM Studio',
+  opencode: 'OpenCode',
+  xai: 'xAI',
+  deepseek: 'DeepSeek',
+};
+
+function getProviderDisplayName(provider: OpenCodeProviderInfo): string {
+  return PROVIDER_DISPLAY[provider.id] || provider.name || provider.id;
+}
 
 export type OpencodeAuthMethod =
   | 'api_key_env' // ANTHROPIC_API_KEY or other provider env vars
@@ -37,6 +69,7 @@ function getAuthMethodLabel(method: OpencodeAuthMethod): string {
 interface OpencodeCliStatusProps {
   status: CliStatus | null;
   authStatus?: OpencodeAuthStatus | null;
+  providers?: OpenCodeProviderInfo[];
   isChecking: boolean;
   onRefresh: () => void;
 }
@@ -151,9 +184,11 @@ export function OpencodeModelConfigSkeleton() {
 export function OpencodeCliStatus({
   status,
   authStatus,
+  providers = [],
   isChecking,
   onRefresh,
 }: OpencodeCliStatusProps) {
+  const authenticatedProviders = providers.filter((p) => p.authenticated);
   if (!status) return <OpencodeCliStatusSkeleton />;
 
   return (
@@ -169,7 +204,7 @@ export function OpencodeCliStatus({
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-brand-500/20 to-brand-600/10 flex items-center justify-center border border-brand-500/20">
-              <Bot className="w-5 h-5 text-brand-500" />
+              <OpenCodeIcon className="w-5 h-5 text-brand-500" />
             </div>
             <h2 className="text-lg font-semibold text-foreground tracking-tight">OpenCode CLI</h2>
           </div>
@@ -222,8 +257,8 @@ export function OpencodeCliStatus({
               </div>
             </div>
 
-            {/* Authentication Status */}
-            {authStatus?.authenticated ? (
+            {/* Authentication Status - consider both direct auth and provider auth */}
+            {authStatus?.authenticated || authenticatedProviders.length > 0 ? (
               <div className="flex items-center gap-3 p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
                 <div className="w-10 h-10 rounded-xl bg-emerald-500/15 flex items-center justify-center border border-emerald-500/20 shrink-0">
                   <CheckCircle2 className="w-5 h-5 text-emerald-500" />
@@ -231,24 +266,71 @@ export function OpencodeCliStatus({
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-emerald-400">Authenticated</p>
                   <div className="text-xs text-emerald-400/70 mt-1.5">
-                    <p>
-                      Method:{' '}
-                      <span className="font-mono">{getAuthMethodLabel(authStatus.method)}</span>
-                    </p>
+                    {authStatus?.authenticated && authStatus.method !== 'none' ? (
+                      <p>
+                        Method:{' '}
+                        <span className="font-mono">{getAuthMethodLabel(authStatus.method)}</span>
+                      </p>
+                    ) : authenticatedProviders.length > 0 ? (
+                      <p>
+                        Via {authenticatedProviders.length} connected provider
+                        {authenticatedProviders.length !== 1 ? 's' : ''}
+                      </p>
+                    ) : null}
                   </div>
                 </div>
               </div>
             ) : (
-              <div className="flex items-start gap-3 p-4 rounded-xl bg-amber-500/10 border border-amber-500/20">
-                <div className="w-10 h-10 rounded-xl bg-amber-500/15 flex items-center justify-center border border-amber-500/20 shrink-0 mt-0.5">
-                  <XCircle className="w-5 h-5 text-amber-500" />
+              <div className="flex items-start gap-3 p-4 rounded-xl bg-blue-500/10 border border-blue-500/20">
+                <div className="w-10 h-10 rounded-xl bg-blue-500/15 flex items-center justify-center border border-blue-500/20 shrink-0 mt-0.5">
+                  <Bot className="w-5 h-5 text-blue-500" />
                 </div>
                 <div className="flex-1">
-                  <p className="text-sm font-medium text-amber-400">Not Authenticated</p>
-                  <p className="text-xs text-amber-400/70 mt-1">
-                    Run{' '}
-                    <code className="font-mono bg-amber-500/10 px-1 rounded">opencode auth</code> or
-                    set an API key to authenticate.
+                  <p className="text-sm font-medium text-blue-400">OpenCode Free Tier Ready</p>
+                  <p className="text-xs text-blue-400/70 mt-1">
+                    Free OpenCode models work without login. Run{' '}
+                    <code className="font-mono bg-blue-500/10 px-1 rounded">
+                      opencode auth login
+                    </code>{' '}
+                    to connect providers like GitHub Copilot, Google AI, etc.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Dynamic Providers Connected */}
+            {authenticatedProviders.length > 0 && (
+              <div className="flex items-center gap-3 p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
+                <div className="w-10 h-10 rounded-xl bg-emerald-500/15 flex items-center justify-center border border-emerald-500/20 shrink-0">
+                  <Cloud className="w-5 h-5 text-emerald-500" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-emerald-400">
+                    {authenticatedProviders.length} Dynamic Provider
+                    {authenticatedProviders.length !== 1 ? 's' : ''} Connected
+                  </p>
+                  <div className="flex flex-wrap gap-1.5 mt-2">
+                    {authenticatedProviders.map((provider) => (
+                      <Badge
+                        key={provider.id}
+                        variant="outline"
+                        className="text-xs bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
+                      >
+                        {getProviderDisplayName(provider)}
+                        {provider.authMethod && (
+                          <span className="ml-1 text-emerald-400/60">
+                            ({provider.authMethod === 'oauth' ? 'OAuth' : 'Key'})
+                          </span>
+                        )}
+                      </Badge>
+                    ))}
+                  </div>
+                  <p className="text-xs text-emerald-400/60 mt-2">
+                    Use{' '}
+                    <code className="font-mono bg-emerald-500/10 px-1 rounded">
+                      opencode auth login
+                    </code>{' '}
+                    to add more providers.
                   </p>
                 </div>
               </div>

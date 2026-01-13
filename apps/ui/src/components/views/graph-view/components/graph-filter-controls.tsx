@@ -110,7 +110,10 @@ export function GraphFilterControls({
   return (
     <Panel position="top-left" className="flex items-center gap-2">
       <TooltipProvider delayDuration={200}>
-        <div className="flex items-center gap-2 p-2 rounded-lg bg-popover/90 backdrop-blur-sm border border-border shadow-lg text-popover-foreground">
+        <div
+          className="flex items-center gap-2 p-2 rounded-lg backdrop-blur-sm border border-border shadow-lg text-popover-foreground"
+          style={{ backgroundColor: 'color-mix(in oklch, var(--popover) 90%, transparent)' }}
+        >
           {/* Category Filter Dropdown */}
           <Popover>
             <Tooltip>

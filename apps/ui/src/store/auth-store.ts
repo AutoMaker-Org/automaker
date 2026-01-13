@@ -5,6 +5,8 @@ interface AuthState {
   authChecked: boolean;
   /** Whether the user is currently authenticated (web mode: valid session cookie) */
   isAuthenticated: boolean;
+  /** Whether settings have been loaded and hydrated from server */
+  settingsLoaded: boolean;
 }
 
 interface AuthActions {
@@ -15,15 +17,18 @@ interface AuthActions {
 const initialState: AuthState = {
   authChecked: false,
   isAuthenticated: false,
+  settingsLoaded: false,
 };
 
 /**
  * Web authentication state.
  *
- * Intentionally NOT persisted: source of truth is the server session cookie.
+ * Intentionally NOT persisted: source of truth is server session cookie.
  */
 export const useAuthStore = create<AuthState & AuthActions>((set) => ({
   ...initialState,
-  setAuthState: (state) => set(state),
+  setAuthState: (state) => {
+    set({ ...state });
+  },
   resetAuth: () => set(initialState),
 }));

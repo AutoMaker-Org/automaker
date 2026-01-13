@@ -19,7 +19,8 @@ export function useBoardPersistence({ currentProject }: UseBoardPersistenceProps
       featureId: string,
       updates: Partial<Feature>,
       descriptionHistorySource?: 'enhance' | 'edit',
-      enhancementMode?: 'improve' | 'technical' | 'simplify' | 'acceptance'
+      enhancementMode?: 'improve' | 'technical' | 'simplify' | 'acceptance' | 'ux-reviewer',
+      preEnhancementDescription?: string
     ) => {
       if (!currentProject) return;
 
@@ -35,7 +36,8 @@ export function useBoardPersistence({ currentProject }: UseBoardPersistenceProps
           featureId,
           updates,
           descriptionHistorySource,
-          enhancementMode
+          enhancementMode,
+          preEnhancementDescription
         );
         if (result.success && result.feature) {
           updateFeature(result.feature.id, result.feature);

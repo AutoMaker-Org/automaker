@@ -17,7 +17,6 @@ interface WorktreeTabProps {
   isActivating: boolean;
   isDevServerRunning: boolean;
   devServerInfo?: DevServerInfo;
-  defaultEditorName: string;
   branches: BranchInfo[];
   filteredBranches: BranchInfo[];
   branchFilter: string;
@@ -37,7 +36,7 @@ interface WorktreeTabProps {
   onCreateBranch: (worktree: WorktreeInfo) => void;
   onPull: (worktree: WorktreeInfo) => void;
   onPush: (worktree: WorktreeInfo) => void;
-  onOpenInEditor: (worktree: WorktreeInfo) => void;
+  onOpenInEditor: (worktree: WorktreeInfo, editorCommand?: string) => void;
   onCommit: (worktree: WorktreeInfo) => void;
   onCreatePR: (worktree: WorktreeInfo) => void;
   onAddressPRComments: (worktree: WorktreeInfo, prInfo: PRInfo) => void;
@@ -46,6 +45,8 @@ interface WorktreeTabProps {
   onStartDevServer: (worktree: WorktreeInfo) => void;
   onStopDevServer: (worktree: WorktreeInfo) => void;
   onOpenDevServerUrl: (worktree: WorktreeInfo) => void;
+  onRunInitScript: (worktree: WorktreeInfo) => void;
+  hasInitScript: boolean;
 }
 
 export function WorktreeTab({
@@ -58,7 +59,6 @@ export function WorktreeTab({
   isActivating,
   isDevServerRunning,
   devServerInfo,
-  defaultEditorName,
   branches,
   filteredBranches,
   branchFilter,
@@ -87,6 +87,8 @@ export function WorktreeTab({
   onStartDevServer,
   onStopDevServer,
   onOpenDevServerUrl,
+  onRunInitScript,
+  hasInitScript,
 }: WorktreeTabProps) {
   let prBadge: JSX.Element | null = null;
   if (worktree.pr) {
@@ -315,7 +317,6 @@ export function WorktreeTab({
       <WorktreeActionsDropdown
         worktree={worktree}
         isSelected={isSelected}
-        defaultEditorName={defaultEditorName}
         aheadCount={aheadCount}
         behindCount={behindCount}
         isPulling={isPulling}
@@ -336,6 +337,8 @@ export function WorktreeTab({
         onStartDevServer={onStartDevServer}
         onStopDevServer={onStopDevServer}
         onOpenDevServerUrl={onOpenDevServerUrl}
+        onRunInitScript={onRunInitScript}
+        hasInitScript={hasInitScript}
       />
     </div>
   );

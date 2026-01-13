@@ -5,59 +5,61 @@ import {
   getSpecRegenerationStatus,
 } from '@/routes/app-spec/common.js';
 
+const TEST_PROJECT_PATH = '/tmp/automaker-test-project';
+
 describe('app-spec/common.ts', () => {
   beforeEach(() => {
     // Reset state before each test
-    setRunningState(false, null);
+    setRunningState(TEST_PROJECT_PATH, false, null);
   });
 
   describe('setRunningState', () => {
     it('should set isRunning to true when running is true', () => {
-      setRunningState(true);
-      expect(getSpecRegenerationStatus().isRunning).toBe(true);
+      setRunningState(TEST_PROJECT_PATH, true);
+      expect(getSpecRegenerationStatus(TEST_PROJECT_PATH).isRunning).toBe(true);
     });
 
     it('should set isRunning to false when running is false', () => {
-      setRunningState(true);
-      setRunningState(false);
-      expect(getSpecRegenerationStatus().isRunning).toBe(false);
+      setRunningState(TEST_PROJECT_PATH, true);
+      setRunningState(TEST_PROJECT_PATH, false);
+      expect(getSpecRegenerationStatus(TEST_PROJECT_PATH).isRunning).toBe(false);
     });
 
     it('should set currentAbortController when provided', () => {
       const controller = new AbortController();
-      setRunningState(true, controller);
-      expect(getSpecRegenerationStatus().currentAbortController).toBe(controller);
+      setRunningState(TEST_PROJECT_PATH, true, controller);
+      expect(getSpecRegenerationStatus(TEST_PROJECT_PATH).currentAbortController).toBe(controller);
     });
 
     it('should set currentAbortController to null when not provided', () => {
       const controller = new AbortController();
-      setRunningState(true, controller);
-      setRunningState(false);
-      expect(getSpecRegenerationStatus().currentAbortController).toBe(null);
+      setRunningState(TEST_PROJECT_PATH, true, controller);
+      setRunningState(TEST_PROJECT_PATH, false);
+      expect(getSpecRegenerationStatus(TEST_PROJECT_PATH).currentAbortController).toBe(null);
     });
 
-    it('should set currentAbortController to null when explicitly passed null', () => {
+    it('should keep currentAbortController when explicitly passed null while running', () => {
       const controller = new AbortController();
-      setRunningState(true, controller);
-      setRunningState(true, null);
-      expect(getSpecRegenerationStatus().currentAbortController).toBe(null);
+      setRunningState(TEST_PROJECT_PATH, true, controller);
+      setRunningState(TEST_PROJECT_PATH, true, null);
+      expect(getSpecRegenerationStatus(TEST_PROJECT_PATH).currentAbortController).toBe(controller);
     });
 
     it('should update state multiple times correctly', () => {
       const controller1 = new AbortController();
       const controller2 = new AbortController();
 
-      setRunningState(true, controller1);
-      expect(getSpecRegenerationStatus().isRunning).toBe(true);
-      expect(getSpecRegenerationStatus().currentAbortController).toBe(controller1);
+      setRunningState(TEST_PROJECT_PATH, true, controller1);
+      expect(getSpecRegenerationStatus(TEST_PROJECT_PATH).isRunning).toBe(true);
+      expect(getSpecRegenerationStatus(TEST_PROJECT_PATH).currentAbortController).toBe(controller1);
 
-      setRunningState(true, controller2);
-      expect(getSpecRegenerationStatus().isRunning).toBe(true);
-      expect(getSpecRegenerationStatus().currentAbortController).toBe(controller2);
+      setRunningState(TEST_PROJECT_PATH, true, controller2);
+      expect(getSpecRegenerationStatus(TEST_PROJECT_PATH).isRunning).toBe(true);
+      expect(getSpecRegenerationStatus(TEST_PROJECT_PATH).currentAbortController).toBe(controller2);
 
-      setRunningState(false, null);
-      expect(getSpecRegenerationStatus().isRunning).toBe(false);
-      expect(getSpecRegenerationStatus().currentAbortController).toBe(null);
+      setRunningState(TEST_PROJECT_PATH, false, null);
+      expect(getSpecRegenerationStatus(TEST_PROJECT_PATH).isRunning).toBe(false);
+      expect(getSpecRegenerationStatus(TEST_PROJECT_PATH).currentAbortController).toBe(null);
     });
   });
 

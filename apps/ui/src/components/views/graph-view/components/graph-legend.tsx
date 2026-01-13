@@ -44,7 +44,10 @@ const legendItems = [
 export function GraphLegend() {
   return (
     <Panel position="bottom-right" className="pointer-events-none">
-      <div className="flex flex-wrap gap-3 p-2 rounded-lg bg-popover/90 backdrop-blur-sm border border-border shadow-lg pointer-events-auto text-popover-foreground">
+      <div
+        className="flex flex-wrap gap-3 p-2 rounded-lg backdrop-blur-sm border border-border shadow-lg pointer-events-auto text-popover-foreground"
+        style={{ backgroundColor: 'color-mix(in oklch, var(--popover) 90%, transparent)' }}
+      >
         {legendItems.map((item) => {
           const Icon = item.icon;
           return (

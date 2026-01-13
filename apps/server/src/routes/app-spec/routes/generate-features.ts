@@ -40,17 +40,17 @@ export function createGenerateFeaturesHandler(
         return;
       }
 
-      const { isRunning } = getSpecRegenerationStatus();
+      const { isRunning } = getSpecRegenerationStatus(projectPath);
       if (isRunning) {
-        logger.warn('Generation already running, rejecting request');
-        res.json({ success: false, error: 'Generation already running' });
+        logger.warn('Generation already running for project:', projectPath);
+        res.json({ success: false, error: 'Generation already running for this project' });
         return;
       }
 
       logAuthStatus('Before starting feature generation');
 
       const abortController = new AbortController();
-      setRunningState(true, abortController);
+      setRunningState(projectPath, true, abortController);
       logger.info('Starting background feature generation task...');
 
       generateFeaturesFromSpec(projectPath, events, abortController, maxFeatures, settingsService)
@@ -63,7 +63,7 @@ export function createGenerateFeaturesHandler(
         })
         .finally(() => {
           logger.info('Feature generation task finished (success or error)');
-          setRunningState(false, null);
+          setRunningState(projectPath, false, null);
         });
 
       logger.info('Returning success response (generation running in background)');

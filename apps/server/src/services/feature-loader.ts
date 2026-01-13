@@ -308,13 +308,15 @@ export class FeatureLoader {
    * @param updates - Partial feature updates
    * @param descriptionHistorySource - Source of description change ('enhance' or 'edit')
    * @param enhancementMode - Enhancement mode if source is 'enhance'
+   * @param preEnhancementDescription - Description before enhancement (for restoring original)
    */
   async update(
     projectPath: string,
     featureId: string,
     updates: Partial<Feature>,
     descriptionHistorySource?: 'enhance' | 'edit',
-    enhancementMode?: 'improve' | 'technical' | 'simplify' | 'acceptance'
+    enhancementMode?: 'improve' | 'technical' | 'simplify' | 'acceptance' | 'ux-reviewer',
+    preEnhancementDescription?: string
   ): Promise<Feature> {
     const feature = await this.get(projectPath, featureId);
     if (!feature) {
@@ -338,9 +340,31 @@ export class FeatureLoader {
       updates.description !== feature.description &&
       updates.description.trim()
     ) {
+      const timestamp = new Date().toISOString();
+
+      // If this is an enhancement and we have the pre-enhancement description,
+      // add the original text to history first (so user can restore to it)
+      if (
+        descriptionHistorySource === 'enhance' &&
+        preEnhancementDescription &&
+        preEnhancementDescription.trim()
+      ) {
+        // Check if this pre-enhancement text is different from the last history entry
+        const lastEntry = updatedHistory[updatedHistory.length - 1];
+        if (!lastEntry || lastEntry.description !== preEnhancementDescription) {
+          const preEnhanceEntry: DescriptionHistoryEntry = {
+            description: preEnhancementDescription,
+            timestamp,
+            source: updatedHistory.length === 0 ? 'initial' : 'edit',
+          };
+          updatedHistory = [...updatedHistory, preEnhanceEntry];
+        }
+      }
+
+      // Add the new/enhanced description to history
       const historyEntry: DescriptionHistoryEntry = {
         description: updates.description,
-        timestamp: new Date().toISOString(),
+        timestamp,
         source: descriptionHistorySource || 'edit',
         ...(descriptionHistorySource === 'enhance' && enhancementMode ? { enhancementMode } : {}),
       };

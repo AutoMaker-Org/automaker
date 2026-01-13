@@ -25,6 +25,12 @@ import { createAuthOpencodeHandler } from './routes/auth-opencode.js';
 import { createDeauthOpencodeHandler } from './routes/deauth-opencode.js';
 import { createOpencodeStatusHandler } from './routes/opencode-status.js';
 import {
+  createGetOpencodeModelsHandler,
+  createRefreshOpencodeModelsHandler,
+  createGetOpencodeProvidersHandler,
+  createClearOpencodeCacheHandler,
+} from './routes/opencode-models.js';
+import {
   createGetCursorConfigHandler,
   createSetCursorDefaultModelHandler,
   createSetCursorModelsHandler,
@@ -65,6 +71,12 @@ export function createSetupRoutes(): Router {
   router.get('/opencode-status', createOpencodeStatusHandler());
   router.post('/auth-opencode', createAuthOpencodeHandler());
   router.post('/deauth-opencode', createDeauthOpencodeHandler());
+
+  // OpenCode Dynamic Model Discovery routes
+  router.get('/opencode/models', createGetOpencodeModelsHandler());
+  router.post('/opencode/models/refresh', createRefreshOpencodeModelsHandler());
+  router.get('/opencode/providers', createGetOpencodeProvidersHandler());
+  router.post('/opencode/cache/clear', createClearOpencodeCacheHandler());
   router.get('/cursor-config', createGetCursorConfigHandler());
   router.post('/cursor-config/default-model', createSetCursorDefaultModelHandler());
   router.post('/cursor-config/models', createSetCursorModelsHandler());

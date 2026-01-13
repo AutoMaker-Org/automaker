@@ -1,12 +1,8 @@
-import { type CodexCreditsSnapshot, type CodexPlanType } from '@/store/app-store';
+import { type CodexPlanType } from '@/store/app-store';
 
 const WINDOW_DEFAULT_LABEL = 'Usage window';
 const RESET_LABEL = 'Resets';
 const UNKNOWN_LABEL = 'Unknown';
-const UNAVAILABLE_LABEL = 'Unavailable';
-const UNLIMITED_LABEL = 'Unlimited';
-const AVAILABLE_LABEL = 'Available';
-const NONE_LABEL = 'None';
 const DAY_UNIT = 'day';
 const HOUR_UNIT = 'hour';
 const MINUTE_UNIT = 'min';
@@ -76,11 +72,4 @@ export function formatCodexResetTime(resetsAt: number | null): string | null {
 export function formatCodexPlanType(plan: CodexPlanType | null): string {
   if (!plan) return UNKNOWN_LABEL;
   return PLAN_TYPE_LABELS[plan] ?? plan;
-}
-
-export function formatCodexCredits(snapshot: CodexCreditsSnapshot | null): string {
-  if (!snapshot) return UNAVAILABLE_LABEL;
-  if (snapshot.unlimited) return UNLIMITED_LABEL;
-  if (snapshot.balance) return snapshot.balance;
-  return snapshot.hasCredits ? AVAILABLE_LABEL : NONE_LABEL;
 }
