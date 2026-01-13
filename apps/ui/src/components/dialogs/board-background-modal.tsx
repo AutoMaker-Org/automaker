@@ -15,7 +15,11 @@ import { Slider } from '@/components/ui/slider';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils';
-import { useAppStore, defaultBackgroundSettings } from '@/store/app-store';
+import { useAppStore } from '@/store/app-store';
+import {
+  useBoardSettingsStore,
+  defaultBoardBackgroundSettings,
+} from '@/store/board-settings-store';
 import { getHttpApiClient } from '@/lib/http-api-client';
 import { getAuthenticatedImageUrl } from '@/lib/api-fetch';
 import { useBoardBackgroundSettings } from '@/hooks/use-board-background-settings';
@@ -33,7 +37,8 @@ interface BoardBackgroundModalProps {
 }
 
 export function BoardBackgroundModal({ open, onOpenChange }: BoardBackgroundModalProps) {
-  const { currentProject, boardBackgroundByProject } = useAppStore();
+  const currentProject = useAppStore((state) => state.currentProject);
+  const boardBackgroundByProject = useBoardSettingsStore((state) => state.boardBackgroundByProject);
   const {
     setBoardBackground,
     setCardOpacity,
@@ -52,7 +57,8 @@ export function BoardBackgroundModal({ open, onOpenChange }: BoardBackgroundModa
 
   // Get current background settings (live from store)
   const backgroundSettings =
-    (currentProject && boardBackgroundByProject[currentProject.path]) || defaultBackgroundSettings;
+    (currentProject && boardBackgroundByProject[currentProject.path]) ||
+    defaultBoardBackgroundSettings;
 
   const cardOpacity = backgroundSettings.cardOpacity;
   const columnOpacity = backgroundSettings.columnOpacity;

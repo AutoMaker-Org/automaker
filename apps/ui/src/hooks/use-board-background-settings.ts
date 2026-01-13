@@ -1,6 +1,9 @@
 import { useCallback } from 'react';
 import { createLogger } from '@automaker/utils/logger';
-import { useAppStore } from '@/store/app-store';
+import {
+  useBoardSettingsStore,
+  defaultBoardBackgroundSettings,
+} from '@/store/board-settings-store';
 import { getHttpApiClient } from '@/lib/http-api-client';
 import { toast } from 'sonner';
 
@@ -10,7 +13,18 @@ const logger = createLogger('BoardBackground');
  * Hook for managing board background settings with automatic persistence to server
  */
 export function useBoardBackgroundSettings() {
-  const store = useAppStore();
+  const boardBackgroundByProject = useBoardSettingsStore((state) => state.boardBackgroundByProject);
+  const setBoardBackgroundState = useBoardSettingsStore((state) => state.setBoardBackground);
+  const setCardOpacityState = useBoardSettingsStore((state) => state.setCardOpacity);
+  const setColumnOpacityState = useBoardSettingsStore((state) => state.setColumnOpacity);
+  const setColumnBorderEnabledState = useBoardSettingsStore(
+    (state) => state.setColumnBorderEnabled
+  );
+  const setCardGlassmorphismState = useBoardSettingsStore((state) => state.setCardGlassmorphism);
+  const setCardBorderEnabledState = useBoardSettingsStore((state) => state.setCardBorderEnabled);
+  const setCardBorderOpacityState = useBoardSettingsStore((state) => state.setCardBorderOpacity);
+  const setHideScrollbarState = useBoardSettingsStore((state) => state.setHideScrollbar);
+  const clearBoardBackgroundState = useBoardSettingsStore((state) => state.clearBoardBackground);
   const httpClient = getHttpApiClient();
 
   // Helper to persist settings to server
@@ -36,21 +50,9 @@ export function useBoardBackgroundSettings() {
   // Get current background settings for a project
   const getCurrentSettings = useCallback(
     (projectPath: string) => {
-      const current = store.boardBackgroundByProject[projectPath];
-      return (
-        current || {
-          imagePath: null,
-          cardOpacity: 100,
-          columnOpacity: 100,
-          columnBorderEnabled: true,
-          cardGlassmorphism: true,
-          cardBorderEnabled: true,
-          cardBorderOpacity: 100,
-          hideScrollbar: false,
-        }
-      );
+      return boardBackgroundByProject[projectPath] || defaultBoardBackgroundSettings;
     },
-    [store.boardBackgroundByProject]
+    [boardBackgroundByProject]
   );
 
   // Persisting wrappers for store actions
@@ -67,106 +69,99 @@ export function useBoardBackgroundSettings() {
       };
 
       // Update local store
-      store.setBoardBackground(projectPath, imagePath);
+      setBoardBackgroundState(projectPath, imagePath);
 
       // Persist to server
       await persistSettings(projectPath, toUpdate);
     },
-    [store, persistSettings, getCurrentSettings]
+    [persistSettings, getCurrentSettings, setBoardBackgroundState]
   );
 
   const setCardOpacity = useCallback(
     async (projectPath: string, opacity: number) => {
       const current = getCurrentSettings(projectPath);
-      store.setCardOpacity(projectPath, opacity);
+      setCardOpacityState(projectPath, opacity);
       await persistSettings(projectPath, { ...current, cardOpacity: opacity });
     },
-    [store, persistSettings, getCurrentSettings]
+    [persistSettings, getCurrentSettings, setCardOpacityState]
   );
 
   const setColumnOpacity = useCallback(
     async (projectPath: string, opacity: number) => {
       const current = getCurrentSettings(projectPath);
-      store.setColumnOpacity(projectPath, opacity);
+      setColumnOpacityState(projectPath, opacity);
       await persistSettings(projectPath, { ...current, columnOpacity: opacity });
     },
-    [store, persistSettings, getCurrentSettings]
+    [persistSettings, getCurrentSettings, setColumnOpacityState]
   );
 
   const setColumnBorderEnabled = useCallback(
     async (projectPath: string, enabled: boolean) => {
       const current = getCurrentSettings(projectPath);
-      store.setColumnBorderEnabled(projectPath, enabled);
+      setColumnBorderEnabledState(projectPath, enabled);
       await persistSettings(projectPath, {
         ...current,
         columnBorderEnabled: enabled,
       });
     },
-    [store, persistSettings, getCurrentSettings]
+    [persistSettings, getCurrentSettings, setColumnBorderEnabledState]
   );
 
   const setCardGlassmorphism = useCallback(
     async (projectPath: string, enabled: boolean) => {
       const current = getCurrentSettings(projectPath);
-      store.setCardGlassmorphism(projectPath, enabled);
+      setCardGlassmorphismState(projectPath, enabled);
       await persistSettings(projectPath, {
         ...current,
         cardGlassmorphism: enabled,
       });
     },
-    [store, persistSettings, getCurrentSettings]
+    [persistSettings, getCurrentSettings, setCardGlassmorphismState]
   );
 
   const setCardBorderEnabled = useCallback(
     async (projectPath: string, enabled: boolean) => {
       const current = getCurrentSettings(projectPath);
-      store.setCardBorderEnabled(projectPath, enabled);
+      setCardBorderEnabledState(projectPath, enabled);
       await persistSettings(projectPath, {
         ...current,
         cardBorderEnabled: enabled,
       });
     },
-    [store, persistSettings, getCurrentSettings]
+    [persistSettings, getCurrentSettings, setCardBorderEnabledState]
   );
 
   const setCardBorderOpacity = useCallback(
     async (projectPath: string, opacity: number) => {
       const current = getCurrentSettings(projectPath);
-      store.setCardBorderOpacity(projectPath, opacity);
+      setCardBorderOpacityState(projectPath, opacity);
       await persistSettings(projectPath, {
         ...current,
         cardBorderOpacity: opacity,
       });
     },
-    [store, persistSettings, getCurrentSettings]
+    [persistSettings, getCurrentSettings, setCardBorderOpacityState]
   );
 
   const setHideScrollbar = useCallback(
     async (projectPath: string, hide: boolean) => {
       const current = getCurrentSettings(projectPath);
-      store.setHideScrollbar(projectPath, hide);
+      setHideScrollbarState(projectPath, hide);
       await persistSettings(projectPath, { ...current, hideScrollbar: hide });
     },
-    [store, persistSettings, getCurrentSettings]
+    [persistSettings, getCurrentSettings, setHideScrollbarState]
   );
 
   const clearBoardBackground = useCallback(
     async (projectPath: string) => {
-      store.clearBoardBackground(projectPath);
+      clearBoardBackgroundState(projectPath);
       // Clear the boardBackground settings
       await persistSettings(projectPath, {
-        imagePath: null,
+        ...defaultBoardBackgroundSettings,
         imageVersion: undefined,
-        cardOpacity: 100,
-        columnOpacity: 100,
-        columnBorderEnabled: true,
-        cardGlassmorphism: true,
-        cardBorderEnabled: true,
-        cardBorderOpacity: 100,
-        hideScrollbar: false,
       });
     },
-    [store, persistSettings]
+    [clearBoardBackgroundState, persistSettings]
   );
 
   return {

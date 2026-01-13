@@ -282,6 +282,11 @@ export function BoardView() {
   const handleViewPlanFeatureClose = useCallback(() => setViewPlanFeature(null), []);
   const handleViewPlanApprove = useCallback(() => setViewPlanFeature(null), []);
   const handleViewPlanReject = useCallback(() => setViewPlanFeature(null), []);
+  const handleViewPlanDialogOpenChange = useCallback((open: boolean) => {
+    if (!open) {
+      setViewPlanFeature(null);
+    }
+  }, []);
   const handleAddFeatureDialogOpenChange = useCallback((open: boolean) => {
     setShowAddDialog(open);
     if (!open) {
@@ -584,6 +589,17 @@ export function BoardView() {
     },
     currentWorktreeBranch,
   });
+
+  const handleOnDelete = useCallback(
+    (featureId: string) => handleDeleteFeature(featureId),
+    [handleDeleteFeature]
+  );
+  const handleDeleteCompletedFeatureConfirm = useCallback(async () => {
+    if (deleteCompletedFeature) {
+      await handleDeleteFeature(deleteCompletedFeature.id);
+      setDeleteCompletedFeature(null);
+    }
+  }, [deleteCompletedFeature, handleDeleteFeature]);
 
   // Handler for bulk updating multiple features
   const handleBulkUpdate = useCallback(
@@ -1442,12 +1458,7 @@ export function BoardView() {
         <DeleteCompletedFeatureDialog
           feature={deleteCompletedFeature}
           onClose={handleDeleteCompletedFeatureClose}
-          onConfirm={useCallback(async () => {
-            if (deleteCompletedFeature) {
-              await handleDeleteFeature(deleteCompletedFeature.id);
-              setDeleteCompletedFeature(null);
-            }
-          }, [deleteCompletedFeature])}
+          onConfirm={handleDeleteCompletedFeatureConfirm}
         />
 
         {/* Add Feature Dialog */}
@@ -1574,7 +1585,7 @@ export function BoardView() {
         {viewPlanFeature && viewPlanFeature.planSpec?.content && (
           <PlanApprovalDialog
             open={true}
-            onOpenChange={useCallback((open) => !open && setViewPlanFeature(null), [])}
+            onOpenChange={handleViewPlanDialogOpenChange}
             feature={viewPlanFeature}
             planContent={viewPlanFeature.planSpec.content}
             onApprove={handleViewPlanApprove}

@@ -1,5 +1,8 @@
 import { useMemo } from 'react';
-import { useAppStore, defaultBackgroundSettings } from '@/store/app-store';
+import {
+  useBoardSettingsStore,
+  defaultBoardBackgroundSettings,
+} from '@/store/board-settings-store';
 import { getAuthenticatedImageUrl } from '@/lib/api-fetch';
 
 interface UseBoardBackgroundProps {
@@ -7,12 +10,13 @@ interface UseBoardBackgroundProps {
 }
 
 export function useBoardBackground({ currentProject }: UseBoardBackgroundProps) {
-  const boardBackgroundByProject = useAppStore((state) => state.boardBackgroundByProject);
+  const boardBackgroundByProject = useBoardSettingsStore((state) => state.boardBackgroundByProject);
 
   // Get background settings for current project
   const backgroundSettings = useMemo(() => {
     return (
-      (currentProject && boardBackgroundByProject[currentProject.path]) || defaultBackgroundSettings
+      (currentProject && boardBackgroundByProject[currentProject.path]) ||
+      defaultBoardBackgroundSettings
     );
   }, [currentProject, boardBackgroundByProject]);
 

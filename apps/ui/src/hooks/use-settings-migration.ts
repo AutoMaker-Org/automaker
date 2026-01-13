@@ -27,6 +27,8 @@ import { createLogger } from '@automaker/utils/logger';
 import { getHttpApiClient, waitForApiKeyInit } from '@/lib/http-api-client';
 import { getItem, setItem } from '@/lib/storage';
 import { useAppStore, THEME_STORAGE_KEY } from '@/store/app-store';
+import { useProjectStore } from '@/store/project-store';
+import { useModelStore } from '@/store/model-store';
 import { useSetupStore } from '@/store/setup-store';
 import {
   DEFAULT_OPENCODE_MODEL,
@@ -503,6 +505,8 @@ export function useSettingsMigration(): MigrationState {
  */
 export function hydrateStoreFromSettings(settings: GlobalSettings): void {
   const current = useAppStore.getState();
+  const currentProjects = useProjectStore.getState();
+  const currentModels = useModelStore.getState();
   const validOpencodeModelIds = new Set(getAllOpencodeModelIds());
   const incomingEnabledOpencodeModels =
     settings.enabledOpencodeModels ?? current.enabledOpencodeModels;
@@ -589,6 +593,32 @@ export function hydrateStoreFromSettings(settings: GlobalSettings): void {
     worktreePanelCollapsed: settings.worktreePanelCollapsed ?? false,
     lastProjectDir: settings.lastProjectDir ?? '',
     recentFolders: settings.recentFolders ?? [],
+  });
+
+  useProjectStore.setState({
+    projects,
+    currentProject,
+    trashedProjects: settings.trashedProjects ?? currentProjects.trashedProjects,
+    projectHistory: settings.projectHistory ?? currentProjects.projectHistory,
+    projectHistoryIndex: settings.projectHistoryIndex ?? currentProjects.projectHistoryIndex,
+    lastProjectDir: settings.lastProjectDir ?? currentProjects.lastProjectDir,
+    recentFolders: settings.recentFolders ?? currentProjects.recentFolders,
+  });
+
+  useModelStore.setState({
+    enhancementModel: settings.enhancementModel ?? currentModels.enhancementModel,
+    validationModel: settings.validationModel ?? currentModels.validationModel,
+    phaseModels: settings.phaseModels ?? currentModels.phaseModels,
+    enabledCursorModels: settings.enabledCursorModels ?? currentModels.enabledCursorModels,
+    cursorDefaultModel: settings.cursorDefaultModel ?? currentModels.cursorDefaultModel,
+    enabledOpencodeModels: sanitizedEnabledOpencodeModels,
+    opencodeDefaultModel: sanitizedOpencodeDefaultModel,
+    enabledDynamicModelIds: sanitizedDynamicModelIds,
+    codexAutoLoadAgents: settings.codexAutoLoadAgents ?? currentModels.codexAutoLoadAgents,
+    codexSandboxMode: settings.codexSandboxMode ?? currentModels.codexSandboxMode,
+    codexApprovalPolicy: settings.codexApprovalPolicy ?? currentModels.codexApprovalPolicy,
+    codexEnableWebSearch: settings.codexEnableWebSearch ?? currentModels.codexEnableWebSearch,
+    codexEnableImages: settings.codexEnableImages ?? currentModels.codexEnableImages,
   });
 
   // Hydrate setup wizard state from global settings (API-backed)

@@ -38,7 +38,7 @@ export interface BoardSettingsActions {
 
 export type BoardSettingsStore = BoardSettingsState & BoardSettingsActions;
 
-const defaultBackgroundSettings: BoardBackground = {
+export const defaultBoardBackgroundSettings: BoardBackground = {
   imagePath: null,
   cardOpacity: 100,
   columnOpacity: 100,
@@ -59,7 +59,7 @@ export const useBoardSettingsStore = create<BoardSettingsStore>()((set, get) => 
   setBoardBackground: (projectPath, imagePath) => {
     const current = get().boardBackgroundByProject;
     const existing = current[projectPath] || {
-      ...defaultBackgroundSettings,
+      ...defaultBoardBackgroundSettings,
     };
     set({
       boardBackgroundByProject: {
@@ -76,7 +76,7 @@ export const useBoardSettingsStore = create<BoardSettingsStore>()((set, get) => 
 
   setCardOpacity: (projectPath, opacity) => {
     const current = get().boardBackgroundByProject;
-    const existing = current[projectPath] || defaultBackgroundSettings;
+    const existing = current[projectPath] || defaultBoardBackgroundSettings;
     set({
       boardBackgroundByProject: {
         ...current,
@@ -90,7 +90,7 @@ export const useBoardSettingsStore = create<BoardSettingsStore>()((set, get) => 
 
   setColumnOpacity: (projectPath, opacity) => {
     const current = get().boardBackgroundByProject;
-    const existing = current[projectPath] || defaultBackgroundSettings;
+    const existing = current[projectPath] || defaultBoardBackgroundSettings;
     set({
       boardBackgroundByProject: {
         ...current,
@@ -104,7 +104,7 @@ export const useBoardSettingsStore = create<BoardSettingsStore>()((set, get) => 
 
   setColumnBorderEnabled: (projectPath, enabled) => {
     const current = get().boardBackgroundByProject;
-    const existing = current[projectPath] || defaultBackgroundSettings;
+    const existing = current[projectPath] || defaultBoardBackgroundSettings;
     set({
       boardBackgroundByProject: {
         ...current,
@@ -118,7 +118,7 @@ export const useBoardSettingsStore = create<BoardSettingsStore>()((set, get) => 
 
   setCardGlassmorphism: (projectPath, enabled) => {
     const current = get().boardBackgroundByProject;
-    const existing = current[projectPath] || defaultBackgroundSettings;
+    const existing = current[projectPath] || defaultBoardBackgroundSettings;
     set({
       boardBackgroundByProject: {
         ...current,
@@ -132,7 +132,7 @@ export const useBoardSettingsStore = create<BoardSettingsStore>()((set, get) => 
 
   setCardBorderEnabled: (projectPath, enabled) => {
     const current = get().boardBackgroundByProject;
-    const existing = current[projectPath] || defaultBackgroundSettings;
+    const existing = current[projectPath] || defaultBoardBackgroundSettings;
     set({
       boardBackgroundByProject: {
         ...current,
@@ -146,7 +146,7 @@ export const useBoardSettingsStore = create<BoardSettingsStore>()((set, get) => 
 
   setCardBorderOpacity: (projectPath, opacity) => {
     const current = get().boardBackgroundByProject;
-    const existing = current[projectPath] || defaultBackgroundSettings;
+    const existing = current[projectPath] || defaultBoardBackgroundSettings;
     set({
       boardBackgroundByProject: {
         ...current,
@@ -160,7 +160,7 @@ export const useBoardSettingsStore = create<BoardSettingsStore>()((set, get) => 
 
   setHideScrollbar: (projectPath, hide) => {
     const current = get().boardBackgroundByProject;
-    const existing = current[projectPath] || defaultBackgroundSettings;
+    const existing = current[projectPath] || defaultBoardBackgroundSettings;
     set({
       boardBackgroundByProject: {
         ...current,
@@ -174,7 +174,7 @@ export const useBoardSettingsStore = create<BoardSettingsStore>()((set, get) => 
 
   clearBoardBackground: (projectPath) => {
     const current = get().boardBackgroundByProject;
-    const existing = current[projectPath] || defaultBackgroundSettings;
+    const existing = current[projectPath] || defaultBoardBackgroundSettings;
     set({
       boardBackgroundByProject: {
         ...current,
@@ -189,6 +189,6 @@ export const useBoardSettingsStore = create<BoardSettingsStore>()((set, get) => 
 
   getBoardBackground: (projectPath) => {
     const settings = get().boardBackgroundByProject[projectPath];
-    return settings || defaultBackgroundSettings;
+    return settings || defaultBoardBackgroundSettings;
   },
 }));
