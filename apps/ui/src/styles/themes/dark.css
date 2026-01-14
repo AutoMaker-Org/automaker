@@ -1,6 +1,6 @@
 /* Dark Theme */
 
-.dark {
+:root.dark {
   /* Deep dark backgrounds - zinc-950 family */
   --background: oklch(0.04 0 0); /* zinc-950 */
   --background-50: oklch(0.04 0 0 / 0.5); /* zinc-950/50 */

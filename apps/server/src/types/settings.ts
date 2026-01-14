@@ -7,13 +7,11 @@
 
 export type {
   ThemeMode,
-  KanbanCardDetailLevel,
   ModelAlias,
   PlanningMode,
   ThinkingLevel,
   ModelProvider,
   KeyboardShortcuts,
-  AIProfile,
   ProjectRef,
   TrashedProjectRef,
   ChatSessionRef,

@@ -37,7 +37,14 @@ jobs:
           git config --global user.email "ci@example.com"
 
       - name: Start backend server
-        run: npm run start --workspace=apps/server &
+        run: |
+          echo "Starting backend server..."
+          # Start server in background and save PID
+          npm run start --workspace=apps/server > backend.log 2>&1 &
+          SERVER_PID=$!
+          echo "Server started with PID: $SERVER_PID"
+          echo "SERVER_PID=$SERVER_PID" >> $GITHUB_ENV
+
         env:
           PORT: 3008
           NODE_ENV: test
@@ -53,21 +60,70 @@ jobs:
       - name: Wait for backend server
         run: |
           echo "Waiting for backend server to be ready..."
+
+          # Check if server process is running
+          if [ -z "$SERVER_PID" ]; then
+            echo "ERROR: Server PID not found in environment"
+            cat backend.log 2>/dev/null || echo "No backend log found"
+            exit 1
+          fi
+
+          # Check if process is actually running
+          if ! kill -0 $SERVER_PID 2>/dev/null; then
+            echo "ERROR: Server process $SERVER_PID is not running!"
+            echo "=== Backend logs ==="
+            cat backend.log
+            echo ""
+            echo "=== Recent system logs ==="
+            dmesg 2>/dev/null | tail -20 || echo "No dmesg available"
+            exit 1
+          fi
+
+          # Wait for health endpoint
           for i in {1..60}; do
             if curl -s -f http://localhost:3008/api/health > /dev/null 2>&1; then
               echo "Backend server is ready!"
-              curl -s http://localhost:3008/api/health | jq . 2>/dev/null || echo "Health check response: $(curl -s http://localhost:3008/api/health 2>/dev/null || echo 'No response')"
+              echo "=== Backend logs ==="
+              cat backend.log
+              echo ""
+              echo "Health check response:"
+              curl -s http://localhost:3008/api/health | jq . 2>/dev/null || echo "Health check: $(curl -s http://localhost:3008/api/health 2>/dev/null || echo 'No response')"
               exit 0
             fi
+            
+            # Check if server process is still running
+            if ! kill -0 $SERVER_PID 2>/dev/null; then
+              echo "ERROR: Server process died during wait!"
+              echo "=== Backend logs ==="
+              cat backend.log
+              exit 1
+            fi
+            
             echo "Waiting... ($i/60)"
             sleep 1
           done
-          echo "Backend server failed to start!"
-          echo "Checking server status..."
+
+          echo "ERROR: Backend server failed to start within 60 seconds!"
+          echo "=== Backend logs ==="
+          cat backend.log
+          echo ""
+          echo "=== Process status ==="
           ps aux | grep -E "(node|tsx)" | grep -v grep || echo "No node processes found"
+          echo ""
+          echo "=== Port status ==="
           netstat -tlnp 2>/dev/null | grep :3008 || echo "Port 3008 not listening"
-          echo "Testing health endpoint..."
+          lsof -i :3008 2>/dev/null || echo "lsof not available or port not in use"
+          echo ""
+          echo "=== Health endpoint test ==="
           curl -v http://localhost:3008/api/health 2>&1 || echo "Health endpoint failed"
+
+          # Kill the server process if it's still hanging
+          if kill -0 $SERVER_PID 2>/dev/null; then
+            echo ""
+            echo "Killing stuck server process..."
+            kill -9 $SERVER_PID 2>/dev/null || true
+          fi
+
           exit 1
 
       - name: Run E2E tests
@@ -80,6 +136,18 @@ jobs:
           VITE_SKIP_SETUP: 'true'
           # Keep UI-side login/defaults consistent
           AUTOMAKER_API_KEY: test-api-key-for-e2e-tests
+
+      - name: Print backend logs on failure
+        if: failure()
+        run: |
+          echo "=== E2E Tests Failed - Backend Logs ==="
+          cat backend.log 2>/dev/null || echo "No backend log found"
+          echo ""
+          echo "=== Process status at failure ==="
+          ps aux | grep -E "(node|tsx)" | grep -v grep || echo "No node processes found"
+          echo ""
+          echo "=== Port status ==="
+          netstat -tlnp 2>/dev/null | grep :3008 || echo "Port 3008 not listening"
 
       - name: Upload Playwright report
         uses: actions/upload-artifact@v4
@@ -98,3 +166,13 @@ jobs:
             apps/ui/test-results/
           retention-days: 7
           if-no-files-found: ignore
+
+      - name: Cleanup - Kill backend server
+        if: always()
+        run: |
+          if [ -n "$SERVER_PID" ]; then
+            echo "Cleaning up backend server (PID: $SERVER_PID)..."
+            kill $SERVER_PID 2>/dev/null || true
+            kill -9 $SERVER_PID 2>/dev/null || true
+            echo "Backend server cleanup complete"
+          fi

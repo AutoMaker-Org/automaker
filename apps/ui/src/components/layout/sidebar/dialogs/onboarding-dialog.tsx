@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import { Rocket, CheckCircle2, Zap, FileText, Sparkles, ArrowRight } from 'lucide-react';
 import {
   Dialog,
@@ -24,13 +25,25 @@ export function OnboardingDialog({
   onSkip,
   onGenerateSpec,
 }: OnboardingDialogProps) {
+  // Track if we're closing because user clicked "Generate App Spec"
+  // to avoid incorrectly calling onSkip
+  const isGeneratingRef = useRef(false);
+
+  const handleGenerateSpec = () => {
+    isGeneratingRef.current = true;
+    onGenerateSpec();
+  };
+
   return (
     <Dialog
       open={open}
       onOpenChange={(isOpen) => {
-        if (!isOpen) {
+        if (!isOpen && !isGeneratingRef.current) {
+          // Only call onSkip when user dismisses dialog (escape, click outside, or skip button)
+          // NOT when they click "Generate App Spec"
           onSkip();
         }
+        isGeneratingRef.current = false;
         onOpenChange(isOpen);
       }}
     >
@@ -108,7 +121,7 @@ export function OnboardingDialog({
             Skip for now
           </Button>
           <Button
-            onClick={onGenerateSpec}
+            onClick={handleGenerateSpec}
             className="bg-gradient-to-r from-brand-500 to-brand-600 hover:from-brand-600 hover:to-brand-600 text-white border-0"
           >
             <Sparkles className="w-4 h-4 mr-2" />

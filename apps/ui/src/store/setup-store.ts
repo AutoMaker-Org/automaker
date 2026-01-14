@@ -7,6 +7,7 @@ export interface CliStatus {
   path: string | null;
   version: string | null;
   method: string;
+  hasApiKey?: boolean;
   error?: string;
 }
 

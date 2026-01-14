@@ -17,6 +17,14 @@ import {
   type EnhancementMode,
 } from '@/lib/enhancement-prompts.js';
 
+const ENHANCEMENT_MODES: EnhancementMode[] = [
+  'improve',
+  'technical',
+  'simplify',
+  'acceptance',
+  'ux-reviewer',
+];
+
 describe('enhancement-prompts.ts', () => {
   describe('System Prompt Constants', () => {
     it('should have non-empty improve system prompt', () => {
@@ -184,8 +192,7 @@ describe('enhancement-prompts.ts', () => {
     });
 
     it('should work with all enhancement modes', () => {
-      const modes: EnhancementMode[] = ['improve', 'technical', 'simplify', 'acceptance'];
-      modes.forEach((mode) => {
+      ENHANCEMENT_MODES.forEach((mode) => {
         const prompt = buildUserPrompt(mode, testText);
         expect(prompt).toContain(testText);
         expect(prompt.length).toBeGreaterThan(100);
@@ -205,6 +212,7 @@ describe('enhancement-prompts.ts', () => {
       expect(isValidEnhancementMode('technical')).toBe(true);
       expect(isValidEnhancementMode('simplify')).toBe(true);
       expect(isValidEnhancementMode('acceptance')).toBe(true);
+      expect(isValidEnhancementMode('ux-reviewer')).toBe(true);
     });
 
     it('should return false for invalid modes', () => {
@@ -216,13 +224,12 @@ describe('enhancement-prompts.ts', () => {
   });
 
   describe('getAvailableEnhancementModes', () => {
-    it('should return all four enhancement modes', () => {
+    it('should return all enhancement modes', () => {
       const modes = getAvailableEnhancementModes();
-      expect(modes).toHaveLength(4);
-      expect(modes).toContain('improve');
-      expect(modes).toContain('technical');
-      expect(modes).toContain('simplify');
-      expect(modes).toContain('acceptance');
+      expect(modes).toHaveLength(ENHANCEMENT_MODES.length);
+      ENHANCEMENT_MODES.forEach((mode) => {
+        expect(modes).toContain(mode);
+      });
     });
 
     it('should return an array', () => {

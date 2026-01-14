@@ -84,11 +84,12 @@ const KEYBOARD_ROWS = [
 // Map shortcut names to human-readable labels
 const SHORTCUT_LABELS: Record<keyof KeyboardShortcuts, string> = {
   board: 'Kanban Board',
+  graph: 'Graph View',
   agent: 'Agent Runner',
   spec: 'Spec Editor',
   context: 'Context',
+  memory: 'Memory',
   settings: 'Settings',
-  profiles: 'AI Profiles',
   terminal: 'Terminal',
   ideation: 'Ideation',
   githubIssues: 'GitHub Issues',
@@ -102,7 +103,6 @@ const SHORTCUT_LABELS: Record<keyof KeyboardShortcuts, string> = {
   projectPicker: 'Project Picker',
   cyclePrevProject: 'Prev Project',
   cycleNextProject: 'Next Project',
-  addProfile: 'Add Profile',
   splitTerminalRight: 'Split Right',
   splitTerminalDown: 'Split Down',
   closeTerminal: 'Close Terminal',
@@ -112,11 +112,12 @@ const SHORTCUT_LABELS: Record<keyof KeyboardShortcuts, string> = {
 // Categorize shortcuts for color coding
 const SHORTCUT_CATEGORIES: Record<keyof KeyboardShortcuts, 'navigation' | 'ui' | 'action'> = {
   board: 'navigation',
+  graph: 'navigation',
   agent: 'navigation',
   spec: 'navigation',
   context: 'navigation',
+  memory: 'navigation',
   settings: 'navigation',
-  profiles: 'navigation',
   terminal: 'navigation',
   ideation: 'navigation',
   githubIssues: 'navigation',
@@ -130,7 +131,6 @@ const SHORTCUT_CATEGORIES: Record<keyof KeyboardShortcuts, 'navigation' | 'ui' |
   projectPicker: 'action',
   cyclePrevProject: 'action',
   cycleNextProject: 'action',
-  addProfile: 'action',
   splitTerminalRight: 'action',
   splitTerminalDown: 'action',
   closeTerminal: 'action',

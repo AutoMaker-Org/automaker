@@ -15,6 +15,7 @@ import { TerminalSection } from './settings-view/terminal/terminal-section';
 import { AudioSection } from './settings-view/audio/audio-section';
 import { KeyboardShortcutsSection } from './settings-view/keyboard-shortcuts/keyboard-shortcuts-section';
 import { FeatureDefaultsSection } from './settings-view/feature-defaults/feature-defaults-section';
+import { WorktreesSection } from './settings-view/worktrees';
 import { DangerZoneSection } from './settings-view/danger-zone/danger-zone-section';
 import { AccountSection } from './settings-view/account';
 import { SecuritySection } from './settings-view/security';
@@ -42,8 +43,6 @@ export function SettingsView() {
     setSkipVerificationInAutoMode,
     useWorktrees,
     setUseWorktrees,
-    showProfilesOnly,
-    setShowProfilesOnly,
     muteDoneSound,
     setMuteDoneSound,
     currentProject,
@@ -52,9 +51,6 @@ export function SettingsView() {
     setDefaultPlanningMode,
     defaultRequirePlanApproval,
     setDefaultRequirePlanApproval,
-    defaultAIProfileId,
-    setDefaultAIProfileId,
-    aiProfiles,
     autoLoadClaudeMd,
     setAutoLoadClaudeMd,
     promptCustomization,
@@ -151,24 +147,21 @@ export function SettingsView() {
       case 'defaults':
         return (
           <FeatureDefaultsSection
-            showProfilesOnly={showProfilesOnly}
             defaultSkipTests={defaultSkipTests}
             enableDependencyBlocking={enableDependencyBlocking}
             skipVerificationInAutoMode={skipVerificationInAutoMode}
-            useWorktrees={useWorktrees}
             defaultPlanningMode={defaultPlanningMode}
             defaultRequirePlanApproval={defaultRequirePlanApproval}
-            defaultAIProfileId={defaultAIProfileId}
-            aiProfiles={aiProfiles}
-            onShowProfilesOnlyChange={setShowProfilesOnly}
             onDefaultSkipTestsChange={setDefaultSkipTests}
             onEnableDependencyBlockingChange={setEnableDependencyBlocking}
             onSkipVerificationInAutoModeChange={setSkipVerificationInAutoMode}
-            onUseWorktreesChange={setUseWorktrees}
             onDefaultPlanningModeChange={setDefaultPlanningMode}
             onDefaultRequirePlanApprovalChange={setDefaultRequirePlanApproval}
-            onDefaultAIProfileIdChange={setDefaultAIProfileId}
           />
+        );
+      case 'worktrees':
+        return (
+          <WorktreesSection useWorktrees={useWorktrees} onUseWorktreesChange={setUseWorktrees} />
         );
       case 'account':
         return <AccountSection />;

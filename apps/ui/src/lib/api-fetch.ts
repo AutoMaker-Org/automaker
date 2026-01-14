@@ -13,6 +13,7 @@ import { getApiKey, getSessionToken, getServerUrlSync } from './http-api-client'
 
 // Server URL - uses shared cached URL from http-api-client
 const getServerUrl = (): string => getServerUrlSync();
+const DEFAULT_CACHE_MODE: RequestCache = 'no-store';
 
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
 
@@ -80,7 +81,7 @@ export async function apiFetch(
   method: HttpMethod = 'GET',
   options: ApiFetchOptions = {}
 ): Promise<Response> {
-  const { headers: additionalHeaders, body, skipAuth, ...restOptions } = options;
+  const { headers: additionalHeaders, body, skipAuth, cache, ...restOptions } = options;
 
   const headers = skipAuth
     ? { 'Content-Type': 'application/json', ...additionalHeaders }
@@ -90,6 +91,7 @@ export async function apiFetch(
     method,
     headers,
     credentials: 'include',
+    cache: cache ?? DEFAULT_CACHE_MODE,
     ...restOptions,
   };
 

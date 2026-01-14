@@ -12,19 +12,18 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { AlertCircle } from 'lucide-react';
 import { modelSupportsThinking } from '@/lib/utils';
-import { Feature, ModelAlias, ThinkingLevel, AIProfile, PlanningMode } from '@/store/app-store';
-import { ProfileSelect, TestingTabContent, PrioritySelect, PlanningModeSelect } from '../shared';
+import { Feature, ModelAlias, ThinkingLevel, PlanningMode } from '@/store/app-store';
+import { TestingTabContent, PrioritySelect, PlanningModeSelect } from '../shared';
 import { PhaseModelSelector } from '@/components/views/settings-view/model-defaults/phase-model-selector';
-import { isCursorModel, PROVIDER_PREFIXES, type PhaseModelEntry } from '@automaker/types';
+import { isCursorModel, isClaudeModel, type PhaseModelEntry } from '@automaker/types';
 import { cn } from '@/lib/utils';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface MassEditDialogProps {
   open: boolean;
   onClose: () => void;
   selectedFeatures: Feature[];
   onApply: (updates: Partial<Feature>) => Promise<void>;
-  showProfilesOnly: boolean;
-  aiProfiles: AIProfile[];
 }
 
 interface ApplyState {
@@ -98,14 +97,7 @@ function FieldWrapper({ label, isMixed, willApply, onApplyChange, children }: Fi
   );
 }
 
-export function MassEditDialog({
-  open,
-  onClose,
-  selectedFeatures,
-  onApply,
-  showProfilesOnly,
-  aiProfiles,
-}: MassEditDialogProps) {
+export function MassEditDialog({ open, onClose, selectedFeatures, onApply }: MassEditDialogProps) {
   const [isApplying, setIsApplying] = useState(false);
 
   // Track which fields to apply
@@ -149,26 +141,6 @@ export function MassEditDialog({
     }
   }, [open, selectedFeatures]);
 
-  const handleModelSelect = (newModel: string) => {
-    const isCursor = isCursorModel(newModel);
-    setModel(newModel as ModelAlias);
-    if (isCursor || !modelSupportsThinking(newModel)) {
-      setThinkingLevel('none');
-    }
-  };
-
-  const handleProfileSelect = (profile: AIProfile) => {
-    if (profile.provider === 'cursor') {
-      const cursorModel = `${PROVIDER_PREFIXES.cursor}${profile.cursorModel || 'auto'}`;
-      setModel(cursorModel as ModelAlias);
-      setThinkingLevel('none');
-    } else {
-      setModel((profile.model || 'sonnet') as ModelAlias);
-      setThinkingLevel(profile.thinkingLevel || 'none');
-    }
-    setApplyState((prev) => ({ ...prev, model: true, thinkingLevel: true }));
-  };
-
   const handleApply = async () => {
     const updates: Partial<Feature> = {};
 
@@ -196,6 +168,7 @@ export function MassEditDialog({
   const hasAnyApply = Object.values(applyState).some(Boolean);
   const isCurrentModelCursor = isCursorModel(model);
   const modelAllowsThinking = !isCurrentModelCursor && modelSupportsThinking(model);
+  const modelSupportsPlanningMode = isClaudeModel(model);
 
   return (
     <Dialog open={open} onOpenChange={(open) => !open && onClose()}>
@@ -208,29 +181,11 @@ export function MassEditDialog({
         </DialogHeader>
 
         <div className="py-4 pr-4 space-y-4 max-h-[60vh] overflow-y-auto">
-          {/* Quick Select Profile Section */}
-          {aiProfiles.length > 0 && (
-            <div className="space-y-2">
-              <Label className="text-sm font-medium">Quick Select Profile</Label>
-              <p className="text-xs text-muted-foreground mb-2">
-                Selecting a profile will automatically enable model settings
-              </p>
-              <ProfileSelect
-                profiles={aiProfiles}
-                selectedModel={model}
-                selectedThinkingLevel={thinkingLevel}
-                selectedCursorModel={isCurrentModelCursor ? model : undefined}
-                onSelect={handleProfileSelect}
-                testIdPrefix="mass-edit-profile"
-              />
-            </div>
-          )}
-
           {/* Model Selector */}
           <div className="space-y-2">
             <Label className="text-sm font-medium">AI Model</Label>
             <p className="text-xs text-muted-foreground mb-2">
-              Or select a specific model configuration
+              Select a specific model configuration
             </p>
             <PhaseModelSelector
               value={{ model, thinkingLevel }}
@@ -252,30 +207,64 @@ export function MassEditDialog({
           <div className="border-t border-border" />
 
           {/* Planning Mode */}
-          <FieldWrapper
-            label="Planning Mode"
-            isMixed={mixedValues.planningMode || mixedValues.requirePlanApproval}
-            willApply={applyState.planningMode || applyState.requirePlanApproval}
-            onApplyChange={(apply) =>
-              setApplyState((prev) => ({
-                ...prev,
-                planningMode: apply,
-                requirePlanApproval: apply,
-              }))
-            }
-          >
-            <PlanningModeSelect
-              mode={planningMode}
-              onModeChange={(newMode) => {
-                setPlanningMode(newMode);
-                // Auto-suggest approval based on mode, but user can override
-                setRequirePlanApproval(newMode === 'spec' || newMode === 'full');
-              }}
-              requireApproval={requirePlanApproval}
-              onRequireApprovalChange={setRequirePlanApproval}
-              testIdPrefix="mass-edit-planning"
-            />
-          </FieldWrapper>
+          {modelSupportsPlanningMode ? (
+            <FieldWrapper
+              label="Planning Mode"
+              isMixed={mixedValues.planningMode || mixedValues.requirePlanApproval}
+              willApply={applyState.planningMode || applyState.requirePlanApproval}
+              onApplyChange={(apply) =>
+                setApplyState((prev) => ({
+                  ...prev,
+                  planningMode: apply,
+                  requirePlanApproval: apply,
+                }))
+              }
+            >
+              <PlanningModeSelect
+                mode={planningMode}
+                onModeChange={(newMode) => {
+                  setPlanningMode(newMode);
+                  // Auto-suggest approval based on mode, but user can override
+                  setRequirePlanApproval(newMode === 'spec' || newMode === 'full');
+                }}
+                requireApproval={requirePlanApproval}
+                onRequireApprovalChange={setRequirePlanApproval}
+                testIdPrefix="mass-edit-planning"
+              />
+            </FieldWrapper>
+          ) : (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div
+                    className={cn(
+                      'p-3 rounded-lg border transition-colors border-border bg-muted/20 opacity-50 cursor-not-allowed'
+                    )}
+                  >
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <Checkbox checked={false} disabled className="opacity-50" />
+                        <Label className="text-sm font-medium text-muted-foreground">
+                          Planning Mode
+                        </Label>
+                      </div>
+                    </div>
+                    <div className="opacity-50 pointer-events-none">
+                      <PlanningModeSelect
+                        mode="skip"
+                        onModeChange={() => {}}
+                        testIdPrefix="mass-edit-planning"
+                        disabled
+                      />
+                    </div>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Planning modes are only available for Claude Provider</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
 
           {/* Priority */}
           <FieldWrapper

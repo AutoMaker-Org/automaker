@@ -129,10 +129,30 @@ export const TOOL_PRESETS = {
   specGeneration: ['Read', 'Glob', 'Grep'] as const,
 
   /** Full tool access for feature implementation */
-  fullAccess: ['Read', 'Write', 'Edit', 'Glob', 'Grep', 'Bash', 'WebSearch', 'WebFetch'] as const,
+  fullAccess: [
+    'Read',
+    'Write',
+    'Edit',
+    'Glob',
+    'Grep',
+    'Bash',
+    'WebSearch',
+    'WebFetch',
+    'TodoWrite',
+  ] as const,
 
   /** Tools for chat/interactive mode */
-  chat: ['Read', 'Write', 'Edit', 'Glob', 'Grep', 'Bash', 'WebSearch', 'WebFetch'] as const,
+  chat: [
+    'Read',
+    'Write',
+    'Edit',
+    'Glob',
+    'Grep',
+    'Bash',
+    'WebSearch',
+    'WebFetch',
+    'TodoWrite',
+  ] as const,
 } as const;
 
 /**

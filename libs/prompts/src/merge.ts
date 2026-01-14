@@ -113,6 +113,10 @@ export function mergeEnhancementPrompts(custom?: EnhancementPrompts): ResolvedEn
       custom?.acceptanceSystemPrompt,
       DEFAULT_ENHANCEMENT_PROMPTS.acceptanceSystemPrompt
     ),
+    uxReviewerSystemPrompt: resolvePrompt(
+      custom?.uxReviewerSystemPrompt,
+      DEFAULT_ENHANCEMENT_PROMPTS.uxReviewerSystemPrompt
+    ),
   };
 }
 

@@ -300,6 +300,17 @@ export type AutoModeEvent =
       featureId: string;
       projectPath?: string;
       phaseNumber: number;
+    }
+  | {
+      type: 'auto_mode_resuming_features';
+      message: string;
+      projectPath?: string;
+      featureIds: string[];
+      features: Array<{
+        id: string;
+        title?: string;
+        status?: string;
+      }>;
     };
 
 export type SpecRegenerationEvent =
@@ -356,15 +367,16 @@ export interface SpecRegenerationAPI {
     error?: string;
   }>;
 
-  stop: () => Promise<{
+  stop: (projectPath?: string) => Promise<{
     success: boolean;
     error?: string;
   }>;
 
-  status: () => Promise<{
+  status: (projectPath?: string) => Promise<{
     success: boolean;
     isRunning?: boolean;
     currentPhase?: string;
+    projectPath?: string;
     error?: string;
   }>;
 
@@ -872,7 +884,10 @@ export interface WorktreeAPI {
   }>;
 
   // Open a worktree directory in the editor
-  openInEditor: (worktreePath: string) => Promise<{
+  openInEditor: (
+    worktreePath: string,
+    editorCommand?: string
+  ) => Promise<{
     success: boolean;
     result?: {
       message: string;
@@ -891,6 +906,30 @@ export interface WorktreeAPI {
     error?: string;
   }>;
 
+  // Get all available code editors
+  getAvailableEditors: () => Promise<{
+    success: boolean;
+    result?: {
+      editors: Array<{
+        name: string;
+        command: string;
+      }>;
+    };
+    error?: string;
+  }>;
+
+  // Refresh editor cache and re-detect available editors
+  refreshEditors: () => Promise<{
+    success: boolean;
+    result?: {
+      editors: Array<{
+        name: string;
+        command: string;
+      }>;
+      message: string;
+    };
+    error?: string;
+  }>;
   // Initialize git repository in a project
   initGit: (projectPath: string) => Promise<{
     success: boolean;
@@ -976,6 +1015,50 @@ export interface WorktreeAPI {
     };
     error?: string;
   }>;
+
+  // Get init script content for a project
+  getInitScript: (projectPath: string) => Promise<{
+    success: boolean;
+    exists: boolean;
+    content: string;
+    path: string;
+    error?: string;
+  }>;
+
+  // Set init script content for a project
+  setInitScript: (
+    projectPath: string,
+    content: string
+  ) => Promise<{
+    success: boolean;
+    path?: string;
+    error?: string;
+  }>;
+
+  // Delete init script for a project
+  deleteInitScript: (projectPath: string) => Promise<{
+    success: boolean;
+    error?: string;
+  }>;
+
+  // Run (or re-run) init script for a worktree
+  runInitScript: (
+    projectPath: string,
+    worktreePath: string,
+    branch: string
+  ) => Promise<{
+    success: boolean;
+    message?: string;
+    error?: string;
+  }>;
+
+  // Subscribe to init script events
+  onInitScriptEvent: (
+    callback: (event: {
+      type: 'worktree:init-started' | 'worktree:init-output' | 'worktree:init-completed';
+      payload: unknown;
+    }) => void
+  ) => () => void;
 }
 
 export interface GitAPI {

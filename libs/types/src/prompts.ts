@@ -89,6 +89,9 @@ export interface EnhancementPrompts {
 
   /** System prompt for "acceptance" mode (add acceptance criteria) */
   acceptanceSystemPrompt?: CustomPrompt;
+
+  /** System prompt for "ux-reviewer" mode (UX and design perspective) */
+  uxReviewerSystemPrompt?: CustomPrompt;
 }
 
 /**
@@ -150,4 +153,5 @@ export interface ResolvedEnhancementPrompts {
   technicalSystemPrompt: string;
   simplifySystemPrompt: string;
   acceptanceSystemPrompt: string;
+  uxReviewerSystemPrompt: string;
 }

@@ -31,7 +31,13 @@ import {
 const logger = createLogger('AutoMode');
 import { resolveModelString, resolvePhaseModel, DEFAULT_MODELS } from '@automaker/model-resolver';
 import { resolveDependencies, areDependenciesSatisfied } from '@automaker/dependency-resolver';
-import { getFeatureDir, getAutomakerDir, getFeaturesDir } from '@automaker/platform';
+import {
+  getFeatureDir,
+  getAutomakerDir,
+  getFeaturesDir,
+  getExecutionStatePath,
+  ensureAutomakerDir,
+} from '@automaker/platform';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import path from 'path';
@@ -201,6 +207,29 @@ interface AutoModeConfig {
   projectPath: string;
 }
 
+/**
+ * Execution state for recovery after server restart
+ * Tracks which features were running and auto-loop configuration
+ */
+interface ExecutionState {
+  version: 1;
+  autoLoopWasRunning: boolean;
+  maxConcurrency: number;
+  projectPath: string;
+  runningFeatureIds: string[];
+  savedAt: string;
+}
+
+// Default empty execution state
+const DEFAULT_EXECUTION_STATE: ExecutionState = {
+  version: 1,
+  autoLoopWasRunning: false,
+  maxConcurrency: 3,
+  projectPath: '',
+  runningFeatureIds: [],
+  savedAt: '',
+};
+
 // Constants for consecutive failure tracking
 const CONSECUTIVE_FAILURE_THRESHOLD = 3; // Pause after 3 consecutive failures
 const FAILURE_WINDOW_MS = 60000; // Failures within 1 minute count as consecutive
@@ -322,6 +351,9 @@ export class AutoModeService {
       projectPath,
     });
 
+    // Save execution state for recovery after restart
+    await this.saveExecutionState(projectPath);
+
     // Note: Memory folder initialization is now handled by loadContextFiles
 
     // Run the loop in the background
@@ -390,17 +422,23 @@ export class AutoModeService {
    */
   async stopAutoLoop(): Promise<number> {
     const wasRunning = this.autoLoopRunning;
+    const projectPath = this.config?.projectPath;
     this.autoLoopRunning = false;
     if (this.autoLoopAbortController) {
       this.autoLoopAbortController.abort();
       this.autoLoopAbortController = null;
     }
 
+    // Clear execution state when auto-loop is explicitly stopped
+    if (projectPath) {
+      await this.clearExecutionState(projectPath);
+    }
+
     // Emit stop event immediately when user explicitly stops
     if (wasRunning) {
       this.emitAutoModeEvent('auto_mode_stopped', {
         message: 'Auto mode stopped',
-        projectPath: this.config?.projectPath,
+        projectPath,
       });
     }
 
@@ -440,6 +478,11 @@ export class AutoModeService {
       startTime: Date.now(),
     };
     this.runningFeatures.set(featureId, tempRunningFeature);
+
+    // Save execution state when feature starts
+    if (isAutoMode) {
+      await this.saveExecutionState(projectPath);
+    }
 
     try {
       // Validate that project path is allowed using centralized validation
@@ -695,6 +738,11 @@ export class AutoModeService {
         `Pending approvals at cleanup: ${Array.from(this.pendingApprovals.keys()).join(', ') || 'none'}`
       );
       this.runningFeatures.delete(featureId);
+
+      // Update execution state after feature completes
+      if (this.autoLoopRunning && projectPath) {
+        await this.saveExecutionState(projectPath);
+      }
     }
   }
 
@@ -2948,6 +2996,149 @@ Begin implementing task ${task.id} now.`;
         );
       }
     });
+  }
+
+  // ============================================================================
+  // Execution State Persistence - For recovery after server restart
+  // ============================================================================
+
+  /**
+   * Save execution state to disk for recovery after server restart
+   */
+  private async saveExecutionState(projectPath: string): Promise<void> {
+    try {
+      await ensureAutomakerDir(projectPath);
+      const statePath = getExecutionStatePath(projectPath);
+      const state: ExecutionState = {
+        version: 1,
+        autoLoopWasRunning: this.autoLoopRunning,
+        maxConcurrency: this.config?.maxConcurrency ?? 3,
+        projectPath,
+        runningFeatureIds: Array.from(this.runningFeatures.keys()),
+        savedAt: new Date().toISOString(),
+      };
+      await secureFs.writeFile(statePath, JSON.stringify(state, null, 2), 'utf-8');
+      logger.info(`Saved execution state: ${state.runningFeatureIds.length} running features`);
+    } catch (error) {
+      logger.error('Failed to save execution state:', error);
+    }
+  }
+
+  /**
+   * Load execution state from disk
+   */
+  private async loadExecutionState(projectPath: string): Promise<ExecutionState> {
+    try {
+      const statePath = getExecutionStatePath(projectPath);
+      const content = (await secureFs.readFile(statePath, 'utf-8')) as string;
+      const state = JSON.parse(content) as ExecutionState;
+      return state;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+        logger.error('Failed to load execution state:', error);
+      }
+      return DEFAULT_EXECUTION_STATE;
+    }
+  }
+
+  /**
+   * Clear execution state (called on successful shutdown or when auto-loop stops)
+   */
+  private async clearExecutionState(projectPath: string): Promise<void> {
+    try {
+      const statePath = getExecutionStatePath(projectPath);
+      await secureFs.unlink(statePath);
+      logger.info('Cleared execution state');
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+        logger.error('Failed to clear execution state:', error);
+      }
+    }
+  }
+
+  /**
+   * Check for and resume interrupted features after server restart
+   * This should be called during server initialization
+   */
+  async resumeInterruptedFeatures(projectPath: string): Promise<void> {
+    logger.info('Checking for interrupted features to resume...');
+
+    // Load all features and find those that were interrupted
+    const featuresDir = getFeaturesDir(projectPath);
+
+    try {
+      const entries = await secureFs.readdir(featuresDir, { withFileTypes: true });
+      const interruptedFeatures: Feature[] = [];
+
+      for (const entry of entries) {
+        if (entry.isDirectory()) {
+          const featurePath = path.join(featuresDir, entry.name, 'feature.json');
+          try {
+            const data = (await secureFs.readFile(featurePath, 'utf-8')) as string;
+            const feature = JSON.parse(data) as Feature;
+
+            // Check if feature was interrupted (in_progress or pipeline_*)
+            if (
+              feature.status === 'in_progress' ||
+              (feature.status && feature.status.startsWith('pipeline_'))
+            ) {
+              // Verify it has existing context (agent-output.md)
+              const featureDir = getFeatureDir(projectPath, feature.id);
+              const contextPath = path.join(featureDir, 'agent-output.md');
+              try {
+                await secureFs.access(contextPath);
+                interruptedFeatures.push(feature);
+                logger.info(
+                  `Found interrupted feature: ${feature.id} (${feature.title}) - status: ${feature.status}`
+                );
+              } catch {
+                // No context file, skip this feature - it will be restarted fresh
+                logger.info(`Interrupted feature ${feature.id} has no context, will restart fresh`);
+              }
+            }
+          } catch {
+            // Skip invalid features
+          }
+        }
+      }
+
+      if (interruptedFeatures.length === 0) {
+        logger.info('No interrupted features found');
+        return;
+      }
+
+      logger.info(`Found ${interruptedFeatures.length} interrupted feature(s) to resume`);
+
+      // Emit event to notify UI
+      this.emitAutoModeEvent('auto_mode_resuming_features', {
+        message: `Resuming ${interruptedFeatures.length} interrupted feature(s) after server restart`,
+        projectPath,
+        featureIds: interruptedFeatures.map((f) => f.id),
+        features: interruptedFeatures.map((f) => ({
+          id: f.id,
+          title: f.title,
+          status: f.status,
+        })),
+      });
+
+      // Resume each interrupted feature
+      for (const feature of interruptedFeatures) {
+        try {
+          logger.info(`Resuming feature: ${feature.id} (${feature.title})`);
+          // Use resumeFeature which will detect the existing context and continue
+          await this.resumeFeature(projectPath, feature.id, true);
+        } catch (error) {
+          logger.error(`Failed to resume feature ${feature.id}:`, error);
+          // Continue with other features
+        }
+      }
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+        logger.info('No features directory found, nothing to resume');
+      } else {
+        logger.error('Error checking for interrupted features:', error);
+      }
+    }
   }
 
   /**

@@ -21,6 +21,12 @@ export interface WorktreeMetadata {
   branch: string;
   createdAt: string;
   pr?: WorktreePRInfo;
+  /** Whether the init script has been executed for this worktree */
+  initScriptRan?: boolean;
+  /** Status of the init script execution */
+  initScriptStatus?: 'running' | 'success' | 'failed';
+  /** Error message if init script failed */
+  initScriptError?: string;
 }
 
 /**

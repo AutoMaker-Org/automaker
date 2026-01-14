@@ -8,43 +8,12 @@ export type OpencodeModelId =
   | 'opencode/glm-4.7-free'
   | 'opencode/gpt-5-nano'
   | 'opencode/grok-code'
-  | 'opencode/minimax-m2.1-free'
-  // Amazon Bedrock - Claude Models
-  | 'amazon-bedrock/anthropic.claude-sonnet-4-5-20250929-v1:0'
-  | 'amazon-bedrock/anthropic.claude-opus-4-5-20251101-v1:0'
-  | 'amazon-bedrock/anthropic.claude-haiku-4-5-20251001-v1:0'
-  | 'amazon-bedrock/anthropic.claude-sonnet-4-20250514-v1:0'
-  | 'amazon-bedrock/anthropic.claude-opus-4-20250514-v1:0'
-  | 'amazon-bedrock/anthropic.claude-3-7-sonnet-20250219-v1:0'
-  | 'amazon-bedrock/anthropic.claude-3-5-sonnet-20241022-v2:0'
-  | 'amazon-bedrock/anthropic.claude-3-opus-20240229-v1:0'
-  // Amazon Bedrock - DeepSeek Models
-  | 'amazon-bedrock/deepseek.r1-v1:0'
-  | 'amazon-bedrock/deepseek.v3-v1:0'
-  // Amazon Bedrock - Amazon Nova Models
-  | 'amazon-bedrock/amazon.nova-premier-v1:0'
-  | 'amazon-bedrock/amazon.nova-pro-v1:0'
-  | 'amazon-bedrock/amazon.nova-lite-v1:0'
-  // Amazon Bedrock - Meta Llama Models
-  | 'amazon-bedrock/meta.llama4-maverick-17b-instruct-v1:0'
-  | 'amazon-bedrock/meta.llama3-3-70b-instruct-v1:0'
-  // Amazon Bedrock - Mistral Models
-  | 'amazon-bedrock/mistral.mistral-large-2402-v1:0'
-  // Amazon Bedrock - Qwen Models
-  | 'amazon-bedrock/qwen.qwen3-coder-480b-a35b-v1:0'
-  | 'amazon-bedrock/qwen.qwen3-235b-a22b-2507-v1:0';
+  | 'opencode/minimax-m2.1-free';
 
 /**
  * Provider type for OpenCode models
  */
-export type OpencodeProvider =
-  | 'opencode'
-  | 'amazon-bedrock-anthropic'
-  | 'amazon-bedrock-deepseek'
-  | 'amazon-bedrock-amazon'
-  | 'amazon-bedrock-meta'
-  | 'amazon-bedrock-mistral'
-  | 'amazon-bedrock-qwen';
+export type OpencodeProvider = 'opencode';
 
 /**
  * Friendly aliases mapped to full model IDs
@@ -59,36 +28,6 @@ export const OPENCODE_MODEL_MAP: Record<string, OpencodeModelId> = {
   'grok-code': 'opencode/grok-code',
   grok: 'opencode/grok-code',
   minimax: 'opencode/minimax-m2.1-free',
-
-  // Claude aliases (via Bedrock)
-  'claude-sonnet-4.5': 'amazon-bedrock/anthropic.claude-sonnet-4-5-20250929-v1:0',
-  'sonnet-4.5': 'amazon-bedrock/anthropic.claude-sonnet-4-5-20250929-v1:0',
-  sonnet: 'amazon-bedrock/anthropic.claude-sonnet-4-5-20250929-v1:0',
-  'claude-opus-4.5': 'amazon-bedrock/anthropic.claude-opus-4-5-20251101-v1:0',
-  'opus-4.5': 'amazon-bedrock/anthropic.claude-opus-4-5-20251101-v1:0',
-  opus: 'amazon-bedrock/anthropic.claude-opus-4-5-20251101-v1:0',
-  'claude-haiku-4.5': 'amazon-bedrock/anthropic.claude-haiku-4-5-20251001-v1:0',
-  'haiku-4.5': 'amazon-bedrock/anthropic.claude-haiku-4-5-20251001-v1:0',
-  haiku: 'amazon-bedrock/anthropic.claude-haiku-4-5-20251001-v1:0',
-
-  // DeepSeek aliases
-  'deepseek-r1': 'amazon-bedrock/deepseek.r1-v1:0',
-  r1: 'amazon-bedrock/deepseek.r1-v1:0',
-  'deepseek-v3': 'amazon-bedrock/deepseek.v3-v1:0',
-
-  // Nova aliases
-  'nova-premier': 'amazon-bedrock/amazon.nova-premier-v1:0',
-  'nova-pro': 'amazon-bedrock/amazon.nova-pro-v1:0',
-  nova: 'amazon-bedrock/amazon.nova-pro-v1:0',
-
-  // Llama aliases
-  llama4: 'amazon-bedrock/meta.llama4-maverick-17b-instruct-v1:0',
-  'llama-4': 'amazon-bedrock/meta.llama4-maverick-17b-instruct-v1:0',
-  llama3: 'amazon-bedrock/meta.llama3-3-70b-instruct-v1:0',
-
-  // Qwen aliases
-  qwen: 'amazon-bedrock/qwen.qwen3-coder-480b-a35b-v1:0',
-  'qwen-coder': 'amazon-bedrock/qwen.qwen3-coder-480b-a35b-v1:0',
 } as const;
 
 /**
@@ -148,162 +87,6 @@ export const OPENCODE_MODELS: OpencodeModelConfig[] = [
     provider: 'opencode',
     tier: 'free',
   },
-
-  // Amazon Bedrock - Claude Models
-  {
-    id: 'amazon-bedrock/anthropic.claude-sonnet-4-5-20250929-v1:0',
-    label: 'Claude Sonnet 4.5 (Bedrock)',
-    description: 'Latest Claude Sonnet via AWS Bedrock - fast and intelligent (default)',
-    supportsVision: true,
-    provider: 'amazon-bedrock-anthropic',
-    tier: 'premium',
-  },
-  {
-    id: 'amazon-bedrock/anthropic.claude-opus-4-5-20251101-v1:0',
-    label: 'Claude Opus 4.5 (Bedrock)',
-    description: 'Most capable Claude model via AWS Bedrock',
-    supportsVision: true,
-    provider: 'amazon-bedrock-anthropic',
-    tier: 'premium',
-  },
-  {
-    id: 'amazon-bedrock/anthropic.claude-haiku-4-5-20251001-v1:0',
-    label: 'Claude Haiku 4.5 (Bedrock)',
-    description: 'Fastest Claude model via AWS Bedrock',
-    supportsVision: true,
-    provider: 'amazon-bedrock-anthropic',
-    tier: 'standard',
-  },
-  {
-    id: 'amazon-bedrock/anthropic.claude-sonnet-4-20250514-v1:0',
-    label: 'Claude Sonnet 4 (Bedrock)',
-    description: 'Claude Sonnet 4 via AWS Bedrock',
-    supportsVision: true,
-    provider: 'amazon-bedrock-anthropic',
-    tier: 'premium',
-  },
-  {
-    id: 'amazon-bedrock/anthropic.claude-opus-4-20250514-v1:0',
-    label: 'Claude Opus 4 (Bedrock)',
-    description: 'Claude Opus 4 via AWS Bedrock',
-    supportsVision: true,
-    provider: 'amazon-bedrock-anthropic',
-    tier: 'premium',
-  },
-  {
-    id: 'amazon-bedrock/anthropic.claude-3-7-sonnet-20250219-v1:0',
-    label: 'Claude 3.7 Sonnet (Bedrock)',
-    description: 'Claude 3.7 Sonnet via AWS Bedrock',
-    supportsVision: true,
-    provider: 'amazon-bedrock-anthropic',
-    tier: 'standard',
-  },
-  {
-    id: 'amazon-bedrock/anthropic.claude-3-5-sonnet-20241022-v2:0',
-    label: 'Claude 3.5 Sonnet (Bedrock)',
-    description: 'Claude 3.5 Sonnet v2 via AWS Bedrock',
-    supportsVision: true,
-    provider: 'amazon-bedrock-anthropic',
-    tier: 'standard',
-  },
-  {
-    id: 'amazon-bedrock/anthropic.claude-3-opus-20240229-v1:0',
-    label: 'Claude 3 Opus (Bedrock)',
-    description: 'Claude 3 Opus via AWS Bedrock',
-    supportsVision: true,
-    provider: 'amazon-bedrock-anthropic',
-    tier: 'premium',
-  },
-
-  // Amazon Bedrock - DeepSeek Models
-  {
-    id: 'amazon-bedrock/deepseek.r1-v1:0',
-    label: 'DeepSeek R1 (Bedrock)',
-    description: 'DeepSeek R1 reasoning model via AWS Bedrock - excellent for coding',
-    supportsVision: false,
-    provider: 'amazon-bedrock-deepseek',
-    tier: 'premium',
-  },
-  {
-    id: 'amazon-bedrock/deepseek.v3-v1:0',
-    label: 'DeepSeek V3 (Bedrock)',
-    description: 'DeepSeek V3 via AWS Bedrock',
-    supportsVision: false,
-    provider: 'amazon-bedrock-deepseek',
-    tier: 'standard',
-  },
-
-  // Amazon Bedrock - Amazon Nova Models
-  {
-    id: 'amazon-bedrock/amazon.nova-premier-v1:0',
-    label: 'Amazon Nova Premier (Bedrock)',
-    description: 'Amazon Nova Premier - most capable Nova model',
-    supportsVision: true,
-    provider: 'amazon-bedrock-amazon',
-    tier: 'premium',
-  },
-  {
-    id: 'amazon-bedrock/amazon.nova-pro-v1:0',
-    label: 'Amazon Nova Pro (Bedrock)',
-    description: 'Amazon Nova Pro - balanced performance',
-    supportsVision: true,
-    provider: 'amazon-bedrock-amazon',
-    tier: 'standard',
-  },
-  {
-    id: 'amazon-bedrock/amazon.nova-lite-v1:0',
-    label: 'Amazon Nova Lite (Bedrock)',
-    description: 'Amazon Nova Lite - fast and efficient',
-    supportsVision: true,
-    provider: 'amazon-bedrock-amazon',
-    tier: 'standard',
-  },
-
-  // Amazon Bedrock - Meta Llama Models
-  {
-    id: 'amazon-bedrock/meta.llama4-maverick-17b-instruct-v1:0',
-    label: 'Llama 4 Maverick 17B (Bedrock)',
-    description: 'Meta Llama 4 Maverick via AWS Bedrock',
-    supportsVision: false,
-    provider: 'amazon-bedrock-meta',
-    tier: 'standard',
-  },
-  {
-    id: 'amazon-bedrock/meta.llama3-3-70b-instruct-v1:0',
-    label: 'Llama 3.3 70B (Bedrock)',
-    description: 'Meta Llama 3.3 70B via AWS Bedrock',
-    supportsVision: false,
-    provider: 'amazon-bedrock-meta',
-    tier: 'standard',
-  },
-
-  // Amazon Bedrock - Mistral Models
-  {
-    id: 'amazon-bedrock/mistral.mistral-large-2402-v1:0',
-    label: 'Mistral Large (Bedrock)',
-    description: 'Mistral Large via AWS Bedrock',
-    supportsVision: false,
-    provider: 'amazon-bedrock-mistral',
-    tier: 'standard',
-  },
-
-  // Amazon Bedrock - Qwen Models
-  {
-    id: 'amazon-bedrock/qwen.qwen3-coder-480b-a35b-v1:0',
-    label: 'Qwen3 Coder 480B (Bedrock)',
-    description: 'Qwen3 Coder 480B via AWS Bedrock - excellent for coding',
-    supportsVision: false,
-    provider: 'amazon-bedrock-qwen',
-    tier: 'premium',
-  },
-  {
-    id: 'amazon-bedrock/qwen.qwen3-235b-a22b-2507-v1:0',
-    label: 'Qwen3 235B (Bedrock)',
-    description: 'Qwen3 235B via AWS Bedrock',
-    supportsVision: false,
-    provider: 'amazon-bedrock-qwen',
-    tier: 'premium',
-  },
 ];
 
 /**
@@ -319,10 +102,9 @@ export const OPENCODE_MODEL_CONFIG_MAP: Record<OpencodeModelId, OpencodeModelCon
   );
 
 /**
- * Default OpenCode model - Claude Sonnet 4.5 via Bedrock
+ * Default OpenCode model - OpenCode free tier
  */
-export const DEFAULT_OPENCODE_MODEL: OpencodeModelId =
-  'amazon-bedrock/anthropic.claude-sonnet-4-5-20250929-v1:0';
+export const DEFAULT_OPENCODE_MODEL: OpencodeModelId = 'opencode/big-pickle';
 
 /**
  * Helper: Get display name for model

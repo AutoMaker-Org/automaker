@@ -2,18 +2,23 @@
  * POST /list endpoint - List all git worktrees
  *
  * Returns actual git worktrees from `git worktree list`.
+ * Also scans .worktrees/ directory to discover worktrees that may have been
+ * created externally or whose git state was corrupted.
  * Does NOT include tracked branches - only real worktrees with separate directories.
  */
 
 import type { Request, Response } from 'express';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import path from 'path';
 import * as secureFs from '../../../lib/secure-fs.js';
 import { isGitRepo } from '@automaker/git-utils';
 import { getErrorMessage, logError, normalizePath } from '../common.js';
 import { readAllWorktreeMetadata, type WorktreePRInfo } from '../../../lib/worktree-metadata.js';
+import { createLogger } from '@automaker/utils';
 
 const execAsync = promisify(exec);
+const logger = createLogger('Worktree');
 
 interface WorktreeInfo {
   path: string;
@@ -33,6 +38,87 @@ async function getCurrentBranch(cwd: string): Promise<string> {
   } catch {
     return '';
   }
+}
+
+/**
+ * Scan the .worktrees directory to discover worktrees that may exist on disk
+ * but are not registered with git (e.g., created externally or corrupted state).
+ */
+async function scanWorktreesDirectory(
+  projectPath: string,
+  knownWorktreePaths: Set<string>
+): Promise<Array<{ path: string; branch: string }>> {
+  const discovered: Array<{ path: string; branch: string }> = [];
+  const worktreesDir = path.join(projectPath, '.worktrees');
+
+  try {
+    // Check if .worktrees directory exists
+    await secureFs.access(worktreesDir);
+  } catch {
+    // .worktrees directory doesn't exist
+    return discovered;
+  }
+
+  try {
+    const entries = await secureFs.readdir(worktreesDir, { withFileTypes: true });
+
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue;
+
+      const worktreePath = path.join(worktreesDir, entry.name);
+      const normalizedPath = normalizePath(worktreePath);
+
+      // Skip if already known from git worktree list
+      if (knownWorktreePaths.has(normalizedPath)) continue;
+
+      // Check if this is a valid git repository
+      const gitPath = path.join(worktreePath, '.git');
+      try {
+        const gitStat = await secureFs.stat(gitPath);
+
+        // Git worktrees have a .git FILE (not directory) that points to the parent repo
+        // Regular repos have a .git DIRECTORY
+        if (gitStat.isFile() || gitStat.isDirectory()) {
+          // Try to get the branch name
+          const branch = await getCurrentBranch(worktreePath);
+          if (branch) {
+            logger.info(
+              `Discovered worktree in .worktrees/ not in git worktree list: ${entry.name} (branch: ${branch})`
+            );
+            discovered.push({
+              path: normalizedPath,
+              branch,
+            });
+          } else {
+            // Try to get branch from HEAD if branch --show-current fails (detached HEAD)
+            try {
+              const { stdout: headRef } = await execAsync('git rev-parse --abbrev-ref HEAD', {
+                cwd: worktreePath,
+              });
+              const headBranch = headRef.trim();
+              if (headBranch && headBranch !== 'HEAD') {
+                logger.info(
+                  `Discovered worktree in .worktrees/ not in git worktree list: ${entry.name} (branch: ${headBranch})`
+                );
+                discovered.push({
+                  path: normalizedPath,
+                  branch: headBranch,
+                });
+              }
+            } catch {
+              // Can't determine branch, skip this directory
+            }
+          }
+        }
+      } catch {
+        // Not a git repo, skip
+      }
+    }
+  } catch (error) {
+    logger.warn(`Failed to scan .worktrees directory: ${getErrorMessage(error)}`);
+  }
+
+  return discovered;
 }
 
 export function createListHandler() {
@@ -114,6 +200,22 @@ export function createListHandler() {
         } catch {
           // Prune failed, but we'll still report the removed worktrees
         }
+      }
+
+      // Scan .worktrees directory to discover worktrees that exist on disk
+      // but are not registered with git (e.g., created externally)
+      const knownPaths = new Set(worktrees.map((w) => w.path));
+      const discoveredWorktrees = await scanWorktreesDirectory(projectPath, knownPaths);
+
+      // Add discovered worktrees to the list
+      for (const discovered of discoveredWorktrees) {
+        worktrees.push({
+          path: discovered.path,
+          branch: discovered.branch,
+          isMain: false,
+          isCurrent: discovered.branch === currentBranch,
+          hasWorktree: true,
+        });
       }
 
       // Read all worktree metadata to get PR info

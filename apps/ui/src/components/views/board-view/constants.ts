@@ -3,6 +3,69 @@ import type { PipelineConfig, FeatureStatusWithPipeline } from '@automaker/types
 
 export type ColumnId = Feature['status'];
 
+/**
+ * Empty state configuration for each column type
+ */
+export interface EmptyStateConfig {
+  title: string;
+  description: string;
+  icon: 'lightbulb' | 'play' | 'clock' | 'check' | 'sparkles';
+  shortcutKey?: string; // Keyboard shortcut label (e.g., 'N', 'A')
+  shortcutHint?: string; // Human-readable shortcut hint
+  primaryAction?: {
+    label: string;
+    actionType: 'ai-suggest' | 'none';
+  };
+}
+
+/**
+ * Default empty state configurations per column type
+ */
+export const EMPTY_STATE_CONFIGS: Record<string, EmptyStateConfig> = {
+  backlog: {
+    title: 'Ready for Ideas',
+    description:
+      'Add your first feature idea to get started using the button below, or let AI help generate ideas.',
+    icon: 'lightbulb',
+    shortcutHint: 'Press',
+    primaryAction: {
+      label: 'Use AI Suggestions',
+      actionType: 'none',
+    },
+  },
+  in_progress: {
+    title: 'Nothing in Progress',
+    description: 'Drag a feature from the backlog here or click implement to start working on it.',
+    icon: 'play',
+  },
+  waiting_approval: {
+    title: 'No Items Awaiting Approval',
+    description: 'Features will appear here after implementation is complete and need your review.',
+    icon: 'clock',
+  },
+  verified: {
+    title: 'No Verified Features',
+    description: 'Approved features will appear here. They can then be completed and archived.',
+    icon: 'check',
+  },
+  // Pipeline step default configuration
+  pipeline_default: {
+    title: 'Pipeline Step Empty',
+    description: 'Features will flow through this step during the automated pipeline process.',
+    icon: 'sparkles',
+  },
+};
+
+/**
+ * Get empty state config for a column, with fallback for pipeline columns
+ */
+export function getEmptyStateConfig(columnId: string): EmptyStateConfig {
+  if (columnId.startsWith('pipeline_')) {
+    return EMPTY_STATE_CONFIGS.pipeline_default;
+  }
+  return EMPTY_STATE_CONFIGS[columnId] || EMPTY_STATE_CONFIGS.default;
+}
+
 export interface Column {
   id: FeatureStatusWithPipeline;
   title: string;

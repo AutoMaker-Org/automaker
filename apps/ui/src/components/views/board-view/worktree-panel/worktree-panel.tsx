@@ -1,15 +1,15 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useCallback, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { GitBranch, Plus, RefreshCw, PanelLeftOpen, PanelLeftClose } from 'lucide-react';
+import { GitBranch, Plus, RefreshCw } from 'lucide-react';
 import { cn, pathsEqual } from '@/lib/utils';
-import { useAppStore } from '@/store/app-store';
+import { toast } from 'sonner';
+import { getHttpApiClient } from '@/lib/http-api-client';
 import type { WorktreePanelProps, WorktreeInfo } from './types';
 import {
   useWorktrees,
   useDevServers,
   useBranches,
   useWorktreeActions,
-  useDefaultEditor,
   useRunningFeatures,
 } from './hooks';
 import { WorktreeTab } from './components';
@@ -76,18 +76,32 @@ export function WorktreePanel({
     fetchBranches,
   });
 
-  const { defaultEditorName } = useDefaultEditor();
-
   const { hasRunningFeatures } = useRunningFeatures({
     runningFeatureIds,
     features,
   });
 
-  // Collapse state from store (synced via API)
-  const isCollapsed = useAppStore((s) => s.worktreePanelCollapsed);
-  const setWorktreePanelCollapsed = useAppStore((s) => s.setWorktreePanelCollapsed);
+  // Track whether init script exists for the project
+  const [hasInitScript, setHasInitScript] = useState(false);
 
-  const toggleCollapsed = () => setWorktreePanelCollapsed(!isCollapsed);
+  useEffect(() => {
+    if (!projectPath) {
+      setHasInitScript(false);
+      return;
+    }
+
+    const checkInitScript = async () => {
+      try {
+        const api = getHttpApiClient();
+        const result = await api.worktree.getInitScript(projectPath);
+        setHasInitScript(result.success && result.exists);
+      } catch {
+        setHasInitScript(false);
+      }
+    };
+
+    checkInitScript();
+  }, [projectPath]);
 
   // Periodic interval check (5 seconds) to detect branch changes on disk
   // Reduced from 1s to 5s to minimize GPU/CPU usage from frequent re-renders
@@ -103,18 +117,6 @@ export function WorktreePanel({
       }
     };
   }, [fetchWorktrees]);
-
-  // Get the currently selected worktree for collapsed view
-  const selectedWorktree = worktrees.find((w) => {
-    if (
-      currentWorktree === null ||
-      currentWorktree === undefined ||
-      currentWorktree.path === null
-    ) {
-      return w.isMain;
-    }
-    return pathsEqual(w.path, currentWorktreePath);
-  });
 
   const isWorktreeSelected = (worktree: WorktreeInfo) => {
     return worktree.isMain
@@ -135,47 +137,38 @@ export function WorktreePanel({
     }
   };
 
+  const handleRunInitScript = useCallback(
+    async (worktree: WorktreeInfo) => {
+      if (!projectPath) return;
+
+      try {
+        const api = getHttpApiClient();
+        const result = await api.worktree.runInitScript(
+          projectPath,
+          worktree.path,
+          worktree.branch
+        );
+
+        if (!result.success) {
+          toast.error('Failed to run init script', {
+            description: result.error,
+          });
+        }
+        // Success feedback will come via WebSocket events (init-started, init-output, init-completed)
+      } catch (error) {
+        toast.error('Failed to run init script', {
+          description: error instanceof Error ? error.message : 'Unknown error',
+        });
+      }
+    },
+    [projectPath]
+  );
+
   const mainWorktree = worktrees.find((w) => w.isMain);
   const nonMainWorktrees = worktrees.filter((w) => !w.isMain);
 
-  // Collapsed view - just show current branch and toggle
-  if (isCollapsed) {
-    return (
-      <div className="flex items-center gap-2 px-4 py-1.5 border-b border-border bg-glass/50 backdrop-blur-sm">
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
-          onClick={toggleCollapsed}
-          title="Expand worktree panel"
-        >
-          <PanelLeftOpen className="w-4 h-4" />
-        </Button>
-        <GitBranch className="w-4 h-4 text-muted-foreground" />
-        <span className="text-sm text-muted-foreground">Branch:</span>
-        <span className="text-sm font-mono font-medium">{selectedWorktree?.branch ?? 'main'}</span>
-        {selectedWorktree?.hasChanges && (
-          <span className="inline-flex items-center justify-center h-4 min-w-[1rem] px-1 text-[10px] font-medium rounded border bg-amber-500/20 text-amber-600 dark:text-amber-400 border-amber-500/30">
-            {selectedWorktree.changedFilesCount ?? '!'}
-          </span>
-        )}
-      </div>
-    );
-  }
-
-  // Expanded view - full worktree panel
   return (
     <div className="flex items-center gap-2 px-4 py-2 border-b border-border bg-glass/50 backdrop-blur-sm">
-      <Button
-        variant="ghost"
-        size="sm"
-        className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
-        onClick={toggleCollapsed}
-        title="Collapse worktree panel"
-      >
-        <PanelLeftClose className="w-4 h-4" />
-      </Button>
-
       <GitBranch className="w-4 h-4 text-muted-foreground" />
       <span className="text-sm text-muted-foreground mr-2">Branch:</span>
 
@@ -192,7 +185,6 @@ export function WorktreePanel({
             isActivating={isActivating}
             isDevServerRunning={isDevServerRunning(mainWorktree)}
             devServerInfo={getDevServerInfo(mainWorktree)}
-            defaultEditorName={defaultEditorName}
             branches={branches}
             filteredBranches={filteredBranches}
             branchFilter={branchFilter}
@@ -221,6 +213,8 @@ export function WorktreePanel({
             onStartDevServer={handleStartDevServer}
             onStopDevServer={handleStopDevServer}
             onOpenDevServerUrl={handleOpenDevServerUrl}
+            onRunInitScript={handleRunInitScript}
+            hasInitScript={hasInitScript}
           />
         )}
       </div>
@@ -247,7 +241,6 @@ export function WorktreePanel({
                   isActivating={isActivating}
                   isDevServerRunning={isDevServerRunning(worktree)}
                   devServerInfo={getDevServerInfo(worktree)}
-                  defaultEditorName={defaultEditorName}
                   branches={branches}
                   filteredBranches={filteredBranches}
                   branchFilter={branchFilter}
@@ -276,6 +269,8 @@ export function WorktreePanel({
                   onStartDevServer={handleStartDevServer}
                   onStopDevServer={handleStopDevServer}
                   onOpenDevServerUrl={handleOpenDevServerUrl}
+                  onRunInitScript={handleRunInitScript}
+                  hasInitScript={hasInitScript}
                 />
               );
             })}

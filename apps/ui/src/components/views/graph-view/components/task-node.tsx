@@ -75,6 +75,24 @@ const priorityConfig = {
   3: { label: 'Low', colorClass: 'bg-[var(--status-info)] text-white' },
 };
 
+// Helper function to get border style with opacity (like KanbanCard does)
+function getCardBorderStyle(
+  enabled: boolean,
+  opacity: number,
+  borderColor: string
+): React.CSSProperties {
+  if (!enabled) {
+    return { borderWidth: '0px', borderColor: 'transparent' };
+  }
+  if (opacity !== 100) {
+    return {
+      borderWidth: '2px',
+      borderColor: `color-mix(in oklch, ${borderColor} ${opacity}%, transparent)`,
+    };
+  }
+  return { borderWidth: '2px' };
+}
+
 export const TaskNode = memo(function TaskNode({ data, selected }: TaskNodeProps) {
   // Handle pipeline statuses by treating them like in_progress
   const status = data.status || 'backlog';
@@ -90,6 +108,28 @@ export const TaskNode = memo(function TaskNode({ data, selected }: TaskNodeProps
 
   // Task is stopped if it's in_progress but not actively running
   const isStopped = data.status === 'in_progress' && !data.isRunning;
+
+  // Background/theme settings with defaults
+  const cardOpacity = data.cardOpacity ?? 100;
+  const glassmorphism = data.cardGlassmorphism ?? true;
+  const cardBorderEnabled = data.cardBorderEnabled ?? true;
+  const cardBorderOpacity = data.cardBorderOpacity ?? 100;
+
+  // Get the border color based on status and error state
+  const borderColor = data.error
+    ? 'var(--status-error)'
+    : config.borderClass.includes('border-border')
+      ? 'var(--border)'
+      : config.borderClass.includes('status-in-progress')
+        ? 'var(--status-in-progress)'
+        : config.borderClass.includes('status-waiting')
+          ? 'var(--status-waiting)'
+          : config.borderClass.includes('status-success')
+            ? 'var(--status-success)'
+            : 'var(--border)';
+
+  // Get computed border style
+  const borderStyle = getCardBorderStyle(cardBorderEnabled, cardBorderOpacity, borderColor);
 
   return (
     <>
@@ -109,22 +149,26 @@ export const TaskNode = memo(function TaskNode({ data, selected }: TaskNodeProps
 
       <div
         className={cn(
-          'min-w-[240px] max-w-[280px] rounded-xl border-2 bg-card shadow-md',
+          'min-w-[240px] max-w-[280px] rounded-xl shadow-md relative',
           'transition-all duration-300',
-          config.borderClass,
           selected && 'ring-2 ring-brand-500 ring-offset-2 ring-offset-background',
           data.isRunning && 'animate-pulse-subtle',
-          data.error && 'border-[var(--status-error)]',
           // Filter highlight states
           isMatched && 'graph-node-matched',
           isHighlighted && !isMatched && 'graph-node-highlighted',
           isDimmed && 'graph-node-dimmed'
         )}
+        style={borderStyle}
       >
+        {/* Background layer with opacity control - like KanbanCard */}
+        <div
+          className={cn('absolute inset-0 rounded-xl bg-card', glassmorphism && 'backdrop-blur-sm')}
+          style={{ opacity: cardOpacity / 100 }}
+        />
         {/* Header with status and actions */}
         <div
           className={cn(
-            'flex items-center justify-between px-3 py-2 rounded-t-[10px]',
+            'relative flex items-center justify-between px-3 py-2 rounded-t-[10px]',
             config.bgClass
           )}
         >
@@ -301,7 +345,7 @@ export const TaskNode = memo(function TaskNode({ data, selected }: TaskNodeProps
         </div>
 
         {/* Content */}
-        <div className="px-3 py-2">
+        <div className="relative px-3 py-2">
           {/* Category */}
           <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">
             {data.category}
