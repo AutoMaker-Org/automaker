@@ -14,7 +14,7 @@ import { query } from '@anthropic-ai/claude-agent-sdk';
 import { createLogger } from '@automaker/utils';
 import { DEFAULT_PHASE_MODELS, isCursorModel, stripProviderPrefix } from '@automaker/types';
 import { resolvePhaseModel } from '@automaker/model-resolver';
-import { mergeCommitMessagePrompts } from '@automaker/prompts';
+import { mergeCommitMessagePrompts, prependLanguageInstruction } from '@automaker/prompts';
 import { ProviderFactory } from '../../../providers/provider-factory.js';
 import type { SettingsService } from '../../../services/settings-service.js';
 import { getErrorMessage, logError } from '../common.js';
@@ -53,11 +53,13 @@ async function* withTimeout<T>(
 /**
  * Get the effective system prompt for commit message generation.
  * Uses custom prompt from settings if enabled, otherwise falls back to default.
+ * Applies language instruction if enabled in settings.
  */
 async function getSystemPrompt(settingsService?: SettingsService): Promise<string> {
   const settings = await settingsService?.getGlobalSettings();
   const prompts = mergeCommitMessagePrompts(settings?.promptCustomization?.commitMessage);
-  return prompts.systemPrompt;
+  const languageInstruction = settings?.languageInstruction;
+  return prependLanguageInstruction(prompts.systemPrompt, languageInstruction);
 }
 
 interface GenerateCommitMessageRequestBody {

@@ -255,7 +255,31 @@ export async function getPromptCustomization(
 
   // Apply language instruction to system prompts if enabled
   return {
-    autoMode: mergedAutoMode,
+    autoMode: {
+      planningLite: prependLanguageInstruction(mergedAutoMode.planningLite, languageInstruction),
+      planningLiteWithApproval: prependLanguageInstruction(
+        mergedAutoMode.planningLiteWithApproval,
+        languageInstruction
+      ),
+      planningSpec: prependLanguageInstruction(mergedAutoMode.planningSpec, languageInstruction),
+      planningFull: prependLanguageInstruction(mergedAutoMode.planningFull, languageInstruction),
+      featurePromptTemplate: prependLanguageInstruction(
+        mergedAutoMode.featurePromptTemplate,
+        languageInstruction
+      ),
+      followUpPromptTemplate: prependLanguageInstruction(
+        mergedAutoMode.followUpPromptTemplate,
+        languageInstruction
+      ),
+      continuationPromptTemplate: prependLanguageInstruction(
+        mergedAutoMode.continuationPromptTemplate,
+        languageInstruction
+      ),
+      pipelineStepPromptTemplate: prependLanguageInstruction(
+        mergedAutoMode.pipelineStepPromptTemplate,
+        languageInstruction
+      ),
+    },
     agent: {
       systemPrompt: prependLanguageInstruction(mergedAgent.systemPrompt, languageInstruction),
     },
