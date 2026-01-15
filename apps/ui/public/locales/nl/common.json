@@ -234,7 +234,8 @@
       "title": "Sessie verwijderen",
       "description": "Weet je zeker dat je deze sessie wilt verwijderen? Deze actie kan niet ongedaan worden gemaakt.",
       "confirmText": "Sessie verwijderen",
-      "messageCount": "{{count}} berichten"
+      "messageCount": "{{count}} bericht",
+      "messageCount_plural": "{{count}} berichten"
     },
     "sandboxRisk": {
       "title": "Sandbox-omgeving niet gedetecteerd",

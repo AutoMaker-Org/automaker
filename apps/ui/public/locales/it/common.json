@@ -234,7 +234,8 @@
       "title": "Elimina sessione",
       "description": "Sei sicuro di voler eliminare questa sessione? Questa azione non può essere annullata.",
       "confirmText": "Elimina sessione",
-      "messageCount": "{{count}} messaggi"
+      "messageCount": "{{count}} messaggio",
+      "messageCount_plural": "{{count}} messaggi"
     },
     "sandboxRisk": {
       "title": "Ambiente Sandbox non rilevato",

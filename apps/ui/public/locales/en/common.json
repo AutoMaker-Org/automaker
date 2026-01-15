@@ -234,7 +234,8 @@
       "title": "Delete Session",
       "description": "Are you sure you want to delete this session? This action cannot be undone.",
       "confirmText": "Delete Session",
-      "messageCount": "{{count}} messages"
+      "messageCount": "{{count}} message",
+      "messageCount_plural": "{{count}} messages"
     },
     "sandboxRisk": {
       "title": "Sandbox Environment Not Detected",

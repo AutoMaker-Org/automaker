@@ -234,7 +234,8 @@
       "title": "Удалить сессию",
       "description": "Вы уверены, что хотите удалить эту сессию? Это действие нельзя отменить.",
       "confirmText": "Удалить сессию",
-      "messageCount": "{{count}} сообщений"
+      "messageCount": "{{count}} сообщение",
+      "messageCount_plural": "{{count}} сообщений"
     },
     "sandboxRisk": {
       "title": "Среда песочницы не обнаружена",

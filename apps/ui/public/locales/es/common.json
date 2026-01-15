@@ -234,7 +234,8 @@
       "title": "Eliminar Sesión",
       "description": "¿Estás seguro de que deseas eliminar esta sesión? Esta acción no se puede deshacer.",
       "confirmText": "Eliminar Sesión",
-      "messageCount": "{{count}} mensajes"
+      "messageCount": "{{count}} mensaje",
+      "messageCount_plural": "{{count}} mensajes"
     },
     "sandboxRisk": {
       "title": "Entorno Sandbox No Detectado",

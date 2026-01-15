@@ -1,5 +1,5 @@
 import { useRef, useCallback, useEffect } from 'react';
-import { useTranslation } from 'react-i18next';
+import { useTranslation, Trans } from 'react-i18next';
 import { Send, Paperclip, Square, ListOrdered } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -185,20 +185,13 @@ export function InputControls({
 
       {/* Keyboard hint */}
       <p className="text-[11px] text-muted-foreground mt-2 text-center hidden sm:block">
-        {t('input.keyboardHint')
-          .split('<kbd>')
-          .map((part, i) => {
-            if (i === 0) return part;
-            const [kbdContent, rest] = part.split('</kbd>');
-            return (
-              <span key={i}>
-                <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-medium">
-                  {kbdContent}
-                </kbd>
-                {rest}
-              </span>
-            );
-          })}
+        <Trans
+          i18nKey="input.keyboardHint"
+          ns="agent"
+          components={{
+            kbd: <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-medium" />,
+          }}
+        />
       </p>
     </>
   );

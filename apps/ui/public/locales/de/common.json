@@ -234,7 +234,8 @@
       "title": "Sitzung löschen",
       "description": "Bist du sicher, dass du diese Sitzung löschen möchtest? Diese Aktion kann nicht rückgängig gemacht werden.",
       "confirmText": "Sitzung löschen",
-      "messageCount": "{{count}} Nachrichten"
+      "messageCount": "{{count}} Nachricht",
+      "messageCount_plural": "{{count}} Nachrichten"
     },
     "sandboxRisk": {
       "title": "Sandbox-Umgebung nicht erkannt",

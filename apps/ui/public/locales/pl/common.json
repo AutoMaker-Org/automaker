@@ -234,7 +234,8 @@
       "title": "Usuń sesję",
       "description": "Czy na pewno chcesz usunąć tę sesję? Tej operacji nie można cofnąć.",
       "confirmText": "Usuń sesję",
-      "messageCount": "{{count}} wiadomości"
+      "messageCount": "{{count}} wiadomość",
+      "messageCount_plural": "{{count}} wiadomości"
     },
     "sandboxRisk": {
       "title": "Nie wykryto środowiska sandbox",
