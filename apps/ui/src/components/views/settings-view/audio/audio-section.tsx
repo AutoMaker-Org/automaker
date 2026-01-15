@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Volume2, VolumeX } from 'lucide-react';
@@ -9,6 +10,8 @@ interface AudioSectionProps {
 }
 
 export function AudioSection({ muteDoneSound, onMuteDoneSoundChange }: AudioSectionProps) {
+  const { t } = useTranslation('settings');
+
   return (
     <div
       className={cn(
@@ -23,11 +26,11 @@ export function AudioSection({ muteDoneSound, onMuteDoneSoundChange }: AudioSect
           <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-brand-500/20 to-brand-600/10 flex items-center justify-center border border-brand-500/20">
             <Volume2 className="w-5 h-5 text-brand-500" />
           </div>
-          <h2 className="text-lg font-semibold text-foreground tracking-tight">Audio</h2>
+          <h2 className="text-lg font-semibold text-foreground tracking-tight">
+            {t('sections.audio.title')}
+          </h2>
         </div>
-        <p className="text-sm text-muted-foreground/80 ml-12">
-          Configure audio and notification settings.
-        </p>
+        <p className="text-sm text-muted-foreground/80 ml-12">{t('sections.audio.description')}</p>
       </div>
       <div className="p-6 space-y-4">
         <div className="group flex items-start space-x-3 p-3 rounded-xl hover:bg-accent/30 transition-colors duration-200 -mx-3">
@@ -44,12 +47,10 @@ export function AudioSection({ muteDoneSound, onMuteDoneSoundChange }: AudioSect
               className="text-foreground cursor-pointer font-medium flex items-center gap-2"
             >
               <VolumeX className="w-4 h-4 text-brand-500" />
-              Mute notification sound when agents complete
+              {t('sections.audio.muteDoneSound')}
             </Label>
             <p className="text-xs text-muted-foreground/80 leading-relaxed">
-              When enabled, disables the &quot;ding&quot; sound that plays when an agent completes a
-              feature. The feature will still move to the completed column, but without audio
-              notification.
+              {t('sections.audio.muteDoneSoundDescription')}
             </p>
           </div>
         </div>

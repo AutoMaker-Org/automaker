@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Feature } from '@/store/app-store';
 import { cn } from '@/lib/utils';
 import { CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -47,6 +48,7 @@ export function CardHeaderSection({
   onViewOutput,
   onSpawnTask,
 }: CardHeaderProps) {
+  const { t } = useTranslation('board');
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
@@ -96,7 +98,7 @@ export function CardHeaderSection({
                 className="text-xs"
               >
                 <Edit className="w-3 h-3 mr-2" />
-                Edit
+                {t('cardActions.edit')}
               </DropdownMenuItem>
               <DropdownMenuItem
                 onClick={(e) => {
@@ -107,7 +109,7 @@ export function CardHeaderSection({
                 className="text-xs"
               >
                 <GitFork className="w-3 h-3 mr-2" />
-                Spawn Sub-Task
+                {t('cardActions.spawnSubTask')}
               </DropdownMenuItem>
               {/* Model info in dropdown */}
               {(() => {
@@ -139,7 +141,7 @@ export function CardHeaderSection({
             }}
             onPointerDown={(e) => e.stopPropagation()}
             data-testid={`spawn-backlog-${feature.id}`}
-            title="Spawn Sub-Task"
+            title={t('cardActions.spawnSubTask')}
           >
             <GitFork className="w-4 h-4" />
           </Button>
@@ -174,7 +176,7 @@ export function CardHeaderSection({
                 data-testid={`edit-${
                   feature.status === 'waiting_approval' ? 'waiting' : 'verified'
                 }-${feature.id}`}
-                title="Edit"
+                title={t('cardActions.edit')}
               >
                 <Edit className="w-4 h-4" />
               </Button>
@@ -190,7 +192,7 @@ export function CardHeaderSection({
                 data-testid={`spawn-${
                   feature.status === 'waiting_approval' ? 'waiting' : 'verified'
                 }-${feature.id}`}
-                title="Spawn Sub-Task"
+                title={t('cardActions.spawnSubTask')}
               >
                 <GitFork className="w-4 h-4" />
               </Button>
@@ -207,7 +209,7 @@ export function CardHeaderSection({
                   data-testid={`logs-${
                     feature.status === 'waiting_approval' ? 'waiting' : 'verified'
                   }-${feature.id}`}
-                  title="Logs"
+                  title={t('cardActions.logs')}
                 >
                   <FileText className="w-4 h-4" />
                 </Button>
@@ -221,7 +223,7 @@ export function CardHeaderSection({
                 data-testid={`delete-${
                   feature.status === 'waiting_approval' ? 'waiting' : 'verified'
                 }-${feature.id}`}
-                title="Delete"
+                title={t('cardActions.delete')}
               >
                 <Trash2 className="w-4 h-4" />
               </Button>
@@ -240,7 +242,7 @@ export function CardHeaderSection({
               onClick={handleDeleteClick}
               onPointerDown={(e) => e.stopPropagation()}
               data-testid={`delete-feature-${feature.id}`}
-              title="Delete"
+              title={t('cardActions.delete')}
             >
               <Trash2 className="w-4 h-4" />
             </Button>
@@ -267,7 +269,7 @@ export function CardHeaderSection({
                   className="text-xs"
                 >
                   <Edit className="w-3 h-3 mr-2" />
-                  Edit
+                  {t('cardActions.edit')}
                 </DropdownMenuItem>
                 {onViewOutput && (
                   <DropdownMenuItem
@@ -279,7 +281,7 @@ export function CardHeaderSection({
                     className="text-xs"
                   >
                     <FileText className="w-3 h-3 mr-2" />
-                    View Logs
+                    {t('cardActions.viewLogs')}
                   </DropdownMenuItem>
                 )}
                 <DropdownMenuItem
@@ -291,7 +293,7 @@ export function CardHeaderSection({
                   className="text-xs"
                 >
                   <GitFork className="w-3 h-3 mr-2" />
-                  Spawn Sub-Task
+                  {t('cardActions.spawnSubTask')}
                 </DropdownMenuItem>
                 {/* Model info in dropdown */}
                 {(() => {
@@ -325,7 +327,9 @@ export function CardHeaderSection({
           {feature.titleGenerating ? (
             <div className="flex items-center gap-1.5 mb-1">
               <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />
-              <span className="text-xs text-muted-foreground italic">Generating title...</span>
+              <span className="text-xs text-muted-foreground italic">
+                {t('cardHeader.generatingTitle')}
+              </span>
             </div>
           ) : feature.title ? (
             <CardTitle className="text-sm font-semibold text-foreground mb-1 line-clamp-2">
@@ -353,12 +357,12 @@ export function CardHeaderSection({
               {isDescriptionExpanded ? (
                 <>
                   <ChevronUp className="w-3 h-3" />
-                  <span>Less</span>
+                  <span>{t('cardHeader.less')}</span>
                 </>
               ) : (
                 <>
                   <ChevronDown className="w-3 h-3" />
-                  <span>More</span>
+                  <span>{t('cardHeader.more')}</span>
                 </>
               )}
             </button>
@@ -371,8 +375,8 @@ export function CardHeaderSection({
         open={isDeleteDialogOpen}
         onOpenChange={setIsDeleteDialogOpen}
         onConfirm={handleConfirmDelete}
-        title="Delete Feature"
-        description="Are you sure you want to delete this feature? This action cannot be undone."
+        title={t('feature.deleteFeature')}
+        description={t('feature.confirmDelete')}
         testId="delete-confirmation-dialog"
         confirmTestId="confirm-delete-button"
       />

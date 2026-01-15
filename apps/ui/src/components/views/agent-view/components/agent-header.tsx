@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Bot, PanelLeftClose, PanelLeft, Wrench, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -24,6 +25,8 @@ export function AgentHeader({
   onToggleSessionManager,
   onClearChat,
 }: AgentHeaderProps) {
+  const { t } = useTranslation('agent');
+
   return (
     <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-card/50 backdrop-blur-sm">
       <div className="flex items-center gap-4">
@@ -43,10 +46,10 @@ export function AgentHeader({
           <Bot className="w-5 h-5 text-primary" />
         </div>
         <div>
-          <h1 className="text-lg font-semibold text-foreground">AI Agent</h1>
+          <h1 className="text-lg font-semibold text-foreground">{t('header.title')}</h1>
           <p className="text-sm text-muted-foreground">
             {projectName}
-            {currentSessionId && !isConnected && ' - Connecting...'}
+            {currentSessionId && !isConnected && ` - ${t('header.connecting')}`}
           </p>
         </div>
       </div>
@@ -68,7 +71,7 @@ export function AgentHeader({
             className="text-muted-foreground hover:text-foreground"
           >
             <Trash2 className="w-4 h-4 mr-2" />
-            Clear
+            {t('header.clear')}
           </Button>
         )}
       </div>

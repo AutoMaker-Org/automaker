@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -22,6 +23,7 @@ export function AppearanceSection({
   currentProject,
   onThemeChange,
 }: AppearanceSectionProps) {
+  const { t } = useTranslation('settings');
   const { setProjectIcon, setProjectName, setProjectCustomIcon } = useAppStore();
   const [activeTab, setActiveTab] = useState<'dark' | 'light'>('dark');
   const [projectName, setProjectNameLocal] = useState(currentProject?.name || '');
@@ -127,10 +129,12 @@ export function AppearanceSection({
           <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-brand-500/20 to-brand-600/10 flex items-center justify-center border border-brand-500/20">
             <Palette className="w-5 h-5 text-brand-500" />
           </div>
-          <h2 className="text-lg font-semibold text-foreground tracking-tight">Appearance</h2>
+          <h2 className="text-lg font-semibold text-foreground tracking-tight">
+            {t('sections.appearance.title')}
+          </h2>
         </div>
         <p className="text-sm text-muted-foreground/80 ml-12">
-          Customize the look and feel of your application.
+          {t('sections.appearance.description')}
         </p>
       </div>
       <div className="p-6 space-y-6">
@@ -139,19 +143,21 @@ export function AppearanceSection({
           <div className="space-y-4 pb-6 border-b border-border/50">
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="project-name-settings">Project Name</Label>
+                <Label htmlFor="project-name-settings">
+                  {t('sections.appearance.projectName')}
+                </Label>
                 <Input
                   id="project-name-settings"
                   value={projectName}
                   onChange={(e) => handleNameChange(e.target.value)}
-                  placeholder="Enter project name"
+                  placeholder={t('sections.appearance.projectNamePlaceholder')}
                 />
               </div>
 
               <div className="space-y-2">
-                <Label>Project Icon</Label>
+                <Label>{t('sections.appearance.projectIcon')}</Label>
                 <p className="text-xs text-muted-foreground mb-2">
-                  Choose a preset icon or upload a custom image
+                  {t('sections.appearance.projectIconDescription')}
                 </p>
 
                 {/* Custom Icon Upload */}
@@ -195,10 +201,12 @@ export function AppearanceSection({
                         className="gap-1.5"
                       >
                         <Upload className="w-3.5 h-3.5" />
-                        {isUploadingIcon ? 'Uploading...' : 'Upload Custom Icon'}
+                        {isUploadingIcon
+                          ? t('sections.appearance.uploading')
+                          : t('sections.appearance.uploadCustomIcon')}
                       </Button>
                       <p className="text-xs text-muted-foreground mt-1">
-                        PNG, JPG, GIF or WebP. Max 2MB.
+                        {t('sections.appearance.iconFileTypes')}
                       </p>
                     </div>
                   </div>
@@ -217,9 +225,11 @@ export function AppearanceSection({
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <Label className="text-foreground font-medium">
-              Theme{' '}
+              {t('sections.appearance.theme')}{' '}
               <span className="text-muted-foreground font-normal">
-                {currentProject ? `(for ${currentProject.name})` : '(Global)'}
+                {currentProject
+                  ? t('sections.appearance.themeForProject', { name: currentProject.name })
+                  : t('sections.appearance.themeGlobal')}
               </span>
             </Label>
             {/* Dark/Light Tabs */}
@@ -234,7 +244,7 @@ export function AppearanceSection({
                 )}
               >
                 <Moon className="w-3.5 h-3.5" />
-                Dark
+                {t('themes.dark')}
               </button>
               <button
                 onClick={() => setActiveTab('light')}
@@ -246,7 +256,7 @@ export function AppearanceSection({
                 )}
               >
                 <Sun className="w-3.5 h-3.5" />
-                Light
+                {t('themes.light')}
               </button>
             </div>
           </div>

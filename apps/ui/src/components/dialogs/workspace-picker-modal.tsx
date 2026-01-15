@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Dialog,
   DialogContent,
@@ -23,6 +24,7 @@ interface WorkspacePickerModalProps {
 }
 
 export function WorkspacePickerModal({ open, onOpenChange, onSelect }: WorkspacePickerModalProps) {
+  const { t } = useTranslation('common');
   const [isLoading, setIsLoading] = useState(false);
   const [directories, setDirectories] = useState<WorkspaceDirectory[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -64,10 +66,10 @@ export function WorkspacePickerModal({ open, onOpenChange, onSelect }: Workspace
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-foreground">
             <FolderOpen className="w-5 h-5 text-brand-500" />
-            Select Project
+            {t('dialogs.workspacePicker.title')}
           </DialogTitle>
           <DialogDescription className="text-muted-foreground">
-            Choose a project from your workspace directory
+            {t('dialogs.workspacePicker.description')}
           </DialogDescription>
         </DialogHeader>
 
@@ -75,7 +77,9 @@ export function WorkspacePickerModal({ open, onOpenChange, onSelect }: Workspace
           {isLoading && (
             <div className="flex flex-col items-center justify-center h-full gap-3">
               <Loader2 className="w-8 h-8 text-brand-500 animate-spin" />
-              <p className="text-sm text-muted-foreground">Loading projects...</p>
+              <p className="text-sm text-muted-foreground">
+                {t('dialogs.workspacePicker.loadingProjects')}
+              </p>
             </div>
           )}
 
@@ -86,7 +90,7 @@ export function WorkspacePickerModal({ open, onOpenChange, onSelect }: Workspace
               </div>
               <p className="text-sm text-destructive">{error}</p>
               <Button variant="secondary" size="sm" onClick={loadDirectories} className="mt-2">
-                Try Again
+                {t('buttons.retry')}
               </Button>
             </div>
           )}
@@ -97,7 +101,7 @@ export function WorkspacePickerModal({ open, onOpenChange, onSelect }: Workspace
                 <Folder className="w-6 h-6 text-muted-foreground" />
               </div>
               <p className="text-sm text-muted-foreground">
-                No projects found in workspace directory
+                {t('dialogs.workspacePicker.noProjectsFound')}
               </p>
             </div>
           )}
@@ -132,7 +136,7 @@ export function WorkspacePickerModal({ open, onOpenChange, onSelect }: Workspace
             onClick={() => onOpenChange(false)}
             className="text-muted-foreground hover:text-foreground hover:bg-accent"
           >
-            Cancel
+            {t('buttons.cancel')}
           </Button>
         </DialogFooter>
       </DialogContent>

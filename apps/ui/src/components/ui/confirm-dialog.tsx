@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import { LucideIcon } from 'lucide-react';
 import {
   Dialog,
@@ -23,9 +24,9 @@ interface ConfirmDialogProps {
   iconClassName?: string;
   /** Optional content to show between description and buttons */
   children?: ReactNode;
-  /** Text for the confirm button. Defaults to "Confirm" */
+  /** Text for the confirm button. Uses translation key buttons.confirm if not provided */
   confirmText?: string;
-  /** Text for the cancel button. Defaults to "Cancel" */
+  /** Text for the cancel button. Uses translation key buttons.cancel if not provided */
   cancelText?: string;
   /** Variant for the confirm button. Defaults to "default" */
   confirmVariant?: 'default' | 'destructive' | 'outline' | 'secondary' | 'ghost' | 'link';
@@ -40,10 +41,13 @@ export function ConfirmDialog({
   icon: Icon,
   iconClassName = 'text-primary',
   children,
-  confirmText = 'Confirm',
-  cancelText = 'Cancel',
+  confirmText,
+  cancelText,
   confirmVariant = 'default',
 }: ConfirmDialogProps) {
+  const { t } = useTranslation('common');
+  const displayConfirmText = confirmText ?? t('buttons.confirm');
+  const displayCancelText = cancelText ?? t('buttons.cancel');
   const handleConfirm = () => {
     onConfirm();
     onOpenChange(false);
@@ -64,7 +68,7 @@ export function ConfirmDialog({
 
         <DialogFooter className="gap-2 sm:gap-2 pt-4">
           <Button variant="ghost" onClick={() => onOpenChange(false)} className="px-4">
-            {cancelText}
+            {displayCancelText}
           </Button>
           <HotkeyButton
             variant={confirmVariant}
@@ -74,7 +78,7 @@ export function ConfirmDialog({
             className="px-4"
           >
             {Icon && <Icon className="w-4 h-4 mr-2" />}
-            {confirmText}
+            {displayConfirmText}
           </HotkeyButton>
         </DialogFooter>
       </DialogContent>

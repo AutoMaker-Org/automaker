@@ -1,0 +1,91 @@
+{
+  "welcome": {
+    "greeting": "Cześć! Jestem agentem Automaker. Mogę pomóc Ci budować oprogramowanie autonomicznie. Potrafię czytać i modyfikować pliki w tym projekcie, uruchamiać polecenia i wykonywać testy. Co chciałbyś dzisiaj stworzyć?"
+  },
+  "header": {
+    "title": "Agent AI",
+    "thinking": "Myślę...",
+    "connected": "Połączono",
+    "disconnected": "Rozłączono",
+    "connecting": "Łączenie...",
+    "messagesCount": "{{count}} wiadomości",
+    "clear": "Wyczyść"
+  },
+  "input": {
+    "placeholder": "Opisz, co chcesz zbudować...",
+    "placeholderProcessing": "Wpisz, aby dodać kolejny prompt do kolejki...",
+    "placeholderDropFiles": "Upuść pliki tutaj...",
+    "send": "Wyślij",
+    "stop": "Zatrzymaj",
+    "stopGeneration": "Zatrzymaj generowanie",
+    "addToQueue": "Dodaj do kolejki",
+    "sendMessage": "Wyślij wiadomość",
+    "attachImage": "Dołącz obraz",
+    "attachFile": "Dołącz plik",
+    "attachFiles": "Dołącz pliki (obrazy, .txt, .md)",
+    "filesAttached": "plików dołączonych",
+    "dropHere": "Upuść tutaj",
+    "keyboardHint": "Naciśnij <kbd>Enter</kbd>, aby wysłać, <kbd>Shift+Enter</kbd> dla nowej linii"
+  },
+  "session": {
+    "newSession": "Nowa sesja",
+    "sessions": "Sesje",
+    "active": "Aktywne",
+    "archived": "Zarchiwizowane",
+    "noSessions": "Brak sesji",
+    "createFirst": "Utwórz pierwszą sesję, aby rozpocząć",
+    "rename": "Zmień nazwę sesji",
+    "archive": "Archiwizuj sesję",
+    "delete": "Usuń sesję",
+    "confirmDelete": "Czy na pewno chcesz usunąć tę sesję?",
+    "messages": "{{count}} wiadomość",
+    "messages_plural": "{{count}} wiadomości",
+    "noSessionSelected": "Nie wybrano sesji",
+    "noSessionDescription": "Utwórz lub wybierz sesję, aby rozpocząć rozmowę z agentem AI",
+    "viewSessions": "Zobacz sesje",
+    "showSessions": "Pokaż sesje"
+  },
+  "chat": {
+    "clearHistory": "Wyczyść historię czatu",
+    "confirmClear": "Czy na pewno chcesz wyczyścić tę rozmowę?",
+    "copyMessage": "Kopiuj wiadomość",
+    "regenerate": "Wygeneruj ponownie odpowiedź",
+    "imagesAttached": "{{count}} obraz dołączony",
+    "imagesAttached_plural": "{{count}} obrazów dołączonych"
+  },
+  "queue": {
+    "title": "Kolejka wiadomości",
+    "empty": "Kolejka jest pusta",
+    "pending": "{{count}} prompt w kolejce",
+    "pending_plural": "{{count}} promptów w kolejce",
+    "remove": "Usuń z kolejki",
+    "clear": "Wyczyść kolejkę",
+    "clearAll": "Wyczyść wszystko",
+    "filesCount": "+{{count}} plik",
+    "filesCount_plural": "+{{count}} plików"
+  },
+  "tools": {
+    "using": "Używam {{tool}}...",
+    "completed": "Narzędzie zakończone",
+    "read": "Czytanie pliku",
+    "write": "Zapisywanie pliku",
+    "edit": "Edytowanie pliku",
+    "bash": "Uruchamianie polecenia",
+    "glob": "Wyszukiwanie plików",
+    "grep": "Wyszukiwanie zawartości"
+  },
+  "errors": {
+    "connectionFailed": "Nie udało się połączyć z agentem",
+    "messageFailed": "Nie udało się wysłać wiadomości",
+    "sessionLoadFailed": "Nie udało się wczytać sesji"
+  },
+  "noProject": {
+    "title": "Nie wybrano projektu",
+    "description": "Otwórz lub utwórz projekt, aby rozpocząć pracę z agentem AI."
+  },
+  "files": {
+    "filesAttached": "{{count}} plik dołączony",
+    "filesAttached_plural": "{{count}} plików dołączonych",
+    "clearAll": "Wyczyść wszystko"
+  }
+}

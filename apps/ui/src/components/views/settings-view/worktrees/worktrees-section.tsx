@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
@@ -33,6 +34,7 @@ interface InitScriptResponse {
 }
 
 export function WorktreesSection({ useWorktrees, onUseWorktreesChange }: WorktreesSectionProps) {
+  const { t } = useTranslation('settings');
   const currentProject = useAppStore((s) => s.currentProject);
   const getShowInitScriptIndicator = useAppStore((s) => s.getShowInitScriptIndicator);
   const setShowInitScriptIndicator = useAppStore((s) => s.setShowInitScriptIndicator);
@@ -113,19 +115,19 @@ export function WorktreesSection({ useWorktrees, onUseWorktreesChange }: Worktre
       if (response.success) {
         setOriginalContent(scriptContent);
         setScriptExists(true);
-        toast.success('Init script saved');
+        toast.success(t('sections.worktrees.initScriptSaved'));
       } else {
-        toast.error('Failed to save init script', {
+        toast.error(t('sections.worktrees.failedToSaveInitScript'), {
           description: response.error,
         });
       }
     } catch (error) {
       console.error('Failed to save init script:', error);
-      toast.error('Failed to save init script');
+      toast.error(t('sections.worktrees.failedToSaveInitScript'));
     } finally {
       setIsSaving(false);
     }
-  }, [currentProject?.path, scriptContent]);
+  }, [currentProject?.path, scriptContent, t]);
 
   // Reset to original content
   const handleReset = useCallback(() => {
@@ -148,19 +150,19 @@ export function WorktreesSection({ useWorktrees, onUseWorktreesChange }: Worktre
         setScriptContent('');
         setOriginalContent('');
         setScriptExists(false);
-        toast.success('Init script deleted');
+        toast.success(t('sections.worktrees.initScriptDeleted'));
       } else {
-        toast.error('Failed to delete init script', {
+        toast.error(t('sections.worktrees.failedToDeleteInitScript'), {
           description: response.error,
         });
       }
     } catch (error) {
       console.error('Failed to delete init script:', error);
-      toast.error('Failed to delete init script');
+      toast.error(t('sections.worktrees.failedToDeleteInitScript'));
     } finally {
       setIsDeleting(false);
     }
-  }, [currentProject?.path]);
+  }, [currentProject?.path, t]);
 
   // Handle content change (no auto-save)
   const handleContentChange = useCallback((value: string) => {
@@ -181,10 +183,12 @@ export function WorktreesSection({ useWorktrees, onUseWorktreesChange }: Worktre
           <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-brand-500/20 to-brand-600/10 flex items-center justify-center border border-brand-500/20">
             <GitBranch className="w-5 h-5 text-brand-500" />
           </div>
-          <h2 className="text-lg font-semibold text-foreground tracking-tight">Worktrees</h2>
+          <h2 className="text-lg font-semibold text-foreground tracking-tight">
+            {t('sections.worktrees.title')}
+          </h2>
         </div>
         <p className="text-sm text-muted-foreground/80 ml-12">
-          Configure git worktree isolation and initialization scripts.
+          {t('sections.worktrees.description')}
         </p>
       </div>
       <div className="p-6 space-y-5">
@@ -203,11 +207,10 @@ export function WorktreesSection({ useWorktrees, onUseWorktreesChange }: Worktre
               className="text-foreground cursor-pointer font-medium flex items-center gap-2"
             >
               <GitBranch className="w-4 h-4 text-brand-500" />
-              Enable Git Worktree Isolation
+              {t('sections.worktrees.enableWorktreeIsolation')}
             </Label>
             <p className="text-xs text-muted-foreground/80 leading-relaxed">
-              Creates isolated git branches for each feature. When disabled, agents work directly in
-              the main project directory.
+              {t('sections.worktrees.enableWorktreeIsolationDescription')}
             </p>
           </div>
         </div>
@@ -241,11 +244,10 @@ export function WorktreesSection({ useWorktrees, onUseWorktreesChange }: Worktre
                 className="text-foreground cursor-pointer font-medium flex items-center gap-2"
               >
                 <PanelBottomClose className="w-4 h-4 text-brand-500" />
-                Show Init Script Indicator
+                {t('sections.worktrees.showInitScriptIndicator')}
               </Label>
               <p className="text-xs text-muted-foreground/80 leading-relaxed">
-                Display a floating panel in the bottom-right corner showing init script execution
-                status and output when a worktree is created.
+                {t('sections.worktrees.showInitScriptIndicatorDescription')}
               </p>
             </div>
           </div>
@@ -279,10 +281,10 @@ export function WorktreesSection({ useWorktrees, onUseWorktreesChange }: Worktre
                 htmlFor="auto-dismiss-indicator"
                 className="text-foreground cursor-pointer font-medium flex items-center gap-2"
               >
-                Auto-dismiss After Completion
+                {t('sections.worktrees.autoDismissAfterCompletion')}
               </Label>
               <p className="text-xs text-muted-foreground/80 leading-relaxed">
-                Automatically hide the indicator 5 seconds after the script completes.
+                {t('sections.worktrees.autoDismissAfterCompletionDescription')}
               </p>
             </div>
           </div>
@@ -317,10 +319,10 @@ export function WorktreesSection({ useWorktrees, onUseWorktreesChange }: Worktre
                 className="text-foreground cursor-pointer font-medium flex items-center gap-2"
               >
                 <Trash2 className="w-4 h-4 text-brand-500" />
-                Delete Branch by Default
+                {t('sections.worktrees.deleteBranchByDefault')}
               </Label>
               <p className="text-xs text-muted-foreground/80 leading-relaxed">
-                When deleting a worktree, automatically check the "Also delete the branch" option.
+                {t('sections.worktrees.deleteBranchByDefaultDescription')}
               </p>
             </div>
           </div>
@@ -334,12 +336,13 @@ export function WorktreesSection({ useWorktrees, onUseWorktreesChange }: Worktre
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Terminal className="w-4 h-4 text-brand-500" />
-              <Label className="text-foreground font-medium">Initialization Script</Label>
+              <Label className="text-foreground font-medium">
+                {t('sections.worktrees.initializationScript')}
+              </Label>
             </div>
           </div>
           <p className="text-xs text-muted-foreground/80 leading-relaxed">
-            Shell commands to run after a worktree is created. Runs once per worktree. Uses Git Bash
-            on Windows for cross-platform compatibility.
+            {t('sections.worktrees.initializationScriptDescription')}
           </p>
 
           {currentProject ? (
@@ -349,7 +352,9 @@ export function WorktreesSection({ useWorktrees, onUseWorktreesChange }: Worktre
                 <FileCode className="w-3.5 h-3.5" />
                 <code className="font-mono">.automaker/worktree-init.sh</code>
                 {hasChanges && (
-                  <span className="text-amber-500 font-medium">(unsaved changes)</span>
+                  <span className="text-amber-500 font-medium">
+                    ({t('sections.worktrees.unsavedChanges')})
+                  </span>
                 )}
               </div>
 
@@ -385,7 +390,7 @@ npm install
                       className="gap-1.5"
                     >
                       <RotateCcw className="w-3.5 h-3.5" />
-                      Reset
+                      {t('sections.worktrees.reset')}
                     </Button>
                     <Button
                       variant="outline"
@@ -399,7 +404,7 @@ npm install
                       ) : (
                         <Trash2 className="w-3.5 h-3.5" />
                       )}
-                      Delete
+                      {t('sections.worktrees.delete')}
                     </Button>
                     <Button
                       size="sm"
@@ -412,7 +417,7 @@ npm install
                       ) : (
                         <Save className="w-3.5 h-3.5" />
                       )}
-                      Save
+                      {t('sections.worktrees.save')}
                     </Button>
                   </div>
                 </>
@@ -420,7 +425,7 @@ npm install
             </>
           ) : (
             <div className="text-sm text-muted-foreground/60 py-4 text-center">
-              Select a project to configure the init script.
+              {t('sections.worktrees.selectProjectToConfigureInitScript')}
             </div>
           )}
         </div>

@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { useEffect, useState, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Feature, ThinkingLevel, ParsedTask } from '@/store/app-store';
 import type { ReasoningEffort } from '@automaker/types';
 import { getProviderFromModel } from '@/lib/utils';
@@ -69,6 +70,7 @@ export function AgentInfoPanel({
   summary,
   isCurrentAutoTask,
 }: AgentInfoPanelProps) {
+  const { t } = useTranslation('board');
   const [agentInfo, setAgentInfo] = useState<AgentTaskInfo | null>(null);
   const [isSummaryDialogOpen, setIsSummaryDialogOpen] = useState(false);
   const [isTodosExpanded, setIsTodosExpanded] = useState(false);
@@ -322,8 +324,8 @@ export function AgentInfoPanel({
               <div className="flex items-center gap-1 text-[10px] text-muted-foreground/70">
                 <ListTodo className="w-3 h-3" />
                 <span>
-                  {effectiveTodos.filter((t) => t.status === 'completed').length}/
-                  {effectiveTodos.length} tasks
+                  {effectiveTodos.filter((todo) => todo.status === 'completed').length}/
+                  {effectiveTodos.length} {t('agentInfo.tasks')}
                 </span>
               </div>
               <div
@@ -365,7 +367,9 @@ export function AgentInfoPanel({
                     onMouseDown={(e) => e.stopPropagation()}
                     className="text-[10px] text-muted-foreground/60 pl-4 hover:text-muted-foreground transition-colors cursor-pointer"
                   >
-                    {isTodosExpanded ? 'Show less' : `+${effectiveTodos.length - 3} more`}
+                    {isTodosExpanded
+                      ? t('agentInfo.showLess')
+                      : t('agentInfo.showMore', { count: effectiveTodos.length - 3 })}
                   </button>
                 )}
               </div>
@@ -380,7 +384,7 @@ export function AgentInfoPanel({
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-1 text-[10px] text-[var(--status-success)] min-w-0">
                       <Sparkles className="w-3 h-3 shrink-0" />
-                      <span className="truncate font-medium">Summary</span>
+                      <span className="truncate font-medium">{t('agentInfo.summary')}</span>
                     </div>
                     <button
                       onClick={(e) => {
@@ -390,7 +394,7 @@ export function AgentInfoPanel({
                       onPointerDown={(e) => e.stopPropagation()}
                       onMouseDown={(e) => e.stopPropagation()}
                       className="p-0.5 rounded-md hover:bg-muted/80 transition-colors text-muted-foreground/60 hover:text-muted-foreground shrink-0"
-                      title="View full summary"
+                      title={t('agentInfo.viewFullSummary')}
                       data-testid={`expand-summary-${feature.id}`}
                     >
                       <Expand className="w-3 h-3" />
@@ -412,12 +416,15 @@ export function AgentInfoPanel({
                   <div className="flex items-center gap-2 text-[10px] text-muted-foreground/60 pt-2 border-t border-border/30">
                     <span className="flex items-center gap-1">
                       <Wrench className="w-2.5 h-2.5" />
-                      {agentInfo?.toolCallCount ?? 0} tool calls
+                      {t('agentInfo.toolCalls', { count: agentInfo?.toolCallCount ?? 0 })}
                     </span>
                     {effectiveTodos.length > 0 && (
                       <span className="flex items-center gap-1">
                         <CheckCircle2 className="w-2.5 h-2.5 text-[var(--status-success)]" />
-                        {effectiveTodos.filter((t) => t.status === 'completed').length} tasks done
+                        {t('agentInfo.tasksDone', {
+                          count: effectiveTodos.filter((todo) => todo.status === 'completed')
+                            .length,
+                        })}
                       </span>
                     )}
                   </div>

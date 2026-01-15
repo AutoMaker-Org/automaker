@@ -1,4 +1,5 @@
 // @ts-nocheck
+import { useTranslation } from 'react-i18next';
 import { Feature } from '@/store/app-store';
 import { Button } from '@/components/ui/button';
 import {
@@ -50,6 +51,8 @@ export function CardActions({
   onViewPlan,
   onApprovePlan,
 }: CardActionsProps) {
+  const { t } = useTranslation('board');
+
   // Hide all actions when in selection mode
   if (isSelectionMode) {
     return null;
@@ -73,7 +76,7 @@ export function CardActions({
               data-testid={`approve-plan-running-${feature.id}`}
             >
               <FileText className="w-3 h-3 mr-1 shrink-0" />
-              <span className="truncate">Approve Plan</span>
+              <span className="truncate">{t('cardActions.approvePlan')}</span>
             </Button>
           )}
           {onViewOutput && (
@@ -89,7 +92,7 @@ export function CardActions({
               data-testid={`view-output-${feature.id}`}
             >
               <FileText className="w-3 h-3 mr-1 shrink-0" />
-              <span className="truncate">Logs</span>
+              <span className="truncate">{t('cardActions.logs')}</span>
               {shortcutKey && (
                 <span
                   className="ml-1.5 px-1 py-0.5 text-[9px] font-mono rounded bg-foreground/10"
@@ -135,7 +138,7 @@ export function CardActions({
                 data-testid={`approve-plan-${feature.id}`}
               >
                 <FileText className="w-3 h-3 mr-1" />
-                Approve Plan
+                {t('cardActions.approvePlan')}
               </Button>
             )}
             {feature.skipTests && onManualVerify ? (
@@ -151,7 +154,7 @@ export function CardActions({
                 data-testid={`manual-verify-${feature.id}`}
               >
                 <CheckCircle2 className="w-3 h-3 mr-1" />
-                Verify
+                {t('cardActions.verify')}
               </Button>
             ) : onResume ? (
               <Button
@@ -166,7 +169,7 @@ export function CardActions({
                 data-testid={`resume-feature-${feature.id}`}
               >
                 <RotateCcw className="w-3 h-3 mr-1" />
-                Resume
+                {t('cardActions.resume')}
               </Button>
             ) : onVerify ? (
               <Button
@@ -181,7 +184,7 @@ export function CardActions({
                 data-testid={`verify-feature-${feature.id}`}
               >
                 <CheckCircle2 className="w-3 h-3 mr-1" />
-                Verify
+                {t('cardActions.verify')}
               </Button>
             ) : null}
             {onViewOutput && !feature.skipTests && (
@@ -217,7 +220,7 @@ export function CardActions({
               data-testid={`view-output-verified-${feature.id}`}
             >
               <FileText className="w-3 h-3 mr-1 shrink-0" />
-              <span className="truncate">Logs</span>
+              <span className="truncate">{t('cardActions.logs')}</span>
             </Button>
           )}
           {/* Complete button */}
@@ -234,7 +237,7 @@ export function CardActions({
               data-testid={`complete-${feature.id}`}
             >
               <Archive className="w-3 h-3 mr-1 shrink-0" />
-              <span className="truncate">Complete</span>
+              <span className="truncate">{t('cardActions.complete')}</span>
             </Button>
           )}
         </>
@@ -255,7 +258,7 @@ export function CardActions({
               data-testid={`follow-up-${feature.id}`}
             >
               <Wand2 className="w-3 h-3 mr-1 shrink-0" />
-              <span className="truncate">Refine</span>
+              <span className="truncate">{t('cardActions.refine')}</span>
             </Button>
           )}
           {/* Show Verify button if PR was created (changes are committed), otherwise show Mark as Verified button */}
@@ -272,7 +275,7 @@ export function CardActions({
               data-testid={`verify-${feature.id}`}
             >
               <CheckCircle2 className="w-3 h-3 mr-1" />
-              Verify
+              {t('cardActions.verify')}
             </Button>
           ) : onManualVerify ? (
             <Button
@@ -287,7 +290,7 @@ export function CardActions({
               data-testid={`mark-as-verified-${feature.id}`}
             >
               <CheckCircle2 className="w-3 h-3 mr-1" />
-              Mark as Verified
+              {t('cardActions.markAsVerified')}
             </Button>
           ) : null}
         </>
@@ -306,7 +309,7 @@ export function CardActions({
             data-testid={`edit-backlog-${feature.id}`}
           >
             <Edit className="w-3 h-3 mr-1" />
-            Edit
+            {t('cardActions.edit')}
           </Button>
           {feature.planSpec?.content && onViewPlan && (
             <Button
@@ -319,7 +322,7 @@ export function CardActions({
               }}
               onPointerDown={(e) => e.stopPropagation()}
               data-testid={`view-plan-${feature.id}`}
-              title="View Plan"
+              title={t('cardActions.viewPlan')}
             >
               <Eye className="w-3 h-3" />
             </Button>
@@ -337,7 +340,7 @@ export function CardActions({
               data-testid={`make-${feature.id}`}
             >
               <PlayCircle className="w-3 h-3 mr-1" />
-              Make
+              {t('cardActions.make')}
             </Button>
           )}
         </>

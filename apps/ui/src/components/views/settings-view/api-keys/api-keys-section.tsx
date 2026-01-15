@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { useAppStore } from '@/store/app-store';
 import { useSetupStore } from '@/store/setup-store';
 import { Button } from '@/components/ui/button';
@@ -12,6 +13,7 @@ import { getElectronAPI } from '@/lib/electron';
 import { toast } from 'sonner';
 
 export function ApiKeysSection() {
+  const { t } = useTranslation('settings');
   const { apiKeys, setApiKeys } = useAppStore();
   const { claudeAuthStatus, setClaudeAuthStatus, codexAuthStatus, setCodexAuthStatus } =
     useSetupStore();
@@ -28,7 +30,7 @@ export function ApiKeysSection() {
     try {
       const api = getElectronAPI();
       if (!api.setup?.deleteApiKey) {
-        toast.error('Delete API not available');
+        toast.error(t('sections.apiKeys.deleteApiNotAvailable'));
         return;
       }
 
@@ -40,16 +42,16 @@ export function ApiKeysSection() {
           method: 'none',
           hasCredentialsFile: claudeAuthStatus?.hasCredentialsFile || false,
         });
-        toast.success('Anthropic API key deleted');
+        toast.success(t('sections.apiKeys.anthropicKeyDeleted'));
       } else {
-        toast.error(result.error || 'Failed to delete API key');
+        toast.error(result.error || t('sections.apiKeys.failedToDeleteKey'));
       }
     } catch (error) {
-      toast.error('Failed to delete API key');
+      toast.error(t('sections.apiKeys.failedToDeleteKey'));
     } finally {
       setIsDeletingAnthropicKey(false);
     }
-  }, [apiKeys, setApiKeys, claudeAuthStatus, setClaudeAuthStatus]);
+  }, [apiKeys, setApiKeys, claudeAuthStatus, setClaudeAuthStatus, t]);
 
   // Delete OpenAI API key
   const deleteOpenaiKey = useCallback(async () => {
@@ -57,7 +59,7 @@ export function ApiKeysSection() {
     try {
       const api = getElectronAPI();
       if (!api.setup?.deleteApiKey) {
-        toast.error('Delete API not available');
+        toast.error(t('sections.apiKeys.deleteApiNotAvailable'));
         return;
       }
 
@@ -68,16 +70,16 @@ export function ApiKeysSection() {
           authenticated: false,
           method: 'none',
         });
-        toast.success('OpenAI API key deleted');
+        toast.success(t('sections.apiKeys.openaiKeyDeleted'));
       } else {
-        toast.error(result.error || 'Failed to delete API key');
+        toast.error(result.error || t('sections.apiKeys.failedToDeleteKey'));
       }
     } catch (error) {
-      toast.error('Failed to delete API key');
+      toast.error(t('sections.apiKeys.failedToDeleteKey'));
     } finally {
       setIsDeletingOpenaiKey(false);
     }
-  }, [apiKeys, setApiKeys, setCodexAuthStatus]);
+  }, [apiKeys, setApiKeys, setCodexAuthStatus, t]);
 
   return (
     <div
@@ -93,10 +95,12 @@ export function ApiKeysSection() {
           <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-brand-500/20 to-brand-600/10 flex items-center justify-center border border-brand-500/20">
             <Key className="w-5 h-5 text-brand-500" />
           </div>
-          <h2 className="text-lg font-semibold text-foreground tracking-tight">API Keys</h2>
+          <h2 className="text-lg font-semibold text-foreground tracking-tight">
+            {t('sections.apiKeys.title')}
+          </h2>
         </div>
         <p className="text-sm text-muted-foreground/80 ml-12">
-          Configure your AI provider API keys. Keys are stored locally in your browser.
+          {t('sections.apiKeys.description')}
         </p>
       </div>
       <div className="p-6 space-y-6">
@@ -126,10 +130,10 @@ export function ApiKeysSection() {
             {saved ? (
               <>
                 <CheckCircle2 className="w-4 h-4 mr-2" />
-                Saved!
+                {t('sections.apiKeys.saved')}
               </>
             ) : (
-              'Save API Keys'
+              t('sections.apiKeys.saveApiKeys')
             )}
           </Button>
 
@@ -146,7 +150,7 @@ export function ApiKeysSection() {
               ) : (
                 <Trash2 className="w-4 h-4 mr-2" />
               )}
-              Delete Anthropic Key
+              {t('sections.apiKeys.deleteAnthropicKey')}
             </Button>
           )}
 
@@ -163,7 +167,7 @@ export function ApiKeysSection() {
               ) : (
                 <Trash2 className="w-4 h-4 mr-2" />
               )}
-              Delete OpenAI Key
+              {t('sections.apiKeys.deleteOpenaiKey')}
             </Button>
           )}
         </div>

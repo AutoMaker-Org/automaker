@@ -1,4 +1,5 @@
 import { Bug } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/utils';
 import { useCallback } from 'react';
 import { getElectronAPI } from '@/lib/electron';
@@ -8,6 +9,8 @@ interface BugReportButtonProps {
 }
 
 export function BugReportButton({ sidebarExpanded }: BugReportButtonProps) {
+  const { t } = useTranslation('common');
+
   const handleBugReportClick = useCallback(() => {
     const api = getElectronAPI();
     api.openExternalLink('https://github.com/AutoMaker-Org/automaker/issues');
@@ -24,7 +27,7 @@ export function BugReportButton({ sidebarExpanded }: BugReportButtonProps) {
         'hover:scale-[1.02] active:scale-[0.97]',
         sidebarExpanded && 'absolute right-3'
       )}
-      title="Report Bug / Feature Request"
+      title={t('sidebar.reportBug')}
       data-testid={sidebarExpanded ? 'bug-report-link' : 'bug-report-link-collapsed'}
     >
       <Bug className="w-4 h-4" />

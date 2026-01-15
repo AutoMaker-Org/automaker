@@ -7,14 +7,25 @@
     "thinking": "Denke nach...",
     "connected": "Verbunden",
     "disconnected": "Getrennt",
-    "messagesCount": "{{count}} Nachrichten"
+    "connecting": "Verbinde...",
+    "messagesCount": "{{count}} Nachrichten",
+    "clear": "Leeren"
   },
   "input": {
-    "placeholder": "Nachricht eingeben...",
+    "placeholder": "Beschreibe, was du bauen möchtest...",
+    "placeholderProcessing": "Tippen, um eine weitere Anfrage einzureihen...",
+    "placeholderDropFiles": "Dateien hier ablegen...",
     "send": "Senden",
     "stop": "Stoppen",
+    "stopGeneration": "Generierung stoppen",
+    "addToQueue": "Zur Warteschlange hinzufügen",
+    "sendMessage": "Nachricht senden",
     "attachImage": "Bild anhängen",
-    "attachFile": "Datei anhängen"
+    "attachFile": "Datei anhängen",
+    "attachFiles": "Dateien anhängen (Bilder, .txt, .md)",
+    "filesAttached": "Dateien angehängt",
+    "dropHere": "Hier ablegen",
+    "keyboardHint": "Drücke <kbd>Enter</kbd> zum Senden, <kbd>Shift+Enter</kbd> für neue Zeile"
   },
   "session": {
     "newSession": "Neue Sitzung",
@@ -28,21 +39,30 @@
     "delete": "Sitzung löschen",
     "confirmDelete": "Möchtest du diese Sitzung wirklich löschen?",
     "messages": "{{count}} Nachricht",
-    "messages_plural": "{{count}} Nachrichten"
+    "messages_plural": "{{count}} Nachrichten",
+    "noSessionSelected": "Keine Sitzung ausgewählt",
+    "noSessionDescription": "Erstelle oder wähle eine Sitzung, um mit dem AI-Agenten zu chatten",
+    "viewSessions": "Sitzungen anzeigen",
+    "showSessions": "Sitzungen zeigen"
   },
   "chat": {
     "clearHistory": "Chat-Verlauf leeren",
     "confirmClear": "Möchtest du diese Konversation wirklich leeren?",
     "copyMessage": "Nachricht kopieren",
-    "regenerate": "Antwort neu generieren"
+    "regenerate": "Antwort neu generieren",
+    "imagesAttached": "{{count}} Bild angehängt",
+    "imagesAttached_plural": "{{count}} Bilder angehängt"
   },
   "queue": {
     "title": "Nachrichten-Warteschlange",
     "empty": "Warteschlange ist leer",
-    "pending": "{{count}} Nachricht ausstehend",
-    "pending_plural": "{{count}} Nachrichten ausstehend",
+    "pending": "{{count}} Anfrage eingereiht",
+    "pending_plural": "{{count}} Anfragen eingereiht",
     "remove": "Aus Warteschlange entfernen",
-    "clear": "Warteschlange leeren"
+    "clear": "Warteschlange leeren",
+    "clearAll": "Alle leeren",
+    "filesCount": "+{{count}} Datei",
+    "filesCount_plural": "+{{count}} Dateien"
   },
   "tools": {
     "using": "Verwende {{tool}}...",
@@ -58,5 +78,14 @@
     "connectionFailed": "Verbindung zum Agent fehlgeschlagen",
     "messageFailed": "Nachricht konnte nicht gesendet werden",
     "sessionLoadFailed": "Sitzung konnte nicht geladen werden"
+  },
+  "noProject": {
+    "title": "Kein Projekt ausgewählt",
+    "description": "Öffne oder erstelle ein Projekt, um mit dem AI-Agenten zu arbeiten."
+  },
+  "files": {
+    "filesAttached": "{{count}} Datei angehängt",
+    "filesAttached_plural": "{{count}} Dateien angehängt",
+    "clearAll": "Alle leeren"
   }
 }

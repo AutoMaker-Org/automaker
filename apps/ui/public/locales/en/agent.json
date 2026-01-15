@@ -7,14 +7,25 @@
     "thinking": "Thinking...",
     "connected": "Connected",
     "disconnected": "Disconnected",
-    "messagesCount": "{{count}} messages"
+    "connecting": "Connecting...",
+    "messagesCount": "{{count}} messages",
+    "clear": "Clear"
   },
   "input": {
-    "placeholder": "Type a message...",
+    "placeholder": "Describe what you want to build...",
+    "placeholderProcessing": "Type to queue another prompt...",
+    "placeholderDropFiles": "Drop your files here...",
     "send": "Send",
     "stop": "Stop",
+    "stopGeneration": "Stop generation",
+    "addToQueue": "Add to queue",
+    "sendMessage": "Send message",
     "attachImage": "Attach image",
-    "attachFile": "Attach file"
+    "attachFile": "Attach file",
+    "attachFiles": "Attach files (images, .txt, .md)",
+    "filesAttached": "files attached",
+    "dropHere": "Drop here",
+    "keyboardHint": "Press <kbd>Enter</kbd> to send, <kbd>Shift+Enter</kbd> for new line"
   },
   "session": {
     "newSession": "New Session",
@@ -28,21 +39,30 @@
     "delete": "Delete session",
     "confirmDelete": "Are you sure you want to delete this session?",
     "messages": "{{count}} message",
-    "messages_plural": "{{count}} messages"
+    "messages_plural": "{{count}} messages",
+    "noSessionSelected": "No Session Selected",
+    "noSessionDescription": "Create or select a session to start chatting with the AI agent",
+    "viewSessions": "View Sessions",
+    "showSessions": "Show Sessions"
   },
   "chat": {
     "clearHistory": "Clear chat history",
     "confirmClear": "Are you sure you want to clear this conversation?",
     "copyMessage": "Copy message",
-    "regenerate": "Regenerate response"
+    "regenerate": "Regenerate response",
+    "imagesAttached": "{{count}} image attached",
+    "imagesAttached_plural": "{{count}} images attached"
   },
   "queue": {
     "title": "Message Queue",
     "empty": "Queue is empty",
-    "pending": "{{count}} message pending",
-    "pending_plural": "{{count}} messages pending",
+    "pending": "{{count}} prompt queued",
+    "pending_plural": "{{count}} prompts queued",
     "remove": "Remove from queue",
-    "clear": "Clear queue"
+    "clear": "Clear queue",
+    "clearAll": "Clear all",
+    "filesCount": "+{{count}} file",
+    "filesCount_plural": "+{{count}} files"
   },
   "tools": {
     "using": "Using {{tool}}...",
@@ -58,5 +78,14 @@
     "connectionFailed": "Failed to connect to agent",
     "messageFailed": "Failed to send message",
     "sessionLoadFailed": "Failed to load session"
+  },
+  "noProject": {
+    "title": "No Project Selected",
+    "description": "Open or create a project to start working with the AI agent."
+  },
+  "files": {
+    "filesAttached": "{{count}} file attached",
+    "filesAttached_plural": "{{count}} files attached",
+    "clearAll": "Clear all"
   }
 }

@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Workflow, RotateCcw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAppStore } from '@/store/app-store';
@@ -8,100 +9,101 @@ import { DEFAULT_PHASE_MODELS } from '@automaker/types';
 
 interface PhaseConfig {
   key: PhaseModelKey;
-  label: string;
-  description: string;
+  labelKey: string;
+  descriptionKey: string;
 }
 
 const QUICK_TASKS: PhaseConfig[] = [
   {
     key: 'enhancementModel',
-    label: 'Feature Enhancement',
-    description: 'Improves feature names and descriptions',
+    labelKey: 'sections.modelDefaults.featureEnhancement',
+    descriptionKey: 'sections.modelDefaults.featureEnhancementDescription',
   },
   {
     key: 'fileDescriptionModel',
-    label: 'File Descriptions',
-    description: 'Generates descriptions for context files',
+    labelKey: 'sections.modelDefaults.fileDescriptions',
+    descriptionKey: 'sections.modelDefaults.fileDescriptionsDescription',
   },
   {
     key: 'imageDescriptionModel',
-    label: 'Image Descriptions',
-    description: 'Analyzes and describes context images',
+    labelKey: 'sections.modelDefaults.imageDescriptions',
+    descriptionKey: 'sections.modelDefaults.imageDescriptionsDescription',
   },
   {
     key: 'commitMessageModel',
-    label: 'Commit Messages',
-    description: 'Generates git commit messages from diffs',
+    labelKey: 'sections.modelDefaults.commitMessages',
+    descriptionKey: 'sections.modelDefaults.commitMessagesDescription',
   },
 ];
 
 const VALIDATION_TASKS: PhaseConfig[] = [
   {
     key: 'validationModel',
-    label: 'GitHub Issue Validation',
-    description: 'Validates and improves GitHub issues',
+    labelKey: 'sections.modelDefaults.githubIssueValidation',
+    descriptionKey: 'sections.modelDefaults.githubIssueValidationDescription',
   },
 ];
 
 const GENERATION_TASKS: PhaseConfig[] = [
   {
     key: 'specGenerationModel',
-    label: 'App Specification',
-    description: 'Generates full application specifications',
+    labelKey: 'sections.modelDefaults.appSpecification',
+    descriptionKey: 'sections.modelDefaults.appSpecificationDescription',
   },
   {
     key: 'featureGenerationModel',
-    label: 'Feature Generation',
-    description: 'Creates features from specifications',
+    labelKey: 'sections.modelDefaults.featureGeneration',
+    descriptionKey: 'sections.modelDefaults.featureGenerationDescription',
   },
   {
     key: 'backlogPlanningModel',
-    label: 'Backlog Planning',
-    description: 'Reorganizes and prioritizes backlog',
+    labelKey: 'sections.modelDefaults.backlogPlanning',
+    descriptionKey: 'sections.modelDefaults.backlogPlanningDescription',
   },
   {
     key: 'projectAnalysisModel',
-    label: 'Project Analysis',
-    description: 'Analyzes project structure for suggestions',
+    labelKey: 'sections.modelDefaults.projectAnalysis',
+    descriptionKey: 'sections.modelDefaults.projectAnalysisDescription',
   },
   {
     key: 'suggestionsModel',
-    label: 'AI Suggestions',
-    description: 'Model for feature, refactoring, security, and performance suggestions',
+    labelKey: 'sections.modelDefaults.aiSuggestions',
+    descriptionKey: 'sections.modelDefaults.aiSuggestionsDescription',
   },
 ];
 
 const MEMORY_TASKS: PhaseConfig[] = [
   {
     key: 'memoryExtractionModel',
-    label: 'Memory Extraction',
-    description: 'Extracts learnings from completed agent sessions',
+    labelKey: 'sections.modelDefaults.memoryExtraction',
+    descriptionKey: 'sections.modelDefaults.memoryExtractionDescription',
   },
 ];
 
 function PhaseGroup({
-  title,
-  subtitle,
+  titleKey,
+  subtitleKey,
   phases,
 }: {
-  title: string;
-  subtitle: string;
+  titleKey: string;
+  subtitleKey: string;
   phases: PhaseConfig[];
 }) {
+  const { t } = useTranslation('settings');
   const { phaseModels, setPhaseModel } = useAppStore();
 
   return (
     <div className="space-y-4">
       <div>
-        <h3 className="text-sm font-medium text-foreground">{title}</h3>
-        <p className="text-xs text-muted-foreground">{subtitle}</p>
+        <h3 className="text-sm font-medium text-foreground">{t(titleKey)}</h3>
+        <p className="text-xs text-muted-foreground">{t(subtitleKey)}</p>
       </div>
       <div className="space-y-3">
         {phases.map((phase) => (
           <PhaseModelSelector
             key={phase.key}
-            label={phase.label}
-            description={phase.description}
+            label={t(phase.labelKey)}
+            description={t(phase.descriptionKey)}
             value={phaseModels[phase.key] ?? DEFAULT_PHASE_MODELS[phase.key]}
             onChange={(model) => setPhaseModel(phase.key, model)}
           />
@@ -112,6 +114,7 @@ function PhaseGroup({
 }
 
 export function ModelDefaultsSection() {
+  const { t } = useTranslation('settings');
   const { resetPhaseModels } = useAppStore();
 
   return (
@@ -132,16 +135,16 @@ export function ModelDefaultsSection() {
             </div>
             <div>
               <h2 className="text-lg font-semibold text-foreground tracking-tight">
-                Model Defaults
+                {t('sections.modelDefaults.title')}
               </h2>
               <p className="text-sm text-muted-foreground/80">
-                Configure which AI model to use for each application task
+                {t('sections.modelDefaults.description')}
               </p>
             </div>
           </div>
           <Button variant="outline" size="sm" onClick={resetPhaseModels} className="gap-2">
             <RotateCcw className="w-3.5 h-3.5" />
-            Reset to Defaults
+            {t('sections.modelDefaults.resetToDefaults')}
           </Button>
         </div>
       </div>
@@ -150,29 +153,29 @@ export function ModelDefaultsSection() {
       <div className="p-6 space-y-8">
         {/* Quick Tasks */}
         <PhaseGroup
-          title="Quick Tasks"
-          subtitle="Fast models recommended for speed and cost savings"
+          titleKey="sections.modelDefaults.quickTasks"
+          subtitleKey="sections.modelDefaults.quickTasksSubtitle"
           phases={QUICK_TASKS}
         />
 
         {/* Validation Tasks */}
         <PhaseGroup
-          title="Validation Tasks"
-          subtitle="Smart models recommended for accuracy"
+          titleKey="sections.modelDefaults.validationTasks"
+          subtitleKey="sections.modelDefaults.validationTasksSubtitle"
           phases={VALIDATION_TASKS}
         />
 
         {/* Generation Tasks */}
         <PhaseGroup
-          title="Generation Tasks"
-          subtitle="Powerful models recommended for quality output"
+          titleKey="sections.modelDefaults.generationTasks"
+          subtitleKey="sections.modelDefaults.generationTasksSubtitle"
           phases={GENERATION_TASKS}
         />
 
         {/* Memory Tasks */}
         <PhaseGroup
-          title="Memory Tasks"
-          subtitle="Fast models recommended for learning extraction"
+          titleKey="sections.modelDefaults.memoryTasks"
+          subtitleKey="sections.modelDefaults.memoryTasksSubtitle"
           phases={MEMORY_TASKS}
         />
       </div>

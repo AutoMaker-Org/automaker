@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { createLogger } from '@automaker/utils/logger';
 import { ImageIcon, Upload, Loader2, Trash2 } from 'lucide-react';
 
@@ -33,6 +34,7 @@ interface BoardBackgroundModalProps {
 }
 
 export function BoardBackgroundModal({ open, onOpenChange }: BoardBackgroundModalProps) {
+  const { t } = useTranslation('common');
   const { currentProject, boardBackgroundByProject } = useAppStore();
   const {
     setBoardBackground,
@@ -264,17 +266,17 @@ export function BoardBackgroundModal({ open, onOpenChange }: BoardBackgroundModa
         <SheetHeader className="px-6 pt-6">
           <SheetTitle className="flex items-center gap-2">
             <ImageIcon className="w-5 h-5 text-brand-500" />
-            Board Background Settings
+            {t('dialogs.boardBackground.title')}
           </SheetTitle>
           <SheetDescription className="text-muted-foreground">
-            Set a custom background image for your kanban board and adjust card/column opacity
+            {t('dialogs.boardBackground.description')}
           </SheetDescription>
         </SheetHeader>
 
         <div className="space-y-6 px-6 pb-6">
           {/* Image Upload Section */}
           <div className="space-y-3">
-            <Label>Background Image</Label>
+            <Label>{t('dialogs.boardBackground.backgroundImage')}</Label>
 
             {/* Hidden file input */}
             <input
@@ -326,7 +328,7 @@ export function BoardBackgroundModal({ open, onOpenChange }: BoardBackgroundModa
                       className="flex-1"
                     >
                       <Upload className="w-4 h-4 mr-2" />
-                      Change Image
+                      {t('dialogs.boardBackground.changeImage')}
                     </Button>
                     <Button
                       variant="destructive"
@@ -335,7 +337,7 @@ export function BoardBackgroundModal({ open, onOpenChange }: BoardBackgroundModa
                       disabled={isProcessing}
                     >
                       <Trash2 className="w-4 h-4 mr-2" />
-                      Clear
+                      {t('buttons.clear')}
                     </Button>
                   </div>
                 </div>
@@ -360,12 +362,13 @@ export function BoardBackgroundModal({ open, onOpenChange }: BoardBackgroundModa
                   </div>
                   <p className="text-sm text-muted-foreground">
                     {isDragOver && !isProcessing
-                      ? 'Drop image here'
-                      : 'Click to upload or drag and drop'}
+                      ? t('dialogs.boardBackground.dropImageHere')
+                      : t('dialogs.boardBackground.clickToUpload')}
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    JPG, PNG, GIF, or WebP (max {Math.round(DEFAULT_MAX_FILE_SIZE / (1024 * 1024))}
-                    MB)
+                    {t('dialogs.boardBackground.supportedFormats', {
+                      maxSize: Math.round(DEFAULT_MAX_FILE_SIZE / (1024 * 1024)),
+                    })}
                   </p>
                 </div>
               )}
@@ -376,7 +379,7 @@ export function BoardBackgroundModal({ open, onOpenChange }: BoardBackgroundModa
           <div className="space-y-4">
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <Label>Card Opacity</Label>
+                <Label>{t('dialogs.boardBackground.cardOpacity')}</Label>
                 <span className="text-sm text-muted-foreground">{cardOpacity}%</span>
               </div>
               <Slider
@@ -391,7 +394,7 @@ export function BoardBackgroundModal({ open, onOpenChange }: BoardBackgroundModa
 
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <Label>Column Opacity</Label>
+                <Label>{t('dialogs.boardBackground.columnOpacity')}</Label>
                 <span className="text-sm text-muted-foreground">{columnOpacity}%</span>
               </div>
               <Slider
@@ -412,7 +415,7 @@ export function BoardBackgroundModal({ open, onOpenChange }: BoardBackgroundModa
                 onCheckedChange={handleColumnBorderToggle}
               />
               <Label htmlFor="column-border-toggle" className="cursor-pointer">
-                Show Column Borders
+                {t('dialogs.boardBackground.showColumnBorders')}
               </Label>
             </div>
 
@@ -424,7 +427,7 @@ export function BoardBackgroundModal({ open, onOpenChange }: BoardBackgroundModa
                 onCheckedChange={handleCardGlassmorphismToggle}
               />
               <Label htmlFor="card-glassmorphism-toggle" className="cursor-pointer">
-                Card Glassmorphism (blur effect)
+                {t('dialogs.boardBackground.cardGlassmorphism')}
               </Label>
             </div>
 
@@ -436,7 +439,7 @@ export function BoardBackgroundModal({ open, onOpenChange }: BoardBackgroundModa
                 onCheckedChange={handleCardBorderToggle}
               />
               <Label htmlFor="card-border-toggle" className="cursor-pointer">
-                Show Card Borders
+                {t('dialogs.boardBackground.showCardBorders')}
               </Label>
             </div>
 
@@ -444,7 +447,7 @@ export function BoardBackgroundModal({ open, onOpenChange }: BoardBackgroundModa
             {cardBorderEnabled && (
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <Label>Card Border Opacity</Label>
+                  <Label>{t('dialogs.boardBackground.cardBorderOpacity')}</Label>
                   <span className="text-sm text-muted-foreground">{cardBorderOpacity}%</span>
                 </div>
                 <Slider
@@ -466,7 +469,7 @@ export function BoardBackgroundModal({ open, onOpenChange }: BoardBackgroundModa
                 onCheckedChange={handleHideScrollbarToggle}
               />
               <Label htmlFor="hide-scrollbar-toggle" className="cursor-pointer">
-                Hide Board Scrollbar
+                {t('dialogs.boardBackground.hideScrollbar')}
               </Label>
             </div>
           </div>

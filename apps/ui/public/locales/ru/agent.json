@@ -1,0 +1,91 @@
+{
+  "welcome": {
+    "greeting": "Привет! Я агент Automaker. Я могу помочь вам создавать программное обеспечение автономно. Я могу читать и изменять файлы в этом проекте, выполнять команды и запускать тесты. Что вы хотите создать сегодня?"
+  },
+  "header": {
+    "title": "ИИ-агент",
+    "thinking": "Думаю...",
+    "connected": "Подключено",
+    "disconnected": "Отключено",
+    "connecting": "Подключение...",
+    "messagesCount": "{{count}} сообщений",
+    "clear": "Очистить"
+  },
+  "input": {
+    "placeholder": "Опишите, что вы хотите создать...",
+    "placeholderProcessing": "Введите для добавления в очередь...",
+    "placeholderDropFiles": "Перетащите файлы сюда...",
+    "send": "Отправить",
+    "stop": "Стоп",
+    "stopGeneration": "Остановить генерацию",
+    "addToQueue": "Добавить в очередь",
+    "sendMessage": "Отправить сообщение",
+    "attachImage": "Прикрепить изображение",
+    "attachFile": "Прикрепить файл",
+    "attachFiles": "Прикрепить файлы (изображения, .txt, .md)",
+    "filesAttached": "файлов прикреплено",
+    "dropHere": "Перетащите сюда",
+    "keyboardHint": "Нажмите <kbd>Enter</kbd> для отправки, <kbd>Shift+Enter</kbd> для новой строки"
+  },
+  "session": {
+    "newSession": "Новая сессия",
+    "sessions": "Сессии",
+    "active": "Активные",
+    "archived": "Архивные",
+    "noSessions": "Сессий пока нет",
+    "createFirst": "Создайте свою первую сессию, чтобы начать",
+    "rename": "Переименовать сессию",
+    "archive": "Архивировать сессию",
+    "delete": "Удалить сессию",
+    "confirmDelete": "Вы уверены, что хотите удалить эту сессию?",
+    "messages": "{{count}} сообщение",
+    "messages_plural": "{{count}} сообщений",
+    "noSessionSelected": "Сессия не выбрана",
+    "noSessionDescription": "Создайте или выберите сессию, чтобы начать общение с ИИ-агентом",
+    "viewSessions": "Просмотр сессий",
+    "showSessions": "Показать сессии"
+  },
+  "chat": {
+    "clearHistory": "Очистить историю чата",
+    "confirmClear": "Вы уверены, что хотите очистить этот разговор?",
+    "copyMessage": "Копировать сообщение",
+    "regenerate": "Сгенерировать заново",
+    "imagesAttached": "{{count}} изображение прикреплено",
+    "imagesAttached_plural": "{{count}} изображений прикреплено"
+  },
+  "queue": {
+    "title": "Очередь сообщений",
+    "empty": "Очередь пуста",
+    "pending": "{{count}} промпт в очереди",
+    "pending_plural": "{{count}} промптов в очереди",
+    "remove": "Удалить из очереди",
+    "clear": "Очистить очередь",
+    "clearAll": "Очистить всё",
+    "filesCount": "+{{count}} файл",
+    "filesCount_plural": "+{{count}} файлов"
+  },
+  "tools": {
+    "using": "Использую {{tool}}...",
+    "completed": "Инструмент завершён",
+    "read": "Чтение файла",
+    "write": "Запись файла",
+    "edit": "Редактирование файла",
+    "bash": "Выполнение команды",
+    "glob": "Поиск файлов",
+    "grep": "Поиск содержимого"
+  },
+  "errors": {
+    "connectionFailed": "Не удалось подключиться к агенту",
+    "messageFailed": "Не удалось отправить сообщение",
+    "sessionLoadFailed": "Не удалось загрузить сессию"
+  },
+  "noProject": {
+    "title": "Проект не выбран",
+    "description": "Откройте или создайте проект, чтобы начать работу с ИИ-агентом."
+  },
+  "files": {
+    "filesAttached": "{{count}} файл прикреплён",
+    "filesAttached_plural": "{{count}} файлов прикреплено",
+    "clearAll": "Очистить всё"
+  }
+}

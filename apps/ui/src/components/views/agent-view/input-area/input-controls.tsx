@@ -1,4 +1,5 @@
 import { useRef, useCallback, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Send, Paperclip, Square, ListOrdered } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -51,6 +52,7 @@ export function InputControls({
   onDrop,
   inputRef: externalInputRef,
 }: InputControlsProps) {
+  const { t } = useTranslation('agent');
   const internalInputRef = useRef<HTMLTextAreaElement>(null);
   const inputRef = externalInputRef || internalInputRef;
 
@@ -93,10 +95,10 @@ export function InputControls({
             ref={inputRef}
             placeholder={
               isDragOver
-                ? 'Drop your files here...'
+                ? t('input.placeholderDropFiles')
                 : isProcessing
-                  ? 'Type to queue another prompt...'
-                  : 'Describe what you want to build...'
+                  ? t('input.placeholderProcessing')
+                  : t('input.placeholder')
             }
             value={input}
             onChange={(e) => onInputChange(e.target.value)}
@@ -114,13 +116,13 @@ export function InputControls({
           />
           {hasFiles && !isDragOver && (
             <div className="hidden sm:block absolute right-3 top-1/2 -translate-y-1/2 text-xs bg-primary text-primary-foreground px-2 py-0.5 rounded-full font-medium">
-              files attached
+              {t('input.filesAttached')}
             </div>
           )}
           {isDragOver && (
             <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5 text-xs text-primary font-medium">
               <Paperclip className="w-3 h-3" />
-              Drop here
+              {t('input.dropHere')}
             </div>
           )}
         </div>
@@ -145,7 +147,7 @@ export function InputControls({
               showImageDropZone && 'bg-primary/10 text-primary border-primary/30',
               hasFiles && 'border-primary/30 text-primary'
             )}
-            title="Attach files (images, .txt, .md)"
+            title={t('input.attachFiles')}
           >
             <Paperclip className="w-4 h-4" />
           </Button>
@@ -161,7 +163,7 @@ export function InputControls({
               className="h-11 px-4 rounded-xl shrink-0"
               variant="destructive"
               data-testid="stop-agent"
-              title="Stop generation"
+              title={t('input.stopGeneration')}
             >
               <Square className="w-4 h-4 fill-current" />
             </Button>
@@ -174,7 +176,7 @@ export function InputControls({
             className="h-11 px-4 rounded-xl shrink-0"
             variant={isProcessing ? 'outline' : 'default'}
             data-testid="send-message"
-            title={isProcessing ? 'Add to queue' : 'Send message'}
+            title={isProcessing ? t('input.addToQueue') : t('input.sendMessage')}
           >
             {isProcessing ? <ListOrdered className="w-4 h-4" /> : <Send className="w-4 h-4" />}
           </Button>
@@ -183,10 +185,20 @@ export function InputControls({
 
       {/* Keyboard hint */}
       <p className="text-[11px] text-muted-foreground mt-2 text-center hidden sm:block">
-        Press <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-medium">Enter</kbd> to
-        send,{' '}
-        <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-medium">Shift+Enter</kbd>{' '}
-        for new line
+        {t('input.keyboardHint')
+          .split('<kbd>')
+          .map((part, i) => {
+            if (i === 0) return part;
+            const [kbdContent, rest] = part.split('</kbd>');
+            return (
+              <span key={i}>
+                <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-medium">
+                  {kbdContent}
+                </kbd>
+                {rest}
+              </span>
+            );
+          })}
       </p>
     </>
   );

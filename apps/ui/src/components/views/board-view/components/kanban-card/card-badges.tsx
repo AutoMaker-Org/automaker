@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Feature, useAppStore } from '@/store/app-store';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -53,6 +54,7 @@ interface PriorityBadgesProps {
 }
 
 export function PriorityBadges({ feature }: PriorityBadgesProps) {
+  const { t } = useTranslation('board');
   const { enableDependencyBlocking, features } = useAppStore();
   const [currentTime, setCurrentTime] = useState(() => Date.now());
 
@@ -135,10 +137,10 @@ export function PriorityBadges({ feature }: PriorityBadgesProps) {
             <TooltipContent side="bottom" className="text-xs">
               <p>
                 {feature.priority === 1
-                  ? 'High Priority'
+                  ? t('badges.highPriority')
                   : feature.priority === 2
-                    ? 'Medium Priority'
-                    : 'Low Priority'}
+                    ? t('badges.mediumPriority')
+                    : t('badges.lowPriority')}
               </p>
             </TooltipContent>
           </Tooltip>
@@ -161,7 +163,7 @@ export function PriorityBadges({ feature }: PriorityBadgesProps) {
               </div>
             </TooltipTrigger>
             <TooltipContent side="bottom" className="text-xs">
-              <p>Manual verification required</p>
+              <p>{t('badges.manualVerification')}</p>
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>
@@ -184,8 +186,7 @@ export function PriorityBadges({ feature }: PriorityBadgesProps) {
             </TooltipTrigger>
             <TooltipContent side="bottom" className="text-xs max-w-[250px]">
               <p className="font-medium mb-1">
-                Blocked by {blockingDependencies.length} incomplete{' '}
-                {blockingDependencies.length === 1 ? 'dependency' : 'dependencies'}
+                {t('badges.blockedBy', { count: blockingDependencies.length })}
               </p>
               <p className="text-muted-foreground">
                 {blockingDependencies
@@ -216,7 +217,7 @@ export function PriorityBadges({ feature }: PriorityBadgesProps) {
               </div>
             </TooltipTrigger>
             <TooltipContent side="bottom" className="text-xs">
-              <p>Agent just finished working on this feature</p>
+              <p>{t('badges.justFinished')}</p>
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>

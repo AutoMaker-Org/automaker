@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Bot, User, ImageIcon, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Markdown } from '@/components/ui/markdown';
@@ -17,6 +18,7 @@ interface MessageBubbleProps {
 }
 
 export function MessageBubble({ message }: MessageBubbleProps) {
+  const { t } = useTranslation('agent');
   const isError = message.isError && message.role === 'assistant';
 
   return (
@@ -77,10 +79,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
           <div className="mt-3 space-y-2">
             <div className="flex items-center gap-1.5 text-xs text-primary-foreground/80">
               <ImageIcon className="w-3 h-3" />
-              <span>
-                {message.images.length} image
-                {message.images.length > 1 ? 's' : ''} attached
-              </span>
+              <span>{t('chat.imagesAttached', { count: message.images.length })}</span>
             </div>
             <div className="flex flex-wrap gap-2">
               {message.images.map((image, index) => {

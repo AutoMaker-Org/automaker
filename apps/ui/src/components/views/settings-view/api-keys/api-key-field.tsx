@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -9,6 +10,7 @@ interface ApiKeyFieldProps {
 }
 
 export function ApiKeyField({ config }: ApiKeyFieldProps) {
+  const { t } = useTranslation('settings');
   const {
     label,
     inputId,
@@ -71,12 +73,12 @@ export function ApiKeyField({ config }: ApiKeyFieldProps) {
           {testButton.loading ? (
             <>
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              Testing...
+              {t('sections.apiKeys.testing')}
             </>
           ) : (
             <>
               <Zap className="w-4 h-4 mr-2" />
-              Test
+              {t('sections.apiKeys.test')}
             </>
           )}
         </Button>

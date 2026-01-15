@@ -1,0 +1,160 @@
+{
+  "title": "機能ボード",
+  "columns": {
+    "backlog": "バックログ",
+    "ready": "準備完了",
+    "inProgress": "進行中",
+    "review": "レビュー",
+    "done": "完了"
+  },
+  "feature": {
+    "newFeature": "新規機能",
+    "addFeature": "機能を追加",
+    "editFeature": "機能を編集",
+    "deleteFeature": "機能を削除",
+    "duplicateFeature": "機能を複製",
+    "moveToBacklog": "バックログに移動",
+    "moveToReady": "準備完了に移動",
+    "startImplementation": "実装を開始",
+    "markAsReview": "レビュー対象としてマーク",
+    "markAsDone": "完了としてマーク",
+    "viewDetails": "詳細を表示",
+    "viewOutput": "エージェント出力を表示",
+    "confirmDelete": "この機能を削除してもよろしいですか？この操作は取り消せません。",
+    "noFeatures": "機能がありません",
+    "createFirst": "開始するには最初の機能を作成してください"
+  },
+  "form": {
+    "title": "タイトル",
+    "titlePlaceholder": "機能のタイトルを入力...",
+    "description": "説明",
+    "descriptionPlaceholder": "この機能が何をすべきかを説明してください...",
+    "category": "カテゴリ",
+    "priority": "優先度",
+    "dependencies": "依存関係",
+    "dependenciesPlaceholder": "この機能が依存する機能を選択",
+    "images": "画像",
+    "addImage": "画像を追加",
+    "spec": "仕様",
+    "specPlaceholder": "オプションの詳細仕様..."
+  },
+  "categories": {
+    "feature": "機能",
+    "bug": "バグ",
+    "enhancement": "改善",
+    "refactor": "リファクタリング",
+    "docs": "ドキュメント",
+    "test": "テスト",
+    "chore": "雑務"
+  },
+  "priorities": {
+    "high": "高",
+    "medium": "中",
+    "low": "低"
+  },
+  "status": {
+    "pending": "保留中",
+    "ready": "準備完了",
+    "running": "実行中",
+    "paused": "一時停止中",
+    "review": "レビュー",
+    "completed": "完了",
+    "failed": "失敗"
+  },
+  "actions": {
+    "runAll": "すべて実行",
+    "runNext": "次を実行",
+    "stopAll": "すべて停止",
+    "clearCompleted": "完了したものをクリア",
+    "importFeatures": "機能をインポート",
+    "exportFeatures": "機能をエクスポート",
+    "generateSpec": "仕様を生成",
+    "generateFeatures": "仕様から機能を生成"
+  },
+  "ai": {
+    "generateTitle": "タイトルを生成",
+    "generateDescription": "説明を生成",
+    "enhanceFeature": "AIで強化",
+    "validateFeature": "機能を検証",
+    "suggestFeatures": "機能を提案"
+  },
+  "filters": {
+    "all": "すべて",
+    "byCategory": "カテゴリ別",
+    "byPriority": "優先度別",
+    "byStatus": "ステータス別",
+    "search": "機能を検索...",
+    "clearSearch": "検索をクリア"
+  },
+  "empty": {
+    "backlog": "バックログは空です",
+    "ready": "実装準備ができている機能がありません",
+    "inProgress": "進行中の機能がありません",
+    "review": "レビュー対象の機能がありません",
+    "done": "完了した機能がありません"
+  },
+  "emptyState": {
+    "noMatchingItems": "一致する項目がありません",
+    "noMatchingFilters": "現在のフィルターに一致する機能がありません。",
+    "press": "押す",
+    "toAdd": "追加するには",
+    "clearFilters": "すべての項目を表示するにはフィルターをクリアしてください"
+  },
+  "spec": {
+    "creatingTitle": "アプリ仕様を作成中",
+    "creating": "仕様を作成中"
+  },
+  "cardActions": {
+    "approvePlan": "計画を承認",
+    "logs": "ログ",
+    "verify": "検証",
+    "resume": "再開",
+    "complete": "完了",
+    "refine": "改善",
+    "markAsVerified": "検証済みとしてマーク",
+    "edit": "編集",
+    "viewPlan": "計画を表示",
+    "make": "作成",
+    "delete": "削除",
+    "spawnSubTask": "サブタスクを生成",
+    "viewLogs": "ログを表示"
+  },
+  "cardHeader": {
+    "generatingTitle": "タイトルを生成中...",
+    "less": "少なく",
+    "more": "多く"
+  },
+  "agentInfo": {
+    "tasks": "タスク",
+    "showLess": "少なく表示",
+    "showMore": "+{{count}}件以上",
+    "summary": "概要",
+    "viewFullSummary": "完全な概要を表示",
+    "toolCalls": "{{count}}回のツール呼び出し",
+    "tasksDone": "{{count}}件のタスク完了"
+  },
+  "summaryDialog": {
+    "title": "実装概要",
+    "noDescription": "説明なし",
+    "noSummary": "概要はありません",
+    "close": "閉じる"
+  },
+  "badges": {
+    "highPriority": "高優先度",
+    "mediumPriority": "中優先度",
+    "lowPriority": "低優先度",
+    "manualVerification": "手動検証が必要",
+    "blockedBy": "{{count}}件の未完了の依存関係によりブロック中",
+    "blockedBy_other": "{{count}}件の未完了の依存関係によりブロック中",
+    "justFinished": "エージェントがこの機能の作業を完了したところです"
+  },
+  "messages": {
+    "featureCreated": "機能を正常に作成しました",
+    "featureUpdated": "機能を正常に更新しました",
+    "featureDeleted": "機能を正常に削除しました",
+    "featureMoved": "機能を{{status}}に移動しました",
+    "implementationStarted": "実装を開始しました",
+    "implementationCompleted": "実装が完了しました",
+    "implementationFailed": "実装に失敗しました"
+  }
+}

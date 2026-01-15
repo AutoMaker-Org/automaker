@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Settings2, Keyboard } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -7,6 +8,8 @@ interface KeyboardShortcutsSectionProps {
 }
 
 export function KeyboardShortcutsSection({ onOpenKeyboardMap }: KeyboardShortcutsSectionProps) {
+  const { t } = useTranslation('settings');
+
   return (
     <div
       className={cn(
@@ -22,11 +25,11 @@ export function KeyboardShortcutsSection({ onOpenKeyboardMap }: KeyboardShortcut
             <Settings2 className="w-5 h-5 text-brand-500" />
           </div>
           <h2 className="text-lg font-semibold text-foreground tracking-tight">
-            Keyboard Shortcuts
+            {t('sections.keyboard.title')}
           </h2>
         </div>
         <p className="text-sm text-muted-foreground/80 ml-12">
-          Customize keyboard shortcuts for navigation and actions using the visual keyboard map.
+          {t('sections.keyboard.description')}
         </p>
       </div>
       <div className="p-6">
@@ -39,10 +42,11 @@ export function KeyboardShortcutsSection({ onOpenKeyboardMap }: KeyboardShortcut
             <div className="absolute inset-0 bg-brand-500/10 blur-2xl rounded-full -z-10" />
           </div>
           <div className="space-y-2 max-w-md">
-            <h3 className="text-lg font-semibold text-foreground">Use the Visual Keyboard Map</h3>
+            <h3 className="text-lg font-semibold text-foreground">
+              {t('sections.keyboard.useVisualMap')}
+            </h3>
             <p className="text-sm text-muted-foreground/80">
-              Click the button below to customize your keyboard shortcuts. The visual interface
-              shows all available keys and lets you easily edit shortcuts.
+              {t('sections.keyboard.visualMapDescription')}
             </p>
           </div>
           <Button
@@ -60,7 +64,7 @@ export function KeyboardShortcutsSection({ onOpenKeyboardMap }: KeyboardShortcut
             )}
           >
             <Keyboard className="w-5 h-5" />
-            Open Keyboard Map
+            {t('sections.keyboard.openKeyboardMap')}
           </Button>
         </div>
       </div>

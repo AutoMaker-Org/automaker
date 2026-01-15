@@ -1,0 +1,160 @@
+{
+  "title": "기능 보드",
+  "columns": {
+    "backlog": "백로그",
+    "ready": "준비됨",
+    "inProgress": "진행 중",
+    "review": "검토",
+    "done": "완료"
+  },
+  "feature": {
+    "newFeature": "새 기능",
+    "addFeature": "기능 추가",
+    "editFeature": "기능 편집",
+    "deleteFeature": "기능 삭제",
+    "duplicateFeature": "기능 복제",
+    "moveToBacklog": "백로그로 이동",
+    "moveToReady": "준비됨으로 이동",
+    "startImplementation": "구현 시작",
+    "markAsReview": "검토로 표시",
+    "markAsDone": "완료로 표시",
+    "viewDetails": "세부정보 보기",
+    "viewOutput": "에이전트 출력 보기",
+    "confirmDelete": "이 기능을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.",
+    "noFeatures": "아직 기능이 없습니다",
+    "createFirst": "첫 번째 기능을 만들어 시작하세요"
+  },
+  "form": {
+    "title": "제목",
+    "titlePlaceholder": "기능 제목을 입력하세요...",
+    "description": "설명",
+    "descriptionPlaceholder": "이 기능이 무엇을 해야 하는지 설명하세요...",
+    "category": "카테고리",
+    "priority": "우선순위",
+    "dependencies": "의존성",
+    "dependenciesPlaceholder": "이 기능이 의존하는 기능을 선택하세요",
+    "images": "이미지",
+    "addImage": "이미지 추가",
+    "spec": "사양",
+    "specPlaceholder": "선택사항: 상세한 사양..."
+  },
+  "categories": {
+    "feature": "기능",
+    "bug": "버그",
+    "enhancement": "개선",
+    "refactor": "리팩터링",
+    "docs": "문서",
+    "test": "테스트",
+    "chore": "기타 작업"
+  },
+  "priorities": {
+    "high": "높음",
+    "medium": "보통",
+    "low": "낮음"
+  },
+  "status": {
+    "pending": "대기 중",
+    "ready": "준비됨",
+    "running": "실행 중",
+    "paused": "일시정지됨",
+    "review": "검토",
+    "completed": "완료됨",
+    "failed": "실패함"
+  },
+  "actions": {
+    "runAll": "모두 실행",
+    "runNext": "다음 실행",
+    "stopAll": "모두 중지",
+    "clearCompleted": "완료된 항목 지우기",
+    "importFeatures": "기능 가져오기",
+    "exportFeatures": "기능 내보내기",
+    "generateSpec": "스펙 생성",
+    "generateFeatures": "스펙에서 기능 생성"
+  },
+  "ai": {
+    "generateTitle": "제목 생성",
+    "generateDescription": "설명 생성",
+    "enhanceFeature": "AI로 향상",
+    "validateFeature": "기능 검증",
+    "suggestFeatures": "기능 제안"
+  },
+  "filters": {
+    "all": "전체",
+    "byCategory": "카테고리별",
+    "byPriority": "우선순위별",
+    "byStatus": "상태별",
+    "search": "기능 검색...",
+    "clearSearch": "검색 지우기"
+  },
+  "empty": {
+    "backlog": "백로그가 비어 있습니다",
+    "ready": "구현 준비된 기능이 없습니다",
+    "inProgress": "진행 중인 기능이 없습니다",
+    "review": "검토할 기능이 없습니다",
+    "done": "완료된 기능이 없습니다"
+  },
+  "emptyState": {
+    "noMatchingItems": "일치하는 항목 없음",
+    "noMatchingFilters": "현재 필터와 일치하는 기능이 없습니다.",
+    "press": "누르기",
+    "toAdd": "추가하려면",
+    "clearFilters": "모든 항목을 보려면 필터를 지우세요"
+  },
+  "spec": {
+    "creatingTitle": "앱 사양 생성 중",
+    "creating": "스펙 생성 중"
+  },
+  "cardActions": {
+    "approvePlan": "계획 승인",
+    "logs": "로그",
+    "verify": "검증",
+    "resume": "재개",
+    "complete": "완료",
+    "refine": "다듬기",
+    "markAsVerified": "검증됨으로 표시",
+    "edit": "편집",
+    "viewPlan": "계획 보기",
+    "make": "만들기",
+    "delete": "삭제",
+    "spawnSubTask": "하위 작업 생성",
+    "viewLogs": "로그 보기"
+  },
+  "cardHeader": {
+    "generatingTitle": "제목 생성 중...",
+    "less": "접기",
+    "more": "펼치기"
+  },
+  "agentInfo": {
+    "tasks": "작업",
+    "showLess": "간략히 보기",
+    "showMore": "+{{count}}개 더 보기",
+    "summary": "요약",
+    "viewFullSummary": "전체 요약 보기",
+    "toolCalls": "{{count}}개의 도구 호출",
+    "tasksDone": "{{count}}개의 작업 완료"
+  },
+  "summaryDialog": {
+    "title": "구현 요약",
+    "noDescription": "설명 없음",
+    "noSummary": "요약을 사용할 수 없습니다",
+    "close": "닫기"
+  },
+  "badges": {
+    "highPriority": "높은 우선순위",
+    "mediumPriority": "보통 우선순위",
+    "lowPriority": "낮은 우선순위",
+    "manualVerification": "수동 검증 필요",
+    "blockedBy": "완료되지 않은 {{count}}개의 의존성에 의해 차단됨",
+    "blockedBy_other": "완료되지 않은 {{count}}개의 의존성에 의해 차단됨",
+    "justFinished": "에이전트가 이 기능 작업을 막 완료했습니다"
+  },
+  "messages": {
+    "featureCreated": "기능이 성공적으로 생성되었습니다",
+    "featureUpdated": "기능이 성공적으로 업데이트되었습니다",
+    "featureDeleted": "기능이 성공적으로 삭제되었습니다",
+    "featureMoved": "기능이 {{status}}(으)로 이동되었습니다",
+    "implementationStarted": "구현이 시작되었습니다",
+    "implementationCompleted": "구현이 완료되었습니다",
+    "implementationFailed": "구현에 실패했습니다"
+  }
+}

@@ -37,7 +37,9 @@
     "archive": "Archive",
     "restore": "Restore",
     "saveChanges": "Save Changes",
-    "discardChanges": "Discard Changes"
+    "discardChanges": "Discard Changes",
+    "browse": "Browse",
+    "view": "View"
   },
   "labels": {
     "title": "Title",
@@ -126,7 +128,68 @@
     "settings": "Settings",
     "help": "Help",
     "about": "About",
-    "logout": "Logout"
+    "logout": "Logout",
+    "wiki": "Wiki",
+    "runningAgents": "Running Agents",
+    "selectProject": "Select Project",
+    "selectOrCreateProject": "Select or create a project above"
+  },
+  "sidebar": {
+    "collapseSidebar": "Collapse sidebar",
+    "expandSidebar": "Expand sidebar",
+    "newProject": "New Project",
+    "new": "New",
+    "openFolder": "Open Folder",
+    "recycleBin": "Recycle Bin",
+    "reportBug": "Report Bug / Feature Request",
+    "projectOptions": "Project options",
+    "searchProjects": "Search projects...",
+    "noProjectsFound": "No projects found",
+    "navigate": "navigate",
+    "select": "select",
+    "close": "close",
+    "projectTheme": "Project Theme",
+    "useGlobal": "Use Global",
+    "dark": "Dark",
+    "light": "Light",
+    "projectHistory": "Project History",
+    "previous": "Previous",
+    "next": "Next",
+    "clearHistory": "Clear history",
+    "moveToTrash": "Move to Trash"
+  },
+  "trash": {
+    "title": "Recycle Bin",
+    "description": "Restore projects to the sidebar or delete their folders using your system Trash.",
+    "empty": "Recycle bin is empty.",
+    "trashed": "Trashed",
+    "restore": "Restore",
+    "deleteFromDisk": "Delete from disk",
+    "deleting": "Deleting...",
+    "removeFromList": "Remove from list",
+    "emptyRecycleBin": "Empty Recycle Bin",
+    "clearing": "Clearing...",
+    "confirmDeleteTitle": "Delete \"{{name}}\" from disk?",
+    "confirmDeleteDescription": "This sends the folder to your system Trash.",
+    "confirmDeleteButton": "Delete from disk",
+    "emptyTrashTitle": "Empty Recycle Bin",
+    "emptyTrashDescription": "Clear all projects from recycle bin? This does not delete folders from disk.",
+    "emptyButton": "Empty"
+  },
+  "onboarding": {
+    "welcomeTo": "Welcome to {{name}}!",
+    "projectReady": "Your new project is ready. Let's get you started.",
+    "generateSpecQuestion": "Would you like to auto-generate your <strong>app_spec.txt</strong>? This file helps describe your project and is used to pre-populate your backlog with features to work on.",
+    "benefitBacklog": "Pre-populate your backlog",
+    "benefitBacklogDesc": "Automatically generate features based on your project specification",
+    "benefitAI": "Better AI assistance",
+    "benefitAIDesc": "Help AI agents understand your project structure and tech stack",
+    "benefitDocs": "Project documentation",
+    "benefitDocsDesc": "Keep a clear record of your project's capabilities and features",
+    "tip": "Tip:",
+    "tipText": "You can always generate or edit your app_spec.txt later from the Spec Editor in the sidebar.",
+    "skipForNow": "Skip for now",
+    "generateAppSpec": "Generate App Spec"
   },
   "time": {
     "now": "Just now",
@@ -139,5 +202,92 @@
     "today": "Today",
     "yesterday": "Yesterday",
     "tomorrow": "Tomorrow"
+  },
+  "dialogs": {
+    "newProject": {
+      "title": "Create New Project",
+      "description": "Start with a blank project or choose from a starter template.",
+      "projectName": "Project Name",
+      "projectNameRequired": "Project name is required",
+      "loadingWorkspace": "Loading workspace...",
+      "willBeCreatedAt": "Will be created at:",
+      "blankProject": "Blank Project",
+      "starterKit": "Starter Kit",
+      "blankProjectDescription": "Create an empty project with the standard .automaker directory structure. Perfect for starting from scratch or importing an existing codebase.",
+      "templateSelectionRequired": "Please select a template or enter a custom GitHub URL",
+      "features": "Features",
+      "moreCount": "+{{count}} more",
+      "customGitHubUrl": "Custom GitHub URL",
+      "customGitHubUrlDescription": "Clone any public GitHub repository as a starting point.",
+      "gitHubUrlRequired": "GitHub URL is required",
+      "cloning": "Cloning...",
+      "creating": "Creating...",
+      "createProject": "Create Project"
+    },
+    "workspacePicker": {
+      "title": "Select Project",
+      "description": "Choose a project from your workspace directory",
+      "loadingProjects": "Loading projects...",
+      "noProjectsFound": "No projects found in workspace directory"
+    },
+    "deleteSession": {
+      "title": "Delete Session",
+      "description": "Are you sure you want to delete this session? This action cannot be undone.",
+      "confirmText": "Delete Session",
+      "messageCount": "{{count}} messages"
+    },
+    "sandboxRisk": {
+      "title": "Sandbox Environment Not Detected",
+      "warningLabel": "Warning:",
+      "warningText": "This application is running outside of a containerized sandbox environment. AI agents will have direct access to your filesystem and can execute commands on your system.",
+      "potentialRisks": "Potential Risks:",
+      "riskFiles": "Agents can read, modify, or delete files on your system",
+      "riskCommands": "Agents can execute arbitrary commands and install software",
+      "riskCredentials": "Agents can access environment variables and credentials",
+      "riskSideEffects": "Unintended side effects from agent actions may affect your system",
+      "dockerSuggestion": "For safer operation, consider running Automaker in Docker. See the README for instructions.",
+      "doNotShowAgain": "Do not show this warning again",
+      "denyAndExit": "Deny & Exit",
+      "acceptRisks": "I Accept the Risks"
+    },
+    "sandboxRejection": {
+      "title": "Access Denied",
+      "description": "You declined to accept the risks of running Automaker outside a sandbox environment.",
+      "dockerSuggestion": "For safer operation, consider running Automaker in Docker. See the README for instructions.",
+      "reloadAndTryAgain": "Reload & Try Again"
+    },
+    "fileBrowser": {
+      "title": "Select Project Directory",
+      "description": "Navigate to your project folder or paste a path directly",
+      "recent": "Recent",
+      "removeFromRecent": "Remove from recent",
+      "drives": "Drives",
+      "loadingDirectories": "Loading directories...",
+      "noSubdirectories": "No subdirectories found",
+      "helpText": "Paste a full path above, or click on folders to navigate. Press Enter or click → to jump to a path.",
+      "selectCurrentFolder": "Select Current Folder",
+      "selectCurrentFolderHint": "Select current folder (Cmd+Enter / Ctrl+Enter)"
+    },
+    "boardBackground": {
+      "title": "Board Background Settings",
+      "description": "Set a custom background image for your kanban board and adjust card/column opacity",
+      "backgroundImage": "Background Image",
+      "changeImage": "Change Image",
+      "dropImageHere": "Drop image here",
+      "clickToUpload": "Click to upload or drag and drop",
+      "supportedFormats": "JPG, PNG, GIF, or WebP (max {{maxSize}}MB)",
+      "cardOpacity": "Card Opacity",
+      "columnOpacity": "Column Opacity",
+      "showColumnBorders": "Show Column Borders",
+      "cardGlassmorphism": "Card Glassmorphism (blur effect)",
+      "showCardBorders": "Show Card Borders",
+      "cardBorderOpacity": "Card Border Opacity",
+      "hideScrollbar": "Hide Board Scrollbar"
+    }
+  },
+  "components": {
+    "errorState": {
+      "title": "Failed to Load"
+    }
   }
 }

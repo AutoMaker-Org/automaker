@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
@@ -36,6 +37,7 @@ interface PromptFieldProps {
   customValue?: CustomPrompt;
   onCustomValueChange: (value: CustomPrompt | undefined) => void;
   critical?: boolean; // Whether this prompt requires strict output format
+  t: (key: string) => string;
 }
 
 /**
@@ -68,6 +70,7 @@ function PromptField({
   customValue,
   onCustomValueChange,
   critical = false,
+  t,
 }: PromptFieldProps) {
   const isEnabled = customValue?.enabled ?? false;
   const displayValue = isEnabled ? (customValue?.value ?? defaultValue) : defaultValue;
@@ -93,10 +96,11 @@ function PromptField({
         <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
           <AlertTriangle className="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" />
           <div className="flex-1">
-            <p className="text-xs font-medium text-amber-500">Critical Prompt</p>
+            <p className="text-xs font-medium text-amber-500">
+              {t('sections.prompts.criticalPrompt')}
+            </p>
             <p className="text-xs text-muted-foreground mt-1">
-              This prompt requires a specific output format. Changing it incorrectly may break
-              functionality. Only modify if you understand the expected structure.
+              {t('sections.prompts.criticalPromptWarning')}
             </p>
           </div>
         </div>
@@ -106,7 +110,9 @@ function PromptField({
           {label}
         </Label>
         <div className="flex items-center gap-2">
-          <span className="text-xs text-muted-foreground">{isEnabled ? 'Custom' : 'Default'}</span>
+          <span className="text-xs text-muted-foreground">
+            {isEnabled ? t('sections.prompts.custom') : t('sections.prompts.default')}
+          </span>
           <Switch
             checked={isEnabled}
             onCheckedChange={handleToggle}
@@ -143,6 +149,7 @@ export function PromptCustomizationSection({
   promptCustomization = {},
   onPromptCustomizationChange,
 }: PromptCustomizationSectionProps) {
+  const { t } = useTranslation('settings');
   const [activeTab, setActiveTab] = useState('auto-mode');
 
   const updatePrompt = <T extends keyof PromptCustomization>(
@@ -190,16 +197,16 @@ export function PromptCustomizationSection({
               <MessageSquareText className="w-5 h-5 text-brand-500" />
             </div>
             <h2 className="text-lg font-semibold text-foreground tracking-tight">
-              Prompt Customization
+              {t('sections.prompts.title')}
             </h2>
           </div>
           <Button variant="outline" size="sm" onClick={resetAllToDefaults} className="gap-2">
             <RotateCcw className="w-4 h-4" />
-            Reset All to Defaults
+            {t('sections.prompts.resetAllToDefaults')}
           </Button>
         </div>
         <p className="text-sm text-muted-foreground/80 ml-12">
-          Customize AI prompts for Auto Mode, Agent Runner, and other features.
+          {t('sections.prompts.description')}
         </p>
       </div>
 
@@ -208,11 +215,11 @@ export function PromptCustomizationSection({
         <div className="flex items-start gap-3 p-4 rounded-xl bg-blue-500/10 border border-blue-500/20">
           <Info className="w-5 h-5 text-blue-500 mt-0.5 flex-shrink-0" />
           <div className="space-y-1">
-            <p className="text-sm text-foreground font-medium">How to Customize Prompts</p>
+            <p className="text-sm text-foreground font-medium">
+              {t('sections.prompts.howToCustomize')}
+            </p>
             <p className="text-xs text-muted-foreground/80 leading-relaxed">
-              Toggle the switch to enable custom mode and edit the prompt. When disabled, the
-              default built-in prompt is used. You can use the default as a starting point by
-              enabling the toggle.
+              {t('sections.prompts.howToCustomizeDescription')}
             </p>
           </div>
         </div>
@@ -224,30 +231,32 @@ export function PromptCustomizationSection({
           <TabsList className="grid grid-cols-5 w-full">
             <TabsTrigger value="auto-mode" className="gap-2">
               <Bot className="w-4 h-4" />
-              Auto Mode
+              {t('sections.prompts.tabs.autoMode')}
             </TabsTrigger>
             <TabsTrigger value="agent" className="gap-2">
               <MessageSquareText className="w-4 h-4" />
-              Agent
+              {t('sections.prompts.tabs.agent')}
             </TabsTrigger>
             <TabsTrigger value="backlog-plan" className="gap-2">
               <KanbanSquare className="w-4 h-4" />
-              Backlog Plan
+              {t('sections.prompts.tabs.backlogPlan')}
             </TabsTrigger>
             <TabsTrigger value="enhancement" className="gap-2">
               <Sparkles className="w-4 h-4" />
-              Enhancement
+              {t('sections.prompts.tabs.enhancement')}
             </TabsTrigger>
             <TabsTrigger value="commit-message" className="gap-2">
               <GitCommitHorizontal className="w-4 h-4" />
-              Commit
+              {t('sections.prompts.tabs.commit')}
             </TabsTrigger>
           </TabsList>
 
           {/* Auto Mode Tab */}
           <TabsContent value="auto-mode" className="space-y-6 mt-6">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-medium text-foreground">Auto Mode Prompts</h3>
+              <h3 className="text-sm font-medium text-foreground">
+                {t('sections.prompts.autoModePrompts')}
+              </h3>
               <Button
                 variant="ghost"
                 size="sm"
@@ -255,7 +264,7 @@ export function PromptCustomizationSection({
                 className="gap-2"
               >
                 <RotateCcw className="w-3 h-3" />
-                Reset Section
+                {t('sections.prompts.resetSection')}
               </Button>
             </div>
 
@@ -263,54 +272,56 @@ export function PromptCustomizationSection({
             <div className="flex items-start gap-3 p-4 rounded-xl bg-blue-500/10 border border-blue-500/20">
               <Info className="w-5 h-5 text-blue-500 mt-0.5 flex-shrink-0" />
               <div className="space-y-1">
-                <p className="text-sm text-foreground font-medium">Planning Mode Markers</p>
+                <p className="text-sm text-foreground font-medium">
+                  {t('sections.prompts.planningModeMarkers')}
+                </p>
                 <p className="text-xs text-muted-foreground/80 leading-relaxed">
-                  Planning prompts use special markers like{' '}
-                  <code className="px-1 py-0.5 rounded bg-muted text-xs">[PLAN_GENERATED]</code> and{' '}
-                  <code className="px-1 py-0.5 rounded bg-muted text-xs">[SPEC_GENERATED]</code> to
-                  control the Auto Mode workflow. These markers must be preserved for proper
-                  functionality.
+                  {t('sections.prompts.planningModeMarkersDescription')}
                 </p>
               </div>
             </div>
 
             <div className="space-y-4">
               <PromptField
-                label="Planning: Lite Mode"
-                description="Quick planning outline without approval requirement"
+                label={t('sections.prompts.planningLiteMode')}
+                description={t('sections.prompts.planningLiteModeDescription')}
                 defaultValue={DEFAULT_AUTO_MODE_PROMPTS.planningLite}
                 customValue={promptCustomization?.autoMode?.planningLite}
                 onCustomValueChange={(value) => updatePrompt('autoMode', 'planningLite', value)}
                 critical={true}
+                t={t}
               />
 
               <PromptField
-                label="Planning: Lite with Approval"
-                description="Planning outline that waits for user approval"
+                label={t('sections.prompts.planningLiteWithApproval')}
+                description={t('sections.prompts.planningLiteWithApprovalDescription')}
                 defaultValue={DEFAULT_AUTO_MODE_PROMPTS.planningLiteWithApproval}
                 customValue={promptCustomization?.autoMode?.planningLiteWithApproval}
                 onCustomValueChange={(value) =>
                   updatePrompt('autoMode', 'planningLiteWithApproval', value)
                 }
                 critical={true}
+                t={t}
               />
 
               <PromptField
-                label="Planning: Spec Mode"
-                description="Detailed specification with task breakdown"
+                label={t('sections.prompts.planningSpecMode')}
+                description={t('sections.prompts.planningSpecModeDescription')}
                 defaultValue={DEFAULT_AUTO_MODE_PROMPTS.planningSpec}
                 customValue={promptCustomization?.autoMode?.planningSpec}
                 onCustomValueChange={(value) => updatePrompt('autoMode', 'planningSpec', value)}
                 critical={true}
+                t={t}
               />
 
               <PromptField
-                label="Planning: Full SDD Mode"
-                description="Comprehensive Software Design Document with phased implementation"
+                label={t('sections.prompts.planningFullSddMode')}
+                description={t('sections.prompts.planningFullSddModeDescription')}
                 defaultValue={DEFAULT_AUTO_MODE_PROMPTS.planningFull}
                 customValue={promptCustomization?.autoMode?.planningFull}
                 onCustomValueChange={(value) => updatePrompt('autoMode', 'planningFull', value)}
                 critical={true}
+                t={t}
               />
             </div>
           </TabsContent>
@@ -318,7 +329,9 @@ export function PromptCustomizationSection({
           {/* Agent Tab */}
           <TabsContent value="agent" className="space-y-6 mt-6">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-medium text-foreground">Agent Runner Prompts</h3>
+              <h3 className="text-sm font-medium text-foreground">
+                {t('sections.prompts.agentRunnerPrompts')}
+              </h3>
               <Button
                 variant="ghost"
                 size="sm"
@@ -326,17 +339,18 @@ export function PromptCustomizationSection({
                 className="gap-2"
               >
                 <RotateCcw className="w-3 h-3" />
-                Reset Section
+                {t('sections.prompts.resetSection')}
               </Button>
             </div>
 
             <div className="space-y-4">
               <PromptField
-                label="System Prompt"
-                description="Defines the AI's role and behavior in interactive chat sessions"
+                label={t('sections.prompts.systemPrompt')}
+                description={t('sections.prompts.agentSystemPromptDescription')}
                 defaultValue={DEFAULT_AGENT_PROMPTS.systemPrompt}
                 customValue={promptCustomization?.agent?.systemPrompt}
                 onCustomValueChange={(value) => updatePrompt('agent', 'systemPrompt', value)}
+                t={t}
               />
             </div>
           </TabsContent>
@@ -344,7 +358,9 @@ export function PromptCustomizationSection({
           {/* Backlog Plan Tab */}
           <TabsContent value="backlog-plan" className="space-y-6 mt-6">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-medium text-foreground">Backlog Planning Prompts</h3>
+              <h3 className="text-sm font-medium text-foreground">
+                {t('sections.prompts.backlogPlanningPrompts')}
+              </h3>
               <Button
                 variant="ghost"
                 size="sm"
@@ -352,7 +368,7 @@ export function PromptCustomizationSection({
                 className="gap-2"
               >
                 <RotateCcw className="w-3 h-3" />
-                Reset Section
+                {t('sections.prompts.resetSection')}
               </Button>
             </div>
 
@@ -360,24 +376,24 @@ export function PromptCustomizationSection({
             <div className="flex items-start gap-3 p-4 rounded-xl bg-amber-500/10 border border-amber-500/20">
               <AlertTriangle className="w-5 h-5 text-amber-500 mt-0.5 flex-shrink-0" />
               <div className="space-y-1">
-                <p className="text-sm text-foreground font-medium">Warning: Critical Prompts</p>
+                <p className="text-sm text-foreground font-medium">
+                  {t('sections.prompts.warningCriticalPrompts')}
+                </p>
                 <p className="text-xs text-muted-foreground/80 leading-relaxed">
-                  Backlog plan prompts require a strict JSON output format. Modifying these prompts
-                  incorrectly can break the backlog planning feature and potentially corrupt your
-                  feature data. Only customize if you fully understand the expected output
-                  structure.
+                  {t('sections.prompts.backlogPlanWarningDescription')}
                 </p>
               </div>
             </div>
 
             <div className="space-y-4">
               <PromptField
-                label="System Prompt"
-                description="Defines how the AI modifies the feature backlog (Plan button on Kanban board)"
+                label={t('sections.prompts.systemPrompt')}
+                description={t('sections.prompts.backlogPlanSystemPromptDescription')}
                 defaultValue={DEFAULT_BACKLOG_PLAN_PROMPTS.systemPrompt}
                 customValue={promptCustomization?.backlogPlan?.systemPrompt}
                 onCustomValueChange={(value) => updatePrompt('backlogPlan', 'systemPrompt', value)}
                 critical={true}
+                t={t}
               />
             </div>
           </TabsContent>
@@ -385,7 +401,9 @@ export function PromptCustomizationSection({
           {/* Enhancement Tab */}
           <TabsContent value="enhancement" className="space-y-6 mt-6">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-medium text-foreground">Enhancement Prompts</h3>
+              <h3 className="text-sm font-medium text-foreground">
+                {t('sections.prompts.enhancementPrompts')}
+              </h3>
               <Button
                 variant="ghost"
                 size="sm"
@@ -393,59 +411,64 @@ export function PromptCustomizationSection({
                 className="gap-2"
               >
                 <RotateCcw className="w-3 h-3" />
-                Reset Section
+                {t('sections.prompts.resetSection')}
               </Button>
             </div>
 
             <div className="space-y-4">
               <PromptField
-                label="Improve Mode"
-                description="Transform vague requests into clear, actionable tasks"
+                label={t('sections.prompts.improveMode')}
+                description={t('sections.prompts.improveModeDescription')}
                 defaultValue={DEFAULT_ENHANCEMENT_PROMPTS.improveSystemPrompt}
                 customValue={promptCustomization?.enhancement?.improveSystemPrompt}
                 onCustomValueChange={(value) =>
                   updatePrompt('enhancement', 'improveSystemPrompt', value)
                 }
+                t={t}
               />
 
               <PromptField
-                label="Technical Mode"
-                description="Add implementation details and technical specifications"
+                label={t('sections.prompts.technicalMode')}
+                description={t('sections.prompts.technicalModeDescription')}
                 defaultValue={DEFAULT_ENHANCEMENT_PROMPTS.technicalSystemPrompt}
                 customValue={promptCustomization?.enhancement?.technicalSystemPrompt}
                 onCustomValueChange={(value) =>
                   updatePrompt('enhancement', 'technicalSystemPrompt', value)
                 }
+                t={t}
               />
 
               <PromptField
-                label="Simplify Mode"
-                description="Make verbose descriptions concise and focused"
+                label={t('sections.prompts.simplifyMode')}
+                description={t('sections.prompts.simplifyModeDescription')}
                 defaultValue={DEFAULT_ENHANCEMENT_PROMPTS.simplifySystemPrompt}
                 customValue={promptCustomization?.enhancement?.simplifySystemPrompt}
                 onCustomValueChange={(value) =>
                   updatePrompt('enhancement', 'simplifySystemPrompt', value)
                 }
+                t={t}
               />
 
               <PromptField
-                label="Acceptance Criteria Mode"
-                description="Add testable acceptance criteria to descriptions"
+                label={t('sections.prompts.acceptanceCriteriaMode')}
+                description={t('sections.prompts.acceptanceCriteriaModeDescription')}
                 defaultValue={DEFAULT_ENHANCEMENT_PROMPTS.acceptanceSystemPrompt}
                 customValue={promptCustomization?.enhancement?.acceptanceSystemPrompt}
                 onCustomValueChange={(value) =>
                   updatePrompt('enhancement', 'acceptanceSystemPrompt', value)
                 }
+                t={t}
               />
 
               <PromptField
-                label="User Experience Mode"
-                description="Review and enhance from a user experience and design perspective"
+                label={t('sections.prompts.userExperienceMode')}
+                description={t('sections.prompts.userExperienceModeDescription')}
                 defaultValue={DEFAULT_ENHANCEMENT_PROMPTS.uxReviewerSystemPrompt}
                 customValue={promptCustomization?.enhancement?.uxReviewerSystemPrompt}
                 onCustomValueChange={(value) =>
                   updatePrompt('enhancement', 'uxReviewerSystemPrompt', value)
                 }
+                t={t}
               />
             </div>
           </TabsContent>
@@ -453,7 +476,9 @@ export function PromptCustomizationSection({
           {/* Commit Message Tab */}
           <TabsContent value="commit-message" className="space-y-6 mt-6">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-medium text-foreground">Commit Message Prompts</h3>
+              <h3 className="text-sm font-medium text-foreground">
+                {t('sections.prompts.commitMessagePrompts')}
+              </h3>
               <Button
                 variant="ghost"
                 size="sm"
@@ -461,19 +486,20 @@ export function PromptCustomizationSection({
                 className="gap-2"
               >
                 <RotateCcw className="w-3 h-3" />
-                Reset Section
+                {t('sections.prompts.resetSection')}
               </Button>
             </div>
 
             <div className="space-y-4">
               <PromptField
-                label="System Prompt"
-                description="Instructions for generating git commit messages from diffs. The AI will receive the git diff and generate a conventional commit message."
+                label={t('sections.prompts.systemPrompt')}
+                description={t('sections.prompts.commitMessageSystemPromptDescription')}
                 defaultValue={DEFAULT_COMMIT_MESSAGE_PROMPTS.systemPrompt}
                 customValue={promptCustomization?.commitMessage?.systemPrompt}
                 onCustomValueChange={(value) =>
                   updatePrompt('commitMessage', 'systemPrompt', value)
                 }
+                t={t}
               />
             </div>
           </TabsContent>

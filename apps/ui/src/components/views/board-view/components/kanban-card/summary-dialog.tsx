@@ -1,4 +1,5 @@
 // @ts-nocheck
+import { useTranslation } from 'react-i18next';
 import { Feature } from '@/store/app-store';
 import { AgentTaskInfo } from '@/lib/agent-context-parser';
 import {
@@ -28,6 +29,8 @@ export function SummaryDialog({
   isOpen,
   onOpenChange,
 }: SummaryDialogProps) {
+  const { t } = useTranslation('board');
+
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent
@@ -40,21 +43,22 @@ export function SummaryDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Sparkles className="w-5 h-5 text-[var(--status-success)]" />
-            Implementation Summary
+            {t('summaryDialog.title')}
           </DialogTitle>
           <DialogDescription
             className="text-sm"
             title={feature.description || feature.summary || ''}
           >
             {(() => {
-              const displayText = feature.description || feature.summary || 'No description';
+              const displayText =
+                feature.description || feature.summary || t('summaryDialog.noDescription');
               return displayText.length > 100 ? `${displayText.slice(0, 100)}...` : displayText;
             })()}
           </DialogDescription>
         </DialogHeader>
         <div className="flex-1 overflow-y-auto p-4 bg-card rounded-lg border border-border/50">
           <Markdown>
-            {feature.summary || summary || agentInfo?.summary || 'No summary available'}
+            {feature.summary || summary || agentInfo?.summary || t('summaryDialog.noSummary')}
           </Markdown>
         </div>
         <DialogFooter>
@@ -63,7 +67,7 @@ export function SummaryDialog({
             onClick={() => onOpenChange(false)}
             data-testid="close-summary-button"
           >
-            Close
+            {t('summaryDialog.close')}
           </Button>
         </DialogFooter>
       </DialogContent>

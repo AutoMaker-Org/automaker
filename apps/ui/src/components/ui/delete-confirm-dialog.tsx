@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Trash2 } from 'lucide-react';
 import {
   Dialog,
@@ -19,7 +20,7 @@ interface DeleteConfirmDialogProps {
   description: string;
   /** Optional content to show between description and buttons (e.g., item preview card) */
   children?: ReactNode;
-  /** Text for the confirm button. Defaults to "Delete" */
+  /** Text for the confirm button. Uses translation key buttons.delete if not provided */
   confirmText?: string;
   /** Test ID for the dialog */
   testId?: string;
@@ -34,10 +35,12 @@ export function DeleteConfirmDialog({
   title,
   description,
   children,
-  confirmText = 'Delete',
+  confirmText,
   testId = 'delete-confirm-dialog',
   confirmTestId = 'confirm-delete-button',
 }: DeleteConfirmDialogProps) {
+  const { t } = useTranslation('common');
+  const displayConfirmText = confirmText ?? t('buttons.delete');
   const handleConfirm = () => {
     onConfirm();
     onOpenChange(false);
@@ -63,7 +66,7 @@ export function DeleteConfirmDialog({
             className="px-4"
             data-testid="cancel-delete-button"
           >
-            Cancel
+            {t('buttons.cancel')}
           </Button>
           <HotkeyButton
             variant="destructive"
@@ -74,7 +77,7 @@ export function DeleteConfirmDialog({
             className="px-4"
           >
             <Trash2 className="w-4 h-4 mr-2" />
-            {confirmText}
+            {displayConfirmText}
           </HotkeyButton>
         </DialogFooter>
       </DialogContent>

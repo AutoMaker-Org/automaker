@@ -1,0 +1,91 @@
+{
+  "welcome": {
+    "greeting": "Bonjour ! Je suis l'Agent Automaker. Je peux vous aider à construire des logiciels de manière autonome. Je peux lire et modifier des fichiers dans ce projet, exécuter des commandes et lancer des tests. Que souhaitez-vous créer aujourd'hui ?"
+  },
+  "header": {
+    "title": "Agent IA",
+    "thinking": "Réflexion...",
+    "connected": "Connecté",
+    "disconnected": "Déconnecté",
+    "connecting": "Connexion...",
+    "messagesCount": "{{count}} messages",
+    "clear": "Effacer"
+  },
+  "input": {
+    "placeholder": "Décrivez ce que vous voulez construire...",
+    "placeholderProcessing": "Tapez pour ajouter un autre prompt à la file...",
+    "placeholderDropFiles": "Déposez vos fichiers ici...",
+    "send": "Envoyer",
+    "stop": "Arrêter",
+    "stopGeneration": "Arrêter la génération",
+    "addToQueue": "Ajouter à la file",
+    "sendMessage": "Envoyer le message",
+    "attachImage": "Joindre une image",
+    "attachFile": "Joindre un fichier",
+    "attachFiles": "Joindre des fichiers (images, .txt, .md)",
+    "filesAttached": "fichiers joints",
+    "dropHere": "Déposez ici",
+    "keyboardHint": "Appuyez sur <kbd>Entrée</kbd> pour envoyer, <kbd>Maj+Entrée</kbd> pour une nouvelle ligne"
+  },
+  "session": {
+    "newSession": "Nouvelle session",
+    "sessions": "Sessions",
+    "active": "Active",
+    "archived": "Archivée",
+    "noSessions": "Aucune session pour l'instant",
+    "createFirst": "Créez votre première session pour commencer",
+    "rename": "Renommer la session",
+    "archive": "Archiver la session",
+    "delete": "Supprimer la session",
+    "confirmDelete": "Êtes-vous sûr de vouloir supprimer cette session ?",
+    "messages": "{{count}} message",
+    "messages_plural": "{{count}} messages",
+    "noSessionSelected": "Aucune session sélectionnée",
+    "noSessionDescription": "Créez ou sélectionnez une session pour commencer à discuter avec l'agent IA",
+    "viewSessions": "Voir les sessions",
+    "showSessions": "Afficher les sessions"
+  },
+  "chat": {
+    "clearHistory": "Effacer l'historique de conversation",
+    "confirmClear": "Êtes-vous sûr de vouloir effacer cette conversation ?",
+    "copyMessage": "Copier le message",
+    "regenerate": "Régénérer la réponse",
+    "imagesAttached": "{{count}} image jointe",
+    "imagesAttached_plural": "{{count}} images jointes"
+  },
+  "queue": {
+    "title": "File de messages",
+    "empty": "La file est vide",
+    "pending": "{{count}} prompt en attente",
+    "pending_plural": "{{count}} prompts en attente",
+    "remove": "Retirer de la file",
+    "clear": "Vider la file",
+    "clearAll": "Tout effacer",
+    "filesCount": "+{{count}} fichier",
+    "filesCount_plural": "+{{count}} fichiers"
+  },
+  "tools": {
+    "using": "Utilisation de {{tool}}...",
+    "completed": "Outil terminé",
+    "read": "Lecture du fichier",
+    "write": "Écriture du fichier",
+    "edit": "Modification du fichier",
+    "bash": "Exécution de la commande",
+    "glob": "Recherche de fichiers",
+    "grep": "Recherche de contenu"
+  },
+  "errors": {
+    "connectionFailed": "Échec de la connexion à l'agent",
+    "messageFailed": "Échec de l'envoi du message",
+    "sessionLoadFailed": "Échec du chargement de la session"
+  },
+  "noProject": {
+    "title": "Aucun projet sélectionné",
+    "description": "Ouvrez ou créez un projet pour commencer à travailler avec l'agent IA."
+  },
+  "files": {
+    "filesAttached": "{{count}} fichier joint",
+    "filesAttached_plural": "{{count}} fichiers joints",
+    "clearAll": "Tout effacer"
+  }
+}

@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { X } from 'lucide-react';
 
 interface QueueItem {
@@ -13,6 +14,8 @@ interface QueueDisplayProps {
 }
 
 export function QueueDisplay({ serverQueue, onRemoveFromQueue, onClearQueue }: QueueDisplayProps) {
+  const { t } = useTranslation('agent');
+
   if (serverQueue.length === 0) {
     return null;
   }
@@ -21,13 +24,13 @@ export function QueueDisplay({ serverQueue, onRemoveFromQueue, onClearQueue }: Q
     <div className="mb-4 space-y-2">
       <div className="flex items-center justify-between">
         <p className="text-xs font-medium text-muted-foreground">
-          {serverQueue.length} prompt{serverQueue.length > 1 ? 's' : ''} queued
+          {t('queue.pending', { count: serverQueue.length })}
         </p>
         <button
           onClick={onClearQueue}
           className="text-xs text-muted-foreground hover:text-foreground transition-colors"
         >
-          Clear all
+          {t('queue.clearAll')}
         </button>
       </div>
       <div className="space-y-1.5">
@@ -42,13 +45,13 @@ export function QueueDisplay({ serverQueue, onRemoveFromQueue, onClearQueue }: Q
             <span className="flex-1 truncate text-foreground">{item.message}</span>
             {item.imagePaths && item.imagePaths.length > 0 && (
               <span className="text-xs text-muted-foreground">
-                +{item.imagePaths.length} file{item.imagePaths.length > 1 ? 's' : ''}
+                {t('queue.filesCount', { count: item.imagePaths.length })}
               </span>
             )}
             <button
               onClick={() => onRemoveFromQueue(item.id)}
               className="opacity-0 group-hover:opacity-100 p-1 hover:bg-destructive/10 hover:text-destructive rounded transition-all"
-              title="Remove from queue"
+              title={t('queue.remove')}
             >
               <X className="w-3 h-3" />
             </button>

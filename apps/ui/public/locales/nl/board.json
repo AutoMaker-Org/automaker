@@ -1,0 +1,160 @@
+{
+  "title": "Functiebord",
+  "columns": {
+    "backlog": "Backlog",
+    "ready": "Gereed",
+    "inProgress": "Bezig",
+    "review": "Review",
+    "done": "Voltooid"
+  },
+  "feature": {
+    "newFeature": "Nieuwe functie",
+    "addFeature": "Functie toevoegen",
+    "editFeature": "Functie bewerken",
+    "deleteFeature": "Functie verwijderen",
+    "duplicateFeature": "Functie dupliceren",
+    "moveToBacklog": "Naar Backlog verplaatsen",
+    "moveToReady": "Naar Gereed verplaatsen",
+    "startImplementation": "Implementatie starten",
+    "markAsReview": "Markeren voor review",
+    "markAsDone": "Markeren als voltooid",
+    "viewDetails": "Details bekijken",
+    "viewOutput": "Agent-uitvoer bekijken",
+    "confirmDelete": "Weet je zeker dat je deze functie wilt verwijderen? Deze actie kan niet ongedaan worden gemaakt.",
+    "noFeatures": "Nog geen functies",
+    "createFirst": "Maak je eerste functie aan om te beginnen"
+  },
+  "form": {
+    "title": "Titel",
+    "titlePlaceholder": "Voer functietitel in...",
+    "description": "Beschrijving",
+    "descriptionPlaceholder": "Beschrijf wat deze functie moet doen...",
+    "category": "Categorie",
+    "priority": "Prioriteit",
+    "dependencies": "Afhankelijkheden",
+    "dependenciesPlaceholder": "Selecteer functies waarvan deze afhankelijk is",
+    "images": "Afbeeldingen",
+    "addImage": "Afbeelding toevoegen",
+    "spec": "Specificatie",
+    "specPlaceholder": "Optionele gedetailleerde specificatie..."
+  },
+  "categories": {
+    "feature": "Functie",
+    "bug": "Bug",
+    "enhancement": "Verbetering",
+    "refactor": "Refactor",
+    "docs": "Documentatie",
+    "test": "Test",
+    "chore": "Klusje"
+  },
+  "priorities": {
+    "high": "Hoog",
+    "medium": "Gemiddeld",
+    "low": "Laag"
+  },
+  "status": {
+    "pending": "In afwachting",
+    "ready": "Gereed",
+    "running": "Actief",
+    "paused": "Gepauzeerd",
+    "review": "Review",
+    "completed": "Voltooid",
+    "failed": "Mislukt"
+  },
+  "actions": {
+    "runAll": "Alles uitvoeren",
+    "runNext": "Volgende uitvoeren",
+    "stopAll": "Alles stoppen",
+    "clearCompleted": "Voltooide wissen",
+    "importFeatures": "Functies importeren",
+    "exportFeatures": "Functies exporteren",
+    "generateSpec": "Specificatie genereren",
+    "generateFeatures": "Functies genereren uit specificatie"
+  },
+  "ai": {
+    "generateTitle": "Titel genereren",
+    "generateDescription": "Beschrijving genereren",
+    "enhanceFeature": "Verbeteren met AI",
+    "validateFeature": "Functie valideren",
+    "suggestFeatures": "Functies voorstellen"
+  },
+  "filters": {
+    "all": "Alle",
+    "byCategory": "Op categorie",
+    "byPriority": "Op prioriteit",
+    "byStatus": "Op status",
+    "search": "Functies zoeken...",
+    "clearSearch": "Zoekopdracht wissen"
+  },
+  "empty": {
+    "backlog": "Backlog is leeg",
+    "ready": "Geen functies gereed voor implementatie",
+    "inProgress": "Geen functies in uitvoering",
+    "review": "Geen functies te reviewen",
+    "done": "Geen voltooide functies"
+  },
+  "emptyState": {
+    "noMatchingItems": "Geen overeenkomende items",
+    "noMatchingFilters": "Geen functies komen overeen met je huidige filters.",
+    "press": "Druk op",
+    "toAdd": "om toe te voegen",
+    "clearFilters": "Wis filters om alle items te zien"
+  },
+  "spec": {
+    "creatingTitle": "Appspecificatie aanmaken",
+    "creating": "Specificatie aanmaken"
+  },
+  "cardActions": {
+    "approvePlan": "Plan goedkeuren",
+    "logs": "Logs",
+    "verify": "Verifiëren",
+    "resume": "Hervatten",
+    "complete": "Voltooien",
+    "refine": "Verfijnen",
+    "markAsVerified": "Als geverifieerd markeren",
+    "edit": "Bewerken",
+    "viewPlan": "Plan bekijken",
+    "make": "Maken",
+    "delete": "Verwijderen",
+    "spawnSubTask": "Subtaak aanmaken",
+    "viewLogs": "Logs bekijken"
+  },
+  "cardHeader": {
+    "generatingTitle": "Titel genereren...",
+    "less": "Minder",
+    "more": "Meer"
+  },
+  "agentInfo": {
+    "tasks": "taken",
+    "showLess": "Minder tonen",
+    "showMore": "+{{count}} meer",
+    "summary": "Samenvatting",
+    "viewFullSummary": "Volledige samenvatting bekijken",
+    "toolCalls": "{{count}} tool-aanroepen",
+    "tasksDone": "{{count}} taken voltooid"
+  },
+  "summaryDialog": {
+    "title": "Implementatiesamenvatting",
+    "noDescription": "Geen beschrijving",
+    "noSummary": "Geen samenvatting beschikbaar",
+    "close": "Sluiten"
+  },
+  "badges": {
+    "highPriority": "Hoge prioriteit",
+    "mediumPriority": "Gemiddelde prioriteit",
+    "lowPriority": "Lage prioriteit",
+    "manualVerification": "Handmatige verificatie vereist",
+    "blockedBy": "Geblokkeerd door {{count}} onvoltooide afhankelijkheid",
+    "blockedBy_other": "Geblokkeerd door {{count}} onvoltooide afhankelijkheden",
+    "justFinished": "Agent is net klaar met werken aan deze functie"
+  },
+  "messages": {
+    "featureCreated": "Functie succesvol aangemaakt",
+    "featureUpdated": "Functie succesvol bijgewerkt",
+    "featureDeleted": "Functie succesvol verwijderd",
+    "featureMoved": "Functie verplaatst naar {{status}}",
+    "implementationStarted": "Implementatie gestart",
+    "implementationCompleted": "Implementatie voltooid",
+    "implementationFailed": "Implementatie mislukt"
+  }
+}

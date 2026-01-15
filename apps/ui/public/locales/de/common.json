@@ -37,7 +37,9 @@
     "archive": "Archivieren",
     "restore": "Wiederherstellen",
     "saveChanges": "Änderungen speichern",
-    "discardChanges": "Änderungen verwerfen"
+    "discardChanges": "Änderungen verwerfen",
+    "browse": "Durchsuchen",
+    "view": "Anzeigen"
   },
   "labels": {
     "title": "Titel",
@@ -126,7 +128,68 @@
     "settings": "Einstellungen",
     "help": "Hilfe",
     "about": "Über",
-    "logout": "Abmelden"
+    "logout": "Abmelden",
+    "wiki": "Wiki",
+    "runningAgents": "Laufende Agenten",
+    "selectProject": "Projekt auswählen",
+    "selectOrCreateProject": "Projekt oben auswählen oder erstellen"
+  },
+  "sidebar": {
+    "collapseSidebar": "Seitenleiste einklappen",
+    "expandSidebar": "Seitenleiste ausklappen",
+    "newProject": "Neues Projekt",
+    "new": "Neu",
+    "openFolder": "Ordner öffnen",
+    "recycleBin": "Papierkorb",
+    "reportBug": "Fehler / Feature-Anfrage melden",
+    "projectOptions": "Projektoptionen",
+    "searchProjects": "Projekte suchen...",
+    "noProjectsFound": "Keine Projekte gefunden",
+    "navigate": "navigieren",
+    "select": "auswählen",
+    "close": "schließen",
+    "projectTheme": "Projekt-Design",
+    "useGlobal": "Global verwenden",
+    "dark": "Dunkel",
+    "light": "Hell",
+    "projectHistory": "Projektverlauf",
+    "previous": "Vorheriges",
+    "next": "Nächstes",
+    "clearHistory": "Verlauf löschen",
+    "moveToTrash": "In Papierkorb verschieben"
+  },
+  "trash": {
+    "title": "Papierkorb",
+    "description": "Projekte in der Seitenleiste wiederherstellen oder ihre Ordner über den System-Papierkorb löschen.",
+    "empty": "Papierkorb ist leer.",
+    "trashed": "Gelöscht",
+    "restore": "Wiederherstellen",
+    "deleteFromDisk": "Von Festplatte löschen",
+    "deleting": "Wird gelöscht...",
+    "removeFromList": "Aus Liste entfernen",
+    "emptyRecycleBin": "Papierkorb leeren",
+    "clearing": "Wird geleert...",
+    "confirmDeleteTitle": "\"{{name}}\" von Festplatte löschen?",
+    "confirmDeleteDescription": "Dies verschiebt den Ordner in den System-Papierkorb.",
+    "confirmDeleteButton": "Von Festplatte löschen",
+    "emptyTrashTitle": "Papierkorb leeren",
+    "emptyTrashDescription": "Alle Projekte aus dem Papierkorb entfernen? Dies löscht keine Ordner von der Festplatte.",
+    "emptyButton": "Leeren"
+  },
+  "onboarding": {
+    "welcomeTo": "Willkommen bei {{name}}!",
+    "projectReady": "Dein neues Projekt ist bereit. Lass uns loslegen.",
+    "generateSpecQuestion": "Möchtest du deine <strong>app_spec.txt</strong> automatisch generieren? Diese Datei hilft dabei, dein Projekt zu beschreiben und wird verwendet, um dein Backlog mit Features zu füllen.",
+    "benefitBacklog": "Backlog vorbefüllen",
+    "benefitBacklogDesc": "Features automatisch basierend auf deiner Projektspezifikation generieren",
+    "benefitAI": "Bessere KI-Unterstützung",
+    "benefitAIDesc": "KI-Agenten helfen, deine Projektstruktur und Tech-Stack zu verstehen",
+    "benefitDocs": "Projektdokumentation",
+    "benefitDocsDesc": "Eine klare Übersicht über die Fähigkeiten und Features deines Projekts behalten",
+    "tip": "Tipp:",
+    "tipText": "Du kannst deine app_spec.txt jederzeit später im Spec-Editor in der Seitenleiste generieren oder bearbeiten.",
+    "skipForNow": "Jetzt überspringen",
+    "generateAppSpec": "App-Spec generieren"
   },
   "time": {
     "now": "Gerade eben",
@@ -139,5 +202,92 @@
     "today": "Heute",
     "yesterday": "Gestern",
     "tomorrow": "Morgen"
+  },
+  "dialogs": {
+    "newProject": {
+      "title": "Neues Projekt erstellen",
+      "description": "Starte mit einem leeren Projekt oder wähle eine Starter-Vorlage.",
+      "projectName": "Projektname",
+      "projectNameRequired": "Projektname ist erforderlich",
+      "loadingWorkspace": "Arbeitsbereich wird geladen...",
+      "willBeCreatedAt": "Wird erstellt in:",
+      "blankProject": "Leeres Projekt",
+      "starterKit": "Starter-Kit",
+      "blankProjectDescription": "Erstelle ein leeres Projekt mit der Standard-.automaker-Verzeichnisstruktur. Perfekt um von Grund auf zu starten oder eine bestehende Codebasis zu importieren.",
+      "templateSelectionRequired": "Bitte wähle eine Vorlage oder gib eine benutzerdefinierte GitHub-URL ein",
+      "features": "Features",
+      "moreCount": "+{{count}} weitere",
+      "customGitHubUrl": "Benutzerdefinierte GitHub-URL",
+      "customGitHubUrlDescription": "Klone ein beliebiges öffentliches GitHub-Repository als Ausgangspunkt.",
+      "gitHubUrlRequired": "GitHub-URL ist erforderlich",
+      "cloning": "Wird geklont...",
+      "creating": "Wird erstellt...",
+      "createProject": "Projekt erstellen"
+    },
+    "workspacePicker": {
+      "title": "Projekt auswählen",
+      "description": "Wähle ein Projekt aus deinem Arbeitsbereich-Verzeichnis",
+      "loadingProjects": "Projekte werden geladen...",
+      "noProjectsFound": "Keine Projekte im Arbeitsbereich-Verzeichnis gefunden"
+    },
+    "deleteSession": {
+      "title": "Sitzung löschen",
+      "description": "Bist du sicher, dass du diese Sitzung löschen möchtest? Diese Aktion kann nicht rückgängig gemacht werden.",
+      "confirmText": "Sitzung löschen",
+      "messageCount": "{{count}} Nachrichten"
+    },
+    "sandboxRisk": {
+      "title": "Sandbox-Umgebung nicht erkannt",
+      "warningLabel": "Warnung:",
+      "warningText": "Diese Anwendung läuft außerhalb einer containerisierten Sandbox-Umgebung. KI-Agenten haben direkten Zugriff auf dein Dateisystem und können Befehle auf deinem System ausführen.",
+      "potentialRisks": "Potenzielle Risiken:",
+      "riskFiles": "Agenten können Dateien auf deinem System lesen, ändern oder löschen",
+      "riskCommands": "Agenten können beliebige Befehle ausführen und Software installieren",
+      "riskCredentials": "Agenten können auf Umgebungsvariablen und Zugangsdaten zugreifen",
+      "riskSideEffects": "Unbeabsichtigte Nebeneffekte von Agentenaktionen können dein System beeinträchtigen",
+      "dockerSuggestion": "Für einen sichereren Betrieb solltest du Automaker in Docker ausführen. Siehe README für Anweisungen.",
+      "doNotShowAgain": "Diese Warnung nicht mehr anzeigen",
+      "denyAndExit": "Ablehnen & Beenden",
+      "acceptRisks": "Ich akzeptiere die Risiken"
+    },
+    "sandboxRejection": {
+      "title": "Zugriff verweigert",
+      "description": "Du hast abgelehnt, die Risiken beim Ausführen von Automaker außerhalb einer Sandbox-Umgebung zu akzeptieren.",
+      "dockerSuggestion": "Für einen sichereren Betrieb solltest du Automaker in Docker ausführen. Siehe README für Anweisungen.",
+      "reloadAndTryAgain": "Neu laden & Erneut versuchen"
+    },
+    "fileBrowser": {
+      "title": "Projektverzeichnis auswählen",
+      "description": "Navigiere zu deinem Projektordner oder füge einen Pfad direkt ein",
+      "recent": "Zuletzt verwendet",
+      "removeFromRecent": "Aus zuletzt verwendet entfernen",
+      "drives": "Laufwerke",
+      "loadingDirectories": "Verzeichnisse werden geladen...",
+      "noSubdirectories": "Keine Unterverzeichnisse gefunden",
+      "helpText": "Füge oben einen vollständigen Pfad ein, oder klicke auf Ordner zum Navigieren. Drücke Enter oder klicke → um zu einem Pfad zu springen.",
+      "selectCurrentFolder": "Aktuellen Ordner auswählen",
+      "selectCurrentFolderHint": "Aktuellen Ordner auswählen (Cmd+Enter / Strg+Enter)"
+    },
+    "boardBackground": {
+      "title": "Board-Hintergrund-Einstellungen",
+      "description": "Setze ein benutzerdefiniertes Hintergrundbild für dein Kanban-Board und passe die Karten-/Spalten-Transparenz an",
+      "backgroundImage": "Hintergrundbild",
+      "changeImage": "Bild ändern",
+      "dropImageHere": "Bild hier ablegen",
+      "clickToUpload": "Klicken zum Hochladen oder per Drag & Drop",
+      "supportedFormats": "JPG, PNG, GIF oder WebP (max. {{maxSize}}MB)",
+      "cardOpacity": "Karten-Transparenz",
+      "columnOpacity": "Spalten-Transparenz",
+      "showColumnBorders": "Spaltenränder anzeigen",
+      "cardGlassmorphism": "Karten-Glasmorphismus (Unschärfe-Effekt)",
+      "showCardBorders": "Kartenränder anzeigen",
+      "cardBorderOpacity": "Kartenrand-Transparenz",
+      "hideScrollbar": "Board-Scrollleiste ausblenden"
+    }
+  },
+  "components": {
+    "errorState": {
+      "title": "Laden fehlgeschlagen"
+    }
   }
 }

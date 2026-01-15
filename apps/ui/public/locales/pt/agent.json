@@ -1,0 +1,91 @@
+{
+  "welcome": {
+    "greeting": "Olá! Eu sou o Agente Automaker. Posso ajudá-lo a construir software de forma autônoma. Posso ler e modificar arquivos neste projeto, executar comandos e rodar testes. O que você gostaria de criar hoje?"
+  },
+  "header": {
+    "title": "Agente IA",
+    "thinking": "Pensando...",
+    "connected": "Conectado",
+    "disconnected": "Desconectado",
+    "connecting": "Conectando...",
+    "messagesCount": "{{count}} mensagens",
+    "clear": "Limpar"
+  },
+  "input": {
+    "placeholder": "Descreva o que você quer construir...",
+    "placeholderProcessing": "Digite para enfileirar outro prompt...",
+    "placeholderDropFiles": "Solte seus arquivos aqui...",
+    "send": "Enviar",
+    "stop": "Parar",
+    "stopGeneration": "Parar geração",
+    "addToQueue": "Adicionar à fila",
+    "sendMessage": "Enviar mensagem",
+    "attachImage": "Anexar imagem",
+    "attachFile": "Anexar arquivo",
+    "attachFiles": "Anexar arquivos (imagens, .txt, .md)",
+    "filesAttached": "arquivos anexados",
+    "dropHere": "Solte aqui",
+    "keyboardHint": "Pressione <kbd>Enter</kbd> para enviar, <kbd>Shift+Enter</kbd> para nova linha"
+  },
+  "session": {
+    "newSession": "Nova Sessão",
+    "sessions": "Sessões",
+    "active": "Ativa",
+    "archived": "Arquivada",
+    "noSessions": "Nenhuma sessão ainda",
+    "createFirst": "Crie sua primeira sessão para começar",
+    "rename": "Renomear sessão",
+    "archive": "Arquivar sessão",
+    "delete": "Excluir sessão",
+    "confirmDelete": "Tem certeza de que deseja excluir esta sessão?",
+    "messages": "{{count}} mensagem",
+    "messages_plural": "{{count}} mensagens",
+    "noSessionSelected": "Nenhuma Sessão Selecionada",
+    "noSessionDescription": "Crie ou selecione uma sessão para começar a conversar com o agente de IA",
+    "viewSessions": "Ver Sessões",
+    "showSessions": "Mostrar Sessões"
+  },
+  "chat": {
+    "clearHistory": "Limpar histórico de conversa",
+    "confirmClear": "Tem certeza de que deseja limpar esta conversa?",
+    "copyMessage": "Copiar mensagem",
+    "regenerate": "Regenerar resposta",
+    "imagesAttached": "{{count}} imagem anexada",
+    "imagesAttached_plural": "{{count}} imagens anexadas"
+  },
+  "queue": {
+    "title": "Fila de Mensagens",
+    "empty": "A fila está vazia",
+    "pending": "{{count}} prompt na fila",
+    "pending_plural": "{{count}} prompts na fila",
+    "remove": "Remover da fila",
+    "clear": "Limpar fila",
+    "clearAll": "Limpar tudo",
+    "filesCount": "+{{count}} arquivo",
+    "filesCount_plural": "+{{count}} arquivos"
+  },
+  "tools": {
+    "using": "Usando {{tool}}...",
+    "completed": "Ferramenta concluída",
+    "read": "Lendo arquivo",
+    "write": "Escrevendo arquivo",
+    "edit": "Editando arquivo",
+    "bash": "Executando comando",
+    "glob": "Pesquisando arquivos",
+    "grep": "Pesquisando conteúdo"
+  },
+  "errors": {
+    "connectionFailed": "Falha ao conectar ao agente",
+    "messageFailed": "Falha ao enviar mensagem",
+    "sessionLoadFailed": "Falha ao carregar sessão"
+  },
+  "noProject": {
+    "title": "Nenhum Projeto Selecionado",
+    "description": "Abra ou crie um projeto para começar a trabalhar com o agente de IA."
+  },
+  "files": {
+    "filesAttached": "{{count}} arquivo anexado",
+    "filesAttached_plural": "{{count}} arquivos anexados",
+    "clearAll": "Limpar tudo"
+  }
+}

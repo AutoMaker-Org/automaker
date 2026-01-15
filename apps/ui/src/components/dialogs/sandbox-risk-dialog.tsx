@@ -6,6 +6,7 @@
  */
 
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ShieldAlert } from 'lucide-react';
 import {
   Dialog,
@@ -26,6 +27,7 @@ interface SandboxRiskDialogProps {
 }
 
 export function SandboxRiskDialog({ open, onConfirm, onDeny }: SandboxRiskDialogProps) {
+  const { t } = useTranslation('common');
   const [skipInFuture, setSkipInFuture] = useState(false);
 
   const handleConfirm = () => {
@@ -45,29 +47,29 @@ export function SandboxRiskDialog({ open, onConfirm, onDeny }: SandboxRiskDialog
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-destructive">
             <ShieldAlert className="w-6 h-6" />
-            Sandbox Environment Not Detected
+            {t('dialogs.sandboxRisk.title')}
           </DialogTitle>
           <DialogDescription asChild>
             <div className="space-y-4 pt-2">
               <p className="text-muted-foreground">
-                <strong>Warning:</strong> This application is running outside of a containerized
-                sandbox environment. AI agents will have direct access to your filesystem and can
-                execute commands on your system.
+                <strong>{t('dialogs.sandboxRisk.warningLabel')}</strong>{' '}
+                {t('dialogs.sandboxRisk.warningText')}
               </p>
 
               <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4 space-y-2">
-                <p className="text-sm font-medium text-destructive">Potential Risks:</p>
+                <p className="text-sm font-medium text-destructive">
+                  {t('dialogs.sandboxRisk.potentialRisks')}
+                </p>
                 <ul className="text-sm text-muted-foreground list-disc list-inside space-y-1">
-                  <li>Agents can read, modify, or delete files on your system</li>
-                  <li>Agents can execute arbitrary commands and install software</li>
-                  <li>Agents can access environment variables and credentials</li>
-                  <li>Unintended side effects from agent actions may affect your system</li>
+                  <li>{t('dialogs.sandboxRisk.riskFiles')}</li>
+                  <li>{t('dialogs.sandboxRisk.riskCommands')}</li>
+                  <li>{t('dialogs.sandboxRisk.riskCredentials')}</li>
+                  <li>{t('dialogs.sandboxRisk.riskSideEffects')}</li>
                 </ul>
               </div>
 
               <p className="text-sm text-muted-foreground">
-                For safer operation, consider running Automaker in Docker. See the README for
-                instructions.
+                {t('dialogs.sandboxRisk.dockerSuggestion')}
               </p>
             </div>
           </DialogDescription>
@@ -85,12 +87,12 @@ export function SandboxRiskDialog({ open, onConfirm, onDeny }: SandboxRiskDialog
               htmlFor="skip-sandbox-warning"
               className="text-sm text-muted-foreground cursor-pointer"
             >
-              Do not show this warning again
+              {t('dialogs.sandboxRisk.doNotShowAgain')}
             </Label>
           </div>
           <div className="flex gap-2 sm:gap-2 w-full sm:justify-end">
             <Button variant="outline" onClick={onDeny} className="px-4" data-testid="sandbox-deny">
-              Deny &amp; Exit
+              {t('dialogs.sandboxRisk.denyAndExit')}
             </Button>
             <Button
               variant="destructive"
@@ -98,7 +100,8 @@ export function SandboxRiskDialog({ open, onConfirm, onDeny }: SandboxRiskDialog
               className="px-4"
               data-testid="sandbox-confirm"
             >
-              <ShieldAlert className="w-4 h-4 mr-2" />I Accept the Risks
+              <ShieldAlert className="w-4 h-4 mr-2" />
+              {t('dialogs.sandboxRisk.acceptRisks')}
             </Button>
           </div>
         </DialogFooter>

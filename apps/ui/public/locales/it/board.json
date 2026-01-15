@@ -1,0 +1,160 @@
+{
+  "title": "Bacheca funzionalità",
+  "columns": {
+    "backlog": "Backlog",
+    "ready": "Pronto",
+    "inProgress": "In corso",
+    "review": "Revisione",
+    "done": "Completato"
+  },
+  "feature": {
+    "newFeature": "Nuova funzionalità",
+    "addFeature": "Aggiungi funzionalità",
+    "editFeature": "Modifica funzionalità",
+    "deleteFeature": "Elimina funzionalità",
+    "duplicateFeature": "Duplica funzionalità",
+    "moveToBacklog": "Sposta nel backlog",
+    "moveToReady": "Sposta in pronto",
+    "startImplementation": "Avvia implementazione",
+    "markAsReview": "Segna per revisione",
+    "markAsDone": "Segna come completato",
+    "viewDetails": "Visualizza dettagli",
+    "viewOutput": "Visualizza output agente",
+    "confirmDelete": "Sei sicuro di voler eliminare questa funzionalità? Questa azione non può essere annullata.",
+    "noFeatures": "Nessuna funzionalità",
+    "createFirst": "Crea la tua prima funzionalità per iniziare"
+  },
+  "form": {
+    "title": "Titolo",
+    "titlePlaceholder": "Inserisci titolo funzionalità...",
+    "description": "Descrizione",
+    "descriptionPlaceholder": "Descrivi cosa dovrebbe fare questa funzionalità...",
+    "category": "Categoria",
+    "priority": "Priorità",
+    "dependencies": "Dipendenze",
+    "dependenciesPlaceholder": "Seleziona le funzionalità da cui dipende",
+    "images": "Immagini",
+    "addImage": "Aggiungi immagine",
+    "spec": "Specifica",
+    "specPlaceholder": "Specifica dettagliata opzionale..."
+  },
+  "categories": {
+    "feature": "Funzionalità",
+    "bug": "Bug",
+    "enhancement": "Miglioramento",
+    "refactor": "Refactor",
+    "docs": "Documentazione",
+    "test": "Test",
+    "chore": "Manutenzione"
+  },
+  "priorities": {
+    "high": "Alta",
+    "medium": "Media",
+    "low": "Bassa"
+  },
+  "status": {
+    "pending": "In attesa",
+    "ready": "Pronto",
+    "running": "In esecuzione",
+    "paused": "In pausa",
+    "review": "Revisione",
+    "completed": "Completato",
+    "failed": "Fallito"
+  },
+  "actions": {
+    "runAll": "Esegui tutti",
+    "runNext": "Esegui prossimo",
+    "stopAll": "Ferma tutti",
+    "clearCompleted": "Cancella completati",
+    "importFeatures": "Importa funzionalità",
+    "exportFeatures": "Esporta funzionalità",
+    "generateSpec": "Genera specifica",
+    "generateFeatures": "Genera funzionalità da specifica"
+  },
+  "ai": {
+    "generateTitle": "Genera titolo",
+    "generateDescription": "Genera descrizione",
+    "enhanceFeature": "Migliora con AI",
+    "validateFeature": "Valida funzionalità",
+    "suggestFeatures": "Suggerisci funzionalità"
+  },
+  "filters": {
+    "all": "Tutti",
+    "byCategory": "Per categoria",
+    "byPriority": "Per priorità",
+    "byStatus": "Per stato",
+    "search": "Cerca funzionalità...",
+    "clearSearch": "Cancella ricerca"
+  },
+  "empty": {
+    "backlog": "Il backlog è vuoto",
+    "ready": "Nessuna funzionalità pronta per l'implementazione",
+    "inProgress": "Nessuna funzionalità in corso",
+    "review": "Nessuna funzionalità da revisionare",
+    "done": "Nessuna funzionalità completata"
+  },
+  "emptyState": {
+    "noMatchingItems": "Nessun elemento corrispondente",
+    "noMatchingFilters": "Nessuna funzionalità corrisponde ai filtri attuali.",
+    "press": "Premi",
+    "toAdd": "per aggiungere",
+    "clearFilters": "Cancella i filtri per vedere tutti gli elementi"
+  },
+  "spec": {
+    "creatingTitle": "Creazione specifica applicazione",
+    "creating": "Creazione specifica"
+  },
+  "cardActions": {
+    "approvePlan": "Approva piano",
+    "logs": "Log",
+    "verify": "Verifica",
+    "resume": "Riprendi",
+    "complete": "Completa",
+    "refine": "Perfeziona",
+    "markAsVerified": "Segna come verificato",
+    "edit": "Modifica",
+    "viewPlan": "Visualizza piano",
+    "make": "Crea",
+    "delete": "Elimina",
+    "spawnSubTask": "Crea sotto-attività",
+    "viewLogs": "Visualizza log"
+  },
+  "cardHeader": {
+    "generatingTitle": "Generazione titolo...",
+    "less": "Meno",
+    "more": "Altro"
+  },
+  "agentInfo": {
+    "tasks": "attività",
+    "showLess": "Mostra meno",
+    "showMore": "+{{count}} altre",
+    "summary": "Riepilogo",
+    "viewFullSummary": "Visualizza riepilogo completo",
+    "toolCalls": "{{count}} chiamate strumento",
+    "tasksDone": "{{count}} attività completate"
+  },
+  "summaryDialog": {
+    "title": "Riepilogo implementazione",
+    "noDescription": "Nessuna descrizione",
+    "noSummary": "Nessun riepilogo disponibile",
+    "close": "Chiudi"
+  },
+  "badges": {
+    "highPriority": "Alta priorità",
+    "mediumPriority": "Media priorità",
+    "lowPriority": "Bassa priorità",
+    "manualVerification": "Richiesta verifica manuale",
+    "blockedBy": "Bloccato da {{count}} dipendenza incompleta",
+    "blockedBy_other": "Bloccato da {{count}} dipendenze incomplete",
+    "justFinished": "L'agente ha appena finito di lavorare su questa funzionalità"
+  },
+  "messages": {
+    "featureCreated": "Funzionalità creata con successo",
+    "featureUpdated": "Funzionalità aggiornata con successo",
+    "featureDeleted": "Funzionalità eliminata con successo",
+    "featureMoved": "Funzionalità spostata in {{status}}",
+    "implementationStarted": "Implementazione avviata",
+    "implementationCompleted": "Implementazione completata",
+    "implementationFailed": "Implementazione fallita"
+  }
+}

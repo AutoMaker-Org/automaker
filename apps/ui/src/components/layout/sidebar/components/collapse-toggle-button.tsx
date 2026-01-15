@@ -1,4 +1,5 @@
 import { PanelLeft, PanelLeftClose } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/utils';
 import { formatShortcut } from '@/store/app-store';
 
@@ -13,6 +14,8 @@ export function CollapseToggleButton({
   toggleSidebar,
   shortcut,
 }: CollapseToggleButtonProps) {
+  const { t } = useTranslation('common');
+
   return (
     <button
       onClick={toggleSidebar}
@@ -47,7 +50,7 @@ export function CollapseToggleButton({
         )}
         data-testid="sidebar-toggle-tooltip"
       >
-        {sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}{' '}
+        {sidebarOpen ? t('sidebar.collapseSidebar') : t('sidebar.expandSidebar')}{' '}
         <span
           className="ml-1.5 px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono text-muted-foreground"
           data-testid="sidebar-toggle-shortcut"

@@ -15,6 +15,7 @@ export type SettingsViewId =
   | 'terminal'
   | 'keyboard'
   | 'audio'
+  | 'language'
   | 'defaults'
   | 'worktrees'
   | 'account'

@@ -1,0 +1,160 @@
+{
+  "title": "Доска функций",
+  "columns": {
+    "backlog": "Бэклог",
+    "ready": "Готово к работе",
+    "inProgress": "В процессе",
+    "review": "На проверке",
+    "done": "Завершено"
+  },
+  "feature": {
+    "newFeature": "Новая функция",
+    "addFeature": "Добавить функцию",
+    "editFeature": "Редактировать функцию",
+    "deleteFeature": "Удалить функцию",
+    "duplicateFeature": "Дублировать функцию",
+    "moveToBacklog": "Переместить в бэклог",
+    "moveToReady": "Переместить в готовые",
+    "startImplementation": "Начать реализацию",
+    "markAsReview": "Отправить на проверку",
+    "markAsDone": "Отметить как завершённую",
+    "viewDetails": "Просмотр деталей",
+    "viewOutput": "Просмотр вывода агента",
+    "confirmDelete": "Вы уверены, что хотите удалить эту функцию? Это действие нельзя отменить.",
+    "noFeatures": "Функций пока нет",
+    "createFirst": "Создайте свою первую функцию, чтобы начать"
+  },
+  "form": {
+    "title": "Название",
+    "titlePlaceholder": "Введите название функции...",
+    "description": "Описание",
+    "descriptionPlaceholder": "Опишите, что должна делать эта функция...",
+    "category": "Категория",
+    "priority": "Приоритет",
+    "dependencies": "Зависимости",
+    "dependenciesPlaceholder": "Выберите функции, от которых зависит эта",
+    "images": "Изображения",
+    "addImage": "Добавить изображение",
+    "spec": "Спецификация",
+    "specPlaceholder": "Необязательная детальная спецификация..."
+  },
+  "categories": {
+    "feature": "Функция",
+    "bug": "Ошибка",
+    "enhancement": "Улучшение",
+    "refactor": "Рефакторинг",
+    "docs": "Документация",
+    "test": "Тест",
+    "chore": "Рутина"
+  },
+  "priorities": {
+    "high": "Высокий",
+    "medium": "Средний",
+    "low": "Низкий"
+  },
+  "status": {
+    "pending": "Ожидание",
+    "ready": "Готово",
+    "running": "Выполняется",
+    "paused": "Приостановлено",
+    "review": "На проверке",
+    "completed": "Завершено",
+    "failed": "Ошибка"
+  },
+  "actions": {
+    "runAll": "Запустить все",
+    "runNext": "Запустить следующую",
+    "stopAll": "Остановить все",
+    "clearCompleted": "Очистить завершённые",
+    "importFeatures": "Импортировать функции",
+    "exportFeatures": "Экспортировать функции",
+    "generateSpec": "Сгенерировать спецификацию",
+    "generateFeatures": "Сгенерировать функции из спецификации"
+  },
+  "ai": {
+    "generateTitle": "Сгенерировать название",
+    "generateDescription": "Сгенерировать описание",
+    "enhanceFeature": "Улучшить с помощью ИИ",
+    "validateFeature": "Проверить функцию",
+    "suggestFeatures": "Предложить функции"
+  },
+  "filters": {
+    "all": "Все",
+    "byCategory": "По категории",
+    "byPriority": "По приоритету",
+    "byStatus": "По статусу",
+    "search": "Поиск функций...",
+    "clearSearch": "Очистить поиск"
+  },
+  "empty": {
+    "backlog": "Бэклог пуст",
+    "ready": "Нет функций, готовых к реализации",
+    "inProgress": "Нет функций в процессе",
+    "review": "Нет функций для проверки",
+    "done": "Нет завершённых функций"
+  },
+  "emptyState": {
+    "noMatchingItems": "Совпадений не найдено",
+    "noMatchingFilters": "Нет функций, соответствующих текущим фильтрам.",
+    "press": "Нажмите",
+    "toAdd": "чтобы добавить",
+    "clearFilters": "Очистите фильтры, чтобы увидеть все элементы"
+  },
+  "spec": {
+    "creatingTitle": "Создание спецификации приложения",
+    "creating": "Создание спецификации"
+  },
+  "cardActions": {
+    "approvePlan": "Одобрить план",
+    "logs": "Логи",
+    "verify": "Проверить",
+    "resume": "Продолжить",
+    "complete": "Завершить",
+    "refine": "Уточнить",
+    "markAsVerified": "Отметить как проверенное",
+    "edit": "Редактировать",
+    "viewPlan": "Просмотр плана",
+    "make": "Создать",
+    "delete": "Удалить",
+    "spawnSubTask": "Создать подзадачу",
+    "viewLogs": "Просмотр логов"
+  },
+  "cardHeader": {
+    "generatingTitle": "Генерация названия...",
+    "less": "Меньше",
+    "more": "Больше"
+  },
+  "agentInfo": {
+    "tasks": "задач",
+    "showLess": "Показать меньше",
+    "showMore": "+{{count}} ещё",
+    "summary": "Сводка",
+    "viewFullSummary": "Просмотреть полную сводку",
+    "toolCalls": "{{count}} вызовов инструментов",
+    "tasksDone": "{{count}} задач выполнено"
+  },
+  "summaryDialog": {
+    "title": "Сводка реализации",
+    "noDescription": "Нет описания",
+    "noSummary": "Сводка недоступна",
+    "close": "Закрыть"
+  },
+  "badges": {
+    "highPriority": "Высокий приоритет",
+    "mediumPriority": "Средний приоритет",
+    "lowPriority": "Низкий приоритет",
+    "manualVerification": "Требуется ручная проверка",
+    "blockedBy": "Заблокировано {{count}} незавершённой зависимостью",
+    "blockedBy_other": "Заблокировано {{count}} незавершёнными зависимостями",
+    "justFinished": "Агент только что завершил работу над этой функцией"
+  },
+  "messages": {
+    "featureCreated": "Функция успешно создана",
+    "featureUpdated": "Функция успешно обновлена",
+    "featureDeleted": "Функция успешно удалена",
+    "featureMoved": "Функция перемещена в {{status}}",
+    "implementationStarted": "Реализация начата",
+    "implementationCompleted": "Реализация завершена",
+    "implementationFailed": "Реализация не удалась"
+  }
+}

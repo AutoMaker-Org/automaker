@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Shield, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Switch } from '@/components/ui/switch';
@@ -12,6 +13,8 @@ export function SecuritySection({
   skipSandboxWarning,
   onSkipSandboxWarningChange,
 }: SecuritySectionProps) {
+  const { t } = useTranslation('settings');
+
   return (
     <div
       className={cn(
@@ -26,10 +29,12 @@ export function SecuritySection({
           <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center border border-primary/20">
             <Shield className="w-5 h-5 text-primary" />
           </div>
-          <h2 className="text-lg font-semibold text-foreground tracking-tight">Security</h2>
+          <h2 className="text-lg font-semibold text-foreground tracking-tight">
+            {t('sections.security.title')}
+          </h2>
         </div>
         <p className="text-sm text-muted-foreground/80 ml-12">
-          Configure security warnings and protections.
+          {t('sections.security.description')}
         </p>
       </div>
       <div className="p-6 space-y-4">
@@ -44,10 +49,10 @@ export function SecuritySection({
                 htmlFor="sandbox-warning-toggle"
                 className="font-medium text-foreground cursor-pointer"
               >
-                Show Sandbox Warning on Startup
+                {t('sections.security.sandboxWarning')}
               </Label>
               <p className="text-xs text-muted-foreground/70 mt-0.5">
-                Display a security warning when not running in a sandboxed environment
+                {t('sections.security.sandboxWarningDescription')}
               </p>
             </div>
           </div>
@@ -61,9 +66,7 @@ export function SecuritySection({
 
         {/* Info text */}
         <p className="text-xs text-muted-foreground/60 px-4">
-          When enabled, you&apos;ll see a warning on app startup if you&apos;re not running in a
-          containerized environment (like Docker). This helps remind you to use proper isolation
-          when running AI agents.
+          {t('sections.security.sandboxWarningInfo')}
         </p>
       </div>
     </div>

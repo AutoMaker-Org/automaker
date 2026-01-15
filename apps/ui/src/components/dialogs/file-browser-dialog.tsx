@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { FolderOpen, Folder, ChevronRight, HardDrive, Clock, X } from 'lucide-react';
 import {
   Dialog,
@@ -46,11 +47,14 @@ export function FileBrowserDialog({
   open,
   onOpenChange,
   onSelect,
-  title = 'Select Project Directory',
-  description = 'Navigate to your project folder or paste a path directly',
+  title,
+  description,
   initialPath,
 }: FileBrowserDialogProps) {
+  const { t } = useTranslation('common');
   const { isMac } = useOSDetection();
+  const displayTitle = title ?? t('dialogs.fileBrowser.title');
+  const displayDescription = description ?? t('dialogs.fileBrowser.description');
   const [currentPath, setCurrentPath] = useState<string>('');
   const [parentPath, setParentPath] = useState<string | null>(null);
   const [directories, setDirectories] = useState<DirectoryEntry[]>([]);
@@ -211,10 +215,10 @@ export function FileBrowserDialog({
         <DialogHeader className="pb-1">
           <DialogTitle className="flex items-center gap-2 text-base">
             <FolderOpen className="w-4 h-4 text-brand-500" />
-            {title}
+            {displayTitle}
           </DialogTitle>
           <DialogDescription className="text-muted-foreground text-xs">
-            {description}
+            {displayDescription}
           </DialogDescription>
         </DialogHeader>
 
@@ -240,7 +244,7 @@ export function FileBrowserDialog({
             <div className="flex flex-wrap gap-1.5 p-2 rounded-md bg-sidebar-accent/10 border border-sidebar-border">
               <div className="flex items-center gap-1 text-xs text-muted-foreground mr-1">
                 <Clock className="w-3 h-3" />
-                <span>Recent:</span>
+                <span>{t('dialogs.fileBrowser.recent')}:</span>
               </div>
               {recentFolders.map((folder) => (
                 <button
@@ -255,7 +259,7 @@ export function FileBrowserDialog({
                   <button
                     onClick={(e) => handleRemoveRecent(e, folder)}
                     className="ml-0.5 opacity-0 group-hover:opacity-100 hover:text-destructive transition-opacity"
-                    title="Remove from recent"
+                    title={t('dialogs.fileBrowser.removeFromRecent')}
                   >
                     <X className="w-3 h-3" />
                   </button>
@@ -269,7 +273,7 @@ export function FileBrowserDialog({
             <div className="flex flex-wrap gap-1.5 p-2 rounded-md bg-sidebar-accent/10 border border-sidebar-border">
               <div className="flex items-center gap-1 text-xs text-muted-foreground mr-1">
                 <HardDrive className="w-3 h-3" />
-                <span>Drives:</span>
+                <span>{t('dialogs.fileBrowser.drives')}:</span>
               </div>
               {drives.map((drive) => (
                 <Button
@@ -290,7 +294,9 @@ export function FileBrowserDialog({
           <div className="flex-1 overflow-y-auto border border-sidebar-border rounded-md scrollbar-styled">
             {loading && (
               <div className="flex items-center justify-center h-full p-4">
-                <div className="text-xs text-muted-foreground">Loading directories...</div>
+                <div className="text-xs text-muted-foreground">
+                  {t('dialogs.fileBrowser.loadingDirectories')}
+                </div>
               </div>
             )}
 
@@ -308,7 +314,9 @@ export function FileBrowserDialog({
 
             {!loading && !error && !warning && directories.length === 0 && (
               <div className="flex items-center justify-center h-full p-4">
-                <div className="text-xs text-muted-foreground">No subdirectories found</div>
+                <div className="text-xs text-muted-foreground">
+                  {t('dialogs.fileBrowser.noSubdirectories')}
+                </div>
               </div>
             )}
 
@@ -330,23 +338,22 @@ export function FileBrowserDialog({
           </div>
 
           <div className="text-[10px] text-muted-foreground">
-            Paste a full path above, or click on folders to navigate. Press Enter or click → to jump
-            to a path.
+            {t('dialogs.fileBrowser.helpText')}
           </div>
         </div>
 
         <DialogFooter className="border-t border-border pt-3 gap-2 mt-1">
           <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)}>
-            Cancel
+            {t('buttons.cancel')}
           </Button>
           <Button
             size="sm"
             onClick={handleSelect}
             disabled={!currentPath || loading}
-            title="Select current folder (Cmd+Enter / Ctrl+Enter)"
+            title={t('dialogs.fileBrowser.selectCurrentFolderHint')}
           >
             <FolderOpen className="w-3.5 h-3.5 mr-1.5" />
-            Select Current Folder
+            {t('dialogs.fileBrowser.selectCurrentFolder')}
             <KbdGroup className="ml-1">
               <Kbd>{isMac ? '⌘' : 'Ctrl'}</Kbd>
               <Kbd>↵</Kbd>

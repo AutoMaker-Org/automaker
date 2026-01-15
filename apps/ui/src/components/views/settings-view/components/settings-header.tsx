@@ -1,20 +1,16 @@
+import { useTranslation } from 'react-i18next';
 import { Settings, PanelLeft, PanelLeftClose } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 
 interface SettingsHeaderProps {
-  title?: string;
-  description?: string;
   showNavigation?: boolean;
   onToggleNavigation?: () => void;
 }
 
-export function SettingsHeader({
-  title = 'Settings',
-  description = 'Configure your API keys and preferences',
-  showNavigation,
-  onToggleNavigation,
-}: SettingsHeaderProps) {
+export function SettingsHeader({ showNavigation, onToggleNavigation }: SettingsHeaderProps) {
+  const { t } = useTranslation('settings');
+
   return (
     <div
       className={cn(
@@ -32,7 +28,7 @@ export function SettingsHeader({
               size="sm"
               onClick={onToggleNavigation}
               className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground lg:hidden"
-              aria-label={showNavigation ? 'Close navigation menu' : 'Open navigation menu'}
+              aria-label={showNavigation ? t('closeNavigation') : t('openNavigation')}
             >
               {showNavigation ? (
                 <PanelLeftClose className="w-5 h-5" />
@@ -53,9 +49,9 @@ export function SettingsHeader({
           </div>
           <div>
             <h1 className="text-xl lg:text-2xl font-bold text-foreground tracking-tight">
-              {title}
+              {t('title')}
             </h1>
-            <p className="text-xs lg:text-sm text-muted-foreground/80 mt-0.5">{description}</p>
+            <p className="text-xs lg:text-sm text-muted-foreground/80 mt-0.5">{t('description')}</p>
           </div>
         </div>
       </div>

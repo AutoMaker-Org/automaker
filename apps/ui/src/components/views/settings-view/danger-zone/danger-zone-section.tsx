@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Trash2, Folder, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -9,6 +10,8 @@ interface DangerZoneSectionProps {
 }
 
 export function DangerZoneSection({ project, onDeleteClick }: DangerZoneSectionProps) {
+  const { t } = useTranslation('settings');
+
   return (
     <div
       className={cn(
@@ -23,9 +26,11 @@ export function DangerZoneSection({ project, onDeleteClick }: DangerZoneSectionP
           <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-destructive/20 to-destructive/10 flex items-center justify-center border border-destructive/20">
             <AlertTriangle className="w-5 h-5 text-destructive" />
           </div>
-          <h2 className="text-lg font-semibold text-foreground tracking-tight">Danger Zone</h2>
+          <h2 className="text-lg font-semibold text-foreground tracking-tight">
+            {t('sections.danger.title')}
+          </h2>
         </div>
-        <p className="text-sm text-muted-foreground/80 ml-12">Destructive project actions.</p>
+        <p className="text-sm text-muted-foreground/80 ml-12">{t('sections.danger.description')}</p>
       </div>
       <div className="p-6 space-y-4">
         {/* Project Delete */}
@@ -52,11 +57,13 @@ export function DangerZoneSection({ project, onDeleteClick }: DangerZoneSectionP
               )}
             >
               <Trash2 className="w-4 h-4 mr-2" />
-              Delete Project
+              {t('sections.danger.deleteProject')}
             </Button>
           </div>
         ) : (
-          <p className="text-sm text-muted-foreground/60 text-center py-4">No project selected.</p>
+          <p className="text-sm text-muted-foreground/60 text-center py-4">
+            {t('sections.danger.noProjectSelected')}
+          </p>
         )}
       </div>
     </div>

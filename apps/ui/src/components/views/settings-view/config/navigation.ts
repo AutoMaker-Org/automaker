@@ -14,62 +14,63 @@ import {
   MessageSquareText,
   User,
   Shield,
-  Cpu,
   GitBranch,
+  Globe,
 } from 'lucide-react';
 import { AnthropicIcon, CursorIcon, OpenAIIcon, OpenCodeIcon } from '@/components/ui/provider-icon';
 import type { SettingsViewId } from '../hooks/use-settings-view';
 
 export interface NavigationItem {
   id: SettingsViewId;
-  label: string;
+  labelKey: string; // Translation key for the label
   icon: LucideIcon | React.ComponentType<{ className?: string }>;
   subItems?: NavigationItem[];
 }
 
 export interface NavigationGroup {
-  label: string;
+  labelKey: string; // Translation key for the group label
   items: NavigationItem[];
 }
 
 // Global settings organized into groups
 export const GLOBAL_NAV_GROUPS: NavigationGroup[] = [
   {
-    label: 'Model & Prompts',
+    labelKey: 'navigation.modelPrompts',
     items: [
-      { id: 'defaults', label: 'Feature Defaults', icon: FlaskConical },
-      { id: 'model-defaults', label: 'Model Defaults', icon: Workflow },
-      { id: 'worktrees', label: 'Worktrees', icon: GitBranch },
-      { id: 'prompts', label: 'Prompt Customization', icon: MessageSquareText },
-      { id: 'api-keys', label: 'API Keys', icon: Key },
+      { id: 'defaults', labelKey: 'navigation.featureDefaults', icon: FlaskConical },
+      { id: 'model-defaults', labelKey: 'navigation.modelDefaults', icon: Workflow },
+      { id: 'worktrees', labelKey: 'navigation.worktrees', icon: GitBranch },
+      { id: 'prompts', labelKey: 'navigation.promptCustomization', icon: MessageSquareText },
+      { id: 'api-keys', labelKey: 'navigation.apiKeys', icon: Key },
       {
         id: 'providers',
-        label: 'AI Providers',
+        labelKey: 'navigation.aiProviders',
         icon: Bot,
         subItems: [
-          { id: 'claude-provider', label: 'Claude', icon: AnthropicIcon },
-          { id: 'cursor-provider', label: 'Cursor', icon: CursorIcon },
-          { id: 'codex-provider', label: 'Codex', icon: OpenAIIcon },
-          { id: 'opencode-provider', label: 'OpenCode', icon: OpenCodeIcon },
+          { id: 'claude-provider', labelKey: 'navigation.claude', icon: AnthropicIcon },
+          { id: 'cursor-provider', labelKey: 'navigation.cursor', icon: CursorIcon },
+          { id: 'codex-provider', labelKey: 'navigation.codex', icon: OpenAIIcon },
+          { id: 'opencode-provider', labelKey: 'navigation.opencode', icon: OpenCodeIcon },
         ],
       },
-      { id: 'mcp-servers', label: 'MCP Servers', icon: Plug },
+      { id: 'mcp-servers', labelKey: 'navigation.mcpServers', icon: Plug },
     ],
   },
   {
-    label: 'Interface',
+    labelKey: 'navigation.interface',
     items: [
-      { id: 'appearance', label: 'Appearance', icon: Palette },
-      { id: 'terminal', label: 'Terminal', icon: SquareTerminal },
-      { id: 'keyboard', label: 'Keyboard Shortcuts', icon: Settings2 },
-      { id: 'audio', label: 'Audio', icon: Volume2 },
+      { id: 'appearance', labelKey: 'navigation.appearance', icon: Palette },
+      { id: 'language', labelKey: 'navigation.language', icon: Globe },
+      { id: 'terminal', labelKey: 'navigation.terminal', icon: SquareTerminal },
+      { id: 'keyboard', labelKey: 'navigation.keyboardShortcuts', icon: Settings2 },
+      { id: 'audio', labelKey: 'navigation.audio', icon: Volume2 },
     ],
   },
   {
-    label: 'Account & Security',
+    labelKey: 'navigation.accountSecurity',
     items: [
-      { id: 'account', label: 'Account', icon: User },
-      { id: 'security', label: 'Security', icon: Shield },
+      { id: 'account', labelKey: 'navigation.account', icon: User },
+      { id: 'security', labelKey: 'navigation.security', icon: Shield },
     ],
   },
 ];
@@ -79,7 +80,7 @@ export const GLOBAL_NAV_ITEMS: NavigationItem[] = GLOBAL_NAV_GROUPS.flatMap((gro
 
 // Project-specific settings - only visible when a project is selected
 export const PROJECT_NAV_ITEMS: NavigationItem[] = [
-  { id: 'danger', label: 'Danger Zone', icon: Trash2 },
+  { id: 'danger', labelKey: 'navigation.dangerZone', icon: Trash2 },
 ];
 
 // Legacy export for backwards compatibility

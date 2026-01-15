@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Slider } from '@/components/ui/slider';
@@ -9,6 +10,7 @@ import { toast } from 'sonner';
 import { TERMINAL_FONT_OPTIONS } from '@/config/terminal-themes';
 
 export function TerminalSection() {
+  const { t } = useTranslation('settings');
   const {
     terminalState,
     setTerminalDefaultRunScript,
@@ -42,23 +44,24 @@ export function TerminalSection() {
           <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-green-500/20 to-green-600/10 flex items-center justify-center border border-green-500/20">
             <SquareTerminal className="w-5 h-5 text-green-500" />
           </div>
-          <h2 className="text-lg font-semibold text-foreground tracking-tight">Terminal</h2>
+          <h2 className="text-lg font-semibold text-foreground tracking-tight">
+            {t('sections.terminal.title')}
+          </h2>
         </div>
         <p className="text-sm text-muted-foreground/80 ml-12">
-          Customize terminal appearance and behavior. Theme follows your app theme in Appearance
-          settings.
+          {t('sections.terminal.description')}
         </p>
       </div>
       <div className="p-6 space-y-6">
         {/* Font Family */}
         <div className="space-y-3">
-          <Label className="text-foreground font-medium">Font Family</Label>
+          <Label className="text-foreground font-medium">{t('sections.terminal.fontFamily')}</Label>
           <select
             value={fontFamily}
             onChange={(e) => {
               setTerminalFontFamily(e.target.value);
-              toast.info('Font family changed', {
-                description: 'Restart terminal for changes to take effect',
+              toast.info(t('sections.terminal.fontFamilyChanged'), {
+                description: t('sections.terminal.restartTerminal'),
               });
             }}
             className={cn(
@@ -79,7 +82,9 @@ export function TerminalSection() {
         {/* Default Font Size */}
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <Label className="text-foreground font-medium">Default Font Size</Label>
+            <Label className="text-foreground font-medium">
+              {t('sections.terminal.defaultFontSize')}
+            </Label>
             <span className="text-sm text-muted-foreground">{defaultFontSize}px</span>
           </div>
           <Slider
@@ -95,7 +100,9 @@ export function TerminalSection() {
         {/* Line Height */}
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <Label className="text-foreground font-medium">Line Height</Label>
+            <Label className="text-foreground font-medium">
+              {t('sections.terminal.lineHeight')}
+            </Label>
             <span className="text-sm text-muted-foreground">{lineHeight.toFixed(1)}</span>
           </div>
           <Slider
@@ -107,8 +114,8 @@ export function TerminalSection() {
               setTerminalLineHeight(value);
             }}
             onValueCommit={() => {
-              toast.info('Line height changed', {
-                description: 'Restart terminal for changes to take effect',
+              toast.info(t('sections.terminal.lineHeightChanged'), {
+                description: t('sections.terminal.restartTerminal'),
               });
             }}
             className="flex-1"
@@ -118,9 +125,13 @@ export function TerminalSection() {
         {/* Scrollback Lines */}
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <Label className="text-foreground font-medium">Scrollback Buffer</Label>
+            <Label className="text-foreground font-medium">
+              {t('sections.terminal.scrollbackBuffer')}
+            </Label>
             <span className="text-sm text-muted-foreground">
-              {(scrollbackLines / 1000).toFixed(0)}k lines
+              {t('sections.terminal.scrollbackLines', {
+                count: (scrollbackLines / 1000).toFixed(0),
+              })}
             </span>
           </div>
           <Slider
@@ -130,8 +141,8 @@ export function TerminalSection() {
             step={1000}
             onValueChange={([value]) => setTerminalScrollbackLines(value)}
             onValueCommit={() => {
-              toast.info('Scrollback changed', {
-                description: 'Restart terminal for changes to take effect',
+              toast.info(t('sections.terminal.scrollbackChanged'), {
+                description: t('sections.terminal.restartTerminal'),
               });
             }}
             className="flex-1"
@@ -140,14 +151,16 @@ export function TerminalSection() {
 
         {/* Default Run Script */}
         <div className="space-y-3">
-          <Label className="text-foreground font-medium">Default Run Script</Label>
+          <Label className="text-foreground font-medium">
+            {t('sections.terminal.defaultScript')}
+          </Label>
           <p className="text-xs text-muted-foreground">
-            Command to run automatically when opening a new terminal (e.g., "claude", "codex")
+            {t('sections.terminal.defaultScriptDescription')}
           </p>
           <Input
             value={defaultRunScript}
             onChange={(e) => setTerminalDefaultRunScript(e.target.value)}
-            placeholder="e.g., claude, codex, npm run dev"
+            placeholder={t('sections.terminal.defaultScriptPlaceholder')}
             className="bg-accent/30 border-border/50"
           />
         </div>
@@ -155,9 +168,11 @@ export function TerminalSection() {
         {/* Screen Reader Mode */}
         <div className="flex items-center justify-between">
           <div className="space-y-1">
-            <Label className="text-foreground font-medium">Screen Reader Mode</Label>
+            <Label className="text-foreground font-medium">
+              {t('sections.terminal.screenReaderMode')}
+            </Label>
             <p className="text-xs text-muted-foreground">
-              Enable accessibility mode for screen readers
+              {t('sections.terminal.screenReaderModeDescription')}
             </p>
           </div>
           <Switch
@@ -165,9 +180,11 @@ export function TerminalSection() {
             onCheckedChange={(checked) => {
               setTerminalScreenReaderMode(checked);
               toast.success(
-                checked ? 'Screen reader mode enabled' : 'Screen reader mode disabled',
+                checked
+                  ? t('sections.terminal.screenReaderEnabled')
+                  : t('sections.terminal.screenReaderDisabled'),
                 {
-                  description: 'Restart terminal for changes to take effect',
+                  description: t('sections.terminal.restartTerminal'),
                 }
               );
             }}

@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -59,6 +60,8 @@ export function FeatureDefaultsSection({
   onEnableAiCommitMessagesChange,
   onDefaultFeatureModelChange,
 }: FeatureDefaultsSectionProps) {
+  const { t } = useTranslation('settings');
+
   return (
     <div
       className={cn(
@@ -73,10 +76,12 @@ export function FeatureDefaultsSection({
           <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-brand-500/20 to-brand-600/10 flex items-center justify-center border border-brand-500/20">
             <FlaskConical className="w-5 h-5 text-brand-500" />
           </div>
-          <h2 className="text-lg font-semibold text-foreground tracking-tight">Feature Defaults</h2>
+          <h2 className="text-lg font-semibold text-foreground tracking-tight">
+            {t('sections.featureDefaults.title')}
+          </h2>
         </div>
         <p className="text-sm text-muted-foreground/80 ml-12">
-          Configure default settings for new features.
+          {t('sections.featureDefaults.description')}
         </p>
       </div>
       <div className="p-6 space-y-5">
@@ -87,7 +92,9 @@ export function FeatureDefaultsSection({
           </div>
           <div className="flex-1 space-y-2">
             <div className="flex items-center justify-between">
-              <Label className="text-foreground font-medium">Default Model</Label>
+              <Label className="text-foreground font-medium">
+                {t('sections.featureDefaults.defaultModel')}
+              </Label>
               <PhaseModelSelector
                 value={defaultFeatureModel}
                 onChange={onDefaultFeatureModelChange}
@@ -96,7 +103,7 @@ export function FeatureDefaultsSection({
               />
             </div>
             <p className="text-xs text-muted-foreground/80 leading-relaxed">
-              The default AI model and thinking level used when creating new feature cards.
+              {t('sections.featureDefaults.defaultModelDescription')}
             </p>
           </div>
         </div>
@@ -125,7 +132,9 @@ export function FeatureDefaultsSection({
           </div>
           <div className="flex-1 space-y-2">
             <div className="flex items-center justify-between">
-              <Label className="text-foreground font-medium">Default Planning Mode</Label>
+              <Label className="text-foreground font-medium">
+                {t('sections.featureDefaults.planningMode')}
+              </Label>
               <Select
                 value={defaultPlanningMode}
                 onValueChange={(v: string) => onDefaultPlanningModeChange(v as PlanningMode)}
@@ -137,26 +146,28 @@ export function FeatureDefaultsSection({
                   <SelectItem value="skip">
                     <div className="flex items-center gap-2">
                       <Zap className="h-3.5 w-3.5 text-emerald-500" />
-                      <span>Skip</span>
-                      <span className="text-[10px] text-muted-foreground">(Default)</span>
+                      <span>{t('planningModes.skip')}</span>
+                      <span className="text-[10px] text-muted-foreground">
+                        ({t('sections.featureDefaults.default')})
+                      </span>
                     </div>
                   </SelectItem>
                   <SelectItem value="lite">
                     <div className="flex items-center gap-2">
                       <ClipboardList className="h-3.5 w-3.5 text-blue-500" />
-                      <span>Lite Planning</span>
+                      <span>{t('planningModes.lite')}</span>
                     </div>
                   </SelectItem>
                   <SelectItem value="spec">
                     <div className="flex items-center gap-2">
                       <FileText className="h-3.5 w-3.5 text-purple-500" />
-                      <span>Spec (Lite SDD)</span>
+                      <span>{t('planningModes.spec')}</span>
                     </div>
                   </SelectItem>
                   <SelectItem value="full">
                     <div className="flex items-center gap-2">
                       <ScrollText className="h-3.5 w-3.5 text-amber-500" />
-                      <span>Full (SDD)</span>
+                      <span>{t('planningModes.full')}</span>
                     </div>
                   </SelectItem>
                 </SelectContent>
@@ -164,13 +175,13 @@ export function FeatureDefaultsSection({
             </div>
             <p className="text-xs text-muted-foreground/80 leading-relaxed">
               {defaultPlanningMode === 'skip' &&
-                'Jump straight to implementation without upfront planning.'}
+                t('sections.featureDefaults.planningModeSkipDescription')}
               {defaultPlanningMode === 'lite' &&
-                'Create a quick planning outline with tasks before building.'}
+                t('sections.featureDefaults.planningModeLiteDescription')}
               {defaultPlanningMode === 'spec' &&
-                'Generate a specification with acceptance criteria for approval.'}
+                t('sections.featureDefaults.planningModeSpecDescription')}
               {defaultPlanningMode === 'full' &&
-                'Create comprehensive spec with phased implementation plan.'}
+                t('sections.featureDefaults.planningModeFullDescription')}
             </p>
           </div>
         </div>
@@ -192,12 +203,10 @@ export function FeatureDefaultsSection({
                   className="text-foreground cursor-pointer font-medium flex items-center gap-2"
                 >
                   <ShieldCheck className="w-4 h-4 text-brand-500" />
-                  Require manual plan approval by default
+                  {t('sections.featureDefaults.requirePlanApproval')}
                 </Label>
                 <p className="text-xs text-muted-foreground/80 leading-relaxed">
-                  When enabled, the agent will pause after generating a plan and wait for you to
-                  review, edit, and approve before starting implementation. You can also view the
-                  plan from the feature card.
+                  {t('sections.featureDefaults.requirePlanApprovalDescription')}
                 </p>
               </div>
             </div>
@@ -222,11 +231,10 @@ export function FeatureDefaultsSection({
               className="text-foreground cursor-pointer font-medium flex items-center gap-2"
             >
               <TestTube className="w-4 h-4 text-brand-500" />
-              Enable automated testing by default
+              {t('sections.featureDefaults.enableAutomatedTesting')}
             </Label>
             <p className="text-xs text-muted-foreground/80 leading-relaxed">
-              When enabled, new features will use TDD with automated tests. When disabled, features
-              will require manual verification.
+              {t('sections.featureDefaults.enableAutomatedTestingDescription')}
             </p>
           </div>
         </div>
@@ -249,12 +257,10 @@ export function FeatureDefaultsSection({
               className="text-foreground cursor-pointer font-medium flex items-center gap-2"
             >
               <AlertCircle className="w-4 h-4 text-brand-500" />
-              Enable Dependency Blocking
+              {t('sections.featureDefaults.enableDependencyBlocking')}
             </Label>
             <p className="text-xs text-muted-foreground/80 leading-relaxed">
-              When enabled, features with incomplete dependencies will show blocked badges and
-              warnings. Auto mode and backlog ordering always respect dependencies regardless of
-              this setting.
+              {t('sections.featureDefaults.enableDependencyBlockingDescription')}
             </p>
           </div>
         </div>
@@ -277,12 +283,10 @@ export function FeatureDefaultsSection({
               className="text-foreground cursor-pointer font-medium flex items-center gap-2"
             >
               <FastForward className="w-4 h-4 text-brand-500" />
-              Skip verification in auto mode
+              {t('sections.featureDefaults.skipVerificationInAutoMode')}
             </Label>
             <p className="text-xs text-muted-foreground/80 leading-relaxed">
-              When enabled, auto mode will grab features even if their dependencies are not
-              verified, as long as they are not currently running. This allows faster pipeline
-              execution without waiting for manual verification.
+              {t('sections.featureDefaults.skipVerificationInAutoModeDescription')}
             </p>
           </div>
         </div>
@@ -305,12 +309,10 @@ export function FeatureDefaultsSection({
               className="text-foreground cursor-pointer font-medium flex items-center gap-2"
             >
               <Sparkles className="w-4 h-4 text-brand-500" />
-              Generate AI commit messages
+              {t('sections.featureDefaults.generateAiCommitMessages')}
             </Label>
             <p className="text-xs text-muted-foreground/80 leading-relaxed">
-              When enabled, opening the commit dialog will automatically generate a commit message
-              using AI based on your staged or unstaged changes. You can configure the model used in
-              Model Defaults.
+              {t('sections.featureDefaults.generateAiCommitMessagesDescription')}
             </p>
           </div>
         </div>

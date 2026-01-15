@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { MessageSquare } from 'lucide-react';
 import { DeleteConfirmDialog } from '@/components/ui/delete-confirm-dialog';
 import type { SessionListItem } from '@/types/electron';
@@ -15,6 +16,7 @@ export function DeleteSessionDialog({
   session,
   onConfirm,
 }: DeleteSessionDialogProps) {
+  const { t } = useTranslation('common');
   const handleConfirm = () => {
     if (session) {
       onConfirm(session.id);
@@ -26,9 +28,9 @@ export function DeleteSessionDialog({
       open={open}
       onOpenChange={onOpenChange}
       onConfirm={handleConfirm}
-      title="Delete Session"
-      description="Are you sure you want to delete this session? This action cannot be undone."
-      confirmText="Delete Session"
+      title={t('dialogs.deleteSession.title')}
+      description={t('dialogs.deleteSession.description')}
+      confirmText={t('dialogs.deleteSession.confirmText')}
       testId="delete-session-dialog"
       confirmTestId="confirm-delete-session"
     >
@@ -39,7 +41,9 @@ export function DeleteSessionDialog({
           </div>
           <div className="min-w-0">
             <p className="font-medium text-foreground truncate">{session.name}</p>
-            <p className="text-xs text-muted-foreground">{session.messageCount} messages</p>
+            <p className="text-xs text-muted-foreground">
+              {t('dialogs.deleteSession.messageCount', { count: session.messageCount })}
+            </p>
           </div>
         </div>
       )}

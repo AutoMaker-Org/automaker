@@ -1,4 +1,5 @@
 import { useRef } from 'react';
+import { useTranslation, Trans } from 'react-i18next';
 import { Rocket, CheckCircle2, Zap, FileText, Sparkles, ArrowRight } from 'lucide-react';
 import {
   Dialog,
@@ -25,6 +26,8 @@ export function OnboardingDialog({
   onSkip,
   onGenerateSpec,
 }: OnboardingDialogProps) {
+  const { t } = useTranslation('common');
+
   // Track if we're closing because user clicked "Generate App Spec"
   // to avoid incorrectly calling onSkip
   const isGeneratingRef = useRef(false);
@@ -54,9 +57,11 @@ export function OnboardingDialog({
               <Rocket className="w-6 h-6 text-brand-500" />
             </div>
             <div className="min-w-0 flex-1">
-              <DialogTitle className="text-2xl truncate">Welcome to {newProjectName}!</DialogTitle>
+              <DialogTitle className="text-2xl truncate">
+                {t('onboarding.welcomeTo', { name: newProjectName })}
+              </DialogTitle>
               <DialogDescription className="text-muted-foreground mt-1">
-                Your new project is ready. Let&apos;s get you started.
+                {t('onboarding.projectReady')}
               </DialogDescription>
             </div>
           </div>
@@ -66,9 +71,11 @@ export function OnboardingDialog({
           {/* Main explanation */}
           <div className="space-y-3">
             <p className="text-sm text-foreground leading-relaxed">
-              Would you like to auto-generate your <strong>app_spec.txt</strong>? This file helps
-              describe your project and is used to pre-populate your backlog with features to work
-              on.
+              <Trans i18nKey="onboarding.generateSpecQuestion" ns="common">
+                Would you like to auto-generate your <strong>app_spec.txt</strong>? This file helps
+                describe your project and is used to pre-populate your backlog with features to work
+                on.
+              </Trans>
             </p>
           </div>
 
@@ -77,27 +84,29 @@ export function OnboardingDialog({
             <div className="flex items-start gap-3">
               <CheckCircle2 className="w-5 h-5 text-brand-500 shrink-0 mt-0.5" />
               <div>
-                <p className="text-sm font-medium text-foreground">Pre-populate your backlog</p>
+                <p className="text-sm font-medium text-foreground">
+                  {t('onboarding.benefitBacklog')}
+                </p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Automatically generate features based on your project specification
+                  {t('onboarding.benefitBacklogDesc')}
                 </p>
               </div>
             </div>
             <div className="flex items-start gap-3">
               <Zap className="w-5 h-5 text-brand-500 shrink-0 mt-0.5" />
               <div>
-                <p className="text-sm font-medium text-foreground">Better AI assistance</p>
+                <p className="text-sm font-medium text-foreground">{t('onboarding.benefitAI')}</p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Help AI agents understand your project structure and tech stack
+                  {t('onboarding.benefitAIDesc')}
                 </p>
               </div>
             </div>
             <div className="flex items-start gap-3">
               <FileText className="w-5 h-5 text-brand-500 shrink-0 mt-0.5" />
               <div>
-                <p className="text-sm font-medium text-foreground">Project documentation</p>
+                <p className="text-sm font-medium text-foreground">{t('onboarding.benefitDocs')}</p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Keep a clear record of your project&apos;s capabilities and features
+                  {t('onboarding.benefitDocsDesc')}
                 </p>
               </div>
             </div>
@@ -106,8 +115,8 @@ export function OnboardingDialog({
           {/* Info box */}
           <div className="rounded-xl bg-brand-500/5 border border-brand-500/10 p-3">
             <p className="text-xs text-muted-foreground leading-relaxed">
-              <strong className="text-foreground">Tip:</strong> You can always generate or edit your
-              app_spec.txt later from the Spec Editor in the sidebar.
+              <strong className="text-foreground">{t('onboarding.tip')}</strong>{' '}
+              {t('onboarding.tipText')}
             </p>
           </div>
         </div>
@@ -118,14 +127,14 @@ export function OnboardingDialog({
             onClick={onSkip}
             className="text-muted-foreground hover:text-foreground"
           >
-            Skip for now
+            {t('onboarding.skipForNow')}
           </Button>
           <Button
             onClick={handleGenerateSpec}
             className="bg-gradient-to-r from-brand-500 to-brand-600 hover:from-brand-600 hover:to-brand-600 text-white border-0"
           >
             <Sparkles className="w-4 h-4 mr-2" />
-            Generate App Spec
+            {t('onboarding.generateAppSpec')}
             <ArrowRight className="w-4 h-4 ml-2" />
           </Button>
         </DialogFooter>

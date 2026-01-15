@@ -1,0 +1,91 @@
+{
+  "welcome": {
+    "greeting": "こんにちは！Automakerエージェントです。ソフトウェアを自律的に構築するお手伝いをします。このプロジェクトのファイルの読み取りや変更、コマンドの実行、テストの実行ができます。今日は何を作成しますか？"
+  },
+  "header": {
+    "title": "AIエージェント",
+    "thinking": "考え中...",
+    "connected": "接続済み",
+    "disconnected": "切断",
+    "connecting": "接続中...",
+    "messagesCount": "{{count}}件のメッセージ",
+    "clear": "クリア"
+  },
+  "input": {
+    "placeholder": "作りたいものを説明してください...",
+    "placeholderProcessing": "別のプロンプトをキューに追加するには入力してください...",
+    "placeholderDropFiles": "ここにファイルをドロップ...",
+    "send": "送信",
+    "stop": "停止",
+    "stopGeneration": "生成を停止",
+    "addToQueue": "キューに追加",
+    "sendMessage": "メッセージを送信",
+    "attachImage": "画像を添付",
+    "attachFile": "ファイルを添付",
+    "attachFiles": "ファイルを添付（画像、.txt、.md）",
+    "filesAttached": "ファイルが添付されています",
+    "dropHere": "ここにドロップ",
+    "keyboardHint": "<kbd>Enter</kbd>で送信、<kbd>Shift+Enter</kbd>で改行"
+  },
+  "session": {
+    "newSession": "新規セッション",
+    "sessions": "セッション",
+    "active": "アクティブ",
+    "archived": "アーカイブ済み",
+    "noSessions": "セッションがありません",
+    "createFirst": "開始するには最初のセッションを作成してください",
+    "rename": "セッション名を変更",
+    "archive": "セッションをアーカイブ",
+    "delete": "セッションを削除",
+    "confirmDelete": "このセッションを削除してもよろしいですか？",
+    "messages": "{{count}}件のメッセージ",
+    "messages_plural": "{{count}}件のメッセージ",
+    "noSessionSelected": "セッションが選択されていません",
+    "noSessionDescription": "AIエージェントとチャットを開始するには、セッションを作成または選択してください",
+    "viewSessions": "セッションを表示",
+    "showSessions": "セッションを表示"
+  },
+  "chat": {
+    "clearHistory": "チャット履歴をクリア",
+    "confirmClear": "この会話をクリアしてもよろしいですか？",
+    "copyMessage": "メッセージをコピー",
+    "regenerate": "応答を再生成",
+    "imagesAttached": "{{count}}枚の画像が添付されています",
+    "imagesAttached_plural": "{{count}}枚の画像が添付されています"
+  },
+  "queue": {
+    "title": "メッセージキュー",
+    "empty": "キューは空です",
+    "pending": "{{count}}件のプロンプトがキューに追加されています",
+    "pending_plural": "{{count}}件のプロンプトがキューに追加されています",
+    "remove": "キューから削除",
+    "clear": "キューをクリア",
+    "clearAll": "すべてクリア",
+    "filesCount": "+{{count}}ファイル",
+    "filesCount_plural": "+{{count}}ファイル"
+  },
+  "tools": {
+    "using": "{{tool}}を使用中...",
+    "completed": "ツールが完了しました",
+    "read": "ファイルを読み取り中",
+    "write": "ファイルを書き込み中",
+    "edit": "ファイルを編集中",
+    "bash": "コマンドを実行中",
+    "glob": "ファイルを検索中",
+    "grep": "コンテンツを検索中"
+  },
+  "errors": {
+    "connectionFailed": "エージェントへの接続に失敗しました",
+    "messageFailed": "メッセージの送信に失敗しました",
+    "sessionLoadFailed": "セッションの読み込みに失敗しました"
+  },
+  "noProject": {
+    "title": "プロジェクトが選択されていません",
+    "description": "AIエージェントと作業を開始するには、プロジェクトを開くか作成してください。"
+  },
+  "files": {
+    "filesAttached": "{{count}}ファイルが添付されています",
+    "filesAttached_plural": "{{count}}ファイルが添付されています",
+    "clearAll": "すべてクリア"
+  }
+}

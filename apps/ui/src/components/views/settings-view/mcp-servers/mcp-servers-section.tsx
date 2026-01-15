@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Plug } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useMCPServers } from './hooks';
@@ -70,6 +71,8 @@ export function MCPServersSection() {
     handleSecurityWarningConfirm,
   } = useMCPServers();
 
+  const { t } = useTranslation('settings');
+
   return (
     <div
       className={cn(
@@ -95,8 +98,8 @@ export function MCPServersSection() {
         {mcpServers.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">
             <Plug className="w-12 h-12 mx-auto mb-3 opacity-50" />
-            <p className="text-sm">No MCP servers configured</p>
-            <p className="text-xs mt-1">Add a server to extend agent capabilities</p>
+            <p className="text-sm">{t('sections.mcpServers.noServersConfigured')}</p>
+            <p className="text-xs mt-1">{t('sections.mcpServers.addServerDescription')}</p>
           </div>
         ) : (
           <div className="space-y-3">

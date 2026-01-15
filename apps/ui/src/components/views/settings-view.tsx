@@ -3,7 +3,6 @@ import { useSearch } from '@tanstack/react-router';
 import { useAppStore } from '@/store/app-store';
 
 import { useSettingsView, type SettingsViewId } from './settings-view/hooks';
-import { NAV_ITEMS } from './settings-view/config/navigation';
 import { SettingsHeader } from './settings-view/components/settings-header';
 import { KeyboardMapDialog } from './settings-view/components/keyboard-map-dialog';
 import { DeleteProjectDialog } from './settings-view/components/delete-project-dialog';
@@ -27,6 +26,7 @@ import {
 } from './settings-view/providers';
 import { MCPServersSection } from './settings-view/mcp-servers';
 import { PromptCustomizationSection } from './settings-view/prompts';
+import { LanguageSection } from './settings-view/language';
 import type { Project as SettingsProject, Theme } from './settings-view/shared/types';
 import type { Project as ElectronProject } from '@/lib/electron';
 
@@ -183,6 +183,8 @@ export function SettingsView() {
         return (
           <AudioSection muteDoneSound={muteDoneSound} onMuteDoneSoundChange={setMuteDoneSound} />
         );
+      case 'language':
+        return <LanguageSection />;
       case 'defaults':
         return (
           <FeatureDefaultsSection
@@ -239,7 +241,6 @@ export function SettingsView() {
       <div className="flex-1 flex overflow-hidden">
         {/* Side Navigation - Overlay on mobile, sidebar on desktop */}
         <SettingsNavigation
-          navItems={NAV_ITEMS}
           activeSection={activeView}
           currentProject={currentProject}
           onNavigate={handleNavigate}

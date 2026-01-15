@@ -1,0 +1,91 @@
+{
+  "welcome": {
+    "greeting": "您好！我是 Automaker 代理。我可以帮助您自主构建软件。我可以读取和修改此项目中的文件、运行命令和执行测试。今天您想创建什么？"
+  },
+  "header": {
+    "title": "AI 代理",
+    "thinking": "思考中...",
+    "connected": "已连接",
+    "disconnected": "已断开",
+    "connecting": "连接中...",
+    "messagesCount": "{{count}} 条消息",
+    "clear": "清除"
+  },
+  "input": {
+    "placeholder": "描述您想构建的内容...",
+    "placeholderProcessing": "输入以排队另一个提示...",
+    "placeholderDropFiles": "将文件拖放到此处...",
+    "send": "发送",
+    "stop": "停止",
+    "stopGeneration": "停止生成",
+    "addToQueue": "添加到队列",
+    "sendMessage": "发送消息",
+    "attachImage": "附加图片",
+    "attachFile": "附加文件",
+    "attachFiles": "附加文件（图片、.txt、.md）",
+    "filesAttached": "个文件已附加",
+    "dropHere": "拖放到此处",
+    "keyboardHint": "按 <kbd>Enter</kbd> 发送，<kbd>Shift+Enter</kbd> 换行"
+  },
+  "session": {
+    "newSession": "新建会话",
+    "sessions": "会话",
+    "active": "活跃",
+    "archived": "已归档",
+    "noSessions": "暂无会话",
+    "createFirst": "创建您的第一个会话以开始",
+    "rename": "重命名会话",
+    "archive": "归档会话",
+    "delete": "删除会话",
+    "confirmDelete": "确定要删除此会话吗？",
+    "messages": "{{count}} 条消息",
+    "messages_plural": "{{count}} 条消息",
+    "noSessionSelected": "未选择会话",
+    "noSessionDescription": "创建或选择一个会话以开始与 AI 代理对话",
+    "viewSessions": "查看会话",
+    "showSessions": "显示会话"
+  },
+  "chat": {
+    "clearHistory": "清除聊天记录",
+    "confirmClear": "确定要清除此对话吗？",
+    "copyMessage": "复制消息",
+    "regenerate": "重新生成回复",
+    "imagesAttached": "已附加 {{count}} 张图片",
+    "imagesAttached_plural": "已附加 {{count}} 张图片"
+  },
+  "queue": {
+    "title": "消息队列",
+    "empty": "队列为空",
+    "pending": "{{count}} 个提示已排队",
+    "pending_plural": "{{count}} 个提示已排队",
+    "remove": "从队列移除",
+    "clear": "清空队列",
+    "clearAll": "全部清空",
+    "filesCount": "+{{count}} 个文件",
+    "filesCount_plural": "+{{count}} 个文件"
+  },
+  "tools": {
+    "using": "正在使用 {{tool}}...",
+    "completed": "工具执行完成",
+    "read": "正在读取文件",
+    "write": "正在写入文件",
+    "edit": "正在编辑文件",
+    "bash": "正在运行命令",
+    "glob": "正在搜索文件",
+    "grep": "正在搜索内容"
+  },
+  "errors": {
+    "connectionFailed": "连接代理失败",
+    "messageFailed": "发送消息失败",
+    "sessionLoadFailed": "加载会话失败"
+  },
+  "noProject": {
+    "title": "未选择项目",
+    "description": "打开或创建一个项目以开始使用 AI 代理。"
+  },
+  "files": {
+    "filesAttached": "已附加 {{count}} 个文件",
+    "filesAttached_plural": "已附加 {{count}} 个文件",
+    "clearAll": "全部清除"
+  }
+}

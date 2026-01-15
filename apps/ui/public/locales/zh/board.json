@@ -1,0 +1,160 @@
+{
+  "title": "功能看板",
+  "columns": {
+    "backlog": "待办",
+    "ready": "就绪",
+    "inProgress": "进行中",
+    "review": "审查",
+    "done": "完成"
+  },
+  "feature": {
+    "newFeature": "新功能",
+    "addFeature": "添加功能",
+    "editFeature": "编辑功能",
+    "deleteFeature": "删除功能",
+    "duplicateFeature": "复制功能",
+    "moveToBacklog": "移至待办",
+    "moveToReady": "移至就绪",
+    "startImplementation": "开始实现",
+    "markAsReview": "标记为审查",
+    "markAsDone": "标记为完成",
+    "viewDetails": "查看详情",
+    "viewOutput": "查看代理输出",
+    "confirmDelete": "确定要删除此功能吗？此操作无法撤销。",
+    "noFeatures": "暂无功能",
+    "createFirst": "创建您的第一个功能以开始"
+  },
+  "form": {
+    "title": "标题",
+    "titlePlaceholder": "输入功能标题...",
+    "description": "描述",
+    "descriptionPlaceholder": "描述此功能应该做什么...",
+    "category": "分类",
+    "priority": "优先级",
+    "dependencies": "依赖项",
+    "dependenciesPlaceholder": "选择此功能依赖的功能",
+    "images": "图片",
+    "addImage": "添加图片",
+    "spec": "规格说明",
+    "specPlaceholder": "可选的详细规格说明..."
+  },
+  "categories": {
+    "feature": "功能",
+    "bug": "缺陷",
+    "enhancement": "增强",
+    "refactor": "重构",
+    "docs": "文档",
+    "test": "测试",
+    "chore": "杂项"
+  },
+  "priorities": {
+    "high": "高",
+    "medium": "中",
+    "low": "低"
+  },
+  "status": {
+    "pending": "待处理",
+    "ready": "就绪",
+    "running": "运行中",
+    "paused": "已暂停",
+    "review": "审查中",
+    "completed": "已完成",
+    "failed": "失败"
+  },
+  "actions": {
+    "runAll": "全部运行",
+    "runNext": "运行下一个",
+    "stopAll": "全部停止",
+    "clearCompleted": "清除已完成",
+    "importFeatures": "导入功能",
+    "exportFeatures": "导出功能",
+    "generateSpec": "生成规格",
+    "generateFeatures": "从规格生成功能"
+  },
+  "ai": {
+    "generateTitle": "生成标题",
+    "generateDescription": "生成描述",
+    "enhanceFeature": "AI 增强",
+    "validateFeature": "验证功能",
+    "suggestFeatures": "建议功能"
+  },
+  "filters": {
+    "all": "全部",
+    "byCategory": "按分类",
+    "byPriority": "按优先级",
+    "byStatus": "按状态",
+    "search": "搜索功能...",
+    "clearSearch": "清除搜索"
+  },
+  "empty": {
+    "backlog": "待办列表为空",
+    "ready": "没有准备好实现的功能",
+    "inProgress": "没有进行中的功能",
+    "review": "没有待审查的功能",
+    "done": "没有已完成的功能"
+  },
+  "emptyState": {
+    "noMatchingItems": "没有匹配的项目",
+    "noMatchingFilters": "没有功能符合当前筛选条件。",
+    "press": "按",
+    "toAdd": "添加",
+    "clearFilters": "清除筛选以查看所有项目"
+  },
+  "spec": {
+    "creatingTitle": "正在创建应用规格",
+    "creating": "正在创建规格"
+  },
+  "cardActions": {
+    "approvePlan": "批准计划",
+    "logs": "日志",
+    "verify": "验证",
+    "resume": "继续",
+    "complete": "完成",
+    "refine": "优化",
+    "markAsVerified": "标记为已验证",
+    "edit": "编辑",
+    "viewPlan": "查看计划",
+    "make": "执行",
+    "delete": "删除",
+    "spawnSubTask": "创建子任务",
+    "viewLogs": "查看日志"
+  },
+  "cardHeader": {
+    "generatingTitle": "正在生成标题...",
+    "less": "收起",
+    "more": "展开"
+  },
+  "agentInfo": {
+    "tasks": "个任务",
+    "showLess": "收起",
+    "showMore": "还有 {{count}} 个",
+    "summary": "摘要",
+    "viewFullSummary": "查看完整摘要",
+    "toolCalls": "{{count}} 次工具调用",
+    "tasksDone": "{{count}} 个任务完成"
+  },
+  "summaryDialog": {
+    "title": "实现摘要",
+    "noDescription": "无描述",
+    "noSummary": "暂无摘要",
+    "close": "关闭"
+  },
+  "badges": {
+    "highPriority": "高优先级",
+    "mediumPriority": "中优先级",
+    "lowPriority": "低优先级",
+    "manualVerification": "需要手动验证",
+    "blockedBy": "被 {{count}} 个未完成的依赖项阻塞",
+    "blockedBy_other": "被 {{count}} 个未完成的依赖项阻塞",
+    "justFinished": "代理刚刚完成此功能的工作"
+  },
+  "messages": {
+    "featureCreated": "功能创建成功",
+    "featureUpdated": "功能更新成功",
+    "featureDeleted": "功能删除成功",
+    "featureMoved": "功能已移至 {{status}}",
+    "implementationStarted": "实现已开始",
+    "implementationCompleted": "实现已完成",
+    "implementationFailed": "实现失败"
+  }
+}

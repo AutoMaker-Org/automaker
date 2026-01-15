@@ -1,6 +1,9 @@
+import { useTranslation } from 'react-i18next';
 import { Bot } from 'lucide-react';
 
 export function ThinkingIndicator() {
+  const { t } = useTranslation('agent');
+
   return (
     <div className="flex gap-4 max-w-4xl">
       <div className="w-9 h-9 rounded-xl bg-primary/10 ring-1 ring-primary/20 flex items-center justify-center shrink-0 shadow-sm">
@@ -22,7 +25,7 @@ export function ThinkingIndicator() {
               style={{ animationDelay: '300ms' }}
             />
           </div>
-          <span className="text-sm text-muted-foreground">Thinking...</span>
+          <span className="text-sm text-muted-foreground">{t('header.thinking')}</span>
         </div>
       </div>
     </div>

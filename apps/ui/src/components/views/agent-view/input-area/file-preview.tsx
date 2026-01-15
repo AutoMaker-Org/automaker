@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { X, FileText } from 'lucide-react';
 import type { ImageAttachment, TextFileAttachment } from '@/store/app-store';
 import { formatFileSize } from '@/lib/image-utils';
@@ -19,6 +20,7 @@ export function FilePreview({
   onRemoveTextFile,
   onClearAll,
 }: FilePreviewProps) {
+  const { t } = useTranslation('agent');
   const totalFiles = selectedImages.length + selectedTextFiles.length;
 
   if (totalFiles === 0) {
@@ -29,13 +31,13 @@ export function FilePreview({
     <div className="mb-4 space-y-2">
       <div className="flex items-center justify-between">
         <p className="text-xs font-medium text-foreground">
-          {totalFiles} file{totalFiles > 1 ? 's' : ''} attached
+          {t('files.filesAttached', { count: totalFiles })}
         </p>
         <button
           onClick={onClearAll}
           className="text-xs text-muted-foreground hover:text-foreground transition-colors"
         >
-          Clear all
+          {t('files.clearAll')}
         </button>
       </div>
       <div className="flex flex-wrap gap-2">

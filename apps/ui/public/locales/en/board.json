@@ -20,7 +20,7 @@
     "markAsDone": "Mark as Done",
     "viewDetails": "View Details",
     "viewOutput": "View Agent Output",
-    "confirmDelete": "Are you sure you want to delete this feature?",
+    "confirmDelete": "Are you sure you want to delete this feature? This action cannot be undone.",
     "noFeatures": "No features yet",
     "createFirst": "Create your first feature to get started"
   },
@@ -83,7 +83,8 @@
     "byCategory": "By Category",
     "byPriority": "By Priority",
     "byStatus": "By Status",
-    "search": "Search features..."
+    "search": "Search features...",
+    "clearSearch": "Clear search"
   },
   "empty": {
     "backlog": "Backlog is empty",
@@ -91,6 +92,61 @@
     "inProgress": "No features in progress",
     "review": "No features to review",
     "done": "No completed features"
+  },
+  "emptyState": {
+    "noMatchingItems": "No Matching Items",
+    "noMatchingFilters": "No features match your current filters.",
+    "press": "Press",
+    "toAdd": "to add",
+    "clearFilters": "Clear filters to see all items"
+  },
+  "spec": {
+    "creatingTitle": "Creating App Specification",
+    "creating": "Creating spec"
+  },
+  "cardActions": {
+    "approvePlan": "Approve Plan",
+    "logs": "Logs",
+    "verify": "Verify",
+    "resume": "Resume",
+    "complete": "Complete",
+    "refine": "Refine",
+    "markAsVerified": "Mark as Verified",
+    "edit": "Edit",
+    "viewPlan": "View Plan",
+    "make": "Make",
+    "delete": "Delete",
+    "spawnSubTask": "Spawn Sub-Task",
+    "viewLogs": "View Logs"
+  },
+  "cardHeader": {
+    "generatingTitle": "Generating title...",
+    "less": "Less",
+    "more": "More"
+  },
+  "agentInfo": {
+    "tasks": "tasks",
+    "showLess": "Show less",
+    "showMore": "+{{count}} more",
+    "summary": "Summary",
+    "viewFullSummary": "View full summary",
+    "toolCalls": "{{count}} tool calls",
+    "tasksDone": "{{count}} tasks done"
+  },
+  "summaryDialog": {
+    "title": "Implementation Summary",
+    "noDescription": "No description",
+    "noSummary": "No summary available",
+    "close": "Close"
+  },
+  "badges": {
+    "highPriority": "High Priority",
+    "mediumPriority": "Medium Priority",
+    "lowPriority": "Low Priority",
+    "manualVerification": "Manual verification required",
+    "blockedBy": "Blocked by {{count}} incomplete dependency",
+    "blockedBy_other": "Blocked by {{count}} incomplete dependencies",
+    "justFinished": "Agent just finished working on this feature"
   },
   "messages": {
     "featureCreated": "Feature created successfully",

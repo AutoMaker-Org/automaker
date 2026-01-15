@@ -1,4 +1,5 @@
 import { memo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Kbd } from '@/components/ui/kbd';
@@ -41,6 +42,7 @@ export const EmptyStateCard = memo(function EmptyStateCard({
   onAiSuggest,
   customConfig,
 }: EmptyStateCardProps) {
+  const { t } = useTranslation('board');
   // Get base config and merge with custom overrides
   const baseConfig = getEmptyStateConfig(columnId);
   const config: EmptyStateConfig = { ...baseConfig, ...customConfig };
@@ -76,22 +78,22 @@ export const EmptyStateCard = memo(function EmptyStateCard({
 
       {/* Title */}
       <h4 className="font-medium text-sm text-muted-foreground/50 mb-1">
-        {isFilteredEmpty ? 'No Matching Items' : config.title}
+        {isFilteredEmpty ? t('emptyState.noMatchingItems') : config.title}
       </h4>
 
       {/* Description */}
       <p className="text-xs text-muted-foreground/40 leading-relaxed max-w-[180px]">
-        {isFilteredEmpty ? 'No features match your current filters.' : config.description}
+        {isFilteredEmpty ? t('emptyState.noMatchingFilters') : config.description}
       </p>
 
       {/* Keyboard shortcut hint for backlog */}
       {showShortcut && (
         <div className="flex items-center gap-1.5 mt-3 text-muted-foreground/40">
-          <span className="text-xs">Press</span>
+          <span className="text-xs">{t('emptyState.press')}</span>
           <Kbd className="bg-muted/30 border-0 px-1.5 py-0.5 text-[10px] text-muted-foreground/50">
             {formatShortcut(addFeatureShortcut, true)}
           </Kbd>
-          <span className="text-xs">to add</span>
+          <span className="text-xs">{t('emptyState.toAdd')}</span>
         </div>
       )}
 
@@ -112,7 +114,7 @@ export const EmptyStateCard = memo(function EmptyStateCard({
       {/* Filtered empty state hint */}
       {isFilteredEmpty && (
         <p className="text-[10px] mt-2 text-muted-foreground/30 italic">
-          Clear filters to see all items
+          {t('emptyState.clearFilters')}
         </p>
       )}
     </div>

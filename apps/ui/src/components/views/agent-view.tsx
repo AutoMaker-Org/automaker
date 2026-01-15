@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useAppStore } from '@/store/app-store';
 import type { PhaseModelEntry } from '@automaker/types';
 import { useElectronAgent } from '@/hooks/use-electron-agent';
@@ -15,11 +16,13 @@ import {
 // Extracted components
 import { NoProjectState, AgentHeader, ChatArea } from './agent-view/components';
 import { AgentInputArea } from './agent-view/input-area';
+import { WELCOME_MESSAGE_ID, WELCOME_MESSAGE_ROLE } from './agent-view/shared/constants';
 
 /** Tailwind lg breakpoint in pixels */
 const LG_BREAKPOINT = 1024;
 
 export function AgentView() {
+  const { t } = useTranslation('agent');
   const { currentProject } = useAppStore();
   const [input, setInput] = useState('');
   const [currentTool, setCurrentTool] = useState<string | null>(null);
@@ -127,7 +130,7 @@ export function AgentView() {
   }, [input, fileAttachments, isProcessing, sendMessage, addToServerQueue]);
 
   const handleClearChat = async () => {
-    if (!confirm('Are you sure you want to clear this conversation?')) return;
+    if (!confirm(t('chat.confirmClear'))) return;
     await clearHistory();
   };
 
@@ -152,10 +155,9 @@ export function AgentView() {
     messages.length === 0
       ? [
           {
-            id: 'welcome',
-            role: 'assistant' as const,
-            content:
-              "Hello! I'm the Automaker Agent. I can help you build software autonomously. I can read and modify files in this project, run commands, and execute tests. What would you like to create today?",
+            id: WELCOME_MESSAGE_ID,
+            role: WELCOME_MESSAGE_ROLE,
+            content: t('welcome.greeting'),
             timestamp: new Date().toISOString(),
           },
         ]

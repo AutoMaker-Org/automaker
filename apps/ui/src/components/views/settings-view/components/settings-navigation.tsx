@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ChevronDown, ChevronRight, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -10,7 +11,6 @@ import type { SettingsViewId } from '../hooks/use-settings-view';
 const PROVIDERS_DROPDOWN_KEY = 'settings-providers-dropdown-open';
 
 interface SettingsNavigationProps {
-  navItems: NavigationItem[];
   activeSection: SettingsViewId;
   currentProject: Project | null;
   onNavigate: (sectionId: SettingsViewId) => void;
@@ -22,10 +22,12 @@ function NavButton({
   item,
   isActive,
   onNavigate,
+  t,
 }: {
   item: NavigationItem;
   isActive: boolean;
   onNavigate: (sectionId: SettingsViewId) => void;
+  t: (key: string) => string;
 }) {
   const Icon = item.icon;
   return (
@@ -59,7 +61,7 @@ function NavButton({
           isActive ? 'text-brand-500' : 'group-hover:text-brand-400 group-hover:scale-110'
         )}
       />
-      <span className="truncate">{item.label}</span>
+      <span className="truncate">{t(item.labelKey)}</span>
     </button>
   );
 }
@@ -68,10 +70,12 @@ function NavItemWithSubItems({
   item,
   activeSection,
   onNavigate,
+  t,
 }: {
   item: NavigationItem;
   activeSection: SettingsViewId;
   onNavigate: (sectionId: SettingsViewId) => void;
+  t: (key: string) => string;
 }) {
   const [isOpen, setIsOpen] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -109,7 +113,7 @@ function NavItemWithSubItems({
             isParentActive || hasActiveSubItem ? 'text-brand-500' : 'group-hover:text-brand-400'
           )}
         />
-        <span className="truncate flex-1">{item.label}</span>
+        <span className="truncate flex-1">{t(item.labelKey)}</span>
         <ChevronIcon
           className={cn(
             'w-4 h-4 shrink-0 transition-transform duration-200',
@@ -156,7 +160,7 @@ function NavItemWithSubItems({
                       : 'group-hover:text-brand-400 group-hover:scale-110'
                   )}
                 />
-                <span className="truncate">{subItem.label}</span>
+                <span className="truncate">{t(subItem.labelKey)}</span>
               </button>
             );
           })}
@@ -173,6 +177,8 @@ export function SettingsNavigation({
   isOpen = true,
   onClose,
 }: SettingsNavigationProps) {
+  const { t } = useTranslation('settings');
+
   // On mobile, only show when isOpen is true
   // On desktop (lg+), always show regardless of isOpen
   // The desktop visibility is handled by CSS, but we need to render on mobile only when open
@@ -207,13 +213,13 @@ export function SettingsNavigation({
       >
         {/* Mobile close button */}
         <div className="lg:hidden flex items-center justify-between px-4 py-3 border-b border-border/50">
-          <span className="text-sm font-semibold text-foreground">Navigation</span>
+          <span className="text-sm font-semibold text-foreground">{t('mobileNavTitle')}</span>
           <Button
             variant="ghost"
             size="sm"
             onClick={onClose}
             className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
-            aria-label="Close navigation menu"
+            aria-label={t('closeNavigation')}
           >
             <X className="w-4 h-4" />
           </Button>
@@ -222,13 +228,13 @@ export function SettingsNavigation({
         <div className="sticky top-0 p-4 space-y-1">
           {/* Global Settings Groups */}
           {GLOBAL_NAV_GROUPS.map((group, groupIndex) => (
-            <div key={group.label}>
+            <div key={group.labelKey}>
               {/* Group divider (except for first group) */}
               {groupIndex > 0 && <div className="my-3 border-t border-border/50" />}
 
               {/* Group Label */}
               <div className="px-3 py-2 text-xs font-semibold text-muted-foreground/70 uppercase tracking-wider">
-                {group.label}
+                {t(group.labelKey)}
               </div>
 
               {/* Group Items */}
@@ -240,6 +246,7 @@ export function SettingsNavigation({
                       item={item}
                       activeSection={activeSection}
                       onNavigate={onNavigate}
+                      t={t}
                     />
                   ) : (
                     <NavButton
@@ -247,6 +254,7 @@ export function SettingsNavigation({
                       item={item}
                       isActive={activeSection === item.id}
                       onNavigate={onNavigate}
+                      t={t}
                     />
                   )
                 )}
@@ -262,7 +270,7 @@ export function SettingsNavigation({
 
               {/* Project Settings Label */}
               <div className="px-3 py-2 text-xs font-semibold text-muted-foreground/70 uppercase tracking-wider">
-                Project Settings
+                {t('navigation.projectSettings')}
               </div>
 
               {/* Project Settings Items */}
@@ -273,6 +281,7 @@ export function SettingsNavigation({
                     item={item}
                     isActive={activeSection === item.id}
                     onNavigate={onNavigate}
+                    t={t}
                   />
                 ))}
               </div>

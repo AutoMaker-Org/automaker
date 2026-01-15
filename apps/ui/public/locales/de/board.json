@@ -20,7 +20,7 @@
     "markAsDone": "Als fertig markieren",
     "viewDetails": "Details anzeigen",
     "viewOutput": "Agent-Ausgabe anzeigen",
-    "confirmDelete": "Möchtest du dieses Feature wirklich löschen?",
+    "confirmDelete": "Möchtest du dieses Feature wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.",
     "noFeatures": "Noch keine Features",
     "createFirst": "Erstelle dein erstes Feature um loszulegen"
   },
@@ -83,7 +83,8 @@
     "byCategory": "Nach Kategorie",
     "byPriority": "Nach Priorität",
     "byStatus": "Nach Status",
-    "search": "Features suchen..."
+    "search": "Features suchen...",
+    "clearSearch": "Suche leeren"
   },
   "empty": {
     "backlog": "Backlog ist leer",
@@ -91,6 +92,61 @@
     "inProgress": "Keine Features in Bearbeitung",
     "review": "Keine Features zum Review",
     "done": "Keine abgeschlossenen Features"
+  },
+  "emptyState": {
+    "noMatchingItems": "Keine passenden Einträge",
+    "noMatchingFilters": "Keine Features entsprechen deinen aktuellen Filtern.",
+    "press": "Drücke",
+    "toAdd": "zum Hinzufügen",
+    "clearFilters": "Filter leeren um alle Einträge zu sehen"
+  },
+  "spec": {
+    "creatingTitle": "App-Spezifikation wird erstellt",
+    "creating": "Erstelle Spezifikation"
+  },
+  "cardActions": {
+    "approvePlan": "Plan genehmigen",
+    "logs": "Logs",
+    "verify": "Verifizieren",
+    "resume": "Fortsetzen",
+    "complete": "Abschließen",
+    "refine": "Verfeinern",
+    "markAsVerified": "Als verifiziert markieren",
+    "edit": "Bearbeiten",
+    "viewPlan": "Plan anzeigen",
+    "make": "Erstellen",
+    "delete": "Löschen",
+    "spawnSubTask": "Unteraufgabe erstellen",
+    "viewLogs": "Logs anzeigen"
+  },
+  "cardHeader": {
+    "generatingTitle": "Titel wird generiert...",
+    "less": "Weniger",
+    "more": "Mehr"
+  },
+  "agentInfo": {
+    "tasks": "Aufgaben",
+    "showLess": "Weniger anzeigen",
+    "showMore": "+{{count}} weitere",
+    "summary": "Zusammenfassung",
+    "viewFullSummary": "Vollständige Zusammenfassung anzeigen",
+    "toolCalls": "{{count}} Tool-Aufrufe",
+    "tasksDone": "{{count}} Aufgaben erledigt"
+  },
+  "summaryDialog": {
+    "title": "Implementierungs-Zusammenfassung",
+    "noDescription": "Keine Beschreibung",
+    "noSummary": "Keine Zusammenfassung verfügbar",
+    "close": "Schließen"
+  },
+  "badges": {
+    "highPriority": "Hohe Priorität",
+    "mediumPriority": "Mittlere Priorität",
+    "lowPriority": "Niedrige Priorität",
+    "manualVerification": "Manuelle Verifizierung erforderlich",
+    "blockedBy": "Blockiert durch {{count}} unvollständige Abhängigkeit",
+    "blockedBy_other": "Blockiert durch {{count}} unvollständige Abhängigkeiten",
+    "justFinished": "Agent hat gerade die Arbeit an diesem Feature beendet"
   },
   "messages": {
     "featureCreated": "Feature erfolgreich erstellt",

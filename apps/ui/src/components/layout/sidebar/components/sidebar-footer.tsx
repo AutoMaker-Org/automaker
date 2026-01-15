@@ -1,4 +1,5 @@
 import type { NavigateOptions } from '@tanstack/react-router';
+import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/utils';
 import { formatShortcut } from '@/store/app-store';
 import { BookOpen, Activity, Settings } from 'lucide-react';
@@ -24,6 +25,8 @@ export function SidebarFooter({
   runningAgentsCount,
   shortcuts,
 }: SidebarFooterProps) {
+  const { t } = useTranslation('common');
+
   return (
     <div
       className={cn(
@@ -58,7 +61,7 @@ export function SidebarFooter({
               sidebarOpen ? 'justify-start' : 'justify-center',
               'hover:scale-[1.02] active:scale-[0.97]'
             )}
-            title={!sidebarOpen ? 'Wiki' : undefined}
+            title={!sidebarOpen ? t('navigation.wiki') : undefined}
             data-testid="wiki-link"
           >
             <BookOpen
@@ -75,7 +78,7 @@ export function SidebarFooter({
                 sidebarOpen ? 'block' : 'hidden'
               )}
             >
-              Wiki
+              {t('navigation.wiki')}
             </span>
             {!sidebarOpen && (
               <span
@@ -88,7 +91,7 @@ export function SidebarFooter({
                   'translate-x-1 group-hover:translate-x-0'
                 )}
               >
-                Wiki
+                {t('navigation.wiki')}
               </span>
             )}
           </button>
@@ -118,7 +121,7 @@ export function SidebarFooter({
               sidebarOpen ? 'justify-start' : 'justify-center',
               'hover:scale-[1.02] active:scale-[0.97]'
             )}
-            title={!sidebarOpen ? 'Running Agents' : undefined}
+            title={!sidebarOpen ? t('navigation.runningAgents') : undefined}
             data-testid="running-agents-link"
           >
             <div className="relative">
@@ -151,7 +154,7 @@ export function SidebarFooter({
                 sidebarOpen ? 'block' : 'hidden'
               )}
             >
-              Running Agents
+              {t('navigation.runningAgents')}
             </span>
             {/* Running agents count badge - shown in expanded state */}
             {sidebarOpen && runningAgentsCount > 0 && (
@@ -179,7 +182,7 @@ export function SidebarFooter({
                   'translate-x-1 group-hover:translate-x-0'
                 )}
               >
-                Running Agents
+                {t('navigation.runningAgents')}
                 {runningAgentsCount > 0 && (
                   <span className="ml-2 px-1.5 py-0.5 bg-brand-500 text-white rounded-full text-[10px] font-semibold">
                     {runningAgentsCount}
@@ -213,7 +216,7 @@ export function SidebarFooter({
             sidebarOpen ? 'justify-start' : 'justify-center',
             'hover:scale-[1.02] active:scale-[0.97]'
           )}
-          title={!sidebarOpen ? 'Settings' : undefined}
+          title={!sidebarOpen ? t('navigation.settings') : undefined}
           data-testid="settings-button"
         >
           <Settings
@@ -230,7 +233,7 @@ export function SidebarFooter({
               sidebarOpen ? 'block' : 'hidden'
             )}
           >
-            Settings
+            {t('navigation.settings')}
           </span>
           {sidebarOpen && (
             <span
@@ -256,7 +259,7 @@ export function SidebarFooter({
                 'translate-x-1 group-hover:translate-x-0'
               )}
             >
-              Settings
+              {t('navigation.settings')}
               <span className="ml-2 px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono text-muted-foreground">
                 {formatShortcut(shortcuts.settings, true)}
               </span>
