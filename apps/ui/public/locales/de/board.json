@@ -1,0 +1,104 @@
+{
+  "title": "Feature-Board",
+  "columns": {
+    "backlog": "Backlog",
+    "ready": "Bereit",
+    "inProgress": "In Bearbeitung",
+    "review": "Review",
+    "done": "Fertig"
+  },
+  "feature": {
+    "newFeature": "Neues Feature",
+    "addFeature": "Feature hinzufügen",
+    "editFeature": "Feature bearbeiten",
+    "deleteFeature": "Feature löschen",
+    "duplicateFeature": "Feature duplizieren",
+    "moveToBacklog": "In Backlog verschieben",
+    "moveToReady": "Als bereit markieren",
+    "startImplementation": "Implementierung starten",
+    "markAsReview": "Für Review markieren",
+    "markAsDone": "Als fertig markieren",
+    "viewDetails": "Details anzeigen",
+    "viewOutput": "Agent-Ausgabe anzeigen",
+    "confirmDelete": "Möchtest du dieses Feature wirklich löschen?",
+    "noFeatures": "Noch keine Features",
+    "createFirst": "Erstelle dein erstes Feature um loszulegen"
+  },
+  "form": {
+    "title": "Titel",
+    "titlePlaceholder": "Feature-Titel eingeben...",
+    "description": "Beschreibung",
+    "descriptionPlaceholder": "Beschreibe was dieses Feature tun soll...",
+    "category": "Kategorie",
+    "priority": "Priorität",
+    "dependencies": "Abhängigkeiten",
+    "dependenciesPlaceholder": "Wähle Features von denen dieses abhängt",
+    "images": "Bilder",
+    "addImage": "Bild hinzufügen",
+    "spec": "Spezifikation",
+    "specPlaceholder": "Optionale detaillierte Spezifikation..."
+  },
+  "categories": {
+    "feature": "Feature",
+    "bug": "Bug",
+    "enhancement": "Erweiterung",
+    "refactor": "Refactoring",
+    "docs": "Dokumentation",
+    "test": "Test",
+    "chore": "Wartung"
+  },
+  "priorities": {
+    "high": "Hoch",
+    "medium": "Mittel",
+    "low": "Niedrig"
+  },
+  "status": {
+    "pending": "Ausstehend",
+    "ready": "Bereit",
+    "running": "Läuft",
+    "paused": "Pausiert",
+    "review": "Review",
+    "completed": "Abgeschlossen",
+    "failed": "Fehlgeschlagen"
+  },
+  "actions": {
+    "runAll": "Alle ausführen",
+    "runNext": "Nächstes ausführen",
+    "stopAll": "Alle stoppen",
+    "clearCompleted": "Abgeschlossene leeren",
+    "importFeatures": "Features importieren",
+    "exportFeatures": "Features exportieren",
+    "generateSpec": "Spezifikation generieren",
+    "generateFeatures": "Features aus Spezifikation generieren"
+  },
+  "ai": {
+    "generateTitle": "Titel generieren",
+    "generateDescription": "Beschreibung generieren",
+    "enhanceFeature": "Mit AI erweitern",
+    "validateFeature": "Feature validieren",
+    "suggestFeatures": "Features vorschlagen"
+  },
+  "filters": {
+    "all": "Alle",
+    "byCategory": "Nach Kategorie",
+    "byPriority": "Nach Priorität",
+    "byStatus": "Nach Status",
+    "search": "Features suchen..."
+  },
+  "empty": {
+    "backlog": "Backlog ist leer",
+    "ready": "Keine Features bereit zur Implementierung",
+    "inProgress": "Keine Features in Bearbeitung",
+    "review": "Keine Features zum Review",
+    "done": "Keine abgeschlossenen Features"
+  },
+  "messages": {
+    "featureCreated": "Feature erfolgreich erstellt",
+    "featureUpdated": "Feature erfolgreich aktualisiert",
+    "featureDeleted": "Feature erfolgreich gelöscht",
+    "featureMoved": "Feature nach {{status}} verschoben",
+    "implementationStarted": "Implementierung gestartet",
+    "implementationCompleted": "Implementierung abgeschlossen",
+    "implementationFailed": "Implementierung fehlgeschlagen"
+  }
+}

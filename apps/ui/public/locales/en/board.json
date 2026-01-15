@@ -1,0 +1,104 @@
+{
+  "title": "Feature Board",
+  "columns": {
+    "backlog": "Backlog",
+    "ready": "Ready",
+    "inProgress": "In Progress",
+    "review": "Review",
+    "done": "Done"
+  },
+  "feature": {
+    "newFeature": "New Feature",
+    "addFeature": "Add Feature",
+    "editFeature": "Edit Feature",
+    "deleteFeature": "Delete Feature",
+    "duplicateFeature": "Duplicate Feature",
+    "moveToBacklog": "Move to Backlog",
+    "moveToReady": "Move to Ready",
+    "startImplementation": "Start Implementation",
+    "markAsReview": "Mark for Review",
+    "markAsDone": "Mark as Done",
+    "viewDetails": "View Details",
+    "viewOutput": "View Agent Output",
+    "confirmDelete": "Are you sure you want to delete this feature?",
+    "noFeatures": "No features yet",
+    "createFirst": "Create your first feature to get started"
+  },
+  "form": {
+    "title": "Title",
+    "titlePlaceholder": "Enter feature title...",
+    "description": "Description",
+    "descriptionPlaceholder": "Describe what this feature should do...",
+    "category": "Category",
+    "priority": "Priority",
+    "dependencies": "Dependencies",
+    "dependenciesPlaceholder": "Select features this depends on",
+    "images": "Images",
+    "addImage": "Add Image",
+    "spec": "Specification",
+    "specPlaceholder": "Optional detailed specification..."
+  },
+  "categories": {
+    "feature": "Feature",
+    "bug": "Bug",
+    "enhancement": "Enhancement",
+    "refactor": "Refactor",
+    "docs": "Documentation",
+    "test": "Test",
+    "chore": "Chore"
+  },
+  "priorities": {
+    "high": "High",
+    "medium": "Medium",
+    "low": "Low"
+  },
+  "status": {
+    "pending": "Pending",
+    "ready": "Ready",
+    "running": "Running",
+    "paused": "Paused",
+    "review": "Review",
+    "completed": "Completed",
+    "failed": "Failed"
+  },
+  "actions": {
+    "runAll": "Run All",
+    "runNext": "Run Next",
+    "stopAll": "Stop All",
+    "clearCompleted": "Clear Completed",
+    "importFeatures": "Import Features",
+    "exportFeatures": "Export Features",
+    "generateSpec": "Generate Spec",
+    "generateFeatures": "Generate Features from Spec"
+  },
+  "ai": {
+    "generateTitle": "Generate Title",
+    "generateDescription": "Generate Description",
+    "enhanceFeature": "Enhance with AI",
+    "validateFeature": "Validate Feature",
+    "suggestFeatures": "Suggest Features"
+  },
+  "filters": {
+    "all": "All",
+    "byCategory": "By Category",
+    "byPriority": "By Priority",
+    "byStatus": "By Status",
+    "search": "Search features..."
+  },
+  "empty": {
+    "backlog": "Backlog is empty",
+    "ready": "No features ready to implement",
+    "inProgress": "No features in progress",
+    "review": "No features to review",
+    "done": "No completed features"
+  },
+  "messages": {
+    "featureCreated": "Feature created successfully",
+    "featureUpdated": "Feature updated successfully",
+    "featureDeleted": "Feature deleted successfully",
+    "featureMoved": "Feature moved to {{status}}",
+    "implementationStarted": "Implementation started",
+    "implementationCompleted": "Implementation completed",
+    "implementationFailed": "Implementation failed"
+  }
+}

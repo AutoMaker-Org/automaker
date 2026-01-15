@@ -1,0 +1,168 @@
+{
+  "title": "Settings",
+  "navigation": {
+    "modelPrompts": "Model & Prompts",
+    "interface": "Interface",
+    "accountSecurity": "Account & Security"
+  },
+  "sections": {
+    "featureDefaults": {
+      "title": "Feature Defaults",
+      "description": "Configure default settings for new features",
+      "defaultModel": "Default Model",
+      "defaultModelDescription": "Model used for implementing features",
+      "planningMode": "Planning Mode",
+      "planningModeDescription": "How features are planned before implementation",
+      "skipTests": "Skip Tests",
+      "skipTestsDescription": "Skip running tests after feature implementation",
+      "worktrees": "Git Worktrees",
+      "worktreesDescription": "Use isolated git worktrees for feature implementation"
+    },
+    "modelDefaults": {
+      "title": "Model Defaults",
+      "description": "Configure AI models for different tasks",
+      "phaseModels": "Phase Models",
+      "enhancementModel": "Enhancement Model",
+      "validationModel": "Validation Model",
+      "specGenerationModel": "Spec Generation Model",
+      "featureGenerationModel": "Feature Generation Model"
+    },
+    "prompts": {
+      "title": "Prompt Customization",
+      "description": "Customize AI prompts for different phases",
+      "howTo": "How to Customize Prompts",
+      "autoMode": "Auto Mode Prompts",
+      "agent": "Agent Prompts",
+      "backlogPlan": "Backlog Planning Prompts",
+      "enhancement": "Enhancement Prompts",
+      "commitMessage": "Commit Message Prompts",
+      "reset": "Reset to Default",
+      "enabled": "Enabled",
+      "disabled": "Disabled"
+    },
+    "apiKeys": {
+      "title": "API Keys",
+      "description": "Manage your API keys for AI providers",
+      "anthropic": "Anthropic API Key",
+      "show": "Show key",
+      "hide": "Hide key",
+      "notSet": "Not configured"
+    },
+    "providers": {
+      "title": "AI Providers",
+      "claude": {
+        "title": "Claude",
+        "description": "Primary AI provider powered by Anthropic",
+        "claudeMd": "CLAUDE.md Integration",
+        "claudeMdDescription": "Automatically load project-specific instructions from CLAUDE.md files"
+      },
+      "cursor": {
+        "title": "Cursor",
+        "description": "AI-powered code editor integration",
+        "enabledModels": "Enabled Models",
+        "defaultModel": "Default Model"
+      },
+      "codex": {
+        "title": "Codex",
+        "description": "OpenAI Codex integration",
+        "sandboxMode": "Sandbox Mode",
+        "approvalPolicy": "Approval Policy"
+      },
+      "opencode": {
+        "title": "OpenCode",
+        "description": "Open source AI code assistant",
+        "enabledModels": "Enabled Models",
+        "defaultModel": "Default Model"
+      }
+    },
+    "mcpServers": {
+      "title": "MCP Servers",
+      "description": "Configure Model Context Protocol servers",
+      "addServer": "Add Server",
+      "noServers": "No MCP servers configured",
+      "name": "Server Name",
+      "type": "Server Type",
+      "command": "Command",
+      "url": "URL",
+      "enabled": "Enabled"
+    },
+    "appearance": {
+      "title": "Appearance",
+      "description": "Customize the look and feel of the application",
+      "theme": "Theme",
+      "themeDescription": "Choose your preferred color scheme",
+      "projectCustomization": "Project Customization",
+      "boardBackground": "Board Background"
+    },
+    "terminal": {
+      "title": "Terminal",
+      "description": "Configure terminal settings",
+      "fontSize": "Font Size",
+      "defaultScript": "Default Run Script",
+      "defaultScriptDescription": "Script to run when starting a new terminal"
+    },
+    "keyboard": {
+      "title": "Keyboard Shortcuts",
+      "description": "Customize keyboard shortcuts",
+      "reset": "Reset to Defaults",
+      "shortcut": "Shortcut",
+      "action": "Action"
+    },
+    "audio": {
+      "title": "Audio",
+      "description": "Configure sound settings",
+      "muteDoneSound": "Mute Completion Sound",
+      "muteDoneSoundDescription": "Disable the sound played when a feature completes"
+    },
+    "language": {
+      "title": "Language",
+      "description": "Configure language settings",
+      "uiLanguage": "Interface Language",
+      "uiLanguageDescription": "Language used for the user interface",
+      "aiLanguage": "AI Response Language",
+      "aiLanguageDescription": "Language used for AI-generated responses"
+    },
+    "account": {
+      "title": "Account",
+      "description": "Manage your account settings"
+    },
+    "security": {
+      "title": "Security",
+      "description": "Security and privacy settings",
+      "sandboxWarning": "Sandbox Warning",
+      "sandboxWarningDescription": "Show warning when running commands outside sandbox"
+    },
+    "danger": {
+      "title": "Danger Zone",
+      "description": "Destructive actions that cannot be undone",
+      "resetSettings": "Reset All Settings",
+      "resetSettingsDescription": "Reset all settings to their default values",
+      "clearData": "Clear All Data",
+      "clearDataDescription": "Delete all local data including projects and sessions"
+    }
+  },
+  "themes": {
+    "light": "Light",
+    "dark": "Dark",
+    "system": "System",
+    "dracula": "Dracula",
+    "nord": "Nord",
+    "monokai": "Monokai",
+    "tokyonight": "Tokyo Night",
+    "solarized": "Solarized",
+    "gruvbox": "Gruvbox",
+    "catppuccin": "Catppuccin",
+    "onedark": "One Dark",
+    "synthwave": "Synthwave",
+    "red": "Red",
+    "cream": "Cream",
+    "sunset": "Sunset",
+    "gray": "Gray"
+  },
+  "planningModes": {
+    "skip": "Skip Planning",
+    "lite": "Lite Planning",
+    "spec": "Spec Mode",
+    "full": "Full SDD Mode"
+  }
+}

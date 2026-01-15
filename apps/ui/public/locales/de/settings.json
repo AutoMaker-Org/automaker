@@ -1,0 +1,168 @@
+{
+  "title": "Einstellungen",
+  "navigation": {
+    "modelPrompts": "Modelle & Prompts",
+    "interface": "Oberfläche",
+    "accountSecurity": "Konto & Sicherheit"
+  },
+  "sections": {
+    "featureDefaults": {
+      "title": "Feature-Standardwerte",
+      "description": "Standardeinstellungen für neue Features konfigurieren",
+      "defaultModel": "Standard-Modell",
+      "defaultModelDescription": "Modell für die Feature-Implementierung",
+      "planningMode": "Planungsmodus",
+      "planningModeDescription": "Wie Features vor der Implementierung geplant werden",
+      "skipTests": "Tests überspringen",
+      "skipTestsDescription": "Tests nach Feature-Implementierung überspringen",
+      "worktrees": "Git Worktrees",
+      "worktreesDescription": "Isolierte Git-Worktrees für Feature-Implementierung verwenden"
+    },
+    "modelDefaults": {
+      "title": "Modell-Standardwerte",
+      "description": "AI-Modelle für verschiedene Aufgaben konfigurieren",
+      "phaseModels": "Phasen-Modelle",
+      "enhancementModel": "Erweiterungs-Modell",
+      "validationModel": "Validierungs-Modell",
+      "specGenerationModel": "Spezifikations-Modell",
+      "featureGenerationModel": "Feature-Generierungs-Modell"
+    },
+    "prompts": {
+      "title": "Prompt-Anpassung",
+      "description": "AI-Prompts für verschiedene Phasen anpassen",
+      "howTo": "Prompts anpassen - Anleitung",
+      "autoMode": "Auto-Modus Prompts",
+      "agent": "Agent Prompts",
+      "backlogPlan": "Backlog-Planungs Prompts",
+      "enhancement": "Erweiterungs-Prompts",
+      "commitMessage": "Commit-Nachrichten Prompts",
+      "reset": "Auf Standard zurücksetzen",
+      "enabled": "Aktiviert",
+      "disabled": "Deaktiviert"
+    },
+    "apiKeys": {
+      "title": "API-Schlüssel",
+      "description": "API-Schlüssel für AI-Anbieter verwalten",
+      "anthropic": "Anthropic API-Schlüssel",
+      "show": "Schlüssel anzeigen",
+      "hide": "Schlüssel verbergen",
+      "notSet": "Nicht konfiguriert"
+    },
+    "providers": {
+      "title": "AI-Anbieter",
+      "claude": {
+        "title": "Claude",
+        "description": "Primärer AI-Anbieter von Anthropic",
+        "claudeMd": "CLAUDE.md Integration",
+        "claudeMdDescription": "Projektspezifische Anweisungen automatisch aus CLAUDE.md-Dateien laden"
+      },
+      "cursor": {
+        "title": "Cursor",
+        "description": "AI-gestützter Code-Editor Integration",
+        "enabledModels": "Aktivierte Modelle",
+        "defaultModel": "Standard-Modell"
+      },
+      "codex": {
+        "title": "Codex",
+        "description": "OpenAI Codex Integration",
+        "sandboxMode": "Sandbox-Modus",
+        "approvalPolicy": "Genehmigungsrichtlinie"
+      },
+      "opencode": {
+        "title": "OpenCode",
+        "description": "Open-Source AI Code-Assistent",
+        "enabledModels": "Aktivierte Modelle",
+        "defaultModel": "Standard-Modell"
+      }
+    },
+    "mcpServers": {
+      "title": "MCP-Server",
+      "description": "Model Context Protocol Server konfigurieren",
+      "addServer": "Server hinzufügen",
+      "noServers": "Keine MCP-Server konfiguriert",
+      "name": "Servername",
+      "type": "Servertyp",
+      "command": "Befehl",
+      "url": "URL",
+      "enabled": "Aktiviert"
+    },
+    "appearance": {
+      "title": "Erscheinungsbild",
+      "description": "Das Aussehen der Anwendung anpassen",
+      "theme": "Design",
+      "themeDescription": "Wähle dein bevorzugtes Farbschema",
+      "projectCustomization": "Projekt-Anpassung",
+      "boardBackground": "Board-Hintergrund"
+    },
+    "terminal": {
+      "title": "Terminal",
+      "description": "Terminal-Einstellungen konfigurieren",
+      "fontSize": "Schriftgröße",
+      "defaultScript": "Standard-Startskript",
+      "defaultScriptDescription": "Skript das beim Starten eines neuen Terminals ausgeführt wird"
+    },
+    "keyboard": {
+      "title": "Tastaturkürzel",
+      "description": "Tastaturkürzel anpassen",
+      "reset": "Auf Standard zurücksetzen",
+      "shortcut": "Kürzel",
+      "action": "Aktion"
+    },
+    "audio": {
+      "title": "Audio",
+      "description": "Ton-Einstellungen konfigurieren",
+      "muteDoneSound": "Fertigstellungston stumm",
+      "muteDoneSoundDescription": "Ton deaktivieren, der bei Feature-Fertigstellung abgespielt wird"
+    },
+    "language": {
+      "title": "Sprache",
+      "description": "Spracheinstellungen konfigurieren",
+      "uiLanguage": "Oberflächensprache",
+      "uiLanguageDescription": "Sprache für die Benutzeroberfläche",
+      "aiLanguage": "AI-Antwortsprache",
+      "aiLanguageDescription": "Sprache für AI-generierte Antworten"
+    },
+    "account": {
+      "title": "Konto",
+      "description": "Kontoeinstellungen verwalten"
+    },
+    "security": {
+      "title": "Sicherheit",
+      "description": "Sicherheits- und Datenschutzeinstellungen",
+      "sandboxWarning": "Sandbox-Warnung",
+      "sandboxWarningDescription": "Warnung anzeigen wenn Befehle außerhalb der Sandbox ausgeführt werden"
+    },
+    "danger": {
+      "title": "Gefahrenzone",
+      "description": "Destruktive Aktionen die nicht rückgängig gemacht werden können",
+      "resetSettings": "Alle Einstellungen zurücksetzen",
+      "resetSettingsDescription": "Alle Einstellungen auf Standardwerte zurücksetzen",
+      "clearData": "Alle Daten löschen",
+      "clearDataDescription": "Alle lokalen Daten einschließlich Projekte und Sitzungen löschen"
+    }
+  },
+  "themes": {
+    "light": "Hell",
+    "dark": "Dunkel",
+    "system": "System",
+    "dracula": "Dracula",
+    "nord": "Nord",
+    "monokai": "Monokai",
+    "tokyonight": "Tokyo Night",
+    "solarized": "Solarized",
+    "gruvbox": "Gruvbox",
+    "catppuccin": "Catppuccin",
+    "onedark": "One Dark",
+    "synthwave": "Synthwave",
+    "red": "Rot",
+    "cream": "Creme",
+    "sunset": "Sonnenuntergang",
+    "gray": "Grau"
+  },
+  "planningModes": {
+    "skip": "Planung überspringen",
+    "lite": "Schnellplanung",
+    "spec": "Spezifikationsmodus",
+    "full": "Vollständiger SDD-Modus"
+  }
+}

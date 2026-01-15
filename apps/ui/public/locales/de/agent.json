@@ -1,0 +1,62 @@
+{
+  "welcome": {
+    "greeting": "Hallo! Ich bin der Automaker Agent. Ich kann dir helfen, Software autonom zu entwickeln. Ich kann Dateien in diesem Projekt lesen und bearbeiten, Befehle ausführen und Tests durchführen. Was möchtest du heute erstellen?"
+  },
+  "header": {
+    "title": "AI Agent",
+    "thinking": "Denke nach...",
+    "connected": "Verbunden",
+    "disconnected": "Getrennt",
+    "messagesCount": "{{count}} Nachrichten"
+  },
+  "input": {
+    "placeholder": "Nachricht eingeben...",
+    "send": "Senden",
+    "stop": "Stoppen",
+    "attachImage": "Bild anhängen",
+    "attachFile": "Datei anhängen"
+  },
+  "session": {
+    "newSession": "Neue Sitzung",
+    "sessions": "Sitzungen",
+    "active": "Aktiv",
+    "archived": "Archiviert",
+    "noSessions": "Noch keine Sitzungen",
+    "createFirst": "Erstelle deine erste Sitzung um loszulegen",
+    "rename": "Sitzung umbenennen",
+    "archive": "Sitzung archivieren",
+    "delete": "Sitzung löschen",
+    "confirmDelete": "Möchtest du diese Sitzung wirklich löschen?",
+    "messages": "{{count}} Nachricht",
+    "messages_plural": "{{count}} Nachrichten"
+  },
+  "chat": {
+    "clearHistory": "Chat-Verlauf leeren",
+    "confirmClear": "Möchtest du diese Konversation wirklich leeren?",
+    "copyMessage": "Nachricht kopieren",
+    "regenerate": "Antwort neu generieren"
+  },
+  "queue": {
+    "title": "Nachrichten-Warteschlange",
+    "empty": "Warteschlange ist leer",
+    "pending": "{{count}} Nachricht ausstehend",
+    "pending_plural": "{{count}} Nachrichten ausstehend",
+    "remove": "Aus Warteschlange entfernen",
+    "clear": "Warteschlange leeren"
+  },
+  "tools": {
+    "using": "Verwende {{tool}}...",
+    "completed": "Tool abgeschlossen",
+    "read": "Lese Datei",
+    "write": "Schreibe Datei",
+    "edit": "Bearbeite Datei",
+    "bash": "Führe Befehl aus",
+    "glob": "Suche Dateien",
+    "grep": "Suche Inhalt"
+  },
+  "errors": {
+    "connectionFailed": "Verbindung zum Agent fehlgeschlagen",
+    "messageFailed": "Nachricht konnte nicht gesendet werden",
+    "sessionLoadFailed": "Sitzung konnte nicht geladen werden"
+  }
+}

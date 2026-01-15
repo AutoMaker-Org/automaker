@@ -1,0 +1,62 @@
+{
+  "welcome": {
+    "greeting": "Hello! I'm the Automaker Agent. I can help you build software autonomously. I can read and modify files in this project, run commands, and execute tests. What would you like to create today?"
+  },
+  "header": {
+    "title": "AI Agent",
+    "thinking": "Thinking...",
+    "connected": "Connected",
+    "disconnected": "Disconnected",
+    "messagesCount": "{{count}} messages"
+  },
+  "input": {
+    "placeholder": "Type a message...",
+    "send": "Send",
+    "stop": "Stop",
+    "attachImage": "Attach image",
+    "attachFile": "Attach file"
+  },
+  "session": {
+    "newSession": "New Session",
+    "sessions": "Sessions",
+    "active": "Active",
+    "archived": "Archived",
+    "noSessions": "No sessions yet",
+    "createFirst": "Create your first session to get started",
+    "rename": "Rename session",
+    "archive": "Archive session",
+    "delete": "Delete session",
+    "confirmDelete": "Are you sure you want to delete this session?",
+    "messages": "{{count}} message",
+    "messages_plural": "{{count}} messages"
+  },
+  "chat": {
+    "clearHistory": "Clear chat history",
+    "confirmClear": "Are you sure you want to clear this conversation?",
+    "copyMessage": "Copy message",
+    "regenerate": "Regenerate response"
+  },
+  "queue": {
+    "title": "Message Queue",
+    "empty": "Queue is empty",
+    "pending": "{{count}} message pending",
+    "pending_plural": "{{count}} messages pending",
+    "remove": "Remove from queue",
+    "clear": "Clear queue"
+  },
+  "tools": {
+    "using": "Using {{tool}}...",
+    "completed": "Tool completed",
+    "read": "Reading file",
+    "write": "Writing file",
+    "edit": "Editing file",
+    "bash": "Running command",
+    "glob": "Searching files",
+    "grep": "Searching content"
+  },
+  "errors": {
+    "connectionFailed": "Failed to connect to agent",
+    "messageFailed": "Failed to send message",
+    "sessionLoadFailed": "Failed to load session"
+  }
+}
