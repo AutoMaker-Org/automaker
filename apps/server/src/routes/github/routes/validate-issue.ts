@@ -119,6 +119,20 @@ async function runValidation(
       linkedPRs
     );
 
+    // Load autoLoadClaudeMd setting
+    const autoLoadClaudeMd = await getAutoLoadClaudeMdSetting(
+      projectPath,
+      settingsService,
+      '[ValidateIssue]'
+    );
+
+    // Load language instruction from settings
+    const languageInstruction = await getLanguageInstruction(settingsService);
+    const effectiveSystemPrompt = prependLanguageInstruction(
+      ISSUE_VALIDATION_SYSTEM_PROMPT,
+      languageInstruction
+    );
+
     let responseText = '';
 
     // Determine if we should use structured output (Claude/Codex support it, Cursor/OpenCode don't)
@@ -127,7 +141,7 @@ async function runValidation(
     // Build the final prompt - for Cursor, include system prompt and JSON schema instructions
     let finalPrompt = basePrompt;
     if (!useStructuredOutput) {
-      finalPrompt = `${ISSUE_VALIDATION_SYSTEM_PROMPT}
+      finalPrompt = `${effectiveSystemPrompt}
 
 CRITICAL INSTRUCTIONS:
 1. DO NOT write any files. Return the JSON in your response only.
@@ -140,13 +154,6 @@ Your entire response should be valid JSON starting with { and ending with }. No 
 
 ${basePrompt}`;
     }
-
-    // Load autoLoadClaudeMd setting
-    const autoLoadClaudeMd = await getAutoLoadClaudeMdSetting(
-      projectPath,
-      settingsService,
-      '[ValidateIssue]'
-    );
 
     // Use request overrides if provided, otherwise fall back to settings
     let effectiveThinkingLevel: ThinkingLevel | undefined = thinkingLevel;
@@ -171,7 +178,7 @@ ${basePrompt}`;
       prompt: finalPrompt,
       model: model as string,
       cwd: projectPath,
-      systemPrompt: useStructuredOutput ? ISSUE_VALIDATION_SYSTEM_PROMPT : undefined,
+      systemPrompt: useStructuredOutput ? effectiveSystemPrompt : undefined,
       abortController,
       thinkingLevel: effectiveThinkingLevel,
       reasoningEffort: effectiveReasoningEffort,
