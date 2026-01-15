@@ -130,8 +130,10 @@
     "showMore": "+{{count}} de plus",
     "summary": "Résumé",
     "viewFullSummary": "Voir le résumé complet",
-    "toolCalls": "{{count}} appels d'outils",
-    "tasksDone": "{{count}} tâches terminées"
+    "toolCalls_one": "{{count}} appel d'outil",
+    "toolCalls_other": "{{count}} appels d'outils",
+    "tasksDone_one": "{{count}} tâche terminée",
+    "tasksDone_other": "{{count}} tâches terminées"
   },
   "summaryDialog": {
     "title": "Résumé de l'implémentation",

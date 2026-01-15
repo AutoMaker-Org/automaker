@@ -130,8 +130,14 @@
     "showMore": "+{{count}} więcej",
     "summary": "Podsumowanie",
     "viewFullSummary": "Zobacz pełne podsumowanie",
-    "toolCalls": "{{count}} wywołań narzędzi",
-    "tasksDone": "{{count}} zadań ukończonych"
+    "toolCalls_one": "{{count}} wywołanie narzędzia",
+    "toolCalls_few": "{{count}} wywołania narzędzi",
+    "toolCalls_many": "{{count}} wywołań narzędzi",
+    "toolCalls_other": "{{count}} wywołań narzędzi",
+    "tasksDone_one": "{{count}} zadanie ukończone",
+    "tasksDone_few": "{{count}} zadania ukończone",
+    "tasksDone_many": "{{count}} zadań ukończonych",
+    "tasksDone_other": "{{count}} zadań ukończonych"
   },
   "summaryDialog": {
     "title": "Podsumowanie implementacji",

@@ -234,7 +234,8 @@
       "title": "セッションを削除",
       "description": "このセッションを削除してもよろしいですか？この操作は取り消せません。",
       "confirmText": "セッションを削除",
-      "messageCount_one": "{{count}}件のメッセージ"
+      "messageCount_one": "{{count}}件のメッセージ",
+      "messageCount_other": "{{count}}件のメッセージ"
     },
     "sandboxRisk": {
       "title": "サンドボックス環境が検出されませんでした",

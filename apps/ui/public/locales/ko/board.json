@@ -130,8 +130,8 @@
     "showMore": "+{{count}}개 더 보기",
     "summary": "요약",
     "viewFullSummary": "전체 요약 보기",
-    "toolCalls": "{{count}}개의 도구 호출",
-    "tasksDone": "{{count}}개의 작업 완료"
+    "toolCalls_other": "{{count}}개의 도구 호출",
+    "tasksDone_other": "{{count}}개의 작업 완료"
   },
   "summaryDialog": {
     "title": "구현 요약",

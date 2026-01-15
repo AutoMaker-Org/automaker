@@ -130,8 +130,10 @@
     "showMore": "+{{count}} altre",
     "summary": "Riepilogo",
     "viewFullSummary": "Visualizza riepilogo completo",
-    "toolCalls": "{{count}} chiamate strumento",
-    "tasksDone": "{{count}} attività completate"
+    "toolCalls_one": "{{count}} chiamata strumento",
+    "toolCalls_other": "{{count}} chiamate strumento",
+    "tasksDone_one": "{{count}} attività completata",
+    "tasksDone_other": "{{count}} attività completate"
   },
   "summaryDialog": {
     "title": "Riepilogo implementazione",

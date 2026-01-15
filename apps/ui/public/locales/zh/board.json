@@ -130,8 +130,8 @@
     "showMore": "还有 {{count}} 个",
     "summary": "摘要",
     "viewFullSummary": "查看完整摘要",
-    "toolCalls": "{{count}} 次工具调用",
-    "tasksDone": "{{count}} 个任务完成"
+    "toolCalls_other": "{{count}} 次工具调用",
+    "tasksDone_other": "{{count}} 个任务完成"
   },
   "summaryDialog": {
     "title": "实现摘要",

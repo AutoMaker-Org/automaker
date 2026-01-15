@@ -130,8 +130,14 @@
     "showMore": "+{{count}} ещё",
     "summary": "Сводка",
     "viewFullSummary": "Просмотреть полную сводку",
-    "toolCalls": "{{count}} вызовов инструментов",
-    "tasksDone": "{{count}} задач выполнено"
+    "toolCalls_one": "{{count}} вызов инструмента",
+    "toolCalls_few": "{{count}} вызова инструментов",
+    "toolCalls_many": "{{count}} вызовов инструментов",
+    "toolCalls_other": "{{count}} вызовов инструментов",
+    "tasksDone_one": "{{count}} задача выполнена",
+    "tasksDone_few": "{{count}} задачи выполнено",
+    "tasksDone_many": "{{count}} задач выполнено",
+    "tasksDone_other": "{{count}} задач выполнено"
   },
   "summaryDialog": {
     "title": "Сводка реализации",

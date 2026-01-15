@@ -130,8 +130,8 @@
     "showMore": "+{{count}}件以上",
     "summary": "概要",
     "viewFullSummary": "完全な概要を表示",
-    "toolCalls": "{{count}}回のツール呼び出し",
-    "tasksDone": "{{count}}件のタスク完了"
+    "toolCalls_other": "{{count}}回のツール呼び出し",
+    "tasksDone_other": "{{count}}件のタスク完了"
   },
   "summaryDialog": {
     "title": "実装概要",
