@@ -121,6 +121,7 @@ export type {
   KeyboardShortcuts,
   MCPToolInfo,
   MCPServerConfig,
+  LanguageInstruction,
   ProjectRef,
   TrashedProjectRef,
   ChatSessionRef,

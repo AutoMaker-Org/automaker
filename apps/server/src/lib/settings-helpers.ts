@@ -5,12 +5,18 @@
 import type { SettingsService } from '../services/settings-service.js';
 import type { ContextFilesResult, ContextFileInfo } from '@automaker/utils';
 import { createLogger } from '@automaker/utils';
-import type { MCPServerConfig, McpServerConfig, PromptCustomization } from '@automaker/types';
+import type {
+  MCPServerConfig,
+  McpServerConfig,
+  PromptCustomization,
+  LanguageInstruction,
+} from '@automaker/types';
 import {
   mergeAutoModePrompts,
   mergeAgentPrompts,
   mergeBacklogPlanPrompts,
   mergeEnhancementPrompts,
+  prependLanguageInstruction,
 } from '@automaker/prompts';
 
 const logger = createLogger('SettingsHelper');
@@ -205,6 +211,7 @@ function convertToSdkFormat(server: MCPServerConfig): McpServerConfig {
 /**
  * Get prompt customization from global settings and merge with defaults.
  * Returns prompts merged with built-in defaults - custom prompts override defaults.
+ * Also applies language instruction to all system prompts if enabled.
  *
  * @param settingsService - Optional settings service instance
  * @param logPrefix - Prefix for log messages
@@ -218,14 +225,20 @@ export async function getPromptCustomization(
   agent: ReturnType<typeof mergeAgentPrompts>;
   backlogPlan: ReturnType<typeof mergeBacklogPlanPrompts>;
   enhancement: ReturnType<typeof mergeEnhancementPrompts>;
+  languageInstruction?: LanguageInstruction;
 }> {
   let customization: PromptCustomization = {};
+  let languageInstruction: LanguageInstruction | undefined;
 
   if (settingsService) {
     try {
       const globalSettings = await settingsService.getGlobalSettings();
       customization = globalSettings.promptCustomization || {};
+      languageInstruction = globalSettings.languageInstruction;
       logger.info(`${logPrefix} Loaded prompt customization from settings`);
+      if (languageInstruction?.enabled) {
+        logger.info(`${logPrefix} Language instruction enabled: ${languageInstruction.language}`);
+      }
     } catch (error) {
       logger.error(`${logPrefix} Failed to load prompt customization:`, error);
       // Fall through to use empty customization (all defaults)
@@ -234,12 +247,69 @@ export async function getPromptCustomization(
     logger.info(`${logPrefix} SettingsService not available, using default prompts`);
   }
 
+  // Merge prompts with defaults
+  const mergedAutoMode = mergeAutoModePrompts(customization.autoMode);
+  const mergedAgent = mergeAgentPrompts(customization.agent);
+  const mergedBacklogPlan = mergeBacklogPlanPrompts(customization.backlogPlan);
+  const mergedEnhancement = mergeEnhancementPrompts(customization.enhancement);
+
+  // Apply language instruction to system prompts if enabled
   return {
-    autoMode: mergeAutoModePrompts(customization.autoMode),
-    agent: mergeAgentPrompts(customization.agent),
-    backlogPlan: mergeBacklogPlanPrompts(customization.backlogPlan),
-    enhancement: mergeEnhancementPrompts(customization.enhancement),
+    autoMode: mergedAutoMode,
+    agent: {
+      systemPrompt: prependLanguageInstruction(mergedAgent.systemPrompt, languageInstruction),
+    },
+    backlogPlan: {
+      systemPrompt: prependLanguageInstruction(mergedBacklogPlan.systemPrompt, languageInstruction),
+      userPromptTemplate: mergedBacklogPlan.userPromptTemplate,
+    },
+    enhancement: {
+      improveSystemPrompt: prependLanguageInstruction(
+        mergedEnhancement.improveSystemPrompt,
+        languageInstruction
+      ),
+      technicalSystemPrompt: prependLanguageInstruction(
+        mergedEnhancement.technicalSystemPrompt,
+        languageInstruction
+      ),
+      simplifySystemPrompt: prependLanguageInstruction(
+        mergedEnhancement.simplifySystemPrompt,
+        languageInstruction
+      ),
+      acceptanceSystemPrompt: prependLanguageInstruction(
+        mergedEnhancement.acceptanceSystemPrompt,
+        languageInstruction
+      ),
+      uxReviewerSystemPrompt: prependLanguageInstruction(
+        mergedEnhancement.uxReviewerSystemPrompt,
+        languageInstruction
+      ),
+    },
+    languageInstruction,
   };
+}
+
+/**
+ * Get language instruction from global settings.
+ * Use this when you need to apply language instruction separately from prompt customization.
+ *
+ * @param settingsService - Optional settings service instance
+ * @returns Promise resolving to the language instruction or undefined if not set
+ */
+export async function getLanguageInstruction(
+  settingsService?: SettingsService | null
+): Promise<LanguageInstruction | undefined> {
+  if (!settingsService) {
+    return undefined;
+  }
+
+  try {
+    const globalSettings = await settingsService.getGlobalSettings();
+    return globalSettings.languageInstruction;
+  } catch (error) {
+    logger.error('[SettingsHelper] Failed to load language instruction:', error);
+    return undefined;
+  }
 }
 
 /**

@@ -27,6 +27,7 @@ import {
 } from './settings-view/providers';
 import { MCPServersSection } from './settings-view/mcp-servers';
 import { PromptCustomizationSection } from './settings-view/prompts';
+import { LanguageSection } from './settings-view/language/language-section';
 import type { Project as SettingsProject, Theme } from './settings-view/shared/types';
 import type { Project as ElectronProject } from '@/lib/electron';
 
@@ -62,6 +63,8 @@ export function SettingsView() {
     setAutoLoadClaudeMd,
     promptCustomization,
     setPromptCustomization,
+    languageInstruction,
+    setLanguageInstruction,
     skipSandboxWarning,
     setSkipSandboxWarning,
   } = useAppStore();
@@ -161,6 +164,13 @@ export function SettingsView() {
           <PromptCustomizationSection
             promptCustomization={promptCustomization}
             onPromptCustomizationChange={setPromptCustomization}
+          />
+        );
+      case 'language':
+        return (
+          <LanguageSection
+            languageInstruction={languageInstruction}
+            onLanguageInstructionChange={setLanguageInstruction}
           />
         );
       case 'model-defaults':
