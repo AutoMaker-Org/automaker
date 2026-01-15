@@ -15,7 +15,8 @@ import { FeatureLoader } from '../../services/feature-loader.js';
 import { getAppSpecPath } from '@automaker/platform';
 import * as secureFs from '../../lib/secure-fs.js';
 import type { SettingsService } from '../../services/settings-service.js';
-import { getAutoLoadClaudeMdSetting } from '../../lib/settings-helpers.js';
+import { getAutoLoadClaudeMdSetting, getLanguageInstruction } from '../../lib/settings-helpers.js';
+import { prependLanguageInstruction } from '@automaker/prompts';
 
 const logger = createLogger('Suggestions');
 
@@ -201,10 +202,14 @@ The response will be automatically formatted as structured JSON.`;
   // Determine if we should use structured output (Claude supports it, Cursor doesn't)
   const useStructuredOutput = !isCursorModel(model);
 
+  // Load language instruction from settings
+  const languageInstruction = await getLanguageInstruction(settingsService);
+  const basePrompt = prependLanguageInstruction(prompt, languageInstruction);
+
   // Build the final prompt - for Cursor, include JSON schema instructions
-  let finalPrompt = prompt;
+  let finalPrompt = basePrompt;
   if (!useStructuredOutput) {
-    finalPrompt = `${prompt}
+    finalPrompt = `${basePrompt}
 
 CRITICAL INSTRUCTIONS:
 1. DO NOT write any files. Return the JSON in your response only.

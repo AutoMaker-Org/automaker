@@ -43,7 +43,11 @@ import {
   logger,
 } from './validation-common.js';
 import type { SettingsService } from '../../../services/settings-service.js';
-import { getAutoLoadClaudeMdSetting } from '../../../lib/settings-helpers.js';
+import {
+  getAutoLoadClaudeMdSetting,
+  getLanguageInstruction,
+} from '../../../lib/settings-helpers.js';
+import { prependLanguageInstruction } from '@automaker/prompts';
 
 /**
  * Request body for issue validation
