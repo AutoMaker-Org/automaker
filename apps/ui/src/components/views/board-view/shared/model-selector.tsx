@@ -47,7 +47,8 @@ export function ModelSelector({
   const isCodexAvailable = codexCliStatus?.installed && codexCliStatus?.auth?.authenticated;
 
   // Check if OpenCode CLI is available
-  const isOpencodeAvailable = opencodeCliStatus?.installed && opencodeCliStatus?.auth?.authenticated;
+  const isOpencodeAvailable =
+    opencodeCliStatus?.installed && opencodeCliStatus?.auth?.authenticated;
 
   // Fetch Codex models on mount
   useEffect(() => {
@@ -61,7 +62,12 @@ export function ModelSelector({
     if (isOpencodeAvailable && dynamicOpencodeModels.length === 0 && !opencodeModelsLoading) {
       fetchOpencodeModels();
     }
-  }, [isOpencodeAvailable, dynamicOpencodeModels.length, opencodeModelsLoading, fetchOpencodeModels]);
+  }, [
+    isOpencodeAvailable,
+    dynamicOpencodeModels.length,
+    opencodeModelsLoading,
+    fetchOpencodeModels,
+  ]);
 
   // Transform codex models from store to ModelOption format
   const dynamicCodexModels: ModelOption[] = codexModels.map((model) => {
@@ -118,7 +124,8 @@ export function ModelSelector({
     } else if (provider === 'opencode' && selectedProvider !== 'opencode') {
       // Switch to OpenCode's default model
       const defaultModel = dynamicOpencodeModels.find((m) => m.default);
-      const defaultModelId = defaultModel?.id || dynamicOpencodeModels[0]?.id || 'opencode/big-pickle';
+      const defaultModelId =
+        defaultModel?.id || dynamicOpencodeModels[0]?.id || 'opencode/big-pickle';
       onModelSelect(defaultModelId);
     } else if (provider === 'claude' && selectedProvider !== 'claude') {
       // Switch to Claude's default model
@@ -348,11 +355,14 @@ export function ModelSelector({
           )}
 
           {/* Model list */}
-          {!opencodeModelsLoading && !opencodeModelsError && transformedOpencodeModels.length === 0 && (
-            <div className="text-sm text-muted-foreground p-3 border border-dashed rounded-md text-center">
-              No OpenCode models available. Make sure you're logged in with GitHub Copilot or other providers.
-            </div>
-          )}
+          {!opencodeModelsLoading &&
+            !opencodeModelsError &&
+            transformedOpencodeModels.length === 0 && (
+              <div className="text-sm text-muted-foreground p-3 border border-dashed rounded-md text-center">
+                No OpenCode models available. Make sure you're logged in with GitHub Copilot or
+                other providers.
+              </div>
+            )}
 
           {!opencodeModelsLoading && transformedOpencodeModels.length > 0 && (
             <div className="flex flex-col gap-2 max-h-[300px] overflow-y-auto">
@@ -382,8 +392,8 @@ export function ModelSelector({
                             isSelected
                               ? 'border-primary-foreground/50 text-primary-foreground'
                               : option.badge === 'Free'
-                              ? 'border-green-500/50 text-green-600 dark:text-green-400'
-                              : 'border-muted-foreground/50 text-muted-foreground'
+                                ? 'border-green-500/50 text-green-600 dark:text-green-400'
+                                : 'border-muted-foreground/50 text-muted-foreground'
                           )}
                         >
                           {option.badge}
