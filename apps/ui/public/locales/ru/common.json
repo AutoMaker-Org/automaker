@@ -193,12 +193,18 @@
   },
   "time": {
     "now": "Только что",
-    "minutesAgo": "{{count}} минуту назад",
-    "minutesAgo_plural": "{{count}} минут назад",
-    "hoursAgo": "{{count}} час назад",
-    "hoursAgo_plural": "{{count}} часов назад",
-    "daysAgo": "{{count}} день назад",
-    "daysAgo_plural": "{{count}} дней назад",
+    "minutesAgo_one": "{{count}} минуту назад",
+    "minutesAgo_few": "{{count}} минуты назад",
+    "minutesAgo_many": "{{count}} минут назад",
+    "minutesAgo_other": "{{count}} минут назад",
+    "hoursAgo_one": "{{count}} час назад",
+    "hoursAgo_few": "{{count}} часа назад",
+    "hoursAgo_many": "{{count}} часов назад",
+    "hoursAgo_other": "{{count}} часов назад",
+    "daysAgo_one": "{{count}} день назад",
+    "daysAgo_few": "{{count}} дня назад",
+    "daysAgo_many": "{{count}} дней назад",
+    "daysAgo_other": "{{count}} дней назад",
     "today": "Сегодня",
     "yesterday": "Вчера",
     "tomorrow": "Завтра"
@@ -234,8 +240,10 @@
       "title": "Удалить сессию",
       "description": "Вы уверены, что хотите удалить эту сессию? Это действие нельзя отменить.",
       "confirmText": "Удалить сессию",
-      "messageCount": "{{count}} сообщение",
-      "messageCount_plural": "{{count}} сообщений"
+      "messageCount_one": "{{count}} сообщение",
+      "messageCount_few": "{{count}} сообщения",
+      "messageCount_many": "{{count}} сообщений",
+      "messageCount_other": "{{count}} сообщений"
     },
     "sandboxRisk": {
       "title": "Среда песочницы не обнаружена",

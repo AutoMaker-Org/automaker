@@ -193,12 +193,12 @@
   },
   "time": {
     "now": "Zojuist",
-    "minutesAgo": "{{count}} minuut geleden",
-    "minutesAgo_plural": "{{count}} minuten geleden",
-    "hoursAgo": "{{count}} uur geleden",
-    "hoursAgo_plural": "{{count}} uur geleden",
-    "daysAgo": "{{count}} dag geleden",
-    "daysAgo_plural": "{{count}} dagen geleden",
+    "minutesAgo_one": "{{count}} minuut geleden",
+    "minutesAgo_other": "{{count}} minuten geleden",
+    "hoursAgo_one": "{{count}} uur geleden",
+    "hoursAgo_other": "{{count}} uur geleden",
+    "daysAgo_one": "{{count}} dag geleden",
+    "daysAgo_other": "{{count}} dagen geleden",
     "today": "Vandaag",
     "yesterday": "Gisteren",
     "tomorrow": "Morgen"
@@ -234,8 +234,8 @@
       "title": "Sessie verwijderen",
       "description": "Weet je zeker dat je deze sessie wilt verwijderen? Deze actie kan niet ongedaan worden gemaakt.",
       "confirmText": "Sessie verwijderen",
-      "messageCount": "{{count}} bericht",
-      "messageCount_plural": "{{count}} berichten"
+      "messageCount_one": "{{count}} bericht",
+      "messageCount_other": "{{count}} berichten"
     },
     "sandboxRisk": {
       "title": "Sandbox-omgeving niet gedetecteerd",

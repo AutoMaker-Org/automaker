@@ -144,7 +144,7 @@
     "mediumPriority": "Mittlere Priorität",
     "lowPriority": "Niedrige Priorität",
     "manualVerification": "Manuelle Verifizierung erforderlich",
-    "blockedBy": "Blockiert durch {{count}} unvollständige Abhängigkeit",
+    "blockedBy_one": "Blockiert durch {{count}} unvollständige Abhängigkeit",
     "blockedBy_other": "Blockiert durch {{count}} unvollständige Abhängigkeiten",
     "justFinished": "Agent hat gerade die Arbeit an diesem Feature beendet"
   },

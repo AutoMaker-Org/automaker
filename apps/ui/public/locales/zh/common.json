@@ -193,12 +193,12 @@
   },
   "time": {
     "now": "刚刚",
-    "minutesAgo": "{{count}} 分钟前",
-    "minutesAgo_plural": "{{count}} 分钟前",
-    "hoursAgo": "{{count}} 小时前",
-    "hoursAgo_plural": "{{count}} 小时前",
-    "daysAgo": "{{count}} 天前",
-    "daysAgo_plural": "{{count}} 天前",
+    "minutesAgo_one": "{{count}} 分钟前",
+    "minutesAgo_other": "{{count}} 分钟前",
+    "hoursAgo_one": "{{count}} 小时前",
+    "hoursAgo_other": "{{count}} 小时前",
+    "daysAgo_one": "{{count}} 天前",
+    "daysAgo_other": "{{count}} 天前",
     "today": "今天",
     "yesterday": "昨天",
     "tomorrow": "明天"
@@ -234,7 +234,7 @@
       "title": "删除会话",
       "description": "确定要删除此会话吗？此操作无法撤销。",
       "confirmText": "删除会话",
-      "messageCount": "{{count}} 条消息"
+      "messageCount_one": "{{count}} 条消息"
     },
     "sandboxRisk": {
       "title": "未检测到沙盒环境",

@@ -300,6 +300,7 @@
       "description": "言語設定を構成します",
       "uiLanguage": "インターフェース言語",
       "uiLanguageDescription": "ユーザーインターフェースに使用する言語",
+      "selectLanguage": "言語を選択",
       "aiLanguage": "AI応答言語",
       "aiLanguageDescription": "AI生成応答に使用する言語"
     },

@@ -38,8 +38,8 @@
     "archive": "Arquivar sessão",
     "delete": "Excluir sessão",
     "confirmDelete": "Tem certeza de que deseja excluir esta sessão?",
-    "messages": "{{count}} mensagem",
-    "messages_plural": "{{count}} mensagens",
+    "messages_one": "{{count}} mensagem",
+    "messages_other": "{{count}} mensagens",
     "noSessionSelected": "Nenhuma Sessão Selecionada",
     "noSessionDescription": "Crie ou selecione uma sessão para começar a conversar com o agente de IA",
     "viewSessions": "Ver Sessões",
@@ -50,19 +50,19 @@
     "confirmClear": "Tem certeza de que deseja limpar esta conversa?",
     "copyMessage": "Copiar mensagem",
     "regenerate": "Regenerar resposta",
-    "imagesAttached": "{{count}} imagem anexada",
-    "imagesAttached_plural": "{{count}} imagens anexadas"
+    "imagesAttached_one": "{{count}} imagem anexada",
+    "imagesAttached_other": "{{count}} imagens anexadas"
   },
   "queue": {
     "title": "Fila de Mensagens",
     "empty": "A fila está vazia",
-    "pending": "{{count}} prompt na fila",
-    "pending_plural": "{{count}} prompts na fila",
+    "pending_one": "{{count}} prompt na fila",
+    "pending_other": "{{count}} prompts na fila",
     "remove": "Remover da fila",
     "clear": "Limpar fila",
     "clearAll": "Limpar tudo",
-    "filesCount": "+{{count}} arquivo",
-    "filesCount_plural": "+{{count}} arquivos"
+    "filesCount_one": "+{{count}} arquivo",
+    "filesCount_other": "+{{count}} arquivos"
   },
   "tools": {
     "using": "Usando {{tool}}...",
@@ -84,8 +84,8 @@
     "description": "Abra ou crie um projeto para começar a trabalhar com o agente de IA."
   },
   "files": {
-    "filesAttached": "{{count}} arquivo anexado",
-    "filesAttached_plural": "{{count}} arquivos anexados",
+    "filesAttached_one": "{{count}} arquivo anexado",
+    "filesAttached_other": "{{count}} arquivos anexados",
     "clearAll": "Limpar tudo"
   }
 }

@@ -38,8 +38,10 @@
     "archive": "Archiwizuj sesję",
     "delete": "Usuń sesję",
     "confirmDelete": "Czy na pewno chcesz usunąć tę sesję?",
-    "messages": "{{count}} wiadomość",
-    "messages_plural": "{{count}} wiadomości",
+    "messages_one": "{{count}} wiadomość",
+    "messages_few": "{{count}} wiadomości",
+    "messages_many": "{{count}} wiadomości",
+    "messages_other": "{{count}} wiadomości",
     "noSessionSelected": "Nie wybrano sesji",
     "noSessionDescription": "Utwórz lub wybierz sesję, aby rozpocząć rozmowę z agentem AI",
     "viewSessions": "Zobacz sesje",
@@ -50,19 +52,25 @@
     "confirmClear": "Czy na pewno chcesz wyczyścić tę rozmowę?",
     "copyMessage": "Kopiuj wiadomość",
     "regenerate": "Wygeneruj ponownie odpowiedź",
-    "imagesAttached": "{{count}} obraz dołączony",
-    "imagesAttached_plural": "{{count}} obrazów dołączonych"
+    "imagesAttached_one": "{{count}} obraz dołączony",
+    "imagesAttached_few": "{{count}} obrazy dołączone",
+    "imagesAttached_many": "{{count}} obrazów dołączonych",
+    "imagesAttached_other": "{{count}} obrazów dołączonych"
   },
   "queue": {
     "title": "Kolejka wiadomości",
     "empty": "Kolejka jest pusta",
-    "pending": "{{count}} prompt w kolejce",
-    "pending_plural": "{{count}} promptów w kolejce",
+    "pending_one": "{{count}} prompt w kolejce",
+    "pending_few": "{{count}} prompty w kolejce",
+    "pending_many": "{{count}} promptów w kolejce",
+    "pending_other": "{{count}} promptów w kolejce",
     "remove": "Usuń z kolejki",
     "clear": "Wyczyść kolejkę",
     "clearAll": "Wyczyść wszystko",
-    "filesCount": "+{{count}} plik",
-    "filesCount_plural": "+{{count}} plików"
+    "filesCount_one": "+{{count}} plik",
+    "filesCount_few": "+{{count}} pliki",
+    "filesCount_many": "+{{count}} plików",
+    "filesCount_other": "+{{count}} plików"
   },
   "tools": {
     "using": "Używam {{tool}}...",
@@ -84,8 +92,10 @@
     "description": "Otwórz lub utwórz projekt, aby rozpocząć pracę z agentem AI."
   },
   "files": {
-    "filesAttached": "{{count}} plik dołączony",
-    "filesAttached_plural": "{{count}} plików dołączonych",
+    "filesAttached_one": "{{count}} plik dołączony",
+    "filesAttached_few": "{{count}} pliki dołączone",
+    "filesAttached_many": "{{count}} plików dołączonych",
+    "filesAttached_other": "{{count}} plików dołączonych",
     "clearAll": "Wyczyść wszystko"
   }
 }

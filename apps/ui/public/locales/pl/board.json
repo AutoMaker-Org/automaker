@@ -144,7 +144,9 @@
     "mediumPriority": "Średni priorytet",
     "lowPriority": "Niski priorytet",
     "manualVerification": "Wymagana ręczna weryfikacja",
-    "blockedBy": "Zablokowane przez {{count}} nieukończoną zależność",
+    "blockedBy_one": "Zablokowane przez {{count}} nieukończoną zależność",
+    "blockedBy_few": "Zablokowane przez {{count}} nieukończone zależności",
+    "blockedBy_many": "Zablokowane przez {{count}} nieukończonych zależności",
     "blockedBy_other": "Zablokowane przez {{count}} nieukończonych zależności",
     "justFinished": "Agent właśnie zakończył pracę nad tą funkcjonalnością"
   },

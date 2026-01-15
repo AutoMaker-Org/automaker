@@ -300,6 +300,7 @@
       "description": "언어 설정 구성",
       "uiLanguage": "인터페이스 언어",
       "uiLanguageDescription": "사용자 인터페이스에 사용되는 언어",
+      "selectLanguage": "언어 선택",
       "aiLanguage": "AI 응답 언어",
       "aiLanguageDescription": "AI가 생성하는 응답에 사용되는 언어"
     },

@@ -193,12 +193,12 @@
   },
   "time": {
     "now": "Ahora mismo",
-    "minutesAgo": "Hace {{count}} minuto",
-    "minutesAgo_plural": "Hace {{count}} minutos",
-    "hoursAgo": "Hace {{count}} hora",
-    "hoursAgo_plural": "Hace {{count}} horas",
-    "daysAgo": "Hace {{count}} día",
-    "daysAgo_plural": "Hace {{count}} días",
+    "minutesAgo_one": "Hace {{count}} minuto",
+    "minutesAgo_other": "Hace {{count}} minutos",
+    "hoursAgo_one": "Hace {{count}} hora",
+    "hoursAgo_other": "Hace {{count}} horas",
+    "daysAgo_one": "Hace {{count}} día",
+    "daysAgo_other": "Hace {{count}} días",
     "today": "Hoy",
     "yesterday": "Ayer",
     "tomorrow": "Mañana"
@@ -234,8 +234,8 @@
       "title": "Eliminar Sesión",
       "description": "¿Estás seguro de que deseas eliminar esta sesión? Esta acción no se puede deshacer.",
       "confirmText": "Eliminar Sesión",
-      "messageCount": "{{count}} mensaje",
-      "messageCount_plural": "{{count}} mensajes"
+      "messageCount_one": "{{count}} mensaje",
+      "messageCount_other": "{{count}} mensajes"
     },
     "sandboxRisk": {
       "title": "Entorno Sandbox No Detectado",

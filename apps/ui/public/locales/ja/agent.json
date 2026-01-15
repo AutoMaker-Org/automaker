@@ -38,8 +38,8 @@
     "archive": "セッションをアーカイブ",
     "delete": "セッションを削除",
     "confirmDelete": "このセッションを削除してもよろしいですか？",
-    "messages": "{{count}}件のメッセージ",
-    "messages_plural": "{{count}}件のメッセージ",
+    "messages_one": "{{count}}件のメッセージ",
+    "messages_other": "{{count}}件のメッセージ",
     "noSessionSelected": "セッションが選択されていません",
     "noSessionDescription": "AIエージェントとチャットを開始するには、セッションを作成または選択してください",
     "viewSessions": "セッションを表示",
@@ -50,19 +50,19 @@
     "confirmClear": "この会話をクリアしてもよろしいですか？",
     "copyMessage": "メッセージをコピー",
     "regenerate": "応答を再生成",
-    "imagesAttached": "{{count}}枚の画像が添付されています",
-    "imagesAttached_plural": "{{count}}枚の画像が添付されています"
+    "imagesAttached_one": "{{count}}枚の画像が添付されています",
+    "imagesAttached_other": "{{count}}枚の画像が添付されています"
   },
   "queue": {
     "title": "メッセージキュー",
     "empty": "キューは空です",
-    "pending": "{{count}}件のプロンプトがキューに追加されています",
-    "pending_plural": "{{count}}件のプロンプトがキューに追加されています",
+    "pending_one": "{{count}}件のプロンプトがキューに追加されています",
+    "pending_other": "{{count}}件のプロンプトがキューに追加されています",
     "remove": "キューから削除",
     "clear": "キューをクリア",
     "clearAll": "すべてクリア",
-    "filesCount": "+{{count}}ファイル",
-    "filesCount_plural": "+{{count}}ファイル"
+    "filesCount_one": "+{{count}}ファイル",
+    "filesCount_other": "+{{count}}ファイル"
   },
   "tools": {
     "using": "{{tool}}を使用中...",
@@ -84,8 +84,8 @@
     "description": "AIエージェントと作業を開始するには、プロジェクトを開くか作成してください。"
   },
   "files": {
-    "filesAttached": "{{count}}ファイルが添付されています",
-    "filesAttached_plural": "{{count}}ファイルが添付されています",
+    "filesAttached_one": "{{count}}ファイルが添付されています",
+    "filesAttached_other": "{{count}}ファイルが添付されています",
     "clearAll": "すべてクリア"
   }
 }

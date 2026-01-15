@@ -144,7 +144,7 @@
     "mediumPriority": "보통 우선순위",
     "lowPriority": "낮은 우선순위",
     "manualVerification": "수동 검증 필요",
-    "blockedBy": "완료되지 않은 {{count}}개의 의존성에 의해 차단됨",
+    "blockedBy_one": "완료되지 않은 {{count}}개의 의존성에 의해 차단됨",
     "blockedBy_other": "완료되지 않은 {{count}}개의 의존성에 의해 차단됨",
     "justFinished": "에이전트가 이 기능 작업을 막 완료했습니다"
   },

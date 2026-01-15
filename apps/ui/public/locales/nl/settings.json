@@ -300,6 +300,7 @@
       "description": "Configureer taalinstellingen",
       "uiLanguage": "Interfacetaal",
       "uiLanguageDescription": "Taal die wordt gebruikt voor de gebruikersinterface",
+      "selectLanguage": "Selecteer taal",
       "aiLanguage": "AI-antwoordtaal",
       "aiLanguageDescription": "Taal die wordt gebruikt voor AI-gegenereerde antwoorden"
     },

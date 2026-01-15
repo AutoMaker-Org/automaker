@@ -38,8 +38,10 @@
     "archive": "Архивировать сессию",
     "delete": "Удалить сессию",
     "confirmDelete": "Вы уверены, что хотите удалить эту сессию?",
-    "messages": "{{count}} сообщение",
-    "messages_plural": "{{count}} сообщений",
+    "messages_one": "{{count}} сообщение",
+    "messages_few": "{{count}} сообщения",
+    "messages_many": "{{count}} сообщений",
+    "messages_other": "{{count}} сообщений",
     "noSessionSelected": "Сессия не выбрана",
     "noSessionDescription": "Создайте или выберите сессию, чтобы начать общение с ИИ-агентом",
     "viewSessions": "Просмотр сессий",
@@ -50,19 +52,25 @@
     "confirmClear": "Вы уверены, что хотите очистить этот разговор?",
     "copyMessage": "Копировать сообщение",
     "regenerate": "Сгенерировать заново",
-    "imagesAttached": "{{count}} изображение прикреплено",
-    "imagesAttached_plural": "{{count}} изображений прикреплено"
+    "imagesAttached_one": "{{count}} изображение прикреплено",
+    "imagesAttached_few": "{{count}} изображения прикреплено",
+    "imagesAttached_many": "{{count}} изображений прикреплено",
+    "imagesAttached_other": "{{count}} изображений прикреплено"
   },
   "queue": {
     "title": "Очередь сообщений",
     "empty": "Очередь пуста",
-    "pending": "{{count}} промпт в очереди",
-    "pending_plural": "{{count}} промптов в очереди",
+    "pending_one": "{{count}} промпт в очереди",
+    "pending_few": "{{count}} промпта в очереди",
+    "pending_many": "{{count}} промптов в очереди",
+    "pending_other": "{{count}} промптов в очереди",
     "remove": "Удалить из очереди",
     "clear": "Очистить очередь",
     "clearAll": "Очистить всё",
-    "filesCount": "+{{count}} файл",
-    "filesCount_plural": "+{{count}} файлов"
+    "filesCount_one": "+{{count}} файл",
+    "filesCount_few": "+{{count}} файла",
+    "filesCount_many": "+{{count}} файлов",
+    "filesCount_other": "+{{count}} файлов"
   },
   "tools": {
     "using": "Использую {{tool}}...",
@@ -84,8 +92,10 @@
     "description": "Откройте или создайте проект, чтобы начать работу с ИИ-агентом."
   },
   "files": {
-    "filesAttached": "{{count}} файл прикреплён",
-    "filesAttached_plural": "{{count}} файлов прикреплено",
+    "filesAttached_one": "{{count}} файл прикреплён",
+    "filesAttached_few": "{{count}} файла прикреплено",
+    "filesAttached_many": "{{count}} файлов прикреплено",
+    "filesAttached_other": "{{count}} файлов прикреплено",
     "clearAll": "Очистить всё"
   }
 }

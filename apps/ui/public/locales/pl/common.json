@@ -193,12 +193,18 @@
   },
   "time": {
     "now": "Przed chwilą",
-    "minutesAgo": "{{count}} minutę temu",
-    "minutesAgo_plural": "{{count}} minut temu",
-    "hoursAgo": "{{count}} godzinę temu",
-    "hoursAgo_plural": "{{count}} godzin temu",
-    "daysAgo": "{{count}} dzień temu",
-    "daysAgo_plural": "{{count}} dni temu",
+    "minutesAgo_one": "{{count}} minutę temu",
+    "minutesAgo_few": "{{count}} minuty temu",
+    "minutesAgo_many": "{{count}} minut temu",
+    "minutesAgo_other": "{{count}} minut temu",
+    "hoursAgo_one": "{{count}} godzinę temu",
+    "hoursAgo_few": "{{count}} godziny temu",
+    "hoursAgo_many": "{{count}} godzin temu",
+    "hoursAgo_other": "{{count}} godzin temu",
+    "daysAgo_one": "{{count}} dzień temu",
+    "daysAgo_few": "{{count}} dni temu",
+    "daysAgo_many": "{{count}} dni temu",
+    "daysAgo_other": "{{count}} dni temu",
     "today": "Dzisiaj",
     "yesterday": "Wczoraj",
     "tomorrow": "Jutro"
@@ -234,8 +240,10 @@
       "title": "Usuń sesję",
       "description": "Czy na pewno chcesz usunąć tę sesję? Tej operacji nie można cofnąć.",
       "confirmText": "Usuń sesję",
-      "messageCount": "{{count}} wiadomość",
-      "messageCount_plural": "{{count}} wiadomości"
+      "messageCount_one": "{{count}} wiadomość",
+      "messageCount_few": "{{count}} wiadomości",
+      "messageCount_many": "{{count}} wiadomości",
+      "messageCount_other": "{{count}} wiadomości"
     },
     "sandboxRisk": {
       "title": "Nie wykryto środowiska sandbox",

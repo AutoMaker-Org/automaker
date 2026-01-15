@@ -193,12 +193,12 @@
   },
   "time": {
     "now": "À l'instant",
-    "minutesAgo": "Il y a {{count}} minute",
-    "minutesAgo_plural": "Il y a {{count}} minutes",
-    "hoursAgo": "Il y a {{count}} heure",
-    "hoursAgo_plural": "Il y a {{count}} heures",
-    "daysAgo": "Il y a {{count}} jour",
-    "daysAgo_plural": "Il y a {{count}} jours",
+    "minutesAgo_one": "Il y a {{count}} minute",
+    "minutesAgo_other": "Il y a {{count}} minutes",
+    "hoursAgo_one": "Il y a {{count}} heure",
+    "hoursAgo_other": "Il y a {{count}} heures",
+    "daysAgo_one": "Il y a {{count}} jour",
+    "daysAgo_other": "Il y a {{count}} jours",
     "today": "Aujourd'hui",
     "yesterday": "Hier",
     "tomorrow": "Demain"
@@ -234,8 +234,8 @@
       "title": "Supprimer la session",
       "description": "Êtes-vous sûr de vouloir supprimer cette session ? Cette action est irréversible.",
       "confirmText": "Supprimer la session",
-      "messageCount": "{{count}} message",
-      "messageCount_plural": "{{count}} messages"
+      "messageCount_one": "{{count}} message",
+      "messageCount_other": "{{count}} messages"
     },
     "sandboxRisk": {
       "title": "Environnement sandbox non détecté",

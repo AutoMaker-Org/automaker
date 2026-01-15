@@ -144,7 +144,7 @@
     "mediumPriority": "中優先度",
     "lowPriority": "低優先度",
     "manualVerification": "手動検証が必要",
-    "blockedBy": "{{count}}件の未完了の依存関係によりブロック中",
+    "blockedBy_one": "{{count}}件の未完了の依存関係によりブロック中",
     "blockedBy_other": "{{count}}件の未完了の依存関係によりブロック中",
     "justFinished": "エージェントがこの機能の作業を完了したところです"
   },

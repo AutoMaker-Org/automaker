@@ -38,8 +38,8 @@
     "archive": "Archive session",
     "delete": "Delete session",
     "confirmDelete": "Are you sure you want to delete this session?",
-    "messages": "{{count}} message",
-    "messages_plural": "{{count}} messages",
+    "messages_one": "{{count}} message",
+    "messages_other": "{{count}} messages",
     "noSessionSelected": "No Session Selected",
     "noSessionDescription": "Create or select a session to start chatting with the AI agent",
     "viewSessions": "View Sessions",
@@ -50,19 +50,19 @@
     "confirmClear": "Are you sure you want to clear this conversation?",
     "copyMessage": "Copy message",
     "regenerate": "Regenerate response",
-    "imagesAttached": "{{count}} image attached",
-    "imagesAttached_plural": "{{count}} images attached"
+    "imagesAttached_one": "{{count}} image attached",
+    "imagesAttached_other": "{{count}} images attached"
   },
   "queue": {
     "title": "Message Queue",
     "empty": "Queue is empty",
-    "pending": "{{count}} prompt queued",
-    "pending_plural": "{{count}} prompts queued",
+    "pending_one": "{{count}} prompt queued",
+    "pending_other": "{{count}} prompts queued",
     "remove": "Remove from queue",
     "clear": "Clear queue",
     "clearAll": "Clear all",
-    "filesCount": "+{{count}} file",
-    "filesCount_plural": "+{{count}} files"
+    "filesCount_one": "+{{count}} file",
+    "filesCount_other": "+{{count}} files"
   },
   "tools": {
     "using": "Using {{tool}}...",
@@ -84,8 +84,8 @@
     "description": "Open or create a project to start working with the AI agent."
   },
   "files": {
-    "filesAttached": "{{count}} file attached",
-    "filesAttached_plural": "{{count}} files attached",
+    "filesAttached_one": "{{count}} file attached",
+    "filesAttached_other": "{{count}} files attached",
     "clearAll": "Clear all"
   }
 }

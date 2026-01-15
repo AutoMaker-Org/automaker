@@ -38,8 +38,8 @@
     "archive": "Sitzung archivieren",
     "delete": "Sitzung löschen",
     "confirmDelete": "Möchtest du diese Sitzung wirklich löschen?",
-    "messages": "{{count}} Nachricht",
-    "messages_plural": "{{count}} Nachrichten",
+    "messages_one": "{{count}} Nachricht",
+    "messages_other": "{{count}} Nachrichten",
     "noSessionSelected": "Keine Sitzung ausgewählt",
     "noSessionDescription": "Erstelle oder wähle eine Sitzung, um mit dem AI-Agenten zu chatten",
     "viewSessions": "Sitzungen anzeigen",
@@ -50,19 +50,19 @@
     "confirmClear": "Möchtest du diese Konversation wirklich leeren?",
     "copyMessage": "Nachricht kopieren",
     "regenerate": "Antwort neu generieren",
-    "imagesAttached": "{{count}} Bild angehängt",
-    "imagesAttached_plural": "{{count}} Bilder angehängt"
+    "imagesAttached_one": "{{count}} Bild angehängt",
+    "imagesAttached_other": "{{count}} Bilder angehängt"
   },
   "queue": {
     "title": "Nachrichten-Warteschlange",
     "empty": "Warteschlange ist leer",
-    "pending": "{{count}} Anfrage eingereiht",
-    "pending_plural": "{{count}} Anfragen eingereiht",
+    "pending_one": "{{count}} Anfrage eingereiht",
+    "pending_other": "{{count}} Anfragen eingereiht",
     "remove": "Aus Warteschlange entfernen",
     "clear": "Warteschlange leeren",
     "clearAll": "Alle leeren",
-    "filesCount": "+{{count}} Datei",
-    "filesCount_plural": "+{{count}} Dateien"
+    "filesCount_one": "+{{count}} Datei",
+    "filesCount_other": "+{{count}} Dateien"
   },
   "tools": {
     "using": "Verwende {{tool}}...",
@@ -84,8 +84,8 @@
     "description": "Öffne oder erstelle ein Projekt, um mit dem AI-Agenten zu arbeiten."
   },
   "files": {
-    "filesAttached": "{{count}} Datei angehängt",
-    "filesAttached_plural": "{{count}} Dateien angehängt",
+    "filesAttached_one": "{{count}} Datei angehängt",
+    "filesAttached_other": "{{count}} Dateien angehängt",
     "clearAll": "Alle leeren"
   }
 }

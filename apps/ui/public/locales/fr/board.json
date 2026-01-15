@@ -144,7 +144,7 @@
     "mediumPriority": "Priorité moyenne",
     "lowPriority": "Priorité basse",
     "manualVerification": "Vérification manuelle requise",
-    "blockedBy": "Bloqué par {{count}} dépendance incomplète",
+    "blockedBy_one": "Bloqué par {{count}} dépendance incomplète",
     "blockedBy_other": "Bloqué par {{count}} dépendances incomplètes",
     "justFinished": "L'agent vient de terminer de travailler sur cette fonctionnalité"
   },

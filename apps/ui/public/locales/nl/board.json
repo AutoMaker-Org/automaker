@@ -144,7 +144,7 @@
     "mediumPriority": "Gemiddelde prioriteit",
     "lowPriority": "Lage prioriteit",
     "manualVerification": "Handmatige verificatie vereist",
-    "blockedBy": "Geblokkeerd door {{count}} onvoltooide afhankelijkheid",
+    "blockedBy_one": "Geblokkeerd door {{count}} onvoltooide afhankelijkheid",
     "blockedBy_other": "Geblokkeerd door {{count}} onvoltooide afhankelijkheden",
     "justFinished": "Agent is net klaar met werken aan deze functie"
   },

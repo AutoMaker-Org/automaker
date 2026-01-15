@@ -144,7 +144,7 @@
     "mediumPriority": "Medium Priority",
     "lowPriority": "Low Priority",
     "manualVerification": "Manual verification required",
-    "blockedBy": "Blocked by {{count}} incomplete dependency",
+    "blockedBy_one": "Blocked by {{count}} incomplete dependency",
     "blockedBy_other": "Blocked by {{count}} incomplete dependencies",
     "justFinished": "Agent just finished working on this feature"
   },

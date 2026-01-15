@@ -70,7 +70,7 @@ export function LanguageSection() {
                     <span className="text-muted-foreground">({currentLangObj.name})</span>
                   </span>
                 ) : (
-                  'Select language'
+                  t('sections.language.selectLanguage')
                 )}
               </SelectValue>
             </SelectTrigger>

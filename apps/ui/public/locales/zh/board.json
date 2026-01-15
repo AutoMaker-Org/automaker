@@ -144,7 +144,7 @@
     "mediumPriority": "中优先级",
     "lowPriority": "低优先级",
     "manualVerification": "需要手动验证",
-    "blockedBy": "被 {{count}} 个未完成的依赖项阻塞",
+    "blockedBy_one": "被 {{count}} 个未完成的依赖项阻塞",
     "blockedBy_other": "被 {{count}} 个未完成的依赖项阻塞",
     "justFinished": "代理刚刚完成此功能的工作"
   },

@@ -193,12 +193,12 @@
   },
   "time": {
     "now": "たった今",
-    "minutesAgo": "{{count}}分前",
-    "minutesAgo_plural": "{{count}}分前",
-    "hoursAgo": "{{count}}時間前",
-    "hoursAgo_plural": "{{count}}時間前",
-    "daysAgo": "{{count}}日前",
-    "daysAgo_plural": "{{count}}日前",
+    "minutesAgo_one": "{{count}}分前",
+    "minutesAgo_other": "{{count}}分前",
+    "hoursAgo_one": "{{count}}時間前",
+    "hoursAgo_other": "{{count}}時間前",
+    "daysAgo_one": "{{count}}日前",
+    "daysAgo_other": "{{count}}日前",
     "today": "今日",
     "yesterday": "昨日",
     "tomorrow": "明日"
@@ -234,7 +234,7 @@
       "title": "セッションを削除",
       "description": "このセッションを削除してもよろしいですか？この操作は取り消せません。",
       "confirmText": "セッションを削除",
-      "messageCount": "{{count}}件のメッセージ"
+      "messageCount_one": "{{count}}件のメッセージ"
     },
     "sandboxRisk": {
       "title": "サンドボックス環境が検出されませんでした",

@@ -130,7 +130,7 @@ export function TerminalSection() {
             </Label>
             <span className="text-sm text-muted-foreground">
               {t('sections.terminal.scrollbackLines', {
-                count: (scrollbackLines / 1000).toFixed(0),
+                count: Math.round(scrollbackLines / 1000),
               })}
             </span>
           </div>

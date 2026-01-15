@@ -38,8 +38,8 @@
     "archive": "Sessie archiveren",
     "delete": "Sessie verwijderen",
     "confirmDelete": "Weet je zeker dat je deze sessie wilt verwijderen?",
-    "messages": "{{count}} bericht",
-    "messages_plural": "{{count}} berichten",
+    "messages_one": "{{count}} bericht",
+    "messages_other": "{{count}} berichten",
     "noSessionSelected": "Geen sessie geselecteerd",
     "noSessionDescription": "Maak een sessie aan of selecteer er een om te chatten met de AI-agent",
     "viewSessions": "Sessies bekijken",
@@ -50,19 +50,19 @@
     "confirmClear": "Weet je zeker dat je dit gesprek wilt wissen?",
     "copyMessage": "Bericht kopiëren",
     "regenerate": "Antwoord opnieuw genereren",
-    "imagesAttached": "{{count}} afbeelding bijgevoegd",
-    "imagesAttached_plural": "{{count}} afbeeldingen bijgevoegd"
+    "imagesAttached_one": "{{count}} afbeelding bijgevoegd",
+    "imagesAttached_other": "{{count}} afbeeldingen bijgevoegd"
   },
   "queue": {
     "title": "Berichtenwachtrij",
     "empty": "Wachtrij is leeg",
-    "pending": "{{count}} prompt in wachtrij",
-    "pending_plural": "{{count}} prompts in wachtrij",
+    "pending_one": "{{count}} prompt in wachtrij",
+    "pending_other": "{{count}} prompts in wachtrij",
     "remove": "Uit wachtrij verwijderen",
     "clear": "Wachtrij wissen",
     "clearAll": "Alles wissen",
-    "filesCount": "+{{count}} bestand",
-    "filesCount_plural": "+{{count}} bestanden"
+    "filesCount_one": "+{{count}} bestand",
+    "filesCount_other": "+{{count}} bestanden"
   },
   "tools": {
     "using": "{{tool}} gebruiken...",
@@ -84,8 +84,8 @@
     "description": "Open of maak een project aan om met de AI-agent te werken."
   },
   "files": {
-    "filesAttached": "{{count}} bestand bijgevoegd",
-    "filesAttached_plural": "{{count}} bestanden bijgevoegd",
+    "filesAttached_one": "{{count}} bestand bijgevoegd",
+    "filesAttached_other": "{{count}} bestanden bijgevoegd",
     "clearAll": "Alles wissen"
   }
 }

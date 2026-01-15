@@ -300,6 +300,7 @@
       "description": "Configura le impostazioni della lingua",
       "uiLanguage": "Lingua interfaccia",
       "uiLanguageDescription": "Lingua usata per l'interfaccia utente",
+      "selectLanguage": "Seleziona lingua",
       "aiLanguage": "Lingua risposte AI",
       "aiLanguageDescription": "Lingua usata per le risposte generate dall'AI"
     },

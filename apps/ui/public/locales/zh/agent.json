@@ -38,8 +38,8 @@
     "archive": "归档会话",
     "delete": "删除会话",
     "confirmDelete": "确定要删除此会话吗？",
-    "messages": "{{count}} 条消息",
-    "messages_plural": "{{count}} 条消息",
+    "messages_one": "{{count}} 条消息",
+    "messages_other": "{{count}} 条消息",
     "noSessionSelected": "未选择会话",
     "noSessionDescription": "创建或选择一个会话以开始与 AI 代理对话",
     "viewSessions": "查看会话",
@@ -50,19 +50,19 @@
     "confirmClear": "确定要清除此对话吗？",
     "copyMessage": "复制消息",
     "regenerate": "重新生成回复",
-    "imagesAttached": "已附加 {{count}} 张图片",
-    "imagesAttached_plural": "已附加 {{count}} 张图片"
+    "imagesAttached_one": "已附加 {{count}} 张图片",
+    "imagesAttached_other": "已附加 {{count}} 张图片"
   },
   "queue": {
     "title": "消息队列",
     "empty": "队列为空",
-    "pending": "{{count}} 个提示已排队",
-    "pending_plural": "{{count}} 个提示已排队",
+    "pending_one": "{{count}} 个提示已排队",
+    "pending_other": "{{count}} 个提示已排队",
     "remove": "从队列移除",
     "clear": "清空队列",
     "clearAll": "全部清空",
-    "filesCount": "+{{count}} 个文件",
-    "filesCount_plural": "+{{count}} 个文件"
+    "filesCount_one": "+{{count}} 个文件",
+    "filesCount_other": "+{{count}} 个文件"
   },
   "tools": {
     "using": "正在使用 {{tool}}...",
@@ -84,8 +84,8 @@
     "description": "打开或创建一个项目以开始使用 AI 代理。"
   },
   "files": {
-    "filesAttached": "已附加 {{count}} 个文件",
-    "filesAttached_plural": "已附加 {{count}} 个文件",
+    "filesAttached_one": "已附加 {{count}} 个文件",
+    "filesAttached_other": "已附加 {{count}} 个文件",
     "clearAll": "全部清除"
   }
 }

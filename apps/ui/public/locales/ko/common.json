@@ -193,12 +193,12 @@
   },
   "time": {
     "now": "방금 전",
-    "minutesAgo": "{{count}}분 전",
-    "minutesAgo_plural": "{{count}}분 전",
-    "hoursAgo": "{{count}}시간 전",
-    "hoursAgo_plural": "{{count}}시간 전",
-    "daysAgo": "{{count}}일 전",
-    "daysAgo_plural": "{{count}}일 전",
+    "minutesAgo_one": "{{count}}분 전",
+    "minutesAgo_other": "{{count}}분 전",
+    "hoursAgo_one": "{{count}}시간 전",
+    "hoursAgo_other": "{{count}}시간 전",
+    "daysAgo_one": "{{count}}일 전",
+    "daysAgo_other": "{{count}}일 전",
     "today": "오늘",
     "yesterday": "어제",
     "tomorrow": "내일"
@@ -234,7 +234,7 @@
       "title": "세션 삭제",
       "description": "이 세션을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.",
       "confirmText": "세션 삭제",
-      "messageCount": "{{count}}개의 메시지"
+      "messageCount_one": "{{count}}개의 메시지"
     },
     "sandboxRisk": {
       "title": "샌드박스 환경이 감지되지 않음",

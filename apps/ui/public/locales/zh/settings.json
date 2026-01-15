@@ -300,6 +300,7 @@
       "description": "配置语言设置",
       "uiLanguage": "界面语言",
       "uiLanguageDescription": "用户界面使用的语言",
+      "selectLanguage": "选择语言",
       "aiLanguage": "AI 响应语言",
       "aiLanguageDescription": "AI 生成响应使用的语言"
     },
