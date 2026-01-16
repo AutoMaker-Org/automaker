@@ -10,11 +10,7 @@ import { getStringParam } from '../../../lib/request-utils/index.js';
 export function createUpdateHandler(agentService: AgentService) {
   return async (req: Request, res: Response): Promise<void> => {
     try {
-      const sessionId = getStringParam(req.params.sessionId);
-      if (!sessionId) {
-        res.status(400).json({ success: false, error: 'sessionId is required' });
-        return;
-      }
+      const sessionId = getStringParam(req.params.sessionId)!;
       const { name, tags, model } = req.body as {
         name?: string;
         tags?: string[];

@@ -9,11 +9,7 @@ import { getStringParam } from '../../../lib/request-utils/index.js';
 export function createSessionResizeHandler() {
   return (req: Request, res: Response): void => {
     const terminalService = getTerminalService();
-    const id = getStringParam(req.params.id);
-    if (!id) {
-      res.status(400).json({ success: false, error: 'id is required' });
-      return;
-    }
+    const id = getStringParam(req.params.id)!;
     const { cols, rows } = req.body;
 
     if (!cols || !rows) {
