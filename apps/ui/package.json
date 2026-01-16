@@ -16,7 +16,7 @@
   "main": "dist-electron/main.js",
   "scripts": {
     "dev": "vite",
-    "dev:web": "cross-env VITE_SKIP_ELECTRON=true vite --host",
+    "dev:web": "cross-env VITE_SKIP_ELECTRON=true vite",
     "dev:electron": "vite",
     "dev:electron:debug": "cross-env OPEN_DEVTOOLS=true vite",
     "build": "vite build",
