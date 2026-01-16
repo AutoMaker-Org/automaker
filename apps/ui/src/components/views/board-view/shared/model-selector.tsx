@@ -1,16 +1,201 @@
 // @ts-nocheck
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Brain, AlertTriangle } from 'lucide-react';
+import { Brain, AlertTriangle, RefreshCw } from 'lucide-react';
 import { AnthropicIcon, CursorIcon, OpenAIIcon, OpenCodeIcon } from '@/components/ui/provider-icon';
 import { cn } from '@/lib/utils';
 import { useAppStore } from '@/store/app-store';
 import { useSetupStore } from '@/store/setup-store';
-import { getModelProvider, PROVIDER_PREFIXES } from '@automaker/types';
+import { getModelProvider, PROVIDER_PREFIXES, DEFAULT_OPENCODE_MODEL } from '@automaker/types';
 import type { ModelProvider } from '@automaker/types';
 import { CLAUDE_MODELS, CURSOR_MODELS, ModelOption } from './model-constants';
 import { useEffect } from 'react';
-import { RefreshCw } from 'lucide-react';
+
+// Badge mappings for model tiers
+const CODEX_BADGE_MAP: Record<string, string> = {
+  premium: 'Premium',
+  basic: 'Speed',
+  standard: 'Balanced',
+};
+
+const OPENCODE_BADGE_MAP: Record<string, string> = {
+  premium: 'Premium',
+  basic: 'Free',
+  standard: 'Balanced',
+};
+
+/**
+ * Custom hook to fetch provider models when available
+ */
+function useProviderModels(
+  isAvailable: boolean,
+  modelsLength: number,
+  isLoading: boolean,
+  fetcher: () => void
+) {
+  useEffect(() => {
+    if (isAvailable && modelsLength === 0 && !isLoading) {
+      fetcher();
+    }
+  }, [isAvailable, modelsLength, isLoading, fetcher]);
+}
+
+/**
+ * Transform raw provider models to ModelOption format
+ */
+function transformModels<
+  T extends {
+    id: string;
+    tier?: string;
+    hasThinking?: boolean;
+    name?: string;
+    label?: string;
+    description?: string;
+  },
+>(
+  models: T[],
+  provider: ModelProvider,
+  badgeMap: Record<string, string>,
+  defaultHasThinking = false
+): ModelOption[] {
+  return models.map((model) => ({
+    id: model.id,
+    label: model.name || model.label || model.id,
+    description: model.description || '',
+    badge: model.tier ? badgeMap[model.tier] : undefined,
+    provider,
+    hasThinking: model.hasThinking ?? defaultHasThinking,
+  }));
+}
+
+interface DynamicModelListProps {
+  models: ModelOption[];
+  selectedModel: string;
+  onModelSelect: (model: string) => void;
+  testIdPrefix: string;
+  isLoading: boolean;
+  error: string | null;
+  onRetry: () => void;
+  emptyMessage: string;
+  badgeColorClass?: string;
+  thinkingBadgeColorClass?: string;
+  showThinkingBadge?: boolean;
+}
+
+/**
+ * Reusable component for displaying a list of dynamic models
+ */
+function DynamicModelList({
+  models,
+  selectedModel,
+  onModelSelect,
+  testIdPrefix,
+  isLoading,
+  error,
+  onRetry,
+  emptyMessage,
+  badgeColorClass = 'border-muted-foreground/50 text-muted-foreground',
+  thinkingBadgeColorClass = 'border-amber-500/50 text-amber-600 dark:text-amber-400',
+  showThinkingBadge = false,
+}: DynamicModelListProps) {
+  // Loading state
+  if (isLoading && models.length === 0) {
+    return (
+      <div className="flex items-center justify-center gap-2 p-6 text-sm text-muted-foreground">
+        <RefreshCw className="w-4 h-4 animate-spin" />
+        Loading models...
+      </div>
+    );
+  }
+
+  // Error state
+  if (error && !isLoading) {
+    return (
+      <div className="flex items-start gap-2 p-3 rounded-lg bg-red-500/10 border border-red-500/20">
+        <AlertTriangle className="w-4 h-4 text-red-400 mt-0.5 shrink-0" />
+        <div className="space-y-1">
+          <div className="text-sm text-red-400">Failed to load models</div>
+          <button
+            type="button"
+            onClick={onRetry}
+            className="text-xs text-red-400 underline hover:no-underline"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Empty state
+  if (!isLoading && !error && models.length === 0) {
+    return (
+      <div className="text-sm text-muted-foreground p-3 border border-dashed rounded-md text-center">
+        {emptyMessage}
+      </div>
+    );
+  }
+
+  // Model list
+  if (!isLoading && models.length > 0) {
+    return (
+      <div className="flex flex-col gap-2 max-h-[300px] overflow-y-auto">
+        {models.map((option) => {
+          const isSelected = selectedModel === option.id;
+          return (
+            <button
+              key={option.id}
+              type="button"
+              onClick={() => onModelSelect(option.id)}
+              title={option.description}
+              className={cn(
+                'w-full px-3 py-2 rounded-md border text-sm font-medium transition-colors flex items-center justify-between',
+                isSelected
+                  ? 'bg-primary text-primary-foreground border-primary'
+                  : 'bg-background hover:bg-accent border-border'
+              )}
+              data-testid={`${testIdPrefix}-${option.id}`}
+            >
+              <span className="truncate">{option.label}</span>
+              <div className="flex gap-1 shrink-0">
+                {showThinkingBadge && option.hasThinking && (
+                  <Badge
+                    variant="outline"
+                    className={cn(
+                      'text-xs',
+                      isSelected
+                        ? 'border-primary-foreground/50 text-primary-foreground'
+                        : thinkingBadgeColorClass
+                    )}
+                  >
+                    Thinking
+                  </Badge>
+                )}
+                {option.badge && (
+                  <Badge
+                    variant="outline"
+                    className={cn(
+                      'text-xs',
+                      isSelected
+                        ? 'border-primary-foreground/50 text-primary-foreground'
+                        : option.badge === 'Free'
+                          ? 'border-green-500/50 text-green-600 dark:text-green-400'
+                          : badgeColorClass
+                    )}
+                  >
+                    {option.badge}
+                  </Badge>
+                )}
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    );
+  }
+
+  return null;
+}
 
 interface ModelSelectorProps {
   selectedModel: string; // Can be ModelAlias or "cursor-{id}"
@@ -50,60 +235,22 @@ export function ModelSelector({
   const isOpencodeAvailable =
     opencodeCliStatus?.installed && opencodeCliStatus?.auth?.authenticated;
 
-  // Fetch Codex models on mount
-  useEffect(() => {
-    if (isCodexAvailable && codexModels.length === 0 && !codexModelsLoading) {
-      fetchCodexModels();
-    }
-  }, [isCodexAvailable, codexModels.length, codexModelsLoading, fetchCodexModels]);
-
-  // Fetch OpenCode models on mount
-  useEffect(() => {
-    if (isOpencodeAvailable && dynamicOpencodeModels.length === 0 && !opencodeModelsLoading) {
-      fetchOpencodeModels();
-    }
-  }, [
+  // Fetch provider models on mount using custom hook
+  useProviderModels(isCodexAvailable, codexModels.length, codexModelsLoading, fetchCodexModels);
+  useProviderModels(
     isOpencodeAvailable,
     dynamicOpencodeModels.length,
     opencodeModelsLoading,
-    fetchOpencodeModels,
-  ]);
+    fetchOpencodeModels
+  );
 
-  // Transform codex models from store to ModelOption format
-  const dynamicCodexModels: ModelOption[] = codexModels.map((model) => {
-    // Infer badge based on tier
-    let badge: string | undefined;
-    if (model.tier === 'premium') badge = 'Premium';
-    else if (model.tier === 'basic') badge = 'Speed';
-    else if (model.tier === 'standard') badge = 'Balanced';
-
-    return {
-      id: model.id,
-      label: model.label,
-      description: model.description,
-      badge,
-      provider: 'codex' as ModelProvider,
-      hasThinking: model.hasThinking,
-    };
-  });
-
-  // Transform opencode models from store to ModelOption format
-  const transformedOpencodeModels: ModelOption[] = dynamicOpencodeModels.map((model) => {
-    // Infer badge based on tier
-    let badge: string | undefined;
-    if (model.tier === 'premium') badge = 'Premium';
-    else if (model.tier === 'basic') badge = 'Free';
-    else if (model.tier === 'standard') badge = 'Balanced';
-
-    return {
-      id: model.id,
-      label: model.name,
-      description: model.description || '',
-      badge,
-      provider: 'opencode' as ModelProvider,
-      hasThinking: false,
-    };
-  });
+  // Transform models using helper function
+  const transformedCodexModels = transformModels(codexModels, 'codex', CODEX_BADGE_MAP);
+  const transformedOpencodeModels = transformModels(
+    dynamicOpencodeModels,
+    'opencode',
+    OPENCODE_BADGE_MAP
+  );
 
   // Filter Cursor models based on enabled models from global settings
   const filteredCursorModels = CURSOR_MODELS.filter((model) => {
@@ -124,7 +271,7 @@ export function ModelSelector({
       // Switch to OpenCode's default model
       const defaultModel = dynamicOpencodeModels.find((m) => m.default);
       const defaultModelId =
-        defaultModel?.id || dynamicOpencodeModels[0]?.id || 'opencode/big-pickle';
+        defaultModel?.id || dynamicOpencodeModels[0]?.id || DEFAULT_OPENCODE_MODEL;
       onModelSelect(defaultModelId);
     } else if (provider === 'claude' && selectedProvider !== 'claude') {
       // Switch to Claude's default model
@@ -198,7 +345,7 @@ export function ModelSelector({
                 data-testid={`${testIdPrefix}-provider-opencode`}
               >
                 <OpenCodeIcon className="w-4 h-4" />
-                OpenCode CLI
+                OpenCode
               </button>
             )}
             {!isCodexDisabled && (
@@ -352,82 +499,17 @@ export function ModelSelector({
             </span>
           </div>
 
-          {/* Loading state */}
-          {opencodeModelsLoading && transformedOpencodeModels.length === 0 && (
-            <div className="flex items-center justify-center gap-2 p-6 text-sm text-muted-foreground">
-              <RefreshCw className="w-4 h-4 animate-spin" />
-              Loading models...
-            </div>
-          )}
-
-          {/* Error state */}
-          {opencodeModelsError && !opencodeModelsLoading && (
-            <div className="flex items-start gap-2 p-3 rounded-lg bg-red-500/10 border border-red-500/20">
-              <AlertTriangle className="w-4 h-4 text-red-400 mt-0.5 shrink-0" />
-              <div className="space-y-1">
-                <div className="text-sm text-red-400">Failed to load OpenCode models</div>
-                <button
-                  type="button"
-                  onClick={() => fetchOpencodeModels(true)}
-                  className="text-xs text-red-400 underline hover:no-underline"
-                >
-                  Retry
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Model list */}
-          {!opencodeModelsLoading &&
-            !opencodeModelsError &&
-            transformedOpencodeModels.length === 0 && (
-              <div className="text-sm text-muted-foreground p-3 border border-dashed rounded-md text-center">
-                No OpenCode models available. Make sure you're logged in with GitHub Copilot or
-                other providers.
-              </div>
-            )}
-
-          {!opencodeModelsLoading && transformedOpencodeModels.length > 0 && (
-            <div className="flex flex-col gap-2 max-h-[300px] overflow-y-auto">
-              {transformedOpencodeModels.map((option) => {
-                const isSelected = selectedModel === option.id;
-                return (
-                  <button
-                    key={option.id}
-                    type="button"
-                    onClick={() => onModelSelect(option.id)}
-                    title={option.description}
-                    className={cn(
-                      'w-full px-3 py-2 rounded-md border text-sm font-medium transition-colors flex items-center justify-between',
-                      isSelected
-                        ? 'bg-primary text-primary-foreground border-primary'
-                        : 'bg-background hover:bg-accent border-border'
-                    )}
-                    data-testid={`${testIdPrefix}-${option.id}`}
-                  >
-                    <span className="truncate">{option.label}</span>
-                    <div className="flex gap-1 shrink-0">
-                      {option.badge && (
-                        <Badge
-                          variant="outline"
-                          className={cn(
-                            'text-xs',
-                            isSelected
-                              ? 'border-primary-foreground/50 text-primary-foreground'
-                              : option.badge === 'Free'
-                                ? 'border-green-500/50 text-green-600 dark:text-green-400'
-                                : 'border-muted-foreground/50 text-muted-foreground'
-                          )}
-                        >
-                          {option.badge}
-                        </Badge>
-                      )}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          )}
+          <DynamicModelList
+            models={transformedOpencodeModels}
+            selectedModel={selectedModel}
+            onModelSelect={onModelSelect}
+            testIdPrefix={testIdPrefix}
+            isLoading={opencodeModelsLoading}
+            error={opencodeModelsError}
+            onRetry={() => fetchOpencodeModels(true)}
+            emptyMessage="No OpenCode models available."
+            badgeColorClass="border-muted-foreground/50 text-muted-foreground"
+          />
         </div>
       )}
 
@@ -455,90 +537,19 @@ export function ModelSelector({
             </span>
           </div>
 
-          {/* Loading state */}
-          {codexModelsLoading && dynamicCodexModels.length === 0 && (
-            <div className="flex items-center justify-center gap-2 p-6 text-sm text-muted-foreground">
-              <RefreshCw className="w-4 h-4 animate-spin" />
-              Loading models...
-            </div>
-          )}
-
-          {/* Error state */}
-          {codexModelsError && !codexModelsLoading && (
-            <div className="flex items-start gap-2 p-3 rounded-lg bg-red-500/10 border border-red-500/20">
-              <AlertTriangle className="w-4 h-4 text-red-400 mt-0.5 shrink-0" />
-              <div className="space-y-1">
-                <div className="text-sm text-red-400">Failed to load Codex models</div>
-                <button
-                  type="button"
-                  onClick={() => fetchCodexModels(true)}
-                  className="text-xs text-red-400 underline hover:no-underline"
-                >
-                  Retry
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Model list */}
-          {!codexModelsLoading && !codexModelsError && dynamicCodexModels.length === 0 && (
-            <div className="text-sm text-muted-foreground p-3 border border-dashed rounded-md text-center">
-              No Codex models available
-            </div>
-          )}
-
-          {!codexModelsLoading && dynamicCodexModels.length > 0 && (
-            <div className="flex flex-col gap-2">
-              {dynamicCodexModels.map((option) => {
-                const isSelected = selectedModel === option.id;
-                return (
-                  <button
-                    key={option.id}
-                    type="button"
-                    onClick={() => onModelSelect(option.id)}
-                    title={option.description}
-                    className={cn(
-                      'w-full px-3 py-2 rounded-md border text-sm font-medium transition-colors flex items-center justify-between',
-                      isSelected
-                        ? 'bg-primary text-primary-foreground border-primary'
-                        : 'bg-background hover:bg-accent border-border'
-                    )}
-                    data-testid={`${testIdPrefix}-${option.id}`}
-                  >
-                    <span>{option.label}</span>
-                    <div className="flex gap-1">
-                      {option.hasThinking && (
-                        <Badge
-                          variant="outline"
-                          className={cn(
-                            'text-xs',
-                            isSelected
-                              ? 'border-primary-foreground/50 text-primary-foreground'
-                              : 'border-emerald-500/50 text-emerald-600 dark:text-emerald-400'
-                          )}
-                        >
-                          Thinking
-                        </Badge>
-                      )}
-                      {option.badge && (
-                        <Badge
-                          variant="outline"
-                          className={cn(
-                            'text-xs',
-                            isSelected
-                              ? 'border-primary-foreground/50 text-primary-foreground'
-                              : 'border-muted-foreground/50 text-muted-foreground'
-                          )}
-                        >
-                          {option.badge}
-                        </Badge>
-                      )}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          )}
+          <DynamicModelList
+            models={transformedCodexModels}
+            selectedModel={selectedModel}
+            onModelSelect={onModelSelect}
+            testIdPrefix={testIdPrefix}
+            isLoading={codexModelsLoading}
+            error={codexModelsError}
+            onRetry={() => fetchCodexModels(true)}
+            emptyMessage="No Codex models available"
+            badgeColorClass="border-muted-foreground/50 text-muted-foreground"
+            thinkingBadgeColorClass="border-emerald-500/50 text-emerald-600 dark:text-emerald-400"
+            showThinkingBadge
+          />
         </div>
       )}
     </div>
