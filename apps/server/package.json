@@ -40,7 +40,7 @@
     "express": "5.2.1",
     "morgan": "1.10.1",
     "node-pty": "1.1.0-beta41",
-    "ws": "8.18.3"
+    "ws": "8.19.0"
   },
   "devDependencies": {
     "@types/cookie": "0.6.0",
@@ -50,10 +50,10 @@
     "@types/morgan": "1.9.10",
     "@types/node": "22.19.3",
     "@types/ws": "8.18.1",
-    "@vitest/coverage-v8": "4.0.16",
-    "@vitest/ui": "4.0.16",
+    "@vitest/coverage-v8": "4.0.17",
+    "@vitest/ui": "4.0.17",
     "tsx": "4.21.0",
     "typescript": "5.9.3",
-    "vitest": "4.0.16"
+    "vitest": "4.0.17"
   }
 }
