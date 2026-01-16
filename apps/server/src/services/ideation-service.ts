@@ -208,7 +208,17 @@ export class IdeationService {
       );
 
       // Resolve model alias to canonical identifier (with prefix)
-      const modelId = resolveModelString(options?.model ?? 'sonnet');
+      let defaultModel = 'sonnet';
+      if (this.settingsService) {
+        try {
+          const settings = await this.settingsService.getGlobalSettings();
+          defaultModel = settings.phaseModels.ideationModel.model;
+        } catch (error) {
+          logger.warn('Failed to get settings for model selection, using default', error);
+        }
+      }
+
+      const modelId = resolveModelString(options?.model ?? defaultModel);
 
       // Create SDK options
       const sdkOptions = createChatOptions({
@@ -663,7 +673,17 @@ export class IdeationService {
       );
 
       // Resolve model alias to canonical identifier (with prefix)
-      const modelId = resolveModelString('sonnet');
+      let modelToUse = 'sonnet';
+      if (this.settingsService) {
+        try {
+          const settings = await this.settingsService.getGlobalSettings();
+          modelToUse = settings.phaseModels.suggestionsModel.model;
+        } catch (error) {
+          logger.warn('Failed to get settings for model selection, using default', error);
+        }
+      }
+
+      const modelId = resolveModelString(modelToUse);
 
       // Create SDK options
       const sdkOptions = createChatOptions({

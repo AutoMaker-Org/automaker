@@ -69,6 +69,11 @@ const GENERATION_TASKS: PhaseConfig[] = [
     label: 'AI Suggestions',
     description: 'Model for feature, refactoring, security, and performance suggestions',
   },
+  {
+    key: 'ideationModel',
+    label: 'Ideation & Brainstorming',
+    description: 'Interactive brainstorming and idea generation sessions',
+  },
 ];
 
 const MEMORY_TASKS: PhaseConfig[] = [

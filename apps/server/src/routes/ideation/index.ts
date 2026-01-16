@@ -7,6 +7,7 @@ import type { EventEmitter } from '../../lib/events.js';
 import { validatePathParams } from '../../middleware/validate-paths.js';
 import type { IdeationService } from '../../services/ideation-service.js';
 import type { FeatureLoader } from '../../services/feature-loader.js';
+import type { SettingsService } from '../../services/settings-service.js';
 
 // Route handlers
 import { createSessionStartHandler } from './routes/session-start.js';
@@ -27,7 +28,8 @@ import { createSuggestionsGenerateHandler } from './routes/suggestions-generate.
 export function createIdeationRoutes(
   events: EventEmitter,
   ideationService: IdeationService,
-  featureLoader: FeatureLoader
+  featureLoader: FeatureLoader,
+  settingsService: SettingsService
 ): Router {
   const router = Router();
 
@@ -91,7 +93,7 @@ export function createIdeationRoutes(
   router.post(
     '/add-suggestion',
     validatePathParams('projectPath'),
-    createAddSuggestionHandler(ideationService, featureLoader)
+    createAddSuggestionHandler(ideationService, featureLoader, settingsService)
   );
 
   // Guided prompts (no validation needed - static data)
