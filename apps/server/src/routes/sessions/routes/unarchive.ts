@@ -10,7 +10,7 @@ import { getStringParam } from '../../../lib/request-utils/index.js';
 export function createUnarchiveHandler(agentService: AgentService) {
   return async (req: Request, res: Response): Promise<void> => {
     try {
-      const sessionId = getStringParam(req.params.sessionId)!;
+      const sessionId = getStringParam(req.params.sessionId);
       const success = await agentService.unarchiveSession(sessionId);
 
       if (!success) {

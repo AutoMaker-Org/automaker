@@ -9,7 +9,7 @@ import { getStringParam } from '../../../lib/request-utils/index.js';
 export function createSessionDeleteHandler() {
   return (req: Request, res: Response): void => {
     const terminalService = getTerminalService();
-    const id = getStringParam(req.params.id)!;
+    const id = getStringParam(req.params.id);
     const killed = terminalService.killSession(id);
 
     if (!killed) {
