@@ -518,7 +518,7 @@ Resets in 2h
 
       const promise = ptyService.fetchUsageData();
 
-      dataCallback!('authentication_error');
+      dataCallback!('{"type":"authentication_error"}');
 
       await expect(promise).rejects.toThrow(
         "Claude CLI authentication issue. Please run 'claude logout' and then 'claude login' in your terminal to refresh permissions."
