@@ -41,6 +41,8 @@ import type { FeatureLoader } from './feature-loader.js';
 import { createChatOptions, validateWorkingDirectory } from '../lib/sdk-options.js';
 import { resolveModelString } from '@automaker/model-resolver';
 import { stripProviderPrefix } from '@automaker/types';
+import { prependLanguageInstruction } from '@automaker/prompts';
+import { getLanguageInstruction } from '../lib/settings-helpers.js';
 
 const logger = createLogger('IdeationService');
 
@@ -195,12 +197,16 @@ export class IdeationService {
       // Gather existing features and ideas to prevent duplicate suggestions
       const existingWorkContext = await this.gatherExistingWorkContext(projectPath);
 
-      // Build system prompt for ideation
-      const systemPrompt = this.buildIdeationSystemPrompt(
+      // Get language instruction from settings
+      const languageInstruction = await getLanguageInstruction(this.settingsService);
+
+      // Build system prompt for ideation (with language instruction applied)
+      const baseSystemPrompt = this.buildIdeationSystemPrompt(
         contextResult.formattedPrompt,
         activeSession.session.promptCategory,
         existingWorkContext
       );
+      const systemPrompt = prependLanguageInstruction(baseSystemPrompt, languageInstruction);
 
       // Resolve model alias to canonical identifier (with prefix)
       const modelId = resolveModelString(options?.model ?? 'sonnet');
@@ -645,13 +651,17 @@ export class IdeationService {
       // Gather existing features and ideas to prevent duplicates
       const existingWorkContext = await this.gatherExistingWorkContext(projectPath);
 
-      // Build system prompt for structured suggestions
-      const systemPrompt = this.buildSuggestionsSystemPrompt(
+      // Get language instruction from settings
+      const languageInstruction = await getLanguageInstruction(this.settingsService);
+
+      // Build system prompt for structured suggestions (with language instruction applied)
+      const baseSystemPrompt = this.buildSuggestionsSystemPrompt(
         contextPrompt,
         category,
         count,
         existingWorkContext
       );
+      const systemPrompt = prependLanguageInstruction(baseSystemPrompt, languageInstruction);
 
       // Resolve model alias to canonical identifier (with prefix)
       const modelId = resolveModelString('sonnet');

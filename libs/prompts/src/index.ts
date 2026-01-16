@@ -54,6 +54,7 @@ export {
   mergeEnhancementPrompts,
   mergeCommitMessagePrompts,
   mergeAllPrompts,
+  prependLanguageInstruction,
 } from './merge.js';
 
 // Re-export resolved prompt types from @automaker/types
@@ -64,3 +65,12 @@ export type {
   ResolvedEnhancementPrompts,
   ResolvedCommitMessagePrompts,
 } from '@automaker/types';
+
+// Language templates for internationalization
+export {
+  LANGUAGE_TEMPLATES,
+  getLanguageTemplate,
+  getDefaultLanguageInstruction,
+  getAvailableLanguages,
+} from './language-templates.js';
+export type { LanguageTemplate } from './language-templates.js';

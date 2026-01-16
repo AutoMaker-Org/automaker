@@ -10,6 +10,7 @@ export type SettingsViewId =
   | 'opencode-provider'
   | 'mcp-servers'
   | 'prompts'
+  | 'language'
   | 'model-defaults'
   | 'appearance'
   | 'terminal'

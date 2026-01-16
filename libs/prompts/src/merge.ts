@@ -21,6 +21,7 @@ import type {
   ResolvedBacklogPlanPrompts,
   ResolvedEnhancementPrompts,
   ResolvedCommitMessagePrompts,
+  LanguageInstruction,
 } from '@automaker/types';
 import {
   DEFAULT_AUTO_MODE_PROMPTS,
@@ -36,6 +37,20 @@ import {
  */
 function resolvePrompt(custom: CustomPrompt | undefined, defaultValue: string): string {
   return custom?.enabled ? custom.value : defaultValue;
+}
+
+/**
+ * Prepend language instruction to a system prompt
+ * Returns the original prompt if language instruction is not enabled
+ */
+export function prependLanguageInstruction(
+  prompt: string,
+  languageInstruction?: LanguageInstruction
+): string {
+  if (!languageInstruction?.enabled || !languageInstruction.instruction?.trim()) {
+    return prompt;
+  }
+  return `${languageInstruction.instruction.trim()}\n\n---\n\n${prompt}`;
 }
 
 /**

@@ -280,6 +280,21 @@ export interface MCPServerConfig {
 }
 
 /**
+ * LanguageInstruction - Global language preference for AI responses
+ *
+ * Allows users to configure the language in which AI agents respond.
+ * The instruction is prepended to all system prompts when enabled.
+ */
+export interface LanguageInstruction {
+  /** Language identifier (e.g., 'german', 'english', 'spanish') */
+  language: string;
+  /** Full instruction text that gets prepended to system prompts */
+  instruction: string;
+  /** Whether the language instruction is active */
+  enabled: boolean;
+}
+
+/**
  * ProjectRef - Minimal reference to a project stored in global settings
  *
  * Used for the projects list and project history. Full project data is loaded separately.
@@ -483,6 +498,10 @@ export interface GlobalSettings {
   // Prompt Customization
   /** Custom prompts for Auto Mode, Agent Runner, Backlog Planning, and Enhancements */
   promptCustomization?: PromptCustomization;
+
+  // Language Configuration
+  /** Global language instruction prepended to all AI prompts */
+  languageInstruction?: LanguageInstruction;
 
   // Skills Configuration
   /**

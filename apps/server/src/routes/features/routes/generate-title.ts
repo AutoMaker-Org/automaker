@@ -8,7 +8,10 @@
 import type { Request, Response } from 'express';
 import { createLogger } from '@automaker/utils';
 import { CLAUDE_MODEL_MAP } from '@automaker/model-resolver';
+import { prependLanguageInstruction } from '@automaker/prompts';
 import { simpleQuery } from '../../../providers/simple-query-service.js';
+import type { SettingsService } from '../../../services/settings-service.js';
+import { getLanguageInstruction } from '../../../lib/settings-helpers.js';
 
 const logger = createLogger('GenerateTitle');
 
@@ -35,7 +38,9 @@ Rules:
 - No quotes, periods, or extra formatting
 - Capture the essence of the feature in a scannable way`;
 
-export function createGenerateTitleHandler(): (req: Request, res: Response) => Promise<void> {
+export function createGenerateTitleHandler(
+  settingsService?: SettingsService
+): (req: Request, res: Response) => Promise<void> {
   return async (req: Request, res: Response): Promise<void> => {
     try {
       const { description } = req.body as GenerateTitleRequestBody;
@@ -61,11 +66,15 @@ export function createGenerateTitleHandler(): (req: Request, res: Response) => P
 
       logger.info(`Generating title for description: ${trimmedDescription.substring(0, 50)}...`);
 
+      // Load language instruction from settings
+      const languageInstruction = await getLanguageInstruction(settingsService);
+      const effectiveSystemPrompt = prependLanguageInstruction(SYSTEM_PROMPT, languageInstruction);
+
       const userPrompt = `Generate a concise title for this feature:\n\n${trimmedDescription}`;
 
       // Use simpleQuery - provider abstraction handles all the streaming/extraction
       const result = await simpleQuery({
-        prompt: `${SYSTEM_PROMPT}\n\n${userPrompt}`,
+        prompt: `${effectiveSystemPrompt}\n\n${userPrompt}`,
         model: CLAUDE_MODEL_MAP.haiku,
         cwd: process.cwd(),
         maxTurns: 1,

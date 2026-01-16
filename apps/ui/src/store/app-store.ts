@@ -23,6 +23,7 @@ import type {
   PipelineConfig,
   PipelineStep,
   PromptCustomization,
+  LanguageInstruction,
   ModelDefinition,
 } from '@automaker/types';
 import {
@@ -627,6 +628,9 @@ export interface AppState {
   // Prompt Customization
   promptCustomization: PromptCustomization; // Custom prompts for Auto Mode, Agent, Backlog Plan, Enhancement
 
+  // Language Instruction
+  languageInstruction: LanguageInstruction | undefined; // Global language instruction for AI responses
+
   // Project Analysis
   projectAnalysis: ProjectAnalysis | null;
   isAnalyzing: boolean;
@@ -1031,6 +1035,9 @@ export interface AppActions {
   // Prompt Customization actions
   setPromptCustomization: (customization: PromptCustomization) => Promise<void>;
 
+  // Language Instruction actions
+  setLanguageInstruction: (instruction: LanguageInstruction | undefined) => Promise<void>;
+
   // MCP Server actions
   addMCPServer: (server: Omit<MCPServerConfig, 'id'>) => void;
   updateMCPServer: (id: string, updates: Partial<MCPServerConfig>) => void;
@@ -1273,6 +1280,7 @@ const initialState: AppState = {
   enableSubagents: true, // Subagents enabled by default
   subagentsSources: ['user', 'project'] as Array<'user' | 'project'>, // Load from both sources by default
   promptCustomization: {}, // Empty by default - all prompts use built-in defaults
+  languageInstruction: undefined, // Language instruction disabled by default
   projectAnalysis: null,
   isAnalyzing: false,
   boardBackgroundByProject: {},
@@ -2183,6 +2191,14 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
   // Prompt Customization actions
   setPromptCustomization: async (customization) => {
     set({ promptCustomization: customization });
+    // Sync to server settings file
+    const { syncSettingsToServer } = await import('@/hooks/use-settings-migration');
+    await syncSettingsToServer();
+  },
+
+  // Language Instruction actions
+  setLanguageInstruction: async (instruction) => {
+    set({ languageInstruction: instruction });
     // Sync to server settings file
     const { syncSettingsToServer } = await import('@/hooks/use-settings-migration');
     await syncSettingsToServer();

@@ -21,7 +21,8 @@ import { streamingQuery } from '../../providers/simple-query-service.js';
 import { generateFeaturesFromSpec } from './generate-features-from-spec.js';
 import { ensureAutomakerDir, getAppSpecPath } from '@automaker/platform';
 import type { SettingsService } from '../../services/settings-service.js';
-import { getAutoLoadClaudeMdSetting } from '../../lib/settings-helpers.js';
+import { getAutoLoadClaudeMdSetting, getLanguageInstruction } from '../../lib/settings-helpers.js';
+import { prependLanguageInstruction } from '@automaker/prompts';
 
 const logger = createLogger('SpecRegeneration');
 
@@ -66,7 +67,7 @@ export async function generateSpec(
 Use these technologies as the foundation for the specification.`;
   }
 
-  const prompt = `You are helping to define a software project specification.
+  const basePrompt = `You are helping to define a software project specification.
 
 IMPORTANT: Never ask for clarification or additional information. Use the information provided and make reasonable assumptions to create the best possible specification. If details are missing, infer them based on common patterns and best practices.
 
@@ -78,6 +79,10 @@ ${techStackDefaults}
 ${analysisInstructions}
 
 ${getStructuredSpecPromptInstruction()}`;
+
+  // Load language instruction from settings
+  const languageInstruction = await getLanguageInstruction(settingsService);
+  const prompt = prependLanguageInstruction(basePrompt, languageInstruction);
 
   logger.info('========== PROMPT BEING SENT ==========');
   logger.info(`Prompt length: ${prompt.length} chars`);

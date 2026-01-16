@@ -14,7 +14,8 @@ import { streamingQuery } from '../../providers/simple-query-service.js';
 import { parseAndCreateFeatures } from './parse-and-create-features.js';
 import { getAppSpecPath } from '@automaker/platform';
 import type { SettingsService } from '../../services/settings-service.js';
-import { getAutoLoadClaudeMdSetting } from '../../lib/settings-helpers.js';
+import { getAutoLoadClaudeMdSetting, getLanguageInstruction } from '../../lib/settings-helpers.js';
+import { prependLanguageInstruction } from '@automaker/prompts';
 
 const logger = createLogger('SpecRegeneration');
 
@@ -53,7 +54,7 @@ export async function generateFeaturesFromSpec(
     return;
   }
 
-  const prompt = `Based on this project specification:
+  const basePrompt = `Based on this project specification:
 
 ${spec}
 
@@ -85,6 +86,10 @@ Format as JSON:
 Generate ${featureCount} features that build on each other logically.
 
 IMPORTANT: Do not ask for clarification. The specification is provided above. Generate the JSON immediately.`;
+
+  // Load language instruction from settings
+  const languageInstruction = await getLanguageInstruction(settingsService);
+  const prompt = prependLanguageInstruction(basePrompt, languageInstruction);
 
   logger.info('========== PROMPT BEING SENT ==========');
   logger.info(`Prompt length: ${prompt.length} chars`);
