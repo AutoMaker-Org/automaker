@@ -5,11 +5,12 @@
 import type { Request, Response } from 'express';
 import { AgentService } from '../../../services/agent-service.js';
 import { getErrorMessage, logError } from '../common.js';
+import { getStringParam } from '../../../lib/request-utils.js';
 
 export function createDeleteHandler(agentService: AgentService) {
   return async (req: Request, res: Response): Promise<void> => {
     try {
-      const { sessionId } = req.params;
+      const sessionId = getStringParam(req.params.sessionId);
       const success = await agentService.deleteSession(sessionId);
 
       if (!success) {

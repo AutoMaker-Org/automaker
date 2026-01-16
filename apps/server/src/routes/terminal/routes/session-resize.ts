@@ -4,11 +4,12 @@
 
 import type { Request, Response } from 'express';
 import { getTerminalService } from '../../../services/terminal-service.js';
+import { getStringParam } from '../../../lib/request-utils.js';
 
 export function createSessionResizeHandler() {
   return (req: Request, res: Response): void => {
     const terminalService = getTerminalService();
-    const { id } = req.params;
+    const id = getStringParam(req.params.id);
     const { cols, rows } = req.body;
 
     if (!cols || !rows) {
