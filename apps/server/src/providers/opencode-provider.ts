@@ -1042,7 +1042,7 @@ export class OpencodeProvider extends CliProvider {
       'lm studio': 'lmstudio',
       lmstudio: 'lmstudio',
       opencode: 'opencode',
-      'z.ai coding plan': 'z-ai',
+      'z.ai coding plan': 'zai-coding-plan',
       'z.ai': 'z-ai',
     };
 
