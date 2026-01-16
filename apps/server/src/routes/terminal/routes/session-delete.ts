@@ -4,11 +4,16 @@
 
 import type { Request, Response } from 'express';
 import { getTerminalService } from '../../../services/terminal-service.js';
+import { getStringParam } from '../../../lib/request-utils/index.js';
 
 export function createSessionDeleteHandler() {
   return (req: Request, res: Response): void => {
     const terminalService = getTerminalService();
-    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const id = getStringParam(req.params.id);
+    if (!id) {
+      res.status(400).json({ success: false, error: 'id is required' });
+      return;
+    }
     const killed = terminalService.killSession(id);
 
     if (!killed) {
