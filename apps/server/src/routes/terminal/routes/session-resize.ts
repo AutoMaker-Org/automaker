@@ -8,7 +8,7 @@ import { getTerminalService } from '../../../services/terminal-service.js';
 export function createSessionResizeHandler() {
   return (req: Request, res: Response): void => {
     const terminalService = getTerminalService();
-    const { id } = req.params;
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
     const { cols, rows } = req.body;
 
     if (!cols || !rows) {
