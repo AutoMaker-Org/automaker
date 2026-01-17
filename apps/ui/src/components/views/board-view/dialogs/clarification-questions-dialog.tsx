@@ -19,6 +19,9 @@ import { Feature } from '@/store/app-store';
 import { Send, Loader2, HelpCircle, X } from 'lucide-react';
 import type { ClarificationQuestion } from '@automaker/types';
 
+/** Value used to represent the "Other" option in radio/checkbox groups */
+const OTHER_OPTION_VALUE = '__other__';
+
 interface ClarificationQuestionsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -55,7 +58,7 @@ export function ClarificationQuestionsDialog({
   }, [open, requestId]);
 
   const handleSingleSelect = (header: string, value: string) => {
-    if (value === '__other__') {
+    if (value === OTHER_OPTION_VALUE) {
       setShowOther((prev) => ({ ...prev, [header]: true }));
       setAnswers((prev) => ({ ...prev, [header]: [] }));
     } else {
@@ -65,7 +68,7 @@ export function ClarificationQuestionsDialog({
   };
 
   const handleMultiSelect = (header: string, value: string, checked: boolean) => {
-    if (value === '__other__') {
+    if (value === OTHER_OPTION_VALUE) {
       setShowOther((prev) => ({ ...prev, [header]: checked }));
       if (!checked) {
         setCustomTexts((prev) => {
@@ -202,7 +205,7 @@ export function ClarificationQuestionsDialog({
                       id={`${question.header}-other`}
                       checked={showOther[question.header] || false}
                       onCheckedChange={(checked) =>
-                        handleMultiSelect(question.header, '__other__', checked as boolean)
+                        handleMultiSelect(question.header, OTHER_OPTION_VALUE, checked as boolean)
                       }
                       disabled={isLoading}
                     />

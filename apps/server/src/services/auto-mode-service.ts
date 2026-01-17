@@ -240,6 +240,61 @@ interface PendingClarification {
   toolUseId: string;
 }
 
+/**
+ * Validates and parses raw tool input into typed ClarificationQuestion array.
+ * Returns null if validation fails.
+ */
+function parseClarificationQuestions(input: unknown): ClarificationQuestion[] | null {
+  if (!Array.isArray(input)) {
+    return null;
+  }
+
+  const questions: ClarificationQuestion[] = [];
+
+  for (const item of input) {
+    // Validate each question has required fields
+    if (!item || typeof item !== 'object') {
+      return null;
+    }
+
+    const q = item as Record<string, unknown>;
+
+    if (typeof q.question !== 'string' || typeof q.header !== 'string') {
+      return null;
+    }
+
+    // Options is required and must be an array
+    if (!Array.isArray(q.options)) {
+      return null;
+    }
+
+    // Validate each option has label and description
+    const options: Array<{ label: string; description: string }> = [];
+    for (const opt of q.options) {
+      if (!opt || typeof opt !== 'object') {
+        return null;
+      }
+      const optObj = opt as Record<string, unknown>;
+      if (typeof optObj.label !== 'string') {
+        return null;
+      }
+      options.push({
+        label: optObj.label,
+        description: typeof optObj.description === 'string' ? optObj.description : '',
+      });
+    }
+
+    questions.push({
+      question: q.question,
+      header: q.header,
+      options,
+      multiSelect: typeof q.multiSelect === 'boolean' ? q.multiSelect : false,
+    });
+  }
+
+  return questions;
+}
+
 interface AutoModeConfig {
   maxConcurrency: number;
   useWorktrees: boolean;
@@ -2130,7 +2185,7 @@ Format your response as a structured markdown document.`;
     this.pendingClarifications.delete(featureId);
 
     // Emit event for tracking
-    this.emitAutoModeEvent('clarification:questions-answered' as any, {
+    this.emitAutoModeEvent('clarification:questions-answered', {
       featureId,
       projectPath: projectPathFromClient || pending.projectPath,
       requestId,
@@ -3330,21 +3385,20 @@ After generating the revised spec, output:
               ) {
                 logger.info(`AskUserQuestion tool detected for feature ${featureId}`);
 
+                // Validate and parse questions from tool input
+                const questions = parseClarificationQuestions(blockInput.questions);
+                if (!questions || questions.length === 0) {
+                  logger.warn(
+                    `Invalid or empty questions from AskUserQuestion tool for feature ${featureId}`
+                  );
+                  continue;
+                }
+
                 const requestId = randomUUID();
                 const toolUseId = blockId || randomUUID();
 
-                // Extract questions from tool input
-                const questions: ClarificationQuestion[] = (blockInput.questions as any[]).map(
-                  (q: any) => ({
-                    question: q.question,
-                    header: q.header,
-                    options: q.options || [],
-                    multiSelect: q.multiSelect || false,
-                  })
-                );
-
                 // Emit WebSocket event for UI
-                this.emitAutoModeEvent('clarification:questions-required' as any, {
+                this.emitAutoModeEvent('clarification:questions-required', {
                   featureId,
                   projectPath: finalProjectPath,
                   questions,
