@@ -496,6 +496,8 @@ export interface GlobalSettings {
   defaultPlanningMode: PlanningMode;
   /** Default: require manual approval before generating */
   defaultRequirePlanApproval: boolean;
+  /** Enable interactive planning with clarification questions (Claude Code CLI only) */
+  enableInteractivePlanning: boolean;
   /** Default model and thinking level for new feature cards */
   defaultFeatureModel: PhaseModelEntry;
 
@@ -857,6 +859,7 @@ export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
   useWorktrees: true,
   defaultPlanningMode: 'skip',
   defaultRequirePlanApproval: false,
+  enableInteractivePlanning: true,
   defaultFeatureModel: { model: 'opus' },
   muteDoneSound: false,
   serverLogLevel: 'info',

@@ -2475,10 +2475,16 @@ Format your response as a structured markdown document.`;
     }
 
     // Conditionally prepend clarification instructions for Claude provider
-    // when requirePlanApproval is enabled and instructions are configured
+    // when requirePlanApproval is enabled, interactive planning is enabled, and instructions are configured
     let finalPrompt = planningPrompt;
     const clarificationInstructions = prompts.autoMode.clarificationInstructions;
+
+    // Check if interactive planning is enabled (default: true)
+    const globalSettings = await this.settingsService?.getGlobalSettings();
+    const enableInteractivePlanning = globalSettings?.enableInteractivePlanning ?? true;
+
     if (
+      enableInteractivePlanning &&
       feature.requirePlanApproval === true &&
       isClaudeModel(feature.model) &&
       clarificationInstructions
@@ -2589,6 +2595,12 @@ You can use the Read tool to view these images at any time during implementation
       (planningMode === 'lite' && options?.requirePlanApproval === true);
     const requiresApproval = planningModeRequiresApproval && options?.requirePlanApproval === true;
 
+    // Check if interactive planning (clarification questions) is enabled
+    const globalSettings = await this.settingsService?.getGlobalSettings();
+    const enableInteractivePlanning = globalSettings?.enableInteractivePlanning ?? true;
+    const enableClarificationQuestions =
+      requiresApproval && enableInteractivePlanning && isClaudeModel(model);
+
     // CI/CD Mock Mode: Return early with mock response when AUTOMAKER_MOCK_AGENT is set
     // This prevents actual API calls during automated testing
     if (process.env.AUTOMAKER_MOCK_AGENT === 'true') {
@@ -2659,7 +2671,7 @@ This mock response was generated because AUTOMAKER_MOCK_AGENT=true was set.
     // Load MCP permission settings (global setting only)
 
     // Build SDK options using centralized configuration for feature implementation
-    // Enable clarification questions when plan approval is required (interactive planning mode)
+    // Enable clarification questions when plan approval is required and interactive planning is enabled
     const sdkOptions = createAutoModeOptions({
       cwd: workDir,
       model: model,
@@ -2667,7 +2679,7 @@ This mock response was generated because AUTOMAKER_MOCK_AGENT=true was set.
       autoLoadClaudeMd,
       mcpServers: Object.keys(mcpServers).length > 0 ? mcpServers : undefined,
       thinkingLevel: options?.thinkingLevel,
-      enableClarificationQuestions: requiresApproval,
+      enableClarificationQuestions,
     });
 
     // Extract model, maxTurns, and allowedTools from SDK options

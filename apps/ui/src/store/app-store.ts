@@ -754,6 +754,7 @@ export interface AppState {
 
   defaultPlanningMode: PlanningMode;
   defaultRequirePlanApproval: boolean;
+  enableInteractivePlanning: boolean;
   defaultFeatureModel: PhaseModelEntry;
 
   // Plan Approval State
@@ -1242,6 +1243,7 @@ export interface AppActions {
 
   setDefaultPlanningMode: (mode: PlanningMode) => void;
   setDefaultRequirePlanApproval: (require: boolean) => void;
+  setEnableInteractivePlanning: (enable: boolean) => void;
   setDefaultFeatureModel: (entry: PhaseModelEntry) => void;
 
   // Plan Approval actions
@@ -1447,6 +1449,7 @@ const initialState: AppState = {
   specCreatingForProject: null,
   defaultPlanningMode: 'skip' as PlanningMode,
   defaultRequirePlanApproval: false,
+  enableInteractivePlanning: true,
   defaultFeatureModel: { model: 'opus' } as PhaseModelEntry,
   pendingPlanApproval: null,
   pendingClarification: null,
@@ -3444,6 +3447,7 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
 
   setDefaultPlanningMode: (mode) => set({ defaultPlanningMode: mode }),
   setDefaultRequirePlanApproval: (require) => set({ defaultRequirePlanApproval: require }),
+  setEnableInteractivePlanning: (enable) => set({ enableInteractivePlanning: enable }),
   setDefaultFeatureModel: (entry) => set({ defaultFeatureModel: entry }),
 
   // Plan Approval actions

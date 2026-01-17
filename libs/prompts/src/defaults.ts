@@ -264,24 +264,26 @@ export const DEFAULT_AUTO_MODE_PIPELINE_STEP_PROMPT_TEMPLATE = `## Pipeline Step
  * Guides the AI on when and how to ask clarification questions during planning.
  * Only applied when using Claude provider with "Require approval" enabled.
  */
-export const DEFAULT_AUTO_MODE_CLARIFICATION_INSTRUCTIONS = `## Clarification Questions (Optional)
+export const DEFAULT_AUTO_MODE_CLARIFICATION_INSTRUCTIONS = `## Clarification Questions (Required)
 
-Before generating your plan, you may use the \`AskUserQuestion\` tool to gather requirements if:
-- The feature request is ambiguous or underspecified
-- Multiple valid implementation approaches exist and user preference matters
-- Critical technical decisions need user input (e.g., database choice, auth method, API design)
-- You're unsure about scope, priorities, or constraints
+**IMPORTANT**: Before generating your plan, you MUST use the \`AskUserQuestion\` tool to gather requirements from the user. The user has explicitly enabled interactive planning mode because they want to provide input before implementation begins.
+
+You should ask clarification questions about:
+- Implementation approach preferences (e.g., which library, framework, or pattern to use)
+- Scope decisions (e.g., what should be included vs excluded, edge cases to handle)
+- Technical choices that affect the architecture (e.g., database, auth method, API design)
+- UI/UX preferences if applicable (e.g., layout, styling approach, component structure)
+- Any assumptions you would otherwise make on your own
 
 Guidelines for asking questions:
-- Ask 1-4 focused questions maximum - don't overwhelm the user
-- Provide 2-4 meaningful options per question with brief descriptions
+- Ask 1-4 focused questions that would meaningfully impact your implementation
+- Provide 2-4 concrete options per question with brief descriptions of trade-offs
 - Use short, descriptive headers (max 12 characters) like "Auth method", "Database", "Scope"
-- Only ask if genuinely needed - skip questions if requirements are already clear
-- Consider what information would significantly change your implementation approach
+- Frame questions around decisions where user preference matters
 
 After receiving answers, incorporate them into your planning. If the user selects "Other" and provides custom input, adapt accordingly.
 
-If requirements are clear enough to proceed, skip clarification and go directly to planning.
+Only skip asking questions if the feature request is extremely specific and detailed, leaving absolutely no room for interpretation or implementation choices.
 `;
 
 /**

@@ -12,6 +12,7 @@ import {
   FastForward,
   Sparkles,
   Cpu,
+  HelpCircle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -32,6 +33,7 @@ interface FeatureDefaultsSectionProps {
   skipVerificationInAutoMode: boolean;
   defaultPlanningMode: PlanningMode;
   defaultRequirePlanApproval: boolean;
+  enableInteractivePlanning: boolean;
   enableAiCommitMessages: boolean;
   defaultFeatureModel: PhaseModelEntry;
   onDefaultSkipTestsChange: (value: boolean) => void;
@@ -39,6 +41,7 @@ interface FeatureDefaultsSectionProps {
   onSkipVerificationInAutoModeChange: (value: boolean) => void;
   onDefaultPlanningModeChange: (value: PlanningMode) => void;
   onDefaultRequirePlanApprovalChange: (value: boolean) => void;
+  onEnableInteractivePlanningChange: (value: boolean) => void;
   onEnableAiCommitMessagesChange: (value: boolean) => void;
   onDefaultFeatureModelChange: (value: PhaseModelEntry) => void;
 }
@@ -49,6 +52,7 @@ export function FeatureDefaultsSection({
   skipVerificationInAutoMode,
   defaultPlanningMode,
   defaultRequirePlanApproval,
+  enableInteractivePlanning,
   enableAiCommitMessages,
   defaultFeatureModel,
   onDefaultSkipTestsChange,
@@ -56,6 +60,7 @@ export function FeatureDefaultsSection({
   onSkipVerificationInAutoModeChange,
   onDefaultPlanningModeChange,
   onDefaultRequirePlanApprovalChange,
+  onEnableInteractivePlanningChange,
   onEnableAiCommitMessagesChange,
   onDefaultFeatureModelChange,
 }: FeatureDefaultsSectionProps) {
@@ -203,6 +208,31 @@ export function FeatureDefaultsSection({
             </div>
           </>
         )}
+
+        {/* Interactive Planning Setting - always visible */}
+        <div className="group flex items-start space-x-3 p-3 rounded-xl hover:bg-accent/30 transition-colors duration-200 -mx-3">
+          <Checkbox
+            id="enable-interactive-planning"
+            checked={enableInteractivePlanning}
+            onCheckedChange={(checked) => onEnableInteractivePlanningChange(checked === true)}
+            className="mt-1"
+            data-testid="enable-interactive-planning-checkbox"
+          />
+          <div className="space-y-1.5">
+            <Label
+              htmlFor="enable-interactive-planning"
+              className="text-foreground cursor-pointer font-medium flex items-center gap-2"
+            >
+              <HelpCircle className="w-4 h-4 text-brand-500" />
+              Enable interactive planning (Claude Code CLI only)
+            </Label>
+            <p className="text-xs text-muted-foreground/80 leading-relaxed">
+              When enabled, the AI will ask clarification questions before generating a plan. This
+              helps gather requirements and preferences to create a better implementation plan.
+              Activates when using Claude models with "Require plan approval" enabled on a feature.
+            </p>
+          </div>
+        </div>
 
         {/* Separator */}
         <div className="border-t border-border/30" />

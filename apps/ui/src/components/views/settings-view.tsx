@@ -54,6 +54,8 @@ export function SettingsView() {
     setDefaultPlanningMode,
     defaultRequirePlanApproval,
     setDefaultRequirePlanApproval,
+    enableInteractivePlanning,
+    setEnableInteractivePlanning,
     defaultFeatureModel,
     setDefaultFeatureModel,
     autoLoadClaudeMd,
@@ -164,6 +166,7 @@ export function SettingsView() {
             skipVerificationInAutoMode={skipVerificationInAutoMode}
             defaultPlanningMode={defaultPlanningMode}
             defaultRequirePlanApproval={defaultRequirePlanApproval}
+            enableInteractivePlanning={enableInteractivePlanning}
             enableAiCommitMessages={enableAiCommitMessages}
             defaultFeatureModel={defaultFeatureModel}
             onDefaultSkipTestsChange={setDefaultSkipTests}
@@ -171,6 +174,7 @@ export function SettingsView() {
             onSkipVerificationInAutoModeChange={setSkipVerificationInAutoMode}
             onDefaultPlanningModeChange={setDefaultPlanningMode}
             onDefaultRequirePlanApprovalChange={setDefaultRequirePlanApproval}
+            onEnableInteractivePlanningChange={setEnableInteractivePlanning}
             onEnableAiCommitMessagesChange={setEnableAiCommitMessages}
             onDefaultFeatureModelChange={setDefaultFeatureModel}
           />
