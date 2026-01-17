@@ -244,6 +244,7 @@ export function TerminalView() {
     setTerminalScrollbackLines,
     setTerminalScreenReaderMode,
     updateTerminalPanelSizes,
+    setPendingTerminalCwd,
   } = useAppStore();
 
   const [status, setStatus] = useState<TerminalStatus | null>(null);
@@ -536,6 +537,100 @@ export function TerminalView() {
       fetchServerSettings();
     }
   }, [terminalState.isUnlocked, fetchServerSettings]);
+
+  // Handle pending terminal cwd (from "open in terminal" action on worktree menu)
+  // When pendingTerminalCwd is set and we're ready, create a terminal with that cwd
+  const pendingTerminalCwdRef = useRef<string | null>(null);
+  const pendingTerminalCreatedRef = useRef<boolean>(false);
+  useEffect(() => {
+    const pendingCwd = terminalState.pendingTerminalCwd;
+
+    // Skip if no pending cwd
+    if (!pendingCwd) {
+      // Reset the created ref when there's no pending cwd
+      pendingTerminalCreatedRef.current = false;
+      pendingTerminalCwdRef.current = null;
+      return;
+    }
+
+    // Skip if we already created a terminal for this exact cwd
+    if (pendingCwd === pendingTerminalCwdRef.current && pendingTerminalCreatedRef.current) {
+      return;
+    }
+
+    // Skip if still loading or terminal not enabled
+    if (loading || !status?.enabled) {
+      logger.debug('Waiting for terminal to be ready before creating terminal for pending cwd');
+      return;
+    }
+
+    // Skip if password is required but not unlocked yet
+    if (status.passwordRequired && !terminalState.isUnlocked) {
+      logger.debug('Waiting for terminal unlock before creating terminal for pending cwd');
+      return;
+    }
+
+    // Track that we're processing this cwd
+    pendingTerminalCwdRef.current = pendingCwd;
+
+    // Create a terminal with the pending cwd
+    logger.info('Creating terminal from pending cwd:', pendingCwd);
+
+    // Create terminal with the specified cwd
+    const createTerminalWithCwd = async () => {
+      try {
+        const headers: Record<string, string> = {};
+        const authToken = useAppStore.getState().terminalState.authToken;
+        if (authToken) {
+          headers['X-Terminal-Token'] = authToken;
+        }
+
+        const response = await apiFetch('/api/terminal/sessions', 'POST', {
+          headers,
+          body: { cwd: pendingCwd, cols: 80, rows: 24 },
+        });
+        const data = await response.json();
+
+        if (data.success) {
+          // Mark as successfully created
+          pendingTerminalCreatedRef.current = true;
+          addTerminalToLayout(data.data.id);
+          // Mark this session as new for running initial command
+          if (defaultRunScript) {
+            setNewSessionIds((prev) => new Set(prev).add(data.data.id));
+          }
+          fetchServerSettings();
+          toast.success(`Opened terminal in ${pendingCwd.split('/').pop() || pendingCwd}`);
+          // Clear the pending cwd after successful creation
+          setPendingTerminalCwd(null);
+        } else {
+          logger.error('Failed to create session from pending cwd:', data.error);
+          toast.error('Failed to open terminal', {
+            description: data.error || 'Unknown error',
+          });
+          // Clear pending cwd on failure to prevent infinite retries
+          setPendingTerminalCwd(null);
+        }
+      } catch (err) {
+        logger.error('Create session error from pending cwd:', err);
+        toast.error('Failed to open terminal');
+        // Clear pending cwd on error to prevent infinite retries
+        setPendingTerminalCwd(null);
+      }
+    };
+
+    createTerminalWithCwd();
+  }, [
+    terminalState.pendingTerminalCwd,
+    terminalState.isUnlocked,
+    loading,
+    status?.enabled,
+    status?.passwordRequired,
+    setPendingTerminalCwd,
+    addTerminalToLayout,
+    defaultRunScript,
+    fetchServerSettings,
+  ]);
 
   // Handle project switching - save and restore terminal layouts
   // Uses terminalState.lastActiveProjectPath (persisted in store) instead of a local ref

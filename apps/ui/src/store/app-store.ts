@@ -531,6 +531,7 @@ export interface TerminalState {
   lineHeight: number; // Line height multiplier for terminal text
   maxSessions: number; // Maximum concurrent terminal sessions (server setting)
   lastActiveProjectPath: string | null; // Last project path to detect route changes vs project switches
+  pendingTerminalCwd: string | null; // Pending cwd to use when creating next terminal (from "open in terminal" action)
 }
 
 // Persisted terminal layout - now includes sessionIds for reconnection
@@ -1229,6 +1230,7 @@ export interface AppActions {
   setTerminalLineHeight: (lineHeight: number) => void;
   setTerminalMaxSessions: (maxSessions: number) => void;
   setTerminalLastActiveProjectPath: (projectPath: string | null) => void;
+  setPendingTerminalCwd: (cwd: string | null) => void;
   addTerminalTab: (name?: string) => string;
   removeTerminalTab: (tabId: string) => void;
   setActiveTerminalTab: (tabId: string) => void;
@@ -1445,6 +1447,7 @@ const initialState: AppState = {
     lineHeight: 1.0,
     maxSessions: 100,
     lastActiveProjectPath: null,
+    pendingTerminalCwd: null,
   },
   terminalLayoutByProject: {},
   specCreatingForProject: null,
@@ -2879,6 +2882,9 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
         maxSessions: current.maxSessions,
         // Preserve lastActiveProjectPath - it will be updated separately when needed
         lastActiveProjectPath: current.lastActiveProjectPath,
+        // Preserve pendingTerminalCwd - this is set by "open in terminal" action and should
+        // survive the clearTerminalState() call that happens during project switching
+        pendingTerminalCwd: current.pendingTerminalCwd,
       },
     });
   },
@@ -2967,6 +2973,13 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
     const current = get().terminalState;
     set({
       terminalState: { ...current, lastActiveProjectPath: projectPath },
+    });
+  },
+
+  setPendingTerminalCwd: (cwd) => {
+    const current = get().terminalState;
+    set({
+      terminalState: { ...current, pendingTerminalCwd: cwd },
     });
   },
 
