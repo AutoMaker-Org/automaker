@@ -26,6 +26,7 @@ import {
   RefreshCw,
   Copy,
   ScrollText,
+  Terminal,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -51,6 +52,7 @@ interface WorktreeActionsDropdownProps {
   onPull: (worktree: WorktreeInfo) => void;
   onPush: (worktree: WorktreeInfo) => void;
   onOpenInEditor: (worktree: WorktreeInfo, editorCommand?: string) => void;
+  onOpenInTerminal: (worktree: WorktreeInfo) => void;
   onCommit: (worktree: WorktreeInfo) => void;
   onCreatePR: (worktree: WorktreeInfo) => void;
   onAddressPRComments: (worktree: WorktreeInfo, prInfo: PRInfo) => void;
@@ -81,6 +83,7 @@ export function WorktreeActionsDropdown({
   onPull,
   onPush,
   onOpenInEditor,
+  onOpenInTerminal,
   onCommit,
   onCreatePR,
   onAddressPRComments,
@@ -303,6 +306,10 @@ export function WorktreeActionsDropdown({
             </DropdownMenuSubContent>
           </DropdownMenuSub>
         )}
+        <DropdownMenuItem onClick={() => onOpenInTerminal(worktree)} className="text-xs">
+          <Terminal className="w-3.5 h-3.5 mr-2" />
+          Open in Terminal
+        </DropdownMenuItem>
         {!worktree.isMain && hasInitScript && (
           <DropdownMenuItem onClick={() => onRunInitScript(worktree)} className="text-xs">
             <RefreshCw className="w-3.5 h-3.5 mr-2" />

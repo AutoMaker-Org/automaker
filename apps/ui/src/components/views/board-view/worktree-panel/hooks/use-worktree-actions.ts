@@ -143,6 +143,24 @@ export function useWorktreeActions({ fetchWorktrees, fetchBranches }: UseWorktre
     }
   }, []);
 
+  const handleOpenInTerminal = useCallback(async (worktree: WorktreeInfo) => {
+    try {
+      const api = getElectronAPI();
+      if (!api?.worktree?.openInTerminal) {
+        logger.warn('Open in terminal API not available');
+        return;
+      }
+      const result = await api.worktree.openInTerminal(worktree.path);
+      if (result.success && result.result) {
+        toast.success(result.result.message);
+      } else if (result.error) {
+        toast.error(result.error);
+      }
+    } catch (error) {
+      logger.error('Open in terminal failed:', error);
+    }
+  }, []);
+
   return {
     isPulling,
     isPushing,
@@ -153,5 +171,6 @@ export function useWorktreeActions({ fetchWorktrees, fetchBranches }: UseWorktre
     handlePull,
     handlePush,
     handleOpenInEditor,
+    handleOpenInTerminal,
   };
 }
