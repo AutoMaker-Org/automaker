@@ -29,6 +29,7 @@ import {
   createGetAvailableEditorsHandler,
   createRefreshEditorsHandler,
 } from './routes/open-in-editor.js';
+import { createOpenInTerminalHandler } from './routes/open-in-terminal.js';
 import { createInitGitHandler } from './routes/init-git.js';
 import { createMigrateHandler } from './routes/migrate.js';
 import { createStartDevHandler } from './routes/start-dev.js';
@@ -97,6 +98,11 @@ export function createWorktreeRoutes(
   );
   router.post('/switch-branch', requireValidWorktree, createSwitchBranchHandler());
   router.post('/open-in-editor', validatePathParams('worktreePath'), createOpenInEditorHandler());
+  router.post(
+    '/open-in-terminal',
+    validatePathParams('worktreePath'),
+    createOpenInTerminalHandler()
+  );
   router.get('/default-editor', createGetDefaultEditorHandler());
   router.get('/available-editors', createGetAvailableEditorsHandler());
   router.post('/refresh-editors', createRefreshEditorsHandler());
