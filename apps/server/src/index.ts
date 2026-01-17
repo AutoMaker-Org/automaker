@@ -114,20 +114,28 @@ export function isRequestLoggingEnabled(): boolean {
 const hasAnthropicKey = !!process.env.ANTHROPIC_API_KEY;
 
 if (!hasAnthropicKey) {
+  const wHeader = '⚠️  WARNING: No Claude authentication configured'.padEnd(67);
+  const w1 = 'The Claude Agent SDK requires authentication to function.'.padEnd(67);
+  const w2 = 'Set your Anthropic API key:'.padEnd(67);
+  const w3 = '  export ANTHROPIC_API_KEY="sk-ant-..."'.padEnd(67);
+  const w4 = 'Or use the setup wizard in Settings to configure authentication.'.padEnd(67);
+
   logger.warn(`
-╔═══════════════════════════════════════════════════════════════════════╗
-║  ⚠️  WARNING: No Claude authentication configured                      ║
-║                                                                       ║
-║  The Claude Agent SDK requires authentication to function.            ║
-║                                                                       ║
-║  Set your Anthropic API key:                                          ║
-║    export ANTHROPIC_API_KEY="sk-ant-..."                              ║
-║                                                                       ║
-║  Or use the setup wizard in Settings to configure authentication.     ║
-╚═══════════════════════════════════════════════════════════════════════╝
+╔═════════════════════════════════════════════════════════════════════╗
+║  ${wHeader}║
+╠═════════════════════════════════════════════════════════════════════╣
+║                                                                     ║
+║  ${w1}║
+║                                                                     ║
+║  ${w2}║
+║  ${w3}║
+║                                                                     ║
+║  ${w4}║
+║                                                                     ║
+╚═════════════════════════════════════════════════════════════════════╝
 `);
 } else {
-  logger.info('✓ ANTHROPIC_API_KEY detected (API key auth)');
+  logger.info('✓ ANTHROPIC_API_KEY detected');
 }
 
 // Initialize security
@@ -618,40 +626,74 @@ const startServer = (port: number, host: string) => {
         ? 'enabled (password protected)'
         : 'enabled'
       : 'disabled';
-    const portStr = port.toString().padEnd(4);
+
+    // Build URLs for display
+    const listenAddr = `${host}:${port}`;
+    const httpUrl = `http://${HOSTNAME}:${port}`;
+    const wsEventsUrl = `ws://${HOSTNAME}:${port}/api/events`;
+    const wsTerminalUrl = `ws://${HOSTNAME}:${port}/api/terminal/ws`;
+    const healthUrl = `http://${HOSTNAME}:${port}/api/health`;
+
+    const sHeader = '🚀 Automaker Backend Server'.padEnd(67);
+    const s1 = `Listening:    ${listenAddr}`.padEnd(67);
+    const s2 = `HTTP API:     ${httpUrl}`.padEnd(67);
+    const s3 = `WebSocket:    ${wsEventsUrl}`.padEnd(67);
+    const s4 = `Terminal WS:  ${wsTerminalUrl}`.padEnd(67);
+    const s5 = `Health:       ${healthUrl}`.padEnd(67);
+    const s6 = `Terminal:     ${terminalStatus}`.padEnd(67);
+
     logger.info(`
-╔═══════════════════════════════════════════════════════╗
-║           Automaker Backend Server                    ║
-╠═══════════════════════════════════════════════════════╣
-║  Listening:   ${host}:${port}${' '.repeat(Math.max(0, 34 - host.length - port.toString().length))}║
-║  HTTP API:    http://${HOSTNAME}:${portStr}                 ║
-║  WebSocket:   ws://${HOSTNAME}:${portStr}/api/events        ║
-║  Terminal:    ws://${HOSTNAME}:${portStr}/api/terminal/ws   ║
-║  Health:      http://${HOSTNAME}:${portStr}/api/health      ║
-║  Terminal:    ${terminalStatus.padEnd(37)}║
-╚═══════════════════════════════════════════════════════╝
+╔═════════════════════════════════════════════════════════════════════╗
+║  ${sHeader}║
+╠═════════════════════════════════════════════════════════════════════╣
+║                                                                     ║
+║  ${s1}║
+║  ${s2}║
+║  ${s3}║
+║  ${s4}║
+║  ${s5}║
+║  ${s6}║
+║                                                                     ║
+╚═════════════════════════════════════════════════════════════════════╝
 `);
   });
 
   server.on('error', (error: NodeJS.ErrnoException) => {
     if (error.code === 'EADDRINUSE') {
+      const portStr = port.toString();
+      const nextPortStr = (port + 1).toString();
+      const killCmd = `lsof -ti:${portStr} | xargs kill -9`;
+      const altCmd = `PORT=${nextPortStr} npm run dev:server`;
+
+      const eHeader = `❌ ERROR: Port ${portStr} is already in use`.padEnd(67);
+      const e1 = 'Another process is using this port.'.padEnd(67);
+      const e2 = 'To fix this, try one of:'.padEnd(67);
+      const e3 = '1. Kill the process using the port:'.padEnd(67);
+      const e4 = `   ${killCmd}`.padEnd(67);
+      const e5 = '2. Use a different port:'.padEnd(67);
+      const e6 = `   ${altCmd}`.padEnd(67);
+      const e7 = '3. Use the init.sh script which handles this:'.padEnd(67);
+      const e8 = '   ./init.sh'.padEnd(67);
+
       logger.error(`
-╔═══════════════════════════════════════════════════════╗
-║  ❌ ERROR: Port ${port} is already in use              ║
-╠═══════════════════════════════════════════════════════╣
-║  Another process is using this port.                  ║
-║                                                       ║
-║  To fix this, try one of:                             ║
-║                                                       ║
-║  1. Kill the process using the port:                  ║
-║     lsof -ti:${port} | xargs kill -9                   ║
-║                                                       ║
-║  2. Use a different port:                             ║
-║     PORT=${port + 1} npm run dev:server                ║
-║                                                       ║
-║  3. Use the init.sh script which handles this:        ║
-║     ./init.sh                                         ║
-╚═══════════════════════════════════════════════════════╝
+╔═════════════════════════════════════════════════════════════════════╗
+║  ${eHeader}║
+╠═════════════════════════════════════════════════════════════════════╣
+║                                                                     ║
+║  ${e1}║
+║                                                                     ║
+║  ${e2}║
+║                                                                     ║
+║  ${e3}║
+║  ${e4}║
+║                                                                     ║
+║  ${e5}║
+║  ${e6}║
+║                                                                     ║
+║  ${e7}║
+║  ${e8}║
+║                                                                     ║
+╚═════════════════════════════════════════════════════════════════════╝
 `);
       process.exit(1);
     } else {
