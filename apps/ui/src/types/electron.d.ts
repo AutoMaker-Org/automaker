@@ -946,6 +946,58 @@ export interface WorktreeAPI {
     };
     error?: string;
   }>;
+
+  // Get available external terminals
+  getAvailableTerminals: () => Promise<{
+    success: boolean;
+    result?: {
+      terminals: Array<{
+        id: string;
+        name: string;
+        command: string;
+      }>;
+    };
+    error?: string;
+  }>;
+
+  // Get default external terminal
+  getDefaultTerminal: () => Promise<{
+    success: boolean;
+    result?: {
+      terminalId: string;
+      terminalName: string;
+      terminalCommand: string;
+    };
+    error?: string;
+  }>;
+
+  // Refresh terminal cache and re-detect available terminals
+  refreshTerminals: () => Promise<{
+    success: boolean;
+    result?: {
+      terminals: Array<{
+        id: string;
+        name: string;
+        command: string;
+      }>;
+      message: string;
+    };
+    error?: string;
+  }>;
+
+  // Open worktree in an external terminal
+  openInExternalTerminal: (
+    worktreePath: string,
+    terminalId?: string
+  ) => Promise<{
+    success: boolean;
+    result?: {
+      message: string;
+      terminalName: string;
+    };
+    error?: string;
+  }>;
+
   // Initialize git repository in a project
   initGit: (projectPath: string) => Promise<{
     success: boolean;

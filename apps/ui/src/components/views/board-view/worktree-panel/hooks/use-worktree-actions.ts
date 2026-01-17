@@ -3,7 +3,6 @@ import { useNavigate } from '@tanstack/react-router';
 import { createLogger } from '@automaker/utils/logger';
 import { getElectronAPI } from '@/lib/electron';
 import { toast } from 'sonner';
-import { useAppStore } from '@/store/app-store';
 import type { WorktreeInfo } from '../types';
 
 const logger = createLogger('WorktreeActions');
@@ -37,12 +36,11 @@ interface UseWorktreeActionsOptions {
 }
 
 export function useWorktreeActions({ fetchWorktrees, fetchBranches }: UseWorktreeActionsOptions) {
+  const navigate = useNavigate();
   const [isPulling, setIsPulling] = useState(false);
   const [isPushing, setIsPushing] = useState(false);
   const [isSwitching, setIsSwitching] = useState(false);
   const [isActivating, setIsActivating] = useState(false);
-  const navigate = useNavigate();
-  const setPendingTerminal = useAppStore((state) => state.setPendingTerminal);
 
   const handleSwitchBranch = useCallback(
     async (worktree: WorktreeInfo, branchName: string) => {
@@ -129,6 +127,18 @@ export function useWorktreeActions({ fetchWorktrees, fetchBranches }: UseWorktre
     [isPushing, fetchBranches, fetchWorktrees]
   );
 
+  const handleOpenInIntegratedTerminal = useCallback(
+    (worktree: WorktreeInfo, mode?: 'tab' | 'split') => {
+      // Navigate to the terminal view with the worktree path and branch name
+      // The terminal view will handle creating the terminal with the specified cwd
+      navigate({
+        to: '/terminal',
+        search: { cwd: worktree.path, branch: worktree.branch, mode },
+      });
+    },
+    [navigate]
+  );
+
   const handleOpenInEditor = useCallback(async (worktree: WorktreeInfo, editorCommand?: string) => {
     try {
       const api = getElectronAPI();
@@ -147,15 +157,25 @@ export function useWorktreeActions({ fetchWorktrees, fetchBranches }: UseWorktre
     }
   }, []);
 
-  const handleOpenInTerminal = useCallback(
-    (worktree: WorktreeInfo) => {
-      // Set the pending terminal with cwd and branch name
-      setPendingTerminal({ cwd: worktree.path, branchName: worktree.branch });
-      // Navigate to the terminal page
-      navigate({ to: '/terminal' });
-      logger.info('Opening terminal for worktree:', worktree.path, 'branch:', worktree.branch);
+  const handleOpenInExternalTerminal = useCallback(
+    async (worktree: WorktreeInfo, terminalId?: string) => {
+      try {
+        const api = getElectronAPI();
+        if (!api?.worktree?.openInExternalTerminal) {
+          logger.warn('Open in external terminal API not available');
+          return;
+        }
+        const result = await api.worktree.openInExternalTerminal(worktree.path, terminalId);
+        if (result.success && result.result) {
+          toast.success(result.result.message);
+        } else if (result.error) {
+          toast.error(result.error);
+        }
+      } catch (error) {
+        logger.error('Open in external terminal failed:', error);
+      }
     },
-    [navigate, setPendingTerminal]
+    []
   );
 
   return {
@@ -167,7 +187,8 @@ export function useWorktreeActions({ fetchWorktrees, fetchBranches }: UseWorktre
     handleSwitchBranch,
     handlePull,
     handlePush,
+    handleOpenInIntegratedTerminal,
     handleOpenInEditor,
-    handleOpenInTerminal,
+    handleOpenInExternalTerminal,
   };
 }

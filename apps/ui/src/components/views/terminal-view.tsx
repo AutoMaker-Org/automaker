@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useNavigate } from '@tanstack/react-router';
 import { createLogger } from '@automaker/utils/logger';
 import {
   Terminal as TerminalIcon,
@@ -216,7 +217,16 @@ function NewTabDropZone({ isDropTarget }: { isDropTarget: boolean }) {
   );
 }
 
-export function TerminalView() {
+interface TerminalViewProps {
+  /** Initial working directory to open a terminal in (e.g., from worktree panel) */
+  initialCwd?: string;
+  /** Branch name for display in toast (optional) */
+  initialBranch?: string;
+  /** Mode for opening terminal: 'tab' for new tab, 'split' for split in current tab */
+  initialMode?: 'tab' | 'split';
+}
+
+export function TerminalView({ initialCwd, initialBranch, initialMode }: TerminalViewProps) {
   const {
     terminalState,
     setTerminalUnlocked,
@@ -244,8 +254,9 @@ export function TerminalView() {
     setTerminalScrollbackLines,
     setTerminalScreenReaderMode,
     updateTerminalPanelSizes,
-    setPendingTerminal,
   } = useAppStore();
+
+  const navigate = useNavigate();
 
   const [status, setStatus] = useState<TerminalStatus | null>(null);
   const [loading, setLoading] = useState(true);
@@ -265,6 +276,7 @@ export function TerminalView() {
     max: number;
   } | null>(null);
   const hasShownHighRamWarningRef = useRef<boolean>(false);
+  const initialCwdHandledRef = useRef<string | null>(null);
 
   // Show warning when 20+ terminals are open
   useEffect(() => {
@@ -538,123 +550,99 @@ export function TerminalView() {
     }
   }, [terminalState.isUnlocked, fetchServerSettings]);
 
-  // Handle pending terminal (from "open in terminal" action on worktree menu)
-  // When pendingTerminal is set and we're ready, create a terminal based on openTerminalMode setting
-  const pendingTerminalRef = useRef<string | null>(null);
-  const pendingTerminalCreatedRef = useRef<boolean>(false);
+  // Handle initialCwd prop - auto-create a terminal with the specified working directory
+  // This is triggered when navigating from worktree panel's "Open in Integrated Terminal"
   useEffect(() => {
-    const pending = terminalState.pendingTerminal;
-    const openMode = terminalState.openTerminalMode;
+    // Skip if no initialCwd provided
+    if (!initialCwd) return;
 
-    // Skip if no pending terminal
-    if (!pending) {
-      // Reset the created ref when there's no pending terminal
-      pendingTerminalCreatedRef.current = false;
-      pendingTerminalRef.current = null;
-      return;
-    }
+    // Skip if we've already handled this exact cwd (prevents duplicate terminals)
+    // Include mode in the key to allow opening same cwd with different modes
+    const cwdKey = `${initialCwd}:${initialMode || 'default'}`;
+    if (initialCwdHandledRef.current === cwdKey) return;
 
-    // Skip if we already created a terminal for this exact cwd
-    if (pending.cwd === pendingTerminalRef.current && pendingTerminalCreatedRef.current) {
-      return;
-    }
+    // Skip if terminal is not enabled or not unlocked
+    if (!status?.enabled) return;
+    if (status.passwordRequired && !terminalState.isUnlocked) return;
 
-    // Skip if still loading or terminal not enabled
-    if (loading || !status?.enabled) {
-      logger.debug('Waiting for terminal to be ready before creating terminal for pending cwd');
-      return;
-    }
+    // Skip if still loading
+    if (loading) return;
 
-    // Skip if password is required but not unlocked yet
-    if (status.passwordRequired && !terminalState.isUnlocked) {
-      logger.debug('Waiting for terminal unlock before creating terminal for pending cwd');
-      return;
-    }
+    // Mark this cwd as being handled
+    initialCwdHandledRef.current = cwdKey;
 
-    // Track that we're processing this cwd
-    pendingTerminalRef.current = pending.cwd;
-
-    // Create a terminal with the pending cwd
-    logger.info('Creating terminal from pending:', pending, 'mode:', openMode);
-
-    const createTerminalFromPending = async () => {
+    // Create the terminal with the specified cwd
+    const createTerminalWithCwd = async () => {
       try {
         const headers: Record<string, string> = {};
-        const authToken = useAppStore.getState().terminalState.authToken;
-        if (authToken) {
-          headers['X-Terminal-Token'] = authToken;
+        if (terminalState.authToken) {
+          headers['X-Terminal-Token'] = terminalState.authToken;
         }
 
         const response = await apiFetch('/api/terminal/sessions', 'POST', {
           headers,
-          body: { cwd: pending.cwd, cols: 80, rows: 24 },
+          body: { cwd: initialCwd, cols: 80, rows: 24 },
         });
         const data = await response.json();
 
         if (data.success) {
-          // Mark as successfully created
-          pendingTerminalCreatedRef.current = true;
-
-          if (openMode === 'newTab') {
-            // Create a new tab with default naming
+          // Create in new tab or split based on mode
+          if (initialMode === 'tab') {
+            // Create in a new tab (tab name uses default "Terminal N" naming)
             const newTabId = addTerminalTab();
-
-            // Set the tab's layout to the new terminal with branch name for display in header
-            useAppStore
-              .getState()
-              .setTerminalTabLayout(
-                newTabId,
-                {
-                  type: 'terminal',
-                  sessionId: data.data.id,
-                  size: 100,
-                  branchName: pending.branchName,
-                },
-                data.data.id
-              );
-            toast.success(`Opened terminal for ${pending.branchName}`);
+            const { addTerminalToTab } = useAppStore.getState();
+            // Pass branch name for display in terminal panel header
+            addTerminalToTab(data.data.id, newTabId, 'horizontal', initialBranch);
           } else {
-            // Split mode: add to current tab layout with branch name
-            addTerminalToLayout(data.data.id, 'horizontal', undefined, pending.branchName);
-            toast.success(`Opened terminal for ${pending.branchName}`);
+            // Default: add to current tab (split if there's already a terminal)
+            // Pass branch name for display in terminal panel header
+            addTerminalToLayout(data.data.id, undefined, undefined, initialBranch);
           }
 
           // Mark this session as new for running initial command
           if (defaultRunScript) {
             setNewSessionIds((prev) => new Set(prev).add(data.data.id));
           }
+
+          // Show success toast with branch name if provided
+          const displayName = initialBranch || initialCwd.split('/').pop() || initialCwd;
+          toast.success(`Terminal opened at ${displayName}`);
+
+          // Refresh session count
           fetchServerSettings();
-          // Clear the pending terminal after successful creation
-          setPendingTerminal(null);
+
+          // Clear the cwd from the URL to prevent re-creating on refresh
+          navigate({ to: '/terminal', search: {}, replace: true });
         } else {
-          logger.error('Failed to create session from pending terminal:', data.error);
-          toast.error('Failed to open terminal', {
+          logger.error('Failed to create terminal for cwd:', data.error);
+          toast.error('Failed to create terminal', {
             description: data.error || 'Unknown error',
           });
-          // Clear pending terminal on failure to prevent infinite retries
-          setPendingTerminal(null);
         }
       } catch (err) {
-        logger.error('Create session error from pending terminal:', err);
-        toast.error('Failed to open terminal');
-        // Clear pending terminal on error to prevent infinite retries
-        setPendingTerminal(null);
+        logger.error('Create terminal with cwd error:', err);
+        toast.error('Failed to create terminal', {
+          description: 'Could not connect to server',
+        });
       }
     };
 
-    createTerminalFromPending();
+    createTerminalWithCwd();
   }, [
-    terminalState.pendingTerminal,
-    terminalState.openTerminalMode,
-    terminalState.isUnlocked,
-    loading,
+    initialCwd,
+    initialBranch,
+    initialMode,
     status?.enabled,
     status?.passwordRequired,
-    setPendingTerminal,
-    addTerminalTab,
-    addTerminalToLayout,
+    terminalState.isUnlocked,
+    terminalState.authToken,
+    terminalState.tabs.length,
+    loading,
     defaultRunScript,
+    addTerminalToLayout,
+    addTerminalTab,
     fetchServerSettings,
+    navigate,
   ]);
 
   // Handle project switching - save and restore terminal layouts
@@ -794,7 +782,6 @@ export function TerminalView() {
               sessionId,
               size: persisted.size,
               fontSize: persisted.fontSize,
-              branchName: persisted.branchName,
             };
           }
 
@@ -949,9 +936,11 @@ export function TerminalView() {
 
   // Create a new terminal session
   // targetSessionId: the terminal to split (if splitting an existing terminal)
+  // customCwd: optional working directory to use instead of the current project path
   const createTerminal = async (
     direction?: 'horizontal' | 'vertical',
-    targetSessionId?: string
+    targetSessionId?: string,
+    customCwd?: string
   ) => {
     if (!canCreateTerminal('[Terminal] Debounced terminal creation')) {
       return;
@@ -965,7 +954,7 @@ export function TerminalView() {
 
       const response = await apiFetch('/api/terminal/sessions', 'POST', {
         headers,
-        body: { cwd: currentProject?.path || undefined, cols: 80, rows: 24 },
+        body: { cwd: customCwd || currentProject?.path || undefined, cols: 80, rows: 24 },
       });
       const data = await response.json();
 

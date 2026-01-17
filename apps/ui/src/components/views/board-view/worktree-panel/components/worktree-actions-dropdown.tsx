@@ -27,13 +27,21 @@ import {
   Copy,
   ScrollText,
   Terminal,
+  SquarePlus,
+  SplitSquareHorizontal,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import type { WorktreeInfo, DevServerInfo, PRInfo, GitRepoStatus } from '../types';
 import { TooltipWrapper } from './tooltip-wrapper';
 import { useAvailableEditors, useEffectiveDefaultEditor } from '../hooks/use-available-editors';
+import {
+  useAvailableTerminals,
+  useEffectiveDefaultTerminal,
+} from '../hooks/use-available-terminals';
 import { getEditorIcon } from '@/components/icons/editor-icons';
+import { getTerminalIcon } from '@/components/icons/terminal-icons';
+import { useAppStore } from '@/store/app-store';
 
 interface WorktreeActionsDropdownProps {
   worktree: WorktreeInfo;
@@ -52,7 +60,8 @@ interface WorktreeActionsDropdownProps {
   onPull: (worktree: WorktreeInfo) => void;
   onPush: (worktree: WorktreeInfo) => void;
   onOpenInEditor: (worktree: WorktreeInfo, editorCommand?: string) => void;
-  onOpenInTerminal: (worktree: WorktreeInfo) => void;
+  onOpenInIntegratedTerminal: (worktree: WorktreeInfo, mode?: 'tab' | 'split') => void;
+  onOpenInExternalTerminal: (worktree: WorktreeInfo, terminalId?: string) => void;
   onCommit: (worktree: WorktreeInfo) => void;
   onCreatePR: (worktree: WorktreeInfo) => void;
   onAddressPRComments: (worktree: WorktreeInfo, prInfo: PRInfo) => void;
@@ -83,7 +92,8 @@ export function WorktreeActionsDropdown({
   onPull,
   onPush,
   onOpenInEditor,
-  onOpenInTerminal,
+  onOpenInIntegratedTerminal,
+  onOpenInExternalTerminal,
   onCommit,
   onCreatePR,
   onAddressPRComments,
@@ -110,6 +120,20 @@ export function WorktreeActionsDropdown({
   const DefaultEditorIcon = effectiveDefaultEditor
     ? getEditorIcon(effectiveDefaultEditor.command)
     : null;
+
+  // Get available terminals for the "Open In Terminal" submenu
+  const { terminals, hasExternalTerminals } = useAvailableTerminals();
+
+  // Use shared hook for effective default terminal (null = integrated terminal)
+  const effectiveDefaultTerminal = useEffectiveDefaultTerminal(terminals);
+
+  // Get the user's preferred mode for opening terminals (new tab vs split)
+  const openTerminalMode = useAppStore((s) => s.terminalState.openTerminalMode);
+
+  // Get icon component for the effective terminal
+  const DefaultTerminalIcon = effectiveDefaultTerminal
+    ? getTerminalIcon(effectiveDefaultTerminal.id)
+    : Terminal;
 
   // Check if there's a PR associated with this worktree from stored metadata
   const hasPR = !!worktree.pr;
@@ -306,10 +330,77 @@ export function WorktreeActionsDropdown({
             </DropdownMenuSubContent>
           </DropdownMenuSub>
         )}
-        <DropdownMenuItem onClick={() => onOpenInTerminal(worktree)} className="text-xs">
-          <Terminal className="w-3.5 h-3.5 mr-2" />
-          Open in Terminal
-        </DropdownMenuItem>
+        {/* Open in terminal - always show with integrated + external options */}
+        <DropdownMenuSub>
+          <div className="flex items-center">
+            {/* Main clickable area - opens in default terminal (integrated or external) */}
+            <DropdownMenuItem
+              onClick={() => {
+                if (effectiveDefaultTerminal) {
+                  // External terminal is the default
+                  onOpenInExternalTerminal(worktree, effectiveDefaultTerminal.id);
+                } else {
+                  // Integrated terminal is the default - use user's preferred mode
+                  const mode = openTerminalMode === 'newTab' ? 'tab' : 'split';
+                  onOpenInIntegratedTerminal(worktree, mode);
+                }
+              }}
+              className="text-xs flex-1 pr-0 rounded-r-none"
+            >
+              <DefaultTerminalIcon className="w-3.5 h-3.5 mr-2" />
+              Open in {effectiveDefaultTerminal?.name ?? 'Terminal'}
+            </DropdownMenuItem>
+            {/* Chevron trigger for submenu with all terminals */}
+            <DropdownMenuSubTrigger className="text-xs px-1 rounded-l-none border-l border-border/30 h-8" />
+          </div>
+          <DropdownMenuSubContent>
+            {/* Automaker Terminal - with submenu for new tab vs split */}
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger className="text-xs">
+                <Terminal className="w-3.5 h-3.5 mr-2" />
+                Terminal
+                {!effectiveDefaultTerminal && (
+                  <span className="ml-auto mr-2 text-[10px] text-muted-foreground">(default)</span>
+                )}
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent>
+                <DropdownMenuItem
+                  onClick={() => onOpenInIntegratedTerminal(worktree, 'tab')}
+                  className="text-xs"
+                >
+                  <SquarePlus className="w-3.5 h-3.5 mr-2" />
+                  New Tab
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => onOpenInIntegratedTerminal(worktree, 'split')}
+                  className="text-xs"
+                >
+                  <SplitSquareHorizontal className="w-3.5 h-3.5 mr-2" />
+                  Split
+                </DropdownMenuItem>
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
+            {/* External terminals */}
+            {terminals.length > 0 && <DropdownMenuSeparator />}
+            {terminals.map((terminal) => {
+              const TerminalIcon = getTerminalIcon(terminal.id);
+              const isDefault = terminal.id === effectiveDefaultTerminal?.id;
+              return (
+                <DropdownMenuItem
+                  key={terminal.id}
+                  onClick={() => onOpenInExternalTerminal(worktree, terminal.id)}
+                  className="text-xs"
+                >
+                  <TerminalIcon className="w-3.5 h-3.5 mr-2" />
+                  {terminal.name}
+                  {isDefault && (
+                    <span className="ml-auto text-[10px] text-muted-foreground">(default)</span>
+                  )}
+                </DropdownMenuItem>
+              );
+            })}
+          </DropdownMenuSubContent>
+        </DropdownMenuSub>
         {!worktree.isMain && hasInitScript && (
           <DropdownMenuItem onClick={() => onRunInitScript(worktree)} className="text-xs">
             <RefreshCw className="w-3.5 h-3.5 mr-2" />

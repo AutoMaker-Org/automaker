@@ -78,8 +78,9 @@ export function WorktreePanel({
     handleSwitchBranch,
     handlePull,
     handlePush,
+    handleOpenInIntegratedTerminal,
     handleOpenInEditor,
-    handleOpenInTerminal,
+    handleOpenInExternalTerminal,
   } = useWorktreeActions({
     fetchWorktrees,
     fetchBranches,
@@ -246,7 +247,8 @@ export function WorktreePanel({
             onPull={handlePull}
             onPush={handlePush}
             onOpenInEditor={handleOpenInEditor}
-            onOpenInTerminal={handleOpenInTerminal}
+            onOpenInIntegratedTerminal={handleOpenInIntegratedTerminal}
+            onOpenInExternalTerminal={handleOpenInExternalTerminal}
             onCommit={onCommit}
             onCreatePR={onCreatePR}
             onAddressPRComments={onAddressPRComments}
@@ -334,7 +336,8 @@ export function WorktreePanel({
             onPull={handlePull}
             onPush={handlePush}
             onOpenInEditor={handleOpenInEditor}
-            onOpenInTerminal={handleOpenInTerminal}
+            onOpenInIntegratedTerminal={handleOpenInIntegratedTerminal}
+            onOpenInExternalTerminal={handleOpenInExternalTerminal}
             onCommit={onCommit}
             onCreatePR={onCreatePR}
             onAddressPRComments={onAddressPRComments}
@@ -393,7 +396,8 @@ export function WorktreePanel({
                   onPull={handlePull}
                   onPush={handlePush}
                   onOpenInEditor={handleOpenInEditor}
-                  onOpenInTerminal={handleOpenInTerminal}
+                  onOpenInIntegratedTerminal={handleOpenInIntegratedTerminal}
+                  onOpenInExternalTerminal={handleOpenInExternalTerminal}
                   onCommit={onCommit}
                   onCreatePR={onCreatePR}
                   onAddressPRComments={onAddressPRComments}

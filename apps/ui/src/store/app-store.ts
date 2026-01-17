@@ -731,6 +731,9 @@ export interface AppState {
   // Editor Configuration
   defaultEditorCommand: string | null; // Default editor for "Open In" action
 
+  // Terminal Configuration
+  defaultTerminalId: string | null; // Default external terminal for "Open In Terminal" action (null = integrated)
+
   // Skills Configuration
   enableSkills: boolean; // Enable Skills functionality (loads from .claude/skills/ directories)
   skillsSources: Array<'user' | 'project'>; // Which directories to load Skills from
@@ -1169,6 +1172,9 @@ export interface AppActions {
   // Editor Configuration actions
   setDefaultEditorCommand: (command: string | null) => void;
 
+  // Terminal Configuration actions
+  setDefaultTerminalId: (terminalId: string | null) => void;
+
   // Prompt Customization actions
   setPromptCustomization: (customization: PromptCustomization) => Promise<void>;
 
@@ -1244,7 +1250,8 @@ export interface AppActions {
   addTerminalToTab: (
     sessionId: string,
     tabId: string,
-    direction?: 'horizontal' | 'vertical'
+    direction?: 'horizontal' | 'vertical',
+    branchName?: string
   ) => void;
   setTerminalTabLayout: (
     tabId: string,
@@ -1426,6 +1433,7 @@ const initialState: AppState = {
   skipSandboxWarning: false, // Default to disabled (show sandbox warning dialog)
   mcpServers: [], // No MCP servers configured by default
   defaultEditorCommand: null, // Auto-detect: Cursor > VS Code > first available
+  defaultTerminalId: null, // Integrated terminal by default
   enableSkills: true, // Skills enabled by default
   skillsSources: ['user', 'project'] as Array<'user' | 'project'>, // Load from both sources by default
   enableSubagents: true, // Subagents enabled by default
@@ -2425,6 +2433,8 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
 
   // Editor Configuration actions
   setDefaultEditorCommand: (command) => set({ defaultEditorCommand: command }),
+  // Terminal Configuration actions
+  setDefaultTerminalId: (terminalId) => set({ defaultTerminalId: terminalId }),
   // Prompt Customization actions
   setPromptCustomization: async (customization) => {
     set({ promptCustomization: customization });
@@ -3240,7 +3250,7 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
     });
   },
 
-  addTerminalToTab: (sessionId, tabId, direction = 'horizontal') => {
+  addTerminalToTab: (sessionId, tabId, direction = 'horizontal', branchName) => {
     const current = get().terminalState;
     const tab = current.tabs.find((t) => t.id === tabId);
     if (!tab) return;
@@ -3249,11 +3259,12 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
       type: 'terminal',
       sessionId,
       size: 50,
+      branchName,
     };
     let newLayout: TerminalPanelContent;
 
     if (!tab.layout) {
-      newLayout = { type: 'terminal', sessionId, size: 100 };
+      newLayout = { type: 'terminal', sessionId, size: 100, branchName };
     } else if (tab.layout.type === 'terminal') {
       newLayout = {
         type: 'split',

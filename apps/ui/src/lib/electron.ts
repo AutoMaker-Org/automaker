@@ -1852,6 +1852,56 @@ function createMockWorktreeAPI(): WorktreeAPI {
       };
     },
 
+    getAvailableTerminals: async () => {
+      console.log('[Mock] Getting available terminals');
+      return {
+        success: true,
+        result: {
+          terminals: [
+            { id: 'iterm2', name: 'iTerm2', command: 'open -a iTerm' },
+            { id: 'terminal-macos', name: 'Terminal', command: 'open -a Terminal' },
+          ],
+        },
+      };
+    },
+
+    getDefaultTerminal: async () => {
+      console.log('[Mock] Getting default terminal');
+      return {
+        success: true,
+        result: {
+          terminalId: 'iterm2',
+          terminalName: 'iTerm2',
+          terminalCommand: 'open -a iTerm',
+        },
+      };
+    },
+
+    refreshTerminals: async () => {
+      console.log('[Mock] Refreshing available terminals');
+      return {
+        success: true,
+        result: {
+          terminals: [
+            { id: 'iterm2', name: 'iTerm2', command: 'open -a iTerm' },
+            { id: 'terminal-macos', name: 'Terminal', command: 'open -a Terminal' },
+          ],
+          message: 'Found 2 available terminals',
+        },
+      };
+    },
+
+    openInExternalTerminal: async (worktreePath: string, terminalId?: string) => {
+      console.log('[Mock] Opening in external terminal:', worktreePath, terminalId);
+      return {
+        success: true,
+        result: {
+          message: `Opened ${worktreePath} in ${terminalId ?? 'default terminal'}`,
+          terminalName: terminalId ?? 'Terminal',
+        },
+      };
+    },
+
     initGit: async (projectPath: string) => {
       console.log('[Mock] Initializing git:', projectPath);
       return {

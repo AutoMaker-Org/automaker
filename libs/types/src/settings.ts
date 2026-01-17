@@ -607,6 +607,10 @@ export interface GlobalSettings {
   /** Default editor command for "Open In" action (null = auto-detect: Cursor > VS Code > first available) */
   defaultEditorCommand: string | null;
 
+  // Terminal Configuration
+  /** Default external terminal ID for "Open In Terminal" action (null = integrated terminal) */
+  defaultTerminalId: string | null;
+
   // Prompt Customization
   /** Custom prompts for Auto Mode, Agent Runner, Backlog Planning, and Enhancements */
   promptCustomization?: PromptCustomization;
@@ -896,6 +900,7 @@ export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
   codexThreadId: undefined,
   mcpServers: [],
   defaultEditorCommand: null,
+  defaultTerminalId: null,
   enableSkills: true,
   skillsSources: ['user', 'project'],
   enableSubagents: true,

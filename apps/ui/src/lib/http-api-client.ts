@@ -1770,6 +1770,11 @@ export class HttpApiClient implements ElectronAPI {
     getDefaultEditor: () => this.get('/api/worktree/default-editor'),
     getAvailableEditors: () => this.get('/api/worktree/available-editors'),
     refreshEditors: () => this.post('/api/worktree/refresh-editors', {}),
+    getAvailableTerminals: () => this.get('/api/worktree/available-terminals'),
+    getDefaultTerminal: () => this.get('/api/worktree/default-terminal'),
+    refreshTerminals: () => this.post('/api/worktree/refresh-terminals', {}),
+    openInExternalTerminal: (worktreePath: string, terminalId?: string) =>
+      this.post('/api/worktree/open-in-external-terminal', { worktreePath, terminalId }),
     initGit: (projectPath: string) => this.post('/api/worktree/init-git', { projectPath }),
     startDevServer: (projectPath: string, worktreePath: string) =>
       this.post('/api/worktree/start-dev', { projectPath, worktreePath }),

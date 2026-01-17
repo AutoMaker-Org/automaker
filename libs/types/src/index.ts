@@ -292,3 +292,6 @@ export type {
   EventReplayHookResult,
 } from './event-history.js';
 export { EVENT_HISTORY_VERSION, DEFAULT_EVENT_HISTORY_INDEX } from './event-history.js';
+
+// Terminal types
+export type { TerminalInfo } from './terminal.js';
