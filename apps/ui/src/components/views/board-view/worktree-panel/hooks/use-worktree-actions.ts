@@ -42,7 +42,7 @@ export function useWorktreeActions({ fetchWorktrees, fetchBranches }: UseWorktre
   const [isSwitching, setIsSwitching] = useState(false);
   const [isActivating, setIsActivating] = useState(false);
   const navigate = useNavigate();
-  const setPendingTerminalCwd = useAppStore((state) => state.setPendingTerminalCwd);
+  const setPendingTerminal = useAppStore((state) => state.setPendingTerminal);
 
   const handleSwitchBranch = useCallback(
     async (worktree: WorktreeInfo, branchName: string) => {
@@ -149,13 +149,13 @@ export function useWorktreeActions({ fetchWorktrees, fetchBranches }: UseWorktre
 
   const handleOpenInTerminal = useCallback(
     (worktree: WorktreeInfo) => {
-      // Set the pending terminal cwd to the worktree path
-      setPendingTerminalCwd(worktree.path);
+      // Set the pending terminal with cwd and branch name
+      setPendingTerminal({ cwd: worktree.path, branchName: worktree.branch });
       // Navigate to the terminal page
       navigate({ to: '/terminal' });
-      logger.info('Opening terminal for worktree:', worktree.path);
+      logger.info('Opening terminal for worktree:', worktree.path, 'branch:', worktree.branch);
     },
-    [navigate, setPendingTerminalCwd]
+    [navigate, setPendingTerminal]
   );
 
   return {

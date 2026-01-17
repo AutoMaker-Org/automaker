@@ -25,6 +25,7 @@ export function TerminalSection() {
     setTerminalScrollbackLines,
     setTerminalLineHeight,
     setTerminalDefaultFontSize,
+    setOpenTerminalMode,
   } = useAppStore();
 
   const {
@@ -34,6 +35,7 @@ export function TerminalSection() {
     scrollbackLines,
     lineHeight,
     defaultFontSize,
+    openTerminalMode,
   } = terminalState;
 
   return (
@@ -163,6 +165,26 @@ export function TerminalSection() {
             placeholder="e.g., claude, codex, npm run dev"
             className="bg-accent/30 border-border/50"
           />
+        </div>
+
+        {/* Open in Terminal Mode */}
+        <div className="space-y-3">
+          <Label className="text-foreground font-medium">Open in Terminal Mode</Label>
+          <p className="text-xs text-muted-foreground">
+            How to open terminals from the "Open in Terminal" action in the worktree menu
+          </p>
+          <Select
+            value={openTerminalMode}
+            onValueChange={(value: 'newTab' | 'split') => setOpenTerminalMode(value)}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="newTab">New Tab (named after branch)</SelectItem>
+              <SelectItem value="split">Split Current Tab</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
         {/* Screen Reader Mode */}

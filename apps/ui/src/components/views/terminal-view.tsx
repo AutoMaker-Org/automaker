@@ -244,7 +244,7 @@ export function TerminalView() {
     setTerminalScrollbackLines,
     setTerminalScreenReaderMode,
     updateTerminalPanelSizes,
-    setPendingTerminalCwd,
+    setPendingTerminal,
   } = useAppStore();
 
   const [status, setStatus] = useState<TerminalStatus | null>(null);
@@ -538,23 +538,24 @@ export function TerminalView() {
     }
   }, [terminalState.isUnlocked, fetchServerSettings]);
 
-  // Handle pending terminal cwd (from "open in terminal" action on worktree menu)
-  // When pendingTerminalCwd is set and we're ready, create a terminal with that cwd
-  const pendingTerminalCwdRef = useRef<string | null>(null);
+  // Handle pending terminal (from "open in terminal" action on worktree menu)
+  // When pendingTerminal is set and we're ready, create a terminal based on openTerminalMode setting
+  const pendingTerminalRef = useRef<string | null>(null);
   const pendingTerminalCreatedRef = useRef<boolean>(false);
   useEffect(() => {
-    const pendingCwd = terminalState.pendingTerminalCwd;
+    const pending = terminalState.pendingTerminal;
+    const openMode = terminalState.openTerminalMode;
 
-    // Skip if no pending cwd
-    if (!pendingCwd) {
-      // Reset the created ref when there's no pending cwd
+    // Skip if no pending terminal
+    if (!pending) {
+      // Reset the created ref when there's no pending terminal
       pendingTerminalCreatedRef.current = false;
-      pendingTerminalCwdRef.current = null;
+      pendingTerminalRef.current = null;
       return;
     }
 
     // Skip if we already created a terminal for this exact cwd
-    if (pendingCwd === pendingTerminalCwdRef.current && pendingTerminalCreatedRef.current) {
+    if (pending.cwd === pendingTerminalRef.current && pendingTerminalCreatedRef.current) {
       return;
     }
 
@@ -571,13 +572,12 @@ export function TerminalView() {
     }
 
     // Track that we're processing this cwd
-    pendingTerminalCwdRef.current = pendingCwd;
+    pendingTerminalRef.current = pending.cwd;
 
     // Create a terminal with the pending cwd
-    logger.info('Creating terminal from pending cwd:', pendingCwd);
+    logger.info('Creating terminal from pending:', pending, 'mode:', openMode);
 
-    // Create terminal with the specified cwd
-    const createTerminalWithCwd = async () => {
+    const createTerminalFromPending = async () => {
       try {
         const headers: Record<string, string> = {};
         const authToken = useAppStore.getState().terminalState.authToken;
@@ -587,46 +587,66 @@ export function TerminalView() {
 
         const response = await apiFetch('/api/terminal/sessions', 'POST', {
           headers,
-          body: { cwd: pendingCwd, cols: 80, rows: 24 },
+          body: { cwd: pending.cwd, cols: 80, rows: 24 },
         });
         const data = await response.json();
 
         if (data.success) {
           // Mark as successfully created
           pendingTerminalCreatedRef.current = true;
-          addTerminalToLayout(data.data.id);
+
+          if (openMode === 'newTab') {
+            // Create a new tab named after the branch
+            const newTabId = addTerminalTab(pending.branchName);
+
+            // Set the tab's layout to the new terminal
+            useAppStore
+              .getState()
+              .setTerminalTabLayout(
+                newTabId,
+                { type: 'terminal', sessionId: data.data.id, size: 100 },
+                data.data.id
+              );
+            toast.success(`Opened terminal for ${pending.branchName}`);
+          } else {
+            // Split mode: add to current tab layout
+            addTerminalToLayout(data.data.id);
+            toast.success(`Opened terminal in ${pending.cwd.split('/').pop() || pending.cwd}`);
+          }
+
           // Mark this session as new for running initial command
           if (defaultRunScript) {
             setNewSessionIds((prev) => new Set(prev).add(data.data.id));
           }
           fetchServerSettings();
-          toast.success(`Opened terminal in ${pendingCwd.split('/').pop() || pendingCwd}`);
-          // Clear the pending cwd after successful creation
-          setPendingTerminalCwd(null);
+          // Clear the pending terminal after successful creation
+          setPendingTerminal(null);
         } else {
-          logger.error('Failed to create session from pending cwd:', data.error);
+          logger.error('Failed to create session from pending terminal:', data.error);
           toast.error('Failed to open terminal', {
             description: data.error || 'Unknown error',
           });
-          // Clear pending cwd on failure to prevent infinite retries
-          setPendingTerminalCwd(null);
+          // Clear pending terminal on failure to prevent infinite retries
+          setPendingTerminal(null);
         }
       } catch (err) {
-        logger.error('Create session error from pending cwd:', err);
+        logger.error('Create session error from pending terminal:', err);
         toast.error('Failed to open terminal');
-        // Clear pending cwd on error to prevent infinite retries
-        setPendingTerminalCwd(null);
+        // Clear pending terminal on error to prevent infinite retries
+        setPendingTerminal(null);
       }
     };
 
-    createTerminalWithCwd();
+    createTerminalFromPending();
   }, [
-    terminalState.pendingTerminalCwd,
+    terminalState.pendingTerminal,
+    terminalState.openTerminalMode,
     terminalState.isUnlocked,
     loading,
     status?.enabled,
     status?.passwordRequired,
-    setPendingTerminalCwd,
+    setPendingTerminal,
+    addTerminalTab,
     addTerminalToLayout,
     defaultRunScript,
     fetchServerSettings,
