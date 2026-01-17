@@ -181,7 +181,7 @@ export function TerminalSection() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="newTab">New Tab (named after branch)</SelectItem>
+              <SelectItem value="newTab">New Tab</SelectItem>
               <SelectItem value="split">Split Current Tab</SelectItem>
             </SelectContent>
           </Select>

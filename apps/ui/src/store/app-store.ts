@@ -500,7 +500,7 @@ export interface ProjectAnalysis {
 
 // Terminal panel layout types (recursive for splits)
 export type TerminalPanelContent =
-  | { type: 'terminal'; sessionId: string; size?: number; fontSize?: number }
+  | { type: 'terminal'; sessionId: string; size?: number; fontSize?: number; branchName?: string }
   | {
       type: 'split';
       id: string; // Stable ID for React key stability
@@ -538,7 +538,7 @@ export interface TerminalState {
 // Persisted terminal layout - now includes sessionIds for reconnection
 // Used to restore terminal layout structure when switching projects
 export type PersistedTerminalPanel =
-  | { type: 'terminal'; size?: number; fontSize?: number; sessionId?: string }
+  | { type: 'terminal'; size?: number; fontSize?: number; sessionId?: string; branchName?: string }
   | {
       type: 'split';
       id?: string; // Optional for backwards compatibility with older persisted layouts
@@ -576,6 +576,7 @@ export interface PersistedTerminalSettings {
   scrollbackLines: number;
   lineHeight: number;
   maxSessions: number;
+  openTerminalMode: 'newTab' | 'split';
 }
 
 /** State for worktree init script execution */
@@ -1217,7 +1218,8 @@ export interface AppActions {
   addTerminalToLayout: (
     sessionId: string,
     direction?: 'horizontal' | 'vertical',
-    targetSessionId?: string
+    targetSessionId?: string,
+    branchName?: string
   ) => void;
   removeTerminalFromLayout: (sessionId: string) => void;
   swapTerminals: (sessionId1: string, sessionId2: string) => void;
@@ -2662,12 +2664,13 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
     });
   },
 
-  addTerminalToLayout: (sessionId, direction = 'horizontal', targetSessionId) => {
+  addTerminalToLayout: (sessionId, direction = 'horizontal', targetSessionId, branchName) => {
     const current = get().terminalState;
     const newTerminal: TerminalPanelContent = {
       type: 'terminal',
       sessionId,
       size: 50,
+      branchName,
     };
 
     // If no tabs, create first tab
@@ -2680,7 +2683,7 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
             {
               id: newTabId,
               name: 'Terminal 1',
-              layout: { type: 'terminal', sessionId, size: 100 },
+              layout: { type: 'terminal', sessionId, size: 100, branchName },
             },
           ],
           activeTabId: newTabId,
@@ -3382,6 +3385,7 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
           size: panel.size,
           fontSize: panel.fontSize,
           sessionId: panel.sessionId, // Preserve for reconnection
+          branchName: panel.branchName, // Preserve branch name for display
         };
       }
       return {

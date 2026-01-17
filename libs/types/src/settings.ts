@@ -475,6 +475,10 @@ export interface GlobalSettings {
   /** Terminal font family (undefined = use default Menlo/Monaco) */
   terminalFontFamily?: string;
 
+  // Terminal Configuration
+  /** How to open terminals from "Open in Terminal" worktree action */
+  openTerminalMode?: 'newTab' | 'split';
+
   // UI State Preferences
   /** Whether sidebar is currently open */
   sidebarOpen: boolean;

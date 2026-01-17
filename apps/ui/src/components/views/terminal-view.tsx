@@ -596,22 +596,27 @@ export function TerminalView() {
           pendingTerminalCreatedRef.current = true;
 
           if (openMode === 'newTab') {
-            // Create a new tab named after the branch
-            const newTabId = addTerminalTab(pending.branchName);
+            // Create a new tab with default naming
+            const newTabId = addTerminalTab();
 
-            // Set the tab's layout to the new terminal
+            // Set the tab's layout to the new terminal with branch name for display in header
             useAppStore
               .getState()
               .setTerminalTabLayout(
                 newTabId,
-                { type: 'terminal', sessionId: data.data.id, size: 100 },
+                {
+                  type: 'terminal',
+                  sessionId: data.data.id,
+                  size: 100,
+                  branchName: pending.branchName,
+                },
                 data.data.id
               );
             toast.success(`Opened terminal for ${pending.branchName}`);
           } else {
-            // Split mode: add to current tab layout
-            addTerminalToLayout(data.data.id);
-            toast.success(`Opened terminal in ${pending.cwd.split('/').pop() || pending.cwd}`);
+            // Split mode: add to current tab layout with branch name
+            addTerminalToLayout(data.data.id, 'horizontal', undefined, pending.branchName);
+            toast.success(`Opened terminal for ${pending.branchName}`);
           }
 
           // Mark this session as new for running initial command
@@ -789,6 +794,7 @@ export function TerminalView() {
               sessionId,
               size: persisted.size,
               fontSize: persisted.fontSize,
+              branchName: persisted.branchName,
             };
           }
 
@@ -1347,6 +1353,7 @@ export function TerminalView() {
             onCommandRan={() => handleCommandRan(content.sessionId)}
             isMaximized={terminalState.maximizedSessionId === content.sessionId}
             onToggleMaximize={() => toggleTerminalMaximized(content.sessionId)}
+            branchName={content.branchName}
           />
         </TerminalErrorBoundary>
       );
