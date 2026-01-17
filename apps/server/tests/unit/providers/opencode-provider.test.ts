@@ -1311,4 +1311,317 @@ describe('opencode-provider.ts', () => {
       expect(args[modelIndex + 1]).toBe('provider/model-v1.2.3-beta');
     });
   });
+
+  // ==========================================================================
+  // parseProvidersOutput Tests
+  // ==========================================================================
+
+  describe('parseProvidersOutput', () => {
+    // Helper function to access private method
+    function parseProviders(output: string) {
+      return (
+        provider as unknown as {
+          parseProvidersOutput: (output: string) => Array<{
+            id: string;
+            name: string;
+            authenticated: boolean;
+            authMethod?: 'oauth' | 'api_key';
+          }>;
+        }
+      ).parseProvidersOutput(output);
+    }
+
+    // =======================================================================
+    // Critical Fix Validation
+    // =======================================================================
+
+    describe('Critical Fix Validation', () => {
+      it('should map "z.ai coding plan" to "zai-coding-plan" (NOT "z-ai")', () => {
+        const output = '●  z.ai coding plan oauth';
+        const result = parseProviders(output);
+
+        expect(result).toHaveLength(1);
+        expect(result[0].id).toBe('zai-coding-plan');
+        expect(result[0].name).toBe('z.ai coding plan');
+        expect(result[0].authMethod).toBe('oauth');
+      });
+
+      it('should map "z.ai" to "z-ai" (different from coding plan)', () => {
+        const output = '●  z.ai api';
+        const result = parseProviders(output);
+
+        expect(result).toHaveLength(1);
+        expect(result[0].id).toBe('z-ai');
+        expect(result[0].name).toBe('z.ai');
+        expect(result[0].authMethod).toBe('api_key');
+      });
+
+      it('should distinguish between "z.ai coding plan" and "z.ai"', () => {
+        const output = '●  z.ai coding plan oauth\n●  z.ai api';
+        const result = parseProviders(output);
+
+        expect(result).toHaveLength(2);
+        expect(result[0].id).toBe('zai-coding-plan');
+        expect(result[0].name).toBe('z.ai coding plan');
+        expect(result[1].id).toBe('z-ai');
+        expect(result[1].name).toBe('z.ai');
+      });
+    });
+
+    // =======================================================================
+    // Provider Name Mapping
+    // =======================================================================
+
+    describe('Provider Name Mapping', () => {
+      it('should map all 12 providers correctly', () => {
+        const output = `●  anthropic oauth
+●  github copilot oauth
+●  google api
+●  openai api
+●  openrouter api
+●  azure api
+●  amazon bedrock oauth
+●  ollama api
+●  lm studio api
+●  opencode oauth
+●  z.ai coding plan oauth
+●  z.ai api`;
+
+        const result = parseProviders(output);
+
+        expect(result).toHaveLength(12);
+        expect(result.map((p) => p.id)).toEqual([
+          'anthropic',
+          'github-copilot',
+          'google',
+          'openai',
+          'openrouter',
+          'azure',
+          'amazon-bedrock',
+          'ollama',
+          'lmstudio',
+          'opencode',
+          'zai-coding-plan',
+          'z-ai',
+        ]);
+      });
+
+      it('should handle case-insensitive provider names and preserve original casing', () => {
+        const output = '●  Anthropic api\n●  OPENAI oauth\n●  GitHub Copilot oauth';
+        const result = parseProviders(output);
+
+        expect(result).toHaveLength(3);
+        expect(result[0].id).toBe('anthropic');
+        expect(result[0].name).toBe('Anthropic'); // Preserves casing
+        expect(result[1].id).toBe('openai');
+        expect(result[1].name).toBe('OPENAI'); // Preserves casing
+        expect(result[2].id).toBe('github-copilot');
+        expect(result[2].name).toBe('GitHub Copilot'); // Preserves casing
+      });
+
+      it('should handle multi-word provider names with spaces', () => {
+        const output = '●  Amazon Bedrock oauth\n●  LM Studio api\n●  GitHub Copilot oauth';
+        const result = parseProviders(output);
+
+        expect(result[0].id).toBe('amazon-bedrock');
+        expect(result[0].name).toBe('Amazon Bedrock');
+        expect(result[1].id).toBe('lmstudio');
+        expect(result[1].name).toBe('LM Studio');
+        expect(result[2].id).toBe('github-copilot');
+        expect(result[2].name).toBe('GitHub Copilot');
+      });
+    });
+
+    // =======================================================================
+    // Duplicate Aliases
+    // =======================================================================
+
+    describe('Duplicate Aliases', () => {
+      it('should map provider aliases to the same ID', () => {
+        // Test copilot variants
+        const copilot1 = parseProviders('●  copilot oauth');
+        const copilot2 = parseProviders('●  github copilot oauth');
+        expect(copilot1[0].id).toBe('github-copilot');
+        expect(copilot2[0].id).toBe('github-copilot');
+
+        // Test bedrock variants
+        const bedrock1 = parseProviders('●  bedrock oauth');
+        const bedrock2 = parseProviders('●  amazon bedrock oauth');
+        expect(bedrock1[0].id).toBe('amazon-bedrock');
+        expect(bedrock2[0].id).toBe('amazon-bedrock');
+
+        // Test lmstudio variants
+        const lm1 = parseProviders('●  lmstudio api');
+        const lm2 = parseProviders('●  lm studio api');
+        expect(lm1[0].id).toBe('lmstudio');
+        expect(lm2[0].id).toBe('lmstudio');
+      });
+    });
+
+    // =======================================================================
+    // Authentication Methods
+    // =======================================================================
+
+    describe('Authentication Methods', () => {
+      it('should detect oauth and api_key auth methods', () => {
+        const output = '●  anthropic oauth\n●  openai api\n●  google api_key';
+        const result = parseProviders(output);
+
+        expect(result[0].authMethod).toBe('oauth');
+        expect(result[1].authMethod).toBe('api_key');
+        expect(result[2].authMethod).toBe('api_key');
+      });
+
+      it('should set authenticated to true and handle case-insensitive auth methods', () => {
+        const output = '●  anthropic OAuth\n●  openai API';
+        const result = parseProviders(output);
+
+        expect(result[0].authenticated).toBe(true);
+        expect(result[0].authMethod).toBe('oauth');
+        expect(result[1].authenticated).toBe(true);
+        expect(result[1].authMethod).toBe('api_key');
+      });
+
+      it('should return undefined authMethod for unknown auth types', () => {
+        const output = '●  anthropic unknown-auth';
+        const result = parseProviders(output);
+
+        expect(result[0].authenticated).toBe(true);
+        expect(result[0].authMethod).toBeUndefined();
+      });
+    });
+
+    // =======================================================================
+    // ANSI Escape Sequences
+    // =======================================================================
+
+    describe('ANSI Escape Sequences', () => {
+      it('should strip ANSI color codes from output', () => {
+        const output = '\x1b[32m●  anthropic oauth\x1b[0m';
+        const result = parseProviders(output);
+
+        expect(result).toHaveLength(1);
+        expect(result[0].id).toBe('anthropic');
+        expect(result[0].name).toBe('anthropic');
+      });
+
+      it('should handle complex ANSI sequences and codes in provider names', () => {
+        const output =
+          '\x1b[1;32m●\x1b[0m  \x1b[33mgit\x1b[32mhub\x1b[0m copilot\x1b[0m \x1b[36moauth\x1b[0m';
+        const result = parseProviders(output);
+
+        expect(result).toHaveLength(1);
+        expect(result[0].id).toBe('github-copilot');
+      });
+    });
+
+    // =======================================================================
+    // Edge Cases
+    // =======================================================================
+
+    describe('Edge Cases', () => {
+      it('should return empty array for empty output or no ● symbols', () => {
+        expect(parseProviders('')).toEqual([]);
+        expect(parseProviders('anthropic oauth\nopenai api')).toEqual([]);
+        expect(parseProviders('No authenticated providers')).toEqual([]);
+      });
+
+      it('should skip malformed lines with ● but insufficient content', () => {
+        const output = '●\n●  \n●  anthropic\n●  openai api';
+        const result = parseProviders(output);
+
+        // Only the last line has both provider name and auth method
+        expect(result).toHaveLength(1);
+        expect(result[0].id).toBe('openai');
+      });
+
+      it('should use fallback for unknown providers (spaces to hyphens)', () => {
+        const output = '●  unknown provider name oauth';
+        const result = parseProviders(output);
+
+        expect(result[0].id).toBe('unknown-provider-name');
+        expect(result[0].name).toBe('unknown provider name');
+      });
+
+      it('should handle extra whitespace and mixed case', () => {
+        const output = '●    AnThRoPiC    oauth';
+        const result = parseProviders(output);
+
+        expect(result[0].id).toBe('anthropic');
+        expect(result[0].name).toBe('AnThRoPiC');
+      });
+
+      it('should handle multiple ● symbols on same line', () => {
+        const output = '●  ●  anthropic oauth';
+        const result = parseProviders(output);
+
+        expect(result).toHaveLength(1);
+        expect(result[0].id).toBe('anthropic');
+      });
+
+      it('should handle different newline formats and trailing newlines', () => {
+        const outputUnix = '●  anthropic oauth\n●  openai api';
+        const outputWindows = '●  anthropic oauth\r\n●  openai api\r\n\r\n';
+
+        const resultUnix = parseProviders(outputUnix);
+        const resultWindows = parseProviders(outputWindows);
+
+        expect(resultUnix).toHaveLength(2);
+        expect(resultWindows).toHaveLength(2);
+      });
+
+      it('should handle provider names with numbers and special characters', () => {
+        const output = '●  gpt-4o api';
+        const result = parseProviders(output);
+
+        expect(result[0].id).toBe('gpt-4o');
+        expect(result[0].name).toBe('gpt-4o');
+      });
+    });
+
+    // =======================================================================
+    // Real-world CLI Output
+    // =======================================================================
+
+    describe('Real-world CLI Output', () => {
+      it('should parse CLI output with box drawing characters and decorations', () => {
+        const output = `┌─────────────────────────────────────────────────┐
+│ Authenticated Providers                        │
+├─────────────────────────────────────────────────┤
+●  anthropic oauth
+●  openai api
+└─────────────────────────────────────────────────┘`;
+
+        const result = parseProviders(output);
+
+        expect(result).toHaveLength(2);
+        expect(result[0].id).toBe('anthropic');
+        expect(result[1].id).toBe('openai');
+      });
+
+      it('should parse output with ANSI colors and box characters', () => {
+        const output = `\x1b[1m┌─────────────────────────────────────────────────┐\x1b[0m
+\x1b[1m│ Authenticated Providers                        │\x1b[0m
+\x1b[1m├─────────────────────────────────────────────────┤\x1b[0m
+\x1b[32m●\x1b[0m  \x1b[33manthropic\x1b[0m \x1b[36moauth\x1b[0m
+\x1b[32m●\x1b[0m  \x1b[33mgoogle\x1b[0m \x1b[36mapi\x1b[0m
+\x1b[1m└─────────────────────────────────────────────────┘\x1b[0m`;
+
+        const result = parseProviders(output);
+
+        expect(result).toHaveLength(2);
+        expect(result[0].id).toBe('anthropic');
+        expect(result[1].id).toBe('google');
+      });
+
+      it('should handle "no authenticated providers" message', () => {
+        const output = `┌─────────────────────────────────────────────────┐
+│ No authenticated providers found               │
+└─────────────────────────────────────────────────┘`;
+
+        const result = parseProviders(output);
+        expect(result).toEqual([]);
+      });
+    });
+  });
 });
