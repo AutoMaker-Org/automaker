@@ -1,5 +1,5 @@
 import { Plus, X, GripVertical, ChevronDown, ChevronUp, FolderOpen } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -17,10 +17,32 @@ interface FeaturesSectionProps {
   onChange: (features: Feature[]) => void;
 }
 
+interface FeatureWithId extends Feature {
+  _id: string;
+  _locationIds?: string[];
+}
+
+function generateId(): string {
+  return crypto.randomUUID();
+}
+
+function featureToInternal(feature: Feature): FeatureWithId {
+  return {
+    ...feature,
+    _id: generateId(),
+    _locationIds: feature.file_locations?.map(() => generateId()),
+  };
+}
+
+function internalToFeature(internal: FeatureWithId): Feature {
+  const { _id, _locationIds, ...feature } = internal;
+  return feature;
+}
+
 interface FeatureCardProps {
-  feature: Feature;
+  feature: FeatureWithId;
   index: number;
-  onChange: (feature: Feature) => void;
+  onChange: (feature: FeatureWithId) => void;
   onRemove: () => void;
 }
 
@@ -37,20 +59,35 @@ function FeatureCard({ feature, index, onChange, onRemove }: FeatureCardProps) {
 
   const handleAddLocation = () => {
     const locations = feature.file_locations || [];
-    onChange({ ...feature, file_locations: [...locations, ''] });
-  };
-
-  const handleRemoveLocation = (locIndex: number) => {
-    const locations = feature.file_locations?.filter((_, i) => i !== locIndex);
+    const locationIds = feature._locationIds || [];
     onChange({
       ...feature,
-      file_locations: locations && locations.length > 0 ? locations : undefined,
+      file_locations: [...locations, ''],
+      _locationIds: [...locationIds, generateId()],
     });
   };
 
-  const handleLocationChange = (locIndex: number, value: string) => {
+  const handleRemoveLocation = (locId: string) => {
+    const locationIds = feature._locationIds || [];
+    const idx = locationIds.indexOf(locId);
+    if (idx === -1) return;
+
+    const newLocations = feature.file_locations?.filter((_, i) => i !== idx);
+    const newLocationIds = locationIds.filter((id) => id !== locId);
+    onChange({
+      ...feature,
+      file_locations: newLocations && newLocations.length > 0 ? newLocations : undefined,
+      _locationIds: newLocationIds.length > 0 ? newLocationIds : undefined,
+    });
+  };
+
+  const handleLocationChange = (locId: string, value: string) => {
+    const locationIds = feature._locationIds || [];
+    const idx = locationIds.indexOf(locId);
+    if (idx === -1) return;
+
     const locations = [...(feature.file_locations || [])];
-    locations[locIndex] = value;
+    locations[idx] = value;
     onChange({ ...feature, file_locations: locations });
   };
 
@@ -117,25 +154,28 @@ function FeatureCard({ feature, index, onChange, onRemove }: FeatureCardProps) {
                 <p className="text-sm text-muted-foreground">No file locations specified.</p>
               ) : (
                 <div className="space-y-2">
-                  {(feature.file_locations || []).map((location, locIndex) => (
-                    <div key={locIndex} className="flex items-center gap-2">
-                      <Input
-                        value={location}
-                        onChange={(e) => handleLocationChange(locIndex, e.target.value)}
-                        placeholder="e.g., src/components/feature.tsx"
-                        className="flex-1 font-mono text-sm"
-                      />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleRemoveLocation(locIndex)}
-                        className="shrink-0 text-muted-foreground hover:text-destructive h-8 w-8"
-                      >
-                        <X className="w-3 h-3" />
-                      </Button>
-                    </div>
-                  ))}
+                  {(feature.file_locations || []).map((location, idx) => {
+                    const locId = feature._locationIds?.[idx] || `fallback-${idx}`;
+                    return (
+                      <div key={locId} className="flex items-center gap-2">
+                        <Input
+                          value={location}
+                          onChange={(e) => handleLocationChange(locId, e.target.value)}
+                          placeholder="e.g., src/components/feature.tsx"
+                          className="flex-1 font-mono text-sm"
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleRemoveLocation(locId)}
+                          className="shrink-0 text-muted-foreground hover:text-destructive h-8 w-8"
+                        >
+                          <X className="w-3 h-3" />
+                        </Button>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -147,18 +187,40 @@ function FeatureCard({ feature, index, onChange, onRemove }: FeatureCardProps) {
 }
 
 export function FeaturesSection({ features, onChange }: FeaturesSectionProps) {
+  // Track features with stable IDs
+  const [items, setItems] = useState<FeatureWithId[]>(() => features.map(featureToInternal));
+
+  // Track if we're making an internal change to avoid sync loops
+  const isInternalChange = useRef(false);
+
+  // Sync external features to internal items when features change externally
+  useEffect(() => {
+    if (isInternalChange.current) {
+      isInternalChange.current = false;
+      return;
+    }
+    setItems(features.map(featureToInternal));
+  }, [features]);
+
   const handleAdd = () => {
-    onChange([...features, { name: '', description: '' }]);
+    const newItems = [...items, featureToInternal({ name: '', description: '' })];
+    setItems(newItems);
+    isInternalChange.current = true;
+    onChange(newItems.map(internalToFeature));
   };
 
-  const handleRemove = (index: number) => {
-    onChange(features.filter((_, i) => i !== index));
+  const handleRemove = (id: string) => {
+    const newItems = items.filter((item) => item._id !== id);
+    setItems(newItems);
+    isInternalChange.current = true;
+    onChange(newItems.map(internalToFeature));
   };
 
-  const handleFeatureChange = (index: number, feature: Feature) => {
-    const newFeatures = [...features];
-    newFeatures[index] = feature;
-    onChange(newFeatures);
+  const handleFeatureChange = (id: string, feature: FeatureWithId) => {
+    const newItems = items.map((item) => (item._id === id ? feature : item));
+    setItems(newItems);
+    isInternalChange.current = true;
+    onChange(newItems.map(internalToFeature));
   };
 
   return (
@@ -168,24 +230,24 @@ export function FeaturesSection({ features, onChange }: FeaturesSectionProps) {
           <ListChecks className="w-5 h-5 text-primary" />
           Implemented Features
           <Badge variant="outline" className="ml-2">
-            {features.length}
+            {items.length}
           </Badge>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
-        {features.length === 0 ? (
+        {items.length === 0 ? (
           <p className="text-sm text-muted-foreground py-2">
             No features added yet. Click below to add implemented features.
           </p>
         ) : (
           <div className="space-y-2">
-            {features.map((feature, index) => (
+            {items.map((feature, index) => (
               <FeatureCard
-                key={index}
+                key={feature._id}
                 feature={feature}
                 index={index}
-                onChange={(f) => handleFeatureChange(index, f)}
-                onRemove={() => handleRemove(index)}
+                onChange={(f) => handleFeatureChange(feature._id, f)}
+                onRemove={() => handleRemove(feature._id)}
               />
             ))}
           </div>

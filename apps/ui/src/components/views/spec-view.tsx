@@ -153,24 +153,18 @@ export function SpecView() {
 
   // Render content based on mode
   const renderContent = () => {
-    // If parse failed and we're not in source mode, force source mode
-    const effectiveMode = !isParseValid && mode !== 'source' ? 'source' : mode;
+    // If the XML is invalid, we can only show the source editor.
+    // The tabs for other modes are disabled, but this is an extra safeguard.
+    if (!isParseValid) {
+      return <SpecEditor value={appSpec} onChange={handleChange} />;
+    }
 
-    switch (effectiveMode) {
+    switch (mode) {
       case 'view':
-        if (parsedSpec) {
-          return <SpecViewMode spec={parsedSpec} />;
-        }
-        // Fallback to source if parsing fails
-        return <SpecEditor value={appSpec} onChange={handleChange} />;
-
+        // When isParseValid is true, parsedSpec is guaranteed to be non-null.
+        return <SpecViewMode spec={parsedSpec!} />;
       case 'edit':
-        if (parsedSpec) {
-          return <SpecEditMode spec={parsedSpec} onChange={handleChange} />;
-        }
-        // Fallback to source if parsing fails
-        return <SpecEditor value={appSpec} onChange={handleChange} />;
-
+        return <SpecEditMode spec={parsedSpec!} onChange={handleChange} />;
       case 'source':
       default:
         return <SpecEditor value={appSpec} onChange={handleChange} />;

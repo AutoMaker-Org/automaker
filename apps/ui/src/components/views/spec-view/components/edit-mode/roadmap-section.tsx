@@ -1,4 +1,5 @@
 import { Plus, X, GripVertical } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -17,19 +18,35 @@ import type { SpecOutput } from '@automaker/spec-parser';
 type RoadmapPhase = NonNullable<SpecOutput['implementation_roadmap']>[number];
 type PhaseStatus = 'completed' | 'in_progress' | 'pending';
 
+interface PhaseWithId extends RoadmapPhase {
+  _id: string;
+}
+
+function generateId(): string {
+  return crypto.randomUUID();
+}
+
+function phaseToInternal(phase: RoadmapPhase): PhaseWithId {
+  return { ...phase, _id: generateId() };
+}
+
+function internalToPhase(internal: PhaseWithId): RoadmapPhase {
+  const { _id, ...phase } = internal;
+  return phase;
+}
+
 interface RoadmapSectionProps {
   phases: RoadmapPhase[];
   onChange: (phases: RoadmapPhase[]) => void;
 }
 
 interface PhaseCardProps {
-  phase: RoadmapPhase;
-  index: number;
-  onChange: (phase: RoadmapPhase) => void;
+  phase: PhaseWithId;
+  onChange: (phase: PhaseWithId) => void;
   onRemove: () => void;
 }
 
-function PhaseCard({ phase, index: _index, onChange, onRemove }: PhaseCardProps) {
+function PhaseCard({ phase, onChange, onRemove }: PhaseCardProps) {
   const handlePhaseNameChange = (name: string) => {
     onChange({ ...phase, phase: name });
   };
@@ -97,18 +114,40 @@ function PhaseCard({ phase, index: _index, onChange, onRemove }: PhaseCardProps)
 }
 
 export function RoadmapSection({ phases, onChange }: RoadmapSectionProps) {
+  // Track phases with stable IDs
+  const [items, setItems] = useState<PhaseWithId[]>(() => phases.map(phaseToInternal));
+
+  // Track if we're making an internal change to avoid sync loops
+  const isInternalChange = useRef(false);
+
+  // Sync external phases to internal items when phases change externally
+  useEffect(() => {
+    if (isInternalChange.current) {
+      isInternalChange.current = false;
+      return;
+    }
+    setItems(phases.map(phaseToInternal));
+  }, [phases]);
+
   const handleAdd = () => {
-    onChange([...phases, { phase: '', status: 'pending', description: '' }]);
+    const newItems = [...items, phaseToInternal({ phase: '', status: 'pending', description: '' })];
+    setItems(newItems);
+    isInternalChange.current = true;
+    onChange(newItems.map(internalToPhase));
   };
 
-  const handleRemove = (index: number) => {
-    onChange(phases.filter((_, i) => i !== index));
+  const handleRemove = (id: string) => {
+    const newItems = items.filter((item) => item._id !== id);
+    setItems(newItems);
+    isInternalChange.current = true;
+    onChange(newItems.map(internalToPhase));
   };
 
-  const handlePhaseChange = (index: number, phase: RoadmapPhase) => {
-    const newPhases = [...phases];
-    newPhases[index] = phase;
-    onChange(newPhases);
+  const handlePhaseChange = (id: string, phase: PhaseWithId) => {
+    const newItems = items.map((item) => (item._id === id ? phase : item));
+    setItems(newItems);
+    isInternalChange.current = true;
+    onChange(newItems.map(internalToPhase));
   };
 
   return (
@@ -120,19 +159,18 @@ export function RoadmapSection({ phases, onChange }: RoadmapSectionProps) {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
-        {phases.length === 0 ? (
+        {items.length === 0 ? (
           <p className="text-sm text-muted-foreground py-2">
             No roadmap phases defined. Add phases to track implementation progress.
           </p>
         ) : (
           <div className="space-y-2">
-            {phases.map((phase, index) => (
+            {items.map((phase) => (
               <PhaseCard
-                key={index}
+                key={phase._id}
                 phase={phase}
-                index={index}
-                onChange={(p) => handlePhaseChange(index, p)}
-                onRemove={() => handleRemove(index)}
+                onChange={(p) => handlePhaseChange(phase._id, p)}
+                onRemove={() => handleRemove(phase._id)}
               />
             ))}
           </div>
