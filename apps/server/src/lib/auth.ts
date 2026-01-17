@@ -132,19 +132,38 @@ const API_KEY = ensureApiKey();
 
 // Print API key to console for web mode users (unless suppressed for production logging)
 if (process.env.AUTOMAKER_HIDE_API_KEY !== 'true') {
+  const autoLoginEnabled = process.env.AUTOMAKER_AUTO_LOGIN === 'true';
+  const autoLoginStatus = autoLoginEnabled ? 'enabled (auto-login active)' : 'disabled';
+
+  // Build box lines with exact padding (67 chars content width, 69 for emoji lines)
+  const header = '🔐 API Key for Web Mode Authentication'.padEnd(67);
+  const line1 = "When accessing via browser, you'll be prompted to enter this key:".padEnd(67);
+  const line2 = API_KEY.padEnd(67);
+  const line3 = 'In Electron mode, authentication is handled automatically.'.padEnd(67);
+  const line4 = `Auto-login (AUTOMAKER_AUTO_LOGIN): ${autoLoginStatus}`.padEnd(67);
+  const tipHeader = '💡 Tips'.padEnd(67);
+  const line5 = 'Set AUTOMAKER_API_KEY env var to use a fixed key'.padEnd(67);
+  const line6 = 'Set AUTOMAKER_AUTO_LOGIN=true to skip the login prompt'.padEnd(67);
+
   logger.info(`
-╔═══════════════════════════════════════════════════════════════════════╗
-║  🔐 API Key for Web Mode Authentication                               ║
-╠═══════════════════════════════════════════════════════════════════════╣
-║                                                                       ║
-║  When accessing via browser, you'll be prompted to enter this key:    ║
-║                                                                       ║
-║    ${API_KEY}
-║                                                                       ║
-║  In Electron mode, authentication is handled automatically.          ║
-║                                                                       ║
-║  💡 Tip: Set AUTOMAKER_API_KEY env var to use a fixed key for dev    ║
-╚═══════════════════════════════════════════════════════════════════════╝
+╔═════════════════════════════════════════════════════════════════════╗
+║  ${header}║
+╠═════════════════════════════════════════════════════════════════════╣
+║                                                                     ║
+║  ${line1}║
+║                                                                     ║
+║  ${line2}║
+║                                                                     ║
+║  ${line3}║
+║                                                                     ║
+║  ${line4}║
+║                                                                     ║
+╠═════════════════════════════════════════════════════════════════════╣
+║  ${tipHeader}║
+╠═════════════════════════════════════════════════════════════════════╣
+║  ${line5}║
+║  ${line6}║
+╚═════════════════════════════════════════════════════════════════════╝
 `);
 } else {
   logger.info('API key banner hidden (AUTOMAKER_HIDE_API_KEY=true)');

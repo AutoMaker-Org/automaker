@@ -117,9 +117,22 @@ export function createAuthRoutes(): Router {
    *
    * Returns whether the current request is authenticated.
    * Used by the UI to determine if login is needed.
+   *
+   * If AUTOMAKER_AUTO_LOGIN=true is set, automatically creates a session
+   * for unauthenticated requests (useful for development).
    */
-  router.get('/status', (req, res) => {
-    const authenticated = isRequestAuthenticated(req);
+  router.get('/status', async (req, res) => {
+    let authenticated = isRequestAuthenticated(req);
+
+    // Auto-login for development: create session automatically if enabled
+    if (!authenticated && process.env.AUTOMAKER_AUTO_LOGIN === 'true') {
+      const sessionToken = await createSession();
+      const cookieOptions = getSessionCookieOptions();
+      const cookieName = getSessionCookieName();
+      res.cookie(cookieName, sessionToken, cookieOptions);
+      authenticated = true;
+    }
+
     res.json({
       success: true,
       authenticated,
