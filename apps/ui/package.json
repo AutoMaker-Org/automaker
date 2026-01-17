@@ -40,6 +40,7 @@
   },
   "dependencies": {
     "@automaker/dependency-resolver": "1.0.0",
+    "@automaker/spec-parser": "1.0.0",
     "@automaker/types": "1.0.0",
     "@codemirror/lang-xml": "6.1.0",
     "@codemirror/language": "^6.12.1",

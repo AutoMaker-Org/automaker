@@ -30,7 +30,7 @@
     "dev:docker:rebuild": "docker compose build --no-cache && docker compose up",
     "dev:full": "npm run build:packages && concurrently \"npm run _dev:server\" \"npm run _dev:web\"",
     "build": "npm run build:packages && npm run build --workspace=apps/ui",
-    "build:packages": "npm run build -w @automaker/types && npm run build -w @automaker/platform && npm run build -w @automaker/utils && npm run build -w @automaker/prompts -w @automaker/model-resolver -w @automaker/dependency-resolver && npm run build -w @automaker/git-utils",
+    "build:packages": "npm run build -w @automaker/types && npm run build -w @automaker/platform && npm run build -w @automaker/utils -w @automaker/spec-parser && npm run build -w @automaker/prompts -w @automaker/model-resolver -w @automaker/dependency-resolver && npm run build -w @automaker/git-utils",
     "build:server": "npm run build:packages && npm run build --workspace=apps/server",
     "build:electron": "npm run build:packages && npm run build:electron --workspace=apps/ui",
     "build:electron:dir": "npm run build:packages && npm run build:electron:dir --workspace=apps/ui",
