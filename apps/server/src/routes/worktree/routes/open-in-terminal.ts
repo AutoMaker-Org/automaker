@@ -144,42 +144,20 @@ export function createRefreshTerminalsHandler() {
 export function createOpenInExternalTerminalHandler() {
   return async (req: Request, res: Response): Promise<void> => {
     try {
+      // worktreePath is validated by validatePathParams middleware
       const { worktreePath, terminalId } = req.body as {
         worktreePath: string;
         terminalId?: string;
       };
 
-      if (!worktreePath) {
-        res.status(400).json({
-          success: false,
-          error: 'worktreePath required',
-        });
-        return;
-      }
-
-      // Security: Validate that worktreePath is an absolute path
-      if (!isAbsolute(worktreePath)) {
-        res.status(400).json({
-          success: false,
-          error: 'worktreePath must be an absolute path',
-        });
-        return;
-      }
-
-      try {
-        const result = await openInExternalTerminal(worktreePath, terminalId);
-        res.json({
-          success: true,
-          result: {
-            message: `Opened ${worktreePath} in ${result.terminalName}`,
-            terminalName: result.terminalName,
-          },
-        });
-      } catch (terminalError) {
-        // Terminal failed to open
-        logger.warn(`Failed to open in terminal: ${getErrorMessage(terminalError)}`);
-        throw terminalError;
-      }
+      const result = await openInExternalTerminal(worktreePath, terminalId);
+      res.json({
+        success: true,
+        result: {
+          message: `Opened ${worktreePath} in ${result.terminalName}`,
+          terminalName: result.terminalName,
+        },
+      });
     } catch (error) {
       logError(error, 'Open in external terminal failed');
       res.status(500).json({ success: false, error: getErrorMessage(error) });

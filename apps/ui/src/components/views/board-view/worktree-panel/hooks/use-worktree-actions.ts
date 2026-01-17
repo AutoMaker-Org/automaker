@@ -131,9 +131,10 @@ export function useWorktreeActions({ fetchWorktrees, fetchBranches }: UseWorktre
     (worktree: WorktreeInfo, mode?: 'tab' | 'split') => {
       // Navigate to the terminal view with the worktree path and branch name
       // The terminal view will handle creating the terminal with the specified cwd
+      // Include nonce to allow opening the same worktree multiple times
       navigate({
         to: '/terminal',
-        search: { cwd: worktree.path, branch: worktree.branch, mode },
+        search: { cwd: worktree.path, branch: worktree.branch, mode, nonce: Date.now() },
       });
     },
     [navigate]

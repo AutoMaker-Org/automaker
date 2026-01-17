@@ -117,7 +117,11 @@ export function createWorktreeRoutes(
   router.get('/available-terminals', createGetAvailableTerminalsHandler());
   router.get('/default-terminal', createGetDefaultTerminalHandler());
   router.post('/refresh-terminals', createRefreshTerminalsHandler());
-  router.post('/open-in-external-terminal', createOpenInExternalTerminalHandler());
+  router.post(
+    '/open-in-external-terminal',
+    validatePathParams('worktreePath'),
+    createOpenInExternalTerminalHandler()
+  );
 
   router.post('/init-git', validatePathParams('projectPath'), createInitGitHandler());
   router.post('/migrate', createMigrateHandler());

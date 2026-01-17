@@ -19,6 +19,15 @@ const execFileAsync = promisify(execFile);
 const isWindows = process.platform === 'win32';
 const isMac = process.platform === 'darwin';
 
+/**
+ * Escape a string for safe use in shell commands
+ * Handles paths with spaces, special characters, etc.
+ */
+function escapeShellArg(arg: string): string {
+  // Escape single quotes by ending the quoted string, adding escaped quote, and starting new quoted string
+  return `'${arg.replace(/'/g, "'\\''")}'`;
+}
+
 // Cache with TTL for editor detection
 let cachedEditors: EditorInfo[] | null = null;
 let cacheTimestamp: number = 0;
@@ -343,34 +352,6 @@ export async function openInFileManager(targetPath: string): Promise<{ editorNam
 }
 
 /**
- * Get the platform-specific terminal information
- */
-function getTerminalInfo(): { name: string; command: string; args: string[] } {
-  if (isMac) {
-    // On macOS, use Terminal.app with AppleScript to open in a specific directory
-    return {
-      name: 'Terminal',
-      command: 'open',
-      args: ['-a', 'Terminal'],
-    };
-  } else if (isWindows) {
-    // On Windows, use Windows Terminal if available, otherwise cmd
-    return {
-      name: 'Windows Terminal',
-      command: 'wt',
-      args: ['-d'],
-    };
-  } else {
-    // On Linux, try common terminal emulators in order of preference
-    return {
-      name: 'Terminal',
-      command: 'x-terminal-emulator',
-      args: ['--working-directory'],
-    };
-  }
-}
-
-/**
  * Open a terminal in the specified directory
  *
  * Handles cross-platform differences:
@@ -386,7 +367,7 @@ export async function openInTerminal(targetPath: string): Promise<{ terminalName
     // Use AppleScript to open Terminal.app in the specified directory
     const script = `
       tell application "Terminal"
-        do script "cd ${targetPath.replace(/"/g, '\\"').replace(/\$/g, '\\$')}"
+        do script "cd ${escapeShellArg(targetPath)}"
         activate
       end tell
     `;

@@ -531,7 +531,6 @@ export interface TerminalState {
   lineHeight: number; // Line height multiplier for terminal text
   maxSessions: number; // Maximum concurrent terminal sessions (server setting)
   lastActiveProjectPath: string | null; // Last project path to detect route changes vs project switches
-  pendingTerminal: { cwd: string; branchName: string } | null; // Pending terminal to create (from "open in terminal" action)
   openTerminalMode: 'newTab' | 'split'; // How to open terminals from "Open in Terminal" action
 }
 
@@ -1239,7 +1238,6 @@ export interface AppActions {
   setTerminalLineHeight: (lineHeight: number) => void;
   setTerminalMaxSessions: (maxSessions: number) => void;
   setTerminalLastActiveProjectPath: (projectPath: string | null) => void;
-  setPendingTerminal: (pending: { cwd: string; branchName: string } | null) => void;
   setOpenTerminalMode: (mode: 'newTab' | 'split') => void;
   addTerminalTab: (name?: string) => string;
   removeTerminalTab: (tabId: string) => void;
@@ -1459,7 +1457,6 @@ const initialState: AppState = {
     lineHeight: 1.0,
     maxSessions: 100,
     lastActiveProjectPath: null,
-    pendingTerminal: null,
     openTerminalMode: 'newTab',
   },
   terminalLayoutByProject: {},
@@ -2898,9 +2895,6 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
         maxSessions: current.maxSessions,
         // Preserve lastActiveProjectPath - it will be updated separately when needed
         lastActiveProjectPath: current.lastActiveProjectPath,
-        // Preserve pendingTerminal - this is set by "open in terminal" action and should
-        // survive the clearTerminalState() call that happens during project switching
-        pendingTerminal: current.pendingTerminal,
         // Preserve openTerminalMode - user preference
         openTerminalMode: current.openTerminalMode,
       },
@@ -2991,13 +2985,6 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
     const current = get().terminalState;
     set({
       terminalState: { ...current, lastActiveProjectPath: projectPath },
-    });
-  },
-
-  setPendingTerminal: (pending) => {
-    const current = get().terminalState;
-    set({
-      terminalState: { ...current, pendingTerminal: pending },
     });
   },
 

@@ -6,6 +6,7 @@ const terminalSearchSchema = z.object({
   cwd: z.string().optional(),
   branch: z.string().optional(),
   mode: z.enum(['tab', 'split']).optional(),
+  nonce: z.number().optional(),
 });
 
 export const Route = createFileRoute('/terminal')({
@@ -14,6 +15,6 @@ export const Route = createFileRoute('/terminal')({
 });
 
 function RouteComponent() {
-  const { cwd, branch, mode } = Route.useSearch();
-  return <TerminalView initialCwd={cwd} initialBranch={branch} initialMode={mode} />;
+  const { cwd, branch, mode, nonce } = Route.useSearch();
+  return <TerminalView initialCwd={cwd} initialBranch={branch} initialMode={mode} nonce={nonce} />;
 }
