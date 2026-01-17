@@ -175,4 +175,5 @@ export {
   findEditorByCommand,
   openInEditor,
   openInFileManager,
+  openInTerminal,
 } from './editor.js';

@@ -341,3 +341,124 @@ export async function openInFileManager(targetPath: string): Promise<{ editorNam
   await execFileAsync(fileManager.command, [targetPath]);
   return { editorName: fileManager.name };
 }
+
+/**
+ * Get the platform-specific terminal information
+ */
+function getTerminalInfo(): { name: string; command: string; args: string[] } {
+  if (isMac) {
+    // On macOS, use Terminal.app with AppleScript to open in a specific directory
+    return {
+      name: 'Terminal',
+      command: 'open',
+      args: ['-a', 'Terminal'],
+    };
+  } else if (isWindows) {
+    // On Windows, use Windows Terminal if available, otherwise cmd
+    return {
+      name: 'Windows Terminal',
+      command: 'wt',
+      args: ['-d'],
+    };
+  } else {
+    // On Linux, try common terminal emulators in order of preference
+    return {
+      name: 'Terminal',
+      command: 'x-terminal-emulator',
+      args: ['--working-directory'],
+    };
+  }
+}
+
+/**
+ * Open a terminal in the specified directory
+ *
+ * Handles cross-platform differences:
+ * - On macOS, uses Terminal.app via 'open -a Terminal' or AppleScript for directory
+ * - On Windows, uses Windows Terminal (wt) or falls back to cmd
+ * - On Linux, uses x-terminal-emulator or common terminal emulators
+ *
+ * @param targetPath - The directory path to open the terminal in
+ * @returns Promise that resolves with terminal info when launched, rejects on error
+ */
+export async function openInTerminal(targetPath: string): Promise<{ terminalName: string }> {
+  if (isMac) {
+    // Use AppleScript to open Terminal.app in the specified directory
+    const script = `
+      tell application "Terminal"
+        do script "cd ${targetPath.replace(/"/g, '\\"').replace(/\$/g, '\\$')}"
+        activate
+      end tell
+    `;
+    await execFileAsync('osascript', ['-e', script]);
+    return { terminalName: 'Terminal' };
+  } else if (isWindows) {
+    // Try Windows Terminal first
+    try {
+      return await new Promise((resolve, reject) => {
+        const child: ChildProcess = spawn('wt', ['-d', targetPath], {
+          shell: true,
+          stdio: 'ignore',
+          detached: true,
+        });
+        child.unref();
+
+        child.on('error', () => {
+          reject(new Error('Windows Terminal not available'));
+        });
+
+        setTimeout(() => resolve({ terminalName: 'Windows Terminal' }), 100);
+      });
+    } catch {
+      // Fall back to cmd
+      return await new Promise((resolve, reject) => {
+        const child: ChildProcess = spawn(
+          'cmd',
+          ['/c', 'start', 'cmd', '/k', `cd /d "${targetPath}"`],
+          {
+            shell: true,
+            stdio: 'ignore',
+            detached: true,
+          }
+        );
+        child.unref();
+
+        child.on('error', (err) => {
+          reject(err);
+        });
+
+        setTimeout(() => resolve({ terminalName: 'Command Prompt' }), 100);
+      });
+    }
+  } else {
+    // Linux: Try common terminal emulators in order
+    const terminals = [
+      {
+        name: 'GNOME Terminal',
+        command: 'gnome-terminal',
+        args: ['--working-directory', targetPath],
+      },
+      { name: 'Konsole', command: 'konsole', args: ['--workdir', targetPath] },
+      {
+        name: 'xfce4-terminal',
+        command: 'xfce4-terminal',
+        args: ['--working-directory', targetPath],
+      },
+      { name: 'xterm', command: 'xterm', args: ['-e', `cd "${targetPath}" && $SHELL`] },
+      {
+        name: 'x-terminal-emulator',
+        command: 'x-terminal-emulator',
+        args: ['--working-directory', targetPath],
+      },
+    ];
+
+    for (const terminal of terminals) {
+      if (await commandExists(terminal.command)) {
+        await execFileAsync(terminal.command, terminal.args);
+        return { terminalName: terminal.name };
+      }
+    }
+
+    throw new Error('No terminal emulator found');
+  }
+}
