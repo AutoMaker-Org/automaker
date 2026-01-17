@@ -7,4 +7,5 @@ export { DeleteCompletedFeatureDialog } from './delete-completed-feature-dialog'
 export { EditFeatureDialog } from './edit-feature-dialog';
 export { FollowUpDialog, type FollowUpHistoryEntry } from './follow-up-dialog';
 export { PlanApprovalDialog } from './plan-approval-dialog';
+export { ClarificationQuestionsDialog } from './clarification-questions-dialog';
 export { MassEditDialog } from './mass-edit-dialog';

@@ -282,6 +282,15 @@ export type {
 export type { NotificationType, Notification, NotificationsFile } from './notification.js';
 export { NOTIFICATIONS_VERSION, DEFAULT_NOTIFICATIONS_FILE } from './notification.js';
 
+// Clarification types (for interactive planning mode)
+export type {
+  ClarificationOption,
+  ClarificationQuestion,
+  ClarificationRequest,
+  ClarificationAnswer,
+  ClarificationResponse,
+} from './clarification.js';
+
 // Event history types
 export type {
   StoredEvent,

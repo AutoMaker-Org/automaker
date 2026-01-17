@@ -47,6 +47,8 @@ export type EventType =
   | 'dev-server:started'
   | 'dev-server:output'
   | 'dev-server:stopped'
-  | 'notification:created';
+  | 'notification:created'
+  | 'clarification:questions-required'
+  | 'clarification:questions-answered';
 
 export type EventCallback = (type: EventType, payload: unknown) => void;

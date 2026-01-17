@@ -66,7 +66,8 @@ export function PromptField({
   const minHeight = calculateMinHeight(displayValue);
 
   const handleToggle = (enabled: boolean) => {
-    const value = customValue?.value ?? defaultValue;
+    // Use || instead of ?? to also fall back when value is empty string
+    const value = customValue?.value || defaultValue;
     onCustomValueChange({ value, enabled });
   };
 

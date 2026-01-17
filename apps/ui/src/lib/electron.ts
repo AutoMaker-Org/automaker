@@ -542,6 +542,12 @@ export interface AutoModeAPI {
     editedPlan?: string,
     feedback?: string
   ) => Promise<{ success: boolean; error?: string }>;
+  submitClarificationResponse: (
+    projectPath: string,
+    featureId: string,
+    requestId: string,
+    answers: Record<string, string>
+  ) => Promise<{ success: boolean; error?: string }>;
   resumeInterrupted: (
     projectPath: string
   ) => Promise<{ success: boolean; message?: string; error?: string }>;

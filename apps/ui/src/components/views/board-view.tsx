@@ -51,6 +51,7 @@ import {
   EditFeatureDialog,
   FollowUpDialog,
   PlanApprovalDialog,
+  ClarificationQuestionsDialog,
 } from './board-view/dialogs';
 import { PipelineSettingsDialog } from './board-view/dialogs/pipeline-settings-dialog';
 import { CreateWorktreeDialog } from './board-view/dialogs/create-worktree-dialog';
@@ -95,6 +96,8 @@ export function BoardView() {
     setSpecCreatingForProject,
     pendingPlanApproval,
     setPendingPlanApproval,
+    pendingClarification,
+    setPendingClarification,
     updateFeature,
     getCurrentWorktree,
     setCurrentWorktree,
@@ -205,6 +208,8 @@ export function BoardView() {
   const [searchQuery, setSearchQuery] = useState('');
   // Plan approval loading state
   const [isPlanApprovalLoading, setIsPlanApprovalLoading] = useState(false);
+  // Clarification questions loading state
+  const [isClarificationLoading, setIsClarificationLoading] = useState(false);
   // Derive spec creation state from store - check if current project is the one being created
   const isCreatingSpec = specCreatingForProject === currentProject?.path;
   const creatingSpecProjectPath = specCreatingForProject ?? undefined;
@@ -1373,6 +1378,51 @@ export function BoardView() {
     [currentProject, setPendingPlanApproval]
   );
 
+  // Find feature for pending clarification
+  const pendingClarificationFeature = useMemo(() => {
+    if (!pendingClarification) return null;
+    return hookFeatures.find((f) => f.id === pendingClarification.featureId) || null;
+  }, [pendingClarification, hookFeatures]);
+
+  // Handle clarification submit
+  const handleClarificationSubmit = useCallback(
+    async (answers: Record<string, string>) => {
+      if (!pendingClarification || !currentProject) return;
+
+      setIsClarificationLoading(true);
+      try {
+        const api = getElectronAPI();
+        if (!api?.autoMode?.submitClarificationResponse) {
+          throw new Error('Clarification response API not available');
+        }
+
+        const result = await api.autoMode.submitClarificationResponse(
+          pendingClarification.projectPath,
+          pendingClarification.featureId,
+          pendingClarification.requestId,
+          answers
+        );
+
+        if (result.success) {
+          logger.info('Clarification answers submitted successfully');
+          setPendingClarification(null);
+        } else {
+          logger.error('Failed to submit clarification answers:', result.error);
+        }
+      } catch (error) {
+        logger.error('Error submitting clarification answers:', error);
+      } finally {
+        setIsClarificationLoading(false);
+      }
+    },
+    [pendingClarification, currentProject, setPendingClarification]
+  );
+
+  // Handle clarification cancel
+  const handleClarificationCancel = useCallback(() => {
+    setPendingClarification(null);
+  }, [setPendingClarification]);
+
   if (!currentProject) {
     return (
       <div className="flex-1 flex items-center justify-center" data-testid="board-view-no-project">
@@ -1748,6 +1798,22 @@ export function BoardView() {
           viewOnly={true}
         />
       )}
+
+      {/* Clarification Questions Dialog */}
+      <ClarificationQuestionsDialog
+        open={pendingClarification !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setPendingClarification(null);
+          }
+        }}
+        feature={pendingClarificationFeature}
+        questions={pendingClarification?.questions || []}
+        requestId={pendingClarification?.requestId || ''}
+        onSubmit={handleClarificationSubmit}
+        onCancel={handleClarificationCancel}
+        isLoading={isClarificationLoading}
+      />
 
       {/* Create Worktree Dialog */}
       <CreateWorktreeDialog

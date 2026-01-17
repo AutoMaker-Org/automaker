@@ -44,6 +44,13 @@ function isPlanApprovalEvent(
   return event.type === 'plan_approval_required';
 }
 
+// Type guard for clarification_questions_required event
+function isClarificationEvent(
+  event: AutoModeEvent
+): event is Extract<AutoModeEvent, { type: 'clarification:questions-required' }> {
+  return event.type === 'clarification:questions-required';
+}
+
 /**
  * Hook for managing auto mode (scoped per project)
  */
@@ -58,6 +65,7 @@ export function useAutoMode() {
     maxConcurrency,
     projects,
     setPendingPlanApproval,
+    setPendingClarification,
   } = useAppStore(
     useShallow((state) => ({
       autoModeByProject: state.autoModeByProject,
@@ -69,6 +77,7 @@ export function useAutoMode() {
       maxConcurrency: state.maxConcurrency,
       projects: state.projects,
       setPendingPlanApproval: state.setPendingPlanApproval,
+      setPendingClarification: state.setPendingClarification,
     }))
   );
 
@@ -255,6 +264,41 @@ export function useAutoMode() {
           }
           break;
 
+        case 'clarification:questions-required':
+          // AI agent has clarification questions during planning
+          if (isClarificationEvent(event)) {
+            logger.debug(`[AutoMode] Clarification questions required for ${event.featureId}`);
+            setPendingClarification({
+              featureId: event.featureId,
+              projectPath: event.projectPath || currentProject?.path || '',
+              questions: event.questions,
+              requestId: event.requestId,
+              timestamp: event.timestamp,
+            });
+            addAutoModeActivity({
+              featureId: event.featureId,
+              type: 'planning',
+              message: `AI is asking ${event.questions.length} clarification question${event.questions.length === 1 ? '' : 's'}`,
+              phase: 'planning',
+            });
+          }
+          break;
+
+        case 'clarification:questions-answered':
+          // User answered clarification questions
+          if ('featureId' in event && event.featureId) {
+            logger.debug(`[AutoMode] Clarification questions answered for ${event.featureId}`);
+            // Clear the pending clarification state
+            setPendingClarification(null);
+            addAutoModeActivity({
+              featureId: event.featureId,
+              type: 'planning',
+              message: 'Clarification answers received, continuing planning...',
+              phase: 'planning',
+            });
+          }
+          break;
+
         case 'planning_started':
           // Log when planning phase begins
           if (event.featureId && event.mode && event.message) {
@@ -374,6 +418,7 @@ export function useAutoMode() {
     addAutoModeActivity,
     getProjectIdFromPath,
     setPendingPlanApproval,
+    setPendingClarification,
     currentProject?.path,
   ]);
 

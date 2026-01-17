@@ -260,6 +260,31 @@ export const DEFAULT_AUTO_MODE_PIPELINE_STEP_PROMPT_TEMPLATE = `## Pipeline Step
 `;
 
 /**
+ * Default clarification instructions for interactive planning.
+ * Guides the AI on when and how to ask clarification questions during planning.
+ * Only applied when using Claude provider with "Require approval" enabled.
+ */
+export const DEFAULT_AUTO_MODE_CLARIFICATION_INSTRUCTIONS = `## Clarification Questions (Optional)
+
+Before generating your plan, you may use the \`AskUserQuestion\` tool to gather requirements if:
+- The feature request is ambiguous or underspecified
+- Multiple valid implementation approaches exist and user preference matters
+- Critical technical decisions need user input (e.g., database choice, auth method, API design)
+- You're unsure about scope, priorities, or constraints
+
+Guidelines for asking questions:
+- Ask 1-4 focused questions maximum - don't overwhelm the user
+- Provide 2-4 meaningful options per question with brief descriptions
+- Use short, descriptive headers (max 12 characters) like "Auth method", "Database", "Scope"
+- Only ask if genuinely needed - skip questions if requirements are already clear
+- Consider what information would significantly change your implementation approach
+
+After receiving answers, incorporate them into your planning. If the user selects "Other" and provides custom input, adapt accordingly.
+
+If requirements are clear enough to proceed, skip clarification and go directly to planning.
+`;
+
+/**
  * Default Auto Mode prompts (from auto-mode-service.ts)
  */
 export const DEFAULT_AUTO_MODE_PROMPTS: ResolvedAutoModePrompts = {
@@ -271,6 +296,7 @@ export const DEFAULT_AUTO_MODE_PROMPTS: ResolvedAutoModePrompts = {
   followUpPromptTemplate: DEFAULT_AUTO_MODE_FOLLOW_UP_PROMPT_TEMPLATE,
   continuationPromptTemplate: DEFAULT_AUTO_MODE_CONTINUATION_PROMPT_TEMPLATE,
   pipelineStepPromptTemplate: DEFAULT_AUTO_MODE_PIPELINE_STEP_PROMPT_TEMPLATE,
+  clarificationInstructions: DEFAULT_AUTO_MODE_CLARIFICATION_INSTRUCTIONS,
 };
 
 /**

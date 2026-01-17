@@ -153,6 +153,20 @@ export const TOOL_PRESETS = {
     'WebFetch',
     'TodoWrite',
   ] as const,
+
+  /** Full access plus AskUserQuestion for interactive planning mode */
+  fullAccessWithClarification: [
+    'Read',
+    'Write',
+    'Edit',
+    'Glob',
+    'Grep',
+    'Bash',
+    'WebSearch',
+    'WebFetch',
+    'TodoWrite',
+    'AskUserQuestion',
+  ] as const,
 } as const;
 
 /**
@@ -351,6 +365,9 @@ export interface CreateSdkOptionsConfig {
 
   /** Extended thinking level for Claude models */
   thinkingLevel?: ThinkingLevel;
+
+  /** Enable AskUserQuestion tool for interactive planning mode */
+  enableClarificationQuestions?: boolean;
 }
 
 // Re-export MCP types from @automaker/types for convenience
@@ -508,6 +525,7 @@ export function createChatOptions(config: CreateSdkOptionsConfig): Options {
  * - Extended turns for thorough feature implementation
  * - Uses default model (can be overridden)
  * - When autoLoadClaudeMd is true, uses preset mode and settingSources for CLAUDE.md loading
+ * - When enableClarificationQuestions is true, includes AskUserQuestion tool for interactive planning
  */
 export function createAutoModeOptions(config: CreateSdkOptionsConfig): Options {
   // Validate working directory before creating options
@@ -522,12 +540,17 @@ export function createAutoModeOptions(config: CreateSdkOptionsConfig): Options {
   // Build thinking options
   const thinkingOptions = buildThinkingOptions(config.thinkingLevel);
 
+  // Use full access with clarification tools when enabled, otherwise standard full access
+  const allowedTools = config.enableClarificationQuestions
+    ? [...TOOL_PRESETS.fullAccessWithClarification]
+    : [...TOOL_PRESETS.fullAccess];
+
   return {
     ...getBaseOptions(),
     model: getModelForUseCase('auto', config.model),
     maxTurns: MAX_TURNS.maximum,
     cwd: config.cwd,
-    allowedTools: [...TOOL_PRESETS.fullAccess],
+    allowedTools,
     ...claudeMdOptions,
     ...thinkingOptions,
     ...(config.abortController && { abortController: config.abortController }),

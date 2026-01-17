@@ -47,6 +47,14 @@ export interface AutoModePrompts {
 
   /** Template for pipeline step execution prompts */
   pipelineStepPromptTemplate?: CustomPrompt;
+
+  /**
+   * Instructions for clarification questions during planning (Claude provider only).
+   * When enabled and non-empty, prepended to planning prompts to guide the AI
+   * on when and how to use the AskUserQuestion tool for gathering requirements.
+   * Only applied when requirePlanApproval is enabled.
+   */
+  clarificationInstructions?: CustomPrompt;
 }
 
 /**
@@ -298,6 +306,8 @@ export interface ResolvedAutoModePrompts {
   followUpPromptTemplate: string;
   continuationPromptTemplate: string;
   pipelineStepPromptTemplate: string;
+  /** Optional clarification instructions - empty string means disabled */
+  clarificationInstructions: string;
 }
 
 export interface ResolvedAgentPrompts {

@@ -129,6 +129,8 @@ export function NotificationsView() {
         return <Check className="h-5 w-5 text-blue-500" />;
       case 'agent_complete':
         return <Check className="h-5 w-5 text-purple-500" />;
+      case 'clarification_questions_required':
+        return <Bell className="h-5 w-5 text-orange-500" />;
       default:
         return <Bell className="h-5 w-5" />;
     }

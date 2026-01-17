@@ -31,6 +31,7 @@ import type {
   ModelDefinition,
   ServerLogLevel,
   EventHook,
+  ClarificationQuestion,
 } from '@automaker/types';
 import {
   getAllCursorModelIds,
@@ -764,6 +765,16 @@ export interface AppState {
     planningMode: 'lite' | 'spec' | 'full';
   } | null;
 
+  // Clarification Questions State
+  // When the AI agent asks clarification questions during planning, this holds the pending request
+  pendingClarification: {
+    featureId: string;
+    projectPath: string;
+    questions: ClarificationQuestion[];
+    requestId: string;
+    timestamp: string;
+  } | null;
+
   // Claude Usage Tracking
   claudeRefreshInterval: number; // Refresh interval in seconds (default: 60)
   claudeUsage: ClaudeUsage | null;
@@ -1243,6 +1254,17 @@ export interface AppActions {
     } | null
   ) => void;
 
+  // Clarification Questions actions
+  setPendingClarification: (
+    clarification: {
+      featureId: string;
+      projectPath: string;
+      questions: ClarificationQuestion[];
+      requestId: string;
+      timestamp: string;
+    } | null
+  ) => void;
+
   // Pipeline actions
   setPipelineConfig: (projectPath: string, config: PipelineConfig) => void;
   getPipelineConfig: (projectPath: string) => PipelineConfig | null;
@@ -1427,6 +1449,7 @@ const initialState: AppState = {
   defaultRequirePlanApproval: false,
   defaultFeatureModel: { model: 'opus' } as PhaseModelEntry,
   pendingPlanApproval: null,
+  pendingClarification: null,
   claudeRefreshInterval: 60,
   claudeUsage: null,
   claudeUsageLastUpdated: null,
@@ -3425,6 +3448,9 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
 
   // Plan Approval actions
   setPendingPlanApproval: (approval) => set({ pendingPlanApproval: approval }),
+
+  // Clarification Questions actions
+  setPendingClarification: (clarification) => set({ pendingClarification: clarification }),
 
   // Claude Usage Tracking actions
   setClaudeRefreshInterval: (interval: number) => set({ claudeRefreshInterval: interval }),

@@ -88,6 +88,10 @@ export function mergeAutoModePrompts(custom?: AutoModePrompts): ResolvedAutoMode
       custom?.pipelineStepPromptTemplate,
       DEFAULT_AUTO_MODE_PROMPTS.pipelineStepPromptTemplate
     ),
+    clarificationInstructions: resolvePrompt(
+      custom?.clarificationInstructions,
+      DEFAULT_AUTO_MODE_PROMPTS.clarificationInstructions
+    ),
   };
 }
 

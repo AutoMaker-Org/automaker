@@ -12,7 +12,8 @@ export type NotificationType =
   | 'feature_waiting_approval'
   | 'feature_verified'
   | 'spec_regeneration_complete'
-  | 'agent_complete';
+  | 'agent_complete'
+  | 'clarification_questions_required';
 
 /**
  * Notification - A single notification entry

@@ -77,6 +77,24 @@ export const TAB_CONFIGS: TabConfig[] = [
     ],
     sections: [
       {
+        title: 'Interactive Planning (Claude Only)',
+        banner: {
+          type: 'info',
+          title: 'Clarification Questions',
+          description:
+            'When using Claude with "Require approval" enabled, you can configure instructions that guide the AI on when to ask clarification questions during planning. Leave empty to disable.',
+        },
+        fields: [
+          {
+            key: 'clarificationInstructions',
+            label: 'Clarification Instructions',
+            description:
+              'Instructions prepended to planning prompts when using Claude with "Require approval". Guides when to use AskUserQuestion tool.',
+            defaultValue: DEFAULT_AUTO_MODE_PROMPTS.clarificationInstructions,
+          },
+        ],
+      },
+      {
         title: 'Template Prompts',
         banner: {
           type: 'info',

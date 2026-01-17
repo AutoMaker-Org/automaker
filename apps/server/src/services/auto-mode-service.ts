@@ -20,6 +20,7 @@ import type {
   PipelineConfig,
   ThinkingLevel,
   PlanningMode,
+  ClarificationQuestion,
 } from '@automaker/types';
 import { DEFAULT_PHASE_MODELS, isClaudeModel, stripProviderPrefix } from '@automaker/types';
 import {
@@ -47,6 +48,7 @@ import {
 } from '@automaker/platform';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { randomUUID } from 'crypto';
 import path from 'path';
 import * as secureFs from '../lib/secure-fs.js';
 import type { EventEmitter } from '../lib/events.js';
@@ -229,6 +231,15 @@ interface PendingApproval {
   projectPath: string;
 }
 
+interface PendingClarification {
+  resolve: (answers: Record<string, string>) => void;
+  reject: (error: Error) => void;
+  featureId: string;
+  projectPath: string;
+  requestId: string;
+  toolUseId: string;
+}
+
 interface AutoModeConfig {
   maxConcurrency: number;
   useWorktrees: boolean;
@@ -271,6 +282,7 @@ export class AutoModeService {
   private autoLoopAbortController: AbortController | null = null;
   private config: AutoModeConfig | null = null;
   private pendingApprovals = new Map<string, PendingApproval>();
+  private pendingClarifications = new Map<string, PendingClarification>();
   private settingsService: SettingsService | null = null;
   // Track consecutive failures to detect quota/API issues
   private consecutiveFailures: { timestamp: number; error: string }[] = [];
@@ -943,6 +955,9 @@ Complete the pipeline step instructions above. Review the previous work and appl
 
     // Cancel any pending plan approval for this feature
     this.cancelPlanApproval(featureId);
+
+    // Cancel any pending clarification for this feature
+    this.cancelClarification(featureId);
 
     running.abortController.abort();
 
@@ -2019,6 +2034,145 @@ Format your response as a structured markdown document.`;
     return this.pendingApprovals.has(featureId);
   }
 
+  /**
+   * Wait for user to answer clarification questions.
+   * Returns a promise that resolves with the user's answers.
+   */
+  waitForClarificationAnswers(
+    featureId: string,
+    projectPath: string,
+    requestId: string,
+    toolUseId: string
+  ): Promise<Record<string, string>> {
+    const CLARIFICATION_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
+
+    logger.info(
+      `Registering pending clarification for feature ${featureId}, requestId=${requestId}`
+    );
+    logger.info(
+      `Current pending clarifications: ${Array.from(this.pendingClarifications.keys()).join(', ') || 'none'}`
+    );
+
+    return new Promise((resolve, reject) => {
+      // Set up timeout to prevent indefinite waiting
+      const timeoutId = setTimeout(() => {
+        const pending = this.pendingClarifications.get(featureId);
+        if (pending) {
+          logger.warn(`Clarification for feature ${featureId} timed out after 10 minutes`);
+          this.pendingClarifications.delete(featureId);
+          reject(
+            new Error('Clarification timed out after 10 minutes - feature execution cancelled')
+          );
+        }
+      }, CLARIFICATION_TIMEOUT_MS);
+
+      // Wrap resolve/reject to clear timeout
+      const wrappedResolve = (answers: Record<string, string>) => {
+        clearTimeout(timeoutId);
+        resolve(answers);
+      };
+
+      const wrappedReject = (error: Error) => {
+        clearTimeout(timeoutId);
+        reject(error);
+      };
+
+      this.pendingClarifications.set(featureId, {
+        resolve: wrappedResolve,
+        reject: wrappedReject,
+        featureId,
+        projectPath,
+        requestId,
+        toolUseId,
+      });
+
+      logger.info(`Pending clarification registered for feature ${featureId}`);
+    });
+  }
+
+  /**
+   * Resolve a pending clarification with user's answers.
+   */
+  async resolveClarification(
+    featureId: string,
+    requestId: string,
+    answers: Record<string, string>,
+    projectPathFromClient?: string
+  ): Promise<{ success: boolean; error?: string }> {
+    logger.info(`resolveClarification called for feature ${featureId}, requestId=${requestId}`);
+    logger.info(
+      `Current pending clarifications: ${Array.from(this.pendingClarifications.keys()).join(', ') || 'none'}`
+    );
+
+    const pending = this.pendingClarifications.get(featureId);
+
+    if (!pending) {
+      logger.info(`No pending clarification in Map for feature ${featureId}`);
+      return {
+        success: false,
+        error: `No pending clarification found for feature ${featureId}`,
+      };
+    }
+
+    // Verify request ID matches
+    if (pending.requestId !== requestId) {
+      logger.warn(
+        `Request ID mismatch for feature ${featureId}: expected ${pending.requestId}, got ${requestId}`
+      );
+      return {
+        success: false,
+        error: `Request ID mismatch - expected ${pending.requestId}`,
+      };
+    }
+
+    // Resolve the promise with answers
+    pending.resolve(answers);
+    this.pendingClarifications.delete(featureId);
+
+    // Emit event for tracking
+    this.emitAutoModeEvent('clarification:questions-answered' as any, {
+      featureId,
+      projectPath: projectPathFromClient || pending.projectPath,
+      requestId,
+      answersCount: Object.keys(answers).length,
+    });
+
+    return { success: true };
+  }
+
+  /**
+   * Cancel a pending clarification (e.g., when feature is stopped).
+   */
+  cancelClarification(featureId: string): void {
+    logger.info(`cancelClarification called for feature ${featureId}`);
+    logger.info(
+      `Current pending clarifications: ${Array.from(this.pendingClarifications.keys()).join(', ') || 'none'}`
+    );
+
+    const pending = this.pendingClarifications.get(featureId);
+    if (pending) {
+      logger.info(`Found and cancelling pending clarification for feature ${featureId}`);
+      pending.reject(new Error('Clarification cancelled - feature was stopped'));
+      this.pendingClarifications.delete(featureId);
+    } else {
+      logger.info(`No pending clarification to cancel for feature ${featureId}`);
+    }
+  }
+
+  /**
+   * Check if a feature has a pending clarification.
+   */
+  hasPendingClarification(featureId: string): boolean {
+    return this.pendingClarifications.has(featureId);
+  }
+
+  /**
+   * Get the pending clarification for a feature.
+   */
+  getPendingClarification(featureId: string): PendingClarification | undefined {
+    return this.pendingClarifications.get(featureId);
+  }
+
   // Private helpers
 
   /**
@@ -2320,7 +2474,19 @@ Format your response as a structured markdown document.`;
       return '';
     }
 
-    return planningPrompt + '\n\n---\n\n## Feature Request\n\n';
+    // Conditionally prepend clarification instructions for Claude provider
+    // when requirePlanApproval is enabled and instructions are configured
+    let finalPrompt = planningPrompt;
+    const clarificationInstructions = prompts.autoMode.clarificationInstructions;
+    if (
+      feature.requirePlanApproval === true &&
+      isClaudeModel(feature.model) &&
+      clarificationInstructions
+    ) {
+      finalPrompt = clarificationInstructions + '\n\n' + planningPrompt;
+    }
+
+    return finalPrompt + '\n\n---\n\n## Feature Request\n\n';
   }
 
   private buildFeaturePrompt(
@@ -2493,6 +2659,7 @@ This mock response was generated because AUTOMAKER_MOCK_AGENT=true was set.
     // Load MCP permission settings (global setting only)
 
     // Build SDK options using centralized configuration for feature implementation
+    // Enable clarification questions when plan approval is required (interactive planning mode)
     const sdkOptions = createAutoModeOptions({
       cwd: workDir,
       model: model,
@@ -2500,6 +2667,7 @@ This mock response was generated because AUTOMAKER_MOCK_AGENT=true was set.
       autoLoadClaudeMd,
       mcpServers: Object.keys(mcpServers).length > 0 ? mcpServers : undefined,
       thinkingLevel: options?.thinkingLevel,
+      enableClarificationQuestions: requiresApproval,
     });
 
     // Extract model, maxTurns, and allowedTools from SDK options
@@ -3137,6 +3305,83 @@ After generating the revised spec, output:
                 tool: block.name,
                 input: block.input,
               });
+
+              // Handle AskUserQuestion tool calls for interactive planning mode
+              // Cast input to get proper typing for the AskUserQuestion tool schema
+              const blockInput = block.input as Record<string, unknown> | undefined;
+              const blockId = (block as { id?: string }).id;
+              if (
+                block.name === 'AskUserQuestion' &&
+                requiresApproval &&
+                blockInput?.questions &&
+                Array.isArray(blockInput.questions)
+              ) {
+                logger.info(`AskUserQuestion tool detected for feature ${featureId}`);
+
+                const requestId = randomUUID();
+                const toolUseId = blockId || randomUUID();
+
+                // Extract questions from tool input
+                const questions: ClarificationQuestion[] = (blockInput.questions as any[]).map(
+                  (q: any) => ({
+                    question: q.question,
+                    header: q.header,
+                    options: q.options || [],
+                    multiSelect: q.multiSelect || false,
+                  })
+                );
+
+                // Emit WebSocket event for UI
+                this.emitAutoModeEvent('clarification:questions-required' as any, {
+                  featureId,
+                  projectPath: finalProjectPath,
+                  questions,
+                  requestId,
+                  toolUseId,
+                  timestamp: new Date().toISOString(),
+                });
+
+                // Create notification
+                try {
+                  const notificationService = getNotificationService();
+                  await notificationService.createNotification({
+                    type: 'clarification_questions_required',
+                    title: 'Clarification needed',
+                    message: `AI has ${questions.length} question${questions.length === 1 ? '' : 's'} during planning`,
+                    featureId,
+                    projectPath: finalProjectPath,
+                  });
+                } catch (notifError) {
+                  logger.error(`Failed to create clarification notification:`, notifError);
+                }
+
+                // Wait for user response
+                logger.info(`Waiting for clarification answers for feature ${featureId}`);
+                try {
+                  const answers = await this.waitForClarificationAnswers(
+                    featureId,
+                    finalProjectPath,
+                    requestId,
+                    toolUseId
+                  );
+                  logger.info(
+                    `Clarification answers received for feature ${featureId}: ${Object.keys(answers).length} answers`
+                  );
+
+                  // Add answers to response text for context
+                  responseText += `\n\n### User Clarification Answers\n`;
+                  for (const [header, answer] of Object.entries(answers)) {
+                    responseText += `- **${header}**: ${answer}\n`;
+                  }
+                  scheduleWrite();
+                } catch (clarificationError) {
+                  // Clarification was cancelled or timed out
+                  logger.warn(
+                    `Clarification failed for feature ${featureId}: ${(clarificationError as Error).message}`
+                  );
+                  throw clarificationError;
+                }
+              }
 
               // Also add to file output for persistence
               if (responseText.length > 0 && !responseText.endsWith('\n')) {

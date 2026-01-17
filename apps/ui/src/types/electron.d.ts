@@ -311,6 +311,30 @@ export type AutoModeEvent =
         title?: string;
         status?: string;
       }>;
+    }
+  | {
+      type: 'clarification:questions-required';
+      featureId: string;
+      projectPath: string;
+      questions: Array<{
+        question: string;
+        header: string;
+        options: Array<{
+          label: string;
+          description: string;
+        }>;
+        multiSelect: boolean;
+      }>;
+      requestId: string;
+      toolUseId: string;
+      timestamp: string;
+    }
+  | {
+      type: 'clarification:questions-answered';
+      featureId: string;
+      projectPath: string;
+      requestId: string;
+      answersCount: number;
     };
 
 export type SpecRegenerationEvent =
@@ -474,6 +498,16 @@ export interface AutoModeAPI {
     approved: boolean,
     editedPlan?: string,
     feedback?: string
+  ) => Promise<{
+    success: boolean;
+    error?: string;
+  }>;
+
+  submitClarificationResponse: (
+    projectPath: string,
+    featureId: string,
+    requestId: string,
+    answers: Record<string, string>
   ) => Promise<{
     success: boolean;
     error?: string;
