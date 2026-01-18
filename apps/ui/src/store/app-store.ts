@@ -724,6 +724,7 @@ export interface AppState {
 
   // MCP Servers
   mcpServers: MCPServerConfig[]; // List of configured MCP servers for agent use
+  mcpLoadingTimeout: number; // Timeout in milliseconds for MCP server loading/initialization (default: 10000)
 
   // Editor Configuration
   defaultEditorCommand: string | null; // Default editor for "Open In" action
@@ -1177,6 +1178,7 @@ export interface AppActions {
   updateMCPServer: (id: string, updates: Partial<MCPServerConfig>) => void;
   removeMCPServer: (id: string) => void;
   reorderMCPServers: (oldIndex: number, newIndex: number) => void;
+  setMcpLoadingTimeout: (timeout: number) => Promise<void>;
 
   // Project Analysis actions
   setProjectAnalysis: (analysis: ProjectAnalysis | null) => void;
@@ -1419,6 +1421,7 @@ const initialState: AppState = {
   autoLoadClaudeMd: false, // Default to disabled (user must opt-in)
   skipSandboxWarning: false, // Default to disabled (show sandbox warning dialog)
   mcpServers: [], // No MCP servers configured by default
+  mcpLoadingTimeout: 10000, // Default 10 seconds for MCP server loading timeout
   defaultEditorCommand: null, // Auto-detect: Cursor > VS Code > first available
   enableSkills: true, // Skills enabled by default
   skillsSources: ['user', 'project'] as Array<'user' | 'project'>, // Load from both sources by default
@@ -2465,6 +2468,13 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
     const [movedServer] = servers.splice(oldIndex, 1);
     servers.splice(newIndex, 0, movedServer);
     set({ mcpServers: servers });
+  },
+
+  setMcpLoadingTimeout: async (timeout) => {
+    set({ mcpLoadingTimeout: timeout });
+    // Sync to server settings file
+    const { syncSettingsToServer } = await import('@/hooks/use-settings-migration');
+    await syncSettingsToServer();
   },
 
   // Project Analysis actions

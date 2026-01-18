@@ -598,6 +598,8 @@ export interface GlobalSettings {
   // MCP Server Configuration
   /** List of configured MCP servers for agent use */
   mcpServers: MCPServerConfig[];
+  /** Timeout in milliseconds for MCP server loading/initialization (default: 10000) */
+  mcpLoadingTimeout?: number;
 
   // Editor Configuration
   /** Default editor command for "Open In" action (null = auto-detect: Cursor > VS Code > first available) */
@@ -899,6 +901,7 @@ export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
   codexAdditionalDirs: DEFAULT_CODEX_ADDITIONAL_DIRS,
   codexThreadId: undefined,
   mcpServers: [],
+  mcpLoadingTimeout: 10000,
   defaultEditorCommand: null,
   enableSkills: true,
   skillsSources: ['user', 'project'],

@@ -1,6 +1,7 @@
 import { Plug } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useMCPServers } from './hooks';
+import { useAppStore } from '@/store/app-store';
 import { MCPServerHeader, MCPToolsWarning, MCPServerCard } from './components';
 import {
   AddEditServerDialog,
@@ -12,6 +13,7 @@ import {
 } from './dialogs';
 
 export function MCPServersSection() {
+  const { mcpLoadingTimeout, setMcpLoadingTimeout } = useAppStore();
   const {
     // Store state
     mcpServers,
@@ -82,11 +84,13 @@ export function MCPServersSection() {
       <MCPServerHeader
         isRefreshing={isRefreshing}
         hasServers={mcpServers.length > 0}
+        mcpLoadingTimeout={mcpLoadingTimeout}
         onRefresh={handleRefresh}
         onExport={handleExportJson}
         onEditAllJson={handleOpenGlobalJsonEdit}
         onImport={() => setIsImportDialogOpen(true)}
         onAdd={handleOpenAddDialog}
+        onTimeoutChange={setMcpLoadingTimeout}
       />
 
       {showToolsWarning && <MCPToolsWarning totalTools={totalToolsCount} />}
