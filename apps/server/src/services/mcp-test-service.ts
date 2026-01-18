@@ -54,7 +54,10 @@ export class MCPTestService {
 
   constructor(settingsService: SettingsService, options?: MCPTestServiceOptions) {
     this.settingsService = settingsService;
-    this.defaultTimeoutMs = options?.timeoutMs ?? DEFAULT_TIMEOUT;
+    // Validate constructor timeout option
+    const timeoutMs = options?.timeoutMs;
+    this.defaultTimeoutMs =
+      Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : DEFAULT_TIMEOUT;
   }
 
   /**
