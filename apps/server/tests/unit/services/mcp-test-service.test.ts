@@ -63,6 +63,7 @@ describe('mcp-test-service.ts', () => {
     describe('constructor options', () => {
       it('should use default timeout when no options provided', async () => {
         const service = new MCPTestService(mockSettingsService);
+        const timeoutSpy = vi.spyOn(service as any, 'timeout');
         const config: MCPServerConfig = {
           id: 'test-server',
           name: 'Test Server',
@@ -71,10 +72,10 @@ describe('mcp-test-service.ts', () => {
           enabled: true,
         };
 
-        // Default timeout is 10000ms
         await service.testServer(config);
-        // Would verify timeout behavior if SDK wasn't mocked
-        expect(true).toBe(true);
+
+        // The service has a default of 10000ms from the constructor
+        expect(timeoutSpy).toHaveBeenCalledWith(10000, expect.any(String));
       });
 
       it('should use custom timeout from constructor options', async () => {
