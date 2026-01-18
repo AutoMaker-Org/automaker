@@ -14,8 +14,13 @@ import path from 'path';
 import * as secureFs from '../../../lib/secure-fs.js';
 import { isGitRepo } from '@automaker/git-utils';
 import { getErrorMessage, logError, normalizePath, execEnv, isGhCliAvailable } from '../common.js';
-import { readAllWorktreeMetadata, type WorktreePRInfo } from '../../../lib/worktree-metadata.js';
+import {
+  readAllWorktreeMetadata,
+  updateWorktreePRInfo,
+  type WorktreePRInfo,
+} from '../../../lib/worktree-metadata.js';
 import { createLogger } from '@automaker/utils';
+import { validatePRState } from '@automaker/types';
 import {
   checkGitHubRemote,
   type GitHubRemoteStatus,
@@ -168,8 +173,11 @@ async function getGitHubRemoteStatus(projectPath: string): Promise<GitHubRemoteS
 }
 
 /**
- * Fetch open PRs from GitHub and create a map of branch name to PR info.
- * This allows detecting PRs that were created outside the app.
+ * Fetch all PRs from GitHub and create a map of branch name to PR info.
+ * Uses --state all to include merged/closed PRs, allowing detection of
+ * state changes (e.g., when a PR is merged on GitHub).
+ *
+ * This also allows detecting PRs that were created outside the app.
  *
  * Uses cached GitHub remote status to avoid repeated warnings when the
  * project doesn't have a GitHub remote configured.
@@ -192,9 +200,9 @@ async function fetchGitHubPRs(projectPath: string): Promise<Map<string, Worktree
         ? `-R ${remoteStatus.owner}/${remoteStatus.repo}`
         : '';
 
-    // Fetch open PRs from GitHub
+    // Fetch all PRs from GitHub (including merged/closed to detect state changes)
     const { stdout } = await execAsync(
-      `gh pr list ${repoFlag} --state open --json number,title,url,state,headRefName,createdAt --limit 1000`,
+      `gh pr list ${repoFlag} --state all --json number,title,url,state,headRefName,createdAt --limit 1000`,
       { cwd: projectPath, env: execEnv, timeout: 15000 }
     );
 
@@ -212,7 +220,8 @@ async function fetchGitHubPRs(projectPath: string): Promise<Map<string, Worktree
         number: pr.number,
         url: pr.url,
         title: pr.title,
-        state: pr.state,
+        // GitHub CLI returns state as uppercase: OPEN, MERGED, CLOSED
+        state: validatePRState(pr.state),
         createdAt: pr.createdAt,
       });
     }
@@ -351,23 +360,36 @@ export function createListHandler() {
         }
       }
 
-      // Add PR info from metadata or GitHub for each worktree
-      // Only fetch GitHub PRs if includeDetails is requested (performance optimization)
+      // Assign PR info to each worktree, preferring fresh GitHub data over cached metadata.
+      // Only fetch GitHub PRs if includeDetails is requested (performance optimization).
+      // Uses --state all to detect merged/closed PRs, limited to 1000 recent PRs.
       const githubPRs = includeDetails
         ? await fetchGitHubPRs(projectPath)
         : new Map<string, WorktreePRInfo>();
 
       for (const worktree of worktrees) {
         const metadata = allMetadata.get(worktree.branch);
-        if (metadata?.pr) {
-          // Use stored metadata (more complete info)
-          worktree.pr = metadata.pr;
-        } else if (includeDetails) {
-          // Fall back to GitHub PR detection only when includeDetails is requested
-          const githubPR = githubPRs.get(worktree.branch);
-          if (githubPR) {
-            worktree.pr = githubPR;
+        const githubPR = githubPRs.get(worktree.branch);
+
+        if (githubPR) {
+          // Prefer fresh GitHub data (it has the current state)
+          worktree.pr = githubPR;
+
+          // Sync metadata with GitHub state when:
+          // 1. No metadata exists for this PR (PR created externally)
+          // 2. State has changed (e.g., merged/closed on GitHub)
+          const needsSync = !metadata?.pr || metadata.pr.state !== githubPR.state;
+          if (needsSync) {
+            // Fire and forget - don't block the response
+            updateWorktreePRInfo(projectPath, worktree.branch, githubPR).catch((err) => {
+              logger.warn(
+                `Failed to update PR info for ${worktree.branch}: ${getErrorMessage(err)}`
+              );
+            });
           }
+        } else if (metadata?.pr) {
+          // Fall back to stored metadata (for PRs not in recent GitHub response)
+          worktree.pr = metadata.pr;
         }
       }
 

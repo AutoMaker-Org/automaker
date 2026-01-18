@@ -1,6 +1,6 @@
 import { Folder, LucideIcon } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, sanitizeForTestId } from '@/lib/utils';
 import { getAuthenticatedImageUrl } from '@/lib/api-fetch';
 import type { Project } from '@/lib/electron';
 
@@ -37,10 +37,15 @@ export function ProjectSwitcherItem({
   const IconComponent = getIconComponent();
   const hasCustomIcon = !!project.customIconPath;
 
+  // Combine project.id with sanitized name for uniqueness and readability
+  // Format: project-switcher-{id}-{sanitizedName}
+  const testId = `project-switcher-${project.id}-${sanitizeForTestId(project.name)}`;
+
   return (
     <button
       onClick={onClick}
       onContextMenu={onContextMenu}
+      data-testid={testId}
       className={cn(
         'group w-full aspect-square rounded-xl flex items-center justify-center relative overflow-hidden',
         'transition-all duration-200 ease-out',
@@ -60,7 +65,6 @@ export function ProjectSwitcherItem({
         'hover:scale-105 active:scale-95'
       )}
       title={project.name}
-      data-testid={`project-switcher-${project.id}`}
     >
       {hasCustomIcon ? (
         <img

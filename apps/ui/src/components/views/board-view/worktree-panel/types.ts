@@ -1,10 +1,6 @@
-export interface WorktreePRInfo {
-  number: number;
-  url: string;
-  title: string;
-  state: string;
-  createdAt: string;
-}
+// Re-export shared types from @automaker/types
+export type { PRState, WorktreePRInfo } from '@automaker/types';
+import type { PRState, WorktreePRInfo } from '@automaker/types';
 
 export interface WorktreeInfo {
   path: string;
@@ -43,7 +39,8 @@ export interface PRInfo {
   number: number;
   title: string;
   url: string;
-  state: string;
+  /** PR state: OPEN, MERGED, or CLOSED */
+  state: PRState;
   author: string;
   body: string;
   comments: Array<{

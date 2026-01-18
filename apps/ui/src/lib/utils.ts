@@ -126,6 +126,34 @@ export const isMac =
         (navigator.platform ? navigator.platform.toLowerCase().includes('mac') : false));
 
 /**
+ * Sanitize a string for use in data-testid attributes.
+ * Creates a deterministic, URL-safe identifier from any input string.
+ *
+ * Transformations:
+ * - Convert to lowercase
+ * - Replace spaces with hyphens
+ * - Remove all non-alphanumeric characters (except hyphens)
+ * - Collapse multiple consecutive hyphens into a single hyphen
+ * - Trim leading/trailing hyphens
+ *
+ * @param name - The string to sanitize (e.g., project name, feature title)
+ * @returns A sanitized string safe for CSS selectors and test IDs
+ *
+ * @example
+ * sanitizeForTestId("My Awesome Project!") // "my-awesome-project"
+ * sanitizeForTestId("test-project-123")    // "test-project-123"
+ * sanitizeForTestId("  Foo  Bar  ")        // "foo-bar"
+ */
+export function sanitizeForTestId(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/\s+/g, '-')
+    .replace(/[^a-z0-9-]/g, '')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+}
+
+/**
  * Generate a UUID v4 string.
  *
  * Uses crypto.randomUUID() when available (secure contexts: HTTPS or localhost).

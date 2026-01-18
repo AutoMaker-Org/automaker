@@ -292,3 +292,7 @@ export type {
   EventReplayHookResult,
 } from './event-history.js';
 export { EVENT_HISTORY_VERSION, DEFAULT_EVENT_HISTORY_INDEX } from './event-history.js';
+
+// Worktree and PR types
+export type { PRState, WorktreePRInfo } from './worktree.js';
+export { PR_STATES, validatePRState } from './worktree.js';
