@@ -2463,8 +2463,10 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
     const { syncSettingsToServer } = await import('@/hooks/use-settings-migration');
     const success = await syncSettingsToServer();
     if (!success) {
-      // Revert on sync failure
-      set({ mcpLoadingTimeout: previous });
+      // Only revert if the value hasn't changed (prevents race conditions)
+      if (get().mcpLoadingTimeout === validTimeout) {
+        set({ mcpLoadingTimeout: previous });
+      }
     }
   },
 
