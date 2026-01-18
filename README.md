@@ -389,6 +389,7 @@ npm run lint
 - `VITE_SKIP_ELECTRON` - Skip Electron in dev mode
 - `OPEN_DEVTOOLS` - Auto-open DevTools in Electron
 - `AUTOMAKER_SKIP_SANDBOX_WARNING` - Skip sandbox warning dialog (useful for dev/CI)
+- `AUTOMAKER_AUTO_LOGIN=true` - Skip login prompt in development (ignored when NODE_ENV=production)
 
 ### Authentication Setup
 

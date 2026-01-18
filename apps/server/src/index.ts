@@ -110,15 +110,20 @@ export function isRequestLoggingEnabled(): boolean {
   return requestLoggingEnabled;
 }
 
+// Width for log box content (excluding borders)
+const BOX_CONTENT_WIDTH = 67;
+
 // Check for required environment variables
 const hasAnthropicKey = !!process.env.ANTHROPIC_API_KEY;
 
 if (!hasAnthropicKey) {
-  const wHeader = '⚠️  WARNING: No Claude authentication configured'.padEnd(67);
-  const w1 = 'The Claude Agent SDK requires authentication to function.'.padEnd(67);
-  const w2 = 'Set your Anthropic API key:'.padEnd(67);
-  const w3 = '  export ANTHROPIC_API_KEY="sk-ant-..."'.padEnd(67);
-  const w4 = 'Or use the setup wizard in Settings to configure authentication.'.padEnd(67);
+  const wHeader = '⚠️  WARNING: No Claude authentication configured'.padEnd(BOX_CONTENT_WIDTH);
+  const w1 = 'The Claude Agent SDK requires authentication to function.'.padEnd(BOX_CONTENT_WIDTH);
+  const w2 = 'Set your Anthropic API key:'.padEnd(BOX_CONTENT_WIDTH);
+  const w3 = '  export ANTHROPIC_API_KEY="sk-ant-..."'.padEnd(BOX_CONTENT_WIDTH);
+  const w4 = 'Or use the setup wizard in Settings to configure authentication.'.padEnd(
+    BOX_CONTENT_WIDTH
+  );
 
   logger.warn(`
 ╔═════════════════════════════════════════════════════════════════════╗
@@ -634,13 +639,13 @@ const startServer = (port: number, host: string) => {
     const wsTerminalUrl = `ws://${HOSTNAME}:${port}/api/terminal/ws`;
     const healthUrl = `http://${HOSTNAME}:${port}/api/health`;
 
-    const sHeader = '🚀 Automaker Backend Server'.padEnd(67);
-    const s1 = `Listening:    ${listenAddr}`.padEnd(67);
-    const s2 = `HTTP API:     ${httpUrl}`.padEnd(67);
-    const s3 = `WebSocket:    ${wsEventsUrl}`.padEnd(67);
-    const s4 = `Terminal WS:  ${wsTerminalUrl}`.padEnd(67);
-    const s5 = `Health:       ${healthUrl}`.padEnd(67);
-    const s6 = `Terminal:     ${terminalStatus}`.padEnd(67);
+    const sHeader = '🚀 Automaker Backend Server'.padEnd(BOX_CONTENT_WIDTH);
+    const s1 = `Listening:    ${listenAddr}`.padEnd(BOX_CONTENT_WIDTH);
+    const s2 = `HTTP API:     ${httpUrl}`.padEnd(BOX_CONTENT_WIDTH);
+    const s3 = `WebSocket:    ${wsEventsUrl}`.padEnd(BOX_CONTENT_WIDTH);
+    const s4 = `Terminal WS:  ${wsTerminalUrl}`.padEnd(BOX_CONTENT_WIDTH);
+    const s5 = `Health:       ${healthUrl}`.padEnd(BOX_CONTENT_WIDTH);
+    const s6 = `Terminal:     ${terminalStatus}`.padEnd(BOX_CONTENT_WIDTH);
 
     logger.info(`
 ╔═════════════════════════════════════════════════════════════════════╗
@@ -665,15 +670,15 @@ const startServer = (port: number, host: string) => {
       const killCmd = `lsof -ti:${portStr} | xargs kill -9`;
       const altCmd = `PORT=${nextPortStr} npm run dev:server`;
 
-      const eHeader = `❌ ERROR: Port ${portStr} is already in use`.padEnd(67);
-      const e1 = 'Another process is using this port.'.padEnd(67);
-      const e2 = 'To fix this, try one of:'.padEnd(67);
-      const e3 = '1. Kill the process using the port:'.padEnd(67);
-      const e4 = `   ${killCmd}`.padEnd(67);
-      const e5 = '2. Use a different port:'.padEnd(67);
-      const e6 = `   ${altCmd}`.padEnd(67);
-      const e7 = '3. Use the init.sh script which handles this:'.padEnd(67);
-      const e8 = '   ./init.sh'.padEnd(67);
+      const eHeader = `❌ ERROR: Port ${portStr} is already in use`.padEnd(BOX_CONTENT_WIDTH);
+      const e1 = 'Another process is using this port.'.padEnd(BOX_CONTENT_WIDTH);
+      const e2 = 'To fix this, try one of:'.padEnd(BOX_CONTENT_WIDTH);
+      const e3 = '1. Kill the process using the port:'.padEnd(BOX_CONTENT_WIDTH);
+      const e4 = `   ${killCmd}`.padEnd(BOX_CONTENT_WIDTH);
+      const e5 = '2. Use a different port:'.padEnd(BOX_CONTENT_WIDTH);
+      const e6 = `   ${altCmd}`.padEnd(BOX_CONTENT_WIDTH);
+      const e7 = '3. Use the init.sh script which handles this:'.padEnd(BOX_CONTENT_WIDTH);
+      const e8 = '   ./init.sh'.padEnd(BOX_CONTENT_WIDTH);
 
       logger.error(`
 ╔═════════════════════════════════════════════════════════════════════╗

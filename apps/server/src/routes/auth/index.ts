@@ -125,7 +125,12 @@ export function createAuthRoutes(): Router {
     let authenticated = isRequestAuthenticated(req);
 
     // Auto-login for development: create session automatically if enabled
-    if (!authenticated && process.env.AUTOMAKER_AUTO_LOGIN === 'true') {
+    // Only works in non-production environments as a safeguard
+    if (
+      !authenticated &&
+      process.env.AUTOMAKER_AUTO_LOGIN === 'true' &&
+      process.env.NODE_ENV !== 'production'
+    ) {
       const sessionToken = await createSession();
       const cookieOptions = getSessionCookieOptions();
       const cookieName = getSessionCookieName();

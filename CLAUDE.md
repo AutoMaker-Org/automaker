@@ -172,4 +172,5 @@ Use `resolveModelString()` from `@automaker/model-resolver` to convert model ali
 - `DATA_DIR` - Data storage directory (default: ./data)
 - `ALLOWED_ROOT_DIRECTORY` - Restrict file operations to specific directory
 - `AUTOMAKER_MOCK_AGENT=true` - Enable mock agent mode for CI testing
+- `AUTOMAKER_AUTO_LOGIN=true` - Skip login prompt in development (disabled when NODE_ENV=production)
 - `VITE_HOSTNAME` - Hostname for frontend API URLs (default: localhost)
