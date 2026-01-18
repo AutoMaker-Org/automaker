@@ -67,7 +67,12 @@ export class MCPTestService {
     options?: MCPTestOptions
   ): Promise<MCPTestResult> {
     const startTime = Date.now();
-    const timeoutMs = options?.timeoutMs ?? this.defaultTimeoutMs;
+    // Validate timeout override, fall back to service default if invalid
+    const overrideTimeout = options?.timeoutMs;
+    const timeoutMs =
+      Number.isFinite(overrideTimeout) && overrideTimeout > 0
+        ? overrideTimeout
+        : this.defaultTimeoutMs;
     let client: Client | null = null;
     let transport:
       | StdioClientTransport
