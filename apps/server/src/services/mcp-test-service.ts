@@ -30,20 +30,44 @@ export interface MCPTestResult {
 }
 
 /**
+ * Options for MCPTestService
+ */
+export interface MCPTestServiceOptions {
+  /** Default timeout in milliseconds for MCP operations (default: 10000) */
+  timeoutMs?: number;
+}
+
+/**
+ * Options for testing an MCP server
+ */
+export interface MCPTestOptions {
+  /** Timeout in milliseconds for this specific test (overrides default) */
+  timeoutMs?: number;
+}
+
+/**
  * MCP Test Service for testing server connections and listing tools
  */
 export class MCPTestService {
   private settingsService: SettingsService;
+  private defaultTimeoutMs: number;
 
-  constructor(settingsService: SettingsService) {
+  constructor(settingsService: SettingsService, options?: MCPTestServiceOptions) {
     this.settingsService = settingsService;
+    this.defaultTimeoutMs = options?.timeoutMs ?? DEFAULT_TIMEOUT;
   }
 
   /**
    * Test connection to an MCP server and list its tools
+   * @param serverConfig - The MCP server configuration
+   * @param options - Optional test options (e.g., custom timeout)
    */
-  async testServer(serverConfig: MCPServerConfig): Promise<MCPTestResult> {
+  async testServer(
+    serverConfig: MCPServerConfig,
+    options?: MCPTestOptions
+  ): Promise<MCPTestResult> {
     const startTime = Date.now();
+    const timeoutMs = options?.timeoutMs ?? this.defaultTimeoutMs;
     let client: Client | null = null;
     let transport:
       | StdioClientTransport
@@ -63,7 +87,7 @@ export class MCPTestService {
       // Connect with timeout
       await Promise.race([
         client.connect(transport),
-        this.timeout(DEFAULT_TIMEOUT, 'Connection timeout'),
+        this.timeout(timeoutMs, 'Connection timeout'),
       ]);
 
       // List tools with timeout
@@ -75,7 +99,7 @@ export class MCPTestService {
             description?: string;
             inputSchema?: Record<string, unknown>;
           }>;
-        }>(DEFAULT_TIMEOUT, 'List tools timeout'),
+        }>(timeoutMs, 'List tools timeout'),
       ]);
 
       const connectionTime = Date.now() - startTime;
@@ -154,6 +178,7 @@ export class MCPTestService {
 
   /**
    * Test server by ID (looks up config from settings)
+   * Uses the mcpLoadingTimeout from global settings if configured
    */
   async testServerById(serverId: string): Promise<MCPTestResult> {
     try {
@@ -167,7 +192,9 @@ export class MCPTestService {
         };
       }
 
-      return this.testServer(serverConfig);
+      // Use timeout from settings if configured, otherwise use default
+      const timeoutMs = globalSettings.mcpLoadingTimeout ?? DEFAULT_TIMEOUT;
+      return this.testServer(serverConfig, { timeoutMs });
     } catch (error) {
       return {
         success: false,

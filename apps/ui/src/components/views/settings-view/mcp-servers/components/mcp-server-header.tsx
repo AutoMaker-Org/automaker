@@ -1,27 +1,43 @@
-import { Plug, RefreshCw, Download, Code, FileJson, Plus } from 'lucide-react';
+import { Plug, RefreshCw, Download, Code, FileJson, Plus, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 
 interface MCPServerHeaderProps {
   isRefreshing: boolean;
   hasServers: boolean;
+  mcpLoadingTimeout: number;
   onRefresh: () => void;
   onExport: () => void;
   onEditAllJson: () => void;
   onImport: () => void;
   onAdd: () => void;
+  onTimeoutChange: (timeout: number) => void;
 }
 
 export function MCPServerHeader({
   isRefreshing,
   hasServers,
+  mcpLoadingTimeout,
   onRefresh,
   onExport,
   onEditAllJson,
   onImport,
   onAdd,
+  onTimeoutChange,
 }: MCPServerHeaderProps) {
+  // Convert milliseconds to seconds for display
+  const timeoutSeconds = Math.round(mcpLoadingTimeout / 1000);
+
+  const handleTimeoutChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const seconds = parseInt(e.target.value, 10);
+    if (!isNaN(seconds) && seconds >= 1) {
+      onTimeoutChange(seconds * 1000); // Convert seconds to milliseconds
+    }
+  };
+
   return (
     <div className="p-6 border-b border-border/50 bg-linear-to-r from-transparent via-accent/5 to-transparent">
       <div className="flex items-center justify-between">
@@ -81,6 +97,32 @@ export function MCPServerHeader({
             <Plus className="w-4 h-4 mr-2" />
             Add Server
           </Button>
+        </div>
+      </div>
+
+      {/* Loading Timeout Configuration */}
+      <div className="mt-4 ml-12 flex items-center gap-3">
+        <div className="flex items-center gap-2">
+          <Clock className="w-4 h-4 text-muted-foreground" />
+          <Label
+            htmlFor="mcp-loading-timeout"
+            className="text-sm text-muted-foreground whitespace-nowrap"
+          >
+            Loading timeout:
+          </Label>
+        </div>
+        <div className="flex items-center gap-2">
+          <Input
+            id="mcp-loading-timeout"
+            type="number"
+            min={1}
+            max={300}
+            value={timeoutSeconds}
+            onChange={handleTimeoutChange}
+            className="w-20 h-8 text-sm"
+            data-testid="mcp-loading-timeout-input"
+          />
+          <span className="text-sm text-muted-foreground">seconds</span>
         </div>
       </div>
     </div>
