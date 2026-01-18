@@ -192,8 +192,8 @@ export class MCPTestService {
         };
       }
 
-      // Use timeout from settings if configured, otherwise use default
-      const timeoutMs = globalSettings.mcpLoadingTimeout ?? DEFAULT_TIMEOUT;
+      // Use timeout from settings if configured, otherwise use service default
+      const timeoutMs = globalSettings.mcpLoadingTimeout ?? this.defaultTimeoutMs;
       return this.testServer(serverConfig, { timeoutMs });
     } catch (error) {
       return {

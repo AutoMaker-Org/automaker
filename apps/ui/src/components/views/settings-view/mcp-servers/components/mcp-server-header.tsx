@@ -33,8 +33,10 @@ export function MCPServerHeader({
 
   const handleTimeoutChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const seconds = parseInt(e.target.value, 10);
-    if (!isNaN(seconds) && seconds >= 1) {
-      onTimeoutChange(seconds * 1000); // Convert seconds to milliseconds
+    if (!Number.isNaN(seconds)) {
+      // Clamp value between 1 and 300 seconds
+      const clamped = Math.min(300, Math.max(1, seconds));
+      onTimeoutChange(clamped * 1000); // Convert seconds to milliseconds
     }
   };
 

@@ -2455,10 +2455,17 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
   },
 
   setMcpLoadingTimeout: async (timeout) => {
-    set({ mcpLoadingTimeout: timeout });
+    const previous = get().mcpLoadingTimeout;
+    // Validate timeout value
+    const validTimeout = Number.isFinite(timeout) && timeout > 0 ? timeout : previous;
+    set({ mcpLoadingTimeout: validTimeout });
     // Sync to server settings file
     const { syncSettingsToServer } = await import('@/hooks/use-settings-migration');
-    await syncSettingsToServer();
+    const success = await syncSettingsToServer();
+    if (!success) {
+      // Revert on sync failure
+      set({ mcpLoadingTimeout: previous });
+    }
   },
 
   // Project Analysis actions
