@@ -330,28 +330,13 @@ export class OpencodeProvider extends CliProvider {
     // Convert canonical prefix format (opencode-xxx) to CLI slash format (opencode/xxx)
     // OpenCode CLI expects provider/model format (e.g., 'opencode/big-model')
     if (options.model) {
-      let cliModel: string;
+      // Strip opencode- prefix if present, then ensure slash format
+      const model = options.model.startsWith('opencode-')
+        ? options.model.slice('opencode-'.length)
+        : options.model;
 
-      if (options.model.startsWith('opencode-')) {
-        // Strip the opencode- prefix
-        const remainder = options.model.slice('opencode-'.length);
-
-        if (remainder.includes('/')) {
-          // Remainder already has provider/model format (e.g., opencode-anthropic/claude-sonnet-4-5)
-          // Use as-is without the opencode- prefix
-          cliModel = remainder;
-        } else {
-          // Bare model name after stripping prefix (e.g., opencode-big-model)
-          // Convert to opencode/model format for CLI
-          cliModel = `opencode/${remainder}`;
-        }
-      } else if (options.model.includes('/')) {
-        // Already in provider/model format (e.g., github-copilot/gpt-4o)
-        cliModel = options.model;
-      } else {
-        // Bare model name - assume opencode provider
-        cliModel = `opencode/${options.model}`;
-      }
+      // If model has slash, it's already provider/model format; otherwise prepend opencode/
+      const cliModel = model.includes('/') ? model : `opencode/${model}`;
 
       args.push('--model', cliModel);
     }
