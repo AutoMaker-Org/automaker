@@ -90,21 +90,23 @@ export function BranchSwitchDropdown({
               {branchFilter ? 'No matching branches' : 'No branches found'}
             </DropdownMenuItem>
           ) : (
-            filteredBranches.map((branch) => (
-              <DropdownMenuItem
-                key={branch.name}
-                onClick={() => onSwitchBranch(worktree, branch.name)}
-                disabled={isSwitching || branch.name === worktree.branch}
-                className="text-xs font-mono"
-              >
-                {branch.name === worktree.branch ? (
-                  <Check className="w-3.5 h-3.5 mr-2 flex-shrink-0" />
-                ) : (
-                  <span className="w-3.5 mr-2 flex-shrink-0" />
-                )}
-                <span className="truncate">{branch.name}</span>
-              </DropdownMenuItem>
-            ))
+            filteredBranches
+              .filter((branch) => !branch.checkedOutInWorktree) // Hide branches already in worktrees
+              .map((branch) => (
+                <DropdownMenuItem
+                  key={branch.name}
+                  onClick={() => onSwitchBranch(worktree, branch.name)}
+                  disabled={isSwitching || branch.name === worktree.branch}
+                  className="text-xs font-mono"
+                >
+                  {branch.name === worktree.branch ? (
+                    <Check className="w-3.5 h-3.5 mr-2 flex-shrink-0" />
+                  ) : (
+                    <span className="w-3.5 mr-2 flex-shrink-0" />
+                  )}
+                  <span className="truncate">{branch.name}</span>
+                </DropdownMenuItem>
+              ))
           )}
         </div>
         <DropdownMenuSeparator />

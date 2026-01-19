@@ -12,9 +12,7 @@ interface UseProjectCreationProps {
   upsertAndSetCurrentProject: (path: string, name: string) => Project;
 }
 
-export function useProjectCreation({
-  upsertAndSetCurrentProject,
-}: UseProjectCreationProps) {
+export function useProjectCreation({ upsertAndSetCurrentProject }: UseProjectCreationProps) {
   // Modal state
   const [showNewProjectModal, setShowNewProjectModal] = useState(false);
   const [isCreatingProject, setIsCreatingProject] = useState(false);

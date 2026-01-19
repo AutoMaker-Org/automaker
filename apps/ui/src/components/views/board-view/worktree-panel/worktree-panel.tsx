@@ -355,8 +355,8 @@ export function WorktreePanel({
         )}
       </div>
 
-      {/* Worktrees section - only show if enabled */}
-      {useWorktreesEnabled && (
+      {/* Worktrees section - show if enabled OR if worktrees exist (so users can navigate to them) */}
+      {(useWorktreesEnabled || nonMainWorktrees.length > 0) && (
         <>
           <div className="w-px h-5 bg-border mx-2" />
           <GitBranch className="w-4 h-4 text-muted-foreground" />

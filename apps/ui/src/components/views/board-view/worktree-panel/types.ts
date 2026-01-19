@@ -17,6 +17,8 @@ export interface BranchInfo {
   name: string;
   isCurrent: boolean;
   isRemote: boolean;
+  /** Path to worktree if this branch is checked out in a worktree (null if not) */
+  checkedOutInWorktree: string | null;
 }
 
 export interface GitRepoStatus {

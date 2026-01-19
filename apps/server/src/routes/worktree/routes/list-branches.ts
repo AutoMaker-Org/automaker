@@ -16,6 +16,37 @@ interface BranchInfo {
   name: string;
   isCurrent: boolean;
   isRemote: boolean;
+  /** Path to worktree if this branch is checked out in a worktree (null if not) */
+  checkedOutInWorktree: string | null;
+}
+
+/**
+ * Get a map of branch names to their worktree paths.
+ * Git doesn't allow checking out a branch that's already checked out in a worktree.
+ */
+async function getWorktreeBranches(cwd: string): Promise<Map<string, string>> {
+  const branchToWorktree = new Map<string, string>();
+  try {
+    const { stdout } = await execAsync('git worktree list --porcelain', { cwd });
+    const lines = stdout.split('\n');
+    let currentWorktreePath: string | null = null;
+
+    for (const line of lines) {
+      if (line.startsWith('worktree ')) {
+        currentWorktreePath = line.slice(9);
+      } else if (line.startsWith('branch ')) {
+        const branchName = line.slice(7).replace('refs/heads/', '');
+        if (currentWorktreePath) {
+          branchToWorktree.set(branchName, currentWorktreePath);
+        }
+      } else if (line === '') {
+        currentWorktreePath = null;
+      }
+    }
+  } catch {
+    // If we can't get worktree info, return empty map
+  }
+  return branchToWorktree;
 }
 
 export function createListBranchesHandler() {
@@ -40,6 +71,10 @@ export function createListBranchesHandler() {
       });
       const currentBranch = currentBranchOutput.trim();
 
+      // Get branches that are already checked out in worktrees
+      // These cannot be switched to from other locations
+      const worktreeBranches = await getWorktreeBranches(worktreePath);
+
       // List all local branches
       // Use double quotes around the format string for cross-platform compatibility
       // Single quotes are preserved literally on Windows; double quotes work on both
@@ -54,10 +89,13 @@ export function createListBranchesHandler() {
         .map((name) => {
           // Remove any surrounding quotes (Windows git may preserve them)
           const cleanName = name.trim().replace(/^['"]|['"]$/g, '');
+          const worktreePath = worktreeBranches.get(cleanName);
           return {
             name: cleanName,
             isCurrent: cleanName === currentBranch,
             isRemote: false,
+            // Mark if this branch is checked out in a worktree (and it's not the current worktree)
+            checkedOutInWorktree: worktreePath && cleanName !== currentBranch ? worktreePath : null,
           };
         });
 
@@ -102,6 +140,7 @@ export function createListBranchesHandler() {
                   name: cleanName, // Keep full name like "origin/main"
                   isCurrent: false,
                   isRemote: true,
+                  checkedOutInWorktree: null, // Remote branches are never checked out in worktrees
                 });
               }
             });
