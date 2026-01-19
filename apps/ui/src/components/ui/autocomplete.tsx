@@ -65,7 +65,14 @@ export function Autocomplete({
   const [triggerWidth, setTriggerWidth] = React.useState<number>(0);
   const triggerRef = React.useRef<HTMLButtonElement>(null);
 
-  const normalizedOptions = React.useMemo(() => options.map(normalizeOption), [options]);
+  const normalizedOptions = React.useMemo(
+    () =>
+      options
+        .filter((opt) => opt != null)
+        .map(normalizeOption)
+        .filter((opt) => opt.value != null),
+    [options]
+  );
 
   // Update trigger width when component mounts or value changes
   React.useEffect(() => {
