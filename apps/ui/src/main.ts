@@ -761,67 +761,31 @@ app.whenReady().then(async () => {
   });
 });
 
-app.on('window-all-closed', () => {
-  // On macOS, keep the app and servers running when all windows are closed
-  // (standard macOS behavior). On other platforms, stop servers and quit.
-  if (process.platform !== 'darwin') {
-    if (serverProcess && serverProcess.pid) {
-      logger.info('All windows closed, stopping server...');
-      if (process.platform === 'win32') {
-        try {
-          execSync(`taskkill /f /t /pid ${serverProcess.pid}`, { stdio: 'ignore' });
-        } catch (error) {
-          logger.error('Failed to kill server process:', (error as Error).message);
-        }
-      } else {
-        // Unix/Linux: kill entire process tree
-        try {
-          execSync(`pkill -P ${serverProcess.pid}`, { stdio: 'ignore' });
-        } catch {
-          // pkill returns non-zero if no processes found, ignore
-        }
-        try {
-          process.kill(serverProcess.pid, 'SIGKILL');
-        } catch {
-          // Process may already be dead
-        }
-      }
-      serverProcess = null;
-    }
-
-    if (staticServer) {
-      logger.info('Stopping static server...');
-      staticServer.close();
-      staticServer = null;
-    }
-
-    app.quit();
-  }
-});
-
-app.on('before-quit', () => {
+/**
+ * Clean up server and static server processes.
+ * Kills entire process tree to prevent orphaned processes and port conflicts on restart.
+ */
+function cleanupServerProcess(reason: 'window-closed' | 'quitting'): void {
   if (serverProcess && serverProcess.pid) {
-    logger.info('Stopping server...');
+    const logMessage =
+      reason === 'window-closed' ? 'All windows closed, stopping server...' : 'Stopping server...';
+    logger.info(logMessage);
+
     if (process.platform === 'win32') {
       try {
         // Windows: use taskkill with /t to kill entire process tree
-        // This prevents orphaned node processes when closing the app
-        // Using execSync to ensure process is killed before app exits
         execSync(`taskkill /f /t /pid ${serverProcess.pid}`, { stdio: 'ignore' });
       } catch (error) {
         logger.error('Failed to kill server process:', (error as Error).message);
       }
     } else {
-      // Unix/macOS: kill entire process tree using pkill
-      // SIGTERM first, then SIGKILL if needed
+      // Unix/macOS: kill child processes with pkill, then SIGKILL the server
       try {
-        // Kill all child processes of the server
         execSync(`pkill -P ${serverProcess.pid}`, { stdio: 'ignore' });
       } catch {
         // pkill returns non-zero if no processes found, ignore
       }
       try {
-        // Kill the server process itself with SIGKILL for reliability
         process.kill(serverProcess.pid, 'SIGKILL');
       } catch {
         // Process may already be dead
@@ -835,6 +799,19 @@ app.on('before-quit', () => {
     staticServer.close();
     staticServer = null;
   }
+}
+
+app.on('window-all-closed', () => {
+  // On macOS, keep the app and servers running when all windows are closed
+  // (standard macOS behavior). On other platforms, stop servers and quit.
+  if (process.platform !== 'darwin') {
+    cleanupServerProcess('window-closed');
+    app.quit();
+  }
+});
+
+app.on('before-quit', () => {
+  cleanupServerProcess('quitting');
 });
 
 // ============================================
