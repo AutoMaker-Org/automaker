@@ -154,11 +154,12 @@ export function useBoardActions({
       } else if (workMode === 'auto') {
         // Auto-generate a branch name based on feature title and timestamp
         // Create a slug from the title: lowercase, replace non-alphanumeric with hyphens
-        const titleSlug = titleForBranch
-          .toLowerCase()
-          .replace(/[^a-z0-9]+/g, '-') // Replace non-alphanumeric sequences with hyphens
-          .substring(0, 50) // Limit length to keep branch names reasonable
-          .replace(/^-|-$/g, ''); // Remove leading/trailing hyphens
+        const titleSlug =
+          titleForBranch
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '-') // Replace non-alphanumeric sequences with hyphens
+            .replace(/^-|-$/g, '') // Remove leading/trailing hyphens
+            .substring(0, 50) || 'untitled'; // Fallback if slug is empty (e.g., title was only special chars)
         const timestamp = Date.now();
         finalBranchName = `feature/${titleSlug}-${timestamp}`;
       } else {
@@ -275,7 +276,6 @@ export function useBoardActions({
       currentProject,
       onWorktreeCreated,
       onWorktreeAutoSelect,
-      getPrimaryWorktreeBranch,
       features,
     ]
   );
@@ -339,11 +339,12 @@ export function useBoardActions({
       } else if (workMode === 'auto') {
         // Auto-generate a branch name based on feature title and timestamp
         // Create a slug from the title: lowercase, replace non-alphanumeric with hyphens
-        const titleSlug = titleForBranch
-          .toLowerCase()
-          .replace(/[^a-z0-9]+/g, '-') // Replace non-alphanumeric sequences with hyphens
-          .replace(/^-|-$/g, '') // Remove leading/trailing hyphens
-          .substring(0, 50); // Limit length to keep branch names reasonable
+        const titleSlug =
+          titleForBranch
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '-') // Replace non-alphanumeric sequences with hyphens
+            .replace(/^-|-$/g, '') // Remove leading/trailing hyphens
+            .substring(0, 50) || 'untitled'; // Fallback if slug is empty (e.g., title was only special chars)
         const timestamp = Date.now();
         finalBranchName = `feature/${titleSlug}-${timestamp}`;
       } else {
@@ -450,7 +451,6 @@ export function useBoardActions({
       setEditingFeature,
       currentProject,
       onWorktreeCreated,
-      getPrimaryWorktreeBranch,
       features,
     ]
   );
