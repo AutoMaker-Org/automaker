@@ -132,7 +132,7 @@ export function DevServerLogsPanel({
   return (
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
       <DialogContent
-        className="w-[70vw] max-w-[900px] max-h-[85vh] flex flex-col gap-0 overflow-hidden"
+        className="w-[70vw] max-w-[900px] max-h-[85vh] flex flex-col gap-0 p-0 overflow-hidden"
         data-testid="dev-server-logs-panel"
         compact
       >
