@@ -758,45 +758,126 @@ center_print() {
 }
 
 resolve_port_conflicts() {
+    # Ensure terminal is in proper state for input
+    show_cursor
+    stty echo icanon 2>/dev/null || true
+
     local web_in_use=false
     local server_in_use=false
+    local web_pids=""
+    local server_pids=""
 
     if is_port_in_use "$DEFAULT_WEB_PORT"; then
         web_in_use=true
+        # Get PIDs and convert newlines to spaces for display
+        web_pids=$(get_pids_on_port "$DEFAULT_WEB_PORT" | tr '\n' ' ' | sed 's/  */ /g' | sed 's/ $//')
     fi
     if is_port_in_use "$DEFAULT_SERVER_PORT"; then
         server_in_use=true
+        # Get PIDs and convert newlines to spaces for display
+        server_pids=$(get_pids_on_port "$DEFAULT_SERVER_PORT" | tr '\n' ' ' | sed 's/  */ /g' | sed 's/ $//')
     fi
 
     if [ "$web_in_use" = true ] || [ "$server_in_use" = true ]; then
-        # Automatically find available ports
+        echo ""
         if [ "$web_in_use" = true ]; then
-            local web_pids
-            # Get PIDs and convert newlines to commas for display
-            web_pids=$(get_pids_on_port "$DEFAULT_WEB_PORT" | tr '\n' ' ' | sed 's/  */ /g' | sed 's/ $//')
-            center_print "Port $DEFAULT_WEB_PORT in use (PID: $web_pids), finding alternative..." "$C_YELLOW"
-            WEB_PORT=$(find_next_available_port "$DEFAULT_WEB_PORT")
+            center_print "Port $DEFAULT_WEB_PORT in use (PID: $web_pids)" "$C_YELLOW"
         fi
         if [ "$server_in_use" = true ]; then
-            local server_pids
-            # Get PIDs and convert newlines to commas for display
-            server_pids=$(get_pids_on_port "$DEFAULT_SERVER_PORT" | tr '\n' ' ' | sed 's/  */ /g' | sed 's/ $//')
-            center_print "Port $DEFAULT_SERVER_PORT in use (PID: $server_pids), finding alternative..." "$C_YELLOW"
-            SERVER_PORT=$(find_next_available_port "$DEFAULT_SERVER_PORT")
+            center_print "Port $DEFAULT_SERVER_PORT in use (PID: $server_pids)" "$C_YELLOW"
         fi
-
-        # Ensure web and server ports don't conflict with each other
-        if [ "$WEB_PORT" -eq "$SERVER_PORT" ]; then
-            SERVER_PORT=$(find_next_available_port $((SERVER_PORT + 1)))
-        fi
-
         echo ""
-        center_print "✓ Auto-selected available ports:" "$C_GREEN"
-        center_print "  Web: $WEB_PORT  |  Server: $SERVER_PORT" "$C_PRI"
+
+        # Show options
+        center_print "What would you like to do?" "$C_WHITE"
+        echo ""
+        center_print "[Enter] Auto-select available ports (Recommended)" "$C_GREEN"
+        center_print "[K] Kill processes and use default ports" "$C_MUTE"
+        center_print "[C] Choose custom ports" "$C_MUTE"
+        center_print "[X] Cancel" "$C_RED"
+        echo ""
+
+        while true; do
+            local choice_pad=$(( (TERM_COLS - 20) / 2 ))
+            printf "%${choice_pad}s" ""
+            read -r -p "Choice [Enter]: " choice
+
+            case "$choice" in
+                ""|[aA]|[aA][uU][tT][oO])
+                    # Auto-select: find next available ports
+                    echo ""
+                    if [ "$web_in_use" = true ]; then
+                        WEB_PORT=$(find_next_available_port "$DEFAULT_WEB_PORT")
+                    fi
+                    if [ "$server_in_use" = true ]; then
+                        SERVER_PORT=$(find_next_available_port "$DEFAULT_SERVER_PORT")
+                    fi
+                    # Ensure web and server ports don't conflict with each other
+                    if [ "$WEB_PORT" -eq "$SERVER_PORT" ]; then
+                        SERVER_PORT=$(find_next_available_port $((SERVER_PORT + 1)))
+                    fi
+                    center_print "✓ Auto-selected available ports:" "$C_GREEN"
+                    center_print "  Web: $WEB_PORT  |  Server: $SERVER_PORT" "$C_PRI"
+                    break
+                    ;;
+                [kK]|[kK][iI][lL][lL])
+                    echo ""
+                    if [ "$web_in_use" = true ]; then
+                        center_print "Killing process(es) on port $DEFAULT_WEB_PORT..." "$C_YELLOW"
+                        kill_port "$DEFAULT_WEB_PORT" > /dev/null 2>&1 || true
+                        center_print "✓ Port $DEFAULT_WEB_PORT is now free" "$C_GREEN"
+                    fi
+                    if [ "$server_in_use" = true ]; then
+                        center_print "Killing process(es) on port $DEFAULT_SERVER_PORT..." "$C_YELLOW"
+                        kill_port "$DEFAULT_SERVER_PORT" > /dev/null 2>&1 || true
+                        center_print "✓ Port $DEFAULT_SERVER_PORT is now free" "$C_GREEN"
+                    fi
+                    break
+                    ;;
+                [cC]|[cC][hH][oO][oO][sS][eE])
+                    echo ""
+                    local input_pad=$(( (TERM_COLS - 40) / 2 ))
+                    # Collect both ports first
+                    printf "%${input_pad}s" ""
+                    read -r -p "Enter web port (default $DEFAULT_WEB_PORT): " input_web
+                    input_web=${input_web:-$DEFAULT_WEB_PORT}
+                    printf "%${input_pad}s" ""
+                    read -r -p "Enter server port (default $DEFAULT_SERVER_PORT): " input_server
+                    input_server=${input_server:-$DEFAULT_SERVER_PORT}
+
+                    # Validate both before assigning either
+                    if ! validate_port "$input_web" "Web port"; then
+                        continue
+                    fi
+                    if ! validate_port "$input_server" "Server port"; then
+                        continue
+                    fi
+
+                    # Assign atomically after both validated
+                    WEB_PORT=$input_web
+                    SERVER_PORT=$input_server
+                    center_print "Using ports: Web=$WEB_PORT, Server=$SERVER_PORT" "$C_GREEN"
+                    break
+                    ;;
+                [xX]|[xX][cC][aA][nN][cC][eE][lL])
+                    echo ""
+                    center_print "Cancelled." "$C_MUTE"
+                    echo ""
+                    exit 0
+                    ;;
+                *)
+                    center_print "Invalid choice. Press Enter for auto-select, or K/C/X." "$C_RED"
+                    ;;
+            esac
+        done
     else
         center_print "✓ Port $DEFAULT_WEB_PORT is available" "$C_GREEN"
         center_print "✓ Port $DEFAULT_SERVER_PORT is available" "$C_GREEN"
     fi
+
+    # Restore terminal state
+    hide_cursor
+    stty -echo -icanon 2>/dev/null || true
 }
 
 launch_sequence() {
