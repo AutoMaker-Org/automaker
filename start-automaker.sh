@@ -453,6 +453,26 @@ is_port_in_use() {
     [ -n "$pids" ] && [ "$pids" != " " ]
 }
 
+# Find the next available port starting from a given port
+# Searches up to 100 ports in sequence
+find_next_available_port() {
+    local start_port=$1
+    local max_attempts=100
+    local port=$start_port
+
+    for ((i=0; i<max_attempts; i++)); do
+        if ! is_port_in_use "$port"; then
+            echo "$port"
+            return 0
+        fi
+        port=$((port + 1))
+    done
+
+    # Fallback: return the start port (will fail later with clear error)
+    echo "$start_port"
+    return 1
+}
+
 kill_port() {
     local port=$1
     local pids
@@ -491,9 +511,7 @@ kill_port() {
 }
 
 check_ports() {
-    show_cursor
-    stty echo icanon 2>/dev/null || true
-
+    # Auto-discover available ports (no user interaction required)
     local web_in_use=false
     local server_in_use=false
 
@@ -509,69 +527,27 @@ check_ports() {
         if [ "$web_in_use" = true ]; then
             local pids
             pids=$(get_pids_on_port "$DEFAULT_WEB_PORT")
-            echo "${C_YELLOW}⚠${RESET}  Port $DEFAULT_WEB_PORT is in use by process(es): $pids"
+            echo "${C_YELLOW}Port $DEFAULT_WEB_PORT in use (PID: $pids), finding alternative...${RESET}"
+            WEB_PORT=$(find_next_available_port "$DEFAULT_WEB_PORT")
         fi
         if [ "$server_in_use" = true ]; then
             local pids
             pids=$(get_pids_on_port "$DEFAULT_SERVER_PORT")
-            echo "${C_YELLOW}⚠${RESET}  Port $DEFAULT_SERVER_PORT is in use by process(es): $pids"
+            echo "${C_YELLOW}Port $DEFAULT_SERVER_PORT in use (PID: $pids), finding alternative...${RESET}"
+            SERVER_PORT=$(find_next_available_port "$DEFAULT_SERVER_PORT")
         fi
+
+        # Ensure web and server ports don't conflict with each other
+        if [ "$WEB_PORT" -eq "$SERVER_PORT" ]; then
+            SERVER_PORT=$(find_next_available_port $((SERVER_PORT + 1)))
+        fi
+
         echo ""
-
-        while true; do
-            read -r -p "What would you like to do? (k)ill processes, (u)se different ports, or (c)ancel: " choice
-            case "$choice" in
-                [kK]|[kK][iI][lL][lL])
-                    if [ "$web_in_use" = true ]; then
-                        kill_port "$DEFAULT_WEB_PORT"
-                    else
-                        echo "${C_GREEN}✓${RESET} Port $DEFAULT_WEB_PORT is available"
-                    fi
-                    if [ "$server_in_use" = true ]; then
-                        kill_port "$DEFAULT_SERVER_PORT"
-                    else
-                        echo "${C_GREEN}✓${RESET} Port $DEFAULT_SERVER_PORT is available"
-                    fi
-                    break
-                    ;;
-                [uU]|[uU][sS][eE])
-                    # Collect both ports first
-                    read -r -p "Enter web port (default $DEFAULT_WEB_PORT): " input_web
-                    input_web=${input_web:-$DEFAULT_WEB_PORT}
-                    read -r -p "Enter server port (default $DEFAULT_SERVER_PORT): " input_server
-                    input_server=${input_server:-$DEFAULT_SERVER_PORT}
-
-                    # Validate both before assigning either
-                    if ! validate_port "$input_web" "Web port"; then
-                        continue
-                    fi
-                    if ! validate_port "$input_server" "Server port"; then
-                        continue
-                    fi
-
-                    # Assign atomically after both validated
-                    WEB_PORT=$input_web
-                    SERVER_PORT=$input_server
-                    echo "${C_GREEN}Using ports: Web=$WEB_PORT, Server=$SERVER_PORT${RESET}"
-                    break
-                    ;;
-                [cC]|[cC][aA][nN][cC][eE][lL])
-                    echo "${C_MUTE}Cancelled.${RESET}"
-                    exit 0
-                    ;;
-                *)
-                    echo "${C_RED}Invalid choice. Please enter k, u, or c.${RESET}"
-                    ;;
-            esac
-        done
-        echo ""
+        echo "${C_GREEN}✓ Auto-selected available ports: Web=$WEB_PORT, Server=$SERVER_PORT${RESET}"
     else
         echo "${C_GREEN}✓${RESET} Port $DEFAULT_WEB_PORT is available"
         echo "${C_GREEN}✓${RESET} Port $DEFAULT_SERVER_PORT is available"
     fi
-
-    hide_cursor
-    stty -echo -icanon 2>/dev/null || true
 }
 
 validate_terminal_size() {
@@ -780,106 +756,43 @@ center_print() {
 }
 
 resolve_port_conflicts() {
-    # Ensure terminal is in proper state for input
-    show_cursor
-    stty echo icanon 2>/dev/null || true
-
     local web_in_use=false
     local server_in_use=false
-    local web_pids=""
-    local server_pids=""
 
     if is_port_in_use "$DEFAULT_WEB_PORT"; then
         web_in_use=true
-        web_pids=$(get_pids_on_port "$DEFAULT_WEB_PORT")
     fi
     if is_port_in_use "$DEFAULT_SERVER_PORT"; then
         server_in_use=true
-        server_pids=$(get_pids_on_port "$DEFAULT_SERVER_PORT")
     fi
 
     if [ "$web_in_use" = true ] || [ "$server_in_use" = true ]; then
-        echo ""
+        # Automatically find available ports
         if [ "$web_in_use" = true ]; then
-            center_print "⚠  Port $DEFAULT_WEB_PORT is in use by process(es): $web_pids" "$C_YELLOW"
+            local web_pids
+            web_pids=$(get_pids_on_port "$DEFAULT_WEB_PORT")
+            center_print "Port $DEFAULT_WEB_PORT in use (PID: $web_pids), finding alternative..." "$C_YELLOW"
+            WEB_PORT=$(find_next_available_port "$DEFAULT_WEB_PORT")
         fi
         if [ "$server_in_use" = true ]; then
-            center_print "⚠  Port $DEFAULT_SERVER_PORT is in use by process(es): $server_pids" "$C_YELLOW"
+            local server_pids
+            server_pids=$(get_pids_on_port "$DEFAULT_SERVER_PORT")
+            center_print "Port $DEFAULT_SERVER_PORT in use (PID: $server_pids), finding alternative..." "$C_YELLOW"
+            SERVER_PORT=$(find_next_available_port "$DEFAULT_SERVER_PORT")
         fi
+
+        # Ensure web and server ports don't conflict with each other
+        if [ "$WEB_PORT" -eq "$SERVER_PORT" ]; then
+            SERVER_PORT=$(find_next_available_port $((SERVER_PORT + 1)))
+        fi
+
         echo ""
-
-        # Show options
-        center_print "What would you like to do?" "$C_WHITE"
-        echo ""
-        center_print "[K] Kill processes and continue" "$C_GREEN"
-        center_print "[U] Use different ports" "$C_MUTE"
-        center_print "[C] Cancel" "$C_RED"
-        echo ""
-
-        while true; do
-            local choice_pad=$(( (TERM_COLS - 20) / 2 ))
-            printf "%${choice_pad}s" ""
-            read -r -p "Choice: " choice
-
-            case "$choice" in
-                [kK]|[kK][iI][lL][lL])
-                    echo ""
-                    if [ "$web_in_use" = true ]; then
-                        center_print "Killing process(es) on port $DEFAULT_WEB_PORT..." "$C_YELLOW"
-                        kill_port "$DEFAULT_WEB_PORT" > /dev/null 2>&1 || true
-                        center_print "✓ Port $DEFAULT_WEB_PORT is now free" "$C_GREEN"
-                    fi
-                    if [ "$server_in_use" = true ]; then
-                        center_print "Killing process(es) on port $DEFAULT_SERVER_PORT..." "$C_YELLOW"
-                        kill_port "$DEFAULT_SERVER_PORT" > /dev/null 2>&1 || true
-                        center_print "✓ Port $DEFAULT_SERVER_PORT is now free" "$C_GREEN"
-                    fi
-                    break
-                    ;;
-                [uU]|[uU][sS][eE])
-                    echo ""
-                    local input_pad=$(( (TERM_COLS - 40) / 2 ))
-                    # Collect both ports first
-                    printf "%${input_pad}s" ""
-                    read -r -p "Enter web port (default $DEFAULT_WEB_PORT): " input_web
-                    input_web=${input_web:-$DEFAULT_WEB_PORT}
-                    printf "%${input_pad}s" ""
-                    read -r -p "Enter server port (default $DEFAULT_SERVER_PORT): " input_server
-                    input_server=${input_server:-$DEFAULT_SERVER_PORT}
-
-                    # Validate both before assigning either
-                    if ! validate_port "$input_web" "Web port"; then
-                        continue
-                    fi
-                    if ! validate_port "$input_server" "Server port"; then
-                        continue
-                    fi
-
-                    # Assign atomically after both validated
-                    WEB_PORT=$input_web
-                    SERVER_PORT=$input_server
-                    center_print "Using ports: Web=$WEB_PORT, Server=$SERVER_PORT" "$C_GREEN"
-                    break
-                    ;;
-                [cC]|[cC][aA][nN][cC][eE][lL])
-                    echo ""
-                    center_print "Cancelled." "$C_MUTE"
-                    echo ""
-                    exit 0
-                    ;;
-                *)
-                    center_print "Invalid choice. Please enter K, U, or C." "$C_RED"
-                    ;;
-            esac
-        done
+        center_print "✓ Auto-selected available ports:" "$C_GREEN"
+        center_print "  Web: $WEB_PORT  |  Server: $SERVER_PORT" "$C_PRI"
     else
         center_print "✓ Port $DEFAULT_WEB_PORT is available" "$C_GREEN"
         center_print "✓ Port $DEFAULT_SERVER_PORT is available" "$C_GREEN"
     fi
-
-    # Restore terminal state
-    hide_cursor
-    stty -echo -icanon 2>/dev/null || true
 }
 
 launch_sequence() {
