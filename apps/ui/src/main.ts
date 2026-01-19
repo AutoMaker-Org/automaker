@@ -774,7 +774,17 @@ app.on('window-all-closed', () => {
           logger.error('Failed to kill server process:', (error as Error).message);
         }
       } else {
-        serverProcess.kill('SIGTERM');
+        // Unix/Linux: kill entire process tree
+        try {
+          execSync(`pkill -P ${serverProcess.pid}`, { stdio: 'ignore' });
+        } catch {
+          // pkill returns non-zero if no processes found, ignore
+        }
+        try {
+          process.kill(serverProcess.pid, 'SIGKILL');
+        } catch {
+          // Process may already be dead
+        }
       }
       serverProcess = null;
     }
@@ -802,7 +812,20 @@ app.on('before-quit', () => {
         logger.error('Failed to kill server process:', (error as Error).message);
       }
     } else {
-      serverProcess.kill('SIGTERM');
+      // Unix/macOS: kill entire process tree using pkill
+      // SIGTERM first, then SIGKILL if needed
+      try {
+        // Kill all child processes of the server
+        execSync(`pkill -P ${serverProcess.pid}`, { stdio: 'ignore' });
+      } catch {
+        // pkill returns non-zero if no processes found, ignore
+      }
+      try {
+        // Kill the server process itself with SIGKILL for reliability
+        process.kill(serverProcess.pid, 'SIGKILL');
+      } catch {
+        // Process may already be dead
+      }
     }
     serverProcess = null;
   }
