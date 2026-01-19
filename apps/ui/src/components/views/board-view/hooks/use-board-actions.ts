@@ -157,8 +157,8 @@ export function useBoardActions({
         const titleSlug = titleForBranch
           .toLowerCase()
           .replace(/[^a-z0-9]+/g, '-') // Replace non-alphanumeric sequences with hyphens
-          .replace(/^-|-$/g, '') // Remove leading/trailing hyphens
-          .substring(0, 50); // Limit length to keep branch names reasonable
+          .substring(0, 50) // Limit length to keep branch names reasonable
+          .replace(/^-|-$/g, ''); // Remove leading/trailing hyphens
         const timestamp = Date.now();
         finalBranchName = `feature/${titleSlug}-${timestamp}`;
       } else {
