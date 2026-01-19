@@ -526,13 +526,15 @@ check_ports() {
         echo ""
         if [ "$web_in_use" = true ]; then
             local pids
-            pids=$(get_pids_on_port "$DEFAULT_WEB_PORT")
+            # Get PIDs and convert newlines to spaces for display
+            pids=$(get_pids_on_port "$DEFAULT_WEB_PORT" | tr '\n' ' ' | sed 's/  */ /g' | sed 's/ $//')
             echo "${C_YELLOW}Port $DEFAULT_WEB_PORT in use (PID: $pids), finding alternative...${RESET}"
             WEB_PORT=$(find_next_available_port "$DEFAULT_WEB_PORT")
         fi
         if [ "$server_in_use" = true ]; then
             local pids
-            pids=$(get_pids_on_port "$DEFAULT_SERVER_PORT")
+            # Get PIDs and convert newlines to spaces for display
+            pids=$(get_pids_on_port "$DEFAULT_SERVER_PORT" | tr '\n' ' ' | sed 's/  */ /g' | sed 's/ $//')
             echo "${C_YELLOW}Port $DEFAULT_SERVER_PORT in use (PID: $pids), finding alternative...${RESET}"
             SERVER_PORT=$(find_next_available_port "$DEFAULT_SERVER_PORT")
         fi
@@ -770,13 +772,15 @@ resolve_port_conflicts() {
         # Automatically find available ports
         if [ "$web_in_use" = true ]; then
             local web_pids
-            web_pids=$(get_pids_on_port "$DEFAULT_WEB_PORT")
+            # Get PIDs and convert newlines to commas for display
+            web_pids=$(get_pids_on_port "$DEFAULT_WEB_PORT" | tr '\n' ' ' | sed 's/  */ /g' | sed 's/ $//')
             center_print "Port $DEFAULT_WEB_PORT in use (PID: $web_pids), finding alternative..." "$C_YELLOW"
             WEB_PORT=$(find_next_available_port "$DEFAULT_WEB_PORT")
         fi
         if [ "$server_in_use" = true ]; then
             local server_pids
-            server_pids=$(get_pids_on_port "$DEFAULT_SERVER_PORT")
+            # Get PIDs and convert newlines to commas for display
+            server_pids=$(get_pids_on_port "$DEFAULT_SERVER_PORT" | tr '\n' ' ' | sed 's/  */ /g' | sed 's/ $//')
             center_print "Port $DEFAULT_SERVER_PORT in use (PID: $server_pids), finding alternative..." "$C_YELLOW"
             SERVER_PORT=$(find_next_available_port "$DEFAULT_SERVER_PORT")
         fi
