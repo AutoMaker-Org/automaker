@@ -34,6 +34,7 @@ fi
 # Port configuration
 DEFAULT_WEB_PORT=3007
 DEFAULT_SERVER_PORT=3008
+PORT_SEARCH_MAX_ATTEMPTS=100
 WEB_PORT=$DEFAULT_WEB_PORT
 SERVER_PORT=$DEFAULT_SERVER_PORT
 
@@ -454,13 +455,13 @@ is_port_in_use() {
 }
 
 # Find the next available port starting from a given port
-# Searches up to 100 ports in sequence
+# Returns the port on stdout if found, nothing if all ports in range are busy
+# Exit code: 0 if found, 1 if no available port in range
 find_next_available_port() {
     local start_port=$1
-    local max_attempts=100
     local port=$start_port
 
-    for ((i=0; i<max_attempts; i++)); do
+    for ((i=0; i<PORT_SEARCH_MAX_ATTEMPTS; i++)); do
         if ! is_port_in_use "$port"; then
             echo "$port"
             return 0
@@ -468,8 +469,7 @@ find_next_available_port() {
         port=$((port + 1))
     done
 
-    # Fallback: return the start port (will fail later with clear error)
-    echo "$start_port"
+    # No free port found in the scan range
     return 1
 }
 
@@ -524,24 +524,38 @@ check_ports() {
 
     if [ "$web_in_use" = true ] || [ "$server_in_use" = true ]; then
         echo ""
+        local max_port
         if [ "$web_in_use" = true ]; then
             local pids
             # Get PIDs and convert newlines to spaces for display
-            pids=$(get_pids_on_port "$DEFAULT_WEB_PORT" | tr '\n' ' ' | sed 's/  */ /g' | sed 's/ $//')
+            pids=$(get_pids_on_port "$DEFAULT_WEB_PORT" | xargs)
             echo "${C_YELLOW}Port $DEFAULT_WEB_PORT in use (PID: $pids), finding alternative...${RESET}"
-            WEB_PORT=$(find_next_available_port "$DEFAULT_WEB_PORT")
+            max_port=$((DEFAULT_WEB_PORT + PORT_SEARCH_MAX_ATTEMPTS - 1))
+            if ! WEB_PORT=$(find_next_available_port "$DEFAULT_WEB_PORT"); then
+                echo "${C_RED}Error: No free web port in range ${DEFAULT_WEB_PORT}-${max_port}${RESET}"
+                exit 1
+            fi
         fi
         if [ "$server_in_use" = true ]; then
             local pids
             # Get PIDs and convert newlines to spaces for display
-            pids=$(get_pids_on_port "$DEFAULT_SERVER_PORT" | tr '\n' ' ' | sed 's/  */ /g' | sed 's/ $//')
+            pids=$(get_pids_on_port "$DEFAULT_SERVER_PORT" | xargs)
             echo "${C_YELLOW}Port $DEFAULT_SERVER_PORT in use (PID: $pids), finding alternative...${RESET}"
-            SERVER_PORT=$(find_next_available_port "$DEFAULT_SERVER_PORT")
+            max_port=$((DEFAULT_SERVER_PORT + PORT_SEARCH_MAX_ATTEMPTS - 1))
+            if ! SERVER_PORT=$(find_next_available_port "$DEFAULT_SERVER_PORT"); then
+                echo "${C_RED}Error: No free server port in range ${DEFAULT_SERVER_PORT}-${max_port}${RESET}"
+                exit 1
+            fi
         fi
 
         # Ensure web and server ports don't conflict with each other
         if [ "$WEB_PORT" -eq "$SERVER_PORT" ]; then
-            SERVER_PORT=$(find_next_available_port $((SERVER_PORT + 1)))
+            local conflict_start=$((SERVER_PORT + 1))
+            max_port=$((conflict_start + PORT_SEARCH_MAX_ATTEMPTS - 1))
+            if ! SERVER_PORT=$(find_next_available_port "$conflict_start"); then
+                echo "${C_RED}Error: No free server port in range ${conflict_start}-${max_port}${RESET}"
+                exit 1
+            fi
         fi
 
         echo ""
@@ -770,12 +784,12 @@ resolve_port_conflicts() {
     if is_port_in_use "$DEFAULT_WEB_PORT"; then
         web_in_use=true
         # Get PIDs and convert newlines to spaces for display
-        web_pids=$(get_pids_on_port "$DEFAULT_WEB_PORT" | tr '\n' ' ' | sed 's/  */ /g' | sed 's/ $//')
+        web_pids=$(get_pids_on_port "$DEFAULT_WEB_PORT" | xargs)
     fi
     if is_port_in_use "$DEFAULT_SERVER_PORT"; then
         server_in_use=true
         # Get PIDs and convert newlines to spaces for display
-        server_pids=$(get_pids_on_port "$DEFAULT_SERVER_PORT" | tr '\n' ' ' | sed 's/  */ /g' | sed 's/ $//')
+        server_pids=$(get_pids_on_port "$DEFAULT_SERVER_PORT" | xargs)
     fi
 
     if [ "$web_in_use" = true ] || [ "$server_in_use" = true ]; then
@@ -806,15 +820,28 @@ resolve_port_conflicts() {
                 ""|[aA]|[aA][uU][tT][oO])
                     # Auto-select: find next available ports
                     echo ""
+                    local max_port=$((DEFAULT_WEB_PORT + PORT_SEARCH_MAX_ATTEMPTS - 1))
                     if [ "$web_in_use" = true ]; then
-                        WEB_PORT=$(find_next_available_port "$DEFAULT_WEB_PORT")
+                        if ! WEB_PORT=$(find_next_available_port "$DEFAULT_WEB_PORT"); then
+                            center_print "No free web port in range ${DEFAULT_WEB_PORT}-${max_port}" "$C_RED"
+                            exit 1
+                        fi
                     fi
+                    max_port=$((DEFAULT_SERVER_PORT + PORT_SEARCH_MAX_ATTEMPTS - 1))
                     if [ "$server_in_use" = true ]; then
-                        SERVER_PORT=$(find_next_available_port "$DEFAULT_SERVER_PORT")
+                        if ! SERVER_PORT=$(find_next_available_port "$DEFAULT_SERVER_PORT"); then
+                            center_print "No free server port in range ${DEFAULT_SERVER_PORT}-${max_port}" "$C_RED"
+                            exit 1
+                        fi
                     fi
                     # Ensure web and server ports don't conflict with each other
                     if [ "$WEB_PORT" -eq "$SERVER_PORT" ]; then
-                        SERVER_PORT=$(find_next_available_port $((SERVER_PORT + 1)))
+                        local conflict_start=$((SERVER_PORT + 1))
+                        max_port=$((conflict_start + PORT_SEARCH_MAX_ATTEMPTS - 1))
+                        if ! SERVER_PORT=$(find_next_available_port "$conflict_start"); then
+                            center_print "No free server port in range ${conflict_start}-${max_port}" "$C_RED"
+                            exit 1
+                        fi
                     fi
                     center_print "✓ Auto-selected available ports:" "$C_GREEN"
                     center_print "  Web: $WEB_PORT  |  Server: $SERVER_PORT" "$C_PRI"
