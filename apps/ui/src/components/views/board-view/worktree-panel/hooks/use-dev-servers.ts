@@ -3,6 +3,7 @@ import { createLogger } from '@automaker/utils/logger';
 import { getElectronAPI } from '@/lib/electron';
 import { normalizePath } from '@/lib/utils';
 import { toast } from 'sonner';
+import { useAppStore } from '@/store/app-store';
 import type { DevServerInfo, WorktreeInfo } from '../types';
 
 const logger = createLogger('DevServers');
@@ -14,6 +15,10 @@ interface UseDevServersOptions {
 export function useDevServers({ projectPath }: UseDevServersOptions) {
   const [isStartingDevServer, setIsStartingDevServer] = useState(false);
   const [runningDevServers, setRunningDevServers] = useState<Map<string, DevServerInfo>>(new Map());
+
+  // Get configured dev server port (project-specific override)
+  const getDevServerPort = useAppStore((s) => s.getDevServerPort);
+  const configuredPort = getDevServerPort(projectPath);
 
   const fetchDevServers = useCallback(async () => {
     try {
@@ -71,7 +76,9 @@ export function useDevServers({ projectPath }: UseDevServersOptions) {
             });
             return next;
           });
-          toast.success(`Dev server started on port ${result.result.port}`);
+          // Use configured port in toast message if set, otherwise use server-allocated port
+          const effectivePort = configuredPort ?? result.result.port;
+          toast.success(`Dev server started on port ${effectivePort}`);
         } else {
           toast.error(result.error || 'Failed to start dev server');
         }
@@ -143,6 +150,12 @@ export function useDevServers({ projectPath }: UseDevServersOptions) {
         }
 
         devServerUrl.hostname = window.location.hostname;
+
+        // Use configured port if set, otherwise use server-reported port
+        if (configuredPort) {
+          devServerUrl.port = String(configuredPort);
+        }
+
         window.open(devServerUrl.toString(), '_blank', 'noopener,noreferrer');
       } catch (error) {
         logger.error('Failed to parse dev server URL:', error);
@@ -151,7 +164,7 @@ export function useDevServers({ projectPath }: UseDevServersOptions) {
         });
       }
     },
-    [runningDevServers, getWorktreeKey]
+    [runningDevServers, getWorktreeKey, configuredPort]
   );
 
   const isDevServerRunning = useCallback(

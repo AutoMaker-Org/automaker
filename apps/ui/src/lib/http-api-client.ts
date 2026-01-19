@@ -2230,6 +2230,7 @@ export class HttpApiClient implements ElectronAPI {
         defaultDeleteBranchWithWorktree?: boolean;
         autoDismissInitScriptIndicator?: boolean;
         lastSelectedSessionId?: string;
+        devServerPort?: number;
       };
       error?: string;
     }> => this.post('/api/settings/project', { projectPath }),

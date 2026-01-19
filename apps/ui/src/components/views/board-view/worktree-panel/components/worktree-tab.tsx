@@ -4,6 +4,7 @@ import { Globe, CircleDot, GitPullRequest } from 'lucide-react';
 import { Spinner } from '@/components/ui/spinner';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { useAppStore } from '@/store/app-store';
 import type { WorktreeInfo, BranchInfo, DevServerInfo, PRInfo, GitRepoStatus } from '../types';
 import { BranchSwitchDropdown } from './branch-switch-dropdown';
 import { WorktreeActionsDropdown } from './worktree-actions-dropdown';
@@ -29,6 +30,8 @@ interface WorktreeTabProps {
   aheadCount: number;
   behindCount: number;
   gitRepoStatus: GitRepoStatus;
+  /** Project path for looking up project-specific settings */
+  projectPath: string;
   onSelectWorktree: (worktree: WorktreeInfo) => void;
   onBranchDropdownOpenChange: (open: boolean) => void;
   onActionsDropdownOpenChange: (open: boolean) => void;
@@ -75,6 +78,7 @@ export function WorktreeTab({
   aheadCount,
   behindCount,
   gitRepoStatus,
+  projectPath,
   onSelectWorktree,
   onBranchDropdownOpenChange,
   onActionsDropdownOpenChange,
@@ -99,6 +103,11 @@ export function WorktreeTab({
   onRunInitScript,
   hasInitScript,
 }: WorktreeTabProps) {
+  // Get configured dev server port (project-specific override)
+  const getDevServerPort = useAppStore((s) => s.getDevServerPort);
+  const configuredPort = getDevServerPort(projectPath);
+  const effectivePort = configuredPort ?? devServerInfo?.port;
+
   let prBadge: JSX.Element | null = null;
   if (worktree.pr) {
     const prState = worktree.pr.state?.toLowerCase() ?? 'open';
@@ -320,13 +329,13 @@ export function WorktreeTab({
                   'text-green-500'
                 )}
                 onClick={() => onOpenDevServerUrl(worktree)}
-                aria-label={`Open dev server on port ${devServerInfo?.port} in browser`}
+                aria-label={`Open dev server on port ${effectivePort} in browser`}
               >
                 <Globe className="w-3 h-3" aria-hidden="true" />
               </Button>
             </TooltipTrigger>
             <TooltipContent>
-              <p>Open dev server (:{devServerInfo?.port})</p>
+              <p>Open dev server (:{effectivePort})</p>
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>
@@ -343,6 +352,7 @@ export function WorktreeTab({
         isDevServerRunning={isDevServerRunning}
         devServerInfo={devServerInfo}
         gitRepoStatus={gitRepoStatus}
+        projectPath={projectPath}
         onOpenChange={onActionsDropdownOpenChange}
         onPull={onPull}
         onPush={onPush}

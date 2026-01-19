@@ -794,6 +794,10 @@ export interface ProjectSettings {
   automodeEnabled?: boolean;
   /** Maximum concurrent agents for this project (overrides global maxConcurrency) */
   maxConcurrentAgents?: number;
+
+  // Dev Server Configuration
+  /** Custom dev server port to display (for projects where the actual port differs from allocated) */
+  devServerPort?: number;
 }
 
 /**

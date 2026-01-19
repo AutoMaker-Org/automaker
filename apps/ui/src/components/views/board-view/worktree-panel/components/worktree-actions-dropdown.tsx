@@ -54,6 +54,8 @@ interface WorktreeActionsDropdownProps {
   isDevServerRunning: boolean;
   devServerInfo?: DevServerInfo;
   gitRepoStatus: GitRepoStatus;
+  /** Project path for looking up project-specific settings like devServerPort */
+  projectPath: string;
   /** When true, renders as a standalone button (not attached to another element) */
   standalone?: boolean;
   onOpenChange: (open: boolean) => void;
@@ -87,6 +89,7 @@ export function WorktreeActionsDropdown({
   isDevServerRunning,
   devServerInfo,
   gitRepoStatus,
+  projectPath,
   standalone = false,
   onOpenChange,
   onPull,
@@ -109,6 +112,11 @@ export function WorktreeActionsDropdown({
 }: WorktreeActionsDropdownProps) {
   // Get available editors for the "Open In" submenu
   const { editors } = useAvailableEditors();
+
+  // Get configured dev server port (project-specific override)
+  const getDevServerPort = useAppStore((s) => s.getDevServerPort);
+  const configuredPort = getDevServerPort(projectPath);
+  const effectivePort = configuredPort ?? devServerInfo?.port;
 
   // Use shared hook for effective default editor
   const effectiveDefaultEditor = useEffectiveDefaultEditor(editors);
@@ -178,12 +186,12 @@ export function WorktreeActionsDropdown({
           <>
             <DropdownMenuLabel className="text-xs flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-              Dev Server Running (:{devServerInfo?.port})
+              Dev Server Running (:{effectivePort})
             </DropdownMenuLabel>
             <DropdownMenuItem
               onClick={() => onOpenDevServerUrl(worktree)}
               className="text-xs"
-              aria-label={`Open dev server on port ${devServerInfo?.port} in browser`}
+              aria-label={`Open dev server on port ${effectivePort} in browser`}
             >
               <Globe className="w-3.5 h-3.5 mr-2" aria-hidden="true" />
               Open in Browser

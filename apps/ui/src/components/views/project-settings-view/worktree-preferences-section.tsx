@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import { ShellSyntaxEditor } from '@/components/ui/shell-syntax-editor';
@@ -11,6 +12,7 @@ import {
   RotateCcw,
   Trash2,
   PanelBottomClose,
+  Globe,
 } from 'lucide-react';
 import { Spinner } from '@/components/ui/spinner';
 import { cn } from '@/lib/utils';
@@ -42,6 +44,8 @@ export function WorktreePreferencesSection({ project }: WorktreePreferencesSecti
   const setDefaultDeleteBranch = useAppStore((s) => s.setDefaultDeleteBranch);
   const getAutoDismissInitScriptIndicator = useAppStore((s) => s.getAutoDismissInitScriptIndicator);
   const setAutoDismissInitScriptIndicator = useAppStore((s) => s.setAutoDismissInitScriptIndicator);
+  const getDevServerPort = useAppStore((s) => s.getDevServerPort);
+  const setDevServerPort = useAppStore((s) => s.setDevServerPort);
 
   // Get effective worktrees setting (project override or global fallback)
   const projectUseWorktrees = getProjectUseWorktrees(project.path);
@@ -58,6 +62,7 @@ export function WorktreePreferencesSection({ project }: WorktreePreferencesSecti
   const showIndicator = getShowInitScriptIndicator(project.path);
   const defaultDeleteBranch = getDefaultDeleteBranch(project.path);
   const autoDismiss = getAutoDismissInitScriptIndicator(project.path);
+  const devServerPort = getDevServerPort(project.path);
 
   // Check if there are unsaved changes
   const hasChanges = scriptContent !== originalContent;
@@ -93,6 +98,9 @@ export function WorktreePreferencesSection({ project }: WorktreePreferencesSecti
               response.settings.autoDismissInitScriptIndicator
             );
           }
+          if (response.settings.devServerPort !== undefined) {
+            setDevServerPort(currentPath, response.settings.devServerPort);
+          }
         }
       } catch (error) {
         if (!isCancelled) {
@@ -112,6 +120,7 @@ export function WorktreePreferencesSection({ project }: WorktreePreferencesSecti
     setShowInitScriptIndicator,
     setDefaultDeleteBranch,
     setAutoDismissInitScriptIndicator,
+    setDevServerPort,
   ]);
 
   // Load init script content when project changes
@@ -381,6 +390,72 @@ export function WorktreePreferencesSection({ project }: WorktreePreferencesSecti
             <p className="text-xs text-muted-foreground/80 leading-relaxed">
               When deleting a worktree, automatically check the "Also delete the branch" option.
             </p>
+          </div>
+        </div>
+
+        {/* Separator */}
+        <div className="border-t border-border/30" />
+
+        {/* Dev Server Port */}
+        <div className="group flex items-start space-x-3 p-3 rounded-xl hover:bg-accent/30 transition-colors duration-200 -mx-3">
+          <div className="w-5 h-5 mt-0.5 flex items-center justify-center">
+            <Globe className="w-4 h-4 text-brand-500" />
+          </div>
+          <div className="space-y-2 flex-1">
+            <Label
+              htmlFor="dev-server-port"
+              className="text-foreground font-medium flex items-center gap-2"
+            >
+              Dev Server Port
+            </Label>
+            <p className="text-xs text-muted-foreground/80 leading-relaxed">
+              Override the port displayed for the dev server. Use this when your framework (e.g.,
+              Vite, Next.js) ignores the allocated port and uses its own default.
+            </p>
+            <div className="flex items-center gap-2 pt-1">
+              <Input
+                id="dev-server-port"
+                type="number"
+                min={1}
+                max={65535}
+                placeholder="e.g., 5173"
+                value={devServerPort ?? ''}
+                onChange={async (e) => {
+                  const value = e.target.value ? parseInt(e.target.value, 10) : undefined;
+                  setDevServerPort(project.path, value);
+                  // Persist to server
+                  try {
+                    const httpClient = getHttpApiClient();
+                    await httpClient.settings.updateProject(project.path, {
+                      devServerPort: value,
+                    });
+                  } catch (error) {
+                    console.error('Failed to persist devServerPort:', error);
+                  }
+                }}
+                className="w-32 h-8 text-sm"
+              />
+              {devServerPort && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 text-xs text-muted-foreground"
+                  onClick={async () => {
+                    setDevServerPort(project.path, undefined);
+                    try {
+                      const httpClient = getHttpApiClient();
+                      await httpClient.settings.updateProject(project.path, {
+                        devServerPort: undefined,
+                      });
+                    } catch (error) {
+                      console.error('Failed to clear devServerPort:', error);
+                    }
+                  }}
+                >
+                  Clear
+                </Button>
+              )}
+            </div>
           </div>
         </div>
 

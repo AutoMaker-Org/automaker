@@ -244,6 +244,7 @@ export function WorktreePanel({
             isDevServerRunning={isDevServerRunning(selectedWorktree)}
             devServerInfo={getDevServerInfo(selectedWorktree)}
             gitRepoStatus={gitRepoStatus}
+            projectPath={projectPath}
             onOpenChange={handleActionsDropdownOpenChange(selectedWorktree)}
             onPull={handlePull}
             onPush={handlePush}
@@ -328,6 +329,7 @@ export function WorktreePanel({
             aheadCount={aheadCount}
             behindCount={behindCount}
             gitRepoStatus={gitRepoStatus}
+            projectPath={projectPath}
             onSelectWorktree={handleSelectWorktree}
             onBranchDropdownOpenChange={handleBranchDropdownOpenChange(mainWorktree)}
             onActionsDropdownOpenChange={handleActionsDropdownOpenChange(mainWorktree)}
@@ -388,6 +390,7 @@ export function WorktreePanel({
                   aheadCount={aheadCount}
                   behindCount={behindCount}
                   gitRepoStatus={gitRepoStatus}
+                  projectPath={projectPath}
                   onSelectWorktree={handleSelectWorktree}
                   onBranchDropdownOpenChange={handleBranchDropdownOpenChange(worktree)}
                   onActionsDropdownOpenChange={handleActionsDropdownOpenChange(worktree)}

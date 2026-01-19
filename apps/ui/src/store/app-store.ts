@@ -841,6 +841,10 @@ export interface AppState {
   // undefined = use global setting, true/false = project-specific override
   useWorktreesByProject: Record<string, boolean | undefined>;
 
+  // Dev Server Port Override (per-project, keyed by project path)
+  // Custom port to display for dev server (for projects where Vite/Next ignores PORT env var)
+  devServerPortByProject: Record<string, number | undefined>;
+
   // UI State (previously in localStorage, now synced via API)
   /** Whether worktree panel is collapsed in board view */
   worktreePanelCollapsed: boolean;
@@ -1315,6 +1319,10 @@ export interface AppActions {
   getProjectUseWorktrees: (projectPath: string) => boolean | undefined; // undefined = using global
   getEffectiveUseWorktrees: (projectPath: string) => boolean; // Returns actual value (project or global fallback)
 
+  // Dev Server Port Override actions (per-project)
+  setDevServerPort: (projectPath: string, port: number | undefined) => void;
+  getDevServerPort: (projectPath: string) => number | undefined;
+
   // UI State actions (previously in localStorage, now synced via API)
   setWorktreePanelCollapsed: (collapsed: boolean) => void;
   setLastProjectDir: (dir: string) => void;
@@ -1481,6 +1489,7 @@ const initialState: AppState = {
   defaultDeleteBranchByProject: {},
   autoDismissInitScriptIndicatorByProject: {},
   useWorktreesByProject: {},
+  devServerPortByProject: {},
   // UI State (previously in localStorage, now synced via API)
   worktreePanelCollapsed: false,
   lastProjectDir: '',
@@ -3786,6 +3795,21 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
       return projectSetting;
     }
     return get().useWorktrees;
+  },
+
+  // Dev Server Port Override actions (per-project)
+  setDevServerPort: (projectPath, port) => {
+    set({
+      devServerPortByProject: {
+        ...get().devServerPortByProject,
+        [projectPath]: port,
+      },
+    });
+  },
+
+  getDevServerPort: (projectPath) => {
+    // Returns undefined if not set (use server-provided port)
+    return get().devServerPortByProject[projectPath];
   },
 
   // UI State actions (previously in localStorage, now synced via API)
