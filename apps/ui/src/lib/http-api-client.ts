@@ -1736,6 +1736,67 @@ export class HttpApiClient implements ElectronAPI {
     },
   };
 
+  // z.ai API
+  zai = {
+    getStatus: (): Promise<{
+      success: boolean;
+      available: boolean;
+      message?: string;
+      hasApiKey?: boolean;
+      hasEnvApiKey?: boolean;
+      error?: string;
+    }> => this.get('/api/zai/status'),
+
+    getUsage: (): Promise<{
+      quotaLimits?: {
+        tokens?: {
+          limitType: string;
+          limit: number;
+          used: number;
+          remaining: number;
+          usedPercent: number;
+          nextResetTime: number;
+        };
+        time?: {
+          limitType: string;
+          limit: number;
+          used: number;
+          remaining: number;
+          usedPercent: number;
+          nextResetTime: number;
+        };
+        planType: string;
+      } | null;
+      usageDetails?: Array<{
+        modelId: string;
+        used: number;
+        limit: number;
+      }>;
+      lastUpdated: string;
+      error?: string;
+      message?: string;
+    }> => this.get('/api/zai/usage'),
+
+    configure: (
+      apiToken?: string,
+      apiHost?: string
+    ): Promise<{
+      success: boolean;
+      message?: string;
+      isAvailable?: boolean;
+      error?: string;
+    }> => this.post('/api/zai/configure', { apiToken, apiHost }),
+
+    verify: (
+      apiKey: string
+    ): Promise<{
+      success: boolean;
+      authenticated: boolean;
+      message?: string;
+      error?: string;
+    }> => this.post('/api/zai/verify', { apiKey }),
+  };
+
   // Features API
   features: FeaturesAPI & {
     bulkUpdate: (

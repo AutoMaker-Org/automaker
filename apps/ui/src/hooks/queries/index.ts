@@ -23,7 +23,7 @@ export {
 } from './use-github';
 
 // Usage
-export { useClaudeUsage, useCodexUsage } from './use-usage';
+export { useClaudeUsage, useCodexUsage, useZaiUsage } from './use-usage';
 
 // Running Agents
 export { useRunningAgents, useRunningAgentsCount } from './use-running-agents';

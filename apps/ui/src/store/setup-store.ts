@@ -112,6 +112,21 @@ export interface CodexAuthStatus {
   error?: string;
 }
 
+// z.ai Auth Method
+export type ZaiAuthMethod =
+  | 'api_key_env' // Z_AI_API_KEY environment variable
+  | 'api_key' // Manually stored API key
+  | 'none';
+
+// z.ai Auth Status
+export interface ZaiAuthStatus {
+  authenticated: boolean;
+  method: ZaiAuthMethod;
+  hasApiKey?: boolean;
+  hasEnvApiKey?: boolean;
+  error?: string;
+}
+
 // Claude Auth Method - all possible authentication sources
 export type ClaudeAuthMethod =
   | 'oauth_token_env'
@@ -189,6 +204,9 @@ export interface SetupState {
   // Copilot SDK state
   copilotCliStatus: CopilotCliStatus | null;
 
+  // z.ai API state
+  zaiAuthStatus: ZaiAuthStatus | null;
+
   // Setup preferences
   skipClaudeSetup: boolean;
 }
@@ -229,6 +247,9 @@ export interface SetupActions {
   // Copilot SDK
   setCopilotCliStatus: (status: CopilotCliStatus | null) => void;
 
+  // z.ai API
+  setZaiAuthStatus: (status: ZaiAuthStatus | null) => void;
+
   // Preferences
   setSkipClaudeSetup: (skip: boolean) => void;
 }
@@ -265,6 +286,8 @@ const initialState: SetupState = {
   geminiCliStatus: null,
 
   copilotCliStatus: null,
+
+  zaiAuthStatus: null,
 
   skipClaudeSetup: shouldSkipSetup,
 };
@@ -343,6 +366,9 @@ export const useSetupStore = create<SetupState & SetupActions>()((set, get) => (
 
   // Copilot SDK
   setCopilotCliStatus: (status) => set({ copilotCliStatus: status }),
+
+  // z.ai API
+  setZaiAuthStatus: (status) => set({ zaiAuthStatus: status }),
 
   // Preferences
   setSkipClaudeSetup: (skip) => set({ skipClaudeSetup: skip }),

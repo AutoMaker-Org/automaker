@@ -1,6 +1,6 @@
 // Type definitions for Electron IPC API
 import type { SessionListItem, Message } from '@/types/electron';
-import type { ClaudeUsageResponse, CodexUsageResponse } from '@/store/app-store';
+import type { ClaudeUsageResponse, CodexUsageResponse, ZaiUsageResponse } from '@/store/app-store';
 import type {
   IssueValidationVerdict,
   IssueValidationConfidence,
@@ -865,6 +865,15 @@ export interface ElectronAPI {
       error?: string;
     }>;
   };
+  zai?: {
+    getUsage: () => Promise<ZaiUsageResponse>;
+    verify: (apiKey: string) => Promise<{
+      success: boolean;
+      authenticated: boolean;
+      message?: string;
+      error?: string;
+    }>;
+  };
   settings?: {
     getStatus: () => Promise<{
       success: boolean;
@@ -1361,6 +1370,51 @@ const _getMockElectronAPI = (): ElectronAPI => {
           costCurrency: null,
           lastUpdated: new Date().toISOString(),
           userTimezone: 'UTC',
+        };
+      },
+    },
+
+    // Mock z.ai API
+    zai: {
+      getUsage: async () => {
+        console.log('[Mock] Getting z.ai usage');
+        return {
+          quotaLimits: {
+            tokens: {
+              limitType: 'TOKENS_LIMIT',
+              limit: 1000000,
+              used: 250000,
+              remaining: 750000,
+              usedPercent: 25,
+              nextResetTime: Date.now() + 86400000,
+            },
+            time: {
+              limitType: 'TIME_LIMIT',
+              limit: 3600,
+              used: 900,
+              remaining: 2700,
+              usedPercent: 25,
+              nextResetTime: Date.now() + 3600000,
+            },
+            planType: 'standard',
+          },
+          lastUpdated: new Date().toISOString(),
+        };
+      },
+      verify: async (apiKey: string) => {
+        console.log('[Mock] Verifying z.ai API key');
+        // Mock successful verification if key is provided
+        if (apiKey && apiKey.trim().length > 0) {
+          return {
+            success: true,
+            authenticated: true,
+            message: 'Connection successful! z.ai API responded.',
+          };
+        }
+        return {
+          success: false,
+          authenticated: false,
+          error: 'Please provide an API key to test.',
         };
       },
     },

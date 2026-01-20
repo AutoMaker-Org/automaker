@@ -1,7 +1,7 @@
 import type { Dispatch, SetStateAction } from 'react';
 import type { ApiKeys } from '@/store/app-store';
 
-export type ProviderKey = 'anthropic' | 'google' | 'openai';
+export type ProviderKey = 'anthropic' | 'google' | 'openai' | 'zai';
 
 export interface ProviderConfig {
   key: ProviderKey;
@@ -59,12 +59,22 @@ export interface ProviderConfigParams {
     onTest: () => Promise<void>;
     result: { success: boolean; message: string } | null;
   };
+  zai: {
+    value: string;
+    setValue: Dispatch<SetStateAction<string>>;
+    show: boolean;
+    setShow: Dispatch<SetStateAction<boolean>>;
+    testing: boolean;
+    onTest: () => Promise<void>;
+    result: { success: boolean; message: string } | null;
+  };
 }
 
 export const buildProviderConfigs = ({
   apiKeys,
   anthropic,
   openai,
+  zai,
 }: ProviderConfigParams): ProviderConfig[] => [
   {
     key: 'anthropic',
@@ -116,6 +126,32 @@ export const buildProviderConfigs = ({
     descriptionPrefix: 'Used for Codex and OpenAI features. Get your key at',
     descriptionLinkHref: 'https://platform.openai.com/api-keys',
     descriptionLinkText: 'platform.openai.com',
+    descriptionSuffix: '.',
+  },
+  {
+    key: 'zai',
+    label: 'z.ai API Key',
+    inputId: 'zai-key',
+    placeholder: 'Enter your z.ai API key',
+    value: zai.value,
+    setValue: zai.setValue,
+    showValue: zai.show,
+    setShowValue: zai.setShow,
+    hasStoredKey: apiKeys.zai,
+    inputTestId: 'zai-api-key-input',
+    toggleTestId: 'toggle-zai-visibility',
+    testButton: {
+      onClick: zai.onTest,
+      disabled: !zai.value || zai.testing,
+      loading: zai.testing,
+      testId: 'test-zai-connection',
+    },
+    result: zai.result,
+    resultTestId: 'zai-test-connection-result',
+    resultMessageTestId: 'zai-test-connection-message',
+    descriptionPrefix: 'Used for z.ai usage tracking and GLM models. Get your key at',
+    descriptionLinkHref: 'https://z.ai',
+    descriptionLinkText: 'z.ai',
     descriptionSuffix: '.',
   },
   // {

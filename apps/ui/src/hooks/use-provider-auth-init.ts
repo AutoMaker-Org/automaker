@@ -1,18 +1,29 @@
 import { useEffect, useRef, useCallback } from 'react';
-import { useSetupStore, type ClaudeAuthMethod, type CodexAuthMethod } from '@/store/setup-store';
+import {
+  useSetupStore,
+  type ClaudeAuthMethod,
+  type CodexAuthMethod,
+  type ZaiAuthMethod,
+} from '@/store/setup-store';
 import { getHttpApiClient } from '@/lib/http-api-client';
 import { createLogger } from '@automaker/utils/logger';
 
 const logger = createLogger('ProviderAuthInit');
 
 /**
- * Hook to initialize Claude and Codex authentication statuses on app startup.
+ * Hook to initialize Claude, Codex, and z.ai authentication statuses on app startup.
  * This ensures that usage tracking information is available in the board header
  * without needing to visit the settings page first.
  */
 export function useProviderAuthInit() {
-  const { setClaudeAuthStatus, setCodexAuthStatus, claudeAuthStatus, codexAuthStatus } =
-    useSetupStore();
+  const {
+    setClaudeAuthStatus,
+    setCodexAuthStatus,
+    setZaiAuthStatus,
+    claudeAuthStatus,
+    codexAuthStatus,
+    zaiAuthStatus,
+  } = useSetupStore();
   const initialized = useRef(false);
 
   const refreshStatuses = useCallback(async () => {
@@ -88,15 +99,40 @@ export function useProviderAuthInit() {
     } catch (error) {
       logger.error('Failed to init Codex auth status:', error);
     }
-  }, [setClaudeAuthStatus, setCodexAuthStatus]);
+
+    // 3. z.ai Auth Status
+    try {
+      const result = await api.zai.getStatus();
+      if (result.success || result.available !== undefined) {
+        let method: ZaiAuthMethod = 'none';
+        if (result.hasEnvApiKey) {
+          method = 'api_key_env';
+        } else if (result.hasApiKey || result.available) {
+          method = 'api_key';
+        }
+
+        setZaiAuthStatus({
+          authenticated: result.available,
+          method,
+          hasApiKey: result.hasApiKey ?? result.available,
+          hasEnvApiKey: result.hasEnvApiKey ?? false,
+        });
+      }
+    } catch (error) {
+      logger.error('Failed to init z.ai auth status:', error);
+    }
+  }, [setClaudeAuthStatus, setCodexAuthStatus, setZaiAuthStatus]);
 
   useEffect(() => {
     // Only initialize once per session if not already set
-    if (initialized.current || (claudeAuthStatus !== null && codexAuthStatus !== null)) {
+    if (
+      initialized.current ||
+      (claudeAuthStatus !== null && codexAuthStatus !== null && zaiAuthStatus !== null)
+    ) {
       return;
     }
     initialized.current = true;
 
     void refreshStatuses();
-  }, [refreshStatuses, claudeAuthStatus, codexAuthStatus]);
+  }, [refreshStatuses, claudeAuthStatus, codexAuthStatus, zaiAuthStatus]);
 }

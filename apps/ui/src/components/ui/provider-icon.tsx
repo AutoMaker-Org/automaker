@@ -105,8 +105,9 @@ const PROVIDER_ICON_DEFINITIONS: Record<ProviderIconKey, ProviderIconDefinition>
   },
   glm: {
     viewBox: '0 0 24 24',
-    // Official Z.ai logo from lobehub/lobe-icons (GLM provider)
+    // Official Z.ai/GLM logo from lobehub/lobe-icons (GLM/Zhipu provider)
     path: 'M12.105 2L9.927 4.953H.653L2.83 2h9.276zM23.254 19.048L21.078 22h-9.242l2.174-2.952h9.244zM24 2L9.264 22H0L14.736 2H24z',
+    fill: '#3B82F6', // z.ai brand blue
   },
   bigpickle: {
     viewBox: '0 0 24 24',
@@ -391,11 +392,14 @@ export function GlmIcon({ className, title, ...props }: { className?: string; ti
       {title && <title>{title}</title>}
       <path
         d="M12.105 2L9.927 4.953H.653L2.83 2h9.276zM23.254 19.048L21.078 22h-9.242l2.174-2.952h9.244zM24 2L9.264 22H0L14.736 2H24z"
-        fill="currentColor"
+        fill="#3B82F6"
       />
     </svg>
   );
 }
+
+// Z.ai icon is the same as GLM (Zhipu AI)
+export const ZaiIcon = GlmIcon;
 
 export function BigPickleIcon({
   className,

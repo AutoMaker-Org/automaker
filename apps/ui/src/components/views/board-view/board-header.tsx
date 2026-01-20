@@ -81,6 +81,7 @@ export function BoardHeader({
     (state) => state.setAddFeatureUseSelectedWorktreeBranch
   );
   const codexAuthStatus = useSetupStore((state) => state.codexAuthStatus);
+  const zaiAuthStatus = useSetupStore((state) => state.zaiAuthStatus);
 
   // Worktree panel visibility (per-project)
   const worktreePanelVisibleByProject = useAppStore((state) => state.worktreePanelVisibleByProject);
@@ -111,6 +112,9 @@ export function BoardHeader({
   // Codex usage tracking visibility logic
   // Show if Codex is authenticated (CLI or API key)
   const showCodexUsage = !!codexAuthStatus?.authenticated;
+
+  // z.ai usage tracking visibility logic
+  const showZaiUsage = !!zaiAuthStatus?.authenticated;
 
   // State for mobile actions panel
   const [showActionsPanel, setShowActionsPanel] = useState(false);
@@ -158,8 +162,10 @@ export function BoardHeader({
             <TooltipContent side="bottom">Refresh board state from server</TooltipContent>
           </Tooltip>
         )}
-        {/* Usage Popover - show if either provider is authenticated, only on desktop */}
-        {isMounted && !isTablet && (showClaudeUsage || showCodexUsage) && <UsagePopover />}
+        {/* Usage Popover - show if any provider is authenticated, only on desktop */}
+        {isMounted && !isTablet && (showClaudeUsage || showCodexUsage || showZaiUsage) && (
+          <UsagePopover />
+        )}
 
         {/* Tablet/Mobile view: show hamburger menu with all controls */}
         {isMounted && isTablet && (
@@ -178,6 +184,7 @@ export function BoardHeader({
             onOpenPlanDialog={onOpenPlanDialog}
             showClaudeUsage={showClaudeUsage}
             showCodexUsage={showCodexUsage}
+            showZaiUsage={showZaiUsage}
           />
         )}
 

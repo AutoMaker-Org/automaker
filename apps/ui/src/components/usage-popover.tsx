@@ -6,8 +6,8 @@ import { RefreshCw, AlertTriangle, CheckCircle, XCircle, Clock, ExternalLink } f
 import { Spinner } from '@/components/ui/spinner';
 import { cn } from '@/lib/utils';
 import { useSetupStore } from '@/store/setup-store';
-import { AnthropicIcon, OpenAIIcon } from '@/components/ui/provider-icon';
-import { useClaudeUsage, useCodexUsage } from '@/hooks/queries';
+import { AnthropicIcon, OpenAIIcon, ZaiIcon } from '@/components/ui/provider-icon';
+import { useClaudeUsage, useCodexUsage, useZaiUsage } from '@/hooks/queries';
 
 // Error codes for distinguishing failure modes
 const ERROR_CODES = {
@@ -27,9 +27,9 @@ type UsageError = {
 
 const CLAUDE_SESSION_WINDOW_HOURS = 5;
 
-// Helper to format reset time for Codex
-function formatCodexResetTime(unixTimestamp: number): string {
-  const date = new Date(unixTimestamp * 1000);
+// Helper to format reset time for Codex/z.ai (unix timestamp in seconds or milliseconds)
+function formatResetTime(unixTimestamp: number, isMilliseconds = false): string {
+  const date = new Date(isMilliseconds ? unixTimestamp : unixTimestamp * 1000);
   const now = new Date();
   const diff = date.getTime() - now.getTime();
 
@@ -45,6 +45,11 @@ function formatCodexResetTime(unixTimestamp: number): string {
   return `Resets ${date.toLocaleDateString()} at ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
 }
 
+// Legacy alias for Codex
+function formatCodexResetTime(unixTimestamp: number): string {
+  return formatResetTime(unixTimestamp, false);
+}
+
 // Helper to format window duration for Codex
 function getCodexWindowLabel(durationMins: number): { title: string; subtitle: string } {
   if (durationMins < 60) {
@@ -58,16 +63,32 @@ function getCodexWindowLabel(durationMins: number): { title: string; subtitle: s
   return { title: `${days}d Window`, subtitle: 'Rate limit' };
 }
 
+// Helper to format large numbers with K/M suffixes
+function formatNumber(num: number): string {
+  if (num >= 1_000_000_000) {
+    return `${(num / 1_000_000_000).toFixed(1)}B`;
+  }
+  if (num >= 1_000_000) {
+    return `${(num / 1_000_000).toFixed(1)}M`;
+  }
+  if (num >= 1_000) {
+    return `${(num / 1_000).toFixed(1)}K`;
+  }
+  return num.toLocaleString();
+}
+
 export function UsagePopover() {
   const claudeAuthStatus = useSetupStore((state) => state.claudeAuthStatus);
   const codexAuthStatus = useSetupStore((state) => state.codexAuthStatus);
+  const zaiAuthStatus = useSetupStore((state) => state.zaiAuthStatus);
 
   const [open, setOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'claude' | 'codex'>('claude');
+  const [activeTab, setActiveTab] = useState<'claude' | 'codex' | 'zai'>('claude');
 
   // Check authentication status
   const isClaudeAuthenticated = !!claudeAuthStatus?.authenticated;
   const isCodexAuthenticated = codexAuthStatus?.authenticated;
+  const isZaiAuthenticated = zaiAuthStatus?.authenticated;
 
   // Use React Query hooks for usage data
   // Only enable polling when popover is open AND the tab is active
@@ -86,6 +107,14 @@ export function UsagePopover() {
     dataUpdatedAt: codexUsageLastUpdated,
     refetch: refetchCodex,
   } = useCodexUsage(open && activeTab === 'codex' && isCodexAuthenticated);
+
+  const {
+    data: zaiUsage,
+    isLoading: zaiLoading,
+    error: zaiQueryError,
+    dataUpdatedAt: zaiUsageLastUpdated,
+    refetch: refetchZai,
+  } = useZaiUsage(open && activeTab === 'zai' && isZaiAuthenticated);
 
   // Parse errors into structured format
   const claudeError = useMemo((): UsageError | null => {
@@ -116,14 +145,28 @@ export function UsagePopover() {
     return { code: ERROR_CODES.AUTH_ERROR, message };
   }, [codexQueryError]);
 
+  const zaiError = useMemo((): UsageError | null => {
+    if (!zaiQueryError) return null;
+    const message = zaiQueryError instanceof Error ? zaiQueryError.message : String(zaiQueryError);
+    if (message.includes('not configured') || message.includes('API token')) {
+      return { code: ERROR_CODES.NOT_AVAILABLE, message };
+    }
+    if (message.includes('API bridge')) {
+      return { code: ERROR_CODES.API_BRIDGE_UNAVAILABLE, message };
+    }
+    return { code: ERROR_CODES.AUTH_ERROR, message };
+  }, [zaiQueryError]);
+
   // Determine which tab to show by default
   useEffect(() => {
     if (isClaudeAuthenticated) {
       setActiveTab('claude');
     } else if (isCodexAuthenticated) {
       setActiveTab('codex');
+    } else if (isZaiAuthenticated) {
+      setActiveTab('zai');
     }
-  }, [isClaudeAuthenticated, isCodexAuthenticated]);
+  }, [isClaudeAuthenticated, isCodexAuthenticated, isZaiAuthenticated]);
 
   // Check if data is stale (older than 2 minutes)
   const isClaudeStale = useMemo(() => {
@@ -134,9 +177,14 @@ export function UsagePopover() {
     return !codexUsageLastUpdated || Date.now() - codexUsageLastUpdated > 2 * 60 * 1000;
   }, [codexUsageLastUpdated]);
 
+  const isZaiStale = useMemo(() => {
+    return !zaiUsageLastUpdated || Date.now() - zaiUsageLastUpdated > 2 * 60 * 1000;
+  }, [zaiUsageLastUpdated]);
+
   // Refetch functions for manual refresh
   const fetchClaudeUsage = () => refetchClaude();
   const fetchCodexUsage = () => refetchCodex();
+  const fetchZaiUsage = () => refetchZai();
 
   // Derived status color/icon helper
   const getStatusInfo = (percentage: number) => {
@@ -251,26 +299,33 @@ export function UsagePopover() {
   const indicatorInfo =
     activeTab === 'claude'
       ? {
-          icon: AnthropicIcon,
-          percentage: claudeSessionPercentage,
-          isStale: isClaudeStale,
-          title: `Session usage (${CLAUDE_SESSION_WINDOW_HOURS}h window)`,
-        }
-      : {
-          icon: OpenAIIcon,
-          percentage: codexWindowUsage ?? 0,
-          isStale: isCodexStale,
-          title: `Usage (${codexWindowLabel})`,
-        };
+        icon: AnthropicIcon,
+        percentage: claudeSessionPercentage,
+        isStale: isClaudeStale,
+        title: `Session usage (${CLAUDE_SESSION_WINDOW_HOURS}h window)`,
+      }
+      : activeTab === 'codex' ? {
+        icon: OpenAIIcon,
+        percentage: codexWindowUsage ?? 0,
+        isStale: isCodexStale,
+        title: `Usage (${codexWindowLabel})`,
+      } : activeTab === 'zai' ? {
+        icon: ZaiIcon,
+        percentage: zaiMaxPercentage,
+        isStale: isZaiStale,
+        title: `Usage (z.ai)`,
+      } : null;
 
   const statusColor = getStatusInfo(indicatorInfo.percentage).color;
   const ProviderIcon = indicatorInfo.icon;
 
   const trigger = (
     <Button variant="ghost" size="sm" className="h-9 gap-2 bg-secondary border border-border px-3">
-      {(claudeUsage || codexUsage) && <ProviderIcon className={cn('w-4 h-4', statusColor)} />}
+      {(claudeUsage || codexUsage || zaiUsage) && (
+        <ProviderIcon className={cn('w-4 h-4', statusColor)} />
+      )}
       <span className="text-sm font-medium">Usage</span>
-      {(claudeUsage || codexUsage) && (
+      {(claudeUsage || codexUsage || zaiUsage) && (
         <div
           title={indicatorInfo.title}
           className={cn(
@@ -293,6 +348,8 @@ export function UsagePopover() {
   // Determine which tabs to show
   const showClaudeTab = isClaudeAuthenticated;
   const showCodexTab = isCodexAuthenticated;
+  const showZaiTab = isZaiAuthenticated;
+  const tabCount = [showClaudeTab, showCodexTab, showZaiTab].filter(Boolean).length;
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -302,18 +359,37 @@ export function UsagePopover() {
         align="end"
         sideOffset={8}
       >
-        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'claude' | 'codex')}>
+        <Tabs
+          value={activeTab}
+          onValueChange={(v) => setActiveTab(v as 'claude' | 'codex' | 'zai')}
+        >
           {/* Tabs Header */}
-          {showClaudeTab && showCodexTab && (
-            <TabsList className="grid w-full grid-cols-2 rounded-none border-b border-border/50">
-              <TabsTrigger value="claude" className="gap-2">
-                <AnthropicIcon className="w-3.5 h-3.5" />
-                Claude
-              </TabsTrigger>
-              <TabsTrigger value="codex" className="gap-2">
-                <OpenAIIcon className="w-3.5 h-3.5" />
-                Codex
-              </TabsTrigger>
+          {tabCount > 1 && (
+            <TabsList
+              className={cn(
+                'grid w-full rounded-none border-b border-border/50',
+                tabCount === 2 && 'grid-cols-2',
+                tabCount === 3 && 'grid-cols-3'
+              )}
+            >
+              {showClaudeTab && (
+                <TabsTrigger value="claude" className="gap-2">
+                  <AnthropicIcon className="w-3.5 h-3.5" />
+                  Claude
+                </TabsTrigger>
+              )}
+              {showCodexTab && (
+                <TabsTrigger value="codex" className="gap-2">
+                  <OpenAIIcon className="w-3.5 h-3.5" />
+                  Codex
+                </TabsTrigger>
+              )}
+              {showZaiTab && (
+                <TabsTrigger value="zai" className="gap-2">
+                  <ZaiIcon className="w-3.5 h-3.5" />
+                  z.ai
+                </TabsTrigger>
+              )}
             </TabsList>
           )}
 
@@ -548,6 +624,122 @@ export function UsagePopover() {
                 className="text-[10px] text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
               >
                 OpenAI Dashboard <ExternalLink className="w-2.5 h-2.5" />
+              </a>
+              <span className="text-[10px] text-muted-foreground">Updates every minute</span>
+            </div>
+          </TabsContent>
+
+          {/* z.ai Tab Content */}
+          <TabsContent value="zai" className="m-0">
+            {/* Header */}
+            <div className="flex items-center justify-between px-4 py-3 border-b border-border/50 bg-secondary/10">
+              <div className="flex items-center gap-2">
+                <ZaiIcon className="w-4 h-4" />
+                <span className="text-sm font-semibold">z.ai Usage</span>
+              </div>
+              {zaiError && zaiError.code !== ERROR_CODES.NOT_AVAILABLE && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className={cn('h-6 w-6', zaiLoading && 'opacity-80')}
+                  onClick={() => !zaiLoading && fetchZaiUsage()}
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                </Button>
+              )}
+            </div>
+
+            {/* Content */}
+            <div className="p-4 space-y-4">
+              {zaiError ? (
+                <div className="flex flex-col items-center justify-center py-6 text-center space-y-3">
+                  <AlertTriangle className="w-8 h-8 text-yellow-500/80" />
+                  <div className="space-y-1 flex flex-col items-center">
+                    <p className="text-sm font-medium">
+                      {zaiError.code === ERROR_CODES.NOT_AVAILABLE
+                        ? 'z.ai not configured'
+                        : zaiError.message}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {zaiError.code === ERROR_CODES.API_BRIDGE_UNAVAILABLE ? (
+                        'Ensure the Electron bridge is running or restart the app'
+                      ) : zaiError.code === ERROR_CODES.NOT_AVAILABLE ? (
+                        <>
+                          Set <code className="font-mono bg-muted px-1 rounded">Z_AI_API_KEY</code>{' '}
+                          environment variable to enable z.ai usage tracking
+                        </>
+                      ) : (
+                        <>Check your z.ai API key configuration</>
+                      )}
+                    </p>
+                  </div>
+                </div>
+              ) : !zaiUsage ? (
+                <div className="flex flex-col items-center justify-center py-8 space-y-2">
+                  <Spinner size="lg" />
+                  <p className="text-xs text-muted-foreground">Loading usage data...</p>
+                </div>
+              ) : zaiUsage.quotaLimits &&
+                (zaiUsage.quotaLimits.tokens || zaiUsage.quotaLimits.mcp) ? (
+                <>
+                  {zaiUsage.quotaLimits.tokens && (
+                    <UsageCard
+                      title="Token Quota"
+                      subtitle={`${formatNumber(zaiUsage.quotaLimits.tokens.used)} / ${formatNumber(zaiUsage.quotaLimits.tokens.limit)} tokens`}
+                      percentage={zaiUsage.quotaLimits.tokens.usedPercent}
+                      resetText={
+                        zaiUsage.quotaLimits.tokens.nextResetTime
+                          ? formatResetTime(zaiUsage.quotaLimits.tokens.nextResetTime, true)
+                          : undefined
+                      }
+                      isPrimary={true}
+                      stale={isZaiStale}
+                    />
+                  )}
+
+                  {zaiUsage.quotaLimits.mcp && (
+                    <UsageCard
+                      title="MCP Quota"
+                      subtitle={`${formatNumber(zaiUsage.quotaLimits.mcp.used)} / ${formatNumber(zaiUsage.quotaLimits.mcp.limit)} calls`}
+                      percentage={zaiUsage.quotaLimits.mcp.usedPercent}
+                      resetText={
+                        zaiUsage.quotaLimits.mcp.nextResetTime
+                          ? formatResetTime(zaiUsage.quotaLimits.mcp.nextResetTime, true)
+                          : undefined
+                      }
+                      stale={isZaiStale}
+                    />
+                  )}
+
+                  {zaiUsage.quotaLimits.planType && zaiUsage.quotaLimits.planType !== 'unknown' && (
+                    <div className="rounded-xl border border-border/40 bg-secondary/20 p-3">
+                      <p className="text-xs text-muted-foreground">
+                        Plan:{' '}
+                        <span className="text-foreground font-medium">
+                          {zaiUsage.quotaLimits.planType.charAt(0).toUpperCase() +
+                            zaiUsage.quotaLimits.planType.slice(1)}
+                        </span>
+                      </p>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-6 text-center">
+                  <AlertTriangle className="w-8 h-8 text-yellow-500/80" />
+                  <p className="text-sm font-medium mt-3">No usage data available</p>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-between px-4 py-2 bg-secondary/10 border-t border-border/50">
+              <a
+                href="https://z.ai"
+                target="_blank"
+                rel="noreferrer"
+                className="text-[10px] text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
+              >
+                z.ai <ExternalLink className="w-2.5 h-2.5" />
               </a>
               <span className="text-[10px] text-muted-foreground">Updates every minute</span>
             </div>

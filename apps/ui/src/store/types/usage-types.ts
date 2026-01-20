@@ -58,3 +58,27 @@ export interface CodexUsage {
 
 // Response type for Codex usage API (can be success or error)
 export type CodexUsageResponse = CodexUsage | { error: string; message?: string };
+
+// z.ai Usage types
+export type ZaiPlanType = 'free' | 'basic' | 'standard' | 'professional' | 'enterprise' | 'unknown';
+
+export interface ZaiQuotaLimit {
+  limitType: 'TOKENS_LIMIT' | 'TIME_LIMIT' | string;
+  limit: number;
+  used: number;
+  remaining: number;
+  usedPercent: number; // Percentage used (0-100)
+  nextResetTime: number; // Epoch milliseconds
+}
+
+export interface ZaiUsage {
+  quotaLimits: {
+    tokens?: ZaiQuotaLimit;
+    mcp?: ZaiQuotaLimit;
+    planType: ZaiPlanType;
+  } | null;
+  lastUpdated: string;
+}
+
+// Response type for z.ai usage API (can be success or error)
+export type ZaiUsageResponse = ZaiUsage | { error: string; message?: string };

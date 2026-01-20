@@ -94,6 +94,10 @@ import {
   type CodexRateLimitWindow,
   type CodexUsage,
   type CodexUsageResponse,
+  type ZaiPlanType,
+  type ZaiQuotaLimit,
+  type ZaiUsage,
+  type ZaiUsageResponse,
 } from './types';
 
 // Import utility functions from modular utils files
@@ -173,6 +177,10 @@ export type {
   CodexRateLimitWindow,
   CodexUsage,
   CodexUsageResponse,
+  ZaiPlanType,
+  ZaiQuotaLimit,
+  ZaiUsage,
+  ZaiUsageResponse,
 };
 
 // Re-export values from ./types for backward compatibility
@@ -234,6 +242,7 @@ const initialState: AppState = {
     anthropic: '',
     google: '',
     openai: '',
+    zai: '',
   },
   chatSessions: [],
   currentChatSession: null,
@@ -314,6 +323,8 @@ const initialState: AppState = {
   claudeUsageLastUpdated: null,
   codexUsage: null,
   codexUsageLastUpdated: null,
+  zaiUsage: null,
+  zaiUsageLastUpdated: null,
   codexModels: [],
   codexModelsLoading: false,
   codexModelsError: null,
@@ -2399,6 +2410,9 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
 
   // Codex Usage Tracking actions
   setCodexUsage: (usage) => set({ codexUsage: usage, codexUsageLastUpdated: Date.now() }),
+
+  // z.ai Usage Tracking actions
+  setZaiUsage: (usage) => set({ zaiUsage: usage, zaiUsageLastUpdated: usage ? Date.now() : null }),
 
   // Codex Models actions
   fetchCodexModels: async (forceRefresh = false) => {

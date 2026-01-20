@@ -1,7 +1,7 @@
 /**
  * Usage Query Hooks
  *
- * React Query hooks for fetching Claude and Codex API usage data.
+ * React Query hooks for fetching Claude, Codex, and z.ai API usage data.
  * These hooks include automatic polling for real-time usage updates.
  */
 
@@ -9,7 +9,7 @@ import { useQuery } from '@tanstack/react-query';
 import { getElectronAPI } from '@/lib/electron';
 import { queryKeys } from '@/lib/query-keys';
 import { STALE_TIMES } from '@/lib/query-client';
-import type { ClaudeUsage, CodexUsage } from '@/store/app-store';
+import type { ClaudeUsage, CodexUsage, ZaiUsage } from '@/store/app-store';
 
 /** Polling interval for usage data (60 seconds) */
 const USAGE_POLLING_INTERVAL = 60 * 1000;
@@ -72,6 +72,39 @@ export function useCodexUsage(enabled = true) {
         throw new Error('Codex API not available');
       }
       const result = await api.codex.getUsage();
+      // Check if result is an error response
+      if ('error' in result) {
+        throw new Error(result.message || result.error);
+      }
+      return result;
+    },
+    enabled,
+    staleTime: STALE_TIMES.USAGE,
+    refetchInterval: enabled ? USAGE_POLLING_INTERVAL : false,
+    // Keep previous data while refetching
+    placeholderData: (previousData) => previousData,
+    refetchOnWindowFocus: USAGE_REFETCH_ON_FOCUS,
+    refetchOnReconnect: USAGE_REFETCH_ON_RECONNECT,
+  });
+}
+
+/**
+ * Fetch z.ai API usage data
+ *
+ * @param enabled - Whether the query should run (default: true)
+ * @returns Query result with z.ai usage data
+ *
+ * @example
+ * ```tsx
+ * const { data: usage, isLoading } = useZaiUsage(isPopoverOpen);
+ * ```
+ */
+export function useZaiUsage(enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.usage.zai(),
+    queryFn: async (): Promise<ZaiUsage> => {
+      const api = getElectronAPI();
+      const result = await api.zai.getUsage();
       // Check if result is an error response
       if ('error' in result) {
         throw new Error(result.message || result.error);

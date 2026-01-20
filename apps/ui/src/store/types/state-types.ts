@@ -36,7 +36,7 @@ import type { ApiKeys } from './settings-types';
 import type { ChatMessage, ChatSession, FeatureImage } from './chat-types';
 import type { TerminalState, TerminalPanelContent, PersistedTerminalState } from './terminal-types';
 import type { Feature, ProjectAnalysis } from './project-types';
-import type { ClaudeUsage, CodexUsage } from './usage-types';
+import type { ClaudeUsage, CodexUsage, ZaiUsage } from './usage-types';
 
 /** State for worktree init script execution */
 export interface InitScriptState {
@@ -296,6 +296,10 @@ export interface AppState {
   // Codex Usage Tracking
   codexUsage: CodexUsage | null;
   codexUsageLastUpdated: number | null;
+
+  // z.ai Usage Tracking
+  zaiUsage: ZaiUsage | null;
+  zaiUsageLastUpdated: number | null;
 
   // Codex Models (dynamically fetched)
   codexModels: Array<{
@@ -763,6 +767,9 @@ export interface AppActions {
 
   // Codex Usage Tracking actions
   setCodexUsage: (usage: CodexUsage | null) => void;
+
+  // z.ai Usage Tracking actions
+  setZaiUsage: (usage: ZaiUsage | null) => void;
 
   // Codex Models actions
   fetchCodexModels: (forceRefresh?: boolean) => Promise<void>;
