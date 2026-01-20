@@ -7,6 +7,7 @@ import fs from 'fs/promises';
 // Mock child_process
 vi.mock('child_process', () => ({
   spawn: vi.fn(),
+  exec: vi.fn(),
   execSync: vi.fn(),
   execFile: vi.fn(),
 }));
