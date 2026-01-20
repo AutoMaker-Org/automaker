@@ -730,8 +730,6 @@ export function hydrateStoreFromSettings(settings: GlobalSettings): void {
     worktreePanelCollapsed: settings.worktreePanelCollapsed ?? false,
     lastProjectDir: settings.lastProjectDir ?? '',
     recentFolders: settings.recentFolders ?? [],
-    // Event hooks
-    eventHooks: settings.eventHooks ?? [],
     // Terminal font (nested in terminalState)
     ...(settings.terminalFontFamily && {
       terminalState: {
@@ -810,7 +808,6 @@ function buildSettingsUpdateFromStore(): Record<string, unknown> {
     lastProjectDir: state.lastProjectDir,
     recentFolders: state.recentFolders,
     terminalFontFamily: state.terminalState.fontFamily,
-    eventHooks: state.eventHooks,
   };
 }
 
