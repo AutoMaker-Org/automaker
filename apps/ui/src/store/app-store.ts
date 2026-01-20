@@ -1057,6 +1057,7 @@ export interface AppActions {
   addRunningTask: (projectId: string, taskId: string) => void;
   removeRunningTask: (projectId: string, taskId: string) => void;
   clearRunningTasks: (projectId: string) => void;
+  setRunningTasks: (projectId: string, taskIds: string[]) => void;
   getAutoModeState: (projectId: string) => {
     isRunning: boolean;
     runningTasks: string[];
@@ -2105,6 +2106,20 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
       autoModeByProject: {
         ...current,
         [projectId]: { ...projectState, runningTasks: [] },
+      },
+    });
+  },
+
+  setRunningTasks: (projectId, taskIds) => {
+    const current = get().autoModeByProject;
+    const projectState = current[projectId] || {
+      isRunning: false,
+      runningTasks: [],
+    };
+    set({
+      autoModeByProject: {
+        ...current,
+        [projectId]: { ...projectState, runningTasks: taskIds },
       },
     });
   },

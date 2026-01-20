@@ -77,16 +77,12 @@ export function useBoardEffects({
         const status = await api.autoMode.status(currentProject.path);
         if (status.success) {
           const projectId = currentProject.id;
-          const { clearRunningTasks, addRunningTask } = useAppStore.getState();
+          const { setRunningTasks } = useAppStore.getState();
 
           if (status.runningFeatures) {
             logger.info('Syncing running tasks from backend:', status.runningFeatures);
-
-            clearRunningTasks(projectId);
-
-            status.runningFeatures.forEach((featureId: string) => {
-              addRunningTask(projectId, featureId);
-            });
+            // Use atomic update to prevent intermediate empty state causing flash
+            setRunningTasks(projectId, status.runningFeatures);
           }
         }
       } catch (error) {
