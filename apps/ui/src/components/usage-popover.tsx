@@ -307,16 +307,16 @@ export function UsagePopover() {
 
   const codexMaxPercentage = codexUsage?.rateLimits
     ? Math.max(
-        codexUsage.rateLimits.primary?.usedPercent || 0,
-        codexUsage.rateLimits.secondary?.usedPercent || 0
-      )
+      codexUsage.rateLimits.primary?.usedPercent || 0,
+      codexUsage.rateLimits.secondary?.usedPercent || 0
+    )
     : 0;
 
   const zaiMaxPercentage = zaiUsage?.quotaLimits
     ? Math.max(
-        zaiUsage.quotaLimits.tokens?.usedPercent || 0,
-        zaiUsage.quotaLimits.mcp?.usedPercent || 0
-      )
+      zaiUsage.quotaLimits.tokens?.usedPercent || 0,
+      zaiUsage.quotaLimits.mcp?.usedPercent || 0
+    )
     : 0;
 
   // Gemini quota from Google Cloud API (if available)
@@ -346,31 +346,31 @@ export function UsagePopover() {
   const indicatorInfo =
     activeTab === 'claude'
       ? {
-          icon: AnthropicIcon,
-          percentage: claudeSessionPercentage,
-          isStale: isClaudeStale,
-          title: `Session usage (${CLAUDE_SESSION_WINDOW_HOURS}h window)`,
-        }
+        icon: AnthropicIcon,
+        percentage: claudeSessionPercentage,
+        isStale: isClaudeStale,
+        title: `Session usage (${CLAUDE_SESSION_WINDOW_HOURS}h window)`,
+      }
       : activeTab === 'codex'
         ? {
-            icon: OpenAIIcon,
-            percentage: codexWindowUsage ?? 0,
-            isStale: isCodexStale,
-          }
+          icon: OpenAIIcon,
+          percentage: codexWindowUsage ?? 0,
+          isStale: isCodexStale,
+        }
         : activeTab === 'zai'
           ? {
-              icon: ZaiIcon,
-              percentage: zaiMaxPercentage,
-              isStale: isZaiStale,
-              title: `Usage (z.ai)`,
-            }
+            icon: ZaiIcon,
+            percentage: zaiMaxPercentage,
+            isStale: isZaiStale,
+            title: `Usage (z.ai)`,
+          }
           : activeTab === 'gemini'
             ? {
-                icon: GeminiIcon,
-                percentage: geminiMaxPercentage,
-                isStale: isGeminiStale,
-                title: `Usage (Gemini)`,
-              }
+              icon: GeminiIcon,
+              percentage: geminiMaxPercentage,
+              isStale: isGeminiStale,
+              title: `Usage (Gemini)`,
+            }
             : null;
 
   const statusColor = getStatusInfo(indicatorInfo.percentage).color;
