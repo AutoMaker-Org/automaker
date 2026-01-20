@@ -495,6 +495,17 @@ export class AutoModeService {
       throw new Error('already running');
     }
 
+    // Check global concurrency limit for manual executions
+    // (Auto-mode has its own check in the auto-loop, so skip for isAutoMode)
+    if (!isAutoMode) {
+      const maxConcurrency = this.config?.maxConcurrency || 3;
+      if (this.runningFeatures.size >= maxConcurrency) {
+        throw new Error(
+          `Cannot start: ${this.runningFeatures.size}/${maxConcurrency} agents already running`
+        );
+      }
+    }
+
     // Add to running features immediately to prevent race conditions
     const abortController = new AbortController();
     const tempRunningFeature: RunningFeature = {
