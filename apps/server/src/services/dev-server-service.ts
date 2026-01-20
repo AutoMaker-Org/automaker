@@ -7,13 +7,15 @@
  * Developers should configure their projects to use the PORT environment variable.
  */
 
-import { spawn, execSync, type ChildProcess } from 'child_process';
+import { spawn, exec, type ChildProcess } from 'child_process';
+import { promisify } from 'util';
 import * as secureFs from '../lib/secure-fs.js';
 import path from 'path';
 import net from 'net';
 import { createLogger } from '@automaker/utils';
 import type { EventEmitter } from '../lib/events.js';
 
+const execAsync = promisify(exec);
 const logger = createLogger('DevServerService');
 
 // Maximum scrollback buffer size (characters) - matches TerminalService pattern
@@ -154,13 +156,15 @@ class DevServerService {
    * Killing arbitrary processes was causing issues (e.g., killing the main
    * Automaker server or other unrelated Node processes). Kept for potential
    * manual cleanup use cases in stopDevServer if a process gets stuck.
+   *
+   * This is an async function to avoid blocking the event loop.
    */
-  private killProcessOnPort(port: number): void {
+  private async killProcessOnPort(port: number): Promise<void> {
     try {
       if (process.platform === 'win32') {
         // Windows: find and kill process on port
-        const result = execSync(`netstat -ano | findstr :${port}`, { encoding: 'utf-8' });
-        const lines = result.trim().split('\n');
+        const { stdout } = await execAsync(`netstat -ano | findstr :${port}`);
+        const lines = stdout.trim().split('\n');
         const pids = new Set<string>();
         for (const line of lines) {
           const parts = line.trim().split(/\s+/);
@@ -171,7 +175,7 @@ class DevServerService {
         }
         for (const pid of pids) {
           try {
-            execSync(`taskkill /F /PID ${pid}`, { stdio: 'ignore' });
+            await execAsync(`taskkill /F /PID ${pid}`);
             logger.debug(`Killed process ${pid} on port ${port}`);
           } catch {
             // Process may have already exited
@@ -180,11 +184,11 @@ class DevServerService {
       } else {
         // macOS/Linux: use lsof to find and kill process
         try {
-          const result = execSync(`lsof -ti:${port}`, { encoding: 'utf-8' });
-          const pids = result.trim().split('\n').filter(Boolean);
+          const { stdout } = await execAsync(`lsof -ti:${port}`);
+          const pids = stdout.trim().split('\n').filter(Boolean);
           for (const pid of pids) {
             try {
-              execSync(`kill -9 ${pid}`, { stdio: 'ignore' });
+              await execAsync(`kill -9 ${pid}`);
               logger.debug(`Killed process ${pid} on port ${port}`);
             } catch {
               // Process may have already exited
