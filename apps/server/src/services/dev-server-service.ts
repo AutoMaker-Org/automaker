@@ -43,9 +43,6 @@ export interface DevServerInfo {
 const BASE_PORT = 3001;
 const MAX_PORT = 3099; // Safety limit
 
-// Common livereload ports that may need cleanup when stopping dev servers
-const LIVERELOAD_PORTS = [35729, 35730, 35731] as const;
-
 class DevServerService {
   private runningServers: Map<string, DevServerInfo> = new Map();
   private allocatedPorts: Set<number> = new Set();
@@ -152,7 +149,11 @@ class DevServerService {
   }
 
   /**
-   * Kill any process running on the given port
+   * Kill any process running on the given port.
+   * NOTE: This method is intentionally NOT used during port allocation.
+   * Killing arbitrary processes was causing issues (e.g., killing the main
+   * Automaker server or other unrelated Node processes). Kept for potential
+   * manual cleanup use cases in stopDevServer if a process gets stuck.
    */
   private killProcessOnPort(port: number): void {
     try {
@@ -200,7 +201,8 @@ class DevServerService {
   }
 
   /**
-   * Find the next available port, killing any process on it first
+   * Find the next available port by scanning for unused ports.
+   * Does NOT kill processes - just skips ports that are in use.
    */
   private async findAvailablePort(): Promise<number> {
     let port = BASE_PORT;
@@ -212,17 +214,14 @@ class DevServerService {
         continue;
       }
 
-      // Force kill any process on this port before checking availability
-      // This ensures we can claim the port even if something stale is holding it
-      this.killProcessOnPort(port);
-
-      // Small delay to let the port be released
-      await new Promise((resolve) => setTimeout(resolve, 100));
-
-      // Now check if it's available
+      // Check if port is available (don't kill anything!)
       if (await this.isPortAvailable(port)) {
+        logger.debug(`Found available port: ${port}`);
         return port;
       }
+
+      // Port is in use by another process - skip to next
+      logger.debug(`Port ${port} in use, trying next port`);
       port++;
     }
 
@@ -340,17 +339,12 @@ class DevServerService {
       };
     }
 
-    // Reserve the port (port was already force-killed in findAvailablePort)
+    // Reserve the port
     this.allocatedPorts.add(port);
 
-    // Also kill common related ports (livereload, etc.)
-    // Some dev servers use fixed ports for HMR/livereload regardless of main port
-    for (const relatedPort of LIVERELOAD_PORTS) {
-      this.killProcessOnPort(relatedPort);
-    }
-
-    // Small delay to ensure related ports are freed
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    // NOTE: We no longer kill processes on livereload ports.
+    // If a dev server needs those ports, it will fail with a clear error message.
+    // This is safer than killing potentially unrelated processes.
 
     logger.info(`Starting dev server on port ${port}`);
     logger.debug(`Working directory (cwd): ${worktreePath}`);
