@@ -21,7 +21,12 @@ import type {
   ThinkingLevel,
   PlanningMode,
 } from '@automaker/types';
-import { DEFAULT_PHASE_MODELS, isClaudeModel, stripProviderPrefix } from '@automaker/types';
+import {
+  DEFAULT_GLOBAL_SETTINGS,
+  DEFAULT_PHASE_MODELS,
+  isClaudeModel,
+  stripProviderPrefix,
+} from '@automaker/types';
 import {
   buildPromptWithImages,
   classifyError,
@@ -498,7 +503,11 @@ export class AutoModeService {
     // Check global concurrency limit for manual executions
     // (Auto-mode has its own check in the auto-loop, so skip for isAutoMode)
     if (!isAutoMode) {
-      const maxConcurrency = this.config?.maxConcurrency || 3;
+      const globalSettings = await this.settingsService?.getGlobalSettings();
+      const maxConcurrency =
+        this.config?.maxConcurrency ??
+        globalSettings?.maxConcurrency ??
+        DEFAULT_GLOBAL_SETTINGS.maxConcurrency;
       if (this.runningFeatures.size >= maxConcurrency) {
         throw new Error(
           `Cannot start: ${this.runningFeatures.size}/${maxConcurrency} agents already running`
