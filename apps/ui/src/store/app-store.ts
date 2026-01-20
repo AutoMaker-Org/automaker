@@ -2111,16 +2111,17 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
   },
 
   setRunningTasks: (projectId, taskIds) => {
-    const current = get().autoModeByProject;
-    const projectState = current[projectId] || {
-      isRunning: false,
-      runningTasks: [],
-    };
-    set({
-      autoModeByProject: {
-        ...current,
-        [projectId]: { ...projectState, runningTasks: taskIds },
-      },
+    set((state) => {
+      const projectState = state.autoModeByProject[projectId] || {
+        isRunning: false,
+        runningTasks: [],
+      };
+      return {
+        autoModeByProject: {
+          ...state.autoModeByProject,
+          [projectId]: { ...projectState, runningTasks: taskIds },
+        },
+      };
     });
   },
 
