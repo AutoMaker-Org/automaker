@@ -128,6 +128,7 @@ export function MassEditDialog({
   // Field values
   const [model, setModel] = useState<ModelAlias>('claude-sonnet');
   const [thinkingLevel, setThinkingLevel] = useState<ThinkingLevel>('none');
+  const [providerId, setProviderId] = useState<string | undefined>(undefined);
   const [planningMode, setPlanningMode] = useState<PlanningMode>('skip');
   const [requirePlanApproval, setRequirePlanApproval] = useState(false);
   const [priority, setPriority] = useState(2);
@@ -162,6 +163,7 @@ export function MassEditDialog({
       });
       setModel(getInitialValue(selectedFeatures, 'model', 'claude-sonnet') as ModelAlias);
       setThinkingLevel(getInitialValue(selectedFeatures, 'thinkingLevel', 'none') as ThinkingLevel);
+      setProviderId(undefined); // Features don't store providerId, but we track it after selection
       setPlanningMode(getInitialValue(selectedFeatures, 'planningMode', 'skip') as PlanningMode);
       setRequirePlanApproval(getInitialValue(selectedFeatures, 'requirePlanApproval', false));
       setPriority(getInitialValue(selectedFeatures, 'priority', 2));
@@ -226,10 +228,11 @@ export function MassEditDialog({
               Select a specific model configuration
             </p>
             <PhaseModelSelector
-              value={{ model, thinkingLevel }}
+              value={{ model, thinkingLevel, providerId }}
               onChange={(entry: PhaseModelEntry) => {
                 setModel(entry.model as ModelAlias);
                 setThinkingLevel(entry.thinkingLevel || 'none');
+                setProviderId(entry.providerId);
                 // Auto-enable model and thinking level for apply state
                 setApplyState((prev) => ({
                   ...prev,

@@ -636,10 +636,8 @@ export function BoardView() {
         const result = await api.features.bulkUpdate(currentProject.path, featureIds, finalUpdates);
 
         if (result.success) {
-          // Update local state
-          featureIds.forEach((featureId) => {
-            updateFeature(featureId, finalUpdates);
-          });
+          // Invalidate React Query cache to refetch features with server-updated values
+          loadFeatures();
           toast.success(`Updated ${result.updatedCount} features`);
           exitSelectionMode();
         } else {
@@ -655,7 +653,7 @@ export function BoardView() {
     [
       currentProject,
       selectedFeatureIds,
-      updateFeature,
+      loadFeatures,
       exitSelectionMode,
       getPrimaryWorktreeBranch,
       addAndSelectWorktree,
@@ -783,10 +781,8 @@ export function BoardView() {
       const result = await api.features.bulkUpdate(currentProject.path, featureIds, updates);
 
       if (result.success) {
-        // Update local state for all features
-        featureIds.forEach((featureId) => {
-          updateFeature(featureId, updates);
-        });
+        // Invalidate React Query cache to refetch features with server-updated values
+        loadFeatures();
         toast.success(`Verified ${result.updatedCount} features`);
         exitSelectionMode();
       } else {
@@ -798,7 +794,7 @@ export function BoardView() {
       logger.error('Bulk verify failed:', error);
       toast.error('Failed to verify features');
     }
-  }, [currentProject, selectedFeatureIds, updateFeature, exitSelectionMode]);
+  }, [currentProject, selectedFeatureIds, loadFeatures, exitSelectionMode]);
 
   // Handler for addressing PR comments - creates a feature and starts it automatically
   const handleAddressPRComments = useCallback(

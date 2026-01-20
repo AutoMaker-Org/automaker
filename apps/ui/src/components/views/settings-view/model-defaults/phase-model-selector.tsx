@@ -415,6 +415,44 @@ export function PhaseModelSelector({
       }
     }
 
+    // Fallback: Check ClaudeCompatibleProvider models by model ID only (when providerId is not set)
+    // This handles cases where features store model ID but not providerId
+    for (const provider of enabledProviders) {
+      const providerModel = provider.models?.find((m) => m.id === selectedModel);
+      if (providerModel) {
+        // Count providers of same type to determine if we need provider name suffix
+        const sameTypeCount = enabledProviders.filter(
+          (p) => p.providerType === provider.providerType
+        ).length;
+        const suffix = sameTypeCount > 1 ? ` (${provider.name})` : '';
+        // Add thinking level to label if not 'none'
+        const thinkingLabel =
+          selectedThinkingLevel !== 'none'
+            ? ` (${THINKING_LEVEL_LABELS[selectedThinkingLevel]} Thinking)`
+            : '';
+        // Get icon based on provider type
+        const getIconForProviderType = () => {
+          switch (provider.providerType) {
+            case 'glm':
+              return GlmIcon;
+            case 'minimax':
+              return MiniMaxIcon;
+            case 'openrouter':
+              return OpenRouterIcon;
+            default:
+              return getProviderIconForModel(providerModel.id) || OpenRouterIcon;
+          }
+        };
+        return {
+          id: selectedModel,
+          label: `${providerModel.displayName}${suffix}${thinkingLabel}`,
+          description: provider.name,
+          provider: 'claude-compatible' as const,
+          icon: getIconForProviderType(),
+        };
+      }
+    }
+
     return null;
   }, [
     selectedModel,
