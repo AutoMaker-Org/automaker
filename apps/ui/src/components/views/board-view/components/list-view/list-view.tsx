@@ -42,6 +42,8 @@ export interface ListViewActionHandlers {
   onViewPlan?: (feature: Feature) => void;
   onApprovePlan?: (feature: Feature) => void;
   onSpawnTask?: (feature: Feature) => void;
+  onDuplicate?: (feature: Feature) => void;
+  onDuplicateAsChild?: (feature: Feature) => void;
 }
 
 export interface ListViewProps {
@@ -311,6 +313,18 @@ export const ListView = memo(function ListView({
           ? (id) => {
               const f = allFeatures.find((f) => f.id === id);
               if (f) actionHandlers.onSpawnTask?.(f);
+            }
+          : undefined,
+        duplicate: actionHandlers.onDuplicate
+          ? (id) => {
+              const f = allFeatures.find((f) => f.id === id);
+              if (f) actionHandlers.onDuplicate?.(f);
+            }
+          : undefined,
+        duplicateAsChild: actionHandlers.onDuplicateAsChild
+          ? (id) => {
+              const f = allFeatures.find((f) => f.id === id);
+              if (f) actionHandlers.onDuplicateAsChild?.(f);
             }
           : undefined,
       });

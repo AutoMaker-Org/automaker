@@ -40,23 +40,6 @@ export function createUpdateHandler(featureLoader: FeatureLoader) {
         return;
       }
 
-      // Check for duplicate title if title is being updated
-      if (updates.title && updates.title.trim()) {
-        const duplicate = await featureLoader.findDuplicateTitle(
-          projectPath,
-          updates.title,
-          featureId // Exclude the current feature from duplicate check
-        );
-        if (duplicate) {
-          res.status(409).json({
-            success: false,
-            error: `A feature with title "${updates.title}" already exists`,
-            duplicateFeatureId: duplicate.id,
-          });
-          return;
-        }
-      }
-
       // Get the current feature to detect status changes
       const currentFeature = await featureLoader.get(projectPath, featureId);
       const previousStatus = currentFeature?.status as FeatureStatus | undefined;

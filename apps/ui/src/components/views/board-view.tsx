@@ -590,6 +590,7 @@ export function BoardView() {
     handleForceStopFeature,
     handleStartNextFeatures,
     handleArchiveAllVerified,
+    handleDuplicateFeature,
   } = useBoardActions({
     currentProject,
     features: hookFeatures,
@@ -1465,6 +1466,8 @@ export function BoardView() {
                   setSpawnParentFeature(feature);
                   setShowAddDialog(true);
                 },
+                onDuplicate: (feature) => handleDuplicateFeature(feature, false),
+                onDuplicateAsChild: (feature) => handleDuplicateFeature(feature, true),
               }}
               runningAutoTasks={runningAutoTasks}
               pipelineConfig={pipelineConfig}
@@ -1504,6 +1507,7 @@ export function BoardView() {
                 setSpawnParentFeature(feature);
                 setShowAddDialog(true);
               }}
+              onDuplicate={handleDuplicateFeature}
               featuresWithContext={featuresWithContext}
               runningAutoTasks={runningAutoTasks}
               onArchiveAllVerified={() => setShowArchiveAllVerifiedDialog(true)}

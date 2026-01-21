@@ -52,6 +52,8 @@ interface KanbanCardProps {
   onViewPlan?: () => void;
   onApprovePlan?: () => void;
   onSpawnTask?: () => void;
+  onDuplicate?: () => void;
+  onDuplicateAsChild?: () => void;
   hasContext?: boolean;
   isCurrentAutoTask?: boolean;
   shortcutKey?: string;
@@ -86,6 +88,8 @@ export const KanbanCard = memo(function KanbanCard({
   onViewPlan,
   onApprovePlan,
   onSpawnTask,
+  onDuplicate,
+  onDuplicateAsChild,
   hasContext,
   isCurrentAutoTask,
   shortcutKey,
@@ -249,6 +253,8 @@ export const KanbanCard = memo(function KanbanCard({
         onDelete={onDelete}
         onViewOutput={onViewOutput}
         onSpawnTask={onSpawnTask}
+        onDuplicate={onDuplicate}
+        onDuplicateAsChild={onDuplicateAsChild}
       />
 
       <CardContent className="px-3 pt-0 pb-0">

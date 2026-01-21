@@ -1083,6 +1083,26 @@ export function useBoardActions({
     });
   }, [features, runningAutoTasks, autoMode, updateFeature, persistFeatureUpdate]);
 
+  const handleDuplicateFeature = useCallback(
+    async (feature: Feature, asChild: boolean = false) => {
+      // Copy all feature data, only override id/status (handled by create) and dependencies if as child
+      const { id: _id, status: _status, ...featureData } = feature;
+      const duplicatedFeatureData = {
+        ...featureData,
+        // If duplicating as child, set source as dependency; otherwise keep existing
+        ...(asChild && { dependencies: [feature.id] }),
+      };
+
+      // Reuse the existing handleAddFeature logic
+      await handleAddFeature(duplicatedFeatureData);
+
+      toast.success(asChild ? 'Duplicated as child' : 'Feature duplicated', {
+        description: `Created copy of: ${truncateDescription(feature.description || feature.title || '')}`,
+      });
+    },
+    [handleAddFeature]
+  );
+
   return {
     handleAddFeature,
     handleUpdateFeature,
@@ -1103,5 +1123,6 @@ export function useBoardActions({
     handleForceStopFeature,
     handleStartNextFeatures,
     handleArchiveAllVerified,
+    handleDuplicateFeature,
   };
 }

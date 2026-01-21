@@ -46,6 +46,7 @@ interface KanbanBoardProps {
   onViewPlan: (feature: Feature) => void;
   onApprovePlan: (feature: Feature) => void;
   onSpawnTask?: (feature: Feature) => void;
+  onDuplicate?: (feature: Feature, asChild: boolean) => void;
   featuresWithContext: Set<string>;
   runningAutoTasks: string[];
   onArchiveAllVerified: () => void;
@@ -282,6 +283,7 @@ export function KanbanBoard({
   onViewPlan,
   onApprovePlan,
   onSpawnTask,
+  onDuplicate,
   featuresWithContext,
   runningAutoTasks,
   onArchiveAllVerified,
@@ -569,6 +571,8 @@ export function KanbanBoard({
                                       onViewPlan={() => onViewPlan(feature)}
                                       onApprovePlan={() => onApprovePlan(feature)}
                                       onSpawnTask={() => onSpawnTask?.(feature)}
+                                      onDuplicate={() => onDuplicate?.(feature, false)}
+                                      onDuplicateAsChild={() => onDuplicate?.(feature, true)}
                                       hasContext={featuresWithContext.has(feature.id)}
                                       isCurrentAutoTask={runningAutoTasks.includes(feature.id)}
                                       shortcutKey={shortcutKey}
@@ -611,6 +615,8 @@ export function KanbanBoard({
                                 onViewPlan={() => onViewPlan(feature)}
                                 onApprovePlan={() => onApprovePlan(feature)}
                                 onSpawnTask={() => onSpawnTask?.(feature)}
+                                onDuplicate={() => onDuplicate?.(feature, false)}
+                                onDuplicateAsChild={() => onDuplicate?.(feature, true)}
                                 hasContext={featuresWithContext.has(feature.id)}
                                 isCurrentAutoTask={runningAutoTasks.includes(feature.id)}
                                 shortcutKey={shortcutKey}
