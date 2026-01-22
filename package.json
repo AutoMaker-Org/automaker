@@ -64,8 +64,7 @@
   "dependencies": {
     "cross-spawn": "7.0.6",
     "rehype-sanitize": "6.0.0",
-    "tree-kill": "1.2.2",
-    "fast-xml-parser": "^5.3.3"
+    "tree-kill": "1.2.2"
   },
   "devDependencies": {
     "husky": "9.1.7",
