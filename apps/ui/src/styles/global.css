@@ -199,6 +199,7 @@
   --status-backlog: oklch(0.5 0 0);
   --status-in-progress: oklch(0.7 0.15 70);
   --status-waiting: oklch(0.65 0.18 50);
+  --status-scheduled: oklch(0.55 0.2 290);
 
   /* Shadow tokens */
   --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.05);
@@ -297,6 +298,7 @@
     --status-backlog: oklch(0.6 0 0);
     --status-in-progress: oklch(0.75 0.15 70);
     --status-waiting: oklch(0.7 0.18 50);
+    --status-scheduled: oklch(0.65 0.2 290);
 
     /* Shadow tokens - darker for dark mode */
     --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.3);

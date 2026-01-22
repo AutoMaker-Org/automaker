@@ -167,81 +167,83 @@ export const CardHeaderSection = memo(function CardHeaderSection({
         </div>
       )}
 
-      {/* Backlog header */}
-      {!isCurrentAutoTask && !isSelectionMode && feature.status === 'backlog' && (
-        <div className="absolute top-2 right-2 flex items-center gap-1">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-6 w-6 p-0 hover:bg-white/10 text-muted-foreground hover:text-destructive"
-            onClick={handleDeleteClick}
-            onPointerDown={(e) => e.stopPropagation()}
-            data-testid={`delete-backlog-${feature.id}`}
-          >
-            <Trash2 className="w-4 h-4" />
-          </Button>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-6 w-6 p-0 hover:bg-muted/80 rounded-md"
-                onClick={(e) => e.stopPropagation()}
-                onPointerDown={(e) => e.stopPropagation()}
-                data-testid={`menu-backlog-${feature.id}`}
-              >
-                <MoreVertical className="w-3.5 h-3.5 text-muted-foreground" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-40">
-              <DropdownMenuItem
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onSpawnTask?.();
-                }}
-                data-testid={`spawn-backlog-${feature.id}`}
-                className="text-xs"
-              >
-                <GitFork className="w-3 h-3 mr-2" />
-                Spawn Sub-Task
-              </DropdownMenuItem>
-              {onDuplicate && (
-                <DropdownMenuSub>
-                  <div className="flex items-center">
-                    <DropdownMenuItem
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onDuplicate();
-                      }}
-                      className="text-xs flex-1 pr-0 rounded-r-none"
-                    >
-                      <Copy className="w-3 h-3 mr-2" />
-                      Duplicate
-                    </DropdownMenuItem>
-                    {onDuplicateAsChild && (
-                      <DropdownMenuSubTrigger className="text-xs px-1 rounded-l-none border-l border-border/30 h-8" />
-                    )}
-                  </div>
-                  {onDuplicateAsChild && (
-                    <DropdownMenuSubContent>
+      {/* Backlog and Scheduled header */}
+      {!isCurrentAutoTask &&
+        !isSelectionMode &&
+        (feature.status === 'backlog' || feature.status === 'scheduled') && (
+          <div className="absolute top-2 right-2 flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 w-6 p-0 hover:bg-white/10 text-muted-foreground hover:text-destructive"
+              onClick={handleDeleteClick}
+              onPointerDown={(e) => e.stopPropagation()}
+              data-testid={`delete-${feature.status}-${feature.id}`}
+            >
+              <Trash2 className="w-4 h-4" />
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 w-6 p-0 hover:bg-muted/80 rounded-md"
+                  onClick={(e) => e.stopPropagation()}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  data-testid={`menu-${feature.status}-${feature.id}`}
+                >
+                  <MoreVertical className="w-3.5 h-3.5 text-muted-foreground" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-40">
+                <DropdownMenuItem
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onSpawnTask?.();
+                  }}
+                  data-testid={`spawn-${feature.status}-${feature.id}`}
+                  className="text-xs"
+                >
+                  <GitFork className="w-3 h-3 mr-2" />
+                  Spawn Sub-Task
+                </DropdownMenuItem>
+                {onDuplicate && (
+                  <DropdownMenuSub>
+                    <div className="flex items-center">
                       <DropdownMenuItem
                         onClick={(e) => {
                           e.stopPropagation();
-                          onDuplicateAsChild();
+                          onDuplicate();
                         }}
-                        className="text-xs"
+                        className="text-xs flex-1 pr-0 rounded-r-none"
                       >
-                        <GitFork className="w-3 h-3 mr-2" />
-                        Duplicate as Child
+                        <Copy className="w-3 h-3 mr-2" />
+                        Duplicate
                       </DropdownMenuItem>
-                    </DropdownMenuSubContent>
-                  )}
-                </DropdownMenuSub>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      )}
+                      {onDuplicateAsChild && (
+                        <DropdownMenuSubTrigger className="text-xs px-1 rounded-l-none border-l border-border/30 h-8" />
+                      )}
+                    </div>
+                    {onDuplicateAsChild && (
+                      <DropdownMenuSubContent>
+                        <DropdownMenuItem
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onDuplicateAsChild();
+                          }}
+                          className="text-xs"
+                        >
+                          <GitFork className="w-3 h-3 mr-2" />
+                          Duplicate as Child
+                        </DropdownMenuItem>
+                      </DropdownMenuSubContent>
+                    )}
+                  </DropdownMenuSub>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        )}
 
       {/* Waiting approval / Verified header */}
       {!isCurrentAutoTask &&

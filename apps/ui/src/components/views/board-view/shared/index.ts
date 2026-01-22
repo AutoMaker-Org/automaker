@@ -12,3 +12,4 @@ export * from './ancestor-context-section';
 export * from './work-mode-selector';
 export * from './enhancement';
 export * from './pipeline-exclusion-controls';
+export * from './schedule-selector';

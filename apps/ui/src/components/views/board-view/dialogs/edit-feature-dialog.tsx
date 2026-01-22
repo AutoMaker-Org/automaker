@@ -21,12 +21,17 @@ import {
   FeatureTextFilePath as DescriptionTextFilePath,
   ImagePreviewMap,
 } from '@/components/ui/description-image-dropzone';
-import { GitBranch, Cpu, FolderKanban, Settings2 } from 'lucide-react';
+import { GitBranch, Cpu, FolderKanban, Settings2, CalendarClock } from 'lucide-react';
 import { useNavigate } from '@tanstack/react-router';
 import { toast } from 'sonner';
 import { cn, modelSupportsThinking } from '@/lib/utils';
-import { Feature, ModelAlias, ThinkingLevel, PlanningMode } from '@/store/app-store';
-import type { ReasoningEffort, PhaseModelEntry, DescriptionHistoryEntry } from '@automaker/types';
+import { Feature, ModelAlias, ThinkingLevel, useAppStore, PlanningMode } from '@/store/app-store';
+import type {
+  ReasoningEffort,
+  PhaseModelEntry,
+  DescriptionHistoryEntry,
+  FeatureSchedule
+} from '@automaker/types';
 import { migrateModelId } from '@automaker/types';
 import {
   PrioritySelector,
@@ -35,6 +40,7 @@ import {
   EnhanceWithAI,
   EnhancementHistoryButton,
   PipelineExclusionControls,
+  ScheduleSelector,
   type EnhancementMode,
 } from '../shared';
 import type { WorkMode } from '../shared';
@@ -148,6 +154,9 @@ export function EditFeatureDialog({
     feature?.excludedPipelineSteps ?? []
   );
 
+  // Schedule state - null means explicitly remove schedule (survives JSON serialization)
+  const [schedule, setSchedule] = useState<FeatureSchedule | null | undefined>(feature?.schedule);
+
   useEffect(() => {
     setEditingFeature(feature);
     if (feature) {
@@ -175,6 +184,8 @@ export function EditFeatureDialog({
       setOriginalChildDependencies(childDeps);
       // Reset pipeline exclusion state
       setExcludedPipelineSteps(feature.excludedPipelineSteps ?? []);
+      // Reset schedule state
+      setSchedule(feature.schedule);
     } else {
       setEditFeaturePreviewMap(new Map());
       setDescriptionChangeSource(null);
@@ -184,6 +195,7 @@ export function EditFeatureDialog({
       setChildDependencies([]);
       setOriginalChildDependencies([]);
       setExcludedPipelineSteps([]);
+      setSchedule(undefined);
     }
   }, [feature, allFeatures]);
 
@@ -245,6 +257,7 @@ export function EditFeatureDialog({
       dependencies: parentDependencies,
       childDependencies: childDepsChanged ? childDependencies : undefined,
       excludedPipelineSteps: excludedPipelineSteps.length > 0 ? excludedPipelineSteps : undefined,
+      schedule,
     };
 
     // Determine if description changed and what source to use
@@ -603,6 +616,18 @@ export function EditFeatureDialog({
                 excludedPipelineSteps={excludedPipelineSteps}
                 onExcludedStepsChange={setExcludedPipelineSteps}
                 testIdPrefix="edit-feature-pipeline"
+              />
+            </div>
+            {/* Schedule Section */}
+            <div className={cardClass}>
+              <div className={sectionHeaderClass}>
+                <CalendarClock className="w-4 h-4 text-muted-foreground" />
+                <span>Recurring Schedule</span>
+              </div>
+              <ScheduleSelector
+                value={schedule}
+                onChange={setSchedule}
+                testIdPrefix="edit-feature-schedule"
               />
             </div>
           </div>

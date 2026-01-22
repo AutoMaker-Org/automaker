@@ -207,6 +207,14 @@ export const AgentInfoPanel = memo(function AgentInfoPanel({
     (freshPlanSpec?.tasks?.length ?? 0) > 0 || (feature.planSpec?.tasks?.length ?? 0) > 0;
   const shouldListenToEvents = feature.status === 'in_progress' && hasPlanSpecTasks;
 
+  // Clear taskStatusMap when the feature is no longer running
+  // This prevents stale "in_progress" task states from showing after the feature is stopped
+  useEffect(() => {
+    if (!isCurrentAutoTask) {
+      setTaskStatusMap((prev) => (prev.size > 0 ? new Map() : prev));
+    }
+  }, [isCurrentAutoTask]);
+
   useEffect(() => {
     if (!shouldListenToEvents) return;
 
@@ -249,8 +257,12 @@ export const AgentInfoPanel = memo(function AgentInfoPanel({
     return unsubscribe;
   }, [feature.id, shouldListenToEvents]);
 
-  // Model/Preset Info for Backlog Cards
-  if (feature.status === 'backlog') {
+  // Model/Preset Info for Backlog Cards and non-running Scheduled Cards
+  // Scheduled features that aren't running shouldn't show stale task lists from previous runs
+  const showSimpleModelInfo =
+    feature.status === 'backlog' || (feature.status === 'scheduled' && !isCurrentAutoTask);
+
+  if (showSimpleModelInfo) {
     const provider = getProviderFromModel(feature.model);
     const isCodex = provider === 'codex';
     const isClaude = provider === 'claude';
@@ -286,11 +298,10 @@ export const AgentInfoPanel = memo(function AgentInfoPanel({
     );
   }
 
-  // Agent Info Panel for non-backlog cards
+  // Agent Info Panel for active/completed cards
   // Show panel if we have agentInfo OR planSpec.tasks (for spec/full mode)
   // Note: hasPlanSpecTasks is already defined above and includes freshPlanSpec
-  // (The backlog case was already handled above and returned early)
-  if (agentInfo || hasPlanSpecTasks) {
+  if (feature.status !== 'backlog' && !showSimpleModelInfo && (agentInfo || hasPlanSpecTasks)) {
     return (
       <>
         <div className="mb-3 space-y-2 overflow-hidden">
@@ -308,11 +319,11 @@ export const AgentInfoPanel = memo(function AgentInfoPanel({
                 className={cn(
                   'px-1.5 py-0.5 rounded-md text-[10px] font-medium',
                   agentInfo.currentPhase === 'planning' &&
-                    'bg-[var(--status-info-bg)] text-[var(--status-info)]',
+                  'bg-[var(--status-info-bg)] text-[var(--status-info)]',
                   agentInfo.currentPhase === 'action' &&
-                    'bg-[var(--status-warning-bg)] text-[var(--status-warning)]',
+                  'bg-[var(--status-warning-bg)] text-[var(--status-warning)]',
                   agentInfo.currentPhase === 'verification' &&
-                    'bg-[var(--status-success-bg)] text-[var(--status-success)]'
+                  'bg-[var(--status-success-bg)] text-[var(--status-success)]'
                 )}
               >
                 {agentInfo.currentPhase}

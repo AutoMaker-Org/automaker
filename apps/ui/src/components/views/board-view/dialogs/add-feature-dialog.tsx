@@ -21,14 +21,26 @@ import {
   FeatureTextFilePath as DescriptionTextFilePath,
   ImagePreviewMap,
 } from '@/components/ui/description-image-dropzone';
-import { Play, Cpu, FolderKanban, Settings2 } from 'lucide-react';
+import { Play, Cpu, FolderKanban, Settings2, CalendarClock } from 'lucide-react';
 import { useNavigate } from '@tanstack/react-router';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { modelSupportsThinking } from '@/lib/utils';
-import { useAppStore, ThinkingLevel, FeatureImage, PlanningMode, Feature } from '@/store/app-store';
-import type { ReasoningEffort, PhaseModelEntry, AgentModel } from '@automaker/types';
-import { supportsReasoningEffort } from '@automaker/types';
+import {
+  useAppStore,
+  ModelAlias,
+  ThinkingLevel,
+  FeatureImage,
+  PlanningMode,
+  Feature,
+} from '@/store/app-store';
+import type {
+  ReasoningEffort,
+  PhaseModelEntry,
+  AgentModel,
+  FeatureSchedule
+} from '@automaker/types';
+import { supportsReasoningEffort, isClaudeModel } from '@automaker/types';
 import {
   PrioritySelector,
   WorkModeSelector,
@@ -37,6 +49,7 @@ import {
   EnhanceWithAI,
   EnhancementHistoryButton,
   PipelineExclusionControls,
+  ScheduleSelector,
   type BaseHistoryEntry,
 } from '../shared';
 import type { WorkMode } from '../shared';
@@ -93,6 +106,7 @@ type FeatureData = {
   childDependencies?: string[]; // Feature IDs that should depend on this feature
   excludedPipelineSteps?: string[]; // Pipeline step IDs to skip for this feature
   workMode: WorkMode;
+  schedule?: FeatureSchedule;
 };
 
 interface AddFeatureDialogProps {
@@ -190,6 +204,9 @@ export function AddFeatureDialog({
   // Pipeline exclusion state
   const [excludedPipelineSteps, setExcludedPipelineSteps] = useState<string[]>([]);
 
+  // Schedule state (optional) - null means explicitly no schedule
+  const [schedule, setSchedule] = useState<FeatureSchedule | null | undefined>(undefined);
+
   // Get defaults from store
   const {
     defaultPlanningMode,
@@ -238,6 +255,9 @@ export function AddFeatureDialog({
       // Reset dependency selections
       setParentDependencies([]);
       setChildDependencies([]);
+
+      // Reset schedule
+      setSchedule(undefined);
 
       // Reset pipeline exclusions (all pipelines enabled by default)
       setExcludedPipelineSteps([]);
@@ -344,6 +364,7 @@ export function AddFeatureDialog({
       childDependencies: childDependencies.length > 0 ? childDependencies : undefined,
       excludedPipelineSteps: excludedPipelineSteps.length > 0 ? excludedPipelineSteps : undefined,
       workMode,
+      schedule,
     };
   };
 
@@ -369,6 +390,7 @@ export function AddFeatureDialog({
     setDescriptionHistory([]);
     setParentDependencies([]);
     setChildDependencies([]);
+    setSchedule(undefined);
     setExcludedPipelineSteps([]);
     onOpenChange(false);
   };
@@ -686,6 +708,19 @@ export function AddFeatureDialog({
                 testIdPrefix="add-feature-pipeline"
               />
             </div>
+          </div>
+
+          {/* Recurring Schedule Section (optional) */}
+          <div className={cardClass}>
+            <div className={sectionHeaderClass}>
+              <CalendarClock className="w-4 h-4 text-muted-foreground" />
+              <span>Recurring Schedule (Optional)</span>
+            </div>
+            <ScheduleSelector
+              value={schedule}
+              onChange={setSchedule}
+              testIdPrefix="add-feature-schedule"
+            />
           </div>
         </div>
 

@@ -3,6 +3,7 @@
  */
 
 import type { Request, Response } from 'express';
+import { CronExpressionParser } from 'cron-parser';
 import { FeatureLoader } from '../../../services/feature-loader.js';
 import type { Feature, FeatureStatus } from '@automaker/types';
 import { getErrorMessage, logError } from '../common.js';
@@ -44,6 +45,50 @@ export function createUpdateHandler(featureLoader: FeatureLoader) {
       const currentFeature = await featureLoader.get(projectPath, featureId);
       const previousStatus = currentFeature?.status as FeatureStatus | undefined;
       const newStatus = updates.status as FeatureStatus | undefined;
+
+      // Handle schedule updates
+      // Check if schedule is being removed or disabled
+      const isScheduleBeingRemoved =
+        'schedule' in updates &&
+        (updates.schedule === undefined ||
+          updates.schedule === null ||
+          updates.schedule?.enabled === false);
+
+      if (isScheduleBeingRemoved) {
+        // If currently scheduled, move back to backlog
+        if (currentFeature?.status === 'scheduled') {
+          updates.status = 'backlog';
+          logger.debug(
+            `Moving feature ${featureId} from 'scheduled' to 'backlog' (schedule removed/disabled)`
+          );
+        }
+        // Clear the schedule
+        updates.schedule = undefined;
+      } else if (updates.schedule?.enabled && updates.schedule?.crontab) {
+        // Calculate nextRun if schedule is being updated and enabled
+        try {
+          const interval = CronExpressionParser.parse(updates.schedule.crontab, {
+            currentDate: new Date(),
+          });
+          const nextRun = interval.next().toDate();
+          updates.schedule = {
+            ...updates.schedule,
+            nextRun: nextRun.toISOString(),
+          };
+          // If enabling a schedule on a feature that's not in_progress, move it to 'scheduled'
+          const currentStatus = currentFeature?.status;
+          if (currentStatus && currentStatus !== 'in_progress' && currentStatus !== 'scheduled') {
+            updates.status = 'scheduled';
+            logger.debug(`Moving feature ${featureId} to 'scheduled' status`);
+          }
+          logger.debug(`Calculated nextRun for feature ${featureId}: ${nextRun.toISOString()}`);
+        } catch (err) {
+          logger.warn(
+            `Invalid crontab expression for feature ${featureId}: ${updates.schedule.crontab}`,
+            err
+          );
+        }
+      }
 
       const updated = await featureLoader.update(
         projectPath,

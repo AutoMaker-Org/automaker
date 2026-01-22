@@ -34,6 +34,7 @@ export function useBoardColumnFeatures({
       in_progress: [],
       waiting_approval: [],
       verified: [],
+      scheduled: [], // Features with recurring schedules
       completed: [], // Completed features are shown in the archive modal, not as a column
     };
     const featureMap = createFeatureMap(features);
@@ -128,9 +129,10 @@ export function useBoardColumnFeatures({
           return;
         }
 
-        // If it's running and has a known non-backlog status, keep it in that status.
+        // If it's running and has a known non-backlog/non-scheduled status, keep it in that status.
+        // Running scheduled features should move to in_progress (they're actively running, not waiting).
         // Otherwise, fallback to in_progress as the "active work" column.
-        if (status !== 'backlog' && map[status]) {
+        if (status !== 'backlog' && status !== 'scheduled' && map[status]) {
           map[status].push(f);
         } else {
           map.in_progress.push(f);

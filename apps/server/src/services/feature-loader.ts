@@ -451,6 +451,12 @@ export class FeatureLoader {
       descriptionHistory: updatedHistory,
     };
 
+    // Explicitly remove schedule if it's undefined/null (to ensure it's removed from JSON)
+    // This handles the case where schedule is being explicitly cleared
+    if (updatedFeature.schedule === undefined || updatedFeature.schedule === null) {
+      delete (updatedFeature as Partial<Feature>).schedule;
+    }
+
     // Write back to file atomically with backup support
     const featureJsonPath = this.getFeatureJsonPath(projectPath, featureId);
     await atomicWriteJson(featureJsonPath, updatedFeature, { backupCount: DEFAULT_BACKUP_COUNT });
@@ -526,6 +532,20 @@ export class FeatureLoader {
     try {
       const agentOutputPath = this.getAgentOutputPath(projectPath, featureId);
       await secureFs.unlink(agentOutputPath);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+        throw error;
+      }
+    }
+  }
+
+  /**
+   * Delete raw output for a feature
+   */
+  async deleteRawOutput(projectPath: string, featureId: string): Promise<void> {
+    try {
+      const rawOutputPath = this.getRawOutputPath(projectPath, featureId);
+      await secureFs.unlink(rawOutputPath);
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
         throw error;

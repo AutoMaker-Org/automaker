@@ -9,11 +9,13 @@
  * - Verification and merge workflows
  */
 
+import { CronExpressionParser } from 'cron-parser';
 import { ProviderFactory } from '../providers/provider-factory.js';
 import { simpleQuery } from '../providers/simple-query-service.js';
 import type {
   ExecuteOptions,
   Feature,
+  FeatureSchedule,
   ModelProvider,
   PipelineStep,
   FeatureStatusWithPipeline,
@@ -772,6 +774,103 @@ export class AutoModeService {
    */
   private recordSuccess(): void {
     this.consecutiveFailures = [];
+  }
+
+  /**
+   * Determine the final status for a completed feature
+   * Takes into account:
+   * - skipTests setting (manual vs automated verification)
+   * - schedule configuration (recurring features go to 'scheduled')
+   *
+   * @returns Object containing the final status and updated schedule if applicable
+   */
+  private async determineFinalStatus(
+    projectPath: string,
+    feature: Feature
+  ): Promise<{
+    status: FeatureStatusWithPipeline;
+    updatedSchedule?: FeatureSchedule;
+  }> {
+    // If feature has an active schedule, move to 'scheduled' status
+    if (feature.schedule?.enabled) {
+      const now = new Date();
+      let nextRun: Date | null = null;
+
+      try {
+        const interval = CronExpressionParser.parse(feature.schedule.crontab, {
+          currentDate: now,
+        });
+        nextRun = interval.next().toDate();
+      } catch (err) {
+        logger.warn(`Invalid crontab for feature ${feature.id}: ${feature.schedule.crontab}`);
+      }
+
+      const updatedSchedule: FeatureSchedule = {
+        ...feature.schedule,
+        lastRun: now.toISOString(),
+        nextRun: nextRun?.toISOString(),
+        runCount: (feature.schedule.runCount || 0) + 1,
+      };
+
+      logger.info(
+        `Feature ${feature.id} completed with schedule. Next run: ${nextRun?.toISOString() || 'unknown'}`
+      );
+
+      return {
+        status: 'scheduled',
+        updatedSchedule,
+      };
+    }
+
+    // No schedule - use normal flow based on testing mode
+    const status = feature.skipTests ? 'waiting_approval' : 'verified';
+    return { status };
+  }
+
+  /**
+   * Determine final status for an aborted/errored scheduled feature.
+   * Similar to determineFinalStatus but doesn't increment runCount since the feature
+   * was stopped/errored, not completed successfully.
+   */
+  private async determineFinalStatusForAbort(
+    projectPath: string,
+    feature: Feature
+  ): Promise<{
+    status: FeatureStatusWithPipeline;
+    updatedSchedule?: FeatureSchedule;
+  }> {
+    // If feature has an active schedule, move to 'scheduled' status
+    if (feature.schedule?.enabled) {
+      const now = new Date();
+      let nextRun: Date | null = null;
+
+      try {
+        const interval = CronExpressionParser.parse(feature.schedule.crontab, {
+          currentDate: now,
+        });
+        nextRun = interval.next().toDate();
+      } catch (err) {
+        logger.warn(`Invalid crontab for feature ${feature.id}: ${feature.schedule.crontab}`);
+      }
+
+      // Don't increment runCount for aborted/errored features
+      const updatedSchedule: FeatureSchedule = {
+        ...feature.schedule,
+        nextRun: nextRun?.toISOString(),
+      };
+
+      logger.info(
+        `Feature ${feature.id} aborted/errored with schedule. Next run: ${nextRun?.toISOString() || 'unknown'}`
+      );
+
+      return {
+        status: 'scheduled',
+        updatedSchedule,
+      };
+    }
+
+    // No schedule - return backlog for non-scheduled features
+    return { status: 'backlog' };
   }
 
   private async resolveMaxConcurrency(
@@ -1569,11 +1668,23 @@ export class AutoModeService {
         );
       }
 
-      // Determine final status based on testing mode:
+      // Determine final status based on testing mode and schedule:
+      // - Features with schedule go to 'scheduled'
       // - skipTests=false (automated testing): go directly to 'verified' (no manual verify needed)
       // - skipTests=true (manual verification): go to 'waiting_approval' for manual review
-      const finalStatus = feature.skipTests ? 'waiting_approval' : 'verified';
-      await this.updateFeatureStatus(projectPath, featureId, finalStatus);
+      const { status: finalStatus, updatedSchedule } = await this.determineFinalStatus(
+        projectPath,
+        feature
+      );
+      if (updatedSchedule) {
+        // Update the feature with the new schedule information
+        await this.featureLoader.update(projectPath, featureId, {
+          status: finalStatus,
+          schedule: updatedSchedule,
+        });
+      } else {
+        await this.updateFeatureStatus(projectPath, featureId, finalStatus);
+      }
 
       // Record success to reset consecutive failure tracking
       this.recordSuccess();
@@ -1633,6 +1744,20 @@ export class AutoModeService {
       const errorInfo = classifyError(error);
 
       if (errorInfo.isAbort) {
+        // Handle status update on server (don't rely on UI)
+        // Scheduled features go back to 'scheduled', others go to 'backlog'
+        const { status, updatedSchedule } = await this.determineFinalStatusForAbort(
+          projectPath,
+          feature!
+        );
+        if (updatedSchedule) {
+          await this.featureLoader.update(projectPath, featureId, {
+            status,
+            schedule: updatedSchedule,
+          });
+        } else {
+          await this.updateFeatureStatus(projectPath, featureId, status);
+        }
         this.emitAutoModeEvent('auto_mode_feature_complete', {
           featureId,
           featureName: feature?.title,
@@ -1643,7 +1768,20 @@ export class AutoModeService {
         });
       } else {
         logger.error(`Feature ${featureId} failed:`, error);
-        await this.updateFeatureStatus(projectPath, featureId, 'backlog');
+        // Handle status update on server
+        // Scheduled features go back to 'scheduled', others go to 'backlog'
+        const { status, updatedSchedule } = await this.determineFinalStatusForAbort(
+          projectPath,
+          feature!
+        );
+        if (updatedSchedule) {
+          await this.featureLoader.update(projectPath, featureId, {
+            status,
+            schedule: updatedSchedule,
+          });
+        } else {
+          await this.updateFeatureStatus(projectPath, featureId, status);
+        }
         this.emitAutoModeEvent('auto_mode_error', {
           featureId,
           featureName: feature?.title,
@@ -1848,8 +1986,11 @@ Complete the pipeline step instructions above. Review the previous work and appl
 
     // Cancel any pending plan approval for this feature
     this.cancelPlanApproval(featureId);
-
-    running.abortController.abort();
+    try {
+      running.abortController.abort();
+    } catch (error) {
+      logger.error(`Error aborting feature ${featureId}:`, error);
+    }
 
     // Remove from running features immediately to allow resume
     // The abort signal will still propagate to stop any ongoing execution
@@ -2035,9 +2176,18 @@ Complete the pipeline step instructions above. Review the previous work and appl
         `[AutoMode] Step ${pipelineInfo.stepId} no longer exists in pipeline, completing feature without pipeline`
       );
 
-      const finalStatus = feature.skipTests ? 'waiting_approval' : 'verified';
-
-      await this.updateFeatureStatus(projectPath, featureId, finalStatus);
+      const { status: finalStatus, updatedSchedule } = await this.determineFinalStatus(
+        projectPath,
+        feature
+      );
+      if (updatedSchedule) {
+        await this.featureLoader.update(projectPath, featureId, {
+          status: finalStatus,
+          schedule: updatedSchedule,
+        });
+      } else {
+        await this.updateFeatureStatus(projectPath, featureId, finalStatus);
+      }
 
       this.emitAutoModeEvent('auto_mode_feature_complete', {
         featureId,
@@ -2242,9 +2392,19 @@ Complete the pipeline step instructions above. Review the previous work and appl
         autoLoadClaudeMd
       );
 
-      // Determine final status
-      const finalStatus = feature.skipTests ? 'waiting_approval' : 'verified';
-      await this.updateFeatureStatus(projectPath, featureId, finalStatus);
+      // Determine final status (considers schedule)
+      const { status: finalStatus, updatedSchedule } = await this.determineFinalStatus(
+        projectPath,
+        feature
+      );
+      if (updatedSchedule) {
+        await this.featureLoader.update(projectPath, featureId, {
+          status: finalStatus,
+          schedule: updatedSchedule,
+        });
+      } else {
+        await this.updateFeatureStatus(projectPath, featureId, finalStatus);
+      }
 
       logger.info(`Pipeline resume completed successfully for feature ${featureId}`);
 
@@ -2253,13 +2413,30 @@ Complete the pipeline step instructions above. Review the previous work and appl
         featureName: feature.title,
         branchName: feature.branchName ?? null,
         passes: true,
-        message: 'Pipeline resumed and completed successfully',
+        message:
+          finalStatus === 'scheduled'
+            ? 'Pipeline resumed and scheduled for next run'
+            : 'Pipeline resumed and completed successfully',
         projectPath,
       });
     } catch (error) {
       const errorInfo = classifyError(error);
 
       if (errorInfo.isAbort) {
+        // Handle status update on server (don't rely on UI)
+        // Scheduled features go back to 'scheduled', others go to 'backlog'
+        const { status, updatedSchedule } = await this.determineFinalStatusForAbort(
+          projectPath,
+          feature
+        );
+        if (updatedSchedule) {
+          await this.featureLoader.update(projectPath, featureId, {
+            status,
+            schedule: updatedSchedule,
+          });
+        } else {
+          await this.updateFeatureStatus(projectPath, featureId, status);
+        }
         this.emitAutoModeEvent('auto_mode_feature_complete', {
           featureId,
           featureName: feature.title,
@@ -2270,7 +2447,20 @@ Complete the pipeline step instructions above. Review the previous work and appl
         });
       } else {
         logger.error(`Pipeline resume failed for feature ${featureId}:`, error);
-        await this.updateFeatureStatus(projectPath, featureId, 'backlog');
+        // Handle status update on server
+        // Scheduled features go back to 'scheduled', others go to 'backlog'
+        const { status, updatedSchedule } = await this.determineFinalStatusForAbort(
+          projectPath,
+          feature
+        );
+        if (updatedSchedule) {
+          await this.featureLoader.update(projectPath, featureId, {
+            status,
+            schedule: updatedSchedule,
+          });
+        } else {
+          await this.updateFeatureStatus(projectPath, featureId, status);
+        }
         this.emitAutoModeEvent('auto_mode_error', {
           featureId,
           featureName: feature.title,
@@ -2491,11 +2681,27 @@ Address the follow-up instructions above. Review the previous work and make the 
         }
       );
 
-      // Determine final status based on testing mode:
+      // Determine final status based on testing mode and schedule:
+      // - Features with schedule go to 'scheduled'
       // - skipTests=false (automated testing): go directly to 'verified' (no manual verify needed)
       // - skipTests=true (manual verification): go to 'waiting_approval' for manual review
-      const finalStatus = feature?.skipTests ? 'waiting_approval' : 'verified';
-      await this.updateFeatureStatus(projectPath, featureId, finalStatus);
+      let finalStatus: FeatureStatusWithPipeline = feature?.skipTests
+        ? 'waiting_approval'
+        : 'verified';
+      if (feature) {
+        const { status, updatedSchedule } = await this.determineFinalStatus(projectPath, feature);
+        finalStatus = status;
+        if (updatedSchedule) {
+          await this.featureLoader.update(projectPath, featureId, {
+            status: finalStatus,
+            schedule: updatedSchedule,
+          });
+        } else {
+          await this.updateFeatureStatus(projectPath, featureId, finalStatus);
+        }
+      } else {
+        await this.updateFeatureStatus(projectPath, featureId, finalStatus);
+      }
 
       // Record success to reset consecutive failure tracking
       this.recordSuccess();
@@ -2505,7 +2711,7 @@ Address the follow-up instructions above. Review the previous work and make the 
         featureName: feature?.title,
         branchName: branchName ?? null,
         passes: true,
-        message: `Follow-up completed successfully${finalStatus === 'verified' ? ' - auto-verified' : ''}`,
+        message: `Follow-up completed successfully${finalStatus === 'verified' ? ' - auto-verified' : finalStatus === 'scheduled' ? ' - scheduled for next run' : ''}`,
         projectPath,
         model,
         provider,

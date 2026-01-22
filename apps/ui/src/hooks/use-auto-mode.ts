@@ -1,9 +1,11 @@
 import { useEffect, useCallback, useMemo } from 'react';
 import { useShallow } from 'zustand/react/shallow';
+import { useQueryClient } from '@tanstack/react-query';
 import { createLogger } from '@automaker/utils/logger';
 import { DEFAULT_MAX_CONCURRENCY } from '@automaker/types';
 import { useAppStore } from '@/store/app-store';
 import { getElectronAPI } from '@/lib/electron';
+import { queryKeys } from '@/lib/query-keys';
 import type { AutoModeEvent } from '@/types/electron';
 import type { WorktreeInfo } from '@/components/views/board-view/worktree-panel/types';
 import { getGlobalEventsRecent } from '@/hooks/use-event-recency';
@@ -72,6 +74,7 @@ export function useAutoMode(worktree?: WorktreeInfo) {
     setAutoModeRunning,
     addRunningTask,
     removeRunningTask,
+    removeRunningTaskFromAllWorktrees,
     currentProject,
     addAutoModeActivity,
     projects,
@@ -86,6 +89,7 @@ export function useAutoMode(worktree?: WorktreeInfo) {
       setAutoModeRunning: state.setAutoModeRunning,
       addRunningTask: state.addRunningTask,
       removeRunningTask: state.removeRunningTask,
+      removeRunningTaskFromAllWorktrees: state.removeRunningTaskFromAllWorktrees,
       currentProject: state.currentProject,
       addAutoModeActivity: state.addAutoModeActivity,
       projects: state.projects,
@@ -96,6 +100,9 @@ export function useAutoMode(worktree?: WorktreeInfo) {
       isPrimaryWorktreeBranch: state.isPrimaryWorktreeBranch,
     }))
   );
+
+  // Get query client for invalidating features when events are received
+  const queryClient = useQueryClient();
 
   // Derive branchName from worktree:
   // If worktree is provided, use its branch name (even for main worktree, as it might be on a feature branch)
@@ -290,14 +297,23 @@ export function useAutoMode(worktree?: WorktreeInfo) {
               type: 'start',
               message: `Started working on feature`,
             });
+            // Invalidate features query to refresh feature status (e.g., scheduled -> in_progress)
+            // This ensures UI updates when scheduler triggers a feature
+            const projectPath = 'projectPath' in event ? event.projectPath : currentProject?.path;
+            if (projectPath) {
+              queryClient.invalidateQueries({ queryKey: queryKeys.features.all(projectPath) });
+            }
           }
           break;
 
         case 'auto_mode_feature_complete':
-          // Feature completed - remove from running tasks and UI will reload features on its own
+          // Feature completed - remove from running tasks and refresh features
           if (event.featureId) {
             logger.info('Feature completed:', event.featureId, 'passes:', event.passes);
-            removeRunningTask(eventProjectId, eventBranchName, event.featureId);
+            // Use removeFromAllWorktrees to ensure removal regardless of worktree state
+            if (eventProjectId) {
+              removeRunningTaskFromAllWorktrees(eventProjectId, event.featureId);
+            }
             addAutoModeActivity({
               featureId: event.featureId,
               type: 'complete',
@@ -306,6 +322,12 @@ export function useAutoMode(worktree?: WorktreeInfo) {
                 : 'Feature completed with failures',
               passes: event.passes,
             });
+            // Invalidate features query to refresh feature status
+            // This ensures scheduled features move back to 'scheduled' column after completion
+            const projectPath = 'projectPath' in event ? event.projectPath : currentProject?.path;
+            if (projectPath) {
+              queryClient.invalidateQueries({ queryKey: queryKeys.features.all(projectPath) });
+            }
           }
           break;
 
@@ -315,9 +337,9 @@ export function useAutoMode(worktree?: WorktreeInfo) {
             if (event.errorType === 'cancellation' || event.errorType === 'abort') {
               // User cancelled/aborted the feature - just log as info, not an error
               logger.info('Feature cancelled/aborted:', event.error);
-              // Remove from running tasks
+              // Remove from running tasks - use removeFromAllWorktrees to ensure removal
               if (eventProjectId) {
-                removeRunningTask(eventProjectId, eventBranchName, event.featureId);
+                removeRunningTaskFromAllWorktrees(eventProjectId, event.featureId);
               }
               break;
             }
@@ -342,9 +364,9 @@ export function useAutoMode(worktree?: WorktreeInfo) {
               errorType: isAuthError ? 'authentication' : 'execution',
             });
 
-            // Remove the task from running since it failed
+            // Remove the task from running since it failed - use removeFromAllWorktrees to ensure removal
             if (eventProjectId) {
-              removeRunningTask(eventProjectId, eventBranchName, event.featureId);
+              removeRunningTaskFromAllWorktrees(eventProjectId, event.featureId);
             }
           }
           break;
@@ -541,6 +563,7 @@ export function useAutoMode(worktree?: WorktreeInfo) {
     projectId,
     addRunningTask,
     removeRunningTask,
+    removeRunningTaskFromAllWorktrees,
     addAutoModeActivity,
     getProjectIdFromPath,
     setPendingPlanApproval,
@@ -549,6 +572,7 @@ export function useAutoMode(worktree?: WorktreeInfo) {
     getMaxConcurrencyForWorktree,
     setMaxConcurrencyForWorktree,
     isPrimaryWorktreeBranch,
+    queryClient,
   ]);
 
   // Start auto mode - calls backend to start the auto loop for this worktree
@@ -657,7 +681,10 @@ export function useAutoMode(worktree?: WorktreeInfo) {
         const result = await api.autoMode.stopFeature(featureId);
 
         if (result.success) {
-          removeRunningTask(currentProject.id, branchName, featureId);
+          // Use removeFromAllWorktrees to ensure the task is removed regardless of which
+          // worktree it was running in (the feature may be on a different branch than
+          // the currently selected worktree)
+          removeRunningTaskFromAllWorktrees(currentProject.id, featureId);
           logger.info('Feature stopped successfully:', featureId);
           addAutoModeActivity({
             featureId,
@@ -674,7 +701,7 @@ export function useAutoMode(worktree?: WorktreeInfo) {
         throw error;
       }
     },
-    [currentProject, branchName, removeRunningTask, addAutoModeActivity]
+    [currentProject, removeRunningTaskFromAllWorktrees, addAutoModeActivity]
   );
 
   return {

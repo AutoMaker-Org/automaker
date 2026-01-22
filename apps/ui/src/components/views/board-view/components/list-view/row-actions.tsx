@@ -133,11 +133,11 @@ function getPrimaryAction(
     return null;
   }
 
-  // Backlog - implement is primary
-  if (feature.status === 'backlog' && handlers.onImplement) {
+  // Backlog or Scheduled - implement is primary
+  if ((feature.status === 'backlog' || feature.status === 'scheduled') && handlers.onImplement) {
     return {
       icon: PlayCircle,
-      label: 'Make',
+      label: feature.status === 'scheduled' ? 'Run Now' : 'Make',
       onClick: handlers.onImplement,
       variant: 'primary',
     };
@@ -389,62 +389,63 @@ export const RowActions = memo(function RowActions({
             </>
           )}
 
-          {/* Backlog actions */}
-          {!isCurrentAutoTask && feature.status === 'backlog' && (
-            <>
-              <MenuItem icon={Edit} label="Edit" onClick={withClose(handlers.onEdit)} />
-              {feature.planSpec?.content && handlers.onViewPlan && (
-                <MenuItem icon={Eye} label="View Plan" onClick={withClose(handlers.onViewPlan)} />
-              )}
-              {handlers.onImplement && (
-                <MenuItem
-                  icon={PlayCircle}
-                  label="Make"
-                  onClick={withClose(handlers.onImplement)}
-                  variant="primary"
-                />
-              )}
-              {handlers.onSpawnTask && (
-                <MenuItem
-                  icon={GitFork}
-                  label="Spawn Sub-Task"
-                  onClick={withClose(handlers.onSpawnTask)}
-                />
-              )}
-              {handlers.onDuplicate && (
-                <DropdownMenuSub>
-                  <div className="flex items-center">
-                    <DropdownMenuItem
-                      onClick={withClose(handlers.onDuplicate)}
-                      className="flex-1 pr-0 rounded-r-none"
-                    >
-                      <Copy className="w-4 h-4 mr-2" />
-                      Duplicate
-                    </DropdownMenuItem>
+          {/* Backlog and Scheduled actions */}
+          {!isCurrentAutoTask &&
+            (feature.status === 'backlog' || feature.status === 'scheduled') && (
+              <>
+                <MenuItem icon={Edit} label="Edit" onClick={withClose(handlers.onEdit)} />
+                {feature.planSpec?.content && handlers.onViewPlan && (
+                  <MenuItem icon={Eye} label="View Plan" onClick={withClose(handlers.onViewPlan)} />
+                )}
+                {handlers.onImplement && (
+                  <MenuItem
+                    icon={PlayCircle}
+                    label={feature.status === 'scheduled' ? 'Run Now' : 'Make'}
+                    onClick={withClose(handlers.onImplement)}
+                    variant="primary"
+                  />
+                )}
+                {handlers.onSpawnTask && (
+                  <MenuItem
+                    icon={GitFork}
+                    label="Spawn Sub-Task"
+                    onClick={withClose(handlers.onSpawnTask)}
+                  />
+                )}
+                {handlers.onDuplicate && (
+                  <DropdownMenuSub>
+                    <div className="flex items-center">
+                      <DropdownMenuItem
+                        onClick={withClose(handlers.onDuplicate)}
+                        className="flex-1 pr-0 rounded-r-none"
+                      >
+                        <Copy className="w-4 h-4 mr-2" />
+                        Duplicate
+                      </DropdownMenuItem>
+                      {handlers.onDuplicateAsChild && (
+                        <DropdownMenuSubTrigger className="px-1 rounded-l-none border-l border-border/30 h-8" />
+                      )}
+                    </div>
                     {handlers.onDuplicateAsChild && (
-                      <DropdownMenuSubTrigger className="px-1 rounded-l-none border-l border-border/30 h-8" />
+                      <DropdownMenuSubContent>
+                        <MenuItem
+                          icon={GitFork}
+                          label="Duplicate as Child"
+                          onClick={withClose(handlers.onDuplicateAsChild)}
+                        />
+                      </DropdownMenuSubContent>
                     )}
-                  </div>
-                  {handlers.onDuplicateAsChild && (
-                    <DropdownMenuSubContent>
-                      <MenuItem
-                        icon={GitFork}
-                        label="Duplicate as Child"
-                        onClick={withClose(handlers.onDuplicateAsChild)}
-                      />
-                    </DropdownMenuSubContent>
-                  )}
-                </DropdownMenuSub>
-              )}
-              <DropdownMenuSeparator />
-              <MenuItem
-                icon={Trash2}
-                label="Delete"
-                onClick={withClose(handlers.onDelete)}
-                variant="destructive"
-              />
-            </>
-          )}
+                  </DropdownMenuSub>
+                )}
+                <DropdownMenuSeparator />
+                <MenuItem
+                  icon={Trash2}
+                  label="Delete"
+                  onClick={withClose(handlers.onDelete)}
+                  variant="destructive"
+                />
+              </>
+            )}
 
           {/* In Progress actions */}
           {!isCurrentAutoTask && feature.status === 'in_progress' && (

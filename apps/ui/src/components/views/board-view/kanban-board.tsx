@@ -303,7 +303,26 @@ export function KanbanBoard({
   className,
 }: KanbanBoardProps) {
   // Generate columns including pipeline steps
-  const columns = useMemo(() => getColumnsWithPipeline(pipelineConfig), [pipelineConfig]);
+  // Filter out scheduled column if it has no features (and no features have schedules)
+  const columns = useMemo(() => {
+    const allColumns = getColumnsWithPipeline(pipelineConfig);
+    const scheduledFeatures = getColumnFeatures('scheduled' as ColumnId);
+
+    // Check if any features in other columns have schedules
+    const hasScheduledFeatures =
+      scheduledFeatures.length > 0 ||
+      ['backlog', 'in_progress', 'waiting_approval', 'verified'].some((colId) => {
+        const features = getColumnFeatures(colId as ColumnId);
+        return features.some((f) => f.schedule?.enabled);
+      });
+
+    // Hide scheduled column if there are no scheduled features
+    if (!hasScheduledFeatures) {
+      return allColumns.filter((col) => col.id !== 'scheduled');
+    }
+
+    return allColumns;
+  }, [pipelineConfig, getColumnFeatures]);
 
   // Get the keyboard shortcut for adding features
   const keyboardShortcuts = useAppStore((state) => state.keyboardShortcuts);

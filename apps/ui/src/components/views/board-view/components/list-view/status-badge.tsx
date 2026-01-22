@@ -207,6 +207,7 @@ export function getStatusOrder(status: FeatureStatusWithPipeline): number {
     in_progress: 1,
     waiting_approval: 2,
     verified: 3,
+    scheduled: 4,
   };
 
   if (isPipelineStatus(status)) {

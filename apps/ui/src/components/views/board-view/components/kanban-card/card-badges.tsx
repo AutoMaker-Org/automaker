@@ -3,7 +3,7 @@ import { memo, useEffect, useMemo, useState } from 'react';
 import { Feature, useAppStore } from '@/store/app-store';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { AlertCircle, Lock, Hand, Sparkles, SkipForward } from 'lucide-react';
+import { AlertCircle, Lock, Hand, Sparkles, SkipForward, CalendarClock } from 'lucide-react';
 import { getBlockingDependencies } from '@automaker/dependency-resolver';
 import { useShallow } from 'zustand/react/shallow';
 import { usePipelineConfig } from '@/hooks/queries/use-pipeline';
@@ -11,6 +11,31 @@ import { usePipelineConfig } from '@/hooks/queries/use-pipeline';
 /** Uniform badge style for all card badges */
 const uniformBadgeClass =
   'inline-flex items-center justify-center w-6 h-6 rounded-md border-[1.5px]';
+
+/** Format next run time for schedule badge tooltip */
+function formatNextRun(nextRun: string): string {
+  const date = new Date(nextRun);
+  const now = new Date();
+  const diff = date.getTime() - now.getTime();
+
+  if (diff < 0) return 'Due now';
+  if (diff < 60 * 1000) return 'In less than a minute';
+  if (diff < 60 * 60 * 1000) {
+    const minutes = Math.round(diff / (60 * 1000));
+    return `In ${minutes} minute${minutes === 1 ? '' : 's'}`;
+  }
+  if (diff < 24 * 60 * 60 * 1000) {
+    const hours = Math.round(diff / (60 * 60 * 1000));
+    return `In ${hours} hour${hours === 1 ? '' : 's'}`;
+  }
+
+  return date.toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}
 
 interface CardBadgesProps {
   feature: Feature;
@@ -111,6 +136,7 @@ export const PriorityBadges = memo(function PriorityBadges({
     blockingDependencies.length > 0 && !feature.error && feature.status === 'backlog';
   const showManualVerification =
     feature.skipTests && !feature.error && feature.status === 'backlog';
+  const hasSchedule = feature.schedule?.enabled;
 
   // Check if feature has excluded pipeline steps
   const excludedStepCount = feature.excludedPipelineSteps?.length || 0;
@@ -124,6 +150,7 @@ export const PriorityBadges = memo(function PriorityBadges({
     showManualVerification ||
     isBlocked ||
     isJustFinished ||
+    hasSchedule ||
     hasPipelineExclusions;
 
   if (!showBadges) {
@@ -140,11 +167,11 @@ export const PriorityBadges = memo(function PriorityBadges({
               className={cn(
                 uniformBadgeClass,
                 feature.priority === 1 &&
-                  'bg-[var(--status-error-bg)] border-[var(--status-error)]/40 text-[var(--status-error)]',
+                'bg-[var(--status-error-bg)] border-[var(--status-error)]/40 text-[var(--status-error)]',
                 feature.priority === 2 &&
-                  'bg-[var(--status-warning-bg)] border-[var(--status-warning)]/40 text-[var(--status-warning)]',
+                'bg-[var(--status-warning-bg)] border-[var(--status-warning)]/40 text-[var(--status-warning)]',
                 feature.priority === 3 &&
-                  'bg-[var(--status-info-bg)] border-[var(--status-info)]/40 text-[var(--status-info)]'
+                'bg-[var(--status-info-bg)] border-[var(--status-info)]/40 text-[var(--status-info)]'
               )}
               data-testid={`priority-badge-${feature.id}`}
             >
@@ -263,6 +290,36 @@ export const PriorityBadges = memo(function PriorityBadges({
                 ? 'This feature will skip all custom pipeline steps'
                 : 'Some custom pipeline steps will be skipped for this feature'}
             </p>
+          </TooltipContent>
+        </Tooltip>
+      )}
+
+      {/* Schedule badge */}
+      {hasSchedule && (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div
+              className={cn(
+                uniformBadgeClass,
+                'bg-[var(--status-scheduled)]/20 border-[var(--status-scheduled)]/50 text-[var(--status-scheduled)]'
+              )}
+              data-testid={`schedule-badge-${feature.id}`}
+            >
+              <CalendarClock className="w-3.5 h-3.5" />
+            </div>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" className="text-xs">
+            <p className="font-medium">Recurring Schedule</p>
+            {feature.schedule?.nextRun && (
+              <p className="text-muted-foreground">
+                Next: {formatNextRun(feature.schedule.nextRun)}
+              </p>
+            )}
+            {feature.schedule?.lastRun && (
+              <p className="text-muted-foreground text-[10px]">
+                Last: {new Date(feature.schedule.lastRun).toLocaleString()}
+              </p>
+            )}
           </TooltipContent>
         </Tooltip>
       )}

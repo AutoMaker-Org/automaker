@@ -67,6 +67,8 @@ export type {
   FeatureExport,
   FeatureImport,
   FeatureImportResult,
+  FeatureSchedule,
+  SchedulePreset,
   ParsedTask,
   PlanSpec,
 } from './feature.js';

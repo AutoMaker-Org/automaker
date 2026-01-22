@@ -6,6 +6,29 @@ import type { PlanningMode, ThinkingLevel } from './settings.js';
 import type { ReasoningEffort } from './provider.js';
 
 /**
+ * Schedule configuration for recurring features
+ */
+export interface FeatureSchedule {
+  /** Crontab expression (e.g., "0 9 * * *" for daily at 9 AM) */
+  crontab: string;
+  /** Whether the schedule is currently enabled */
+  enabled: boolean;
+  /** Timestamp of the last successful run */
+  lastRun?: string; // ISO date string
+  /** Timestamp of the next scheduled run (calculated from crontab) */
+  nextRun?: string; // ISO date string
+  /** Number of times this schedule has been triggered */
+  runCount?: number;
+  /** Whether to keep prior context (agent output) between runs. Defaults to true. */
+  keepPriorContext?: boolean;
+}
+
+/**
+ * Preset interval options for schedule UI
+ */
+export type SchedulePreset = 'hourly' | 'daily' | 'weekly' | 'monthly' | 'custom';
+
+/**
  * A single entry in the description history
  */
 export interface DescriptionHistoryEntry {
@@ -103,10 +126,17 @@ export interface Feature {
   summary?: string;
   startedAt?: string;
   descriptionHistory?: DescriptionHistoryEntry[]; // History of description changes
+  schedule?: FeatureSchedule; // Recurring schedule configuration
   [key: string]: unknown; // Keep catch-all for extensibility
 }
 
-export type FeatureStatus = 'pending' | 'running' | 'completed' | 'failed' | 'verified';
+export type FeatureStatus =
+  | 'pending'
+  | 'running'
+  | 'completed'
+  | 'failed'
+  | 'verified'
+  | 'scheduled';
 
 /**
  * Export format for a feature, used when exporting features to share or backup

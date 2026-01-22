@@ -76,6 +76,7 @@ import { createMCPRoutes } from './routes/mcp/index.js';
 import { MCPTestService } from './services/mcp-test-service.js';
 import { createPipelineRoutes } from './routes/pipeline/index.js';
 import { pipelineService } from './services/pipeline-service.js';
+import { createScheduleRoutes } from './routes/schedule/index.js';
 import { createIdeationRoutes } from './routes/ideation/index.js';
 import { IdeationService } from './services/ideation-service.js';
 import { getDevServerService } from './services/dev-server-service.js';
@@ -86,6 +87,7 @@ import { createEventHistoryRoutes } from './routes/event-history/index.js';
 import { getEventHistoryService } from './services/event-history-service.js';
 import { getTestRunnerService } from './services/test-runner-service.js';
 import { createProjectsRoutes } from './routes/projects/index.js';
+import { SchedulerService, setSchedulerService } from './services/scheduler-service.js';
 
 // Load environment variables
 dotenv.config();
@@ -261,6 +263,13 @@ const settingsService = new SettingsService(DATA_DIR);
 const agentService = new AgentService(DATA_DIR, events, settingsService);
 const featureLoader = new FeatureLoader();
 const autoModeService = new AutoModeService(events, settingsService);
+const schedulerService = new SchedulerService(
+  events,
+  featureLoader,
+  autoModeService,
+  settingsService
+);
+setSchedulerService(schedulerService);
 const claudeUsageService = new ClaudeUsageService();
 const codexAppServerService = new CodexAppServerService();
 const codexModelCacheService = new CodexModelCacheService(DATA_DIR, codexAppServerService);
@@ -387,6 +396,7 @@ app.use(
   '/api/projects',
   createProjectsRoutes(featureLoader, autoModeService, settingsService, notificationService)
 );
+app.use('/api/schedule', createScheduleRoutes());
 
 // Create HTTP server
 const server = createServer(app);
@@ -735,6 +745,12 @@ const startServer = (port: number, host: string) => {
 ║                                                                     ║
 ╚═════════════════════════════════════════════════════════════════════╝
 `);
+
+    // Start the scheduler service for recurring tasks
+    schedulerService.start();
+    schedulerService.recalculateNextRunTimes().catch((err) => {
+      logger.error('Error recalculating scheduled task run times:', err);
+    });
   });
 
   server.on('error', (error: NodeJS.ErrnoException) => {
@@ -822,6 +838,7 @@ const gracefulShutdown = async (signal: string) => {
   // Note: markAllRunningFeaturesInterrupted handles errors internally and never rejects
   await autoModeService.markAllRunningFeaturesInterrupted(`${signal} signal received`);
 
+  schedulerService.stop();
   terminalService.cleanup();
   server.close(() => {
     clearTimeout(forceExitTimeout);

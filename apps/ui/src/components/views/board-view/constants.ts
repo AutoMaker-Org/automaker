@@ -48,6 +48,11 @@ export const EMPTY_STATE_CONFIGS: Record<string, EmptyStateConfig> = {
     description: 'Approved features will appear here. They can then be completed and archived.',
     icon: 'check',
   },
+  scheduled: {
+    title: 'No Scheduled Features',
+    description: 'Features with recurring schedules will appear here between runs.',
+    icon: 'clock',
+  },
   // Pipeline step default configuration
   pipeline_default: {
     title: 'Pipeline Step Empty',
@@ -95,6 +100,11 @@ const END_COLUMNS: Column[] = [
     id: 'verified',
     title: 'Verified',
     colorClass: 'bg-[var(--status-success)]',
+  },
+  {
+    id: 'scheduled',
+    title: 'Scheduled',
+    colorClass: 'bg-[var(--status-scheduled)]',
   },
 ];
 

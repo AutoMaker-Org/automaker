@@ -26,4 +26,5 @@ export type FeatureStatusWithPipeline =
   | 'waiting_approval'
   | 'verified'
   | 'completed'
+  | 'scheduled'
   | PipelineStatus;

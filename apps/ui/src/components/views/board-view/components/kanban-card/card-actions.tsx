@@ -293,7 +293,7 @@ export const CardActions = memo(function CardActions({
           ) : null}
         </>
       )}
-      {!isCurrentAutoTask && feature.status === 'backlog' && (
+      {!isCurrentAutoTask && (feature.status === 'backlog' || feature.status === 'scheduled') && (
         <>
           <Button
             variant="secondary"
@@ -309,6 +309,23 @@ export const CardActions = memo(function CardActions({
             <Edit className="w-3 h-3 mr-1" />
             Edit
           </Button>
+          {/* View Logs button for scheduled features with prior runs */}
+          {feature.status === 'scheduled' && onViewOutput && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 text-xs px-2"
+              onClick={(e) => {
+                e.stopPropagation();
+                onViewOutput();
+              }}
+              onPointerDown={(e) => e.stopPropagation()}
+              data-testid={`view-output-scheduled-${feature.id}`}
+              title="View Logs"
+            >
+              <FileText className="w-3 h-3" />
+            </Button>
+          )}
           {feature.planSpec?.content && onViewPlan && (
             <Button
               variant="outline"
@@ -338,7 +355,7 @@ export const CardActions = memo(function CardActions({
               data-testid={`make-${feature.id}`}
             >
               <PlayCircle className="w-3 h-3 mr-1" />
-              Make
+              {feature.status === 'scheduled' ? 'Run Now' : 'Make'}
             </Button>
           )}
         </>
