@@ -128,7 +128,10 @@ export async function generateBacklogPlan(
     let credentials: import('@automaker/types').Credentials | undefined;
 
     if (effectiveModel) {
-      // Use explicit override - just get credentials
+      // Use explicit override - resolve model alias and get credentials
+      const resolved = resolvePhaseModel({ model: effectiveModel });
+      effectiveModel = resolved.model;
+      thinkingLevel = resolved.thinkingLevel;
       credentials = await settingsService?.getCredentials();
     } else if (settingsService) {
       // Use settings-based model with provider info
