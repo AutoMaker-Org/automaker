@@ -29,84 +29,103 @@ export interface CopilotModelConfig {
  * and can be discovered at runtime via the CLI's listModels() method.
  */
 export const COPILOT_MODEL_MAP = {
-  // GPT-4 models (commonly available via Copilot)
-  'copilot-gpt-4o': {
-    label: 'GPT-4o',
-    description: 'OpenAI GPT-4o via GitHub Copilot. Fast and capable multimodal model.',
-    supportsVision: true,
-    supportsTools: true,
-    contextWindow: 128000,
-  },
-  'copilot-gpt-4o-mini': {
-    label: 'GPT-4o Mini',
-    description: 'Smaller, faster GPT-4o variant for quick tasks.',
-    supportsVision: true,
-    supportsTools: true,
-    contextWindow: 128000,
-  },
-  'copilot-gpt-4-turbo': {
-    label: 'GPT-4 Turbo',
-    description: 'GPT-4 Turbo with vision capabilities.',
-    supportsVision: true,
-    supportsTools: true,
-    contextWindow: 128000,
-  },
-  // Claude models (available in Copilot Enterprise)
-  'copilot-claude-3.5-sonnet': {
-    label: 'Claude 3.5 Sonnet',
-    description: 'Anthropic Claude 3.5 Sonnet via Copilot Enterprise.',
+  // Claude models (Anthropic via GitHub Copilot)
+  'copilot-claude-sonnet-4.5': {
+    label: 'Claude Sonnet 4.5',
+    description: 'Anthropic Claude Sonnet 4.5 via GitHub Copilot.',
     supportsVision: true,
     supportsTools: true,
     contextWindow: 200000,
   },
-  'copilot-claude-3-opus': {
-    label: 'Claude 3 Opus',
-    description: 'Anthropic Claude 3 Opus via Copilot Enterprise.',
+  'copilot-claude-haiku-4.5': {
+    label: 'Claude Haiku 4.5',
+    description: 'Fast and efficient Claude Haiku 4.5 via GitHub Copilot.',
     supportsVision: true,
     supportsTools: true,
     contextWindow: 200000,
   },
-  // o1 series reasoning models
-  'copilot-o1': {
-    label: 'o1',
-    description: 'OpenAI o1 reasoning model for complex tasks.',
-    supportsVision: false,
+  'copilot-claude-opus-4.5': {
+    label: 'Claude Opus 4.5',
+    description: 'Most capable Claude Opus 4.5 via GitHub Copilot.',
+    supportsVision: true,
     supportsTools: true,
     contextWindow: 200000,
   },
-  'copilot-o1-mini': {
-    label: 'o1 Mini',
-    description: 'Faster o1 variant for reasoning tasks.',
-    supportsVision: false,
-    supportsTools: true,
-    contextWindow: 128000,
-  },
-  'copilot-o1-preview': {
-    label: 'o1 Preview',
-    description: 'Preview version of o1 reasoning model.',
-    supportsVision: false,
-    supportsTools: true,
-    contextWindow: 128000,
-  },
-  // o3 series (newest reasoning models)
-  'copilot-o3': {
-    label: 'o3',
-    description: 'OpenAI o3 advanced reasoning model.',
-    supportsVision: false,
+  'copilot-claude-sonnet-4': {
+    label: 'Claude Sonnet 4',
+    description: 'Anthropic Claude Sonnet 4 via GitHub Copilot.',
+    supportsVision: true,
     supportsTools: true,
     contextWindow: 200000,
   },
-  'copilot-o3-mini': {
-    label: 'o3 Mini',
-    description: 'Faster o3 variant for reasoning tasks.',
-    supportsVision: false,
+  // GPT-5 series (OpenAI via GitHub Copilot)
+  'copilot-gpt-5.2-codex': {
+    label: 'GPT-5.2 Codex',
+    description: 'OpenAI GPT-5.2 Codex for advanced coding tasks.',
+    supportsVision: true,
     supportsTools: true,
     contextWindow: 128000,
   },
-  // Gemini models (if available via Copilot)
-  'copilot-gemini-2.0-flash': {
-    label: 'Gemini 2.0 Flash',
-    description: 'Google Gemini 2.0 Flash via Copilot.',
+  'copilot-gpt-5.1-codex-max': {
+    label: 'GPT-5.1 Codex Max',
+    description: 'Maximum capability GPT-5.1 Codex model.',
+    supportsVision: true,
+    supportsTools: true,
+    contextWindow: 128000,
+  },
+  'copilot-gpt-5.1-codex': {
+    label: 'GPT-5.1 Codex',
+    description: 'OpenAI GPT-5.1 Codex for coding tasks.',
+    supportsVision: true,
+    supportsTools: true,
+    contextWindow: 128000,
+  },
+  'copilot-gpt-5.2': {
+    label: 'GPT-5.2',
+    description: 'Latest OpenAI GPT-5.2 model.',
+    supportsVision: true,
+    supportsTools: true,
+    contextWindow: 128000,
+  },
+  'copilot-gpt-5.1': {
+    label: 'GPT-5.1',
+    description: 'OpenAI GPT-5.1 model.',
+    supportsVision: true,
+    supportsTools: true,
+    contextWindow: 128000,
+  },
+  'copilot-gpt-5': {
+    label: 'GPT-5',
+    description: 'OpenAI GPT-5 base model.',
+    supportsVision: true,
+    supportsTools: true,
+    contextWindow: 128000,
+  },
+  'copilot-gpt-5.1-codex-mini': {
+    label: 'GPT-5.1 Codex Mini',
+    description: 'Fast and efficient GPT-5.1 Codex Mini.',
+    supportsVision: true,
+    supportsTools: true,
+    contextWindow: 128000,
+  },
+  'copilot-gpt-5-mini': {
+    label: 'GPT-5 Mini',
+    description: 'Lightweight GPT-5 Mini model.',
+    supportsVision: true,
+    supportsTools: true,
+    contextWindow: 128000,
+  },
+  'copilot-gpt-4.1': {
+    label: 'GPT-4.1',
+    description: 'OpenAI GPT-4.1 model.',
+    supportsVision: true,
+    supportsTools: true,
+    contextWindow: 128000,
+  },
+  // Gemini models (Google via GitHub Copilot)
+  'copilot-gemini-3-pro-preview': {
+    label: 'Gemini 3 Pro Preview',
+    description: 'Google Gemini 3 Pro Preview via GitHub Copilot.',
     supportsVision: true,
     supportsTools: true,
     contextWindow: 1000000,
@@ -128,7 +147,7 @@ export function getAllCopilotModelIds(): CopilotModelId[] {
 /**
  * Default Copilot model
  */
-export const DEFAULT_COPILOT_MODEL: CopilotModelId = 'copilot-gpt-4o';
+export const DEFAULT_COPILOT_MODEL: CopilotModelId = 'copilot-claude-sonnet-4.5';
 
 /**
  * GitHub Copilot authentication status

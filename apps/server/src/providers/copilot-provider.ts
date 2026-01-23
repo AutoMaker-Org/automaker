@@ -811,4 +811,28 @@ export class CopilotProvider extends CliProvider {
     const supported = ['tools', 'text', 'streaming', 'vision'];
     return supported.includes(feature);
   }
+
+  /**
+   * Check if runtime models have been cached
+   */
+  hasCachedModels(): boolean {
+    return this.runtimeModels !== null && this.runtimeModels.length > 0;
+  }
+
+  /**
+   * Clear the runtime model cache
+   */
+  clearModelCache(): void {
+    this.runtimeModels = null;
+    logger.debug('Cleared Copilot model cache');
+  }
+
+  /**
+   * Refresh models from CLI and return all available models
+   */
+  async refreshModels(): Promise<ModelDefinition[]> {
+    logger.debug('Refreshing Copilot models from CLI');
+    await this.fetchRuntimeModels();
+    return this.getAvailableModels();
+  }
 }

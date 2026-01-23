@@ -29,6 +29,11 @@ import { createAuthGeminiHandler } from './routes/auth-gemini.js';
 import { createDeauthGeminiHandler } from './routes/deauth-gemini.js';
 import { createCopilotStatusHandler } from './routes/copilot-status.js';
 import {
+  createGetCopilotModelsHandler,
+  createRefreshCopilotModelsHandler,
+  createClearCopilotCacheHandler,
+} from './routes/copilot-models.js';
+import {
   createGetOpencodeModelsHandler,
   createRefreshOpencodeModelsHandler,
   createGetOpencodeProvidersHandler,
@@ -81,8 +86,13 @@ export function createSetupRoutes(): Router {
   router.post('/auth-gemini', createAuthGeminiHandler());
   router.post('/deauth-gemini', createDeauthGeminiHandler());
 
-  // Copilot SDK routes
+  // Copilot CLI routes
   router.get('/copilot-status', createCopilotStatusHandler());
+
+  // Copilot Dynamic Model Discovery routes
+  router.get('/copilot/models', createGetCopilotModelsHandler());
+  router.post('/copilot/models/refresh', createRefreshCopilotModelsHandler());
+  router.post('/copilot/cache/clear', createClearCopilotCacheHandler());
 
   // OpenCode Dynamic Model Discovery routes
   router.get('/opencode/models', createGetOpencodeModelsHandler());
