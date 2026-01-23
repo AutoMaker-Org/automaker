@@ -6,6 +6,16 @@
  */
 
 /**
+ * Valid todo status values in the standard format
+ */
+type TodoStatus = 'pending' | 'in_progress' | 'completed';
+
+/**
+ * Set of valid status values for validation
+ */
+const VALID_STATUSES = new Set<TodoStatus>(['pending', 'in_progress', 'completed']);
+
+/**
  * Todo item from various AI providers (Gemini, Copilot, etc.)
  */
 interface ProviderTodo {
@@ -19,8 +29,18 @@ interface ProviderTodo {
  */
 interface NormalizedTodo {
   content: string;
-  status: string;
+  status: TodoStatus;
   activeForm: string;
+}
+
+/**
+ * Normalize a provider status value to a valid TodoStatus
+ */
+function normalizeStatus(status: string | undefined): TodoStatus {
+  if (!status) return 'pending';
+  if (status === 'cancelled' || status === 'canceled') return 'completed';
+  if (VALID_STATUSES.has(status as TodoStatus)) return status as TodoStatus;
+  return 'pending';
 }
 
 /**
@@ -33,11 +53,11 @@ interface NormalizedTodo {
  * Output format (Claude/Standard):
  * - { content, status, activeForm } where status is 'pending'|'in_progress'|'completed'
  */
-export function normalizeTodos(todos: ProviderTodo[]): NormalizedTodo[] {
+export function normalizeTodos(todos: ProviderTodo[] | null | undefined): NormalizedTodo[] {
+  if (!todos) return [];
   return todos.map((todo) => ({
     content: todo.content || todo.description || '',
-    // Map 'cancelled' to 'completed' since the standard format doesn't have cancelled status
-    status: todo.status === 'cancelled' ? 'completed' : todo.status || 'pending',
+    status: normalizeStatus(todo.status),
     // Use content/description as activeForm since providers may not have it
     activeForm: todo.content || todo.description || '',
   }));

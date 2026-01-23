@@ -566,6 +566,10 @@ export class CopilotProvider extends CliProvider {
       const session = await client.createSession({
         model: bareModel,
         streaming: true,
+        // AUTONOMOUS MODE: Auto-approve all permission requests.
+        // AutoMaker is designed for fully autonomous AI agent operation.
+        // Security boundary is provided by Docker containerization (see CLAUDE.md).
+        // User is warned about this at app startup.
         onPermissionRequest: async (
           request: PermissionRequest
         ): Promise<{ kind: 'approved' } | { kind: 'denied-interactively-by-user' }> => {

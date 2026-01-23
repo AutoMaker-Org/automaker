@@ -120,7 +120,7 @@ describe('copilot-provider.ts', () => {
 
   describe('checkAuth', () => {
     it('should return authenticated status when gh CLI is logged in', async () => {
-      // Must include --version mock for CLI detection to succeed
+      // Set up mock BEFORE creating provider to ensure CLI detection succeeds
       vi.mocked(execSync).mockImplementation((cmd: string) => {
         if (cmd.includes('--version')) {
           return '1.0.0';
@@ -131,14 +131,16 @@ describe('copilot-provider.ts', () => {
         return '';
       });
 
-      const status = await provider.checkAuth();
+      // Create fresh provider with the mock in place
+      const freshProvider = new CopilotProvider();
+      const status = await freshProvider.checkAuth();
       expect(status.authenticated).toBe(true);
       expect(status.method).toBe('oauth');
       expect(status.login).toBe('testuser');
     });
 
     it('should return unauthenticated when gh auth fails', async () => {
-      // Must include --version mock for CLI detection to succeed
+      // Set up mock BEFORE creating provider
       vi.mocked(execSync).mockImplementation((cmd: string) => {
         if (cmd.includes('--version')) {
           return '1.0.0';
@@ -152,7 +154,9 @@ describe('copilot-provider.ts', () => {
         return '';
       });
 
-      const status = await provider.checkAuth();
+      // Create fresh provider with the mock in place
+      const freshProvider = new CopilotProvider();
+      const status = await freshProvider.checkAuth();
       expect(status.authenticated).toBe(false);
       expect(status.method).toBe('none');
     });
@@ -160,7 +164,7 @@ describe('copilot-provider.ts', () => {
     it('should detect GITHUB_TOKEN environment variable', async () => {
       process.env.GITHUB_TOKEN = 'test-token';
 
-      // Must include --version mock for CLI detection to succeed
+      // Set up mock BEFORE creating provider
       vi.mocked(execSync).mockImplementation((cmd: string) => {
         if (cmd.includes('--version')) {
           return '1.0.0';
@@ -174,7 +178,9 @@ describe('copilot-provider.ts', () => {
         return '';
       });
 
-      const status = await provider.checkAuth();
+      // Create fresh provider with the mock in place
+      const freshProvider = new CopilotProvider();
+      const status = await freshProvider.checkAuth();
       expect(status.authenticated).toBe(true);
       expect(status.method).toBe('oauth');
 
@@ -184,6 +190,7 @@ describe('copilot-provider.ts', () => {
 
   describe('detectInstallation', () => {
     it('should detect installed CLI', async () => {
+      // Set up mock BEFORE creating provider
       vi.mocked(execSync).mockImplementation((cmd: string) => {
         if (cmd.includes('--version')) {
           return '1.2.3';
@@ -194,7 +201,9 @@ describe('copilot-provider.ts', () => {
         return '';
       });
 
-      const status = await provider.detectInstallation();
+      // Create fresh provider with the mock in place
+      const freshProvider = new CopilotProvider();
+      const status = await freshProvider.detectInstallation();
       expect(status.installed).toBe(true);
       expect(status.version).toBe('1.2.3');
       expect(status.authenticated).toBe(true);

@@ -52,3 +52,8 @@ export async function persistApiKeyToEnv(key: string, value: string): Promise<vo
 // Re-export shared utilities
 export { getErrorMessageShared as getErrorMessage };
 export const logError = createLogError(logger);
+
+/**
+ * Marker file used to indicate a provider has been explicitly disconnected by user
+ */
+export const COPILOT_DISCONNECTED_MARKER_FILE = '.copilot-disconnected';
