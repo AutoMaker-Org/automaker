@@ -26,6 +26,7 @@ import { validateBareModelId } from '@automaker/types';
 import { GEMINI_MODEL_MAP, type GeminiAuthStatus } from '@automaker/types';
 import { createLogger, isAbortError } from '@automaker/utils';
 import { spawnJSONLProcess } from '@automaker/platform';
+import { normalizeTodos } from './tool-normalization.js';
 
 // Create logger for this module
 const logger = createLogger('GeminiProvider');
@@ -150,6 +151,8 @@ function normalizeGeminiToolName(geminiToolName: string): string {
 /**
  * Normalize Gemini tool input parameters to standard format
  *
+ * Uses shared normalizeTodos utility for consistent todo normalization.
+ *
  * Gemini `write_todos` format:
  * {"todos": [{"description": "Task text", "status": "pending|in_progress|completed|cancelled"}]}
  *
@@ -160,17 +163,9 @@ function normalizeGeminiToolInput(
   toolName: string,
   input: Record<string, unknown>
 ): Record<string, unknown> {
-  // Normalize write_todos: map 'description' to 'content', handle 'cancelled' status
+  // Normalize write_todos using shared utility
   if (toolName === 'write_todos' && Array.isArray(input.todos)) {
-    return {
-      todos: input.todos.map((todo: { description?: string; status?: string }) => ({
-        content: todo.description || '',
-        // Map 'cancelled' to 'completed' since Claude doesn't have cancelled status
-        status: todo.status === 'cancelled' ? 'completed' : todo.status,
-        // Use description as activeForm since Gemini doesn't have it
-        activeForm: todo.description || '',
-      })),
-    };
+    return { todos: normalizeTodos(input.todos) };
   }
   return input;
 }

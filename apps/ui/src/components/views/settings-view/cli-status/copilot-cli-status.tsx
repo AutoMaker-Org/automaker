@@ -5,22 +5,12 @@ import { CheckCircle2, AlertCircle, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { CliStatus } from '../shared/types';
 import { CopilotIcon } from '@/components/ui/provider-icon';
+import type { CopilotAuthStatus } from '@automaker/types';
 
-export type CopilotAuthMethod =
-  | 'oauth' // GitHub OAuth authentication
-  | 'cli' // Copilot CLI authentication
-  | 'none';
+// Re-export for backwards compatibility
+export type { CopilotAuthStatus };
 
-export interface CopilotAuthStatus {
-  authenticated: boolean;
-  method: CopilotAuthMethod;
-  login?: string;
-  host?: string;
-  statusMessage?: string;
-  error?: string;
-}
-
-function getAuthMethodLabel(method: CopilotAuthMethod): string {
+function getAuthMethodLabel(method: CopilotAuthStatus['method']): string {
   switch (method) {
     case 'oauth':
       return 'GitHub OAuth';

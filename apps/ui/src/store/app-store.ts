@@ -1530,7 +1530,7 @@ const initialState: AppState = {
   enabledGeminiModels: getAllGeminiModelIds(), // All Gemini models enabled by default
   geminiDefaultModel: DEFAULT_GEMINI_MODEL, // Default to Gemini 2.5 Flash
   enabledCopilotModels: getAllCopilotModelIds(), // All Copilot models enabled by default
-  copilotDefaultModel: DEFAULT_COPILOT_MODEL, // Default to GPT-4o
+  copilotDefaultModel: DEFAULT_COPILOT_MODEL, // Default to Claude Sonnet 4.5
   disabledProviders: [], // No providers disabled by default
   autoLoadClaudeMd: false, // Default to disabled (user must opt-in)
   skipSandboxWarning: false, // Default to disabled (show sandbox warning dialog)

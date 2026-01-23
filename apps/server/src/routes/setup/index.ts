@@ -28,6 +28,8 @@ import { createGeminiStatusHandler } from './routes/gemini-status.js';
 import { createAuthGeminiHandler } from './routes/auth-gemini.js';
 import { createDeauthGeminiHandler } from './routes/deauth-gemini.js';
 import { createCopilotStatusHandler } from './routes/copilot-status.js';
+import { createAuthCopilotHandler } from './routes/auth-copilot.js';
+import { createDeauthCopilotHandler } from './routes/deauth-copilot.js';
 import {
   createGetCopilotModelsHandler,
   createRefreshCopilotModelsHandler,
@@ -88,6 +90,8 @@ export function createSetupRoutes(): Router {
 
   // Copilot CLI routes
   router.get('/copilot-status', createCopilotStatusHandler());
+  router.post('/auth-copilot', createAuthCopilotHandler());
+  router.post('/deauth-copilot', createDeauthCopilotHandler());
 
   // Copilot Dynamic Model Discovery routes
   router.get('/copilot/models', createGetCopilotModelsHandler());

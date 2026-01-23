@@ -31,9 +31,18 @@ import {
 } from '@automaker/types';
 import { createLogger, isAbortError } from '@automaker/utils';
 import { CopilotClient, type PermissionRequest } from '@github/copilot-sdk';
+import {
+  normalizeTodos,
+  normalizeFilePathInput,
+  normalizeCommandInput,
+  normalizePatternInput,
+} from './tool-normalization.js';
 
 // Create logger for this module
 const logger = createLogger('CopilotProvider');
+
+// Default bare model (without copilot- prefix) for SDK calls
+const DEFAULT_BARE_MODEL = 'claude-sonnet-4.5';
 
 // =============================================================================
 // SDK Event Types (from @github/copilot-sdk)
@@ -178,6 +187,7 @@ function normalizeCopilotToolName(copilotToolName: string): string {
  * Normalize Copilot tool input parameters to standard format
  *
  * Maps Copilot's parameter names to our standard parameter names.
+ * Uses shared utilities from tool-normalization.ts for common normalizations.
  */
 function normalizeCopilotToolInput(
   toolName: string,
@@ -187,49 +197,22 @@ function normalizeCopilotToolInput(
 
   // Normalize todo_write / write_todos: ensure proper format
   if (normalizedName === 'TodoWrite' && Array.isArray(input.todos)) {
-    return {
-      todos: input.todos.map(
-        (todo: { description?: string; content?: string; status?: string }) => ({
-          content: todo.content || todo.description || '',
-          status: todo.status === 'cancelled' ? 'completed' : todo.status || 'pending',
-          activeForm: todo.content || todo.description || '',
-        })
-      ),
-    };
+    return { todos: normalizeTodos(input.todos) };
   }
 
   // Normalize file path parameters for Read/Write/Edit tools
   if (normalizedName === 'Read' || normalizedName === 'Write' || normalizedName === 'Edit') {
-    const normalized = { ...input };
-    // Map various path parameter names to file_path
-    if (!normalized.file_path) {
-      if (input.path) normalized.file_path = input.path;
-      else if (input.file) normalized.file_path = input.file;
-      else if (input.filename) normalized.file_path = input.filename;
-      else if (input.filePath) normalized.file_path = input.filePath;
-    }
-    return normalized;
+    return normalizeFilePathInput(input);
   }
 
   // Normalize shell command parameters for Bash tool
   if (normalizedName === 'Bash') {
-    const normalized = { ...input };
-    if (!normalized.command) {
-      if (input.cmd) normalized.command = input.cmd;
-      else if (input.script) normalized.command = input.script;
-    }
-    return normalized;
+    return normalizeCommandInput(input);
   }
 
   // Normalize search parameters for Grep tool
   if (normalizedName === 'Grep') {
-    const normalized = { ...input };
-    if (!normalized.pattern) {
-      if (input.query) normalized.pattern = input.query;
-      else if (input.search) normalized.pattern = input.search;
-      else if (input.regex) normalized.pattern = input.regex;
-    }
-    return normalized;
+    return normalizePatternInput(input);
   }
 
   return input;
@@ -292,11 +275,22 @@ export class CopilotProvider extends CliProvider {
 
   /**
    * Extract prompt text from ExecuteOptions
+   *
+   * Note: CopilotProvider does not yet support vision/image inputs.
+   * If non-text content is provided, an error is thrown.
    */
   private extractPromptText(options: ExecuteOptions): string {
     if (typeof options.prompt === 'string') {
       return options.prompt;
     } else if (Array.isArray(options.prompt)) {
+      // Check for non-text content (images, etc.) which we don't support yet
+      const hasNonText = options.prompt.some((p) => p.type !== 'text');
+      if (hasNonText) {
+        throw new Error(
+          'CopilotProvider does not yet support non-text prompt parts (e.g., images). ' +
+            'Please use text-only prompts or switch to a provider that supports vision.'
+        );
+      }
       return options.prompt
         .filter((p) => p.type === 'text' && p.text)
         .map((p) => p.text)
@@ -455,7 +449,7 @@ export class CopilotProvider extends CliProvider {
         code: CopilotErrorCode.MODEL_UNAVAILABLE,
         message: 'Requested model is not available',
         recoverable: true,
-        suggestion: 'Try using "claude-sonnet-4.5" or select a different model',
+        suggestion: `Try using "${DEFAULT_BARE_MODEL}" or select a different model`,
       };
     }
 
@@ -526,7 +520,7 @@ export class CopilotProvider extends CliProvider {
     }
 
     const promptText = this.extractPromptText(options);
-    const bareModel = options.model || 'claude-sonnet-4.5';
+    const bareModel = options.model || DEFAULT_BARE_MODEL;
     const workingDirectory = options.cwd || process.cwd();
 
     logger.debug(
@@ -608,6 +602,13 @@ export class CopilotProvider extends CliProvider {
       while (!sessionComplete || eventQueue.length > 0) {
         await waitForEvent();
 
+        // Check for errors first (before processing events to avoid race condition)
+        if (sessionError) {
+          await session.destroy();
+          await client.stop();
+          throw sessionError;
+        }
+
         // Process all queued events
         while (eventQueue.length > 0) {
           const event = eventQueue.shift()!;
@@ -620,13 +621,6 @@ export class CopilotProvider extends CliProvider {
             yield normalized;
           }
         }
-
-        // Check for errors
-        if (sessionError) {
-          await session.destroy();
-          await client.stop();
-          throw sessionError;
-        }
       }
 
       // Cleanup
@@ -637,8 +631,9 @@ export class CopilotProvider extends CliProvider {
       // Ensure client is stopped on error
       try {
         await client.stop();
-      } catch {
-        // Ignore cleanup errors
+      } catch (cleanupError) {
+        // Log but don't throw cleanup errors - the original error is more important
+        logger.debug(`Failed to stop client during cleanup: ${cleanupError}`);
       }
 
       if (isAbortError(error)) {
@@ -829,6 +824,8 @@ export class CopilotProvider extends CliProvider {
       logger.debug(`Fetched ${models.length} runtime models from Copilot CLI`);
       return models;
     } catch (error) {
+      // Clear cache on failure to avoid returning stale data
+      this.runtimeModels = null;
       logger.debug(`Failed to fetch runtime models: ${error}`);
       return [];
     }
@@ -906,9 +903,12 @@ export class CopilotProvider extends CliProvider {
 
   /**
    * Check if a feature is supported
+   *
+   * Note: Vision is NOT currently supported - the SDK doesn't handle image inputs yet.
+   * This may change in future versions of the Copilot SDK.
    */
   supportsFeature(feature: string): boolean {
-    const supported = ['tools', 'text', 'streaming', 'vision'];
+    const supported = ['tools', 'text', 'streaming'];
     return supported.includes(feature);
   }
 
