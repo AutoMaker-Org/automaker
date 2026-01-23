@@ -117,36 +117,53 @@ export interface CopilotError extends Error {
 
 /**
  * Copilot SDK tool name to standard tool name mapping
+ *
+ * Maps Copilot CLI tool names to our standard tool names for consistent UI display.
+ * Tool names are case-insensitive (normalized to lowercase before lookup).
  */
 const COPILOT_TOOL_NAME_MAP: Record<string, string> = {
   // File operations
   read_file: 'Read',
   read: 'Read',
+  view: 'Read', // Copilot uses 'view' for reading files
+  read_many_files: 'Read',
   write_file: 'Write',
   write: 'Write',
+  create_file: 'Write',
   edit_file: 'Edit',
   edit: 'Edit',
+  replace: 'Edit',
+  patch: 'Edit',
   // Shell operations
   run_shell: 'Bash',
+  run_shell_command: 'Bash',
   shell: 'Bash',
   bash: 'Bash',
   execute: 'Bash',
+  terminal: 'Bash',
   // Search operations
   search: 'Grep',
   grep: 'Grep',
+  search_file_content: 'Grep',
   find_files: 'Glob',
   glob: 'Glob',
   list_dir: 'Ls',
+  list_directory: 'Ls',
   ls: 'Ls',
   // Web operations
   web_fetch: 'WebFetch',
   fetch: 'WebFetch',
   web_search: 'WebSearch',
   search_web: 'WebSearch',
+  google_web_search: 'WebSearch',
   // Todo operations
   todo_write: 'TodoWrite',
   write_todos: 'TodoWrite',
   update_todos: 'TodoWrite',
+  // Planning/intent operations (Copilot-specific)
+  report_intent: 'ReportIntent', // Keep as-is, it's a planning tool
+  think: 'Think',
+  plan: 'Plan',
 };
 
 /**
@@ -159,6 +176,8 @@ function normalizeCopilotToolName(copilotToolName: string): string {
 
 /**
  * Normalize Copilot tool input parameters to standard format
+ *
+ * Maps Copilot's parameter names to our standard parameter names.
  */
 function normalizeCopilotToolInput(
   toolName: string,
@@ -179,11 +198,38 @@ function normalizeCopilotToolInput(
     };
   }
 
-  // Normalize file path parameters
+  // Normalize file path parameters for Read/Write/Edit tools
   if (normalizedName === 'Read' || normalizedName === 'Write' || normalizedName === 'Edit') {
-    if (input.path && !input.file_path) {
-      return { ...input, file_path: input.path };
+    const normalized = { ...input };
+    // Map various path parameter names to file_path
+    if (!normalized.file_path) {
+      if (input.path) normalized.file_path = input.path;
+      else if (input.file) normalized.file_path = input.file;
+      else if (input.filename) normalized.file_path = input.filename;
+      else if (input.filePath) normalized.file_path = input.filePath;
     }
+    return normalized;
+  }
+
+  // Normalize shell command parameters for Bash tool
+  if (normalizedName === 'Bash') {
+    const normalized = { ...input };
+    if (!normalized.command) {
+      if (input.cmd) normalized.command = input.cmd;
+      else if (input.script) normalized.command = input.script;
+    }
+    return normalized;
+  }
+
+  // Normalize search parameters for Grep tool
+  if (normalizedName === 'Grep') {
+    const normalized = { ...input };
+    if (!normalized.pattern) {
+      if (input.query) normalized.pattern = input.query;
+      else if (input.search) normalized.pattern = input.search;
+      else if (input.regex) normalized.pattern = input.regex;
+    }
+    return normalized;
   }
 
   return input;
