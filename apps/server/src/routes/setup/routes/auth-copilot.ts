@@ -3,9 +3,8 @@
  */
 
 import type { Request, Response } from 'express';
-import { getErrorMessage, logError, COPILOT_DISCONNECTED_MARKER_FILE } from '../common.js';
-import * as fs from 'fs/promises';
-import * as path from 'path';
+import { getErrorMessage, logError } from '../common.js';
+import { connectCopilot } from '../../../services/copilot-connection-service.js';
 
 /**
  * Creates handler for POST /api/setup/auth-copilot
@@ -14,16 +13,7 @@ import * as path from 'path';
 export function createAuthCopilotHandler() {
   return async (_req: Request, res: Response): Promise<void> => {
     try {
-      const projectRoot = process.cwd();
-      const automakerDir = path.join(projectRoot, '.automaker');
-      const markerPath = path.join(automakerDir, COPILOT_DISCONNECTED_MARKER_FILE);
-
-      // Remove the disconnection marker if it exists
-      try {
-        await fs.unlink(markerPath);
-      } catch {
-        // File doesn't exist, nothing to remove
-      }
+      await connectCopilot();
 
       res.json({
         success: true,

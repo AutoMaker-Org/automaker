@@ -3,9 +3,8 @@
  */
 
 import type { Request, Response } from 'express';
-import { getErrorMessage, logError, COPILOT_DISCONNECTED_MARKER_FILE } from '../common.js';
-import * as fs from 'fs/promises';
-import * as path from 'path';
+import { getErrorMessage, logError } from '../common.js';
+import { disconnectCopilot } from '../../../services/copilot-connection-service.js';
 
 /**
  * Creates handler for POST /api/setup/deauth-copilot
@@ -14,16 +13,7 @@ import * as path from 'path';
 export function createDeauthCopilotHandler() {
   return async (_req: Request, res: Response): Promise<void> => {
     try {
-      const projectRoot = process.cwd();
-      const automakerDir = path.join(projectRoot, '.automaker');
-
-      // Ensure .automaker directory exists
-      await fs.mkdir(automakerDir, { recursive: true });
-
-      const markerPath = path.join(automakerDir, COPILOT_DISCONNECTED_MARKER_FILE);
-
-      // Create the disconnection marker
-      await fs.writeFile(markerPath, 'Copilot CLI disconnected from app');
+      await disconnectCopilot();
 
       res.json({
         success: true,

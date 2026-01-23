@@ -24,6 +24,15 @@ vi.mock('child_process', async (importOriginal) => {
   };
 });
 
+// Mock fs (synchronous) for CLI detection (existsSync)
+vi.mock('fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('fs')>();
+  return {
+    ...actual,
+    existsSync: vi.fn().mockReturnValue(true),
+  };
+});
+
 // Mock fs/promises
 vi.mock('fs/promises', () => ({
   access: vi.fn().mockRejectedValue(new Error('Not found')),
@@ -33,6 +42,7 @@ vi.mock('fs/promises', () => ({
 
 // Import execSync after mocking
 import { execSync } from 'child_process';
+import * as fs from 'fs';
 
 describe('copilot-provider.ts', () => {
   let provider: CopilotProvider;
@@ -40,8 +50,17 @@ describe('copilot-provider.ts', () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
+    // Mock fs.existsSync for CLI path validation
+    vi.mocked(fs.existsSync).mockReturnValue(true);
+
     // Mock CLI detection to find the CLI
+    // The CliProvider base class uses 'which copilot' (Unix) or 'where copilot' (Windows)
+    // to find the CLI path, then validates with fs.existsSync
     vi.mocked(execSync).mockImplementation((cmd: string) => {
+      // CLI path detection (which/where command)
+      if (cmd.startsWith('which ') || cmd.startsWith('where ')) {
+        return '/usr/local/bin/copilot';
+      }
       if (cmd.includes('--version')) {
         return '1.0.0';
       }
@@ -120,8 +139,13 @@ describe('copilot-provider.ts', () => {
 
   describe('checkAuth', () => {
     it('should return authenticated status when gh CLI is logged in', async () => {
-      // Set up mock BEFORE creating provider to ensure CLI detection succeeds
+      // Set up mocks BEFORE creating provider to ensure CLI detection succeeds
+      vi.mocked(fs.existsSync).mockReturnValue(true);
       vi.mocked(execSync).mockImplementation((cmd: string) => {
+        // CLI path detection (which/where command)
+        if (cmd.startsWith('which ') || cmd.startsWith('where ')) {
+          return '/usr/local/bin/copilot';
+        }
         if (cmd.includes('--version')) {
           return '1.0.0';
         }
@@ -140,8 +164,13 @@ describe('copilot-provider.ts', () => {
     });
 
     it('should return unauthenticated when gh auth fails', async () => {
-      // Set up mock BEFORE creating provider
+      // Set up mocks BEFORE creating provider
+      vi.mocked(fs.existsSync).mockReturnValue(true);
       vi.mocked(execSync).mockImplementation((cmd: string) => {
+        // CLI path detection (which/where command)
+        if (cmd.startsWith('which ') || cmd.startsWith('where ')) {
+          return '/usr/local/bin/copilot';
+        }
         if (cmd.includes('--version')) {
           return '1.0.0';
         }
@@ -164,8 +193,13 @@ describe('copilot-provider.ts', () => {
     it('should detect GITHUB_TOKEN environment variable', async () => {
       process.env.GITHUB_TOKEN = 'test-token';
 
-      // Set up mock BEFORE creating provider
+      // Set up mocks BEFORE creating provider
+      vi.mocked(fs.existsSync).mockReturnValue(true);
       vi.mocked(execSync).mockImplementation((cmd: string) => {
+        // CLI path detection (which/where command)
+        if (cmd.startsWith('which ') || cmd.startsWith('where ')) {
+          return '/usr/local/bin/copilot';
+        }
         if (cmd.includes('--version')) {
           return '1.0.0';
         }
@@ -190,8 +224,13 @@ describe('copilot-provider.ts', () => {
 
   describe('detectInstallation', () => {
     it('should detect installed CLI', async () => {
-      // Set up mock BEFORE creating provider
+      // Set up mocks BEFORE creating provider
+      vi.mocked(fs.existsSync).mockReturnValue(true);
       vi.mocked(execSync).mockImplementation((cmd: string) => {
+        // CLI path detection (which/where command)
+        if (cmd.startsWith('which ') || cmd.startsWith('where ')) {
+          return '/usr/local/bin/copilot';
+        }
         if (cmd.includes('--version')) {
           return '1.2.3';
         }
