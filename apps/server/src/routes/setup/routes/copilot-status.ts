@@ -1,5 +1,5 @@
 /**
- * GET /copilot-status endpoint - Get Copilot SDK installation and auth status
+ * GET /copilot-status endpoint - Get Copilot CLI installation and auth status
  */
 
 import type { Request, Response } from 'express';
@@ -23,10 +23,10 @@ async function isCopilotDisconnectedFromApp(): Promise<boolean> {
 
 /**
  * Creates handler for GET /api/setup/copilot-status
- * Returns Copilot SDK installation and authentication status
+ * Returns Copilot CLI installation and authentication status
  */
 export function createCopilotStatusHandler() {
-  const installCommand = 'npm install -g @github/copilot-sdk';
+  const installCommand = 'npm install -g @github/copilot';
   const loginCommand = 'gh auth login';
 
   return async (_req: Request, res: Response): Promise<void> => {

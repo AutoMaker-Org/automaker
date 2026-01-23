@@ -1553,7 +1553,7 @@ function CopilotContent() {
           loginCommand: result.loginCommand,
         });
         if (result.auth?.authenticated) {
-          toast.success('Copilot SDK is ready!');
+          toast.success('Copilot CLI is ready!');
         }
       }
     } catch {
@@ -1630,7 +1630,7 @@ function CopilotContent() {
         <div className="flex items-center justify-between">
           <CardTitle className="text-lg flex items-center gap-2">
             <CopilotIcon className="w-5 h-5" />
-            GitHub Copilot SDK Status
+            GitHub Copilot CLI Status
           </CardTitle>
           <Button variant="ghost" size="sm" onClick={checkStatus} disabled={isChecking}>
             {isChecking ? <Spinner size="sm" /> : <RefreshCw className="w-4 h-4" />}
@@ -1675,24 +1675,24 @@ function CopilotContent() {
             <div className="flex items-start gap-3 p-4 rounded-lg bg-muted/30 border border-border">
               <XCircle className="w-5 h-5 text-muted-foreground shrink-0 mt-0.5" />
               <div className="flex-1">
-                <p className="font-medium text-foreground">Copilot SDK not found</p>
+                <p className="font-medium text-foreground">Copilot CLI not found</p>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Install the GitHub Copilot SDK to use Copilot models.
+                  Install the GitHub Copilot CLI to use Copilot models.
                 </p>
               </div>
             </div>
             <div className="space-y-3 p-4 rounded-lg bg-muted/30 border border-border">
-              <p className="font-medium text-foreground text-sm">Install Copilot SDK:</p>
+              <p className="font-medium text-foreground text-sm">Install Copilot CLI:</p>
               <div className="flex items-center gap-2">
                 <code className="flex-1 bg-muted px-3 py-2 rounded text-sm font-mono text-foreground overflow-x-auto">
-                  {copilotCliStatus?.installCommand || 'npm install -g @github/copilot-sdk'}
+                  {copilotCliStatus?.installCommand || 'npm install -g @github/copilot'}
                 </code>
                 <Button
                   variant="ghost"
                   size="icon"
                   onClick={() =>
                     copyCommand(
-                      copilotCliStatus?.installCommand || 'npm install -g @github/copilot-sdk'
+                      copilotCliStatus?.installCommand || 'npm install -g @github/copilot'
                     )
                   }
                 >
@@ -1733,9 +1733,7 @@ function CopilotContent() {
                 <Button
                   variant="ghost"
                   size="icon"
-                  onClick={() =>
-                    copyCommand(copilotCliStatus?.loginCommand || 'gh auth login')
-                  }
+                  onClick={() => copyCommand(copilotCliStatus?.loginCommand || 'gh auth login')}
                 >
                   <Copy className="w-4 h-4" />
                 </Button>
@@ -1761,7 +1759,7 @@ function CopilotContent() {
         {isChecking && (
           <div className="flex items-center gap-3 p-4 rounded-lg bg-blue-500/10 border border-blue-500/20">
             <Spinner size="md" />
-            <p className="font-medium text-foreground">Checking Copilot SDK status...</p>
+            <p className="font-medium text-foreground">Checking Copilot CLI status...</p>
           </div>
         )}
       </CardContent>
@@ -1924,7 +1922,14 @@ export function ProvidersSetupStep({ onNext, onBack }: ProvidersSetupStepProps) 
     };
 
     // Run all checks in parallel
-    await Promise.all([checkClaude(), checkCursor(), checkCodex(), checkOpencode(), checkGemini(), checkCopilot()]);
+    await Promise.all([
+      checkClaude(),
+      checkCursor(),
+      checkCodex(),
+      checkOpencode(),
+      checkGemini(),
+      checkCopilot(),
+    ]);
     setIsInitialChecking(false);
   }, [
     setClaudeCliStatus,

@@ -107,7 +107,7 @@ export function CopilotCliStatus({
               <CopilotIcon className="w-5 h-5 text-violet-500" />
             </div>
             <h2 className="text-lg font-semibold text-foreground tracking-tight">
-              GitHub Copilot SDK
+              GitHub Copilot CLI
             </h2>
           </div>
           <Button
@@ -116,7 +116,7 @@ export function CopilotCliStatus({
             onClick={onRefresh}
             disabled={isChecking}
             data-testid="refresh-copilot-cli"
-            title="Refresh Copilot SDK detection"
+            title="Refresh Copilot CLI detection"
             className={cn(
               'h-9 w-9 rounded-lg',
               'hover:bg-accent/50 hover:scale-105',
@@ -127,7 +127,7 @@ export function CopilotCliStatus({
           </Button>
         </div>
         <p className="text-sm text-muted-foreground/80 ml-12">
-          GitHub Copilot SDK provides access to GPT and Claude models via your Copilot subscription.
+          GitHub Copilot CLI provides access to GPT and Claude models via your Copilot subscription.
         </p>
       </div>
       <div className="p-6 space-y-4">
@@ -138,7 +138,7 @@ export function CopilotCliStatus({
                 <CheckCircle2 className="w-5 h-5 text-emerald-500" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-emerald-400">Copilot SDK Installed</p>
+                <p className="text-sm font-medium text-emerald-400">Copilot CLI Installed</p>
                 <div className="text-xs text-emerald-400/70 mt-1.5 space-y-0.5">
                   {status.method && (
                     <p>
@@ -211,10 +211,10 @@ export function CopilotCliStatus({
                 <AlertCircle className="w-5 h-5 text-amber-500" />
               </div>
               <div className="flex-1">
-                <p className="text-sm font-medium text-amber-400">Copilot SDK Not Detected</p>
+                <p className="text-sm font-medium text-amber-400">Copilot CLI Not Detected</p>
                 <p className="text-xs text-amber-400/70 mt-1">
                   {status.recommendation ||
-                    'Install GitHub Copilot SDK to use models via your Copilot subscription.'}
+                    'Install GitHub Copilot CLI to use models via your Copilot subscription.'}
                 </p>
               </div>
             </div>

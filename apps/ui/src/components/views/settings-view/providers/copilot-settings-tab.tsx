@@ -60,7 +60,7 @@ export function CopilotSettingsTab() {
   const handleRefreshCopilotCli = useCallback(async () => {
     await queryClient.invalidateQueries({ queryKey: queryKeys.cli.copilot() });
     await refetchCliStatus();
-    toast.success('Copilot SDK refreshed');
+    toast.success('Copilot CLI refreshed');
   }, [queryClient, refetchCliStatus]);
 
   const handleDefaultModelChange = useCallback(

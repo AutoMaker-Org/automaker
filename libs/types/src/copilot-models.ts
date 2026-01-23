@@ -1,10 +1,10 @@
 /**
- * GitHub Copilot SDK Model Definitions
+ * GitHub Copilot CLI Model Definitions
  *
- * Defines available models for GitHub Copilot SDK integration.
- * Based on https://github.com/github/copilot-sdk
+ * Defines available models for GitHub Copilot CLI integration.
+ * Based on https://github.com/github/copilot
  *
- * The SDK provides runtime model discovery, but we define common models
+ * The CLI provides runtime model discovery, but we define common models
  * for UI consistency and offline use.
  */
 
@@ -20,13 +20,13 @@ export interface CopilotModelConfig {
 }
 
 /**
- * Available Copilot models via the GitHub Copilot SDK
+ * Available Copilot models via the GitHub Copilot CLI
  *
  * Model IDs use 'copilot-' prefix for consistent provider routing.
- * When passed to the SDK, the prefix is stripped.
+ * When passed to the CLI, the prefix is stripped.
  *
  * Note: Actual available models depend on the user's Copilot subscription
- * and can be discovered at runtime via the SDK's listModels() method.
+ * and can be discovered at runtime via the CLI's listModels() method.
  */
 export const COPILOT_MODEL_MAP = {
   // GPT-4 models (commonly available via Copilot)

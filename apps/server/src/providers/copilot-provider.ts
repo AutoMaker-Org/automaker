@@ -1,12 +1,12 @@
 /**
- * Copilot Provider - Executes queries using the GitHub Copilot SDK
+ * Copilot Provider - Executes queries using the GitHub Copilot CLI
  *
  * Extends CliProvider with Copilot-specific:
- * - SDK-based execution via JSON-RPC over CLI
+ * - CLI-based execution via JSON-RPC
  * - GitHub OAuth authentication support
  * - Tool call normalization for AutoMaker UI
  *
- * Based on https://github.com/github/copilot-sdk
+ * Based on https://github.com/github/copilot
  */
 
 import { execSync, spawn, type ChildProcess } from 'child_process';
@@ -34,13 +34,13 @@ import { spawnJSONLProcess } from '@automaker/platform';
 const logger = createLogger('CopilotProvider');
 
 // =============================================================================
-// Copilot Stream Event Types (SDK JSON-RPC output)
+// Copilot Stream Event Types (CLI JSON-RPC output)
 // =============================================================================
 
 /**
- * Base event structure from Copilot SDK JSON-RPC
+ * Base event structure from Copilot CLI JSON-RPC
  *
- * The SDK operates the Copilot CLI in server mode, communicating via JSON-RPC.
+ * The CLI operates in server mode, communicating via JSON-RPC.
  * Events are streamed as JSONL.
  */
 interface CopilotStreamEvent {
@@ -105,7 +105,7 @@ export enum CopilotErrorCode {
   NETWORK_ERROR = 'COPILOT_NETWORK_ERROR',
   PROCESS_CRASHED = 'COPILOT_PROCESS_CRASHED',
   TIMEOUT = 'COPILOT_TIMEOUT',
-  SDK_ERROR = 'COPILOT_SDK_ERROR',
+  CLI_ERROR = 'COPILOT_CLI_ERROR',
   UNKNOWN = 'COPILOT_UNKNOWN_ERROR',
 }
 
@@ -120,8 +120,8 @@ export interface CopilotError extends Error {
 // =============================================================================
 
 /**
- * Copilot SDK tool name to standard tool name mapping
- * The SDK uses standard tool names similar to Claude, but we normalize for consistency
+ * Copilot CLI tool name to standard tool name mapping
+ * The CLI uses standard tool names similar to Claude, but we normalize for consistency
  */
 const COPILOT_TOOL_NAME_MAP: Record<string, string> = {
   // File operations
@@ -165,7 +165,7 @@ function normalizeCopilotToolName(copilotToolName: string): string {
 /**
  * Normalize Copilot tool input parameters to standard format
  *
- * Copilot SDK uses similar formats to Claude, but with potential variations
+ * Copilot CLI uses similar formats to Claude, but with potential variations
  */
 function normalizeCopilotToolInput(
   toolName: string,
@@ -176,11 +176,13 @@ function normalizeCopilotToolInput(
   // Normalize todo_write / write_todos: ensure proper format
   if (normalizedName === 'TodoWrite' && Array.isArray(input.todos)) {
     return {
-      todos: input.todos.map((todo: { description?: string; content?: string; status?: string }) => ({
-        content: todo.content || todo.description || '',
-        status: todo.status === 'cancelled' ? 'completed' : todo.status || 'pending',
-        activeForm: todo.content || todo.description || '',
-      })),
+      todos: input.todos.map(
+        (todo: { description?: string; content?: string; status?: string }) => ({
+          content: todo.content || todo.description || '',
+          status: todo.status === 'cancelled' ? 'completed' : todo.status || 'pending',
+          activeForm: todo.content || todo.description || '',
+        })
+      ),
     };
   }
 
@@ -195,7 +197,7 @@ function normalizeCopilotToolInput(
 }
 
 /**
- * CopilotProvider - Integrates GitHub Copilot SDK as an AI provider
+ * CopilotProvider - Integrates GitHub Copilot CLI as an AI provider
  *
  * Features:
  * - GitHub OAuth authentication
@@ -228,7 +230,7 @@ export class CopilotProvider extends CliProvider {
   getSpawnConfig(): CliSpawnConfig {
     return {
       windowsStrategy: 'npx', // Copilot CLI can be run via npx
-      npxPackage: '@github/copilot-sdk', // Official GitHub Copilot SDK package
+      npxPackage: '@github/copilot', // Official GitHub Copilot CLI package
       commonPaths: {
         linux: [
           path.join(os.homedir(), '.local/bin/copilot'),
@@ -415,8 +417,7 @@ export class CopilotProvider extends CliProvider {
         code: CopilotErrorCode.NOT_AUTHENTICATED,
         message: 'GitHub Copilot is not authenticated',
         recoverable: true,
-        suggestion:
-          'Run "gh auth login" or "copilot auth login" to authenticate with GitHub',
+        suggestion: 'Run "gh auth login" or "copilot auth login" to authenticate with GitHub',
       };
     }
 
@@ -439,7 +440,7 @@ export class CopilotProvider extends CliProvider {
       lower.includes('invalid model') ||
       lower.includes('unknown model') ||
       lower.includes('model not found') ||
-      lower.includes('not found') && lower.includes('404')
+      (lower.includes('not found') && lower.includes('404'))
     ) {
       return {
         code: CopilotErrorCode.MODEL_UNAVAILABLE,
@@ -483,11 +484,11 @@ export class CopilotProvider extends CliProvider {
    * Override install instructions for Copilot-specific guidance
    */
   protected getInstallInstructions(): string {
-    return 'Install with: npm install -g @github/copilot-sdk (or visit https://github.com/github/copilot-sdk)';
+    return 'Install with: npm install -g @github/copilot (or visit https://github.com/github/copilot)';
   }
 
   /**
-   * Execute a prompt using Copilot SDK with streaming
+   * Execute a prompt using Copilot CLI with streaming
    */
   async *executeQuery(options: ExecuteOptions): AsyncGenerator<ProviderMessage> {
     this.ensureCliDetected();
@@ -604,7 +605,7 @@ export class CopilotProvider extends CliProvider {
    * Check authentication status
    *
    * Uses GitHub CLI (gh) to check Copilot authentication status.
-   * The Copilot SDK relies on gh auth for authentication.
+   * The Copilot CLI relies on gh auth for authentication.
    */
   async checkAuth(): Promise<CopilotAuthStatus> {
     this.ensureCliDetected();
@@ -616,7 +617,7 @@ export class CopilotProvider extends CliProvider {
     logger.debug('checkAuth: Starting credential check');
 
     // Try to check GitHub CLI authentication status first
-    // The Copilot SDK uses gh auth for authentication
+    // The Copilot CLI uses gh auth for authentication
     try {
       const ghStatus = execSync('gh auth status --hostname github.com', {
         encoding: 'utf8',
@@ -707,7 +708,7 @@ export class CopilotProvider extends CliProvider {
   }
 
   /**
-   * Fetch available models from the SDK at runtime
+   * Fetch available models from the CLI at runtime
    */
   async fetchRuntimeModels(): Promise<CopilotRuntimeModel[]> {
     this.ensureCliDetected();
@@ -716,7 +717,7 @@ export class CopilotProvider extends CliProvider {
     }
 
     try {
-      // Try to list models using the SDK
+      // Try to list models using the CLI
       const result = execSync(`"${this.cliPath}" models list --format json`, {
         encoding: 'utf8',
         timeout: 15000,
@@ -725,7 +726,7 @@ export class CopilotProvider extends CliProvider {
 
       const models = JSON.parse(result) as CopilotRuntimeModel[];
       this.runtimeModels = models;
-      logger.debug(`Fetched ${models.length} runtime models from Copilot SDK`);
+      logger.debug(`Fetched ${models.length} runtime models from Copilot CLI`);
       return models;
     } catch (error) {
       logger.debug(`Failed to fetch runtime models: ${error}`);
@@ -769,7 +770,7 @@ export class CopilotProvider extends CliProvider {
       ([id, config]) => ({
         id, // Full model ID with copilot- prefix
         name: config.label,
-        modelString: id.replace('copilot-', ''), // Bare model for SDK
+        modelString: id.replace('copilot-', ''), // Bare model for CLI
         provider: 'copilot',
         description: config.description,
         supportsTools: config.supportsTools,
@@ -778,7 +779,7 @@ export class CopilotProvider extends CliProvider {
       })
     );
 
-    // Add runtime models if available (discovered via SDK)
+    // Add runtime models if available (discovered via CLI)
     if (this.runtimeModels) {
       for (const runtimeModel of this.runtimeModels) {
         // Skip if already in static list

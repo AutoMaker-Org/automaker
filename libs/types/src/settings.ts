@@ -905,10 +905,10 @@ export interface GlobalSettings {
   /** Default Gemini model selection when switching to Gemini CLI */
   geminiDefaultModel?: GeminiModelId;
 
-  // Copilot SDK Settings (global)
+  // Copilot CLI Settings (global)
   /** Which Copilot models are available in feature modal (empty = all) */
   enabledCopilotModels?: CopilotModelId[];
-  /** Default Copilot model selection when switching to Copilot SDK */
+  /** Default Copilot model selection when switching to Copilot CLI */
   copilotDefaultModel?: CopilotModelId;
 
   // Provider Visibility Settings
