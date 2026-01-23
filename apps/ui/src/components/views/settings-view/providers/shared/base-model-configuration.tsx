@@ -139,8 +139,9 @@ export function BaseModelConfiguration<T extends string>({
           <Label>Available Models</Label>
           <div className="grid gap-3">
             {models.map((model) => {
-              const isEnabled = enabledModels.includes(model.id);
               const isDefault = model.id === defaultModel;
+              // Default model is always considered enabled
+              const isEnabled = isDefault || enabledModels.includes(model.id);
               const badge = getFeatureBadge?.(model);
 
               return (

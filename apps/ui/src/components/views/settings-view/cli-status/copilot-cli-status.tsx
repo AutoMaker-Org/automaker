@@ -107,6 +107,7 @@ export function CopilotCliStatus({
             disabled={isChecking}
             data-testid="refresh-copilot-cli"
             title="Refresh Copilot CLI detection"
+            aria-label="Refresh Copilot CLI detection"
             className={cn(
               'h-9 w-9 rounded-lg',
               'hover:bg-accent/50 hover:scale-105',

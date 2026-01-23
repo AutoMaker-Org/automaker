@@ -120,7 +120,11 @@ describe('copilot-provider.ts', () => {
 
   describe('checkAuth', () => {
     it('should return authenticated status when gh CLI is logged in', async () => {
+      // Must include --version mock for CLI detection to succeed
       vi.mocked(execSync).mockImplementation((cmd: string) => {
+        if (cmd.includes('--version')) {
+          return '1.0.0';
+        }
         if (cmd.includes('gh auth status')) {
           return 'Logged in to github.com account testuser';
         }
@@ -134,7 +138,11 @@ describe('copilot-provider.ts', () => {
     });
 
     it('should return unauthenticated when gh auth fails', async () => {
+      // Must include --version mock for CLI detection to succeed
       vi.mocked(execSync).mockImplementation((cmd: string) => {
+        if (cmd.includes('--version')) {
+          return '1.0.0';
+        }
         if (cmd.includes('gh auth status')) {
           throw new Error('Not logged in');
         }
@@ -152,7 +160,11 @@ describe('copilot-provider.ts', () => {
     it('should detect GITHUB_TOKEN environment variable', async () => {
       process.env.GITHUB_TOKEN = 'test-token';
 
+      // Must include --version mock for CLI detection to succeed
       vi.mocked(execSync).mockImplementation((cmd: string) => {
+        if (cmd.includes('--version')) {
+          return '1.0.0';
+        }
         if (cmd.includes('gh auth status')) {
           throw new Error('Not logged in');
         }
