@@ -42,6 +42,12 @@ PORT_SEARCH_MAX_ATTEMPTS=100
 WEB_PORT=$DEFAULT_WEB_PORT
 SERVER_PORT=$DEFAULT_SERVER_PORT
 
+# Watchdog configuration (can be overridden by .env)
+WATCHDOG_ENABLED="${WATCHDOG_ENABLED:-false}"
+WATCHDOG_CHECK_INTERVAL="${WATCHDOG_CHECK_INTERVAL:-30}"       # Seconds between health checks
+WATCHDOG_MAX_RESTARTS="${WATCHDOG_MAX_RESTARTS:-3}"            # Max restarts within window
+WATCHDOG_WINDOW_SECONDS="${WATCHDOG_WINDOW_SECONDS:-300}"      # Time window for counting restarts (5 min default)
+
 # Port validation function
 # Returns 0 if valid, 1 if invalid (with error message printed)
 validate_port() {
@@ -145,6 +151,16 @@ KEYBOARD SHORTCUTS (in menu):
 HISTORY:
   Your last selected mode is remembered in: ~/.automaker_launcher_history
   Use --no-history to disable this feature
+
+WATCHDOG (.env configuration):
+  WATCHDOG_ENABLED=true          Enable watchdog monitoring (default: false)
+  WATCHDOG_CHECK_INTERVAL=30     Seconds between health checks (default: 30)
+  WATCHDOG_MAX_RESTARTS=3        Max restart attempts in window (default: 3)
+  WATCHDOG_WINDOW_SECONDS=300    Time window for counting restarts (default: 300)
+
+  The watchdog monitors both API and web servers in web mode, automatically
+  restarting them if they become unresponsive. If max restarts are exceeded
+  within the time window, the watchdog will give up and exit.
 
 PLATFORMS:
   Linux, macOS, Windows (Git Bash, WSL, MSYS2, Cygwin)
@@ -603,9 +619,15 @@ cleanup() {
     show_cursor
     # Restore terminal settings (echo and canonical mode)
     stty echo icanon 2>/dev/null || true
-    # Kill server process if running in production mode
+    # Kill all managed processes
+    if [ -n "${WATCHDOG_PID:-}" ]; then
+        kill $WATCHDOG_PID 2>/dev/null || true
+    fi
     if [ -n "${SERVER_PID:-}" ]; then
         kill $SERVER_PID 2>/dev/null || true
+    fi
+    if [ -n "${WEB_PID:-}" ]; then
+        kill $WEB_PID 2>/dev/null || true
     fi
     printf "${RESET}\n"
 }
@@ -969,6 +991,176 @@ get_last_mode_from_history() {
 }
 
 # ============================================================================
+# WATCHDOG FUNCTIONALITY
+# ============================================================================
+
+# Arrays to track restart timestamps (for rate limiting)
+declare -a SERVER_RESTART_TIMESTAMPS=()
+declare -a WEB_RESTART_TIMESTAMPS=()
+
+# Check if a service is healthy by making an HTTP request
+check_service_health() {
+    local port="$1"
+    local endpoint="${2:-/}"
+    curl -s --max-time 5 "http://localhost:$port$endpoint" > /dev/null 2>&1
+}
+
+# Count restarts within the time window
+count_recent_restarts() {
+    local -n timestamps=$1
+    local window=$2
+    local now
+    now=$(date +%s)
+    local count=0
+    local new_timestamps=()
+
+    for ts in "${timestamps[@]}"; do
+        if (( now - ts < window )); then
+            ((count++))
+            new_timestamps+=("$ts")
+        fi
+    done
+
+    # Update the array to only keep recent timestamps
+    timestamps=("${new_timestamps[@]}")
+    echo "$count"
+}
+
+# Add a restart timestamp
+record_restart() {
+    local -n timestamps=$1
+    timestamps+=("$(date +%s)")
+}
+
+# Start the API server
+start_api_server() {
+    if [ "$PRODUCTION_MODE" = true ]; then
+        npm run start --workspace=apps/server &
+    else
+        npm run _dev:server &
+    fi
+    SERVER_PID=$!
+    echo "$SERVER_PID"
+}
+
+# Start the web server (Vite dev or preview)
+start_web_server() {
+    if [ "$PRODUCTION_MODE" = true ]; then
+        npm run preview --workspace=apps/ui -- --port "$WEB_PORT" &
+    else
+        npm run _dev:web &
+    fi
+    WEB_PID=$!
+    echo "$WEB_PID"
+}
+
+# Watchdog monitoring loop
+run_watchdog() {
+    local server_port="$1"
+    local web_port="$2"
+    local check_interval="$WATCHDOG_CHECK_INTERVAL"
+    local max_restarts="$WATCHDOG_MAX_RESTARTS"
+    local window="$WATCHDOG_WINDOW_SECONDS"
+
+    echo ""
+    center_print "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" "$C_GRAY"
+    center_print "Watchdog Active" "$C_GREEN"
+    center_print "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" "$C_GRAY"
+    center_print "Check interval: ${check_interval}s | Max restarts: $max_restarts in ${window}s" "$C_MUTE"
+    echo ""
+
+    while true; do
+        sleep "$check_interval"
+
+        # Check API server health
+        if ! check_service_health "$server_port" "/api/health"; then
+            echo ""
+            center_print "⚠ API server not responding on port $server_port" "$C_YELLOW"
+
+            local server_restart_count
+            server_restart_count=$(count_recent_restarts SERVER_RESTART_TIMESTAMPS "$window")
+
+            if (( server_restart_count >= max_restarts )); then
+                center_print "✗ API server exceeded max restarts ($max_restarts) within ${window}s window" "$C_RED"
+                center_print "Watchdog giving up. Please check server logs." "$C_RED"
+                # Kill web server too if it's running
+                [ -n "${WEB_PID:-}" ] && kill "$WEB_PID" 2>/dev/null || true
+                exit 1
+            fi
+
+            center_print "Attempting to restart API server (attempt $((server_restart_count + 1))/$max_restarts)..." "$C_YELLOW"
+            record_restart SERVER_RESTART_TIMESTAMPS
+
+            # Kill existing server process if still running
+            [ -n "${SERVER_PID:-}" ] && kill "$SERVER_PID" 2>/dev/null || true
+            sleep 2
+
+            # Restart server
+            SERVER_PID=$(start_api_server)
+
+            # Wait for server to come back up
+            local retries=0
+            local max_wait=30
+            while (( retries < max_wait )); do
+                if check_service_health "$server_port" "/api/health"; then
+                    center_print "✓ API server restarted successfully (PID: $SERVER_PID)" "$C_GREEN"
+                    break
+                fi
+                sleep 1
+                ((retries++))
+            done
+
+            if (( retries >= max_wait )); then
+                center_print "✗ API server failed to restart within ${max_wait}s" "$C_RED"
+            fi
+        fi
+
+        # Check web server health (only for web mode with separate web server)
+        if [ -n "${WEB_PID:-}" ] && ! check_service_health "$web_port"; then
+            echo ""
+            center_print "⚠ Web server not responding on port $web_port" "$C_YELLOW"
+
+            local web_restart_count
+            web_restart_count=$(count_recent_restarts WEB_RESTART_TIMESTAMPS "$window")
+
+            if (( web_restart_count >= max_restarts )); then
+                center_print "✗ Web server exceeded max restarts ($max_restarts) within ${window}s window" "$C_RED"
+                center_print "Watchdog giving up. Please check web server logs." "$C_RED"
+                # Kill API server too
+                [ -n "${SERVER_PID:-}" ] && kill "$SERVER_PID" 2>/dev/null || true
+                exit 1
+            fi
+
+            center_print "Attempting to restart web server (attempt $((web_restart_count + 1))/$max_restarts)..." "$C_YELLOW"
+            record_restart WEB_RESTART_TIMESTAMPS
+
+            # Kill existing web process if still running
+            kill "$WEB_PID" 2>/dev/null || true
+            sleep 2
+
+            # Restart web server
+            WEB_PID=$(start_web_server)
+
+            # Wait for web server to come back up
+            local retries=0
+            local max_wait=30
+            while (( retries < max_wait )); do
+                if check_service_health "$web_port"; then
+                    center_print "✓ Web server restarted successfully (PID: $WEB_PID)" "$C_GREEN"
+                    break
+                fi
+                sleep 1
+                ((retries++))
+            done
+
+            if (( retries >= max_wait )); then
+                center_print "✗ Web server failed to restart within ${max_wait}s" "$C_RED"
+            fi
+        fi
+    done
+}
+
+# ============================================================================
 # PRODUCTION BUILD
 # ============================================================================
 
@@ -1203,10 +1395,48 @@ case $MODE in
 
             # Start UI preview
             center_print "Starting UI preview on port $WEB_PORT..." "$C_YELLOW"
-            npm run preview --workspace=apps/ui -- --port "$WEB_PORT"
 
-            # Cleanup server on exit
-            kill $SERVER_PID 2>/dev/null || true
+            if [ "$WATCHDOG_ENABLED" = true ]; then
+                # Run web server in background and start watchdog
+                npm run preview --workspace=apps/ui -- --port "$WEB_PORT" &
+                WEB_PID=$!
+
+                # Wait for web server to be ready
+                max_retries=30
+                web_ready=false
+                for ((i=0; i<max_retries; i++)); do
+                    if curl -s "http://localhost:$WEB_PORT" > /dev/null 2>&1; then
+                        web_ready=true
+                        break
+                    fi
+                    sleep 1
+                done
+
+                if [ "$web_ready" = false ]; then
+                    center_print "✗ Web server failed to start" "$C_RED"
+                    kill $SERVER_PID 2>/dev/null || true
+                    kill $WEB_PID 2>/dev/null || true
+                    exit 1
+                fi
+                center_print "✓ Web server is ready!" "$C_GREEN"
+
+                # Start watchdog in background
+                run_watchdog "$SERVER_PORT" "$WEB_PORT" &
+                WATCHDOG_PID=$!
+
+                # Wait for any process to exit
+                wait -n $SERVER_PID $WEB_PID 2>/dev/null || wait $SERVER_PID $WEB_PID
+
+                # Cleanup
+                kill $WATCHDOG_PID 2>/dev/null || true
+                kill $SERVER_PID 2>/dev/null || true
+                kill $WEB_PID 2>/dev/null || true
+            else
+                npm run preview --workspace=apps/ui -- --port "$WEB_PORT"
+
+                # Cleanup server on exit
+                kill $SERVER_PID 2>/dev/null || true
+            fi
         else
             # Development: build packages, start server, then start UI with Vite dev server
             echo ""
@@ -1247,7 +1477,41 @@ case $MODE in
 
             # Start web app with Vite dev server (HMR enabled)
             export VITE_APP_MODE="1"
-            npm run _dev:web
+
+            if [ "$WATCHDOG_ENABLED" = true ]; then
+                # Run web server in background and start watchdog
+                npm run _dev:web &
+                WEB_PID=$!
+
+                # Wait for web server to be ready
+                max_retries=30
+                web_ready=false
+                for ((i=0; i<max_retries; i++)); do
+                    if curl -s "http://localhost:$WEB_PORT" > /dev/null 2>&1; then
+                        web_ready=true
+                        break
+                    fi
+                    sleep 1
+                done
+
+                if [ "$web_ready" = false ]; then
+                    center_print "⚠ Web server may still be starting..." "$C_YELLOW"
+                fi
+
+                # Start watchdog in background
+                run_watchdog "$SERVER_PORT" "$WEB_PORT" &
+                WATCHDOG_PID=$!
+
+                # Wait for any process to exit
+                wait -n $SERVER_PID $WEB_PID 2>/dev/null || wait $SERVER_PID $WEB_PID
+
+                # Cleanup
+                kill $WATCHDOG_PID 2>/dev/null || true
+                kill $SERVER_PID 2>/dev/null || true
+                kill $WEB_PID 2>/dev/null || true
+            else
+                npm run _dev:web
+            fi
         fi
         ;;
     electron)
