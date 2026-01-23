@@ -22,7 +22,8 @@ import type {
   InstallationStatus,
   ModelDefinition,
 } from './types.js';
-import { validateBareModelId } from '@automaker/types';
+// Note: validateBareModelId is not used because Copilot's bare model IDs
+// legitimately contain prefixes like claude-, gemini-, gpt-
 import {
   COPILOT_MODEL_MAP,
   type CopilotAuthStatus,
@@ -460,8 +461,16 @@ export class CopilotProvider extends CliProvider {
   async *executeQuery(options: ExecuteOptions): AsyncGenerator<ProviderMessage> {
     this.ensureCliDetected();
 
-    // Validate that model doesn't have a provider prefix
-    validateBareModelId(options.model, 'CopilotProvider');
+    // Note: We don't use validateBareModelId here because Copilot's model IDs
+    // legitimately contain prefixes like claude-, gemini-, gpt- which are the
+    // actual model names from the Copilot CLI. We only need to ensure the
+    // copilot- prefix has been stripped by the ProviderFactory.
+    if (options.model?.startsWith('copilot-')) {
+      throw new Error(
+        `[CopilotProvider] Model ID should not have 'copilot-' prefix. Got: '${options.model}'. ` +
+          `The ProviderFactory should strip this prefix before passing to the provider.`
+      );
+    }
 
     if (!this.cliPath) {
       throw this.createError(
