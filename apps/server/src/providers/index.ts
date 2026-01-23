@@ -38,6 +38,12 @@ export { CursorConfigManager } from './cursor-config-manager.js';
 // OpenCode provider
 export { OpencodeProvider } from './opencode-provider.js';
 
+// Gemini provider
+export { GeminiProvider, GeminiErrorCode } from './gemini-provider.js';
+
+// Copilot provider (GitHub Copilot SDK)
+export { CopilotProvider, CopilotErrorCode } from './copilot-provider.js';
+
 // Provider factory
 export { ProviderFactory } from './provider-factory.js';
 

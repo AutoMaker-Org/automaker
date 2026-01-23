@@ -8,6 +8,7 @@ import type {
   CodexModelId,
   OpencodeModelId,
   GeminiModelId,
+  CopilotModelId,
   GroupedModel,
   PhaseModelEntry,
   ClaudeCompatibleProvider,
@@ -27,6 +28,7 @@ import {
   CURSOR_MODELS,
   OPENCODE_MODELS,
   GEMINI_MODELS,
+  COPILOT_MODELS,
   THINKING_LEVELS,
   THINKING_LEVEL_LABELS,
   REASONING_EFFORT_LEVELS,
@@ -42,6 +44,7 @@ import {
   GlmIcon,
   MiniMaxIcon,
   GeminiIcon,
+  CopilotIcon,
   getProviderIconForModel,
 } from '@/components/ui/provider-icon';
 import { Button } from '@/components/ui/button';
@@ -172,6 +175,7 @@ export function PhaseModelSelector({
   const {
     enabledCursorModels,
     enabledGeminiModels,
+    enabledCopilotModels,
     favoriteModels,
     toggleFavoriteModel,
     codexModels,
@@ -331,6 +335,11 @@ export function PhaseModelSelector({
     return enabledGeminiModels.includes(model.id as GeminiModelId);
   });
 
+  // Filter Copilot models to only show enabled ones
+  const availableCopilotModels = COPILOT_MODELS.filter((model) => {
+    return enabledCopilotModels.includes(model.id as CopilotModelId);
+  });
+
   // Helper to find current selected model details
   const currentModel = useMemo(() => {
     const claudeModel = CLAUDE_MODELS.find((m) => m.id === selectedModel);
@@ -375,6 +384,15 @@ export function PhaseModelSelector({
       return {
         ...geminiModel,
         icon: GeminiIcon,
+      };
+    }
+
+    // Check Copilot models
+    const copilotModel = availableCopilotModels.find((m) => m.id === selectedModel);
+    if (copilotModel) {
+      return {
+        ...copilotModel,
+        icon: CopilotIcon,
       };
     }
 
@@ -479,6 +497,7 @@ export function PhaseModelSelector({
     selectedThinkingLevel,
     availableCursorModels,
     availableGeminiModels,
+    availableCopilotModels,
     transformedCodexModels,
     dynamicOpencodeModels,
     enabledProviders,
@@ -545,19 +564,22 @@ export function PhaseModelSelector({
   // Check if providers are disabled (needed for rendering conditions)
   const isCursorDisabled = disabledProviders.includes('cursor');
   const isGeminiDisabled = disabledProviders.includes('gemini');
+  const isCopilotDisabled = disabledProviders.includes('copilot');
 
   // Group models (filtering out disabled providers)
-  const { favorites, claude, cursor, codex, gemini, opencode } = useMemo(() => {
+  const { favorites, claude, cursor, codex, gemini, copilot, opencode } = useMemo(() => {
     const favs: typeof CLAUDE_MODELS = [];
     const cModels: typeof CLAUDE_MODELS = [];
     const curModels: typeof CURSOR_MODELS = [];
     const codModels: typeof transformedCodexModels = [];
     const gemModels: typeof GEMINI_MODELS = [];
+    const copModels: typeof COPILOT_MODELS = [];
     const ocModels: ModelOption[] = [];
 
     const isClaudeDisabled = disabledProviders.includes('claude');
     const isCodexDisabled = disabledProviders.includes('codex');
     const isGeminiDisabledInner = disabledProviders.includes('gemini');
+    const isCopilotDisabledInner = disabledProviders.includes('copilot');
     const isOpencodeDisabled = disabledProviders.includes('opencode');
 
     // Process Claude Models (skip if provider is disabled)
@@ -604,6 +626,17 @@ export function PhaseModelSelector({
       });
     }
 
+    // Process Copilot Models (skip if provider is disabled)
+    if (!isCopilotDisabledInner) {
+      availableCopilotModels.forEach((model) => {
+        if (favoriteModels.includes(model.id)) {
+          favs.push(model);
+        } else {
+          copModels.push(model);
+        }
+      });
+    }
+
     // Process OpenCode Models (skip if provider is disabled)
     if (!isOpencodeDisabled) {
       allOpencodeModels.forEach((model) => {
@@ -621,12 +654,14 @@ export function PhaseModelSelector({
       cursor: curModels,
       codex: codModels,
       gemini: gemModels,
+      copilot: copModels,
       opencode: ocModels,
     };
   }, [
     favoriteModels,
     availableCursorModels,
     availableGeminiModels,
+    availableCopilotModels,
     transformedCodexModels,
     allOpencodeModels,
     disabledProviders,
@@ -1081,6 +1116,59 @@ export function PhaseModelSelector({
       >
         <div className="flex items-center gap-3 overflow-hidden">
           <GeminiIcon
+            className={cn(
+              'h-4 w-4 shrink-0',
+              isSelected ? 'text-primary' : 'text-muted-foreground'
+            )}
+          />
+          <div className="flex flex-col truncate">
+            <span className={cn('truncate font-medium', isSelected && 'text-primary')}>
+              {model.label}
+            </span>
+            <span className="truncate text-xs text-muted-foreground">{model.description}</span>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-1 ml-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            className={cn(
+              'h-6 w-6 hover:bg-transparent hover:text-yellow-500 focus:ring-0',
+              isFavorite
+                ? 'text-yellow-500 opacity-100'
+                : 'opacity-0 group-hover:opacity-100 text-muted-foreground'
+            )}
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleFavoriteModel(model.id);
+            }}
+          >
+            <Star className={cn('h-3.5 w-3.5', isFavorite && 'fill-current')} />
+          </Button>
+          {isSelected && <Check className="h-4 w-4 text-primary shrink-0" />}
+        </div>
+      </CommandItem>
+    );
+  };
+
+  // Render Copilot model item - simple selector without thinking level
+  const renderCopilotModelItem = (model: (typeof COPILOT_MODELS)[0]) => {
+    const isSelected = selectedModel === model.id;
+    const isFavorite = favoriteModels.includes(model.id);
+
+    return (
+      <CommandItem
+        key={model.id}
+        value={model.label}
+        onSelect={() => {
+          onChange({ model: model.id as CopilotModelId });
+          setOpen(false);
+        }}
+        className="group flex items-center justify-between py-2"
+      >
+        <div className="flex items-center gap-3 overflow-hidden">
+          <CopilotIcon
             className={cn(
               'h-4 w-4 shrink-0',
               isSelected ? 'text-primary' : 'text-muted-foreground'
@@ -1933,6 +2021,10 @@ export function PhaseModelSelector({
                     if (model.provider === 'gemini') {
                       return renderGeminiModelItem(model as (typeof GEMINI_MODELS)[0]);
                     }
+                    // Copilot model
+                    if (model.provider === 'copilot') {
+                      return renderCopilotModelItem(model as (typeof COPILOT_MODELS)[0]);
+                    }
                     // OpenCode model
                     if (model.provider === 'opencode') {
                       return renderOpencodeModelItem(model);
@@ -2014,6 +2106,12 @@ export function PhaseModelSelector({
           {!isGeminiDisabled && gemini.length > 0 && (
             <CommandGroup heading="Gemini Models">
               {gemini.map((model) => renderGeminiModelItem(model))}
+            </CommandGroup>
+          )}
+
+          {!isCopilotDisabled && copilot.length > 0 && (
+            <CommandGroup heading="Copilot Models">
+              {copilot.map((model) => renderCopilotModelItem(model))}
             </CommandGroup>
           )}
 

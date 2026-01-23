@@ -24,6 +24,7 @@ import {
   CodexSettingsTab,
   OpencodeSettingsTab,
   GeminiSettingsTab,
+  CopilotSettingsTab,
 } from './settings-view/providers';
 import { MCPServersSection } from './settings-view/mcp-servers';
 import { PromptCustomizationSection } from './settings-view/prompts';
@@ -126,6 +127,8 @@ export function SettingsView() {
         return <OpencodeSettingsTab />;
       case 'gemini-provider':
         return <GeminiSettingsTab />;
+      case 'copilot-provider':
+        return <CopilotSettingsTab />;
       case 'providers':
       case 'claude': // Backwards compatibility - redirect to claude-provider
         return <ClaudeSettingsTab />;

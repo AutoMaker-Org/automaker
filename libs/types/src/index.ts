@@ -253,6 +253,9 @@ export * from './opencode-models.js';
 // Gemini types
 export * from './gemini-models.js';
 
+// Copilot types
+export * from './copilot-models.js';
+
 // Provider utilities
 export {
   PROVIDER_PREFIXES,
@@ -261,6 +264,7 @@ export {
   isCodexModel,
   isOpencodeModel,
   isGeminiModel,
+  isCopilotModel,
   getModelProvider,
   stripProviderPrefix,
   addProviderPrefix,

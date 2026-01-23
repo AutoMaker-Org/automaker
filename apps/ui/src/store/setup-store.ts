@@ -79,6 +79,22 @@ export interface GeminiCliStatus {
   error?: string;
 }
 
+// Copilot SDK Status
+export interface CopilotCliStatus {
+  installed: boolean;
+  version?: string | null;
+  path?: string | null;
+  auth?: {
+    authenticated: boolean;
+    method: string;
+    login?: string;
+    host?: string;
+  };
+  installCommand?: string;
+  loginCommand?: string;
+  error?: string;
+}
+
 // Codex Auth Method
 export type CodexAuthMethod =
   | 'api_key_env' // OPENAI_API_KEY environment variable
@@ -137,6 +153,7 @@ export type SetupStep =
   | 'codex'
   | 'opencode'
   | 'gemini'
+  | 'copilot'
   | 'github'
   | 'complete';
 
@@ -168,6 +185,9 @@ export interface SetupState {
 
   // Gemini CLI state
   geminiCliStatus: GeminiCliStatus | null;
+
+  // Copilot SDK state
+  copilotCliStatus: CopilotCliStatus | null;
 
   // Setup preferences
   skipClaudeSetup: boolean;
@@ -206,6 +226,9 @@ export interface SetupActions {
   // Gemini CLI
   setGeminiCliStatus: (status: GeminiCliStatus | null) => void;
 
+  // Copilot SDK
+  setCopilotCliStatus: (status: CopilotCliStatus | null) => void;
+
   // Preferences
   setSkipClaudeSetup: (skip: boolean) => void;
 }
@@ -240,6 +263,8 @@ const initialState: SetupState = {
   opencodeCliStatus: null,
 
   geminiCliStatus: null,
+
+  copilotCliStatus: null,
 
   skipClaudeSetup: shouldSkipSetup,
 };
@@ -315,6 +340,9 @@ export const useSetupStore = create<SetupState & SetupActions>()((set, get) => (
 
   // Gemini CLI
   setGeminiCliStatus: (status) => set({ geminiCliStatus: status }),
+
+  // Copilot SDK
+  setCopilotCliStatus: (status) => set({ copilotCliStatus: status }),
 
   // Preferences
   setSkipClaudeSetup: (skip) => set({ skipClaudeSetup: skip }),

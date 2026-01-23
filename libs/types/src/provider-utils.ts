@@ -11,6 +11,7 @@ import { CURSOR_MODEL_MAP, LEGACY_CURSOR_MODEL_MAP } from './cursor-models.js';
 import { CLAUDE_MODEL_MAP, CODEX_MODEL_MAP } from './model.js';
 import { OPENCODE_MODEL_CONFIG_MAP, LEGACY_OPENCODE_MODEL_MAP } from './opencode-models.js';
 import { GEMINI_MODEL_MAP } from './gemini-models.js';
+import { COPILOT_MODEL_MAP } from './copilot-models.js';
 
 /** Provider prefix constants */
 export const PROVIDER_PREFIXES = {
@@ -18,6 +19,7 @@ export const PROVIDER_PREFIXES = {
   codex: 'codex-',
   opencode: 'opencode-',
   gemini: 'gemini-',
+  copilot: 'copilot-',
 } as const;
 
 /**
@@ -115,6 +117,28 @@ export function isGeminiModel(model: string | undefined | null): boolean {
 }
 
 /**
+ * Check if a model string represents a GitHub Copilot model
+ *
+ * @param model - Model string to check (e.g., "copilot-gpt-4o", "copilot-claude-3.5-sonnet")
+ * @returns true if the model is a Copilot model
+ */
+export function isCopilotModel(model: string | undefined | null): boolean {
+  if (!model || typeof model !== 'string') return false;
+
+  // Canonical format: copilot- prefix (e.g., "copilot-gpt-4o")
+  if (model.startsWith(PROVIDER_PREFIXES.copilot)) {
+    return true;
+  }
+
+  // Check if it's a known Copilot model ID (map keys include copilot- prefix)
+  if (model in COPILOT_MODEL_MAP) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
  * Check if a model string represents an OpenCode model
  *
  * With canonical model IDs, static OpenCode models use 'opencode-' prefix.
@@ -175,7 +199,11 @@ export function isOpencodeModel(model: string | undefined | null): boolean {
  * @returns The provider type, defaults to 'claude' for unknown models
  */
 export function getModelProvider(model: string | undefined | null): ModelProvider {
-  // Check Gemini first since it uses gemini- prefix
+  // Check Copilot first since it has a unique prefix
+  if (isCopilotModel(model)) {
+    return 'copilot';
+  }
+  // Check Gemini since it uses gemini- prefix
   if (isGeminiModel(model)) {
     return 'gemini';
   }
@@ -248,6 +276,10 @@ export function addProviderPrefix(model: string, provider: ModelProvider): strin
     if (!model.startsWith(PROVIDER_PREFIXES.gemini)) {
       return `${PROVIDER_PREFIXES.gemini}${model}`;
     }
+  } else if (provider === 'copilot') {
+    if (!model.startsWith(PROVIDER_PREFIXES.copilot)) {
+      return `${PROVIDER_PREFIXES.copilot}${model}`;
+    }
   }
   // Claude models don't use prefixes
   return model;
@@ -284,6 +316,7 @@ export function normalizeModelString(model: string | undefined | null): string {
     model.startsWith(PROVIDER_PREFIXES.codex) ||
     model.startsWith(PROVIDER_PREFIXES.opencode) ||
     model.startsWith(PROVIDER_PREFIXES.gemini) ||
+    model.startsWith(PROVIDER_PREFIXES.copilot) ||
     model.startsWith('claude-')
   ) {
     return model;

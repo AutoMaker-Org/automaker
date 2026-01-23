@@ -5,6 +5,7 @@ import {
   CODEX_MODEL_MAP,
   OPENCODE_MODELS as OPENCODE_MODEL_CONFIGS,
   GEMINI_MODEL_MAP,
+  COPILOT_MODEL_MAP,
 } from '@automaker/types';
 import { Brain, Zap, Scale, Cpu, Rocket, Sparkles } from 'lucide-react';
 import {
@@ -13,6 +14,7 @@ import {
   OpenAIIcon,
   OpenCodeIcon,
   GeminiIcon,
+  CopilotIcon,
 } from '@/components/ui/provider-icon';
 
 export type ModelOption = {
@@ -140,7 +142,22 @@ export const GEMINI_MODELS: ModelOption[] = Object.entries(GEMINI_MODEL_MAP).map
 );
 
 /**
- * All available models (Claude + Cursor + Codex + OpenCode + Gemini)
+ * Copilot models derived from COPILOT_MODEL_MAP
+ * Model IDs already have 'copilot-' prefix
+ */
+export const COPILOT_MODELS: ModelOption[] = Object.entries(COPILOT_MODEL_MAP).map(
+  ([id, config]) => ({
+    id, // IDs already have copilot- prefix (e.g., 'copilot-gpt-4o')
+    label: config.label,
+    description: config.description,
+    badge: config.supportsVision ? 'Vision' : 'Standard',
+    provider: 'copilot' as ModelProvider,
+    hasThinking: false,
+  })
+);
+
+/**
+ * All available models (Claude + Cursor + Codex + OpenCode + Gemini + Copilot)
  */
 export const ALL_MODELS: ModelOption[] = [
   ...CLAUDE_MODELS,
@@ -148,6 +165,7 @@ export const ALL_MODELS: ModelOption[] = [
   ...CODEX_MODELS,
   ...OPENCODE_MODELS,
   ...GEMINI_MODELS,
+  ...COPILOT_MODELS,
 ];
 
 export const THINKING_LEVELS: ThinkingLevel[] = ['none', 'low', 'medium', 'high', 'ultrathink'];
@@ -195,4 +213,5 @@ export const PROFILE_ICONS: Record<string, React.ComponentType<{ className?: str
   Codex: OpenAIIcon,
   OpenCode: OpenCodeIcon,
   Gemini: GeminiIcon,
+  Copilot: CopilotIcon,
 };

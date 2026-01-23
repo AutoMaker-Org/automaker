@@ -9,6 +9,7 @@ export type SettingsViewId =
   | 'codex-provider'
   | 'opencode-provider'
   | 'gemini-provider'
+  | 'copilot-provider'
   | 'mcp-servers'
   | 'prompts'
   | 'model-defaults'

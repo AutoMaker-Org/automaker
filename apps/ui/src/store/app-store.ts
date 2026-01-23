@@ -22,6 +22,7 @@ import type {
   CodexModelId,
   OpencodeModelId,
   GeminiModelId,
+  CopilotModelId,
   PhaseModelConfig,
   PhaseModelKey,
   PhaseModelEntry,
@@ -41,9 +42,11 @@ import {
   getAllCodexModelIds,
   getAllOpencodeModelIds,
   getAllGeminiModelIds,
+  getAllCopilotModelIds,
   DEFAULT_PHASE_MODELS,
   DEFAULT_OPENCODE_MODEL,
   DEFAULT_GEMINI_MODEL,
+  DEFAULT_COPILOT_MODEL,
   DEFAULT_MAX_CONCURRENCY,
   DEFAULT_GLOBAL_SETTINGS,
 } from '@automaker/types';
@@ -736,6 +739,10 @@ export interface AppState {
   enabledGeminiModels: GeminiModelId[]; // Which Gemini models are available in feature modal
   geminiDefaultModel: GeminiModelId; // Default Gemini model selection
 
+  // Copilot SDK Settings (global)
+  enabledCopilotModels: CopilotModelId[]; // Which Copilot models are available in feature modal
+  copilotDefaultModel: CopilotModelId; // Default Copilot model selection
+
   // Provider Visibility Settings
   disabledProviders: ModelProvider[]; // Providers that are disabled and hidden from dropdowns
 
@@ -1230,6 +1237,11 @@ export interface AppActions {
   setGeminiDefaultModel: (model: GeminiModelId) => void;
   toggleGeminiModel: (model: GeminiModelId, enabled: boolean) => void;
 
+  // Copilot SDK Settings actions
+  setEnabledCopilotModels: (models: CopilotModelId[]) => void;
+  setCopilotDefaultModel: (model: CopilotModelId) => void;
+  toggleCopilotModel: (model: CopilotModelId, enabled: boolean) => void;
+
   // Provider Visibility Settings actions
   setDisabledProviders: (providers: ModelProvider[]) => void;
   toggleProviderDisabled: (provider: ModelProvider, disabled: boolean) => void;
@@ -1517,6 +1529,8 @@ const initialState: AppState = {
   opencodeModelsLastFailedAt: null,
   enabledGeminiModels: getAllGeminiModelIds(), // All Gemini models enabled by default
   geminiDefaultModel: DEFAULT_GEMINI_MODEL, // Default to Gemini 2.5 Flash
+  enabledCopilotModels: getAllCopilotModelIds(), // All Copilot models enabled by default
+  copilotDefaultModel: DEFAULT_COPILOT_MODEL, // Default to GPT-4o
   disabledProviders: [], // No providers disabled by default
   autoLoadClaudeMd: false, // Default to disabled (user must opt-in)
   skipSandboxWarning: false, // Default to disabled (show sandbox warning dialog)
@@ -2757,6 +2771,16 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
       enabledGeminiModels: enabled
         ? [...state.enabledGeminiModels, model]
         : state.enabledGeminiModels.filter((m) => m !== model),
+    })),
+
+  // Copilot SDK Settings actions
+  setEnabledCopilotModels: (models) => set({ enabledCopilotModels: models }),
+  setCopilotDefaultModel: (model) => set({ copilotDefaultModel: model }),
+  toggleCopilotModel: (model, enabled) =>
+    set((state) => ({
+      enabledCopilotModels: enabled
+        ? [...state.enabledCopilotModels, model]
+        : state.enabledCopilotModels.filter((m) => m !== model),
     })),
 
   // Provider Visibility Settings actions

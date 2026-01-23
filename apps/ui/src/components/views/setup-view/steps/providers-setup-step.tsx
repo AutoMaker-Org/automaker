@@ -37,6 +37,7 @@ import {
   OpenAIIcon,
   OpenCodeIcon,
   GeminiIcon,
+  CopilotIcon,
 } from '@/components/ui/provider-icon';
 import { TerminalOutput } from '../components';
 import { useCliInstallation, useTokenSave } from '../hooks';
@@ -46,7 +47,7 @@ interface ProvidersSetupStepProps {
   onBack: () => void;
 }
 
-type ProviderTab = 'claude' | 'cursor' | 'codex' | 'opencode' | 'gemini';
+type ProviderTab = 'claude' | 'cursor' | 'codex' | 'opencode' | 'gemini' | 'copilot';
 
 // ============================================================================
 // Claude Content
@@ -1528,6 +1529,247 @@ function GeminiContent() {
 }
 
 // ============================================================================
+// Copilot Content
+// ============================================================================
+function CopilotContent() {
+  const { copilotCliStatus, setCopilotCliStatus } = useSetupStore();
+  const [isChecking, setIsChecking] = useState(false);
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  const checkStatus = useCallback(async () => {
+    setIsChecking(true);
+    try {
+      const api = getElectronAPI();
+      if (!api.setup?.getCopilotStatus) return;
+      const result = await api.setup.getCopilotStatus();
+      if (result.success) {
+        setCopilotCliStatus({
+          installed: result.installed ?? false,
+          version: result.version,
+          path: result.path,
+          auth: result.auth,
+          installCommand: result.installCommand,
+          loginCommand: result.loginCommand,
+        });
+        if (result.auth?.authenticated) {
+          toast.success('Copilot SDK is ready!');
+        }
+      }
+    } catch {
+      // Ignore
+    } finally {
+      setIsChecking(false);
+    }
+  }, [setCopilotCliStatus]);
+
+  useEffect(() => {
+    checkStatus();
+    return () => {
+      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+    };
+  }, [checkStatus]);
+
+  const copyCommand = (command: string) => {
+    navigator.clipboard.writeText(command);
+    toast.success('Command copied to clipboard');
+  };
+
+  const handleLogin = async () => {
+    setIsLoggingIn(true);
+    try {
+      const loginCommand = copilotCliStatus?.loginCommand || 'gh auth login';
+      await navigator.clipboard.writeText(loginCommand);
+      toast.info('Login command copied! Paste in terminal to authenticate.');
+
+      let attempts = 0;
+      pollIntervalRef.current = setInterval(async () => {
+        attempts++;
+        try {
+          const api = getElectronAPI();
+          if (!api.setup?.getCopilotStatus) return;
+          const result = await api.setup.getCopilotStatus();
+          if (result.auth?.authenticated) {
+            if (pollIntervalRef.current) {
+              clearInterval(pollIntervalRef.current);
+              pollIntervalRef.current = null;
+            }
+            setCopilotCliStatus({
+              ...copilotCliStatus,
+              installed: result.installed ?? true,
+              version: result.version,
+              path: result.path,
+              auth: result.auth,
+            });
+            setIsLoggingIn(false);
+            toast.success('Successfully authenticated with GitHub!');
+          }
+        } catch {
+          // Ignore
+        }
+        if (attempts >= 60) {
+          if (pollIntervalRef.current) {
+            clearInterval(pollIntervalRef.current);
+            pollIntervalRef.current = null;
+          }
+          setIsLoggingIn(false);
+          toast.error('Login timed out. Please try again.');
+        }
+      }, 2000);
+    } catch {
+      toast.error('Failed to start login process');
+      setIsLoggingIn(false);
+    }
+  };
+
+  const isReady = copilotCliStatus?.installed && copilotCliStatus?.auth?.authenticated;
+
+  return (
+    <Card className="bg-card border-border">
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-lg flex items-center gap-2">
+            <CopilotIcon className="w-5 h-5" />
+            GitHub Copilot SDK Status
+          </CardTitle>
+          <Button variant="ghost" size="sm" onClick={checkStatus} disabled={isChecking}>
+            {isChecking ? <Spinner size="sm" /> : <RefreshCw className="w-4 h-4" />}
+          </Button>
+        </div>
+        <CardDescription>
+          {copilotCliStatus?.installed
+            ? copilotCliStatus.auth?.authenticated
+              ? `Authenticated${copilotCliStatus.version ? ` (v${copilotCliStatus.version})` : ''}`
+              : 'Installed but not authenticated'
+            : 'Not installed on your system'}
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {isReady && (
+          <div className="space-y-3">
+            <div className="flex items-center gap-3 p-4 rounded-lg bg-green-500/10 border border-green-500/20">
+              <CheckCircle2 className="w-5 h-5 text-green-500" />
+              <div>
+                <p className="font-medium text-foreground">SDK Installed</p>
+                <p className="text-sm text-muted-foreground">
+                  {copilotCliStatus?.version && `Version: ${copilotCliStatus.version}`}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 p-4 rounded-lg bg-green-500/10 border border-green-500/20">
+              <CheckCircle2 className="w-5 h-5 text-green-500" />
+              <div>
+                <p className="font-medium text-foreground">Authenticated</p>
+                {copilotCliStatus?.auth?.login && (
+                  <p className="text-sm text-muted-foreground">
+                    Logged in as {copilotCliStatus.auth.login}
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {!copilotCliStatus?.installed && !isChecking && (
+          <div className="space-y-4">
+            <div className="flex items-start gap-3 p-4 rounded-lg bg-muted/30 border border-border">
+              <XCircle className="w-5 h-5 text-muted-foreground shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="font-medium text-foreground">Copilot SDK not found</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Install the GitHub Copilot SDK to use Copilot models.
+                </p>
+              </div>
+            </div>
+            <div className="space-y-3 p-4 rounded-lg bg-muted/30 border border-border">
+              <p className="font-medium text-foreground text-sm">Install Copilot SDK:</p>
+              <div className="flex items-center gap-2">
+                <code className="flex-1 bg-muted px-3 py-2 rounded text-sm font-mono text-foreground overflow-x-auto">
+                  {copilotCliStatus?.installCommand || 'npm install -g @github/copilot-sdk'}
+                </code>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() =>
+                    copyCommand(
+                      copilotCliStatus?.installCommand || 'npm install -g @github/copilot-sdk'
+                    )
+                  }
+                >
+                  <Copy className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {copilotCliStatus?.installed && !copilotCliStatus?.auth?.authenticated && !isChecking && (
+          <div className="space-y-4">
+            {/* Show SDK installed toast */}
+            <div className="flex items-center gap-3 p-4 rounded-lg bg-green-500/10 border border-green-500/20">
+              <CheckCircle2 className="w-5 h-5 text-green-500" />
+              <div>
+                <p className="font-medium text-foreground">SDK Installed</p>
+                <p className="text-sm text-muted-foreground">
+                  {copilotCliStatus?.version && `Version: ${copilotCliStatus.version}`}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3 p-4 rounded-lg bg-amber-500/10 border border-amber-500/20">
+              <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="font-medium text-foreground">GitHub not authenticated</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Run the GitHub CLI login command to authenticate.
+                </p>
+              </div>
+            </div>
+            <div className="space-y-3 p-4 rounded-lg bg-muted/30 border border-border">
+              <div className="flex items-center gap-2">
+                <code className="flex-1 bg-muted px-3 py-2 rounded text-sm font-mono text-foreground">
+                  {copilotCliStatus?.loginCommand || 'gh auth login'}
+                </code>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() =>
+                    copyCommand(copilotCliStatus?.loginCommand || 'gh auth login')
+                  }
+                >
+                  <Copy className="w-4 h-4" />
+                </Button>
+              </div>
+              <Button
+                onClick={handleLogin}
+                disabled={isLoggingIn}
+                className="w-full bg-brand-500 hover:bg-brand-600 text-white"
+              >
+                {isLoggingIn ? (
+                  <>
+                    <Spinner size="sm" className="mr-2" />
+                    Waiting for login...
+                  </>
+                ) : (
+                  'Copy Command & Wait for Login'
+                )}
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {isChecking && (
+          <div className="flex items-center gap-3 p-4 rounded-lg bg-blue-500/10 border border-blue-500/20">
+            <Spinner size="md" />
+            <p className="font-medium text-foreground">Checking Copilot SDK status...</p>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ============================================================================
 // Main Component
 // ============================================================================
 export function ProvidersSetupStep({ onNext, onBack }: ProvidersSetupStepProps) {
@@ -1544,12 +1786,14 @@ export function ProvidersSetupStep({ onNext, onBack }: ProvidersSetupStepProps) 
     codexAuthStatus,
     opencodeCliStatus,
     geminiCliStatus,
+    copilotCliStatus,
     setClaudeCliStatus,
     setCursorCliStatus,
     setCodexCliStatus,
     setCodexAuthStatus,
     setOpencodeCliStatus,
     setGeminiCliStatus,
+    setCopilotCliStatus,
   } = useSetupStore();
 
   // Check all providers on mount
@@ -1659,8 +1903,28 @@ export function ProvidersSetupStep({ onNext, onBack }: ProvidersSetupStepProps) 
       }
     };
 
+    // Check Copilot
+    const checkCopilot = async () => {
+      try {
+        if (!api.setup?.getCopilotStatus) return;
+        const result = await api.setup.getCopilotStatus();
+        if (result.success) {
+          setCopilotCliStatus({
+            installed: result.installed ?? false,
+            version: result.version,
+            path: result.path,
+            auth: result.auth,
+            installCommand: result.installCommand,
+            loginCommand: result.loginCommand,
+          });
+        }
+      } catch {
+        // Ignore errors
+      }
+    };
+
     // Run all checks in parallel
-    await Promise.all([checkClaude(), checkCursor(), checkCodex(), checkOpencode(), checkGemini()]);
+    await Promise.all([checkClaude(), checkCursor(), checkCodex(), checkOpencode(), checkGemini(), checkCopilot()]);
     setIsInitialChecking(false);
   }, [
     setClaudeCliStatus,
@@ -1669,6 +1933,7 @@ export function ProvidersSetupStep({ onNext, onBack }: ProvidersSetupStepProps) 
     setCodexAuthStatus,
     setOpencodeCliStatus,
     setGeminiCliStatus,
+    setCopilotCliStatus,
   ]);
 
   useEffect(() => {
@@ -1698,12 +1963,16 @@ export function ProvidersSetupStep({ onNext, onBack }: ProvidersSetupStepProps) 
   const isGeminiInstalled = geminiCliStatus?.installed === true;
   const isGeminiAuthenticated = geminiCliStatus?.auth?.authenticated === true;
 
+  const isCopilotInstalled = copilotCliStatus?.installed === true;
+  const isCopilotAuthenticated = copilotCliStatus?.auth?.authenticated === true;
+
   const hasAtLeastOneProvider =
     isClaudeAuthenticated ||
     isCursorAuthenticated ||
     isCodexAuthenticated ||
     isOpencodeAuthenticated ||
-    isGeminiAuthenticated;
+    isGeminiAuthenticated ||
+    isCopilotAuthenticated;
 
   type ProviderStatus = 'not_installed' | 'installed_not_auth' | 'authenticated' | 'verifying';
 
@@ -1754,6 +2023,13 @@ export function ProvidersSetupStep({ onNext, onBack }: ProvidersSetupStepProps) 
       status: getProviderStatus(isGeminiInstalled, isGeminiAuthenticated),
       color: 'text-blue-500',
     },
+    {
+      id: 'copilot' as const,
+      label: 'Copilot',
+      icon: CopilotIcon,
+      status: getProviderStatus(isCopilotInstalled, isCopilotAuthenticated),
+      color: 'text-violet-500',
+    },
   ];
 
   const renderStatusIcon = (status: ProviderStatus) => {
@@ -1790,7 +2066,7 @@ export function ProvidersSetupStep({ onNext, onBack }: ProvidersSetupStepProps) 
       )}
 
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as ProviderTab)}>
-        <TabsList className="grid w-full grid-cols-5 h-auto p-1">
+        <TabsList className="grid w-full grid-cols-6 h-auto p-1">
           {providers.map((provider) => {
             const Icon = provider.icon;
             return (
@@ -1838,6 +2114,9 @@ export function ProvidersSetupStep({ onNext, onBack }: ProvidersSetupStepProps) 
           </TabsContent>
           <TabsContent value="gemini" className="mt-0">
             <GeminiContent />
+          </TabsContent>
+          <TabsContent value="copilot" className="mt-0">
+            <CopilotContent />
           </TabsContent>
         </div>
       </Tabs>

@@ -22,11 +22,13 @@ import { waitForMigrationComplete, resetMigrationState } from './use-settings-mi
 import {
   DEFAULT_OPENCODE_MODEL,
   DEFAULT_GEMINI_MODEL,
+  DEFAULT_COPILOT_MODEL,
   DEFAULT_MAX_CONCURRENCY,
   getAllOpencodeModelIds,
   getAllCursorModelIds,
   getAllCodexModelIds,
   getAllGeminiModelIds,
+  getAllCopilotModelIds,
   migrateCursorModelIds,
   migrateOpencodeModelIds,
   migratePhaseModelEntry,
@@ -35,6 +37,7 @@ import {
   type OpencodeModelId,
   type CodexModelId,
   type GeminiModelId,
+  type CopilotModelId,
 } from '@automaker/types';
 
 const logger = createLogger('SettingsSync');
@@ -75,6 +78,8 @@ const SETTINGS_FIELDS_TO_SYNC = [
   'codexDefaultModel',
   'enabledGeminiModels',
   'geminiDefaultModel',
+  'enabledCopilotModels',
+  'copilotDefaultModel',
   'enabledDynamicModelIds',
   'disabledProviders',
   'autoLoadClaudeMd',
@@ -607,6 +612,21 @@ export async function refreshSettingsFromServer(): Promise<boolean> {
       sanitizedEnabledGeminiModels.push(sanitizedGeminiDefaultModel);
     }
 
+    // Sanitize Copilot models
+    const validCopilotModelIds = new Set(getAllCopilotModelIds());
+    const sanitizedEnabledCopilotModels = (serverSettings.enabledCopilotModels ?? []).filter(
+      (id): id is CopilotModelId => validCopilotModelIds.has(id as CopilotModelId)
+    );
+    const sanitizedCopilotDefaultModel = validCopilotModelIds.has(
+      serverSettings.copilotDefaultModel as CopilotModelId
+    )
+      ? (serverSettings.copilotDefaultModel as CopilotModelId)
+      : DEFAULT_COPILOT_MODEL;
+
+    if (!sanitizedEnabledCopilotModels.includes(sanitizedCopilotDefaultModel)) {
+      sanitizedEnabledCopilotModels.push(sanitizedCopilotDefaultModel);
+    }
+
     const persistedDynamicModelIds =
       serverSettings.enabledDynamicModelIds ?? currentAppState.enabledDynamicModelIds;
     const sanitizedDynamicModelIds = persistedDynamicModelIds.filter(
@@ -703,6 +723,8 @@ export async function refreshSettingsFromServer(): Promise<boolean> {
       codexDefaultModel: sanitizedCodexDefaultModel,
       enabledGeminiModels: sanitizedEnabledGeminiModels,
       geminiDefaultModel: sanitizedGeminiDefaultModel,
+      enabledCopilotModels: sanitizedEnabledCopilotModels,
+      copilotDefaultModel: sanitizedCopilotDefaultModel,
       enabledDynamicModelIds: sanitizedDynamicModelIds,
       disabledProviders: serverSettings.disabledProviders ?? [],
       autoLoadClaudeMd: serverSettings.autoLoadClaudeMd ?? false,

@@ -110,6 +110,26 @@ export function useGeminiCliStatus() {
 }
 
 /**
+ * Fetch Copilot SDK status
+ *
+ * @returns Query result with Copilot SDK status
+ */
+export function useCopilotCliStatus() {
+  return useQuery({
+    queryKey: queryKeys.cli.copilot(),
+    queryFn: async () => {
+      const api = getElectronAPI();
+      const result = await api.setup.getCopilotStatus();
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to fetch Copilot status');
+      }
+      return result;
+    },
+    staleTime: STALE_TIMES.CLI_STATUS,
+  });
+}
+
+/**
  * Fetch GitHub CLI status
  *
  * @returns Query result with GitHub CLI status

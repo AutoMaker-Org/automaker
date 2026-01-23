@@ -178,6 +178,8 @@ export const queryKeys = {
     opencode: () => ['cli', 'opencode'] as const,
     /** Gemini CLI status */
     gemini: () => ['cli', 'gemini'] as const,
+    /** Copilot SDK status */
+    copilot: () => ['cli', 'copilot'] as const,
     /** GitHub CLI status */
     github: () => ['cli', 'github'] as const,
     /** API keys status */

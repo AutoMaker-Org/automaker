@@ -11,6 +11,10 @@ import type { CursorModelId } from './cursor-models.js';
 import { CURSOR_MODEL_MAP, getAllCursorModelIds } from './cursor-models.js';
 import type { OpencodeModelId } from './opencode-models.js';
 import { getAllOpencodeModelIds, DEFAULT_OPENCODE_MODEL } from './opencode-models.js';
+import type { GeminiModelId } from './gemini-models.js';
+import { getAllGeminiModelIds, DEFAULT_GEMINI_MODEL } from './gemini-models.js';
+import type { CopilotModelId } from './copilot-models.js';
+import { getAllCopilotModelIds, DEFAULT_COPILOT_MODEL } from './copilot-models.js';
 import type { PromptCustomization } from './prompts.js';
 import type { CodexSandboxMode, CodexApprovalPolicy } from './codex.js';
 import type { ReasoningEffort } from './provider.js';
@@ -99,7 +103,7 @@ export function getThinkingTokenBudget(level: ThinkingLevel | undefined): number
 }
 
 /** ModelProvider - AI model provider for credentials and API key management */
-export type ModelProvider = 'claude' | 'cursor' | 'codex' | 'opencode' | 'gemini';
+export type ModelProvider = 'claude' | 'cursor' | 'codex' | 'opencode' | 'gemini' | 'copilot';
 
 // ============================================================================
 // Claude-Compatible Providers - Configuration for Claude-compatible API endpoints
@@ -895,6 +899,18 @@ export interface GlobalSettings {
   /** Which dynamic OpenCode models are enabled (empty = all discovered) */
   enabledDynamicModelIds?: string[];
 
+  // Gemini CLI Settings (global)
+  /** Which Gemini models are available in feature modal (empty = all) */
+  enabledGeminiModels?: GeminiModelId[];
+  /** Default Gemini model selection when switching to Gemini CLI */
+  geminiDefaultModel?: GeminiModelId;
+
+  // Copilot SDK Settings (global)
+  /** Which Copilot models are available in feature modal (empty = all) */
+  enabledCopilotModels?: CopilotModelId[];
+  /** Default Copilot model selection when switching to Copilot SDK */
+  copilotDefaultModel?: CopilotModelId;
+
   // Provider Visibility Settings
   /** Providers that are disabled and should not appear in model dropdowns */
   disabledProviders?: ModelProvider[];
@@ -1316,6 +1332,10 @@ export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
   enabledOpencodeModels: getAllOpencodeModelIds(), // Returns prefixed IDs
   opencodeDefaultModel: DEFAULT_OPENCODE_MODEL, // Already prefixed
   enabledDynamicModelIds: [],
+  enabledGeminiModels: getAllGeminiModelIds(), // Returns prefixed IDs
+  geminiDefaultModel: DEFAULT_GEMINI_MODEL, // Already prefixed
+  enabledCopilotModels: getAllCopilotModelIds(), // Returns prefixed IDs
+  copilotDefaultModel: DEFAULT_COPILOT_MODEL, // Already prefixed
   disabledProviders: [],
   keyboardShortcuts: DEFAULT_KEYBOARD_SHORTCUTS,
   projects: [],

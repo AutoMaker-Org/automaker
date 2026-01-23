@@ -12,6 +12,7 @@ import {
   isCodexModel,
   isOpencodeModel,
   isGeminiModel,
+  isCopilotModel,
   type ModelProvider,
 } from '@automaker/types';
 import * as fs from 'fs';
@@ -23,6 +24,7 @@ const DISCONNECTED_MARKERS: Record<string, string> = {
   cursor: '.cursor-disconnected',
   opencode: '.opencode-disconnected',
   gemini: '.gemini-disconnected',
+  copilot: '.copilot-disconnected',
 };
 
 /**
@@ -275,6 +277,7 @@ import { CursorProvider } from './cursor-provider.js';
 import { CodexProvider } from './codex-provider.js';
 import { OpencodeProvider } from './opencode-provider.js';
 import { GeminiProvider } from './gemini-provider.js';
+import { CopilotProvider } from './copilot-provider.js';
 
 // Register Claude provider
 registerProvider('claude', {
@@ -316,4 +319,12 @@ registerProvider('gemini', {
   aliases: ['google'],
   canHandleModel: (model: string) => isGeminiModel(model),
   priority: 4, // Between opencode (3) and codex (5)
+});
+
+// Register Copilot provider (GitHub Copilot SDK)
+registerProvider('copilot', {
+  factory: () => new CopilotProvider(),
+  aliases: ['github-copilot', 'github'],
+  canHandleModel: (model: string) => isCopilotModel(model),
+  priority: 6, // High priority - check before Codex since both can handle GPT models
 });

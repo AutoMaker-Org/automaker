@@ -19,6 +19,7 @@ const PROVIDER_ICON_KEYS = {
   minimax: 'minimax',
   glm: 'glm',
   bigpickle: 'bigpickle',
+  copilot: 'copilot',
 } as const;
 
 type ProviderIconKey = keyof typeof PROVIDER_ICON_KEYS;
@@ -113,6 +114,12 @@ const PROVIDER_ICON_DEFINITIONS: Record<ProviderIconKey, ProviderIconDefinition>
     path: 'M8 4c-2.21 0-4 1.79-4 4v8c0 2.21 1.79 4 4 4h8c2.21 0 4-1.79 4-4V8c0-2.21-1.79-4-4-4H8zm0 2h8c1.103 0 2 .897 2 2v8c0 1.103-.897 2-2 2H8c-1.103 0-2-.897-2-2V8c0-1.103.897-2 2-2zm2 3a1 1 0 100 2 1 1 0 000-2zm4 0a1 1 0 100 2 1 1 0 000-2zm-4 4a1 1 0 100 2 1 1 0 000-2zm4 0a1 1 0 100 2 1 1 0 000-2z',
     fill: '#4ADE80',
   },
+  copilot: {
+    viewBox: '0 0 24 24',
+    // GitHub Copilot logo - dual robot heads icon
+    path: 'M9.75 14a.75.75 0 01.75.75v2.5a.75.75 0 01-1.5 0v-2.5a.75.75 0 01.75-.75zm4.5 0a.75.75 0 01.75.75v2.5a.75.75 0 01-1.5 0v-2.5a.75.75 0 01.75-.75zM12 2c2.214 0 4.248.657 5.747 1.756.136.099.268.204.394.312a.75.75 0 01-.296 1.34 8.992 8.992 0 00-2.593.789c.107.244.194.495.262.754h2.236a.75.75 0 010 1.5H17.5v.25c0 .608-.079 1.198-.228 1.761a.75.75 0 01-.18.305c-.49.513-1.148.946-1.97 1.291-.814.34-1.79.548-2.872.598l-.25.007-.25-.007c-1.082-.05-2.058-.258-2.872-.598-.822-.345-1.48-.778-1.97-1.291a.75.75 0 01-.18-.305A6.483 6.483 0 016.5 8.549V8.3H6.25a.75.75 0 010-1.5h2.236c.068-.26.155-.51.262-.754a8.99 8.99 0 00-2.593-.79.75.75 0 01-.296-1.34c.126-.107.258-.212.394-.311C7.752 2.657 9.786 2 12 2zM8 8.55c0 2.07 1.887 3.45 4 3.45s4-1.38 4-3.45v-.3a4.986 4.986 0 00-4-1.998c-1.635 0-3.128.737-4 1.998v.3zm12 6.2a.75.75 0 01.75.75v2.5a.75.75 0 01-1.5 0v-2.5a.75.75 0 01.75-.75zm-16 0a.75.75 0 01.75.75v2.5a.75.75 0 01-1.5 0v-2.5a.75.75 0 01.75-.75zm14.5 4.75a.75.75 0 010 1.5h-13a.75.75 0 010-1.5h13z',
+    fill: '#8B5CF6',
+  },
 };
 
 export interface ProviderIconProps extends Omit<SVGProps<SVGSVGElement>, 'viewBox'> {
@@ -168,6 +175,10 @@ export function CursorIcon(props: Omit<ProviderIconProps, 'provider'>) {
 
 export function GeminiIcon(props: Omit<ProviderIconProps, 'provider'>) {
   return <ProviderIcon provider={PROVIDER_ICON_KEYS.gemini} {...props} />;
+}
+
+export function CopilotIcon(props: Omit<ProviderIconProps, 'provider'>) {
+  return <ProviderIcon provider={PROVIDER_ICON_KEYS.copilot} {...props} />;
 }
 
 export function GrokIcon(props: Omit<ProviderIconProps, 'provider'>) {
@@ -396,6 +407,7 @@ export const PROVIDER_ICON_COMPONENTS: Record<
   codex: OpenAIIcon,
   opencode: OpenCodeIcon,
   gemini: GeminiIcon,
+  copilot: CopilotIcon,
 };
 
 /**
@@ -546,6 +558,10 @@ function getUnderlyingModelIcon(model?: AgentModel | string): ProviderIconKey {
   if (modelStr.includes('grok')) {
     return 'grok';
   }
+  // GitHub Copilot models
+  if (modelStr.includes('copilot')) {
+    return 'copilot';
+  }
   // Cursor models - canonical format includes 'cursor-' prefix
   // Also support legacy IDs for backward compatibility
   if (
@@ -563,6 +579,7 @@ function getUnderlyingModelIcon(model?: AgentModel | string): ProviderIconKey {
   if (provider === 'codex') return 'openai';
   if (provider === 'cursor') return 'cursor';
   if (provider === 'opencode') return 'opencode';
+  if (provider === 'copilot') return 'copilot';
   return 'anthropic';
 }
 
@@ -587,6 +604,7 @@ export function getProviderIconForModel(
     minimax: MiniMaxIcon,
     glm: GlmIcon,
     bigpickle: BigPickleIcon,
+    copilot: CopilotIcon,
   };
 
   return iconMap[iconKey] || AnthropicIcon;

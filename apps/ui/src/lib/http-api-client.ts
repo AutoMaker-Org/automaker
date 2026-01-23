@@ -1697,6 +1697,27 @@ export class HttpApiClient implements ElectronAPI {
       error?: string;
     }> => this.post('/api/setup/deauth-gemini'),
 
+    // Copilot SDK methods
+    getCopilotStatus: (): Promise<{
+      success: boolean;
+      status?: string;
+      installed?: boolean;
+      method?: string;
+      version?: string;
+      path?: string;
+      recommendation?: string;
+      auth?: {
+        authenticated: boolean;
+        method: string;
+        login?: string;
+        host?: string;
+        error?: string;
+      };
+      loginCommand?: string;
+      installCommand?: string;
+      error?: string;
+    }> => this.get('/api/setup/copilot-status'),
+
     onInstallProgress: (callback: (progress: unknown) => void) => {
       return this.subscribeToEvent('agent:stream', callback);
     },

@@ -64,6 +64,7 @@ export {
   useCodexCliStatus,
   useOpencodeCliStatus,
   useGeminiCliStatus,
+  useCopilotCliStatus,
   useGitHubCliStatus,
   useApiKeysStatus,
   usePlatformInfo,
