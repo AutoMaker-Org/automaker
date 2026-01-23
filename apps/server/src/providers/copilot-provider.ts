@@ -53,12 +53,8 @@ interface SdkMessageEvent extends SdkEvent {
   };
 }
 
-interface SdkMessageDeltaEvent extends SdkEvent {
-  type: 'assistant.message_delta';
-  data: {
-    deltaContent: string;
-  };
-}
+// Note: SdkMessageDeltaEvent is not used - we skip delta events to reduce noise
+// The final assistant.message event contains the complete content
 
 interface SdkToolExecutionStartEvent extends SdkEvent {
   type: 'tool.execution_start';
@@ -200,12 +196,10 @@ function normalizeCopilotToolInput(
  * - SDK-based session management
  * - Runtime model discovery
  * - Tool call normalization
- * - Streaming responses
+ * - Per-execution working directory support
  */
 export class CopilotProvider extends CliProvider {
   private runtimeModels: CopilotRuntimeModel[] | null = null;
-  private client: CopilotClient | null = null;
-  private clientStarted = false;
 
   constructor(config: ProviderConfig = {}) {
     super(config);
@@ -291,14 +285,9 @@ export class CopilotProvider extends CliProvider {
       }
 
       case 'assistant.message_delta': {
-        const deltaEvent = sdkEvent as SdkMessageDeltaEvent;
-        return {
-          type: 'assistant',
-          message: {
-            role: 'assistant',
-            content: [{ type: 'text', text: deltaEvent.data.deltaContent }],
-          },
-        };
+        // Skip delta events - they create too much noise
+        // The final assistant.message event has the complete content
+        return null;
       }
 
       case 'tool.execution_start': {
@@ -461,38 +450,10 @@ export class CopilotProvider extends CliProvider {
   }
 
   /**
-   * Get or create the CopilotClient instance
-   */
-  private async getClient(): Promise<CopilotClient> {
-    if (!this.client) {
-      this.client = new CopilotClient({
-        logLevel: 'warning',
-        autoRestart: true,
-      });
-    }
-
-    if (!this.clientStarted) {
-      await this.client.start();
-      this.clientStarted = true;
-      logger.debug('CopilotClient started');
-    }
-
-    return this.client;
-  }
-
-  /**
-   * Stop the client when done
-   */
-  async stopClient(): Promise<void> {
-    if (this.client && this.clientStarted) {
-      await this.client.stop();
-      this.clientStarted = false;
-      logger.debug('CopilotClient stopped');
-    }
-  }
-
-  /**
    * Execute a prompt using Copilot SDK with streaming
+   *
+   * Creates a new CopilotClient for each execution with the correct working directory.
+   * This ensures the CLI operates in the correct project context.
    */
   async *executeQuery(options: ExecuteOptions): AsyncGenerator<ProviderMessage> {
     this.ensureCliDetected();
@@ -511,11 +472,22 @@ export class CopilotProvider extends CliProvider {
 
     const promptText = this.extractPromptText(options);
     const bareModel = options.model || 'claude-sonnet-4.5';
+    const workingDirectory = options.cwd || process.cwd();
 
-    logger.debug(`CopilotProvider.executeQuery called with model: "${bareModel}"`);
+    logger.debug(
+      `CopilotProvider.executeQuery called with model: "${bareModel}", cwd: "${workingDirectory}"`
+    );
+
+    // Create a client for this execution with the correct working directory
+    const client = new CopilotClient({
+      logLevel: 'warning',
+      autoRestart: false, // Don't auto-restart for single execution
+      cwd: workingDirectory, // Set working directory for file operations
+    });
 
     try {
-      const client = await this.getClient();
+      await client.start();
+      logger.debug(`CopilotClient started with cwd: ${workingDirectory}`);
 
       // Create session with configuration
       const session = await client.createSession({
@@ -571,6 +543,7 @@ export class CopilotProvider extends CliProvider {
           // If we got an idle event, we're done
           if (event.type === 'session.idle') {
             await session.destroy();
+            await client.stop();
             return;
           }
         }
@@ -578,6 +551,7 @@ export class CopilotProvider extends CliProvider {
         // Check if there was an error
         if (errorOccurred) {
           await session.destroy();
+          await client.stop();
           throw errorOccurred;
         }
 
@@ -585,6 +559,13 @@ export class CopilotProvider extends CliProvider {
         await new Promise((resolve) => setTimeout(resolve, 10));
       }
     } catch (error) {
+      // Ensure client is stopped on error
+      try {
+        await client.stop();
+      } catch {
+        // Ignore cleanup errors
+      }
+
       if (isAbortError(error)) {
         logger.debug('Query aborted');
         return;
