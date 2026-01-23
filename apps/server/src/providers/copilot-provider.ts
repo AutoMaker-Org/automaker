@@ -1,15 +1,16 @@
 /**
- * Copilot Provider - Executes queries using the GitHub Copilot CLI
+ * Copilot Provider - Executes queries using the GitHub Copilot SDK
  *
- * Extends CliProvider with Copilot-specific:
- * - CLI-based execution via JSON-RPC
- * - GitHub OAuth authentication support
- * - Tool call normalization for AutoMaker UI
+ * Uses the official @github/copilot-sdk for:
+ * - Session management and streaming responses
+ * - GitHub OAuth authentication (via gh CLI)
+ * - Tool call handling and permission management
+ * - Runtime model discovery
  *
- * Based on https://github.com/github/copilot
+ * Based on https://github.com/github/copilot-sdk
  */
 
-import { execSync, spawn, type ChildProcess } from 'child_process';
+import { execSync } from 'child_process';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as os from 'os';
@@ -28,69 +29,66 @@ import {
   type CopilotRuntimeModel,
 } from '@automaker/types';
 import { createLogger, isAbortError } from '@automaker/utils';
-import { spawnJSONLProcess } from '@automaker/platform';
+import { CopilotClient, type PermissionRequest } from '@github/copilot-sdk';
 
 // Create logger for this module
 const logger = createLogger('CopilotProvider');
 
 // =============================================================================
-// Copilot Stream Event Types (CLI JSON-RPC output)
+// SDK Event Types (from @github/copilot-sdk)
 // =============================================================================
 
 /**
- * Base event structure from Copilot CLI JSON-RPC
- *
- * The CLI operates in server mode, communicating via JSON-RPC.
- * Events are streamed as JSONL.
+ * SDK session event data types
  */
-interface CopilotStreamEvent {
-  type:
-    | 'session.start'
-    | 'assistant.message'
-    | 'tool.use'
-    | 'tool.result'
-    | 'session.idle'
-    | 'session.error'
-    | 'error';
-  sessionId?: string;
-  timestamp?: string;
+interface SdkEvent {
+  type: string;
+  data?: unknown;
 }
 
-interface CopilotSessionStartEvent extends CopilotStreamEvent {
-  type: 'session.start';
-  sessionId: string;
-  model?: string;
-}
-
-interface CopilotMessageEvent extends CopilotStreamEvent {
+interface SdkMessageEvent extends SdkEvent {
   type: 'assistant.message';
-  content: string;
-  delta?: boolean;
+  data: {
+    content: string;
+  };
 }
 
-interface CopilotToolUseEvent extends CopilotStreamEvent {
-  type: 'tool.use';
-  toolCallId: string;
-  toolName: string;
-  arguments: Record<string, unknown>;
+interface SdkMessageDeltaEvent extends SdkEvent {
+  type: 'assistant.message_delta';
+  data: {
+    deltaContent: string;
+  };
 }
 
-interface CopilotToolResultEvent extends CopilotStreamEvent {
-  type: 'tool.result';
-  toolCallId: string;
-  resultType: 'success' | 'failure' | 'rejected' | 'denied';
-  content?: string;
-  error?: string;
+interface SdkToolExecutionStartEvent extends SdkEvent {
+  type: 'tool.execution_start';
+  data: {
+    toolName: string;
+    toolCallId: string;
+    input?: Record<string, unknown>;
+  };
 }
 
-interface CopilotIdleEvent extends CopilotStreamEvent {
+interface SdkToolExecutionEndEvent extends SdkEvent {
+  type: 'tool.execution_end';
+  data: {
+    toolName: string;
+    toolCallId: string;
+    result?: string;
+    error?: string;
+  };
+}
+
+interface SdkSessionIdleEvent extends SdkEvent {
   type: 'session.idle';
 }
 
-interface CopilotErrorEvent extends CopilotStreamEvent {
-  type: 'session.error' | 'error';
-  error: string;
-  code?: string;
+interface SdkSessionErrorEvent extends SdkEvent {
+  type: 'session.error';
+  data: {
+    message: string;
+    code?: string;
+  };
 }
 
 // =============================================================================
@@ -106,6 +104,7 @@ export enum CopilotErrorCode {
   PROCESS_CRASHED = 'COPILOT_PROCESS_CRASHED',
   TIMEOUT = 'COPILOT_TIMEOUT',
   CLI_ERROR = 'COPILOT_CLI_ERROR',
+  SDK_ERROR = 'COPILOT_SDK_ERROR',
   UNKNOWN = 'COPILOT_UNKNOWN_ERROR',
 }
 
@@ -120,8 +119,7 @@ export interface CopilotError extends Error {
 // =============================================================================
 
 /**
- * Copilot CLI tool name to standard tool name mapping
- * The CLI uses standard tool names similar to Claude, but we normalize for consistency
+ * Copilot SDK tool name to standard tool name mapping
  */
 const COPILOT_TOOL_NAME_MAP: Record<string, string> = {
   // File operations
@@ -164,8 +162,6 @@ function normalizeCopilotToolName(copilotToolName: string): string {
 
 /**
  * Normalize Copilot tool input parameters to standard format
- *
- * Copilot CLI uses similar formats to Claude, but with potential variations
  */
 function normalizeCopilotToolInput(
   toolName: string,
@@ -197,17 +193,19 @@ function normalizeCopilotToolInput(
 }
 
 /**
- * CopilotProvider - Integrates GitHub Copilot CLI as an AI provider
+ * CopilotProvider - Integrates GitHub Copilot SDK as an AI provider
  *
  * Features:
  * - GitHub OAuth authentication
- * - JSON-RPC communication with Copilot CLI
+ * - SDK-based session management
  * - Runtime model discovery
  * - Tool call normalization
  * - Streaming responses
  */
 export class CopilotProvider extends CliProvider {
   private runtimeModels: CopilotRuntimeModel[] | null = null;
+  private client: CopilotClient | null = null;
+  private clientStarted = false;
 
   constructor(config: ProviderConfig = {}) {
     super(config);
@@ -267,78 +265,58 @@ export class CopilotProvider extends CliProvider {
     }
   }
 
-  buildCliArgs(options: ExecuteOptions): string[] {
-    // Model comes in stripped of provider prefix (e.g., 'gpt-4o' from 'copilot-gpt-4o')
-    const bareModel = options.model || 'gpt-4o';
-    const cliArgs: string[] = [];
-
-    // Use server mode for JSON-RPC communication
-    cliArgs.push('--mode', 'server');
-
-    // Streaming JSON output format
-    cliArgs.push('--output-format', 'jsonl');
-
-    // Model selection
-    if (bareModel && bareModel !== 'auto') {
-      cliArgs.push('--model', bareModel);
-    }
-
-    // Enable all first-party tools (equivalent to --allow-all)
-    cliArgs.push('--tools', 'all');
-
-    // Set working directory for file operations
-    if (options.cwd) {
-      cliArgs.push('--cwd', options.cwd);
-    }
-
-    return cliArgs;
+  /**
+   * Not used with SDK approach - kept for interface compatibility
+   */
+  buildCliArgs(_options: ExecuteOptions): string[] {
+    return [];
   }
 
   /**
-   * Convert Copilot event to AutoMaker ProviderMessage format
+   * Convert SDK event to AutoMaker ProviderMessage format
    */
   normalizeEvent(event: unknown): ProviderMessage | null {
-    const copilotEvent = event as CopilotStreamEvent;
+    const sdkEvent = event as SdkEvent;
 
-    switch (copilotEvent.type) {
-      case 'session.start': {
-        const startEvent = copilotEvent as CopilotSessionStartEvent;
-        logger.debug(
-          `Copilot session start: sessionId=${startEvent.sessionId}, model=${startEvent.model}`
-        );
-        return null; // Session start is internal
-      }
-
+    switch (sdkEvent.type) {
       case 'assistant.message': {
-        const messageEvent = copilotEvent as CopilotMessageEvent;
+        const messageEvent = sdkEvent as SdkMessageEvent;
         return {
           type: 'assistant',
-          session_id: copilotEvent.sessionId,
           message: {
             role: 'assistant',
-            content: [{ type: 'text', text: messageEvent.content }],
+            content: [{ type: 'text', text: messageEvent.data.content }],
           },
         };
       }
 
-      case 'tool.use': {
-        const toolEvent = copilotEvent as CopilotToolUseEvent;
-        const normalizedName = normalizeCopilotToolName(toolEvent.toolName);
-        const normalizedInput = normalizeCopilotToolInput(
-          toolEvent.toolName,
-          toolEvent.arguments as Record<string, unknown>
-        );
+      case 'assistant.message_delta': {
+        const deltaEvent = sdkEvent as SdkMessageDeltaEvent;
+        return {
+          type: 'assistant',
+          message: {
+            role: 'assistant',
+            content: [{ type: 'text', text: deltaEvent.data.deltaContent }],
+          },
+        };
+      }
+
+      case 'tool.execution_start': {
+        const toolEvent = sdkEvent as SdkToolExecutionStartEvent;
+        const normalizedName = normalizeCopilotToolName(toolEvent.data.toolName);
+        const normalizedInput = toolEvent.data.input
+          ? normalizeCopilotToolInput(toolEvent.data.toolName, toolEvent.data.input)
+          : {};
 
         return {
           type: 'assistant',
-          session_id: copilotEvent.sessionId,
           message: {
             role: 'assistant',
             content: [
               {
                 type: 'tool_use',
                 name: normalizedName,
-                tool_use_id: toolEvent.toolCallId,
+                tool_use_id: toolEvent.data.toolCallId,
                 input: normalizedInput,
               },
             ],
@@ -346,23 +324,21 @@ export class CopilotProvider extends CliProvider {
         };
       }
 
-      case 'tool.result': {
-        const toolResultEvent = copilotEvent as CopilotToolResultEvent;
-        const isError =
-          toolResultEvent.resultType === 'failure' || toolResultEvent.resultType === 'rejected';
+      case 'tool.execution_end': {
+        const toolResultEvent = sdkEvent as SdkToolExecutionEndEvent;
+        const isError = !!toolResultEvent.data.error;
         const content = isError
-          ? `[ERROR] ${toolResultEvent.error || toolResultEvent.content || 'Tool failed'}`
-          : toolResultEvent.content || '';
+          ? `[ERROR] ${toolResultEvent.data.error}`
+          : toolResultEvent.data.result || '';
 
         return {
           type: 'assistant',
-          session_id: copilotEvent.sessionId,
           message: {
             role: 'assistant',
             content: [
               {
                 type: 'tool_result',
-                tool_use_id: toolResultEvent.toolCallId,
+                tool_use_id: toolResultEvent.data.toolCallId,
                 content,
               },
             ],
@@ -375,22 +351,19 @@ export class CopilotProvider extends CliProvider {
         return {
           type: 'result',
           subtype: 'success',
-          session_id: copilotEvent.sessionId,
         };
       }
 
-      case 'session.error':
-      case 'error': {
-        const errorEvent = copilotEvent as CopilotErrorEvent;
+      case 'session.error': {
+        const errorEvent = sdkEvent as SdkSessionErrorEvent;
         return {
           type: 'error',
-          session_id: copilotEvent.sessionId,
-          error: errorEvent.error || 'Unknown error',
+          error: errorEvent.data.message || 'Unknown error',
         };
       }
 
       default:
-        logger.debug(`Unknown Copilot event type: ${copilotEvent.type}`);
+        logger.debug(`Unknown Copilot SDK event type: ${sdkEvent.type}`);
         return null;
     }
   }
@@ -446,7 +419,7 @@ export class CopilotProvider extends CliProvider {
         code: CopilotErrorCode.MODEL_UNAVAILABLE,
         message: 'Requested model is not available',
         recoverable: true,
-        suggestion: 'Try using "gpt-4o" or select a different model',
+        suggestion: 'Try using "claude-sonnet-4.5" or select a different model',
       };
     }
 
@@ -488,7 +461,38 @@ export class CopilotProvider extends CliProvider {
   }
 
   /**
-   * Execute a prompt using Copilot CLI with streaming
+   * Get or create the CopilotClient instance
+   */
+  private async getClient(): Promise<CopilotClient> {
+    if (!this.client) {
+      this.client = new CopilotClient({
+        logLevel: 'warning',
+        autoRestart: true,
+      });
+    }
+
+    if (!this.clientStarted) {
+      await this.client.start();
+      this.clientStarted = true;
+      logger.debug('CopilotClient started');
+    }
+
+    return this.client;
+  }
+
+  /**
+   * Stop the client when done
+   */
+  async stopClient(): Promise<void> {
+    if (this.client && this.clientStarted) {
+      await this.client.stop();
+      this.clientStarted = false;
+      logger.debug('CopilotClient stopped');
+    }
+  }
+
+  /**
+   * Execute a prompt using Copilot SDK with streaming
    */
   async *executeQuery(options: ExecuteOptions): AsyncGenerator<ProviderMessage> {
     this.ensureCliDetected();
@@ -505,38 +509,80 @@ export class CopilotProvider extends CliProvider {
       );
     }
 
-    // Extract prompt text to pass as positional argument
     const promptText = this.extractPromptText(options);
+    const bareModel = options.model || 'claude-sonnet-4.5';
 
-    // Build CLI args and append the prompt
-    const cliArgs = this.buildCliArgs(options);
-    cliArgs.push('--prompt', promptText);
-
-    const subprocessOptions = this.buildSubprocessOptions(options, cliArgs);
-
-    let sessionId: string | undefined;
-
-    logger.debug(`CopilotProvider.executeQuery called with model: "${options.model}"`);
+    logger.debug(`CopilotProvider.executeQuery called with model: "${bareModel}"`);
 
     try {
-      for await (const rawEvent of spawnJSONLProcess(subprocessOptions)) {
-        const event = rawEvent as CopilotStreamEvent;
+      const client = await this.getClient();
 
-        // Capture session ID from start event
-        if (event.type === 'session.start') {
-          const startEvent = event as CopilotSessionStartEvent;
-          sessionId = startEvent.sessionId;
-          logger.debug(`Session started: ${sessionId}, model: ${startEvent.model}`);
+      // Create session with configuration
+      const session = await client.createSession({
+        model: bareModel,
+        streaming: true,
+        // Auto-approve all operations for autonomous agent use
+        onPermissionRequest: async (
+          request: PermissionRequest
+        ): Promise<{ kind: 'approved' } | { kind: 'denied-interactively-by-user' }> => {
+          logger.debug(`Permission request: ${request.kind}`);
+          // Auto-approve all permissions for autonomous operation
+          return { kind: 'approved' };
+        },
+      });
+
+      logger.debug(`Session created: ${session.sessionId}`);
+
+      // Create a promise that resolves when session is idle
+      let resolveIdle: () => void;
+      const idlePromise = new Promise<void>((resolve) => {
+        resolveIdle = resolve;
+      });
+
+      // Collect events as they arrive
+      const eventQueue: SdkEvent[] = [];
+      let errorOccurred: Error | null = null;
+
+      // Set up event handler
+      session.on((event: SdkEvent) => {
+        if (event.type === 'session.idle') {
+          resolveIdle();
+        } else if (event.type === 'session.error') {
+          const errorEvent = event as SdkSessionErrorEvent;
+          errorOccurred = new Error(errorEvent.data.message);
+          resolveIdle();
         }
+        eventQueue.push(event);
+      });
 
-        // Normalize and yield the event
-        const normalized = this.normalizeEvent(event);
-        if (normalized) {
-          if (!normalized.session_id && sessionId) {
-            normalized.session_id = sessionId;
+      // Send the prompt
+      await session.send({ prompt: promptText });
+
+      // Yield events as they arrive
+      while (true) {
+        // Process any queued events
+        while (eventQueue.length > 0) {
+          const event = eventQueue.shift()!;
+          const normalized = this.normalizeEvent(event);
+          if (normalized) {
+            yield normalized;
           }
-          yield normalized;
+
+          // If we got an idle event, we're done
+          if (event.type === 'session.idle') {
+            await session.destroy();
+            return;
+          }
         }
+
+        // Check if there was an error
+        if (errorOccurred) {
+          await session.destroy();
+          throw errorOccurred;
+        }
+
+        // Wait a bit for more events
+        await new Promise((resolve) => setTimeout(resolve, 10));
       }
     } catch (error) {
       if (isAbortError(error)) {
@@ -544,12 +590,9 @@ export class CopilotProvider extends CliProvider {
         return;
       }
 
-      // Map CLI errors to CopilotError
-      if (error instanceof Error && 'stderr' in error) {
-        const errorInfo = this.mapError(
-          (error as { stderr?: string }).stderr || error.message,
-          (error as { exitCode?: number | null }).exitCode ?? null
-        );
+      // Map errors to CopilotError
+      if (error instanceof Error) {
+        const errorInfo = this.mapError(error.message, null);
         throw this.createError(
           errorInfo.code as CopilotErrorCode,
           errorInfo.message,

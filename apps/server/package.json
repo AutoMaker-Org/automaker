@@ -32,6 +32,7 @@
     "@automaker/prompts": "1.0.0",
     "@automaker/types": "1.0.0",
     "@automaker/utils": "1.0.0",
+    "@github/copilot-sdk": "^0.1.16",
     "@modelcontextprotocol/sdk": "1.25.2",
     "@openai/codex-sdk": "^0.77.0",
     "cookie-parser": "1.4.7",
