@@ -451,12 +451,10 @@ export class CopilotProvider extends CliProvider {
   }
 
   /**
-   * Execute a prompt using Copilot SDK
+   * Execute a prompt using Copilot SDK with real-time streaming
    *
    * Creates a new CopilotClient for each execution with the correct working directory.
-   * This ensures the CLI operates in the correct project context.
-   *
-   * Uses sendAndWait for simpler, more reliable execution.
+   * Streams tool execution events in real-time for UI display.
    */
   async *executeQuery(options: ExecuteOptions): AsyncGenerator<ProviderMessage> {
     this.ensureCliDetected();
@@ -493,74 +491,97 @@ export class CopilotProvider extends CliProvider {
     // Create a client for this execution with the correct working directory
     const client = new CopilotClient({
       logLevel: 'warning',
-      autoRestart: false, // Don't auto-restart for single execution
-      cwd: workingDirectory, // Set working directory for file operations
+      autoRestart: false,
+      cwd: workingDirectory,
     });
+
+    // Use an async queue to bridge callback-based SDK events to async generator
+    const eventQueue: SdkEvent[] = [];
+    let resolveWaiting: (() => void) | null = null;
+    let sessionComplete = false;
+    let sessionError: Error | null = null;
+
+    const pushEvent = (event: SdkEvent) => {
+      eventQueue.push(event);
+      if (resolveWaiting) {
+        resolveWaiting();
+        resolveWaiting = null;
+      }
+    };
+
+    const waitForEvent = (): Promise<void> => {
+      if (eventQueue.length > 0 || sessionComplete) {
+        return Promise.resolve();
+      }
+      return new Promise((resolve) => {
+        resolveWaiting = resolve;
+      });
+    };
 
     try {
       await client.start();
       logger.debug(`CopilotClient started with cwd: ${workingDirectory}`);
 
-      // Create session with configuration - disable streaming for simpler handling
+      // Create session with streaming enabled for real-time events
       const session = await client.createSession({
         model: bareModel,
-        streaming: false, // Use non-streaming for more reliable results
-        // Auto-approve all operations for autonomous agent use
+        streaming: true,
         onPermissionRequest: async (
           request: PermissionRequest
         ): Promise<{ kind: 'approved' } | { kind: 'denied-interactively-by-user' }> => {
           logger.debug(`Permission request: ${request.kind}`);
-          // Auto-approve all permissions for autonomous operation
           return { kind: 'approved' };
         },
       });
 
-      logger.debug(`Session created: ${session.sessionId}`);
+      const sessionId = session.sessionId;
+      logger.debug(`Session created: ${sessionId}`);
 
-      // Collect tool events for yielding
-      const toolEvents: SdkEvent[] = [];
-
-      // Set up event handler to capture tool executions
+      // Set up event handler to push events to queue
       session.on((event: SdkEvent) => {
-        // Capture tool events to yield them
-        if (
-          event.type === 'tool.execution_start' ||
-          event.type === 'tool.execution_end' ||
-          event.type === 'session.error'
-        ) {
-          toolEvents.push(event);
+        logger.debug(`SDK event: ${event.type}`);
+
+        if (event.type === 'session.idle') {
+          sessionComplete = true;
+          pushEvent(event);
+        } else if (event.type === 'session.error') {
+          const errorEvent = event as SdkSessionErrorEvent;
+          sessionError = new Error(errorEvent.data.message);
+          sessionComplete = true;
+          pushEvent(event);
+        } else {
+          // Push all other events (tool.execution_start, tool.execution_end, assistant.message, etc.)
+          pushEvent(event);
         }
       });
 
-      // Send the prompt and wait for completion (with 10 minute timeout)
-      const response = await session.sendAndWait({ prompt: promptText }, 600000);
+      // Send the prompt (non-blocking)
+      await session.send({ prompt: promptText });
 
-      // Yield any tool events that were captured
-      for (const event of toolEvents) {
-        const normalized = this.normalizeEvent(event);
-        if (normalized) {
-          yield normalized;
+      // Process events as they arrive
+      while (!sessionComplete || eventQueue.length > 0) {
+        await waitForEvent();
+
+        // Process all queued events
+        while (eventQueue.length > 0) {
+          const event = eventQueue.shift()!;
+          const normalized = this.normalizeEvent(event);
+          if (normalized) {
+            // Add session_id if not present
+            if (!normalized.session_id) {
+              normalized.session_id = sessionId;
+            }
+            yield normalized;
+          }
+        }
+
+        // Check for errors
+        if (sessionError) {
+          await session.destroy();
+          await client.stop();
+          throw sessionError;
         }
       }
-
-      // Yield the final response if we got one
-      if (response && response.data && 'content' in response.data) {
-        yield {
-          type: 'assistant',
-          session_id: session.sessionId,
-          message: {
-            role: 'assistant',
-            content: [{ type: 'text', text: (response.data as { content: string }).content }],
-          },
-        };
-      }
-
-      // Yield success result
-      yield {
-        type: 'result',
-        subtype: 'success',
-        session_id: session.sessionId,
-      };
 
       // Cleanup
       await session.destroy();
