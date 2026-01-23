@@ -450,10 +450,12 @@ export class CopilotProvider extends CliProvider {
   }
 
   /**
-   * Execute a prompt using Copilot SDK with streaming
+   * Execute a prompt using Copilot SDK
    *
    * Creates a new CopilotClient for each execution with the correct working directory.
    * This ensures the CLI operates in the correct project context.
+   *
+   * Uses sendAndWait for simpler, more reliable execution.
    */
   async *executeQuery(options: ExecuteOptions): AsyncGenerator<ProviderMessage> {
     this.ensureCliDetected();
@@ -477,6 +479,7 @@ export class CopilotProvider extends CliProvider {
     logger.debug(
       `CopilotProvider.executeQuery called with model: "${bareModel}", cwd: "${workingDirectory}"`
     );
+    logger.debug(`Prompt length: ${promptText.length} characters`);
 
     // Create a client for this execution with the correct working directory
     const client = new CopilotClient({
@@ -489,10 +492,10 @@ export class CopilotProvider extends CliProvider {
       await client.start();
       logger.debug(`CopilotClient started with cwd: ${workingDirectory}`);
 
-      // Create session with configuration
+      // Create session with configuration - disable streaming for simpler handling
       const session = await client.createSession({
         model: bareModel,
-        streaming: true,
+        streaming: false, // Use non-streaming for more reliable results
         // Auto-approve all operations for autonomous agent use
         onPermissionRequest: async (
           request: PermissionRequest
@@ -505,59 +508,55 @@ export class CopilotProvider extends CliProvider {
 
       logger.debug(`Session created: ${session.sessionId}`);
 
-      // Create a promise that resolves when session is idle
-      let resolveIdle: () => void;
-      const idlePromise = new Promise<void>((resolve) => {
-        resolveIdle = resolve;
-      });
+      // Collect tool events for yielding
+      const toolEvents: SdkEvent[] = [];
 
-      // Collect events as they arrive
-      const eventQueue: SdkEvent[] = [];
-      let errorOccurred: Error | null = null;
-
-      // Set up event handler
+      // Set up event handler to capture tool executions
       session.on((event: SdkEvent) => {
-        if (event.type === 'session.idle') {
-          resolveIdle();
-        } else if (event.type === 'session.error') {
-          const errorEvent = event as SdkSessionErrorEvent;
-          errorOccurred = new Error(errorEvent.data.message);
-          resolveIdle();
+        // Capture tool events to yield them
+        if (
+          event.type === 'tool.execution_start' ||
+          event.type === 'tool.execution_end' ||
+          event.type === 'session.error'
+        ) {
+          toolEvents.push(event);
         }
-        eventQueue.push(event);
       });
 
-      // Send the prompt
-      await session.send({ prompt: promptText });
+      // Send the prompt and wait for completion (with 10 minute timeout)
+      const response = await session.sendAndWait({ prompt: promptText }, 600000);
 
-      // Yield events as they arrive
-      while (true) {
-        // Process any queued events
-        while (eventQueue.length > 0) {
-          const event = eventQueue.shift()!;
-          const normalized = this.normalizeEvent(event);
-          if (normalized) {
-            yield normalized;
-          }
-
-          // If we got an idle event, we're done
-          if (event.type === 'session.idle') {
-            await session.destroy();
-            await client.stop();
-            return;
-          }
+      // Yield any tool events that were captured
+      for (const event of toolEvents) {
+        const normalized = this.normalizeEvent(event);
+        if (normalized) {
+          yield normalized;
         }
-
-        // Check if there was an error
-        if (errorOccurred) {
-          await session.destroy();
-          await client.stop();
-          throw errorOccurred;
-        }
-
-        // Wait a bit for more events
-        await new Promise((resolve) => setTimeout(resolve, 10));
       }
+
+      // Yield the final response if we got one
+      if (response && response.data && 'content' in response.data) {
+        yield {
+          type: 'assistant',
+          session_id: session.sessionId,
+          message: {
+            role: 'assistant',
+            content: [{ type: 'text', text: (response.data as { content: string }).content }],
+          },
+        };
+      }
+
+      // Yield success result
+      yield {
+        type: 'result',
+        subtype: 'success',
+        session_id: session.sessionId,
+      };
+
+      // Cleanup
+      await session.destroy();
+      await client.stop();
+      logger.debug('CopilotClient stopped successfully');
     } catch (error) {
       // Ensure client is stopped on error
       try {
@@ -573,6 +572,7 @@ export class CopilotProvider extends CliProvider {
 
       // Map errors to CopilotError
       if (error instanceof Error) {
+        logger.error(`Copilot SDK error: ${error.message}`);
         const errorInfo = this.mapError(error.message, null);
         throw this.createError(
           errorInfo.code as CopilotErrorCode,
