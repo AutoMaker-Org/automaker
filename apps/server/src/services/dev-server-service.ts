@@ -12,7 +12,10 @@ import * as secureFs from '../lib/secure-fs.js';
 import path from 'path';
 import net from 'net';
 import { createLogger } from '@automaker/utils';
+import { killProcessTree } from '@automaker/platform';
 import type { EventEmitter } from '../lib/events.js';
+
+const IS_WINDOWS = process.platform === 'win32';
 
 const logger = createLogger('DevServerService');
 
@@ -591,9 +594,15 @@ class DevServerService {
       });
     }
 
-    // Kill the process
-    if (server.process && !server.process.killed) {
-      server.process.kill('SIGTERM');
+    // Kill the process tree (important on Windows where child processes aren't auto-terminated)
+    if (server.process && !server.process.killed && server.process.pid) {
+      if (IS_WINDOWS) {
+        // Use tree-kill to terminate the entire process tree
+        // This prevents orphaned child processes (e.g., Next.js start-server.js)
+        await killProcessTree(server.process.pid);
+      } else {
+        server.process.kill('SIGTERM');
+      }
     }
 
     // Free the port

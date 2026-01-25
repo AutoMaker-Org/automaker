@@ -24,16 +24,27 @@ vi.mock('net', () => ({
   createServer: vi.fn(),
 }));
 
+// Mock @automaker/platform for killProcessTree
+vi.mock('@automaker/platform', () => ({
+  killProcessTree: vi.fn().mockResolvedValue(undefined),
+}));
+
 import { spawn, execSync } from 'child_process';
 import * as secureFs from '@/lib/secure-fs.js';
 import net from 'net';
+import { killProcessTree } from '@automaker/platform';
 
 describe('dev-server-service.ts', () => {
   let testDir: string;
+  let originalHostname: string | undefined;
 
   beforeEach(async () => {
     vi.clearAllMocks();
     vi.resetModules();
+
+    // Save and set HOSTNAME for consistent test URLs
+    originalHostname = process.env.HOSTNAME;
+    process.env.HOSTNAME = 'localhost';
 
     testDir = path.join(os.tmpdir(), `dev-server-test-${Date.now()}`);
     await fs.mkdir(testDir, { recursive: true });
@@ -56,6 +67,13 @@ describe('dev-server-service.ts', () => {
   });
 
   afterEach(async () => {
+    // Restore HOSTNAME
+    if (originalHostname !== undefined) {
+      process.env.HOSTNAME = originalHostname;
+    } else {
+      delete process.env.HOSTNAME;
+    }
+
     try {
       await fs.rm(testDir, { recursive: true, force: true });
     } catch {
@@ -250,7 +268,12 @@ describe('dev-server-service.ts', () => {
       const result = await service.stopDevServer(testDir);
 
       expect(result.success).toBe(true);
-      expect(mockProcess.kill).toHaveBeenCalledWith('SIGTERM');
+      // On Windows, killProcessTree is used; on Unix, process.kill('SIGTERM')
+      if (process.platform === 'win32') {
+        expect(killProcessTree).toHaveBeenCalledWith(mockProcess.pid);
+      } else {
+        expect(mockProcess.kill).toHaveBeenCalledWith('SIGTERM');
+      }
     });
   });
 
@@ -377,6 +400,7 @@ function createMockProcess() {
   mockProcess.stderr = new EventEmitter();
   mockProcess.kill = vi.fn();
   mockProcess.killed = false;
+  mockProcess.pid = 12345; // Add pid for process tree kill condition
 
   // Don't exit immediately - let the test control the lifecycle
   return mockProcess;

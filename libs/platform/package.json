@@ -22,7 +22,8 @@
   },
   "dependencies": {
     "@automaker/types": "1.0.0",
-    "p-limit": "6.2.0"
+    "p-limit": "6.2.0",
+    "tree-kill": "1.2.2"
   },
   "devDependencies": {
     "@types/node": "22.19.3",

@@ -186,3 +186,6 @@ export {
   findTerminalById,
   openInExternalTerminal,
 } from './terminal.js';
+
+// Process utilities (cross-platform process tree management)
+export { killProcessTree, waitForProcessExit, forceKillProcessTree } from './process-utils.js';

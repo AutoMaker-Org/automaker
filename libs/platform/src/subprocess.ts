@@ -4,6 +4,9 @@
 
 import { spawn, type ChildProcess } from 'child_process';
 import readline from 'readline';
+import { killProcessTree } from './process-utils.js';
+
+const IS_WINDOWS = process.platform === 'win32';
 
 export interface SubprocessOptions {
   command: string;
@@ -76,17 +79,28 @@ export async function* spawnJSONLProcess(options: SubprocessOptions): AsyncGener
     });
   }
 
+  // Helper to kill process tree (important on Windows where SIGTERM doesn't propagate)
+  const killProcess = async () => {
+    if (IS_WINDOWS && childProcess.pid) {
+      // On Windows, use tree-kill to terminate entire process tree
+      // This prevents orphaned child processes (MCP servers, dev servers, etc.)
+      await killProcessTree(childProcess.pid);
+    } else {
+      childProcess.kill('SIGTERM');
+    }
+  };
+
   // Setup timeout detection
   const resetTimeout = () => {
     lastOutputTime = Date.now();
     if (timeoutHandle) {
       clearTimeout(timeoutHandle);
     }
-    timeoutHandle = setTimeout(() => {
+    timeoutHandle = setTimeout(async () => {
       const elapsed = Date.now() - lastOutputTime;
       if (elapsed >= timeout) {
         console.error(`[SubprocessManager] Process timeout: no output for ${timeout}ms`);
-        childProcess.kill('SIGTERM');
+        await killProcess();
       }
     }, timeout);
   };
@@ -97,11 +111,14 @@ export async function* spawnJSONLProcess(options: SubprocessOptions): AsyncGener
   let abortHandler: (() => void) | null = null;
   if (abortController) {
     abortHandler = () => {
-      console.log('[SubprocessManager] Abort signal received, killing process');
+      console.log('[SubprocessManager] Abort signal received, killing process tree');
       if (timeoutHandle) {
         clearTimeout(timeoutHandle);
       }
-      childProcess.kill('SIGTERM');
+      // Use async kill but don't await (abort handler is sync)
+      killProcess().catch((err) => {
+        console.error('[SubprocessManager] Error killing process tree:', err);
+      });
     };
     // Check if already aborted, if so call handler immediately
     if (abortController.signal.aborted) {
@@ -244,7 +261,14 @@ export async function spawnProcess(options: SubprocessOptions): Promise<Subproce
     if (abortController) {
       abortHandler = () => {
         cleanupAbortListener();
-        childProcess.kill('SIGTERM');
+        // Use tree-kill on Windows to terminate entire process tree
+        if (IS_WINDOWS && childProcess.pid) {
+          killProcessTree(childProcess.pid).catch((err) => {
+            console.error('[SubprocessManager] Error killing process tree:', err);
+          });
+        } else {
+          childProcess.kill('SIGTERM');
+        }
         reject(new Error('Process aborted'));
       };
       abortController.signal.addEventListener('abort', abortHandler);
