@@ -98,6 +98,10 @@ import {
   type ZaiQuotaLimit,
   type ZaiUsage,
   type ZaiUsageResponse,
+  type GeminiQuotaBucket,
+  type GeminiTierQuota,
+  type GeminiUsage,
+  type GeminiUsageResponse,
 } from './types';
 
 // Import utility functions from modular utils files
@@ -181,6 +185,10 @@ export type {
   ZaiQuotaLimit,
   ZaiUsage,
   ZaiUsageResponse,
+  GeminiQuotaBucket,
+  GeminiTierQuota,
+  GeminiUsage,
+  GeminiUsageResponse,
 };
 
 // Re-export values from ./types for backward compatibility
@@ -210,7 +218,7 @@ export { defaultBackgroundSettings, defaultTerminalState, MAX_INIT_OUTPUT_LINES 
 // - Terminal types (./types/terminal-types.ts)
 // - ClaudeModel, Feature, FileTreeNode, ProjectAnalysis (./types/project-types.ts)
 // - InitScriptState, AutoModeActivity, AppState, AppActions (./types/state-types.ts)
-// - Claude/Codex usage types (./types/usage-types.ts)
+// - Claude/Codex/Zai/Gemini usage types (./types/usage-types.ts)
 // The following utility functions have been moved to ./utils/:
 // - Theme utilities: THEME_STORAGE_KEY, getStoredTheme, getStoredFontSans, getStoredFontMono, etc. (./utils/theme-utils.ts)
 // - Shortcut utilities: parseShortcut, formatShortcut, DEFAULT_KEYBOARD_SHORTCUTS (./utils/shortcut-utils.ts)
@@ -219,6 +227,9 @@ export { defaultBackgroundSettings, defaultTerminalState, MAX_INIT_OUTPUT_LINES 
 // - MAX_INIT_OUTPUT_LINES (./defaults/constants.ts)
 // - defaultBackgroundSettings (./defaults/background-settings.ts)
 // - defaultTerminalState (./defaults/terminal-defaults.ts)
+
+// Type definitions are imported from ./types/state-types.ts
+// AppActions interface is defined in ./types/state-types.ts
 
 const initialState: AppState = {
   projects: [],

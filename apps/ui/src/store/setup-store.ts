@@ -127,6 +127,22 @@ export interface ZaiAuthStatus {
   error?: string;
 }
 
+// Gemini Auth Method
+export type GeminiAuthMethod =
+  | 'cli_login' // Gemini CLI is installed and authenticated
+  | 'api_key_env' // GOOGLE_API_KEY or GEMINI_API_KEY environment variable
+  | 'api_key' // Manually stored API key
+  | 'none';
+
+// Gemini Auth Status
+export interface GeminiAuthStatus {
+  authenticated: boolean;
+  method: GeminiAuthMethod;
+  hasApiKey?: boolean;
+  hasEnvApiKey?: boolean;
+  error?: string;
+}
+
 // Claude Auth Method - all possible authentication sources
 export type ClaudeAuthMethod =
   | 'oauth_token_env'
@@ -200,6 +216,7 @@ export interface SetupState {
 
   // Gemini CLI state
   geminiCliStatus: GeminiCliStatus | null;
+  geminiAuthStatus: GeminiAuthStatus | null;
 
   // Copilot SDK state
   copilotCliStatus: CopilotCliStatus | null;
@@ -243,6 +260,7 @@ export interface SetupActions {
 
   // Gemini CLI
   setGeminiCliStatus: (status: GeminiCliStatus | null) => void;
+  setGeminiAuthStatus: (status: GeminiAuthStatus | null) => void;
 
   // Copilot SDK
   setCopilotCliStatus: (status: CopilotCliStatus | null) => void;
@@ -284,6 +302,7 @@ const initialState: SetupState = {
   opencodeCliStatus: null,
 
   geminiCliStatus: null,
+  geminiAuthStatus: null,
 
   copilotCliStatus: null,
 
@@ -363,6 +382,7 @@ export const useSetupStore = create<SetupState & SetupActions>()((set, get) => (
 
   // Gemini CLI
   setGeminiCliStatus: (status) => set({ geminiCliStatus: status }),
+  setGeminiAuthStatus: (status) => set({ geminiAuthStatus: status }),
 
   // Copilot SDK
   setCopilotCliStatus: (status) => set({ copilotCliStatus: status }),

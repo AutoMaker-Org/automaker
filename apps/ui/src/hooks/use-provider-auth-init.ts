@@ -4,6 +4,7 @@ import {
   type ClaudeAuthMethod,
   type CodexAuthMethod,
   type ZaiAuthMethod,
+  type GeminiAuthMethod,
 } from '@/store/setup-store';
 import { getHttpApiClient } from '@/lib/http-api-client';
 import { createLogger } from '@automaker/utils/logger';
@@ -11,7 +12,7 @@ import { createLogger } from '@automaker/utils/logger';
 const logger = createLogger('ProviderAuthInit');
 
 /**
- * Hook to initialize Claude, Codex, and z.ai authentication statuses on app startup.
+ * Hook to initialize Claude, Codex, z.ai, and Gemini authentication statuses on app startup.
  * This ensures that usage tracking information is available in the board header
  * without needing to visit the settings page first.
  */
@@ -20,9 +21,12 @@ export function useProviderAuthInit() {
     setClaudeAuthStatus,
     setCodexAuthStatus,
     setZaiAuthStatus,
+    setGeminiCliStatus,
+    setGeminiAuthStatus,
     claudeAuthStatus,
     codexAuthStatus,
     zaiAuthStatus,
+    geminiAuthStatus,
   } = useSetupStore();
   const initialized = useRef(false);
 
@@ -121,18 +125,74 @@ export function useProviderAuthInit() {
     } catch (error) {
       logger.error('Failed to init z.ai auth status:', error);
     }
-  }, [setClaudeAuthStatus, setCodexAuthStatus, setZaiAuthStatus]);
+
+    // 4. Gemini Auth Status
+    try {
+      const result = await api.setup.getGeminiStatus();
+      if (result.success) {
+        // Set CLI status
+        setGeminiCliStatus({
+          installed: result.installed ?? false,
+          version: result.version,
+          path: result.status,
+        });
+
+        // Set Auth status - always set a status to mark initialization as complete
+        if (result.auth) {
+          const auth = result.auth;
+          const validMethods: GeminiAuthMethod[] = ['cli_login', 'api_key_env', 'api_key', 'none'];
+
+          const method = validMethods.includes(auth.method as GeminiAuthMethod)
+            ? (auth.method as GeminiAuthMethod)
+            : ((auth.authenticated ? 'cli_login' : 'none') as GeminiAuthMethod);
+
+          setGeminiAuthStatus({
+            authenticated: auth.authenticated,
+            method,
+            hasApiKey: auth.hasApiKey ?? false,
+            hasEnvApiKey: auth.hasEnvApiKey ?? false,
+          });
+        } else {
+          // No auth info available, set default unauthenticated status
+          setGeminiAuthStatus({
+            authenticated: false,
+            method: 'none',
+            hasApiKey: false,
+            hasEnvApiKey: false,
+          });
+        }
+      }
+    } catch (error) {
+      logger.error('Failed to init Gemini auth status:', error);
+      // Set default status on error to prevent infinite retries
+      setGeminiAuthStatus({
+        authenticated: false,
+        method: 'none',
+        hasApiKey: false,
+        hasEnvApiKey: false,
+      });
+    }
+  }, [
+    setClaudeAuthStatus,
+    setCodexAuthStatus,
+    setZaiAuthStatus,
+    setGeminiCliStatus,
+    setGeminiAuthStatus,
+  ]);
 
   useEffect(() => {
     // Only initialize once per session if not already set
     if (
       initialized.current ||
-      (claudeAuthStatus !== null && codexAuthStatus !== null && zaiAuthStatus !== null)
+      (claudeAuthStatus !== null &&
+        codexAuthStatus !== null &&
+        zaiAuthStatus !== null &&
+        geminiAuthStatus !== null)
     ) {
       return;
     }
     initialized.current = true;
 
     void refreshStatuses();
-  }, [refreshStatuses, claudeAuthStatus, codexAuthStatus, zaiAuthStatus]);
+  }, [refreshStatuses, claudeAuthStatus, codexAuthStatus, zaiAuthStatus, geminiAuthStatus]);
 }

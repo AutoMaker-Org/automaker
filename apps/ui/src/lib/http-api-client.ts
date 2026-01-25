@@ -41,7 +41,11 @@ import type {
   Notification,
 } from '@automaker/types';
 import type { Message, SessionListItem } from '@/types/electron';
-import type { ClaudeUsageResponse, CodexUsageResponse } from '@/store/app-store';
+import type {
+  ClaudeUsageResponse,
+  CodexUsageResponse,
+  GeminiUsage,
+} from '@/store/app-store';
 import type { WorktreeAPI, GitAPI, ModelDefinition, ProviderStatus } from '@/types/electron';
 import type { ModelId, ThinkingLevel, ReasoningEffort, Feature } from '@automaker/types';
 import { getGlobalFileBrowser } from '@/contexts/file-browser-context';
@@ -2685,6 +2689,11 @@ export class HttpApiClient implements ElectronAPI {
       const url = `/api/codex/models${refresh ? '?refresh=true' : ''}`;
       return this.get(url);
     },
+  };
+
+  // Gemini API
+  gemini = {
+    getUsage: (): Promise<GeminiUsage> => this.get('/api/gemini/usage'),
   };
 
   // Context API

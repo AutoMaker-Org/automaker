@@ -31,6 +31,7 @@ interface HeaderMobileMenuProps {
   showClaudeUsage: boolean;
   showCodexUsage: boolean;
   showZaiUsage?: boolean;
+  showGeminiUsage?: boolean;
 }
 
 export function HeaderMobileMenu({
@@ -49,13 +50,14 @@ export function HeaderMobileMenu({
   showClaudeUsage,
   showCodexUsage,
   showZaiUsage = false,
+  showGeminiUsage = false,
 }: HeaderMobileMenuProps) {
   return (
     <>
       <HeaderActionsPanelTrigger isOpen={isOpen} onToggle={onToggle} />
       <HeaderActionsPanel isOpen={isOpen} onClose={onToggle} title="Board Controls">
         {/* Usage Bar - show if any provider is authenticated */}
-        {(showClaudeUsage || showCodexUsage || showZaiUsage) && (
+        {(showClaudeUsage || showCodexUsage || showZaiUsage || showGeminiUsage) && (
           <div className="space-y-2">
             <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
               Usage
@@ -64,6 +66,7 @@ export function HeaderMobileMenu({
               showClaudeUsage={showClaudeUsage}
               showCodexUsage={showCodexUsage}
               showZaiUsage={showZaiUsage}
+              showGeminiUsage={showGeminiUsage}
             />
           </div>
         )}

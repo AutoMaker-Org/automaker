@@ -1,6 +1,11 @@
 // Type definitions for Electron IPC API
 import type { SessionListItem, Message } from '@/types/electron';
-import type { ClaudeUsageResponse, CodexUsageResponse, ZaiUsageResponse } from '@/store/app-store';
+import type {
+  ClaudeUsageResponse,
+  CodexUsageResponse,
+  ZaiUsageResponse,
+  GeminiUsageResponse,
+} from '@/store/app-store';
 import type {
   IssueValidationVerdict,
   IssueValidationConfidence,
@@ -874,6 +879,9 @@ export interface ElectronAPI {
       error?: string;
     }>;
   };
+  gemini?: {
+    getUsage: () => Promise<GeminiUsageResponse>;
+  };
   settings?: {
     getStatus: () => Promise<{
       success: boolean;
@@ -1415,6 +1423,20 @@ const _getMockElectronAPI = (): ElectronAPI => {
           success: false,
           authenticated: false,
           error: 'Please provide an API key to test.',
+        };
+      },
+    },
+
+    // Mock Gemini API
+    gemini: {
+      getUsage: async () => {
+        console.log('[Mock] Getting Gemini usage');
+        return {
+          authenticated: true,
+          authMethod: 'cli_login',
+          usedPercent: 0,
+          remainingPercent: 100,
+          lastUpdated: new Date().toISOString(),
         };
       },
     },

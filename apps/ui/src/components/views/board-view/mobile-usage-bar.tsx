@@ -4,12 +4,14 @@ import { cn } from '@/lib/utils';
 import { Spinner } from '@/components/ui/spinner';
 import { getElectronAPI } from '@/lib/electron';
 import { useAppStore } from '@/store/app-store';
-import { AnthropicIcon, OpenAIIcon, ZaiIcon } from '@/components/ui/provider-icon';
+import { AnthropicIcon, OpenAIIcon, ZaiIcon, GeminiIcon } from '@/components/ui/provider-icon';
+import type { GeminiUsage } from '@/store/app-store';
 
 interface MobileUsageBarProps {
   showClaudeUsage: boolean;
   showCodexUsage: boolean;
   showZaiUsage?: boolean;
+  showGeminiUsage?: boolean;
 }
 
 // Helper to get progress bar color based on percentage
@@ -152,6 +154,7 @@ export function MobileUsageBar({
   showClaudeUsage,
   showCodexUsage,
   showZaiUsage = false,
+  showGeminiUsage = false,
 }: MobileUsageBarProps) {
   const { claudeUsage, claudeUsageLastUpdated, setClaudeUsage } = useAppStore();
   const { codexUsage, codexUsageLastUpdated, setCodexUsage } = useAppStore();
@@ -159,12 +162,17 @@ export function MobileUsageBar({
   const [isClaudeLoading, setIsClaudeLoading] = useState(false);
   const [isCodexLoading, setIsCodexLoading] = useState(false);
   const [isZaiLoading, setIsZaiLoading] = useState(false);
+  const [isGeminiLoading, setIsGeminiLoading] = useState(false);
+  const [geminiUsage, setGeminiUsage] = useState<GeminiUsage | null>(null);
+  const [geminiUsageLastUpdated, setGeminiUsageLastUpdated] = useState<number | null>(null);
 
   // Check if data is stale (older than 2 minutes)
   const isClaudeStale =
     !claudeUsageLastUpdated || Date.now() - claudeUsageLastUpdated > 2 * 60 * 1000;
   const isCodexStale = !codexUsageLastUpdated || Date.now() - codexUsageLastUpdated > 2 * 60 * 1000;
   const isZaiStale = !zaiUsageLastUpdated || Date.now() - zaiUsageLastUpdated > 2 * 60 * 1000;
+  const isGeminiStale =
+    !geminiUsageLastUpdated || Date.now() - geminiUsageLastUpdated > 2 * 60 * 1000;
 
   const fetchClaudeUsage = useCallback(async () => {
     setIsClaudeLoading(true);
@@ -214,6 +222,23 @@ export function MobileUsageBar({
     }
   }, [setZaiUsage]);
 
+  const fetchGeminiUsage = useCallback(async () => {
+    setIsGeminiLoading(true);
+    try {
+      const api = getElectronAPI();
+      if (!api.gemini) return;
+      const data = await api.gemini.getUsage();
+      if (!('error' in data)) {
+        setGeminiUsage(data);
+        setGeminiUsageLastUpdated(Date.now());
+      }
+    } catch {
+      // Silently fail - usage display is optional
+    } finally {
+      setIsGeminiLoading(false);
+    }
+  }, []);
+
   const getCodexWindowLabel = (durationMins: number) => {
     if (durationMins < 60) return `${durationMins}m Window`;
     if (durationMins < 1440) return `${Math.round(durationMins / 60)}h Window`;
@@ -239,8 +264,14 @@ export function MobileUsageBar({
     }
   }, [showZaiUsage, isZaiStale, fetchZaiUsage]);
 
+  useEffect(() => {
+    if (showGeminiUsage && isGeminiStale) {
+      fetchGeminiUsage();
+    }
+  }, [showGeminiUsage, isGeminiStale, fetchGeminiUsage]);
+
   // Don't render if there's nothing to show
-  if (!showClaudeUsage && !showCodexUsage && !showZaiUsage) {
+  if (!showClaudeUsage && !showCodexUsage && !showZaiUsage && !showGeminiUsage) {
     return null;
   }
 
@@ -335,6 +366,58 @@ export function MobileUsageBar({
             </>
           ) : zaiUsage ? (
             <p className="text-[10px] text-muted-foreground italic">No usage data from z.ai API</p>
+          ) : (
+            <p className="text-[10px] text-muted-foreground italic">Loading usage data...</p>
+          )}
+        </UsageItem>
+      )}
+
+      {showGeminiUsage && (
+        <UsageItem
+          icon={GeminiIcon}
+          label="Gemini"
+          isLoading={isGeminiLoading}
+          onRefresh={fetchGeminiUsage}
+        >
+          {geminiUsage ? (
+            geminiUsage.authenticated ? (
+              geminiUsage.flashQuota || geminiUsage.proQuota ? (
+                <>
+                  {geminiUsage.flashQuota && (
+                    <UsageBar
+                      label="Flash"
+                      percentage={geminiUsage.flashQuota.usedPercent}
+                      isStale={isGeminiStale}
+                      resetText={geminiUsage.flashQuota.resetText}
+                    />
+                  )}
+                  {geminiUsage.proQuota && (
+                    <UsageBar
+                      label="Pro"
+                      percentage={geminiUsage.proQuota.usedPercent}
+                      isStale={isGeminiStale}
+                      resetText={geminiUsage.proQuota.resetText}
+                    />
+                  )}
+                </>
+              ) : (
+                <div className="text-[10px]">
+                  <p className="text-green-500 font-medium">
+                    Connected via{' '}
+                    {geminiUsage.authMethod === 'cli_login'
+                      ? 'CLI Login'
+                      : geminiUsage.authMethod === 'api_key'
+                        ? 'API Key'
+                        : geminiUsage.authMethod}
+                  </p>
+                  <p className="text-muted-foreground italic mt-0.5">
+                    {geminiUsage.error || 'No usage yet'}
+                  </p>
+                </div>
+              )
+            ) : (
+              <p className="text-[10px] text-yellow-500">Not authenticated</p>
+            )
           ) : (
             <p className="text-[10px] text-muted-foreground italic">Loading usage data...</p>
           )}

@@ -82,6 +82,7 @@ export function BoardHeader({
   );
   const codexAuthStatus = useSetupStore((state) => state.codexAuthStatus);
   const zaiAuthStatus = useSetupStore((state) => state.zaiAuthStatus);
+  const geminiAuthStatus = useSetupStore((state) => state.geminiAuthStatus);
 
   // Worktree panel visibility (per-project)
   const worktreePanelVisibleByProject = useAppStore((state) => state.worktreePanelVisibleByProject);
@@ -115,6 +116,9 @@ export function BoardHeader({
 
   // z.ai usage tracking visibility logic
   const showZaiUsage = !!zaiAuthStatus?.authenticated;
+
+  // Gemini usage tracking visibility logic
+  const showGeminiUsage = !!geminiAuthStatus?.authenticated;
 
   // State for mobile actions panel
   const [showActionsPanel, setShowActionsPanel] = useState(false);
@@ -163,9 +167,11 @@ export function BoardHeader({
           </Tooltip>
         )}
         {/* Usage Popover - show if any provider is authenticated, only on desktop */}
-        {isMounted && !isTablet && (showClaudeUsage || showCodexUsage || showZaiUsage) && (
-          <UsagePopover />
-        )}
+        {isMounted &&
+          !isTablet &&
+          (showClaudeUsage || showCodexUsage || showZaiUsage || showGeminiUsage) && (
+            <UsagePopover />
+          )}
 
         {/* Tablet/Mobile view: show hamburger menu with all controls */}
         {isMounted && isTablet && (
@@ -185,6 +191,7 @@ export function BoardHeader({
             showClaudeUsage={showClaudeUsage}
             showCodexUsage={showCodexUsage}
             showZaiUsage={showZaiUsage}
+            showGeminiUsage={showGeminiUsage}
           />
         )}
 
