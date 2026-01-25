@@ -167,10 +167,9 @@ ${contentToAnalyze}`;
         model,
         cwd,
         maxTurns: 1,
-        allowedTools: [],
         thinkingLevel,
-        readOnly: true, // File description only reads, doesn't write
         settingSources: autoLoadClaudeMd ? ['user', 'project', 'local'] : undefined,
+        // allowedTools intentionally omitted - undefined works better than empty array
       });
 
       const description = result.text;

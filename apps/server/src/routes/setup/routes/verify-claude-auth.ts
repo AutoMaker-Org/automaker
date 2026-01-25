@@ -158,8 +158,8 @@ export function createVerifyClaudeAuthHandler() {
           options: {
             model: 'claude-sonnet-4-20250514',
             maxTurns: 1,
-            allowedTools: [],
             abortController,
+            // allowedTools intentionally omitted - undefined works better than empty array
           },
         });
 

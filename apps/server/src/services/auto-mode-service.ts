@@ -3611,9 +3611,9 @@ If nothing notable: {"learnings": []}`;
         model: resolvedModel,
         cwd: projectPath,
         maxTurns: 1,
-        allowedTools: [],
         systemPrompt:
           'You are a JSON extraction assistant. You MUST respond with ONLY valid JSON, no explanations, no markdown, no other text. Extract learnings from the provided implementation context and return them as JSON.',
+        // allowedTools intentionally omitted - undefined works better than empty array
       });
 
       const responseText = result.text;

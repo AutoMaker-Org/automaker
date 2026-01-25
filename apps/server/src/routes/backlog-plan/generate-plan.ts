@@ -162,11 +162,10 @@ ${userPrompt}`;
       cwd: projectPath,
       systemPrompt: finalSystemPrompt,
       maxTurns: 1,
-      allowedTools: [], // No tools needed for this
       abortController,
       settingSources: autoLoadClaudeMd ? ['user', 'project'] : undefined,
-      readOnly: true, // Plan generation only generates text, doesn't write files
       thinkingLevel, // Pass thinking level for extended thinking
+      // allowedTools intentionally omitted - undefined works better than empty array
     });
 
     let responseText = '';

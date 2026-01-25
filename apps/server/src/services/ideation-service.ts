@@ -676,9 +676,8 @@ export class IdeationService {
         cwd: projectPath,
         systemPrompt: sdkOptions.systemPrompt,
         maxTurns: 1,
-        // Disable all tools - we just want text generation, not codebase analysis
-        allowedTools: [],
         abortController: new AbortController(),
+        // allowedTools intentionally omitted - undefined works better than empty array
       };
 
       const stream = provider.executeQuery(executeOptions);

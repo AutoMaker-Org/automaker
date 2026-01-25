@@ -195,8 +195,17 @@ export class ClaudeProvider extends BaseProvider {
       thinkingLevel,
     } = options;
 
-    // Map to Bedrock model ID if Bedrock is configured
-    const model = await mapToBedrockModel(requestedModel, this);
+    // Skip Bedrock mapping for simple text-only queries (they often fail with Bedrock)
+    // Use standard Claude models for text generation to avoid SDK exit code 1
+    const isSimpleTextQuery = maxTurns === 1 && (!allowedTools || allowedTools.length === 0);
+    const skipBedrockMapping = isSimpleTextQuery;
+    const model = skipBedrockMapping
+      ? requestedModel
+      : await mapToBedrockModel(requestedModel, this);
+
+    if (skipBedrockMapping) {
+      logger.debug(`Skipping Bedrock mapping for simple text query, using: ${requestedModel}`);
+    }
 
     // Convert thinking level to token budget
     const maxThinkingTokens = getThinkingTokenBudget(thinkingLevel);
@@ -210,7 +219,8 @@ export class ClaudeProvider extends BaseProvider {
       // Pass only explicitly allowed environment variables to SDK
       env: await this.buildEnv(),
       // Pass through allowedTools if provided by caller (decided by sdk-options.ts)
-      ...(allowedTools && { allowedTools }),
+      // Only pass if explicitly defined and non-empty to avoid SDK issues
+      ...(allowedTools !== undefined && allowedTools.length > 0 ? { allowedTools } : {}),
       // AUTONOMOUS MODE: Always bypass permissions for fully autonomous operation
       permissionMode: 'bypassPermissions',
       allowDangerouslySkipPermissions: true,

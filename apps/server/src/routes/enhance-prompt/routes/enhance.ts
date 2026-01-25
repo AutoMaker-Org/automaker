@@ -134,9 +134,8 @@ export function createEnhanceHandler(
         model: resolvedModel,
         cwd: process.cwd(), // Enhancement doesn't need a specific working directory
         maxTurns: 1,
-        allowedTools: [],
         thinkingLevel,
-        readOnly: true, // Prompt enhancement only generates text, doesn't write files
+        // allowedTools intentionally omitted - undefined works better than empty array
       });
 
       const enhancedText = result.text;

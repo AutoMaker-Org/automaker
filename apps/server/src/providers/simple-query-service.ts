@@ -118,7 +118,8 @@ export async function simpleQuery(options: SimpleQueryOptions): Promise<SimpleQu
     cwd: options.cwd,
     systemPrompt: options.systemPrompt,
     maxTurns: options.maxTurns ?? 1,
-    allowedTools: options.allowedTools ?? [],
+    // Only include allowedTools if explicitly provided (undefined is better than empty array)
+    ...(options.allowedTools !== undefined && { allowedTools: options.allowedTools }),
     abortController: options.abortController,
     outputFormat: options.outputFormat,
     thinkingLevel: options.thinkingLevel,
@@ -200,7 +201,8 @@ export async function streamingQuery(options: StreamingQueryOptions): Promise<Si
     cwd: options.cwd,
     systemPrompt: options.systemPrompt,
     maxTurns: options.maxTurns ?? 250,
-    allowedTools: options.allowedTools ?? ['Read', 'Glob', 'Grep'],
+    // Only include allowedTools if explicitly provided
+    ...(options.allowedTools !== undefined && { allowedTools: options.allowedTools }),
     abortController: options.abortController,
     outputFormat: options.outputFormat,
     thinkingLevel: options.thinkingLevel,

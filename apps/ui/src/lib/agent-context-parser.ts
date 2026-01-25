@@ -33,10 +33,17 @@ export const DEFAULT_MODEL = 'claude-opus-4-5-20251101';
  * Formats a model name for display
  */
 export function formatModelName(model: string): string {
+  // Check if it's a Bedrock model
+  const isBedrock =
+    model.includes('.anthropic.claude-') ||
+    model.startsWith('anthropic.claude-') ||
+    model.startsWith('eu.anthropic.') ||
+    model.startsWith('us.anthropic.');
+
   // Claude models
-  if (model.includes('opus')) return 'Opus 4.5';
-  if (model.includes('sonnet')) return 'Sonnet 4.5';
-  if (model.includes('haiku')) return 'Haiku 4.5';
+  if (model.includes('opus')) return isBedrock ? 'Opus 4.5 (Bedrock)' : 'Opus 4.5';
+  if (model.includes('sonnet')) return isBedrock ? 'Sonnet 4.5 (Bedrock)' : 'Sonnet 4.5';
+  if (model.includes('haiku')) return isBedrock ? 'Haiku 4.5 (Bedrock)' : 'Haiku 4.5';
 
   // Codex/GPT models - specific formatting
   if (model === 'codex-gpt-5.2-codex') return 'GPT-5.2 Codex';

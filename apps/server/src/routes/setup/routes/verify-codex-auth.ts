@@ -165,8 +165,8 @@ export function createVerifyCodexAuthHandler() {
           model: CODEX_MODEL_MAP.gpt52Codex,
           cwd: process.cwd(),
           maxTurns: 1,
-          allowedTools: [],
           abortController,
+          // allowedTools intentionally omitted - undefined works better than empty array
         });
 
         let receivedAnyContent = false;

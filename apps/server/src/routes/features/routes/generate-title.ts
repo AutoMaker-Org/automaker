@@ -64,12 +64,13 @@ export function createGenerateTitleHandler(): (req: Request, res: Response) => P
       const userPrompt = `Generate a concise title for this feature:\n\n${trimmedDescription}`;
 
       // Use simpleQuery - provider abstraction handles all the streaming/extraction
+      // Don't pass allowedTools at all (undefined) to prevent SDK exit code 1 issues
       const result = await simpleQuery({
         prompt: `${SYSTEM_PROMPT}\n\n${userPrompt}`,
         model: CLAUDE_MODEL_MAP.haiku,
         cwd: process.cwd(),
         maxTurns: 1,
-        allowedTools: [],
+        // allowedTools intentionally omitted - undefined works better than empty array
       });
 
       const title = result.text;

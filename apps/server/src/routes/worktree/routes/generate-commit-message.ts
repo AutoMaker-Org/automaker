@@ -213,8 +213,7 @@ export function createGenerateCommitMessageHandler(
           model: bareModel,
           cwd: worktreePath,
           maxTurns: 1,
-          allowedTools: [],
-          readOnly: true,
+          // allowedTools intentionally omitted - undefined works better than empty array
         });
 
         // Wrap with timeout to prevent indefinite hangs
@@ -237,8 +236,8 @@ export function createGenerateCommitMessageHandler(
             model,
             systemPrompt,
             maxTurns: 1,
-            allowedTools: [],
             permissionMode: 'default',
+            // allowedTools intentionally omitted - undefined works better than empty array
           },
         });
 

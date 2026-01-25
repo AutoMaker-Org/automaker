@@ -175,17 +175,17 @@ export function AwsBedrockSection() {
 
   if (isLoading) {
     return (
-      <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-6">
+      <div className="bg-card border border-border rounded-xl p-6">
         <div className="animate-pulse">
-          <div className="h-6 bg-zinc-800 rounded w-1/3 mb-2"></div>
-          <div className="h-4 bg-zinc-800 rounded w-2/3"></div>
+          <div className="h-6 bg-muted rounded w-1/3 mb-2"></div>
+          <div className="h-4 bg-muted rounded w-2/3"></div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-6 space-y-4">
+    <div className="bg-card border border-border rounded-xl p-6 space-y-4">
       {/* Header */}
       <div className="flex items-start justify-between">
         <div className="flex items-start gap-3">
@@ -193,8 +193,8 @@ export function AwsBedrockSection() {
             <CloudCog className="w-5 h-5 text-orange-400" />
           </div>
           <div>
-            <h3 className="font-medium text-zinc-100">AWS Bedrock</h3>
-            <p className="text-sm text-zinc-400 mt-1">
+            <h3 className="font-medium text-foreground">AWS Bedrock</h3>
+            <p className="text-sm text-muted-foreground mt-1">
               Use Claude models via AWS Bedrock for enterprise deployments
             </p>
           </div>
@@ -202,17 +202,17 @@ export function AwsBedrockSection() {
 
         {/* Status Indicator */}
         {isConfigured && enabled && (
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-green-500/10 border border-green-500/20 rounded-lg">
-            <CheckCircle2 className="w-4 h-4 text-green-400" />
-            <span className="text-sm text-green-400">Configured</span>
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-[var(--status-success-bg)] border border-[var(--status-success)]/20 rounded-lg">
+            <CheckCircle2 className="w-4 h-4 text-[var(--status-success)]" />
+            <span className="text-sm text-[var(--status-success)]">Configured</span>
           </div>
         )}
       </div>
 
       {/* Security Warning */}
-      <div className="flex items-start gap-3 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
-        <AlertTriangle className="w-4 h-4 text-yellow-400 shrink-0 mt-0.5" />
-        <p className="text-xs text-yellow-400/90">
+      <div className="flex items-start gap-3 p-3 rounded-lg bg-[var(--status-warning-bg)] border border-[var(--status-warning)]/20">
+        <AlertTriangle className="w-4 h-4 text-[var(--status-warning)] shrink-0 mt-0.5" />
+        <p className="text-xs text-[var(--status-warning)]">
           Credentials are stored unencrypted in credentials.json. Only use on trusted systems.
         </p>
       </div>
@@ -220,19 +220,19 @@ export function AwsBedrockSection() {
       {/* Enable/Disable Toggle */}
       <div className="flex items-center justify-between pt-2">
         <div>
-          <label className="text-sm font-medium text-zinc-200">Enable AWS Bedrock</label>
-          <p className="text-xs text-zinc-500 mt-0.5">
+          <label className="text-sm font-medium text-foreground">Enable AWS Bedrock</label>
+          <p className="text-xs text-muted-foreground mt-0.5">
             Use Bedrock instead of direct Anthropic API
           </p>
         </div>
         <button
           onClick={() => setEnabled(!enabled)}
           className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-            enabled ? 'bg-blue-500' : 'bg-zinc-700'
+            enabled ? 'bg-brand-500' : 'bg-muted'
           }`}
         >
           <span
-            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+            className={`inline-block h-4 w-4 transform rounded-full bg-background transition-transform ${
               enabled ? 'translate-x-6' : 'translate-x-1'
             }`}
           />
@@ -241,17 +241,17 @@ export function AwsBedrockSection() {
 
       {/* Configuration Form (shown when enabled) */}
       {enabled && (
-        <div className="space-y-4 pt-2 border-t border-zinc-800">
+        <div className="space-y-4 pt-2 border-t border-border">
           {/* CLI Import Section */}
-          <div className="p-3 bg-zinc-800/50 border border-zinc-700 rounded-lg space-y-3">
+          <div className="p-3 bg-muted/50 border border-border rounded-lg space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <FileText className="w-4 h-4 text-blue-400" />
-                <span className="text-sm font-medium text-zinc-200">Import from AWS CLI</span>
+                <FileText className="w-4 h-4 text-brand-500" />
+                <span className="text-sm font-medium text-foreground">Import from AWS CLI</span>
               </div>
               <button
                 onClick={() => setShowCliImport(!showCliImport)}
-                className="text-xs px-2 py-1 bg-zinc-700 hover:bg-zinc-600 text-zinc-200 rounded transition-colors"
+                className="text-xs px-2 py-1 bg-muted hover:bg-muted/80 text-foreground rounded transition-colors"
               >
                 {showCliImport ? 'Hide' : 'Show'}
               </button>
@@ -259,7 +259,7 @@ export function AwsBedrockSection() {
 
             {showCliImport && (
               <div className="space-y-2">
-                <p className="text-xs text-zinc-400">
+                <p className="text-xs text-muted-foreground">
                   Paste your AWS CLI export commands here (from AWS SSO login):
                 </p>
                 <textarea
@@ -267,12 +267,12 @@ export function AwsBedrockSection() {
                   onChange={(e) => setCliImportText(e.target.value)}
                   placeholder={`export AWS_ACCESS_KEY_ID=AKIA...\nexport AWS_SECRET_ACCESS_KEY=...\nexport AWS_SESSION_TOKEN=...\nexport AWS_DEFAULT_REGION=eu-central-1`}
                   rows={6}
-                  className="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-xs text-zinc-100 placeholder-zinc-600 focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
+                  className="w-full px-3 py-2 bg-background border border-border rounded-lg text-xs text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-brand-500 font-mono"
                 />
                 <button
                   onClick={parseCliExports}
                   disabled={!cliImportText.trim()}
-                  className="w-full px-3 py-2 bg-blue-500 hover:bg-blue-600 disabled:bg-zinc-700 disabled:text-zinc-500 text-white rounded-lg transition-colors text-sm font-medium"
+                  className="w-full px-3 py-2 bg-brand-500 hover:bg-brand-600 disabled:bg-muted disabled:text-muted-foreground text-white rounded-lg transition-colors text-sm font-medium"
                 >
                   Parse & Fill Credentials
                 </button>
@@ -282,11 +282,11 @@ export function AwsBedrockSection() {
 
           {/* AWS Region */}
           <div>
-            <label className="block text-sm font-medium text-zinc-200 mb-2">AWS Region</label>
+            <label className="block text-sm font-medium text-foreground mb-2">AWS Region</label>
             <select
               value={region}
               onChange={(e) => setRegion(e.target.value)}
-              className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand-500"
             >
               {AWS_REGIONS.map((r) => (
                 <option key={r.value} value={r.value}>
@@ -298,7 +298,7 @@ export function AwsBedrockSection() {
 
           {/* AWS Access Key ID */}
           <div>
-            <label className="block text-sm font-medium text-zinc-200 mb-2">
+            <label className="block text-sm font-medium text-foreground mb-2">
               AWS Access Key ID <span className="text-red-400">*</span>
             </label>
             <div className="relative">
@@ -307,12 +307,12 @@ export function AwsBedrockSection() {
                 value={accessKeyId}
                 onChange={(e) => setAccessKeyId(e.target.value)}
                 placeholder={isConfigured ? '(configured)' : 'AKIA...'}
-                className="w-full px-3 py-2 pr-10 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 pr-10 bg-background border border-border rounded-lg text-sm text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-brand-500"
               />
               <button
                 type="button"
                 onClick={() => setShowAccessKey(!showAccessKey)}
-                className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-zinc-400 hover:text-zinc-200 transition-colors"
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-muted-foreground hover:text-foreground transition-colors"
               >
                 {showAccessKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
@@ -321,7 +321,7 @@ export function AwsBedrockSection() {
 
           {/* AWS Secret Access Key */}
           <div>
-            <label className="block text-sm font-medium text-zinc-200 mb-2">
+            <label className="block text-sm font-medium text-foreground mb-2">
               AWS Secret Access Key <span className="text-red-400">*</span>
             </label>
             <div className="relative">
@@ -330,12 +330,12 @@ export function AwsBedrockSection() {
                 value={secretAccessKey}
                 onChange={(e) => setSecretAccessKey(e.target.value)}
                 placeholder={isConfigured ? '(configured)' : 'wJal...'}
-                className="w-full px-3 py-2 pr-10 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 pr-10 bg-background border border-border rounded-lg text-sm text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-brand-500"
               />
               <button
                 type="button"
                 onClick={() => setShowSecretKey(!showSecretKey)}
-                className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-zinc-400 hover:text-zinc-200 transition-colors"
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-muted-foreground hover:text-foreground transition-colors"
               >
                 {showSecretKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
@@ -344,8 +344,8 @@ export function AwsBedrockSection() {
 
           {/* AWS Session Token (Optional) */}
           <div>
-            <label className="block text-sm font-medium text-zinc-200 mb-2">
-              AWS Session Token <span className="text-xs text-zinc-500">(optional)</span>
+            <label className="block text-sm font-medium text-foreground mb-2">
+              AWS Session Token <span className="text-xs text-muted-foreground">(optional)</span>
             </label>
             <div className="relative">
               <input
@@ -353,12 +353,12 @@ export function AwsBedrockSection() {
                 value={sessionToken}
                 onChange={(e) => setSessionToken(e.target.value)}
                 placeholder={isConfigured ? '(configured)' : 'For temporary credentials'}
-                className="w-full px-3 py-2 pr-10 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 pr-10 bg-background border border-border rounded-lg text-sm text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-brand-500"
               />
               <button
                 type="button"
                 onClick={() => setShowSessionToken(!showSessionToken)}
-                className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-zinc-400 hover:text-zinc-200 transition-colors"
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-muted-foreground hover:text-foreground transition-colors"
               >
                 {showSessionToken ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
@@ -366,10 +366,11 @@ export function AwsBedrockSection() {
           </div>
 
           {/* IAM Permissions Note */}
-          <div className="p-3 bg-zinc-800/50 border border-zinc-700 rounded-lg">
-            <p className="text-xs text-zinc-400">
-              <span className="font-medium text-zinc-300">IAM Permissions Required:</span> Your AWS
-              credentials need bedrock:InvokeModel permission for the Claude models you want to use.
+          <div className="p-3 bg-muted/50 border border-border rounded-lg">
+            <p className="text-xs text-muted-foreground">
+              <span className="font-medium text-foreground">IAM Permissions Required:</span> Your
+              AWS credentials need bedrock:InvokeModel permission for the Claude models you want to
+              use.
             </p>
           </div>
         </div>
@@ -380,7 +381,7 @@ export function AwsBedrockSection() {
         <button
           onClick={handleSave}
           disabled={isSaving}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 disabled:bg-zinc-700 disabled:text-zinc-500 text-white rounded-lg transition-colors text-sm font-medium"
+          className="flex items-center gap-2 px-4 py-2 bg-brand-500 hover:bg-brand-600 disabled:bg-muted disabled:text-muted-foreground text-white rounded-lg transition-colors text-sm font-medium"
         >
           <Save className="w-4 h-4" />
           {isSaving ? 'Saving...' : 'Save AWS Bedrock Credentials'}
