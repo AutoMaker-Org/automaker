@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Shield, ShieldCheck, ShieldAlert, ChevronDown, Copy, Check } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 import { cn } from '@/lib/utils';
 import type { CursorStatus } from '../hooks/use-cursor-status';
 import type { PermissionsData } from '../hooks/use-cursor-permissions';
@@ -118,7 +119,7 @@ export function CursorPermissionsSection({
 
             {isLoadingPermissions ? (
               <div className="flex items-center justify-center py-8">
-                <div className="animate-spin w-6 h-6 border-2 border-brand-500 border-t-transparent rounded-full" />
+                <Spinner size="lg" />
               </div>
             ) : (
               <>

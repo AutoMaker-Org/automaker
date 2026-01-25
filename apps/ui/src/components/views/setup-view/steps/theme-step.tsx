@@ -24,10 +24,10 @@ export function ThemeStep({ onNext, onBack }: ThemeStepProps) {
 
   const handleThemeClick = (themeValue: string) => {
     setTheme(themeValue as typeof theme);
-    // Also update the current project's theme if one exists
-    // This ensures the selected theme is visible since getEffectiveTheme() prioritizes project theme
-    if (currentProject) {
-      setProjectTheme(currentProject.id, themeValue as typeof theme);
+    // Clear the current project's theme so it uses the global theme
+    // This ensures "Use Global Theme" is checked and the project inherits the global theme
+    if (currentProject && currentProject.theme !== undefined) {
+      setProjectTheme(currentProject.id, null);
     }
     setPreviewTheme(null);
   };

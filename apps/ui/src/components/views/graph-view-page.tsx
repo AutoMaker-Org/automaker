@@ -1,19 +1,28 @@
 // @ts-nocheck
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import { useAppStore, Feature } from '@/store/app-store';
+import { useShallow } from 'zustand/react/shallow';
 import { GraphView } from './graph-view';
-import { EditFeatureDialog, AddFeatureDialog, AgentOutputModal } from './board-view/dialogs';
+import {
+  EditFeatureDialog,
+  AddFeatureDialog,
+  AgentOutputModal,
+  BacklogPlanDialog,
+} from './board-view/dialogs';
 import {
   useBoardFeatures,
   useBoardActions,
   useBoardBackground,
   useBoardPersistence,
 } from './board-view/hooks';
+import { useWorktrees } from './board-view/worktree-panel/hooks';
 import { useAutoMode } from '@/hooks/use-auto-mode';
 import { pathsEqual } from '@/lib/utils';
-import { RefreshCw } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 import { getElectronAPI } from '@/lib/electron';
 import { createLogger } from '@automaker/utils/logger';
+import { toast } from 'sonner';
+import type { BacklogPlanResult } from '@automaker/types';
 
 const logger = createLogger('GraphViewPage');
 
@@ -29,7 +38,26 @@ export function GraphViewPage() {
     setWorktrees,
     setCurrentWorktree,
     defaultSkipTests,
-  } = useAppStore();
+    addFeatureUseSelectedWorktreeBranch,
+    planUseSelectedWorktreeBranch,
+    setPlanUseSelectedWorktreeBranch,
+  } = useAppStore(
+    useShallow((state) => ({
+      currentProject: state.currentProject,
+      updateFeature: state.updateFeature,
+      getCurrentWorktree: state.getCurrentWorktree,
+      getWorktrees: state.getWorktrees,
+      setWorktrees: state.setWorktrees,
+      setCurrentWorktree: state.setCurrentWorktree,
+      defaultSkipTests: state.defaultSkipTests,
+      addFeatureUseSelectedWorktreeBranch: state.addFeatureUseSelectedWorktreeBranch,
+      planUseSelectedWorktreeBranch: state.planUseSelectedWorktreeBranch,
+      setPlanUseSelectedWorktreeBranch: state.setPlanUseSelectedWorktreeBranch,
+    }))
+  );
+
+  // Ensure worktrees are loaded when landing directly on graph view
+  useWorktrees({ projectPath: currentProject?.path ?? '' });
 
   const worktreesByProject = useAppStore((s) => s.worktreesByProject);
   const worktrees = useMemo(
@@ -62,6 +90,9 @@ export function GraphViewPage() {
   const [spawnParentFeature, setSpawnParentFeature] = useState<Feature | null>(null);
   const [showOutputModal, setShowOutputModal] = useState(false);
   const [outputFeature, setOutputFeature] = useState<Feature | null>(null);
+  const [showPlanDialog, setShowPlanDialog] = useState(false);
+  const [pendingBacklogPlan, setPendingBacklogPlan] = useState<BacklogPlanResult | null>(null);
+  const [isGeneratingPlan, setIsGeneratingPlan] = useState(false);
 
   // Worktree refresh key
   const [worktreeRefreshKey, setWorktreeRefreshKey] = useState(0);
@@ -116,6 +147,71 @@ export function GraphViewPage() {
     fetchBranches();
   }, [currentProject, worktreeRefreshKey]);
 
+  // Listen for backlog plan events (for background generation)
+  useEffect(() => {
+    const api = getElectronAPI();
+    if (!api?.backlogPlan) {
+      logger.debug('Backlog plan API not available for event subscription');
+      return;
+    }
+
+    const unsubscribe = api.backlogPlan.onEvent(
+      (event: { type: string; result?: BacklogPlanResult; error?: string }) => {
+        logger.debug('Backlog plan event received', {
+          type: event.type,
+          hasResult: Boolean(event.result),
+          hasError: Boolean(event.error),
+        });
+        if (event.type === 'backlog_plan_complete') {
+          setIsGeneratingPlan(false);
+          if (event.result && event.result.changes?.length > 0) {
+            setPendingBacklogPlan(event.result);
+            toast.success('Plan ready! Click to review.', {
+              duration: 10000,
+              action: {
+                label: 'Review',
+                onClick: () => setShowPlanDialog(true),
+              },
+            });
+          } else {
+            toast.info('No changes generated. Try again with a different prompt.');
+          }
+        } else if (event.type === 'backlog_plan_error') {
+          setIsGeneratingPlan(false);
+          toast.error(`Plan generation failed: ${event.error}`);
+        }
+      }
+    );
+
+    return unsubscribe;
+  }, []);
+
+  // Load any saved plan from disk when opening the graph view
+  useEffect(() => {
+    if (!currentProject || pendingBacklogPlan) return;
+
+    let isActive = true;
+    const loadSavedPlan = async () => {
+      const api = getElectronAPI();
+      if (!api?.backlogPlan) return;
+
+      const result = await api.backlogPlan.status(currentProject.path);
+      if (
+        isActive &&
+        result.success &&
+        result.savedPlan?.result &&
+        result.savedPlan.result.changes?.length > 0
+      ) {
+        setPendingBacklogPlan(result.savedPlan.result);
+      }
+    };
+
+    loadSavedPlan();
+    return () => {
+      isActive = false;
+    };
+  }, [currentProject, pendingBacklogPlan]);
+
   // Branch card counts
   const branchCardCounts = useMemo(() => {
     return hookFeatures.reduce(
@@ -155,6 +251,17 @@ export function GraphViewPage() {
       return isRunning || f.status === 'in_progress';
     });
   }, [hookFeatures, runningAutoTasks]);
+
+  // Simple feature update handler for graph view (dependencies, etc.)
+  const handleGraphUpdateFeature = useCallback(
+    async (featureId: string, updates: Partial<Feature>) => {
+      logger.info('handleGraphUpdateFeature called', { featureId, updates });
+      updateFeature(featureId, updates);
+      await persistFeatureUpdate(featureId, updates);
+      logger.info('handleGraphUpdateFeature completed');
+    },
+    [updateFeature, persistFeatureUpdate]
+  );
 
   // Board actions hook
   const {
@@ -237,7 +344,7 @@ export function GraphViewPage() {
   if (isLoading) {
     return (
       <div className="flex-1 flex items-center justify-center" data-testid="graph-view-loading">
-        <RefreshCw className="w-6 h-6 animate-spin text-muted-foreground" />
+        <Spinner size="lg" />
       </div>
     );
   }
@@ -261,13 +368,17 @@ export function GraphViewPage() {
         onStartTask={handleStartImplementation}
         onStopTask={handleForceStopFeature}
         onResumeTask={handleResumeFeature}
-        onUpdateFeature={updateFeature}
+        onUpdateFeature={handleGraphUpdateFeature}
         onSpawnTask={(feature) => {
           setSpawnParentFeature(feature);
           setShowAddDialog(true);
         }}
         onDeleteTask={(feature) => handleDeleteFeature(feature.id)}
         onAddFeature={() => setShowAddDialog(true)}
+        onOpenPlanDialog={() => setShowPlanDialog(true)}
+        hasPendingPlan={Boolean(pendingBacklogPlan)}
+        planUseSelectedWorktreeBranch={planUseSelectedWorktreeBranch}
+        onPlanUseSelectedWorktreeBranchChange={setPlanUseSelectedWorktreeBranch}
       />
 
       {/* Edit Feature Dialog */}
@@ -303,6 +414,14 @@ export function GraphViewPage() {
         isMaximized={false}
         parentFeature={spawnParentFeature}
         allFeatures={hookFeatures}
+        // When setting is enabled and a non-main worktree is selected, pass its branch to default to 'custom' work mode
+        selectedNonMainWorktreeBranch={
+          addFeatureUseSelectedWorktreeBranch && currentWorktreePath !== null
+            ? currentWorktreeBranch || undefined
+            : undefined
+        }
+        // When the worktree setting is disabled, force 'current' branch mode
+        forceCurrentBranchMode={!addFeatureUseSelectedWorktreeBranch}
       />
 
       {/* Agent Output Modal */}
@@ -313,6 +432,20 @@ export function GraphViewPage() {
         featureId={outputFeature?.id || ''}
         featureStatus={outputFeature?.status}
         onNumberKeyPress={handleOutputModalNumberKeyPress}
+        branchName={outputFeature?.branchName}
+      />
+
+      {/* Backlog Plan Dialog */}
+      <BacklogPlanDialog
+        open={showPlanDialog}
+        onClose={() => setShowPlanDialog(false)}
+        projectPath={currentProject.path}
+        onPlanApplied={loadFeatures}
+        pendingPlanResult={pendingBacklogPlan}
+        setPendingPlanResult={setPendingBacklogPlan}
+        isGeneratingPlan={isGeneratingPlan}
+        setIsGeneratingPlan={setIsGeneratingPlan}
+        currentBranch={planUseSelectedWorktreeBranch ? selectedWorktreeBranch : undefined}
       />
     </div>
   );

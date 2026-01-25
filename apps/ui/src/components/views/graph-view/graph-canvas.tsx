@@ -1,4 +1,4 @@
-import { useCallback, useState, useEffect, useRef } from 'react';
+import { useCallback, useState, useEffect, useMemo, useRef } from 'react';
 import {
   ReactFlow,
   Background,
@@ -13,6 +13,7 @@ import {
   ConnectionMode,
   Node,
   Connection,
+  Edge,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
@@ -35,8 +36,15 @@ import {
 } from './hooks';
 import { cn } from '@/lib/utils';
 import { useDebounceValue } from 'usehooks-ts';
-import { SearchX, Plus } from 'lucide-react';
+import { SearchX, Plus, Wand2, ClipboardCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { PlanSettingsPopover } from '../board-view/dialogs/plan-settings-popover';
+import {
+  GRAPH_LARGE_EDGE_COUNT,
+  GRAPH_LARGE_NODE_COUNT,
+  GRAPH_RENDER_MODE_COMPACT,
+  GRAPH_RENDER_MODE_FULL,
+} from './constants';
 
 // Define custom node and edge types - using any to avoid React Flow's strict typing
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -65,10 +73,45 @@ interface GraphCanvasProps {
   nodeActionCallbacks?: NodeActionCallbacks;
   onCreateDependency?: (sourceId: string, targetId: string) => Promise<boolean>;
   onAddFeature?: () => void;
+  onOpenPlanDialog?: () => void;
+  hasPendingPlan?: boolean;
+  planUseSelectedWorktreeBranch?: boolean;
+  onPlanUseSelectedWorktreeBranchChange?: (value: boolean) => void;
   backgroundStyle?: React.CSSProperties;
   backgroundSettings?: BackgroundSettings;
   className?: string;
+  projectPath?: string | null;
 }
+
+// Helper to get session storage key for viewport
+const getViewportStorageKey = (projectPath: string) => `graph-viewport:${projectPath}`;
+
+// Helper to save viewport to session storage
+const saveViewportToStorage = (
+  projectPath: string,
+  viewport: { x: number; y: number; zoom: number }
+) => {
+  try {
+    sessionStorage.setItem(getViewportStorageKey(projectPath), JSON.stringify(viewport));
+  } catch {
+    // Ignore storage errors
+  }
+};
+
+// Helper to load viewport from session storage
+const loadViewportFromStorage = (
+  projectPath: string
+): { x: number; y: number; zoom: number } | null => {
+  try {
+    const stored = sessionStorage.getItem(getViewportStorageKey(projectPath));
+    if (stored) {
+      return JSON.parse(stored);
+    }
+  } catch {
+    // Ignore storage errors
+  }
+  return null;
+};
 
 function GraphCanvasInner({
   features,
@@ -79,12 +122,38 @@ function GraphCanvasInner({
   nodeActionCallbacks,
   onCreateDependency,
   onAddFeature,
+  onOpenPlanDialog,
+  hasPendingPlan,
+  planUseSelectedWorktreeBranch,
+  onPlanUseSelectedWorktreeBranchChange,
   backgroundStyle,
   backgroundSettings,
   className,
+  projectPath,
 }: GraphCanvasProps) {
   const [isLocked, setIsLocked] = useState(false);
   const [layoutDirection, setLayoutDirection] = useState<'LR' | 'TB'>('LR');
+  const { setViewport, getViewport, fitView } = useReactFlow();
+
+  // Refs for tracking layout and viewport state
+  const hasRestoredViewport = useRef(false);
+  const lastProjectPath = useRef(projectPath);
+  const hasInitialLayout = useRef(false);
+  const prevNodeIds = useRef<Set<string>>(new Set());
+  const prevLayoutVersion = useRef<number>(0);
+  const hasLayoutWithEdges = useRef(false);
+
+  // Reset flags when project changes
+  useEffect(() => {
+    if (projectPath !== lastProjectPath.current) {
+      hasRestoredViewport.current = false;
+      hasLayoutWithEdges.current = false;
+      hasInitialLayout.current = false;
+      prevNodeIds.current = new Set();
+      prevLayoutVersion.current = 0;
+      lastProjectPath.current = projectPath;
+    }
+  }, [projectPath]);
 
   // Determine React Flow color mode based on current theme
   const effectiveTheme = useAppStore((state) => state.getEffectiveTheme());
@@ -135,6 +204,17 @@ function GraphCanvasInner({
   // Calculate filter results
   const filterResult = useGraphFilter(features, filterState, runningAutoTasks);
 
+  const estimatedEdgeCount = useMemo(() => {
+    return features.reduce((total, feature) => {
+      const deps = feature.dependencies as string[] | undefined;
+      return total + (deps?.length ?? 0);
+    }, 0);
+  }, [features]);
+
+  const isLargeGraph =
+    features.length >= GRAPH_LARGE_NODE_COUNT || estimatedEdgeCount >= GRAPH_LARGE_EDGE_COUNT;
+  const renderMode = isLargeGraph ? GRAPH_RENDER_MODE_COMPACT : GRAPH_RENDER_MODE_FULL;
+
   // Transform features to nodes and edges with filter results
   const { nodes: initialNodes, edges: initialEdges } = useGraphNodes({
     features,
@@ -142,10 +222,12 @@ function GraphCanvasInner({
     filterResult,
     actionCallbacks: nodeActionCallbacks,
     backgroundSettings,
+    renderMode,
+    enableEdgeAnimations: !isLargeGraph,
   });
 
   // Apply layout
-  const { layoutedNodes, layoutedEdges, runLayout } = useGraphLayout({
+  const { layoutedNodes, layoutedEdges, layoutVersion, runLayout } = useGraphLayout({
     nodes: initialNodes,
     edges: initialEdges,
   });
@@ -154,24 +236,22 @@ function GraphCanvasInner({
   const [nodes, setNodes, onNodesChange] = useNodesState(layoutedNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(layoutedEdges);
 
-  // Track if initial layout has been applied
-  const hasInitialLayout = useRef(false);
-  // Track the previous node IDs to detect new nodes
-  const prevNodeIds = useRef<Set<string>>(new Set());
-
   // Update nodes/edges when features change, but preserve user positions
   useEffect(() => {
     const currentNodeIds = new Set(layoutedNodes.map((n) => n.id));
     const isInitialRender = !hasInitialLayout.current;
+    // Detect if a fresh layout was computed (structure changed)
+    const layoutWasRecomputed = layoutVersion !== prevLayoutVersion.current;
 
     // Check if there are new nodes that need layout
     const hasNewNodes = layoutedNodes.some((n) => !prevNodeIds.current.has(n.id));
 
-    if (isInitialRender) {
-      // Apply full layout for initial render
+    if (isInitialRender || layoutWasRecomputed) {
+      // Apply full layout for initial render OR when layout was recomputed due to structure change
       setNodes(layoutedNodes);
       setEdges(layoutedEdges);
       hasInitialLayout.current = true;
+      prevLayoutVersion.current = layoutVersion;
     } else if (hasNewNodes) {
       // New nodes added - need to re-layout but try to preserve existing positions
       setNodes((currentNodes) => {
@@ -197,15 +277,55 @@ function GraphCanvasInner({
 
     // Update prev node IDs for next comparison
     prevNodeIds.current = currentNodeIds;
-  }, [layoutedNodes, layoutedEdges, setNodes, setEdges]);
+
+    // Restore viewport from session storage after initial layout
+    if (isInitialRender && projectPath && !hasRestoredViewport.current) {
+      const savedViewport = loadViewportFromStorage(projectPath);
+      if (savedViewport) {
+        // Use setTimeout to ensure React Flow has finished rendering
+        setTimeout(() => {
+          setViewport(savedViewport, { duration: 0 });
+        }, 50);
+      }
+      hasRestoredViewport.current = true;
+    }
+  }, [layoutedNodes, layoutedEdges, layoutVersion, setNodes, setEdges, projectPath, setViewport]);
+
+  // Force layout recalculation on initial mount when edges are available
+  // This fixes timing issues when navigating directly to the graph route
+  useEffect(() => {
+    // Only run once: when we have nodes and edges but haven't done a layout with edges yet
+    if (!hasLayoutWithEdges.current && layoutedNodes.length > 0 && layoutedEdges.length > 0) {
+      hasLayoutWithEdges.current = true;
+      // Small delay to ensure React Flow is mounted and ready
+      const timeoutId = setTimeout(() => {
+        const { nodes: relayoutedNodes, edges: relayoutedEdges } = runLayout('LR');
+        setNodes(relayoutedNodes);
+        setEdges(relayoutedEdges);
+        fitView({ padding: 0.2, duration: 300 });
+      }, 100);
+      return () => clearTimeout(timeoutId);
+    }
+  }, [layoutedNodes.length, layoutedEdges.length, runLayout, setNodes, setEdges, fitView]);
+
+  // Save viewport when user pans or zooms
+  const handleMoveEnd = useCallback(() => {
+    if (projectPath) {
+      const viewport = getViewport();
+      saveViewportToStorage(projectPath, viewport);
+    }
+  }, [projectPath, getViewport]);
 
   // Handle layout direction change
   const handleRunLayout = useCallback(
     (direction: 'LR' | 'TB') => {
       setLayoutDirection(direction);
-      runLayout(direction);
+      const { nodes: relayoutedNodes, edges: relayoutedEdges } = runLayout(direction);
+      setNodes(relayoutedNodes);
+      setEdges(relayoutedEdges);
+      fitView({ padding: 0.2, duration: 300 });
     },
-    [runLayout]
+    [runLayout, setNodes, setEdges, fitView]
   );
 
   // Handle clear all filters
@@ -246,9 +366,6 @@ function GraphCanvasInner({
     },
     []
   );
-
-  // Get fitView from React Flow for orientation change handling
-  const { fitView } = useReactFlow();
 
   // Handle orientation changes on mobile devices
   // When rotating from landscape to portrait, the view may incorrectly zoom in
@@ -323,6 +440,23 @@ function GraphCanvasInner({
     };
   }, [fitView]);
 
+  // Handle edge deletion (when user presses delete key or uses other deletion methods)
+  const handleEdgesDelete = useCallback(
+    (deletedEdges: Edge[]) => {
+      console.log('onEdgesDelete triggered', deletedEdges);
+      deletedEdges.forEach((edge) => {
+        if (nodeActionCallbacks?.onDeleteDependency) {
+          console.log('Calling onDeleteDependency from onEdgesDelete', {
+            source: edge.source,
+            target: edge.target,
+          });
+          nodeActionCallbacks.onDeleteDependency(edge.source, edge.target);
+        }
+      });
+    },
+    [nodeActionCallbacks]
+  );
+
   // MiniMap node color based on status
   const minimapNodeColor = useCallback((node: Node<TaskNodeData>) => {
     const data = node.data as TaskNodeData | undefined;
@@ -342,6 +476,8 @@ function GraphCanvasInner({
     }
   }, []);
 
+  const shouldRenderVisibleOnly = isLargeGraph;
+
   return (
     <div className={cn('w-full h-full', className)} style={backgroundStyle}>
       <ReactFlow
@@ -349,7 +485,9 @@ function GraphCanvasInner({
         edges={edges}
         onNodesChange={isLocked ? undefined : onNodesChange}
         onEdgesChange={onEdgesChange}
+        onEdgesDelete={handleEdgesDelete}
         onNodeDoubleClick={handleNodeDoubleClick}
+        onMoveEnd={handleMoveEnd}
         onConnect={handleConnect}
         isValidConnection={isValidConnection}
         nodeTypes={nodeTypes}
@@ -361,6 +499,7 @@ function GraphCanvasInner({
         maxZoom={2}
         selectionMode={SelectionMode.Partial}
         connectionMode={ConnectionMode.Loose}
+        onlyRenderVisibleElements={shouldRenderVisibleOnly}
         proOptions={{ hideAttribution: true }}
         className="graph-canvas"
       >
@@ -392,6 +531,8 @@ function GraphCanvasInner({
           filterState={filterState}
           availableCategories={filterResult.availableCategories}
           hasActiveFilter={filterResult.hasActiveFilter}
+          searchQuery={searchQuery}
+          onSearchQueryChange={onSearchQueryChange}
           onCategoriesChange={setSelectedCategories}
           onStatusesChange={setSelectedStatuses}
           onNegativeFilterChange={setIsNegativeFilter}
@@ -402,10 +543,42 @@ function GraphCanvasInner({
 
         {/* Add Feature Button */}
         <Panel position="top-right">
-          <Button variant="default" size="sm" onClick={onAddFeature} className="gap-1.5">
-            <Plus className="w-4 h-4" />
-            Add Feature
-          </Button>
+          <div className="flex items-center gap-2">
+            {onOpenPlanDialog && (
+              <div className="flex items-center gap-1.5 rounded-md border border-border bg-secondary/60 px-2 py-1 shadow-sm">
+                {hasPendingPlan && (
+                  <button
+                    onClick={onOpenPlanDialog}
+                    className="flex items-center text-emerald-500 hover:text-emerald-400 transition-colors"
+                    data-testid="graph-plan-review-button"
+                  >
+                    <ClipboardCheck className="w-4 h-4" />
+                  </button>
+                )}
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={onOpenPlanDialog}
+                  className="gap-1.5"
+                  data-testid="graph-plan-button"
+                >
+                  <Wand2 className="w-4 h-4" />
+                  Plan
+                </Button>
+                {onPlanUseSelectedWorktreeBranchChange &&
+                  planUseSelectedWorktreeBranch !== undefined && (
+                    <PlanSettingsPopover
+                      planUseSelectedWorktreeBranch={planUseSelectedWorktreeBranch}
+                      onPlanUseSelectedWorktreeBranchChange={onPlanUseSelectedWorktreeBranchChange}
+                    />
+                  )}
+              </div>
+            )}
+            <Button variant="default" size="sm" onClick={onAddFeature} className="gap-1.5">
+              <Plus className="w-4 h-4" />
+              Add Feature
+            </Button>
+          </div>
         </Panel>
 
         {/* Empty state when all nodes are filtered out */}

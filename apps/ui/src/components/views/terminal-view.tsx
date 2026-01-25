@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useNavigate } from '@tanstack/react-router';
 import { createLogger } from '@automaker/utils/logger';
 import {
   Terminal as TerminalIcon,
@@ -7,13 +8,13 @@ import {
   Unlock,
   SplitSquareHorizontal,
   SplitSquareVertical,
-  Loader2,
   AlertCircle,
   RefreshCw,
   X,
   SquarePlus,
   Settings,
 } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 import { getServerUrlSync } from '@/lib/http-api-client';
 import {
   useAppStore,
@@ -25,8 +26,17 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
+import { Switch } from '@/components/ui/switch';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { TERMINAL_FONT_OPTIONS } from '@/config/terminal-themes';
+import { DEFAULT_FONT_VALUE } from '@/config/ui-font-options';
 import { toast } from 'sonner';
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 import { TerminalPanel } from './terminal-view/terminal-panel';
@@ -207,7 +217,18 @@ function NewTabDropZone({ isDropTarget }: { isDropTarget: boolean }) {
   );
 }
 
-export function TerminalView() {
+interface TerminalViewProps {
+  /** Initial working directory to open a terminal in (e.g., from worktree panel) */
+  initialCwd?: string;
+  /** Branch name for display in toast (optional) */
+  initialBranch?: string;
+  /** Mode for opening terminal: 'tab' for new tab, 'split' for split in current tab */
+  initialMode?: 'tab' | 'split';
+  /** Unique nonce to allow opening the same worktree multiple times */
+  nonce?: number;
+}
+
+export function TerminalView({ initialCwd, initialBranch, initialMode, nonce }: TerminalViewProps) {
   const {
     terminalState,
     setTerminalUnlocked,
@@ -232,8 +253,12 @@ export function TerminalView() {
     setTerminalDefaultRunScript,
     setTerminalFontFamily,
     setTerminalLineHeight,
+    setTerminalScrollbackLines,
+    setTerminalScreenReaderMode,
     updateTerminalPanelSizes,
   } = useAppStore();
+
+  const navigate = useNavigate();
 
   const [status, setStatus] = useState<TerminalStatus | null>(null);
   const [loading, setLoading] = useState(true);
@@ -253,6 +278,7 @@ export function TerminalView() {
     max: number;
   } | null>(null);
   const hasShownHighRamWarningRef = useRef<boolean>(false);
+  const initialCwdHandledRef = useRef<string | null>(null);
 
   // Show warning when 20+ terminals are open
   useEffect(() => {
@@ -525,6 +551,106 @@ export function TerminalView() {
       fetchServerSettings();
     }
   }, [terminalState.isUnlocked, fetchServerSettings]);
+
+  // Handle initialCwd prop - auto-create a terminal with the specified working directory
+  // This is triggered when navigating from worktree panel's "Open in Integrated Terminal"
+  useEffect(() => {
+    // Skip if no initialCwd provided
+    if (!initialCwd) return;
+
+    // Skip if we've already handled this exact request (prevents duplicate terminals)
+    // Include mode and nonce in the key to allow opening same cwd multiple times
+    const cwdKey = `${initialCwd}:${initialMode || 'default'}:${nonce || 0}`;
+    if (initialCwdHandledRef.current === cwdKey) return;
+
+    // Skip if terminal is not enabled or not unlocked
+    if (!status?.enabled) return;
+    if (status.passwordRequired && !terminalState.isUnlocked) return;
+
+    // Skip if still loading
+    if (loading) return;
+
+    // Mark this cwd as being handled
+    initialCwdHandledRef.current = cwdKey;
+
+    // Create the terminal with the specified cwd
+    const createTerminalWithCwd = async () => {
+      try {
+        const headers: Record<string, string> = {};
+        if (terminalState.authToken) {
+          headers['X-Terminal-Token'] = terminalState.authToken;
+        }
+
+        const response = await apiFetch('/api/terminal/sessions', 'POST', {
+          headers,
+          body: { cwd: initialCwd, cols: 80, rows: 24 },
+        });
+        const data = await response.json();
+
+        if (data.success) {
+          // Create in new tab or split based on mode
+          if (initialMode === 'tab') {
+            // Create in a new tab (tab name uses default "Terminal N" naming)
+            const newTabId = addTerminalTab();
+            const { addTerminalToTab } = useAppStore.getState();
+            // Pass branch name for display in terminal panel header
+            addTerminalToTab(data.data.id, newTabId, 'horizontal', initialBranch);
+          } else {
+            // Default: add to current tab (split if there's already a terminal)
+            // Pass branch name for display in terminal panel header
+            addTerminalToLayout(data.data.id, undefined, undefined, initialBranch);
+          }
+
+          // Mark this session as new for running initial command
+          if (defaultRunScript) {
+            setNewSessionIds((prev) => new Set(prev).add(data.data.id));
+          }
+
+          // Show success toast with branch name if provided
+          const displayName = initialBranch || initialCwd.split('/').pop() || initialCwd;
+          toast.success(`Terminal opened at ${displayName}`);
+
+          // Refresh session count
+          fetchServerSettings();
+
+          // Clear the cwd from the URL to prevent re-creating on refresh
+          navigate({ to: '/terminal', search: {}, replace: true });
+        } else {
+          logger.error('Failed to create terminal for cwd:', data.error);
+          toast.error('Failed to create terminal', {
+            description: data.error || 'Unknown error',
+          });
+          // Reset the handled ref so the same cwd can be retried
+          initialCwdHandledRef.current = undefined;
+        }
+      } catch (err) {
+        logger.error('Create terminal with cwd error:', err);
+        toast.error('Failed to create terminal', {
+          description: 'Could not connect to server',
+        });
+        // Reset the handled ref so the same cwd can be retried
+        initialCwdHandledRef.current = undefined;
+      }
+    };
+
+    createTerminalWithCwd();
+  }, [
+    initialCwd,
+    initialBranch,
+    initialMode,
+    nonce,
+    status?.enabled,
+    status?.passwordRequired,
+    terminalState.isUnlocked,
+    terminalState.authToken,
+    terminalState.tabs.length,
+    loading,
+    defaultRunScript,
+    addTerminalToLayout,
+    addTerminalTab,
+    fetchServerSettings,
+    navigate,
+  ]);
 
   // Handle project switching - save and restore terminal layouts
   // Uses terminalState.lastActiveProjectPath (persisted in store) instead of a local ref
@@ -817,9 +943,11 @@ export function TerminalView() {
 
   // Create a new terminal session
   // targetSessionId: the terminal to split (if splitting an existing terminal)
+  // customCwd: optional working directory to use instead of the current project path
   const createTerminal = async (
     direction?: 'horizontal' | 'vertical',
-    targetSessionId?: string
+    targetSessionId?: string,
+    customCwd?: string
   ) => {
     if (!canCreateTerminal('[Terminal] Debounced terminal creation')) {
       return;
@@ -833,7 +961,7 @@ export function TerminalView() {
 
       const response = await apiFetch('/api/terminal/sessions', 'POST', {
         headers,
-        body: { cwd: currentProject?.path || undefined, cols: 80, rows: 24 },
+        body: { cwd: customCwd || currentProject?.path || undefined, cols: 80, rows: 24 },
       });
       const data = await response.json();
 
@@ -1221,6 +1349,7 @@ export function TerminalView() {
             onCommandRan={() => handleCommandRan(content.sessionId)}
             isMaximized={terminalState.maximizedSessionId === content.sessionId}
             onToggleMaximize={() => toggleTerminalMaximized(content.sessionId)}
+            branchName={content.branchName}
           />
         </TerminalErrorBoundary>
       );
@@ -1268,7 +1397,7 @@ export function TerminalView() {
   if (loading) {
     return (
       <div className="flex-1 flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <Spinner size="xl" />
       </div>
     );
   }
@@ -1331,7 +1460,7 @@ export function TerminalView() {
           {authError && <p className="text-sm text-destructive">{authError}</p>}
           <Button type="submit" className="w-full" disabled={authLoading || !password}>
             {authLoading ? (
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              <Spinner size="sm" className="mr-2" />
             ) : (
               <Unlock className="h-4 w-4 mr-2" />
             )}
@@ -1457,9 +1586,9 @@ export function TerminalView() {
                   <Settings className="h-4 w-4" />
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-80" align="end">
+              <PopoverContent className="w-72" align="end">
                 <div className="space-y-4">
-                  <div className="space-y-2">
+                  <div className="space-y-1">
                     <h4 className="font-medium text-sm">Terminal Settings</h4>
                     <p className="text-xs text-muted-foreground">
                       Configure global terminal appearance
@@ -1469,15 +1598,15 @@ export function TerminalView() {
                   {/* Default Font Size */}
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <Label className="text-sm">Default Font Size</Label>
-                      <span className="text-sm text-muted-foreground">
+                      <Label className="text-xs font-medium">Default Font Size</Label>
+                      <span className="text-xs text-muted-foreground">
                         {terminalState.defaultFontSize}px
                       </span>
                     </div>
                     <Slider
                       value={[terminalState.defaultFontSize]}
                       min={8}
-                      max={24}
+                      max={32}
                       step={1}
                       onValueChange={([value]) => setTerminalDefaultFontSize(value)}
                       onValueCommit={() => {
@@ -1488,37 +1617,79 @@ export function TerminalView() {
                     />
                   </div>
 
+                  {/* Default Run Script */}
+                  <div className="space-y-2">
+                    <Label className="text-xs font-medium">Run on New Terminal</Label>
+                    <Input
+                      value={terminalState.defaultRunScript}
+                      onChange={(e) => setTerminalDefaultRunScript(e.target.value)}
+                      placeholder="e.g., claude"
+                      className="h-7 text-xs"
+                    />
+                    <p className="text-[10px] text-muted-foreground">
+                      Command to run when creating a new terminal
+                    </p>
+                  </div>
+
                   {/* Font Family */}
                   <div className="space-y-2">
-                    <Label className="text-sm">Font Family</Label>
-                    <select
-                      value={terminalState.fontFamily}
-                      onChange={(e) => {
-                        setTerminalFontFamily(e.target.value);
+                    <Label className="text-xs font-medium">Font Family</Label>
+                    <Select
+                      value={terminalState.fontFamily || DEFAULT_FONT_VALUE}
+                      onValueChange={(value) => {
+                        setTerminalFontFamily(value);
                         toast.info('Font family changed', {
                           description: 'Restart terminal for changes to take effect',
                         });
                       }}
-                      className={cn(
-                        'w-full px-2 py-1.5 rounded-md text-sm',
-                        'bg-accent/50 border border-border',
-                        'text-foreground',
-                        'focus:outline-none focus:ring-2 focus:ring-ring'
-                      )}
                     >
-                      {TERMINAL_FONT_OPTIONS.map((font) => (
-                        <option key={font.value} value={font.value}>
-                          {font.label}
-                        </option>
-                      ))}
-                    </select>
+                      <SelectTrigger className="w-full h-8 text-xs">
+                        <SelectValue placeholder="Default (Menlo / Monaco)" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {TERMINAL_FONT_OPTIONS.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            <span
+                              style={{
+                                fontFamily:
+                                  option.value === DEFAULT_FONT_VALUE ? undefined : option.value,
+                              }}
+                            >
+                              {option.label}
+                            </span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Scrollback */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs font-medium">Scrollback</Label>
+                      <span className="text-xs text-muted-foreground">
+                        {(terminalState.scrollbackLines / 1000).toFixed(0)}k lines
+                      </span>
+                    </div>
+                    <Slider
+                      value={[terminalState.scrollbackLines]}
+                      min={1000}
+                      max={100000}
+                      step={1000}
+                      onValueChange={([value]) => setTerminalScrollbackLines(value)}
+                      onValueCommit={() => {
+                        toast.info('Scrollback changed', {
+                          description: 'Restart terminal for changes to take effect',
+                        });
+                      }}
+                    />
                   </div>
 
                   {/* Line Height */}
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <Label className="text-sm">Line Height</Label>
-                      <span className="text-sm text-muted-foreground">
+                      <Label className="text-xs font-medium">Line Height</Label>
+                      <span className="text-xs text-muted-foreground">
                         {terminalState.lineHeight.toFixed(1)}
                       </span>
                     </div>
@@ -1536,18 +1707,21 @@ export function TerminalView() {
                     />
                   </div>
 
-                  {/* Default Run Script */}
-                  <div className="space-y-2">
-                    <Label className="text-sm">Default Run Script</Label>
-                    <Input
-                      value={terminalState.defaultRunScript}
-                      onChange={(e) => setTerminalDefaultRunScript(e.target.value)}
-                      placeholder="e.g., claude, npm run dev"
-                      className="h-8 text-sm"
+                  {/* Screen Reader */}
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label className="text-xs font-medium">Screen Reader</Label>
+                      <p className="text-[10px] text-muted-foreground">Enable accessibility mode</p>
+                    </div>
+                    <Switch
+                      checked={terminalState.screenReaderMode}
+                      onCheckedChange={(checked) => {
+                        setTerminalScreenReaderMode(checked);
+                        toast.info(checked ? 'Screen reader enabled' : 'Screen reader disabled', {
+                          description: 'Restart terminal for changes to take effect',
+                        });
+                      }}
                     />
-                    <p className="text-xs text-muted-foreground">
-                      Command to run when opening new terminals
-                    </p>
                   </div>
                 </div>
               </PopoverContent>

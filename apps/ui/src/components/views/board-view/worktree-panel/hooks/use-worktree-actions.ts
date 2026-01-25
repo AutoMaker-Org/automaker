@@ -1,157 +1,112 @@
 import { useState, useCallback } from 'react';
+import { useNavigate } from '@tanstack/react-router';
 import { createLogger } from '@automaker/utils/logger';
 import { getElectronAPI } from '@/lib/electron';
 import { toast } from 'sonner';
+import {
+  useSwitchBranch,
+  usePullWorktree,
+  usePushWorktree,
+  useOpenInEditor,
+} from '@/hooks/mutations';
 import type { WorktreeInfo } from '../types';
 
 const logger = createLogger('WorktreeActions');
 
-// Error codes that need special user-friendly handling
-const GIT_STATUS_ERROR_CODES = ['NOT_GIT_REPO', 'NO_COMMITS'] as const;
-type GitStatusErrorCode = (typeof GIT_STATUS_ERROR_CODES)[number];
-
-// User-friendly messages for git status errors
-const GIT_STATUS_ERROR_MESSAGES: Record<GitStatusErrorCode, string> = {
-  NOT_GIT_REPO: 'This directory is not a git repository',
-  NO_COMMITS: 'Repository has no commits yet. Create an initial commit first.',
-};
-
-/**
- * Helper to handle git status errors with user-friendly messages.
- * @returns true if the error was a git status error and was handled, false otherwise.
- */
-function handleGitStatusError(result: { code?: string; error?: string }): boolean {
-  const errorCode = result.code as GitStatusErrorCode | undefined;
-  if (errorCode && GIT_STATUS_ERROR_CODES.includes(errorCode)) {
-    toast.info(GIT_STATUS_ERROR_MESSAGES[errorCode] || result.error);
-    return true;
-  }
-  return false;
-}
-
-interface UseWorktreeActionsOptions {
-  fetchWorktrees: () => Promise<Array<{ path: string; branch: string }> | undefined>;
-  fetchBranches: (worktreePath: string) => Promise<void>;
-}
-
-export function useWorktreeActions({ fetchWorktrees, fetchBranches }: UseWorktreeActionsOptions) {
-  const [isPulling, setIsPulling] = useState(false);
-  const [isPushing, setIsPushing] = useState(false);
-  const [isSwitching, setIsSwitching] = useState(false);
+export function useWorktreeActions() {
+  const navigate = useNavigate();
   const [isActivating, setIsActivating] = useState(false);
+
+  // Use React Query mutations
+  const switchBranchMutation = useSwitchBranch();
+  const pullMutation = usePullWorktree();
+  const pushMutation = usePushWorktree();
+  const openInEditorMutation = useOpenInEditor();
 
   const handleSwitchBranch = useCallback(
     async (worktree: WorktreeInfo, branchName: string) => {
-      if (isSwitching || branchName === worktree.branch) return;
-      setIsSwitching(true);
-      try {
-        const api = getElectronAPI();
-        if (!api?.worktree?.switchBranch) {
-          toast.error('Switch branch API not available');
-          return;
-        }
-        const result = await api.worktree.switchBranch(worktree.path, branchName);
-        if (result.success && result.result) {
-          toast.success(result.result.message);
-          fetchWorktrees();
-        } else {
-          if (handleGitStatusError(result)) return;
-          toast.error(result.error || 'Failed to switch branch');
-        }
-      } catch (error) {
-        logger.error('Switch branch failed:', error);
-        toast.error('Failed to switch branch');
-      } finally {
-        setIsSwitching(false);
-      }
+      if (switchBranchMutation.isPending || branchName === worktree.branch) return;
+      switchBranchMutation.mutate({
+        worktreePath: worktree.path,
+        branchName,
+      });
     },
-    [isSwitching, fetchWorktrees]
+    [switchBranchMutation]
   );
 
   const handlePull = useCallback(
     async (worktree: WorktreeInfo) => {
-      if (isPulling) return;
-      setIsPulling(true);
-      try {
-        const api = getElectronAPI();
-        if (!api?.worktree?.pull) {
-          toast.error('Pull API not available');
-          return;
-        }
-        const result = await api.worktree.pull(worktree.path);
-        if (result.success && result.result) {
-          toast.success(result.result.message);
-          fetchWorktrees();
-        } else {
-          if (handleGitStatusError(result)) return;
-          toast.error(result.error || 'Failed to pull latest changes');
-        }
-      } catch (error) {
-        logger.error('Pull failed:', error);
-        toast.error('Failed to pull latest changes');
-      } finally {
-        setIsPulling(false);
-      }
+      if (pullMutation.isPending) return;
+      pullMutation.mutate(worktree.path);
     },
-    [isPulling, fetchWorktrees]
+    [pullMutation]
   );
 
   const handlePush = useCallback(
     async (worktree: WorktreeInfo) => {
-      if (isPushing) return;
-      setIsPushing(true);
-      try {
-        const api = getElectronAPI();
-        if (!api?.worktree?.push) {
-          toast.error('Push API not available');
-          return;
-        }
-        const result = await api.worktree.push(worktree.path);
-        if (result.success && result.result) {
-          toast.success(result.result.message);
-          fetchBranches(worktree.path);
-          fetchWorktrees();
-        } else {
-          if (handleGitStatusError(result)) return;
-          toast.error(result.error || 'Failed to push changes');
-        }
-      } catch (error) {
-        logger.error('Push failed:', error);
-        toast.error('Failed to push changes');
-      } finally {
-        setIsPushing(false);
-      }
+      if (pushMutation.isPending) return;
+      pushMutation.mutate({
+        worktreePath: worktree.path,
+      });
     },
-    [isPushing, fetchBranches, fetchWorktrees]
+    [pushMutation]
   );
 
-  const handleOpenInEditor = useCallback(async (worktree: WorktreeInfo, editorCommand?: string) => {
-    try {
-      const api = getElectronAPI();
-      if (!api?.worktree?.openInEditor) {
-        logger.warn('Open in editor API not available');
-        return;
+  const handleOpenInIntegratedTerminal = useCallback(
+    (worktree: WorktreeInfo, mode?: 'tab' | 'split') => {
+      // Navigate to the terminal view with the worktree path and branch name
+      // The terminal view will handle creating the terminal with the specified cwd
+      // Include nonce to allow opening the same worktree multiple times
+      navigate({
+        to: '/terminal',
+        search: { cwd: worktree.path, branch: worktree.branch, mode, nonce: Date.now() },
+      });
+    },
+    [navigate]
+  );
+
+  const handleOpenInEditor = useCallback(
+    async (worktree: WorktreeInfo, editorCommand?: string) => {
+      openInEditorMutation.mutate({
+        worktreePath: worktree.path,
+        editorCommand,
+      });
+    },
+    [openInEditorMutation]
+  );
+
+  const handleOpenInExternalTerminal = useCallback(
+    async (worktree: WorktreeInfo, terminalId?: string) => {
+      try {
+        const api = getElectronAPI();
+        if (!api?.worktree?.openInExternalTerminal) {
+          logger.warn('Open in external terminal API not available');
+          return;
+        }
+        const result = await api.worktree.openInExternalTerminal(worktree.path, terminalId);
+        if (result.success && result.result) {
+          toast.success(result.result.message);
+        } else if (result.error) {
+          toast.error(result.error);
+        }
+      } catch (error) {
+        logger.error('Open in external terminal failed:', error);
       }
-      const result = await api.worktree.openInEditor(worktree.path, editorCommand);
-      if (result.success && result.result) {
-        toast.success(result.result.message);
-      } else if (result.error) {
-        toast.error(result.error);
-      }
-    } catch (error) {
-      logger.error('Open in editor failed:', error);
-    }
-  }, []);
+    },
+    []
+  );
 
   return {
-    isPulling,
-    isPushing,
-    isSwitching,
+    isPulling: pullMutation.isPending,
+    isPushing: pushMutation.isPending,
+    isSwitching: switchBranchMutation.isPending,
     isActivating,
     setIsActivating,
     handleSwitchBranch,
     handlePull,
     handlePush,
+    handleOpenInIntegratedTerminal,
     handleOpenInEditor,
+    handleOpenInExternalTerminal,
   };
 }

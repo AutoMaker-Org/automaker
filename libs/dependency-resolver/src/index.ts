@@ -7,6 +7,8 @@ export {
   resolveDependencies,
   areDependenciesSatisfied,
   getBlockingDependencies,
+  createFeatureMap,
+  getBlockingDependenciesFromMap,
   wouldCreateCircularDependency,
   dependencyExists,
   getAncestors,

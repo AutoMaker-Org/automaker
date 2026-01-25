@@ -5,59 +5,53 @@
  * configuring which sources to load Skills from (user/project).
  */
 
-import { useState } from 'react';
+import { useCallback } from 'react';
 import { useAppStore } from '@/store/app-store';
 import { toast } from 'sonner';
-import { getElectronAPI } from '@/lib/electron';
+import { useUpdateGlobalSettings } from '@/hooks/mutations';
 
 export function useSkillsSettings() {
   const enabled = useAppStore((state) => state.enableSkills);
   const sources = useAppStore((state) => state.skillsSources);
-  const [isLoading, setIsLoading] = useState(false);
 
-  const updateEnabled = async (newEnabled: boolean) => {
-    setIsLoading(true);
-    try {
-      const api = getElectronAPI();
-      if (!api.settings) {
-        throw new Error('Settings API not available');
-      }
-      await api.settings.updateGlobal({ enableSkills: newEnabled });
-      // Update local store after successful server update
-      useAppStore.setState({ enableSkills: newEnabled });
-      toast.success(newEnabled ? 'Skills enabled' : 'Skills disabled');
-    } catch (error) {
-      toast.error('Failed to update skills settings');
-      console.error(error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  // React Query mutation (disable default toast)
+  const updateSettingsMutation = useUpdateGlobalSettings({ showSuccessToast: false });
 
-  const updateSources = async (newSources: Array<'user' | 'project'>) => {
-    setIsLoading(true);
-    try {
-      const api = getElectronAPI();
-      if (!api.settings) {
-        throw new Error('Settings API not available');
-      }
-      await api.settings.updateGlobal({ skillsSources: newSources });
-      // Update local store after successful server update
-      useAppStore.setState({ skillsSources: newSources });
-      toast.success('Skills sources updated');
-    } catch (error) {
-      toast.error('Failed to update skills sources');
-      console.error(error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const updateEnabled = useCallback(
+    (newEnabled: boolean) => {
+      updateSettingsMutation.mutate(
+        { enableSkills: newEnabled },
+        {
+          onSuccess: () => {
+            useAppStore.setState({ enableSkills: newEnabled });
+            toast.success(newEnabled ? 'Skills enabled' : 'Skills disabled');
+          },
+        }
+      );
+    },
+    [updateSettingsMutation]
+  );
+
+  const updateSources = useCallback(
+    (newSources: Array<'user' | 'project'>) => {
+      updateSettingsMutation.mutate(
+        { skillsSources: newSources },
+        {
+          onSuccess: () => {
+            useAppStore.setState({ skillsSources: newSources });
+            toast.success('Skills sources updated');
+          },
+        }
+      );
+    },
+    [updateSettingsMutation]
+  );
 
   return {
     enabled,
     sources,
     updateEnabled,
     updateSources,
-    isLoading,
+    isLoading: updateSettingsMutation.isPending,
   };
 }

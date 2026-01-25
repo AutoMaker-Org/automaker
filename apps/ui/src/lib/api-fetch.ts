@@ -185,7 +185,13 @@ export function getAuthenticatedImageUrl(
   if (apiKey) {
     params.set('apiKey', apiKey);
   }
-  // Note: Session token auth relies on cookies which are sent automatically by the browser
+
+  // Web mode: also add session token as query param for image loads
+  // This ensures images load correctly even if cookies aren't sent (e.g., cross-origin proxy scenarios)
+  const sessionToken = getSessionToken();
+  if (sessionToken) {
+    params.set('token', sessionToken);
+  }
 
   return `${serverUrl}/api/fs/image?${params.toString()}`;
 }

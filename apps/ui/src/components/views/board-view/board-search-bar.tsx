@@ -1,6 +1,7 @@
 import { useRef, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
-import { Search, X, Loader2 } from 'lucide-react';
+import { Search, X } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 
 interface BoardSearchBarProps {
   searchQuery: string;
@@ -75,7 +76,7 @@ export function BoardSearchBar({
           title="Creating App Specification"
           data-testid="spec-creation-badge"
         >
-          <Loader2 className="w-3 h-3 animate-spin text-brand-500 shrink-0" />
+          <Spinner size="xs" className="shrink-0" />
           <span className="text-xs font-medium text-brand-500 whitespace-nowrap">
             Creating spec
           </span>

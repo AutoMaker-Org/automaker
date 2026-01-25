@@ -1,10 +1,11 @@
 // @ts-nocheck
-import { useEffect, useMemo, useState } from 'react';
+import { memo, useEffect, useMemo, useState } from 'react';
 import { Feature, useAppStore } from '@/store/app-store';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { AlertCircle, Lock, Hand, Sparkles } from 'lucide-react';
 import { getBlockingDependencies } from '@automaker/dependency-resolver';
+import { useShallow } from 'zustand/react/shallow';
 
 /** Uniform badge style for all card badges */
 const uniformBadgeClass =
@@ -18,7 +19,7 @@ interface CardBadgesProps {
  * CardBadges - Shows error badges below the card header
  * Note: Blocked/Lock badges are now shown in PriorityBadges for visual consistency
  */
-export function CardBadges({ feature }: CardBadgesProps) {
+export const CardBadges = memo(function CardBadges({ feature }: CardBadgesProps) {
   if (!feature.error) {
     return null;
   }
@@ -46,14 +47,19 @@ export function CardBadges({ feature }: CardBadgesProps) {
       </TooltipProvider>
     </div>
   );
-}
+});
 
 interface PriorityBadgesProps {
   feature: Feature;
 }
 
-export function PriorityBadges({ feature }: PriorityBadgesProps) {
-  const { enableDependencyBlocking, features } = useAppStore();
+export const PriorityBadges = memo(function PriorityBadges({ feature }: PriorityBadgesProps) {
+  const { enableDependencyBlocking, features } = useAppStore(
+    useShallow((state) => ({
+      enableDependencyBlocking: state.enableDependencyBlocking,
+      features: state.features,
+    }))
+  );
   const [currentTime, setCurrentTime] = useState(() => Date.now());
 
   // Calculate blocking dependencies (if feature is in backlog and has incomplete dependencies)
@@ -223,4 +229,4 @@ export function PriorityBadges({ feature }: PriorityBadgesProps) {
       )}
     </div>
   );
-}
+});

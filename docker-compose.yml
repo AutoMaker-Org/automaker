@@ -38,7 +38,7 @@ services:
     ports:
       - '3008:3008'
     environment:
-      # Required
+      # Optional - Anthropic API key
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
 
       # Optional - Claude CLI OAuth credentials (for macOS users)

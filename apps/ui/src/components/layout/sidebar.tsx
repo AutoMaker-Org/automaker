@@ -4,7 +4,8 @@ import { useNavigate, useLocation } from '@tanstack/react-router';
 
 const logger = createLogger('Sidebar');
 import { cn } from '@/lib/utils';
-import { useAppStore, type ThemeMode } from '@/store/app-store';
+import { useAppStore } from '@/store/app-store';
+import { useNotificationsStore } from '@/store/notifications-store';
 import { useKeyboardShortcuts, useKeyboardShortcutsConfig } from '@/hooks/use-keyboard-shortcuts';
 import { getElectronAPI } from '@/lib/electron';
 import { initializeProject, hasAppSpec, hasAutomakerDir } from '@/lib/project-init';
@@ -19,7 +20,10 @@ import {
   SidebarHeader,
   SidebarNavigation,
   SidebarFooter,
+  MobileSidebarToggle,
 } from './sidebar/components';
+import { useIsCompact } from '@/hooks/use-media-query';
+import { PanelLeftClose } from 'lucide-react';
 import { TrashDialog, OnboardingDialog } from './sidebar/dialogs';
 import { SIDEBAR_FEATURE_FLAGS } from './sidebar/constants';
 import {
@@ -30,7 +34,6 @@ import {
   useProjectCreation,
   useSetupDialog,
   useTrashOperations,
-  useProjectTheme,
   useUnviewedValidations,
 } from './sidebar/hooks';
 
@@ -43,9 +46,11 @@ export function Sidebar() {
     trashedProjects,
     currentProject,
     sidebarOpen,
+    mobileSidebarHidden,
     projectHistory,
     upsertAndSetCurrentProject,
     toggleSidebar,
+    toggleMobileSidebarHidden,
     restoreTrashedProject,
     deleteTrashedProject,
     emptyTrash,
@@ -56,21 +61,22 @@ export function Sidebar() {
     setSpecCreatingForProject,
   } = useAppStore();
 
+  const isCompact = useIsCompact();
+
   // Environment variable flags for hiding sidebar items
-  const { hideTerminal, hideWiki, hideRunningAgents, hideContext, hideSpecEditor } =
-    SIDEBAR_FEATURE_FLAGS;
+  const { hideTerminal, hideRunningAgents, hideContext, hideSpecEditor } = SIDEBAR_FEATURE_FLAGS;
 
   // Get customizable keyboard shortcuts
   const shortcuts = useKeyboardShortcutsConfig();
+
+  // Get unread notifications count
+  const unreadNotificationsCount = useNotificationsStore((s) => s.unreadCount);
 
   // State for delete project confirmation dialog
   const [showDeleteProjectDialog, setShowDeleteProjectDialog] = useState(false);
 
   // State for trash dialog
   const [showTrashDialog, setShowTrashDialog] = useState(false);
-
-  // Project theme management (must come before useProjectCreation which uses globalTheme)
-  const { globalTheme } = useProjectTheme();
 
   // Project creation state and handlers
   const {
@@ -87,9 +93,6 @@ export function Sidebar() {
     handleCreateFromTemplate,
     handleCreateFromCustomUrl,
   } = useProjectCreation({
-    trashedProjects,
-    currentProject,
-    globalTheme,
     upsertAndSetCurrentProject,
   });
 
@@ -188,13 +191,8 @@ export function Sidebar() {
         }
 
         // Upsert project and set as current (handles both create and update cases)
-        // Theme preservation is handled by the store action
-        const trashedProject = trashedProjects.find((p) => p.path === path);
-        const effectiveTheme =
-          (trashedProject?.theme as ThemeMode | undefined) ||
-          (currentProject?.theme as ThemeMode | undefined) ||
-          globalTheme;
-        upsertAndSetCurrentProject(path, name, effectiveTheme);
+        // Theme handling (trashed project recovery or undefined for global) is done by the store
+        upsertAndSetCurrentProject(path, name);
 
         // Check if app_spec.txt exists
         const specExists = await hasAppSpec(path);
@@ -222,7 +220,7 @@ export function Sidebar() {
         });
       }
     }
-  }, [trashedProjects, upsertAndSetCurrentProject, currentProject, globalTheme]);
+  }, [upsertAndSetCurrentProject]);
 
   // Navigation sections and keyboard shortcuts (defined after handlers)
   const { navSections, navigationShortcuts } = useNavigation({
@@ -239,6 +237,7 @@ export function Sidebar() {
     cyclePrevProject,
     cycleNextProject,
     unviewedValidationsCount,
+    unreadNotificationsCount,
     isSpecGenerating: isCurrentProjectGeneratingSpec,
   });
 
@@ -251,10 +250,16 @@ export function Sidebar() {
     return location.pathname === routePath;
   };
 
+  // Check if sidebar should be completely hidden on mobile
+  const shouldHideSidebar = isCompact && mobileSidebarHidden;
+
   return (
     <>
+      {/* Floating toggle to show sidebar on mobile when hidden */}
+      <MobileSidebarToggle />
+
       {/* Mobile backdrop overlay */}
-      {sidebarOpen && (
+      {sidebarOpen && !shouldHideSidebar && (
         <div
           className="fixed inset-0 bg-black/50 z-20 lg:hidden"
           onClick={toggleSidebar}
@@ -270,8 +275,11 @@ export function Sidebar() {
           'border-r border-border/60 shadow-[1px_0_20px_-5px_rgba(0,0,0,0.1)]',
           // Smooth width transition
           'transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]',
+          // Mobile: completely hidden when mobileSidebarHidden is true
+          shouldHideSidebar && 'hidden',
           // Mobile: overlay when open, collapsed when closed
-          sidebarOpen ? 'fixed inset-y-0 left-0 w-72 lg:relative lg:w-72' : 'relative w-16'
+          !shouldHideSidebar &&
+            (sidebarOpen ? 'fixed inset-y-0 left-0 w-72 lg:relative lg:w-72' : 'relative w-16')
         )}
         data-testid="sidebar"
       >
@@ -281,8 +289,33 @@ export function Sidebar() {
           shortcut={shortcuts.toggleSidebar}
         />
 
+        {/* Floating hide button on right edge - only visible on compact screens when sidebar is collapsed */}
+        {!sidebarOpen && isCompact && (
+          <button
+            onClick={toggleMobileSidebarHidden}
+            className={cn(
+              'absolute -right-6 top-1/2 -translate-y-1/2 z-40',
+              'flex items-center justify-center w-6 h-10 rounded-r-lg',
+              'bg-card/95 backdrop-blur-sm border border-l-0 border-border/80',
+              'text-muted-foreground hover:text-brand-500 hover:bg-accent/80',
+              'shadow-lg hover:shadow-xl hover:shadow-brand-500/10',
+              'transition-all duration-200',
+              'hover:w-8 active:scale-95'
+            )}
+            aria-label="Hide sidebar"
+            data-testid="sidebar-mobile-hide"
+          >
+            <PanelLeftClose className="w-3.5 h-3.5" />
+          </button>
+        )}
+
         <div className="flex-1 flex flex-col overflow-hidden">
-          <SidebarHeader sidebarOpen={sidebarOpen} currentProject={currentProject} />
+          <SidebarHeader
+            sidebarOpen={sidebarOpen}
+            currentProject={currentProject}
+            onClose={toggleSidebar}
+            onExpand={toggleSidebar}
+          />
 
           <SidebarNavigation
             currentProject={currentProject}
@@ -297,7 +330,6 @@ export function Sidebar() {
           sidebarOpen={sidebarOpen}
           isActiveRoute={isActiveRoute}
           navigate={navigate}
-          hideWiki={hideWiki}
           hideRunningAgents={hideRunningAgents}
           runningAgentsCount={runningAgentsCount}
           shortcuts={{ settings: shortcuts.settings }}

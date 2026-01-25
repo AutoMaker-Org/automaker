@@ -22,8 +22,8 @@ import {
   Filter,
   Circle,
   Play,
-  Loader2,
 } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 import { cn } from '@/lib/utils';
 import {
   parseLogOutput,
@@ -108,7 +108,7 @@ const getToolCategoryColor = (category: ToolCategory | undefined): string => {
     case 'task':
       return 'text-indigo-400 bg-indigo-500/10 border-indigo-500/30';
     default:
-      return 'text-zinc-400 bg-zinc-500/10 border-zinc-500/30';
+      return 'text-muted-foreground bg-muted/30 border-border';
   }
 };
 
@@ -148,11 +148,11 @@ function TodoListRenderer({ todos }: { todos: TodoItem[] }) {
       case 'completed':
         return <CheckCircle2 className="w-4 h-4 text-emerald-400" />;
       case 'in_progress':
-        return <Loader2 className="w-4 h-4 text-amber-400 animate-spin" />;
+        return <Spinner size="sm" />;
       case 'pending':
-        return <Circle className="w-4 h-4 text-zinc-500" />;
+        return <Circle className="w-4 h-4 text-muted-foreground/70" />;
       default:
-        return <Circle className="w-4 h-4 text-zinc-500" />;
+        return <Circle className="w-4 h-4 text-muted-foreground/70" />;
     }
   };
 
@@ -163,9 +163,9 @@ function TodoListRenderer({ todos }: { todos: TodoItem[] }) {
       case 'in_progress':
         return 'text-amber-300';
       case 'pending':
-        return 'text-zinc-400';
+        return 'text-muted-foreground';
       default:
-        return 'text-zinc-400';
+        return 'text-muted-foreground';
     }
   };
 
@@ -197,7 +197,7 @@ function TodoListRenderer({ todos }: { todos: TodoItem[] }) {
             'flex items-start gap-2 p-2 rounded-md transition-colors',
             todo.status === 'in_progress' && 'bg-amber-500/5 border border-amber-500/20',
             todo.status === 'completed' && 'bg-emerald-500/5',
-            todo.status === 'pending' && 'bg-zinc-800/30'
+            todo.status === 'pending' && 'bg-muted/30'
           )}
         >
           <div className="mt-0.5 flex-shrink-0">{getStatusIcon(todo.status)}</div>
@@ -313,9 +313,9 @@ function LogEntryItem({ entry, isExpanded, onToggle }: LogEntryItemProps) {
 
   // Get colors - use tool category colors for tool_call entries
   const colorParts = toolCategoryColors.split(' ');
-  const textColor = isToolCall ? colorParts[0] || 'text-zinc-400' : colors.text;
-  const bgColor = isToolCall ? colorParts[1] || 'bg-zinc-500/10' : colors.bg;
-  const borderColor = isToolCall ? colorParts[2] || 'border-zinc-500/30' : colors.border;
+  const textColor = isToolCall ? colorParts[0] || 'text-muted-foreground' : colors.text;
+  const bgColor = isToolCall ? colorParts[1] || 'bg-muted/30' : colors.bg;
+  const borderColor = isToolCall ? colorParts[2] || 'border-border' : colors.border;
 
   return (
     <div
@@ -334,9 +334,9 @@ function LogEntryItem({ entry, isExpanded, onToggle }: LogEntryItemProps) {
       >
         {hasContent ? (
           isExpanded ? (
-            <ChevronDown className="w-4 h-4 text-zinc-400 flex-shrink-0" />
+            <ChevronDown className="w-4 h-4 text-muted-foreground flex-shrink-0" />
           ) : (
-            <ChevronRight className="w-4 h-4 text-zinc-400 flex-shrink-0" />
+            <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
           )
         ) : (
           <span className="w-4 flex-shrink-0" />
@@ -361,7 +361,9 @@ function LogEntryItem({ entry, isExpanded, onToggle }: LogEntryItemProps) {
           {entry.title}
         </span>
 
-        <span className="text-xs text-zinc-400 truncate flex-1 ml-2">{collapsedPreview}</span>
+        <span className="text-xs text-muted-foreground truncate flex-1 ml-2">
+          {collapsedPreview}
+        </span>
       </button>
 
       {(isExpanded || !hasContent) && (
@@ -374,7 +376,7 @@ function LogEntryItem({ entry, isExpanded, onToggle }: LogEntryItemProps) {
               {formattedContent.map((part, index) => (
                 <div key={index}>
                   {part.type === 'json' ? (
-                    <pre className="bg-zinc-900/50 rounded p-2 overflow-x-auto scrollbar-styled text-xs text-primary">
+                    <pre className="bg-muted/50 rounded p-2 overflow-x-auto scrollbar-styled text-xs text-primary">
                       {part.content}
                     </pre>
                   ) : (
@@ -576,7 +578,7 @@ export function LogViewer({ output, className }: LogViewerProps) {
           <Info className="w-8 h-8 mx-auto mb-2 opacity-50" />
           <p className="text-sm">No log entries yet. Logs will appear here as the process runs.</p>
           {output && output.trim() && (
-            <div className="mt-4 p-3 bg-zinc-900/50 rounded text-xs font-mono text-left max-h-40 overflow-auto scrollbar-styled">
+            <div className="mt-4 p-3 bg-muted/50 rounded text-xs font-mono text-left max-h-40 overflow-auto scrollbar-styled">
               <pre className="whitespace-pre-wrap">{output}</pre>
             </div>
           )}
@@ -610,23 +612,23 @@ export function LogViewer({ output, className }: LogViewerProps) {
     <div className={cn('flex flex-col', className)}>
       {/* Sticky header with search, stats, and filters */}
       {/* Use -top-4 to compensate for parent's p-4 padding, pt-4 to restore visual spacing */}
-      <div className="sticky -top-4 z-10 bg-zinc-950/95 backdrop-blur-sm pt-4 pb-2 space-y-2 -mx-4 px-4">
+      <div className="sticky -top-4 z-10 bg-popover/95 backdrop-blur-sm pt-4 pb-2 space-y-2 -mx-4 px-4">
         {/* Search bar */}
         <div className="flex items-center gap-2 px-1" data-testid="log-search-bar">
           <div className="relative flex-1">
-            <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+            <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/70" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search logs..."
-              className="w-full pl-8 pr-8 py-1.5 text-xs bg-zinc-900/50 border border-zinc-700/50 rounded-md text-zinc-200 placeholder:text-zinc-500 focus:outline-none focus:border-zinc-600"
+              className="w-full pl-8 pr-8 py-1.5 text-xs bg-muted/50 border border-border rounded-md text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-ring"
               data-testid="log-search-input"
             />
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery('')}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300"
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                 data-testid="log-search-clear"
               >
                 <X className="w-3 h-3" />
@@ -636,7 +638,7 @@ export function LogViewer({ output, className }: LogViewerProps) {
           {hasActiveFilters && (
             <button
               onClick={clearFilters}
-              className="text-xs text-zinc-400 hover:text-zinc-200 px-2 py-1 rounded hover:bg-zinc-800/50 transition-colors flex items-center gap-1"
+              className="text-xs text-muted-foreground hover:text-foreground px-2 py-1 rounded hover:bg-muted transition-colors flex items-center gap-1"
               data-testid="log-clear-filters"
             >
               <X className="w-3 h-3" />
@@ -648,7 +650,7 @@ export function LogViewer({ output, className }: LogViewerProps) {
         {/* Tool category stats bar */}
         {stats.total > 0 && (
           <div className="flex items-center gap-1 px-1 flex-wrap" data-testid="log-stats-bar">
-            <span className="text-xs text-zinc-500 mr-1">
+            <span className="text-xs text-muted-foreground/70 mr-1">
               <Wrench className="w-3 h-3 inline mr-1" />
               {stats.total} tools:
             </span>
@@ -686,7 +688,7 @@ export function LogViewer({ output, className }: LogViewerProps) {
         {/* Header with type filters and controls */}
         <div className="flex items-center justify-between px-1" data-testid="log-viewer-header">
           <div className="flex items-center gap-1 flex-wrap">
-            <Filter className="w-3 h-3 text-zinc-500 mr-1" />
+            <Filter className="w-3 h-3 text-muted-foreground/70 mr-1" />
             {Object.entries(typeCounts).map(([type, count]) => {
               const colors = getLogTypeColors(type as LogEntryType);
               const isHidden = hiddenTypes.has(type as LogEntryType);
@@ -708,7 +710,7 @@ export function LogViewer({ output, className }: LogViewerProps) {
             })}
           </div>
           <div className="flex items-center gap-1">
-            <span className="text-xs text-zinc-500">
+            <span className="text-xs text-muted-foreground/70">
               {filteredEntries.length}/{entries.length}
             </span>
             <button
@@ -717,7 +719,7 @@ export function LogViewer({ output, className }: LogViewerProps) {
                 'text-xs px-2 py-1 rounded transition-colors',
                 expandAllMode
                   ? 'text-primary bg-primary/20 hover:bg-primary/30'
-                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted'
               )}
               data-testid="log-expand-all"
               title={
@@ -728,7 +730,7 @@ export function LogViewer({ output, className }: LogViewerProps) {
             </button>
             <button
               onClick={collapseAll}
-              className="text-xs text-zinc-400 hover:text-zinc-200 px-2 py-1 rounded hover:bg-zinc-800/50 transition-colors"
+              className="text-xs text-muted-foreground hover:text-foreground px-2 py-1 rounded hover:bg-muted transition-colors"
               data-testid="log-collapse-all"
             >
               Collapse All
@@ -740,7 +742,7 @@ export function LogViewer({ output, className }: LogViewerProps) {
       {/* Log entries */}
       <div className="space-y-2 mt-2" data-testid="log-entries-container">
         {filteredEntries.length === 0 ? (
-          <div className="text-center py-4 text-zinc-500 text-sm">
+          <div className="text-center py-4 text-muted-foreground text-sm">
             No entries match your filters.
             {hasActiveFilters && (
               <button onClick={clearFilters} className="ml-2 text-primary hover:underline">

@@ -44,7 +44,7 @@ export class CursorConfigManager {
 
     // Return default config with all available models
     return {
-      defaultModel: 'auto',
+      defaultModel: 'cursor-auto',
       models: getAllCursorModelIds(),
     };
   }
@@ -77,7 +77,7 @@ export class CursorConfigManager {
    * Get the default model
    */
   getDefaultModel(): CursorModelId {
-    return this.config.defaultModel || 'auto';
+    return this.config.defaultModel || 'cursor-auto';
   }
 
   /**
@@ -93,7 +93,7 @@ export class CursorConfigManager {
    * Get enabled models
    */
   getEnabledModels(): CursorModelId[] {
-    return this.config.models || ['auto'];
+    return this.config.models || ['cursor-auto'];
   }
 
   /**
@@ -174,7 +174,7 @@ export class CursorConfigManager {
    */
   reset(): void {
     this.config = {
-      defaultModel: 'auto',
+      defaultModel: 'cursor-auto',
       models: getAllCursorModelIds(),
     };
     this.saveConfig();

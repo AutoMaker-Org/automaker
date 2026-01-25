@@ -4,7 +4,8 @@ import { useAppStore } from '@/store/app-store';
 import { getElectronAPI } from '@/lib/electron';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { File, Folder, FolderOpen, ChevronRight, ChevronDown, RefreshCw, Code } from 'lucide-react';
+import { File, Folder, FolderOpen, ChevronRight, ChevronDown, Code } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 import { cn } from '@/lib/utils';
 
 const logger = createLogger('CodeView');
@@ -206,7 +207,7 @@ export function CodeView() {
   if (isLoading) {
     return (
       <div className="flex-1 flex items-center justify-center" data-testid="code-view-loading">
-        <RefreshCw className="w-6 h-6 animate-spin text-muted-foreground" />
+        <Spinner size="lg" />
       </div>
     );
   }

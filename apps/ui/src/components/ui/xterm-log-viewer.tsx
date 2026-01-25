@@ -1,6 +1,6 @@
 import { useEffect, useRef, useCallback, useState, forwardRef, useImperativeHandle } from 'react';
 import { useAppStore } from '@/store/app-store';
-import { getTerminalTheme, DEFAULT_TERMINAL_FONT } from '@/config/terminal-themes';
+import { getTerminalTheme, getTerminalFontFamily } from '@/config/terminal-themes';
 
 // Types for dynamically imported xterm modules
 type XTerminal = InstanceType<typeof import('@xterm/xterm').Terminal>;
@@ -20,7 +20,7 @@ export interface XtermLogViewerRef {
 export interface XtermLogViewerProps {
   /** Initial content to display */
   initialContent?: string;
-  /** Font size in pixels (default: 13) */
+  /** Font size in pixels (uses terminal settings if not provided) */
   fontSize?: number;
   /** Whether to auto-scroll to bottom when new content is added (default: true) */
   autoScroll?: boolean;
@@ -42,7 +42,7 @@ export const XtermLogViewer = forwardRef<XtermLogViewerRef, XtermLogViewerProps>
   (
     {
       initialContent,
-      fontSize = 13,
+      fontSize,
       autoScroll = true,
       className,
       minHeight = 300,
@@ -58,9 +58,14 @@ export const XtermLogViewer = forwardRef<XtermLogViewerRef, XtermLogViewerProps>
     const autoScrollRef = useRef(autoScroll);
     const pendingContentRef = useRef<string[]>([]);
 
-    // Get theme from store
+    // Get theme and font settings from store
     const getEffectiveTheme = useAppStore((state) => state.getEffectiveTheme);
     const effectiveTheme = getEffectiveTheme();
+    const terminalFontFamily = useAppStore((state) => state.terminalState.fontFamily);
+    const terminalFontSize = useAppStore((state) => state.terminalState.defaultFontSize);
+
+    // Use prop if provided, otherwise use store value, fallback to 13
+    const effectiveFontSize = fontSize ?? terminalFontSize ?? 13;
 
     // Track system dark mode for "system" theme
     const [systemIsDark, setSystemIsDark] = useState(() => {
@@ -102,12 +107,17 @@ export const XtermLogViewer = forwardRef<XtermLogViewerRef, XtermLogViewerProps>
 
         const terminalTheme = getTerminalTheme(resolvedTheme);
 
+        // Get font settings from store at initialization time
+        const terminalState = useAppStore.getState().terminalState;
+        const fontFamily = getTerminalFontFamily(terminalState.fontFamily);
+        const initFontSize = fontSize ?? terminalState.defaultFontSize ?? 13;
+
         const terminal = new Terminal({
           cursorBlink: false,
           cursorStyle: 'underline',
           cursorInactiveStyle: 'none',
-          fontSize,
-          fontFamily: DEFAULT_TERMINAL_FONT,
+          fontSize: initFontSize,
+          fontFamily,
           lineHeight: 1.2,
           theme: terminalTheme,
           disableStdin: true, // Read-only mode
@@ -181,10 +191,18 @@ export const XtermLogViewer = forwardRef<XtermLogViewerRef, XtermLogViewerProps>
     // Update font size when it changes
     useEffect(() => {
       if (xtermRef.current && isReady) {
-        xtermRef.current.options.fontSize = fontSize;
+        xtermRef.current.options.fontSize = effectiveFontSize;
         fitAddonRef.current?.fit();
       }
-    }, [fontSize, isReady]);
+    }, [effectiveFontSize, isReady]);
+
+    // Update font family when it changes
+    useEffect(() => {
+      if (xtermRef.current && isReady) {
+        xtermRef.current.options.fontFamily = getTerminalFontFamily(terminalFontFamily);
+        fitAddonRef.current?.fit();
+      }
+    }, [terminalFontFamily, isReady]);
 
     // Handle resize
     useEffect(() => {

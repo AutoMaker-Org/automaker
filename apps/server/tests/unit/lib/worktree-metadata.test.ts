@@ -121,7 +121,7 @@ describe('worktree-metadata.ts', () => {
           number: 123,
           url: 'https://github.com/owner/repo/pull/123',
           title: 'Test PR',
-          state: 'open',
+          state: 'OPEN',
           createdAt: new Date().toISOString(),
         },
       };
@@ -158,7 +158,7 @@ describe('worktree-metadata.ts', () => {
           number: 456,
           url: 'https://github.com/owner/repo/pull/456',
           title: 'Updated PR',
-          state: 'closed',
+          state: 'CLOSED',
           createdAt: new Date().toISOString(),
         },
       };
@@ -177,7 +177,7 @@ describe('worktree-metadata.ts', () => {
         number: 789,
         url: 'https://github.com/owner/repo/pull/789',
         title: 'New PR',
-        state: 'open',
+        state: 'OPEN',
         createdAt: new Date().toISOString(),
       };
 
@@ -201,7 +201,7 @@ describe('worktree-metadata.ts', () => {
         number: 999,
         url: 'https://github.com/owner/repo/pull/999',
         title: 'Updated PR',
-        state: 'merged',
+        state: 'MERGED',
         createdAt: new Date().toISOString(),
       };
 
@@ -224,7 +224,7 @@ describe('worktree-metadata.ts', () => {
         number: 111,
         url: 'https://github.com/owner/repo/pull/111',
         title: 'PR',
-        state: 'open',
+        state: 'OPEN',
         createdAt: new Date().toISOString(),
       };
 
@@ -259,7 +259,7 @@ describe('worktree-metadata.ts', () => {
         number: 222,
         url: 'https://github.com/owner/repo/pull/222',
         title: 'Has PR',
-        state: 'open',
+        state: 'OPEN',
         createdAt: new Date().toISOString(),
       };
 
@@ -297,7 +297,7 @@ describe('worktree-metadata.ts', () => {
           number: 333,
           url: 'https://github.com/owner/repo/pull/333',
           title: 'PR 3',
-          state: 'open',
+          state: 'OPEN',
           createdAt: new Date().toISOString(),
         },
       };

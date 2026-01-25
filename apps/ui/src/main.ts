@@ -474,6 +474,17 @@ async function startServer(): Promise<void> {
     ? path.join(process.resourcesPath, 'server')
     : path.join(__dirname, '../../server');
 
+  // IMPORTANT: Use shared data directory (not Electron's user data directory)
+  // This ensures Electron and web mode share the same settings/projects
+  // In dev: project root/data (navigate from __dirname which is apps/server/dist or apps/ui/dist-electron)
+  // In production: same as Electron user data (for app isolation)
+  const dataDir = app.isPackaged
+    ? app.getPath('userData')
+    : path.join(__dirname, '../../..', 'data');
+  logger.info(
+    `[DATA_DIR] app.isPackaged=${app.isPackaged}, __dirname=${__dirname}, dataDir=${dataDir}`
+  );
+
   // Build enhanced PATH that includes Node.js directory (cross-platform)
   const enhancedPath = buildEnhancedPath(command, process.env.PATH || '');
   if (enhancedPath !== process.env.PATH) {
@@ -484,7 +495,7 @@ async function startServer(): Promise<void> {
     ...process.env,
     PATH: enhancedPath,
     PORT: serverPort.toString(),
-    DATA_DIR: app.getPath('userData'),
+    DATA_DIR: dataDir,
     NODE_PATH: serverNodeModules,
     // Pass API key to server for CSRF protection
     AUTOMAKER_API_KEY: apiKey!,
@@ -496,6 +507,7 @@ async function startServer(): Promise<void> {
   };
 
   logger.info('Server will use port', serverPort);
+  logger.info('[DATA_DIR_SPAWN] env.DATA_DIR=', env.DATA_DIR);
 
   logger.info('Starting backend server...');
   logger.info('Server path:', serverPath);
@@ -647,20 +659,44 @@ function createWindow(): void {
 
 // App lifecycle
 app.whenReady().then(async () => {
-  // Ensure userData path is consistent across dev/prod so files land in Automaker dir
-  try {
-    const desiredUserDataPath = path.join(app.getPath('appData'), 'Automaker');
-    if (app.getPath('userData') !== desiredUserDataPath) {
-      app.setPath('userData', desiredUserDataPath);
-      logger.info('userData path set to:', desiredUserDataPath);
+  // In production, use Automaker dir in appData for app isolation
+  // In development, use project root for shared data between Electron and web mode
+  let userDataPathToUse: string;
+
+  if (app.isPackaged) {
+    // Production: Ensure userData path is consistent so files land in Automaker dir
+    try {
+      const desiredUserDataPath = path.join(app.getPath('appData'), 'Automaker');
+      if (app.getPath('userData') !== desiredUserDataPath) {
+        app.setPath('userData', desiredUserDataPath);
+        logger.info('[PRODUCTION] userData path set to:', desiredUserDataPath);
+      }
+      userDataPathToUse = desiredUserDataPath;
+    } catch (error) {
+      logger.warn('[PRODUCTION] Failed to set userData path:', (error as Error).message);
+      userDataPathToUse = app.getPath('userData');
     }
-  } catch (error) {
-    logger.warn('Failed to set userData path:', (error as Error).message);
+  } else {
+    // Development: Explicitly set userData to project root for shared data between Electron and web
+    // This OVERRIDES Electron's default userData path (~/.config/Automaker)
+    // __dirname is apps/ui/dist-electron, so go up to get project root
+    const projectRoot = path.join(__dirname, '../../..');
+    userDataPathToUse = path.join(projectRoot, 'data');
+    try {
+      app.setPath('userData', userDataPathToUse);
+      logger.info('[DEVELOPMENT] userData path explicitly set to:', userDataPathToUse);
+    } catch (error) {
+      logger.warn(
+        '[DEVELOPMENT] Failed to set userData path, using fallback:',
+        (error as Error).message
+      );
+      userDataPathToUse = path.join(projectRoot, 'data');
+    }
   }
 
   // Initialize centralized path helpers for Electron
   // This must be done before any file operations
-  setElectronUserDataPath(app.getPath('userData'));
+  setElectronUserDataPath(userDataPathToUse);
 
   // In development mode, allow access to the entire project root (for source files, node_modules, etc.)
   // In production, only allow access to the built app directory and resources
@@ -675,7 +711,12 @@ app.whenReady().then(async () => {
 
   // Initialize security settings for path validation
   // Set DATA_DIR before initializing so it's available for security checks
-  process.env.DATA_DIR = app.getPath('userData');
+  // Use the project's shared data directory in development, userData in production
+  const mainProcessDataDir = app.isPackaged
+    ? app.getPath('userData')
+    : path.join(process.cwd(), 'data');
+  process.env.DATA_DIR = mainProcessDataDir;
+  logger.info('[MAIN_PROCESS_DATA_DIR]', mainProcessDataDir);
   // ALLOWED_ROOT_DIRECTORY should already be in process.env if set by user
   // (it will be passed to server process, but we also need it in main process for dialog validation)
   initAllowedPaths();

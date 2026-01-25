@@ -1,65 +1,46 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
-import { createLogger } from '@automaker/utils/logger';
+import { useMemo, useCallback } from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { getElectronAPI } from '@/lib/electron';
 import { useAppStore } from '@/store/app-store';
+import { useAvailableEditors as useAvailableEditorsQuery } from '@/hooks/queries';
+import { queryKeys } from '@/lib/query-keys';
 import type { EditorInfo } from '@automaker/types';
-
-const logger = createLogger('AvailableEditors');
 
 // Re-export EditorInfo for convenience
 export type { EditorInfo };
 
+/**
+ * Hook for fetching and managing available editors
+ *
+ * Uses React Query for data fetching with caching.
+ * Provides a refresh function that clears server cache and re-detects editors.
+ */
 export function useAvailableEditors() {
-  const [editors, setEditors] = useState<EditorInfo[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-
-  const fetchAvailableEditors = useCallback(async () => {
-    try {
-      const api = getElectronAPI();
-      if (!api?.worktree?.getAvailableEditors) {
-        setIsLoading(false);
-        return;
-      }
-      const result = await api.worktree.getAvailableEditors();
-      if (result.success && result.result?.editors) {
-        setEditors(result.result.editors);
-      }
-    } catch (error) {
-      logger.error('Failed to fetch available editors:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+  const queryClient = useQueryClient();
+  const { data: editors = [], isLoading } = useAvailableEditorsQuery();
 
   /**
-   * Refresh editors by clearing the server cache and re-detecting
+   * Mutation to refresh editors by clearing the server cache and re-detecting
    * Use this when the user has installed/uninstalled editors
    */
-  const refresh = useCallback(async () => {
-    setIsRefreshing(true);
-    try {
+  const { mutate: refreshMutate, isPending: isRefreshing } = useMutation({
+    mutationFn: async () => {
       const api = getElectronAPI();
-      if (!api?.worktree?.refreshEditors) {
-        // Fallback to regular fetch if refresh not available
-        await fetchAvailableEditors();
-        return;
-      }
       const result = await api.worktree.refreshEditors();
-      if (result.success && result.result?.editors) {
-        setEditors(result.result.editors);
-        logger.info(`Editor cache refreshed, found ${result.result.editors.length} editors`);
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to refresh editors');
       }
-    } catch (error) {
-      logger.error('Failed to refresh editors:', error);
-    } finally {
-      setIsRefreshing(false);
-    }
-  }, [fetchAvailableEditors]);
+      return result.result?.editors ?? [];
+    },
+    onSuccess: (newEditors) => {
+      // Update the cache with new editors
+      queryClient.setQueryData(queryKeys.worktrees.editors(), newEditors);
+    },
+  });
 
-  useEffect(() => {
-    fetchAvailableEditors();
-  }, [fetchAvailableEditors]);
+  const refresh = useCallback(() => {
+    refreshMutate();
+  }, [refreshMutate]);
 
   return {
     editors,

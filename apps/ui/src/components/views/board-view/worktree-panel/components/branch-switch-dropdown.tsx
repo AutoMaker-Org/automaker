@@ -8,7 +8,8 @@ import {
   DropdownMenuTrigger,
   DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu';
-import { GitBranch, RefreshCw, GitBranchPlus, Check, Search } from 'lucide-react';
+import { GitBranch, GitBranchPlus, Check, Search } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 import { cn } from '@/lib/utils';
 import type { WorktreeInfo, BranchInfo } from '../types';
 
@@ -81,7 +82,7 @@ export function BranchSwitchDropdown({
         <div className="max-h-[250px] overflow-y-auto">
           {isLoadingBranches ? (
             <DropdownMenuItem disabled className="text-xs">
-              <RefreshCw className="w-3.5 h-3.5 mr-2 animate-spin" />
+              <Spinner size="xs" className="mr-2" />
               Loading branches...
             </DropdownMenuItem>
           ) : filteredBranches.length === 0 ? (

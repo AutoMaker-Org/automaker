@@ -1,7 +1,11 @@
 // @ts-nocheck
 import { useMemo, useCallback } from 'react';
 import { Feature, useAppStore } from '@/store/app-store';
-import { resolveDependencies, getBlockingDependencies } from '@automaker/dependency-resolver';
+import {
+  createFeatureMap,
+  getBlockingDependenciesFromMap,
+  resolveDependencies,
+} from '@automaker/dependency-resolver';
 
 type ColumnId = Feature['status'];
 
@@ -32,6 +36,8 @@ export function useBoardColumnFeatures({
       verified: [],
       completed: [], // Completed features are shown in the archive modal, not as a column
     };
+    const featureMap = createFeatureMap(features);
+    const runningTaskIds = new Set(runningAutoTasks);
 
     // Filter features by search query (case-insensitive)
     const normalizedQuery = searchQuery.toLowerCase().trim();
@@ -55,7 +61,7 @@ export function useBoardColumnFeatures({
 
     filteredFeatures.forEach((f) => {
       // If feature has a running agent, always show it in "in_progress"
-      const isRunning = runningAutoTasks.includes(f.id);
+      const isRunning = runningTaskIds.has(f.id);
 
       // Check if feature matches the current worktree by branchName
       // Features without branchName are considered unassigned (show only on primary worktree)
@@ -97,8 +103,25 @@ export function useBoardColumnFeatures({
       // Historically, we forced "running" features into in_progress so they never disappeared
       // during stale reload windows. With pipelines, a feature can legitimately be running while
       // its status is `pipeline_*`, so we must respect that status to render it in the right column.
+      // NOTE: runningAutoTasks is already worktree-scoped, so if a feature is in runningAutoTasks,
+      // it's already running for the current worktree. However, we still need to check matchesWorktree
+      // to ensure the feature's branchName matches the current worktree's branch.
       if (isRunning) {
-        if (!matchesWorktree) return;
+        // If feature is running but doesn't match worktree, it might be a timing issue where
+        // the feature was started for a different worktree. Still show it if it's running to
+        // prevent disappearing features, but log a warning.
+        if (!matchesWorktree) {
+          // This can happen if:
+          // 1. Feature was started for a different worktree (bug)
+          // 2. Timing issue where branchName hasn't been set yet
+          // 3. User switched worktrees while feature was starting
+          // Still show it in in_progress to prevent it from disappearing
+          console.debug(
+            `Feature ${f.id} is running but branchName (${featureBranch}) doesn't match current worktree branch (${effectiveBranch}) - showing anyway to prevent disappearing`
+          );
+          map.in_progress.push(f);
+          return;
+        }
 
         if (status.startsWith('pipeline_')) {
           if (!map[status]) map[status] = [];
@@ -151,7 +174,6 @@ export function useBoardColumnFeatures({
       const { orderedFeatures } = resolveDependencies(map.backlog);
 
       // Get all features to check blocking dependencies against
-      const allFeatures = features;
       const enableDependencyBlocking = useAppStore.getState().enableDependencyBlocking;
 
       // Sort blocked features to the end of the backlog
@@ -161,7 +183,7 @@ export function useBoardColumnFeatures({
         const blocked: Feature[] = [];
 
         for (const f of orderedFeatures) {
-          if (getBlockingDependencies(f, allFeatures).length > 0) {
+          if (getBlockingDependenciesFromMap(f, featureMap).length > 0) {
             blocked.push(f);
           } else {
             unblocked.push(f);

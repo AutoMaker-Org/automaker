@@ -202,8 +202,17 @@ describe('auto-mode-service.ts - Planning Mode', () => {
   });
 
   describe('buildFeaturePrompt', () => {
-    const buildFeaturePrompt = (svc: any, feature: any) => {
-      return svc.buildFeaturePrompt(feature);
+    const defaultTaskExecutionPrompts = {
+      implementationInstructions: 'Test implementation instructions',
+      playwrightVerificationInstructions: 'Test playwright instructions',
+    };
+
+    const buildFeaturePrompt = (
+      svc: any,
+      feature: any,
+      taskExecutionPrompts = defaultTaskExecutionPrompts
+    ) => {
+      return svc.buildFeaturePrompt(feature, taskExecutionPrompts);
     };
 
     it('should include feature ID and description', () => {
@@ -242,14 +251,15 @@ describe('auto-mode-service.ts - Planning Mode', () => {
       expect(result).toContain('/tmp/image2.jpg');
     });
 
-    it('should include summary tags instruction', () => {
+    it('should include implementation instructions', () => {
       const feature = {
         id: 'feat-123',
         description: 'Test feature',
       };
       const result = buildFeaturePrompt(service, feature);
-      expect(result).toContain('<summary>');
-      expect(result).toContain('</summary>');
+      // The prompt should include the implementation instructions passed to it
+      expect(result).toContain('Test implementation instructions');
+      expect(result).toContain('Test playwright instructions');
     });
   });
 

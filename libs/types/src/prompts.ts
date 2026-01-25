@@ -105,6 +105,125 @@ export interface CommitMessagePrompts {
 }
 
 /**
+ * TitleGenerationPrompts - Customizable prompts for AI feature title generation
+ *
+ * Controls how the AI generates short, descriptive titles for features.
+ */
+export interface TitleGenerationPrompts {
+  /** System prompt for generating feature titles from descriptions */
+  systemPrompt?: CustomPrompt;
+}
+
+/**
+ * IssueValidationPrompts - Customizable prompts for GitHub issue validation
+ *
+ * Controls how the AI validates GitHub issues against the codebase,
+ * determining if issues are valid, invalid, or need clarification.
+ */
+export interface IssueValidationPrompts {
+  /** System prompt for validating GitHub issues against codebase */
+  systemPrompt?: CustomPrompt;
+}
+
+/**
+ * IdeationPrompts - Customizable prompts for AI-powered ideation and brainstorming
+ *
+ * Controls how the AI generates feature ideas and suggestions for the project.
+ */
+export interface IdeationPrompts {
+  /** System prompt for ideation chat conversations */
+  ideationSystemPrompt?: CustomPrompt;
+
+  /** System prompt for generating feature suggestions */
+  suggestionsSystemPrompt?: CustomPrompt;
+}
+
+/**
+ * AppSpecPrompts - Customizable prompts for project specification generation
+ *
+ * Controls how the AI generates project specifications and features from specs.
+ */
+export interface AppSpecPrompts {
+  /** System prompt for generating project specifications */
+  generateSpecSystemPrompt?: CustomPrompt;
+
+  /** Instructions for structured specification output format */
+  structuredSpecInstructions?: CustomPrompt;
+
+  /** System prompt for generating features from a specification */
+  generateFeaturesFromSpecPrompt?: CustomPrompt;
+}
+
+/**
+ * ContextDescriptionPrompts - Customizable prompts for context file/image descriptions
+ *
+ * Controls how the AI describes context files and images.
+ */
+export interface ContextDescriptionPrompts {
+  /** System prompt for describing text files added as context */
+  describeFilePrompt?: CustomPrompt;
+
+  /** System prompt for describing images added as context */
+  describeImagePrompt?: CustomPrompt;
+}
+
+/**
+ * SuggestionsPrompts - Customizable prompts for generating various suggestions
+ *
+ * Controls how the AI generates feature, refactoring, security, and performance suggestions.
+ */
+export interface SuggestionsPrompts {
+  /** Prompt for generating new feature suggestions */
+  featuresPrompt?: CustomPrompt;
+
+  /** Prompt for generating refactoring suggestions */
+  refactoringPrompt?: CustomPrompt;
+
+  /** Prompt for generating security suggestions */
+  securityPrompt?: CustomPrompt;
+
+  /** Prompt for generating performance suggestions */
+  performancePrompt?: CustomPrompt;
+
+  /** Base template for all suggestion types */
+  baseTemplate?: CustomPrompt;
+}
+
+/**
+ * TaskExecutionPrompts - Customizable prompts for Auto Mode task execution
+ *
+ * Controls how the AI executes tasks, extracts learnings, and handles continuations.
+ */
+export interface TaskExecutionPrompts {
+  /** Template for building task execution prompts */
+  taskPromptTemplate?: CustomPrompt;
+
+  /** Instructions appended to feature implementation prompts */
+  implementationInstructions?: CustomPrompt;
+
+  /** Instructions for Playwright verification (when enabled) */
+  playwrightVerificationInstructions?: CustomPrompt;
+
+  /** System prompt for extracting learnings/ADRs from implementation */
+  learningExtractionSystemPrompt?: CustomPrompt;
+
+  /** User prompt template for learning extraction */
+  learningExtractionUserPromptTemplate?: CustomPrompt;
+
+  /** Template for prompting plan revisions */
+  planRevisionTemplate?: CustomPrompt;
+
+  /** Template for continuation after plan approval */
+  continuationAfterApprovalTemplate?: CustomPrompt;
+
+  /** Template for resuming interrupted features */
+  resumeFeatureTemplate?: CustomPrompt;
+
+  /** Template for project analysis */
+  projectAnalysisPrompt?: CustomPrompt;
+}
+
+/**
  * PromptCustomization - Complete set of customizable prompts
  *
  * All fields are optional. Undefined values fall back to built-in defaults.
@@ -125,6 +244,27 @@ export interface PromptCustomization {
 
   /** Commit message prompts (AI-generated commit messages) */
   commitMessage?: CommitMessagePrompts;
+
+  /** Title generation prompts (AI-generated feature titles) */
+  titleGeneration?: TitleGenerationPrompts;
+
+  /** Issue validation prompts (GitHub issue validation) */
+  issueValidation?: IssueValidationPrompts;
+
+  /** Ideation prompts (AI-powered brainstorming and suggestions) */
+  ideation?: IdeationPrompts;
+
+  /** App specification prompts (project spec generation) */
+  appSpec?: AppSpecPrompts;
+
+  /** Context description prompts (file/image descriptions) */
+  contextDescription?: ContextDescriptionPrompts;
+
+  /** Suggestions prompts (features, refactoring, security, performance) */
+  suggestions?: SuggestionsPrompts;
+
+  /** Task execution prompts (Auto Mode task execution, learning extraction) */
+  taskExecution?: TaskExecutionPrompts;
 }
 
 /**
@@ -136,6 +276,13 @@ export const DEFAULT_PROMPT_CUSTOMIZATION: PromptCustomization = {
   backlogPlan: {},
   enhancement: {},
   commitMessage: {},
+  titleGeneration: {},
+  issueValidation: {},
+  ideation: {},
+  appSpec: {},
+  contextDescription: {},
+  suggestions: {},
+  taskExecution: {},
 };
 
 /**
@@ -172,4 +319,48 @@ export interface ResolvedEnhancementPrompts {
 
 export interface ResolvedCommitMessagePrompts {
   systemPrompt: string;
+}
+
+export interface ResolvedTitleGenerationPrompts {
+  systemPrompt: string;
+}
+
+export interface ResolvedIssueValidationPrompts {
+  systemPrompt: string;
+}
+
+export interface ResolvedIdeationPrompts {
+  ideationSystemPrompt: string;
+  suggestionsSystemPrompt: string;
+}
+
+export interface ResolvedAppSpecPrompts {
+  generateSpecSystemPrompt: string;
+  structuredSpecInstructions: string;
+  generateFeaturesFromSpecPrompt: string;
+}
+
+export interface ResolvedContextDescriptionPrompts {
+  describeFilePrompt: string;
+  describeImagePrompt: string;
+}
+
+export interface ResolvedSuggestionsPrompts {
+  featuresPrompt: string;
+  refactoringPrompt: string;
+  securityPrompt: string;
+  performancePrompt: string;
+  baseTemplate: string;
+}
+
+export interface ResolvedTaskExecutionPrompts {
+  taskPromptTemplate: string;
+  implementationInstructions: string;
+  playwrightVerificationInstructions: string;
+  learningExtractionSystemPrompt: string;
+  learningExtractionUserPromptTemplate: string;
+  planRevisionTemplate: string;
+  continuationAfterApprovalTemplate: string;
+  resumeFeatureTemplate: string;
+  projectAnalysisPrompt: string;
 }

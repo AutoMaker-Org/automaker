@@ -14,7 +14,12 @@ import { streamingQuery } from '../../providers/simple-query-service.js';
 import { parseAndCreateFeatures } from './parse-and-create-features.js';
 import { getAppSpecPath } from '@automaker/platform';
 import type { SettingsService } from '../../services/settings-service.js';
-import { getAutoLoadClaudeMdSetting } from '../../lib/settings-helpers.js';
+import {
+  getAutoLoadClaudeMdSetting,
+  getPromptCustomization,
+  getPhaseModelWithOverrides,
+} from '../../lib/settings-helpers.js';
+import { FeatureLoader } from '../../services/feature-loader.js';
 
 const logger = createLogger('SpecRegeneration');
 
@@ -53,38 +58,48 @@ export async function generateFeaturesFromSpec(
     return;
   }
 
+  // Get customized prompts from settings
+  const prompts = await getPromptCustomization(settingsService, '[FeatureGeneration]');
+
+  // Load existing features to prevent duplicates
+  const featureLoader = new FeatureLoader();
+  const existingFeatures = await featureLoader.getAll(projectPath);
+
+  logger.info(`Found ${existingFeatures.length} existing features to exclude from generation`);
+
+  // Build existing features context for the prompt
+  let existingFeaturesContext = '';
+  if (existingFeatures.length > 0) {
+    const featuresList = existingFeatures
+      .map(
+        (f) =>
+          `- "${f.title}" (ID: ${f.id}): ${f.description?.substring(0, 100) || 'No description'}`
+      )
+      .join('\n');
+    existingFeaturesContext = `
+
+## EXISTING FEATURES (DO NOT REGENERATE THESE)
+
+The following ${existingFeatures.length} features already exist in the project. You MUST NOT generate features that duplicate or overlap with these:
+
+${featuresList}
+
+CRITICAL INSTRUCTIONS:
+- DO NOT generate any features with the same or similar titles as the existing features listed above
+- DO NOT generate features that cover the same functionality as existing features
+- ONLY generate NEW features that are not yet in the system
+- If a feature from the roadmap already exists, skip it entirely
+- Generate unique feature IDs that do not conflict with existing IDs: ${existingFeatures.map((f) => f.id).join(', ')}
+`;
+  }
+
   const prompt = `Based on this project specification:
 
 ${spec}
+${existingFeaturesContext}
+${prompts.appSpec.generateFeaturesFromSpecPrompt}
 
-Generate a prioritized list of implementable features. For each feature provide:
-
-1. **id**: A unique lowercase-hyphenated identifier
-2. **category**: Functional category (e.g., "Core", "UI", "API", "Authentication", "Database")
-3. **title**: Short descriptive title
-4. **description**: What this feature does (2-3 sentences)
-5. **priority**: 1 (high), 2 (medium), or 3 (low)
-6. **complexity**: "simple", "moderate", or "complex"
-7. **dependencies**: Array of feature IDs this depends on (can be empty)
-
-Format as JSON:
-{
-  "features": [
-    {
-      "id": "feature-id",
-      "category": "Feature Category",
-      "title": "Feature Title",
-      "description": "What it does",
-      "priority": 1,
-      "complexity": "moderate",
-      "dependencies": []
-    }
-  ]
-}
-
-Generate ${featureCount} features that build on each other logically.
-
-IMPORTANT: Do not ask for clarification. The specification is provided above. Generate the JSON immediately.`;
+Generate ${featureCount} NEW features that build on each other logically. Remember: ONLY generate features that DO NOT already exist.`;
 
   logger.info('========== PROMPT BEING SENT ==========');
   logger.info(`Prompt length: ${prompt.length} chars`);
@@ -104,13 +119,26 @@ IMPORTANT: Do not ask for clarification. The specification is provided above. Ge
     '[FeatureGeneration]'
   );
 
-  // Get model from phase settings
-  const settings = await settingsService?.getGlobalSettings();
-  const phaseModelEntry =
-    settings?.phaseModels?.featureGenerationModel || DEFAULT_PHASE_MODELS.featureGenerationModel;
+  // Get model from phase settings with provider info
+  const {
+    phaseModel: phaseModelEntry,
+    provider,
+    credentials,
+  } = settingsService
+    ? await getPhaseModelWithOverrides(
+        'featureGenerationModel',
+        settingsService,
+        projectPath,
+        '[FeatureGeneration]'
+      )
+    : {
+        phaseModel: DEFAULT_PHASE_MODELS.featureGenerationModel,
+        provider: undefined,
+        credentials: undefined,
+      };
   const { model, thinkingLevel } = resolvePhaseModel(phaseModelEntry);
 
-  logger.info('Using model:', model);
+  logger.info('Using model:', model, provider ? `via provider: ${provider.name}` : 'direct API');
 
   // Use streamingQuery with event callbacks
   const result = await streamingQuery({
@@ -123,6 +151,8 @@ IMPORTANT: Do not ask for clarification. The specification is provided above. Ge
     thinkingLevel,
     readOnly: true, // Feature generation only reads code, doesn't write
     settingSources: autoLoadClaudeMd ? ['user', 'project', 'local'] : undefined,
+    claudeCompatibleProvider: provider, // Pass provider for alternative endpoint configuration
+    credentials, // Pass credentials for resolving 'credentials' apiKeySource
     onText: (text) => {
       logger.debug(`Feature text block received (${text.length} chars)`);
       events.emit('spec-regeneration:event', {

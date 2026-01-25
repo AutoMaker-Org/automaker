@@ -1,20 +1,28 @@
 // @ts-nocheck
 import { useState, useCallback, useMemo } from 'react';
 import { createLogger } from '@automaker/utils/logger';
-import { CircleDot, RefreshCw } from 'lucide-react';
+import { CircleDot, RefreshCw, SearchX } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
 import { getElectronAPI, GitHubIssue, IssueValidationResult } from '@/lib/electron';
 import { useAppStore } from '@/store/app-store';
+import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { LoadingState } from '@/components/ui/loading-state';
 import { ErrorState } from '@/components/ui/error-state';
-import { cn, pathsEqual } from '@/lib/utils';
+import { cn, pathsEqual, generateUUID } from '@/lib/utils';
 import { toast } from 'sonner';
-import { useGithubIssues, useIssueValidation } from './github-issues-view/hooks';
+import { queryKeys } from '@/lib/query-keys';
+import { useGithubIssues, useIssueValidation, useIssuesFilter } from './github-issues-view/hooks';
 import { IssueRow, IssueDetailPanel, IssuesListHeader } from './github-issues-view/components';
 import { ValidationDialog } from './github-issues-view/dialogs';
 import { formatDate, getFeaturePriority } from './github-issues-view/utils';
 import { useModelOverride } from '@/components/shared';
-import type { ValidateIssueOptions } from './github-issues-view/types';
+import type {
+  ValidateIssueOptions,
+  IssuesFilterState,
+  IssuesStateFilter,
+} from './github-issues-view/types';
+import { DEFAULT_ISSUES_FILTER_STATE } from './github-issues-view/types';
 
 const logger = createLogger('GitHubIssuesView');
 
@@ -26,7 +34,11 @@ export function GitHubIssuesView() {
   const [pendingRevalidateOptions, setPendingRevalidateOptions] =
     useState<ValidateIssueOptions | null>(null);
 
+  // Filter state
+  const [filterState, setFilterState] = useState<IssuesFilterState>(DEFAULT_ISSUES_FILTER_STATE);
+
   const { currentProject, getCurrentWorktree, worktreesByProject } = useAppStore();
+  const queryClient = useQueryClient();
 
   // Model override for validation
   const validationModelOverride = useModelOverride({ phase: 'validationModel' });
@@ -43,6 +55,41 @@ export function GitHubIssuesView() {
       onValidationResultChange: setValidationResult,
       onShowValidationDialogChange: setShowValidationDialog,
     });
+
+  // Combine all issues for filtering
+  const allIssues = useMemo(() => [...openIssues, ...closedIssues], [openIssues, closedIssues]);
+
+  // Apply filter to issues - now returns matched issues directly for better performance
+  const filterResult = useIssuesFilter(allIssues, filterState, cachedValidations);
+
+  // Separate filtered issues by state - this is O(n) but now only done once
+  // since filterResult.matchedIssues already contains the filtered issues
+  const { filteredOpenIssues, filteredClosedIssues } = useMemo(() => {
+    const open: typeof openIssues = [];
+    const closed: typeof closedIssues = [];
+    for (const issue of filterResult.matchedIssues) {
+      if (issue.state.toLowerCase() === 'open') {
+        open.push(issue);
+      } else {
+        closed.push(issue);
+      }
+    }
+    return { filteredOpenIssues: open, filteredClosedIssues: closed };
+  }, [filterResult.matchedIssues]);
+
+  // Filter state change handlers
+  const handleStateFilterChange = useCallback((stateFilter: IssuesStateFilter) => {
+    setFilterState((prev) => ({ ...prev, stateFilter }));
+  }, []);
+
+  const handleLabelsChange = useCallback((selectedLabels: string[]) => {
+    setFilterState((prev) => ({ ...prev, selectedLabels }));
+  }, []);
+
+  // Clear all filters to default state
+  const handleClearFilters = useCallback(() => {
+    setFilterState(DEFAULT_ISSUES_FILTER_STATE);
+  }, []);
 
   // Get current branch from selected worktree
   const currentBranch = useMemo(() => {
@@ -93,7 +140,7 @@ export function GitHubIssuesView() {
             .join('\n');
 
           const feature = {
-            id: `issue-${issue.number}-${crypto.randomUUID()}`,
+            id: `issue-${issue.number}-${generateUUID()}`,
             title: issue.title,
             description,
             category: 'From GitHub',
@@ -109,6 +156,10 @@ export function GitHubIssuesView() {
 
           const result = await api.features.create(currentProject.path, feature);
           if (result.success) {
+            // Invalidate React Query cache to sync UI
+            queryClient.invalidateQueries({
+              queryKey: queryKeys.features.all(currentProject.path),
+            });
             toast.success(`Created task: ${issue.title}`);
           } else {
             toast.error(result.error || 'Failed to create task');
@@ -119,7 +170,7 @@ export function GitHubIssuesView() {
         toast.error(err instanceof Error ? err.message : 'Failed to create task');
       }
     },
-    [currentProject?.path, currentBranch]
+    [currentProject?.path, currentBranch, queryClient]
   );
 
   if (loading) {
@@ -130,7 +181,10 @@ export function GitHubIssuesView() {
     return <ErrorState error={error} title="Failed to Load Issues" onRetry={refresh} />;
   }
 
-  const totalIssues = openIssues.length + closedIssues.length;
+  const totalIssues = filteredOpenIssues.length + filteredClosedIssues.length;
+  const totalUnfilteredIssues = openIssues.length + closedIssues.length;
+  const isFilteredEmpty =
+    totalIssues === 0 && totalUnfilteredIssues > 0 && filterResult.hasActiveFilter;
 
   return (
     <div className="flex-1 flex overflow-hidden">
@@ -143,10 +197,21 @@ export function GitHubIssuesView() {
       >
         {/* Header */}
         <IssuesListHeader
-          openCount={openIssues.length}
-          closedCount={closedIssues.length}
+          openCount={filteredOpenIssues.length}
+          closedCount={filteredClosedIssues.length}
+          totalOpenCount={openIssues.length}
+          totalClosedCount={closedIssues.length}
+          hasActiveFilter={filterResult.hasActiveFilter}
           refreshing={refreshing}
           onRefresh={refresh}
+          compact={!!selectedIssue}
+          filterProps={{
+            stateFilter: filterState.stateFilter,
+            selectedLabels: filterState.selectedLabels,
+            availableLabels: filterResult.availableLabels,
+            onStateFilterChange: handleStateFilterChange,
+            onLabelsChange: handleLabelsChange,
+          }}
         />
 
         {/* Issues List */}
@@ -154,15 +219,35 @@ export function GitHubIssuesView() {
           {totalIssues === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-center p-6">
               <div className="p-4 rounded-full bg-muted/50 mb-4">
-                <CircleDot className="h-8 w-8 text-muted-foreground" />
+                {isFilteredEmpty ? (
+                  <SearchX className="h-8 w-8 text-muted-foreground" />
+                ) : (
+                  <CircleDot className="h-8 w-8 text-muted-foreground" />
+                )}
               </div>
-              <h2 className="text-base font-medium mb-2">No Issues</h2>
-              <p className="text-sm text-muted-foreground">This repository has no issues yet.</p>
+              <h2 className="text-base font-medium mb-2">
+                {isFilteredEmpty ? 'No Matching Issues' : 'No Issues'}
+              </h2>
+              <p className="text-sm text-muted-foreground mb-4">
+                {isFilteredEmpty
+                  ? 'No issues match your current filters.'
+                  : 'This repository has no issues yet.'}
+              </p>
+              {isFilteredEmpty && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleClearFilters}
+                  className="text-xs"
+                >
+                  Clear Filters
+                </Button>
+              )}
             </div>
           ) : (
             <div className="divide-y divide-border">
               {/* Open Issues */}
-              {openIssues.map((issue) => (
+              {filteredOpenIssues.map((issue) => (
                 <IssueRow
                   key={issue.number}
                   issue={issue}
@@ -176,12 +261,12 @@ export function GitHubIssuesView() {
               ))}
 
               {/* Closed Issues Section */}
-              {closedIssues.length > 0 && (
+              {filteredClosedIssues.length > 0 && (
                 <>
                   <div className="px-4 py-2 bg-muted/30 text-xs font-medium text-muted-foreground">
-                    Closed Issues ({closedIssues.length})
+                    Closed Issues ({filteredClosedIssues.length})
                   </div>
-                  {closedIssues.map((issue) => (
+                  {filteredClosedIssues.map((issue) => (
                     <IssueRow
                       key={issue.number}
                       issue={issue}

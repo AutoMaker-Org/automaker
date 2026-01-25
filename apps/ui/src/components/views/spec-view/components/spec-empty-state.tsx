@@ -1,5 +1,6 @@
 import { Button } from '@/components/ui/button';
-import { FileText, FilePlus2, Loader2 } from 'lucide-react';
+import { FileText, FilePlus2 } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 import { PHASE_LABELS } from '../constants';
 
 interface SpecEmptyStateProps {
@@ -36,7 +37,7 @@ export function SpecEmptyState({
         {isProcessing && (
           <div className="flex items-center gap-3 px-6 py-3.5 rounded-xl bg-linear-to-r from-primary/15 to-primary/5 border border-primary/30 shadow-lg backdrop-blur-md">
             <div className="relative">
-              <Loader2 className="w-5 h-5 animate-spin text-primary shrink-0" />
+              <Spinner size="md" className="shrink-0" />
               <div className="absolute inset-0 w-5 h-5 animate-ping text-primary/20" />
             </div>
             <div className="flex flex-col gap-1 min-w-0">
@@ -64,7 +65,7 @@ export function SpecEmptyState({
           <div className="mb-6 flex justify-center">
             <div className="p-4 rounded-full bg-primary/10">
               {isCreating ? (
-                <Loader2 className="w-12 h-12 text-primary animate-spin" />
+                <Spinner size="xl" className="w-12 h-12" />
               ) : (
                 <FilePlus2 className="w-12 h-12 text-primary" />
               )}

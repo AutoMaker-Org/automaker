@@ -23,6 +23,10 @@ interface GraphViewProps {
   onSpawnTask?: (feature: Feature) => void;
   onDeleteTask?: (feature: Feature) => void;
   onAddFeature?: () => void;
+  onOpenPlanDialog?: () => void;
+  hasPendingPlan?: boolean;
+  planUseSelectedWorktreeBranch?: boolean;
+  onPlanUseSelectedWorktreeBranchChange?: (value: boolean) => void;
 }
 
 export function GraphView({
@@ -42,8 +46,12 @@ export function GraphView({
   onSpawnTask,
   onDeleteTask,
   onAddFeature,
+  onOpenPlanDialog,
+  hasPendingPlan,
+  planUseSelectedWorktreeBranch,
+  onPlanUseSelectedWorktreeBranchChange,
 }: GraphViewProps) {
-  const { currentProject } = useAppStore();
+  const currentProject = useAppStore((state) => state.currentProject);
 
   // Use the same background hook as the board view
   const { backgroundImageStyle, backgroundSettings } = useBoardBackground({ currentProject });
@@ -53,9 +61,6 @@ export function GraphView({
     const effectiveBranch = currentWorktreeBranch;
 
     return features.filter((f) => {
-      // Skip completed features (they're in archive)
-      if (f.status === 'completed') return false;
-
       const featureBranch = f.branchName as string | undefined;
 
       if (!featureBranch) {
@@ -178,15 +183,26 @@ export function GraphView({
       },
       onDeleteDependency: (sourceId: string, targetId: string) => {
         // Find the target feature and remove the source from its dependencies
+        console.log('onDeleteDependency called', { sourceId, targetId });
         const targetFeature = features.find((f) => f.id === targetId);
-        if (!targetFeature) return;
+        if (!targetFeature) {
+          console.error('Target feature not found:', targetId);
+          return;
+        }
 
         const currentDeps = (targetFeature.dependencies as string[] | undefined) || [];
+        console.log('Current dependencies:', currentDeps);
         const newDeps = currentDeps.filter((depId) => depId !== sourceId);
+        console.log('New dependencies:', newDeps);
 
-        onUpdateFeature?.(targetId, {
-          dependencies: newDeps,
-        });
+        if (onUpdateFeature) {
+          console.log('Calling onUpdateFeature');
+          onUpdateFeature(targetId, {
+            dependencies: newDeps,
+          });
+        } else {
+          console.error('onUpdateFeature is not defined!');
+        }
 
         toast.success('Dependency removed');
       },
@@ -215,8 +231,13 @@ export function GraphView({
         nodeActionCallbacks={nodeActionCallbacks}
         onCreateDependency={handleCreateDependency}
         onAddFeature={onAddFeature}
+        onOpenPlanDialog={onOpenPlanDialog}
+        hasPendingPlan={hasPendingPlan}
+        planUseSelectedWorktreeBranch={planUseSelectedWorktreeBranch}
+        onPlanUseSelectedWorktreeBranchChange={onPlanUseSelectedWorktreeBranchChange}
         backgroundStyle={backgroundImageStyle}
         backgroundSettings={backgroundSettings}
+        projectPath={projectPath}
         className="h-full"
       />
     </div>

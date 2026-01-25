@@ -1,7 +1,9 @@
 import { useCallback, useState } from 'react';
 import { createLogger } from '@automaker/utils/logger';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAppStore, FileTreeNode, ProjectAnalysis } from '@/store/app-store';
 import { getElectronAPI } from '@/lib/electron';
+import { queryKeys } from '@/lib/query-keys';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
@@ -14,13 +16,13 @@ import {
   RefreshCw,
   BarChart3,
   FileCode,
-  Loader2,
   FileText,
   CheckCircle,
   AlertCircle,
   ListChecks,
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { Spinner } from '@/components/ui/spinner';
+import { cn, generateUUID } from '@/lib/utils';
 
 const logger = createLogger('AnalysisView');
 
@@ -72,6 +74,7 @@ export function AnalysisView() {
   const [isGeneratingFeatureList, setIsGeneratingFeatureList] = useState(false);
   const [featureListGenerated, setFeatureListGenerated] = useState(false);
   const [featureListError, setFeatureListError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
   // Recursively scan directory
   const scanDirectory = useCallback(
@@ -638,7 +641,7 @@ ${Object.entries(projectAnalysis.filesByExtension)
 
       for (const detectedFeature of detectedFeatures) {
         await api.features.create(currentProject.path, {
-          id: crypto.randomUUID(),
+          id: generateUUID(),
           category: detectedFeature.category,
           description: detectedFeature.description,
           status: 'backlog',
@@ -646,6 +649,11 @@ ${Object.entries(projectAnalysis.filesByExtension)
           steps: [],
         } as any);
       }
+
+      // Invalidate React Query cache to sync UI
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.features.all(currentProject.path),
+      });
 
       setFeatureListGenerated(true);
     } catch (error) {
@@ -656,7 +664,7 @@ ${Object.entries(projectAnalysis.filesByExtension)
     } finally {
       setIsGeneratingFeatureList(false);
     }
-  }, [currentProject, projectAnalysis]);
+  }, [currentProject, projectAnalysis, queryClient]);
 
   // Toggle folder expansion
   const toggleFolder = (path: string) => {
@@ -742,7 +750,7 @@ ${Object.entries(projectAnalysis.filesByExtension)
         <Button onClick={runAnalysis} disabled={isAnalyzing} data-testid="analyze-project-button">
           {isAnalyzing ? (
             <>
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              <Spinner size="sm" className="mr-2" />
               Analyzing...
             </>
           ) : (
@@ -771,7 +779,7 @@ ${Object.entries(projectAnalysis.filesByExtension)
           </div>
         ) : isAnalyzing ? (
           <div className="flex flex-col items-center justify-center h-full">
-            <Loader2 className="w-12 h-12 animate-spin text-primary mb-4" />
+            <Spinner size="xl" className="mb-4" />
             <p className="text-muted-foreground">Scanning project files...</p>
           </div>
         ) : projectAnalysis ? (
@@ -850,7 +858,7 @@ ${Object.entries(projectAnalysis.filesByExtension)
                   >
                     {isGeneratingSpec ? (
                       <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        <Spinner size="sm" className="mr-2" />
                         Generating...
                       </>
                     ) : (
@@ -903,7 +911,7 @@ ${Object.entries(projectAnalysis.filesByExtension)
                   >
                     {isGeneratingFeatureList ? (
                       <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        <Spinner size="sm" className="mr-2" />
                         Generating...
                       </>
                     ) : (

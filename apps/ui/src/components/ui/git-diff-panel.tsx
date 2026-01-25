@@ -1,5 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
-import { getElectronAPI } from '@/lib/electron';
+import { useState, useMemo } from 'react';
 import { cn } from '@/lib/utils';
 import {
   File,
@@ -9,12 +8,13 @@ import {
   FilePen,
   ChevronDown,
   ChevronRight,
-  Loader2,
   RefreshCw,
   GitBranch,
   AlertCircle,
 } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 import { Button } from './button';
+import { useWorktreeDiffs, useGitDiffs } from '@/hooks/queries';
 import type { FileStatus } from '@/types/electron';
 
 interface GitDiffPanelProps {
@@ -350,56 +350,44 @@ export function GitDiffPanel({
   useWorktrees = false,
 }: GitDiffPanelProps) {
   const [isExpanded, setIsExpanded] = useState(!compact);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [files, setFiles] = useState<FileStatus[]>([]);
-  const [diffContent, setDiffContent] = useState<string>('');
   const [expandedFiles, setExpandedFiles] = useState<Set<string>>(new Set());
 
-  const loadDiffs = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const api = getElectronAPI();
+  // Use worktree diffs hook when worktrees are enabled and panel is expanded
+  // Pass undefined for featureId when not using worktrees to disable the query
+  const {
+    data: worktreeDiffsData,
+    isLoading: isLoadingWorktree,
+    error: worktreeError,
+    refetch: refetchWorktree,
+  } = useWorktreeDiffs(
+    useWorktrees && isExpanded ? projectPath : undefined,
+    useWorktrees && isExpanded ? featureId : undefined
+  );
 
-      // Use worktree API if worktrees are enabled, otherwise use git API for main project
-      if (useWorktrees) {
-        if (!api?.worktree?.getDiffs) {
-          throw new Error('Worktree API not available');
-        }
-        const result = await api.worktree.getDiffs(projectPath, featureId);
-        if (result.success) {
-          setFiles(result.files || []);
-          setDiffContent(result.diff || '');
-        } else {
-          setError(result.error || 'Failed to load diffs');
-        }
-      } else {
-        // Use git API for main project diffs
-        if (!api?.git?.getDiffs) {
-          throw new Error('Git API not available');
-        }
-        const result = await api.git.getDiffs(projectPath);
-        if (result.success) {
-          setFiles(result.files || []);
-          setDiffContent(result.diff || '');
-        } else {
-          setError(result.error || 'Failed to load diffs');
-        }
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load diffs');
-    } finally {
-      setIsLoading(false);
-    }
-  }, [projectPath, featureId, useWorktrees]);
+  // Use git diffs hook when worktrees are disabled and panel is expanded
+  const {
+    data: gitDiffsData,
+    isLoading: isLoadingGit,
+    error: gitError,
+    refetch: refetchGit,
+  } = useGitDiffs(projectPath, !useWorktrees && isExpanded);
 
-  // Load diffs when expanded
-  useEffect(() => {
-    if (isExpanded) {
-      loadDiffs();
-    }
-  }, [isExpanded, loadDiffs]);
+  // Select the appropriate data based on useWorktrees prop
+  const diffsData = useWorktrees ? worktreeDiffsData : gitDiffsData;
+  const isLoading = useWorktrees ? isLoadingWorktree : isLoadingGit;
+  const queryError = useWorktrees ? worktreeError : gitError;
+
+  // Extract files and diff content from the data
+  const files: FileStatus[] = diffsData?.files ?? [];
+  const diffContent = diffsData?.diff ?? '';
+  const error = queryError
+    ? queryError instanceof Error
+      ? queryError.message
+      : 'Failed to load diffs'
+    : null;
+
+  // Refetch function
+  const loadDiffs = useWorktrees ? refetchWorktree : refetchGit;
 
   const parsedDiffs = useMemo(() => parseDiff(diffContent), [diffContent]);
 
@@ -484,7 +472,7 @@ export function GitDiffPanel({
         <div className="border-t border-border">
           {isLoading ? (
             <div className="flex items-center justify-center gap-2 py-8 text-muted-foreground">
-              <Loader2 className="w-5 h-5 animate-spin" />
+              <Spinner size="md" />
               <span className="text-sm">Loading changes...</span>
             </div>
           ) : error ? (

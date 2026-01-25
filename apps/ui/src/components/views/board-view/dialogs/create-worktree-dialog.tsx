@@ -10,7 +10,8 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { GitBranch, Loader2, AlertCircle } from 'lucide-react';
+import { GitBranch, AlertCircle } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 import { getElectronAPI } from '@/lib/electron';
 import { toast } from 'sonner';
 
@@ -216,7 +217,7 @@ export function CreateWorktreeDialog({
           <Button onClick={handleCreate} disabled={isLoading || !branchName.trim()}>
             {isLoading ? (
               <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                <Spinner size="sm" className="mr-2" />
                 Creating...
               </>
             ) : (

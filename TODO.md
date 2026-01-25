@@ -2,6 +2,14 @@
 
 - Setting the default model does not seem like it works.
 
+# Performance (completed)
+
+- [x] Graph performance mode for large graphs (compact nodes/edges + visible-only rendering)
+- [x] Render containment on heavy scroll regions (kanban columns, chat history)
+- [x] Reduce blur/shadow effects when lists get large
+- [x] React Query tuning for heavy datasets (less refetch on focus/reconnect)
+- [x] DnD/list rendering optimizations (virtualized kanban + memoized card sections)
+
 # UX
 
 - Consolidate all models to a single place in the settings instead of having AI profiles and all this other stuff

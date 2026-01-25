@@ -67,9 +67,25 @@ export function FileBrowserProvider({ children }: { children: ReactNode }) {
   );
 }
 
+// No-op fallback for HMR transitions when context temporarily becomes unavailable
+const hmrFallback: FileBrowserContextValue = {
+  openFileBrowser: async () => {
+    console.warn('[HMR] FileBrowserContext not available, returning null');
+    return null;
+  },
+};
+
 export function useFileBrowser() {
   const context = useContext(FileBrowserContext);
+  // During HMR, the context can temporarily be null as modules reload.
+  // Instead of crashing the app, return a safe no-op fallback that will
+  // be replaced once the provider re-mounts.
   if (!context) {
+    if (import.meta.hot) {
+      // In development with HMR active, gracefully degrade
+      return hmrFallback;
+    }
+    // In production, this indicates a real bug - throw to help debug
     throw new Error('useFileBrowser must be used within FileBrowserProvider');
   }
   return context;

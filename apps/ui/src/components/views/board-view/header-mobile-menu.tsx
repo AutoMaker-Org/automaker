@@ -2,18 +2,17 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Slider } from '@/components/ui/slider';
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { Menu, Bot, Wand2, Settings2, GitBranch, Zap } from 'lucide-react';
+  HeaderActionsPanel,
+  HeaderActionsPanelTrigger,
+} from '@/components/ui/header-actions-panel';
+import { Bot, Wand2, GitBranch, Zap, FastForward } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { MobileUsageBar } from './mobile-usage-bar';
 
 interface HeaderMobileMenuProps {
+  // Panel visibility
+  isOpen: boolean;
+  onToggle: () => void;
   // Worktree panel visibility
   isWorktreePanelVisible: boolean;
   onWorktreePanelToggle: (visible: boolean) => void;
@@ -24,7 +23,8 @@ interface HeaderMobileMenuProps {
   // Auto mode
   isAutoModeRunning: boolean;
   onAutoModeToggle: (enabled: boolean) => void;
-  onOpenAutoModeSettings: () => void;
+  skipVerificationInAutoMode: boolean;
+  onSkipVerificationChange: (value: boolean) => void;
   // Plan button
   onOpenPlanDialog: () => void;
   // Usage bar visibility
@@ -33,6 +33,8 @@ interface HeaderMobileMenuProps {
 }
 
 export function HeaderMobileMenu({
+  isOpen,
+  onToggle,
   isWorktreePanelVisible,
   onWorktreePanelToggle,
   maxConcurrency,
@@ -40,135 +42,138 @@ export function HeaderMobileMenu({
   onConcurrencyChange,
   isAutoModeRunning,
   onAutoModeToggle,
-  onOpenAutoModeSettings,
+  skipVerificationInAutoMode,
+  onSkipVerificationChange,
   onOpenPlanDialog,
   showClaudeUsage,
   showCodexUsage,
 }: HeaderMobileMenuProps) {
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button
-          variant="outline"
-          size="sm"
-          className="h-8 w-8 p-0"
-          data-testid="header-mobile-menu-trigger"
-        >
-          <Menu className="w-4 h-4" />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-64">
+    <>
+      <HeaderActionsPanelTrigger isOpen={isOpen} onToggle={onToggle} />
+      <HeaderActionsPanel isOpen={isOpen} onClose={onToggle} title="Board Controls">
         {/* Usage Bar - show if either provider is authenticated */}
         {(showClaudeUsage || showCodexUsage) && (
-          <>
-            <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
+          <div className="space-y-2">
+            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
               Usage
-            </DropdownMenuLabel>
+            </span>
             <MobileUsageBar showClaudeUsage={showClaudeUsage} showCodexUsage={showCodexUsage} />
-            <DropdownMenuSeparator />
-          </>
+          </div>
         )}
 
-        <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
-          Controls
-        </DropdownMenuLabel>
-        <DropdownMenuSeparator />
+        {/* Controls Section */}
+        <div className="space-y-1">
+          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+            Controls
+          </span>
 
-        {/* Auto Mode Toggle */}
-        <div
-          className="flex items-center justify-between px-2 py-2 cursor-pointer hover:bg-accent rounded-sm"
-          onClick={() => onAutoModeToggle(!isAutoModeRunning)}
-          data-testid="mobile-auto-mode-toggle-container"
-        >
-          <div className="flex items-center gap-2">
-            <Zap
-              className={cn(
-                'w-4 h-4',
-                isAutoModeRunning ? 'text-yellow-500' : 'text-muted-foreground'
-              )}
-            />
-            <span className="text-sm font-medium">Auto Mode</span>
+          {/* Auto Mode Section */}
+          <div className="rounded-lg border border-border/50 overflow-hidden">
+            {/* Auto Mode Toggle */}
+            <div
+              className="flex items-center justify-between p-3 cursor-pointer hover:bg-accent/50 transition-colors"
+              onClick={() => onAutoModeToggle(!isAutoModeRunning)}
+              data-testid="mobile-auto-mode-toggle-container"
+            >
+              <div className="flex items-center gap-2">
+                <Zap
+                  className={cn(
+                    'w-4 h-4',
+                    isAutoModeRunning ? 'text-yellow-500' : 'text-muted-foreground'
+                  )}
+                />
+                <span className="text-sm font-medium">Auto Mode</span>
+              </div>
+              <Switch
+                id="mobile-auto-mode-toggle"
+                checked={isAutoModeRunning}
+                onCheckedChange={onAutoModeToggle}
+                onClick={(e) => e.stopPropagation()}
+                data-testid="mobile-auto-mode-toggle"
+              />
+            </div>
+
+            {/* Skip Verification Toggle */}
+            <div
+              className="flex items-center justify-between p-3 pl-9 cursor-pointer hover:bg-accent/50 border-t border-border/30 transition-colors"
+              onClick={() => onSkipVerificationChange(!skipVerificationInAutoMode)}
+              data-testid="mobile-skip-verification-toggle-container"
+            >
+              <div className="flex items-center gap-2">
+                <FastForward className="w-4 h-4 text-muted-foreground" />
+                <span className="text-sm text-muted-foreground">Skip Verification</span>
+              </div>
+              <Switch
+                id="mobile-skip-verification-toggle"
+                checked={skipVerificationInAutoMode}
+                onCheckedChange={onSkipVerificationChange}
+                onClick={(e) => e.stopPropagation()}
+                data-testid="mobile-skip-verification-toggle"
+              />
+            </div>
+
+            {/* Concurrency Control */}
+            <div
+              className="p-3 pl-9 border-t border-border/30"
+              data-testid="mobile-concurrency-control"
+            >
+              <div className="flex items-center gap-2 mb-3">
+                <Bot className="w-4 h-4 text-muted-foreground" />
+                <span className="text-sm text-muted-foreground">Max Agents</span>
+                <span
+                  className="text-sm text-muted-foreground ml-auto"
+                  data-testid="mobile-concurrency-value"
+                >
+                  {runningAgentsCount}/{maxConcurrency}
+                </span>
+              </div>
+              <Slider
+                value={[maxConcurrency]}
+                onValueChange={(value) => onConcurrencyChange(value[0])}
+                min={1}
+                max={10}
+                step={1}
+                className="w-full"
+                data-testid="mobile-concurrency-slider"
+              />
+            </div>
           </div>
-          <div className="flex items-center gap-2">
+
+          {/* Worktrees Toggle */}
+          <div
+            className="flex items-center justify-between p-3 cursor-pointer hover:bg-accent/50 rounded-lg border border-border/50 transition-colors"
+            onClick={() => onWorktreePanelToggle(!isWorktreePanelVisible)}
+            data-testid="mobile-worktrees-toggle-container"
+          >
+            <div className="flex items-center gap-2">
+              <GitBranch className="w-4 h-4 text-muted-foreground" />
+              <span className="text-sm font-medium">Worktree Bar</span>
+            </div>
             <Switch
-              id="mobile-auto-mode-toggle"
-              checked={isAutoModeRunning}
-              onCheckedChange={onAutoModeToggle}
+              id="mobile-worktrees-toggle"
+              checked={isWorktreePanelVisible}
+              onCheckedChange={onWorktreePanelToggle}
               onClick={(e) => e.stopPropagation()}
-              data-testid="mobile-auto-mode-toggle"
+              data-testid="mobile-worktrees-toggle"
             />
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onOpenAutoModeSettings();
-              }}
-              className="p-1 rounded hover:bg-accent/50 transition-colors"
-              title="Auto Mode Settings"
-              data-testid="mobile-auto-mode-settings-button"
-            >
-              <Settings2 className="w-4 h-4 text-muted-foreground" />
-            </button>
           </div>
+
+          {/* Plan Button */}
+          <Button
+            variant="outline"
+            className="w-full justify-start"
+            onClick={() => {
+              onOpenPlanDialog();
+              onToggle();
+            }}
+            data-testid="mobile-plan-button"
+          >
+            <Wand2 className="w-4 h-4 mr-2" />
+            Plan
+          </Button>
         </div>
-
-        <DropdownMenuSeparator />
-
-        {/* Worktrees Toggle */}
-        <div
-          className="flex items-center justify-between px-2 py-2 cursor-pointer hover:bg-accent rounded-sm"
-          onClick={() => onWorktreePanelToggle(!isWorktreePanelVisible)}
-          data-testid="mobile-worktrees-toggle-container"
-        >
-          <div className="flex items-center gap-2">
-            <GitBranch className="w-4 h-4 text-muted-foreground" />
-            <span className="text-sm font-medium">Worktrees</span>
-          </div>
-          <Switch
-            id="mobile-worktrees-toggle"
-            checked={isWorktreePanelVisible}
-            onCheckedChange={onWorktreePanelToggle}
-            onClick={(e) => e.stopPropagation()}
-            data-testid="mobile-worktrees-toggle"
-          />
-        </div>
-
-        <DropdownMenuSeparator />
-
-        {/* Concurrency Control */}
-        <div className="px-2 py-2" data-testid="mobile-concurrency-control">
-          <div className="flex items-center gap-2 mb-2">
-            <Bot className="w-4 h-4 text-muted-foreground" />
-            <span className="text-sm font-medium">Max Agents</span>
-            <span
-              className="text-sm text-muted-foreground ml-auto"
-              data-testid="mobile-concurrency-value"
-            >
-              {runningAgentsCount}/{maxConcurrency}
-            </span>
-          </div>
-          <Slider
-            value={[maxConcurrency]}
-            onValueChange={(value) => onConcurrencyChange(value[0])}
-            min={1}
-            max={10}
-            step={1}
-            className="w-full"
-            data-testid="mobile-concurrency-slider"
-          />
-        </div>
-
-        <DropdownMenuSeparator />
-
-        {/* Plan Button */}
-        <DropdownMenuItem
-          onClick={onOpenPlanDialog}
-          className="flex items-center gap-2"
-          data-testid="mobile-plan-button"
-        >
-          <Wand2 className="w-4 h-4" />
-          <span>Plan</span>
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+      </HeaderActionsPanel>
+    </>
   );
 }

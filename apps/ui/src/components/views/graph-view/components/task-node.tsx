@@ -18,6 +18,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { TaskNodeData } from '../hooks/use-graph-nodes';
+import { GRAPH_RENDER_MODE_COMPACT } from '../constants';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -60,13 +61,6 @@ const statusConfig = {
     borderClass: 'border-[var(--status-success)]',
     bgClass: 'bg-[var(--status-success-bg)]',
   },
-  completed: {
-    icon: CheckCircle2,
-    label: 'Completed',
-    colorClass: 'text-[var(--status-success)]',
-    borderClass: 'border-[var(--status-success)]/50',
-    bgClass: 'bg-[var(--status-success-bg)]/50',
-  },
 };
 
 const priorityConfig = {
@@ -95,8 +89,13 @@ function getCardBorderStyle(
 
 export const TaskNode = memo(function TaskNode({ data, selected }: TaskNodeProps) {
   // Handle pipeline statuses by treating them like in_progress
+  // Treat completed (archived) as verified for display
   const status = data.status || 'backlog';
-  const statusKey = status.startsWith('pipeline_') ? 'in_progress' : status;
+  const statusKey = status.startsWith('pipeline_')
+    ? 'in_progress'
+    : status === 'completed'
+      ? 'verified'
+      : status;
   const config = statusConfig[statusKey as keyof typeof statusConfig] || statusConfig.backlog;
   const StatusIcon = config.icon;
   const priorityConf = data.priority ? priorityConfig[data.priority as 1 | 2 | 3] : null;
@@ -111,9 +110,11 @@ export const TaskNode = memo(function TaskNode({ data, selected }: TaskNodeProps
 
   // Background/theme settings with defaults
   const cardOpacity = data.cardOpacity ?? 100;
-  const glassmorphism = data.cardGlassmorphism ?? true;
+  const shouldUseGlassmorphism = data.cardGlassmorphism ?? true;
   const cardBorderEnabled = data.cardBorderEnabled ?? true;
   const cardBorderOpacity = data.cardBorderOpacity ?? 100;
+  const isCompact = data.renderMode === GRAPH_RENDER_MODE_COMPACT;
+  const glassmorphism = shouldUseGlassmorphism && !isCompact;
 
   // Get the border color based on status and error state
   const borderColor = data.error
@@ -130,6 +131,99 @@ export const TaskNode = memo(function TaskNode({ data, selected }: TaskNodeProps
 
   // Get computed border style
   const borderStyle = getCardBorderStyle(cardBorderEnabled, cardBorderOpacity, borderColor);
+
+  if (isCompact) {
+    return (
+      <>
+        <Handle
+          id="target"
+          type="target"
+          position={Position.Left}
+          isConnectable={true}
+          className={cn(
+            'w-3 h-3 !bg-border border-2 border-background',
+            'transition-colors duration-200',
+            'hover:!bg-brand-500',
+            isDimmed && 'opacity-30'
+          )}
+        />
+
+        <div
+          className={cn(
+            'min-w-[200px] max-w-[240px] rounded-lg shadow-sm relative',
+            'transition-all duration-200',
+            selected && 'ring-2 ring-brand-500 ring-offset-1 ring-offset-background',
+            isMatched && 'graph-node-matched',
+            isHighlighted && !isMatched && 'graph-node-highlighted',
+            isDimmed && 'graph-node-dimmed'
+          )}
+          style={borderStyle}
+        >
+          <div
+            className="absolute inset-0 rounded-lg bg-card"
+            style={{ opacity: cardOpacity / 100 }}
+          />
+          <div className={cn('relative flex items-center gap-2 px-2.5 py-2', config.bgClass)}>
+            <StatusIcon className={cn('w-3.5 h-3.5', config.colorClass)} />
+            <span className={cn('text-[11px] font-medium', config.colorClass)}>{config.label}</span>
+            {priorityConf && (
+              <span
+                className={cn(
+                  'ml-auto text-[9px] font-bold px-1.5 py-0.5 rounded',
+                  priorityConf.colorClass
+                )}
+              >
+                {data.priority === 1 ? 'H' : data.priority === 2 ? 'M' : 'L'}
+              </span>
+            )}
+          </div>
+          <div className="relative px-2.5 py-2">
+            <p
+              className={cn(
+                'text-xs text-foreground line-clamp-2',
+                data.title ? 'font-medium' : 'font-semibold'
+              )}
+            >
+              {data.title || data.description}
+            </p>
+            {data.title && data.description && (
+              <p className="text-[11px] text-muted-foreground line-clamp-1 mt-1">
+                {data.description}
+              </p>
+            )}
+            {data.isRunning && (
+              <div className="mt-2 flex items-center gap-2 text-[10px] text-muted-foreground">
+                <span className="inline-flex w-1.5 h-1.5 rounded-full bg-[var(--status-in-progress)]" />
+                Running
+              </div>
+            )}
+            {isStopped && (
+              <div className="mt-2 flex items-center gap-2 text-[10px] text-[var(--status-warning)]">
+                <span className="inline-flex w-1.5 h-1.5 rounded-full bg-[var(--status-warning)]" />
+                Paused
+              </div>
+            )}
+          </div>
+        </div>
+
+        <Handle
+          id="source"
+          type="source"
+          position={Position.Right}
+          isConnectable={true}
+          className={cn(
+            'w-3 h-3 !bg-border border-2 border-background',
+            'transition-colors duration-200',
+            'hover:!bg-brand-500',
+            data.status === 'completed' || data.status === 'verified'
+              ? '!bg-[var(--status-success)]'
+              : '',
+            isDimmed && 'opacity-30'
+          )}
+        />
+      </>
+    );
+  }
 
   return (
     <>

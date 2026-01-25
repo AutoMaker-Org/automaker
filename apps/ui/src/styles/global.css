@@ -18,6 +18,10 @@
 @custom-variant gray (&:is(.gray *));
 @custom-variant forest (&:is(.forest *));
 @custom-variant ocean (&:is(.ocean *));
+@custom-variant ember (&:is(.ember *));
+@custom-variant ayu-dark (&:is(.ayu-dark *));
+@custom-variant ayu-mirage (&:is(.ayu-mirage *));
+@custom-variant matcha (&:is(.matcha *));
 
 /* Light themes */
 @custom-variant cream (&:is(.cream *));
@@ -35,6 +39,10 @@
 @custom-variant gruvboxlight (&:is(.gruvboxlight *));
 @custom-variant nordlight (&:is(.nordlight *));
 @custom-variant blossom (&:is(.blossom *));
+@custom-variant ayu-light (&:is(.ayu-light *));
+@custom-variant onelight (&:is(.onelight *));
+@custom-variant bluloco (&:is(.bluloco *));
+@custom-variant feather (&:is(.feather *));
 
 @theme inline {
   --color-background: var(--background);
@@ -124,6 +132,7 @@
 :root {
   /* Default to light mode */
   --radius: 0.625rem;
+  --perf-contain-intrinsic-size: 500px;
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
@@ -372,6 +381,15 @@
   body {
     @apply bg-background text-foreground;
     background-color: var(--background);
+    font-family: var(--font-sans);
+  }
+
+  /* Apply monospace font to code elements */
+  code,
+  pre,
+  kbd,
+  samp {
+    font-family: var(--font-mono);
   }
 
   /* Text selection styling for readability */
@@ -481,6 +499,16 @@
 
 .scrollbar-styled::-webkit-scrollbar-thumb:hover {
   background: oklch(0.45 0 0);
+}
+
+/* Hidden scrollbar - still scrollable but no visible scrollbar */
+.scrollbar-hide {
+  -ms-overflow-style: none; /* IE and Edge */
+  scrollbar-width: none; /* Firefox */
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
 }
 
 /* Glass morphism utilities */
@@ -853,6 +881,11 @@
   background: var(--muted-foreground);
 }
 
+/* Terminal padding for better readability */
+.xterm {
+  padding: 12px 16px;
+}
+
 /* ========================================
    DEPENDENCY GRAPH STYLES
    Theme-aware styling for React Flow graph
@@ -1087,4 +1120,10 @@
   .graph-node-matched {
     animation: none;
   }
+}
+
+.perf-contain {
+  contain: layout paint;
+  content-visibility: auto;
+  contain-intrinsic-size: auto var(--perf-contain-intrinsic-size);
 }

@@ -93,7 +93,7 @@ export function useDevServerLogs({ worktreePath, autoSubscribe = true }: UseDevS
           isRunning: true,
           isLoading: false,
           port: result.result!.port,
-          url: `http://localhost:${result.result!.port}`,
+          url: result.result!.url,
           startedAt: result.result!.startedAt,
           error: null,
         }));

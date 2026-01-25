@@ -1,7 +1,7 @@
 import { memo } from 'react';
 import { useDroppable } from '@dnd-kit/core';
 import { cn } from '@/lib/utils';
-import type { ReactNode } from 'react';
+import type { CSSProperties, ReactNode, Ref, UIEvent } from 'react';
 
 interface KanbanColumnProps {
   id: string;
@@ -17,6 +17,11 @@ interface KanbanColumnProps {
   hideScrollbar?: boolean;
   /** Custom width in pixels. If not provided, defaults to 288px (w-72) */
   width?: number;
+  contentRef?: Ref<HTMLDivElement>;
+  onScroll?: (event: UIEvent<HTMLDivElement>) => void;
+  contentClassName?: string;
+  contentStyle?: CSSProperties;
+  disableItemSpacing?: boolean;
 }
 
 export const KanbanColumn = memo(function KanbanColumn({
@@ -31,6 +36,11 @@ export const KanbanColumn = memo(function KanbanColumn({
   showBorder = true,
   hideScrollbar = false,
   width,
+  contentRef,
+  onScroll,
+  contentClassName,
+  contentStyle,
+  disableItemSpacing = false,
 }: KanbanColumnProps) {
   const { setNodeRef, isOver } = useDroppable({ id });
 
@@ -78,14 +88,19 @@ export const KanbanColumn = memo(function KanbanColumn({
       {/* Column Content */}
       <div
         className={cn(
-          'relative z-10 flex-1 overflow-y-auto p-2 space-y-2.5',
+          'relative z-10 flex-1 overflow-y-auto p-2',
+          !disableItemSpacing && 'space-y-2.5',
           hideScrollbar &&
             '[&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]',
           // Smooth scrolling
           'scroll-smooth',
           // Add padding at bottom if there's a footer action
-          footerAction && 'pb-14'
+          footerAction && 'pb-14',
+          contentClassName
         )}
+        ref={contentRef}
+        onScroll={onScroll}
+        style={contentStyle}
       >
         {children}
       </div>

@@ -50,7 +50,7 @@ export function createGenerateFeaturesHandler(
       logAuthStatus('Before starting feature generation');
 
       const abortController = new AbortController();
-      setRunningState(projectPath, true, abortController);
+      setRunningState(projectPath, true, abortController, 'feature_generation');
       logger.info('Starting background feature generation task...');
 
       generateFeaturesFromSpec(projectPath, events, abortController, maxFeatures, settingsService)

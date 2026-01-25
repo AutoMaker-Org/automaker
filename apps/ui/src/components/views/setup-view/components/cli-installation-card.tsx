@@ -1,6 +1,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Download, Loader2, AlertCircle } from 'lucide-react';
+import { Download, AlertCircle } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 import { CopyableCommandField } from './copyable-command-field';
 import { TerminalOutput } from './terminal-output';
 
@@ -59,7 +60,7 @@ export function CliInstallationCard({
         >
           {isInstalling ? (
             <>
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              <Spinner size="sm" className="mr-2" />
               Installing...
             </>
           ) : (

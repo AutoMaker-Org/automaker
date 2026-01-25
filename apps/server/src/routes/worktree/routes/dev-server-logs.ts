@@ -34,6 +34,7 @@ export function createGetDevServerLogsHandler() {
           result: {
             worktreePath: result.result.worktreePath,
             port: result.result.port,
+            url: result.result.url,
             logs: result.result.logs,
             startedAt: result.result.startedAt,
           },

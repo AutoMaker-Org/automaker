@@ -286,6 +286,7 @@ describe('claude-provider.ts', () => {
 
       const generator = provider.executeQuery({
         prompt: 'Test',
+        model: 'claude-opus-4-5-20251101',
         cwd: '/test',
       });
 
@@ -312,6 +313,7 @@ describe('claude-provider.ts', () => {
 
       const generator = provider.executeQuery({
         prompt: 'Test',
+        model: 'claude-opus-4-5-20251101',
         cwd: '/test',
       });
 
@@ -339,6 +341,7 @@ describe('claude-provider.ts', () => {
 
       const generator = provider.executeQuery({
         prompt: 'Test',
+        model: 'claude-opus-4-5-20251101',
         cwd: '/test',
       });
 

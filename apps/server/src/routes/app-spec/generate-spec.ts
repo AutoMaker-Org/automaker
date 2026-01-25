@@ -7,12 +7,7 @@
 
 import * as secureFs from '../../lib/secure-fs.js';
 import type { EventEmitter } from '../../lib/events.js';
-import {
-  specOutputSchema,
-  specToXml,
-  getStructuredSpecPromptInstruction,
-  type SpecOutput,
-} from '../../lib/app-spec-format.js';
+import { specOutputSchema, specToXml, type SpecOutput } from '../../lib/app-spec-format.js';
 import { createLogger } from '@automaker/utils';
 import { DEFAULT_PHASE_MODELS, isCursorModel } from '@automaker/types';
 import { resolvePhaseModel } from '@automaker/model-resolver';
@@ -21,7 +16,11 @@ import { streamingQuery } from '../../providers/simple-query-service.js';
 import { generateFeaturesFromSpec } from './generate-features-from-spec.js';
 import { ensureAutomakerDir, getAppSpecPath } from '@automaker/platform';
 import type { SettingsService } from '../../services/settings-service.js';
-import { getAutoLoadClaudeMdSetting } from '../../lib/settings-helpers.js';
+import {
+  getAutoLoadClaudeMdSetting,
+  getPromptCustomization,
+  getPhaseModelWithOverrides,
+} from '../../lib/settings-helpers.js';
 
 const logger = createLogger('SpecRegeneration');
 
@@ -42,6 +41,9 @@ export async function generateSpec(
   logger.info('generateFeatures:', generateFeatures);
   logger.info('analyzeProject:', analyzeProject);
   logger.info('maxFeatures:', maxFeatures);
+
+  // Get customized prompts from settings
+  const prompts = await getPromptCustomization(settingsService, '[SpecRegeneration]');
 
   // Build the prompt based on whether we should analyze the project
   let analysisInstructions = '';
@@ -66,9 +68,7 @@ export async function generateSpec(
 Use these technologies as the foundation for the specification.`;
   }
 
-  const prompt = `You are helping to define a software project specification.
-
-IMPORTANT: Never ask for clarification or additional information. Use the information provided and make reasonable assumptions to create the best possible specification. If details are missing, infer them based on common patterns and best practices.
+  const prompt = `${prompts.appSpec.generateSpecSystemPrompt}
 
 Project Overview:
 ${projectOverview}
@@ -77,7 +77,7 @@ ${techStackDefaults}
 
 ${analysisInstructions}
 
-${getStructuredSpecPromptInstruction()}`;
+${prompts.appSpec.structuredSpecInstructions}`;
 
   logger.info('========== PROMPT BEING SENT ==========');
   logger.info(`Prompt length: ${prompt.length} chars`);
@@ -96,13 +96,26 @@ ${getStructuredSpecPromptInstruction()}`;
     '[SpecRegeneration]'
   );
 
-  // Get model from phase settings
-  const settings = await settingsService?.getGlobalSettings();
-  const phaseModelEntry =
-    settings?.phaseModels?.specGenerationModel || DEFAULT_PHASE_MODELS.specGenerationModel;
+  // Get model from phase settings with provider info
+  const {
+    phaseModel: phaseModelEntry,
+    provider,
+    credentials,
+  } = settingsService
+    ? await getPhaseModelWithOverrides(
+        'specGenerationModel',
+        settingsService,
+        projectPath,
+        '[SpecRegeneration]'
+      )
+    : {
+        phaseModel: DEFAULT_PHASE_MODELS.specGenerationModel,
+        provider: undefined,
+        credentials: undefined,
+      };
   const { model, thinkingLevel } = resolvePhaseModel(phaseModelEntry);
 
-  logger.info('Using model:', model);
+  logger.info('Using model:', model, provider ? `via provider: ${provider.name}` : 'direct API');
 
   let responseText = '';
   let structuredOutput: SpecOutput | null = null;
@@ -136,6 +149,8 @@ Your entire response should be valid JSON starting with { and ending with }. No 
     thinkingLevel,
     readOnly: true, // Spec generation only reads code, we write the spec ourselves
     settingSources: autoLoadClaudeMd ? ['user', 'project', 'local'] : undefined,
+    claudeCompatibleProvider: provider, // Pass provider for alternative endpoint configuration
+    credentials, // Pass credentials for resolving 'credentials' apiKeySource
     outputFormat: useStructuredOutput
       ? {
           type: 'json_schema',
@@ -205,19 +220,33 @@ Your entire response should be valid JSON starting with { and ending with }. No 
       xmlContent = responseText.substring(xmlStart, xmlEnd + '</project_specification>'.length);
       logger.info(`Extracted XML content: ${xmlContent.length} chars (from position ${xmlStart})`);
     } else {
-      // No valid XML structure found in the response text
-      // This happens when structured output was expected but not received, and the agent
-      // output conversational text instead of XML (e.g., "The project directory appears to be empty...")
-      // We should NOT save this conversational text as it's not a valid spec
-      logger.error('❌ Response does not contain valid <project_specification> XML structure');
-      logger.error(
-        'This typically happens when structured output failed and the agent produced conversational text instead of XML'
-      );
-      throw new Error(
-        'Failed to generate spec: No valid XML structure found in response. ' +
-          'The response contained conversational text but no <project_specification> tags. ' +
-          'Please try again.'
-      );
+      // No XML found, try JSON extraction
+      logger.warn('⚠️ No XML tags found, attempting JSON extraction...');
+      const extractedJson = extractJson<SpecOutput>(responseText, { logger });
+
+      if (
+        extractedJson &&
+        typeof extractedJson.project_name === 'string' &&
+        typeof extractedJson.overview === 'string' &&
+        Array.isArray(extractedJson.technology_stack) &&
+        Array.isArray(extractedJson.core_capabilities) &&
+        Array.isArray(extractedJson.implemented_features)
+      ) {
+        logger.info('✅ Successfully extracted JSON from response text');
+        xmlContent = specToXml(extractedJson);
+        logger.info(`✅ Converted extracted JSON to XML: ${xmlContent.length} chars`);
+      } else {
+        // Neither XML nor valid JSON found
+        logger.error('❌ Response does not contain valid XML or JSON structure');
+        logger.error(
+          'This typically happens when structured output failed and the agent produced conversational text instead of structured output'
+        );
+        throw new Error(
+          'Failed to generate spec: No valid XML or JSON structure found in response. ' +
+            'The response contained conversational text but no <project_specification> tags or valid JSON. ' +
+            'Please try again.'
+        );
+      }
     }
   }
 

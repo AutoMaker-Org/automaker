@@ -1,9 +1,22 @@
 /**
  * OpenCode Model IDs
  * Models available via OpenCode CLI (opencode models command)
+ *
+ * All OpenCode model IDs use 'opencode-' prefix for consistent provider routing.
+ * This prevents naming collisions and ensures clear provider attribution.
  */
 export type OpencodeModelId =
   // OpenCode Free Tier Models
+  | 'opencode-big-pickle'
+  | 'opencode-glm-4.7-free'
+  | 'opencode-gpt-5-nano'
+  | 'opencode-grok-code'
+  | 'opencode-minimax-m2.1-free';
+
+/**
+ * Legacy OpenCode model IDs (with slash format) for migration support
+ */
+export type LegacyOpencodeModelId =
   | 'opencode/big-pickle'
   | 'opencode/glm-4.7-free'
   | 'opencode/gpt-5-nano'
@@ -20,15 +33,26 @@ export type OpencodeProvider = 'opencode';
  */
 export const OPENCODE_MODEL_MAP: Record<string, OpencodeModelId> = {
   // OpenCode free tier aliases
-  'big-pickle': 'opencode/big-pickle',
-  pickle: 'opencode/big-pickle',
-  'glm-free': 'opencode/glm-4.7-free',
-  'gpt-nano': 'opencode/gpt-5-nano',
-  nano: 'opencode/gpt-5-nano',
-  'grok-code': 'opencode/grok-code',
-  grok: 'opencode/grok-code',
-  minimax: 'opencode/minimax-m2.1-free',
+  'big-pickle': 'opencode-big-pickle',
+  pickle: 'opencode-big-pickle',
+  'glm-free': 'opencode-glm-4.7-free',
+  'gpt-nano': 'opencode-gpt-5-nano',
+  nano: 'opencode-gpt-5-nano',
+  'grok-code': 'opencode-grok-code',
+  grok: 'opencode-grok-code',
+  minimax: 'opencode-minimax-m2.1-free',
 } as const;
+
+/**
+ * Map from legacy slash-format model IDs to canonical prefixed IDs
+ */
+export const LEGACY_OPENCODE_MODEL_MAP: Record<LegacyOpencodeModelId, OpencodeModelId> = {
+  'opencode/big-pickle': 'opencode-big-pickle',
+  'opencode/glm-4.7-free': 'opencode-glm-4.7-free',
+  'opencode/gpt-5-nano': 'opencode-gpt-5-nano',
+  'opencode/grok-code': 'opencode-grok-code',
+  'opencode/minimax-m2.1-free': 'opencode-minimax-m2.1-free',
+};
 
 /**
  * OpenCode model metadata
@@ -44,11 +68,12 @@ export interface OpencodeModelConfig {
 
 /**
  * Complete list of OpenCode model configurations
+ * All IDs use 'opencode-' prefix for consistent provider routing.
  */
 export const OPENCODE_MODELS: OpencodeModelConfig[] = [
   // OpenCode Free Tier Models
   {
-    id: 'opencode/big-pickle',
+    id: 'opencode-big-pickle',
     label: 'Big Pickle',
     description: 'OpenCode free tier model - great for general coding',
     supportsVision: false,
@@ -56,7 +81,7 @@ export const OPENCODE_MODELS: OpencodeModelConfig[] = [
     tier: 'free',
   },
   {
-    id: 'opencode/glm-4.7-free',
+    id: 'opencode-glm-4.7-free',
     label: 'GLM 4.7 Free',
     description: 'OpenCode free tier GLM model',
     supportsVision: false,
@@ -64,7 +89,7 @@ export const OPENCODE_MODELS: OpencodeModelConfig[] = [
     tier: 'free',
   },
   {
-    id: 'opencode/gpt-5-nano',
+    id: 'opencode-gpt-5-nano',
     label: 'GPT-5 Nano',
     description: 'OpenCode free tier nano model - fast and lightweight',
     supportsVision: false,
@@ -72,7 +97,7 @@ export const OPENCODE_MODELS: OpencodeModelConfig[] = [
     tier: 'free',
   },
   {
-    id: 'opencode/grok-code',
+    id: 'opencode-grok-code',
     label: 'Grok Code',
     description: 'OpenCode free tier Grok model for coding',
     supportsVision: false,
@@ -80,7 +105,7 @@ export const OPENCODE_MODELS: OpencodeModelConfig[] = [
     tier: 'free',
   },
   {
-    id: 'opencode/minimax-m2.1-free',
+    id: 'opencode-minimax-m2.1-free',
     label: 'MiniMax M2.1 Free',
     description: 'OpenCode free tier MiniMax model',
     supportsVision: false,
@@ -104,7 +129,7 @@ export const OPENCODE_MODEL_CONFIG_MAP: Record<OpencodeModelId, OpencodeModelCon
 /**
  * Default OpenCode model - OpenCode free tier
  */
-export const DEFAULT_OPENCODE_MODEL: OpencodeModelId = 'opencode/big-pickle';
+export const DEFAULT_OPENCODE_MODEL: OpencodeModelId = 'opencode-big-pickle';
 
 /**
  * Helper: Get display name for model

@@ -1,19 +1,17 @@
-// @ts-nocheck
-import { useCallback, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { Spinner } from '@/components/ui/spinner';
 import { RefreshCw, AlertCircle } from 'lucide-react';
 import { OpenAIIcon } from '@/components/ui/provider-icon';
 import { cn } from '@/lib/utils';
-import { getElectronAPI } from '@/lib/electron';
 import {
   formatCodexPlanType,
   formatCodexResetTime,
   getCodexWindowLabel,
 } from '@/lib/codex-usage-format';
 import { useSetupStore } from '@/store/setup-store';
-import { useAppStore, type CodexRateLimitWindow } from '@/store/app-store';
+import { useCodexUsage } from '@/hooks/queries';
+import type { CodexRateLimitWindow } from '@/store/app-store';
 
-const ERROR_NO_API = 'Codex usage API not available';
 const CODEX_USAGE_TITLE = 'Codex Usage';
 const CODEX_USAGE_SUBTITLE = 'Shows usage limits reported by the Codex CLI.';
 const CODEX_AUTH_WARNING = 'Authenticate Codex CLI to view usage limits.';
@@ -21,14 +19,11 @@ const CODEX_LOGIN_COMMAND = 'codex login';
 const CODEX_NO_USAGE_MESSAGE =
   'Usage limits are not available yet. Try refreshing if this persists.';
 const UPDATED_LABEL = 'Updated';
-const CODEX_FETCH_ERROR = 'Failed to fetch usage';
 const CODEX_REFRESH_LABEL = 'Refresh Codex usage';
 const PLAN_LABEL = 'Plan';
 const WARNING_THRESHOLD = 75;
 const CAUTION_THRESHOLD = 50;
 const MAX_PERCENTAGE = 100;
-const REFRESH_INTERVAL_MS = 60_000;
-const STALE_THRESHOLD_MS = 2 * 60_000;
 const USAGE_COLOR_CRITICAL = 'bg-red-500';
 const USAGE_COLOR_WARNING = 'bg-amber-500';
 const USAGE_COLOR_OK = 'bg-emerald-500';
@@ -39,11 +34,12 @@ const isRateLimitWindow = (
 
 export function CodexUsageSection() {
   const codexAuthStatus = useSetupStore((state) => state.codexAuthStatus);
-  const { codexUsage, codexUsageLastUpdated, setCodexUsage } = useAppStore();
-  const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
 
   const canFetchUsage = !!codexAuthStatus?.authenticated;
+
+  // Use React Query for data fetching with automatic polling
+  const { data: codexUsage, isLoading, isFetching, error, refetch } = useCodexUsage(canFetchUsage);
+
   const rateLimits = codexUsage?.rateLimits ?? null;
   const primary = rateLimits?.primary ?? null;
   const secondary = rateLimits?.secondary ?? null;
@@ -54,46 +50,7 @@ export function CodexUsageSection() {
     ? new Date(codexUsage.lastUpdated).toLocaleString()
     : null;
   const showAuthWarning = !canFetchUsage && !codexUsage && !isLoading;
-  const isStale = !codexUsageLastUpdated || Date.now() - codexUsageLastUpdated > STALE_THRESHOLD_MS;
-
-  const fetchUsage = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const api = getElectronAPI();
-      if (!api.codex) {
-        setError(ERROR_NO_API);
-        return;
-      }
-      const result = await api.codex.getUsage();
-      if ('error' in result) {
-        setError(result.message || result.error);
-        return;
-      }
-      setCodexUsage(result);
-    } catch (fetchError) {
-      const message = fetchError instanceof Error ? fetchError.message : CODEX_FETCH_ERROR;
-      setError(message);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [setCodexUsage]);
-
-  useEffect(() => {
-    if (canFetchUsage && isStale) {
-      void fetchUsage();
-    }
-  }, [fetchUsage, canFetchUsage, isStale]);
-
-  useEffect(() => {
-    if (!canFetchUsage) return undefined;
-
-    const intervalId = setInterval(() => {
-      void fetchUsage();
-    }, REFRESH_INTERVAL_MS);
-
-    return () => clearInterval(intervalId);
-  }, [fetchUsage, canFetchUsage]);
+  const errorMessage = error instanceof Error ? error.message : error ? String(error) : null;
 
   const getUsageColor = (percentage: number) => {
     if (percentage >= WARNING_THRESHOLD) {
@@ -162,13 +119,13 @@ export function CodexUsageSection() {
           <Button
             variant="ghost"
             size="icon"
-            onClick={fetchUsage}
-            disabled={isLoading}
+            onClick={() => refetch()}
+            disabled={isFetching}
             className="ml-auto h-9 w-9 rounded-lg hover:bg-accent/50"
             data-testid="refresh-codex-usage"
             title={CODEX_REFRESH_LABEL}
           >
-            <RefreshCw className={cn('w-4 h-4', isLoading && 'animate-spin')} />
+            {isFetching ? <Spinner size="sm" /> : <RefreshCw className="w-4 h-4" />}
           </Button>
         </div>
         <p className="text-sm text-muted-foreground/80 ml-12">{CODEX_USAGE_SUBTITLE}</p>
@@ -182,10 +139,10 @@ export function CodexUsageSection() {
             </div>
           </div>
         )}
-        {error && (
+        {errorMessage && (
           <div className="flex items-start gap-3 p-4 rounded-xl bg-red-500/10 border border-red-500/20">
             <AlertCircle className="w-5 h-5 text-red-500 mt-0.5" />
-            <div className="text-sm text-red-400">{error}</div>
+            <div className="text-sm text-red-400">{errorMessage}</div>
           </div>
         )}
         {hasMetrics && (
@@ -210,7 +167,7 @@ export function CodexUsageSection() {
             </div>
           </div>
         )}
-        {!hasMetrics && !error && canFetchUsage && !isLoading && (
+        {!hasMetrics && !errorMessage && canFetchUsage && !isLoading && (
           <div className="rounded-xl border border-border/60 bg-secondary/20 p-4 text-xs text-muted-foreground">
             {CODEX_NO_USAGE_MESSAGE}
           </div>

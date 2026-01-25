@@ -18,6 +18,7 @@ import {
   authenticateForTests,
   handleLoginScreenIfPresent,
   waitForNetworkIdle,
+  sanitizeForTestId,
 } from '../utils';
 
 // Create unique temp dir for this test run
@@ -83,8 +84,24 @@ test.describe('Open Project', () => {
     // Intercept settings API BEFORE any navigation to prevent restoring a currentProject
     // AND inject our test project into the projects list
     await page.route('**/api/settings/global', async (route) => {
-      const response = await route.fetch();
-      const json = await response.json();
+      let response;
+      try {
+        response = await route.fetch();
+      } catch {
+        // If fetch fails, continue with original request
+        await route.continue();
+        return;
+      }
+
+      let json;
+      try {
+        json = await response.json();
+      } catch {
+        // If response is disposed, continue with original request
+        await route.continue();
+        return;
+      }
+
       if (json.settings) {
         // Remove currentProjectId to prevent restoring a project
         json.settings.currentProjectId = null;
@@ -104,11 +121,7 @@ test.describe('Open Project', () => {
           json.settings.projects = [testProject, ...existingProjects];
         }
       }
-      await route.fulfill({
-        status: response.status(),
-        headers: response.headers(),
-        json,
-      });
+      await route.fulfill({ response, json });
     });
 
     // Now navigate to the app
@@ -156,9 +169,11 @@ test.describe('Open Project', () => {
     }
 
     // Wait for a project to be set as current and visible on the page
-    // The project name appears in the sidebar project selector button
+    // The project name appears in the project switcher button
+    // Use ends-with selector since data-testid format is: project-switcher-{id}-{sanitizedName}
     if (targetProjectName) {
-      await expect(page.getByRole('button', { name: new RegExp(targetProjectName) })).toBeVisible({
+      const sanitizedName = sanitizeForTestId(targetProjectName);
+      await expect(page.locator(`[data-testid$="-${sanitizedName}"]`)).toBeVisible({
         timeout: 15000,
       });
     }

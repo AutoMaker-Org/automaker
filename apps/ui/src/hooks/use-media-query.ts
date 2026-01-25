@@ -56,3 +56,12 @@ export function useIsMobile(): boolean {
 export function useIsTablet(): boolean {
   return useMediaQuery('(max-width: 1024px)');
 }
+
+/**
+ * Hook to detect compact layout (screen width <= 1240px)
+ * Used for collapsing top bar controls into mobile menu
+ * @returns boolean indicating if compact layout should be used
+ */
+export function useIsCompact(): boolean {
+  return useMediaQuery('(max-width: 1240px)');
+}

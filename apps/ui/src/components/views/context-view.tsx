@@ -8,7 +8,10 @@ import { Button } from '@/components/ui/button';
 import { HotkeyButton } from '@/components/ui/hotkey-button';
 import { Card } from '@/components/ui/card';
 import {
-  RefreshCw,
+  HeaderActionsPanel,
+  HeaderActionsPanelTrigger,
+} from '@/components/ui/header-actions-panel';
+import {
   FileText,
   Image as ImageIcon,
   Trash2,
@@ -20,9 +23,9 @@ import {
   Pencil,
   FilePlus,
   FileUp,
-  Loader2,
   MoreVertical,
 } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 import {
   useKeyboardShortcuts,
   useKeyboardShortcutsConfig,
@@ -93,6 +96,9 @@ export function ContextView() {
   const [isEditDescriptionOpen, setIsEditDescriptionOpen] = useState(false);
   const [editDescriptionValue, setEditDescriptionValue] = useState('');
   const [editDescriptionFileName, setEditDescriptionFileName] = useState('');
+
+  // Actions panel state (for tablet/mobile)
+  const [showActionsPanel, setShowActionsPanel] = useState(false);
 
   // File input ref for import
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -663,7 +669,7 @@ export function ContextView() {
   if (isLoading) {
     return (
       <div className="flex-1 flex items-center justify-center" data-testid="context-view-loading">
-        <RefreshCw className="w-6 h-6 animate-spin text-muted-foreground" />
+        <Spinner size="lg" />
       </div>
     );
   }
@@ -691,29 +697,69 @@ export function ContextView() {
             </p>
           </div>
         </div>
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleImportClick}
-            disabled={isUploading}
-            data-testid="import-file-button"
-          >
-            <FileUp className="w-4 h-4 mr-2" />
-            Import File
-          </Button>
-          <HotkeyButton
-            size="sm"
-            onClick={() => setIsCreateMarkdownOpen(true)}
-            hotkey={shortcuts.addContextFile}
-            hotkeyActive={false}
-            data-testid="create-markdown-button"
-          >
-            <FilePlus className="w-4 h-4 mr-2" />
-            Create Markdown
-          </HotkeyButton>
+        <div className="flex items-center gap-2">
+          {/* Desktop: show actions inline */}
+          <div className="hidden lg:flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleImportClick}
+              disabled={isUploading}
+              data-testid="import-file-button"
+            >
+              <FileUp className="w-4 h-4 mr-2" />
+              Import File
+            </Button>
+            <HotkeyButton
+              size="sm"
+              onClick={() => setIsCreateMarkdownOpen(true)}
+              hotkey={shortcuts.addContextFile}
+              hotkeyActive={false}
+              data-testid="create-markdown-button"
+            >
+              <FilePlus className="w-4 h-4 mr-2" />
+              Create Markdown
+            </HotkeyButton>
+          </div>
+          {/* Tablet/Mobile: show trigger for actions panel */}
+          <HeaderActionsPanelTrigger
+            isOpen={showActionsPanel}
+            onToggle={() => setShowActionsPanel(!showActionsPanel)}
+          />
         </div>
       </div>
+
+      {/* Actions Panel (tablet/mobile) */}
+      <HeaderActionsPanel
+        isOpen={showActionsPanel}
+        onClose={() => setShowActionsPanel(false)}
+        title="Context Actions"
+      >
+        <Button
+          variant="outline"
+          className="w-full justify-start"
+          onClick={() => {
+            handleImportClick();
+            setShowActionsPanel(false);
+          }}
+          disabled={isUploading}
+          data-testid="import-file-button-mobile"
+        >
+          <FileUp className="w-4 h-4 mr-2" />
+          Import File
+        </Button>
+        <Button
+          className="w-full justify-start"
+          onClick={() => {
+            setIsCreateMarkdownOpen(true);
+            setShowActionsPanel(false);
+          }}
+          data-testid="create-markdown-button-mobile"
+        >
+          <FilePlus className="w-4 h-4 mr-2" />
+          Create Markdown
+        </Button>
+      </HeaderActionsPanel>
 
       {/* Main content area with file list and editor */}
       <div
@@ -743,7 +789,7 @@ export function ContextView() {
         {isUploading && (
           <div className="absolute inset-0 bg-background/80 z-50 flex items-center justify-center">
             <div className="flex flex-col items-center">
-              <Loader2 className="w-8 h-8 animate-spin text-primary mb-2" />
+              <Spinner size="xl" className="mb-2" />
               <span className="text-sm font-medium">Uploading {uploadingFileName}...</span>
             </div>
           </div>
@@ -791,7 +837,7 @@ export function ContextView() {
                         <span className="truncate text-sm block">{file.name}</span>
                         {isGenerating ? (
                           <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                            <Loader2 className="w-3 h-3 animate-spin" />
+                            <Spinner size="xs" />
                             Generating description...
                           </span>
                         ) : file.description ? (
@@ -908,7 +954,7 @@ export function ContextView() {
                       </span>
                       {generatingDescriptions.has(selectedFile.name) ? (
                         <div className="flex items-center gap-2 mt-1 text-sm text-muted-foreground">
-                          <Loader2 className="w-4 h-4 animate-spin" />
+                          <Spinner size="sm" />
                           <span>Generating description with AI...</span>
                         </div>
                       ) : selectedFile.description ? (

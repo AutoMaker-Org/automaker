@@ -11,7 +11,8 @@ import { PromptList } from './components/prompt-list';
 import { IdeationDashboard } from './components/ideation-dashboard';
 import { useGuidedPrompts } from '@/hooks/use-guided-prompts';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, ChevronRight, Lightbulb, CheckCheck, Loader2 } from 'lucide-react';
+import { ArrowLeft, ChevronRight, Lightbulb, CheckCheck, Trash2 } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 import type { IdeaCategory } from '@automaker/types';
 import type { IdeationMode } from '@/store/ideation-store';
 
@@ -71,6 +72,9 @@ function IdeationHeader({
   acceptAllCount,
   onAcceptAll,
   isAcceptingAll,
+  discardAllReady,
+  discardAllCount,
+  onDiscardAll,
 }: {
   currentMode: IdeationMode;
   selectedCategory: IdeaCategory | null;
@@ -81,6 +85,9 @@ function IdeationHeader({
   acceptAllCount: number;
   onAcceptAll: () => void;
   isAcceptingAll: boolean;
+  discardAllReady: boolean;
+  discardAllCount: number;
+  onDiscardAll: () => void;
 }) {
   const { getCategoryById } = useGuidedPrompts();
   const showBackButton = currentMode === 'prompts';
@@ -128,6 +135,17 @@ function IdeationHeader({
       </div>
 
       <div className="flex gap-2 items-center">
+        {currentMode === 'dashboard' && discardAllReady && (
+          <Button
+            onClick={onDiscardAll}
+            variant="outline"
+            className="gap-2 text-destructive hover:text-destructive"
+            disabled={isAcceptingAll}
+          >
+            <Trash2 className="w-4 h-4" />
+            Discard All ({discardAllCount})
+          </Button>
+        )}
         {currentMode === 'dashboard' && acceptAllReady && (
           <Button
             onClick={onAcceptAll}
@@ -135,11 +153,7 @@ function IdeationHeader({
             className="gap-2"
             disabled={isAcceptingAll}
           >
-            {isAcceptingAll ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <CheckCheck className="w-4 h-4" />
-            )}
+            {isAcceptingAll ? <Spinner size="sm" /> : <CheckCheck className="w-4 h-4" />}
             Accept All ({acceptAllCount})
           </Button>
         )}
@@ -162,6 +176,11 @@ export function IdeationView() {
   const [acceptAllHandler, setAcceptAllHandler] = useState<(() => Promise<void>) | null>(null);
   const [isAcceptingAll, setIsAcceptingAll] = useState(false);
 
+  // Discard all state
+  const [discardAllReady, setDiscardAllReady] = useState(false);
+  const [discardAllCount, setDiscardAllCount] = useState(0);
+  const [discardAllHandler, setDiscardAllHandler] = useState<(() => void) | null>(null);
+
   const handleAcceptAllReady = useCallback(
     (isReady: boolean, count: number, handler: () => Promise<void>) => {
       setAcceptAllReady(isReady);
@@ -181,6 +200,21 @@ export function IdeationView() {
       }
     }
   }, [acceptAllHandler]);
+
+  const handleDiscardAllReady = useCallback(
+    (isReady: boolean, count: number, handler: () => void) => {
+      setDiscardAllReady(isReady);
+      setDiscardAllCount(count);
+      setDiscardAllHandler(() => handler);
+    },
+    []
+  );
+
+  const handleDiscardAll = useCallback(() => {
+    if (discardAllHandler) {
+      discardAllHandler();
+    }
+  }, [discardAllHandler]);
 
   const handleNavigate = useCallback(
     (mode: IdeationMode, category?: IdeaCategory | null) => {
@@ -245,6 +279,9 @@ export function IdeationView() {
         acceptAllCount={acceptAllCount}
         onAcceptAll={handleAcceptAll}
         isAcceptingAll={isAcceptingAll}
+        discardAllReady={discardAllReady}
+        discardAllCount={discardAllCount}
+        onDiscardAll={handleDiscardAll}
       />
 
       {/* Dashboard - main view */}
@@ -252,6 +289,7 @@ export function IdeationView() {
         <IdeationDashboard
           onGenerateIdeas={handleGenerateIdeas}
           onAcceptAllReady={handleAcceptAllReady}
+          onDiscardAllReady={handleDiscardAllReady}
         />
       )}
 

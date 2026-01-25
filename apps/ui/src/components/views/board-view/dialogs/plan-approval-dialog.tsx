@@ -14,7 +14,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Markdown } from '@/components/ui/markdown';
 import { Label } from '@/components/ui/label';
 import { Feature } from '@/store/app-store';
-import { Check, RefreshCw, Edit2, Eye, Loader2 } from 'lucide-react';
+import { Check, RefreshCw, Edit2, Eye } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 
 interface PlanApprovalDialogProps {
   open: boolean;
@@ -171,7 +172,7 @@ export function PlanApprovalDialog({
               </Button>
               <Button variant="secondary" onClick={handleReject} disabled={isLoading}>
                 {isLoading ? (
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  <Spinner size="sm" className="mr-2" />
                 ) : (
                   <RefreshCw className="w-4 h-4 mr-2" />
                 )}
@@ -190,7 +191,7 @@ export function PlanApprovalDialog({
                 className="bg-green-600 hover:bg-green-700 text-white"
               >
                 {isLoading ? (
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  <Spinner size="sm" className="mr-2" />
                 ) : (
                   <Check className="w-4 h-4 mr-2" />
                 )}

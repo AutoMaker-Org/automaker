@@ -647,9 +647,10 @@ describe('settings-service.ts', () => {
       const settings = await settingsService.getGlobalSettings();
 
       // Verify all phase models are now PhaseModelEntry objects
-      expect(settings.phaseModels.enhancementModel).toEqual({ model: 'sonnet' });
-      expect(settings.phaseModels.fileDescriptionModel).toEqual({ model: 'haiku' });
-      expect(settings.phaseModels.specGenerationModel).toEqual({ model: 'opus' });
+      // Legacy aliases are migrated to canonical IDs
+      expect(settings.phaseModels.enhancementModel).toEqual({ model: 'claude-sonnet' });
+      expect(settings.phaseModels.fileDescriptionModel).toEqual({ model: 'claude-haiku' });
+      expect(settings.phaseModels.specGenerationModel).toEqual({ model: 'claude-opus' });
       expect(settings.version).toBe(SETTINGS_VERSION);
     });
 
@@ -675,16 +676,17 @@ describe('settings-service.ts', () => {
       const settings = await settingsService.getGlobalSettings();
 
       // Verify PhaseModelEntry objects are preserved with thinkingLevel
+      // Legacy aliases are migrated to canonical IDs
       expect(settings.phaseModels.enhancementModel).toEqual({
-        model: 'sonnet',
+        model: 'claude-sonnet',
         thinkingLevel: 'high',
       });
       expect(settings.phaseModels.specGenerationModel).toEqual({
-        model: 'opus',
+        model: 'claude-opus',
         thinkingLevel: 'ultrathink',
       });
       expect(settings.phaseModels.backlogPlanningModel).toEqual({
-        model: 'sonnet',
+        model: 'claude-sonnet',
         thinkingLevel: 'medium',
       });
     });
@@ -710,15 +712,15 @@ describe('settings-service.ts', () => {
 
       const settings = await settingsService.getGlobalSettings();
 
-      // Strings should be converted to objects
-      expect(settings.phaseModels.enhancementModel).toEqual({ model: 'sonnet' });
-      expect(settings.phaseModels.imageDescriptionModel).toEqual({ model: 'haiku' });
-      // Objects should be preserved
+      // Strings should be converted to objects with canonical IDs
+      expect(settings.phaseModels.enhancementModel).toEqual({ model: 'claude-sonnet' });
+      expect(settings.phaseModels.imageDescriptionModel).toEqual({ model: 'claude-haiku' });
+      // Objects should be preserved with migrated IDs
       expect(settings.phaseModels.fileDescriptionModel).toEqual({
-        model: 'haiku',
+        model: 'claude-haiku',
         thinkingLevel: 'low',
       });
-      expect(settings.phaseModels.validationModel).toEqual({ model: 'opus' });
+      expect(settings.phaseModels.validationModel).toEqual({ model: 'claude-opus' });
     });
 
     it('should migrate legacy enhancementModel/validationModel fields', async () => {
@@ -735,11 +737,11 @@ describe('settings-service.ts', () => {
 
       const settings = await settingsService.getGlobalSettings();
 
-      // Legacy fields should be migrated to phaseModels
-      expect(settings.phaseModels.enhancementModel).toEqual({ model: 'haiku' });
-      expect(settings.phaseModels.validationModel).toEqual({ model: 'opus' });
-      // Other fields should use defaults
-      expect(settings.phaseModels.specGenerationModel).toEqual({ model: 'opus' });
+      // Legacy fields should be migrated to phaseModels with canonical IDs
+      expect(settings.phaseModels.enhancementModel).toEqual({ model: 'claude-haiku' });
+      expect(settings.phaseModels.validationModel).toEqual({ model: 'claude-opus' });
+      // Other fields should use defaults (canonical IDs)
+      expect(settings.phaseModels.specGenerationModel).toEqual({ model: 'claude-opus' });
     });
 
     it('should use default phase models when none are configured', async () => {
@@ -753,10 +755,10 @@ describe('settings-service.ts', () => {
 
       const settings = await settingsService.getGlobalSettings();
 
-      // Should use DEFAULT_PHASE_MODELS
-      expect(settings.phaseModels.enhancementModel).toEqual({ model: 'sonnet' });
-      expect(settings.phaseModels.fileDescriptionModel).toEqual({ model: 'haiku' });
-      expect(settings.phaseModels.specGenerationModel).toEqual({ model: 'opus' });
+      // Should use DEFAULT_PHASE_MODELS (with canonical IDs)
+      expect(settings.phaseModels.enhancementModel).toEqual({ model: 'claude-sonnet' });
+      expect(settings.phaseModels.fileDescriptionModel).toEqual({ model: 'claude-haiku' });
+      expect(settings.phaseModels.specGenerationModel).toEqual({ model: 'claude-opus' });
     });
 
     it('should deep merge phaseModels on update', async () => {
@@ -776,13 +778,13 @@ describe('settings-service.ts', () => {
 
       const settings = await settingsService.getGlobalSettings();
 
-      // Both should be preserved
+      // Both should be preserved (models migrated to canonical format)
       expect(settings.phaseModels.enhancementModel).toEqual({
-        model: 'sonnet',
+        model: 'claude-sonnet',
         thinkingLevel: 'high',
       });
       expect(settings.phaseModels.specGenerationModel).toEqual({
-        model: 'opus',
+        model: 'claude-opus',
         thinkingLevel: 'ultrathink',
       });
     });

@@ -281,7 +281,7 @@ export const ListRow = memo(function ListRow({
       <div
         role="cell"
         className={cn(
-          'flex items-center px-3 py-3 gap-2',
+          'flex items-center pl-3 pr-0 py-3 gap-0',
           getColumnWidth('title'),
           getColumnAlign('title')
         )}
@@ -313,6 +313,42 @@ export const ListRow = memo(function ListRow({
             </p>
           )}
         </div>
+      </div>
+
+      {/* Priority column */}
+      <div
+        role="cell"
+        className={cn(
+          'flex items-center pl-0 pr-3 py-3 shrink-0',
+          getColumnWidth('priority'),
+          getColumnAlign('priority')
+        )}
+        data-testid={`list-row-priority-${feature.id}`}
+      >
+        {feature.priority ? (
+          <span
+            className={cn(
+              'inline-flex items-center justify-center w-6 h-6 rounded-md border-[1.5px] font-bold text-xs',
+              feature.priority === 1 &&
+                'bg-[var(--status-error-bg)] border-[var(--status-error)]/40 text-[var(--status-error)]',
+              feature.priority === 2 &&
+                'bg-[var(--status-warning-bg)] border-[var(--status-warning)]/40 text-[var(--status-warning)]',
+              feature.priority === 3 &&
+                'bg-[var(--status-info-bg)] border-[var(--status-info)]/40 text-[var(--status-info)]'
+            )}
+            title={
+              feature.priority === 1
+                ? 'High Priority'
+                : feature.priority === 2
+                  ? 'Medium Priority'
+                  : 'Low Priority'
+            }
+          >
+            {feature.priority === 1 ? 'H' : feature.priority === 2 ? 'M' : 'L'}
+          </span>
+        ) : (
+          <span className="text-muted-foreground text-xs">-</span>
+        )}
       </div>
 
       {/* Actions column */}

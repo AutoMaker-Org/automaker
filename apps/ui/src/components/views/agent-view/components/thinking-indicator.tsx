@@ -1,4 +1,5 @@
 import { Bot } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 
 export function ThinkingIndicator() {
   return (
@@ -8,20 +9,7 @@ export function ThinkingIndicator() {
       </div>
       <div className="bg-card border border-border rounded-2xl px-4 py-3 shadow-sm">
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1">
-            <span
-              className="w-2 h-2 rounded-full bg-primary animate-pulse"
-              style={{ animationDelay: '0ms' }}
-            />
-            <span
-              className="w-2 h-2 rounded-full bg-primary animate-pulse"
-              style={{ animationDelay: '150ms' }}
-            />
-            <span
-              className="w-2 h-2 rounded-full bg-primary animate-pulse"
-              style={{ animationDelay: '300ms' }}
-            />
-          </div>
+          <Spinner size="sm" />
           <span className="text-sm text-muted-foreground">Thinking...</span>
         </div>
       </div>

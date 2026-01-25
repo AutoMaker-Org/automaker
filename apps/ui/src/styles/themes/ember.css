@@ -1,0 +1,151 @@
+/* Ember Theme - Warm orange accent on dark background */
+
+.ember {
+  /* Backgrounds - from bgMain #272822 */
+  --background: oklch(0.2 0.02 100); /* #272822 */
+  --background-50: oklch(0.2 0.02 100 / 0.5);
+  --background-80: oklch(0.2 0.02 100 / 0.8);
+
+  /* Text - from textMain #f8f8f2, textDim #8f908a */
+  --foreground: oklch(0.97 0.01 100); /* #f8f8f2 */
+  --foreground-secondary: oklch(0.65 0.02 100);
+  --foreground-muted: oklch(0.6 0.02 100); /* #8f908a */
+
+  /* Card/Popover - derived from bgActivity #3e3d32 */
+  --card: oklch(0.28 0.02 100); /* #3e3d32 */
+  --card-foreground: oklch(0.97 0.01 100);
+  --popover: oklch(0.24 0.02 100);
+  --popover-foreground: oklch(0.97 0.01 100);
+
+  /* Primary/Brand - from accent #fd971f (orange) */
+  --primary: oklch(0.75 0.18 60); /* #fd971f */
+  --primary-foreground: oklch(0.18 0.02 100); /* #1e1f1c */
+
+  --brand-400: oklch(0.8 0.16 60); /* #fdbf6f lighter */
+  --brand-500: oklch(0.75 0.18 60); /* #fd971f */
+  --brand-600: oklch(0.68 0.2 55);
+
+  /* Secondary - from bgActivity #3e3d32 */
+  --secondary: oklch(0.28 0.02 100);
+  --secondary-foreground: oklch(0.97 0.01 100);
+
+  /* Muted */
+  --muted: oklch(0.28 0.02 100);
+  --muted-foreground: oklch(0.6 0.02 100);
+
+  /* Accent - from accentDim */
+  --accent: oklch(0.32 0.04 80);
+  --accent-foreground: oklch(0.97 0.01 100);
+
+  /* Destructive - from error #f92672 */
+  --destructive: oklch(0.6 0.28 350); /* #f92672 */
+
+  /* Borders - from border #49483e */
+  --border: oklch(0.35 0.03 90); /* #49483e */
+  --border-glass: oklch(0.75 0.18 60 / 0.3);
+
+  --input: oklch(0.24 0.02 100);
+  --ring: oklch(0.75 0.18 60);
+
+  /* Charts - using theme colors */
+  --chart-1: oklch(0.75 0.18 60); /* Orange accent */
+  --chart-2: oklch(0.75 0.22 130); /* Green #a6e22e */
+  --chart-3: oklch(0.85 0.15 95); /* Yellow #e6db74 */
+  --chart-4: oklch(0.6 0.28 350); /* Pink #f92672 */
+  --chart-5: oklch(0.7 0.2 200); /* Blue for variety */
+
+  /* Sidebar - from bgSidebar #1e1f1c */
+  --sidebar: oklch(0.16 0.02 100); /* #1e1f1c */
+  --sidebar-foreground: oklch(0.97 0.01 100);
+  --sidebar-primary: oklch(0.75 0.18 60);
+  --sidebar-primary-foreground: oklch(0.18 0.02 100);
+  --sidebar-accent: oklch(0.28 0.02 100);
+  --sidebar-accent-foreground: oklch(0.97 0.01 100);
+  --sidebar-border: oklch(0.35 0.03 90);
+  --sidebar-ring: oklch(0.75 0.18 60);
+
+  /* Action buttons - orange/green theme */
+  --action-view: oklch(0.75 0.18 60); /* Orange */
+  --action-view-hover: oklch(0.7 0.2 55);
+  --action-followup: oklch(0.7 0.2 200); /* Blue */
+  --action-followup-hover: oklch(0.65 0.22 200);
+  --action-commit: oklch(0.75 0.22 130); /* Green #a6e22e */
+  --action-commit-hover: oklch(0.7 0.24 130);
+  --action-verify: oklch(0.75 0.22 130);
+  --action-verify-hover: oklch(0.7 0.24 130);
+
+  /* Running indicator - Orange */
+  --running-indicator: oklch(0.75 0.18 60);
+  --running-indicator-text: oklch(0.8 0.16 60);
+}
+
+/* Theme-specific overrides */
+
+.ember .animated-outline-gradient {
+  background: conic-gradient(from 90deg at 50% 50%, #fd971f 0%, #f92672 50%, #fd971f 100%);
+}
+
+.ember .animated-outline-inner {
+  background: oklch(0.2 0.02 100) !important;
+  color: #fd971f !important;
+}
+
+.ember [data-slot='button'][class*='animated-outline']:hover .animated-outline-inner {
+  background: oklch(0.28 0.02 100) !important;
+  color: #fdbf6f !important;
+}
+
+.ember .slider-track {
+  background: oklch(0.28 0.02 100);
+}
+
+.ember .slider-range {
+  background: linear-gradient(to right, #fd971f, #fdbf6f);
+}
+
+.ember .slider-thumb {
+  background: oklch(0.2 0.02 100);
+  border-color: #fd971f;
+}
+
+/* XML Syntax Highlighting */
+.ember .xml-highlight {
+  color: oklch(0.97 0.01 100);
+}
+
+.ember .xml-tag-bracket {
+  color: oklch(0.6 0.28 350); /* Pink */
+}
+
+.ember .xml-tag-name {
+  color: oklch(0.6 0.28 350); /* Pink */
+}
+
+.ember .xml-attribute-name {
+  color: oklch(0.75 0.22 130); /* Green */
+}
+
+.ember .xml-attribute-equals {
+  color: oklch(0.97 0.01 100);
+}
+
+.ember .xml-attribute-value {
+  color: oklch(0.85 0.15 95); /* Yellow */
+}
+
+.ember .xml-comment {
+  color: oklch(0.6 0.02 100);
+  font-style: italic;
+}
+
+.ember .xml-cdata {
+  color: oklch(0.7 0.2 200); /* Blue */
+}
+
+.ember .xml-doctype {
+  color: oklch(0.75 0.18 60); /* Orange */
+}
+
+.ember .xml-text {
+  color: oklch(0.97 0.01 100);
+}

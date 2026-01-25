@@ -2,12 +2,12 @@
  * Hook for fetching guided prompts from the backend API
  *
  * This hook provides the single source of truth for guided prompts,
- * fetched from the backend /api/ideation/prompts endpoint.
+ * with caching via React Query.
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import type { IdeationPrompt, PromptCategory, IdeaCategory } from '@automaker/types';
-import { getElectronAPI } from '@/lib/electron';
+import { useIdeationPrompts } from '@/hooks/queries';
 
 interface UseGuidedPromptsReturn {
   prompts: IdeationPrompt[];
@@ -21,36 +21,10 @@ interface UseGuidedPromptsReturn {
 }
 
 export function useGuidedPrompts(): UseGuidedPromptsReturn {
-  const [prompts, setPrompts] = useState<IdeationPrompt[]>([]);
-  const [categories, setCategories] = useState<PromptCategory[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { data, isLoading, error, refetch } = useIdeationPrompts();
 
-  const fetchPrompts = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const api = getElectronAPI();
-      const result = await api.ideation?.getPrompts();
-
-      if (result?.success) {
-        setPrompts(result.prompts || []);
-        setCategories(result.categories || []);
-      } else {
-        setError(result?.error || 'Failed to fetch prompts');
-      }
-    } catch (err) {
-      console.error('Failed to fetch guided prompts:', err);
-      setError(err instanceof Error ? err.message : 'Failed to fetch prompts');
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchPrompts();
-  }, [fetchPrompts]);
+  const prompts = data?.prompts ?? [];
+  const categories = data?.categories ?? [];
 
   const getPromptsByCategory = useCallback(
     (category: IdeaCategory): IdeationPrompt[] => {
@@ -73,12 +47,23 @@ export function useGuidedPrompts(): UseGuidedPromptsReturn {
     [categories]
   );
 
+  // Convert async refetch to match the expected interface
+  const handleRefetch = useCallback(async () => {
+    await refetch();
+  }, [refetch]);
+
+  // Convert error to string for backward compatibility
+  const errorMessage = useMemo(() => {
+    if (!error) return null;
+    return error instanceof Error ? error.message : String(error);
+  }, [error]);
+
   return {
     prompts,
     categories,
     isLoading,
-    error,
-    refetch: fetchPrompts,
+    error: errorMessage,
+    refetch: handleRefetch,
     getPromptsByCategory,
     getPromptById,
     getCategoryById,

@@ -1,6 +1,7 @@
 import { useEffect, useCallback, useState, type ComponentType, type ReactNode } from 'react';
 import { RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Spinner } from '@/components/ui/spinner';
 import { getElectronAPI } from '@/lib/electron';
 import { useAppStore } from '@/store/app-store';
 import { AnthropicIcon, OpenAIIcon } from '@/components/ui/provider-icon';
@@ -90,9 +91,11 @@ function UsageItem({
           className="p-1 rounded hover:bg-accent/50 transition-colors"
           title="Refresh usage"
         >
-          <RefreshCw
-            className={cn('w-3.5 h-3.5 text-muted-foreground', isLoading && 'animate-spin')}
-          />
+          {isLoading ? (
+            <Spinner size="xs" />
+          ) : (
+            <RefreshCw className="w-3.5 h-3.5 text-muted-foreground" />
+          )}
         </button>
       </div>
       <div className="pl-6 space-y-2">{children}</div>

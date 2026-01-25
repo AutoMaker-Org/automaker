@@ -230,6 +230,49 @@ export function getBlockingDependencies(feature: Feature, allFeatures: Feature[]
 }
 
 /**
+ * Builds a lookup map for features by id.
+ *
+ * @param features - Features to index
+ * @returns Map keyed by feature id
+ */
+export function createFeatureMap(features: Feature[]): Map<string, Feature> {
+  const featureMap = new Map<string, Feature>();
+  for (const feature of features) {
+    if (feature?.id) {
+      featureMap.set(feature.id, feature);
+    }
+  }
+  return featureMap;
+}
+
+/**
+ * Gets the blocking dependencies using a precomputed feature map.
+ *
+ * @param feature - Feature to check
+ * @param featureMap - Map of all features by id
+ * @returns Array of feature IDs that are blocking this feature
+ */
+export function getBlockingDependenciesFromMap(
+  feature: Feature,
+  featureMap: Map<string, Feature>
+): string[] {
+  const dependencies = feature.dependencies;
+  if (!dependencies || dependencies.length === 0) {
+    return [];
+  }
+
+  const blockingDependencies: string[] = [];
+  for (const depId of dependencies) {
+    const dep = featureMap.get(depId);
+    if (dep && dep.status !== 'completed' && dep.status !== 'verified') {
+      blockingDependencies.push(depId);
+    }
+  }
+
+  return blockingDependencies;
+}
+
+/**
  * Checks if adding a dependency from sourceId to targetId would create a circular dependency.
  * When we say "targetId depends on sourceId", we add sourceId to targetId.dependencies.
  * A cycle would occur if sourceId already depends on targetId (directly or transitively).

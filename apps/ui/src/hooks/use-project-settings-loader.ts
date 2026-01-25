@@ -1,11 +1,13 @@
 import { useEffect, useRef } from 'react';
 import { useAppStore } from '@/store/app-store';
-import { getHttpApiClient } from '@/lib/http-api-client';
+import { useProjectSettings } from '@/hooks/queries';
 
 /**
  * Hook that loads project settings from the server when the current project changes.
  * This ensures that settings like board backgrounds are properly restored when
  * switching between projects or restarting the app.
+ *
+ * Uses React Query for data fetching with automatic caching.
  */
 export function useProjectSettingsLoader() {
   const currentProject = useAppStore((state) => state.currentProject);
@@ -23,94 +25,133 @@ export function useProjectSettingsLoader() {
   const setAutoDismissInitScriptIndicator = useAppStore(
     (state) => state.setAutoDismissInitScriptIndicator
   );
+  const setCurrentProject = useAppStore((state) => state.setCurrentProject);
 
-  const loadingRef = useRef<string | null>(null);
-  const currentProjectRef = useRef<string | null>(null);
+  const appliedProjectRef = useRef<{ path: string; dataUpdatedAt: number } | null>(null);
 
+  // Fetch project settings with React Query
+  const { data: settings, dataUpdatedAt } = useProjectSettings(currentProject?.path);
+
+  // Apply settings when data changes
   useEffect(() => {
-    currentProjectRef.current = currentProject?.path ?? null;
-
-    if (!currentProject?.path) {
+    if (!currentProject?.path || !settings) {
       return;
     }
 
-    // Prevent loading the same project multiple times
-    if (loadingRef.current === currentProject.path) {
+    // Prevent applying the same settings multiple times
+    if (
+      appliedProjectRef.current?.path === currentProject.path &&
+      appliedProjectRef.current?.dataUpdatedAt === dataUpdatedAt
+    ) {
       return;
     }
 
-    loadingRef.current = currentProject.path;
-    const requestedProjectPath = currentProject.path;
+    appliedProjectRef.current = { path: currentProject.path, dataUpdatedAt };
+    const projectPath = currentProject.path;
 
-    const loadProjectSettings = async () => {
-      try {
-        const httpClient = getHttpApiClient();
-        const result = await httpClient.settings.getProject(requestedProjectPath);
+    const bg = settings.boardBackground;
 
-        // Race condition protection: ignore stale results if project changed
-        if (currentProjectRef.current !== requestedProjectPath) {
-          return;
-        }
+    // Apply boardBackground if present
+    if (bg?.imagePath) {
+      setBoardBackground(projectPath, bg.imagePath);
+    }
 
-        if (result.success && result.settings) {
-          const bg = result.settings.boardBackground;
+    // Settings map for cleaner iteration
+    const settingsMap = {
+      cardOpacity: setCardOpacity,
+      columnOpacity: setColumnOpacity,
+      columnBorderEnabled: setColumnBorderEnabled,
+      cardGlassmorphism: setCardGlassmorphism,
+      cardBorderEnabled: setCardBorderEnabled,
+      cardBorderOpacity: setCardBorderOpacity,
+      hideScrollbar: setHideScrollbar,
+    } as const;
 
-          // Apply boardBackground if present
-          if (bg?.imagePath) {
-            setBoardBackground(requestedProjectPath, bg.imagePath);
-          }
-
-          // Settings map for cleaner iteration
-          const settingsMap = {
-            cardOpacity: setCardOpacity,
-            columnOpacity: setColumnOpacity,
-            columnBorderEnabled: setColumnBorderEnabled,
-            cardGlassmorphism: setCardGlassmorphism,
-            cardBorderEnabled: setCardBorderEnabled,
-            cardBorderOpacity: setCardBorderOpacity,
-            hideScrollbar: setHideScrollbar,
-          } as const;
-
-          // Apply all settings that are defined
-          for (const [key, setter] of Object.entries(settingsMap)) {
-            const value = bg?.[key as keyof typeof bg];
-            if (value !== undefined) {
-              (setter as (path: string, val: typeof value) => void)(requestedProjectPath, value);
-            }
-          }
-
-          // Apply worktreePanelVisible if present
-          if (result.settings.worktreePanelVisible !== undefined) {
-            setWorktreePanelVisible(requestedProjectPath, result.settings.worktreePanelVisible);
-          }
-
-          // Apply showInitScriptIndicator if present
-          if (result.settings.showInitScriptIndicator !== undefined) {
-            setShowInitScriptIndicator(
-              requestedProjectPath,
-              result.settings.showInitScriptIndicator
-            );
-          }
-
-          // Apply defaultDeleteBranch if present
-          if (result.settings.defaultDeleteBranch !== undefined) {
-            setDefaultDeleteBranch(requestedProjectPath, result.settings.defaultDeleteBranch);
-          }
-
-          // Apply autoDismissInitScriptIndicator if present
-          if (result.settings.autoDismissInitScriptIndicator !== undefined) {
-            setAutoDismissInitScriptIndicator(
-              requestedProjectPath,
-              result.settings.autoDismissInitScriptIndicator
-            );
-          }
-        }
-      } catch (error) {
-        console.error('Failed to load project settings:', error);
-        // Don't show error toast - just log it
+    // Apply all settings that are defined
+    for (const [key, setter] of Object.entries(settingsMap)) {
+      const value = bg?.[key as keyof typeof bg];
+      if (value !== undefined) {
+        (setter as (path: string, val: typeof value) => void)(projectPath, value);
       }
-    };
+    }
 
-    loadProjectSettings();
-  }, [currentProject?.path]);
+    // Apply worktreePanelVisible if present
+    if (settings.worktreePanelVisible !== undefined) {
+      setWorktreePanelVisible(projectPath, settings.worktreePanelVisible);
+    }
+
+    // Apply showInitScriptIndicator if present
+    if (settings.showInitScriptIndicator !== undefined) {
+      setShowInitScriptIndicator(projectPath, settings.showInitScriptIndicator);
+    }
+
+    // Apply defaultDeleteBranchWithWorktree if present
+    if (settings.defaultDeleteBranchWithWorktree !== undefined) {
+      setDefaultDeleteBranch(projectPath, settings.defaultDeleteBranchWithWorktree);
+    }
+
+    // Apply autoDismissInitScriptIndicator if present
+    if (settings.autoDismissInitScriptIndicator !== undefined) {
+      setAutoDismissInitScriptIndicator(projectPath, settings.autoDismissInitScriptIndicator);
+    }
+
+    // Apply activeClaudeApiProfileId and phaseModelOverrides if present
+    // These are stored directly on the project, so we need to update both
+    // currentProject AND the projects array to keep them in sync
+    // Type assertion needed because API returns Record<string, unknown>
+    const settingsWithExtras = settings as Record<string, unknown>;
+    const activeClaudeApiProfileId = settingsWithExtras.activeClaudeApiProfileId as
+      | string
+      | null
+      | undefined;
+    const phaseModelOverrides = settingsWithExtras.phaseModelOverrides as
+      | import('@automaker/types').PhaseModelConfig
+      | undefined;
+
+    // Check if we need to update the project
+    const storeState = useAppStore.getState();
+    const updatedProject = storeState.currentProject;
+    if (updatedProject && updatedProject.path === projectPath) {
+      const needsUpdate =
+        (activeClaudeApiProfileId !== undefined &&
+          updatedProject.activeClaudeApiProfileId !== activeClaudeApiProfileId) ||
+        (phaseModelOverrides !== undefined &&
+          JSON.stringify(updatedProject.phaseModelOverrides) !==
+            JSON.stringify(phaseModelOverrides));
+
+      if (needsUpdate) {
+        const updatedProjectData = {
+          ...updatedProject,
+          ...(activeClaudeApiProfileId !== undefined && { activeClaudeApiProfileId }),
+          ...(phaseModelOverrides !== undefined && { phaseModelOverrides }),
+        };
+
+        // Update currentProject
+        setCurrentProject(updatedProjectData);
+
+        // Also update the project in the projects array to keep them in sync
+        const updatedProjects = storeState.projects.map((p) =>
+          p.id === updatedProject.id ? updatedProjectData : p
+        );
+        useAppStore.setState({ projects: updatedProjects });
+      }
+    }
+  }, [
+    currentProject?.path,
+    settings,
+    dataUpdatedAt,
+    setBoardBackground,
+    setCardOpacity,
+    setColumnOpacity,
+    setColumnBorderEnabled,
+    setCardGlassmorphism,
+    setCardBorderEnabled,
+    setCardBorderOpacity,
+    setHideScrollbar,
+    setWorktreePanelVisible,
+    setShowInitScriptIndicator,
+    setDefaultDeleteBranch,
+    setAutoDismissInitScriptIndicator,
+    setCurrentProject,
+  ]);
 }

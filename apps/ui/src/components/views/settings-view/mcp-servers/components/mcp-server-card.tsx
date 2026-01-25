@@ -1,4 +1,5 @@
-import { ChevronDown, ChevronRight, Code, Pencil, Trash2, PlayCircle, Loader2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, Code, Pencil, Trash2, PlayCircle } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -111,7 +112,7 @@ export function MCPServerCard({
               className="h-8 px-2"
             >
               {testState?.status === 'testing' ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
+                <Spinner size="sm" />
               ) : (
                 <PlayCircle className="w-4 h-4" />
               )}

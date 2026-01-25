@@ -1,4 +1,5 @@
 // @ts-nocheck
+import { memo } from 'react';
 import { Feature } from '@/store/app-store';
 import { Button } from '@/components/ui/button';
 import {
@@ -32,7 +33,7 @@ interface CardActionsProps {
   onApprovePlan?: () => void;
 }
 
-export function CardActions({
+export const CardActions = memo(function CardActions({
   feature,
   isCurrentAutoTask,
   hasContext,
@@ -344,4 +345,4 @@ export function CardActions({
       )}
     </div>
   );
-}
+});

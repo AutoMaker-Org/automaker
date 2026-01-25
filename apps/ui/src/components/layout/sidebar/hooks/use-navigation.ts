@@ -11,6 +11,8 @@ import {
   Lightbulb,
   Brain,
   Network,
+  Bell,
+  Settings,
 } from 'lucide-react';
 import type { NavSection, NavItem } from '../types';
 import type { KeyboardShortcut } from '@/hooks/use-keyboard-shortcuts';
@@ -32,9 +34,11 @@ interface UseNavigationProps {
     agent: string;
     terminal: string;
     settings: string;
+    projectSettings: string;
     ideation: string;
     githubIssues: string;
     githubPrs: string;
+    notifications: string;
   };
   hideSpecEditor: boolean;
   hideContext: boolean;
@@ -49,6 +53,8 @@ interface UseNavigationProps {
   cycleNextProject: () => void;
   /** Count of unviewed validations to show on GitHub Issues nav item */
   unviewedValidationsCount?: number;
+  /** Count of unread notifications to show on Notifications nav item */
+  unreadNotificationsCount?: number;
   /** Whether spec generation is currently running for the current project */
   isSpecGenerating?: boolean;
 }
@@ -67,6 +73,7 @@ export function useNavigation({
   cyclePrevProject,
   cycleNextProject,
   unviewedValidationsCount,
+  unreadNotificationsCount,
   isSpecGenerating,
 }: UseNavigationProps) {
   // Track if current project has a GitHub remote
@@ -199,6 +206,26 @@ export function useNavigation({
       });
     }
 
+    // Add Notifications and Project Settings as a standalone section (no label for visual separation)
+    sections.push({
+      label: '',
+      items: [
+        {
+          id: 'notifications',
+          label: 'Notifications',
+          icon: Bell,
+          shortcut: shortcuts.notifications,
+          count: unreadNotificationsCount,
+        },
+        {
+          id: 'project-settings',
+          label: 'Project Settings',
+          icon: Settings,
+          shortcut: shortcuts.projectSettings,
+        },
+      ],
+    });
+
     return sections;
   }, [
     shortcuts,
@@ -207,6 +234,7 @@ export function useNavigation({
     hideTerminal,
     hasGitHubRemote,
     unviewedValidationsCount,
+    unreadNotificationsCount,
     isSpecGenerating,
   ]);
 
@@ -257,11 +285,11 @@ export function useNavigation({
         });
       });
 
-      // Add settings shortcut
+      // Add global settings shortcut
       shortcutsList.push({
         key: shortcuts.settings,
         action: () => navigate({ to: '/settings' }),
-        description: 'Navigate to Settings',
+        description: 'Navigate to Global Settings',
       });
     }
 

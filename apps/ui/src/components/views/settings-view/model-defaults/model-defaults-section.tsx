@@ -1,8 +1,10 @@
-import { Workflow, RotateCcw } from 'lucide-react';
+import { useState } from 'react';
+import { Workflow, RotateCcw, Replace } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAppStore } from '@/store/app-store';
 import { Button } from '@/components/ui/button';
 import { PhaseModelSelector } from './phase-model-selector';
+import { BulkReplaceDialog } from './bulk-replace-dialog';
 import type { PhaseModelKey } from '@automaker/types';
 import { DEFAULT_PHASE_MODELS } from '@automaker/types';
 
@@ -112,7 +114,12 @@ function PhaseGroup({
 }
 
 export function ModelDefaultsSection() {
-  const { resetPhaseModels } = useAppStore();
+  const { resetPhaseModels, claudeCompatibleProviders } = useAppStore();
+  const [showBulkReplace, setShowBulkReplace] = useState(false);
+
+  // Check if there are any enabled ClaudeCompatibleProviders
+  const hasEnabledProviders =
+    claudeCompatibleProviders && claudeCompatibleProviders.some((p) => p.enabled !== false);
 
   return (
     <div
@@ -139,12 +146,28 @@ export function ModelDefaultsSection() {
               </p>
             </div>
           </div>
-          <Button variant="outline" size="sm" onClick={resetPhaseModels} className="gap-2">
-            <RotateCcw className="w-3.5 h-3.5" />
-            Reset to Defaults
-          </Button>
+          <div className="flex items-center gap-2">
+            {hasEnabledProviders && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowBulkReplace(true)}
+                className="gap-2"
+              >
+                <Replace className="w-3.5 h-3.5" />
+                Bulk Replace
+              </Button>
+            )}
+            <Button variant="outline" size="sm" onClick={resetPhaseModels} className="gap-2">
+              <RotateCcw className="w-3.5 h-3.5" />
+              Reset to Defaults
+            </Button>
+          </div>
         </div>
       </div>
+
+      {/* Bulk Replace Dialog */}
+      <BulkReplaceDialog open={showBulkReplace} onOpenChange={setShowBulkReplace} />
 
       {/* Content */}
       <div className="p-6 space-y-8">

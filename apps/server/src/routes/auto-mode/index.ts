@@ -10,6 +10,8 @@ import { validatePathParams } from '../../middleware/validate-paths.js';
 import { createStopFeatureHandler } from './routes/stop-feature.js';
 import { createStatusHandler } from './routes/status.js';
 import { createRunFeatureHandler } from './routes/run-feature.js';
+import { createStartHandler } from './routes/start.js';
+import { createStopHandler } from './routes/stop.js';
 import { createVerifyFeatureHandler } from './routes/verify-feature.js';
 import { createResumeFeatureHandler } from './routes/resume-feature.js';
 import { createContextExistsHandler } from './routes/context-exists.js';
@@ -21,6 +23,10 @@ import { createResumeInterruptedHandler } from './routes/resume-interrupted.js';
 
 export function createAutoModeRoutes(autoModeService: AutoModeService): Router {
   const router = Router();
+
+  // Auto loop control routes
+  router.post('/start', validatePathParams('projectPath'), createStartHandler(autoModeService));
+  router.post('/stop', validatePathParams('projectPath'), createStopHandler(autoModeService));
 
   router.post('/stop-feature', createStopFeatureHandler(autoModeService));
   router.post('/status', validatePathParams('projectPath?'), createStatusHandler(autoModeService));

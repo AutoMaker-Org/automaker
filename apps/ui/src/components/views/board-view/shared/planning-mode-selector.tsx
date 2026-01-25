@@ -6,12 +6,12 @@ import {
   ClipboardList,
   FileText,
   ScrollText,
-  Loader2,
   Check,
   Eye,
   RefreshCw,
   Sparkles,
 } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -236,7 +236,7 @@ export function PlanningModeSelector({
               <div className="flex items-center gap-2">
                 {isGenerating ? (
                   <>
-                    <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                    <Spinner size="sm" />
                     <span className="text-sm text-muted-foreground">
                       Generating {mode === 'full' ? 'comprehensive spec' : 'spec'}...
                     </span>

@@ -6,22 +6,13 @@ const logger = createLogger('ProjectCreation');
 import { initializeProject } from '@/lib/project-init';
 import { toast } from 'sonner';
 import type { StarterTemplate } from '@/lib/templates';
-import type { ThemeMode } from '@/store/app-store';
-import type { TrashedProject, Project } from '@/lib/electron';
+import type { Project } from '@/lib/electron';
 
 interface UseProjectCreationProps {
-  trashedProjects: TrashedProject[];
-  currentProject: Project | null;
-  globalTheme: ThemeMode;
-  upsertAndSetCurrentProject: (path: string, name: string, theme: ThemeMode) => Project;
+  upsertAndSetCurrentProject: (path: string, name: string) => Project;
 }
 
-export function useProjectCreation({
-  trashedProjects,
-  currentProject,
-  globalTheme,
-  upsertAndSetCurrentProject,
-}: UseProjectCreationProps) {
+export function useProjectCreation({ upsertAndSetCurrentProject }: UseProjectCreationProps) {
   // Modal state
   const [showNewProjectModal, setShowNewProjectModal] = useState(false);
   const [isCreatingProject, setIsCreatingProject] = useState(false);
@@ -67,14 +58,8 @@ export function useProjectCreation({
 </project_specification>`
         );
 
-        // Determine theme: try trashed project theme, then current project theme, then global
-        const trashedProject = trashedProjects.find((p) => p.path === projectPath);
-        const effectiveTheme =
-          (trashedProject?.theme as ThemeMode | undefined) ||
-          (currentProject?.theme as ThemeMode | undefined) ||
-          globalTheme;
-
-        upsertAndSetCurrentProject(projectPath, projectName, effectiveTheme);
+        // Let the store handle theme (trashed project recovery or undefined for global)
+        upsertAndSetCurrentProject(projectPath, projectName);
 
         setShowNewProjectModal(false);
 
@@ -92,7 +77,7 @@ export function useProjectCreation({
         throw error;
       }
     },
-    [trashedProjects, currentProject, globalTheme, upsertAndSetCurrentProject]
+    [upsertAndSetCurrentProject]
   );
 
   /**
@@ -169,14 +154,8 @@ export function useProjectCreation({
 </project_specification>`
         );
 
-        // Determine theme
-        const trashedProject = trashedProjects.find((p) => p.path === projectPath);
-        const effectiveTheme =
-          (trashedProject?.theme as ThemeMode | undefined) ||
-          (currentProject?.theme as ThemeMode | undefined) ||
-          globalTheme;
-
-        upsertAndSetCurrentProject(projectPath, projectName, effectiveTheme);
+        // Let the store handle theme (trashed project recovery or undefined for global)
+        upsertAndSetCurrentProject(projectPath, projectName);
         setShowNewProjectModal(false);
         setNewProjectName(projectName);
         setNewProjectPath(projectPath);
@@ -194,7 +173,7 @@ export function useProjectCreation({
         setIsCreatingProject(false);
       }
     },
-    [trashedProjects, currentProject, globalTheme, upsertAndSetCurrentProject]
+    [upsertAndSetCurrentProject]
   );
 
   /**
@@ -244,14 +223,8 @@ export function useProjectCreation({
 </project_specification>`
         );
 
-        // Determine theme
-        const trashedProject = trashedProjects.find((p) => p.path === projectPath);
-        const effectiveTheme =
-          (trashedProject?.theme as ThemeMode | undefined) ||
-          (currentProject?.theme as ThemeMode | undefined) ||
-          globalTheme;
-
-        upsertAndSetCurrentProject(projectPath, projectName, effectiveTheme);
+        // Let the store handle theme (trashed project recovery or undefined for global)
+        upsertAndSetCurrentProject(projectPath, projectName);
         setShowNewProjectModal(false);
         setNewProjectName(projectName);
         setNewProjectPath(projectPath);
@@ -269,7 +242,7 @@ export function useProjectCreation({
         setIsCreatingProject(false);
       }
     },
-    [trashedProjects, currentProject, globalTheme, upsertAndSetCurrentProject]
+    [upsertAndSetCurrentProject]
   );
 
   return {

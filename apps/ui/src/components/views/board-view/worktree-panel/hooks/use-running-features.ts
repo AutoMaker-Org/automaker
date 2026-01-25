@@ -17,6 +17,8 @@ export function useRunningFeatures({ runningFeatureIds, features }: UseRunningFe
 
         // Match by branchName only (worktreePath is no longer stored)
         if (feature.branchName) {
+          // Check if branch names match - this handles both main worktree (any primary branch name)
+          // and feature worktrees
           return worktree.branch === feature.branchName;
         }
 

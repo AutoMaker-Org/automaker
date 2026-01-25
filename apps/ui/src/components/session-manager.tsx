@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { createLogger } from '@automaker/utils/logger';
+import { useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 const logger = createLogger('SessionManager');
@@ -16,12 +17,14 @@ import {
   Check,
   X,
   ArchiveRestore,
-  Loader2,
 } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 import { cn } from '@/lib/utils';
 import type { SessionListItem } from '@/types/electron';
 import { useKeyboardShortcutsConfig } from '@/hooks/use-keyboard-shortcuts';
 import { getElectronAPI } from '@/lib/electron';
+import { useSessions } from '@/hooks/queries';
+import { queryKeys } from '@/lib/query-keys';
 import { DeleteSessionDialog } from '@/components/dialogs/delete-session-dialog';
 import { DeleteAllArchivedSessionsDialog } from '@/components/dialogs/delete-all-archived-sessions-dialog';
 
@@ -102,7 +105,7 @@ export function SessionManager({
   onQuickCreateRef,
 }: SessionManagerProps) {
   const shortcuts = useKeyboardShortcutsConfig();
-  const [sessions, setSessions] = useState<SessionListItem[]>([]);
+  const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<'active' | 'archived'>('active');
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState('');
@@ -113,8 +116,14 @@ export function SessionManager({
   const [sessionToDelete, setSessionToDelete] = useState<SessionListItem | null>(null);
   const [isDeleteAllArchivedDialogOpen, setIsDeleteAllArchivedDialogOpen] = useState(false);
 
+  // Use React Query for sessions list - always include archived, filter client-side
+  const { data: sessions = [], refetch: refetchSessions } = useSessions(true);
+
+  // Ref to track if we've done the initial running sessions check
+  const hasCheckedInitialRef = useRef(false);
+
   // Check running state for all sessions
-  const checkRunningSessions = async (sessionList: SessionListItem[]) => {
+  const checkRunningSessions = useCallback(async (sessionList: SessionListItem[]) => {
     const api = getElectronAPI();
     if (!api?.agent) return;
 
@@ -134,25 +143,25 @@ export function SessionManager({
     }
 
     setRunningSessions(runningIds);
-  };
-
-  // Load sessions
-  const loadSessions = async () => {
-    const api = getElectronAPI();
-    if (!api?.sessions) return;
-
-    // Always load all sessions and filter client-side
-    const result = await api.sessions.list(true);
-    if (result.success && result.sessions) {
-      setSessions(result.sessions);
-      // Check running state for all sessions
-      await checkRunningSessions(result.sessions);
-    }
-  };
-
-  useEffect(() => {
-    loadSessions();
   }, []);
+
+  // Helper to invalidate sessions cache and refetch
+  const invalidateSessions = useCallback(async () => {
+    await queryClient.invalidateQueries({ queryKey: queryKeys.sessions.all(true) });
+    // Also check running state after invalidation
+    const result = await refetchSessions();
+    if (result.data) {
+      await checkRunningSessions(result.data);
+    }
+  }, [queryClient, refetchSessions, checkRunningSessions]);
+
+  // Check running state on initial load (runs only once when sessions first load)
+  useEffect(() => {
+    if (sessions.length > 0 && !hasCheckedInitialRef.current) {
+      hasCheckedInitialRef.current = true;
+      checkRunningSessions(sessions);
+    }
+  }, [sessions, checkRunningSessions]);
 
   // Periodically check running state for sessions (useful for detecting when agents finish)
   useEffect(() => {
@@ -166,7 +175,7 @@ export function SessionManager({
     }, 3000); // Check every 3 seconds
 
     return () => clearInterval(interval);
-  }, [sessions, runningSessions.size, isCurrentSessionThinking]);
+  }, [sessions, runningSessions.size, isCurrentSessionThinking, checkRunningSessions]);
 
   // Create new session with random name
   const handleCreateSession = async () => {
@@ -180,7 +189,7 @@ export function SessionManager({
     if (result.success && result.session?.id) {
       setNewSessionName('');
       setIsCreating(false);
-      await loadSessions();
+      await invalidateSessions();
       onSelectSession(result.session.id);
     }
   };
@@ -195,7 +204,7 @@ export function SessionManager({
     const result = await api.sessions.create(sessionName, projectPath, projectPath);
 
     if (result.success && result.session?.id) {
-      await loadSessions();
+      await invalidateSessions();
       onSelectSession(result.session.id);
     }
   };
@@ -222,7 +231,7 @@ export function SessionManager({
     if (result.success) {
       setEditingSessionId(null);
       setEditingName('');
-      await loadSessions();
+      await invalidateSessions();
     }
   };
 
@@ -241,7 +250,7 @@ export function SessionManager({
         if (currentSessionId === sessionId) {
           onSelectSession(null);
         }
-        await loadSessions();
+        await invalidateSessions();
       } else {
         logger.error('[SessionManager] Archive failed:', result.error);
       }
@@ -261,7 +270,7 @@ export function SessionManager({
     try {
       const result = await api.sessions.unarchive(sessionId);
       if (result.success) {
-        await loadSessions();
+        await invalidateSessions();
       } else {
         logger.error('[SessionManager] Unarchive failed:', result.error);
       }
@@ -283,7 +292,7 @@ export function SessionManager({
 
     const result = await api.sessions.delete(sessionId);
     if (result.success) {
-      await loadSessions();
+      await invalidateSessions();
       if (currentSessionId === sessionId) {
         // Switch to another session or create a new one
         const activeSessionsList = sessions.filter((s) => !s.isArchived);
@@ -305,7 +314,7 @@ export function SessionManager({
       await api.sessions.delete(session.id);
     }
 
-    await loadSessions();
+    await invalidateSessions();
     setIsDeleteAllArchivedDialogOpen(false);
   };
 
@@ -466,7 +475,7 @@ export function SessionManager({
                       {/* Show loading indicator if this session is running (either current session thinking or any session in runningSessions) */}
                       {(currentSessionId === session.id && isCurrentSessionThinking) ||
                       runningSessions.has(session.id) ? (
-                        <Loader2 className="w-4 h-4 text-primary animate-spin shrink-0" />
+                        <Spinner size="sm" className="shrink-0" />
                       ) : (
                         <MessageSquare className="w-4 h-4 text-muted-foreground shrink-0" />
                       )}

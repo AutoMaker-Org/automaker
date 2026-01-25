@@ -1,11 +1,11 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useMemo } from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
 import { RefreshCw, AlertTriangle, CheckCircle, XCircle, Clock, ExternalLink } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 import { cn } from '@/lib/utils';
-import { getElectronAPI } from '@/lib/electron';
-import { useAppStore } from '@/store/app-store';
 import { useSetupStore } from '@/store/setup-store';
+import { useCodexUsage } from '@/hooks/queries';
 
 // Error codes for distinguishing failure modes
 const ERROR_CODES = {
@@ -21,9 +21,6 @@ type UsageError = {
   code: ErrorCode;
   message: string;
 };
-
-// Fixed refresh interval (45 seconds)
-const REFRESH_INTERVAL_SECONDS = 45;
 
 // Helper to format reset time
 function formatResetTime(unixTimestamp: number): string {
@@ -62,95 +59,39 @@ function getWindowLabel(durationMins: number): { title: string; subtitle: string
 }
 
 export function CodexUsagePopover() {
-  const { codexUsage, codexUsageLastUpdated, setCodexUsage } = useAppStore();
   const codexAuthStatus = useSetupStore((state) => state.codexAuthStatus);
   const [open, setOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<UsageError | null>(null);
 
   // Check if Codex is authenticated
   const isCodexAuthenticated = codexAuthStatus?.authenticated;
 
+  // Use React Query for data fetching with automatic polling
+  const {
+    data: codexUsage,
+    isLoading,
+    isFetching,
+    error: queryError,
+    dataUpdatedAt,
+    refetch,
+  } = useCodexUsage(isCodexAuthenticated);
+
   // Check if data is stale (older than 2 minutes)
   const isStale = useMemo(() => {
-    return !codexUsageLastUpdated || Date.now() - codexUsageLastUpdated > 2 * 60 * 1000;
-  }, [codexUsageLastUpdated]);
+    return !dataUpdatedAt || Date.now() - dataUpdatedAt > 2 * 60 * 1000;
+  }, [dataUpdatedAt]);
 
-  const fetchUsage = useCallback(
-    async (isAutoRefresh = false) => {
-      if (!isAutoRefresh) setLoading(true);
-      setError(null);
-      try {
-        const api = getElectronAPI();
-        if (!api.codex) {
-          setError({
-            code: ERROR_CODES.API_BRIDGE_UNAVAILABLE,
-            message: 'Codex API bridge not available',
-          });
-          return;
-        }
-        const data = await api.codex.getUsage();
-        if ('error' in data) {
-          // Check if it's the "not available" error
-          if (
-            data.message?.includes('not available') ||
-            data.message?.includes('does not provide')
-          ) {
-            setError({
-              code: ERROR_CODES.NOT_AVAILABLE,
-              message: data.message || data.error,
-            });
-          } else {
-            setError({
-              code: ERROR_CODES.AUTH_ERROR,
-              message: data.message || data.error,
-            });
-          }
-          return;
-        }
-        setCodexUsage(data);
-      } catch (err) {
-        setError({
-          code: ERROR_CODES.UNKNOWN,
-          message: err instanceof Error ? err.message : 'Failed to fetch usage',
-        });
-      } finally {
-        if (!isAutoRefresh) setLoading(false);
-      }
-    },
-    [setCodexUsage]
-  );
-
-  // Auto-fetch on mount if data is stale (only if authenticated)
-  useEffect(() => {
-    if (isStale && isCodexAuthenticated) {
-      fetchUsage(true);
+  // Convert query error to UsageError format for backward compatibility
+  const error = useMemo((): UsageError | null => {
+    if (!queryError) return null;
+    const message = queryError instanceof Error ? queryError.message : String(queryError);
+    if (message.includes('not available') || message.includes('does not provide')) {
+      return { code: ERROR_CODES.NOT_AVAILABLE, message };
     }
-  }, [isStale, isCodexAuthenticated, fetchUsage]);
-
-  useEffect(() => {
-    // Skip if not authenticated
-    if (!isCodexAuthenticated) return;
-
-    // Initial fetch when opened
-    if (open) {
-      if (!codexUsage || isStale) {
-        fetchUsage();
-      }
+    if (message.includes('bridge') || message.includes('API')) {
+      return { code: ERROR_CODES.API_BRIDGE_UNAVAILABLE, message };
     }
-
-    // Auto-refresh interval (only when open)
-    let intervalId: NodeJS.Timeout | null = null;
-    if (open) {
-      intervalId = setInterval(() => {
-        fetchUsage(true);
-      }, REFRESH_INTERVAL_SECONDS * 1000);
-    }
-
-    return () => {
-      if (intervalId) clearInterval(intervalId);
-    };
-  }, [open, codexUsage, isStale, isCodexAuthenticated, fetchUsage]);
+    return { code: ERROR_CODES.AUTH_ERROR, message };
+  }, [queryError]);
 
   // Derived status color/icon helper
   const getStatusInfo = (percentage: number) => {
@@ -288,10 +229,10 @@ export function CodexUsagePopover() {
             <Button
               variant="ghost"
               size="icon"
-              className={cn('h-6 w-6', loading && 'opacity-80')}
-              onClick={() => !loading && fetchUsage(false)}
+              className={cn('h-6 w-6', isFetching && 'opacity-80')}
+              onClick={() => !isFetching && refetch()}
             >
-              <RefreshCw className="w-3.5 h-3.5" />
+              <RefreshCw className={cn('w-3.5 h-3.5', isFetching && 'animate-spin')} />
             </Button>
           )}
         </div>
@@ -333,7 +274,7 @@ export function CodexUsagePopover() {
           ) : !codexUsage ? (
             // Loading state
             <div className="flex flex-col items-center justify-center py-8 space-y-2">
-              <RefreshCw className="w-6 h-6 animate-spin text-muted-foreground/50" />
+              <Spinner size="lg" />
               <p className="text-xs text-muted-foreground">Loading usage data...</p>
             </div>
           ) : codexUsage.rateLimits ? (

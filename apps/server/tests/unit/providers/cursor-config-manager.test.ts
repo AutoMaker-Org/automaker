@@ -50,8 +50,8 @@ describe('cursor-config-manager.ts', () => {
       manager = new CursorConfigManager(testProjectPath);
 
       const config = manager.getConfig();
-      expect(config.defaultModel).toBe('auto');
-      expect(config.models).toContain('auto');
+      expect(config.defaultModel).toBe('cursor-auto');
+      expect(config.models).toContain('cursor-auto');
     });
 
     it('should use default config if file read fails', () => {
@@ -62,7 +62,7 @@ describe('cursor-config-manager.ts', () => {
 
       manager = new CursorConfigManager(testProjectPath);
 
-      expect(manager.getDefaultModel()).toBe('auto');
+      expect(manager.getDefaultModel()).toBe('cursor-auto');
     });
 
     it('should use default config if JSON parse fails', () => {
@@ -71,7 +71,7 @@ describe('cursor-config-manager.ts', () => {
 
       manager = new CursorConfigManager(testProjectPath);
 
-      expect(manager.getDefaultModel()).toBe('auto');
+      expect(manager.getDefaultModel()).toBe('cursor-auto');
     });
   });
 
@@ -93,7 +93,7 @@ describe('cursor-config-manager.ts', () => {
     });
 
     it('should return default model', () => {
-      expect(manager.getDefaultModel()).toBe('auto');
+      expect(manager.getDefaultModel()).toBe('cursor-auto');
     });
 
     it('should set and persist default model', () => {
@@ -103,13 +103,13 @@ describe('cursor-config-manager.ts', () => {
       expect(fs.writeFileSync).toHaveBeenCalled();
     });
 
-    it('should return auto if defaultModel is undefined', () => {
+    it('should return cursor-auto if defaultModel is undefined', () => {
       vi.mocked(fs.existsSync).mockReturnValue(true);
-      vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ models: ['auto'] }));
+      vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ models: ['cursor-auto'] }));
 
       manager = new CursorConfigManager(testProjectPath);
 
-      expect(manager.getDefaultModel()).toBe('auto');
+      expect(manager.getDefaultModel()).toBe('cursor-auto');
     });
   });
 
@@ -121,7 +121,7 @@ describe('cursor-config-manager.ts', () => {
     it('should return enabled models', () => {
       const models = manager.getEnabledModels();
       expect(Array.isArray(models)).toBe(true);
-      expect(models).toContain('auto');
+      expect(models).toContain('cursor-auto');
     });
 
     it('should set enabled models', () => {
@@ -131,13 +131,13 @@ describe('cursor-config-manager.ts', () => {
       expect(fs.writeFileSync).toHaveBeenCalled();
     });
 
-    it('should return [auto] if models is undefined', () => {
+    it('should return [cursor-auto] if models is undefined', () => {
       vi.mocked(fs.existsSync).mockReturnValue(true);
-      vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ defaultModel: 'auto' }));
+      vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ defaultModel: 'cursor-auto' }));
 
       manager = new CursorConfigManager(testProjectPath);
 
-      expect(manager.getEnabledModels()).toEqual(['auto']);
+      expect(manager.getEnabledModels()).toEqual(['cursor-auto']);
     });
   });
 
@@ -146,8 +146,8 @@ describe('cursor-config-manager.ts', () => {
       vi.mocked(fs.existsSync).mockReturnValue(true);
       vi.mocked(fs.readFileSync).mockReturnValue(
         JSON.stringify({
-          defaultModel: 'auto',
-          models: ['auto'],
+          defaultModel: 'cursor-auto',
+          models: ['cursor-auto'],
         })
       );
       manager = new CursorConfigManager(testProjectPath);
@@ -161,14 +161,14 @@ describe('cursor-config-manager.ts', () => {
     });
 
     it('should not add duplicate models', () => {
-      manager.addModel('auto');
+      manager.addModel('cursor-auto');
 
       // Should not save if model already exists
       expect(fs.writeFileSync).not.toHaveBeenCalled();
     });
 
     it('should initialize models array if undefined', () => {
-      vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ defaultModel: 'auto' }));
+      vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ defaultModel: 'cursor-auto' }));
       manager = new CursorConfigManager(testProjectPath);
 
       manager.addModel('claude-3-5-sonnet');
@@ -293,7 +293,7 @@ describe('cursor-config-manager.ts', () => {
     it('should reset to default values', () => {
       manager.reset();
 
-      expect(manager.getDefaultModel()).toBe('auto');
+      expect(manager.getDefaultModel()).toBe('cursor-auto');
       expect(manager.getMcpServers()).toEqual([]);
       expect(manager.getRules()).toEqual([]);
       expect(fs.writeFileSync).toHaveBeenCalled();

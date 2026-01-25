@@ -1,7 +1,8 @@
 import { useAppStore } from '@/store/app-store';
 import { useSetupStore } from '@/store/setup-store';
 import { Button } from '@/components/ui/button';
-import { Key, CheckCircle2, Trash2, Loader2 } from 'lucide-react';
+import { Key, CheckCircle2, Trash2, Info } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 import { ApiKeyField } from './api-key-field';
 import { buildProviderConfigs } from '@/config/api-providers';
 import { SecurityNotice } from './security-notice';
@@ -100,9 +101,37 @@ export function ApiKeysSection() {
         </p>
       </div>
       <div className="p-6 space-y-6">
-        {/* API Key Fields */}
+        {/* API Key Fields with contextual info */}
         {providerConfigs.map((provider) => (
-          <ApiKeyField key={provider.key} config={provider} />
+          <div key={provider.key}>
+            <ApiKeyField config={provider} />
+            {/* Anthropic-specific provider info */}
+            {provider.key === 'anthropic' && (
+              <div className="mt-3 p-3 rounded-lg bg-blue-500/5 border border-blue-500/20">
+                <div className="flex gap-2">
+                  <Info className="w-4 h-4 text-blue-500 flex-shrink-0 mt-0.5" />
+                  <div className="text-xs text-muted-foreground space-y-1">
+                    <p>
+                      <span className="font-medium text-foreground/80">
+                        Using Claude Compatible Providers?
+                      </span>{' '}
+                      Add a provider in <span className="text-blue-500">AI Providers → Claude</span>{' '}
+                      with{' '}
+                      <span className="font-mono text-[10px] bg-muted/50 px-1 rounded">
+                        credentials
+                      </span>{' '}
+                      as the API key source to use this key.
+                    </p>
+                    <p>
+                      For alternative providers (z.AI GLM, MiniMax, OpenRouter), add a provider with{' '}
+                      <span className="font-mono text-[10px] bg-muted/50 px-1 rounded">inline</span>{' '}
+                      key source and enter the provider's API key directly.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
         ))}
 
         {/* Security Notice */}
@@ -142,7 +171,7 @@ export function ApiKeysSection() {
               data-testid="delete-anthropic-key"
             >
               {isDeletingAnthropicKey ? (
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                <Spinner size="sm" className="mr-2" />
               ) : (
                 <Trash2 className="w-4 h-4 mr-2" />
               )}
@@ -159,7 +188,7 @@ export function ApiKeysSection() {
               data-testid="delete-openai-key"
             >
               {isDeletingOpenaiKey ? (
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                <Spinner size="sm" className="mr-2" />
               ) : (
                 <Trash2 className="w-4 h-4 mr-2" />
               )}

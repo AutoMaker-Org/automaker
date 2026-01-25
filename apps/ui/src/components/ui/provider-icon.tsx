@@ -523,6 +523,15 @@ function getUnderlyingModelIcon(model?: AgentModel | string): ProviderIconKey {
     }
   }
 
+  // Check for ClaudeCompatibleProvider model patterns (GLM, MiniMax, etc.)
+  // These are model IDs like "GLM-4.5-Air", "GLM-4.7", "MiniMax-M2.1"
+  if (modelStr.includes('glm')) {
+    return 'glm';
+  }
+  if (modelStr.includes('minimax')) {
+    return 'minimax';
+  }
+
   // Check for Cursor-specific models with underlying providers
   if (modelStr.includes('sonnet') || modelStr.includes('opus') || modelStr.includes('claude')) {
     return 'anthropic';
@@ -536,7 +545,15 @@ function getUnderlyingModelIcon(model?: AgentModel | string): ProviderIconKey {
   if (modelStr.includes('grok')) {
     return 'grok';
   }
-  if (modelStr.includes('cursor') || modelStr === 'auto' || modelStr === 'composer-1') {
+  // Cursor models - canonical format includes 'cursor-' prefix
+  // Also support legacy IDs for backward compatibility
+  if (
+    modelStr.includes('cursor') ||
+    modelStr === 'auto' ||
+    modelStr === 'composer-1' ||
+    modelStr === 'cursor-auto' ||
+    modelStr === 'cursor-composer-1'
+  ) {
     return 'cursor';
   }
 

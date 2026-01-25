@@ -1,13 +1,13 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { RefreshCw, AlertTriangle, CheckCircle, XCircle, Clock, ExternalLink } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 import { cn } from '@/lib/utils';
-import { getElectronAPI } from '@/lib/electron';
-import { useAppStore } from '@/store/app-store';
 import { useSetupStore } from '@/store/setup-store';
 import { AnthropicIcon, OpenAIIcon } from '@/components/ui/provider-icon';
+import { useClaudeUsage, useCodexUsage } from '@/hooks/queries';
 
 // Error codes for distinguishing failure modes
 const ERROR_CODES = {
@@ -60,21 +60,62 @@ function getCodexWindowLabel(durationMins: number): { title: string; subtitle: s
 }
 
 export function UsagePopover() {
-  const { claudeUsage, claudeUsageLastUpdated, setClaudeUsage } = useAppStore();
-  const { codexUsage, codexUsageLastUpdated, setCodexUsage } = useAppStore();
   const claudeAuthStatus = useSetupStore((state) => state.claudeAuthStatus);
   const codexAuthStatus = useSetupStore((state) => state.codexAuthStatus);
 
   const [open, setOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'claude' | 'codex'>('claude');
-  const [claudeLoading, setClaudeLoading] = useState(false);
-  const [codexLoading, setCodexLoading] = useState(false);
-  const [claudeError, setClaudeError] = useState<UsageError | null>(null);
-  const [codexError, setCodexError] = useState<UsageError | null>(null);
 
   // Check authentication status
   const isClaudeAuthenticated = !!claudeAuthStatus?.authenticated;
   const isCodexAuthenticated = codexAuthStatus?.authenticated;
+
+  // Use React Query hooks for usage data
+  // Only enable polling when popover is open AND the tab is active
+  const {
+    data: claudeUsage,
+    isLoading: claudeLoading,
+    error: claudeQueryError,
+    dataUpdatedAt: claudeUsageLastUpdated,
+    refetch: refetchClaude,
+  } = useClaudeUsage(open && activeTab === 'claude' && isClaudeAuthenticated);
+
+  const {
+    data: codexUsage,
+    isLoading: codexLoading,
+    error: codexQueryError,
+    dataUpdatedAt: codexUsageLastUpdated,
+    refetch: refetchCodex,
+  } = useCodexUsage(open && activeTab === 'codex' && isCodexAuthenticated);
+
+  // Parse errors into structured format
+  const claudeError = useMemo((): UsageError | null => {
+    if (!claudeQueryError) return null;
+    const message =
+      claudeQueryError instanceof Error ? claudeQueryError.message : String(claudeQueryError);
+    // Detect trust prompt error
+    const isTrustPrompt = message.includes('Trust prompt') || message.includes('folder permission');
+    if (isTrustPrompt) {
+      return { code: ERROR_CODES.TRUST_PROMPT, message };
+    }
+    if (message.includes('API bridge')) {
+      return { code: ERROR_CODES.API_BRIDGE_UNAVAILABLE, message };
+    }
+    return { code: ERROR_CODES.AUTH_ERROR, message };
+  }, [claudeQueryError]);
+
+  const codexError = useMemo((): UsageError | null => {
+    if (!codexQueryError) return null;
+    const message =
+      codexQueryError instanceof Error ? codexQueryError.message : String(codexQueryError);
+    if (message.includes('not available') || message.includes('does not provide')) {
+      return { code: ERROR_CODES.NOT_AVAILABLE, message };
+    }
+    if (message.includes('API bridge')) {
+      return { code: ERROR_CODES.API_BRIDGE_UNAVAILABLE, message };
+    }
+    return { code: ERROR_CODES.AUTH_ERROR, message };
+  }, [codexQueryError]);
 
   // Determine which tab to show by default
   useEffect(() => {
@@ -94,137 +135,9 @@ export function UsagePopover() {
     return !codexUsageLastUpdated || Date.now() - codexUsageLastUpdated > 2 * 60 * 1000;
   }, [codexUsageLastUpdated]);
 
-  const fetchClaudeUsage = useCallback(
-    async (isAutoRefresh = false) => {
-      if (!isAutoRefresh) setClaudeLoading(true);
-      setClaudeError(null);
-      try {
-        const api = getElectronAPI();
-        if (!api.claude) {
-          setClaudeError({
-            code: ERROR_CODES.API_BRIDGE_UNAVAILABLE,
-            message: 'Claude API bridge not available',
-          });
-          return;
-        }
-        const data = await api.claude.getUsage();
-        if ('error' in data) {
-          // Detect trust prompt error
-          const isTrustPrompt =
-            data.error === 'Trust prompt pending' ||
-            (data.message && data.message.includes('folder permission'));
-          setClaudeError({
-            code: isTrustPrompt ? ERROR_CODES.TRUST_PROMPT : ERROR_CODES.AUTH_ERROR,
-            message: data.message || data.error,
-          });
-          return;
-        }
-        setClaudeUsage(data);
-      } catch (err) {
-        setClaudeError({
-          code: ERROR_CODES.UNKNOWN,
-          message: err instanceof Error ? err.message : 'Failed to fetch usage',
-        });
-      } finally {
-        if (!isAutoRefresh) setClaudeLoading(false);
-      }
-    },
-    [setClaudeUsage]
-  );
-
-  const fetchCodexUsage = useCallback(
-    async (isAutoRefresh = false) => {
-      if (!isAutoRefresh) setCodexLoading(true);
-      setCodexError(null);
-      try {
-        const api = getElectronAPI();
-        if (!api.codex) {
-          setCodexError({
-            code: ERROR_CODES.API_BRIDGE_UNAVAILABLE,
-            message: 'Codex API bridge not available',
-          });
-          return;
-        }
-        const data = await api.codex.getUsage();
-        if ('error' in data) {
-          if (
-            data.message?.includes('not available') ||
-            data.message?.includes('does not provide')
-          ) {
-            setCodexError({
-              code: ERROR_CODES.NOT_AVAILABLE,
-              message: data.message || data.error,
-            });
-          } else {
-            setCodexError({
-              code: ERROR_CODES.AUTH_ERROR,
-              message: data.message || data.error,
-            });
-          }
-          return;
-        }
-        setCodexUsage(data);
-      } catch (err) {
-        setCodexError({
-          code: ERROR_CODES.UNKNOWN,
-          message: err instanceof Error ? err.message : 'Failed to fetch usage',
-        });
-      } finally {
-        if (!isAutoRefresh) setCodexLoading(false);
-      }
-    },
-    [setCodexUsage]
-  );
-
-  // Auto-fetch on mount if data is stale
-  useEffect(() => {
-    if (isClaudeStale && isClaudeAuthenticated) {
-      fetchClaudeUsage(true);
-    }
-  }, [isClaudeStale, isClaudeAuthenticated, fetchClaudeUsage]);
-
-  useEffect(() => {
-    if (isCodexStale && isCodexAuthenticated) {
-      fetchCodexUsage(true);
-    }
-  }, [isCodexStale, isCodexAuthenticated, fetchCodexUsage]);
-
-  // Auto-refresh when popover is open
-  useEffect(() => {
-    if (!open) return;
-
-    // Fetch based on active tab
-    if (activeTab === 'claude' && isClaudeAuthenticated) {
-      if (!claudeUsage || isClaudeStale) {
-        fetchClaudeUsage();
-      }
-      const intervalId = setInterval(() => {
-        fetchClaudeUsage(true);
-      }, REFRESH_INTERVAL_SECONDS * 1000);
-      return () => clearInterval(intervalId);
-    }
-
-    if (activeTab === 'codex' && isCodexAuthenticated) {
-      if (!codexUsage || isCodexStale) {
-        fetchCodexUsage();
-      }
-      const intervalId = setInterval(() => {
-        fetchCodexUsage(true);
-      }, REFRESH_INTERVAL_SECONDS * 1000);
-      return () => clearInterval(intervalId);
-    }
-  }, [
-    open,
-    activeTab,
-    claudeUsage,
-    isClaudeStale,
-    isClaudeAuthenticated,
-    codexUsage,
-    isCodexStale,
-    isCodexAuthenticated,
-    fetchClaudeUsage,
-    fetchCodexUsage,
-  ]);
+  // Refetch functions for manual refresh
+  const fetchClaudeUsage = () => refetchClaude();
+  const fetchCodexUsage = () => refetchCodex();
 
   // Derived status color/icon helper
   const getStatusInfo = (percentage: number) => {
@@ -333,19 +246,43 @@ export function UsagePopover() {
     return 'bg-green-500';
   };
 
+  // Determine which provider icon and percentage to show based on active tab
+  const getTabInfo = () => {
+    if (activeTab === 'claude') {
+      return {
+        icon: AnthropicIcon,
+        percentage: claudeMaxPercentage,
+        isStale: isClaudeStale,
+      };
+    }
+    return {
+      icon: OpenAIIcon,
+      percentage: codexMaxPercentage,
+      isStale: isCodexStale,
+    };
+  };
+
+  const tabInfo = getTabInfo();
+  const statusColor = getStatusInfo(tabInfo.percentage).color;
+  const ProviderIcon = tabInfo.icon;
+
   const trigger = (
-    <Button variant="ghost" size="sm" className="h-9 gap-3 bg-secondary border border-border px-3">
+    <Button variant="ghost" size="sm" className="h-9 gap-2 bg-secondary border border-border px-3">
+      {(claudeUsage || codexUsage) && <ProviderIcon className={cn('w-4 h-4', statusColor)} />}
       <span className="text-sm font-medium">Usage</span>
       {(claudeUsage || codexUsage) && (
         <div
           className={cn(
             'h-1.5 w-16 bg-muted-foreground/20 rounded-full overflow-hidden transition-opacity',
-            isStale && 'opacity-60'
+            tabInfo.isStale && 'opacity-60'
           )}
         >
           <div
-            className={cn('h-full transition-all duration-500', getProgressBarColor(maxPercentage))}
-            style={{ width: `${Math.min(maxPercentage, 100)}%` }}
+            className={cn(
+              'h-full transition-all duration-500',
+              getProgressBarColor(tabInfo.percentage)
+            )}
+            style={{ width: `${Math.min(tabInfo.percentage, 100)}%` }}
           />
         </div>
       )}
@@ -392,7 +329,7 @@ export function UsagePopover() {
                   variant="ghost"
                   size="icon"
                   className={cn('h-6 w-6', claudeLoading && 'opacity-80')}
-                  onClick={() => !claudeLoading && fetchClaudeUsage(false)}
+                  onClick={() => !claudeLoading && fetchClaudeUsage()}
                 >
                   <RefreshCw className="w-3.5 h-3.5" />
                 </Button>
@@ -425,7 +362,7 @@ export function UsagePopover() {
                 </div>
               ) : !claudeUsage ? (
                 <div className="flex flex-col items-center justify-center py-8 space-y-2">
-                  <RefreshCw className="w-6 h-6 animate-spin text-muted-foreground/50" />
+                  <Spinner size="lg" />
                   <p className="text-xs text-muted-foreground">Loading usage data...</p>
                 </div>
               ) : (
@@ -499,7 +436,7 @@ export function UsagePopover() {
                   variant="ghost"
                   size="icon"
                   className={cn('h-6 w-6', codexLoading && 'opacity-80')}
-                  onClick={() => !codexLoading && fetchCodexUsage(false)}
+                  onClick={() => !codexLoading && fetchCodexUsage()}
                 >
                   <RefreshCw className="w-3.5 h-3.5" />
                 </Button>
@@ -544,7 +481,7 @@ export function UsagePopover() {
                 </div>
               ) : !codexUsage ? (
                 <div className="flex flex-col items-center justify-center py-8 space-y-2">
-                  <RefreshCw className="w-6 h-6 animate-spin text-muted-foreground/50" />
+                  <Spinner size="lg" />
                   <p className="text-xs text-muted-foreground">Loading usage data...</p>
                 </div>
               ) : codexUsage.rateLimits ? (

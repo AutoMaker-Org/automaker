@@ -1,12 +1,11 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useMemo } from 'react';
 import { cn } from '@/lib/utils';
-import { getElectronAPI } from '@/lib/electron';
 import { useSetupStore } from '@/store/setup-store';
-import { useAppStore } from '@/store/app-store';
+import { useClaudeUsage } from '@/hooks/queries';
 import { Button } from '@/components/ui/button';
+import { Spinner } from '@/components/ui/spinner';
 import { RefreshCw, AlertCircle } from 'lucide-react';
 
-const ERROR_NO_API = 'Claude usage API not available';
 const CLAUDE_USAGE_TITLE = 'Claude Usage';
 const CLAUDE_USAGE_SUBTITLE = 'Shows usage limits reported by the Claude CLI.';
 const CLAUDE_AUTH_WARNING = 'Authenticate Claude CLI to view usage limits.';
@@ -14,13 +13,10 @@ const CLAUDE_LOGIN_COMMAND = 'claude login';
 const CLAUDE_NO_USAGE_MESSAGE =
   'Usage limits are not available yet. Try refreshing if this persists.';
 const UPDATED_LABEL = 'Updated';
-const CLAUDE_FETCH_ERROR = 'Failed to fetch usage';
 const CLAUDE_REFRESH_LABEL = 'Refresh Claude usage';
 const WARNING_THRESHOLD = 75;
 const CAUTION_THRESHOLD = 50;
 const MAX_PERCENTAGE = 100;
-const REFRESH_INTERVAL_MS = 60_000;
-const STALE_THRESHOLD_MS = 2 * 60_000;
 // Using purple/indigo for Claude branding
 const USAGE_COLOR_CRITICAL = 'bg-red-500';
 const USAGE_COLOR_WARNING = 'bg-amber-500';
@@ -80,77 +76,31 @@ function UsageCard({
 
 export function ClaudeUsageSection() {
   const claudeAuthStatus = useSetupStore((state) => state.claudeAuthStatus);
-  const { claudeUsage, claudeUsageLastUpdated, setClaudeUsage } = useAppStore();
-  const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
 
   const canFetchUsage = !!claudeAuthStatus?.authenticated;
+
+  // Use React Query for data fetching with automatic polling
+  const {
+    data: claudeUsage,
+    isLoading,
+    isFetching,
+    error,
+    dataUpdatedAt,
+    refetch,
+  } = useClaudeUsage(canFetchUsage);
+
   // If we have usage data, we can show it even if auth status is unsure
   const hasUsage = !!claudeUsage;
 
-  const lastUpdatedLabel = claudeUsageLastUpdated
-    ? new Date(claudeUsageLastUpdated).toLocaleString()
-    : null;
+  const lastUpdatedLabel = useMemo(() => {
+    return dataUpdatedAt ? new Date(dataUpdatedAt).toLocaleString() : null;
+  }, [dataUpdatedAt]);
+
+  const errorMessage = error instanceof Error ? error.message : error ? String(error) : null;
 
   const showAuthWarning =
     (!canFetchUsage && !hasUsage && !isLoading) ||
-    (error && error.includes('Authentication required'));
-
-  const isStale =
-    !claudeUsageLastUpdated || Date.now() - claudeUsageLastUpdated > STALE_THRESHOLD_MS;
-
-  const fetchUsage = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const api = getElectronAPI();
-      if (!api.claude) {
-        setError(ERROR_NO_API);
-        return;
-      }
-      const result = await api.claude.getUsage();
-
-      if ('error' in result) {
-        // Check for auth errors specifically
-        if (
-          result.message?.includes('Authentication required') ||
-          result.error?.includes('Authentication required')
-        ) {
-          // We'll show the auth warning UI instead of a generic error
-        } else {
-          setError(result.message || result.error);
-        }
-        return;
-      }
-
-      setClaudeUsage(result);
-    } catch (fetchError) {
-      const message = fetchError instanceof Error ? fetchError.message : CLAUDE_FETCH_ERROR;
-      setError(message);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [setClaudeUsage]);
-
-  useEffect(() => {
-    // Initial fetch if authenticated and stale
-    // Compute staleness inside effect to avoid re-running when Date.now() changes
-    const isDataStale =
-      !claudeUsageLastUpdated || Date.now() - claudeUsageLastUpdated > STALE_THRESHOLD_MS;
-    if (canFetchUsage && isDataStale) {
-      void fetchUsage();
-    }
-  }, [fetchUsage, canFetchUsage, claudeUsageLastUpdated]);
-
-  useEffect(() => {
-    if (!canFetchUsage) return undefined;
-
-    const intervalId = setInterval(() => {
-      void fetchUsage();
-    }, REFRESH_INTERVAL_MS);
-
-    return () => clearInterval(intervalId);
-  }, [fetchUsage, canFetchUsage]);
+    (errorMessage && errorMessage.includes('Authentication required'));
 
   return (
     <div
@@ -172,13 +122,13 @@ export function ClaudeUsageSection() {
           <Button
             variant="ghost"
             size="icon"
-            onClick={fetchUsage}
-            disabled={isLoading}
+            onClick={() => refetch()}
+            disabled={isFetching}
             className="ml-auto h-9 w-9 rounded-lg hover:bg-accent/50"
             data-testid="refresh-claude-usage"
             title={CLAUDE_REFRESH_LABEL}
           >
-            <RefreshCw className={cn('w-4 h-4', isLoading && 'animate-spin')} />
+            {isFetching ? <Spinner size="sm" /> : <RefreshCw className="w-4 h-4" />}
           </Button>
         </div>
         <p className="text-sm text-muted-foreground/80 ml-12">{CLAUDE_USAGE_SUBTITLE}</p>
@@ -194,10 +144,10 @@ export function ClaudeUsageSection() {
           </div>
         )}
 
-        {error && !showAuthWarning && (
+        {errorMessage && !showAuthWarning && (
           <div className="flex items-start gap-3 p-4 rounded-xl bg-red-500/10 border border-red-500/20">
             <AlertCircle className="w-5 h-5 text-red-500 mt-0.5" />
-            <div className="text-sm text-red-400">{error}</div>
+            <div className="text-sm text-red-400">{errorMessage}</div>
           </div>
         )}
 
@@ -219,7 +169,7 @@ export function ClaudeUsageSection() {
           </div>
         )}
 
-        {!hasUsage && !error && !showAuthWarning && !isLoading && (
+        {!hasUsage && !errorMessage && !showAuthWarning && !isLoading && (
           <div className="rounded-xl border border-border/60 bg-secondary/20 p-4 text-xs text-muted-foreground">
             {CLAUDE_NO_USAGE_MESSAGE}
           </div>

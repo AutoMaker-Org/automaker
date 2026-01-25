@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -13,9 +13,11 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { BranchAutocomplete } from '@/components/ui/branch-autocomplete';
-import { GitPullRequest, Loader2, ExternalLink } from 'lucide-react';
+import { GitPullRequest, ExternalLink } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 import { getElectronAPI } from '@/lib/electron';
 import { toast } from 'sonner';
+import { useWorktreeBranches } from '@/hooks/queries';
 
 interface WorktreeInfo {
   path: string;
@@ -53,11 +55,20 @@ export function CreatePRDialog({
   const [prUrl, setPrUrl] = useState<string | null>(null);
   const [browserUrl, setBrowserUrl] = useState<string | null>(null);
   const [showBrowserFallback, setShowBrowserFallback] = useState(false);
-  // Branch fetching state
-  const [branches, setBranches] = useState<string[]>([]);
-  const [isLoadingBranches, setIsLoadingBranches] = useState(false);
   // Track whether an operation completed that warrants a refresh
   const operationCompletedRef = useRef(false);
+
+  // Use React Query for branch fetching - only enabled when dialog is open
+  const { data: branchesData, isLoading: isLoadingBranches } = useWorktreeBranches(
+    open ? worktree?.path : undefined,
+    true // Include remote branches for PR base branch selection
+  );
+
+  // Filter out current worktree branch from the list
+  const branches = useMemo(() => {
+    if (!branchesData?.branches) return [];
+    return branchesData.branches.map((b) => b.name).filter((name) => name !== worktree?.branch);
+  }, [branchesData?.branches, worktree?.branch]);
 
   // Common state reset function to avoid duplication
   const resetState = useCallback(() => {
@@ -71,44 +82,13 @@ export function CreatePRDialog({
     setBrowserUrl(null);
     setShowBrowserFallback(false);
     operationCompletedRef.current = false;
-    setBranches([]);
   }, [defaultBaseBranch]);
-
-  // Fetch branches for autocomplete
-  const fetchBranches = useCallback(async () => {
-    if (!worktree?.path) return;
-
-    setIsLoadingBranches(true);
-    try {
-      const api = getElectronAPI();
-      if (!api?.worktree?.listBranches) {
-        return;
-      }
-      // Fetch both local and remote branches for PR base branch selection
-      const result = await api.worktree.listBranches(worktree.path, true);
-      if (result.success && result.result) {
-        // Extract branch names, filtering out the current worktree branch
-        const branchNames = result.result.branches
-          .map((b) => b.name)
-          .filter((name) => name !== worktree.branch);
-        setBranches(branchNames);
-      }
-    } catch {
-      // Silently fail - branches will default to main only
-    } finally {
-      setIsLoadingBranches(false);
-    }
-  }, [worktree?.path, worktree?.branch]);
 
   // Reset state when dialog opens or worktree changes
   useEffect(() => {
     // Reset all state on both open and close
     resetState();
-    if (open) {
-      // Fetch fresh branches when dialog opens
-      fetchBranches();
-    }
-  }, [open, worktree?.path, resetState, fetchBranches]);
+  }, [open, worktree?.path, resetState]);
 
   const handleCreate = async () => {
     if (!worktree) return;
@@ -405,7 +385,7 @@ export function CreatePRDialog({
               <Button onClick={handleCreate} disabled={isLoading}>
                 {isLoading ? (
                   <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    <Spinner size="sm" className="mr-2" />
                     Creating...
                   </>
                 ) : (

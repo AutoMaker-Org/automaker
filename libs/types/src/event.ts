@@ -10,6 +10,7 @@ export type EventType =
   | 'auto-mode:idle'
   | 'auto-mode:error'
   | 'backlog-plan:event'
+  | 'feature:created'
   | 'feature:started'
   | 'feature:completed'
   | 'feature:stopped'
@@ -45,6 +46,7 @@ export type EventType =
   | 'worktree:init-completed'
   | 'dev-server:started'
   | 'dev-server:output'
-  | 'dev-server:stopped';
+  | 'dev-server:stopped'
+  | 'notification:created';
 
 export type EventCallback = (type: EventType, payload: unknown) => void;

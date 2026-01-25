@@ -11,6 +11,7 @@ import {
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
 import { LogOut, User, Code2, RefreshCw } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 import { cn } from '@/lib/utils';
 import { logout } from '@/lib/http-api-client';
 import { useAuthStore } from '@/store/auth-store';
@@ -143,7 +144,7 @@ export function AccountSection() {
                     disabled={isRefreshing || isLoadingEditors}
                     className="shrink-0 h-9 w-9"
                   >
-                    <RefreshCw className={cn('w-4 h-4', isRefreshing && 'animate-spin')} />
+                    {isRefreshing ? <Spinner size="sm" /> : <RefreshCw className="w-4 h-4" />}
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>

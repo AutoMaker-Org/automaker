@@ -1,116 +1,58 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Label } from '@/components/ui/label';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { Palette, Moon, Sun, Upload, X, ImageIcon } from 'lucide-react';
+import { Palette, Moon, Sun, Type } from 'lucide-react';
 import { darkThemes, lightThemes } from '@/config/theme-options';
+import {
+  UI_SANS_FONT_OPTIONS,
+  UI_MONO_FONT_OPTIONS,
+  DEFAULT_FONT_VALUE,
+} from '@/config/ui-font-options';
 import { cn } from '@/lib/utils';
 import { useAppStore } from '@/store/app-store';
-import { IconPicker } from '@/components/layout/project-switcher/components/icon-picker';
-import { getAuthenticatedImageUrl } from '@/lib/api-fetch';
-import { getHttpApiClient } from '@/lib/http-api-client';
-import type { Theme, Project } from '../shared/types';
+import { FontSelector } from '@/components/shared';
+import type { Theme } from '../shared/types';
 
 interface AppearanceSectionProps {
   effectiveTheme: Theme;
-  currentProject: Project | null;
   onThemeChange: (theme: Theme) => void;
 }
 
-export function AppearanceSection({
-  effectiveTheme,
-  currentProject,
-  onThemeChange,
-}: AppearanceSectionProps) {
-  const { setProjectIcon, setProjectName, setProjectCustomIcon } = useAppStore();
-  const [activeTab, setActiveTab] = useState<'dark' | 'light'>('dark');
-  const [projectName, setProjectNameLocal] = useState(currentProject?.name || '');
-  const [projectIcon, setProjectIconLocal] = useState<string | null>(currentProject?.icon || null);
-  const [customIconPath, setCustomIconPathLocal] = useState<string | null>(
-    currentProject?.customIconPath || null
-  );
-  const [isUploadingIcon, setIsUploadingIcon] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+export function AppearanceSection({ effectiveTheme, onThemeChange }: AppearanceSectionProps) {
+  const { fontFamilySans, fontFamilyMono, setFontSans, setFontMono } = useAppStore();
 
-  // Sync local state when currentProject changes
+  // Determine if current theme is light or dark
+  const isLightTheme = lightThemes.some((t) => t.value === effectiveTheme);
+  const [activeTab, setActiveTab] = useState<'dark' | 'light'>(isLightTheme ? 'light' : 'dark');
+
+  // Sync active tab when theme changes
   useEffect(() => {
-    setProjectNameLocal(currentProject?.name || '');
-    setProjectIconLocal(currentProject?.icon || null);
-    setCustomIconPathLocal(currentProject?.customIconPath || null);
-  }, [currentProject]);
+    const currentIsLight = lightThemes.some((t) => t.value === effectiveTheme);
+    setActiveTab(currentIsLight ? 'light' : 'dark');
+  }, [effectiveTheme]);
 
   const themesToShow = activeTab === 'dark' ? darkThemes : lightThemes;
 
-  // Auto-save when values change
-  const handleNameChange = (name: string) => {
-    setProjectNameLocal(name);
-    if (currentProject && name.trim() && name.trim() !== currentProject.name) {
-      setProjectName(currentProject.id, name.trim());
-    }
+  // Convert null to 'default' for Select component
+  // Also fallback to default if the stored font is not in the available options
+  const isValidSansFont = (font: string | null): boolean => {
+    if (!font) return false;
+    return UI_SANS_FONT_OPTIONS.some((opt) => opt.value === font);
+  };
+  const isValidMonoFont = (font: string | null): boolean => {
+    if (!font) return false;
+    return UI_MONO_FONT_OPTIONS.some((opt) => opt.value === font);
+  };
+  const fontSansValue =
+    fontFamilySans && isValidSansFont(fontFamilySans) ? fontFamilySans : DEFAULT_FONT_VALUE;
+  const fontMonoValue =
+    fontFamilyMono && isValidMonoFont(fontFamilyMono) ? fontFamilyMono : DEFAULT_FONT_VALUE;
+
+  const handleFontSansChange = (value: string) => {
+    setFontSans(value === DEFAULT_FONT_VALUE ? null : value);
   };
 
-  const handleIconChange = (icon: string | null) => {
-    setProjectIconLocal(icon);
-    if (currentProject) {
-      setProjectIcon(currentProject.id, icon);
-    }
-  };
-
-  const handleCustomIconChange = (path: string | null) => {
-    setCustomIconPathLocal(path);
-    if (currentProject) {
-      setProjectCustomIcon(currentProject.id, path);
-      // Clear Lucide icon when custom icon is set
-      if (path) {
-        setProjectIconLocal(null);
-        setProjectIcon(currentProject.id, null);
-      }
-    }
-  };
-
-  const handleCustomIconUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !currentProject) return;
-
-    // Validate file type
-    const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-    if (!validTypes.includes(file.type)) {
-      return;
-    }
-
-    // Validate file size (max 2MB for icons)
-    if (file.size > 2 * 1024 * 1024) {
-      return;
-    }
-
-    setIsUploadingIcon(true);
-    try {
-      // Convert to base64
-      const reader = new FileReader();
-      reader.onload = async () => {
-        const base64Data = reader.result as string;
-        const result = await getHttpApiClient().saveImageToTemp(
-          base64Data,
-          `project-icon-${file.name}`,
-          file.type,
-          currentProject.path
-        );
-        if (result.success && result.path) {
-          handleCustomIconChange(result.path);
-        }
-        setIsUploadingIcon(false);
-      };
-      reader.readAsDataURL(file);
-    } catch {
-      setIsUploadingIcon(false);
-    }
-  };
-
-  const handleRemoveCustomIcon = () => {
-    handleCustomIconChange(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
+  const handleFontMonoChange = (value: string) => {
+    setFontMono(value === DEFAULT_FONT_VALUE ? null : value);
   };
 
   return (
@@ -134,94 +76,10 @@ export function AppearanceSection({
         </p>
       </div>
       <div className="p-6 space-y-6">
-        {/* Project Details Section */}
-        {currentProject && (
-          <div className="space-y-4 pb-6 border-b border-border/50">
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="project-name-settings">Project Name</Label>
-                <Input
-                  id="project-name-settings"
-                  value={projectName}
-                  onChange={(e) => handleNameChange(e.target.value)}
-                  placeholder="Enter project name"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label>Project Icon</Label>
-                <p className="text-xs text-muted-foreground mb-2">
-                  Choose a preset icon or upload a custom image
-                </p>
-
-                {/* Custom Icon Upload */}
-                <div className="mb-4">
-                  <div className="flex items-center gap-3">
-                    {customIconPath ? (
-                      <div className="relative">
-                        <img
-                          src={getAuthenticatedImageUrl(customIconPath, currentProject.path)}
-                          alt="Custom project icon"
-                          className="w-12 h-12 rounded-lg object-cover border border-border"
-                        />
-                        <button
-                          type="button"
-                          onClick={handleRemoveCustomIcon}
-                          className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center hover:bg-destructive/90"
-                        >
-                          <X className="w-3 h-3" />
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="w-12 h-12 rounded-lg border border-dashed border-border flex items-center justify-center bg-accent/30">
-                        <ImageIcon className="w-5 h-5 text-muted-foreground" />
-                      </div>
-                    )}
-                    <div className="flex-1">
-                      <input
-                        ref={fileInputRef}
-                        type="file"
-                        accept="image/jpeg,image/png,image/gif,image/webp"
-                        onChange={handleCustomIconUpload}
-                        className="hidden"
-                        id="custom-icon-upload"
-                      />
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => fileInputRef.current?.click()}
-                        disabled={isUploadingIcon}
-                        className="gap-1.5"
-                      >
-                        <Upload className="w-3.5 h-3.5" />
-                        {isUploadingIcon ? 'Uploading...' : 'Upload Custom Icon'}
-                      </Button>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        PNG, JPG, GIF or WebP. Max 2MB.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Preset Icon Picker - only show if no custom icon */}
-                {!customIconPath && (
-                  <IconPicker selectedIcon={projectIcon} onSelectIcon={handleIconChange} />
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* Theme Section */}
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <Label className="text-foreground font-medium">
-              Theme{' '}
-              <span className="text-muted-foreground font-normal">
-                {currentProject ? `(for ${currentProject.name})` : '(Global)'}
-              </span>
-            </Label>
+            <Label className="text-foreground font-medium">Theme</Label>
             {/* Dark/Light Tabs */}
             <div className="flex gap-1 p-1 rounded-lg bg-accent/30">
               <button
@@ -282,6 +140,53 @@ export function AppearanceSection({
                 </button>
               );
             })}
+          </div>
+        </div>
+
+        {/* Fonts Section */}
+        <div className="space-y-4 pt-6 border-t border-border/50">
+          <div className="flex items-center gap-2 mb-4">
+            <Type className="w-4 h-4 text-muted-foreground" />
+            <Label className="text-foreground font-medium">Fonts</Label>
+          </div>
+          <p className="text-xs text-muted-foreground -mt-2 mb-4">
+            Set default fonts for all projects. Individual projects can override these settings.
+          </p>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* UI Font Selector */}
+            <div className="space-y-2">
+              <Label htmlFor="global-ui-font-select" className="text-sm">
+                UI Font
+              </Label>
+              <FontSelector
+                id="global-ui-font-select"
+                value={fontSansValue}
+                options={UI_SANS_FONT_OPTIONS}
+                placeholder="Default (Geist Sans)"
+                onChange={handleFontSansChange}
+              />
+              <p className="text-xs text-muted-foreground">
+                Used for headings, labels, and UI text
+              </p>
+            </div>
+
+            {/* Code Font Selector */}
+            <div className="space-y-2">
+              <Label htmlFor="global-code-font-select" className="text-sm">
+                Code Font
+              </Label>
+              <FontSelector
+                id="global-code-font-select"
+                value={fontMonoValue}
+                options={UI_MONO_FONT_OPTIONS}
+                placeholder="Default (Geist Mono)"
+                onChange={handleFontMonoChange}
+              />
+              <p className="text-xs text-muted-foreground">
+                Used for code blocks and monospaced text
+              </p>
+            </div>
           </div>
         </div>
       </div>

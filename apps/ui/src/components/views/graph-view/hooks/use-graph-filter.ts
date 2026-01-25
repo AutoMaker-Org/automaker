@@ -54,16 +54,40 @@ function getAncestors(
 /**
  * Traverses down to find all descendants (features that depend on this one)
  */
-function getDescendants(featureId: string, features: Feature[], visited: Set<string>): void {
+function getDescendants(
+  featureId: string,
+  dependentsMap: Map<string, string[]>,
+  visited: Set<string>
+): void {
   if (visited.has(featureId)) return;
   visited.add(featureId);
 
+  const dependents = dependentsMap.get(featureId);
+  if (!dependents || dependents.length === 0) return;
+
+  for (const dependentId of dependents) {
+    getDescendants(dependentId, dependentsMap, visited);
+  }
+}
+
+function buildDependentsMap(features: Feature[]): Map<string, string[]> {
+  const dependentsMap = new Map<string, string[]>();
+
   for (const feature of features) {
     const deps = feature.dependencies as string[] | undefined;
-    if (deps?.includes(featureId)) {
-      getDescendants(feature.id, features, visited);
+    if (!deps || deps.length === 0) continue;
+
+    for (const depId of deps) {
+      const existing = dependentsMap.get(depId);
+      if (existing) {
+        existing.push(feature.id);
+      } else {
+        dependentsMap.set(depId, [feature.id]);
+      }
     }
   }
+
+  return dependentsMap;
 }
 
 /**
@@ -89,10 +113,15 @@ function getHighlightedEdges(highlightedNodeIds: Set<string>, features: Feature[
 
 /**
  * Gets the effective status of a feature (accounting for running state)
+ * Treats completed (archived) as verified
  */
-function getEffectiveStatus(feature: Feature, runningAutoTasks: string[]): StatusFilterValue {
+function getEffectiveStatus(feature: Feature, runningTaskIds: Set<string>): StatusFilterValue {
   if (feature.status === 'in_progress') {
-    return runningAutoTasks.includes(feature.id) ? 'running' : 'paused';
+    return runningTaskIds.has(feature.id) ? 'running' : 'paused';
+  }
+  // Treat completed (archived) as verified
+  if (feature.status === 'completed') {
+    return 'verified';
   }
   return feature.status as StatusFilterValue;
 }
@@ -114,6 +143,7 @@ export function useGraphFilter(
     ).sort();
 
     const normalizedQuery = searchQuery.toLowerCase().trim();
+    const runningTaskIds = new Set(runningAutoTasks);
     const hasSearchQuery = normalizedQuery.length > 0;
     const hasCategoryFilter = selectedCategories.length > 0;
     const hasStatusFilter = selectedStatuses.length > 0;
@@ -134,6 +164,7 @@ export function useGraphFilter(
     // Find directly matched nodes
     const matchedNodeIds = new Set<string>();
     const featureMap = new Map(features.map((f) => [f.id, f]));
+    const dependentsMap = buildDependentsMap(features);
 
     for (const feature of features) {
       let matchesSearch = true;
@@ -154,7 +185,7 @@ export function useGraphFilter(
 
       // Check status match
       if (hasStatusFilter) {
-        const effectiveStatus = getEffectiveStatus(feature, runningAutoTasks);
+        const effectiveStatus = getEffectiveStatus(feature, runningTaskIds);
         matchesStatus = selectedStatuses.includes(effectiveStatus);
       }
 
@@ -185,7 +216,7 @@ export function useGraphFilter(
       getAncestors(id, featureMap, highlightedNodeIds);
 
       // Add all descendants (dependents)
-      getDescendants(id, features, highlightedNodeIds);
+      getDescendants(id, dependentsMap, highlightedNodeIds);
     }
 
     // Get edges in the highlighted path

@@ -41,7 +41,8 @@ runs:
       # Use npm install instead of npm ci to correctly resolve platform-specific
       # optional dependencies (e.g., @tailwindcss/oxide, lightningcss binaries)
       # Skip scripts to avoid electron-builder install-app-deps which uses too much memory
-      run: npm install --ignore-scripts
+      # Use --force to allow platform-specific dev dependencies like dmg-license on non-darwin platforms
+      run: npm install --ignore-scripts --force
 
     - name: Install Linux native bindings
       shell: bash

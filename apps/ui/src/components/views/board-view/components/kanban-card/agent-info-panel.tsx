@@ -1,5 +1,4 @@
-// @ts-nocheck
-import { useEffect, useState, useMemo } from 'react';
+import { memo, useEffect, useState, useMemo } from 'react';
 import { Feature, ThinkingLevel, ParsedTask } from '@/store/app-store';
 import type { ReasoningEffort } from '@automaker/types';
 import { getProviderFromModel } from '@/lib/utils';
@@ -11,19 +10,12 @@ import {
 } from '@/lib/agent-context-parser';
 import { cn } from '@/lib/utils';
 import type { AutoModeEvent } from '@/types/electron';
-import {
-  Brain,
-  ListTodo,
-  Sparkles,
-  Expand,
-  CheckCircle2,
-  Circle,
-  Loader2,
-  Wrench,
-} from 'lucide-react';
+import { Brain, ListTodo, Sparkles, Expand, CheckCircle2, Circle, Wrench } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 import { getElectronAPI } from '@/lib/electron';
 import { SummaryDialog } from './summary-dialog';
 import { getProviderIconForModel } from '@/components/ui/provider-icon';
+import { useFeature, useAgentOutput } from '@/hooks/queries';
 
 /**
  * Formats thinking level for compact display
@@ -58,30 +50,62 @@ function formatReasoningEffort(effort: ReasoningEffort | undefined): string {
 
 interface AgentInfoPanelProps {
   feature: Feature;
+  projectPath: string;
   contextContent?: string;
   summary?: string;
   isCurrentAutoTask?: boolean;
 }
 
-export function AgentInfoPanel({
+export const AgentInfoPanel = memo(function AgentInfoPanel({
   feature,
+  projectPath,
   contextContent,
   summary,
   isCurrentAutoTask,
 }: AgentInfoPanelProps) {
-  const [agentInfo, setAgentInfo] = useState<AgentTaskInfo | null>(null);
   const [isSummaryDialogOpen, setIsSummaryDialogOpen] = useState(false);
   const [isTodosExpanded, setIsTodosExpanded] = useState(false);
   // Track real-time task status updates from WebSocket events
   const [taskStatusMap, setTaskStatusMap] = useState<
     Map<string, 'pending' | 'in_progress' | 'completed'>
   >(new Map());
-  // Fresh planSpec data fetched from API (store data is stale for task progress)
-  const [freshPlanSpec, setFreshPlanSpec] = useState<{
-    tasks?: ParsedTask[];
-    tasksCompleted?: number;
-    currentTaskId?: string;
-  } | null>(null);
+
+  // Determine if we should poll for updates
+  const shouldPoll = isCurrentAutoTask || feature.status === 'in_progress';
+  const shouldFetchData = feature.status !== 'backlog';
+
+  // Fetch fresh feature data for planSpec (store data can be stale for task progress)
+  const { data: freshFeature } = useFeature(projectPath, feature.id, {
+    enabled: shouldFetchData && !contextContent,
+    pollingInterval: shouldPoll ? 3000 : false,
+  });
+
+  // Fetch agent output for parsing
+  const { data: agentOutputContent } = useAgentOutput(projectPath, feature.id, {
+    enabled: shouldFetchData && !contextContent,
+    pollingInterval: shouldPoll ? 3000 : false,
+  });
+
+  // Parse agent output into agentInfo
+  const agentInfo = useMemo(() => {
+    if (contextContent) {
+      return parseAgentContext(contextContent);
+    }
+    if (agentOutputContent) {
+      return parseAgentContext(agentOutputContent);
+    }
+    return null;
+  }, [contextContent, agentOutputContent]);
+
+  // Fresh planSpec data from API (more accurate than store data for task progress)
+  const freshPlanSpec = useMemo(() => {
+    if (!freshFeature?.planSpec) return null;
+    return {
+      tasks: freshFeature.planSpec.tasks,
+      tasksCompleted: freshFeature.planSpec.tasksCompleted || 0,
+      currentTaskId: freshFeature.planSpec.currentTaskId,
+    };
+  }, [freshFeature?.planSpec]);
 
   // Derive effective todos from planSpec.tasks when available, fallback to agentInfo.todos
   // Uses freshPlanSpec (from API) for accurate progress, with taskStatusMap for real-time updates
@@ -132,73 +156,6 @@ export function AgentInfoPanel({
     agentInfo?.todos,
     taskStatusMap,
   ]);
-
-  useEffect(() => {
-    const loadContext = async () => {
-      if (contextContent) {
-        const info = parseAgentContext(contextContent);
-        setAgentInfo(info);
-        return;
-      }
-
-      if (feature.status === 'backlog') {
-        setAgentInfo(null);
-        setFreshPlanSpec(null);
-        return;
-      }
-
-      try {
-        const api = getElectronAPI();
-        const currentProject = (window as any).__currentProject;
-        if (!currentProject?.path) return;
-
-        if (api.features) {
-          // Fetch fresh feature data to get up-to-date planSpec (store data is stale)
-          try {
-            const featureResult = await api.features.get(currentProject.path, feature.id);
-            const freshFeature: any = (featureResult as any).feature;
-            if (featureResult.success && freshFeature?.planSpec) {
-              setFreshPlanSpec({
-                tasks: freshFeature.planSpec.tasks,
-                tasksCompleted: freshFeature.planSpec.tasksCompleted || 0,
-                currentTaskId: freshFeature.planSpec.currentTaskId,
-              });
-            }
-          } catch {
-            // Ignore errors fetching fresh planSpec
-          }
-
-          const result = await api.features.getAgentOutput(currentProject.path, feature.id);
-
-          if (result.success && result.content) {
-            const info = parseAgentContext(result.content);
-            setAgentInfo(info);
-          }
-        } else {
-          const contextPath = `${currentProject.path}/.automaker/features/${feature.id}/agent-output.md`;
-          const result = await api.readFile(contextPath);
-
-          if (result.success && result.content) {
-            const info = parseAgentContext(result.content);
-            setAgentInfo(info);
-          }
-        }
-      } catch {
-        console.debug('[KanbanCard] No context file for feature:', feature.id);
-      }
-    };
-
-    loadContext();
-
-    // Poll for updates when feature is in_progress (not just isCurrentAutoTask)
-    // This ensures planSpec progress stays in sync
-    if (isCurrentAutoTask || feature.status === 'in_progress') {
-      const interval = setInterval(loadContext, 3000);
-      return () => {
-        clearInterval(interval);
-      };
-    }
-  }, [feature.id, feature.status, contextContent, isCurrentAutoTask]);
 
   // Listen to WebSocket events for real-time task status updates
   // This ensures the Kanban card shows the same progress as the Agent Output modal
@@ -338,7 +295,7 @@ export function AgentInfoPanel({
                       {todo.status === 'completed' ? (
                         <CheckCircle2 className="w-2.5 h-2.5 text-[var(--status-success)] shrink-0" />
                       ) : todo.status === 'in_progress' ? (
-                        <Loader2 className="w-2.5 h-2.5 text-[var(--status-warning)] animate-spin shrink-0" />
+                        <Spinner size="xs" className="w-2.5 h-2.5 shrink-0" />
                       ) : (
                         <Circle className="w-2.5 h-2.5 text-muted-foreground/50 shrink-0" />
                       )}
@@ -448,4 +405,4 @@ export function AgentInfoPanel({
       onOpenChange={setIsSummaryDialogOpen}
     />
   );
-}
+});

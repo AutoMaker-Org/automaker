@@ -17,9 +17,19 @@ import dotenv from 'dotenv';
 
 import { createEventEmitter, type EventEmitter } from './lib/events.js';
 import { initAllowedPaths } from '@automaker/platform';
-import { createLogger } from '@automaker/utils';
+import { createLogger, setLogLevel, LogLevel } from '@automaker/utils';
 
 const logger = createLogger('Server');
+
+/**
+ * Map server log level string to LogLevel enum
+ */
+const LOG_LEVEL_MAP: Record<string, LogLevel> = {
+  error: LogLevel.ERROR,
+  warn: LogLevel.WARN,
+  info: LogLevel.INFO,
+  debug: LogLevel.DEBUG,
+};
 import { authMiddleware, validateWsConnectionToken, checkRawAuthentication } from './lib/auth.js';
 import { requireJsonContentType } from './middleware/require-json-content-type.js';
 import { createAuthRoutes } from './routes/auth/index.js';
@@ -68,32 +78,72 @@ import { pipelineService } from './services/pipeline-service.js';
 import { createIdeationRoutes } from './routes/ideation/index.js';
 import { IdeationService } from './services/ideation-service.js';
 import { getDevServerService } from './services/dev-server-service.js';
+import { eventHookService } from './services/event-hook-service.js';
+import { createNotificationsRoutes } from './routes/notifications/index.js';
+import { getNotificationService } from './services/notification-service.js';
+import { createEventHistoryRoutes } from './routes/event-history/index.js';
+import { getEventHistoryService } from './services/event-history-service.js';
 
 // Load environment variables
 dotenv.config();
 
 const PORT = parseInt(process.env.PORT || '3008', 10);
+const HOST = process.env.HOST || '0.0.0.0';
+const HOSTNAME = process.env.HOSTNAME || 'localhost';
 const DATA_DIR = process.env.DATA_DIR || './data';
-const ENABLE_REQUEST_LOGGING = process.env.ENABLE_REQUEST_LOGGING !== 'false'; // Default to true
+logger.info('[SERVER_STARTUP] process.env.DATA_DIR:', process.env.DATA_DIR);
+logger.info('[SERVER_STARTUP] Resolved DATA_DIR:', DATA_DIR);
+logger.info('[SERVER_STARTUP] process.cwd():', process.cwd());
+const ENABLE_REQUEST_LOGGING_DEFAULT = process.env.ENABLE_REQUEST_LOGGING !== 'false'; // Default to true
+
+// Runtime-configurable request logging flag (can be changed via settings)
+let requestLoggingEnabled = ENABLE_REQUEST_LOGGING_DEFAULT;
+
+/**
+ * Enable or disable HTTP request logging at runtime
+ */
+export function setRequestLoggingEnabled(enabled: boolean): void {
+  requestLoggingEnabled = enabled;
+}
+
+/**
+ * Get current request logging state
+ */
+export function isRequestLoggingEnabled(): boolean {
+  return requestLoggingEnabled;
+}
+
+// Width for log box content (excluding borders)
+const BOX_CONTENT_WIDTH = 67;
 
 // Check for required environment variables
 const hasAnthropicKey = !!process.env.ANTHROPIC_API_KEY;
 
 if (!hasAnthropicKey) {
+  const wHeader = '⚠️  WARNING: No Claude authentication configured'.padEnd(BOX_CONTENT_WIDTH);
+  const w1 = 'The Claude Agent SDK requires authentication to function.'.padEnd(BOX_CONTENT_WIDTH);
+  const w2 = 'Set your Anthropic API key:'.padEnd(BOX_CONTENT_WIDTH);
+  const w3 = '  export ANTHROPIC_API_KEY="sk-ant-..."'.padEnd(BOX_CONTENT_WIDTH);
+  const w4 = 'Or use the setup wizard in Settings to configure authentication.'.padEnd(
+    BOX_CONTENT_WIDTH
+  );
+
   logger.warn(`
-╔═══════════════════════════════════════════════════════════════════════╗
-║  ⚠️  WARNING: No Claude authentication configured                      ║
-║                                                                       ║
-║  The Claude Agent SDK requires authentication to function.            ║
-║                                                                       ║
-║  Set your Anthropic API key:                                          ║
-║    export ANTHROPIC_API_KEY="sk-ant-..."                              ║
-║                                                                       ║
-║  Or use the setup wizard in Settings to configure authentication.     ║
-╚═══════════════════════════════════════════════════════════════════════╝
+╔═════════════════════════════════════════════════════════════════════╗
+║  ${wHeader}║
+╠═════════════════════════════════════════════════════════════════════╣
+║                                                                     ║
+║  ${w1}║
+║                                                                     ║
+║  ${w2}║
+║  ${w3}║
+║                                                                     ║
+║  ${w4}║
+║                                                                     ║
+╚═════════════════════════════════════════════════════════════════════╝
 `);
 } else {
-  logger.info('✓ ANTHROPIC_API_KEY detected (API key auth)');
+  logger.info('✓ ANTHROPIC_API_KEY detected');
 }
 
 // Initialize security
@@ -103,22 +153,21 @@ initAllowedPaths();
 const app = express();
 
 // Middleware
-// Custom colored logger showing only endpoint and status code (configurable via ENABLE_REQUEST_LOGGING env var)
-if (ENABLE_REQUEST_LOGGING) {
-  morgan.token('status-colored', (_req, res) => {
-    const status = res.statusCode;
-    if (status >= 500) return `\x1b[31m${status}\x1b[0m`; // Red for server errors
-    if (status >= 400) return `\x1b[33m${status}\x1b[0m`; // Yellow for client errors
-    if (status >= 300) return `\x1b[36m${status}\x1b[0m`; // Cyan for redirects
-    return `\x1b[32m${status}\x1b[0m`; // Green for success
-  });
+// Custom colored logger showing only endpoint and status code (dynamically configurable)
+morgan.token('status-colored', (_req, res) => {
+  const status = res.statusCode;
+  if (status >= 500) return `\x1b[31m${status}\x1b[0m`; // Red for server errors
+  if (status >= 400) return `\x1b[33m${status}\x1b[0m`; // Yellow for client errors
+  if (status >= 300) return `\x1b[36m${status}\x1b[0m`; // Cyan for redirects
+  return `\x1b[32m${status}\x1b[0m`; // Green for success
+});
 
-  app.use(
-    morgan(':method :url :status-colored', {
-      skip: (req) => req.url === '/api/health', // Skip health check logs
-    })
-  );
-}
+app.use(
+  morgan(':method :url :status-colored', {
+    // Skip when request logging is disabled or for health check endpoints
+    skip: (req) => !requestLoggingEnabled || req.url === '/api/health',
+  })
+);
 // CORS configuration
 // When using credentials (cookies), origin cannot be '*'
 // We dynamically allow the requesting origin for local development
@@ -142,14 +191,25 @@ app.use(
         return;
       }
 
-      // For local development, allow localhost origins
-      if (
-        origin.startsWith('http://localhost:') ||
-        origin.startsWith('http://127.0.0.1:') ||
-        origin.startsWith('http://[::1]:')
-      ) {
-        callback(null, origin);
-        return;
+      // For local development, allow all localhost/loopback origins (any port)
+      try {
+        const url = new URL(origin);
+        const hostname = url.hostname;
+
+        if (
+          hostname === 'localhost' ||
+          hostname === '127.0.0.1' ||
+          hostname === '::1' ||
+          hostname === '0.0.0.0' ||
+          hostname.startsWith('192.168.') ||
+          hostname.startsWith('10.') ||
+          hostname.startsWith('172.')
+        ) {
+          callback(null, origin);
+          return;
+        }
+      } catch (err) {
+        // Ignore URL parsing errors
       }
 
       // Reject other origins by default for security
@@ -186,8 +246,50 @@ const ideationService = new IdeationService(events, settingsService, featureLoad
 const devServerService = getDevServerService();
 devServerService.setEventEmitter(events);
 
+// Initialize Notification Service with event emitter for real-time updates
+const notificationService = getNotificationService();
+notificationService.setEventEmitter(events);
+
+// Initialize Event History Service
+const eventHistoryService = getEventHistoryService();
+
+// Initialize Event Hook Service for custom event triggers (with history storage)
+eventHookService.initialize(events, settingsService, eventHistoryService, featureLoader);
+
 // Initialize services
 (async () => {
+  // Migrate settings from legacy Electron userData location if needed
+  // This handles users upgrading from versions that stored settings in ~/.config/Automaker (Linux),
+  // ~/Library/Application Support/Automaker (macOS), or %APPDATA%\Automaker (Windows)
+  // to the new shared ./data directory
+  try {
+    const migrationResult = await settingsService.migrateFromLegacyElectronPath();
+    if (migrationResult.migrated) {
+      logger.info(`Settings migrated from legacy location: ${migrationResult.legacyPath}`);
+      logger.info(`Migrated files: ${migrationResult.migratedFiles.join(', ')}`);
+    }
+    if (migrationResult.errors.length > 0) {
+      logger.warn('Migration errors:', migrationResult.errors);
+    }
+  } catch (err) {
+    logger.warn('Failed to check for legacy settings migration:', err);
+  }
+
+  // Apply logging settings from saved settings
+  try {
+    const settings = await settingsService.getGlobalSettings();
+    if (settings.serverLogLevel && LOG_LEVEL_MAP[settings.serverLogLevel] !== undefined) {
+      setLogLevel(LOG_LEVEL_MAP[settings.serverLogLevel]);
+      logger.info(`Server log level set to: ${settings.serverLogLevel}`);
+    }
+    // Apply request logging setting (default true if not set)
+    const enableRequestLog = settings.enableRequestLogging ?? true;
+    setRequestLoggingEnabled(enableRequestLog);
+    logger.info(`HTTP request logging: ${enableRequestLog ? 'enabled' : 'disabled'}`);
+  } catch (err) {
+    logger.warn('Failed to load logging settings, using defaults');
+  }
+
   await agentService.initialize();
   logger.info('Agent service initialized');
 
@@ -224,7 +326,7 @@ app.get('/api/health/detailed', createDetailedHandler());
 app.use('/api/fs', createFsRoutes(events));
 app.use('/api/agent', createAgentRoutes(agentService, events));
 app.use('/api/sessions', createSessionsRoutes(agentService));
-app.use('/api/features', createFeaturesRoutes(featureLoader));
+app.use('/api/features', createFeaturesRoutes(featureLoader, settingsService, events));
 app.use('/api/auto-mode', createAutoModeRoutes(autoModeService));
 app.use('/api/enhance-prompt', createEnhancePromptRoutes(settingsService));
 app.use('/api/worktree', createWorktreeRoutes(events, settingsService));
@@ -245,6 +347,8 @@ app.use('/api/backlog-plan', createBacklogPlanRoutes(events, settingsService));
 app.use('/api/mcp', createMCPRoutes(mcpTestService));
 app.use('/api/pipeline', createPipelineRoutes(pipelineService));
 app.use('/api/ideation', createIdeationRoutes(events, ideationService, featureLoader));
+app.use('/api/notifications', createNotificationsRoutes(notificationService));
+app.use('/api/event-history', createEventHistoryRoutes(eventHistoryService, settingsService));
 
 // Create HTTP server
 const server = createServer(app);
@@ -556,46 +660,81 @@ terminalWss.on('connection', (ws: WebSocket, req: import('http').IncomingMessage
 });
 
 // Start server with error handling for port conflicts
-const startServer = (port: number) => {
-  server.listen(port, () => {
+const startServer = (port: number, host: string) => {
+  server.listen(port, host, () => {
     const terminalStatus = isTerminalEnabled()
       ? isTerminalPasswordRequired()
         ? 'enabled (password protected)'
         : 'enabled'
       : 'disabled';
-    const portStr = port.toString().padEnd(4);
+
+    // Build URLs for display
+    const listenAddr = `${host}:${port}`;
+    const httpUrl = `http://${HOSTNAME}:${port}`;
+    const wsEventsUrl = `ws://${HOSTNAME}:${port}/api/events`;
+    const wsTerminalUrl = `ws://${HOSTNAME}:${port}/api/terminal/ws`;
+    const healthUrl = `http://${HOSTNAME}:${port}/api/health`;
+
+    const sHeader = '🚀 Automaker Backend Server'.padEnd(BOX_CONTENT_WIDTH);
+    const s1 = `Listening:    ${listenAddr}`.padEnd(BOX_CONTENT_WIDTH);
+    const s2 = `HTTP API:     ${httpUrl}`.padEnd(BOX_CONTENT_WIDTH);
+    const s3 = `WebSocket:    ${wsEventsUrl}`.padEnd(BOX_CONTENT_WIDTH);
+    const s4 = `Terminal WS:  ${wsTerminalUrl}`.padEnd(BOX_CONTENT_WIDTH);
+    const s5 = `Health:       ${healthUrl}`.padEnd(BOX_CONTENT_WIDTH);
+    const s6 = `Terminal:     ${terminalStatus}`.padEnd(BOX_CONTENT_WIDTH);
+
     logger.info(`
-╔═══════════════════════════════════════════════════════╗
-║           Automaker Backend Server                    ║
-╠═══════════════════════════════════════════════════════╣
-║  HTTP API:    http://localhost:${portStr}                 ║
-║  WebSocket:   ws://localhost:${portStr}/api/events        ║
-║  Terminal:    ws://localhost:${portStr}/api/terminal/ws   ║
-║  Health:      http://localhost:${portStr}/api/health      ║
-║  Terminal:    ${terminalStatus.padEnd(37)}║
-╚═══════════════════════════════════════════════════════╝
+╔═════════════════════════════════════════════════════════════════════╗
+║  ${sHeader}║
+╠═════════════════════════════════════════════════════════════════════╣
+║                                                                     ║
+║  ${s1}║
+║  ${s2}║
+║  ${s3}║
+║  ${s4}║
+║  ${s5}║
+║  ${s6}║
+║                                                                     ║
+╚═════════════════════════════════════════════════════════════════════╝
 `);
   });
 
   server.on('error', (error: NodeJS.ErrnoException) => {
     if (error.code === 'EADDRINUSE') {
+      const portStr = port.toString();
+      const nextPortStr = (port + 1).toString();
+      const killCmd = `lsof -ti:${portStr} | xargs kill -9`;
+      const altCmd = `PORT=${nextPortStr} npm run dev:server`;
+
+      const eHeader = `❌ ERROR: Port ${portStr} is already in use`.padEnd(BOX_CONTENT_WIDTH);
+      const e1 = 'Another process is using this port.'.padEnd(BOX_CONTENT_WIDTH);
+      const e2 = 'To fix this, try one of:'.padEnd(BOX_CONTENT_WIDTH);
+      const e3 = '1. Kill the process using the port:'.padEnd(BOX_CONTENT_WIDTH);
+      const e4 = `   ${killCmd}`.padEnd(BOX_CONTENT_WIDTH);
+      const e5 = '2. Use a different port:'.padEnd(BOX_CONTENT_WIDTH);
+      const e6 = `   ${altCmd}`.padEnd(BOX_CONTENT_WIDTH);
+      const e7 = '3. Use the init.sh script which handles this:'.padEnd(BOX_CONTENT_WIDTH);
+      const e8 = '   ./init.sh'.padEnd(BOX_CONTENT_WIDTH);
+
       logger.error(`
-╔═══════════════════════════════════════════════════════╗
-║  ❌ ERROR: Port ${port} is already in use              ║
-╠═══════════════════════════════════════════════════════╣
-║  Another process is using this port.                  ║
-║                                                       ║
-║  To fix this, try one of:                             ║
-║                                                       ║
-║  1. Kill the process using the port:                  ║
-║     lsof -ti:${port} | xargs kill -9                   ║
-║                                                       ║
-║  2. Use a different port:                             ║
-║     PORT=${port + 1} npm run dev:server                ║
-║                                                       ║
-║  3. Use the init.sh script which handles this:        ║
-║     ./init.sh                                         ║
-╚═══════════════════════════════════════════════════════╝
+╔═════════════════════════════════════════════════════════════════════╗
+║  ${eHeader}║
+╠═════════════════════════════════════════════════════════════════════╣
+║                                                                     ║
+║  ${e1}║
+║                                                                     ║
+║  ${e2}║
+║                                                                     ║
+║  ${e3}║
+║  ${e4}║
+║                                                                     ║
+║  ${e5}║
+║  ${e6}║
+║                                                                     ║
+║  ${e7}║
+║  ${e8}║
+║                                                                     ║
+╚═════════════════════════════════════════════════════════════════════╝
 `);
       process.exit(1);
     } else {
@@ -605,7 +744,7 @@ const startServer = (port: number) => {
   });
 };
 
-startServer(PORT);
+startServer(PORT, HOST);
 
 // Global error handlers to prevent crashes from uncaught errors
 process.on('unhandledRejection', (reason: unknown, _promise: Promise<unknown>) => {

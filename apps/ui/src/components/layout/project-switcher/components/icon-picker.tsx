@@ -448,7 +448,9 @@ export function IconPicker({ selectedIcon, onSelectIcon }: IconPickerProps) {
   );
 
   const getIconComponent = (iconName: string) => {
-    return (LucideIcons as Record<string, React.ComponentType<{ className?: string }>>)[iconName];
+    return (LucideIcons as unknown as Record<string, React.ComponentType<{ className?: string }>>)[
+      iconName
+    ];
   };
 
   return (

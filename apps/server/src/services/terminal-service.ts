@@ -70,6 +70,29 @@ export class TerminalService extends EventEmitter {
   private sessions: Map<string, TerminalSession> = new Map();
   private dataCallbacks: Set<DataCallback> = new Set();
   private exitCallbacks: Set<ExitCallback> = new Set();
+  private isWindows = os.platform() === 'win32';
+  // On Windows, ConPTY requires AttachConsole which fails in Electron/service mode
+  // Detect Electron by checking for electron-specific env vars or process properties
+  private isElectron =
+    !!(process.versions && (process.versions as Record<string, string>).electron) ||
+    !!process.env.ELECTRON_RUN_AS_NODE;
+  private useConptyFallback = false; // Track if we need to use winpty fallback on Windows
+
+  /**
+   * Kill a PTY process with platform-specific handling.
+   * Windows doesn't support Unix signals like SIGTERM/SIGKILL, so we call kill() without arguments.
+   * On Unix-like systems (macOS, Linux), we can specify the signal.
+   *
+   * @param ptyProcess - The PTY process to kill
+   * @param signal - The signal to send on Unix-like systems (default: 'SIGTERM')
+   */
+  private killPtyProcess(ptyProcess: pty.IPty, signal: string = 'SIGTERM'): void {
+    if (this.isWindows) {
+      ptyProcess.kill();
+    } else {
+      ptyProcess.kill(signal);
+    }
+  }
 
   /**
    * Detect the best shell for the current platform
@@ -322,13 +345,60 @@ export class TerminalService extends EventEmitter {
 
     logger.info(`Creating session ${id} with shell: ${shell} in ${cwd}`);
 
-    const ptyProcess = pty.spawn(shell, shellArgs, {
+    // Build PTY spawn options
+    const ptyOptions: pty.IPtyForkOptions = {
       name: 'xterm-256color',
       cols: options.cols || 80,
       rows: options.rows || 24,
       cwd,
       env,
-    });
+    };
+
+    // On Windows, always use winpty instead of ConPTY
+    // ConPTY requires AttachConsole which fails in many contexts:
+    // - Electron apps without a console
+    // - VS Code integrated terminal
+    // - Spawned from other applications
+    // The error happens in a subprocess so we can't catch it - must proactively disable
+    if (this.isWindows) {
+      (ptyOptions as pty.IWindowsPtyForkOptions).useConpty = false;
+      logger.info(
+        `[createSession] Using winpty for session ${id} (ConPTY disabled for compatibility)`
+      );
+    }
+
+    let ptyProcess: pty.IPty;
+    try {
+      ptyProcess = pty.spawn(shell, shellArgs, ptyOptions);
+    } catch (spawnError) {
+      const errorMessage = spawnError instanceof Error ? spawnError.message : String(spawnError);
+
+      // Check for Windows ConPTY-specific errors
+      if (this.isWindows && errorMessage.includes('AttachConsole failed')) {
+        // ConPTY failed - try winpty fallback
+        if (!this.useConptyFallback) {
+          logger.warn(`[createSession] ConPTY AttachConsole failed, retrying with winpty fallback`);
+          this.useConptyFallback = true;
+
+          try {
+            (ptyOptions as pty.IWindowsPtyForkOptions).useConpty = false;
+            ptyProcess = pty.spawn(shell, shellArgs, ptyOptions);
+            logger.info(`[createSession] Successfully spawned session ${id} with winpty fallback`);
+          } catch (fallbackError) {
+            const fallbackMessage =
+              fallbackError instanceof Error ? fallbackError.message : String(fallbackError);
+            logger.error(`[createSession] Winpty fallback also failed:`, fallbackMessage);
+            return null;
+          }
+        } else {
+          logger.error(`[createSession] PTY spawn failed (winpty):`, errorMessage);
+          return null;
+        }
+      } else {
+        logger.error(`[createSession] PTY spawn failed:`, errorMessage);
+        return null;
+      }
+    }
 
     const session: TerminalSession = {
       id,
@@ -392,7 +462,11 @@ export class TerminalService extends EventEmitter {
 
     // Handle exit
     ptyProcess.onExit(({ exitCode }) => {
-      logger.info(`Session ${id} exited with code ${exitCode}`);
+      const exitMessage =
+        exitCode === undefined || exitCode === null
+          ? 'Session terminated'
+          : `Session exited with code ${exitCode}`;
+      logger.info(`${exitMessage} (${id})`);
       this.sessions.delete(id);
       this.exitCallbacks.forEach((cb) => cb(id, exitCode));
       this.emit('exit', id, exitCode);
@@ -477,8 +551,9 @@ export class TerminalService extends EventEmitter {
       }
 
       // First try graceful SIGTERM to allow process cleanup
+      // On Windows, killPtyProcess calls kill() without signal since Windows doesn't support Unix signals
       logger.info(`Session ${sessionId} sending SIGTERM`);
-      session.pty.kill('SIGTERM');
+      this.killPtyProcess(session.pty, 'SIGTERM');
 
       // Schedule SIGKILL fallback if process doesn't exit gracefully
       // The onExit handler will remove session from map when it actually exits
@@ -486,7 +561,7 @@ export class TerminalService extends EventEmitter {
         if (this.sessions.has(sessionId)) {
           logger.info(`Session ${sessionId} still alive after SIGTERM, sending SIGKILL`);
           try {
-            session.pty.kill('SIGKILL');
+            this.killPtyProcess(session.pty, 'SIGKILL');
           } catch {
             // Process may have already exited
           }
@@ -588,7 +663,8 @@ export class TerminalService extends EventEmitter {
         if (session.flushTimeout) {
           clearTimeout(session.flushTimeout);
         }
-        session.pty.kill();
+        // Use platform-specific kill to ensure proper termination on Windows
+        this.killPtyProcess(session.pty);
       } catch {
         // Ignore errors during cleanup
       }

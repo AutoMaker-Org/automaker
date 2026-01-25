@@ -14,16 +14,8 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils';
-import {
-  Bot,
-  RefreshCw,
-  Loader2,
-  Users,
-  ExternalLink,
-  Globe,
-  FolderOpen,
-  Sparkles,
-} from 'lucide-react';
+import { Bot, RefreshCw, Users, ExternalLink, Globe, FolderOpen, Sparkles } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 import { useSubagents } from './hooks/use-subagents';
 import { useSubagentsSettings } from './hooks/use-subagents-settings';
 import { SubagentCard } from './subagent-card';
@@ -178,11 +170,7 @@ export function SubagentsSection() {
                 title="Refresh agents from disk"
                 className="gap-1.5 h-7 px-2 text-xs"
               >
-                {isLoadingAgents ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <RefreshCw className="h-3.5 w-3.5" />
-                )}
+                {isLoadingAgents ? <Spinner size="xs" /> : <RefreshCw className="h-3.5 w-3.5" />}
                 Refresh
               </Button>
             </div>

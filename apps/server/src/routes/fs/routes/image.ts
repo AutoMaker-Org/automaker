@@ -1,5 +1,12 @@
 /**
  * GET /image endpoint - Serve image files
+ *
+ * Requires authentication via auth middleware:
+ * - apiKey query parameter (Electron mode)
+ * - token query parameter (web mode)
+ * - session cookie (web mode)
+ * - X-API-Key header (Electron mode)
+ * - X-Session-Token header (web mode)
  */
 
 import type { Request, Response } from 'express';

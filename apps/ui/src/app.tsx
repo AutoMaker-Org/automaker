@@ -8,6 +8,7 @@ import { useCursorStatusInit } from './hooks/use-cursor-status-init';
 import { useProviderAuthInit } from './hooks/use-provider-auth-init';
 import './styles/global.css';
 import './styles/theme-imports';
+import './styles/font-imports';
 
 const logger = createLogger('App');
 

@@ -379,10 +379,11 @@ class DevServerService {
 
     // Create server info early so we can reference it in handlers
     // We'll add it to runningServers after verifying the process started successfully
+    const hostname = process.env.HOSTNAME || 'localhost';
     const serverInfo: DevServerInfo = {
       worktreePath,
       port,
-      url: `http://localhost:${port}`,
+      url: `http://${hostname}:${port}`,
       process: devProcess,
       startedAt: new Date(),
       scrollbackBuffer: '',
@@ -474,7 +475,7 @@ class DevServerService {
       result: {
         worktreePath,
         port,
-        url: `http://localhost:${port}`,
+        url: `http://${hostname}:${port}`,
         message: `Dev server started on port ${port}`,
       },
     };
@@ -594,6 +595,7 @@ class DevServerService {
     result?: {
       worktreePath: string;
       port: number;
+      url: string;
       logs: string;
       startedAt: string;
     };
@@ -613,6 +615,7 @@ class DevServerService {
       result: {
         worktreePath: server.worktreePath,
         port: server.port,
+        url: server.url,
         logs: server.scrollbackBuffer,
         startedAt: server.startedAt.toISOString(),
       },

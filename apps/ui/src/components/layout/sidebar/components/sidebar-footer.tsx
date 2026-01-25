@@ -1,13 +1,12 @@
 import type { NavigateOptions } from '@tanstack/react-router';
 import { cn } from '@/lib/utils';
 import { formatShortcut } from '@/store/app-store';
-import { BookOpen, Activity, Settings } from 'lucide-react';
+import { Activity, Settings } from 'lucide-react';
 
 interface SidebarFooterProps {
   sidebarOpen: boolean;
   isActiveRoute: (id: string) => boolean;
   navigate: (opts: NavigateOptions) => void;
-  hideWiki: boolean;
   hideRunningAgents: boolean;
   runningAgentsCount: number;
   shortcuts: {
@@ -19,7 +18,6 @@ export function SidebarFooter({
   sidebarOpen,
   isActiveRoute,
   navigate,
-  hideWiki,
   hideRunningAgents,
   runningAgentsCount,
   shortcuts,
@@ -34,66 +32,6 @@ export function SidebarFooter({
         'bg-gradient-to-t from-background/10 via-sidebar/50 to-transparent'
       )}
     >
-      {/* Wiki Link */}
-      {!hideWiki && (
-        <div className="p-2 pb-0">
-          <button
-            onClick={() => navigate({ to: '/wiki' })}
-            className={cn(
-              'group flex items-center w-full px-3 py-2.5 rounded-xl relative overflow-hidden titlebar-no-drag',
-              'transition-all duration-200 ease-out',
-              isActiveRoute('wiki')
-                ? [
-                    'bg-gradient-to-r from-brand-500/20 via-brand-500/15 to-brand-600/10',
-                    'text-foreground font-medium',
-                    'border border-brand-500/30',
-                    'shadow-md shadow-brand-500/10',
-                  ]
-                : [
-                    'text-muted-foreground hover:text-foreground',
-                    'hover:bg-accent/50',
-                    'border border-transparent hover:border-border/40',
-                    'hover:shadow-sm',
-                  ],
-              sidebarOpen ? 'justify-start' : 'justify-center',
-              'hover:scale-[1.02] active:scale-[0.97]'
-            )}
-            title={!sidebarOpen ? 'Wiki' : undefined}
-            data-testid="wiki-link"
-          >
-            <BookOpen
-              className={cn(
-                'w-[18px] h-[18px] shrink-0 transition-all duration-200',
-                isActiveRoute('wiki')
-                  ? 'text-brand-500 drop-shadow-sm'
-                  : 'group-hover:text-brand-400 group-hover:scale-110'
-              )}
-            />
-            <span
-              className={cn(
-                'ml-3 font-medium text-sm flex-1 text-left',
-                sidebarOpen ? 'block' : 'hidden'
-              )}
-            >
-              Wiki
-            </span>
-            {!sidebarOpen && (
-              <span
-                className={cn(
-                  'absolute left-full ml-3 px-2.5 py-1.5 rounded-lg',
-                  'bg-popover text-popover-foreground text-xs font-medium',
-                  'border border-border shadow-lg',
-                  'opacity-0 group-hover:opacity-100',
-                  'transition-all duration-200 whitespace-nowrap z-50',
-                  'translate-x-1 group-hover:translate-x-0'
-                )}
-              >
-                Wiki
-              </span>
-            )}
-          </button>
-        </div>
-      )}
       {/* Running Agents Link */}
       {!hideRunningAgents && (
         <div className="p-2 pb-0">
@@ -213,7 +151,7 @@ export function SidebarFooter({
             sidebarOpen ? 'justify-start' : 'justify-center',
             'hover:scale-[1.02] active:scale-[0.97]'
           )}
-          title={!sidebarOpen ? 'Settings' : undefined}
+          title={!sidebarOpen ? 'Global Settings' : undefined}
           data-testid="settings-button"
         >
           <Settings
@@ -230,7 +168,7 @@ export function SidebarFooter({
               sidebarOpen ? 'block' : 'hidden'
             )}
           >
-            Settings
+            Global Settings
           </span>
           {sidebarOpen && (
             <span
@@ -256,7 +194,7 @@ export function SidebarFooter({
                 'translate-x-1 group-hover:translate-x-0'
               )}
             >
-              Settings
+              Global Settings
               <span className="ml-2 px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono text-muted-foreground">
                 {formatShortcut(shortcuts.settings, true)}
               </span>

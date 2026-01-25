@@ -10,6 +10,7 @@ import { createElement } from 'react';
 import { SPEC_FILE_WRITE_DELAY, STATUS_CHECK_INTERVAL_MS } from '../constants';
 import type { FeatureCount } from '../types';
 import type { SpecRegenerationEvent } from '@/types/electron';
+import { useCreateSpec, useRegenerateSpec, useGenerateFeatures } from '@/hooks/mutations';
 
 interface UseSpecGenerationOptions {
   loadSpec: () => Promise<void>;
@@ -17,6 +18,11 @@ interface UseSpecGenerationOptions {
 
 export function useSpecGeneration({ loadSpec }: UseSpecGenerationOptions) {
   const { currentProject } = useAppStore();
+
+  // React Query mutations
+  const createSpecMutation = useCreateSpec(currentProject?.path ?? '');
+  const regenerateSpecMutation = useRegenerateSpec(currentProject?.path ?? '');
+  const generateFeaturesMutation = useGenerateFeatures(currentProject?.path ?? '');
 
   // Dialog visibility state
   const [showCreateDialog, setShowCreateDialog] = useState(false);
@@ -39,6 +45,9 @@ export function useSpecGeneration({ loadSpec }: UseSpecGenerationOptions) {
   // Generate features only state
   const [isGeneratingFeatures, setIsGeneratingFeatures] = useState(false);
 
+  // Sync state
+  const [isSyncing, setIsSyncing] = useState(false);
+
   // Logs state (kept for internal tracking)
   const [logs, setLogs] = useState<string>('');
   const logsRef = useRef<string>('');
@@ -55,6 +64,7 @@ export function useSpecGeneration({ loadSpec }: UseSpecGenerationOptions) {
     setIsCreating(false);
     setIsRegenerating(false);
     setIsGeneratingFeatures(false);
+    setIsSyncing(false);
     setCurrentPhase('');
     setErrorMessage('');
     setLogs('');
@@ -135,7 +145,7 @@ export function useSpecGeneration({ loadSpec }: UseSpecGenerationOptions) {
       if (
         !document.hidden &&
         currentProject &&
-        (isCreating || isRegenerating || isGeneratingFeatures)
+        (isCreating || isRegenerating || isGeneratingFeatures || isSyncing)
       ) {
         try {
           const api = getElectronAPI();
@@ -151,6 +161,7 @@ export function useSpecGeneration({ loadSpec }: UseSpecGenerationOptions) {
             setIsCreating(false);
             setIsRegenerating(false);
             setIsGeneratingFeatures(false);
+            setIsSyncing(false);
             setCurrentPhase('');
             stateRestoredRef.current = false;
             loadSpec();
@@ -167,11 +178,12 @@ export function useSpecGeneration({ loadSpec }: UseSpecGenerationOptions) {
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [currentProject, isCreating, isRegenerating, isGeneratingFeatures, loadSpec]);
+  }, [currentProject, isCreating, isRegenerating, isGeneratingFeatures, isSyncing, loadSpec]);
 
   // Periodic status check
   useEffect(() => {
-    if (!currentProject || (!isCreating && !isRegenerating && !isGeneratingFeatures)) return;
+    if (!currentProject || (!isCreating && !isRegenerating && !isGeneratingFeatures && !isSyncing))
+      return;
 
     const intervalId = setInterval(async () => {
       try {
@@ -187,6 +199,7 @@ export function useSpecGeneration({ loadSpec }: UseSpecGenerationOptions) {
           setIsCreating(false);
           setIsRegenerating(false);
           setIsGeneratingFeatures(false);
+          setIsSyncing(false);
           setCurrentPhase('');
           stateRestoredRef.current = false;
           loadSpec();
@@ -205,7 +218,15 @@ export function useSpecGeneration({ loadSpec }: UseSpecGenerationOptions) {
     return () => {
       clearInterval(intervalId);
     };
-  }, [currentProject, isCreating, isRegenerating, isGeneratingFeatures, currentPhase, loadSpec]);
+  }, [
+    currentProject,
+    isCreating,
+    isRegenerating,
+    isGeneratingFeatures,
+    isSyncing,
+    currentPhase,
+    loadSpec,
+  ]);
 
   // Subscribe to spec regeneration events
   useEffect(() => {
@@ -317,7 +338,8 @@ export function useSpecGeneration({ loadSpec }: UseSpecGenerationOptions) {
           event.message === 'All tasks completed!' ||
           event.message === 'All tasks completed' ||
           event.message === 'Spec regeneration complete!' ||
-          event.message === 'Initial spec creation complete!';
+          event.message === 'Initial spec creation complete!' ||
+          event.message?.includes('Spec sync complete');
 
         const hasCompletePhase = logsRef.current.includes('[Phase: complete]');
 
@@ -337,6 +359,7 @@ export function useSpecGeneration({ loadSpec }: UseSpecGenerationOptions) {
           setIsRegenerating(false);
           setIsCreating(false);
           setIsGeneratingFeatures(false);
+          setIsSyncing(false);
           setCurrentPhase('');
           setShowRegenerateDialog(false);
           setShowCreateDialog(false);
@@ -349,18 +372,23 @@ export function useSpecGeneration({ loadSpec }: UseSpecGenerationOptions) {
             loadSpec();
           }, SPEC_FILE_WRITE_DELAY);
 
+          const isSyncComplete = event.message?.includes('sync');
           const isRegeneration = event.message?.includes('regeneration');
           const isFeatureGeneration = event.message?.includes('Feature generation');
           toast.success(
-            isFeatureGeneration
-              ? 'Feature Generation Complete'
-              : isRegeneration
-                ? 'Spec Regeneration Complete'
-                : 'Spec Creation Complete',
+            isSyncComplete
+              ? 'Spec Sync Complete'
+              : isFeatureGeneration
+                ? 'Feature Generation Complete'
+                : isRegeneration
+                  ? 'Spec Regeneration Complete'
+                  : 'Spec Creation Complete',
             {
-              description: isFeatureGeneration
-                ? 'Features have been created from the app specification.'
-                : 'Your app specification has been saved.',
+              description: isSyncComplete
+                ? 'Your spec has been updated with the latest changes.'
+                : isFeatureGeneration
+                  ? 'Features have been created from the app specification.'
+                  : 'Your app specification has been saved.',
               icon: createElement(CheckCircle2, { className: 'w-4 h-4' }),
             }
           );
@@ -378,6 +406,7 @@ export function useSpecGeneration({ loadSpec }: UseSpecGenerationOptions) {
         setIsRegenerating(false);
         setIsCreating(false);
         setIsGeneratingFeatures(false);
+        setIsSyncing(false);
         setCurrentPhase('error');
         setErrorMessage(event.error);
         stateRestoredRef.current = false;
@@ -404,47 +433,34 @@ export function useSpecGeneration({ loadSpec }: UseSpecGenerationOptions) {
     logsRef.current = '';
     setLogs('');
     logger.debug('[useSpecGeneration] Starting spec creation, generateFeatures:', generateFeatures);
-    try {
-      const api = getElectronAPI();
-      if (!api.specRegeneration) {
-        logger.error('[useSpecGeneration] Spec regeneration not available');
-        setIsCreating(false);
-        return;
-      }
-      const result = await api.specRegeneration.create(
-        currentProject.path,
-        projectOverview.trim(),
-        generateFeatures,
-        analyzeProjectOnCreate,
-        generateFeatures ? featureCountOnCreate : undefined
-      );
 
-      if (!result.success) {
-        const errorMsg = result.error || 'Unknown error';
-        logger.error('[useSpecGeneration] Failed to start spec creation:', errorMsg);
-        setIsCreating(false);
-        setCurrentPhase('error');
-        setErrorMessage(errorMsg);
-        const errorLog = `[Error] Failed to start spec creation: ${errorMsg}\n`;
-        logsRef.current = errorLog;
-        setLogs(errorLog);
+    createSpecMutation.mutate(
+      {
+        projectOverview: projectOverview.trim(),
+        generateFeatures,
+        analyzeProject: analyzeProjectOnCreate,
+        featureCount: generateFeatures ? featureCountOnCreate : undefined,
+      },
+      {
+        onError: (error) => {
+          const errorMsg = error.message;
+          logger.error('[useSpecGeneration] Failed to create spec:', errorMsg);
+          setIsCreating(false);
+          setCurrentPhase('error');
+          setErrorMessage(errorMsg);
+          const errorLog = `[Error] Failed to create spec: ${errorMsg}\n`;
+          logsRef.current = errorLog;
+          setLogs(errorLog);
+        },
       }
-    } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : String(error);
-      logger.error('[useSpecGeneration] Failed to create spec:', errorMsg);
-      setIsCreating(false);
-      setCurrentPhase('error');
-      setErrorMessage(errorMsg);
-      const errorLog = `[Error] Failed to create spec: ${errorMsg}\n`;
-      logsRef.current = errorLog;
-      setLogs(errorLog);
-    }
+    );
   }, [
     currentProject,
     projectOverview,
     generateFeatures,
     analyzeProjectOnCreate,
     featureCountOnCreate,
+    createSpecMutation,
   ]);
 
   const handleRegenerate = useCallback(async () => {
@@ -460,47 +476,34 @@ export function useSpecGeneration({ loadSpec }: UseSpecGenerationOptions) {
       '[useSpecGeneration] Starting spec regeneration, generateFeatures:',
       generateFeaturesOnRegenerate
     );
-    try {
-      const api = getElectronAPI();
-      if (!api.specRegeneration) {
-        logger.error('[useSpecGeneration] Spec regeneration not available');
-        setIsRegenerating(false);
-        return;
-      }
-      const result = await api.specRegeneration.generate(
-        currentProject.path,
-        projectDefinition.trim(),
-        generateFeaturesOnRegenerate,
-        analyzeProjectOnRegenerate,
-        generateFeaturesOnRegenerate ? featureCountOnRegenerate : undefined
-      );
 
-      if (!result.success) {
-        const errorMsg = result.error || 'Unknown error';
-        logger.error('[useSpecGeneration] Failed to start regeneration:', errorMsg);
-        setIsRegenerating(false);
-        setCurrentPhase('error');
-        setErrorMessage(errorMsg);
-        const errorLog = `[Error] Failed to start regeneration: ${errorMsg}\n`;
-        logsRef.current = errorLog;
-        setLogs(errorLog);
+    regenerateSpecMutation.mutate(
+      {
+        projectDefinition: projectDefinition.trim(),
+        generateFeatures: generateFeaturesOnRegenerate,
+        analyzeProject: analyzeProjectOnRegenerate,
+        featureCount: generateFeaturesOnRegenerate ? featureCountOnRegenerate : undefined,
+      },
+      {
+        onError: (error) => {
+          const errorMsg = error.message;
+          logger.error('[useSpecGeneration] Failed to regenerate spec:', errorMsg);
+          setIsRegenerating(false);
+          setCurrentPhase('error');
+          setErrorMessage(errorMsg);
+          const errorLog = `[Error] Failed to regenerate spec: ${errorMsg}\n`;
+          logsRef.current = errorLog;
+          setLogs(errorLog);
+        },
       }
-    } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : String(error);
-      logger.error('[useSpecGeneration] Failed to regenerate spec:', errorMsg);
-      setIsRegenerating(false);
-      setCurrentPhase('error');
-      setErrorMessage(errorMsg);
-      const errorLog = `[Error] Failed to regenerate spec: ${errorMsg}\n`;
-      logsRef.current = errorLog;
-      setLogs(errorLog);
-    }
+    );
   }, [
     currentProject,
     projectDefinition,
     generateFeaturesOnRegenerate,
     analyzeProjectOnRegenerate,
     featureCountOnRegenerate,
+    regenerateSpecMutation,
   ]);
 
   const handleGenerateFeatures = useCallback(async () => {
@@ -513,32 +516,56 @@ export function useSpecGeneration({ loadSpec }: UseSpecGenerationOptions) {
     logsRef.current = '';
     setLogs('');
     logger.debug('[useSpecGeneration] Starting feature generation from existing spec');
+
+    generateFeaturesMutation.mutate(undefined, {
+      onError: (error) => {
+        const errorMsg = error.message;
+        logger.error('[useSpecGeneration] Failed to generate features:', errorMsg);
+        setIsGeneratingFeatures(false);
+        setCurrentPhase('error');
+        setErrorMessage(errorMsg);
+        const errorLog = `[Error] Failed to generate features: ${errorMsg}\n`;
+        logsRef.current = errorLog;
+        setLogs(errorLog);
+      },
+    });
+  }, [currentProject, generateFeaturesMutation]);
+
+  const handleSync = useCallback(async () => {
+    if (!currentProject) return;
+
+    setIsSyncing(true);
+    setCurrentPhase('sync');
+    setErrorMessage('');
+    logsRef.current = '';
+    setLogs('');
+    logger.debug('[useSpecGeneration] Starting spec sync');
     try {
       const api = getElectronAPI();
       if (!api.specRegeneration) {
         logger.error('[useSpecGeneration] Spec regeneration not available');
-        setIsGeneratingFeatures(false);
+        setIsSyncing(false);
         return;
       }
-      const result = await api.specRegeneration.generateFeatures(currentProject.path);
+      const result = await api.specRegeneration.sync(currentProject.path);
 
       if (!result.success) {
         const errorMsg = result.error || 'Unknown error';
-        logger.error('[useSpecGeneration] Failed to start feature generation:', errorMsg);
-        setIsGeneratingFeatures(false);
+        logger.error('[useSpecGeneration] Failed to start spec sync:', errorMsg);
+        setIsSyncing(false);
         setCurrentPhase('error');
         setErrorMessage(errorMsg);
-        const errorLog = `[Error] Failed to start feature generation: ${errorMsg}\n`;
+        const errorLog = `[Error] Failed to start spec sync: ${errorMsg}\n`;
         logsRef.current = errorLog;
         setLogs(errorLog);
       }
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
-      logger.error('[useSpecGeneration] Failed to generate features:', errorMsg);
-      setIsGeneratingFeatures(false);
+      logger.error('[useSpecGeneration] Failed to sync spec:', errorMsg);
+      setIsSyncing(false);
       setCurrentPhase('error');
       setErrorMessage(errorMsg);
-      const errorLog = `[Error] Failed to generate features: ${errorMsg}\n`;
+      const errorLog = `[Error] Failed to sync spec: ${errorMsg}\n`;
       logsRef.current = errorLog;
       setLogs(errorLog);
     }
@@ -576,6 +603,9 @@ export function useSpecGeneration({ loadSpec }: UseSpecGenerationOptions) {
     // Feature generation state
     isGeneratingFeatures,
 
+    // Sync state
+    isSyncing,
+
     // Status state
     currentPhase,
     errorMessage,
@@ -584,6 +614,7 @@ export function useSpecGeneration({ loadSpec }: UseSpecGenerationOptions) {
     // Handlers
     handleCreateSpec,
     handleRegenerate,
+    handleSync,
     handleGenerateFeatures,
   };
 }

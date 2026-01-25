@@ -13,7 +13,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { getElectronAPI } from '@/lib/electron';
 import { toast } from 'sonner';
-import { GitBranchPlus, Loader2 } from 'lucide-react';
+import { GitBranchPlus } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 
 interface WorktreeInfo {
   path: string;
@@ -133,7 +134,7 @@ export function CreateBranchDialog({
           <Button onClick={handleCreate} disabled={!branchName.trim() || isCreating}>
             {isCreating ? (
               <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                <Spinner size="sm" className="mr-2" />
                 Creating...
               </>
             ) : (

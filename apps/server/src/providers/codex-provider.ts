@@ -33,6 +33,8 @@ import {
   CODEX_MODEL_MAP,
   supportsReasoningEffort,
   validateBareModelId,
+  calculateReasoningTimeout,
+  DEFAULT_TIMEOUT_MS,
   type CodexApprovalPolicy,
   type CodexSandboxMode,
   type CodexAuthStatus,
@@ -91,7 +93,14 @@ const CODEX_ITEM_TYPES = {
 const SYSTEM_PROMPT_LABEL = 'System instructions';
 const HISTORY_HEADER = 'Current request:\n';
 const TEXT_ENCODING = 'utf-8';
-const DEFAULT_TIMEOUT_MS = 30000;
+/**
+ * Default timeout for Codex CLI operations in milliseconds.
+ * This is the "no output" timeout - if the CLI doesn't produce any JSONL output
+ * for this duration, the process is killed. For reasoning models with high
+ * reasoning effort, this timeout is dynamically extended via calculateReasoningTimeout().
+ * @see calculateReasoningTimeout from @automaker/types
+ */
+const CODEX_CLI_TIMEOUT_MS = DEFAULT_TIMEOUT_MS;
 const CONTEXT_WINDOW_256K = 256000;
 const MAX_OUTPUT_32K = 32000;
 const MAX_OUTPUT_16K = 16000;
@@ -814,13 +823,19 @@ export class CodexProvider extends BaseProvider {
         envOverrides[OPENAI_API_KEY_ENV] = executionPlan.openAiApiKey;
       }
 
+      // Calculate dynamic timeout based on reasoning effort.
+      // Higher reasoning effort (e.g., 'xhigh' for "xtra thinking" mode) requires more time
+      // for the model to generate reasoning tokens before producing output.
+      // This fixes GitHub issue #530 where features would get stuck with reasoning models.
+      const timeout = calculateReasoningTimeout(options.reasoningEffort, CODEX_CLI_TIMEOUT_MS);
+
       const stream = spawnJSONLProcess({
         command: commandPath,
         args,
         cwd: options.cwd,
         env: envOverrides,
         abortController: options.abortController,
-        timeout: DEFAULT_TIMEOUT_MS,
+        timeout,
         stdinData: promptText, // Pass prompt via stdin
       });
 

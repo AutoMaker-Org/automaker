@@ -24,7 +24,8 @@ import {
 } from '@/lib/http-api-client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { KeyRound, AlertCircle, Loader2, RefreshCw, ServerCrash } from 'lucide-react';
+import { KeyRound, AlertCircle, RefreshCw, ServerCrash } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 import { useAuthStore } from '@/store/auth-store';
 import { useSetupStore } from '@/store/setup-store';
 
@@ -349,7 +350,7 @@ export function LoginView() {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background p-4">
         <div className="text-center space-y-4">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
+          <Spinner size="xl" className="mx-auto" />
           <p className="text-sm text-muted-foreground">
             Connecting to server
             {state.attempt > 1 ? ` (attempt ${state.attempt}/${MAX_RETRIES})` : '...'}
@@ -385,7 +386,7 @@ export function LoginView() {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background p-4">
         <div className="text-center space-y-4">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
+          <Spinner size="xl" className="mx-auto" />
           <p className="text-sm text-muted-foreground">
             {state.phase === 'checking_setup' ? 'Loading settings...' : 'Redirecting...'}
           </p>
@@ -447,7 +448,7 @@ export function LoginView() {
           >
             {isLoggingIn ? (
               <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                <Spinner size="sm" className="mr-2" />
                 Authenticating...
               </>
             ) : (

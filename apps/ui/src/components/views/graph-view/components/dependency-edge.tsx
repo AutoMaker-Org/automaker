@@ -4,6 +4,7 @@ import type { EdgeProps } from '@xyflow/react';
 import { cn } from '@/lib/utils';
 import { Feature } from '@/store/app-store';
 import { Trash2 } from 'lucide-react';
+import { GRAPH_RENDER_MODE_COMPACT, type GraphRenderMode } from '../constants';
 
 export interface DependencyEdgeData {
   sourceStatus: Feature['status'];
@@ -11,6 +12,7 @@ export interface DependencyEdgeData {
   isHighlighted?: boolean;
   isDimmed?: boolean;
   onDeleteDependency?: (sourceId: string, targetId: string) => void;
+  renderMode?: GraphRenderMode;
 }
 
 const getEdgeColor = (sourceStatus?: Feature['status'], targetStatus?: Feature['status']) => {
@@ -61,6 +63,7 @@ export const DependencyEdge = memo(function DependencyEdge(props: EdgeProps) {
 
   const isHighlighted = edgeData?.isHighlighted ?? false;
   const isDimmed = edgeData?.isDimmed ?? false;
+  const isCompact = edgeData?.renderMode === GRAPH_RENDER_MODE_COMPACT;
 
   const edgeColor = isHighlighted
     ? 'var(--brand-500)'
@@ -74,8 +77,62 @@ export const DependencyEdge = memo(function DependencyEdge(props: EdgeProps) {
 
   const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation();
-    edgeData?.onDeleteDependency?.(source, target);
+    console.log('Edge delete button clicked', {
+      source,
+      target,
+      hasCallback: !!edgeData?.onDeleteDependency,
+    });
+    if (edgeData?.onDeleteDependency) {
+      edgeData.onDeleteDependency(source, target);
+    } else {
+      console.error('onDeleteDependency callback is not defined on edge data');
+    }
   };
+
+  if (isCompact) {
+    return (
+      <>
+        <BaseEdge
+          id={id}
+          path={edgePath}
+          className={cn('transition-opacity duration-200', isDimmed && 'graph-edge-dimmed')}
+          style={{
+            strokeWidth: selected ? 2 : 1.5,
+            stroke: selected ? 'var(--status-error)' : edgeColor,
+            strokeDasharray: isCompleted ? 'none' : '5 5',
+            opacity: isDimmed ? 0.2 : 1,
+          }}
+        />
+        {selected && edgeData?.onDeleteDependency && (
+          <EdgeLabelRenderer>
+            <div
+              style={{
+                position: 'absolute',
+                transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
+                pointerEvents: 'auto',
+                zIndex: 1000,
+              }}
+            >
+              <button
+                onClick={handleDelete}
+                className={cn(
+                  'flex items-center justify-center',
+                  'w-6 h-6 rounded-full',
+                  'bg-[var(--status-error)] hover:bg-[var(--status-error)]/80',
+                  'text-white shadow-lg',
+                  'transition-all duration-150',
+                  'hover:scale-110'
+                )}
+                title="Delete dependency"
+              >
+                <Trash2 className="w-3 h-3" />
+              </button>
+            </div>
+          </EdgeLabelRenderer>
+        )}
+      </>
+    );
+  }
 
   return (
     <>

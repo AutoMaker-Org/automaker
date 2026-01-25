@@ -68,6 +68,9 @@ export type ThemeMode =
 /** PlanningMode - Planning levels for feature generation workflows */
 export type PlanningMode = 'skip' | 'lite' | 'spec' | 'full';
 
+/** ServerLogLevel - Log verbosity level for the API server */
+export type ServerLogLevel = 'error' | 'warn' | 'info' | 'debug';
+
 /** ThinkingLevel - Extended thinking levels for Claude models (reasoning intensity) */
 export type ThinkingLevel = 'none' | 'low' | 'medium' | 'high' | 'ultrathink';
 
@@ -98,6 +101,437 @@ export function getThinkingTokenBudget(level: ThinkingLevel | undefined): number
 /** ModelProvider - AI model provider for credentials and API key management */
 export type ModelProvider = 'claude' | 'cursor' | 'codex' | 'opencode';
 
+// ============================================================================
+// Claude-Compatible Providers - Configuration for Claude-compatible API endpoints
+// ============================================================================
+
+/**
+ * ApiKeySource - Strategy for sourcing API keys
+ *
+ * - 'inline': API key stored directly in the profile (legacy/default behavior)
+ * - 'env': Use ANTHROPIC_API_KEY environment variable
+ * - 'credentials': Use the Anthropic key from Settings → API Keys (credentials.json)
+ */
+export type ApiKeySource = 'inline' | 'env' | 'credentials';
+
+/**
+ * ClaudeCompatibleProviderType - Type of Claude-compatible provider
+ *
+ * Used to determine provider-specific UI screens and default configurations.
+ */
+export type ClaudeCompatibleProviderType =
+  | 'anthropic' // Direct Anthropic API (built-in)
+  | 'glm' // z.AI GLM
+  | 'minimax' // MiniMax
+  | 'openrouter' // OpenRouter proxy
+  | 'custom'; // User-defined custom provider
+
+/**
+ * ClaudeModelAlias - The three main Claude model aliases for mapping
+ */
+export type ClaudeModelAlias = 'haiku' | 'sonnet' | 'opus';
+
+/**
+ * ProviderModel - A model exposed by a Claude-compatible provider
+ *
+ * Each provider configuration can expose multiple models that will appear
+ * in all model dropdowns throughout the app. Models map directly to a
+ * Claude model (haiku, sonnet, opus) for bulk replace and display.
+ */
+export interface ProviderModel {
+  /** Model ID sent to the API (e.g., "GLM-4.7", "MiniMax-M2.1") */
+  id: string;
+  /** Display name shown in UI (e.g., "GLM 4.7", "MiniMax M2.1") */
+  displayName: string;
+  /** Which Claude model this maps to (for bulk replace and display) */
+  mapsToClaudeModel?: ClaudeModelAlias;
+  /** Model capabilities */
+  capabilities?: {
+    /** Whether model supports vision/image inputs */
+    supportsVision?: boolean;
+    /** Whether model supports extended thinking */
+    supportsThinking?: boolean;
+    /** Maximum thinking level if thinking is supported */
+    maxThinkingLevel?: ThinkingLevel;
+  };
+}
+
+/**
+ * ClaudeCompatibleProvider - Configuration for a Claude-compatible API endpoint
+ *
+ * Providers expose their models to all model dropdowns in the app.
+ * Each provider has its own API configuration (endpoint, credentials, etc.)
+ */
+export interface ClaudeCompatibleProvider {
+  /** Unique identifier (uuid) */
+  id: string;
+  /** Display name (e.g., "z.AI GLM (Work)", "MiniMax") */
+  name: string;
+  /** Provider type determines UI screen and default settings */
+  providerType: ClaudeCompatibleProviderType;
+  /** Whether this provider is enabled (models appear in dropdowns) */
+  enabled?: boolean;
+
+  // Connection settings
+  /** ANTHROPIC_BASE_URL - custom API endpoint */
+  baseUrl: string;
+  /** API key sourcing strategy */
+  apiKeySource: ApiKeySource;
+  /** API key value (only required when apiKeySource = 'inline') */
+  apiKey?: string;
+  /** If true, use ANTHROPIC_AUTH_TOKEN instead of ANTHROPIC_API_KEY */
+  useAuthToken?: boolean;
+  /** API_TIMEOUT_MS override in milliseconds */
+  timeoutMs?: number;
+  /** Set CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1 */
+  disableNonessentialTraffic?: boolean;
+
+  /** Models exposed by this provider (appear in all dropdowns) */
+  models: ProviderModel[];
+
+  /** Provider-specific settings for future extensibility */
+  providerSettings?: Record<string, unknown>;
+}
+
+/**
+ * ClaudeApiProfile - Configuration for a Claude-compatible API endpoint
+ *
+ * @deprecated Use ClaudeCompatibleProvider instead. This type is kept for
+ * backward compatibility during migration.
+ */
+export interface ClaudeApiProfile {
+  /** Unique identifier (uuid) */
+  id: string;
+  /** Display name (e.g., "z.AI GLM", "AWS Bedrock") */
+  name: string;
+  /** ANTHROPIC_BASE_URL - custom API endpoint */
+  baseUrl: string;
+  /**
+   * API key sourcing strategy (default: 'inline' for backwards compatibility)
+   * - 'inline': Use apiKey field value
+   * - 'env': Use ANTHROPIC_API_KEY environment variable
+   * - 'credentials': Use the Anthropic key from credentials.json
+   */
+  apiKeySource?: ApiKeySource;
+  /** API key value (only required when apiKeySource = 'inline' or undefined) */
+  apiKey?: string;
+  /** If true, use ANTHROPIC_AUTH_TOKEN instead of ANTHROPIC_API_KEY */
+  useAuthToken?: boolean;
+  /** API_TIMEOUT_MS override in milliseconds */
+  timeoutMs?: number;
+  /** Optional model name mappings (deprecated - use ClaudeCompatibleProvider.models instead) */
+  modelMappings?: {
+    /** Maps to ANTHROPIC_DEFAULT_HAIKU_MODEL */
+    haiku?: string;
+    /** Maps to ANTHROPIC_DEFAULT_SONNET_MODEL */
+    sonnet?: string;
+    /** Maps to ANTHROPIC_DEFAULT_OPUS_MODEL */
+    opus?: string;
+  };
+  /** Set CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1 */
+  disableNonessentialTraffic?: boolean;
+}
+
+/**
+ * ClaudeCompatibleProviderTemplate - Template for quick provider setup
+ *
+ * Contains pre-configured settings for known Claude-compatible providers.
+ */
+export interface ClaudeCompatibleProviderTemplate {
+  /** Template identifier for matching */
+  templateId: ClaudeCompatibleProviderType;
+  /** Display name for the template */
+  name: string;
+  /** Provider type */
+  providerType: ClaudeCompatibleProviderType;
+  /** API base URL */
+  baseUrl: string;
+  /** Default API key source for this template */
+  defaultApiKeySource: ApiKeySource;
+  /** Use auth token instead of API key */
+  useAuthToken: boolean;
+  /** Timeout in milliseconds */
+  timeoutMs?: number;
+  /** Disable non-essential traffic */
+  disableNonessentialTraffic?: boolean;
+  /** Description shown in UI */
+  description: string;
+  /** URL to get API key */
+  apiKeyUrl?: string;
+  /** Default models for this provider */
+  defaultModels: ProviderModel[];
+}
+
+/** Predefined templates for known Claude-compatible providers */
+export const CLAUDE_PROVIDER_TEMPLATES: ClaudeCompatibleProviderTemplate[] = [
+  {
+    templateId: 'anthropic',
+    name: 'Direct Anthropic',
+    providerType: 'anthropic',
+    baseUrl: 'https://api.anthropic.com',
+    defaultApiKeySource: 'credentials',
+    useAuthToken: false,
+    description: 'Standard Anthropic API with your API key',
+    apiKeyUrl: 'https://console.anthropic.com/settings/keys',
+    defaultModels: [
+      { id: 'claude-haiku', displayName: 'Claude Haiku', mapsToClaudeModel: 'haiku' },
+      { id: 'claude-sonnet', displayName: 'Claude Sonnet', mapsToClaudeModel: 'sonnet' },
+      { id: 'claude-opus', displayName: 'Claude Opus', mapsToClaudeModel: 'opus' },
+    ],
+  },
+  {
+    templateId: 'openrouter',
+    name: 'OpenRouter',
+    providerType: 'openrouter',
+    baseUrl: 'https://openrouter.ai/api',
+    defaultApiKeySource: 'inline',
+    useAuthToken: true,
+    description: 'Access Claude and 300+ models via OpenRouter',
+    apiKeyUrl: 'https://openrouter.ai/keys',
+    defaultModels: [
+      // OpenRouter users manually add model IDs
+      {
+        id: 'anthropic/claude-3.5-haiku',
+        displayName: 'Claude 3.5 Haiku',
+        mapsToClaudeModel: 'haiku',
+      },
+      {
+        id: 'anthropic/claude-3.5-sonnet',
+        displayName: 'Claude 3.5 Sonnet',
+        mapsToClaudeModel: 'sonnet',
+      },
+      { id: 'anthropic/claude-3-opus', displayName: 'Claude 3 Opus', mapsToClaudeModel: 'opus' },
+    ],
+  },
+  {
+    templateId: 'glm',
+    name: 'z.AI GLM',
+    providerType: 'glm',
+    baseUrl: 'https://api.z.ai/api/anthropic',
+    defaultApiKeySource: 'inline',
+    useAuthToken: true,
+    timeoutMs: 3000000,
+    disableNonessentialTraffic: true,
+    description: '3× usage at fraction of cost via GLM Coding Plan',
+    apiKeyUrl: 'https://z.ai/manage-apikey/apikey-list',
+    defaultModels: [
+      { id: 'GLM-4.5-Air', displayName: 'GLM 4.5 Air', mapsToClaudeModel: 'haiku' },
+      { id: 'GLM-4.7', displayName: 'GLM 4.7', mapsToClaudeModel: 'sonnet' },
+      { id: 'GLM-4.7', displayName: 'GLM 4.7', mapsToClaudeModel: 'opus' },
+    ],
+  },
+  {
+    templateId: 'minimax',
+    name: 'MiniMax',
+    providerType: 'minimax',
+    baseUrl: 'https://api.minimax.io/anthropic',
+    defaultApiKeySource: 'inline',
+    useAuthToken: true,
+    timeoutMs: 3000000,
+    disableNonessentialTraffic: true,
+    description: 'MiniMax M2.1 coding model with extended context',
+    apiKeyUrl: 'https://platform.minimax.io/user-center/basic-information/interface-key',
+    defaultModels: [
+      { id: 'MiniMax-M2.1', displayName: 'MiniMax M2.1', mapsToClaudeModel: 'haiku' },
+      { id: 'MiniMax-M2.1', displayName: 'MiniMax M2.1', mapsToClaudeModel: 'sonnet' },
+      { id: 'MiniMax-M2.1', displayName: 'MiniMax M2.1', mapsToClaudeModel: 'opus' },
+    ],
+  },
+  {
+    templateId: 'minimax',
+    name: 'MiniMax (China)',
+    providerType: 'minimax',
+    baseUrl: 'https://api.minimaxi.com/anthropic',
+    defaultApiKeySource: 'inline',
+    useAuthToken: true,
+    timeoutMs: 3000000,
+    disableNonessentialTraffic: true,
+    description: 'MiniMax M2.1 for users in China',
+    apiKeyUrl: 'https://platform.minimaxi.com/user-center/basic-information/interface-key',
+    defaultModels: [
+      { id: 'MiniMax-M2.1', displayName: 'MiniMax M2.1', mapsToClaudeModel: 'haiku' },
+      { id: 'MiniMax-M2.1', displayName: 'MiniMax M2.1', mapsToClaudeModel: 'sonnet' },
+      { id: 'MiniMax-M2.1', displayName: 'MiniMax M2.1', mapsToClaudeModel: 'opus' },
+    ],
+  },
+];
+
+/**
+ * @deprecated Use ClaudeCompatibleProviderTemplate instead
+ */
+export interface ClaudeApiProfileTemplate {
+  name: string;
+  baseUrl: string;
+  defaultApiKeySource?: ApiKeySource;
+  useAuthToken: boolean;
+  timeoutMs?: number;
+  modelMappings?: ClaudeApiProfile['modelMappings'];
+  disableNonessentialTraffic?: boolean;
+  description: string;
+  apiKeyUrl?: string;
+}
+
+/**
+ * @deprecated Use CLAUDE_PROVIDER_TEMPLATES instead
+ */
+export const CLAUDE_API_PROFILE_TEMPLATES: ClaudeApiProfileTemplate[] = [
+  {
+    name: 'Direct Anthropic',
+    baseUrl: 'https://api.anthropic.com',
+    defaultApiKeySource: 'credentials',
+    useAuthToken: false,
+    description: 'Standard Anthropic API with your API key',
+    apiKeyUrl: 'https://console.anthropic.com/settings/keys',
+  },
+  {
+    name: 'OpenRouter',
+    baseUrl: 'https://openrouter.ai/api',
+    defaultApiKeySource: 'inline',
+    useAuthToken: true,
+    description: 'Access Claude and 300+ models via OpenRouter',
+    apiKeyUrl: 'https://openrouter.ai/keys',
+  },
+  {
+    name: 'z.AI GLM',
+    baseUrl: 'https://api.z.ai/api/anthropic',
+    defaultApiKeySource: 'inline',
+    useAuthToken: true,
+    timeoutMs: 3000000,
+    modelMappings: {
+      haiku: 'GLM-4.5-Air',
+      sonnet: 'GLM-4.7',
+      opus: 'GLM-4.7',
+    },
+    disableNonessentialTraffic: true,
+    description: '3× usage at fraction of cost via GLM Coding Plan',
+    apiKeyUrl: 'https://z.ai/manage-apikey/apikey-list',
+  },
+  {
+    name: 'MiniMax',
+    baseUrl: 'https://api.minimax.io/anthropic',
+    defaultApiKeySource: 'inline',
+    useAuthToken: true,
+    timeoutMs: 3000000,
+    modelMappings: {
+      haiku: 'MiniMax-M2.1',
+      sonnet: 'MiniMax-M2.1',
+      opus: 'MiniMax-M2.1',
+    },
+    disableNonessentialTraffic: true,
+    description: 'MiniMax M2.1 coding model with extended context',
+    apiKeyUrl: 'https://platform.minimax.io/user-center/basic-information/interface-key',
+  },
+  {
+    name: 'MiniMax (China)',
+    baseUrl: 'https://api.minimaxi.com/anthropic',
+    defaultApiKeySource: 'inline',
+    useAuthToken: true,
+    timeoutMs: 3000000,
+    modelMappings: {
+      haiku: 'MiniMax-M2.1',
+      sonnet: 'MiniMax-M2.1',
+      opus: 'MiniMax-M2.1',
+    },
+    disableNonessentialTraffic: true,
+    description: 'MiniMax M2.1 for users in China',
+    apiKeyUrl: 'https://platform.minimaxi.com/user-center/basic-information/interface-key',
+  },
+];
+
+// ============================================================================
+// Event Hooks - Custom actions triggered by system events
+// ============================================================================
+
+/**
+ * EventHookTrigger - Event types that can trigger custom hooks
+ *
+ * - feature_created: A new feature was created
+ * - feature_success: Feature completed successfully
+ * - feature_error: Feature failed with an error
+ * - auto_mode_complete: Auto mode finished processing all features
+ * - auto_mode_error: Auto mode encountered a critical error and paused
+ */
+export type EventHookTrigger =
+  | 'feature_created'
+  | 'feature_success'
+  | 'feature_error'
+  | 'auto_mode_complete'
+  | 'auto_mode_error';
+
+/** HTTP methods supported for webhook requests */
+export type EventHookHttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH';
+
+/**
+ * EventHookShellAction - Configuration for executing a shell command
+ *
+ * Shell commands are executed in the server's working directory.
+ * Supports variable substitution using {{variableName}} syntax.
+ */
+export interface EventHookShellAction {
+  type: 'shell';
+  /** Shell command to execute. Supports {{variable}} substitution. */
+  command: string;
+  /** Timeout in milliseconds (default: 30000) */
+  timeout?: number;
+}
+
+/**
+ * EventHookHttpAction - Configuration for making an HTTP webhook request
+ *
+ * Supports variable substitution in URL, headers, and body.
+ */
+export interface EventHookHttpAction {
+  type: 'http';
+  /** URL to send the request to. Supports {{variable}} substitution. */
+  url: string;
+  /** HTTP method to use */
+  method: EventHookHttpMethod;
+  /** Optional headers to include. Values support {{variable}} substitution. */
+  headers?: Record<string, string>;
+  /** Optional request body (JSON string). Supports {{variable}} substitution. */
+  body?: string;
+}
+
+/** Union type for all hook action configurations */
+export type EventHookAction = EventHookShellAction | EventHookHttpAction;
+
+/**
+ * EventHook - Configuration for a single event hook
+ *
+ * Event hooks allow users to execute custom shell commands or HTTP requests
+ * when specific events occur in the system.
+ *
+ * Available variables for substitution:
+ * - {{featureId}} - ID of the feature (if applicable)
+ * - {{featureName}} - Name of the feature (if applicable)
+ * - {{projectPath}} - Absolute path to the project
+ * - {{projectName}} - Name of the project
+ * - {{error}} - Error message (for error events)
+ * - {{timestamp}} - ISO timestamp of the event
+ * - {{eventType}} - The event type that triggered the hook
+ */
+export interface EventHook {
+  /** Unique identifier for this hook */
+  id: string;
+  /** Which event type triggers this hook */
+  trigger: EventHookTrigger;
+  /** Whether this hook is currently enabled */
+  enabled: boolean;
+  /** The action to execute when triggered */
+  action: EventHookAction;
+  /** Optional friendly name for display */
+  name?: string;
+}
+
+/** Human-readable labels for event hook triggers */
+export const EVENT_HOOK_TRIGGER_LABELS: Record<EventHookTrigger, string> = {
+  feature_created: 'Feature created',
+  feature_success: 'Feature completed successfully',
+  feature_error: 'Feature failed with error',
+  auto_mode_complete: 'Auto mode completed all features',
+  auto_mode_error: 'Auto mode paused due to error',
+};
+
 const DEFAULT_CODEX_AUTO_LOAD_AGENTS = false;
 const DEFAULT_CODEX_SANDBOX_MODE: CodexSandboxMode = 'workspace-write';
 const DEFAULT_CODEX_APPROVAL_POLICY: CodexApprovalPolicy = 'on-request';
@@ -112,8 +546,21 @@ const DEFAULT_CODEX_ADDITIONAL_DIRS: string[] = [];
  * - Claude models: Use thinkingLevel for extended thinking
  * - Codex models: Use reasoningEffort for reasoning intensity
  * - Cursor models: Handle thinking internally
+ *
+ * For Claude-compatible provider models (GLM, MiniMax, OpenRouter, etc.),
+ * the providerId field specifies which provider configuration to use.
  */
 export interface PhaseModelEntry {
+  /**
+   * Provider ID for Claude-compatible provider models.
+   * - undefined: Use native Anthropic API (no custom provider)
+   * - string: Use the specified ClaudeCompatibleProvider by ID
+   *
+   * Only required when using models from a ClaudeCompatibleProvider.
+   * Native Claude models (claude-haiku, claude-sonnet, claude-opus) and
+   * other providers (Cursor, Codex, OpenCode) don't need this field.
+   */
+  providerId?: string;
   /** The model to use (supports Claude, Cursor, Codex, OpenCode, and dynamic provider IDs) */
   model: ModelId;
   /** Extended thinking level (only applies to Claude models, defaults to 'none') */
@@ -202,8 +649,12 @@ export interface KeyboardShortcuts {
   context: string;
   /** Open settings */
   settings: string;
+  /** Open project settings */
+  projectSettings: string;
   /** Open terminal */
   terminal: string;
+  /** Open notifications */
+  notifications: string;
   /** Toggle sidebar visibility */
   toggleSidebar: string;
   /** Add new feature */
@@ -295,6 +746,10 @@ export interface ProjectRef {
   lastOpened?: string;
   /** Project-specific theme override (or undefined to use global) */
   theme?: string;
+  /** Project-specific UI/sans font override (or undefined to use global) */
+  fontFamilySans?: string;
+  /** Project-specific code/mono font override (or undefined to use global) */
+  fontFamilyMono?: string;
   /** Whether project is pinned to favorites on dashboard */
   isFavorite?: boolean;
   /** Lucide icon name for project identification */
@@ -362,6 +817,18 @@ export interface GlobalSettings {
   /** Currently selected theme */
   theme: ThemeMode;
 
+  // Font Configuration
+  /** Global UI/Sans font family (undefined = use default Geist Sans) */
+  fontFamilySans?: string;
+  /** Global Code/Mono font family (undefined = use default Geist Mono) */
+  fontFamilyMono?: string;
+  /** Terminal font family (undefined = use default Menlo/Monaco) */
+  terminalFontFamily?: string;
+
+  // Terminal Configuration
+  /** How to open terminals from "Open in Terminal" worktree action */
+  openTerminalMode?: 'newTab' | 'split';
+
   // UI State Preferences
   /** Whether sidebar is currently open */
   sidebarOpen: boolean;
@@ -390,6 +857,12 @@ export interface GlobalSettings {
   /** Mute completion notification sound */
   muteDoneSound: boolean;
 
+  // Server Logging Preferences
+  /** Log level for the API server (error, warn, info, debug). Default: info */
+  serverLogLevel?: ServerLogLevel;
+  /** Enable HTTP request logging (Morgan). Default: true */
+  enableRequestLogging?: boolean;
+
   // AI Commit Message Generation
   /** Enable AI-generated commit messages when opening commit dialog (default: true) */
   enableAiCommitMessages: boolean;
@@ -417,6 +890,10 @@ export interface GlobalSettings {
   opencodeDefaultModel?: OpencodeModelId;
   /** Which dynamic OpenCode models are enabled (empty = all discovered) */
   enabledDynamicModelIds?: string[];
+
+  // Provider Visibility Settings
+  /** Providers that are disabled and should not appear in model dropdowns */
+  disabledProviders?: ModelProvider[];
 
   // Input Configuration
   /** User's keyboard shortcut bindings */
@@ -480,6 +957,10 @@ export interface GlobalSettings {
   /** Default editor command for "Open In" action (null = auto-detect: Cursor > VS Code > first available) */
   defaultEditorCommand: string | null;
 
+  // Terminal Configuration
+  /** Default external terminal ID for "Open In Terminal" action (null = integrated terminal) */
+  defaultTerminalId: string | null;
+
   // Prompt Customization
   /** Custom prompts for Auto Mode, Agent Runner, Backlog Planning, and Enhancements */
   promptCustomization?: PromptCustomization;
@@ -520,6 +1001,46 @@ export interface GlobalSettings {
    * Value: agent configuration
    */
   customSubagents?: Record<string, import('./provider.js').AgentDefinition>;
+
+  // Event Hooks Configuration
+  /**
+   * Event hooks for executing custom commands or HTTP requests on events
+   * @see EventHook for configuration details
+   */
+  eventHooks?: EventHook[];
+
+  // Claude-Compatible Providers Configuration
+  /**
+   * Claude-compatible provider configurations.
+   * Each provider exposes its models to all model dropdowns in the app.
+   * Models can be mixed across providers (e.g., use GLM for enhancements, Anthropic for generation).
+   */
+  claudeCompatibleProviders?: ClaudeCompatibleProvider[];
+
+  // Deprecated Claude API Profiles (kept for migration)
+  /**
+   * @deprecated Use claudeCompatibleProviders instead.
+   * Kept for backward compatibility during migration.
+   */
+  claudeApiProfiles?: ClaudeApiProfile[];
+
+  /**
+   * @deprecated No longer used. Models are selected per-phase via phaseModels.
+   * Each PhaseModelEntry can specify a providerId for provider-specific models.
+   */
+  activeClaudeApiProfileId?: string | null;
+
+  /**
+   * Per-worktree auto mode settings
+   * Key: "${projectId}::${branchName ?? '__main__'}"
+   */
+  autoModeByWorktree?: Record<
+    string,
+    {
+      maxConcurrency: number;
+      branchName: string | null;
+    }
+  >;
 }
 
 /**
@@ -630,6 +1151,12 @@ export interface ProjectSettings {
   /** Project theme (undefined = use global setting) */
   theme?: ThemeMode;
 
+  // Font Configuration (project-specific override)
+  /** UI/Sans font family override (undefined = use default Geist Sans) */
+  fontFamilySans?: string;
+  /** Code/Mono font family override (undefined = use default Geist Mono) */
+  fontFamilyMono?: string;
+
   // Worktree Management
   /** Project-specific worktree preference override */
   useWorktrees?: boolean;
@@ -674,42 +1201,69 @@ export interface ProjectSettings {
    * Value: agent configuration
    */
   customSubagents?: Record<string, import('./provider.js').AgentDefinition>;
+
+  // Auto Mode Configuration (per-project)
+  /** Whether auto mode is enabled for this project (backend-controlled loop) */
+  automodeEnabled?: boolean;
+  /** Maximum concurrent agents for this project (overrides global maxConcurrency) */
+  maxConcurrentAgents?: number;
+
+  // Phase Model Overrides (per-project)
+  /**
+   * Override phase model settings for this project.
+   * Any phase not specified here falls back to global phaseModels setting.
+   * Allows per-project customization of which models are used for each task.
+   */
+  phaseModelOverrides?: Partial<PhaseModelConfig>;
+
+  // Deprecated Claude API Profile Override
+  /**
+   * @deprecated Use phaseModelOverrides instead.
+   * Models are now selected per-phase via phaseModels/phaseModelOverrides.
+   * Each PhaseModelEntry can specify a providerId for provider-specific models.
+   */
+  activeClaudeApiProfileId?: string | null;
 }
 
 /**
  * Default values and constants
  */
 
-/** Default phase model configuration - sensible defaults for each task type */
+/** Default phase model configuration - sensible defaults for each task type
+ * Uses canonical prefixed model IDs for consistent routing.
+ */
 export const DEFAULT_PHASE_MODELS: PhaseModelConfig = {
   // Quick tasks - use fast models for speed and cost
-  enhancementModel: { model: 'sonnet' },
-  fileDescriptionModel: { model: 'haiku' },
-  imageDescriptionModel: { model: 'haiku' },
+  enhancementModel: { model: 'claude-sonnet' },
+  fileDescriptionModel: { model: 'claude-haiku' },
+  imageDescriptionModel: { model: 'claude-haiku' },
 
   // Validation - use smart models for accuracy
-  validationModel: { model: 'sonnet' },
+  validationModel: { model: 'claude-sonnet' },
 
   // Generation - use powerful models for quality
-  specGenerationModel: { model: 'opus' },
-  featureGenerationModel: { model: 'sonnet' },
-  backlogPlanningModel: { model: 'sonnet' },
-  projectAnalysisModel: { model: 'sonnet' },
-  suggestionsModel: { model: 'sonnet' },
+  specGenerationModel: { model: 'claude-opus' },
+  featureGenerationModel: { model: 'claude-sonnet' },
+  backlogPlanningModel: { model: 'claude-sonnet' },
+  projectAnalysisModel: { model: 'claude-sonnet' },
+  suggestionsModel: { model: 'claude-sonnet' },
 
   // Memory - use fast model for learning extraction (cost-effective)
-  memoryExtractionModel: { model: 'haiku' },
+  memoryExtractionModel: { model: 'claude-haiku' },
 
   // Commit messages - use fast model for speed
-  commitMessageModel: { model: 'haiku' },
+  commitMessageModel: { model: 'claude-haiku' },
 };
 
 /** Current version of the global settings schema */
-export const SETTINGS_VERSION = 4;
+export const SETTINGS_VERSION = 6;
 /** Current version of the credentials schema */
 export const CREDENTIALS_VERSION = 1;
 /** Current version of the project settings schema */
 export const PROJECT_SETTINGS_VERSION = 1;
+
+/** Default maximum concurrent agents for auto mode */
+export const DEFAULT_MAX_CONCURRENCY = 1;
 
 /** Default keyboard shortcut bindings */
 export const DEFAULT_KEYBOARD_SHORTCUTS: KeyboardShortcuts = {
@@ -718,7 +1272,9 @@ export const DEFAULT_KEYBOARD_SHORTCUTS: KeyboardShortcuts = {
   spec: 'D',
   context: 'C',
   settings: 'S',
+  projectSettings: 'Shift+S',
   terminal: 'T',
+  notifications: 'X',
   toggleSidebar: '`',
   addFeature: 'N',
   addContextFile: 'N',
@@ -742,24 +1298,27 @@ export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
   theme: 'dark',
   sidebarOpen: true,
   chatHistoryOpen: false,
-  maxConcurrency: 3,
+  maxConcurrency: DEFAULT_MAX_CONCURRENCY,
   defaultSkipTests: true,
   enableDependencyBlocking: true,
   skipVerificationInAutoMode: false,
   useWorktrees: true,
   defaultPlanningMode: 'skip',
   defaultRequirePlanApproval: false,
-  defaultFeatureModel: { model: 'opus' },
+  defaultFeatureModel: { model: 'claude-opus' }, // Use canonical ID
   muteDoneSound: false,
+  serverLogLevel: 'info',
+  enableRequestLogging: true,
   enableAiCommitMessages: true,
   phaseModels: DEFAULT_PHASE_MODELS,
-  enhancementModel: 'sonnet',
-  validationModel: 'opus',
-  enabledCursorModels: getAllCursorModelIds(),
-  cursorDefaultModel: 'auto',
-  enabledOpencodeModels: getAllOpencodeModelIds(),
-  opencodeDefaultModel: DEFAULT_OPENCODE_MODEL,
+  enhancementModel: 'sonnet', // Legacy alias still supported
+  validationModel: 'opus', // Legacy alias still supported
+  enabledCursorModels: getAllCursorModelIds(), // Returns prefixed IDs
+  cursorDefaultModel: 'cursor-auto', // Use canonical prefixed ID
+  enabledOpencodeModels: getAllOpencodeModelIds(), // Returns prefixed IDs
+  opencodeDefaultModel: DEFAULT_OPENCODE_MODEL, // Already prefixed
   enabledDynamicModelIds: [],
+  disabledProviders: [],
   keyboardShortcuts: DEFAULT_KEYBOARD_SHORTCUTS,
   projects: [],
   trashedProjects: [],
@@ -770,7 +1329,7 @@ export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
   recentFolders: [],
   worktreePanelCollapsed: false,
   lastSelectedSessionByProject: {},
-  autoLoadClaudeMd: false,
+  autoLoadClaudeMd: true,
   skipSandboxWarning: false,
   codexAutoLoadAgents: DEFAULT_CODEX_AUTO_LOAD_AGENTS,
   codexSandboxMode: DEFAULT_CODEX_SANDBOX_MODE,
@@ -781,10 +1340,17 @@ export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
   codexThreadId: undefined,
   mcpServers: [],
   defaultEditorCommand: null,
+  defaultTerminalId: null,
   enableSkills: true,
   skillsSources: ['user', 'project'],
   enableSubagents: true,
   subagentsSources: ['user', 'project'],
+  // New provider system
+  claudeCompatibleProviders: [],
+  // Deprecated - kept for migration
+  claudeApiProfiles: [],
+  activeClaudeApiProfileId: null,
+  autoModeByWorktree: {},
 };
 
 /** Default credentials (empty strings - user must provide API keys) */

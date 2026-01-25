@@ -15,9 +15,10 @@ const execAsync = promisify(exec);
 export function createPushHandler() {
   return async (req: Request, res: Response): Promise<void> => {
     try {
-      const { worktreePath, force } = req.body as {
+      const { worktreePath, force, remote } = req.body as {
         worktreePath: string;
         force?: boolean;
+        remote?: string;
       };
 
       if (!worktreePath) {
@@ -34,15 +35,18 @@ export function createPushHandler() {
       });
       const branchName = branchOutput.trim();
 
+      // Use specified remote or default to 'origin'
+      const targetRemote = remote || 'origin';
+
       // Push the branch
       const forceFlag = force ? '--force' : '';
       try {
-        await execAsync(`git push -u origin ${branchName} ${forceFlag}`, {
+        await execAsync(`git push -u ${targetRemote} ${branchName} ${forceFlag}`, {
           cwd: worktreePath,
         });
       } catch {
         // Try setting upstream
-        await execAsync(`git push --set-upstream origin ${branchName} ${forceFlag}`, {
+        await execAsync(`git push --set-upstream ${targetRemote} ${branchName} ${forceFlag}`, {
           cwd: worktreePath,
         });
       }
@@ -52,7 +56,7 @@ export function createPushHandler() {
         result: {
           branch: branchName,
           pushed: true,
-          message: `Successfully pushed ${branchName} to origin`,
+          message: `Successfully pushed ${branchName} to ${targetRemote}`,
         },
       });
     } catch (error) {

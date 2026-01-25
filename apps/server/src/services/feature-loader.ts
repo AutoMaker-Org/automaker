@@ -5,14 +5,22 @@
 
 import path from 'path';
 import type { Feature, DescriptionHistoryEntry } from '@automaker/types';
-import { createLogger } from '@automaker/utils';
+import {
+  createLogger,
+  atomicWriteJson,
+  readJsonWithRecovery,
+  logRecoveryWarning,
+  DEFAULT_BACKUP_COUNT,
+} from '@automaker/utils';
 import * as secureFs from '../lib/secure-fs.js';
 import {
   getFeaturesDir,
   getFeatureDir,
   getFeatureImagesDir,
+  getAppSpecPath,
   ensureAutomakerDir,
 } from '@automaker/platform';
+import { addImplementedFeature, type ImplementedFeature } from '../lib/xml-extractor.js';
 
 const logger = createLogger('FeatureLoader');
 
@@ -192,31 +200,31 @@ export class FeatureLoader {
       })) as any[];
       const featureDirs = entries.filter((entry) => entry.isDirectory());
 
-      // Load all features concurrently (secureFs has built-in concurrency limiting)
+      // Load all features concurrently with automatic recovery from backups
       const featurePromises = featureDirs.map(async (dir) => {
         const featureId = dir.name;
         const featureJsonPath = this.getFeatureJsonPath(projectPath, featureId);
 
-        try {
-          const content = (await secureFs.readFile(featureJsonPath, 'utf-8')) as string;
-          const feature = JSON.parse(content);
+        // Use recovery-enabled read to handle corrupted files
+        const result = await readJsonWithRecovery<Feature | null>(featureJsonPath, null, {
+          maxBackups: DEFAULT_BACKUP_COUNT,
+          autoRestore: true,
+        });
 
-          if (!feature.id) {
-            logger.warn(`Feature ${featureId} missing required 'id' field, skipping`);
-            return null;
-          }
+        logRecoveryWarning(result, `Feature ${featureId}`, logger);
 
-          return feature as Feature;
-        } catch (error) {
-          if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-            return null;
-          } else if (error instanceof SyntaxError) {
-            logger.warn(`Failed to parse feature.json for ${featureId}: ${error.message}`);
-          } else {
-            logger.error(`Failed to load feature ${featureId}:`, (error as Error).message);
-          }
+        const feature = result.data;
+
+        if (!feature) {
           return null;
         }
+
+        if (!feature.id) {
+          logger.warn(`Feature ${featureId} missing required 'id' field, skipping`);
+          return null;
+        }
+
+        return feature;
       });
 
       const results = await Promise.all(featurePromises);
@@ -237,20 +245,84 @@ export class FeatureLoader {
   }
 
   /**
+   * Normalize a title for comparison (case-insensitive, trimmed)
+   */
+  private normalizeTitle(title: string): string {
+    return title.toLowerCase().trim();
+  }
+
+  /**
+   * Find a feature by its title (case-insensitive match)
+   * @param projectPath - Path to the project
+   * @param title - Title to search for
+   * @returns The matching feature or null if not found
+   */
+  async findByTitle(projectPath: string, title: string): Promise<Feature | null> {
+    if (!title || !title.trim()) {
+      return null;
+    }
+
+    const normalizedTitle = this.normalizeTitle(title);
+    const features = await this.getAll(projectPath);
+
+    for (const feature of features) {
+      if (feature.title && this.normalizeTitle(feature.title) === normalizedTitle) {
+        return feature;
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Check if a title already exists on another feature (for duplicate detection)
+   * @param projectPath - Path to the project
+   * @param title - Title to check
+   * @param excludeFeatureId - Optional feature ID to exclude from the check (for updates)
+   * @returns The duplicate feature if found, null otherwise
+   */
+  async findDuplicateTitle(
+    projectPath: string,
+    title: string,
+    excludeFeatureId?: string
+  ): Promise<Feature | null> {
+    if (!title || !title.trim()) {
+      return null;
+    }
+
+    const normalizedTitle = this.normalizeTitle(title);
+    const features = await this.getAll(projectPath);
+
+    for (const feature of features) {
+      // Skip the feature being updated (if provided)
+      if (excludeFeatureId && feature.id === excludeFeatureId) {
+        continue;
+      }
+
+      if (feature.title && this.normalizeTitle(feature.title) === normalizedTitle) {
+        return feature;
+      }
+    }
+
+    return null;
+  }
+
+  /**
    * Get a single feature by ID
+   * Uses automatic recovery from backups if the main file is corrupted
    */
   async get(projectPath: string, featureId: string): Promise<Feature | null> {
-    try {
-      const featureJsonPath = this.getFeatureJsonPath(projectPath, featureId);
-      const content = (await secureFs.readFile(featureJsonPath, 'utf-8')) as string;
-      return JSON.parse(content);
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-        return null;
-      }
-      logger.error(`Failed to get feature ${featureId}:`, error);
-      throw error;
-    }
+    const featureJsonPath = this.getFeatureJsonPath(projectPath, featureId);
+
+    // Use recovery-enabled read to handle corrupted files
+    const result = await readJsonWithRecovery<Feature | null>(featureJsonPath, null, {
+      maxBackups: DEFAULT_BACKUP_COUNT,
+      autoRestore: true,
+    });
+
+    logRecoveryWarning(result, `Feature ${featureId}`, logger);
+
+    return result.data;
   }
 
   /**
@@ -294,8 +366,8 @@ export class FeatureLoader {
       descriptionHistory: initialHistory,
     };
 
-    // Write feature.json
-    await secureFs.writeFile(featureJsonPath, JSON.stringify(feature, null, 2), 'utf-8');
+    // Write feature.json atomically with backup support
+    await atomicWriteJson(featureJsonPath, feature, { backupCount: DEFAULT_BACKUP_COUNT });
 
     logger.info(`Created feature ${featureId}`);
     return feature;
@@ -379,9 +451,9 @@ export class FeatureLoader {
       descriptionHistory: updatedHistory,
     };
 
-    // Write back to file
+    // Write back to file atomically with backup support
     const featureJsonPath = this.getFeatureJsonPath(projectPath, featureId);
-    await secureFs.writeFile(featureJsonPath, JSON.stringify(updatedFeature, null, 2), 'utf-8');
+    await atomicWriteJson(featureJsonPath, updatedFeature, { backupCount: DEFAULT_BACKUP_COUNT });
 
     logger.info(`Updated feature ${featureId}`);
     return updatedFeature;
@@ -458,6 +530,66 @@ export class FeatureLoader {
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
         throw error;
       }
+    }
+  }
+
+  /**
+   * Sync a completed feature to the app_spec.txt implemented_features section
+   *
+   * When a feature is completed, this method adds it to the implemented_features
+   * section of the project's app_spec.txt file. This keeps the spec in sync
+   * with the actual state of the codebase.
+   *
+   * @param projectPath - Path to the project
+   * @param feature - The feature to sync (must have title or description)
+   * @param fileLocations - Optional array of file paths where the feature was implemented
+   * @returns True if the spec was updated, false if no spec exists or feature was skipped
+   */
+  async syncFeatureToAppSpec(
+    projectPath: string,
+    feature: Feature,
+    fileLocations?: string[]
+  ): Promise<boolean> {
+    try {
+      const appSpecPath = getAppSpecPath(projectPath);
+
+      // Read the current app_spec.txt
+      let specContent: string;
+      try {
+        specContent = (await secureFs.readFile(appSpecPath, 'utf-8')) as string;
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+          logger.info(`No app_spec.txt found for project, skipping sync for feature ${feature.id}`);
+          return false;
+        }
+        throw error;
+      }
+
+      // Build the implemented feature entry
+      const featureName = feature.title || `Feature: ${feature.id}`;
+      const implementedFeature: ImplementedFeature = {
+        name: featureName,
+        description: feature.description,
+        ...(fileLocations && fileLocations.length > 0 ? { file_locations: fileLocations } : {}),
+      };
+
+      // Add the feature to the implemented_features section
+      const updatedSpecContent = addImplementedFeature(specContent, implementedFeature);
+
+      // Check if the content actually changed (feature might already exist)
+      if (updatedSpecContent === specContent) {
+        logger.info(`Feature "${featureName}" already exists in app_spec.txt, skipping`);
+        return false;
+      }
+
+      // Write the updated spec back to the file
+      await secureFs.writeFile(appSpecPath, updatedSpecContent, 'utf-8');
+
+      logger.info(`Synced feature "${featureName}" to app_spec.txt`);
+      return true;
+    } catch (error) {
+      logger.error(`Failed to sync feature ${feature.id} to app_spec.txt:`, error);
+      throw error;
     }
   }
 }

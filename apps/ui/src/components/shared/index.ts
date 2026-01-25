@@ -5,3 +5,6 @@ export {
   type UseModelOverrideOptions,
   type UseModelOverrideResult,
 } from './use-model-override';
+
+// Font Components
+export { FontSelector } from './font-selector';

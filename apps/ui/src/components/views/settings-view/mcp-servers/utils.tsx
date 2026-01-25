@@ -1,4 +1,5 @@
-import { Terminal, Globe, Loader2, CheckCircle2, XCircle } from 'lucide-react';
+import { Terminal, Globe, CheckCircle2, XCircle } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 import type { ServerType, ServerTestState } from './types';
 import { SENSITIVE_PARAM_PATTERNS } from './constants';
 
@@ -40,7 +41,7 @@ export function getServerIcon(type: ServerType = 'stdio') {
 export function getTestStatusIcon(status: ServerTestState['status']) {
   switch (status) {
     case 'testing':
-      return <Loader2 className="w-4 h-4 animate-spin text-brand-500" />;
+      return <Spinner size="sm" />;
     case 'success':
       return <CheckCircle2 className="w-4 h-4 text-green-500" />;
     case 'error':

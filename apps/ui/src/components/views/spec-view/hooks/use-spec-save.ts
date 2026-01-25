@@ -1,28 +1,20 @@
 import { useState } from 'react';
-import { createLogger } from '@automaker/utils/logger';
 import { useAppStore } from '@/store/app-store';
-
-const logger = createLogger('SpecSave');
-import { getElectronAPI } from '@/lib/electron';
+import { useSaveSpec } from '@/hooks/mutations';
 
 export function useSpecSave() {
   const { currentProject, appSpec, setAppSpec } = useAppStore();
-  const [isSaving, setIsSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
+
+  // React Query mutation
+  const saveMutation = useSaveSpec(currentProject?.path ?? '');
 
   const saveSpec = async () => {
     if (!currentProject) return;
 
-    setIsSaving(true);
-    try {
-      const api = getElectronAPI();
-      await api.writeFile(`${currentProject.path}/.automaker/app_spec.txt`, appSpec);
-      setHasChanges(false);
-    } catch (error) {
-      logger.error('Failed to save spec:', error);
-    } finally {
-      setIsSaving(false);
-    }
+    saveMutation.mutate(appSpec, {
+      onSuccess: () => setHasChanges(false),
+    });
   };
 
   const handleChange = (value: string) => {
@@ -31,7 +23,7 @@ export function useSpecSave() {
   };
 
   return {
-    isSaving,
+    isSaving: saveMutation.isPending,
     hasChanges,
     setHasChanges,
     saveSpec,

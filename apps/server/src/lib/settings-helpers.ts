@@ -5,12 +5,30 @@
 import type { SettingsService } from '../services/settings-service.js';
 import type { ContextFilesResult, ContextFileInfo } from '@automaker/utils';
 import { createLogger } from '@automaker/utils';
-import type { MCPServerConfig, McpServerConfig, PromptCustomization } from '@automaker/types';
+import type {
+  MCPServerConfig,
+  McpServerConfig,
+  PromptCustomization,
+  ClaudeApiProfile,
+  ClaudeCompatibleProvider,
+  PhaseModelKey,
+  PhaseModelEntry,
+  Credentials,
+} from '@automaker/types';
+import { DEFAULT_PHASE_MODELS } from '@automaker/types';
 import {
   mergeAutoModePrompts,
   mergeAgentPrompts,
   mergeBacklogPlanPrompts,
   mergeEnhancementPrompts,
+  mergeCommitMessagePrompts,
+  mergeTitleGenerationPrompts,
+  mergeIssueValidationPrompts,
+  mergeIdeationPrompts,
+  mergeAppSpecPrompts,
+  mergeContextDescriptionPrompts,
+  mergeSuggestionsPrompts,
+  mergeTaskExecutionPrompts,
 } from '@automaker/prompts';
 
 const logger = createLogger('SettingsHelper');
@@ -218,6 +236,14 @@ export async function getPromptCustomization(
   agent: ReturnType<typeof mergeAgentPrompts>;
   backlogPlan: ReturnType<typeof mergeBacklogPlanPrompts>;
   enhancement: ReturnType<typeof mergeEnhancementPrompts>;
+  commitMessage: ReturnType<typeof mergeCommitMessagePrompts>;
+  titleGeneration: ReturnType<typeof mergeTitleGenerationPrompts>;
+  issueValidation: ReturnType<typeof mergeIssueValidationPrompts>;
+  ideation: ReturnType<typeof mergeIdeationPrompts>;
+  appSpec: ReturnType<typeof mergeAppSpecPrompts>;
+  contextDescription: ReturnType<typeof mergeContextDescriptionPrompts>;
+  suggestions: ReturnType<typeof mergeSuggestionsPrompts>;
+  taskExecution: ReturnType<typeof mergeTaskExecutionPrompts>;
 }> {
   let customization: PromptCustomization = {};
 
@@ -239,6 +265,14 @@ export async function getPromptCustomization(
     agent: mergeAgentPrompts(customization.agent),
     backlogPlan: mergeBacklogPlanPrompts(customization.backlogPlan),
     enhancement: mergeEnhancementPrompts(customization.enhancement),
+    commitMessage: mergeCommitMessagePrompts(customization.commitMessage),
+    titleGeneration: mergeTitleGenerationPrompts(customization.titleGeneration),
+    issueValidation: mergeIssueValidationPrompts(customization.issueValidation),
+    ideation: mergeIdeationPrompts(customization.ideation),
+    appSpec: mergeAppSpecPrompts(customization.appSpec),
+    contextDescription: mergeContextDescriptionPrompts(customization.contextDescription),
+    suggestions: mergeSuggestionsPrompts(customization.suggestions),
+    taskExecution: mergeTaskExecutionPrompts(customization.taskExecution),
   };
 }
 
@@ -320,4 +354,377 @@ export async function getCustomSubagents(
   };
 
   return Object.keys(merged).length > 0 ? merged : undefined;
+}
+
+/** Result from getActiveClaudeApiProfile */
+export interface ActiveClaudeApiProfileResult {
+  /** The active profile, or undefined if using direct Anthropic API */
+  profile: ClaudeApiProfile | undefined;
+  /** Credentials for resolving 'credentials' apiKeySource */
+  credentials: import('@automaker/types').Credentials | undefined;
+}
+
+/**
+ * Get the active Claude API profile and credentials from settings.
+ * Checks project settings first for per-project overrides, then falls back to global settings.
+ * Returns both the profile and credentials for resolving 'credentials' apiKeySource.
+ *
+ * @deprecated Use getProviderById and getPhaseModelWithOverrides instead for the new provider system.
+ * This function is kept for backward compatibility during migration.
+ *
+ * @param settingsService - Optional settings service instance
+ * @param logPrefix - Prefix for log messages (e.g., '[AgentService]')
+ * @param projectPath - Optional project path for per-project override
+ * @returns Promise resolving to object with profile and credentials
+ */
+export async function getActiveClaudeApiProfile(
+  settingsService?: SettingsService | null,
+  logPrefix = '[SettingsHelper]',
+  projectPath?: string
+): Promise<ActiveClaudeApiProfileResult> {
+  if (!settingsService) {
+    return { profile: undefined, credentials: undefined };
+  }
+
+  try {
+    const globalSettings = await settingsService.getGlobalSettings();
+    const credentials = await settingsService.getCredentials();
+    const profiles = globalSettings.claudeApiProfiles || [];
+
+    // Check for project-level override first
+    let activeProfileId: string | null | undefined;
+    let isProjectOverride = false;
+
+    if (projectPath) {
+      const projectSettings = await settingsService.getProjectSettings(projectPath);
+      // undefined = use global, null = explicit no profile, string = specific profile
+      if (projectSettings.activeClaudeApiProfileId !== undefined) {
+        activeProfileId = projectSettings.activeClaudeApiProfileId;
+        isProjectOverride = true;
+      }
+    }
+
+    // Fall back to global if project doesn't specify
+    if (activeProfileId === undefined && !isProjectOverride) {
+      activeProfileId = globalSettings.activeClaudeApiProfileId;
+    }
+
+    // No active profile selected - use direct Anthropic API
+    if (!activeProfileId) {
+      if (isProjectOverride && activeProfileId === null) {
+        logger.info(`${logPrefix} Project explicitly using Direct Anthropic API`);
+      }
+      return { profile: undefined, credentials };
+    }
+
+    // Find the active profile by ID
+    const activeProfile = profiles.find((p) => p.id === activeProfileId);
+
+    if (activeProfile) {
+      const overrideSuffix = isProjectOverride ? ' (project override)' : '';
+      logger.info(`${logPrefix} Using Claude API profile: ${activeProfile.name}${overrideSuffix}`);
+      return { profile: activeProfile, credentials };
+    } else {
+      logger.warn(
+        `${logPrefix} Active profile ID "${activeProfileId}" not found, falling back to direct Anthropic API`
+      );
+      return { profile: undefined, credentials };
+    }
+  } catch (error) {
+    logger.error(`${logPrefix} Failed to load Claude API profile:`, error);
+    return { profile: undefined, credentials: undefined };
+  }
+}
+
+// ============================================================================
+// New Provider System Helpers
+// ============================================================================
+
+/** Result from getProviderById */
+export interface ProviderByIdResult {
+  /** The provider, or undefined if not found */
+  provider: ClaudeCompatibleProvider | undefined;
+  /** Credentials for resolving 'credentials' apiKeySource */
+  credentials: Credentials | undefined;
+}
+
+/**
+ * Get a ClaudeCompatibleProvider by its ID.
+ * Returns the provider configuration and credentials for API key resolution.
+ *
+ * @param providerId - The provider ID to look up
+ * @param settingsService - Settings service instance
+ * @param logPrefix - Prefix for log messages
+ * @returns Promise resolving to object with provider and credentials
+ */
+export async function getProviderById(
+  providerId: string,
+  settingsService: SettingsService,
+  logPrefix = '[SettingsHelper]'
+): Promise<ProviderByIdResult> {
+  try {
+    const globalSettings = await settingsService.getGlobalSettings();
+    const credentials = await settingsService.getCredentials();
+    const providers = globalSettings.claudeCompatibleProviders || [];
+
+    const provider = providers.find((p) => p.id === providerId);
+
+    if (provider) {
+      if (provider.enabled === false) {
+        logger.warn(`${logPrefix} Provider "${provider.name}" (${providerId}) is disabled`);
+      } else {
+        logger.debug(`${logPrefix} Found provider: ${provider.name}`);
+      }
+      return { provider, credentials };
+    } else {
+      logger.warn(`${logPrefix} Provider not found: ${providerId}`);
+      return { provider: undefined, credentials };
+    }
+  } catch (error) {
+    logger.error(`${logPrefix} Failed to load provider by ID:`, error);
+    return { provider: undefined, credentials: undefined };
+  }
+}
+
+/** Result from getPhaseModelWithOverrides */
+export interface PhaseModelWithOverridesResult {
+  /** The resolved phase model entry */
+  phaseModel: PhaseModelEntry;
+  /** Whether a project override was applied */
+  isProjectOverride: boolean;
+  /** The provider if providerId is set and found */
+  provider: ClaudeCompatibleProvider | undefined;
+  /** Credentials for API key resolution */
+  credentials: Credentials | undefined;
+}
+
+/**
+ * Get the phase model configuration for a specific phase, applying project overrides if available.
+ * Also resolves the provider if the phase model has a providerId.
+ *
+ * @param phase - The phase key (e.g., 'enhancementModel', 'specGenerationModel')
+ * @param settingsService - Optional settings service instance (returns defaults if undefined)
+ * @param projectPath - Optional project path for checking overrides
+ * @param logPrefix - Prefix for log messages
+ * @returns Promise resolving to phase model with provider info
+ */
+export async function getPhaseModelWithOverrides(
+  phase: PhaseModelKey,
+  settingsService?: SettingsService | null,
+  projectPath?: string,
+  logPrefix = '[SettingsHelper]'
+): Promise<PhaseModelWithOverridesResult> {
+  // Handle undefined settingsService gracefully
+  if (!settingsService) {
+    logger.info(`${logPrefix} SettingsService not available, using default for ${phase}`);
+    return {
+      phaseModel: DEFAULT_PHASE_MODELS[phase] || { model: 'sonnet' },
+      isProjectOverride: false,
+      provider: undefined,
+      credentials: undefined,
+    };
+  }
+
+  try {
+    const globalSettings = await settingsService.getGlobalSettings();
+    const credentials = await settingsService.getCredentials();
+    const globalPhaseModels = globalSettings.phaseModels || {};
+
+    // Start with global phase model
+    let phaseModel = globalPhaseModels[phase];
+    let isProjectOverride = false;
+
+    // Check for project override
+    if (projectPath) {
+      const projectSettings = await settingsService.getProjectSettings(projectPath);
+      const projectOverrides = projectSettings.phaseModelOverrides || {};
+
+      if (projectOverrides[phase]) {
+        phaseModel = projectOverrides[phase];
+        isProjectOverride = true;
+        logger.debug(`${logPrefix} Using project override for ${phase}`);
+      }
+    }
+
+    // If no phase model found, use per-phase default
+    if (!phaseModel) {
+      phaseModel = DEFAULT_PHASE_MODELS[phase] || { model: 'sonnet' };
+      logger.debug(`${logPrefix} No ${phase} configured, using default: ${phaseModel.model}`);
+    }
+
+    // Resolve provider if providerId is set
+    let provider: ClaudeCompatibleProvider | undefined;
+    if (phaseModel.providerId) {
+      const providers = globalSettings.claudeCompatibleProviders || [];
+      provider = providers.find((p) => p.id === phaseModel.providerId);
+
+      if (provider) {
+        if (provider.enabled === false) {
+          logger.warn(
+            `${logPrefix} Provider "${provider.name}" for ${phase} is disabled, falling back to direct API`
+          );
+          provider = undefined;
+        } else {
+          logger.debug(`${logPrefix} Using provider "${provider.name}" for ${phase}`);
+        }
+      } else {
+        logger.warn(
+          `${logPrefix} Provider ${phaseModel.providerId} not found for ${phase}, falling back to direct API`
+        );
+      }
+    }
+
+    return {
+      phaseModel,
+      isProjectOverride,
+      provider,
+      credentials,
+    };
+  } catch (error) {
+    logger.error(`${logPrefix} Failed to get phase model with overrides:`, error);
+    // Return a safe default
+    return {
+      phaseModel: { model: 'sonnet' },
+      isProjectOverride: false,
+      provider: undefined,
+      credentials: undefined,
+    };
+  }
+}
+
+/** Result from getProviderByModelId */
+export interface ProviderByModelIdResult {
+  /** The provider that contains this model, or undefined if not found */
+  provider: ClaudeCompatibleProvider | undefined;
+  /** The model configuration if found */
+  modelConfig: import('@automaker/types').ProviderModel | undefined;
+  /** Credentials for API key resolution */
+  credentials: Credentials | undefined;
+  /** The resolved Claude model ID to use for API calls (from mapsToClaudeModel) */
+  resolvedModel: string | undefined;
+}
+
+/**
+ * Find a ClaudeCompatibleProvider by one of its model IDs.
+ * Searches through all enabled providers to find one that contains the specified model.
+ * This is useful when you have a model string from the UI but need the provider config.
+ *
+ * Also resolves the `mapsToClaudeModel` field to get the actual Claude model ID to use
+ * when calling the API (e.g., "GLM-4.5-Air" -> "claude-haiku-4-5").
+ *
+ * @param modelId - The model ID to search for (e.g., "GLM-4.7", "MiniMax-M2.1")
+ * @param settingsService - Settings service instance
+ * @param logPrefix - Prefix for log messages
+ * @returns Promise resolving to object with provider, model config, credentials, and resolved model
+ */
+export async function getProviderByModelId(
+  modelId: string,
+  settingsService: SettingsService,
+  logPrefix = '[SettingsHelper]'
+): Promise<ProviderByModelIdResult> {
+  try {
+    const globalSettings = await settingsService.getGlobalSettings();
+    const credentials = await settingsService.getCredentials();
+    const providers = globalSettings.claudeCompatibleProviders || [];
+
+    // Search through all enabled providers for this model
+    for (const provider of providers) {
+      // Skip disabled providers
+      if (provider.enabled === false) {
+        continue;
+      }
+
+      // Check if this provider has the model
+      const modelConfig = provider.models?.find(
+        (m) => m.id === modelId || m.id.toLowerCase() === modelId.toLowerCase()
+      );
+
+      if (modelConfig) {
+        logger.info(`${logPrefix} Found model "${modelId}" in provider "${provider.name}"`);
+
+        // Resolve the mapped Claude model if specified
+        let resolvedModel: string | undefined;
+        if (modelConfig.mapsToClaudeModel) {
+          // Import resolveModelString to convert alias to full model ID
+          const { resolveModelString } = await import('@automaker/model-resolver');
+          resolvedModel = resolveModelString(modelConfig.mapsToClaudeModel);
+          logger.info(
+            `${logPrefix} Model "${modelId}" maps to Claude model "${modelConfig.mapsToClaudeModel}" -> "${resolvedModel}"`
+          );
+        }
+
+        return { provider, modelConfig, credentials, resolvedModel };
+      }
+    }
+
+    // Model not found in any provider
+    logger.debug(`${logPrefix} Model "${modelId}" not found in any provider`);
+    return {
+      provider: undefined,
+      modelConfig: undefined,
+      credentials: undefined,
+      resolvedModel: undefined,
+    };
+  } catch (error) {
+    logger.error(`${logPrefix} Failed to find provider by model ID:`, error);
+    return {
+      provider: undefined,
+      modelConfig: undefined,
+      credentials: undefined,
+      resolvedModel: undefined,
+    };
+  }
+}
+
+/**
+ * Get all enabled provider models for use in model dropdowns.
+ * Returns models from all enabled ClaudeCompatibleProviders.
+ *
+ * @param settingsService - Settings service instance
+ * @param logPrefix - Prefix for log messages
+ * @returns Promise resolving to array of provider models with their provider info
+ */
+export async function getAllProviderModels(
+  settingsService: SettingsService,
+  logPrefix = '[SettingsHelper]'
+): Promise<
+  Array<{
+    providerId: string;
+    providerName: string;
+    model: import('@automaker/types').ProviderModel;
+  }>
+> {
+  try {
+    const globalSettings = await settingsService.getGlobalSettings();
+    const providers = globalSettings.claudeCompatibleProviders || [];
+
+    const allModels: Array<{
+      providerId: string;
+      providerName: string;
+      model: import('@automaker/types').ProviderModel;
+    }> = [];
+
+    for (const provider of providers) {
+      // Skip disabled providers
+      if (provider.enabled === false) {
+        continue;
+      }
+
+      for (const model of provider.models || []) {
+        allModels.push({
+          providerId: provider.id,
+          providerName: provider.name,
+          model,
+        });
+      }
+    }
+
+    logger.debug(
+      `${logPrefix} Found ${allModels.length} models from ${providers.length} providers`
+    );
+    return allModels;
+  } catch (error) {
+    logger.error(`${logPrefix} Failed to get all provider models:`, error);
+    return [];
+  }
 }

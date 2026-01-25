@@ -1,4 +1,3 @@
-import { useState, useEffect, useCallback } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -8,8 +7,9 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Folder, Loader2, FolderOpen, AlertCircle } from 'lucide-react';
-import { getHttpApiClient } from '@/lib/http-api-client';
+import { Folder, FolderOpen, AlertCircle } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
+import { useWorkspaceDirectories } from '@/hooks/queries';
 
 interface WorkspaceDirectory {
   name: string;
@@ -23,40 +23,14 @@ interface WorkspacePickerModalProps {
 }
 
 export function WorkspacePickerModal({ open, onOpenChange, onSelect }: WorkspacePickerModalProps) {
-  const [isLoading, setIsLoading] = useState(false);
-  const [directories, setDirectories] = useState<WorkspaceDirectory[]>([]);
-  const [error, setError] = useState<string | null>(null);
-
-  const loadDirectories = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const client = getHttpApiClient();
-      const result = await client.workspace.getDirectories();
-
-      if (result.success && result.directories) {
-        setDirectories(result.directories);
-      } else {
-        setError(result.error || 'Failed to load directories');
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load directories');
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  // Load directories when modal opens
-  useEffect(() => {
-    if (open) {
-      loadDirectories();
-    }
-  }, [open, loadDirectories]);
+  // React Query hook - only fetch when modal is open
+  const { data: directories = [], isLoading, error, refetch } = useWorkspaceDirectories(open);
 
   const handleSelect = (dir: WorkspaceDirectory) => {
     onSelect(dir.path, dir.name);
   };
+
+  const errorMessage = error instanceof Error ? error.message : null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -74,24 +48,24 @@ export function WorkspacePickerModal({ open, onOpenChange, onSelect }: Workspace
         <div className="flex-1 overflow-y-auto py-4 min-h-[200px]">
           {isLoading && (
             <div className="flex flex-col items-center justify-center h-full gap-3">
-              <Loader2 className="w-8 h-8 text-brand-500 animate-spin" />
+              <Spinner size="xl" />
               <p className="text-sm text-muted-foreground">Loading projects...</p>
             </div>
           )}
 
-          {error && !isLoading && (
+          {errorMessage && !isLoading && (
             <div className="flex flex-col items-center justify-center h-full gap-3 text-center px-4">
               <div className="w-12 h-12 rounded-full bg-destructive/10 flex items-center justify-center">
                 <AlertCircle className="w-6 h-6 text-destructive" />
               </div>
-              <p className="text-sm text-destructive">{error}</p>
-              <Button variant="secondary" size="sm" onClick={loadDirectories} className="mt-2">
+              <p className="text-sm text-destructive">{errorMessage}</p>
+              <Button variant="secondary" size="sm" onClick={() => refetch()} className="mt-2">
                 Try Again
               </Button>
             </div>
           )}
 
-          {!isLoading && !error && directories.length === 0 && (
+          {!isLoading && !errorMessage && directories.length === 0 && (
             <div className="flex flex-col items-center justify-center h-full gap-3 text-center px-4">
               <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center">
                 <Folder className="w-6 h-6 text-muted-foreground" />
@@ -102,7 +76,7 @@ export function WorkspacePickerModal({ open, onOpenChange, onSelect }: Workspace
             </div>
           )}
 
-          {!isLoading && !error && directories.length > 0 && (
+          {!isLoading && !errorMessage && directories.length > 0 && (
             <div className="space-y-2">
               {directories.map((dir) => (
                 <button

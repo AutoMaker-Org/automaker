@@ -1,0 +1,103 @@
+/**
+ * Matcha Theme
+ * A calming dark theme with sage green and warm beige accents
+ * Inspired by: https://github.com/lucafalasco/matcha
+ */
+
+.matcha {
+  /* Background layers - dark with subtle green undertone */
+  --background: oklch(20% 0.015 145);
+  --background-secondary: oklch(24% 0.015 145);
+  --background-tertiary: oklch(16% 0.015 145);
+  --background-50: oklch(20% 0.015 145 / 0.5);
+  --background-80: oklch(20% 0.015 145 / 0.8);
+
+  /* Foreground / text - light with green tint */
+  --foreground: oklch(90% 0.025 145);
+  --foreground-secondary: oklch(70% 0.02 145);
+  --foreground-muted: oklch(60% 0.015 145);
+
+  /* Brand / accent - sage green */
+  --brand-400: oklch(72% 0.12 135);
+  --brand-500: oklch(68% 0.14 135);
+  --brand-600: oklch(62% 0.16 135);
+  --primary: oklch(68% 0.14 135);
+  --primary-foreground: oklch(15% 0.02 135);
+
+  /* Sidebar - slightly lighter with green tint */
+  --sidebar: oklch(22% 0.02 145);
+  --sidebar-foreground: oklch(90% 0.025 145);
+  --sidebar-primary: oklch(68% 0.14 135);
+  --sidebar-primary-foreground: oklch(15% 0.02 135);
+  --sidebar-accent: oklch(28% 0.025 145);
+  --sidebar-accent-foreground: oklch(90% 0.025 145);
+  --sidebar-border: oklch(30% 0.02 145);
+  --sidebar-ring: oklch(68% 0.14 135);
+
+  /* Cards */
+  --card: oklch(22% 0.02 145);
+  --card-foreground: oklch(90% 0.025 145);
+
+  /* Inputs */
+  --input: oklch(18% 0.015 145);
+
+  /* Borders */
+  --border: oklch(32% 0.025 145);
+  --border-glass: oklch(90% 0.02 145 / 0.1);
+
+  /* Popover / Dropdown */
+  --popover: oklch(20% 0.02 145);
+  --popover-foreground: oklch(90% 0.025 145);
+
+  /* Secondary */
+  --secondary: oklch(28% 0.025 145);
+  --secondary-foreground: oklch(90% 0.025 145);
+
+  /* Muted */
+  --muted: oklch(26% 0.02 145);
+  --muted-foreground: oklch(65% 0.02 145);
+
+  /* Accent */
+  --accent: oklch(30% 0.03 145);
+  --accent-foreground: oklch(90% 0.025 145);
+
+  /* Destructive */
+  --destructive: oklch(60% 0.18 25);
+
+  /* Ring / Focus */
+  --ring: oklch(68% 0.14 135);
+
+  /* Action buttons - warm beige */
+  --action-view: oklch(78% 0.06 90);
+  --action-view-hover: oklch(72% 0.07 90);
+  --action-followup: oklch(68% 0.14 135);
+  --action-followup-hover: oklch(62% 0.16 135);
+  --action-commit: oklch(68% 0.14 135);
+  --action-commit-hover: oklch(62% 0.16 135);
+  --action-verify: oklch(68% 0.14 135);
+  --action-verify-hover: oklch(62% 0.16 135);
+
+  /* Running indicator - sage green */
+  --running-indicator: oklch(68% 0.14 135);
+  --running-indicator-text: oklch(72% 0.12 135);
+
+  /* Status colors */
+  --status-success: oklch(68% 0.14 135);
+  --status-success-bg: oklch(68% 0.14 135 / 0.2);
+  --status-warning: oklch(78% 0.12 85);
+  --status-warning-bg: oklch(78% 0.12 85 / 0.2);
+  --status-error: oklch(65% 0.18 25);
+  --status-error-bg: oklch(65% 0.18 25 / 0.2);
+  --status-info: oklch(68% 0.14 135);
+  --status-info-bg: oklch(68% 0.14 135 / 0.2);
+  --status-backlog: oklch(55% 0 0);
+  --status-in-progress: oklch(78% 0.12 85);
+  --status-waiting: oklch(70% 0.15 55);
+
+  /* Chart colors */
+  --chart-1: oklch(68% 0.14 135);
+  --chart-2: oklch(70% 0.1 170);
+  --chart-3: oklch(78% 0.12 85);
+  --chart-4: oklch(65% 0.12 280);
+  --chart-5: oklch(60% 0.15 25);
+}

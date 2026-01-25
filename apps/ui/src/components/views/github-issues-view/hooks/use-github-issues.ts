@@ -1,79 +1,29 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { createLogger } from '@automaker/utils/logger';
-import { getElectronAPI, GitHubIssue } from '@/lib/electron';
+/**
+ * GitHub Issues Hook
+ *
+ * React Query-based hook for fetching GitHub issues.
+ */
 
-const logger = createLogger('GitHubIssues');
 import { useAppStore } from '@/store/app-store';
+import { useGitHubIssues as useGitHubIssuesQuery } from '@/hooks/queries';
 
 export function useGithubIssues() {
   const { currentProject } = useAppStore();
-  const [openIssues, setOpenIssues] = useState<GitHubIssue[]>([]);
-  const [closedIssues, setClosedIssues] = useState<GitHubIssue[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const isMountedRef = useRef(true);
 
-  const fetchIssues = useCallback(async () => {
-    if (!currentProject?.path) {
-      if (isMountedRef.current) {
-        setError('No project selected');
-        setLoading(false);
-      }
-      return;
-    }
-
-    try {
-      if (isMountedRef.current) {
-        setError(null);
-      }
-      const api = getElectronAPI();
-      if (api.github) {
-        const result = await api.github.listIssues(currentProject.path);
-        if (isMountedRef.current) {
-          if (result.success) {
-            setOpenIssues(result.openIssues || []);
-            setClosedIssues(result.closedIssues || []);
-          } else {
-            setError(result.error || 'Failed to fetch issues');
-          }
-        }
-      }
-    } catch (err) {
-      if (isMountedRef.current) {
-        logger.error('Error fetching issues:', err);
-        setError(err instanceof Error ? err.message : 'Failed to fetch issues');
-      }
-    } finally {
-      if (isMountedRef.current) {
-        setLoading(false);
-        setRefreshing(false);
-      }
-    }
-  }, [currentProject?.path]);
-
-  useEffect(() => {
-    isMountedRef.current = true;
-    fetchIssues();
-
-    return () => {
-      isMountedRef.current = false;
-    };
-  }, [fetchIssues]);
-
-  const refresh = useCallback(() => {
-    if (isMountedRef.current) {
-      setRefreshing(true);
-    }
-    fetchIssues();
-  }, [fetchIssues]);
+  const {
+    data,
+    isLoading: loading,
+    isFetching: refreshing,
+    error,
+    refetch: refresh,
+  } = useGitHubIssuesQuery(currentProject?.path);
 
   return {
-    openIssues,
-    closedIssues,
+    openIssues: data?.openIssues ?? [],
+    closedIssues: data?.closedIssues ?? [],
     loading,
     refreshing,
-    error,
+    error: error instanceof Error ? error.message : error ? String(error) : null,
     refresh,
   };
 }

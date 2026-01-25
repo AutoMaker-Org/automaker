@@ -1,9 +1,7 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { createLogger } from '@automaker/utils/logger';
-import { getElectronAPI, GitHubComment } from '@/lib/electron';
-
-const logger = createLogger('IssueComments');
+import { useMemo, useCallback } from 'react';
+import type { GitHubComment } from '@/lib/electron';
 import { useAppStore } from '@/store/app-store';
+import { useGitHubIssueComments } from '@/hooks/queries';
 
 interface UseIssueCommentsResult {
   comments: GitHubComment[];
@@ -18,119 +16,36 @@ interface UseIssueCommentsResult {
 
 export function useIssueComments(issueNumber: number | null): UseIssueCommentsResult {
   const { currentProject } = useAppStore();
-  const [comments, setComments] = useState<GitHubComment[]>([]);
-  const [totalCount, setTotalCount] = useState(0);
-  const [loading, setLoading] = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [hasNextPage, setHasNextPage] = useState(false);
-  const [endCursor, setEndCursor] = useState<string | undefined>(undefined);
-  const [error, setError] = useState<string | null>(null);
-  const isMountedRef = useRef(true);
 
-  const fetchComments = useCallback(
-    async (cursor?: string) => {
-      if (!currentProject?.path || !issueNumber) {
-        return;
-      }
+  // Use React Query infinite query
+  const { data, isLoading, isFetchingNextPage, hasNextPage, fetchNextPage, refetch, error } =
+    useGitHubIssueComments(currentProject?.path, issueNumber ?? undefined);
 
-      const isLoadingMore = !!cursor;
+  // Flatten all pages into a single comments array
+  const comments = useMemo(() => {
+    return data?.pages.flatMap((page) => page.comments) ?? [];
+  }, [data?.pages]);
 
-      try {
-        if (isMountedRef.current) {
-          setError(null);
-          if (isLoadingMore) {
-            setLoadingMore(true);
-          } else {
-            setLoading(true);
-          }
-        }
-
-        const api = getElectronAPI();
-        if (api.github) {
-          const result = await api.github.getIssueComments(
-            currentProject.path,
-            issueNumber,
-            cursor
-          );
-
-          if (isMountedRef.current) {
-            if (result.success) {
-              if (isLoadingMore) {
-                // Append new comments
-                setComments((prev) => [...prev, ...(result.comments || [])]);
-              } else {
-                // Replace all comments
-                setComments(result.comments || []);
-              }
-              setTotalCount(result.totalCount || 0);
-              setHasNextPage(result.hasNextPage || false);
-              setEndCursor(result.endCursor);
-            } else {
-              setError(result.error || 'Failed to fetch comments');
-            }
-          }
-        }
-      } catch (err) {
-        if (isMountedRef.current) {
-          logger.error('Error fetching comments:', err);
-          setError(err instanceof Error ? err.message : 'Failed to fetch comments');
-        }
-      } finally {
-        if (isMountedRef.current) {
-          setLoading(false);
-          setLoadingMore(false);
-        }
-      }
-    },
-    [currentProject?.path, issueNumber]
-  );
-
-  // Reset and fetch when issue changes
-  useEffect(() => {
-    isMountedRef.current = true;
-
-    if (issueNumber) {
-      // Reset state when issue changes
-      setComments([]);
-      setTotalCount(0);
-      setHasNextPage(false);
-      setEndCursor(undefined);
-      setError(null);
-      fetchComments();
-    } else {
-      // Clear comments when no issue is selected
-      setComments([]);
-      setTotalCount(0);
-      setHasNextPage(false);
-      setEndCursor(undefined);
-      setLoading(false);
-      setError(null);
-    }
-
-    return () => {
-      isMountedRef.current = false;
-    };
-  }, [issueNumber, fetchComments]);
+  // Get total count from the first page
+  const totalCount = data?.pages[0]?.totalCount ?? 0;
 
   const loadMore = useCallback(() => {
-    if (hasNextPage && endCursor && !loadingMore) {
-      fetchComments(endCursor);
+    if (hasNextPage && !isFetchingNextPage) {
+      fetchNextPage();
     }
-  }, [hasNextPage, endCursor, loadingMore, fetchComments]);
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   const refresh = useCallback(() => {
-    setComments([]);
-    setEndCursor(undefined);
-    fetchComments();
-  }, [fetchComments]);
+    refetch();
+  }, [refetch]);
 
   return {
     comments,
     totalCount,
-    loading,
-    loadingMore,
-    hasNextPage,
-    error,
+    loading: isLoading,
+    loadingMore: isFetchingNextPage,
+    hasNextPage: hasNextPage ?? false,
+    error: error instanceof Error ? error.message : null,
     loadMore,
     refresh,
   };

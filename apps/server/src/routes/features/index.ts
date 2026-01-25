@@ -4,6 +4,8 @@
 
 import { Router } from 'express';
 import { FeatureLoader } from '../../services/feature-loader.js';
+import type { SettingsService } from '../../services/settings-service.js';
+import type { EventEmitter } from '../../lib/events.js';
 import { validatePathParams } from '../../middleware/validate-paths.js';
 import { createListHandler } from './routes/list.js';
 import { createGetHandler } from './routes/get.js';
@@ -15,12 +17,20 @@ import { createDeleteHandler } from './routes/delete.js';
 import { createAgentOutputHandler, createRawOutputHandler } from './routes/agent-output.js';
 import { createGenerateTitleHandler } from './routes/generate-title.js';
 
-export function createFeaturesRoutes(featureLoader: FeatureLoader): Router {
+export function createFeaturesRoutes(
+  featureLoader: FeatureLoader,
+  settingsService?: SettingsService,
+  events?: EventEmitter
+): Router {
   const router = Router();
 
   router.post('/list', validatePathParams('projectPath'), createListHandler(featureLoader));
   router.post('/get', validatePathParams('projectPath'), createGetHandler(featureLoader));
-  router.post('/create', validatePathParams('projectPath'), createCreateHandler(featureLoader));
+  router.post(
+    '/create',
+    validatePathParams('projectPath'),
+    createCreateHandler(featureLoader, events)
+  );
   router.post('/update', validatePathParams('projectPath'), createUpdateHandler(featureLoader));
   router.post(
     '/bulk-update',
@@ -35,7 +45,7 @@ export function createFeaturesRoutes(featureLoader: FeatureLoader): Router {
   router.post('/delete', validatePathParams('projectPath'), createDeleteHandler(featureLoader));
   router.post('/agent-output', createAgentOutputHandler(featureLoader));
   router.post('/raw-output', createRawOutputHandler(featureLoader));
-  router.post('/generate-title', createGenerateTitleHandler());
+  router.post('/generate-title', createGenerateTitleHandler(settingsService));
 
   return router;
 }

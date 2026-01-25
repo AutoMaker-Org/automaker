@@ -37,17 +37,18 @@ describe('model-resolver.ts', () => {
       const result = resolveModelString('opus');
       expect(result).toBe('claude-opus-4-5-20251101');
       expect(consoleSpy.log).toHaveBeenCalledWith(
-        expect.stringContaining('Resolved Claude model alias: "opus"')
+        expect.stringContaining('Migrated legacy ID: "opus" -> "claude-opus"')
       );
     });
 
-    it('should treat unknown models as falling back to default', () => {
-      // Note: Don't include valid Cursor model IDs here (e.g., 'gpt-5.2' is in CURSOR_MODEL_MAP)
-      const models = ['o1', 'o1-mini', 'o3', 'unknown-model', 'fake-model-123'];
+    it('should pass through unknown models unchanged (may be provider models)', () => {
+      // Unknown models now pass through unchanged to support ClaudeCompatibleProvider models
+      // like GLM-4.7, MiniMax-M2.1, o1, etc.
+      const models = ['o1', 'o1-mini', 'o3', 'unknown-model', 'fake-model-123', 'GLM-4.7'];
       models.forEach((model) => {
         const result = resolveModelString(model);
-        // Should fall back to default since these aren't supported
-        expect(result).toBe(DEFAULT_MODELS.claude);
+        // Should pass through unchanged (could be provider models)
+        expect(result).toBe(model);
       });
     });
 
@@ -73,12 +74,12 @@ describe('model-resolver.ts', () => {
       expect(result).toBe(customDefault);
     });
 
-    it('should return default for unknown model key', () => {
+    it('should pass through unknown model key unchanged (no warning)', () => {
       const result = resolveModelString('unknown-model');
-      expect(result).toBe(DEFAULT_MODELS.claude);
-      expect(consoleSpy.warn).toHaveBeenCalledWith(
-        expect.stringContaining('Unknown model key "unknown-model"')
-      );
+      // Unknown models pass through unchanged (could be provider models)
+      expect(result).toBe('unknown-model');
+      // No warning - unknown models are valid for providers
+      expect(consoleSpy.warn).not.toHaveBeenCalled();
     });
 
     it('should handle empty string', () => {

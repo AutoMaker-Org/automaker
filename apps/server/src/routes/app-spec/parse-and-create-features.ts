@@ -5,9 +5,10 @@
 import path from 'path';
 import * as secureFs from '../../lib/secure-fs.js';
 import type { EventEmitter } from '../../lib/events.js';
-import { createLogger } from '@automaker/utils';
+import { createLogger, atomicWriteJson, DEFAULT_BACKUP_COUNT } from '@automaker/utils';
 import { getFeaturesDir } from '@automaker/platform';
 import { extractJsonWithArray } from '../../lib/json-extractor.js';
+import { getNotificationService } from '../../services/notification-service.js';
 
 const logger = createLogger('SpecRegeneration');
 
@@ -73,10 +74,10 @@ export async function parseAndCreateFeatures(
         updatedAt: new Date().toISOString(),
       };
 
-      await secureFs.writeFile(
-        path.join(featureDir, 'feature.json'),
-        JSON.stringify(featureData, null, 2)
-      );
+      // Use atomic write with backup support for crash protection
+      await atomicWriteJson(path.join(featureDir, 'feature.json'), featureData, {
+        backupCount: DEFAULT_BACKUP_COUNT,
+      });
 
       createdFeatures.push({ id: feature.id, title: feature.title });
     }
@@ -86,6 +87,15 @@ export async function parseAndCreateFeatures(
     events.emit('spec-regeneration:event', {
       type: 'spec_regeneration_complete',
       message: `Spec regeneration complete! Created ${createdFeatures.length} features.`,
+      projectPath: projectPath,
+    });
+
+    // Create notification for spec generation completion
+    const notificationService = getNotificationService();
+    await notificationService.createNotification({
+      type: 'spec_regeneration_complete',
+      title: 'Spec Generation Complete',
+      message: `Created ${createdFeatures.length} features from the project specification.`,
       projectPath: projectPath,
     });
   } catch (error) {

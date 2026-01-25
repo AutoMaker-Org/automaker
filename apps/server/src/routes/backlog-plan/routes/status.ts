@@ -3,13 +3,15 @@
  */
 
 import type { Request, Response } from 'express';
-import { getBacklogPlanStatus, getErrorMessage, logError } from '../common.js';
+import { getBacklogPlanStatus, loadBacklogPlan, getErrorMessage, logError } from '../common.js';
 
 export function createStatusHandler() {
-  return async (_req: Request, res: Response): Promise<void> => {
+  return async (req: Request, res: Response): Promise<void> => {
     try {
       const status = getBacklogPlanStatus();
-      res.json({ success: true, ...status });
+      const projectPath = typeof req.query.projectPath === 'string' ? req.query.projectPath : '';
+      const savedPlan = projectPath ? await loadBacklogPlan(projectPath) : null;
+      res.json({ success: true, ...status, savedPlan });
     } catch (error) {
       logError(error, 'Get backlog plan status failed');
       res.status(500).json({ success: false, error: getErrorMessage(error) });

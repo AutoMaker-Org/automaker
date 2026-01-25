@@ -27,18 +27,6 @@ export function AgentHeader({
   return (
     <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-card/50 backdrop-blur-sm">
       <div className="flex items-center gap-4">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={onToggleSessionManager}
-          className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
-        >
-          {showSessionManager ? (
-            <PanelLeftClose className="w-4 h-4" />
-          ) : (
-            <PanelLeft className="w-4 h-4" />
-          )}
-        </Button>
         <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center">
           <Bot className="w-5 h-5 text-primary" />
         </div>
@@ -71,6 +59,19 @@ export function AgentHeader({
             Clear
           </Button>
         )}
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onToggleSessionManager}
+          className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
+          aria-label={showSessionManager ? 'Hide sessions panel' : 'Show sessions panel'}
+        >
+          {showSessionManager ? (
+            <PanelLeftClose className="w-4 h-4" />
+          ) : (
+            <PanelLeft className="w-4 h-4" />
+          )}
+        </Button>
       </div>
     </div>
   );

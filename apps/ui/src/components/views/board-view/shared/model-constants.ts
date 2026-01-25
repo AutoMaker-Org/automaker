@@ -9,7 +9,7 @@ import { Brain, Zap, Scale, Cpu, Rocket, Sparkles } from 'lucide-react';
 import { AnthropicIcon, CursorIcon, OpenAIIcon, OpenCodeIcon } from '@/components/ui/provider-icon';
 
 export type ModelOption = {
-  id: string; // Claude models use ModelAlias, Cursor models use "cursor-{id}"
+  id: string; // All model IDs use canonical prefixed format (e.g., "claude-sonnet", "cursor-auto")
   label: string;
   description: string;
   badge?: string;
@@ -17,23 +17,27 @@ export type ModelOption = {
   hasThinking?: boolean;
 };
 
+/**
+ * Claude models with canonical prefixed IDs
+ * UI displays short labels but stores full canonical IDs
+ */
 export const CLAUDE_MODELS: ModelOption[] = [
   {
-    id: 'haiku',
+    id: 'claude-haiku', // Canonical prefixed ID
     label: 'Claude Haiku',
     description: 'Fast and efficient for simple tasks.',
     badge: 'Speed',
     provider: 'claude',
   },
   {
-    id: 'sonnet',
+    id: 'claude-sonnet', // Canonical prefixed ID
     label: 'Claude Sonnet',
     description: 'Balanced performance with strong reasoning.',
     badge: 'Balanced',
     provider: 'claude',
   },
   {
-    id: 'opus',
+    id: 'claude-opus', // Canonical prefixed ID
     label: 'Claude Opus',
     description: 'Most capable model for complex work.',
     badge: 'Premium',
@@ -82,11 +86,11 @@ export const BEDROCK_MODELS: ModelOption[] = [
 
 /**
  * Cursor models derived from CURSOR_MODEL_MAP
- * ID is prefixed with "cursor-" for ProviderFactory routing
+ * IDs already have 'cursor-' prefix in the canonical format
  */
 export const CURSOR_MODELS: ModelOption[] = Object.entries(CURSOR_MODEL_MAP).map(
   ([id, config]) => ({
-    id: `cursor-${id}`,
+    id, // Already prefixed in canonical format
     label: config.label,
     description: config.description,
     provider: 'cursor' as ModelProvider,

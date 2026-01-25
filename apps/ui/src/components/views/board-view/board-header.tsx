@@ -1,11 +1,11 @@
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { Wand2, GitBranch } from 'lucide-react';
+import { Wand2, GitBranch, ClipboardCheck } from 'lucide-react';
 import { UsagePopover } from '@/components/usage-popover';
 import { useAppStore } from '@/store/app-store';
 import { useSetupStore } from '@/store/setup-store';
-import { useIsMobile } from '@/hooks/use-media-query';
+import { useIsTablet } from '@/hooks/use-media-query';
 import { AutoModeSettingsPopover } from './dialogs/auto-mode-settings-popover';
 import { WorktreeSettingsPopover } from './dialogs/worktree-settings-popover';
 import { PlanSettingsPopover } from './dialogs/plan-settings-popover';
@@ -25,6 +25,8 @@ interface BoardHeaderProps {
   isAutoModeRunning: boolean;
   onAutoModeToggle: (enabled: boolean) => void;
   onOpenPlanDialog: () => void;
+  hasPendingPlan?: boolean;
+  onOpenPendingPlan?: () => void;
   isMounted: boolean;
   // Search bar props
   searchQuery: string;
@@ -50,6 +52,8 @@ export function BoardHeader({
   isAutoModeRunning,
   onAutoModeToggle,
   onOpenPlanDialog,
+  hasPendingPlan,
+  onOpenPendingPlan,
   isMounted,
   searchQuery,
   onSearchChange,
@@ -104,7 +108,10 @@ export function BoardHeader({
   // Show if Codex is authenticated (CLI or API key)
   const showCodexUsage = !!codexAuthStatus?.authenticated;
 
-  const isMobile = useIsMobile();
+  // State for mobile actions panel
+  const [showActionsPanel, setShowActionsPanel] = useState(false);
+
+  const isTablet = useIsTablet();
 
   return (
     <div className="flex items-center justify-between gap-5 p-4 border-b border-border bg-glass backdrop-blur-md">
@@ -121,11 +128,13 @@ export function BoardHeader({
       </div>
       <div className="flex gap-4 items-center">
         {/* Usage Popover - show if either provider is authenticated, only on desktop */}
-        {isMounted && !isMobile && (showClaudeUsage || showCodexUsage) && <UsagePopover />}
+        {isMounted && !isTablet && (showClaudeUsage || showCodexUsage) && <UsagePopover />}
 
-        {/* Mobile view: show hamburger menu with all controls */}
-        {isMounted && isMobile && (
+        {/* Tablet/Mobile view: show hamburger menu with all controls */}
+        {isMounted && isTablet && (
           <HeaderMobileMenu
+            isOpen={showActionsPanel}
+            onToggle={() => setShowActionsPanel(!showActionsPanel)}
             isWorktreePanelVisible={isWorktreePanelVisible}
             onWorktreePanelToggle={handleWorktreePanelToggle}
             maxConcurrency={maxConcurrency}
@@ -133,7 +142,8 @@ export function BoardHeader({
             onConcurrencyChange={onConcurrencyChange}
             isAutoModeRunning={isAutoModeRunning}
             onAutoModeToggle={onAutoModeToggle}
-            onOpenAutoModeSettings={() => {}}
+            skipVerificationInAutoMode={skipVerificationInAutoMode}
+            onSkipVerificationChange={setSkipVerificationInAutoMode}
             onOpenPlanDialog={onOpenPlanDialog}
             showClaudeUsage={showClaudeUsage}
             showCodexUsage={showCodexUsage}
@@ -142,7 +152,7 @@ export function BoardHeader({
 
         {/* Desktop view: show full controls */}
         {/* Worktrees Toggle - only show after mount to prevent hydration issues */}
-        {isMounted && !isMobile && (
+        {isMounted && !isTablet && (
           <div className={controlContainerClass} data-testid="worktrees-toggle-container">
             <GitBranch className="w-4 h-4 text-muted-foreground" />
             <Label
@@ -165,7 +175,7 @@ export function BoardHeader({
         )}
 
         {/* Auto Mode Toggle - only show after mount to prevent hydration issues */}
-        {isMounted && !isMobile && (
+        {isMounted && !isTablet && (
           <div className={controlContainerClass} data-testid="auto-mode-toggle-container">
             <Label
               htmlFor="auto-mode-toggle"
@@ -173,6 +183,13 @@ export function BoardHeader({
             >
               Auto Mode
             </Label>
+            <span
+              className="text-[10px] font-medium text-muted-foreground bg-muted/60 px-1.5 py-0.5 rounded"
+              data-testid="auto-mode-max-concurrency"
+              title="Max concurrent agents"
+            >
+              {maxConcurrency}
+            </span>
             <Switch
               id="auto-mode-toggle"
               checked={isAutoModeRunning}
@@ -189,9 +206,18 @@ export function BoardHeader({
           </div>
         )}
 
-        {/* Plan Button with Settings - only show on desktop, mobile has it in the menu */}
-        {isMounted && !isMobile && (
+        {/* Plan Button with Settings - only show on desktop, tablet/mobile has it in the panel */}
+        {isMounted && !isTablet && (
           <div className={controlContainerClass} data-testid="plan-button-container">
+            {hasPendingPlan && (
+              <button
+                onClick={onOpenPendingPlan || onOpenPlanDialog}
+                className="flex items-center gap-1.5 text-emerald-500 hover:text-emerald-400 transition-colors"
+                data-testid="plan-review-button"
+              >
+                <ClipboardCheck className="w-4 h-4" />
+              </button>
+            )}
             <button
               onClick={onOpenPlanDialog}
               className="flex items-center gap-1.5 hover:text-foreground transition-colors"

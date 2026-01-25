@@ -162,6 +162,18 @@ export function getAppSpecPath(projectPath: string): string {
 }
 
 /**
+ * Get the notifications file path for a project
+ *
+ * Stores project-level notifications for feature status changes and operation completions.
+ *
+ * @param projectPath - Absolute path to project directory
+ * @returns Absolute path to {projectPath}/.automaker/notifications.json
+ */
+export function getNotificationsPath(projectPath: string): string {
+  return path.join(getAutomakerDir(projectPath), 'notifications.json');
+}
+
+/**
  * Get the branch tracking file path for a project
  *
  * Stores JSON metadata about active git branches and worktrees.
@@ -333,6 +345,57 @@ export async function ensureIdeationDir(projectPath: string): Promise<string> {
   await secureFs.mkdir(getIdeationSessionsDir(projectPath), { recursive: true });
   await secureFs.mkdir(getIdeationDraftsDir(projectPath), { recursive: true });
   return ideationDir;
+}
+
+// ============================================================================
+// Event History Paths
+// ============================================================================
+
+/**
+ * Get the event history directory for a project
+ *
+ * Contains stored event records for debugging and replay.
+ *
+ * @param projectPath - Absolute path to project directory
+ * @returns Absolute path to {projectPath}/.automaker/events
+ */
+export function getEventHistoryDir(projectPath: string): string {
+  return path.join(getAutomakerDir(projectPath), 'events');
+}
+
+/**
+ * Get the event history index file path
+ *
+ * Stores an index of all events for quick listing without scanning directory.
+ *
+ * @param projectPath - Absolute path to project directory
+ * @returns Absolute path to {projectPath}/.automaker/events/index.json
+ */
+export function getEventHistoryIndexPath(projectPath: string): string {
+  return path.join(getEventHistoryDir(projectPath), 'index.json');
+}
+
+/**
+ * Get the file path for a specific event
+ *
+ * @param projectPath - Absolute path to project directory
+ * @param eventId - Event identifier
+ * @returns Absolute path to {projectPath}/.automaker/events/{eventId}.json
+ */
+export function getEventPath(projectPath: string, eventId: string): string {
+  return path.join(getEventHistoryDir(projectPath), `${eventId}.json`);
+}
+
+/**
+ * Create the event history directory for a project if it doesn't exist
+ *
+ * @param projectPath - Absolute path to project directory
+ * @returns Promise resolving to the created events directory path
+ */
+export async function ensureEventHistoryDir(projectPath: string): Promise<string> {
+  const eventsDir = getEventHistoryDir(projectPath);
+  await secureFs.mkdir(eventsDir, { recursive: true });
+  return eventsDir;
 }
 
 // ============================================================================

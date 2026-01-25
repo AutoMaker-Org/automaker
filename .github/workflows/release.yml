@@ -35,6 +35,11 @@ jobs:
         with:
           check-lockfile: 'true'
 
+      - name: Install RPM build tools (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        shell: bash
+        run: sudo apt-get update && sudo apt-get install -y rpm
+
       - name: Build Electron app (macOS)
         if: matrix.os == 'macos-latest'
         shell: bash
@@ -73,7 +78,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: linux-builds
-          path: apps/ui/release/*.{AppImage,deb}
+          path: apps/ui/release/*.{AppImage,deb,rpm}
           retention-days: 30
 
   upload:
@@ -104,8 +109,8 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            artifacts/macos-builds/*
-            artifacts/windows-builds/*
-            artifacts/linux-builds/*
+            artifacts/macos-builds/*.{dmg,zip,blockmap}
+            artifacts/windows-builds/*.{exe,blockmap}
+            artifacts/linux-builds/*.{AppImage,deb,rpm,blockmap}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -21,6 +21,7 @@ import {
   getKanbanColumn,
   authenticateForTests,
   handleLoginScreenIfPresent,
+  sanitizeForTestId,
 } from '../utils';
 
 const TEST_TEMP_DIR = createTempDirPath('manual-review-test');
@@ -130,8 +131,10 @@ test.describe('Feature Manual Review Flow', () => {
       await page.waitForTimeout(300);
     }
 
-    // Verify we're on the correct project (project name appears in sidebar button)
-    await expect(page.getByRole('button', { name: new RegExp(projectName) })).toBeVisible({
+    // Verify we're on the correct project (project switcher button shows project name)
+    // Use ends-with selector since data-testid format is: project-switcher-{id}-{sanitizedName}
+    const sanitizedProjectName = sanitizeForTestId(projectName);
+    await expect(page.locator(`[data-testid$="-${sanitizedProjectName}"]`)).toBeVisible({
       timeout: 10000,
     });
 

@@ -1,5 +1,6 @@
 import { Plug, RefreshCw, Download, Code, FileJson, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Spinner } from '@/components/ui/spinner';
 import { cn } from '@/lib/utils';
 
 interface MCPServerHeaderProps {
@@ -43,7 +44,7 @@ export function MCPServerHeader({
             disabled={isRefreshing}
             data-testid="refresh-mcp-servers-button"
           >
-            <RefreshCw className={cn('w-4 h-4', isRefreshing && 'animate-spin')} />
+            {isRefreshing ? <Spinner size="sm" /> : <RefreshCw className="w-4 h-4" />}
           </Button>
           {hasServers && (
             <>

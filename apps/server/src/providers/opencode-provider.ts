@@ -25,7 +25,6 @@ import type {
   InstallationStatus,
   ContentBlock,
 } from '@automaker/types';
-import { stripProviderPrefix } from '@automaker/types';
 import { type SubprocessOptions, getOpenCodeAuthIndicators } from '@automaker/platform';
 import { createLogger } from '@automaker/utils';
 
@@ -328,10 +327,18 @@ export class OpencodeProvider extends CliProvider {
     args.push('--format', 'json');
 
     // Handle model selection
-    // Strip 'opencode-' prefix if present, OpenCode uses format like 'anthropic/claude-sonnet-4-5'
+    // Convert canonical prefix format (opencode-xxx) to CLI slash format (opencode/xxx)
+    // OpenCode CLI expects provider/model format (e.g., 'opencode/big-model')
     if (options.model) {
-      const model = stripProviderPrefix(options.model);
-      args.push('--model', model);
+      // Strip opencode- prefix if present, then ensure slash format
+      const model = options.model.startsWith('opencode-')
+        ? options.model.slice('opencode-'.length)
+        : options.model;
+
+      // If model has slash, it's already provider/model format; otherwise prepend opencode/
+      const cliModel = model.includes('/') ? model : `opencode/${model}`;
+
+      args.push('--model', cliModel);
     }
 
     // Note: OpenCode reads from stdin automatically when input is piped
@@ -1035,7 +1042,7 @@ export class OpencodeProvider extends CliProvider {
       'lm studio': 'lmstudio',
       lmstudio: 'lmstudio',
       opencode: 'opencode',
-      'z.ai coding plan': 'z-ai',
+      'z.ai coding plan': 'zai-coding-plan',
       'z.ai': 'z-ai',
     };
 

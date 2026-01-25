@@ -3,7 +3,7 @@
  * doesn't tree-shake their CSS when imported dynamically.
  */
 
-// Dark themes (16)
+// Dark themes (20)
 import './themes/dark.css';
 import './themes/retro.css';
 import './themes/dracula.css';
@@ -20,8 +20,12 @@ import './themes/sunset.css';
 import './themes/gray.css';
 import './themes/forest.css';
 import './themes/ocean.css';
+import './themes/ember.css';
+import './themes/ayu-dark.css';
+import './themes/ayu-mirage.css';
+import './themes/matcha.css';
 
-// Light themes (16)
+// Light themes (20)
 import './themes/light.css';
 import './themes/cream.css';
 import './themes/solarizedlight.css';
@@ -38,3 +42,7 @@ import './themes/sepia.css';
 import './themes/gruvboxlight.css';
 import './themes/nordlight.css';
 import './themes/blossom.css';
+import './themes/ayu-light.css';
+import './themes/onelight.css';
+import './themes/bluloco.css';
+import './themes/feather.css';

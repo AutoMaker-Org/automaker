@@ -1,0 +1,67 @@
+/* Zed Fonts - https://github.com/zed-industries/zed-fonts */
+
+/* Zed Sans - UI Font */
+@font-face {
+  font-family: 'Zed Sans';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('./zed-sans-extended.ttf') format('truetype');
+}
+
+@font-face {
+  font-family: 'Zed Sans';
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: url('./zed-sans-extendeditalic.ttf') format('truetype');
+}
+
+@font-face {
+  font-family: 'Zed Sans';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('./zed-sans-extendedbold.ttf') format('truetype');
+}
+
+@font-face {
+  font-family: 'Zed Sans';
+  font-style: italic;
+  font-weight: 700;
+  font-display: swap;
+  src: url('./zed-sans-extendedbolditalic.ttf') format('truetype');
+}
+
+/* Zed Mono - Code Font */
+@font-face {
+  font-family: 'Zed Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('./zed-mono-extended.ttf') format('truetype');
+}
+
+@font-face {
+  font-family: 'Zed Mono';
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: url('./zed-mono-extendeditalic.ttf') format('truetype');
+}
+
+@font-face {
+  font-family: 'Zed Mono';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('./zed-mono-extendedbold.ttf') format('truetype');
+}
+
+@font-face {
+  font-family: 'Zed Mono';
+  font-style: italic;
+  font-weight: 700;
+  font-display: swap;
+  src: url('./zed-mono-extendedbolditalic.ttf') format('truetype');
+}

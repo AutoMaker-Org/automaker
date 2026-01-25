@@ -12,6 +12,7 @@ import { useCursorStatus } from '../hooks/use-cursor-status';
 import { useCursorPermissions } from '../hooks/use-cursor-permissions';
 import { CursorPermissionsSection } from './cursor-permissions-section';
 import { CursorModelConfiguration } from './cursor-model-configuration';
+import { ProviderToggle } from './provider-toggle';
 
 export function CursorSettingsTab() {
   // Global settings from store
@@ -73,6 +74,9 @@ export function CursorSettingsTab() {
 
   return (
     <div className="space-y-6">
+      {/* Provider Visibility Toggle */}
+      <ProviderToggle provider="cursor" providerLabel="Cursor" />
+
       {/* CLI Status */}
       <CursorCliStatus status={status} isChecking={isLoading} onRefresh={loadData} />
 

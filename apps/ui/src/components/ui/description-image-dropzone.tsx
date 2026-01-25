@@ -3,7 +3,8 @@ import { createLogger } from '@automaker/utils/logger';
 import { cn } from '@/lib/utils';
 
 const logger = createLogger('DescriptionImageDropZone');
-import { ImageIcon, X, Loader2, FileText } from 'lucide-react';
+import { ImageIcon, X, FileText } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 import { Textarea } from '@/components/ui/textarea';
 import { getElectronAPI } from '@/lib/electron';
 import { getAuthenticatedImageUrl } from '@/lib/api-fetch';
@@ -431,7 +432,7 @@ export function DescriptionImageDropZone({
       {/* Processing indicator */}
       {isProcessing && (
         <div className="flex items-center gap-2 mt-2 text-sm text-muted-foreground">
-          <Loader2 className="w-4 h-4 animate-spin" />
+          <Spinner size="sm" />
           <span>Processing files...</span>
         </div>
       )}

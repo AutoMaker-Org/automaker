@@ -13,6 +13,7 @@ import { toast } from 'sonner';
 import { getElectronAPI } from '@/lib/electron';
 import { ModelOverrideTrigger, useModelOverride } from '@/components/shared';
 import { EnhancementMode, ENHANCEMENT_MODE_LABELS } from './enhancement-constants';
+import { useAppStore } from '@/store/app-store';
 
 const logger = createLogger('EnhanceWithAI');
 
@@ -56,6 +57,9 @@ export function EnhanceWithAI({
   const [enhancementMode, setEnhancementMode] = useState<EnhancementMode>('improve');
   const [enhanceOpen, setEnhanceOpen] = useState(false);
 
+  // Get current project path for per-project Claude API profile
+  const currentProjectPath = useAppStore((state) => state.currentProject?.path);
+
   // Enhancement model override
   const enhancementOverride = useModelOverride({ phase: 'enhancementModel' });
 
@@ -69,7 +73,8 @@ export function EnhanceWithAI({
         value,
         enhancementMode,
         enhancementOverride.effectiveModel,
-        enhancementOverride.effectiveModelEntry.thinkingLevel
+        enhancementOverride.effectiveModelEntry.thinkingLevel,
+        currentProjectPath
       );
 
       if (result?.success && result.enhancedText) {

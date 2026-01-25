@@ -6,8 +6,17 @@ import { createLogger } from '@automaker/utils';
 
 const logger = createLogger('SpecRegeneration');
 
+// Types for running generation
+export type GenerationType = 'spec_regeneration' | 'feature_generation' | 'sync';
+
+interface RunningGeneration {
+  isRunning: boolean;
+  type: GenerationType;
+  startedAt: string;
+}
+
 // Shared state for tracking generation status - scoped by project path
-const runningProjects = new Map<string, boolean>();
+const runningProjects = new Map<string, RunningGeneration>();
 const abortControllers = new Map<string, AbortController>();
 
 /**
@@ -17,16 +26,21 @@ export function getSpecRegenerationStatus(projectPath?: string): {
   isRunning: boolean;
   currentAbortController: AbortController | null;
   projectPath?: string;
+  type?: GenerationType;
+  startedAt?: string;
 } {
   if (projectPath) {
+    const generation = runningProjects.get(projectPath);
     return {
-      isRunning: runningProjects.get(projectPath) || false,
+      isRunning: generation?.isRunning || false,
       currentAbortController: abortControllers.get(projectPath) || null,
       projectPath,
+      type: generation?.type,
+      startedAt: generation?.startedAt,
     };
   }
   // Fallback: check if any project is running (for backward compatibility)
-  const isAnyRunning = Array.from(runningProjects.values()).some((running) => running);
+  const isAnyRunning = Array.from(runningProjects.values()).some((g) => g.isRunning);
   return { isRunning: isAnyRunning, currentAbortController: null };
 }
 
@@ -46,10 +60,15 @@ export function getRunningProjectPath(): string | null {
 export function setRunningState(
   projectPath: string,
   running: boolean,
-  controller: AbortController | null = null
+  controller: AbortController | null = null,
+  type: GenerationType = 'spec_regeneration'
 ): void {
   if (running) {
-    runningProjects.set(projectPath, true);
+    runningProjects.set(projectPath, {
+      isRunning: true,
+      type,
+      startedAt: new Date().toISOString(),
+    });
     if (controller) {
       abortControllers.set(projectPath, controller);
     }
@@ -57,6 +76,33 @@ export function setRunningState(
     runningProjects.delete(projectPath);
     abortControllers.delete(projectPath);
   }
+}
+
+/**
+ * Get all running spec/feature generations for the running agents view
+ */
+export function getAllRunningGenerations(): Array<{
+  projectPath: string;
+  type: GenerationType;
+  startedAt: string;
+}> {
+  const results: Array<{
+    projectPath: string;
+    type: GenerationType;
+    startedAt: string;
+  }> = [];
+
+  for (const [projectPath, generation] of runningProjects.entries()) {
+    if (generation.isRunning) {
+      results.push({
+        projectPath,
+        type: generation.type,
+        startedAt: generation.startedAt,
+      });
+    }
+  }
+
+  return results;
 }
 
 /**

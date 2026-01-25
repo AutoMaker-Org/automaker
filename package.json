@@ -1,6 +1,6 @@
 {
   "name": "automaker",
-  "version": "1.0.0",
+  "version": "0.13.0",
   "private": true,
   "engines": {
     "node": ">=22.0.0 <23.0.0"
@@ -12,7 +12,8 @@
   "scripts": {
     "postinstall": "node -e \"const fs=require('fs');if(process.platform==='darwin'){['darwin-arm64','darwin-x64'].forEach(a=>{const p='node_modules/node-pty/prebuilds/'+a+'/spawn-helper';if(fs.existsSync(p))fs.chmodSync(p,0o755)})}\" && node scripts/fix-lockfile-urls.mjs",
     "fix:lockfile": "node scripts/fix-lockfile-urls.mjs",
-    "dev": "node dev.mjs",
+    "dev": "node start-automaker.mjs",
+    "start": "node start-automaker.mjs --production",
     "_dev:web": "npm run dev:web --workspace=apps/ui",
     "_dev:electron": "npm run dev:electron --workspace=apps/ui",
     "_dev:electron:debug": "npm run dev:electron:debug --workspace=apps/ui",
@@ -29,7 +30,7 @@
     "dev:docker:rebuild": "docker compose build --no-cache && docker compose up",
     "dev:full": "npm run build:packages && concurrently \"npm run _dev:server\" \"npm run _dev:web\"",
     "build": "npm run build:packages && npm run build --workspace=apps/ui",
-    "build:packages": "npm run build -w @automaker/types && npm run build -w @automaker/platform && npm run build -w @automaker/utils && npm run build -w @automaker/prompts -w @automaker/model-resolver -w @automaker/dependency-resolver && npm run build -w @automaker/git-utils",
+    "build:packages": "npm run build -w @automaker/types && npm run build -w @automaker/platform && npm run build -w @automaker/utils -w @automaker/spec-parser && npm run build -w @automaker/prompts -w @automaker/model-resolver -w @automaker/dependency-resolver && npm run build -w @automaker/git-utils",
     "build:server": "npm run build:packages && npm run build --workspace=apps/server",
     "build:electron": "npm run build:packages && npm run build:electron --workspace=apps/ui",
     "build:electron:dir": "npm run build:packages && npm run build:electron:dir --workspace=apps/ui",
@@ -70,5 +71,8 @@
     "lint-staged": "16.2.7",
     "prettier": "3.7.4",
     "vitest": "4.0.16"
+  },
+  "optionalDependencies": {
+    "dmg-license": "^1.0.11"
   }
 }

@@ -15,7 +15,12 @@ import { FeatureLoader } from '../../services/feature-loader.js';
 import { getAppSpecPath } from '@automaker/platform';
 import * as secureFs from '../../lib/secure-fs.js';
 import type { SettingsService } from '../../services/settings-service.js';
-import { getAutoLoadClaudeMdSetting } from '../../lib/settings-helpers.js';
+import {
+  getAutoLoadClaudeMdSetting,
+  getPromptCustomization,
+  getPhaseModelWithOverrides,
+  getProviderByModelId,
+} from '../../lib/settings-helpers.js';
 
 const logger = createLogger('Suggestions');
 
@@ -137,11 +142,15 @@ export async function generateSuggestions(
   modelOverride?: string,
   thinkingLevelOverride?: ThinkingLevel
 ): Promise<void> {
+  // Get customized prompts from settings
+  const prompts = await getPromptCustomization(settingsService, '[Suggestions]');
+
+  // Map suggestion types to their prompts
   const typePrompts: Record<string, string> = {
-    features: 'Analyze this project and suggest new features that would add value.',
-    refactoring: 'Analyze this project and identify refactoring opportunities.',
-    security: 'Analyze this project for security vulnerabilities and suggest fixes.',
-    performance: 'Analyze this project for performance issues and suggest optimizations.',
+    features: prompts.suggestions.featuresPrompt,
+    refactoring: prompts.suggestions.refactoringPrompt,
+    security: prompts.suggestions.securityPrompt,
+    performance: prompts.suggestions.performancePrompt,
   };
 
   // Load existing context to avoid duplicates
@@ -151,15 +160,7 @@ export async function generateSuggestions(
 ${existingContext}
 
 ${existingContext ? '\nIMPORTANT: Do NOT suggest features that are already implemented or already in the backlog above. Focus on NEW ideas that complement what already exists.\n' : ''}
-Look at the codebase and provide 3-5 concrete suggestions.
-
-For each suggestion, provide:
-1. A category (e.g., "User Experience", "Security", "Performance")
-2. A clear description of what to implement
-3. Priority (1=high, 2=medium, 3=low)
-4. Brief reasoning for why this would help
-
-The response will be automatically formatted as structured JSON.`;
+${prompts.suggestions.baseTemplate}`;
 
   // Don't send initial message - let the agent output speak for itself
   // The first agent message will be captured as an info entry
@@ -171,11 +172,12 @@ The response will be automatically formatted as structured JSON.`;
     '[Suggestions]'
   );
 
-  // Get model from phase settings (AI Suggestions = suggestionsModel)
+  // Get model from phase settings with provider info (AI Suggestions = suggestionsModel)
   // Use override if provided, otherwise fall back to settings
-  const settings = await settingsService?.getGlobalSettings();
   let model: string;
   let thinkingLevel: ThinkingLevel | undefined;
+  let provider: import('@automaker/types').ClaudeCompatibleProvider | undefined;
+  let credentials: import('@automaker/types').Credentials | undefined;
 
   if (modelOverride) {
     // Use explicit override - resolve the model string
@@ -185,16 +187,47 @@ The response will be automatically formatted as structured JSON.`;
     });
     model = resolved.model;
     thinkingLevel = resolved.thinkingLevel;
+
+    // Try to find a provider for this model (e.g., GLM, MiniMax models)
+    if (settingsService) {
+      const providerResult = await getProviderByModelId(
+        modelOverride,
+        settingsService,
+        '[Suggestions]'
+      );
+      provider = providerResult.provider;
+      // Use resolved model from provider if available (maps to Claude model)
+      if (providerResult.resolvedModel) {
+        model = providerResult.resolvedModel;
+      }
+      credentials = providerResult.credentials ?? (await settingsService.getCredentials());
+    }
+    // If no settingsService, credentials remains undefined (initialized above)
+  } else if (settingsService) {
+    // Use settings-based model with provider info
+    const phaseResult = await getPhaseModelWithOverrides(
+      'suggestionsModel',
+      settingsService,
+      projectPath,
+      '[Suggestions]'
+    );
+    const resolved = resolvePhaseModel(phaseResult.phaseModel);
+    model = resolved.model;
+    thinkingLevel = resolved.thinkingLevel;
+    provider = phaseResult.provider;
+    credentials = phaseResult.credentials;
   } else {
-    // Use settings-based model
-    const phaseModelEntry =
-      settings?.phaseModels?.suggestionsModel || DEFAULT_PHASE_MODELS.suggestionsModel;
-    const resolved = resolvePhaseModel(phaseModelEntry);
+    // Fallback to defaults
+    const resolved = resolvePhaseModel(DEFAULT_PHASE_MODELS.suggestionsModel);
     model = resolved.model;
     thinkingLevel = resolved.thinkingLevel;
   }
 
-  logger.info('[Suggestions] Using model:', model);
+  logger.info(
+    '[Suggestions] Using model:',
+    model,
+    provider ? `via provider: ${provider.name}` : 'direct API'
+  );
 
   let responseText = '';
 
@@ -227,6 +260,8 @@ Your entire response should be valid JSON starting with { and ending with }. No 
     thinkingLevel,
     readOnly: true, // Suggestions only reads code, doesn't write
     settingSources: autoLoadClaudeMd ? ['user', 'project', 'local'] : undefined,
+    claudeCompatibleProvider: provider, // Pass provider for alternative endpoint configuration
+    credentials, // Pass credentials for resolving 'credentials' apiKeySource
     outputFormat: useStructuredOutput
       ? {
           type: 'json_schema',

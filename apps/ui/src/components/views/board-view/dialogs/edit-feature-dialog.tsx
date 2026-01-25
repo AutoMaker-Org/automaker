@@ -15,6 +15,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { CategoryAutocomplete } from '@/components/ui/category-autocomplete';
+import { DependencySelector } from '@/components/ui/dependency-selector';
 import {
   DescriptionImageDropZone,
   FeatureImagePath as DescriptionImagePath,
@@ -27,6 +28,7 @@ import { toast } from 'sonner';
 import { cn, modelSupportsThinking } from '@/lib/utils';
 import { Feature, ModelAlias, ThinkingLevel, useAppStore, PlanningMode } from '@/store/app-store';
 import type { ReasoningEffort, PhaseModelEntry, DescriptionHistoryEntry } from '@automaker/types';
+import { migrateModelId } from '@automaker/types';
 import {
   TestingTabContent,
   PrioritySelector,
@@ -63,6 +65,8 @@ interface EditFeatureDialogProps {
       priority: number;
       planningMode: PlanningMode;
       requirePlanApproval: boolean;
+      dependencies?: string[];
+      childDependencies?: string[]; // Feature IDs that should depend on this feature
     },
     descriptionHistorySource?: 'enhance' | 'edit',
     enhancementMode?: EnhancementMode,
@@ -104,9 +108,9 @@ export function EditFeatureDialog({
     feature?.requirePlanApproval ?? false
   );
 
-  // Model selection state
+  // Model selection state - migrate legacy model IDs to canonical format
   const [modelEntry, setModelEntry] = useState<PhaseModelEntry>(() => ({
-    model: (feature?.model as ModelAlias) || 'opus',
+    model: migrateModelId(feature?.model) || 'claude-opus',
     thinkingLevel: feature?.thinkingLevel || 'none',
     reasoningEffort: feature?.reasoningEffort || 'none',
   }));
@@ -127,6 +131,21 @@ export function EditFeatureDialog({
     feature?.descriptionHistory ?? []
   );
 
+  // Dependency state
+  const [parentDependencies, setParentDependencies] = useState<string[]>(
+    feature?.dependencies ?? []
+  );
+  // Child dependencies are features that have this feature in their dependencies
+  const [childDependencies, setChildDependencies] = useState<string[]>(() => {
+    if (!feature) return [];
+    return allFeatures.filter((f) => f.dependencies?.includes(feature.id)).map((f) => f.id);
+  });
+  // Track original child dependencies to detect changes
+  const [originalChildDependencies, setOriginalChildDependencies] = useState<string[]>(() => {
+    if (!feature) return [];
+    return allFeatures.filter((f) => f.dependencies?.includes(feature.id)).map((f) => f.id);
+  });
+
   useEffect(() => {
     setEditingFeature(feature);
     if (feature) {
@@ -139,19 +158,29 @@ export function EditFeatureDialog({
       setDescriptionChangeSource(null);
       setPreEnhancementDescription(null);
       setLocalHistory(feature.descriptionHistory ?? []);
-      // Reset model entry
+      // Reset model entry - migrate legacy model IDs
       setModelEntry({
-        model: (feature.model as ModelAlias) || 'opus',
+        model: migrateModelId(feature.model) || 'claude-opus',
         thinkingLevel: feature.thinkingLevel || 'none',
         reasoningEffort: feature.reasoningEffort || 'none',
       });
+      // Reset dependency state
+      setParentDependencies(feature.dependencies ?? []);
+      const childDeps = allFeatures
+        .filter((f) => f.dependencies?.includes(feature.id))
+        .map((f) => f.id);
+      setChildDependencies(childDeps);
+      setOriginalChildDependencies(childDeps);
     } else {
       setEditFeaturePreviewMap(new Map());
       setDescriptionChangeSource(null);
       setPreEnhancementDescription(null);
       setLocalHistory([]);
+      setParentDependencies([]);
+      setChildDependencies([]);
+      setOriginalChildDependencies([]);
     }
-  }, [feature]);
+  }, [feature, allFeatures]);
 
   const handleModelChange = (entry: PhaseModelEntry) => {
     setModelEntry(entry);
@@ -180,6 +209,12 @@ export function EditFeatureDialog({
     // For 'custom' mode, use the specified branch name
     const finalBranchName = workMode === 'custom' ? editingFeature.branchName || '' : '';
 
+    // Check if child dependencies changed
+    const childDepsChanged =
+      childDependencies.length !== originalChildDependencies.length ||
+      childDependencies.some((id) => !originalChildDependencies.includes(id)) ||
+      originalChildDependencies.some((id) => !childDependencies.includes(id));
+
     const updates = {
       title: editingFeature.title ?? '',
       category: editingFeature.category,
@@ -195,6 +230,8 @@ export function EditFeatureDialog({
       planningMode,
       requirePlanApproval,
       workMode,
+      dependencies: parentDependencies,
+      childDependencies: childDepsChanged ? childDependencies : undefined,
     };
 
     // Determine if description changed and what source to use
@@ -547,6 +584,40 @@ export function EditFeatureDialog({
                 testIdPrefix="edit-feature-work-mode"
               />
             </div>
+
+            {/* Dependencies */}
+            {allFeatures.length > 1 && (
+              <div className="pt-2 space-y-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">
+                    Parent Dependencies (this feature depends on)
+                  </Label>
+                  <DependencySelector
+                    currentFeatureId={editingFeature.id}
+                    value={parentDependencies}
+                    onChange={setParentDependencies}
+                    features={allFeatures}
+                    type="parent"
+                    placeholder="Select features this depends on..."
+                    data-testid="edit-feature-parent-deps"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">
+                    Child Dependencies (features that depend on this)
+                  </Label>
+                  <DependencySelector
+                    currentFeatureId={editingFeature.id}
+                    value={childDependencies}
+                    onChange={setChildDependencies}
+                    features={allFeatures}
+                    type="child"
+                    placeholder="Select features that depend on this..."
+                    data-testid="edit-feature-child-deps"
+                  />
+                </div>
+              </div>
+            )}
           </div>
         </div>
 

@@ -29,6 +29,7 @@ import {
   getSkillsConfiguration,
   getSubagentsConfiguration,
   getCustomSubagents,
+  getProviderByModelId,
 } from '../lib/settings-helpers.js';
 
 interface Message {
@@ -274,6 +275,30 @@ export class AgentService {
           ? await getCustomSubagents(this.settingsService, effectiveWorkDir)
           : undefined;
 
+      // Get credentials for API calls
+      const credentials = await this.settingsService?.getCredentials();
+
+      // Try to find a provider for the model (if it's a provider model like "GLM-4.7")
+      // This allows users to select provider models in the Agent Runner UI
+      let claudeCompatibleProvider: import('@automaker/types').ClaudeCompatibleProvider | undefined;
+      let providerResolvedModel: string | undefined;
+      const requestedModel = model || session.model;
+      if (requestedModel && this.settingsService) {
+        const providerResult = await getProviderByModelId(
+          requestedModel,
+          this.settingsService,
+          '[AgentService]'
+        );
+        if (providerResult.provider) {
+          claudeCompatibleProvider = providerResult.provider;
+          providerResolvedModel = providerResult.resolvedModel;
+          this.logger.info(
+            `[AgentService] Using provider "${providerResult.provider.name}" for model "${requestedModel}"` +
+              (providerResolvedModel ? ` -> resolved to "${providerResolvedModel}"` : '')
+          );
+        }
+      }
+
       // Load project context files (CLAUDE.md, CODE_QUALITY.md, etc.) and memory files
       // Use the user's message as task context for smart memory selection
       const contextResult = await loadContextFiles({
@@ -299,10 +324,16 @@ export class AgentService {
       // Use thinking level and reasoning effort from request, or fall back to session's stored values
       const effectiveThinkingLevel = thinkingLevel ?? session.thinkingLevel;
       const effectiveReasoningEffort = reasoningEffort ?? session.reasoningEffort;
+
+      // When using a provider model, use the resolved Claude model (from mapsToClaudeModel)
+      // e.g., "GLM-4.5-Air" -> "claude-haiku-4-5"
+      const modelForSdk = providerResolvedModel || model;
+      const sessionModelForSdk = providerResolvedModel ? undefined : session.model;
+
       const sdkOptions = createChatOptions({
         cwd: effectiveWorkDir,
-        model: model,
-        sessionModel: session.model,
+        model: modelForSdk,
+        sessionModel: sessionModelForSdk,
         systemPrompt: combinedSystemPrompt,
         abortController: session.abortController!,
         autoLoadClaudeMd,
@@ -378,6 +409,8 @@ export class AgentService {
         agents: customSubagents, // Pass custom subagents for task delegation
         thinkingLevel: effectiveThinkingLevel, // Pass thinking level for Claude models
         reasoningEffort: effectiveReasoningEffort, // Pass reasoning effort for Codex models
+        credentials, // Pass credentials for resolving 'credentials' apiKeySource
+        claudeCompatibleProvider, // Pass provider for alternative endpoint configuration (GLM, MiniMax, etc.)
       };
 
       // Build prompt content with images

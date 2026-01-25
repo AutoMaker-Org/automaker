@@ -7,7 +7,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { GitBranch, ChevronDown, Loader2, CircleDot, Check } from 'lucide-react';
+import { GitBranch, ChevronDown, CircleDot, Check } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 import { cn } from '@/lib/utils';
 import type { WorktreeInfo } from '../types';
 
@@ -44,7 +45,7 @@ export function WorktreeMobileDropdown({
           <GitBranch className="w-3.5 h-3.5 shrink-0" />
           <span className="truncate">{displayBranch}</span>
           {isActivating ? (
-            <Loader2 className="w-3 h-3 animate-spin shrink-0" />
+            <Spinner size="xs" className="shrink-0" />
           ) : (
             <ChevronDown className="w-3 h-3 shrink-0 ml-auto" />
           )}
@@ -74,7 +75,7 @@ export function WorktreeMobileDropdown({
                 ) : (
                   <div className="w-3.5 h-3.5 shrink-0" />
                 )}
-                {isRunning && <Loader2 className="w-3 h-3 animate-spin shrink-0" />}
+                {isRunning && <Spinner size="xs" className="shrink-0" />}
                 <span className={cn('font-mono text-xs truncate', isSelected && 'font-medium')}>
                   {worktree.branch}
                 </span>

@@ -13,8 +13,8 @@ import {
   Gauge,
   Accessibility,
   BarChart3,
-  Loader2,
 } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 import { Card, CardContent } from '@/components/ui/card';
 import { useGuidedPrompts } from '@/hooks/use-guided-prompts';
 import type { IdeaCategory } from '@automaker/types';
@@ -53,7 +53,7 @@ export function PromptCategoryGrid({ onSelect, onBack }: PromptCategoryGridProps
 
         {isLoading && (
           <div className="flex items-center justify-center py-12">
-            <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+            <Spinner size="lg" />
             <span className="ml-2 text-muted-foreground">Loading categories...</span>
           </div>
         )}
@@ -69,17 +69,19 @@ export function PromptCategoryGrid({ onSelect, onBack }: PromptCategoryGridProps
               return (
                 <Card
                   key={category.id}
-                  className="cursor-pointer transition-all hover:border-primary hover:shadow-md"
+                  className="group cursor-pointer transition-all duration-300 hover:border-primary hover:shadow-lg hover:-translate-y-1"
                   onClick={() => onSelect(category.id)}
                 >
                   <CardContent className="p-6">
-                    <div className="flex flex-col items-center text-center gap-3">
-                      <div className="p-4 rounded-full bg-primary/10">
-                        <Icon className="w-8 h-8 text-primary" />
+                    <div className="flex flex-col items-center text-center gap-4">
+                      <div className="p-4 rounded-2xl bg-primary/10 text-primary group-hover:bg-primary/20 group-hover:scale-110 transition-all duration-300">
+                        <Icon className="w-8 h-8" />
                       </div>
-                      <div>
-                        <h3 className="font-semibold text-lg">{category.name}</h3>
-                        <p className="text-muted-foreground text-sm mt-1">{category.description}</p>
+                      <div className="space-y-2">
+                        <h3 className="font-semibold text-lg leading-tight group-hover:text-primary transition-colors">
+                          {category.name}
+                        </h3>
+                        <p className="text-muted-foreground text-sm">{category.description}</p>
                       </div>
                     </div>
                   </CardContent>

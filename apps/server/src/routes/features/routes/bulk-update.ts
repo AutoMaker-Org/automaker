@@ -43,17 +43,36 @@ export function createBulkUpdateHandler(featureLoader: FeatureLoader) {
       const results: BulkUpdateResult[] = [];
       const updatedFeatures: Feature[] = [];
 
-      for (const featureId of featureIds) {
-        try {
-          const updated = await featureLoader.update(projectPath, featureId, updates);
-          results.push({ featureId, success: true });
-          updatedFeatures.push(updated);
-        } catch (error) {
-          results.push({
-            featureId,
-            success: false,
-            error: getErrorMessage(error),
-          });
+      // Process in parallel batches of 20 for efficiency
+      const BATCH_SIZE = 20;
+      for (let i = 0; i < featureIds.length; i += BATCH_SIZE) {
+        const batch = featureIds.slice(i, i + BATCH_SIZE);
+        const batchResults = await Promise.all(
+          batch.map(async (featureId) => {
+            try {
+              const updated = await featureLoader.update(projectPath, featureId, updates);
+              return { featureId, success: true as const, feature: updated };
+            } catch (error) {
+              return {
+                featureId,
+                success: false as const,
+                error: getErrorMessage(error),
+              };
+            }
+          })
+        );
+
+        for (const result of batchResults) {
+          if (result.success) {
+            results.push({ featureId: result.featureId, success: true });
+            updatedFeatures.push(result.feature);
+          } else {
+            results.push({
+              featureId: result.featureId,
+              success: false,
+              error: result.error,
+            });
+          }
         }
       }
 

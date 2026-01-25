@@ -63,7 +63,10 @@ describe('IdeationService', () => {
     } as unknown as EventEmitter;
 
     // Create mock settings service
-    mockSettingsService = {} as SettingsService;
+    mockSettingsService = {
+      getCredentials: vi.fn().mockResolvedValue({}),
+      getGlobalSettings: vi.fn().mockResolvedValue({}),
+    } as unknown as SettingsService;
 
     // Create mock feature loader
     mockFeatureLoader = {

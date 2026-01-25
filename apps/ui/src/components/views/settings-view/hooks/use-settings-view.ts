@@ -15,10 +15,12 @@ export type SettingsViewId =
   | 'terminal'
   | 'keyboard'
   | 'audio'
+  | 'event-hooks'
   | 'defaults'
   | 'worktrees'
   | 'account'
   | 'security'
+  | 'developer'
   | 'danger';
 
 interface UseSettingsViewOptions {

@@ -1,66 +1,46 @@
 import { useState, useCallback } from 'react';
-import { createLogger } from '@automaker/utils/logger';
-import { getElectronAPI } from '@/lib/electron';
-import type { BranchInfo, GitRepoStatus } from '../types';
+import { useWorktreeBranches } from '@/hooks/queries';
+import type { GitRepoStatus } from '../types';
 
-const logger = createLogger('Branches');
-
+/**
+ * Hook for managing branch data with React Query
+ *
+ * Uses useWorktreeBranches for data fetching while maintaining
+ * the current interface for backward compatibility. Tracks which
+ * worktree path is currently being viewed and fetches branches on demand.
+ */
 export function useBranches() {
-  const [branches, setBranches] = useState<BranchInfo[]>([]);
-  const [aheadCount, setAheadCount] = useState(0);
-  const [behindCount, setBehindCount] = useState(0);
-  const [isLoadingBranches, setIsLoadingBranches] = useState(false);
+  const [currentWorktreePath, setCurrentWorktreePath] = useState<string | undefined>();
   const [branchFilter, setBranchFilter] = useState('');
-  const [gitRepoStatus, setGitRepoStatus] = useState<GitRepoStatus>({
-    isGitRepo: true,
-    hasCommits: true,
-  });
 
-  /** Helper to reset branch state to initial values */
-  const resetBranchState = useCallback(() => {
-    setBranches([]);
-    setAheadCount(0);
-    setBehindCount(0);
-  }, []);
+  const {
+    data: branchData,
+    isLoading: isLoadingBranches,
+    refetch,
+  } = useWorktreeBranches(currentWorktreePath);
+
+  const branches = branchData?.branches ?? [];
+  const aheadCount = branchData?.aheadCount ?? 0;
+  const behindCount = branchData?.behindCount ?? 0;
+  const hasRemoteBranch = branchData?.hasRemoteBranch ?? false;
+  // Use conservative defaults (false) until data is confirmed
+  // This prevents the UI from assuming git capabilities before the query completes
+  const gitRepoStatus: GitRepoStatus = {
+    isGitRepo: branchData?.isGitRepo ?? false,
+    hasCommits: branchData?.hasCommits ?? false,
+  };
 
   const fetchBranches = useCallback(
-    async (worktreePath: string) => {
-      setIsLoadingBranches(true);
-      try {
-        const api = getElectronAPI();
-        if (!api?.worktree?.listBranches) {
-          logger.warn('List branches API not available');
-          return;
-        }
-        const result = await api.worktree.listBranches(worktreePath);
-        if (result.success && result.result) {
-          setBranches(result.result.branches);
-          setAheadCount(result.result.aheadCount || 0);
-          setBehindCount(result.result.behindCount || 0);
-          setGitRepoStatus({ isGitRepo: true, hasCommits: true });
-        } else if (result.code === 'NOT_GIT_REPO') {
-          // Not a git repository - clear branches silently without logging an error
-          resetBranchState();
-          setGitRepoStatus({ isGitRepo: false, hasCommits: false });
-        } else if (result.code === 'NO_COMMITS') {
-          // Git repo but no commits yet - clear branches silently without logging an error
-          resetBranchState();
-          setGitRepoStatus({ isGitRepo: true, hasCommits: false });
-        } else if (!result.success) {
-          // Other errors - log them
-          logger.warn('Failed to fetch branches:', result.error);
-          resetBranchState();
-        }
-      } catch (error) {
-        logger.error('Failed to fetch branches:', error);
-        resetBranchState();
-        // Reset git status to unknown state on network/API errors
-        setGitRepoStatus({ isGitRepo: true, hasCommits: true });
-      } finally {
-        setIsLoadingBranches(false);
+    (worktreePath: string) => {
+      if (worktreePath === currentWorktreePath) {
+        // Same path - just refetch to get latest data
+        refetch();
+      } else {
+        // Different path - update the tracked path (triggers new query)
+        setCurrentWorktreePath(worktreePath);
       }
     },
-    [resetBranchState]
+    [currentWorktreePath, refetch]
   );
 
   const resetBranchFilter = useCallback(() => {
@@ -76,6 +56,7 @@ export function useBranches() {
     filteredBranches,
     aheadCount,
     behindCount,
+    hasRemoteBranch,
     isLoadingBranches,
     branchFilter,
     setBranchFilter,

@@ -1,0 +1,93 @@
+/* Atom One Light Theme - Clean light with blue accent */
+
+.onelight {
+  /* Backgrounds */
+  --background: oklch(0.98 0.002 250);
+  --background-50: oklch(0.98 0.002 250 / 0.5);
+  --background-80: oklch(0.98 0.002 250 / 0.8);
+
+  /* Text */
+  --foreground: oklch(0.3 0.02 250);
+  --foreground-secondary: oklch(0.45 0.02 250);
+  --foreground-muted: oklch(0.55 0.015 250);
+
+  /* Card/Popover */
+  --card: oklch(0.97 0.002 250);
+  --card-foreground: oklch(0.3 0.02 250);
+  --popover: oklch(0.98 0.002 250);
+  --popover-foreground: oklch(0.3 0.02 250);
+
+  /* Primary/Brand - blue #526FFF */
+  --primary: oklch(0.55 0.22 265);
+  --primary-foreground: oklch(1 0 0);
+
+  --brand-400: oklch(0.6 0.2 265);
+  --brand-500: oklch(0.55 0.22 265);
+  --brand-600: oklch(0.5 0.24 265);
+
+  /* Secondary */
+  --secondary: oklch(0.92 0.005 250);
+  --secondary-foreground: oklch(0.3 0.02 250);
+
+  /* Muted */
+  --muted: oklch(0.93 0.005 250);
+  --muted-foreground: oklch(0.5 0.015 250);
+
+  /* Accent */
+  --accent: oklch(0.94 0.005 250);
+  --accent-foreground: oklch(0.3 0.02 250);
+
+  /* Destructive - red #E45649 */
+  --destructive: oklch(0.55 0.2 25);
+
+  /* Borders */
+  --border: oklch(0.88 0.005 250);
+  --border-glass: oklch(0.3 0.02 250 / 0.1);
+
+  --input: oklch(0.98 0.002 250);
+  --ring: oklch(0.55 0.22 265);
+
+  /* Charts */
+  --chart-1: oklch(0.55 0.22 265);
+  --chart-2: oklch(0.55 0.15 145);
+  --chart-3: oklch(0.55 0.2 25);
+  --chart-4: oklch(0.55 0.18 320);
+  --chart-5: oklch(0.55 0.15 70);
+
+  /* Sidebar */
+  --sidebar: oklch(0.93 0.005 250);
+  --sidebar-foreground: oklch(0.3 0.02 250);
+  --sidebar-primary: oklch(0.55 0.22 265);
+  --sidebar-primary-foreground: oklch(1 0 0);
+  --sidebar-accent: oklch(0.9 0.005 250);
+  --sidebar-accent-foreground: oklch(0.3 0.02 250);
+  --sidebar-border: oklch(0.88 0.005 250);
+  --sidebar-ring: oklch(0.55 0.22 265);
+
+  /* Action buttons */
+  --action-view: oklch(0.55 0.22 265);
+  --action-view-hover: oklch(0.5 0.24 265);
+  --action-followup: oklch(0.55 0.18 230);
+  --action-followup-hover: oklch(0.5 0.2 230);
+  --action-commit: oklch(0.55 0.15 145);
+  --action-commit-hover: oklch(0.5 0.17 145);
+  --action-verify: oklch(0.55 0.15 145);
+  --action-verify-hover: oklch(0.5 0.17 145);
+
+  /* Running indicator */
+  --running-indicator: oklch(0.55 0.22 265);
+  --running-indicator-text: oklch(0.5 0.24 265);
+
+  /* Status colors */
+  --status-success: oklch(0.55 0.15 145);
+  --status-success-bg: oklch(0.55 0.15 145 / 0.15);
+  --status-warning: oklch(0.7 0.15 70);
+  --status-warning-bg: oklch(0.7 0.15 70 / 0.15);
+  --status-error: oklch(0.55 0.2 25);
+  --status-error-bg: oklch(0.55 0.2 25 / 0.15);
+  --status-info: oklch(0.55 0.22 265);
+  --status-info-bg: oklch(0.55 0.22 265 / 0.15);
+  --status-backlog: oklch(0.5 0 0);
+  --status-in-progress: oklch(0.7 0.15 70);
+  --status-waiting: oklch(0.65 0.18 50);
+}

@@ -1,9 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
-import { createLogger } from '@automaker/utils/logger';
-import { toast } from 'sonner';
-
-const logger = createLogger('CursorStatus');
-import { getHttpApiClient } from '@/lib/http-api-client';
+import { useEffect, useMemo, useCallback } from 'react';
+import { useCursorCliStatus } from '@/hooks/queries';
 import { useSetupStore } from '@/store/setup-store';
 
 export interface CursorStatus {
@@ -15,52 +11,42 @@ export interface CursorStatus {
 
 /**
  * Custom hook for managing Cursor CLI status
- * Handles checking CLI installation, authentication, and refresh functionality
+ * Uses React Query for data fetching with automatic caching.
  */
 export function useCursorStatus() {
   const { setCursorCliStatus } = useSetupStore();
+  const { data: result, isLoading, refetch } = useCursorCliStatus();
 
-  const [status, setStatus] = useState<CursorStatus | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  // Transform the API result into the local CursorStatus shape
+  const status = useMemo((): CursorStatus | null => {
+    if (!result) return null;
+    return {
+      installed: result.installed ?? false,
+      version: result.version ?? undefined,
+      authenticated: result.auth?.authenticated ?? false,
+      method: result.auth?.method,
+    };
+  }, [result]);
 
-  const loadData = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const api = getHttpApiClient();
-      const statusResult = await api.setup.getCursorStatus();
-
-      if (statusResult.success) {
-        const newStatus = {
-          installed: statusResult.installed ?? false,
-          version: statusResult.version ?? undefined,
-          authenticated: statusResult.auth?.authenticated ?? false,
-          method: statusResult.auth?.method,
-        };
-        setStatus(newStatus);
-
-        // Also update the global setup store so other components can access the status
-        setCursorCliStatus({
-          installed: newStatus.installed,
-          version: newStatus.version,
-          auth: newStatus.authenticated
-            ? {
-                authenticated: true,
-                method: newStatus.method || 'unknown',
-              }
-            : undefined,
-        });
-      }
-    } catch (error) {
-      logger.error('Failed to load Cursor settings:', error);
-      toast.error('Failed to load Cursor settings');
-    } finally {
-      setIsLoading(false);
-    }
-  }, [setCursorCliStatus]);
-
+  // Keep the global setup store in sync with query data
   useEffect(() => {
-    loadData();
-  }, [loadData]);
+    if (status) {
+      setCursorCliStatus({
+        installed: status.installed,
+        version: status.version,
+        auth: status.authenticated
+          ? {
+              authenticated: true,
+              method: status.method || 'unknown',
+            }
+          : undefined,
+      });
+    }
+  }, [status, setCursorCliStatus]);
+
+  const loadData = useCallback(() => {
+    refetch();
+  }, [refetch]);
 
   return {
     status,

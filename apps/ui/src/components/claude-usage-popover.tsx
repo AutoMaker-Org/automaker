@@ -1,114 +1,40 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+/**
+ * Claude Usage Popover
+ *
+ * Displays Claude API usage statistics using React Query for data fetching.
+ */
+
+import { useState, useMemo } from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
 import { RefreshCw, AlertTriangle, CheckCircle, XCircle, Clock, ExternalLink } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 import { cn } from '@/lib/utils';
-import { getElectronAPI } from '@/lib/electron';
-import { useAppStore } from '@/store/app-store';
 import { useSetupStore } from '@/store/setup-store';
-
-// Error codes for distinguishing failure modes
-const ERROR_CODES = {
-  API_BRIDGE_UNAVAILABLE: 'API_BRIDGE_UNAVAILABLE',
-  AUTH_ERROR: 'AUTH_ERROR',
-  TRUST_PROMPT: 'TRUST_PROMPT',
-  UNKNOWN: 'UNKNOWN',
-} as const;
-
-type ErrorCode = (typeof ERROR_CODES)[keyof typeof ERROR_CODES];
-
-type UsageError = {
-  code: ErrorCode;
-  message: string;
-};
-
-// Fixed refresh interval (45 seconds)
-const REFRESH_INTERVAL_SECONDS = 45;
+import { useClaudeUsage } from '@/hooks/queries';
 
 export function ClaudeUsagePopover() {
-  const { claudeUsage, claudeUsageLastUpdated, setClaudeUsage } = useAppStore();
   const claudeAuthStatus = useSetupStore((state) => state.claudeAuthStatus);
   const [open, setOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<UsageError | null>(null);
 
   // Check if CLI is verified/authenticated
   const isCliVerified =
     claudeAuthStatus?.authenticated && claudeAuthStatus?.method === 'cli_authenticated';
 
-  // Check if data is stale (older than 2 minutes) - recalculates when claudeUsageLastUpdated changes
+  // Use React Query for usage data
+  const {
+    data: claudeUsage,
+    isLoading,
+    isFetching,
+    error,
+    dataUpdatedAt,
+    refetch,
+  } = useClaudeUsage(isCliVerified);
+
+  // Check if data is stale (older than 2 minutes)
   const isStale = useMemo(() => {
-    return !claudeUsageLastUpdated || Date.now() - claudeUsageLastUpdated > 2 * 60 * 1000;
-  }, [claudeUsageLastUpdated]);
-
-  const fetchUsage = useCallback(
-    async (isAutoRefresh = false) => {
-      if (!isAutoRefresh) setLoading(true);
-      setError(null);
-      try {
-        const api = getElectronAPI();
-        if (!api.claude) {
-          setError({
-            code: ERROR_CODES.API_BRIDGE_UNAVAILABLE,
-            message: 'Claude API bridge not available',
-          });
-          return;
-        }
-        const data = await api.claude.getUsage();
-        if ('error' in data) {
-          // Detect trust prompt error
-          const isTrustPrompt =
-            data.error === 'Trust prompt pending' ||
-            (data.message && data.message.includes('folder permission'));
-          setError({
-            code: isTrustPrompt ? ERROR_CODES.TRUST_PROMPT : ERROR_CODES.AUTH_ERROR,
-            message: data.message || data.error,
-          });
-          return;
-        }
-        setClaudeUsage(data);
-      } catch (err) {
-        setError({
-          code: ERROR_CODES.UNKNOWN,
-          message: err instanceof Error ? err.message : 'Failed to fetch usage',
-        });
-      } finally {
-        if (!isAutoRefresh) setLoading(false);
-      }
-    },
-    [setClaudeUsage]
-  );
-
-  // Auto-fetch on mount if data is stale (only if CLI is verified)
-  useEffect(() => {
-    if (isStale && isCliVerified) {
-      fetchUsage(true);
-    }
-  }, [isStale, isCliVerified, fetchUsage]);
-
-  useEffect(() => {
-    // Skip if CLI is not verified
-    if (!isCliVerified) return;
-
-    // Initial fetch when opened
-    if (open) {
-      if (!claudeUsage || isStale) {
-        fetchUsage();
-      }
-    }
-
-    // Auto-refresh interval (only when open)
-    let intervalId: NodeJS.Timeout | null = null;
-    if (open) {
-      intervalId = setInterval(() => {
-        fetchUsage(true);
-      }, REFRESH_INTERVAL_SECONDS * 1000);
-    }
-
-    return () => {
-      if (intervalId) clearInterval(intervalId);
-    };
-  }, [open, claudeUsage, isStale, isCliVerified, fetchUsage]);
+    return !dataUpdatedAt || Date.now() - dataUpdatedAt > 2 * 60 * 1000;
+  }, [dataUpdatedAt]);
 
   // Derived status color/icon helper
   const getStatusInfo = (percentage: number) => {
@@ -143,7 +69,6 @@ export function ClaudeUsagePopover() {
     isPrimary?: boolean;
     stale?: boolean;
   }) => {
-    // Check if percentage is valid (not NaN, not undefined, is a finite number)
     const isValidPercentage =
       typeof percentage === 'number' && !isNaN(percentage) && isFinite(percentage);
     const safePercentage = isValidPercentage ? percentage : 0;
@@ -244,10 +169,10 @@ export function ClaudeUsagePopover() {
             <Button
               variant="ghost"
               size="icon"
-              className={cn('h-6 w-6', loading && 'opacity-80')}
-              onClick={() => !loading && fetchUsage(false)}
+              className={cn('h-6 w-6', isFetching && 'opacity-80')}
+              onClick={() => !isFetching && refetch()}
             >
-              <RefreshCw className="w-3.5 h-3.5" />
+              <RefreshCw className={cn('w-3.5 h-3.5', isFetching && 'animate-spin')} />
             </Button>
           )}
         </div>
@@ -258,28 +183,18 @@ export function ClaudeUsagePopover() {
             <div className="flex flex-col items-center justify-center py-6 text-center space-y-3">
               <AlertTriangle className="w-8 h-8 text-yellow-500/80" />
               <div className="space-y-1 flex flex-col items-center">
-                <p className="text-sm font-medium">{error.message}</p>
+                <p className="text-sm font-medium">
+                  {error instanceof Error ? error.message : 'Failed to fetch usage'}
+                </p>
                 <p className="text-xs text-muted-foreground">
-                  {error.code === ERROR_CODES.API_BRIDGE_UNAVAILABLE ? (
-                    'Ensure the Electron bridge is running or restart the app'
-                  ) : error.code === ERROR_CODES.TRUST_PROMPT ? (
-                    <>
-                      Run <code className="font-mono bg-muted px-1 rounded">claude</code> in your
-                      terminal and approve access to continue
-                    </>
-                  ) : (
-                    <>
-                      Make sure Claude CLI is installed and authenticated via{' '}
-                      <code className="font-mono bg-muted px-1 rounded">claude login</code>
-                    </>
-                  )}
+                  Make sure Claude CLI is installed and authenticated via{' '}
+                  <code className="font-mono bg-muted px-1 rounded">claude login</code>
                 </p>
               </div>
             </div>
-          ) : !claudeUsage ? (
-            // Loading state
+          ) : isLoading || !claudeUsage ? (
             <div className="flex flex-col items-center justify-center py-8 space-y-2">
-              <RefreshCw className="w-6 h-6 animate-spin text-muted-foreground/50" />
+              <Spinner size="lg" />
               <p className="text-xs text-muted-foreground">Loading usage data...</p>
             </div>
           ) : (

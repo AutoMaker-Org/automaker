@@ -70,8 +70,7 @@ const editorTheme = EditorView.theme({
     backgroundColor: 'oklch(0.55 0.25 265 / 0.3)',
   },
   '.cm-activeLine': {
-    backgroundColor: 'var(--accent)',
-    opacity: '0.3',
+    backgroundColor: 'transparent',
   },
   '.cm-line': {
     padding: '0 0.25rem',
@@ -114,7 +113,7 @@ export function ShellSyntaxEditor({
 }: ShellSyntaxEditorProps) {
   return (
     <div
-      className={cn('w-full rounded-lg border border-border bg-muted/30', className)}
+      className={cn('w-full rounded-lg border border-border bg-background', className)}
       style={{ minHeight }}
       data-testid={testId}
     >

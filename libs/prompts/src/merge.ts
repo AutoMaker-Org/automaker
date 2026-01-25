@@ -15,12 +15,26 @@ import type {
   BacklogPlanPrompts,
   EnhancementPrompts,
   CommitMessagePrompts,
+  TitleGenerationPrompts,
+  IssueValidationPrompts,
+  IdeationPrompts,
+  AppSpecPrompts,
+  ContextDescriptionPrompts,
+  SuggestionsPrompts,
+  TaskExecutionPrompts,
   CustomPrompt,
   ResolvedAutoModePrompts,
   ResolvedAgentPrompts,
   ResolvedBacklogPlanPrompts,
   ResolvedEnhancementPrompts,
   ResolvedCommitMessagePrompts,
+  ResolvedTitleGenerationPrompts,
+  ResolvedIssueValidationPrompts,
+  ResolvedIdeationPrompts,
+  ResolvedAppSpecPrompts,
+  ResolvedContextDescriptionPrompts,
+  ResolvedSuggestionsPrompts,
+  ResolvedTaskExecutionPrompts,
 } from '@automaker/types';
 import {
   DEFAULT_AUTO_MODE_PROMPTS,
@@ -28,6 +42,13 @@ import {
   DEFAULT_BACKLOG_PLAN_PROMPTS,
   DEFAULT_ENHANCEMENT_PROMPTS,
   DEFAULT_COMMIT_MESSAGE_PROMPTS,
+  DEFAULT_TITLE_GENERATION_PROMPTS,
+  DEFAULT_ISSUE_VALIDATION_PROMPTS,
+  DEFAULT_IDEATION_PROMPTS,
+  DEFAULT_APP_SPEC_PROMPTS,
+  DEFAULT_CONTEXT_DESCRIPTION_PROMPTS,
+  DEFAULT_SUGGESTIONS_PROMPTS,
+  DEFAULT_TASK_EXECUTION_PROMPTS,
 } from './defaults.js';
 
 /**
@@ -136,6 +157,166 @@ export function mergeCommitMessagePrompts(
 }
 
 /**
+ * Merge custom Title Generation prompts with defaults
+ * Custom prompts override defaults only when enabled=true
+ */
+export function mergeTitleGenerationPrompts(
+  custom?: TitleGenerationPrompts
+): ResolvedTitleGenerationPrompts {
+  return {
+    systemPrompt: resolvePrompt(
+      custom?.systemPrompt,
+      DEFAULT_TITLE_GENERATION_PROMPTS.systemPrompt
+    ),
+  };
+}
+
+/**
+ * Merge custom Issue Validation prompts with defaults
+ * Custom prompts override defaults only when enabled=true
+ */
+export function mergeIssueValidationPrompts(
+  custom?: IssueValidationPrompts
+): ResolvedIssueValidationPrompts {
+  return {
+    systemPrompt: resolvePrompt(
+      custom?.systemPrompt,
+      DEFAULT_ISSUE_VALIDATION_PROMPTS.systemPrompt
+    ),
+  };
+}
+
+/**
+ * Merge custom Ideation prompts with defaults
+ * Custom prompts override defaults only when enabled=true
+ */
+export function mergeIdeationPrompts(custom?: IdeationPrompts): ResolvedIdeationPrompts {
+  return {
+    ideationSystemPrompt: resolvePrompt(
+      custom?.ideationSystemPrompt,
+      DEFAULT_IDEATION_PROMPTS.ideationSystemPrompt
+    ),
+    suggestionsSystemPrompt: resolvePrompt(
+      custom?.suggestionsSystemPrompt,
+      DEFAULT_IDEATION_PROMPTS.suggestionsSystemPrompt
+    ),
+  };
+}
+
+/**
+ * Merge custom App Spec prompts with defaults
+ * Custom prompts override defaults only when enabled=true
+ */
+export function mergeAppSpecPrompts(custom?: AppSpecPrompts): ResolvedAppSpecPrompts {
+  return {
+    generateSpecSystemPrompt: resolvePrompt(
+      custom?.generateSpecSystemPrompt,
+      DEFAULT_APP_SPEC_PROMPTS.generateSpecSystemPrompt
+    ),
+    structuredSpecInstructions: resolvePrompt(
+      custom?.structuredSpecInstructions,
+      DEFAULT_APP_SPEC_PROMPTS.structuredSpecInstructions
+    ),
+    generateFeaturesFromSpecPrompt: resolvePrompt(
+      custom?.generateFeaturesFromSpecPrompt,
+      DEFAULT_APP_SPEC_PROMPTS.generateFeaturesFromSpecPrompt
+    ),
+  };
+}
+
+/**
+ * Merge custom Context Description prompts with defaults
+ * Custom prompts override defaults only when enabled=true
+ */
+export function mergeContextDescriptionPrompts(
+  custom?: ContextDescriptionPrompts
+): ResolvedContextDescriptionPrompts {
+  return {
+    describeFilePrompt: resolvePrompt(
+      custom?.describeFilePrompt,
+      DEFAULT_CONTEXT_DESCRIPTION_PROMPTS.describeFilePrompt
+    ),
+    describeImagePrompt: resolvePrompt(
+      custom?.describeImagePrompt,
+      DEFAULT_CONTEXT_DESCRIPTION_PROMPTS.describeImagePrompt
+    ),
+  };
+}
+
+/**
+ * Merge custom Suggestions prompts with defaults
+ * Custom prompts override defaults only when enabled=true
+ */
+export function mergeSuggestionsPrompts(custom?: SuggestionsPrompts): ResolvedSuggestionsPrompts {
+  return {
+    featuresPrompt: resolvePrompt(
+      custom?.featuresPrompt,
+      DEFAULT_SUGGESTIONS_PROMPTS.featuresPrompt
+    ),
+    refactoringPrompt: resolvePrompt(
+      custom?.refactoringPrompt,
+      DEFAULT_SUGGESTIONS_PROMPTS.refactoringPrompt
+    ),
+    securityPrompt: resolvePrompt(
+      custom?.securityPrompt,
+      DEFAULT_SUGGESTIONS_PROMPTS.securityPrompt
+    ),
+    performancePrompt: resolvePrompt(
+      custom?.performancePrompt,
+      DEFAULT_SUGGESTIONS_PROMPTS.performancePrompt
+    ),
+    baseTemplate: resolvePrompt(custom?.baseTemplate, DEFAULT_SUGGESTIONS_PROMPTS.baseTemplate),
+  };
+}
+
+/**
+ * Merge custom Task Execution prompts with defaults
+ * Custom prompts override defaults only when enabled=true
+ */
+export function mergeTaskExecutionPrompts(
+  custom?: TaskExecutionPrompts
+): ResolvedTaskExecutionPrompts {
+  return {
+    taskPromptTemplate: resolvePrompt(
+      custom?.taskPromptTemplate,
+      DEFAULT_TASK_EXECUTION_PROMPTS.taskPromptTemplate
+    ),
+    implementationInstructions: resolvePrompt(
+      custom?.implementationInstructions,
+      DEFAULT_TASK_EXECUTION_PROMPTS.implementationInstructions
+    ),
+    playwrightVerificationInstructions: resolvePrompt(
+      custom?.playwrightVerificationInstructions,
+      DEFAULT_TASK_EXECUTION_PROMPTS.playwrightVerificationInstructions
+    ),
+    learningExtractionSystemPrompt: resolvePrompt(
+      custom?.learningExtractionSystemPrompt,
+      DEFAULT_TASK_EXECUTION_PROMPTS.learningExtractionSystemPrompt
+    ),
+    learningExtractionUserPromptTemplate: resolvePrompt(
+      custom?.learningExtractionUserPromptTemplate,
+      DEFAULT_TASK_EXECUTION_PROMPTS.learningExtractionUserPromptTemplate
+    ),
+    planRevisionTemplate: resolvePrompt(
+      custom?.planRevisionTemplate,
+      DEFAULT_TASK_EXECUTION_PROMPTS.planRevisionTemplate
+    ),
+    continuationAfterApprovalTemplate: resolvePrompt(
+      custom?.continuationAfterApprovalTemplate,
+      DEFAULT_TASK_EXECUTION_PROMPTS.continuationAfterApprovalTemplate
+    ),
+    resumeFeatureTemplate: resolvePrompt(
+      custom?.resumeFeatureTemplate,
+      DEFAULT_TASK_EXECUTION_PROMPTS.resumeFeatureTemplate
+    ),
+    projectAnalysisPrompt: resolvePrompt(
+      custom?.projectAnalysisPrompt,
+      DEFAULT_TASK_EXECUTION_PROMPTS.projectAnalysisPrompt
+    ),
+  };
+}
+
+/**
  * Merge all custom prompts with defaults
  * Returns a complete PromptCustomization with all fields populated
  */
@@ -146,5 +327,12 @@ export function mergeAllPrompts(custom?: PromptCustomization) {
     backlogPlan: mergeBacklogPlanPrompts(custom?.backlogPlan),
     enhancement: mergeEnhancementPrompts(custom?.enhancement),
     commitMessage: mergeCommitMessagePrompts(custom?.commitMessage),
+    titleGeneration: mergeTitleGenerationPrompts(custom?.titleGeneration),
+    issueValidation: mergeIssueValidationPrompts(custom?.issueValidation),
+    ideation: mergeIdeationPrompts(custom?.ideation),
+    appSpec: mergeAppSpecPrompts(custom?.appSpec),
+    contextDescription: mergeContextDescriptionPrompts(custom?.contextDescription),
+    suggestions: mergeSuggestionsPrompts(custom?.suggestions),
+    taskExecution: mergeTaskExecutionPrompts(custom?.taskExecution),
   };
 }

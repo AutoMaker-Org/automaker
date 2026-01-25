@@ -17,7 +17,6 @@ import {
   ArrowRight,
   ArrowLeft,
   CheckCircle2,
-  Loader2,
   Key,
   ExternalLink,
   Copy,
@@ -29,6 +28,7 @@ import {
   Terminal,
   AlertCircle,
 } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { AnthropicIcon, CursorIcon, OpenAIIcon, OpenCodeIcon } from '@/components/ui/provider-icon';
@@ -240,7 +240,7 @@ function ClaudeContent() {
             onClick={checkStatus}
             disabled={isChecking || isVerifying}
           >
-            <RefreshCw className={`w-4 h-4 ${isChecking || isVerifying ? 'animate-spin' : ''}`} />
+            {isChecking || isVerifying ? <Spinner size="sm" /> : <RefreshCw className="w-4 h-4" />}
           </Button>
         </div>
         <CardDescription>
@@ -278,7 +278,7 @@ function ClaudeContent() {
         {/* Checking/Verifying State */}
         {(isChecking || isVerifying) && (
           <div className="flex items-center gap-3 p-4 rounded-lg bg-blue-500/10 border border-blue-500/20">
-            <Loader2 className="w-5 h-5 text-blue-500 animate-spin" />
+            <Spinner size="md" />
             <p className="font-medium text-foreground">
               {isChecking ? 'Checking Claude CLI status...' : 'Verifying authentication...'}
             </p>
@@ -322,7 +322,7 @@ function ClaudeContent() {
               >
                 {isInstalling ? (
                   <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    <Spinner size="sm" className="mr-2" />
                     Installing...
                   </>
                 ) : (
@@ -417,11 +417,7 @@ function ClaudeContent() {
                         disabled={isSavingApiKey || !apiKey.trim()}
                         className="flex-1 bg-brand-500 hover:bg-brand-600 text-white"
                       >
-                        {isSavingApiKey ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (
-                          'Save API Key'
-                        )}
+                        {isSavingApiKey ? <Spinner size="sm" /> : 'Save API Key'}
                       </Button>
                       {hasApiKey && (
                         <Button
@@ -431,7 +427,7 @@ function ClaudeContent() {
                           className="border-red-500/50 text-red-500 hover:bg-red-500/10"
                         >
                           {isDeletingApiKey ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
+                            <Spinner size="sm" />
                           ) : (
                             <Trash2 className="w-4 h-4" />
                           )}
@@ -553,7 +549,7 @@ function CursorContent() {
             Cursor CLI Status
           </CardTitle>
           <Button variant="ghost" size="sm" onClick={checkStatus} disabled={isChecking}>
-            <RefreshCw className={`w-4 h-4 ${isChecking ? 'animate-spin' : ''}`} />
+            {isChecking ? <Spinner size="sm" /> : <RefreshCw className="w-4 h-4" />}
           </Button>
         </div>
         <CardDescription>
@@ -658,7 +654,7 @@ function CursorContent() {
               >
                 {isLoggingIn ? (
                   <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    <Spinner size="sm" className="mr-2" />
                     Waiting for login...
                   </>
                 ) : (
@@ -671,7 +667,7 @@ function CursorContent() {
 
         {isChecking && (
           <div className="flex items-center gap-3 p-4 rounded-lg bg-blue-500/10 border border-blue-500/20">
-            <Loader2 className="w-5 h-5 text-blue-500 animate-spin" />
+            <Spinner size="md" />
             <p className="font-medium text-foreground">Checking Cursor CLI status...</p>
           </div>
         )}
@@ -807,7 +803,7 @@ function CodexContent() {
             Codex CLI Status
           </CardTitle>
           <Button variant="ghost" size="sm" onClick={checkStatus} disabled={isChecking}>
-            <RefreshCw className={`w-4 h-4 ${isChecking ? 'animate-spin' : ''}`} />
+            {isChecking ? <Spinner size="sm" /> : <RefreshCw className="w-4 h-4" />}
           </Button>
         </div>
         <CardDescription>
@@ -915,7 +911,7 @@ function CodexContent() {
                   >
                     {isLoggingIn ? (
                       <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        <Spinner size="sm" className="mr-2" />
                         Waiting for login...
                       </>
                     ) : (
@@ -958,7 +954,7 @@ function CodexContent() {
                     disabled={isSaving || !apiKey.trim()}
                     className="w-full bg-brand-500 hover:bg-brand-600 text-white"
                   >
-                    {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save API Key'}
+                    {isSaving ? <Spinner size="sm" /> : 'Save API Key'}
                   </Button>
                 </AccordionContent>
               </AccordionItem>
@@ -968,7 +964,7 @@ function CodexContent() {
 
         {isChecking && (
           <div className="flex items-center gap-3 p-4 rounded-lg bg-blue-500/10 border border-blue-500/20">
-            <Loader2 className="w-5 h-5 text-blue-500 animate-spin" />
+            <Spinner size="md" />
             <p className="font-medium text-foreground">Checking Codex CLI status...</p>
           </div>
         )}
@@ -1082,7 +1078,7 @@ function OpencodeContent() {
             OpenCode CLI Status
           </CardTitle>
           <Button variant="ghost" size="sm" onClick={checkStatus} disabled={isChecking}>
-            <RefreshCw className={`w-4 h-4 ${isChecking ? 'animate-spin' : ''}`} />
+            {isChecking ? <Spinner size="sm" /> : <RefreshCw className="w-4 h-4" />}
           </Button>
         </div>
         <CardDescription>
@@ -1191,7 +1187,7 @@ function OpencodeContent() {
               >
                 {isLoggingIn ? (
                   <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    <Spinner size="sm" className="mr-2" />
                     Waiting for login...
                   </>
                 ) : (
@@ -1204,7 +1200,7 @@ function OpencodeContent() {
 
         {isChecking && (
           <div className="flex items-center gap-3 p-4 rounded-lg bg-blue-500/10 border border-blue-500/20">
-            <Loader2 className="w-5 h-5 text-blue-500 animate-spin" />
+            <Spinner size="md" />
             <p className="font-medium text-foreground">Checking OpenCode CLI status...</p>
           </div>
         )}
@@ -1416,7 +1412,7 @@ export function ProvidersSetupStep({ onNext, onBack }: ProvidersSetupStepProps) 
         );
       case 'verifying':
         return (
-          <Loader2 className="w-3 h-3 text-blue-500 absolute -top-1 -right-1.5 bg-background rounded-full animate-spin" />
+          <Spinner size="xs" className="absolute -top-1 -right-1.5 bg-background rounded-full" />
         );
       case 'installed_not_auth':
         return (
@@ -1436,7 +1432,7 @@ export function ProvidersSetupStep({ onNext, onBack }: ProvidersSetupStepProps) 
 
       {isInitialChecking && (
         <div className="flex items-center justify-center gap-2 p-4 rounded-lg bg-blue-500/10 border border-blue-500/20">
-          <Loader2 className="w-5 h-5 text-blue-500 animate-spin" />
+          <Spinner size="md" />
           <p className="font-medium text-foreground">Checking provider status...</p>
         </div>
       )}

@@ -9,7 +9,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Terminal, Cloud, Cpu, Brain, Github, Loader2, KeyRound, ShieldCheck } from 'lucide-react';
+import { Terminal, Cloud, Cpu, Brain, Github, KeyRound, ShieldCheck } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import type {
@@ -500,7 +501,7 @@ export function OpencodeModelConfiguration({
                   </p>
                   {isLoadingDynamicModels && (
                     <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                      <Loader2 className="w-3 h-3 animate-spin" />
+                      <Spinner size="xs" />
                       <span>Discovering...</span>
                     </div>
                   )}
@@ -611,16 +612,16 @@ export function OpencodeModelConfiguration({
                           Dynamic
                         </Badge>
                       </div>
-                      {models.length > 0 && (
+                      {filteredModels.length > 0 && (
                         <div className={OPENCODE_SELECT_ALL_CONTAINER_CLASS}>
                           <Checkbox
                             checked={getSelectionState(
-                              models.map((model) => model.id),
+                              filteredModels.map((model) => model.id),
                               enabledDynamicModelIds
                             )}
                             onCheckedChange={(checked) =>
                               toggleProviderDynamicModels(
-                                models.map((model) => model.id),
+                                filteredModels.map((model) => model.id),
                                 checked
                               )
                             }

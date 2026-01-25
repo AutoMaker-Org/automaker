@@ -11,6 +11,11 @@ import {
   getCodexConfigDir,
   getCodexAuthIndicators,
 } from '@automaker/platform';
+import {
+  calculateReasoningTimeout,
+  REASONING_TIMEOUT_MULTIPLIERS,
+  DEFAULT_TIMEOUT_MS,
+} from '@automaker/types';
 
 const OPENAI_API_KEY_ENV = 'OPENAI_API_KEY';
 const originalOpenAIKey = process.env[OPENAI_API_KEY_ENV];
@@ -288,6 +293,122 @@ describe('codex-provider.ts', () => {
 
       expect(codexRunMock).not.toHaveBeenCalled();
       expect(spawnJSONLProcess).toHaveBeenCalled();
+    });
+
+    it('passes extended timeout for high reasoning effort', async () => {
+      vi.mocked(spawnJSONLProcess).mockReturnValue((async function* () {})());
+
+      await collectAsyncGenerator(
+        provider.executeQuery({
+          prompt: 'Complex reasoning task',
+          model: 'gpt-5.1-codex-max',
+          cwd: '/tmp',
+          reasoningEffort: 'high',
+        })
+      );
+
+      const call = vi.mocked(spawnJSONLProcess).mock.calls[0][0];
+      // High reasoning effort should have 3x the default timeout (90000ms)
+      expect(call.timeout).toBe(DEFAULT_TIMEOUT_MS * REASONING_TIMEOUT_MULTIPLIERS.high);
+    });
+
+    it('passes extended timeout for xhigh reasoning effort', async () => {
+      vi.mocked(spawnJSONLProcess).mockReturnValue((async function* () {})());
+
+      await collectAsyncGenerator(
+        provider.executeQuery({
+          prompt: 'Very complex reasoning task',
+          model: 'gpt-5.1-codex-max',
+          cwd: '/tmp',
+          reasoningEffort: 'xhigh',
+        })
+      );
+
+      const call = vi.mocked(spawnJSONLProcess).mock.calls[0][0];
+      // xhigh reasoning effort should have 4x the default timeout (120000ms)
+      expect(call.timeout).toBe(DEFAULT_TIMEOUT_MS * REASONING_TIMEOUT_MULTIPLIERS.xhigh);
+    });
+
+    it('uses default timeout when no reasoning effort is specified', async () => {
+      vi.mocked(spawnJSONLProcess).mockReturnValue((async function* () {})());
+
+      await collectAsyncGenerator(
+        provider.executeQuery({
+          prompt: 'Simple task',
+          model: 'gpt-5.2',
+          cwd: '/tmp',
+        })
+      );
+
+      const call = vi.mocked(spawnJSONLProcess).mock.calls[0][0];
+      // No reasoning effort should use the default timeout
+      expect(call.timeout).toBe(DEFAULT_TIMEOUT_MS);
+    });
+  });
+
+  describe('calculateReasoningTimeout', () => {
+    it('returns default timeout when no reasoning effort is specified', () => {
+      expect(calculateReasoningTimeout()).toBe(DEFAULT_TIMEOUT_MS);
+      expect(calculateReasoningTimeout(undefined)).toBe(DEFAULT_TIMEOUT_MS);
+    });
+
+    it('returns default timeout for none reasoning effort', () => {
+      expect(calculateReasoningTimeout('none')).toBe(DEFAULT_TIMEOUT_MS);
+    });
+
+    it('applies correct multiplier for minimal reasoning effort', () => {
+      const expected = Math.round(DEFAULT_TIMEOUT_MS * REASONING_TIMEOUT_MULTIPLIERS.minimal);
+      expect(calculateReasoningTimeout('minimal')).toBe(expected);
+    });
+
+    it('applies correct multiplier for low reasoning effort', () => {
+      const expected = Math.round(DEFAULT_TIMEOUT_MS * REASONING_TIMEOUT_MULTIPLIERS.low);
+      expect(calculateReasoningTimeout('low')).toBe(expected);
+    });
+
+    it('applies correct multiplier for medium reasoning effort', () => {
+      const expected = Math.round(DEFAULT_TIMEOUT_MS * REASONING_TIMEOUT_MULTIPLIERS.medium);
+      expect(calculateReasoningTimeout('medium')).toBe(expected);
+    });
+
+    it('applies correct multiplier for high reasoning effort', () => {
+      const expected = Math.round(DEFAULT_TIMEOUT_MS * REASONING_TIMEOUT_MULTIPLIERS.high);
+      expect(calculateReasoningTimeout('high')).toBe(expected);
+    });
+
+    it('applies correct multiplier for xhigh reasoning effort', () => {
+      const expected = Math.round(DEFAULT_TIMEOUT_MS * REASONING_TIMEOUT_MULTIPLIERS.xhigh);
+      expect(calculateReasoningTimeout('xhigh')).toBe(expected);
+    });
+
+    it('uses custom base timeout when provided', () => {
+      const customBase = 60000;
+      expect(calculateReasoningTimeout('high', customBase)).toBe(
+        Math.round(customBase * REASONING_TIMEOUT_MULTIPLIERS.high)
+      );
+    });
+
+    it('falls back to 1.0 multiplier for invalid reasoning effort', () => {
+      // Test that invalid values fallback gracefully to default multiplier
+      // This tests the defensive ?? 1.0 in calculateReasoningTimeout
+      const invalidEffort = 'invalid_effort' as never;
+      expect(calculateReasoningTimeout(invalidEffort)).toBe(DEFAULT_TIMEOUT_MS);
+    });
+
+    it('produces expected absolute timeout values', () => {
+      // Verify the actual timeout values that will be used:
+      // none: 30000ms (30s)
+      // minimal: 36000ms (36s)
+      // low: 45000ms (45s)
+      // medium: 60000ms (1m)
+      // high: 90000ms (1m 30s)
+      // xhigh: 120000ms (2m)
+      expect(calculateReasoningTimeout('none')).toBe(30000);
+      expect(calculateReasoningTimeout('minimal')).toBe(36000);
+      expect(calculateReasoningTimeout('low')).toBe(45000);
+      expect(calculateReasoningTimeout('medium')).toBe(60000);
+      expect(calculateReasoningTimeout('high')).toBe(90000);
+      expect(calculateReasoningTimeout('xhigh')).toBe(120000);
     });
   });
 });

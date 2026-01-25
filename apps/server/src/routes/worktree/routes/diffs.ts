@@ -39,7 +39,10 @@ export function createDiffsHandler() {
       }
 
       // Git worktrees are stored in project directory
-      const worktreePath = path.join(projectPath, '.worktrees', featureId);
+      // Sanitize featureId the same way it's sanitized when creating worktrees
+      // (see create.ts: branchName.replace(/[^a-zA-Z0-9_-]/g, '-'))
+      const sanitizedFeatureId = featureId.replace(/[^a-zA-Z0-9_-]/g, '-');
+      const worktreePath = path.join(projectPath, '.worktrees', sanitizedFeatureId);
 
       try {
         // Check if worktree exists

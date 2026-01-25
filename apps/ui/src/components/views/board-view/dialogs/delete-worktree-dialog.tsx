@@ -10,7 +10,8 @@ import {
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
-import { Loader2, Trash2, AlertTriangle, FileWarning } from 'lucide-react';
+import { Trash2, AlertTriangle, FileWarning } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 import { getElectronAPI } from '@/lib/electron';
 import { toast } from 'sonner';
 
@@ -147,7 +148,7 @@ export function DeleteWorktreeDialog({
           <Button variant="destructive" onClick={handleDelete} disabled={isLoading}>
             {isLoading ? (
               <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                <Spinner size="sm" className="mr-2" />
                 Deleting...
               </>
             ) : (

@@ -27,7 +27,7 @@ services:
     ports:
       - '3008:3008'
     environment:
-      # Required
+      # Optional - Anthropic API key
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
 
       # Optional - Claude CLI OAuth credentials
@@ -43,6 +43,7 @@ services:
       - NODE_ENV=development
       - PORT=3008
       - CORS_ORIGIN=http://localhost:3007
+      - HUSKY=0
 
       # Optional - restrict to specific directory within container
       - ALLOWED_ROOT_DIRECTORY=${ALLOWED_ROOT_DIRECTORY:-/projects}
@@ -58,8 +59,10 @@ services:
       # This ensures native modules are built for the container's architecture
       - automaker-dev-node-modules:/app/node_modules
 
-      # Persist data across restarts
-      - automaker-data:/data
+      # IMPORTANT: Mount local ./data directory (not a Docker volume)
+      # This ensures Electron and web mode share the same data directory
+      # and projects opened in either mode are visible in both
+      - ./data:/data
 
       # Persist CLI configurations
       - automaker-claude-config:/home/automaker/.claude
@@ -73,19 +76,17 @@ services:
     command:
       - -c
       - |
-        # Fix permissions on node_modules (created as root by Docker volume)
-        echo 'Fixing node_modules permissions...'
-        chown -R automaker:automaker /app/node_modules 2>/dev/null || true
+        # Install as root to avoid permission issues with named volumes
+        # Use --force to skip platform-specific devDependencies (dmg-license is macOS-only)
+        echo 'Installing dependencies...' &&
+        npm ci --legacy-peer-deps --force &&
+        echo 'Building shared packages...' &&
+        npm run build:packages &&
 
-        # Run the rest as automaker user
-        exec gosu automaker sh -c "
-          echo 'Installing dependencies...' &&
-          npm install &&
-          echo 'Building shared packages...' &&
-          npm run build:packages &&
-          echo 'Starting server in development mode...' &&
-          npm run _dev:server
-        "
+        # Fix permissions and start server as automaker user
+        chown -R automaker:automaker /app/node_modules &&
+        echo 'Starting server in development mode...' &&
+        exec gosu automaker npm run _dev:server
     healthcheck:
       test: ['CMD', 'curl', '-f', 'http://localhost:3008/api/health']
       interval: 10s
@@ -97,9 +98,6 @@ volumes:
   automaker-dev-node-modules:
     name: automaker-dev-node-modules
     # Named volume for container-specific node_modules
-
-  automaker-data:
-    name: automaker-data
 
   automaker-claude-config:
     name: automaker-claude-config

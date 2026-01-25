@@ -2,6 +2,7 @@ import { Panel } from '@xyflow/react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
+import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import {
@@ -15,6 +16,7 @@ import {
   Clock,
   CheckCircle2,
   CircleDot,
+  Search,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -43,6 +45,8 @@ interface GraphFilterControlsProps {
   filterState: GraphFilterState;
   availableCategories: string[];
   hasActiveFilter: boolean;
+  searchQuery: string;
+  onSearchQueryChange: (query: string) => void;
   onCategoriesChange: (categories: string[]) => void;
   onStatusesChange: (statuses: string[]) => void;
   onNegativeFilterChange: (isNegative: boolean) => void;
@@ -53,6 +57,8 @@ export function GraphFilterControls({
   filterState,
   availableCategories,
   hasActiveFilter,
+  searchQuery,
+  onSearchQueryChange,
   onCategoriesChange,
   onStatusesChange,
   onNegativeFilterChange,
@@ -114,6 +120,30 @@ export function GraphFilterControls({
           className="flex items-center gap-2 p-2 rounded-lg backdrop-blur-sm border border-border shadow-lg text-popover-foreground"
           style={{ backgroundColor: 'color-mix(in oklch, var(--popover) 90%, transparent)' }}
         >
+          {/* Search Input */}
+          <div className="relative">
+            <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+            <Input
+              type="text"
+              placeholder="Search tasks..."
+              value={searchQuery}
+              onChange={(e) => onSearchQueryChange(e.target.value)}
+              className="h-8 w-48 pl-8 pr-8 text-sm bg-background/50"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => onSearchQueryChange('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                aria-label="Clear search"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+
+          {/* Divider */}
+          <div className="h-6 w-px bg-border" />
+
           {/* Category Filter Dropdown */}
           <Popover>
             <Tooltip>

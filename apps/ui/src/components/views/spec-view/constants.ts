@@ -24,6 +24,7 @@ export const PHASE_LABELS: Record<string, string> = {
   analysis: 'Analyzing project structure...',
   spec_complete: 'Spec created! Generating features...',
   feature_generation: 'Creating features from roadmap...',
+  working: 'Working...',
   complete: 'Complete!',
   error: 'Error occurred',
 };

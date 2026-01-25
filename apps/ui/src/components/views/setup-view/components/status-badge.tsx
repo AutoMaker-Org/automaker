@@ -1,4 +1,5 @@
-import { CheckCircle2, XCircle, Loader2, AlertCircle } from 'lucide-react';
+import { CheckCircle2, XCircle, AlertCircle } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 
 interface StatusBadgeProps {
   status:
@@ -34,7 +35,7 @@ export function StatusBadge({ status, label }: StatusBadgeProps) {
         };
       case 'checking':
         return {
-          icon: <Loader2 className="w-4 h-4 animate-spin" />,
+          icon: <Spinner size="sm" />,
           className: 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20',
         };
       case 'unverified':

@@ -35,6 +35,7 @@ import {
   type SubprocessOptions,
   type WslCliResult,
 } from '@automaker/platform';
+import { calculateReasoningTimeout } from '@automaker/types';
 import { createLogger, isAbortError } from '@automaker/utils';
 import { execSync } from 'child_process';
 import * as fs from 'fs';
@@ -106,6 +107,15 @@ export interface CliDetectionResult {
 
 // Create logger for CLI operations
 const cliLogger = createLogger('CliProvider');
+
+/**
+ * Base timeout for CLI operations in milliseconds.
+ * CLI tools have longer startup and processing times compared to direct API calls,
+ * so we use a higher base timeout (120s) than the default provider timeout (30s).
+ * This is multiplied by reasoning effort multipliers when applicable.
+ * @see calculateReasoningTimeout from @automaker/types
+ */
+const CLI_BASE_TIMEOUT_MS = 120000;
 
 /**
  * Abstract base class for CLI-based providers
@@ -450,6 +460,10 @@ export abstract class CliProvider extends BaseProvider {
       }
     }
 
+    // Calculate dynamic timeout based on reasoning effort.
+    // This addresses GitHub issue #530 where reasoning models with 'xhigh' effort would timeout.
+    const timeout = calculateReasoningTimeout(options.reasoningEffort, CLI_BASE_TIMEOUT_MS);
+
     // WSL strategy
     if (this.useWsl && this.wslCliPath) {
       const wslCwd = windowsToWslPath(cwd);
@@ -473,7 +487,7 @@ export abstract class CliProvider extends BaseProvider {
         cwd, // Windows cwd for spawn
         env: filteredEnv,
         abortController: options.abortController,
-        timeout: 120000, // CLI operations may take longer
+        timeout,
       };
     }
 
@@ -488,7 +502,7 @@ export abstract class CliProvider extends BaseProvider {
         cwd,
         env: filteredEnv,
         abortController: options.abortController,
-        timeout: 120000,
+        timeout,
       };
     }
 
@@ -501,7 +515,7 @@ export abstract class CliProvider extends BaseProvider {
       cwd,
       env: filteredEnv,
       abortController: options.abortController,
-      timeout: 120000,
+      timeout,
     };
   }
 

@@ -411,7 +411,6 @@ export const ListView = memo(function ListView({
                       feature={feature}
                       handlers={createHandlers(feature)}
                       isCurrentAutoTask={runningAutoTasks.includes(feature.id)}
-                      pipelineConfig={pipelineConfig}
                       isSelected={selectedFeatureIds.has(feature.id)}
                       showCheckbox={isSelectionMode}
                       onToggleSelect={() => onToggleFeatureSelection?.(feature.id)}

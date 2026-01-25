@@ -1,5 +1,7 @@
 import { useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
+import { SkeletonPulse } from '@/components/ui/skeleton';
+import { Spinner } from '@/components/ui/spinner';
 import { CheckCircle2, AlertCircle, RefreshCw, XCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { CliStatus } from '../shared/types';
@@ -32,10 +34,6 @@ function getAuthMethodLabel(method: string): string {
     default:
       return method || 'Unknown';
   }
-}
-
-function SkeletonPulse({ className }: { className?: string }) {
-  return <div className={cn('animate-pulse bg-muted/50 rounded', className)} />;
 }
 
 function ClaudeCliStatusSkeleton() {
@@ -172,7 +170,7 @@ export function ClaudeCliStatus({ status, authStatus, isChecking, onRefresh }: C
               'transition-all duration-200'
             )}
           >
-            <RefreshCw className={cn('w-4 h-4', isChecking && 'animate-spin')} />
+            {isChecking ? <Spinner size="sm" /> : <RefreshCw className="w-4 h-4" />}
           </Button>
         </div>
         <p className="text-sm text-muted-foreground/80 ml-12">

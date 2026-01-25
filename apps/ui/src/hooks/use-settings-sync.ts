@@ -21,8 +21,15 @@ import { useAuthStore } from '@/store/auth-store';
 import { waitForMigrationComplete, resetMigrationState } from './use-settings-migration';
 import {
   DEFAULT_OPENCODE_MODEL,
+  DEFAULT_MAX_CONCURRENCY,
   getAllOpencodeModelIds,
+  getAllCursorModelIds,
+  migrateCursorModelIds,
+  migrateOpencodeModelIds,
+  migratePhaseModelEntry,
   type GlobalSettings,
+  type CursorModelId,
+  type OpencodeModelId,
 } from '@automaker/types';
 
 const logger = createLogger('SettingsSync');
@@ -33,9 +40,14 @@ const SYNC_DEBOUNCE_MS = 1000;
 // Fields to sync to server (subset of AppState that should be persisted)
 const SETTINGS_FIELDS_TO_SYNC = [
   'theme',
+  'fontFamilySans',
+  'fontFamilyMono',
+  'terminalFontFamily', // Maps to terminalState.fontFamily
+  'openTerminalMode', // Maps to terminalState.openTerminalMode
   'sidebarOpen',
   'chatHistoryOpen',
   'maxConcurrency',
+  'autoModeByWorktree', // Per-worktree auto mode settings (only maxConcurrency is persisted)
   'defaultSkipTests',
   'enableDependencyBlocking',
   'skipVerificationInAutoMode',
@@ -44,6 +56,8 @@ const SETTINGS_FIELDS_TO_SYNC = [
   'defaultRequirePlanApproval',
   'defaultFeatureModel',
   'muteDoneSound',
+  'serverLogLevel',
+  'enableRequestLogging',
   'enhancementModel',
   'validationModel',
   'phaseModels',
@@ -52,11 +66,16 @@ const SETTINGS_FIELDS_TO_SYNC = [
   'enabledOpencodeModels',
   'opencodeDefaultModel',
   'enabledDynamicModelIds',
+  'disabledProviders',
   'autoLoadClaudeMd',
   'keyboardShortcuts',
   'mcpServers',
   'defaultEditorCommand',
+  'defaultTerminalId',
   'promptCustomization',
+  'eventHooks',
+  'claudeApiProfiles',
+  'activeClaudeApiProfileId',
   'projects',
   'trashedProjects',
   'currentProjectId', // ID of currently open project
@@ -71,6 +90,78 @@ const SETTINGS_FIELDS_TO_SYNC = [
 
 // Fields from setup store to sync
 const SETUP_FIELDS_TO_SYNC = ['isFirstRun', 'setupComplete', 'skipClaudeSetup'] as const;
+
+/**
+ * Helper to extract a settings field value from app state
+ *
+ * Handles special cases where store fields don't map directly to settings:
+ * - currentProjectId: Extract from currentProject?.id
+ * - terminalFontFamily: Extract from terminalState.fontFamily
+ * - Other fields: Direct access
+ *
+ * @param field The settings field to extract
+ * @param appState Current app store state
+ * @returns The value of the field in the app state
+ */
+function getSettingsFieldValue(
+  field: (typeof SETTINGS_FIELDS_TO_SYNC)[number],
+  appState: ReturnType<typeof useAppStore.getState>
+): unknown {
+  if (field === 'currentProjectId') {
+    return appState.currentProject?.id ?? null;
+  }
+  if (field === 'terminalFontFamily') {
+    return appState.terminalState.fontFamily;
+  }
+  if (field === 'openTerminalMode') {
+    return appState.terminalState.openTerminalMode;
+  }
+  if (field === 'autoModeByWorktree') {
+    // Only persist settings (maxConcurrency), not runtime state (isRunning, runningTasks)
+    const autoModeByWorktree = appState.autoModeByWorktree;
+    const persistedSettings: Record<string, { maxConcurrency: number; branchName: string | null }> =
+      {};
+    for (const [key, value] of Object.entries(autoModeByWorktree)) {
+      persistedSettings[key] = {
+        maxConcurrency: value.maxConcurrency ?? DEFAULT_MAX_CONCURRENCY,
+        branchName: value.branchName,
+      };
+    }
+    return persistedSettings;
+  }
+  return appState[field as keyof typeof appState];
+}
+
+/**
+ * Helper to check if a settings field changed between states
+ *
+ * Compares field values between old and new state, handling special cases:
+ * - currentProjectId: Compare currentProject?.id values
+ * - terminalFontFamily: Compare terminalState.fontFamily values
+ * - Other fields: Direct reference equality check
+ *
+ * @param field The settings field to check
+ * @param newState New app store state
+ * @param prevState Previous app store state
+ * @returns true if the field value changed between states
+ */
+function hasSettingsFieldChanged(
+  field: (typeof SETTINGS_FIELDS_TO_SYNC)[number],
+  newState: ReturnType<typeof useAppStore.getState>,
+  prevState: ReturnType<typeof useAppStore.getState>
+): boolean {
+  if (field === 'currentProjectId') {
+    return newState.currentProject?.id !== prevState.currentProject?.id;
+  }
+  if (field === 'terminalFontFamily') {
+    return newState.terminalState.fontFamily !== prevState.terminalState.fontFamily;
+  }
+  if (field === 'openTerminalMode') {
+    return newState.terminalState.openTerminalMode !== prevState.terminalState.openTerminalMode;
+  }
+  const key = field as keyof typeof newState;
+  return newState[key] !== prevState[key];
+}
 
 interface SettingsSyncState {
   /** Whether initial settings have been loaded from API */
@@ -130,14 +221,18 @@ export function useSettingsSync(): SettingsSyncState {
       // Never sync when not authenticated or settings not loaded
       // The settingsLoaded flag ensures we don't sync default empty state before hydration
       const auth = useAuthStore.getState();
-      logger.debug('syncToServer check:', {
+      logger.debug('[SYNC_CHECK] Auth state:', {
         authChecked: auth.authChecked,
         isAuthenticated: auth.isAuthenticated,
         settingsLoaded: auth.settingsLoaded,
         projectsCount: useAppStore.getState().projects?.length ?? 0,
       });
       if (!auth.authChecked || !auth.isAuthenticated || !auth.settingsLoaded) {
-        logger.debug('Sync skipped: not authenticated or settings not loaded');
+        logger.warn('[SYNC_SKIPPED] Not ready:', {
+          authChecked: auth.authChecked,
+          isAuthenticated: auth.isAuthenticated,
+          settingsLoaded: auth.settingsLoaded,
+        });
         return;
       }
 
@@ -145,17 +240,14 @@ export function useSettingsSync(): SettingsSyncState {
       const api = getHttpApiClient();
       const appState = useAppStore.getState();
 
-      logger.debug('Syncing to server:', { projectsCount: appState.projects?.length ?? 0 });
+      logger.info('[SYNC_START] Syncing to server:', {
+        projectsCount: appState.projects?.length ?? 0,
+      });
 
       // Build updates object from current state
       const updates: Record<string, unknown> = {};
       for (const field of SETTINGS_FIELDS_TO_SYNC) {
-        if (field === 'currentProjectId') {
-          // Special handling: extract ID from currentProject object
-          updates[field] = appState.currentProject?.id ?? null;
-        } else {
-          updates[field] = appState[field as keyof typeof appState];
-        }
+        updates[field] = getSettingsFieldValue(field, appState);
       }
 
       // Include setup wizard state (lives in a separate store)
@@ -167,17 +259,30 @@ export function useSettingsSync(): SettingsSyncState {
       // Create a hash of the updates to avoid redundant syncs
       const updateHash = JSON.stringify(updates);
       if (updateHash === lastSyncedRef.current) {
-        logger.debug('Sync skipped: no changes');
+        logger.debug('[SYNC_SKIP_IDENTICAL] No changes from last sync');
         setState((s) => ({ ...s, syncing: false }));
         return;
       }
 
-      logger.info('Sending settings update:', { projects: updates.projects });
+      logger.info('[SYNC_SEND] Sending settings update to server:', {
+        projects: (updates.projects as any)?.length ?? 0,
+        trashedProjects: (updates.trashedProjects as any)?.length ?? 0,
+      });
 
       const result = await api.settings.updateGlobal(updates);
+      logger.info('[SYNC_RESPONSE] Server response:', { success: result.success });
       if (result.success) {
         lastSyncedRef.current = updateHash;
         logger.debug('Settings synced to server');
+
+        // Update localStorage cache with synced settings to keep it fresh
+        // This prevents stale data when switching between Electron and web modes
+        try {
+          setItem('automaker-settings-cache', JSON.stringify(updates));
+          logger.debug('Updated localStorage cache after sync');
+        } catch (storageError) {
+          logger.warn('Failed to update localStorage cache after sync:', storageError);
+        }
       } else {
         logger.error('Failed to sync settings:', result.error);
       }
@@ -252,11 +357,7 @@ export function useSettingsSync(): SettingsSyncState {
         // (migration has already hydrated the store from server/localStorage)
         const updates: Record<string, unknown> = {};
         for (const field of SETTINGS_FIELDS_TO_SYNC) {
-          if (field === 'currentProjectId') {
-            updates[field] = appState.currentProject?.id ?? null;
-          } else {
-            updates[field] = appState[field as keyof typeof appState];
-          }
+          updates[field] = getSettingsFieldValue(field, appState);
         }
         for (const field of SETUP_FIELDS_TO_SYNC) {
           updates[field] = setupState[field as keyof typeof setupState];
@@ -307,21 +408,27 @@ export function useSettingsSync(): SettingsSyncState {
         return;
       }
 
-      // Check if any synced field changed
+      // If projects array changed (by reference, meaning content changed), sync immediately
+      // This is critical - projects list changes must sync right away to prevent loss
+      // when switching between Electron and web modes or closing the app
+      if (newState.projects !== prevState.projects) {
+        logger.info('[PROJECTS_CHANGED] Projects array changed, syncing immediately', {
+          prevCount: prevState.projects?.length ?? 0,
+          newCount: newState.projects?.length ?? 0,
+          prevProjects: prevState.projects?.map((p) => p.name) ?? [],
+          newProjects: newState.projects?.map((p) => p.name) ?? [],
+        });
+        syncNow();
+        return;
+      }
+
+      // Check if any other synced field changed
       let changed = false;
       for (const field of SETTINGS_FIELDS_TO_SYNC) {
-        if (field === 'currentProjectId') {
-          // Special handling: compare currentProject IDs
-          if (newState.currentProject?.id !== prevState.currentProject?.id) {
-            changed = true;
-            break;
-          }
-        } else {
-          const key = field as keyof typeof newState;
-          if (newState[key] !== prevState[key]) {
-            changed = true;
-            break;
-          }
+        if (field === 'projects') continue; // Already handled above
+        if (hasSettingsFieldChanged(field, newState, prevState)) {
+          changed = true;
+          break;
         }
       }
 
@@ -395,11 +502,7 @@ export async function forceSyncSettingsToServer(): Promise<boolean> {
 
     const updates: Record<string, unknown> = {};
     for (const field of SETTINGS_FIELDS_TO_SYNC) {
-      if (field === 'currentProjectId') {
-        updates[field] = appState.currentProject?.id ?? null;
-      } else {
-        updates[field] = appState[field as keyof typeof appState];
-      }
+      updates[field] = getSettingsFieldValue(field, appState);
     }
     const setupState = useSetupStore.getState();
     for (const field of SETUP_FIELDS_TO_SYNC) {
@@ -429,17 +532,35 @@ export async function refreshSettingsFromServer(): Promise<boolean> {
 
     const serverSettings = result.settings as unknown as GlobalSettings;
     const currentAppState = useAppStore.getState();
-    const validOpencodeModelIds = new Set(getAllOpencodeModelIds());
-    const incomingEnabledOpencodeModels =
-      serverSettings.enabledOpencodeModels ?? currentAppState.enabledOpencodeModels;
-    const sanitizedOpencodeDefaultModel = validOpencodeModelIds.has(
-      serverSettings.opencodeDefaultModel ?? currentAppState.opencodeDefaultModel
-    )
-      ? (serverSettings.opencodeDefaultModel ?? currentAppState.opencodeDefaultModel)
-      : DEFAULT_OPENCODE_MODEL;
-    const sanitizedEnabledOpencodeModels = Array.from(
-      new Set(incomingEnabledOpencodeModels.filter((modelId) => validOpencodeModelIds.has(modelId)))
+
+    // Cursor models - ALWAYS use ALL available models to ensure new models are visible
+    const allCursorModels = getAllCursorModelIds();
+    const validCursorModelIds = new Set(allCursorModels);
+
+    // Migrate Cursor default model
+    const migratedCursorDefault = migrateCursorModelIds([
+      serverSettings.cursorDefaultModel ?? 'cursor-auto',
+    ])[0];
+    const sanitizedCursorDefault = validCursorModelIds.has(migratedCursorDefault)
+      ? migratedCursorDefault
+      : ('cursor-auto' as CursorModelId);
+
+    // Migrate OpenCode models to canonical format
+    const migratedOpencodeModels = migrateOpencodeModelIds(
+      serverSettings.enabledOpencodeModels ?? []
     );
+    const validOpencodeModelIds = new Set(getAllOpencodeModelIds());
+    const sanitizedEnabledOpencodeModels = migratedOpencodeModels.filter((id) =>
+      validOpencodeModelIds.has(id)
+    );
+
+    // Migrate OpenCode default model
+    const migratedOpencodeDefault = migrateOpencodeModelIds([
+      serverSettings.opencodeDefaultModel ?? DEFAULT_OPENCODE_MODEL,
+    ])[0];
+    const sanitizedOpencodeDefaultModel = validOpencodeModelIds.has(migratedOpencodeDefault)
+      ? migratedOpencodeDefault
+      : DEFAULT_OPENCODE_MODEL;
 
     if (!sanitizedEnabledOpencodeModels.includes(sanitizedOpencodeDefaultModel)) {
       sanitizedEnabledOpencodeModels.push(sanitizedOpencodeDefaultModel);
@@ -451,9 +572,65 @@ export async function refreshSettingsFromServer(): Promise<boolean> {
       (modelId) => !modelId.startsWith('amazon-bedrock/')
     );
 
+    // Migrate phase models to canonical format
+    const migratedPhaseModels = serverSettings.phaseModels
+      ? {
+          enhancementModel: migratePhaseModelEntry(serverSettings.phaseModels.enhancementModel),
+          fileDescriptionModel: migratePhaseModelEntry(
+            serverSettings.phaseModels.fileDescriptionModel
+          ),
+          imageDescriptionModel: migratePhaseModelEntry(
+            serverSettings.phaseModels.imageDescriptionModel
+          ),
+          validationModel: migratePhaseModelEntry(serverSettings.phaseModels.validationModel),
+          specGenerationModel: migratePhaseModelEntry(
+            serverSettings.phaseModels.specGenerationModel
+          ),
+          featureGenerationModel: migratePhaseModelEntry(
+            serverSettings.phaseModels.featureGenerationModel
+          ),
+          backlogPlanningModel: migratePhaseModelEntry(
+            serverSettings.phaseModels.backlogPlanningModel
+          ),
+          projectAnalysisModel: migratePhaseModelEntry(
+            serverSettings.phaseModels.projectAnalysisModel
+          ),
+          suggestionsModel: migratePhaseModelEntry(serverSettings.phaseModels.suggestionsModel),
+          memoryExtractionModel: migratePhaseModelEntry(
+            serverSettings.phaseModels.memoryExtractionModel
+          ),
+          commitMessageModel: migratePhaseModelEntry(serverSettings.phaseModels.commitMessageModel),
+        }
+      : undefined;
+
     // Save theme to localStorage for fallback when server settings aren't available
     if (serverSettings.theme) {
       setItem(THEME_STORAGE_KEY, serverSettings.theme);
+    }
+
+    // Restore autoModeByWorktree settings (only maxConcurrency is persisted, runtime state is reset)
+    const restoredAutoModeByWorktree: Record<
+      string,
+      {
+        isRunning: boolean;
+        runningTasks: string[];
+        branchName: string | null;
+        maxConcurrency: number;
+      }
+    > = {};
+    if (serverSettings.autoModeByWorktree) {
+      const persistedSettings = serverSettings.autoModeByWorktree as Record<
+        string,
+        { maxConcurrency?: number; branchName?: string | null }
+      >;
+      for (const [key, value] of Object.entries(persistedSettings)) {
+        restoredAutoModeByWorktree[key] = {
+          isRunning: false, // Always start with auto mode off
+          runningTasks: [], // No running tasks on startup
+          branchName: value.branchName ?? null,
+          maxConcurrency: value.maxConcurrency ?? DEFAULT_MAX_CONCURRENCY,
+        };
+      }
     }
 
     useAppStore.setState({
@@ -461,22 +638,28 @@ export async function refreshSettingsFromServer(): Promise<boolean> {
       sidebarOpen: serverSettings.sidebarOpen,
       chatHistoryOpen: serverSettings.chatHistoryOpen,
       maxConcurrency: serverSettings.maxConcurrency,
+      autoModeByWorktree: restoredAutoModeByWorktree,
       defaultSkipTests: serverSettings.defaultSkipTests,
       enableDependencyBlocking: serverSettings.enableDependencyBlocking,
       skipVerificationInAutoMode: serverSettings.skipVerificationInAutoMode,
       useWorktrees: serverSettings.useWorktrees,
       defaultPlanningMode: serverSettings.defaultPlanningMode,
       defaultRequirePlanApproval: serverSettings.defaultRequirePlanApproval,
-      defaultFeatureModel: serverSettings.defaultFeatureModel ?? { model: 'opus' },
+      defaultFeatureModel: serverSettings.defaultFeatureModel
+        ? migratePhaseModelEntry(serverSettings.defaultFeatureModel)
+        : { model: 'claude-opus' },
       muteDoneSound: serverSettings.muteDoneSound,
+      serverLogLevel: serverSettings.serverLogLevel ?? 'info',
+      enableRequestLogging: serverSettings.enableRequestLogging ?? true,
       enhancementModel: serverSettings.enhancementModel,
       validationModel: serverSettings.validationModel,
-      phaseModels: serverSettings.phaseModels,
-      enabledCursorModels: serverSettings.enabledCursorModels,
-      cursorDefaultModel: serverSettings.cursorDefaultModel,
+      phaseModels: migratedPhaseModels ?? serverSettings.phaseModels,
+      enabledCursorModels: allCursorModels, // Always use ALL cursor models
+      cursorDefaultModel: sanitizedCursorDefault,
       enabledOpencodeModels: sanitizedEnabledOpencodeModels,
       opencodeDefaultModel: sanitizedOpencodeDefaultModel,
       enabledDynamicModelIds: sanitizedDynamicModelIds,
+      disabledProviders: serverSettings.disabledProviders ?? [],
       autoLoadClaudeMd: serverSettings.autoLoadClaudeMd ?? false,
       keyboardShortcuts: {
         ...currentAppState.keyboardShortcuts,
@@ -486,7 +669,10 @@ export async function refreshSettingsFromServer(): Promise<boolean> {
       },
       mcpServers: serverSettings.mcpServers,
       defaultEditorCommand: serverSettings.defaultEditorCommand ?? null,
+      defaultTerminalId: serverSettings.defaultTerminalId ?? null,
       promptCustomization: serverSettings.promptCustomization ?? {},
+      claudeApiProfiles: serverSettings.claudeApiProfiles ?? [],
+      activeClaudeApiProfileId: serverSettings.activeClaudeApiProfileId ?? null,
       projects: serverSettings.projects,
       trashedProjects: serverSettings.trashedProjects,
       projectHistory: serverSettings.projectHistory,
@@ -496,6 +682,20 @@ export async function refreshSettingsFromServer(): Promise<boolean> {
       worktreePanelCollapsed: serverSettings.worktreePanelCollapsed ?? false,
       lastProjectDir: serverSettings.lastProjectDir ?? '',
       recentFolders: serverSettings.recentFolders ?? [],
+      // Event hooks
+      eventHooks: serverSettings.eventHooks ?? [],
+      // Terminal settings (nested in terminalState)
+      ...((serverSettings.terminalFontFamily || serverSettings.openTerminalMode) && {
+        terminalState: {
+          ...currentAppState.terminalState,
+          ...(serverSettings.terminalFontFamily && {
+            fontFamily: serverSettings.terminalFontFamily,
+          }),
+          ...(serverSettings.openTerminalMode && {
+            openTerminalMode: serverSettings.openTerminalMode,
+          }),
+        },
+      }),
     });
 
     // Also refresh setup wizard state

@@ -8,8 +8,8 @@ interface SpecEditorProps {
 
 export function SpecEditor({ value, onChange }: SpecEditorProps) {
   return (
-    <div className="flex-1 p-4 overflow-hidden">
-      <Card className="h-full">
+    <div className="flex-1 p-4 overflow-hidden min-h-0">
+      <Card className="h-full overflow-hidden">
         <XmlSyntaxEditor
           value={value}
           onChange={onChange}

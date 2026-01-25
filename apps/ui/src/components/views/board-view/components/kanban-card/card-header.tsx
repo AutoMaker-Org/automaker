@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { useState } from 'react';
+import { memo, useState } from 'react';
 import { Feature } from '@/store/app-store';
 import { cn } from '@/lib/utils';
 import { CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,7 +13,6 @@ import {
 import {
   GripVertical,
   Edit,
-  Loader2,
   Trash2,
   FileText,
   MoreVertical,
@@ -21,6 +20,7 @@ import {
   ChevronUp,
   GitFork,
 } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 import { CountUpTimer } from '@/components/ui/count-up-timer';
 import { formatModelName, DEFAULT_MODEL } from '@/lib/agent-context-parser';
 import { DeleteConfirmDialog } from '@/components/ui/delete-confirm-dialog';
@@ -37,7 +37,7 @@ interface CardHeaderProps {
   onSpawnTask?: () => void;
 }
 
-export function CardHeaderSection({
+export const CardHeaderSection = memo(function CardHeaderSection({
   feature,
   isDraggable,
   isCurrentAutoTask,
@@ -65,7 +65,7 @@ export function CardHeaderSection({
       {isCurrentAutoTask && !isSelectionMode && (
         <div className="absolute top-2 right-2 flex items-center gap-1">
           <div className="flex items-center justify-center gap-2 bg-[var(--status-in-progress)]/15 border border-[var(--status-in-progress)]/50 rounded-md px-2 py-0.5">
-            <Loader2 className="w-3.5 h-3.5 text-[var(--status-in-progress)] animate-spin" />
+            <Spinner size="xs" />
             {feature.startedAt && (
               <CountUpTimer
                 startedAt={feature.startedAt}
@@ -324,7 +324,7 @@ export function CardHeaderSection({
         <div className="flex-1 min-w-0 overflow-hidden">
           {feature.titleGenerating ? (
             <div className="flex items-center gap-1.5 mb-1">
-              <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />
+              <Spinner size="xs" />
               <span className="text-xs text-muted-foreground italic">Generating title...</span>
             </div>
           ) : feature.title ? (
@@ -378,4 +378,4 @@ export function CardHeaderSection({
       />
     </CardHeader>
   );
-}
+});

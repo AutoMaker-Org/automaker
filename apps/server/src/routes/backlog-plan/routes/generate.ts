@@ -4,7 +4,13 @@
 
 import type { Request, Response } from 'express';
 import type { EventEmitter } from '../../../lib/events.js';
-import { getBacklogPlanStatus, setRunningState, getErrorMessage, logError } from '../common.js';
+import {
+  getBacklogPlanStatus,
+  setRunningState,
+  setRunningDetails,
+  getErrorMessage,
+  logError,
+} from '../common.js';
 import { generateBacklogPlan } from '../generate-plan.js';
 import type { SettingsService } from '../../../services/settings-service.js';
 
@@ -37,20 +43,26 @@ export function createGenerateHandler(events: EventEmitter, settingsService?: Se
       }
 
       setRunningState(true);
+      setRunningDetails({
+        projectPath,
+        prompt,
+        model,
+        startedAt: new Date().toISOString(),
+      });
       const abortController = new AbortController();
       setRunningState(true, abortController);
 
       // Start generation in background
+      // Note: generateBacklogPlan handles its own error event emission,
+      // so we only log here to avoid duplicate error toasts
       generateBacklogPlan(projectPath, prompt, events, abortController, settingsService, model)
         .catch((error) => {
+          // Just log - error event already emitted by generateBacklogPlan
           logError(error, 'Generate backlog plan failed (background)');
-          events.emit('backlog-plan:event', {
-            type: 'backlog_plan_error',
-            error: getErrorMessage(error),
-          });
         })
         .finally(() => {
           setRunningState(false, null);
+          setRunningDetails(null);
         });
 
       res.json({ success: true });

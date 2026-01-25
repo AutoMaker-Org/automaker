@@ -1,0 +1,151 @@
+/* Ayu Mirage Theme - Soft dark with golden yellow accents */
+
+.ayu-mirage {
+  /* Backgrounds - from editor.bg #242936, ui.bg #1F2430 */
+  --background: oklch(0.2 0.02 260); /* #1F2430 */
+  --background-50: oklch(0.2 0.02 260 / 0.5);
+  --background-80: oklch(0.2 0.02 260 / 0.8);
+
+  /* Text - from editor.fg #CCCAC2, ui.fg #707A8C */
+  --foreground: oklch(0.82 0.01 90); /* #CCCAC2 */
+  --foreground-secondary: oklch(0.58 0.03 240);
+  --foreground-muted: oklch(0.52 0.04 240); /* #707A8C */
+
+  /* Card/Popover - from panel.bg #282E3B, popup.bg #1C212C */
+  --card: oklch(0.24 0.02 260); /* #282E3B */
+  --card-foreground: oklch(0.82 0.01 90);
+  --popover: oklch(0.18 0.02 260); /* #1C212C */
+  --popover-foreground: oklch(0.82 0.01 90);
+
+  /* Primary/Brand - from accent.tint #FFCC66 */
+  --primary: oklch(0.85 0.14 85); /* #FFCC66 golden yellow */
+  --primary-foreground: oklch(0.18 0.02 260);
+
+  --brand-400: oklch(0.88 0.12 85);
+  --brand-500: oklch(0.85 0.14 85); /* #FFCC66 */
+  --brand-600: oklch(0.78 0.16 80);
+
+  /* Secondary - from ui.line #171B24 */
+  --secondary: oklch(0.22 0.02 260);
+  --secondary-foreground: oklch(0.82 0.01 90);
+
+  /* Muted */
+  --muted: oklch(0.22 0.02 260);
+  --muted-foreground: oklch(0.52 0.04 240);
+
+  /* Accent */
+  --accent: oklch(0.28 0.03 260);
+  --accent-foreground: oklch(0.82 0.01 90);
+
+  /* Destructive - from error #FF6666 */
+  --destructive: oklch(0.62 0.22 20); /* #FF6666 */
+
+  /* Borders - from editor.line #1A1F29 */
+  --border: oklch(0.22 0.02 260);
+  --border-glass: oklch(0.85 0.14 85 / 0.3);
+
+  --input: oklch(0.2 0.02 260);
+  --ring: oklch(0.85 0.14 85);
+
+  /* Charts - using Ayu Mirage palette */
+  --chart-1: oklch(0.85 0.14 85); /* Yellow accent */
+  --chart-2: oklch(0.85 0.2 120); /* Green #D5FF80 */
+  --chart-3: oklch(0.78 0.12 200); /* Blue #73D0FF */
+  --chart-4: oklch(0.82 0.15 310); /* Purple #DFBFFF */
+  --chart-5: oklch(0.68 0.18 20); /* Red #F28779 */
+
+  /* Sidebar - slightly darker than main bg */
+  --sidebar: oklch(0.16 0.02 260);
+  --sidebar-foreground: oklch(0.82 0.01 90);
+  --sidebar-primary: oklch(0.85 0.14 85);
+  --sidebar-primary-foreground: oklch(0.18 0.02 260);
+  --sidebar-accent: oklch(0.22 0.02 260);
+  --sidebar-accent-foreground: oklch(0.82 0.01 90);
+  --sidebar-border: oklch(0.22 0.02 260);
+  --sidebar-ring: oklch(0.85 0.14 85);
+
+  /* Action buttons */
+  --action-view: oklch(0.85 0.14 85); /* Yellow */
+  --action-view-hover: oklch(0.78 0.16 80);
+  --action-followup: oklch(0.78 0.12 200); /* Blue #73D0FF */
+  --action-followup-hover: oklch(0.72 0.14 200);
+  --action-commit: oklch(0.85 0.2 120); /* Green #D5FF80 */
+  --action-commit-hover: oklch(0.78 0.22 120);
+  --action-verify: oklch(0.85 0.2 120);
+  --action-verify-hover: oklch(0.78 0.22 120);
+
+  /* Running indicator */
+  --running-indicator: oklch(0.85 0.14 85);
+  --running-indicator-text: oklch(0.88 0.12 85);
+}
+
+/* Theme-specific overrides */
+
+.ayu-mirage .animated-outline-gradient {
+  background: conic-gradient(from 90deg at 50% 50%, #ffcc66 0%, #ffa659 50%, #ffcc66 100%);
+}
+
+.ayu-mirage .animated-outline-inner {
+  background: oklch(0.2 0.02 260) !important;
+  color: #ffcc66 !important;
+}
+
+.ayu-mirage [data-slot='button'][class*='animated-outline']:hover .animated-outline-inner {
+  background: oklch(0.24 0.02 260) !important;
+  color: #ffcd66 !important;
+}
+
+.ayu-mirage .slider-track {
+  background: oklch(0.22 0.02 260);
+}
+
+.ayu-mirage .slider-range {
+  background: linear-gradient(to right, #ffcc66, #ffa659);
+}
+
+.ayu-mirage .slider-thumb {
+  background: oklch(0.2 0.02 260);
+  border-color: #ffcc66;
+}
+
+/* XML Syntax Highlighting */
+.ayu-mirage .xml-highlight {
+  color: oklch(0.82 0.01 90);
+}
+
+.ayu-mirage .xml-tag-bracket {
+  color: #5ccfe6; /* Indigo/Cyan */
+}
+
+.ayu-mirage .xml-tag-name {
+  color: #5ccfe6;
+}
+
+.ayu-mirage .xml-attribute-name {
+  color: #ffcd66; /* Yellow */
+}
+
+.ayu-mirage .xml-attribute-equals {
+  color: oklch(0.82 0.01 90);
+}
+
+.ayu-mirage .xml-attribute-value {
+  color: #d5ff80; /* Green */
+}
+
+.ayu-mirage .xml-comment {
+  color: #6e7c8f; /* Gray */
+  font-style: italic;
+}
+
+.ayu-mirage .xml-cdata {
+  color: #95e6cb; /* Teal */
+}
+
+.ayu-mirage .xml-doctype {
+  color: #dfbfff; /* Purple */
+}
+
+.ayu-mirage .xml-text {
+  color: oklch(0.82 0.01 90);
+}

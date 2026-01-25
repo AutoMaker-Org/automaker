@@ -2,11 +2,28 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Slider } from '@/components/ui/slider';
 import { Input } from '@/components/ui/input';
-import { SquareTerminal } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  SquareTerminal,
+  RefreshCw,
+  Terminal,
+  SquarePlus,
+  SplitSquareHorizontal,
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAppStore } from '@/store/app-store';
 import { toast } from 'sonner';
 import { TERMINAL_FONT_OPTIONS } from '@/config/terminal-themes';
+import { DEFAULT_FONT_VALUE } from '@/config/ui-font-options';
+import { useAvailableTerminals } from '@/components/views/board-view/worktree-panel/hooks/use-available-terminals';
+import { getTerminalIcon } from '@/components/icons/terminal-icons';
 
 export function TerminalSection() {
   const {
@@ -17,6 +34,9 @@ export function TerminalSection() {
     setTerminalScrollbackLines,
     setTerminalLineHeight,
     setTerminalDefaultFontSize,
+    defaultTerminalId,
+    setDefaultTerminalId,
+    setOpenTerminalMode,
   } = useAppStore();
 
   const {
@@ -26,7 +46,11 @@ export function TerminalSection() {
     scrollbackLines,
     lineHeight,
     defaultFontSize,
+    openTerminalMode,
   } = terminalState;
+
+  // Get available external terminals
+  const { terminals, isRefreshing, refresh } = useAvailableTerminals();
 
   return (
     <div
@@ -50,30 +74,132 @@ export function TerminalSection() {
         </p>
       </div>
       <div className="p-6 space-y-6">
+        {/* Default External Terminal */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <Label className="text-foreground font-medium">Default External Terminal</Label>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 w-7 p-0"
+              onClick={refresh}
+              disabled={isRefreshing}
+              title="Refresh available terminals"
+              aria-label="Refresh available terminals"
+            >
+              <RefreshCw className={cn('w-3.5 h-3.5', isRefreshing && 'animate-spin')} />
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Terminal to use when selecting "Open in Terminal" from the worktree menu
+          </p>
+          <Select
+            value={defaultTerminalId ?? 'integrated'}
+            onValueChange={(value) => {
+              setDefaultTerminalId(value === 'integrated' ? null : value);
+              toast.success(
+                value === 'integrated'
+                  ? 'Integrated terminal set as default'
+                  : 'Default terminal changed'
+              );
+            }}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Select a terminal" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="integrated">
+                <span className="flex items-center gap-2">
+                  <Terminal className="w-4 h-4" />
+                  Integrated Terminal
+                </span>
+              </SelectItem>
+              {terminals.map((terminal) => {
+                const TerminalIcon = getTerminalIcon(terminal.id);
+                return (
+                  <SelectItem key={terminal.id} value={terminal.id}>
+                    <span className="flex items-center gap-2">
+                      <TerminalIcon className="w-4 h-4" />
+                      {terminal.name}
+                    </span>
+                  </SelectItem>
+                );
+              })}
+            </SelectContent>
+          </Select>
+          {terminals.length === 0 && !isRefreshing && (
+            <p className="text-xs text-muted-foreground italic">
+              No external terminals detected. Click refresh to re-scan.
+            </p>
+          )}
+        </div>
+
+        {/* Default Open Mode */}
+        <div className="space-y-3">
+          <Label className="text-foreground font-medium">Default Open Mode</Label>
+          <p className="text-xs text-muted-foreground">
+            How to open the integrated terminal when using "Open in Terminal" from the worktree menu
+          </p>
+          <Select
+            value={openTerminalMode}
+            onValueChange={(value: 'newTab' | 'split') => {
+              setOpenTerminalMode(value);
+              toast.success(
+                value === 'newTab'
+                  ? 'New terminals will open in new tabs'
+                  : 'New terminals will split the current tab'
+              );
+            }}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="newTab">
+                <span className="flex items-center gap-2">
+                  <SquarePlus className="w-4 h-4" />
+                  New Tab
+                </span>
+              </SelectItem>
+              <SelectItem value="split">
+                <span className="flex items-center gap-2">
+                  <SplitSquareHorizontal className="w-4 h-4" />
+                  Split Current Tab
+                </span>
+              </SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
         {/* Font Family */}
         <div className="space-y-3">
           <Label className="text-foreground font-medium">Font Family</Label>
-          <select
-            value={fontFamily}
-            onChange={(e) => {
-              setTerminalFontFamily(e.target.value);
+          <Select
+            value={fontFamily || DEFAULT_FONT_VALUE}
+            onValueChange={(value) => {
+              setTerminalFontFamily(value);
               toast.info('Font family changed', {
                 description: 'Restart terminal for changes to take effect',
               });
             }}
-            className={cn(
-              'w-full px-3 py-2 rounded-lg',
-              'bg-accent/30 border border-border/50',
-              'text-foreground text-sm',
-              'focus:outline-none focus:ring-2 focus:ring-green-500/30'
-            )}
           >
-            {TERMINAL_FONT_OPTIONS.map((font) => (
-              <option key={font.value} value={font.value}>
-                {font.label}
-              </option>
-            ))}
-          </select>
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Default (Menlo / Monaco)" />
+            </SelectTrigger>
+            <SelectContent>
+              {TERMINAL_FONT_OPTIONS.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  <span
+                    style={{
+                      fontFamily: option.value === DEFAULT_FONT_VALUE ? undefined : option.value,
+                    }}
+                  >
+                    {option.label}
+                  </span>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         {/* Default Font Size */}

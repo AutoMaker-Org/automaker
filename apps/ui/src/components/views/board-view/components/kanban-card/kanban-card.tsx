@@ -1,10 +1,11 @@
 // @ts-nocheck
-import React, { memo, useLayoutEffect, useState } from 'react';
-import { useDraggable } from '@dnd-kit/core';
+import React, { memo, useLayoutEffect, useState, useCallback } from 'react';
+import { useDraggable, useDroppable } from '@dnd-kit/core';
 import { cn } from '@/lib/utils';
 import { Card, CardContent } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Feature, useAppStore } from '@/store/app-store';
+import { useShallow } from 'zustand/react/shallow';
 import { CardBadges, PriorityBadges } from './card-badges';
 import { CardHeaderSection } from './card-header';
 import { CardContentSections } from './card-content-sections';
@@ -61,10 +62,12 @@ interface KanbanCardProps {
   cardBorderEnabled?: boolean;
   cardBorderOpacity?: number;
   isOverlay?: boolean;
+  reduceEffects?: boolean;
   // Selection mode props
   isSelectionMode?: boolean;
   isSelected?: boolean;
   onToggleSelect?: () => void;
+  selectionTarget?: 'backlog' | 'waiting_approval' | null;
 }
 
 export const KanbanCard = memo(function KanbanCard({
@@ -93,11 +96,18 @@ export const KanbanCard = memo(function KanbanCard({
   cardBorderEnabled = true,
   cardBorderOpacity = 100,
   isOverlay,
+  reduceEffects = false,
   isSelectionMode = false,
   isSelected = false,
   onToggleSelect,
+  selectionTarget = null,
 }: KanbanCardProps) {
-  const { useWorktrees } = useAppStore();
+  const { useWorktrees, currentProject } = useAppStore(
+    useShallow((state) => ({
+      useWorktrees: state.useWorktrees,
+      currentProject: state.currentProject,
+    }))
+  );
   const [isLifted, setIsLifted] = useState(false);
 
   useLayoutEffect(() => {
@@ -113,11 +123,38 @@ export const KanbanCard = memo(function KanbanCard({
     (feature.status === 'backlog' ||
       feature.status === 'waiting_approval' ||
       feature.status === 'verified' ||
+      feature.status.startsWith('pipeline_') ||
       (feature.status === 'in_progress' && !isCurrentAutoTask));
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+  const {
+    attributes,
+    listeners,
+    setNodeRef: setDraggableRef,
+    isDragging,
+  } = useDraggable({
     id: feature.id,
     disabled: !isDraggable || isOverlay || isSelectionMode,
   });
+
+  // Make the card a drop target for creating dependency links
+  // Only backlog cards can be link targets (to avoid complexity with running features)
+  const isDroppable = !isOverlay && feature.status === 'backlog' && !isSelectionMode;
+  const { setNodeRef: setDroppableRef, isOver } = useDroppable({
+    id: `card-drop-${feature.id}`,
+    disabled: !isDroppable,
+    data: {
+      type: 'card',
+      featureId: feature.id,
+    },
+  });
+
+  // Combine refs for both draggable and droppable
+  const setNodeRef = useCallback(
+    (node: HTMLElement | null) => {
+      setDraggableRef(node);
+      setDroppableRef(node);
+    },
+    [setDraggableRef, setDroppableRef]
+  );
 
   const dndStyle = {
     opacity: isDragging ? 0.5 : undefined,
@@ -125,22 +162,29 @@ export const KanbanCard = memo(function KanbanCard({
 
   const cardStyle = getCardBorderStyle(cardBorderEnabled, cardBorderOpacity);
 
-  // Only allow selection for backlog features
-  const isSelectable = isSelectionMode && feature.status === 'backlog';
+  // Only allow selection for features matching the selection target
+  const isSelectable = isSelectionMode && feature.status === selectionTarget;
 
   const wrapperClasses = cn(
     'relative select-none outline-none touch-none transition-transform duration-200 ease-out',
     getCursorClass(isOverlay, isDraggable, isSelectable),
-    isOverlay && isLifted && 'scale-105 rotate-1 z-50'
+    isOverlay && isLifted && 'scale-105 rotate-1 z-50',
+    // Visual feedback when another card is being dragged over this one
+    isOver && !isDragging && 'ring-2 ring-primary ring-offset-2 ring-offset-background scale-[1.02]'
   );
 
   const isInteractive = !isDragging && !isOverlay;
   const hasError = feature.error && !isCurrentAutoTask;
 
   const innerCardClasses = cn(
-    'kanban-card-content h-full relative shadow-sm',
+    'kanban-card-content h-full relative',
+    reduceEffects ? 'shadow-none' : 'shadow-sm',
     'transition-all duration-200 ease-out',
-    isInteractive && 'hover:-translate-y-0.5 hover:shadow-md hover:shadow-black/10 bg-transparent',
+    // Disable hover translate for in-progress cards to prevent gap showing gradient
+    isInteractive &&
+      !reduceEffects &&
+      !isCurrentAutoTask &&
+      'hover:-translate-y-0.5 hover:shadow-md hover:shadow-black/10 bg-transparent',
     !glassmorphism && 'backdrop-blur-[0px]!',
     !isCurrentAutoTask &&
       cardBorderEnabled &&
@@ -180,7 +224,7 @@ export const KanbanCard = memo(function KanbanCard({
 
       {/* Category row with selection checkbox */}
       <div className="px-3 pt-3 flex items-center gap-2">
-        {isSelectionMode && !isOverlay && feature.status === 'backlog' && (
+        {isSelectable && !isOverlay && (
           <Checkbox
             checked={isSelected}
             onCheckedChange={() => onToggleSelect?.()}
@@ -213,6 +257,7 @@ export const KanbanCard = memo(function KanbanCard({
         {/* Agent Info Panel */}
         <AgentInfoPanel
           feature={feature}
+          projectPath={currentProject?.path ?? ''}
           contextContent={contextContent}
           summary={summary}
           isCurrentAutoTask={isCurrentAutoTask}

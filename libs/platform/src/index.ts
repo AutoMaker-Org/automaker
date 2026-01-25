@@ -19,6 +19,12 @@ export {
   getAppSpecPath,
   getBranchTrackingPath,
   getExecutionStatePath,
+  getNotificationsPath,
+  // Event history paths
+  getEventHistoryDir,
+  getEventHistoryIndexPath,
+  getEventPath,
+  ensureEventHistoryDir,
   ensureAutomakerDir,
   getGlobalSettingsPath,
   getCredentialsPath,
@@ -169,4 +175,14 @@ export {
   findEditorByCommand,
   openInEditor,
   openInFileManager,
+  openInTerminal,
 } from './editor.js';
+
+// External terminal detection and launching
+export {
+  clearTerminalCache,
+  detectAllTerminals,
+  detectDefaultTerminal,
+  findTerminalById,
+  openInExternalTerminal,
+} from './terminal.js';

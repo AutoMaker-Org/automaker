@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useRef } from 'react';
 import dagre from 'dagre';
-import { Node, Edge, useReactFlow } from '@xyflow/react';
+import { Node, Edge } from '@xyflow/react';
 import { TaskNode, DependencyEdge } from './use-graph-nodes';
 
 const NODE_WIDTH = 280;
@@ -16,11 +16,11 @@ interface UseGraphLayoutProps {
  * Dependencies flow left-to-right
  */
 export function useGraphLayout({ nodes, edges }: UseGraphLayoutProps) {
-  const { fitView, setNodes } = useReactFlow();
-
   // Cache the last computed positions to avoid recalculating layout
   const positionCache = useRef<Map<string, { x: number; y: number }>>(new Map());
   const lastStructureKey = useRef<string>('');
+  // Track layout version to signal when fresh layout was computed
+  const layoutVersion = useRef<number>(0);
 
   const getLayoutedElements = useCallback(
     (
@@ -71,31 +71,39 @@ export function useGraphLayout({ nodes, edges }: UseGraphLayoutProps) {
     []
   );
 
-  // Create a stable structure key based only on node IDs (not edge changes)
-  // Edges changing shouldn't trigger re-layout
+  // Create a stable structure key based on node IDs AND edge connections
+  // Layout must recalculate when the dependency graph structure changes
   const structureKey = useMemo(() => {
     const nodeIds = nodes
       .map((n) => n.id)
       .sort()
       .join(',');
-    return nodeIds;
-  }, [nodes]);
+    // Include edge structure (source->target pairs) to ensure layout recalculates
+    // when dependencies change, not just when nodes are added/removed
+    const edgeConnections = edges
+      .map((e) => `${e.source}->${e.target}`)
+      .sort()
+      .join(',');
+    return `${nodeIds}|${edgeConnections}`;
+  }, [nodes, edges]);
 
-  // Initial layout - only recalculate when node structure changes (new nodes added/removed)
+  // Initial layout - recalculate when graph structure changes (nodes added/removed OR edges/dependencies change)
   const layoutedElements = useMemo(() => {
     if (nodes.length === 0) {
       positionCache.current.clear();
       lastStructureKey.current = '';
-      return { nodes: [], edges: [] };
+      return { nodes: [], edges: [], didRelayout: false };
     }
 
-    // Check if structure changed (new nodes added or removed)
+    // Check if structure changed (nodes added/removed OR dependencies changed)
     const structureChanged = structureKey !== lastStructureKey.current;
 
     if (structureChanged) {
       // Structure changed - run full layout
       lastStructureKey.current = structureKey;
-      return getLayoutedElements(nodes, edges, 'LR');
+      layoutVersion.current += 1;
+      const result = getLayoutedElements(nodes, edges, 'LR');
+      return { ...result, didRelayout: true };
     } else {
       // Structure unchanged - preserve cached positions, just update node data
       const layoutedNodes = nodes.map((node) => {
@@ -107,26 +115,22 @@ export function useGraphLayout({ nodes, edges }: UseGraphLayoutProps) {
           sourcePosition: 'right',
         } as TaskNode;
       });
-      return { nodes: layoutedNodes, edges };
+      return { nodes: layoutedNodes, edges, didRelayout: false };
     }
   }, [nodes, edges, structureKey, getLayoutedElements]);
 
   // Manual re-layout function
   const runLayout = useCallback(
     (direction: 'LR' | 'TB' = 'LR') => {
-      const { nodes: layoutedNodes } = getLayoutedElements(nodes, edges, direction);
-      setNodes(layoutedNodes);
-      // Fit view after layout with a small delay to allow DOM updates
-      setTimeout(() => {
-        fitView({ padding: 0.2, duration: 300 });
-      }, 50);
+      return getLayoutedElements(nodes, edges, direction);
     },
-    [nodes, edges, getLayoutedElements, setNodes, fitView]
+    [nodes, edges, getLayoutedElements]
   );
 
   return {
     layoutedNodes: layoutedElements.nodes,
     layoutedEdges: layoutedElements.edges,
+    layoutVersion: layoutVersion.current,
     runLayout,
   };
 }

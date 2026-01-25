@@ -1,59 +1,37 @@
-import { useState, useEffect, useCallback } from 'react';
-import { createLogger } from '@automaker/utils/logger';
-import { GitPullRequest, Loader2, RefreshCw, ExternalLink, GitMerge, X } from 'lucide-react';
-import { getElectronAPI, GitHubPR } from '@/lib/electron';
+/**
+ * GitHub PRs View
+ *
+ * Displays pull requests using React Query for data fetching.
+ */
+
+import { useState, useCallback } from 'react';
+import { GitPullRequest, RefreshCw, ExternalLink, GitMerge, X } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
+import { getElectronAPI, type GitHubPR } from '@/lib/electron';
 import { useAppStore } from '@/store/app-store';
 import { Button } from '@/components/ui/button';
 import { Markdown } from '@/components/ui/markdown';
 import { cn } from '@/lib/utils';
-
-const logger = createLogger('GitHubPRsView');
+import { useGitHubPRs } from '@/hooks/queries';
 
 export function GitHubPRsView() {
-  const [openPRs, setOpenPRs] = useState<GitHubPR[]>([]);
-  const [mergedPRs, setMergedPRs] = useState<GitHubPR[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [selectedPR, setSelectedPR] = useState<GitHubPR | null>(null);
   const { currentProject } = useAppStore();
 
-  const fetchPRs = useCallback(async () => {
-    if (!currentProject?.path) {
-      setError('No project selected');
-      setLoading(false);
-      return;
-    }
+  const {
+    data,
+    isLoading: loading,
+    isFetching: refreshing,
+    error,
+    refetch,
+  } = useGitHubPRs(currentProject?.path);
 
-    try {
-      setError(null);
-      const api = getElectronAPI();
-      if (api.github) {
-        const result = await api.github.listPRs(currentProject.path);
-        if (result.success) {
-          setOpenPRs(result.openPRs || []);
-          setMergedPRs(result.mergedPRs || []);
-        } else {
-          setError(result.error || 'Failed to fetch pull requests');
-        }
-      }
-    } catch (err) {
-      logger.error('Error fetching PRs:', err);
-      setError(err instanceof Error ? err.message : 'Failed to fetch pull requests');
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, [currentProject?.path]);
-
-  useEffect(() => {
-    fetchPRs();
-  }, [fetchPRs]);
+  const openPRs = data?.openPRs ?? [];
+  const mergedPRs = data?.mergedPRs ?? [];
 
   const handleRefresh = useCallback(() => {
-    setRefreshing(true);
-    fetchPRs();
-  }, [fetchPRs]);
+    refetch();
+  }, [refetch]);
 
   const handleOpenInGitHub = useCallback((url: string) => {
     const api = getElectronAPI();
@@ -86,7 +64,7 @@ export function GitHubPRsView() {
   if (loading) {
     return (
       <div className="flex-1 flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <Spinner size="xl" />
       </div>
     );
   }
@@ -98,7 +76,9 @@ export function GitHubPRsView() {
           <GitPullRequest className="h-12 w-12 text-destructive" />
         </div>
         <h2 className="text-lg font-medium mb-2">Failed to Load Pull Requests</h2>
-        <p className="text-muted-foreground max-w-md mb-4">{error}</p>
+        <p className="text-muted-foreground max-w-md mb-4">
+          {error instanceof Error ? error.message : 'Failed to fetch pull requests'}
+        </p>
         <Button variant="outline" onClick={handleRefresh}>
           <RefreshCw className="h-4 w-4 mr-2" />
           Try Again
@@ -134,7 +114,7 @@ export function GitHubPRsView() {
             </div>
           </div>
           <Button variant="outline" size="sm" onClick={handleRefresh} disabled={refreshing}>
-            <RefreshCw className={cn('h-4 w-4', refreshing && 'animate-spin')} />
+            {refreshing ? <Spinner size="sm" /> : <RefreshCw className="h-4 w-4" />}
           </Button>
         </div>
 
@@ -196,9 +176,9 @@ export function GitHubPRsView() {
           <div className="flex items-center justify-between p-3 border-b border-border bg-muted/30">
             <div className="flex items-center gap-2 min-w-0">
               {selectedPR.state === 'MERGED' ? (
-                <GitMerge className="h-4 w-4 text-purple-500 flex-shrink-0" />
+                <GitMerge className="h-4 w-4 text-purple-500 shrink-0" />
               ) : (
-                <GitPullRequest className="h-4 w-4 text-green-500 flex-shrink-0" />
+                <GitPullRequest className="h-4 w-4 text-green-500 shrink-0" />
               )}
               <span className="text-sm font-medium truncate">
                 #{selectedPR.number} {selectedPR.title}
@@ -209,7 +189,7 @@ export function GitHubPRsView() {
                 </span>
               )}
             </div>
-            <div className="flex items-center gap-2 flex-shrink-0">
+            <div className="flex items-center gap-2 shrink-0">
               <Button
                 variant="outline"
                 size="sm"
@@ -341,16 +321,16 @@ function PRRow({
       onClick={onClick}
     >
       {pr.state === 'MERGED' ? (
-        <GitMerge className="h-4 w-4 text-purple-500 mt-0.5 flex-shrink-0" />
+        <GitMerge className="h-4 w-4 text-purple-500 mt-0.5 shrink-0" />
       ) : (
-        <GitPullRequest className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+        <GitPullRequest className="h-4 w-4 text-green-500 mt-0.5 shrink-0" />
       )}
 
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium truncate">{pr.title}</span>
           {pr.isDraft && (
-            <span className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-muted text-muted-foreground flex-shrink-0">
+            <span className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-muted text-muted-foreground shrink-0">
               Draft
             </span>
           )}
@@ -401,7 +381,7 @@ function PRRow({
       <Button
         variant="ghost"
         size="sm"
-        className="flex-shrink-0 opacity-0 group-hover:opacity-100"
+        className="shrink-0 opacity-0 group-hover:opacity-100"
         onClick={(e) => {
           e.stopPropagation();
           onOpenExternal();

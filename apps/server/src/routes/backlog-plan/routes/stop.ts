@@ -3,7 +3,13 @@
  */
 
 import type { Request, Response } from 'express';
-import { getAbortController, setRunningState, getErrorMessage, logError } from '../common.js';
+import {
+  getAbortController,
+  setRunningState,
+  setRunningDetails,
+  getErrorMessage,
+  logError,
+} from '../common.js';
 
 export function createStopHandler() {
   return async (_req: Request, res: Response): Promise<void> => {
@@ -12,6 +18,7 @@ export function createStopHandler() {
       if (abortController) {
         abortController.abort();
         setRunningState(false, null);
+        setRunningDetails(null);
       }
       res.json({ success: true });
     } catch (error) {

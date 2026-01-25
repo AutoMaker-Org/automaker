@@ -9,7 +9,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { useAppStore, type ThemeMode } from '@/store/app-store';
+import { useAppStore } from '@/store/app-store';
 import { getElectronAPI } from '@/lib/electron';
 import { initializeProject } from '@/lib/project-init';
 import {
@@ -20,8 +20,8 @@ import {
   Sparkles,
   MessageSquare,
   ChevronDown,
-  Loader2,
 } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -38,15 +38,7 @@ import { useNavigate } from '@tanstack/react-router';
 const logger = createLogger('WelcomeView');
 
 export function WelcomeView() {
-  const {
-    projects,
-    trashedProjects,
-    currentProject,
-    upsertAndSetCurrentProject,
-    addProject,
-    setCurrentProject,
-    theme: globalTheme,
-  } = useAppStore();
+  const { projects, upsertAndSetCurrentProject, addProject, setCurrentProject } = useAppStore();
   const navigate = useNavigate();
   const [showNewProjectModal, setShowNewProjectModal] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
@@ -109,13 +101,8 @@ export function WelcomeView() {
         }
 
         // Upsert project and set as current (handles both create and update cases)
-        // Theme preservation is handled by the store action
-        const trashedProject = trashedProjects.find((p) => p.path === path);
-        const effectiveTheme =
-          (trashedProject?.theme as ThemeMode | undefined) ||
-          (currentProject?.theme as ThemeMode | undefined) ||
-          globalTheme;
-        upsertAndSetCurrentProject(path, name, effectiveTheme);
+        // Theme handling (trashed project recovery or undefined for global) is done by the store
+        upsertAndSetCurrentProject(path, name);
 
         // Show initialization dialog if files were created
         if (initResult.createdFiles && initResult.createdFiles.length > 0) {
@@ -150,14 +137,7 @@ export function WelcomeView() {
         setIsOpening(false);
       }
     },
-    [
-      trashedProjects,
-      currentProject,
-      globalTheme,
-      upsertAndSetCurrentProject,
-      analyzeProject,
-      navigate,
-    ]
+    [upsertAndSetCurrentProject, analyzeProject, navigate]
   );
 
   const handleOpenProject = useCallback(async () => {
@@ -758,7 +738,7 @@ export function WelcomeView() {
               <div className="mt-5 p-4 rounded-xl bg-muted/50 border border-border">
                 {isAnalyzing ? (
                   <div className="flex items-center gap-3">
-                    <Loader2 className="w-4 h-4 text-brand-500 animate-spin" />
+                    <Spinner size="sm" />
                     <p className="text-sm text-brand-500">
                       AI agent is analyzing your project structure...
                     </p>
@@ -802,7 +782,7 @@ export function WelcomeView() {
           data-testid="project-opening-overlay"
         >
           <div className="flex flex-col items-center gap-4 p-8 rounded-2xl bg-card border border-border shadow-2xl">
-            <Loader2 className="w-10 h-10 text-brand-500 animate-spin" />
+            <Spinner size="xl" />
             <p className="text-foreground font-medium">Initializing project...</p>
           </div>
         </div>

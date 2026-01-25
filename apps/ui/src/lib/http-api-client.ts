@@ -32,7 +32,10 @@ import type {
   CreateIdeaInput,
   UpdateIdeaInput,
   ConvertToFeatureOptions,
+  NotificationsAPI,
+  EventHistoryAPI,
 } from './electron';
+import type { EventHistoryFilter } from '@automaker/types';
 import type { Message, SessionListItem } from '@/types/electron';
 import type { Feature, ClaudeUsageResponse, CodexUsageResponse } from '@/store/app-store';
 import type { WorktreeAPI, GitAPI, ModelDefinition, ProviderStatus } from '@/types/electron';
@@ -153,8 +156,16 @@ const getServerUrl = (): string => {
   if (typeof window !== 'undefined') {
     const envUrl = import.meta.env.VITE_SERVER_URL;
     if (envUrl) return envUrl;
+
+    // In web mode (not Electron), use relative URL to leverage Vite proxy
+    // This avoids CORS issues since requests appear same-origin
+    if (!window.electron) {
+      return '';
+    }
   }
-  return 'http://localhost:3008';
+  // Use VITE_HOSTNAME if set, otherwise default to localhost
+  const hostname = import.meta.env.VITE_HOSTNAME || 'localhost';
+  return `http://${hostname}:3008`;
 };
 
 /**
@@ -168,8 +179,24 @@ let apiKeyInitialized = false;
 let apiKeyInitPromise: Promise<void> | null = null;
 
 // Cached session token for authentication (Web mode - explicit header auth)
-// Only used in-memory after fresh login; on refresh we rely on HTTP-only cookies
+// Persisted to localStorage to survive page reloads
 let cachedSessionToken: string | null = null;
+const SESSION_TOKEN_KEY = 'automaker:sessionToken';
+
+// Initialize cached session token from localStorage on module load
+// This ensures web mode survives page reloads with valid authentication
+const initSessionToken = (): void => {
+  if (typeof window === 'undefined') return; // Skip in SSR
+  try {
+    cachedSessionToken = window.localStorage.getItem(SESSION_TOKEN_KEY);
+  } catch {
+    // localStorage might be disabled or unavailable
+    cachedSessionToken = null;
+  }
+};
+
+// Initialize on module load
+initSessionToken();
 
 // Get API key for Electron mode (returns cached value after initialization)
 // Exported for use in WebSocket connections that need auth
@@ -189,14 +216,30 @@ export const waitForApiKeyInit = (): Promise<void> => {
 // Get session token for Web mode (returns cached value after login)
 export const getSessionToken = (): string | null => cachedSessionToken;
 
-// Set session token (called after login)
+// Set session token (called after login) - persists to localStorage for page reload survival
 export const setSessionToken = (token: string | null): void => {
   cachedSessionToken = token;
+  if (typeof window === 'undefined') return; // Skip in SSR
+  try {
+    if (token) {
+      window.localStorage.setItem(SESSION_TOKEN_KEY, token);
+    } else {
+      window.localStorage.removeItem(SESSION_TOKEN_KEY);
+    }
+  } catch {
+    // localStorage might be disabled; continue with in-memory cache
+  }
 };
 
 // Clear session token (called on logout)
 export const clearSessionToken = (): void => {
   cachedSessionToken = null;
+  if (typeof window === 'undefined') return; // Skip in SSR
+  try {
+    window.localStorage.removeItem(SESSION_TOKEN_KEY);
+  } catch {
+    // localStorage might be disabled
+  }
 };
 
 /**
@@ -478,6 +521,7 @@ export const verifySession = async (): Promise<boolean> => {
  */
 export const checkSandboxEnvironment = async (): Promise<{
   isContainerized: boolean;
+  skipSandboxWarning?: boolean;
   error?: string;
 }> => {
   try {
@@ -493,7 +537,10 @@ export const checkSandboxEnvironment = async (): Promise<{
     }
 
     const data = await response.json();
-    return { isContainerized: data.isContainerized ?? false };
+    return {
+      isContainerized: data.isContainerized ?? false,
+      skipSandboxWarning: data.skipSandboxWarning ?? false,
+    };
   } catch (error) {
     logger.error('Sandbox environment check failed:', error);
     return { isContainerized: false, error: 'Network error' };
@@ -514,7 +561,8 @@ type EventType =
   | 'worktree:init-completed'
   | 'dev-server:started'
   | 'dev-server:output'
-  | 'dev-server:stopped';
+  | 'dev-server:stopped'
+  | 'notification:created';
 
 /**
  * Dev server log event payloads for WebSocket streaming
@@ -553,6 +601,7 @@ export interface DevServerLogsResponse {
   result?: {
     worktreePath: string;
     port: number;
+    url: string;
     logs: string;
     startedAt: string;
   };
@@ -1608,8 +1657,8 @@ export class HttpApiClient implements ElectronAPI {
       this.post('/api/features/delete', { projectPath, featureId }),
     getAgentOutput: (projectPath: string, featureId: string) =>
       this.post('/api/features/agent-output', { projectPath, featureId }),
-    generateTitle: (description: string) =>
-      this.post('/api/features/generate-title', { description }),
+    generateTitle: (description: string, projectPath?: string) =>
+      this.post('/api/features/generate-title', { description, projectPath }),
     bulkUpdate: (projectPath: string, featureIds: string[], updates: Partial<Feature>) =>
       this.post('/api/features/bulk-update', { projectPath, featureIds, updates }),
     bulkDelete: (projectPath: string, featureIds: string[]) =>
@@ -1618,11 +1667,13 @@ export class HttpApiClient implements ElectronAPI {
 
   // Auto Mode API
   autoMode: AutoModeAPI = {
-    start: (projectPath: string, maxConcurrency?: number) =>
-      this.post('/api/auto-mode/start', { projectPath, maxConcurrency }),
-    stop: (projectPath: string) => this.post('/api/auto-mode/stop', { projectPath }),
+    start: (projectPath: string, branchName?: string | null, maxConcurrency?: number) =>
+      this.post('/api/auto-mode/start', { projectPath, branchName, maxConcurrency }),
+    stop: (projectPath: string, branchName?: string | null) =>
+      this.post('/api/auto-mode/stop', { projectPath, branchName }),
     stopFeature: (featureId: string) => this.post('/api/auto-mode/stop-feature', { featureId }),
-    status: (projectPath?: string) => this.post('/api/auto-mode/status', { projectPath }),
+    status: (projectPath?: string, branchName?: string | null) =>
+      this.post('/api/auto-mode/status', { projectPath, branchName }),
     runFeature: (
       projectPath: string,
       featureId: string,
@@ -1694,13 +1745,15 @@ export class HttpApiClient implements ElectronAPI {
       originalText: string,
       enhancementMode: string,
       model?: string,
-      thinkingLevel?: string
+      thinkingLevel?: string,
+      projectPath?: string
     ): Promise<EnhancePromptResult> =>
       this.post('/api/enhance-prompt', {
         originalText,
         enhancementMode,
         model,
         thinkingLevel,
+        projectPath,
       }),
   };
 
@@ -1710,15 +1763,23 @@ export class HttpApiClient implements ElectronAPI {
       projectPath: string,
       branchName: string,
       worktreePath: string,
+      targetBranch?: string,
       options?: object
-    ) => this.post('/api/worktree/merge', { projectPath, branchName, worktreePath, options }),
+    ) =>
+      this.post('/api/worktree/merge', {
+        projectPath,
+        branchName,
+        worktreePath,
+        targetBranch,
+        options,
+      }),
     getInfo: (projectPath: string, featureId: string) =>
       this.post('/api/worktree/info', { projectPath, featureId }),
     getStatus: (projectPath: string, featureId: string) =>
       this.post('/api/worktree/status', { projectPath, featureId }),
     list: (projectPath: string) => this.post('/api/worktree/list', { projectPath }),
-    listAll: (projectPath: string, includeDetails?: boolean) =>
-      this.post('/api/worktree/list', { projectPath, includeDetails }),
+    listAll: (projectPath: string, includeDetails?: boolean, forceRefreshGitHub?: boolean) =>
+      this.post('/api/worktree/list', { projectPath, includeDetails, forceRefreshGitHub }),
     create: (projectPath: string, branchName: string, baseBranch?: string) =>
       this.post('/api/worktree/create', {
         projectPath,
@@ -1735,8 +1796,8 @@ export class HttpApiClient implements ElectronAPI {
       this.post('/api/worktree/commit', { worktreePath, message }),
     generateCommitMessage: (worktreePath: string) =>
       this.post('/api/worktree/generate-commit-message', { worktreePath }),
-    push: (worktreePath: string, force?: boolean) =>
-      this.post('/api/worktree/push', { worktreePath, force }),
+    push: (worktreePath: string, force?: boolean, remote?: string) =>
+      this.post('/api/worktree/push', { worktreePath, force, remote }),
     createPR: (worktreePath: string, options?: any) =>
       this.post('/api/worktree/create-pr', { worktreePath, ...options }),
     getDiffs: (projectPath: string, featureId: string) =>
@@ -1754,11 +1815,18 @@ export class HttpApiClient implements ElectronAPI {
       this.post('/api/worktree/list-branches', { worktreePath, includeRemote }),
     switchBranch: (worktreePath: string, branchName: string) =>
       this.post('/api/worktree/switch-branch', { worktreePath, branchName }),
+    listRemotes: (worktreePath: string) =>
+      this.post('/api/worktree/list-remotes', { worktreePath }),
     openInEditor: (worktreePath: string, editorCommand?: string) =>
       this.post('/api/worktree/open-in-editor', { worktreePath, editorCommand }),
     getDefaultEditor: () => this.get('/api/worktree/default-editor'),
     getAvailableEditors: () => this.get('/api/worktree/available-editors'),
     refreshEditors: () => this.post('/api/worktree/refresh-editors', {}),
+    getAvailableTerminals: () => this.get('/api/worktree/available-terminals'),
+    getDefaultTerminal: () => this.get('/api/worktree/default-terminal'),
+    refreshTerminals: () => this.post('/api/worktree/refresh-terminals', {}),
+    openInExternalTerminal: (worktreePath: string, terminalId?: string) =>
+      this.post('/api/worktree/open-in-external-terminal', { worktreePath, terminalId }),
     initGit: (projectPath: string) => this.post('/api/worktree/init-git', { projectPath }),
     startDevServer: (projectPath: string, worktreePath: string) =>
       this.post('/api/worktree/start-dev', { projectPath, worktreePath }),
@@ -1793,6 +1861,8 @@ export class HttpApiClient implements ElectronAPI {
       this.httpDelete('/api/worktree/init-script', { projectPath }),
     runInitScript: (projectPath: string, worktreePath: string, branch: string) =>
       this.post('/api/worktree/run-init-script', { projectPath, worktreePath, branch }),
+    discardChanges: (worktreePath: string) =>
+      this.post('/api/worktree/discard-changes', { worktreePath }),
     onInitScriptEvent: (
       callback: (event: {
         type: 'worktree:init-started' | 'worktree:init-output' | 'worktree:init-completed';
@@ -1875,6 +1945,7 @@ export class HttpApiClient implements ElectronAPI {
         projectPath,
         maxFeatures,
       }),
+    sync: (projectPath: string) => this.post('/api/spec-regeneration/sync', { projectPath }),
     stop: (projectPath?: string) => this.post('/api/spec-regeneration/stop', { projectPath }),
     status: (projectPath?: string) =>
       this.get(
@@ -2200,6 +2271,9 @@ export class HttpApiClient implements ElectronAPI {
           hideScrollbar: boolean;
         };
         worktreePanelVisible?: boolean;
+        showInitScriptIndicator?: boolean;
+        defaultDeleteBranchWithWorktree?: boolean;
+        autoDismissInitScriptIndicator?: boolean;
         lastSelectedSessionId?: string;
       };
       error?: string;
@@ -2354,8 +2428,32 @@ export class HttpApiClient implements ElectronAPI {
     stop: (): Promise<{ success: boolean; error?: string }> =>
       this.post('/api/backlog-plan/stop', {}),
 
-    status: (): Promise<{ success: boolean; isRunning?: boolean; error?: string }> =>
-      this.get('/api/backlog-plan/status'),
+    status: (
+      projectPath: string
+    ): Promise<{
+      success: boolean;
+      isRunning?: boolean;
+      savedPlan?: {
+        savedAt: string;
+        prompt: string;
+        model?: string;
+        result: {
+          changes: Array<{
+            type: 'add' | 'update' | 'delete';
+            featureId?: string;
+            feature?: Record<string, unknown>;
+            reason: string;
+          }>;
+          summary: string;
+          dependencyUpdates: Array<{
+            featureId: string;
+            removedDependencies: string[];
+            addedDependencies: string[];
+          }>;
+        };
+      } | null;
+      error?: string;
+    }> => this.get(`/api/backlog-plan/status?projectPath=${encodeURIComponent(projectPath)}`),
 
     apply: (
       projectPath: string,
@@ -2376,6 +2474,9 @@ export class HttpApiClient implements ElectronAPI {
       branchName?: string
     ): Promise<{ success: boolean; appliedChanges?: string[]; error?: string }> =>
       this.post('/api/backlog-plan/apply', { projectPath, plan, branchName }),
+
+    clear: (projectPath: string): Promise<{ success: boolean; error?: string }> =>
+      this.post('/api/backlog-plan/clear', { projectPath }),
 
     onEvent: (callback: (data: unknown) => void): (() => void) => {
       return this.subscribeToEvent('backlog-plan:event', callback as EventCallback);
@@ -2440,6 +2541,43 @@ export class HttpApiClient implements ElectronAPI {
     onAnalysisEvent: (callback: (event: any) => void): (() => void) => {
       return this.subscribeToEvent('ideation:analysis', callback as EventCallback);
     },
+  };
+
+  // Notifications API - project-level notifications
+  notifications: NotificationsAPI & {
+    onNotificationCreated: (callback: (notification: any) => void) => () => void;
+  } = {
+    list: (projectPath: string) => this.post('/api/notifications/list', { projectPath }),
+
+    getUnreadCount: (projectPath: string) =>
+      this.post('/api/notifications/unread-count', { projectPath }),
+
+    markAsRead: (projectPath: string, notificationId?: string) =>
+      this.post('/api/notifications/mark-read', { projectPath, notificationId }),
+
+    dismiss: (projectPath: string, notificationId?: string) =>
+      this.post('/api/notifications/dismiss', { projectPath, notificationId }),
+
+    onNotificationCreated: (callback: (notification: any) => void): (() => void) => {
+      return this.subscribeToEvent('notification:created', callback as EventCallback);
+    },
+  };
+
+  // Event History API - stored events for debugging and replay
+  eventHistory: EventHistoryAPI = {
+    list: (projectPath: string, filter?: EventHistoryFilter) =>
+      this.post('/api/event-history/list', { projectPath, filter }),
+
+    get: (projectPath: string, eventId: string) =>
+      this.post('/api/event-history/get', { projectPath, eventId }),
+
+    delete: (projectPath: string, eventId: string) =>
+      this.post('/api/event-history/delete', { projectPath, eventId }),
+
+    clear: (projectPath: string) => this.post('/api/event-history/clear', { projectPath }),
+
+    replay: (projectPath: string, eventId: string, hookIds?: string[]) =>
+      this.post('/api/event-history/replay', { projectPath, eventId, hookIds }),
   };
 
   // MCP API - Test MCP server connections and list tools

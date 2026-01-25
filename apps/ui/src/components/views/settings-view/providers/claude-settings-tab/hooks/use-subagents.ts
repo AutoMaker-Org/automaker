@@ -9,10 +9,12 @@
  * Agent definitions in settings JSON are used server-side only.
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useMemo, useCallback } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAppStore } from '@/store/app-store';
 import type { AgentDefinition } from '@automaker/types';
-import { getElectronAPI } from '@/lib/electron';
+import { useDiscoveredAgents } from '@/hooks/queries';
+import { queryKeys } from '@/lib/query-keys';
 
 export type SubagentScope = 'global' | 'project';
 export type SubagentType = 'filesystem';
@@ -35,51 +37,40 @@ interface FilesystemAgent {
 }
 
 export function useSubagents() {
+  const queryClient = useQueryClient();
   const currentProject = useAppStore((state) => state.currentProject);
-  const [isLoading, setIsLoading] = useState(false);
-  const [subagentsWithScope, setSubagentsWithScope] = useState<SubagentWithScope[]>([]);
 
-  // Fetch filesystem agents
-  const fetchFilesystemAgents = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const api = getElectronAPI();
-      if (!api.settings) {
-        console.warn('Settings API not available');
-        return;
-      }
-      const data = await api.settings.discoverAgents(currentProject?.path, ['user', 'project']);
+  // Use React Query hook for fetching agents
+  const {
+    data: agents = [],
+    isLoading,
+    refetch,
+  } = useDiscoveredAgents(currentProject?.path, ['user', 'project']);
 
-      if (data.success && data.agents) {
-        // Transform filesystem agents to SubagentWithScope format
-        const agents: SubagentWithScope[] = data.agents.map(
-          ({ name, definition, source, filePath }: FilesystemAgent) => ({
-            name,
-            definition,
-            scope: source === 'user' ? 'global' : 'project',
-            type: 'filesystem' as const,
-            source,
-            filePath,
-          })
-        );
-        setSubagentsWithScope(agents);
-      }
-    } catch (error) {
-      console.error('Failed to fetch filesystem agents:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [currentProject?.path]);
+  // Transform agents to SubagentWithScope format
+  const subagentsWithScope = useMemo((): SubagentWithScope[] => {
+    return agents.map(({ name, definition, source, filePath }: FilesystemAgent) => ({
+      name,
+      definition,
+      scope: source === 'user' ? 'global' : 'project',
+      type: 'filesystem' as const,
+      source,
+      filePath,
+    }));
+  }, [agents]);
 
-  // Fetch filesystem agents on mount and when project changes
-  useEffect(() => {
-    fetchFilesystemAgents();
-  }, [fetchFilesystemAgents]);
+  // Refresh function that invalidates the query cache
+  const refreshFilesystemAgents = useCallback(async () => {
+    await queryClient.invalidateQueries({
+      queryKey: queryKeys.settings.agents(currentProject?.path ?? ''),
+    });
+    await refetch();
+  }, [queryClient, currentProject?.path, refetch]);
 
   return {
     subagentsWithScope,
     isLoading,
     hasProject: !!currentProject,
-    refreshFilesystemAgents: fetchFilesystemAgents,
+    refreshFilesystemAgents,
   };
 }

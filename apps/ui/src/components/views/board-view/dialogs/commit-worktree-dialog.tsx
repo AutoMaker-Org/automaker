@@ -10,7 +10,8 @@ import {
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { GitCommit, Loader2, Sparkles } from 'lucide-react';
+import { GitCommit, Sparkles } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 import { getElectronAPI } from '@/lib/electron';
 import { toast } from 'sonner';
 import { useAppStore } from '@/store/app-store';
@@ -209,7 +210,7 @@ export function CommitWorktreeDialog({
           <Button onClick={handleCommit} disabled={isLoading || isGenerating || !message.trim()}>
             {isLoading ? (
               <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                <Spinner size="sm" className="mr-2" />
                 Committing...
               </>
             ) : (

@@ -1,5 +1,6 @@
 import { Button } from '@/components/ui/button';
 import { CheckCircle2, AlertCircle, RefreshCw } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 import { cn } from '@/lib/utils';
 import type { CliStatus } from '../shared/types';
 
@@ -56,7 +57,7 @@ export function CliStatusCard({
               'transition-all duration-200'
             )}
           >
-            <RefreshCw className={cn('w-4 h-4', isChecking && 'animate-spin')} />
+            {isChecking ? <Spinner size="sm" /> : <RefreshCw className="w-4 h-4" />}
           </Button>
         </div>
         <p className="text-sm text-muted-foreground/80 ml-12">{description}</p>

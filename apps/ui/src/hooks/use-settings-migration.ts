@@ -30,8 +30,13 @@ import { useAppStore, THEME_STORAGE_KEY } from '@/store/app-store';
 import { useSetupStore } from '@/store/setup-store';
 import {
   DEFAULT_OPENCODE_MODEL,
+  DEFAULT_MAX_CONCURRENCY,
   getAllOpencodeModelIds,
+  getAllCursorModelIds,
+  migrateCursorModelIds,
+  migratePhaseModelEntry,
   type GlobalSettings,
+  type CursorModelId,
 } from '@automaker/types';
 
 const logger = createLogger('SettingsMigration');
@@ -111,9 +116,34 @@ export function resetMigrationState(): void {
 
 /**
  * Parse localStorage data into settings object
+ *
+ * Checks for settings in multiple locations:
+ * 1. automaker-settings-cache: Fresh server settings cached from last fetch
+ * 2. automaker-storage: Zustand-persisted app store state (legacy)
+ * 3. automaker-setup: Setup wizard state (legacy)
+ * 4. Standalone keys: worktree-panel-collapsed, file-browser-recent-folders, etc.
+ *
+ * @returns Merged settings object or null if no settings found
  */
 export function parseLocalStorageSettings(): Partial<GlobalSettings> | null {
   try {
+    // First, check for fresh server settings cache (updated whenever server settings are fetched)
+    // This prevents stale data when switching between modes
+    const settingsCache = getItem('automaker-settings-cache');
+    if (settingsCache) {
+      try {
+        const cached = JSON.parse(settingsCache) as GlobalSettings;
+        const cacheProjectCount = cached?.projects?.length ?? 0;
+        logger.info(`[CACHE_LOADED] projects=${cacheProjectCount}, theme=${cached?.theme}`);
+        return cached;
+      } catch (e) {
+        logger.warn('Failed to parse settings cache, falling back to old storage');
+      }
+    } else {
+      logger.info('[CACHE_EMPTY] No settings cache found in localStorage');
+    }
+
+    // Fall back to old Zustand persisted storage
     const automakerStorage = getItem('automaker-storage');
     if (!automakerStorage) {
       return null;
@@ -160,10 +190,12 @@ export function parseLocalStorageSettings(): Partial<GlobalSettings> | null {
       opencodeDefaultModel: state.opencodeDefaultModel as GlobalSettings['opencodeDefaultModel'],
       enabledDynamicModelIds:
         state.enabledDynamicModelIds as GlobalSettings['enabledDynamicModelIds'],
+      disabledProviders: (state.disabledProviders ?? []) as GlobalSettings['disabledProviders'],
       autoLoadClaudeMd: state.autoLoadClaudeMd as boolean,
       keyboardShortcuts: state.keyboardShortcuts as GlobalSettings['keyboardShortcuts'],
       mcpServers: state.mcpServers as GlobalSettings['mcpServers'],
       promptCustomization: state.promptCustomization as GlobalSettings['promptCustomization'],
+      eventHooks: state.eventHooks as GlobalSettings['eventHooks'],
       projects: state.projects as GlobalSettings['projects'],
       trashedProjects: state.trashedProjects as GlobalSettings['trashedProjects'],
       currentProjectId: (state.currentProject as { id?: string } | null)?.id ?? null,
@@ -176,6 +208,13 @@ export function parseLocalStorageSettings(): Partial<GlobalSettings> | null {
         worktreePanelCollapsed === 'true' || (state.worktreePanelCollapsed as boolean),
       lastProjectDir: lastProjectDir || (state.lastProjectDir as string),
       recentFolders: recentFolders ? JSON.parse(recentFolders) : (state.recentFolders as string[]),
+      // Claude API Profiles (legacy)
+      claudeApiProfiles: (state.claudeApiProfiles as GlobalSettings['claudeApiProfiles']) ?? [],
+      activeClaudeApiProfileId:
+        (state.activeClaudeApiProfileId as GlobalSettings['activeClaudeApiProfileId']) ?? null,
+      // Claude Compatible Providers (new system)
+      claudeCompatibleProviders:
+        (state.claudeCompatibleProviders as GlobalSettings['claudeCompatibleProviders']) ?? [],
     };
   } catch (error) {
     logger.error('Failed to parse localStorage settings:', error);
@@ -185,7 +224,14 @@ export function parseLocalStorageSettings(): Partial<GlobalSettings> | null {
 
 /**
  * Check if localStorage has more complete data than server
- * Returns true if localStorage has projects but server doesn't
+ *
+ * Compares the completeness of data to determine if a migration is needed.
+ * Returns true if localStorage has projects but server doesn't, indicating
+ * the localStorage data should be merged with server settings.
+ *
+ * @param localSettings Settings loaded from localStorage
+ * @param serverSettings Settings loaded from server
+ * @returns true if localStorage has more data that should be preserved
  */
 export function localStorageHasMoreData(
   localSettings: Partial<GlobalSettings> | null,
@@ -208,7 +254,15 @@ export function localStorageHasMoreData(
 
 /**
  * Merge localStorage settings with server settings
- * Prefers server data, but uses localStorage for missing arrays/objects
+ *
+ * Intelligently combines settings from both sources:
+ * - Prefers server data as the base
+ * - Uses localStorage values when server has empty arrays/objects
+ * - Specific handling for: projects, trashedProjects, mcpServers, recentFolders, etc.
+ *
+ * @param serverSettings Settings from server API (base)
+ * @param localSettings Settings from localStorage (fallback)
+ * @returns Merged GlobalSettings object ready to hydrate the store
  */
 export function mergeSettings(
   serverSettings: GlobalSettings,
@@ -281,6 +335,30 @@ export function mergeSettings(
     merged.currentProjectId = localSettings.currentProjectId;
   }
 
+  // Claude API Profiles - preserve from localStorage if server is empty
+  if (
+    (!serverSettings.claudeApiProfiles || serverSettings.claudeApiProfiles.length === 0) &&
+    localSettings.claudeApiProfiles &&
+    localSettings.claudeApiProfiles.length > 0
+  ) {
+    merged.claudeApiProfiles = localSettings.claudeApiProfiles;
+  }
+
+  // Active Claude API Profile ID - preserve from localStorage if server doesn't have one
+  if (!serverSettings.activeClaudeApiProfileId && localSettings.activeClaudeApiProfileId) {
+    merged.activeClaudeApiProfileId = localSettings.activeClaudeApiProfileId;
+  }
+
+  // Claude Compatible Providers - preserve from localStorage if server is empty
+  if (
+    (!serverSettings.claudeCompatibleProviders ||
+      serverSettings.claudeCompatibleProviders.length === 0) &&
+    localSettings.claudeCompatibleProviders &&
+    localSettings.claudeCompatibleProviders.length > 0
+  ) {
+    merged.claudeCompatibleProviders = localSettings.claudeCompatibleProviders;
+  }
+
   return merged;
 }
 
@@ -290,20 +368,33 @@ export function mergeSettings(
  * This is the core migration logic extracted for use outside of React hooks.
  * Call this from __root.tsx during app initialization.
  *
- * @param serverSettings - Settings fetched from the server API
- * @returns Promise resolving to the final settings to use (merged if migration needed)
+ * Flow:
+ * 1. If server has localStorageMigrated flag, skip migration (already done)
+ * 2. Check if localStorage has more data than server
+ * 3. If yes, merge them and sync merged state back to server
+ * 4. Set localStorageMigrated flag to prevent re-migration
+ *
+ * @param serverSettings Settings fetched from the server API
+ * @returns Promise resolving to {settings, migrated} - final settings and whether migration occurred
  */
 export async function performSettingsMigration(
   serverSettings: GlobalSettings
 ): Promise<{ settings: GlobalSettings; migrated: boolean }> {
   // Get localStorage data
   const localSettings = parseLocalStorageSettings();
-  logger.info(`localStorage has ${localSettings?.projects?.length ?? 0} projects`);
-  logger.info(`Server has ${serverSettings.projects?.length ?? 0} projects`);
+  const localProjects = localSettings?.projects?.length ?? 0;
+  const serverProjects = serverSettings.projects?.length ?? 0;
+
+  logger.info('[MIGRATION_CHECK]', {
+    localStorageProjects: localProjects,
+    serverProjects: serverProjects,
+    localStorageMigrated: serverSettings.localStorageMigrated,
+    dataSourceMismatch: localProjects !== serverProjects,
+  });
 
   // Check if migration has already been completed
   if (serverSettings.localStorageMigrated) {
-    logger.info('localStorage migration already completed, using server settings only');
+    logger.info('[MIGRATION_SKIP] Using server settings only (migration already completed)');
     return { settings: serverSettings, migrated: false };
   }
 
@@ -411,6 +502,15 @@ export function useSettingsMigration(): MigrationState {
           if (global.success && global.settings) {
             serverSettings = global.settings as unknown as GlobalSettings;
             logger.info(`Server has ${serverSettings.projects?.length ?? 0} projects`);
+
+            // Update localStorage with fresh server data to keep cache in sync
+            // This prevents stale localStorage data from being used when switching between modes
+            try {
+              setItem('automaker-settings-cache', JSON.stringify(serverSettings));
+              logger.debug('Updated localStorage with fresh server settings');
+            } catch (storageError) {
+              logger.warn('Failed to update localStorage cache:', storageError);
+            }
           }
         } catch (error) {
           logger.error('Failed to fetch server settings:', error);
@@ -503,6 +603,19 @@ export function useSettingsMigration(): MigrationState {
  */
 export function hydrateStoreFromSettings(settings: GlobalSettings): void {
   const current = useAppStore.getState();
+
+  // Migrate Cursor models to canonical format
+  // IMPORTANT: Always use ALL available Cursor models to ensure new models are visible
+  // Users who had old settings with a subset of models should still see all available models
+  const allCursorModels = getAllCursorModelIds();
+  const migratedCursorDefault = migrateCursorModelIds([
+    settings.cursorDefaultModel ?? current.cursorDefaultModel ?? 'cursor-auto',
+  ])[0];
+  const validCursorModelIds = new Set(allCursorModels);
+  const sanitizedCursorDefaultModel = validCursorModelIds.has(migratedCursorDefault)
+    ? migratedCursorDefault
+    : ('cursor-auto' as CursorModelId);
+
   const validOpencodeModelIds = new Set(getAllOpencodeModelIds());
   const incomingEnabledOpencodeModels =
     settings.enabledOpencodeModels ?? current.enabledOpencodeModels;
@@ -532,6 +645,8 @@ export function hydrateStoreFromSettings(settings: GlobalSettings): void {
     path: ref.path,
     lastOpened: ref.lastOpened,
     theme: ref.theme,
+    fontFamilySans: ref.fontFamilySans,
+    fontFamilyMono: ref.fontFamilyMono,
     isFavorite: ref.isFavorite,
     icon: ref.icon,
     customIconPath: ref.customIconPath,
@@ -553,27 +668,60 @@ export function hydrateStoreFromSettings(settings: GlobalSettings): void {
     setItem(THEME_STORAGE_KEY, storedTheme);
   }
 
+  // Restore autoModeByWorktree settings (only maxConcurrency is persisted, runtime state is reset)
+  const restoredAutoModeByWorktree: Record<
+    string,
+    {
+      isRunning: boolean;
+      runningTasks: string[];
+      branchName: string | null;
+      maxConcurrency: number;
+    }
+  > = {};
+  if ((settings as Record<string, unknown>).autoModeByWorktree) {
+    const persistedSettings = (settings as Record<string, unknown>).autoModeByWorktree as Record<
+      string,
+      { maxConcurrency?: number; branchName?: string | null }
+    >;
+    for (const [key, value] of Object.entries(persistedSettings)) {
+      restoredAutoModeByWorktree[key] = {
+        isRunning: false, // Always start with auto mode off
+        runningTasks: [], // No running tasks on startup
+        branchName: value.branchName ?? null,
+        maxConcurrency: value.maxConcurrency ?? DEFAULT_MAX_CONCURRENCY,
+      };
+    }
+  }
+
   useAppStore.setState({
     theme: settings.theme as unknown as import('@/store/app-store').ThemeMode,
+    fontFamilySans: settings.fontFamilySans ?? null,
+    fontFamilyMono: settings.fontFamilyMono ?? null,
     sidebarOpen: settings.sidebarOpen ?? true,
     chatHistoryOpen: settings.chatHistoryOpen ?? false,
-    maxConcurrency: settings.maxConcurrency ?? 3,
+    maxConcurrency: settings.maxConcurrency ?? DEFAULT_MAX_CONCURRENCY,
+    autoModeByWorktree: restoredAutoModeByWorktree,
     defaultSkipTests: settings.defaultSkipTests ?? true,
     enableDependencyBlocking: settings.enableDependencyBlocking ?? true,
     skipVerificationInAutoMode: settings.skipVerificationInAutoMode ?? false,
     useWorktrees: settings.useWorktrees ?? true,
     defaultPlanningMode: settings.defaultPlanningMode ?? 'skip',
     defaultRequirePlanApproval: settings.defaultRequirePlanApproval ?? false,
-    defaultFeatureModel: settings.defaultFeatureModel ?? { model: 'opus' },
+    defaultFeatureModel: migratePhaseModelEntry(settings.defaultFeatureModel) ?? {
+      model: 'claude-opus',
+    },
     muteDoneSound: settings.muteDoneSound ?? false,
-    enhancementModel: settings.enhancementModel ?? 'sonnet',
-    validationModel: settings.validationModel ?? 'opus',
+    serverLogLevel: settings.serverLogLevel ?? 'info',
+    enableRequestLogging: settings.enableRequestLogging ?? true,
+    enhancementModel: settings.enhancementModel ?? 'claude-sonnet',
+    validationModel: settings.validationModel ?? 'claude-opus',
     phaseModels: settings.phaseModels ?? current.phaseModels,
-    enabledCursorModels: settings.enabledCursorModels ?? current.enabledCursorModels,
-    cursorDefaultModel: settings.cursorDefaultModel ?? 'auto',
+    enabledCursorModels: allCursorModels, // Always use ALL cursor models
+    cursorDefaultModel: sanitizedCursorDefaultModel,
     enabledOpencodeModels: sanitizedEnabledOpencodeModels,
     opencodeDefaultModel: sanitizedOpencodeDefaultModel,
     enabledDynamicModelIds: sanitizedDynamicModelIds,
+    disabledProviders: settings.disabledProviders ?? [],
     autoLoadClaudeMd: settings.autoLoadClaudeMd ?? false,
     skipSandboxWarning: settings.skipSandboxWarning ?? false,
     keyboardShortcuts: {
@@ -582,6 +730,10 @@ export function hydrateStoreFromSettings(settings: GlobalSettings): void {
     },
     mcpServers: settings.mcpServers ?? [],
     promptCustomization: settings.promptCustomization ?? {},
+    eventHooks: settings.eventHooks ?? [],
+    claudeCompatibleProviders: settings.claudeCompatibleProviders ?? [],
+    claudeApiProfiles: settings.claudeApiProfiles ?? [],
+    activeClaudeApiProfileId: settings.activeClaudeApiProfileId ?? null,
     projects,
     currentProject,
     trashedProjects: settings.trashedProjects ?? [],
@@ -592,6 +744,13 @@ export function hydrateStoreFromSettings(settings: GlobalSettings): void {
     worktreePanelCollapsed: settings.worktreePanelCollapsed ?? false,
     lastProjectDir: settings.lastProjectDir ?? '',
     recentFolders: settings.recentFolders ?? [],
+    // Terminal font (nested in terminalState)
+    ...(settings.terminalFontFamily && {
+      terminalState: {
+        ...current.terminalState,
+        fontFamily: settings.terminalFontFamily,
+      },
+    }),
   });
 
   // Hydrate setup wizard state from global settings (API-backed)
@@ -609,6 +768,19 @@ export function hydrateStoreFromSettings(settings: GlobalSettings): void {
 function buildSettingsUpdateFromStore(): Record<string, unknown> {
   const state = useAppStore.getState();
   const setupState = useSetupStore.getState();
+
+  // Only persist settings (maxConcurrency), not runtime state (isRunning, runningTasks)
+  const persistedAutoModeByWorktree: Record<
+    string,
+    { maxConcurrency: number; branchName: string | null }
+  > = {};
+  for (const [key, value] of Object.entries(state.autoModeByWorktree)) {
+    persistedAutoModeByWorktree[key] = {
+      maxConcurrency: value.maxConcurrency ?? DEFAULT_MAX_CONCURRENCY,
+      branchName: value.branchName,
+    };
+  }
+
   return {
     setupComplete: setupState.setupComplete,
     isFirstRun: setupState.isFirstRun,
@@ -617,6 +789,7 @@ function buildSettingsUpdateFromStore(): Record<string, unknown> {
     sidebarOpen: state.sidebarOpen,
     chatHistoryOpen: state.chatHistoryOpen,
     maxConcurrency: state.maxConcurrency,
+    autoModeByWorktree: persistedAutoModeByWorktree,
     defaultSkipTests: state.defaultSkipTests,
     enableDependencyBlocking: state.enableDependencyBlocking,
     skipVerificationInAutoMode: state.skipVerificationInAutoMode,
@@ -624,15 +797,22 @@ function buildSettingsUpdateFromStore(): Record<string, unknown> {
     defaultPlanningMode: state.defaultPlanningMode,
     defaultRequirePlanApproval: state.defaultRequirePlanApproval,
     muteDoneSound: state.muteDoneSound,
+    serverLogLevel: state.serverLogLevel,
+    enableRequestLogging: state.enableRequestLogging,
     enhancementModel: state.enhancementModel,
     validationModel: state.validationModel,
     phaseModels: state.phaseModels,
     enabledDynamicModelIds: state.enabledDynamicModelIds,
+    disabledProviders: state.disabledProviders,
     autoLoadClaudeMd: state.autoLoadClaudeMd,
     skipSandboxWarning: state.skipSandboxWarning,
     keyboardShortcuts: state.keyboardShortcuts,
     mcpServers: state.mcpServers,
     promptCustomization: state.promptCustomization,
+    eventHooks: state.eventHooks,
+    claudeCompatibleProviders: state.claudeCompatibleProviders,
+    claudeApiProfiles: state.claudeApiProfiles,
+    activeClaudeApiProfileId: state.activeClaudeApiProfileId,
     projects: state.projects,
     trashedProjects: state.trashedProjects,
     currentProjectId: state.currentProject?.id ?? null,
@@ -642,6 +822,7 @@ function buildSettingsUpdateFromStore(): Record<string, unknown> {
     worktreePanelCollapsed: state.worktreePanelCollapsed,
     lastProjectDir: state.lastProjectDir,
     recentFolders: state.recentFolders,
+    terminalFontFamily: state.terminalState.fontFamily,
   };
 }
 

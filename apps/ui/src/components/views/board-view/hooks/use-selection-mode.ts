@@ -1,10 +1,13 @@
 import { useState, useCallback, useEffect } from 'react';
 
+export type SelectionTarget = 'backlog' | 'waiting_approval' | null;
+
 interface UseSelectionModeReturn {
   isSelectionMode: boolean;
+  selectionTarget: SelectionTarget;
   selectedFeatureIds: Set<string>;
   selectedCount: number;
-  toggleSelectionMode: () => void;
+  toggleSelectionMode: (target?: SelectionTarget) => void;
   toggleFeatureSelection: (featureId: string) => void;
   selectAll: (featureIds: string[]) => void;
   clearSelection: () => void;
@@ -13,21 +16,26 @@ interface UseSelectionModeReturn {
 }
 
 export function useSelectionMode(): UseSelectionModeReturn {
-  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [selectionTarget, setSelectionTarget] = useState<SelectionTarget>(null);
   const [selectedFeatureIds, setSelectedFeatureIds] = useState<Set<string>>(new Set());
 
-  const toggleSelectionMode = useCallback(() => {
-    setIsSelectionMode((prev) => {
-      if (prev) {
+  const isSelectionMode = selectionTarget !== null;
+
+  const toggleSelectionMode = useCallback((target: SelectionTarget = 'backlog') => {
+    setSelectionTarget((prev) => {
+      if (prev === target) {
         // Exiting selection mode - clear selection
         setSelectedFeatureIds(new Set());
+        return null;
       }
-      return !prev;
+      // Switching to a different target or entering selection mode
+      setSelectedFeatureIds(new Set());
+      return target;
     });
   }, []);
 
   const exitSelectionMode = useCallback(() => {
-    setIsSelectionMode(false);
+    setSelectionTarget(null);
     setSelectedFeatureIds(new Set());
   }, []);
 
@@ -70,6 +78,7 @@ export function useSelectionMode(): UseSelectionModeReturn {
 
   return {
     isSelectionMode,
+    selectionTarget,
     selectedFeatureIds,
     selectedCount: selectedFeatureIds.size,
     toggleSelectionMode,

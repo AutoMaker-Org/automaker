@@ -30,19 +30,27 @@ export function createBulkDeleteHandler(featureLoader: FeatureLoader) {
         return;
       }
 
-      const results = await Promise.all(
-        featureIds.map(async (featureId) => {
-          const success = await featureLoader.delete(projectPath, featureId);
-          if (success) {
-            return { featureId, success: true };
-          }
-          return {
-            featureId,
-            success: false,
-            error: 'Deletion failed. Check server logs for details.',
-          };
-        })
-      );
+      // Process in parallel batches of 20 for efficiency
+      const BATCH_SIZE = 20;
+      const results: BulkDeleteResult[] = [];
+
+      for (let i = 0; i < featureIds.length; i += BATCH_SIZE) {
+        const batch = featureIds.slice(i, i + BATCH_SIZE);
+        const batchResults = await Promise.all(
+          batch.map(async (featureId) => {
+            const success = await featureLoader.delete(projectPath, featureId);
+            if (success) {
+              return { featureId, success: true };
+            }
+            return {
+              featureId,
+              success: false,
+              error: 'Deletion failed. Check server logs for details.',
+            };
+          })
+        );
+        results.push(...batchResults);
+      }
 
       const successCount = results.reduce((count, r) => count + (r.success ? 1 : 0), 0);
       const failureCount = results.length - successCount;

@@ -4,10 +4,20 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import type { Project } from '@/lib/electron';
 import type { NavigationItem, NavigationGroup } from '../config/navigation';
-import { GLOBAL_NAV_GROUPS, PROJECT_NAV_ITEMS } from '../config/navigation';
+import { GLOBAL_NAV_GROUPS } from '../config/navigation';
 import type { SettingsViewId } from '../hooks/use-settings-view';
+import { useAppStore } from '@/store/app-store';
+import type { ModelProvider } from '@automaker/types';
 
 const PROVIDERS_DROPDOWN_KEY = 'settings-providers-dropdown-open';
+
+// Map navigation item IDs to provider types for checking disabled state
+const NAV_ID_TO_PROVIDER: Record<string, ModelProvider> = {
+  'claude-provider': 'claude',
+  'cursor-provider': 'cursor',
+  'codex-provider': 'codex',
+  'opencode-provider': 'opencode',
+};
 
 interface SettingsNavigationProps {
   navItems: NavigationItem[];
@@ -73,6 +83,8 @@ function NavItemWithSubItems({
   activeSection: SettingsViewId;
   onNavigate: (sectionId: SettingsViewId) => void;
 }) {
+  const disabledProviders = useAppStore((state) => state.disabledProviders);
+
   const [isOpen, setIsOpen] = useState(() => {
     if (typeof window !== 'undefined') {
       const stored = localStorage.getItem(PROVIDERS_DROPDOWN_KEY);
@@ -123,6 +135,9 @@ function NavItemWithSubItems({
           {item.subItems.map((subItem) => {
             const SubIcon = subItem.icon;
             const isSubActive = subItem.id === activeSection;
+            // Check if this provider is disabled
+            const provider = NAV_ID_TO_PROVIDER[subItem.id];
+            const isDisabled = provider && disabledProviders.includes(provider);
             return (
               <button
                 key={subItem.id}
@@ -141,7 +156,9 @@ function NavItemWithSubItems({
                         'hover:bg-accent/50',
                         'border border-transparent hover:border-border/40',
                       ],
-                  'hover:scale-[1.01] active:scale-[0.98]'
+                  'hover:scale-[1.01] active:scale-[0.98]',
+                  // Gray out disabled providers
+                  isDisabled && !isSubActive && 'opacity-40'
                 )}
               >
                 {/* Active indicator bar */}
@@ -153,7 +170,9 @@ function NavItemWithSubItems({
                     'w-4 h-4 shrink-0 transition-all duration-200',
                     isSubActive
                       ? 'text-brand-500'
-                      : 'group-hover:text-brand-400 group-hover:scale-110'
+                      : 'group-hover:text-brand-400 group-hover:scale-110',
+                    // Gray out icon for disabled providers
+                    isDisabled && !isSubActive && 'opacity-60'
                   )}
                 />
                 <span className="truncate">{subItem.label}</span>
@@ -191,15 +210,15 @@ export function SettingsNavigation({
       {/* Navigation sidebar */}
       <nav
         className={cn(
-          // Mobile: fixed position overlay with slide transition
-          'fixed inset-y-0 left-0 w-72 z-30',
+          // Mobile: fixed position overlay with slide transition from right
+          'fixed inset-y-0 right-0 w-72 z-30',
           'transition-transform duration-200 ease-out',
           // Hide on mobile when closed, show when open
-          isOpen ? 'translate-x-0' : '-translate-x-full',
+          isOpen ? 'translate-x-0' : 'translate-x-full',
           // Desktop: relative position in layout, always visible
           'lg:relative lg:w-64 lg:z-auto lg:translate-x-0',
           'shrink-0 overflow-y-auto',
-          'border-r border-border/50',
+          'border-l border-border/50 lg:border-l-0 lg:border-r',
           'bg-gradient-to-b from-card/95 via-card/90 to-card/85 backdrop-blur-xl',
           // Desktop background
           'lg:from-card/80 lg:via-card/60 lg:to-card/40'
@@ -253,31 +272,6 @@ export function SettingsNavigation({
               </div>
             </div>
           ))}
-
-          {/* Project Settings - only show when a project is selected */}
-          {currentProject && (
-            <>
-              {/* Divider */}
-              <div className="my-3 border-t border-border/50" />
-
-              {/* Project Settings Label */}
-              <div className="px-3 py-2 text-xs font-semibold text-muted-foreground/70 uppercase tracking-wider">
-                Project Settings
-              </div>
-
-              {/* Project Settings Items */}
-              <div className="space-y-1">
-                {PROJECT_NAV_ITEMS.map((item) => (
-                  <NavButton
-                    key={item.id}
-                    item={item}
-                    isActive={activeSection === item.id}
-                    onNavigate={onNavigate}
-                  />
-                ))}
-              </div>
-            </>
-          )}
         </div>
       </nav>
     </>

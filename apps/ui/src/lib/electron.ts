@@ -28,6 +28,7 @@ import type {
   UpdateIdeaInput,
   ConvertToFeatureOptions,
 } from '@automaker/types';
+import { DEFAULT_MAX_CONCURRENCY } from '@automaker/types';
 import { getJSON, setJSON, removeItem } from './storage';
 
 // Re-export issue validation types for use in components
@@ -437,6 +438,10 @@ export interface SpecRegenerationAPI {
     success: boolean;
     error?: string;
   }>;
+  sync: (projectPath: string) => Promise<{
+    success: boolean;
+    error?: string;
+  }>;
   stop: (projectPath?: string) => Promise<{ success: boolean; error?: string }>;
   status: (projectPath?: string) => Promise<{
     success: boolean;
@@ -475,26 +480,34 @@ export interface FeaturesAPI {
     featureId: string
   ) => Promise<{ success: boolean; content?: string | null; error?: string }>;
   generateTitle: (
-    description: string
+    description: string,
+    projectPath?: string
   ) => Promise<{ success: boolean; title?: string; error?: string }>;
 }
 
 export interface AutoModeAPI {
   start: (
     projectPath: string,
+    branchName?: string | null,
     maxConcurrency?: number
   ) => Promise<{ success: boolean; error?: string }>;
   stop: (
-    projectPath: string
+    projectPath: string,
+    branchName?: string | null
   ) => Promise<{ success: boolean; error?: string; runningFeatures?: number }>;
   stopFeature: (featureId: string) => Promise<{ success: boolean; error?: string }>;
-  status: (projectPath?: string) => Promise<{
+  status: (
+    projectPath?: string,
+    branchName?: string | null
+  ) => Promise<{
     success: boolean;
     isRunning?: boolean;
+    isAutoLoopRunning?: boolean;
     currentFeatureId?: string | null;
     runningFeatures?: string[];
     runningProjects?: string[];
     runningCount?: number;
+    maxConcurrency?: number;
     error?: string;
   }>;
   runFeature: (
@@ -548,6 +561,88 @@ export interface SaveImageResult {
   success: boolean;
   path?: string;
   error?: string;
+}
+
+// Notifications API interface
+import type {
+  Notification,
+  StoredEvent,
+  StoredEventSummary,
+  EventHistoryFilter,
+  EventReplayResult,
+} from '@automaker/types';
+
+export interface NotificationsAPI {
+  list: (projectPath: string) => Promise<{
+    success: boolean;
+    notifications?: Notification[];
+    error?: string;
+  }>;
+  getUnreadCount: (projectPath: string) => Promise<{
+    success: boolean;
+    count?: number;
+    error?: string;
+  }>;
+  markAsRead: (
+    projectPath: string,
+    notificationId?: string
+  ) => Promise<{
+    success: boolean;
+    notification?: Notification;
+    count?: number;
+    error?: string;
+  }>;
+  dismiss: (
+    projectPath: string,
+    notificationId?: string
+  ) => Promise<{
+    success: boolean;
+    dismissed?: boolean;
+    count?: number;
+    error?: string;
+  }>;
+}
+
+// Event History API interface
+export interface EventHistoryAPI {
+  list: (
+    projectPath: string,
+    filter?: EventHistoryFilter
+  ) => Promise<{
+    success: boolean;
+    events?: StoredEventSummary[];
+    total?: number;
+    error?: string;
+  }>;
+  get: (
+    projectPath: string,
+    eventId: string
+  ) => Promise<{
+    success: boolean;
+    event?: StoredEvent;
+    error?: string;
+  }>;
+  delete: (
+    projectPath: string,
+    eventId: string
+  ) => Promise<{
+    success: boolean;
+    error?: string;
+  }>;
+  clear: (projectPath: string) => Promise<{
+    success: boolean;
+    cleared?: number;
+    error?: string;
+  }>;
+  replay: (
+    projectPath: string,
+    eventId: string,
+    hookIds?: string[]
+  ) => Promise<{
+    success: boolean;
+    result?: EventReplayResult;
+    error?: string;
+  }>;
 }
 
 export interface ElectronAPI {
@@ -618,7 +713,8 @@ export interface ElectronAPI {
       originalText: string,
       enhancementMode: string,
       model?: string,
-      thinkingLevel?: string
+      thinkingLevel?: string,
+      projectPath?: string
     ) => Promise<{
       success: boolean;
       enhancedText?: string;
@@ -639,7 +735,30 @@ export interface ElectronAPI {
       model?: string
     ) => Promise<{ success: boolean; error?: string }>;
     stop: () => Promise<{ success: boolean; error?: string }>;
-    status: () => Promise<{ success: boolean; isRunning?: boolean; error?: string }>;
+    status: (projectPath: string) => Promise<{
+      success: boolean;
+      isRunning?: boolean;
+      savedPlan?: {
+        savedAt: string;
+        prompt: string;
+        model?: string;
+        result: {
+          changes: Array<{
+            type: 'add' | 'update' | 'delete';
+            featureId?: string;
+            feature?: Record<string, unknown>;
+            reason: string;
+          }>;
+          summary: string;
+          dependencyUpdates: Array<{
+            featureId: string;
+            removedDependencies: string[];
+            addedDependencies: string[];
+          }>;
+        };
+      } | null;
+      error?: string;
+    }>;
     apply: (
       projectPath: string,
       plan: {
@@ -658,6 +777,7 @@ export interface ElectronAPI {
       },
       branchName?: string
     ) => Promise<{ success: boolean; appliedChanges?: string[]; error?: string }>;
+    clear: (projectPath: string) => Promise<{ success: boolean; error?: string }>;
     onEvent: (callback: (data: unknown) => void) => () => void;
   };
   // Setup API surface is implemented by the main process and mirrored by HttpApiClient.
@@ -736,6 +856,8 @@ export interface ElectronAPI {
     }>;
   };
   ideation?: IdeationAPI;
+  notifications?: NotificationsAPI;
+  eventHistory?: EventHistoryAPI;
   codex?: {
     getUsage: () => Promise<CodexUsageResponse>;
     getModels: (refresh?: boolean) => Promise<{
@@ -1472,15 +1594,18 @@ function createMockWorktreeAPI(): WorktreeAPI {
       projectPath: string,
       branchName: string,
       worktreePath: string,
+      targetBranch?: string,
       options?: object
     ) => {
+      const target = targetBranch || 'main';
       console.log('[Mock] Merging feature:', {
         projectPath,
         branchName,
         worktreePath,
+        targetBranch: target,
         options,
       });
-      return { success: true, mergedBranch: branchName };
+      return { success: true, mergedBranch: branchName, targetBranch: target };
     },
 
     getInfo: async (projectPath: string, featureId: string) => {
@@ -1512,10 +1637,15 @@ function createMockWorktreeAPI(): WorktreeAPI {
       return { success: true, worktrees: [] };
     },
 
-    listAll: async (projectPath: string, includeDetails?: boolean) => {
+    listAll: async (
+      projectPath: string,
+      includeDetails?: boolean,
+      forceRefreshGitHub?: boolean
+    ) => {
       console.log('[Mock] Listing all worktrees:', {
         projectPath,
         includeDetails,
+        forceRefreshGitHub,
       });
       return {
         success: true,
@@ -1585,14 +1715,15 @@ function createMockWorktreeAPI(): WorktreeAPI {
       };
     },
 
-    push: async (worktreePath: string, force?: boolean) => {
-      console.log('[Mock] Pushing worktree:', { worktreePath, force });
+    push: async (worktreePath: string, force?: boolean, remote?: string) => {
+      const targetRemote = remote || 'origin';
+      console.log('[Mock] Pushing worktree:', { worktreePath, force, remote: targetRemote });
       return {
         success: true,
         result: {
           branch: 'feature-branch',
           pushed: true,
-          message: 'Successfully pushed to origin/feature-branch',
+          message: `Successfully pushed to ${targetRemote}/feature-branch`,
         },
       };
     },
@@ -1678,6 +1809,7 @@ function createMockWorktreeAPI(): WorktreeAPI {
           ],
           aheadCount: 2,
           behindCount: 0,
+          hasRemoteBranch: true,
         },
       };
     },
@@ -1690,6 +1822,26 @@ function createMockWorktreeAPI(): WorktreeAPI {
           previousBranch: 'main',
           currentBranch: branchName,
           message: `Switched to branch '${branchName}'`,
+        },
+      };
+    },
+
+    listRemotes: async (worktreePath: string) => {
+      console.log('[Mock] Listing remotes for:', worktreePath);
+      return {
+        success: true,
+        result: {
+          remotes: [
+            {
+              name: 'origin',
+              url: 'git@github.com:example/repo.git',
+              branches: [
+                { name: 'main', fullRef: 'origin/main' },
+                { name: 'develop', fullRef: 'origin/develop' },
+                { name: 'feature/example', fullRef: 'origin/feature/example' },
+              ],
+            },
+          ],
         },
       };
     },
@@ -1759,6 +1911,56 @@ function createMockWorktreeAPI(): WorktreeAPI {
             { name: 'Finder', command: 'open' },
           ],
           message: 'Found 2 available editors',
+        },
+      };
+    },
+
+    getAvailableTerminals: async () => {
+      console.log('[Mock] Getting available terminals');
+      return {
+        success: true,
+        result: {
+          terminals: [
+            { id: 'iterm2', name: 'iTerm2', command: 'open -a iTerm' },
+            { id: 'terminal-macos', name: 'Terminal', command: 'open -a Terminal' },
+          ],
+        },
+      };
+    },
+
+    getDefaultTerminal: async () => {
+      console.log('[Mock] Getting default terminal');
+      return {
+        success: true,
+        result: {
+          terminalId: 'iterm2',
+          terminalName: 'iTerm2',
+          terminalCommand: 'open -a iTerm',
+        },
+      };
+    },
+
+    refreshTerminals: async () => {
+      console.log('[Mock] Refreshing available terminals');
+      return {
+        success: true,
+        result: {
+          terminals: [
+            { id: 'iterm2', name: 'iTerm2', command: 'open -a iTerm' },
+            { id: 'terminal-macos', name: 'Terminal', command: 'open -a Terminal' },
+          ],
+          message: 'Found 2 available terminals',
+        },
+      };
+    },
+
+    openInExternalTerminal: async (worktreePath: string, terminalId?: string) => {
+      console.log('[Mock] Opening in external terminal:', worktreePath, terminalId);
+      return {
+        success: true,
+        result: {
+          message: `Opened ${worktreePath} in ${terminalId ?? 'default terminal'}`,
+          terminalName: terminalId ?? 'Terminal',
         },
       };
     },
@@ -1875,6 +2077,20 @@ function createMockWorktreeAPI(): WorktreeAPI {
         console.log('[Mock] Unsubscribing from init script events');
       };
     },
+
+    discardChanges: async (worktreePath: string) => {
+      console.log('[Mock] Discarding changes:', { worktreePath });
+      return {
+        success: true,
+        result: {
+          discarded: true,
+          filesDiscarded: 0,
+          filesRemaining: 0,
+          branch: 'main',
+          message: 'Mock: Changes discarded successfully',
+        },
+      };
+    },
   };
 }
 
@@ -1919,7 +2135,9 @@ function createMockAutoModeAPI(): AutoModeAPI {
       }
 
       mockAutoModeRunning = true;
-      console.log(`[Mock] Auto mode started with maxConcurrency: ${maxConcurrency || 3}`);
+      console.log(
+        `[Mock] Auto mode started with maxConcurrency: ${maxConcurrency || DEFAULT_MAX_CONCURRENCY}`
+      );
       const featureId = 'auto-mode-0';
       mockRunningFeatures.add(featureId);
 
@@ -2662,6 +2880,30 @@ function createMockSpecRegenerationAPI(): SpecRegenerationAPI {
       return { success: true };
     },
 
+    sync: async (projectPath: string) => {
+      if (mockSpecRegenerationRunning) {
+        return {
+          success: false,
+          error: 'Spec sync is already running',
+        };
+      }
+
+      mockSpecRegenerationRunning = true;
+      console.log(`[Mock] Syncing spec for: ${projectPath}`);
+
+      // Simulate async spec sync (similar to feature generation but simpler)
+      setTimeout(() => {
+        emitSpecRegenerationEvent({
+          type: 'spec_regeneration_complete',
+          message: 'Spec synchronized successfully',
+          projectPath,
+        });
+        mockSpecRegenerationRunning = false;
+      }, 1000);
+
+      return { success: true };
+    },
+
     stop: async (_projectPath?: string) => {
       mockSpecRegenerationRunning = false;
       mockSpecRegenerationPhase = '';
@@ -3008,7 +3250,7 @@ function createMockFeaturesAPI(): FeaturesAPI {
       return { success: true, content: content || null };
     },
 
-    generateTitle: async (description: string) => {
+    generateTitle: async (description: string, _projectPath?: string) => {
       console.log('[Mock] Generating title for:', description.substring(0, 50));
       // Mock title generation - just take first few words
       const words = description.split(/\s+/).slice(0, 6).join(' ');
@@ -3113,7 +3355,7 @@ function createMockGitHubAPI(): GitHubAPI {
                 estimatedComplexity: 'moderate' as const,
               },
               projectPath,
-              model: model || 'sonnet',
+              model: model || 'claude-sonnet',
             })
           );
         }, 2000);
@@ -3179,9 +3421,25 @@ export interface Project {
   path: string;
   lastOpened?: string;
   theme?: string; // Per-project theme override (uses ThemeMode from app-store)
+  fontFamilySans?: string; // Per-project UI/sans font override
+  fontFamilyMono?: string; // Per-project code/mono font override
   isFavorite?: boolean; // Pin project to top of dashboard
   icon?: string; // Lucide icon name for project identification
   customIconPath?: string; // Path to custom uploaded icon image in .automaker/images/
+  /**
+   * Override the active Claude API profile for this project.
+   * - undefined: Use global setting (activeClaudeApiProfileId)
+   * - null: Explicitly use Direct Anthropic API (no profile)
+   * - string: Use specific profile by ID
+   * @deprecated Use phaseModelOverrides instead for per-phase model selection
+   */
+  activeClaudeApiProfileId?: string | null;
+  /**
+   * Per-phase model overrides for this project.
+   * Keys are phase names (e.g., 'enhancementModel'), values are PhaseModelEntry.
+   * If a phase is not present, the global setting is used.
+   */
+  phaseModelOverrides?: Partial<import('@automaker/types').PhaseModelConfig>;
 }
 
 export interface TrashedProject extends Project {

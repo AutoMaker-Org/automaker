@@ -5,6 +5,7 @@ import { CodexCliStatus } from '../cli-status/codex-cli-status';
 import { CodexSettings } from '../codex/codex-settings';
 import { CodexUsageSection } from '../codex/codex-usage-section';
 import { CodexModelConfiguration } from './codex-model-configuration';
+import { ProviderToggle } from './provider-toggle';
 import { getElectronAPI } from '@/lib/electron';
 import { createLogger } from '@automaker/utils/logger';
 import type { CliStatus as SharedCliStatus } from '../shared/types';
@@ -162,6 +163,9 @@ export function CodexSettingsTab() {
 
   return (
     <div className="space-y-6">
+      {/* Provider Visibility Toggle */}
+      <ProviderToggle provider="codex" providerLabel="Codex" />
+
       <CodexCliStatus
         status={codexCliStatus}
         authStatus={authStatusToDisplay}

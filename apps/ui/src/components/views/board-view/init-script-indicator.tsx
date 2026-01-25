@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Terminal, Check, X, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
+import { Terminal, Check, X, ChevronDown, ChevronUp } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 import { cn } from '@/lib/utils';
 import { useAppStore, type InitScriptState } from '@/store/app-store';
 import { AnsiOutput } from '@/components/ui/ansi-output';
@@ -65,7 +66,7 @@ function SingleIndicator({
       {/* Header */}
       <div className="flex items-center justify-between p-3 border-b border-border/50">
         <div className="flex items-center gap-2">
-          {status === 'running' && <Loader2 className="w-4 h-4 animate-spin text-blue-500" />}
+          {status === 'running' && <Spinner size="sm" />}
           {status === 'success' && <Check className="w-4 h-4 text-green-500" />}
           {status === 'failed' && <X className="w-4 h-4 text-red-500" />}
           <span className="font-medium text-sm">

@@ -1,7 +1,8 @@
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { AlertCircle, CheckCircle2, Eye, EyeOff, Loader2, Zap } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Eye, EyeOff, Zap } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 import type { ProviderConfig } from '@/config/api-providers';
 
 interface ApiKeyFieldProps {
@@ -70,7 +71,7 @@ export function ApiKeyField({ config }: ApiKeyFieldProps) {
         >
           {testButton.loading ? (
             <>
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              <Spinner size="sm" className="mr-2" />
               Testing...
             </>
           ) : (

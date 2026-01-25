@@ -53,6 +53,20 @@ export {
 // File system utilities
 export { mkdirSafe, existsSafe } from './fs-utils.js';
 
+// Atomic file operations
+export {
+  atomicWriteJson,
+  readJsonFile,
+  updateJsonAtomically,
+  readJsonWithRecovery,
+  rotateBackups,
+  logRecoveryWarning,
+  DEFAULT_BACKUP_COUNT,
+  type AtomicWriteOptions,
+  type ReadJsonRecoveryResult,
+  type ReadJsonRecoveryOptions,
+} from './atomic-writer.js';
+
 // Path utilities
 export { normalizePath, pathsEqual } from './path-utils.js';
 

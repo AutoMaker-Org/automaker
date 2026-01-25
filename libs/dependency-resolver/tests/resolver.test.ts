@@ -3,6 +3,8 @@ import {
   resolveDependencies,
   areDependenciesSatisfied,
   getBlockingDependencies,
+  createFeatureMap,
+  getBlockingDependenciesFromMap,
   wouldCreateCircularDependency,
   dependencyExists,
 } from '../src/resolver';
@@ -348,6 +350,21 @@ describe('resolver.ts', () => {
       expect(blocking).toContain('Dep1');
       expect(blocking).toContain('Dep3');
       expect(blocking).not.toContain('Dep2');
+    });
+  });
+
+  describe('getBlockingDependenciesFromMap', () => {
+    it('should match getBlockingDependencies when using a feature map', () => {
+      const dep1 = createFeature('Dep1', { status: 'pending' });
+      const dep2 = createFeature('Dep2', { status: 'completed' });
+      const dep3 = createFeature('Dep3', { status: 'running' });
+      const feature = createFeature('A', { dependencies: ['Dep1', 'Dep2', 'Dep3'] });
+      const allFeatures = [dep1, dep2, dep3, feature];
+      const featureMap = createFeatureMap(allFeatures);
+
+      expect(getBlockingDependenciesFromMap(feature, featureMap)).toEqual(
+        getBlockingDependencies(feature, allFeatures)
+      );
     });
   });
 

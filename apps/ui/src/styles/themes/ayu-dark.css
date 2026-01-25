@@ -1,0 +1,151 @@
+/* Ayu Dark Theme - Deep dark with warm orange accents */
+
+.ayu-dark {
+  /* Backgrounds - from editor.bg #10141C, ui.bg #0D1017 */
+  --background: oklch(0.12 0.02 250); /* #0D1017 */
+  --background-50: oklch(0.12 0.02 250 / 0.5);
+  --background-80: oklch(0.12 0.02 250 / 0.8);
+
+  /* Text - from editor.fg #BFBDB6, ui.fg #5A6378 - boosted for contrast */
+  --foreground: oklch(0.95 0.01 90); /* Brighter for better readability */
+  --foreground-secondary: oklch(0.75 0.02 240);
+  --foreground-muted: oklch(0.6 0.03 240);
+
+  /* Card/Popover - from panel.bg #141821, popup.bg #0F131A */
+  --card: oklch(0.15 0.02 250); /* #141821 */
+  --card-foreground: oklch(0.95 0.01 90);
+  --popover: oklch(0.13 0.02 250); /* #0F131A */
+  --popover-foreground: oklch(0.95 0.01 90);
+
+  /* Primary/Brand - from accent.tint #E6B450, orange #FF8F40 */
+  --primary: oklch(0.78 0.15 75); /* #E6B450 golden */
+  --primary-foreground: oklch(0.12 0.02 250);
+
+  --brand-400: oklch(0.82 0.14 75);
+  --brand-500: oklch(0.78 0.15 75); /* #E6B450 */
+  --brand-600: oklch(0.72 0.17 70);
+
+  /* Secondary - from ui.line #1B1F29 */
+  --secondary: oklch(0.18 0.02 250);
+  --secondary-foreground: oklch(0.95 0.01 90);
+
+  /* Muted */
+  --muted: oklch(0.18 0.02 250);
+  --muted-foreground: oklch(0.45 0.04 240);
+
+  /* Accent */
+  --accent: oklch(0.22 0.03 250);
+  --accent-foreground: oklch(0.95 0.01 90);
+
+  /* Destructive - from error #D95757 */
+  --destructive: oklch(0.55 0.2 25); /* #D95757 */
+
+  /* Borders - from editor.line #161A24 */
+  --border: oklch(0.2 0.02 250);
+  --border-glass: oklch(0.78 0.15 75 / 0.3);
+
+  --input: oklch(0.15 0.02 250);
+  --ring: oklch(0.78 0.15 75);
+
+  /* Charts - using Ayu palette */
+  --chart-1: oklch(0.78 0.15 75); /* Gold accent */
+  --chart-2: oklch(0.75 0.2 130); /* Green #AAD94C */
+  --chart-3: oklch(0.7 0.15 220); /* Blue #59C2FF */
+  --chart-4: oklch(0.7 0.2 320); /* Purple #D2A6FF */
+  --chart-5: oklch(0.65 0.2 15); /* Red #F07178 */
+
+  /* Sidebar - from ui.bg #0D1017 */
+  --sidebar: oklch(0.1 0.02 250);
+  --sidebar-foreground: oklch(0.95 0.01 90);
+  --sidebar-primary: oklch(0.78 0.15 75);
+  --sidebar-primary-foreground: oklch(0.12 0.02 250);
+  --sidebar-accent: oklch(0.18 0.02 250);
+  --sidebar-accent-foreground: oklch(0.95 0.01 90);
+  --sidebar-border: oklch(0.2 0.02 250);
+  --sidebar-ring: oklch(0.78 0.15 75);
+
+  /* Action buttons */
+  --action-view: oklch(0.78 0.15 75); /* Gold */
+  --action-view-hover: oklch(0.72 0.17 70);
+  --action-followup: oklch(0.7 0.15 220); /* Blue #59C2FF */
+  --action-followup-hover: oklch(0.65 0.17 220);
+  --action-commit: oklch(0.75 0.2 130); /* Green #AAD94C */
+  --action-commit-hover: oklch(0.7 0.22 130);
+  --action-verify: oklch(0.75 0.2 130);
+  --action-verify-hover: oklch(0.7 0.22 130);
+
+  /* Running indicator */
+  --running-indicator: oklch(0.78 0.15 75);
+  --running-indicator-text: oklch(0.82 0.14 75);
+}
+
+/* Theme-specific overrides */
+
+.ayu-dark .animated-outline-gradient {
+  background: conic-gradient(from 90deg at 50% 50%, #e6b450 0%, #ff8f40 50%, #e6b450 100%);
+}
+
+.ayu-dark .animated-outline-inner {
+  background: oklch(0.12 0.02 250) !important;
+  color: #e6b450 !important;
+}
+
+.ayu-dark [data-slot='button'][class*='animated-outline']:hover .animated-outline-inner {
+  background: oklch(0.18 0.02 250) !important;
+  color: #ffb454 !important;
+}
+
+.ayu-dark .slider-track {
+  background: oklch(0.18 0.02 250);
+}
+
+.ayu-dark .slider-range {
+  background: linear-gradient(to right, #e6b450, #ffb454);
+}
+
+.ayu-dark .slider-thumb {
+  background: oklch(0.12 0.02 250);
+  border-color: #e6b450;
+}
+
+/* XML Syntax Highlighting */
+.ayu-dark .xml-highlight {
+  color: oklch(0.95 0.01 90);
+}
+
+.ayu-dark .xml-tag-bracket {
+  color: #39bae6; /* Indigo */
+}
+
+.ayu-dark .xml-tag-name {
+  color: #39bae6;
+}
+
+.ayu-dark .xml-attribute-name {
+  color: #ffb454; /* Yellow */
+}
+
+.ayu-dark .xml-attribute-equals {
+  color: oklch(0.95 0.01 90);
+}
+
+.ayu-dark .xml-attribute-value {
+  color: #aad94c; /* Green */
+}
+
+.ayu-dark .xml-comment {
+  color: #5a6673; /* Gray */
+  font-style: italic;
+}
+
+.ayu-dark .xml-cdata {
+  color: #95e6cb; /* Teal */
+}
+
+.ayu-dark .xml-doctype {
+  color: #d2a6ff; /* Purple */
+}
+
+.ayu-dark .xml-text {
+  color: oklch(0.95 0.01 90);
+}

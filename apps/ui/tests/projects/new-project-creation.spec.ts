@@ -14,6 +14,7 @@ import {
   authenticateForTests,
   handleLoginScreenIfPresent,
   waitForNetworkIdle,
+  sanitizeForTestId,
 } from '../utils';
 
 const TEST_TEMP_DIR = createTempDirPath('project-creation-test');
@@ -77,8 +78,10 @@ test.describe('Project Creation', () => {
     }
 
     // Wait for project to be set as current and visible on the page
-    // The project name appears in the sidebar project selector button
-    await expect(page.getByRole('button', { name: new RegExp(projectName) })).toBeVisible({
+    // The project name appears in the project switcher button
+    // Use ends-with selector since data-testid format is: project-switcher-{id}-{sanitizedName}
+    const sanitizedProjectName = sanitizeForTestId(projectName);
+    await expect(page.locator(`[data-testid$="-${sanitizedProjectName}"]`)).toBeVisible({
       timeout: 15000,
     });
 

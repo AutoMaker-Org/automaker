@@ -14,16 +14,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import {
-  FolderPlus,
-  FolderOpen,
-  Rocket,
-  ExternalLink,
-  Check,
-  Loader2,
-  Link,
-  Folder,
-} from 'lucide-react';
+import { FolderPlus, FolderOpen, Rocket, ExternalLink, Check, Link, Folder } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 import { starterTemplates, type StarterTemplate } from '@/lib/templates';
 import { getElectronAPI } from '@/lib/electron';
 import { cn } from '@/lib/utils';
@@ -451,7 +443,7 @@ export function NewProjectModal({
           >
             {isCreating ? (
               <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                <Spinner size="sm" className="mr-2" />
                 {activeTab === 'template' ? 'Cloning...' : 'Creating...'}
               </>
             ) : (

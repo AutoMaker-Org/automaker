@@ -1,0 +1,151 @@
+/* Ayu Light Theme - Clean light with warm orange accents */
+
+.ayu-light {
+  /* Backgrounds - from editor.bg #FCFCFC, ui.bg #F8F9FA */
+  --background: oklch(0.98 0.005 90); /* #FCFCFC */
+  --background-50: oklch(0.98 0.005 90 / 0.5);
+  --background-80: oklch(0.98 0.005 90 / 0.8);
+
+  /* Text - from editor.fg #5C6166, ui.fg #828E9F */
+  --foreground: oklch(0.42 0.02 240); /* #5C6166 */
+  --foreground-secondary: oklch(0.52 0.02 240);
+  --foreground-muted: oklch(0.58 0.03 240); /* #828E9F */
+
+  /* Card/Popover - from panel.bg #FAFAFA, popup.bg #FFFFFF */
+  --card: oklch(0.98 0.003 90); /* #FAFAFA */
+  --card-foreground: oklch(0.42 0.02 240);
+  --popover: oklch(1 0 0); /* #FFFFFF */
+  --popover-foreground: oklch(0.42 0.02 240);
+
+  /* Primary/Brand - from accent.tint #F29718 */
+  --primary: oklch(0.72 0.18 55); /* #F29718 orange */
+  --primary-foreground: oklch(1 0 0);
+
+  --brand-400: oklch(0.78 0.16 55);
+  --brand-500: oklch(0.72 0.18 55); /* #F29718 */
+  --brand-600: oklch(0.65 0.2 50);
+
+  /* Secondary */
+  --secondary: oklch(0.96 0.005 90);
+  --secondary-foreground: oklch(0.42 0.02 240);
+
+  /* Muted */
+  --muted: oklch(0.96 0.005 90);
+  --muted-foreground: oklch(0.58 0.03 240);
+
+  /* Accent */
+  --accent: oklch(0.94 0.01 90);
+  --accent-foreground: oklch(0.42 0.02 240);
+
+  /* Destructive - from error #E65050 */
+  --destructive: oklch(0.55 0.22 25); /* #E65050 */
+
+  /* Borders */
+  --border: oklch(0.9 0.01 90);
+  --border-glass: oklch(0.42 0.02 240 / 0.1);
+
+  --input: oklch(1 0 0);
+  --ring: oklch(0.72 0.18 55);
+
+  /* Charts - using Ayu Light palette */
+  --chart-1: oklch(0.72 0.18 55); /* Orange accent */
+  --chart-2: oklch(0.6 0.18 130); /* Green #86B300 */
+  --chart-3: oklch(0.65 0.15 210); /* Blue #22A4E6 */
+  --chart-4: oklch(0.55 0.18 310); /* Purple #A37ACC */
+  --chart-5: oklch(0.58 0.2 20); /* Red #F07171 */
+
+  /* Sidebar */
+  --sidebar: oklch(0.97 0.005 90); /* #F8F9FA */
+  --sidebar-foreground: oklch(0.42 0.02 240);
+  --sidebar-primary: oklch(0.72 0.18 55);
+  --sidebar-primary-foreground: oklch(1 0 0);
+  --sidebar-accent: oklch(0.94 0.01 90);
+  --sidebar-accent-foreground: oklch(0.42 0.02 240);
+  --sidebar-border: oklch(0.9 0.01 90);
+  --sidebar-ring: oklch(0.72 0.18 55);
+
+  /* Action buttons */
+  --action-view: oklch(0.72 0.18 55); /* Orange */
+  --action-view-hover: oklch(0.65 0.2 50);
+  --action-followup: oklch(0.65 0.15 210); /* Blue */
+  --action-followup-hover: oklch(0.58 0.17 210);
+  --action-commit: oklch(0.6 0.18 130); /* Green */
+  --action-commit-hover: oklch(0.55 0.2 130);
+  --action-verify: oklch(0.6 0.18 130);
+  --action-verify-hover: oklch(0.55 0.2 130);
+
+  /* Running indicator */
+  --running-indicator: oklch(0.72 0.18 55);
+  --running-indicator-text: oklch(0.65 0.2 50);
+}
+
+/* Theme-specific overrides */
+
+.ayu-light .animated-outline-gradient {
+  background: conic-gradient(from 90deg at 50% 50%, #f29718 0%, #fa8532 50%, #f29718 100%);
+}
+
+.ayu-light .animated-outline-inner {
+  background: oklch(0.98 0.005 90) !important;
+  color: #f29718 !important;
+}
+
+.ayu-light [data-slot='button'][class*='animated-outline']:hover .animated-outline-inner {
+  background: oklch(0.96 0.01 90) !important;
+  color: #fa8532 !important;
+}
+
+.ayu-light .slider-track {
+  background: oklch(0.92 0.01 90);
+}
+
+.ayu-light .slider-range {
+  background: linear-gradient(to right, #f29718, #fa8532);
+}
+
+.ayu-light .slider-thumb {
+  background: oklch(1 0 0);
+  border-color: #f29718;
+}
+
+/* XML Syntax Highlighting */
+.ayu-light .xml-highlight {
+  color: oklch(0.42 0.02 240);
+}
+
+.ayu-light .xml-tag-bracket {
+  color: #55b4d4; /* Indigo/Cyan */
+}
+
+.ayu-light .xml-tag-name {
+  color: #55b4d4;
+}
+
+.ayu-light .xml-attribute-name {
+  color: #f29718; /* Orange */
+}
+
+.ayu-light .xml-attribute-equals {
+  color: oklch(0.42 0.02 240);
+}
+
+.ayu-light .xml-attribute-value {
+  color: #86b300; /* Green */
+}
+
+.ayu-light .xml-comment {
+  color: #adaeb1; /* Gray */
+  font-style: italic;
+}
+
+.ayu-light .xml-cdata {
+  color: #4cbf99; /* Teal */
+}
+
+.ayu-light .xml-doctype {
+  color: #a37acc; /* Purple */
+}
+
+.ayu-light .xml-text {
+  color: oklch(0.42 0.02 240);
+}

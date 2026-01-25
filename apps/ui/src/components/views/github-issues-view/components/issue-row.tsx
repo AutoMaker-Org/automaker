@@ -2,12 +2,12 @@ import {
   Circle,
   CheckCircle2,
   ExternalLink,
-  Loader2,
   CheckCircle,
   Sparkles,
   GitPullRequest,
   User,
 } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import type { IssueRowProps } from '../types';
@@ -97,7 +97,7 @@ export function IssueRow({
           {/* Validating indicator */}
           {isValidating && (
             <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-medium rounded-full bg-primary/10 text-primary border border-primary/20 animate-in fade-in duration-200">
-              <Loader2 className="h-3 w-3 animate-spin" />
+              <Spinner size="xs" />
               Analyzing...
             </span>
           )}

@@ -1,61 +1,51 @@
 import { useEffect, useState, useCallback } from 'react';
-import { createLogger } from '@automaker/utils/logger';
 import { useAppStore } from '@/store/app-store';
-
-const logger = createLogger('SpecLoading');
-import { getElectronAPI } from '@/lib/electron';
+import { useSpecFile, useSpecRegenerationStatus } from '@/hooks/queries';
+import { useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '@/lib/query-keys';
 
 export function useSpecLoading() {
   const { currentProject, setAppSpec } = useAppStore();
-  const [isLoading, setIsLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [specExists, setSpecExists] = useState(true);
-  const [isGenerationRunning, setIsGenerationRunning] = useState(false);
 
-  const loadSpec = useCallback(async () => {
-    if (!currentProject) return;
+  // React Query hooks
+  const specFileQuery = useSpecFile(currentProject?.path);
+  const statusQuery = useSpecRegenerationStatus(currentProject?.path);
 
-    setIsLoading(true);
-    try {
-      const api = getElectronAPI();
+  const isGenerationRunning = statusQuery.data?.isRunning ?? false;
 
-      // Check if spec generation is running before trying to load
-      // This prevents showing "No App Specification Found" during generation
-      if (api.specRegeneration) {
-        const status = await api.specRegeneration.status(currentProject.path);
-        if (status.success && status.isRunning) {
-          logger.debug('Spec generation is running for this project, skipping load');
-          setIsGenerationRunning(true);
-          setIsLoading(false);
-          return;
-        }
-      }
-      // Always reset when generation is not running (handles edge case where api.specRegeneration might not be available)
-      setIsGenerationRunning(false);
-
-      const result = await api.readFile(`${currentProject.path}/.automaker/app_spec.txt`);
-
-      if (result.success && result.content) {
-        setAppSpec(result.content);
-        setSpecExists(true);
-      } else {
-        // File doesn't exist
-        setAppSpec('');
-        setSpecExists(false);
-      }
-    } catch (error) {
-      logger.error('Failed to load spec:', error);
-      setSpecExists(false);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [currentProject, setAppSpec]);
-
+  // Update app store and specExists when spec file data changes
   useEffect(() => {
-    loadSpec();
-  }, [loadSpec]);
+    if (specFileQuery.data && !isGenerationRunning) {
+      setAppSpec(specFileQuery.data.content);
+      setSpecExists(specFileQuery.data.exists);
+    }
+  }, [specFileQuery.data, setAppSpec, isGenerationRunning]);
+
+  // Manual reload function (invalidates cache)
+  const loadSpec = useCallback(async () => {
+    if (!currentProject?.path) return;
+
+    // Fetch fresh status data to avoid stale cache issues
+    // Using fetchQuery ensures we get the latest data before checking
+    const statusData = await queryClient.fetchQuery<{ isRunning: boolean }>({
+      queryKey: queryKeys.specRegeneration.status(currentProject.path),
+      staleTime: 0, // Force fresh fetch
+    });
+
+    if (statusData?.isRunning) {
+      return;
+    }
+
+    // Invalidate and refetch spec file
+    await queryClient.invalidateQueries({
+      queryKey: queryKeys.spec.file(currentProject.path),
+    });
+  }, [currentProject?.path, queryClient]);
 
   return {
-    isLoading,
+    isLoading: specFileQuery.isLoading,
     specExists,
     setSpecExists,
     isGenerationRunning,

@@ -11,12 +11,12 @@ import {
   Terminal,
   CheckCircle,
   XCircle,
-  Loader2,
   Play,
   File,
   Pencil,
   Wrench,
 } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 import { cn } from '@/lib/utils';
 import { getElectronAPI } from '@/lib/electron';
 
@@ -236,7 +236,7 @@ export function AgentToolsView() {
               >
                 {isReadingFile ? (
                   <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    <Spinner size="sm" className="mr-2" />
                     Reading...
                   </>
                 ) : (
@@ -315,7 +315,7 @@ export function AgentToolsView() {
               >
                 {isWritingFile ? (
                   <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    <Spinner size="sm" className="mr-2" />
                     Writing...
                   </>
                 ) : (
@@ -383,7 +383,7 @@ export function AgentToolsView() {
               >
                 {isRunningCommand ? (
                   <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    <Spinner size="sm" className="mr-2" />
                     Running...
                   </>
                 ) : (

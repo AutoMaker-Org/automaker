@@ -13,6 +13,7 @@ import type { LinkedPRInfo, PhaseModelEntry, ModelId } from '@automaker/types';
 import { useAppStore } from '@/store/app-store';
 import { toast } from 'sonner';
 import { isValidationStale } from '../utils';
+import { useValidateIssue, useMarkValidationViewed } from '@/hooks/mutations';
 
 const logger = createLogger('IssueValidation');
 
@@ -46,6 +47,10 @@ export function useIssueValidation({
     new Map()
   );
   const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  // React Query mutations
+  const validateIssueMutation = useValidateIssue(currentProject?.path ?? '');
+  const markViewedMutation = useMarkValidationViewed(currentProject?.path ?? '');
   // Refs for stable event handler (avoids re-subscribing on state changes)
   const selectedIssueRef = useRef<GitHubIssue | null>(null);
   const showValidationDialogRef = useRef(false);
@@ -240,7 +245,7 @@ export function useIssueValidation({
       }
 
       // Check if already validating this issue
-      if (validatingIssues.has(issue.number)) {
+      if (validatingIssues.has(issue.number) || validateIssueMutation.isPending) {
         toast.info(`Validation already in progress for issue #${issue.number}`);
         return;
       }
@@ -253,11 +258,6 @@ export function useIssueValidation({
         onShowValidationDialogChange(true);
         return;
       }
-
-      // Start async validation in background (no dialog - user will see badge when done)
-      toast.info(`Starting validation for issue #${issue.number}`, {
-        description: 'You will be notified when the analysis is complete',
-      });
 
       // Use provided model override or fall back to phaseModels.validationModel
       // Extract model string and thinking level from PhaseModelEntry (handles both old string format and new object format)
@@ -276,40 +276,22 @@ export function useIssueValidation({
       const thinkingLevelToUse = normalizedEntry.thinkingLevel;
       const reasoningEffortToUse = normalizedEntry.reasoningEffort;
 
-      try {
-        const api = getElectronAPI();
-        if (api.github?.validateIssue) {
-          const validationInput = {
-            issueNumber: issue.number,
-            issueTitle: issue.title,
-            issueBody: issue.body || '',
-            issueLabels: issue.labels.map((l) => l.name),
-            comments, // Include comments if provided
-            linkedPRs, // Include linked PRs if provided
-          };
-          const result = await api.github.validateIssue(
-            currentProject.path,
-            validationInput,
-            modelToUse,
-            thinkingLevelToUse,
-            reasoningEffortToUse
-          );
-
-          if (!result.success) {
-            toast.error(result.error || 'Failed to start validation');
-          }
-          // On success, the result will come through the event stream
-        }
-      } catch (err) {
-        logger.error('Validation error:', err);
-        toast.error(err instanceof Error ? err.message : 'Failed to validate issue');
-      }
+      // Use mutation to trigger validation (toast is handled by mutation)
+      validateIssueMutation.mutate({
+        issue,
+        model: modelToUse,
+        thinkingLevel: thinkingLevelToUse,
+        reasoningEffort: reasoningEffortToUse,
+        comments,
+        linkedPRs,
+      });
     },
     [
       currentProject?.path,
       validatingIssues,
       cachedValidations,
       phaseModels.validationModel,
+      validateIssueMutation,
       onValidationResultChange,
       onShowValidationDialogChange,
     ]
@@ -325,10 +307,8 @@ export function useIssueValidation({
 
         // Mark as viewed if not already viewed
         if (!cached.viewedAt && currentProject?.path) {
-          try {
-            const api = getElectronAPI();
-            if (api.github?.markValidationViewed) {
-              await api.github.markValidationViewed(currentProject.path, issue.number);
+          markViewedMutation.mutate(issue.number, {
+            onSuccess: () => {
               // Update local state
               setCachedValidations((prev) => {
                 const next = new Map(prev);
@@ -341,16 +321,15 @@ export function useIssueValidation({
                 }
                 return next;
               });
-            }
-          } catch (err) {
-            logger.error('Failed to mark validation as viewed:', err);
-          }
+            },
+          });
         }
       }
     },
     [
       cachedValidations,
       currentProject?.path,
+      markViewedMutation,
       onValidationResultChange,
       onShowValidationDialogChange,
     ]
@@ -361,5 +340,6 @@ export function useIssueValidation({
     cachedValidations,
     handleValidateIssue,
     handleViewCachedValidation,
+    isValidating: validateIssueMutation.isPending,
   };
 }

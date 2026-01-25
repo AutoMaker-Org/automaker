@@ -15,6 +15,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { CategoryAutocomplete } from '@/components/ui/category-autocomplete';
+import { DependencySelector } from '@/components/ui/dependency-selector';
 import {
   DescriptionImageDropZone,
   FeatureImagePath as DescriptionImagePath,
@@ -99,6 +100,7 @@ type FeatureData = {
   planningMode: PlanningMode;
   requirePlanApproval: boolean;
   dependencies?: string[];
+  childDependencies?: string[]; // Feature IDs that should depend on this feature
   workMode: WorkMode;
 };
 
@@ -168,7 +170,7 @@ export function AddFeatureDialog({
   const [priority, setPriority] = useState(2);
 
   // Model selection state
-  const [modelEntry, setModelEntry] = useState<PhaseModelEntry>({ model: 'opus' });
+  const [modelEntry, setModelEntry] = useState<PhaseModelEntry>({ model: 'claude-opus' });
 
   // Check if current model supports planning mode (Claude/Anthropic only)
   const modelSupportsPlanningMode = isClaudeModel(modelEntry.model);
@@ -187,6 +189,10 @@ export function AddFeatureDialog({
   // Spawn mode state
   const [ancestors, setAncestors] = useState<AncestorContext[]>([]);
   const [selectedAncestorIds, setSelectedAncestorIds] = useState<Set<string>>(new Set());
+
+  // Dependency selection state (not in spawn mode)
+  const [parentDependencies, setParentDependencies] = useState<string[]>([]);
+  const [childDependencies, setChildDependencies] = useState<string[]>([]);
 
   // Get defaults from store
   const { defaultPlanningMode, defaultRequirePlanApproval, useWorktrees, defaultFeatureModel } =
@@ -224,6 +230,10 @@ export function AddFeatureDialog({
         setAncestors([]);
         setSelectedAncestorIds(new Set());
       }
+
+      // Reset dependency selections
+      setParentDependencies([]);
+      setChildDependencies([]);
     }
   }, [
     open,
@@ -291,6 +301,16 @@ export function AddFeatureDialog({
       }
     }
 
+    // Determine final dependencies
+    // In spawn mode, use parent feature as dependency
+    // Otherwise, use manually selected parent dependencies
+    const finalDependencies =
+      isSpawnMode && parentFeature
+        ? [parentFeature.id]
+        : parentDependencies.length > 0
+          ? parentDependencies
+          : undefined;
+
     return {
       title,
       category: finalCategory,
@@ -306,7 +326,8 @@ export function AddFeatureDialog({
       priority,
       planningMode,
       requirePlanApproval,
-      dependencies: isSpawnMode && parentFeature ? [parentFeature.id] : undefined,
+      dependencies: finalDependencies,
+      childDependencies: childDependencies.length > 0 ? childDependencies : undefined,
       workMode,
     };
   };
@@ -331,6 +352,8 @@ export function AddFeatureDialog({
     setPreviewMap(new Map());
     setDescriptionError(false);
     setDescriptionHistory([]);
+    setParentDependencies([]);
+    setChildDependencies([]);
     onOpenChange(false);
   };
 
@@ -641,6 +664,38 @@ export function AddFeatureDialog({
                 testIdPrefix="feature-work-mode"
               />
             </div>
+
+            {/* Dependencies - only show when not in spawn mode */}
+            {!isSpawnMode && allFeatures.length > 0 && (
+              <div className="pt-2 space-y-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">
+                    Parent Dependencies (this feature depends on)
+                  </Label>
+                  <DependencySelector
+                    value={parentDependencies}
+                    onChange={setParentDependencies}
+                    features={allFeatures}
+                    type="parent"
+                    placeholder="Select features this depends on..."
+                    data-testid="add-feature-parent-deps"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">
+                    Child Dependencies (features that depend on this)
+                  </Label>
+                  <DependencySelector
+                    value={childDependencies}
+                    onChange={setChildDependencies}
+                    features={allFeatures}
+                    type="child"
+                    placeholder="Select features that will depend on this..."
+                    data-testid="add-feature-child-deps"
+                  />
+                </div>
+              </div>
+            )}
           </div>
         </div>
 

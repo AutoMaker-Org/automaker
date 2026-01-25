@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { createLogger } from '@automaker/utils/logger';
 import { useNavigate } from '@tanstack/react-router';
-import { useAppStore, type ThemeMode } from '@/store/app-store';
+import { useAppStore } from '@/store/app-store';
 import { useOSDetection } from '@/hooks/use-os-detection';
 import { getElectronAPI, isElectron } from '@/lib/electron';
 import { initializeProject } from '@/lib/project-init';
@@ -18,13 +18,18 @@ import {
   Folder,
   Star,
   Clock,
-  Loader2,
   ChevronDown,
   MessageSquare,
-  Settings,
   MoreVertical,
   Trash2,
+  Search,
+  X,
+  type LucideIcon,
 } from 'lucide-react';
+import * as LucideIcons from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
+import { Input } from '@/components/ui/input';
+import { getAuthenticatedImageUrl } from '@/lib/api-fetch';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -55,6 +60,13 @@ function getOSAbbreviation(os: string): string {
   }
 }
 
+function getIconComponent(iconName?: string): LucideIcon {
+  if (iconName && iconName in LucideIcons) {
+    return (LucideIcons as unknown as Record<string, LucideIcon>)[iconName];
+  }
+  return Folder;
+}
+
 export function DashboardView() {
   const navigate = useNavigate();
   const { os } = useOSDetection();
@@ -64,14 +76,11 @@ export function DashboardView() {
 
   const {
     projects,
-    trashedProjects,
-    currentProject,
     upsertAndSetCurrentProject,
     addProject,
     setCurrentProject,
     toggleProjectFavorite,
     moveProjectToTrash,
-    theme: globalTheme,
   } = useAppStore();
 
   const [showNewProjectModal, setShowNewProjectModal] = useState(false);
@@ -79,6 +88,7 @@ export function DashboardView() {
   const [isCreating, setIsCreating] = useState(false);
   const [isOpening, setIsOpening] = useState(false);
   const [projectToRemove, setProjectToRemove] = useState<{ id: string; name: string } | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Sort projects: favorites first, then by last opened
   const sortedProjects = [...projects].sort((a, b) => {
@@ -91,8 +101,15 @@ export function DashboardView() {
     return dateB - dateA;
   });
 
-  const favoriteProjects = sortedProjects.filter((p) => p.isFavorite);
-  const recentProjects = sortedProjects.filter((p) => !p.isFavorite);
+  // Filter projects based on search query
+  const filteredProjects = sortedProjects.filter((project) => {
+    if (!searchQuery.trim()) return true;
+    const query = searchQuery.toLowerCase();
+    return project.name.toLowerCase().includes(query) || project.path.toLowerCase().includes(query);
+  });
+
+  const favoriteProjects = filteredProjects.filter((p) => p.isFavorite);
+  const recentProjects = filteredProjects.filter((p) => !p.isFavorite);
 
   /**
    * Initialize project and navigate to board
@@ -104,18 +121,27 @@ export function DashboardView() {
         const initResult = await initializeProject(path);
 
         if (!initResult.success) {
+          // If the project directory doesn't exist, automatically remove it from the project list
+          if (initResult.error?.includes('does not exist')) {
+            const projectToRemove = projects.find((p) => p.path === path);
+            if (projectToRemove) {
+              logger.warn(`[Dashboard] Removing project with non-existent path: ${path}`);
+              moveProjectToTrash(projectToRemove.id);
+              toast.error('Project directory not found', {
+                description: `Removed ${name} from your projects list since the directory no longer exists.`,
+              });
+              return;
+            }
+          }
+
           toast.error('Failed to initialize project', {
             description: initResult.error || 'Unknown error occurred',
           });
           return;
         }
 
-        const trashedProject = trashedProjects.find((p) => p.path === path);
-        const effectiveTheme =
-          (trashedProject?.theme as ThemeMode | undefined) ||
-          (currentProject?.theme as ThemeMode | undefined) ||
-          globalTheme;
-        upsertAndSetCurrentProject(path, name, effectiveTheme);
+        // Theme handling (trashed project recovery or undefined for global) is done by the store
+        upsertAndSetCurrentProject(path, name);
 
         toast.success('Project opened', {
           description: `Opened ${name}`,
@@ -131,7 +157,7 @@ export function DashboardView() {
         setIsOpening(false);
       }
     },
-    [trashedProjects, currentProject, globalTheme, upsertAndSetCurrentProject, navigate]
+    [projects, upsertAndSetCurrentProject, navigate, moveProjectToTrash]
   );
 
   const handleOpenProject = useCallback(async () => {
@@ -529,14 +555,35 @@ export function DashboardView() {
               </span>
             </div>
           </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => navigate({ to: '/settings' })}
-            className="titlebar-no-drag"
-          >
-            <Settings className="w-5 h-5" />
-          </Button>
+
+          {/* Mobile action buttons in header */}
+          {hasProjects && (
+            <div className="flex sm:hidden gap-2 titlebar-no-drag">
+              <Button variant="outline" size="icon" onClick={handleOpenProject}>
+                <FolderOpen className="w-4 h-4" />
+              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    size="icon"
+                    className="bg-linear-to-r from-brand-500 to-brand-600 hover:from-brand-600 hover:to-brand-700 text-white"
+                  >
+                    <Plus className="w-4 h-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuItem onClick={handleNewProject}>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Quick Setup
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleInteractiveMode}>
+                    <MessageSquare className="w-4 h-4 mr-2" />
+                    Interactive Mode
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          )}
         </div>
       </header>
 
@@ -646,25 +693,42 @@ export function DashboardView() {
           {/* Has projects - show project list */}
           {hasProjects && (
             <div className="space-y-6 sm:space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-              {/* Quick actions header */}
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <h2 className="text-2xl font-bold text-foreground">Your Projects</h2>
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    onClick={handleOpenProject}
-                    className="flex-1 sm:flex-none"
-                  >
-                    <FolderOpen className="w-4 h-4 sm:mr-2" />
-                    <span className="hidden sm:inline">Open Folder</span>
+              {/* Search and actions header */}
+              <div className="flex items-center justify-between gap-4">
+                <h2 className="text-xl sm:text-2xl font-bold text-foreground">Your Projects</h2>
+                <div className="flex items-center gap-2">
+                  {/* Search input */}
+                  <div className="relative flex-1 sm:flex-none">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+                    <Input
+                      type="text"
+                      placeholder="Search projects..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-9 pr-8 w-full sm:w-64"
+                      data-testid="project-search-input"
+                    />
+                    {searchQuery && (
+                      <button
+                        onClick={() => setSearchQuery('')}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded hover:bg-muted transition-colors"
+                        title="Clear search"
+                      >
+                        <X className="w-4 h-4 text-muted-foreground" />
+                      </button>
+                    )}
+                  </div>
+                  {/* Desktop only buttons */}
+                  <Button variant="outline" onClick={handleOpenProject} className="hidden sm:flex">
+                    <FolderOpen className="w-4 h-4 mr-2" />
+                    Open Folder
                   </Button>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button className="flex-1 sm:flex-none bg-linear-to-r from-brand-500 to-brand-600 hover:from-brand-600 hover:to-brand-700 text-white">
-                        <Plus className="w-4 h-4 sm:mr-2" />
-                        <span className="hidden sm:inline">New Project</span>
-                        <span className="sm:hidden">New</span>
-                        <ChevronDown className="w-4 h-4 ml-1 sm:ml-2" />
+                      <Button className="hidden sm:flex bg-linear-to-r from-brand-500 to-brand-600 hover:from-brand-600 hover:to-brand-700 text-white">
+                        <Plus className="w-4 h-4 mr-2" />
+                        New Project
+                        <ChevronDown className="w-4 h-4 ml-2" />
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-56">
@@ -703,8 +767,24 @@ export function DashboardView() {
                         <div className="absolute inset-0 rounded-xl bg-linear-to-br from-yellow-500/5 to-amber-600/5 opacity-0 group-hover:opacity-100 transition-all duration-300" />
                         <div className="relative p-3 sm:p-4">
                           <div className="flex items-start gap-2.5 sm:gap-3">
-                            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-yellow-500/10 border border-yellow-500/30 flex items-center justify-center group-hover:bg-yellow-500/20 transition-all duration-300 shrink-0">
-                              <Folder className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-500" />
+                            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-yellow-500/10 border border-yellow-500/30 flex items-center justify-center group-hover:bg-yellow-500/20 transition-all duration-300 shrink-0 overflow-hidden">
+                              {project.customIconPath ? (
+                                <img
+                                  src={getAuthenticatedImageUrl(
+                                    project.customIconPath,
+                                    project.path
+                                  )}
+                                  alt={project.name}
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : (
+                                (() => {
+                                  const IconComponent = getIconComponent(project.icon);
+                                  return (
+                                    <IconComponent className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-500" />
+                                  );
+                                })()
+                              )}
                             </div>
                             <div className="flex-1 min-w-0">
                               <p className="text-sm sm:text-base font-medium text-foreground truncate group-hover:text-yellow-500 transition-colors duration-300">
@@ -778,8 +858,24 @@ export function DashboardView() {
                         <div className="absolute inset-0 rounded-xl bg-linear-to-br from-brand-500/0 to-purple-600/0 group-hover:from-brand-500/5 group-hover:to-purple-600/5 transition-all duration-300" />
                         <div className="relative p-3 sm:p-4">
                           <div className="flex items-start gap-2.5 sm:gap-3">
-                            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-muted/80 border border-border flex items-center justify-center group-hover:bg-brand-500/10 group-hover:border-brand-500/30 transition-all duration-300 shrink-0">
-                              <Folder className="w-4 h-4 sm:w-5 sm:h-5 text-muted-foreground group-hover:text-brand-500 transition-colors duration-300" />
+                            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-muted/80 border border-border flex items-center justify-center group-hover:bg-brand-500/10 group-hover:border-brand-500/30 transition-all duration-300 shrink-0 overflow-hidden">
+                              {project.customIconPath ? (
+                                <img
+                                  src={getAuthenticatedImageUrl(
+                                    project.customIconPath,
+                                    project.path
+                                  )}
+                                  alt={project.name}
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : (
+                                (() => {
+                                  const IconComponent = getIconComponent(project.icon);
+                                  return (
+                                    <IconComponent className="w-4 h-4 sm:w-5 sm:h-5 text-muted-foreground group-hover:text-brand-500 transition-colors duration-300" />
+                                  );
+                                })()
+                              )}
                             </div>
                             <div className="flex-1 min-w-0">
                               <p className="text-sm sm:text-base font-medium text-foreground truncate group-hover:text-brand-500 transition-colors duration-300">
@@ -797,10 +893,10 @@ export function DashboardView() {
                             <div className="flex items-center gap-0.5 sm:gap-1">
                               <button
                                 onClick={(e) => handleToggleFavorite(e, project.id)}
-                                className="p-1 sm:p-1.5 rounded-lg hover:bg-muted transition-colors opacity-0 group-hover:opacity-100"
+                                className="p-1 sm:p-1.5 rounded-lg hover:bg-muted transition-colors"
                                 title="Add to favorites"
                               >
-                                <Star className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-muted-foreground hover:text-yellow-500" />
+                                <Star className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-muted-foreground/50 hover:text-yellow-500 transition-colors" />
                               </button>
                               <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
@@ -828,6 +924,22 @@ export function DashboardView() {
                       </div>
                     ))}
                   </div>
+                </div>
+              )}
+
+              {/* No search results */}
+              {searchQuery && favoriteProjects.length === 0 && recentProjects.length === 0 && (
+                <div className="text-center py-12">
+                  <div className="w-16 h-16 rounded-full bg-muted/50 flex items-center justify-center mx-auto mb-4">
+                    <Search className="w-8 h-8 text-muted-foreground" />
+                  </div>
+                  <h3 className="text-lg font-medium text-foreground mb-2">No projects found</h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    No projects match "{searchQuery}"
+                  </p>
+                  <Button variant="outline" size="sm" onClick={() => setSearchQuery('')}>
+                    Clear search
+                  </Button>
                 </div>
               )}
             </div>
@@ -886,7 +998,7 @@ export function DashboardView() {
           data-testid="project-opening-overlay"
         >
           <div className="flex flex-col items-center gap-4 p-8 rounded-2xl bg-card border border-border shadow-2xl">
-            <Loader2 className="w-10 h-10 text-brand-500 animate-spin" />
+            <Spinner size="xl" />
             <p className="text-foreground font-medium">Opening project...</p>
           </div>
         </div>

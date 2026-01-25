@@ -5,7 +5,8 @@ import { createLogger } from '@automaker/utils/logger';
 import { cn } from '@/lib/utils';
 
 const logger = createLogger('TaskProgressPanel');
-import { Check, Loader2, Circle, ChevronDown, ChevronRight, FileCode } from 'lucide-react';
+import { Check, Circle, ChevronDown, ChevronRight, FileCode } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 import { getElectronAPI } from '@/lib/electron';
 import type { AutoModeEvent } from '@/types/electron';
 import { Badge } from '@/components/ui/badge';
@@ -260,7 +261,7 @@ export function TaskProgressPanel({
                       )}
                     >
                       {isCompleted && <Check className="h-3.5 w-3.5" />}
-                      {isActive && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                      {isActive && <Spinner size="xs" />}
                       {isPending && <Circle className="h-2 w-2 fill-current opacity-50" />}
                     </div>
 
