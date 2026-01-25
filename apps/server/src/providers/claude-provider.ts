@@ -66,12 +66,13 @@ async function mapToBedrockModel(model: string, provider: ClaudeProvider): Promi
   const regionPrefix = region.startsWith('eu-') ? 'eu' : 'us';
 
   // Map standard Claude model IDs to Bedrock format
+  // Use Cross-Region Inference profiles (with region prefix) for models that support it
   const bedrockModelMap: Record<string, string> = {
     'claude-opus-4-5-20251101': `${regionPrefix}.anthropic.claude-opus-4-5-20251101-v1:0`,
     'claude-sonnet-4-5-20250929': `${regionPrefix}.anthropic.claude-sonnet-4-5-20250929-v1:0`,
     'claude-sonnet-4-20250514': `${regionPrefix}.anthropic.claude-sonnet-4-5-20250929-v1:0`, // Legacy
     'claude-3-5-sonnet-20241022': 'anthropic.claude-3-5-sonnet-20241022-v2:0',
-    'claude-haiku-4-5-20251001': 'anthropic.claude-haiku-4-5-20251001-v1:0',
+    'claude-haiku-4-5-20251001': `${regionPrefix}.anthropic.claude-haiku-4-5-20251001-v1:0`,
   };
 
   const bedrockModel = bedrockModelMap[model];
@@ -195,17 +196,8 @@ export class ClaudeProvider extends BaseProvider {
       thinkingLevel,
     } = options;
 
-    // Skip Bedrock mapping for simple text-only queries (they often fail with Bedrock)
-    // Use standard Claude models for text generation to avoid SDK exit code 1
-    const isSimpleTextQuery = maxTurns === 1 && (!allowedTools || allowedTools.length === 0);
-    const skipBedrockMapping = isSimpleTextQuery;
-    const model = skipBedrockMapping
-      ? requestedModel
-      : await mapToBedrockModel(requestedModel, this);
-
-    if (skipBedrockMapping) {
-      logger.debug(`Skipping Bedrock mapping for simple text query, using: ${requestedModel}`);
-    }
+    // Map to Bedrock if configured
+    const model = await mapToBedrockModel(requestedModel, this);
 
     // Convert thinking level to token budget
     const maxThinkingTokens = getThinkingTokenBudget(thinkingLevel);
