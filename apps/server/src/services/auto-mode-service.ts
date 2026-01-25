@@ -461,6 +461,13 @@ export class AutoModeService {
     }
 
     const abortController = params.abortController ?? new AbortController();
+
+    // Create completion tracking for graceful cleanup
+    let signalCompletion: () => void;
+    const completionPromise = new Promise<void>((resolve) => {
+      signalCompletion = resolve;
+    });
+
     const entry: RunningFeature = {
       featureId: params.featureId,
       projectPath: params.projectPath,
@@ -470,6 +477,8 @@ export class AutoModeService {
       isAutoMode: params.isAutoMode,
       startTime: Date.now(),
       leaseCount: 1,
+      completionPromise,
+      signalCompletion: signalCompletion!,
     };
     this.runningFeatures.set(params.featureId, entry);
     return entry;
@@ -1665,6 +1674,8 @@ export class AutoModeService {
       logger.info(
         `Pending approvals at cleanup: ${Array.from(this.pendingApprovals.keys()).join(', ') || 'none'}`
       );
+      // Signal completion for graceful cleanup
+      tempRunningFeature.signalCompletion?.();
       this.releaseRunningFeature(featureId);
 
       // Update execution state after feature completes
@@ -1879,7 +1890,7 @@ Complete the pipeline step instructions above. Review the previous work and appl
     /** Internal flag: set to true when called from a method that already tracks the feature */
     _calledInternally = false
   ): Promise<void> {
-    this.acquireRunningFeature({
+    const runningFeature = this.acquireRunningFeature({
       featureId,
       projectPath,
       isAutoMode: false,
@@ -1931,6 +1942,8 @@ Complete the pipeline step instructions above. Review the previous work and appl
         _calledInternally: true,
       });
     } finally {
+      // Signal completion for graceful cleanup
+      runningFeature.signalCompletion?.();
       this.releaseRunningFeature(featureId);
     }
   }
@@ -2241,6 +2254,8 @@ Complete the pipeline step instructions above. Review the previous work and appl
         });
       }
     } finally {
+      // Signal completion for graceful cleanup
+      runningEntry.signalCompletion?.();
       this.releaseRunningFeature(featureId);
     }
   }
@@ -2496,6 +2511,8 @@ Address the follow-up instructions above. Review the previous work and make the 
         }
       }
     } finally {
+      // Signal completion for graceful cleanup
+      runningEntry.signalCompletion?.();
       this.releaseRunningFeature(featureId);
     }
   }
