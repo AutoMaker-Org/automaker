@@ -123,7 +123,7 @@ async function cleanupOrphanedProcesses(workDir: string, featureId: string): Pro
       windowsHide: true,
     });
 
-    if (!result.trim()) {
+    if (!result.trim() || result.trim() === 'null') {
       return; // No matching processes
     }
 
@@ -131,7 +131,10 @@ async function cleanupOrphanedProcesses(workDir: string, featureId: string): Pro
     let processes: { ProcessId: number; Name: string; CommandLine: string }[] = [];
     try {
       const parsed = JSON.parse(result);
-      // PowerShell returns a single object if one result, array if multiple
+      // PowerShell returns null if no matches, single object if one, array if multiple
+      if (!parsed) {
+        return;
+      }
       processes = Array.isArray(parsed) ? parsed : [parsed];
     } catch {
       logger.debug(`[cleanupOrphanedProcesses] Failed to parse PowerShell output`);
