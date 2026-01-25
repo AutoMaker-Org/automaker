@@ -1,7 +1,9 @@
 import { useState, useCallback, useEffect } from 'react';
 import { RouterProvider } from '@tanstack/react-router';
+import { QueryClientProvider } from '@tanstack/react-query';
 import { createLogger } from '@automaker/utils/logger';
 import { router } from './utils/router';
+import { queryClient } from './lib/query-client';
 import { SplashScreen } from './components/splash-screen';
 import { useSettingsSync } from './hooks/use-settings-sync';
 import { useCursorStatusInit } from './hooks/use-cursor-status-init';
@@ -59,9 +61,9 @@ export default function App() {
   }, []);
 
   return (
-    <>
+    <QueryClientProvider client={queryClient}>
       <RouterProvider router={router} />
       {showSplash && <SplashScreen onComplete={handleSplashComplete} />}
-    </>
+    </QueryClientProvider>
   );
 }
