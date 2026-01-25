@@ -271,10 +271,13 @@ import { OpencodeProvider } from './opencode-provider.js';
 // Register Claude provider
 registerProvider('claude', {
   factory: () => new ClaudeProvider(),
-  aliases: ['anthropic'],
+  aliases: ['anthropic', 'bedrock'],
   canHandleModel: (model: string) => {
     return (
-      model.startsWith('claude-') || ['opus', 'sonnet', 'haiku'].some((n) => model.includes(n))
+      model.startsWith('claude-') ||
+      model.includes('.anthropic.claude-') || // AWS Bedrock format: eu.anthropic.claude-*
+      model.startsWith('anthropic.claude-') || // Alternative Bedrock format
+      ['opus', 'sonnet', 'haiku'].some((n) => model.includes(n))
     );
   },
   priority: 0, // Default priority

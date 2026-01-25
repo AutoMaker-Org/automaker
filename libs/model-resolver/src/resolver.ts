@@ -80,8 +80,17 @@ export function resolveModelString(
     return modelKey;
   }
 
-  // Full Claude model string - pass through unchanged
-  if (modelKey.includes('claude-')) {
+  // Full Claude model string (including AWS Bedrock format) - pass through unchanged
+  // Supports:
+  // - Direct Anthropic API: claude-*
+  // - AWS Bedrock EU: eu.anthropic.claude-*
+  // - AWS Bedrock US: us.anthropic.claude-*
+  // - AWS Bedrock generic: anthropic.claude-*
+  if (
+    modelKey.includes('claude-') ||
+    modelKey.includes('.anthropic.claude-') ||
+    modelKey.startsWith('anthropic.claude-')
+  ) {
     console.log(`[ModelResolver] Using full Claude model string: ${modelKey}`);
     return modelKey;
   }

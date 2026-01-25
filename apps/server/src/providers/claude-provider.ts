@@ -24,6 +24,13 @@ const ALLOWED_ENV_VARS = [
   'ANTHROPIC_API_KEY',
   'ANTHROPIC_BASE_URL',
   'ANTHROPIC_AUTH_TOKEN',
+  // AWS Bedrock credentials for enterprise/AWS deployments
+  'AWS_ACCESS_KEY_ID',
+  'AWS_SECRET_ACCESS_KEY',
+  'AWS_SESSION_TOKEN',
+  'AWS_REGION',
+  'AWS_DEFAULT_REGION',
+  'CLAUDE_CODE_USE_BEDROCK',
   'PATH',
   'HOME',
   'SHELL',
@@ -46,6 +53,54 @@ function buildEnv(): Record<string, string | undefined> {
   return env;
 }
 
+/**
+ * Check if Bedrock is configured via environment variables
+ */
+function isBedrockConfigured(): boolean {
+  return !!(
+    process.env.CLAUDE_CODE_USE_BEDROCK ||
+    (process.env.AWS_REGION && process.env.AWS_ACCESS_KEY_ID)
+  );
+}
+
+/**
+ * Map standard Claude model IDs to AWS Bedrock model IDs
+ * Only applies when Bedrock is configured via environment
+ */
+function mapToBedrockModel(model: string): string {
+  // If already a Bedrock model ID, pass through
+  if (model.includes('.anthropic.claude-') || model.startsWith('anthropic.claude-')) {
+    logger.debug(`Model already in Bedrock format: ${model}`);
+    return model;
+  }
+
+  // If Bedrock not configured, pass through unchanged
+  if (!isBedrockConfigured()) {
+    return model;
+  }
+
+  // Get AWS region for region-specific model IDs
+  const region = process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || 'us-east-1';
+  const regionPrefix = region.startsWith('eu-') ? 'eu' : 'us';
+
+  // Map standard Claude model IDs to Bedrock format
+  const bedrockModelMap: Record<string, string> = {
+    'claude-opus-4-5-20251101': `${regionPrefix}.anthropic.claude-opus-4-5-20251101-v1:0`,
+    'claude-sonnet-4-20250514': `${regionPrefix}.anthropic.claude-sonnet-4-5-20250929-v1:0`,
+    'claude-3-5-sonnet-20241022': 'anthropic.claude-3-5-sonnet-20241022-v2:0',
+    'claude-haiku-4-5-20251001': 'anthropic.claude-haiku-4-5-20251001-v1:0',
+  };
+
+  const bedrockModel = bedrockModelMap[model];
+  if (bedrockModel) {
+    logger.info(`Mapped Claude model to Bedrock: ${model} → ${bedrockModel}`);
+    return bedrockModel;
+  }
+
+  logger.warn(`No Bedrock mapping for model: ${model}, using as-is`);
+  return model;
+}
+
 export class ClaudeProvider extends BaseProvider {
   getName(): string {
     return 'claude';
@@ -61,7 +116,7 @@ export class ClaudeProvider extends BaseProvider {
 
     const {
       prompt,
-      model,
+      model: requestedModel,
       cwd,
       systemPrompt,
       maxTurns = 20,
@@ -71,6 +126,9 @@ export class ClaudeProvider extends BaseProvider {
       sdkSessionId,
       thinkingLevel,
     } = options;
+
+    // Map to Bedrock model ID if Bedrock is configured
+    const model = mapToBedrockModel(requestedModel);
 
     // Convert thinking level to token budget
     const maxThinkingTokens = getThinkingTokenBudget(thinkingLevel);
@@ -186,7 +244,7 @@ export class ClaudeProvider extends BaseProvider {
    * Get available Claude models
    */
   getAvailableModels(): ModelDefinition[] {
-    const models = [
+    const anthropicModels: ModelDefinition[] = [
       {
         id: 'claude-opus-4-5-20251101',
         name: 'Claude Opus 4.5',
@@ -236,8 +294,54 @@ export class ClaudeProvider extends BaseProvider {
         supportsTools: true,
         tier: 'basic' as const,
       },
-    ] satisfies ModelDefinition[];
-    return models;
+    ];
+
+    // Add AWS Bedrock models if configured (checked dynamically at runtime)
+    const bedrockModels: ModelDefinition[] = isBedrockConfigured()
+      ? [
+          {
+            id: 'eu.anthropic.claude-sonnet-4-5-20250929-v1:0',
+            name: 'Claude Sonnet 4.5 (AWS Bedrock)',
+            modelString: 'eu.anthropic.claude-sonnet-4-5-20250929-v1:0',
+            provider: 'bedrock',
+            description: 'Claude Sonnet 4.5 via AWS Bedrock (eu-central-1)',
+            contextWindow: 200000,
+            maxOutputTokens: 16000,
+            supportsVision: true,
+            supportsTools: true,
+            tier: 'standard' as const,
+            default: false,
+          },
+          {
+            id: 'us.anthropic.claude-opus-4-5-20251101-v1:0',
+            name: 'Claude Opus 4.5 (AWS Bedrock)',
+            modelString: 'us.anthropic.claude-opus-4-5-20251101-v1:0',
+            provider: 'bedrock',
+            description: 'Claude Opus 4.5 via AWS Bedrock (us-east-1)',
+            contextWindow: 200000,
+            maxOutputTokens: 16000,
+            supportsVision: true,
+            supportsTools: true,
+            tier: 'premium' as const,
+            default: false,
+          },
+          {
+            id: 'anthropic.claude-3-5-sonnet-20241022-v2:0',
+            name: 'Claude 3.5 Sonnet (AWS Bedrock)',
+            modelString: 'anthropic.claude-3-5-sonnet-20241022-v2:0',
+            provider: 'bedrock',
+            description: 'Claude 3.5 Sonnet via AWS Bedrock',
+            contextWindow: 200000,
+            maxOutputTokens: 8000,
+            supportsVision: true,
+            supportsTools: true,
+            tier: 'standard' as const,
+            default: false,
+          },
+        ]
+      : [];
+
+    return [...anthropicModels, ...bedrockModels];
   }
 
   /**
