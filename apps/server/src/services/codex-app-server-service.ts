@@ -1,7 +1,9 @@
 import { spawn, type ChildProcess } from 'child_process';
 import readline from 'readline';
-import { findCodexCliPath } from '@automaker/platform';
+import { findCodexCliPath, killProcessTree } from '@automaker/platform';
 import { createLogger } from '@automaker/utils';
+
+const IS_WINDOWS = process.platform === 'win32';
 import type {
   AppServerModelResponse,
   AppServerAccountResponse,
@@ -196,7 +198,11 @@ export class CodexAppServerService {
 
       // Clean up
       rl.close();
-      childProcess.kill('SIGTERM');
+      if (IS_WINDOWS && childProcess.pid) {
+        await killProcessTree(childProcess.pid);
+      } else {
+        childProcess.kill('SIGTERM');
+      }
 
       return result;
     } catch (error) {
@@ -204,8 +210,12 @@ export class CodexAppServerService {
       return null;
     } finally {
       // Ensure process is killed
-      if (childProcess && !childProcess.killed) {
-        childProcess.kill('SIGTERM');
+      if (childProcess && !childProcess.killed && childProcess.pid) {
+        if (IS_WINDOWS) {
+          killProcessTree(childProcess.pid).catch(() => {});
+        } else {
+          childProcess.kill('SIGTERM');
+        }
       }
     }
   }

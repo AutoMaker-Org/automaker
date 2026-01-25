@@ -49,6 +49,7 @@ import {
   getFeaturesDir,
   getExecutionStatePath,
   ensureAutomakerDir,
+  killProcessTree,
 } from '@automaker/platform';
 import { exec } from 'child_process';
 import { promisify } from 'util';
@@ -74,6 +75,110 @@ import {
 import { getNotificationService } from './notification-service.js';
 
 const execAsync = promisify(exec);
+
+const IS_WINDOWS = process.platform === 'win32';
+
+/**
+ * Clean up orphaned processes related to a specific working directory.
+ *
+ * On Windows, processes spawned by agents (like dev servers) don't automatically
+ * terminate when the parent process is killed. This function finds and kills
+ * processes whose command line contains the working directory path.
+ *
+ * We search for multiple process types because the Claude Agent SDK spawns
+ * a chain like: sh.exe -> node.exe (npm) -> cmd.exe -> node.exe (next dev)
+ * If we only kill node.exe, the sh.exe/cmd.exe parents may keep things alive.
+ *
+ * @param workDir - The working directory to match against process command lines
+ * @param featureId - For logging purposes
+ */
+async function cleanupOrphanedProcesses(workDir: string, featureId: string): Promise<void> {
+  if (!IS_WINDOWS) {
+    // On Unix, SIGTERM propagates to child processes properly
+    return;
+  }
+
+  try {
+    // For PowerShell's -like operator, we need to escape only special wildcard chars (*, ?, [)
+    // Backslashes are NOT special in -like, so don't escape them
+    // Just normalize forward slashes to backslashes for Windows paths
+    const normalizedDir = workDir.replace(/\//g, '\\');
+
+    // Also create a Unix-style path variant (Git Bash uses /c/Users/... format)
+    const unixStyleDir = workDir
+      .replace(/^([A-Z]):/i, (_, drive) => `/${drive.toLowerCase()}`)
+      .replace(/\\/g, '/');
+
+    // Search for multiple process types that might be in the chain
+    // sh.exe (Git Bash), cmd.exe (Windows shell), node.exe (Node.js)
+    const processTypes = ['node.exe', 'sh.exe', 'cmd.exe'];
+    const processFilter = processTypes.map((p) => `$_.Name -eq '${p}'`).join(' -or ');
+
+    // Get processes via PowerShell - match either Windows-style or Unix-style paths
+    const psCommand = `Get-CimInstance Win32_Process | Where-Object { (${processFilter}) -and ($_.CommandLine -like '*${normalizedDir}*' -or $_.CommandLine -like '*${unixStyleDir}*') } | Select-Object ProcessId, Name, CommandLine | ConvertTo-Json`;
+
+    const { stdout: result } = await execAsync(`powershell -Command "${psCommand}"`, {
+      encoding: 'utf8',
+      timeout: 15000,
+      windowsHide: true,
+    });
+
+    if (!result.trim()) {
+      return; // No matching processes
+    }
+
+    // Parse the JSON output
+    let processes: { ProcessId: number; Name: string; CommandLine: string }[] = [];
+    try {
+      const parsed = JSON.parse(result);
+      // PowerShell returns a single object if one result, array if multiple
+      processes = Array.isArray(parsed) ? parsed : [parsed];
+    } catch {
+      logger.debug(`[cleanupOrphanedProcesses] Failed to parse PowerShell output`);
+      return;
+    }
+
+    // Filter out:
+    // - The current process (Automaker server)
+    // - The parent of the current process
+    // - Any process that's part of the Automaker server chain
+    const serverPid = process.pid;
+    const automakerPaths = ['automaker', 'tsx', 'vite'];
+
+    const pidsToKill = processes
+      .filter((p) => {
+        // Skip current process and parent
+        if (p.ProcessId === serverPid || p.ProcessId === process.ppid) {
+          return false;
+        }
+        // Skip Automaker's own processes (server, vite, tsx)
+        const cmdLower = (p.CommandLine || '').toLowerCase();
+        if (
+          automakerPaths.some((ap) => cmdLower.includes(`\\automaker\\`) && cmdLower.includes(ap))
+        ) {
+          return false;
+        }
+        return true;
+      })
+      .map((p) => p.ProcessId);
+
+    if (pidsToKill.length === 0) {
+      return;
+    }
+
+    logger.info(
+      `[cleanupOrphanedProcesses] Killing ${pidsToKill.length} orphaned processes for feature ${featureId}: ${pidsToKill.join(', ')}`
+    );
+
+    // Kill each process tree
+    await Promise.allSettled(pidsToKill.map((pid) => killProcessTree(pid)));
+
+    logger.info(`[cleanupOrphanedProcesses] Cleanup complete for feature ${featureId}`);
+  } catch (error) {
+    // Don't fail the feature if cleanup fails - just log it
+    logger.warn(`[cleanupOrphanedProcesses] Error during cleanup for feature ${featureId}:`, error);
+  }
+}
 
 /**
  * Get the current branch name for a git repository
@@ -236,6 +341,10 @@ interface RunningFeature {
   leaseCount: number;
   model?: string;
   provider?: ModelProvider;
+  /** Promise that resolves when execution ends (success, failure, or abort) */
+  completionPromise?: Promise<void>;
+  /** Call to signal execution has completed (for cleanup tracking) */
+  signalCompletion?: () => void;
 }
 
 interface AutoLoopState {
@@ -380,6 +489,93 @@ export class AutoModeService {
     entry.leaseCount = (entry.leaseCount ?? 1) - 1;
     if (entry.leaseCount <= 0) {
       this.runningFeatures.delete(featureId);
+    }
+  }
+
+  /**
+   * Initialize the service - should be called after construction.
+   * Performs startup cleanup of any orphaned processes from previous runs.
+   */
+  async initialize(): Promise<void> {
+    if (IS_WINDOWS) {
+      await this.cleanupOrphanedProcessesOnStartup();
+    }
+  }
+
+  /**
+   * Clean up orphaned processes from previous Automaker runs.
+   * This catches processes that were orphaned when Automaker was force-closed,
+   * crashed, or the browser tab was closed without proper cleanup.
+   *
+   * We look for processes that:
+   * 1. Are node.exe, sh.exe, or cmd.exe
+   * 2. Have command lines suggesting they were spawned by npm/next/dev servers
+   * 3. Have orphaned parent processes (parent PID doesn't exist)
+   */
+  private async cleanupOrphanedProcessesOnStartup(): Promise<void> {
+    try {
+      logger.info('[Startup] Checking for orphaned processes from previous runs...');
+
+      // PowerShell script to find potentially orphaned dev server processes
+      // We look for processes whose parent no longer exists
+      // Note: Script must be single-line with semicolons for proper parsing
+      // We capture $parentPid before the nested Where-Object to avoid $_ shadowing
+      const psScript = `$orphans = @(); Get-CimInstance Win32_Process | Where-Object { ($_.Name -eq 'node.exe' -or $_.Name -eq 'sh.exe' -or $_.Name -eq 'cmd.exe') -and $_.CommandLine -match 'next|npm run dev|start-server' } | ForEach-Object { $parentPid = $_.ParentProcessId; $parent = Get-CimInstance Win32_Process | Where-Object { $_.ProcessId -eq $parentPid }; if (-not $parent) { $orphans += [PSCustomObject]@{ ProcessId = $_.ProcessId; Name = $_.Name; CommandLine = $_.CommandLine } } }; $orphans | ConvertTo-Json`;
+
+      const { stdout: result } = await execAsync(`powershell -Command "${psScript}"`, {
+        encoding: 'utf8',
+        timeout: 20000,
+        windowsHide: true,
+      });
+
+      if (!result.trim() || result.trim() === 'null') {
+        logger.info('[Startup] No orphaned processes found');
+        return;
+      }
+
+      let orphans: { ProcessId: number; Name: string; CommandLine: string }[] = [];
+      try {
+        const parsed = JSON.parse(result);
+        orphans = Array.isArray(parsed) ? parsed : [parsed];
+      } catch {
+        logger.debug('[Startup] Failed to parse orphan detection output');
+        return;
+      }
+
+      // Filter out Automaker's own processes
+      const serverPid = process.pid;
+      const pidsToKill = orphans
+        .filter((p) => {
+          if (p.ProcessId === serverPid || p.ProcessId === process.ppid) {
+            return false;
+          }
+          // Skip if it's part of Automaker itself
+          const cmdLower = (p.CommandLine || '').toLowerCase();
+          if (
+            cmdLower.includes('\\automaker\\') &&
+            (cmdLower.includes('tsx') || cmdLower.includes('vite'))
+          ) {
+            return false;
+          }
+          return true;
+        })
+        .map((p) => p.ProcessId);
+
+      if (pidsToKill.length === 0) {
+        logger.info('[Startup] No orphaned processes to clean up');
+        return;
+      }
+
+      logger.info(
+        `[Startup] Cleaning up ${pidsToKill.length} orphaned processes: ${pidsToKill.join(', ')}`
+      );
+
+      await Promise.allSettled(pidsToKill.map((pid) => killProcessTree(pid)));
+
+      logger.info('[Startup] Orphaned process cleanup complete');
+    } catch (error) {
+      // Don't fail startup if cleanup fails
+      logger.warn('[Startup] Failed to check for orphaned processes:', error);
     }
   }
 
@@ -828,7 +1024,34 @@ export class AutoModeService {
   }
 
   /**
-   * Stop the auto mode loop for a specific project/worktree
+   * Get running features for a specific project/worktree
+   * @param projectPath - The project path
+   * @param branchName - The branch name, or null for main worktree
+   */
+  private getRunningFeaturesForWorktree(
+    projectPath: string,
+    branchName: string | null
+  ): RunningFeature[] {
+    const features: RunningFeature[] = [];
+    const normalizedBranch = branchName === 'main' ? null : branchName;
+
+    for (const [, feature] of this.runningFeatures) {
+      if (feature.projectPath === projectPath) {
+        // Match by branch: null matches both null and 'main'
+        const featureBranch = feature.branchName === 'main' ? null : feature.branchName;
+        if (featureBranch === normalizedBranch) {
+          features.push(feature);
+        }
+      }
+    }
+    return features;
+  }
+
+  /**
+   * Stop the auto mode loop for a specific project/worktree.
+   * This only stops new features from being picked up - running features continue to completion.
+   * Use stopFeature() to explicitly abort a running feature.
+   *
    * @param projectPath - The project to stop auto mode for
    * @param branchName - The branch name, or null for main worktree
    */
@@ -1608,8 +1831,11 @@ Complete the pipeline step instructions above. Review the previous work and appl
 
   /**
    * Stop a specific feature
+   * @param featureId - The feature ID to stop
+   * @param waitForCleanup - Whether to wait for the feature to fully clean up (default: true)
+   * @param timeoutMs - Maximum time to wait for cleanup in milliseconds (default: 10000)
    */
-  async stopFeature(featureId: string): Promise<boolean> {
+  async stopFeature(featureId: string, waitForCleanup = true, timeoutMs = 10000): Promise<boolean> {
     const running = this.runningFeatures.get(featureId);
     if (!running) {
       return false;
@@ -1618,10 +1844,26 @@ Complete the pipeline step instructions above. Review the previous work and appl
     // Cancel any pending plan approval for this feature
     this.cancelPlanApproval(featureId);
 
+    // Abort the feature execution
     running.abortController.abort();
 
-    // Remove from running features immediately to allow resume
-    // The abort signal will still propagate to stop any ongoing execution
+    // If we have a completion promise and should wait, wait for cleanup with timeout
+    if (waitForCleanup && running.completionPromise) {
+      try {
+        await Promise.race([
+          running.completionPromise,
+          new Promise<void>((_, reject) =>
+            setTimeout(() => reject(new Error('Cleanup timeout')), timeoutMs)
+          ),
+        ]);
+        logger.info(`Feature ${featureId} cleanup completed gracefully`);
+      } catch (error) {
+        // Timeout or other error - force release
+        logger.warn(`Feature ${featureId} cleanup timed out or failed, forcing removal:`, error);
+      }
+    }
+
+    // Release the feature (force: true to immediately remove regardless of lease count)
     this.releaseRunningFeature(featureId, { force: true });
 
     return true;
@@ -4246,6 +4488,11 @@ After generating the revised spec, output:
         clearTimeout(rawWriteTimeout);
         rawWriteTimeout = null;
       }
+
+      // Clean up orphaned processes on Windows
+      // This handles dev servers, MCP processes, etc. that don't terminate
+      // when the agent is aborted
+      await cleanupOrphanedProcesses(workDir, featureId);
     }
   }
 
