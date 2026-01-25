@@ -74,23 +74,19 @@ interface GenerateCommitMessageErrorResponse {
   error: string;
 }
 
-async function extractTextFromStream(
-  stream: AsyncIterable<{
-    type: string;
-    subtype?: string;
-    result?: string;
-    message?: {
-      content?: Array<{ type: string; text?: string }>;
-    };
-  }>
-): Promise<string> {
+async function extractTextFromStream(stream: AsyncIterable<any>): Promise<string> {
   let responseText = '';
 
   for await (const msg of stream) {
     if (msg.type === 'assistant' && msg.message?.content) {
-      for (const block of msg.message.content) {
-        if (block.type === 'text' && block.text) {
-          responseText += block.text;
+      // Handle both string and array content from different SDK versions
+      if (typeof msg.message.content === 'string') {
+        responseText += msg.message.content;
+      } else if (Array.isArray(msg.message.content)) {
+        for (const block of msg.message.content) {
+          if (block.type === 'text' && block.text) {
+            responseText += block.text;
+          }
         }
       }
     } else if (msg.type === 'result' && msg.subtype === 'success') {
