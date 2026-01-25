@@ -59,6 +59,23 @@ export function registerProvider(name: string, registration: ProviderRegistratio
 }
 
 export class ProviderFactory {
+  private static settingsService: any | null = null;
+
+  /**
+   * Initialize provider factory with settings service
+   * Should be called once during server startup
+   */
+  static initialize(settingsService: any): void {
+    this.settingsService = settingsService;
+  }
+
+  /**
+   * Get the settings service instance
+   */
+  static getSettingsService(): any | null {
+    return this.settingsService;
+  }
+
   /**
    * Determine which provider to use for a given model
    *
@@ -210,9 +227,10 @@ export class ProviderFactory {
   /**
    * Get all available models from all providers
    */
-  static getAllAvailableModels(): ModelDefinition[] {
+  static async getAllAvailableModels(): Promise<ModelDefinition[]> {
     const providers = this.getAllProviders();
-    return providers.flatMap((p) => p.getAvailableModels());
+    const modelArrays = await Promise.all(providers.map((p) => p.getAvailableModels()));
+    return modelArrays.flat();
   }
 
   /**
@@ -226,11 +244,11 @@ export class ProviderFactory {
    * Check if a specific model supports vision/image input
    *
    * @param modelId Model identifier
-   * @returns Whether the model supports vision (defaults to true if model not found)
+   * @returns Promise resolving to whether the model supports vision (defaults to true if model not found)
    */
-  static modelSupportsVision(modelId: string): boolean {
+  static async modelSupportsVision(modelId: string): Promise<boolean> {
     const provider = this.getProviderForModel(modelId);
-    const models = provider.getAvailableModels();
+    const models = await provider.getAvailableModels();
 
     // Find the model in the available models list
     for (const model of models) {

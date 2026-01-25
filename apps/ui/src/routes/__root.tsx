@@ -34,6 +34,7 @@ import { SandboxRiskDialog } from '@/components/dialogs/sandbox-risk-dialog';
 import { SandboxRejectionScreen } from '@/components/dialogs/sandbox-rejection-screen';
 import { LoadingState } from '@/components/ui/loading-state';
 import { useProjectSettingsLoader } from '@/hooks/use-project-settings-loader';
+import { useBedrockStatus } from '@/hooks/use-bedrock-status';
 import type { Project } from '@/lib/electron';
 
 const logger = createLogger('RootLayout');
@@ -175,6 +176,9 @@ function RootLayoutContent() {
 
   // Load project settings when switching projects
   useProjectSettingsLoader();
+
+  // Load Bedrock status on mount
+  useBedrockStatus();
 
   const isSetupRoute = location.pathname === '/setup';
   const isLoginRoute = location.pathname === '/login';

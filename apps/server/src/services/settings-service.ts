@@ -384,17 +384,22 @@ export class SettingsService {
         ...DEFAULT_CREDENTIALS.apiKeys,
         ...credentials.apiKeys,
       },
+      awsBedrock: {
+        ...DEFAULT_AWS_BEDROCK_CONFIG,
+        ...credentials.awsBedrock,
+      },
     };
   }
 
   /**
    * Update credentials with partial changes
    *
-   * Updates individual API keys. Uses deep merge for apiKeys object.
-   * Creates dataDir if needed. Credentials are written atomically.
+   * Updates individual API keys and AWS Bedrock config. Uses deep merge for
+   * apiKeys and awsBedrock objects. Creates dataDir if needed.
+   * Credentials are written atomically.
    * WARNING: Use only in secure contexts - keys are unencrypted.
    *
-   * @param updates - Partial Credentials (usually just apiKeys)
+   * @param updates - Partial Credentials (apiKeys or awsBedrock)
    * @returns Promise resolving to complete updated Credentials object
    */
   async updateCredentials(updates: Partial<Credentials>): Promise<Credentials> {
@@ -413,6 +418,14 @@ export class SettingsService {
       updated.apiKeys = {
         ...current.apiKeys,
         ...updates.apiKeys,
+      };
+    }
+
+    // Deep merge AWS Bedrock config if provided
+    if (updates.awsBedrock) {
+      updated.awsBedrock = {
+        ...current.awsBedrock,
+        ...updates.awsBedrock,
       };
     }
 
@@ -435,6 +448,13 @@ export class SettingsService {
     anthropic: { configured: boolean; masked: string };
     google: { configured: boolean; masked: string };
     openai: { configured: boolean; masked: string };
+    awsBedrock: {
+      configured: boolean;
+      enabled: boolean;
+      region: string;
+      accessKeyMasked: string;
+      secretKeyMasked: string;
+    };
   }> {
     const credentials = await this.getCredentials();
 
@@ -455,6 +475,13 @@ export class SettingsService {
       openai: {
         configured: !!credentials.apiKeys.openai,
         masked: maskKey(credentials.apiKeys.openai),
+      },
+      awsBedrock: {
+        configured: !!(credentials.awsBedrock?.accessKeyId && credentials.awsBedrock?.region),
+        enabled: credentials.awsBedrock?.enabled || false,
+        region: credentials.awsBedrock?.region || '',
+        accessKeyMasked: maskKey(credentials.awsBedrock?.accessKeyId || ''),
+        secretKeyMasked: maskKey(credentials.awsBedrock?.secretAccessKey || ''),
       },
     };
   }

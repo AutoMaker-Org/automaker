@@ -2126,21 +2126,49 @@ export class HttpApiClient implements ElectronAPI {
         anthropic: { configured: boolean; masked: string };
         google: { configured: boolean; masked: string };
         openai: { configured: boolean; masked: string };
+        awsBedrock: {
+          configured: boolean;
+          enabled: boolean;
+          region: string;
+          accessKeyMasked: string;
+          secretKeyMasked: string;
+        };
       };
       error?: string;
     }> => this.get('/api/settings/credentials'),
 
     updateCredentials: (updates: {
       apiKeys?: { anthropic?: string; google?: string; openai?: string };
+      awsBedrock?: {
+        enabled?: boolean;
+        accessKeyId?: string;
+        secretAccessKey?: string;
+        sessionToken?: string;
+        region?: string;
+      };
     }): Promise<{
       success: boolean;
       credentials?: {
         anthropic: { configured: boolean; masked: string };
         google: { configured: boolean; masked: string };
         openai: { configured: boolean; masked: string };
+        awsBedrock: {
+          configured: boolean;
+          enabled: boolean;
+          region: string;
+          accessKeyMasked: string;
+          secretKeyMasked: string;
+        };
       };
       error?: string;
     }> => this.put('/api/settings/credentials', updates),
+
+    getBedrockStatus: (): Promise<{
+      success: boolean;
+      bedrockConfigured: boolean;
+      region?: string | null;
+      error?: string;
+    }> => this.get('/api/settings/bedrock-status'),
 
     // Project settings
     getProject: (

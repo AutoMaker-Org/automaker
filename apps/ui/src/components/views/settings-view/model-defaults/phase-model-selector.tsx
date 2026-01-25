@@ -20,6 +20,7 @@ import {
 } from '@automaker/types';
 import {
   CLAUDE_MODELS,
+  BEDROCK_MODELS,
   CURSOR_MODELS,
   OPENCODE_MODELS,
   THINKING_LEVELS,
@@ -168,7 +169,17 @@ export function PhaseModelSelector({
     dynamicOpencodeModels,
     opencodeModelsLoading,
     fetchOpencodeModels,
+    bedrockConfigured,
   } = useAppStore();
+
+  // Build Claude models list (include Bedrock if configured)
+  const claudeModels = useMemo(() => {
+    const models = [...CLAUDE_MODELS];
+    if (bedrockConfigured) {
+      models.push(...BEDROCK_MODELS);
+    }
+    return models;
+  }, [bedrockConfigured]);
 
   // Detect mobile devices to use inline expansion instead of nested popovers
   const isMobile = useIsMobile();
@@ -284,7 +295,7 @@ export function PhaseModelSelector({
 
   // Helper to find current selected model details
   const currentModel = useMemo(() => {
-    const claudeModel = CLAUDE_MODELS.find((m) => m.id === selectedModel);
+    const claudeModel = claudeModels.find((m) => m.id === selectedModel);
     if (claudeModel) {
       // Add thinking level to label if not 'none'
       const thinkingLabel =
@@ -402,14 +413,14 @@ export function PhaseModelSelector({
 
   // Group models
   const { favorites, claude, cursor, codex, opencode } = useMemo(() => {
-    const favs: typeof CLAUDE_MODELS = [];
-    const cModels: typeof CLAUDE_MODELS = [];
+    const favs: typeof claudeModels = [];
+    const cModels: typeof claudeModels = [];
     const curModels: typeof CURSOR_MODELS = [];
     const codModels: typeof transformedCodexModels = [];
     const ocModels: ModelOption[] = [];
 
     // Process Claude Models
-    CLAUDE_MODELS.forEach((model) => {
+    claudeModels.forEach((model) => {
       if (favoriteModels.includes(model.id)) {
         favs.push(model);
       } else {
@@ -939,7 +950,7 @@ export function PhaseModelSelector({
   };
 
   // Render Claude model item with secondary popover for thinking level
-  const renderClaudeModelItem = (model: (typeof CLAUDE_MODELS)[0]) => {
+  const renderClaudeModelItem = (model: (typeof claudeModels)[0]) => {
     const isSelected = selectedModel === model.id;
     const isFavorite = favoriteModels.includes(model.id);
     const isExpanded = expandedClaudeModel === model.id;

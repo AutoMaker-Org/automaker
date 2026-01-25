@@ -72,7 +72,7 @@ export function createGetOpencodeModelsHandler() {
         cached = false;
       } else {
         // Check if we have cached models
-        const cachedModels = provider.getAvailableModels();
+        const cachedModels = await provider.getAvailableModels();
 
         // If cache only has default models (provider.hasCachedModels() would be false),
         // trigger a refresh to get dynamic models

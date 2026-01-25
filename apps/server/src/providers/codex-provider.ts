@@ -1037,7 +1037,7 @@ export class CodexProvider extends BaseProvider {
     };
   }
 
-  getAvailableModels(): ModelDefinition[] {
+  async getAvailableModels(): Promise<ModelDefinition[]> {
     // Return all available Codex/OpenAI models
     return CODEX_MODELS;
   }

@@ -2371,7 +2371,7 @@ This helps parse your summary correctly in the output logs.`;
     // Validate vision support before processing images
     const effectiveModel = model || 'claude-sonnet-4-20250514';
     if (imagePaths && imagePaths.length > 0) {
-      const supportsVision = ProviderFactory.modelSupportsVision(effectiveModel);
+      const supportsVision = await ProviderFactory.modelSupportsVision(effectiveModel);
       if (!supportsVision) {
         throw new Error(
           `This model (${effectiveModel}) does not support image input. ` +

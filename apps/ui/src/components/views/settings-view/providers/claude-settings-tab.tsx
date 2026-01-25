@@ -7,6 +7,7 @@ import { ClaudeMdSettings } from '../claude/claude-md-settings';
 import { ClaudeUsageSection } from '../api-keys/claude-usage-section';
 import { SkillsSection } from './claude-settings-tab/skills-section';
 import { SubagentsSection } from './claude-settings-tab/subagents-section';
+import { AwsBedrockSection } from './claude-settings-tab/aws-bedrock-section';
 import { Info } from 'lucide-react';
 
 export function ClaudeSettingsTab() {
@@ -34,6 +35,9 @@ export function ClaudeSettingsTab() {
           </p>
         </div>
       </div>
+
+      {/* AWS Bedrock Configuration */}
+      <AwsBedrockSection />
 
       <ClaudeCliStatus
         status={claudeCliStatus}

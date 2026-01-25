@@ -777,18 +777,45 @@ export interface ElectronAPI {
         anthropic: { configured: boolean; masked: string };
         google: { configured: boolean; masked: string };
         openai: { configured: boolean; masked: string };
+        awsBedrock: {
+          configured: boolean;
+          enabled: boolean;
+          region: string;
+          accessKeyMasked: string;
+          secretKeyMasked: string;
+        };
       };
       error?: string;
     }>;
     updateCredentials: (updates: {
       apiKeys?: { anthropic?: string; google?: string; openai?: string };
+      awsBedrock?: {
+        enabled?: boolean;
+        accessKeyId?: string;
+        secretAccessKey?: string;
+        sessionToken?: string;
+        region?: string;
+      };
     }) => Promise<{
       success: boolean;
       credentials?: {
         anthropic: { configured: boolean; masked: string };
         google: { configured: boolean; masked: string };
         openai: { configured: boolean; masked: string };
+        awsBedrock: {
+          configured: boolean;
+          enabled: boolean;
+          region: string;
+          accessKeyMasked: string;
+          secretKeyMasked: string;
+        };
       };
+      error?: string;
+    }>;
+    getBedrockStatus: () => Promise<{
+      success: boolean;
+      bedrockConfigured: boolean;
+      region?: string | null;
       error?: string;
     }>;
     getProject: (projectPath: string) => Promise<{

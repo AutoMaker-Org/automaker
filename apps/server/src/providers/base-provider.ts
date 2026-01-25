@@ -43,9 +43,9 @@ export abstract class BaseProvider {
 
   /**
    * Get available models for this provider
-   * @returns Array of model definitions
+   * @returns Promise resolving to array of model definitions
    */
-  abstract getAvailableModels(): ModelDefinition[];
+  abstract getAvailableModels(): Promise<ModelDefinition[]>;
 
   /**
    * Validate the provider configuration

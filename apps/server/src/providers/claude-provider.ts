@@ -17,6 +17,7 @@ import type {
   InstallationStatus,
   ModelDefinition,
 } from './types.js';
+import type { AWSBedrockConfig } from '@automaker/types';
 
 // Explicit allowlist of environment variables to pass to the SDK.
 // Only these vars are passed - nothing else from process.env leaks through.
@@ -41,33 +42,10 @@ const ALLOWED_ENV_VARS = [
 ];
 
 /**
- * Build environment for the SDK with only explicitly allowed variables
- */
-function buildEnv(): Record<string, string | undefined> {
-  const env: Record<string, string | undefined> = {};
-  for (const key of ALLOWED_ENV_VARS) {
-    if (process.env[key]) {
-      env[key] = process.env[key];
-    }
-  }
-  return env;
-}
-
-/**
- * Check if Bedrock is configured via environment variables
- */
-function isBedrockConfigured(): boolean {
-  return !!(
-    process.env.CLAUDE_CODE_USE_BEDROCK ||
-    (process.env.AWS_REGION && process.env.AWS_ACCESS_KEY_ID)
-  );
-}
-
-/**
  * Map standard Claude model IDs to AWS Bedrock model IDs
- * Only applies when Bedrock is configured via environment
+ * Only applies when Bedrock is configured
  */
-function mapToBedrockModel(model: string): string {
+async function mapToBedrockModel(model: string, provider: ClaudeProvider): Promise<string> {
   // If already a Bedrock model ID, pass through
   if (model.includes('.anthropic.claude-') || model.startsWith('anthropic.claude-')) {
     logger.debug(`Model already in Bedrock format: ${model}`);
@@ -75,12 +53,16 @@ function mapToBedrockModel(model: string): string {
   }
 
   // If Bedrock not configured, pass through unchanged
-  if (!isBedrockConfigured()) {
+  if (!(await provider['isBedrockConfigured']())) {
     return model;
   }
 
-  // Get AWS region for region-specific model IDs
-  const region = process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || 'us-east-1';
+  // Get AWS region for region-specific model IDs (check ENV first, then credentials)
+  let region = process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION;
+  if (!region) {
+    const config = await provider['getBedrockConfig']();
+    region = config?.region || 'us-east-1';
+  }
   const regionPrefix = region.startsWith('eu-') ? 'eu' : 'us';
 
   // Map standard Claude model IDs to Bedrock format
@@ -102,8 +84,93 @@ function mapToBedrockModel(model: string): string {
 }
 
 export class ClaudeProvider extends BaseProvider {
+  private static bedrockConfigCache: AWSBedrockConfig | null = null;
+  private static configLoadedAt: number = 0;
+  private static readonly CACHE_TTL_MS = 60000; // 1 minute cache
+
   getName(): string {
     return 'claude';
+  }
+
+  /**
+   * Load Bedrock configuration from settings (with caching)
+   */
+  private async getBedrockConfig(): Promise<AWSBedrockConfig | null> {
+    const now = Date.now();
+
+    // Return cached config if still valid
+    if (
+      ClaudeProvider.bedrockConfigCache &&
+      now - ClaudeProvider.configLoadedAt < ClaudeProvider.CACHE_TTL_MS
+    ) {
+      return ClaudeProvider.bedrockConfigCache;
+    }
+
+    // Load from settings
+    const factory = await import('./provider-factory.js');
+    const settingsService = factory.ProviderFactory.getSettingsService();
+
+    if (!settingsService) {
+      return null;
+    }
+
+    try {
+      const credentials = await settingsService.getCredentials();
+      ClaudeProvider.bedrockConfigCache = credentials.awsBedrock || null;
+      ClaudeProvider.configLoadedAt = now;
+      return ClaudeProvider.bedrockConfigCache;
+    } catch (error) {
+      logger.error('Failed to load Bedrock config:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Check if Bedrock is configured via ENV or credentials
+   */
+  private async isBedrockConfigured(): Promise<boolean> {
+    // Check ENV vars first (takes precedence)
+    if (
+      process.env.CLAUDE_CODE_USE_BEDROCK ||
+      (process.env.AWS_REGION && process.env.AWS_ACCESS_KEY_ID)
+    ) {
+      return true;
+    }
+
+    // Check credentials.json
+    const config = await this.getBedrockConfig();
+    return !!(config?.enabled && config.accessKeyId && config.region);
+  }
+
+  /**
+   * Build environment for the SDK with only explicitly allowed variables
+   * Merges ENV vars and credentials (ENV takes precedence)
+   */
+  private async buildEnv(): Promise<Record<string, string | undefined>> {
+    const env: Record<string, string | undefined> = {};
+
+    // Start with allowed ENV vars (takes precedence)
+    for (const key of ALLOWED_ENV_VARS) {
+      if (process.env[key]) {
+        env[key] = process.env[key];
+      }
+    }
+
+    // If AWS credentials not in ENV, use credentials.json
+    if (!env.AWS_ACCESS_KEY_ID) {
+      const config = await this.getBedrockConfig();
+      if (config?.enabled && config.accessKeyId) {
+        env.AWS_ACCESS_KEY_ID = config.accessKeyId;
+        env.AWS_SECRET_ACCESS_KEY = config.secretAccessKey;
+        if (config.sessionToken) {
+          env.AWS_SESSION_TOKEN = config.sessionToken;
+        }
+        env.AWS_REGION = config.region;
+        env.CLAUDE_CODE_USE_BEDROCK = 'true';
+      }
+    }
+
+    return env;
   }
 
   /**
@@ -128,7 +195,7 @@ export class ClaudeProvider extends BaseProvider {
     } = options;
 
     // Map to Bedrock model ID if Bedrock is configured
-    const model = mapToBedrockModel(requestedModel);
+    const model = await mapToBedrockModel(requestedModel, this);
 
     // Convert thinking level to token budget
     const maxThinkingTokens = getThinkingTokenBudget(thinkingLevel);
@@ -140,7 +207,7 @@ export class ClaudeProvider extends BaseProvider {
       maxTurns,
       cwd,
       // Pass only explicitly allowed environment variables to SDK
-      env: buildEnv(),
+      env: await this.buildEnv(),
       // Pass through allowedTools if provided by caller (decided by sdk-options.ts)
       ...(allowedTools && { allowedTools }),
       // AUTONOMOUS MODE: Always bypass permissions for fully autonomous operation
@@ -241,9 +308,9 @@ export class ClaudeProvider extends BaseProvider {
   }
 
   /**
-   * Get available Claude models
+   * Get available Claude models (includes Bedrock if configured)
    */
-  getAvailableModels(): ModelDefinition[] {
+  async getAvailableModels(): Promise<ModelDefinition[]> {
     const anthropicModels: ModelDefinition[] = [
       {
         id: 'claude-opus-4-5-20251101',
@@ -296,12 +363,15 @@ export class ClaudeProvider extends BaseProvider {
       },
     ];
 
-    // Add AWS Bedrock models if configured (checked dynamically at runtime)
-    const bedrockModels: ModelDefinition[] = isBedrockConfigured()
+    // Check if Bedrock is configured
+    const bedrockConfigured = await this.isBedrockConfigured();
+
+    // Add AWS Bedrock models if configured
+    const bedrockModels: ModelDefinition[] = bedrockConfigured
       ? [
           {
             id: 'eu.anthropic.claude-sonnet-4-5-20250929-v1:0',
-            name: 'Claude Sonnet 4.5 (AWS Bedrock)',
+            name: 'Claude Sonnet 4.5 (AWS Bedrock EU)',
             modelString: 'eu.anthropic.claude-sonnet-4-5-20250929-v1:0',
             provider: 'bedrock',
             description: 'Claude Sonnet 4.5 via AWS Bedrock (eu-central-1)',
@@ -310,11 +380,10 @@ export class ClaudeProvider extends BaseProvider {
             supportsVision: true,
             supportsTools: true,
             tier: 'standard' as const,
-            default: false,
           },
           {
             id: 'us.anthropic.claude-opus-4-5-20251101-v1:0',
-            name: 'Claude Opus 4.5 (AWS Bedrock)',
+            name: 'Claude Opus 4.5 (AWS Bedrock US)',
             modelString: 'us.anthropic.claude-opus-4-5-20251101-v1:0',
             provider: 'bedrock',
             description: 'Claude Opus 4.5 via AWS Bedrock (us-east-1)',
@@ -323,7 +392,6 @@ export class ClaudeProvider extends BaseProvider {
             supportsVision: true,
             supportsTools: true,
             tier: 'premium' as const,
-            default: false,
           },
           {
             id: 'anthropic.claude-3-5-sonnet-20241022-v2:0',
@@ -336,7 +404,18 @@ export class ClaudeProvider extends BaseProvider {
             supportsVision: true,
             supportsTools: true,
             tier: 'standard' as const,
-            default: false,
+          },
+          {
+            id: 'anthropic.claude-haiku-4-5-20251001-v1:0',
+            name: 'Claude Haiku 4.5 (AWS Bedrock)',
+            modelString: 'anthropic.claude-haiku-4-5-20251001-v1:0',
+            provider: 'bedrock',
+            description: 'Claude Haiku 4.5 via AWS Bedrock',
+            contextWindow: 200000,
+            maxOutputTokens: 8000,
+            supportsVision: true,
+            supportsTools: true,
+            tier: 'basic' as const,
           },
         ]
       : [];

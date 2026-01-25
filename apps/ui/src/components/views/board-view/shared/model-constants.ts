@@ -42,6 +42,45 @@ export const CLAUDE_MODELS: ModelOption[] = [
 ];
 
 /**
+ * AWS Bedrock models (shown only when Bedrock is configured)
+ * These are conditionally added to the Claude models list
+ */
+export const BEDROCK_MODELS: ModelOption[] = [
+  {
+    id: 'eu.anthropic.claude-sonnet-4-5-20250929-v1:0',
+    label: 'Sonnet 4.5 (Bedrock EU)',
+    description: 'Via AWS Bedrock eu-central-1',
+    badge: 'AWS',
+    provider: 'claude',
+    hasThinking: true,
+  },
+  {
+    id: 'us.anthropic.claude-opus-4-5-20251101-v1:0',
+    label: 'Opus 4.5 (Bedrock US)',
+    description: 'Via AWS Bedrock us-east-1',
+    badge: 'AWS',
+    provider: 'claude',
+    hasThinking: true,
+  },
+  {
+    id: 'anthropic.claude-3-5-sonnet-20241022-v2:0',
+    label: '3.5 Sonnet (Bedrock)',
+    description: 'Via AWS Bedrock',
+    badge: 'AWS',
+    provider: 'claude',
+    hasThinking: true,
+  },
+  {
+    id: 'anthropic.claude-haiku-4-5-20251001-v1:0',
+    label: 'Haiku 4.5 (Bedrock)',
+    description: 'Via AWS Bedrock',
+    badge: 'AWS',
+    provider: 'claude',
+    hasThinking: false,
+  },
+];
+
+/**
  * Cursor models derived from CURSOR_MODEL_MAP
  * ID is prefixed with "cursor-" for ProviderFactory routing
  */

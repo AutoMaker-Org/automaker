@@ -1034,7 +1034,7 @@ export class CursorProvider extends CliProvider {
   /**
    * Get available Cursor models
    */
-  getAvailableModels(): ModelDefinition[] {
+  async getAvailableModels(): Promise<ModelDefinition[]> {
     return Object.entries(CURSOR_MODEL_MAP).map(([id, config]) => ({
       id: `cursor-${id}`,
       name: config.label,

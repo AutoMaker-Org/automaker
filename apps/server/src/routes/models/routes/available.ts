@@ -10,7 +10,7 @@ export function createAvailableHandler() {
   return async (_req: Request, res: Response): Promise<void> => {
     try {
       // Get all models from all registered providers (Claude + Cursor)
-      const models = ProviderFactory.getAllAvailableModels();
+      const models = await ProviderFactory.getAllAvailableModels();
 
       res.json({ success: true, models });
     } catch (error) {

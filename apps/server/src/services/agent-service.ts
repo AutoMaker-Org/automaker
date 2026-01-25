@@ -186,7 +186,7 @@ export class AgentService {
     // Validate vision support before processing images
     const effectiveModel = model || session.model;
     if (imagePaths && imagePaths.length > 0 && effectiveModel) {
-      const supportsVision = ProviderFactory.modelSupportsVision(effectiveModel);
+      const supportsVision = await ProviderFactory.modelSupportsVision(effectiveModel);
       if (!supportsVision) {
         throw new Error(
           `This model (${effectiveModel}) does not support image input. ` +

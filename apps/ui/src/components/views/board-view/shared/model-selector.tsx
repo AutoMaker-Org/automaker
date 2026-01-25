@@ -9,8 +9,8 @@ import { useAppStore } from '@/store/app-store';
 import { useSetupStore } from '@/store/setup-store';
 import { getModelProvider, PROVIDER_PREFIXES, stripProviderPrefix } from '@automaker/types';
 import type { ModelProvider } from '@automaker/types';
-import { CLAUDE_MODELS, CURSOR_MODELS, ModelOption } from './model-constants';
-import { useEffect } from 'react';
+import { CLAUDE_MODELS, BEDROCK_MODELS, CURSOR_MODELS, ModelOption } from './model-constants';
+import { useEffect, useMemo } from 'react';
 import { RefreshCw } from 'lucide-react';
 
 interface ModelSelectorProps {
@@ -31,6 +31,7 @@ export function ModelSelector({
     codexModelsLoading,
     codexModelsError,
     fetchCodexModels,
+    bedrockConfigured,
   } = useAppStore();
   const { cursorCliStatus, codexCliStatus } = useSetupStore();
 
@@ -66,6 +67,15 @@ export function ModelSelector({
       hasThinking: model.hasThinking,
     };
   });
+
+  // Build Claude models list (include Bedrock if configured)
+  const claudeModels = useMemo(() => {
+    const models = [...CLAUDE_MODELS];
+    if (bedrockConfigured) {
+      models.push(...BEDROCK_MODELS);
+    }
+    return models;
+  }, [bedrockConfigured]);
 
   // Filter Cursor models based on enabled models from global settings
   const filteredCursorModels = CURSOR_MODELS.filter((model) => {
@@ -153,7 +163,7 @@ export function ModelSelector({
             </span>
           </div>
           <div className="flex gap-2 flex-wrap">
-            {CLAUDE_MODELS.map((option) => {
+            {claudeModels.map((option) => {
               const isSelected = selectedModel === option.id;
               const shortName = option.label.replace('Claude ', '');
               return (
@@ -170,7 +180,16 @@ export function ModelSelector({
                   )}
                   data-testid={`${testIdPrefix}-${option.id}`}
                 >
-                  {shortName}
+                  {option.badge === 'AWS' ? (
+                    <span className="flex items-center gap-1">
+                      {shortName}
+                      <Badge className="ml-1 text-[10px] px-1.5 py-0 bg-orange-500/20 text-orange-400 border-orange-500/30">
+                        AWS
+                      </Badge>
+                    </span>
+                  ) : (
+                    shortName
+                  )}
                 </button>
               );
             })}

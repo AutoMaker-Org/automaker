@@ -579,7 +579,7 @@ export class OpencodeProvider extends CliProvider {
    *
    * Use `refreshModels()` to force a fresh fetch from the CLI.
    */
-  getAvailableModels(): ModelDefinition[] {
+  async getAvailableModels(): Promise<ModelDefinition[]> {
     // Return cached models if available and not expired
     if (this.cachedModels && Date.now() < this.modelsCacheExpiry) {
       return this.cachedModels;

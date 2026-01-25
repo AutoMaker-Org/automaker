@@ -679,6 +679,9 @@ export interface AppState {
   claudeUsage: ClaudeUsage | null;
   claudeUsageLastUpdated: number | null;
 
+  // AWS Bedrock Configuration
+  bedrockConfigured: boolean; // Whether AWS Bedrock credentials are configured
+
   // Codex Usage Tracking
   codexUsage: CodexUsage | null;
   codexUsageLastUpdated: number | null;
@@ -1169,6 +1172,9 @@ export interface AppActions {
   setClaudeUsageLastUpdated: (timestamp: number) => void;
   setClaudeUsage: (usage: ClaudeUsage | null) => void;
 
+  // AWS Bedrock Configuration actions
+  setBedrockConfigured: (configured: boolean) => void;
+
   // Codex Usage Tracking actions
   setCodexUsage: (usage: CodexUsage | null) => void;
 
@@ -1302,6 +1308,7 @@ const initialState: AppState = {
   claudeRefreshInterval: 60,
   claudeUsage: null,
   claudeUsageLastUpdated: null,
+  bedrockConfigured: false,
   codexUsage: null,
   codexUsageLastUpdated: null,
   codexModels: [],
@@ -3189,6 +3196,9 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
       claudeUsage: usage,
       claudeUsageLastUpdated: usage ? Date.now() : null,
     }),
+
+  // AWS Bedrock Configuration actions
+  setBedrockConfigured: (configured: boolean) => set({ bedrockConfigured: configured }),
 
   // Codex Usage Tracking actions
   setCodexUsage: (usage: CodexUsage | null) =>
