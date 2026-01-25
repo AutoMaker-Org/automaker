@@ -10,7 +10,7 @@ import { getElectronAPI } from '@/lib/electron';
  * the Bedrock status when the app loads.
  */
 export function useBedrockStatus() {
-  const { setBedrockConfigured } = useAppStore();
+  const { setBedrockConfigured, setBedrockEnabled } = useAppStore();
 
   useEffect(() => {
     const loadStatus = async () => {
@@ -21,6 +21,7 @@ export function useBedrockStatus() {
         const response = await api.settings.getBedrockStatus();
         if (response.success) {
           setBedrockConfigured(response.bedrockConfigured);
+          setBedrockEnabled(response.bedrockEnabled);
         }
       } catch (error) {
         console.error('Failed to load Bedrock status:', error);
@@ -28,5 +29,5 @@ export function useBedrockStatus() {
     };
 
     loadStatus();
-  }, [setBedrockConfigured]);
+  }, [setBedrockConfigured, setBedrockEnabled]);
 }

@@ -22,6 +22,7 @@ export function createGetBedrockStatusHandler(settingsService: SettingsService) 
       res.json({
         success: true,
         bedrockConfigured: isConfigured,
+        bedrockEnabled: config?.enabled || false,
         region: isConfigured ? config?.region : null,
       });
     } catch (error) {

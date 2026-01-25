@@ -68,7 +68,8 @@ async function mapToBedrockModel(model: string, provider: ClaudeProvider): Promi
   // Map standard Claude model IDs to Bedrock format
   const bedrockModelMap: Record<string, string> = {
     'claude-opus-4-5-20251101': `${regionPrefix}.anthropic.claude-opus-4-5-20251101-v1:0`,
-    'claude-sonnet-4-20250514': `${regionPrefix}.anthropic.claude-sonnet-4-5-20250929-v1:0`,
+    'claude-sonnet-4-5-20250929': `${regionPrefix}.anthropic.claude-sonnet-4-5-20250929-v1:0`,
+    'claude-sonnet-4-20250514': `${regionPrefix}.anthropic.claude-sonnet-4-5-20250929-v1:0`, // Legacy
     'claude-3-5-sonnet-20241022': 'anthropic.claude-3-5-sonnet-20241022-v2:0',
     'claude-haiku-4-5-20251001': 'anthropic.claude-haiku-4-5-20251001-v1:0',
   };

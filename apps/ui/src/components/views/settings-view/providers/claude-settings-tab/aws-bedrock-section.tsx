@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { CloudCog, Eye, EyeOff, Save, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { CloudCog, Eye, EyeOff, Save, AlertTriangle, CheckCircle2, FileText } from 'lucide-react';
 import { getElectronAPI } from '@/lib/electron';
 import { toast } from 'sonner';
 import { useAppStore } from '@/store/app-store';
@@ -14,7 +14,7 @@ const AWS_REGIONS = [
 ];
 
 export function AwsBedrockSection() {
-  const { setBedrockConfigured } = useAppStore();
+  const { setBedrockConfigured, setBedrockEnabled } = useAppStore();
 
   // Form state
   const [enabled, setEnabled] = useState(false);
@@ -30,6 +30,8 @@ export function AwsBedrockSection() {
   const [isSaving, setIsSaving] = useState(false);
   const [isConfigured, setIsConfigured] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [showCliImport, setShowCliImport] = useState(false);
+  const [cliImportText, setCliImportText] = useState('');
 
   // Load existing credentials
   useEffect(() => {
@@ -57,6 +59,59 @@ export function AwsBedrockSection() {
       console.error('Failed to load Bedrock credentials:', error);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const parseCliExports = () => {
+    try {
+      const lines = cliImportText.split('\n');
+      let parsedAccessKeyId = '';
+      let parsedSecretAccessKey = '';
+      let parsedSessionToken = '';
+      let parsedRegion = '';
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+
+        // Match: export AWS_ACCESS_KEY_ID=value or AWS_ACCESS_KEY_ID=value
+        if (trimmed.match(/^(export\s+)?AWS_ACCESS_KEY_ID=/i)) {
+          parsedAccessKeyId = trimmed.replace(/^(export\s+)?AWS_ACCESS_KEY_ID=/i, '').trim();
+        }
+        // Match: export AWS_SECRET_ACCESS_KEY=value
+        else if (trimmed.match(/^(export\s+)?AWS_SECRET_ACCESS_KEY=/i)) {
+          parsedSecretAccessKey = trimmed
+            .replace(/^(export\s+)?AWS_SECRET_ACCESS_KEY=/i, '')
+            .trim();
+        }
+        // Match: export AWS_SESSION_TOKEN=value
+        else if (trimmed.match(/^(export\s+)?AWS_SESSION_TOKEN=/i)) {
+          parsedSessionToken = trimmed.replace(/^(export\s+)?AWS_SESSION_TOKEN=/i, '').trim();
+        }
+        // Match: export AWS_DEFAULT_REGION=value or export AWS_REGION=value
+        else if (trimmed.match(/^(export\s+)?AWS_(DEFAULT_)?REGION=/i)) {
+          parsedRegion = trimmed.replace(/^(export\s+)?AWS_(DEFAULT_)?REGION=/i, '').trim();
+        }
+      }
+
+      if (!parsedAccessKeyId || !parsedSecretAccessKey) {
+        toast.error('Could not parse AWS credentials. Please check the format.');
+        return;
+      }
+
+      // Set the parsed values
+      setAccessKeyId(parsedAccessKeyId);
+      setSecretAccessKey(parsedSecretAccessKey);
+      setSessionToken(parsedSessionToken);
+      if (parsedRegion) {
+        setRegion(parsedRegion);
+      }
+
+      toast.success('AWS credentials parsed successfully');
+      setShowCliImport(false);
+      setCliImportText('');
+    } catch (error) {
+      toast.error('Failed to parse AWS CLI exports');
+      console.error('Parse error:', error);
     }
   };
 
@@ -99,6 +154,7 @@ export function AwsBedrockSection() {
         const statusResponse = await api.settings.getBedrockStatus();
         if (statusResponse.success) {
           setBedrockConfigured(statusResponse.bedrockConfigured);
+          setBedrockEnabled(statusResponse.bedrockEnabled);
         }
 
         // Clear input fields after save (security)
@@ -186,6 +242,44 @@ export function AwsBedrockSection() {
       {/* Configuration Form (shown when enabled) */}
       {enabled && (
         <div className="space-y-4 pt-2 border-t border-zinc-800">
+          {/* CLI Import Section */}
+          <div className="p-3 bg-zinc-800/50 border border-zinc-700 rounded-lg space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <FileText className="w-4 h-4 text-blue-400" />
+                <span className="text-sm font-medium text-zinc-200">Import from AWS CLI</span>
+              </div>
+              <button
+                onClick={() => setShowCliImport(!showCliImport)}
+                className="text-xs px-2 py-1 bg-zinc-700 hover:bg-zinc-600 text-zinc-200 rounded transition-colors"
+              >
+                {showCliImport ? 'Hide' : 'Show'}
+              </button>
+            </div>
+
+            {showCliImport && (
+              <div className="space-y-2">
+                <p className="text-xs text-zinc-400">
+                  Paste your AWS CLI export commands here (from AWS SSO login):
+                </p>
+                <textarea
+                  value={cliImportText}
+                  onChange={(e) => setCliImportText(e.target.value)}
+                  placeholder={`export AWS_ACCESS_KEY_ID=AKIA...\nexport AWS_SECRET_ACCESS_KEY=...\nexport AWS_SESSION_TOKEN=...\nexport AWS_DEFAULT_REGION=eu-central-1`}
+                  rows={6}
+                  className="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-xs text-zinc-100 placeholder-zinc-600 focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
+                />
+                <button
+                  onClick={parseCliExports}
+                  disabled={!cliImportText.trim()}
+                  className="w-full px-3 py-2 bg-blue-500 hover:bg-blue-600 disabled:bg-zinc-700 disabled:text-zinc-500 text-white rounded-lg transition-colors text-sm font-medium"
+                >
+                  Parse & Fill Credentials
+                </button>
+              </div>
+            )}
+          </div>
+
           {/* AWS Region */}
           <div>
             <label className="block text-sm font-medium text-zinc-200 mb-2">AWS Region</label>

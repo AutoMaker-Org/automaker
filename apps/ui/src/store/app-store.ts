@@ -681,6 +681,7 @@ export interface AppState {
 
   // AWS Bedrock Configuration
   bedrockConfigured: boolean; // Whether AWS Bedrock credentials are configured
+  bedrockEnabled: boolean; // Whether AWS Bedrock is enabled (replaces normal Claude models)
 
   // Codex Usage Tracking
   codexUsage: CodexUsage | null;
@@ -1174,6 +1175,7 @@ export interface AppActions {
 
   // AWS Bedrock Configuration actions
   setBedrockConfigured: (configured: boolean) => void;
+  setBedrockEnabled: (enabled: boolean) => void;
 
   // Codex Usage Tracking actions
   setCodexUsage: (usage: CodexUsage | null) => void;
@@ -1309,6 +1311,7 @@ const initialState: AppState = {
   claudeUsage: null,
   claudeUsageLastUpdated: null,
   bedrockConfigured: false,
+  bedrockEnabled: false,
   codexUsage: null,
   codexUsageLastUpdated: null,
   codexModels: [],
@@ -3199,6 +3202,7 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
 
   // AWS Bedrock Configuration actions
   setBedrockConfigured: (configured: boolean) => set({ bedrockConfigured: configured }),
+  setBedrockEnabled: (enabled: boolean) => set({ bedrockEnabled: enabled }),
 
   // Codex Usage Tracking actions
   setCodexUsage: (usage: CodexUsage | null) =>

@@ -2166,6 +2166,7 @@ export class HttpApiClient implements ElectronAPI {
     getBedrockStatus: (): Promise<{
       success: boolean;
       bedrockConfigured: boolean;
+      bedrockEnabled: boolean;
       region?: string | null;
       error?: string;
     }> => this.get('/api/settings/bedrock-status'),

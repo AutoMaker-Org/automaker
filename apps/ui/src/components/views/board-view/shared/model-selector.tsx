@@ -32,6 +32,7 @@ export function ModelSelector({
     codexModelsError,
     fetchCodexModels,
     bedrockConfigured,
+    bedrockEnabled,
   } = useAppStore();
   const { cursorCliStatus, codexCliStatus } = useSetupStore();
 
@@ -68,14 +69,21 @@ export function ModelSelector({
     };
   });
 
-  // Build Claude models list (include Bedrock if configured)
+  // Build Claude models list
+  // If Bedrock is enabled, ONLY show Bedrock models (replace normal Claude models)
+  // If Bedrock is just configured but not enabled, show both
   const claudeModels = useMemo(() => {
-    const models = [...CLAUDE_MODELS];
-    if (bedrockConfigured) {
-      models.push(...BEDROCK_MODELS);
+    if (bedrockEnabled) {
+      // Bedrock enabled: ONLY Bedrock models (replaces normal Claude)
+      return [...BEDROCK_MODELS];
+    } else if (bedrockConfigured) {
+      // Bedrock configured but not enabled: show both
+      return [...CLAUDE_MODELS, ...BEDROCK_MODELS];
+    } else {
+      // Bedrock not configured: only normal Claude models
+      return [...CLAUDE_MODELS];
     }
-    return models;
-  }, [bedrockConfigured]);
+  }, [bedrockConfigured, bedrockEnabled]);
 
   // Filter Cursor models based on enabled models from global settings
   const filteredCursorModels = CURSOR_MODELS.filter((model) => {
