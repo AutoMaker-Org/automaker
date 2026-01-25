@@ -523,6 +523,34 @@ export interface GlobalSettings {
 }
 
 /**
+ * AWS Bedrock Configuration - Settings for using Claude via AWS Bedrock
+ *
+ * When configured, Claude models will be accessed through AWS Bedrock instead of
+ * the direct Anthropic API. This is useful for enterprise deployments with AWS.
+ */
+export interface AWSBedrockConfig {
+  /** Enable AWS Bedrock as the model provider */
+  enabled: boolean;
+  /** AWS Access Key ID */
+  accessKeyId: string;
+  /** AWS Secret Access Key */
+  secretAccessKey: string;
+  /** AWS Session Token (optional, for temporary credentials) */
+  sessionToken?: string;
+  /** AWS Region (e.g., 'us-east-1', 'eu-central-1') */
+  region: string;
+}
+
+/** Default AWS Bedrock configuration */
+export const DEFAULT_AWS_BEDROCK_CONFIG: AWSBedrockConfig = {
+  enabled: false,
+  accessKeyId: '',
+  secretAccessKey: '',
+  sessionToken: '',
+  region: 'us-east-1',
+};
+
+/**
  * Credentials - API keys stored in {DATA_DIR}/credentials.json
  *
  * Sensitive data stored separately from general settings.
@@ -540,6 +568,8 @@ export interface Credentials {
     /** OpenAI API key (for compatibility or alternative providers) */
     openai: string;
   };
+  /** AWS Bedrock configuration for enterprise Claude access */
+  awsBedrock?: AWSBedrockConfig;
 }
 
 /**
@@ -765,6 +795,7 @@ export const DEFAULT_CREDENTIALS: Credentials = {
     google: '',
     openai: '',
   },
+  awsBedrock: DEFAULT_AWS_BEDROCK_CONFIG,
 };
 
 /** Default project settings (empty - all settings are optional and fall back to global) */

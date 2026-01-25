@@ -23,6 +23,7 @@ export type {
   PhaseModelConfig,
   PhaseModelKey,
   PhaseModelEntry,
+  AWSBedrockConfig,
 } from '@automaker/types';
 
 export {
@@ -31,6 +32,7 @@ export {
   DEFAULT_CREDENTIALS,
   DEFAULT_PROJECT_SETTINGS,
   DEFAULT_PHASE_MODELS,
+  DEFAULT_AWS_BEDROCK_CONFIG,
   SETTINGS_VERSION,
   CREDENTIALS_VERSION,
   PROJECT_SETTINGS_VERSION,

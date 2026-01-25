@@ -129,6 +129,7 @@ export type {
   BoardBackgroundSettings,
   WorktreeInfo,
   ProjectSettings,
+  AWSBedrockConfig,
 } from './settings.js';
 export {
   DEFAULT_KEYBOARD_SHORTCUTS,
@@ -136,6 +137,7 @@ export {
   DEFAULT_GLOBAL_SETTINGS,
   DEFAULT_CREDENTIALS,
   DEFAULT_PROJECT_SETTINGS,
+  DEFAULT_AWS_BEDROCK_CONFIG,
   SETTINGS_VERSION,
   CREDENTIALS_VERSION,
   PROJECT_SETTINGS_VERSION,

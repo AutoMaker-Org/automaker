@@ -28,12 +28,14 @@ import type {
   WorktreeInfo,
   PhaseModelConfig,
   PhaseModelEntry,
+  AWSBedrockConfig,
 } from '../types/settings.js';
 import {
   DEFAULT_GLOBAL_SETTINGS,
   DEFAULT_CREDENTIALS,
   DEFAULT_PROJECT_SETTINGS,
   DEFAULT_PHASE_MODELS,
+  DEFAULT_AWS_BEDROCK_CONFIG,
   SETTINGS_VERSION,
   CREDENTIALS_VERSION,
   PROJECT_SETTINGS_VERSION,
