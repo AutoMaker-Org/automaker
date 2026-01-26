@@ -261,7 +261,7 @@ const featureLoader = new FeatureLoader();
 const autoModeService = new AutoModeService(events, settingsService);
 // Initialize auto mode service (performs startup cleanup of orphaned processes on Windows)
 autoModeService.initialize().catch((err) => {
-  console.error('[AutoModeService] Initialization error:', err);
+  logger.error('[AutoModeService] Initialization error:', err);
 });
 const claudeUsageService = new ClaudeUsageService();
 const codexAppServerService = new CodexAppServerService();

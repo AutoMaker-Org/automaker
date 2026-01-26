@@ -2094,17 +2094,18 @@ Complete the pipeline step instructions above. Review the previous work and appl
 
     // If we have a completion promise and should wait, wait for cleanup with timeout
     if (waitForCleanup && running.completionPromise) {
+      let timeoutId: NodeJS.Timeout | undefined;
+      const timeoutPromise = new Promise<void>((_, reject) => {
+        timeoutId = setTimeout(() => reject(new Error('Cleanup timeout')), timeoutMs);
+      });
       try {
-        await Promise.race([
-          running.completionPromise,
-          new Promise<void>((_, reject) =>
-            setTimeout(() => reject(new Error('Cleanup timeout')), timeoutMs)
-          ),
-        ]);
+        await Promise.race([running.completionPromise, timeoutPromise]);
         logger.info(`Feature ${featureId} cleanup completed gracefully`);
       } catch (error) {
         // Timeout or other error - force release
         logger.warn(`Feature ${featureId} cleanup timed out or failed, forcing removal:`, error);
+      } finally {
+        if (timeoutId) clearTimeout(timeoutId);
       }
     }
 
