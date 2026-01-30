@@ -740,6 +740,7 @@ export function electronUserDataReadFileSync(
 
 /**
  * Write a file to Electron userData directory
+ * Ensures parent directory exists before writing
  */
 export function electronUserDataWriteFileSync(
   relativePath: string,
@@ -750,6 +751,11 @@ export function electronUserDataWriteFileSync(
     throw new Error('[SystemPaths] Electron userData path not initialized');
   }
   const fullPath = path.join(electronUserDataPath, relativePath);
+  // Ensure parent directory exists
+  const parentDir = path.dirname(fullPath);
+  if (!fsSync.existsSync(parentDir)) {
+    fsSync.mkdirSync(parentDir, { recursive: true });
+  }
   fsSync.writeFileSync(fullPath, data, options);
 }
 

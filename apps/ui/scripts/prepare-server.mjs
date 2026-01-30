@@ -77,16 +77,40 @@ for (const pkgName of LOCAL_PACKAGES) {
   console.log(`   ✓ ${pkgName}`);
 }
 
-// Step 5: Create a minimal package.json for the server
+// Step 5: Create a minimal package.json for the server (without local packages)
+// Also collect external dependencies from local packages
 console.log('📝 Creating server package.json...');
 const serverPkg = JSON.parse(readFileSync(join(SERVER_DIR, 'package.json'), 'utf-8'));
 
-// Replace local package versions with file: references
+// Remove local packages from dependencies - we'll copy them directly to node_modules
+// This avoids symlinks that break in packaged apps
 const dependencies = { ...serverPkg.dependencies };
 for (const pkgName of LOCAL_PACKAGES) {
-  if (dependencies[pkgName]) {
-    const pkgDir = pkgName.replace('@automaker/', '');
-    dependencies[pkgName] = `file:libs/${pkgDir}`;
+  delete dependencies[pkgName];
+}
+
+// Collect external dependencies from local packages
+// These need to be installed via npm since we're copying local packages directly
+console.log('📦 Collecting dependencies from local packages...');
+for (const pkgName of LOCAL_PACKAGES) {
+  const pkgDir = pkgName.replace('@automaker/', '');
+  const pkgJsonPath = join(LIBS_DIR, pkgDir, 'package.json');
+
+  if (existsSync(pkgJsonPath)) {
+    const localPkg = JSON.parse(readFileSync(pkgJsonPath, 'utf-8'));
+    if (localPkg.dependencies) {
+      for (const [depName, depVersion] of Object.entries(localPkg.dependencies)) {
+        // Skip other local packages - they're handled separately
+        if (depName.startsWith('@automaker/')) {
+          continue;
+        }
+        // Add external dependency if not already present
+        if (!dependencies[depName]) {
+          dependencies[depName] = depVersion;
+          console.log(`   + ${depName}@${depVersion} (from ${pkgName})`);
+        }
+      }
+    }
   }
 }
 
@@ -100,8 +124,9 @@ const bundlePkg = {
 
 writeFileSync(join(BUNDLE_DIR, 'package.json'), JSON.stringify(bundlePkg, null, 2));
 
-// Step 6: Install production dependencies
+// Step 6: Install production dependencies (external only)
 console.log('📥 Installing server production dependencies...');
+// Note: execSync is used here with hardcoded commands (no user input) for build automation
 execSync('npm install --omit=dev', {
   cwd: BUNDLE_DIR,
   stdio: 'inherit',
@@ -112,7 +137,27 @@ execSync('npm install --omit=dev', {
   },
 });
 
-// Step 7: Rebuild native modules for current architecture
+// Step 7: Copy local packages directly to node_modules (avoiding symlinks)
+console.log('📦 Installing local packages to node_modules...');
+const nodeModulesAutomaker = join(BUNDLE_DIR, 'node_modules', '@automaker');
+mkdirSync(nodeModulesAutomaker, { recursive: true });
+
+for (const pkgName of LOCAL_PACKAGES) {
+  const pkgDir = pkgName.replace('@automaker/', '');
+  const srcDir = join(bundleLibsDir, pkgDir);
+  const destDir = join(nodeModulesAutomaker, pkgDir);
+
+  if (existsSync(srcDir)) {
+    // Remove any existing symlink or directory
+    if (existsSync(destDir)) {
+      rmSync(destDir, { recursive: true });
+    }
+    cpSync(srcDir, destDir, { recursive: true });
+    console.log(`   ✓ ${pkgName}`);
+  }
+}
+
+// Step 8: Rebuild native modules for current architecture
 // This is critical for modules like node-pty that have native bindings
 console.log('🔨 Rebuilding native modules for current architecture...');
 try {
