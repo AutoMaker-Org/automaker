@@ -8,7 +8,7 @@ import { getTerminalService } from '../../../services/terminal-service.js';
 export function createSessionDeleteHandler() {
   return (req: Request, res: Response): void => {
     const terminalService = getTerminalService();
-    const { id } = req.params;
+    const id = req.params.id as string;
     const killed = terminalService.killSession(id);
 
     if (!killed) {

@@ -9,7 +9,7 @@ import { getErrorMessage, logError } from '../common.js';
 export function createDeleteHandler(agentService: AgentService) {
   return async (req: Request, res: Response): Promise<void> => {
     try {
-      const { sessionId } = req.params;
+      const sessionId = req.params.sessionId as string;
       const success = await agentService.deleteSession(sessionId);
 
       if (!success) {

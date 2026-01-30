@@ -9,7 +9,7 @@ import { getErrorMessage, logError } from '../common.js';
 export function createUpdateHandler(agentService: AgentService) {
   return async (req: Request, res: Response): Promise<void> => {
     try {
-      const { sessionId } = req.params;
+      const sessionId = req.params.sessionId as string;
       const { name, tags, model } = req.body as {
         name?: string;
         tags?: string[];
