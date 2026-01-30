@@ -157,9 +157,12 @@ const getServerUrl = (): string => {
     const envUrl = import.meta.env.VITE_SERVER_URL;
     if (envUrl) return envUrl;
 
-    // In web mode (not Electron), use relative URL to leverage Vite proxy
+    // In web mode (not Electron), use relative URL to leverage nginx proxy
     // This avoids CORS issues since requests appear same-origin
-    if (!window.electron) {
+    // Note: Using 'in' operator prevents Vite from tree-shaking this branch,
+    // as it cannot statically determine the result at build time
+    const isElectron = 'electron' in window && window.electron != null;
+    if (!isElectron) {
       return '';
     }
   }
