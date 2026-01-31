@@ -247,6 +247,7 @@ export {
   isClaudeModel,
   isCodexModel,
   isOpencodeModel,
+  isKimiModel,
   getModelProvider,
   stripProviderPrefix,
   addProviderPrefix,

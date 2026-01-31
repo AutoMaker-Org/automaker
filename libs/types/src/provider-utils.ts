@@ -16,6 +16,7 @@ export const PROVIDER_PREFIXES = {
   cursor: 'cursor-',
   codex: 'codex-',
   opencode: 'opencode-',
+  kimi: 'kimi-',
 } as const;
 
 /**
@@ -145,13 +146,43 @@ export function isOpencodeModel(model: string | undefined | null): boolean {
 }
 
 /**
+ * Check if a model string represents a Kimi model (via OpenRouter)
+ *
+ * Kimi models are identified by:
+ * - 'kimi-' prefix (canonical format)
+ * - 'moonshotai/' prefix (OpenRouter format)
+ *
+ * @param model - Model string to check
+ * @returns true if the model is a Kimi model
+ */
+export function isKimiModel(model: string | undefined | null): boolean {
+  if (!model || typeof model !== 'string') return false;
+
+  // Canonical format: kimi- prefix
+  if (model.startsWith(PROVIDER_PREFIXES.kimi)) {
+    return true;
+  }
+
+  // OpenRouter format: moonshotai/ prefix
+  if (model.startsWith('moonshotai/')) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
  * Get the provider for a model string
  *
  * @param model - Model string to check
  * @returns The provider type, defaults to 'claude' for unknown models
  */
 export function getModelProvider(model: string | undefined | null): ModelProvider {
-  // Check OpenCode first since it uses provider-prefixed formats that could conflict
+  // Check Kimi first (specific OpenRouter provider)
+  if (isKimiModel(model)) {
+    return 'kimi';
+  }
+  // Check OpenCode since it uses provider-prefixed formats that could conflict
   if (isOpencodeModel(model)) {
     return 'opencode';
   }
@@ -215,6 +246,10 @@ export function addProviderPrefix(model: string, provider: ModelProvider): strin
     if (!model.startsWith(PROVIDER_PREFIXES.opencode)) {
       return `${PROVIDER_PREFIXES.opencode}${model}`;
     }
+  } else if (provider === 'kimi') {
+    if (!model.startsWith(PROVIDER_PREFIXES.kimi)) {
+      return `${PROVIDER_PREFIXES.kimi}${model}`;
+    }
   }
   // Claude models don't use prefixes
   return model;
@@ -238,6 +273,7 @@ export function getBareModelId(model: string): string {
  * - OpenCode models: always have opencode- prefix (static) or provider/model format (dynamic)
  * - Claude models: can use legacy aliases or claude- prefix
  * - Codex models: always have codex- prefix
+ * - Kimi models: always have kimi- prefix
  *
  * @param model - Model string to normalize
  * @returns Normalized model string
@@ -250,9 +286,16 @@ export function normalizeModelString(model: string | undefined | null): string {
     model.startsWith(PROVIDER_PREFIXES.cursor) ||
     model.startsWith(PROVIDER_PREFIXES.codex) ||
     model.startsWith(PROVIDER_PREFIXES.opencode) ||
+    model.startsWith(PROVIDER_PREFIXES.kimi) ||
     model.startsWith('claude-')
   ) {
     return model;
+  }
+
+  // OpenRouter Kimi format: moonshotai/model -> kimi-model
+  if (model.startsWith('moonshotai/')) {
+    const kimiModel = model.replace('moonshotai/', '');
+    return `${PROVIDER_PREFIXES.kimi}${kimiModel}`;
   }
 
   // Check if it's a legacy Cursor model ID

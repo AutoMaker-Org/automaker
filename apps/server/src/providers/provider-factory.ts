@@ -7,7 +7,13 @@
 
 import { BaseProvider } from './base-provider.js';
 import type { InstallationStatus, ModelDefinition } from './types.js';
-import { isCursorModel, isCodexModel, isOpencodeModel, type ModelProvider } from '@automaker/types';
+import {
+  isCursorModel,
+  isCodexModel,
+  isOpencodeModel,
+  isKimiModel,
+  type ModelProvider,
+} from '@automaker/types';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -16,6 +22,7 @@ const DISCONNECTED_MARKERS: Record<string, string> = {
   codex: '.codex-disconnected',
   cursor: '.cursor-disconnected',
   opencode: '.opencode-disconnected',
+  kimi: '.kimi-disconnected',
 };
 
 /**
@@ -267,6 +274,7 @@ import { ClaudeProvider } from './claude-provider.js';
 import { CursorProvider } from './cursor-provider.js';
 import { CodexProvider } from './codex-provider.js';
 import { OpencodeProvider } from './opencode-provider.js';
+import { KimiProvider } from './kimi-provider.js';
 
 // Register Claude provider
 registerProvider('claude', {
@@ -300,4 +308,12 @@ registerProvider('opencode', {
   factory: () => new OpencodeProvider(),
   canHandleModel: (model: string) => isOpencodeModel(model),
   priority: 3, // Between codex (5) and claude (0)
+});
+
+// Register Kimi provider (via OpenRouter)
+registerProvider('kimi', {
+  factory: () => new KimiProvider(),
+  aliases: ['moonshot', 'openrouter-kimi'],
+  canHandleModel: (model: string) => isKimiModel(model),
+  priority: 4, // Between opencode (3) and codex (5)
 });

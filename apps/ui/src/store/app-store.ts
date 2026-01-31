@@ -232,6 +232,7 @@ export interface ApiKeys {
   anthropic: string;
   google: string;
   openai: string;
+  openrouter: string;
 }
 
 // Keyboard Shortcut with optional modifiers
@@ -1444,6 +1445,7 @@ const initialState: AppState = {
     anthropic: '',
     google: '',
     openai: '',
+    openrouter: '',
   },
   chatSessions: [],
   currentChatSession: null,

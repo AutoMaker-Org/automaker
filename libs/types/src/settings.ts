@@ -99,7 +99,7 @@ export function getThinkingTokenBudget(level: ThinkingLevel | undefined): number
 }
 
 /** ModelProvider - AI model provider for credentials and API key management */
-export type ModelProvider = 'claude' | 'cursor' | 'codex' | 'opencode';
+export type ModelProvider = 'claude' | 'cursor' | 'codex' | 'opencode' | 'kimi';
 
 // ============================================================================
 // Claude-Compatible Providers - Configuration for Claude-compatible API endpoints
@@ -1060,6 +1060,8 @@ export interface Credentials {
     google: string;
     /** OpenAI API key (for compatibility or alternative providers) */
     openai: string;
+    /** OpenRouter API key (for Kimi and other models via OpenRouter) */
+    openrouter: string;
   };
 }
 
@@ -1330,6 +1332,7 @@ export const DEFAULT_CREDENTIALS: Credentials = {
     anthropic: '',
     google: '',
     openai: '',
+    openrouter: '',
   },
 };
 
