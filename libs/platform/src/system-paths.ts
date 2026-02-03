@@ -141,6 +141,14 @@ export function getCodexCliPaths(): string[] {
       // pnpm on Windows
       path.join(localAppData, 'pnpm', 'codex.cmd'),
       path.join(localAppData, 'pnpm', 'codex'),
+      // Scoop Node.js (global packages)
+      path.join(homeDir, 'scoop', 'apps', 'nodejs', 'current', 'bin', 'codex.cmd'),
+      path.join(homeDir, 'scoop', 'apps', 'nodejs', 'current', 'bin', 'codex'),
+      path.join(homeDir, 'scoop', 'apps', 'nodejs', 'current', 'codex.cmd'),
+      path.join(homeDir, 'scoop', 'apps', 'nodejs', 'current', 'codex'),
+      // Scoop global shim
+      path.join(homeDir, 'scoop', 'shims', 'codex.cmd'),
+      path.join(homeDir, 'scoop', 'shims', 'codex'),
     ];
   }
 
