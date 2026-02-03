@@ -973,6 +973,26 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
     });
   },
 
+  removeRunningTaskFromAllWorktrees: (projectId: string, taskId: string) => {
+    const current = get().autoModeByWorktree;
+    const projectPrefix = `${projectId}::`;
+    const updated: typeof current = {};
+
+    // Iterate through all worktree states and remove the task from any that contain it
+    for (const [key, worktreeState] of Object.entries(current)) {
+      if (key.startsWith(projectPrefix) && worktreeState.runningTasks.includes(taskId)) {
+        updated[key] = {
+          ...worktreeState,
+          runningTasks: worktreeState.runningTasks.filter((id) => id !== taskId),
+        };
+      } else {
+        updated[key] = worktreeState;
+      }
+    }
+
+    set({ autoModeByWorktree: updated });
+  },
+
   clearRunningTasks: (projectId: string, branchName: string | null) => {
     const key = get().getWorktreeKey(projectId, branchName);
     set((state) => {
