@@ -1274,9 +1274,13 @@ export function BoardView() {
         maxConcurrency={maxConcurrency}
         runningAgentsCount={runningAutoTasks.length}
         onConcurrencyChange={(newMaxConcurrency) => {
-          if (currentProject && selectedWorktree) {
-            const branchName = selectedWorktree.isMain ? null : selectedWorktree.branch;
+          // Allow changing concurrency even if no worktree is explicitly selected yet.
+          // Default to main worktree in that case.
+          if (currentProject) {
+            const branchName =
+              selectedWorktree && !selectedWorktree.isMain ? selectedWorktree.branch : null;
             setMaxConcurrencyForWorktree(currentProject.id, branchName, newMaxConcurrency);
+
             // Also update backend if auto mode is running
             if (autoMode.isRunning) {
               // Restart auto mode with new concurrency (backend will handle this)
