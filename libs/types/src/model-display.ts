@@ -72,6 +72,14 @@ export const CLAUDE_MODELS: ModelOption[] = [
  */
 export const CODEX_MODELS: (ModelOption & { hasReasoning?: boolean })[] = [
   {
+    id: CODEX_MODEL_MAP.gpt53Codex,
+    label: 'GPT-5.3-Codex',
+    description: 'Most advanced agentic coding model for complex software engineering.',
+    badge: 'Premium',
+    provider: 'codex',
+    hasReasoning: true,
+  },
+  {
     id: CODEX_MODEL_MAP.gpt52Codex,
     label: 'GPT-5.2-Codex',
     description: 'Most advanced agentic coding model for complex software engineering.',
@@ -94,6 +102,14 @@ export const CODEX_MODELS: (ModelOption & { hasReasoning?: boolean })[] = [
     badge: 'Speed',
     provider: 'codex',
     hasReasoning: false,
+  },
+  {
+    id: CODEX_MODEL_MAP.gpt53,
+    label: 'GPT-5.3',
+    description: 'Best general agentic model for tasks across industries and domains.',
+    badge: 'Balanced',
+    provider: 'codex',
+    hasReasoning: true,
   },
   {
     id: CODEX_MODEL_MAP.gpt52,
