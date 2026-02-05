@@ -59,7 +59,7 @@ export const CLAUDE_MODELS: ModelOption[] = [
   },
   {
     id: 'opus',
-    label: 'Claude Opus',
+    label: 'Opus 4.6',
     description: 'Most capable model for complex work.',
     badge: 'Premium',
     provider: 'claude',
@@ -193,7 +193,8 @@ export function getModelDisplayName(model: ModelAlias | string): string {
   const displayNames: Record<string, string> = {
     haiku: 'Claude Haiku',
     sonnet: 'Claude Sonnet',
-    opus: 'Claude Opus',
+    opus: 'Opus 4.6',
+    'claude-opus-4-6': 'Opus 4.6',
     [CODEX_MODEL_MAP.gpt52Codex]: 'GPT-5.2-Codex',
     [CODEX_MODEL_MAP.gpt51CodexMax]: 'GPT-5.1-Codex-Max',
     [CODEX_MODEL_MAP.gpt51CodexMini]: 'GPT-5.1-Codex-Mini',
