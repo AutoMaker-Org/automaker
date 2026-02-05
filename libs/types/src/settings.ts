@@ -276,7 +276,7 @@ export const CLAUDE_PROVIDER_TEMPLATES: ClaudeCompatibleProviderTemplate[] = [
     defaultModels: [
       { id: 'claude-haiku', displayName: 'Claude Haiku', mapsToClaudeModel: 'haiku' },
       { id: 'claude-sonnet', displayName: 'Claude Sonnet', mapsToClaudeModel: 'sonnet' },
-      { id: 'claude-opus', displayName: 'Claude Opus', mapsToClaudeModel: 'opus' },
+      { id: 'claude-opus', displayName: 'Opus 4.6', mapsToClaudeModel: 'opus' },
     ],
   },
   {
