@@ -18,10 +18,10 @@ call :killPort 3008
 echo.
 echo Starting backend (apps/server) on http://localhost:3008 ...
 REM Using tsx directly is more reliable than watch-mode when starting/stopping frequently
-start "Automaker Backend" cmd /k "cd /d \"%ROOT%apps\server\" ^&^& npx.cmd --yes tsx src/index.ts"
+start "Automaker Backend" cmd /k "cd /d ""%ROOT%apps\server"" && npx.cmd --yes tsx src/index.ts"
 
 echo Starting UI (apps/ui) on http://localhost:3007 ...
-start "Automaker UI" cmd /k "cd /d \"%ROOT%\" ^&^& npm.cmd run _dev:web"
+start "Automaker UI" cmd /k "cd /d ""%ROOT%"" && npm.cmd run _dev:web"
 
 echo.
 echo Done. Open: http://localhost:3007/
