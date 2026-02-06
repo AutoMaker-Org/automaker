@@ -45,20 +45,22 @@ export function AutoModeSettingsPopover({
               <Bot className="w-4 h-4 text-brand-500 shrink-0" />
               <Label className="text-xs font-medium">Max Concurrent Agents</Label>
               <span className="ml-auto text-xs text-muted-foreground">
-                {runningAgentsCount}/{maxConcurrency}
+                {maxConcurrency === 0 ? 'Paused' : `${runningAgentsCount}/${maxConcurrency}`}
               </span>
             </div>
             <div className="flex items-center gap-3">
               <Slider
                 value={[maxConcurrency]}
                 onValueChange={(value) => onConcurrencyChange(value[0])}
-                min={1}
+                min={0}
                 max={10}
                 step={1}
                 className="flex-1"
                 data-testid="concurrency-slider"
               />
-              <span className="text-xs font-medium min-w-[2ch] text-right">{maxConcurrency}</span>
+              <span className="text-xs font-medium min-w-[2ch] text-right">
+                {maxConcurrency === 0 ? '0' : maxConcurrency}
+              </span>
             </div>
             <p className="text-[10px] text-muted-foreground">
               Higher values process more features in parallel but use more API resources.

@@ -935,7 +935,7 @@ export class AutoModeService {
     ) {
       try {
         // Check if we have capacity
-        if (this.runningFeatures.size >= (this.config?.maxConcurrency || DEFAULT_MAX_CONCURRENCY)) {
+        if (this.runningFeatures.size >= (this.config?.maxConcurrency ?? DEFAULT_MAX_CONCURRENCY)) {
           await this.sleep(5000);
           continue;
         }
