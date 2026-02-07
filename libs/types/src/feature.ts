@@ -32,6 +32,26 @@ export interface FeatureTextFilePath {
   [key: string]: unknown;
 }
 
+export interface UsageEntry {
+  label: string;
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheWriteTokens: number;
+  durationMs: number;
+  numTurns: number;
+}
+
+export interface TokenUsage {
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheWriteTokens: number;
+  durationMs: number;
+  numTurns: number;
+  entries: UsageEntry[];
+}
+
 export interface Feature {
   id: string;
   title?: string;
@@ -76,6 +96,7 @@ export interface Feature {
     }>;
   };
   summary?: string;
+  tokenUsage?: TokenUsage;
   startedAt?: string;
   mergedToMain?: boolean; // Whether verified feature branch has been merged back to main
   descriptionHistory?: DescriptionHistoryEntry[]; // History of description changes

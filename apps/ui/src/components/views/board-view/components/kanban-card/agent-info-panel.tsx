@@ -10,7 +10,7 @@ import {
 } from '@/lib/agent-context-parser';
 import { cn } from '@/lib/utils';
 import type { AutoModeEvent } from '@/types/electron';
-import { Brain, ListTodo, Sparkles, Expand, CheckCircle2, Circle, Wrench } from 'lucide-react';
+import { Brain, ListTodo, Sparkles, Expand, CheckCircle2, Circle, Wrench, Zap } from 'lucide-react';
 import { Spinner } from '@/components/ui/spinner';
 import { getElectronAPI } from '@/lib/electron';
 import { SummaryDialog } from './summary-dialog';
@@ -46,6 +46,15 @@ function formatReasoningEffort(effort: ReasoningEffort | undefined): string {
     xhigh: 'XHigh',
   };
   return labels[effort];
+}
+
+/**
+ * Formats a token count for compact display
+ */
+function formatTokenCount(count: number): string {
+  if (count >= 1_000_000) return `${(count / 1_000_000).toFixed(1)}M`;
+  if (count >= 1_000) return `${(count / 1_000).toFixed(1)}K`;
+  return String(count);
 }
 
 interface AgentInfoPanelProps {
@@ -272,6 +281,20 @@ export const AgentInfoPanel = memo(function AgentInfoPanel({
               </div>
             )}
           </div>
+
+          {/* Token Usage */}
+          {feature.tokenUsage && (
+            <div
+              className="flex items-center gap-1 text-[10px] text-muted-foreground/60"
+              title="Total tokens used (input + output)"
+            >
+              <Zap className="w-2.5 h-2.5" />
+              <span>
+                {formatTokenCount(feature.tokenUsage.inputTokens + feature.tokenUsage.outputTokens)}{' '}
+                tokens
+              </span>
+            </div>
+          )}
 
           {/* Task List Progress */}
           {effectiveTodos.length > 0 && (

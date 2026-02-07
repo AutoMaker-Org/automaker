@@ -20,6 +20,8 @@ import type {
   PipelineConfig,
   ThinkingLevel,
   PlanningMode,
+  TokenUsage,
+  UsageEntry,
 } from '@automaker/types';
 import {
   DEFAULT_PHASE_MODELS,
@@ -38,6 +40,7 @@ import {
   readJsonWithRecovery,
   logRecoveryWarning,
   DEFAULT_BACKUP_COUNT,
+  extractSummary,
 } from '@automaker/utils';
 
 const logger = createLogger('AutoMode');
@@ -47,7 +50,12 @@ import {
   DEFAULT_MODELS,
   getEscalatedModel,
 } from '@automaker/model-resolver';
-import { resolveDependencies, areDependenciesSatisfied } from '@automaker/dependency-resolver';
+import {
+  resolveDependencies,
+  areDependenciesSatisfied,
+  getAncestors,
+  formatAncestorContextForPrompt,
+} from '@automaker/dependency-resolver';
 import { mergeWorktreeBranch, cleanupWorktree, getGitRepositoryDiffs } from '@automaker/git-utils';
 import {
   getFeatureDir,
@@ -1252,7 +1260,12 @@ export class AutoModeService {
         logger.info(`Using continuation prompt for feature ${featureId}`);
       } else {
         // Normal flow: build prompt with planning phase
-        const featurePrompt = this.buildFeaturePrompt(feature, prompts.taskExecution);
+        const ancestorContext = await this.buildAncestorContext(projectPath, feature);
+        const featurePrompt = this.buildFeaturePrompt(
+          feature,
+          prompts.taskExecution,
+          ancestorContext
+        );
         const planningPrefix = await this.getPlanningPromptPrefix(feature);
         prompt = planningPrefix + featurePrompt;
 
@@ -1284,7 +1297,7 @@ export class AutoModeService {
 
       // Run the agent with the feature's model and images
       // Context files are passed as system prompt for higher priority
-      await this.runAgent(
+      const mainEntry = await this.runAgent(
         workDir,
         featureId,
         prompt,
@@ -1302,6 +1315,8 @@ export class AutoModeService {
           branchName: feature.branchName ?? null,
         }
       );
+      if (mainEntry) mainEntry.label = 'Implementation';
+      let featureUsage: TokenUsage | undefined = this.accumulateUsage(undefined, mainEntry);
 
       // Check for pipeline steps and execute them
       const pipelineConfig = await pipelineService.getPipelineConfig(projectPath);
@@ -1309,7 +1324,7 @@ export class AutoModeService {
 
       if (sortedSteps.length > 0) {
         // Execute pipeline steps sequentially
-        await this.executePipelineSteps(
+        const pipelineUsage = await this.executePipelineSteps(
           projectPath,
           featureId,
           feature,
@@ -1318,12 +1333,17 @@ export class AutoModeService {
           abortController,
           autoLoadClaudeMd
         );
+        if (pipelineUsage) {
+          for (const entry of pipelineUsage.entries) {
+            featureUsage = this.accumulateUsage(featureUsage, entry);
+          }
+        }
       }
 
       // Self-review pass: review the diff for issues before setting final status
       const globalSettings = await this.settingsService?.getGlobalSettings();
       if (globalSettings?.enableSelfReview !== false) {
-        await this.executeSelfReview(
+        const reviewEntry = await this.executeSelfReview(
           projectPath,
           featureId,
           feature,
@@ -1331,6 +1351,7 @@ export class AutoModeService {
           abortController,
           autoLoadClaudeMd
         );
+        featureUsage = this.accumulateUsage(featureUsage, reviewEntry);
       }
 
       // Determine final status based on testing mode:
@@ -1367,6 +1388,14 @@ export class AutoModeService {
           // Agent output might not exist yet
         }
 
+        // Extract summary from agent output and save to feature for dependency context
+        if (agentOutput) {
+          const summary = extractSummary(agentOutput);
+          if (summary) {
+            await this.featureLoader.update(projectPath, featureId, { summary });
+          }
+        }
+
         // Record memory usage if we loaded any memory files
         if (contextResult.memoryFiles.length > 0 && agentOutput) {
           await recordMemoryUsage(
@@ -1384,6 +1413,29 @@ export class AutoModeService {
         console.warn('[AutoMode] Failed to record learnings:', learningError);
       }
 
+      // Persist accumulated token usage to feature
+      if (featureUsage) {
+        try {
+          const currentFeature = await this.loadFeature(projectPath, featureId);
+          if (currentFeature?.tokenUsage) {
+            featureUsage = {
+              inputTokens: currentFeature.tokenUsage.inputTokens + featureUsage.inputTokens,
+              outputTokens: currentFeature.tokenUsage.outputTokens + featureUsage.outputTokens,
+              cacheReadTokens:
+                currentFeature.tokenUsage.cacheReadTokens + featureUsage.cacheReadTokens,
+              cacheWriteTokens:
+                currentFeature.tokenUsage.cacheWriteTokens + featureUsage.cacheWriteTokens,
+              durationMs: currentFeature.tokenUsage.durationMs + featureUsage.durationMs,
+              numTurns: currentFeature.tokenUsage.numTurns + featureUsage.numTurns,
+              entries: [...currentFeature.tokenUsage.entries, ...featureUsage.entries],
+            };
+          }
+          await this.featureLoader.update(projectPath, featureId, { tokenUsage: featureUsage });
+        } catch (usageError) {
+          logger.warn(`Failed to persist token usage for feature ${featureId}:`, usageError);
+        }
+      }
+
       this.emitAutoModeEvent('auto_mode_feature_complete', {
         featureId,
         featureName: feature.title,
@@ -1395,6 +1447,7 @@ export class AutoModeService {
         projectPath,
         model: tempRunningFeature.model,
         provider: tempRunningFeature.provider,
+        tokenUsage: featureUsage,
       });
     } catch (error) {
       const errorInfo = classifyError(error);
@@ -1475,7 +1528,8 @@ export class AutoModeService {
     workDir: string,
     abortController: AbortController,
     autoLoadClaudeMd: boolean
-  ): Promise<void> {
+  ): Promise<TokenUsage | undefined> {
+    let pipelineUsage: TokenUsage | undefined;
     logger.info(`Executing ${steps.length} pipeline step(s) for feature ${featureId}`);
 
     // Get customized prompts from settings
@@ -1537,7 +1591,7 @@ export class AutoModeService {
       const model = resolveModelString(feature.model, DEFAULT_MODELS.claude);
 
       // Run the agent for this pipeline step
-      await this.runAgent(
+      const stepEntry = await this.runAgent(
         workDir,
         featureId,
         prompt,
@@ -1555,6 +1609,8 @@ export class AutoModeService {
           thinkingLevel: feature.thinkingLevel,
         }
       );
+      if (stepEntry) stepEntry.label = `Pipeline: ${step.name}`;
+      pipelineUsage = this.accumulateUsage(pipelineUsage, stepEntry);
 
       // Load updated context for next step
       try {
@@ -1578,6 +1634,7 @@ export class AutoModeService {
     }
 
     logger.info(`All pipeline steps completed for feature ${featureId}`);
+    return pipelineUsage;
   }
 
   /**
@@ -1591,7 +1648,7 @@ export class AutoModeService {
     workDir: string,
     abortController: AbortController,
     autoLoadClaudeMd: boolean
-  ): Promise<void> {
+  ): Promise<UsageEntry | undefined> {
     logger.info(`Starting self-review for feature ${featureId}`);
 
     this.emitAutoModeEvent('self_review_started', {
@@ -1649,8 +1706,9 @@ export class AutoModeService {
       .replace('{{description}}', feature.description || 'No description')
       .replace('{{diff}}', truncatedDiff);
 
-    // Get the model for the review (use feature model)
-    const model = resolveModelString(feature.model, DEFAULT_MODELS.claude);
+    // Prefer sonnet for review (fast, cheap), fall back to feature model
+    const featureModel = resolveModelString(feature.model, DEFAULT_MODELS.claude);
+    const model = resolveModelString('claude-sonnet', featureModel);
 
     // Run a lightweight, read-only review
     let reviewResponse: string;
@@ -1681,6 +1739,7 @@ export class AutoModeService {
     // Check if issues were found
     const noIssues = reviewResponse.includes('NO_ISSUES_FOUND');
     let fixesApplied = false;
+    let reviewFixEntry: UsageEntry | undefined;
 
     if (!noIssues) {
       logger.info(`Self-review found issues for feature ${featureId}, running fix pass`);
@@ -1695,7 +1754,7 @@ ${reviewResponse}
 Please fix these issues. Only fix the specific problems listed above — do not make other changes.`;
 
       try {
-        await this.runAgent(
+        reviewFixEntry = await this.runAgent(
           workDir,
           featureId,
           fixPrompt,
@@ -1712,6 +1771,7 @@ Please fix these issues. Only fix the specific problems listed above — do not 
             branchName: feature.branchName ?? null,
           }
         );
+        if (reviewFixEntry) reviewFixEntry.label = 'Self-review fix';
         fixesApplied = true;
 
         this.emitAutoModeEvent('self_review_fix_applied', {
@@ -1759,6 +1819,7 @@ Please fix these issues. Only fix the specific problems listed above — do not 
     logger.info(
       `Self-review complete for feature ${featureId}: ${noIssues ? 'no issues' : `issues found, fixes ${fixesApplied ? 'applied' : 'failed'}`}`
     );
+    return reviewFixEntry;
   }
 
   /**
@@ -2390,7 +2451,7 @@ Address the follow-up instructions above. Review the previous work and make the 
       // Note: Follow-ups skip planning mode - they continue from previous work
       // Pass previousContext so the history is preserved in the output file
       // Context files are passed as system prompt for higher priority
-      await this.runAgent(
+      const followUpEntry = await this.runAgent(
         workDir,
         featureId,
         fullPrompt,
@@ -2407,11 +2468,19 @@ Address the follow-up instructions above. Review the previous work and make the 
           thinkingLevel: feature?.thinkingLevel,
         }
       );
+      if (followUpEntry) followUpEntry.label = 'Follow-up';
+      let followUpUsage: TokenUsage | undefined;
+
+      // Accumulate follow-up usage with existing feature usage
+      {
+        const currentFeature = await this.loadFeature(projectPath, featureId);
+        followUpUsage = this.accumulateUsage(currentFeature?.tokenUsage, followUpEntry);
+      }
 
       // Self-review pass after follow-up
       const globalSettingsFollowUp = await this.settingsService?.getGlobalSettings();
       if (globalSettingsFollowUp?.enableSelfReview !== false && feature) {
-        await this.executeSelfReview(
+        const reviewEntry = await this.executeSelfReview(
           projectPath,
           featureId,
           feature,
@@ -2419,6 +2488,16 @@ Address the follow-up instructions above. Review the previous work and make the 
           abortController,
           autoLoadClaudeMd
         );
+        followUpUsage = this.accumulateUsage(followUpUsage, reviewEntry);
+      }
+
+      // Persist accumulated token usage
+      if (followUpUsage) {
+        try {
+          await this.featureLoader.update(projectPath, featureId, { tokenUsage: followUpUsage });
+        } catch (usageError) {
+          logger.warn(`Failed to persist token usage for follow-up ${featureId}:`, usageError);
+        }
       }
 
       // Determine final status based on testing mode:
@@ -2451,6 +2530,7 @@ Address the follow-up instructions above. Review the previous work and make the 
         projectPath,
         model,
         provider,
+        tokenUsage: followUpUsage,
       });
     } catch (error) {
       const errorInfo = classifyError(error);
@@ -3934,12 +4014,28 @@ Format your response as a structured markdown document.`;
     return planningPrompt + '\n\n---\n\n## Feature Request\n\n';
   }
 
+  private async buildAncestorContext(projectPath: string, feature: Feature): Promise<string> {
+    if (!feature.dependencies || feature.dependencies.length === 0) {
+      return '';
+    }
+
+    const allFeatures = await this.featureLoader.getAll(projectPath);
+    const ancestors = getAncestors(feature, allFeatures, 2);
+    if (ancestors.length === 0) {
+      return '';
+    }
+
+    const selectedIds = new Set(ancestors.map((a) => a.id));
+    return formatAncestorContextForPrompt(ancestors, selectedIds);
+  }
+
   private buildFeaturePrompt(
     feature: Feature,
     taskExecutionPrompts: {
       implementationInstructions: string;
       playwrightVerificationInstructions: string;
-    }
+    },
+    ancestorContext?: string
   ): string {
     const title = this.extractTitleFromDescription(feature.description);
 
@@ -3955,6 +4051,10 @@ Format your response as a structured markdown document.`;
 **Specification:**
 ${feature.spec}
 `;
+    }
+
+    if (ancestorContext) {
+      prompt += `\n${ancestorContext}\n`;
     }
 
     // Add images note (like old implementation)
@@ -3991,6 +4091,33 @@ You can use the Read tool to view these images at any time during implementation
     return prompt;
   }
 
+  private accumulateUsage(
+    existing: TokenUsage | undefined,
+    entry: UsageEntry | undefined
+  ): TokenUsage | undefined {
+    if (!entry) return existing;
+    if (!existing) {
+      return {
+        inputTokens: entry.inputTokens,
+        outputTokens: entry.outputTokens,
+        cacheReadTokens: entry.cacheReadTokens,
+        cacheWriteTokens: entry.cacheWriteTokens,
+        durationMs: entry.durationMs,
+        numTurns: entry.numTurns,
+        entries: [entry],
+      };
+    }
+    return {
+      inputTokens: existing.inputTokens + entry.inputTokens,
+      outputTokens: existing.outputTokens + entry.outputTokens,
+      cacheReadTokens: existing.cacheReadTokens + entry.cacheReadTokens,
+      cacheWriteTokens: existing.cacheWriteTokens + entry.cacheWriteTokens,
+      durationMs: existing.durationMs + entry.durationMs,
+      numTurns: existing.numTurns + entry.numTurns,
+      entries: [...existing.entries, entry],
+    };
+  }
+
   private async runAgent(
     workDir: string,
     featureId: string,
@@ -4009,7 +4136,8 @@ You can use the Read tool to view these images at any time during implementation
       thinkingLevel?: ThinkingLevel;
       branchName?: string | null;
     }
-  ): Promise<void> {
+  ): Promise<UsageEntry | undefined> {
+    let usageEntry: UsageEntry | undefined;
     const finalProjectPath = options?.projectPath || projectPath;
     const branchName = options?.branchName ?? null;
     const planningMode = options?.planningMode || 'skip';
@@ -4769,8 +4897,21 @@ After generating the revised spec, output:
                       }
                     } else if (msg.type === 'error') {
                       throw new Error(msg.error || 'Unknown error during implementation');
-                    } else if (msg.type === 'result' && msg.subtype === 'success') {
-                      responseText += msg.result || '';
+                    } else if (msg.type === 'result') {
+                      if (msg.subtype === 'success') {
+                        responseText += msg.result || '';
+                      }
+                      if (msg.usage) {
+                        usageEntry = {
+                          label: '',
+                          inputTokens: msg.usage.input_tokens ?? 0,
+                          outputTokens: msg.usage.output_tokens ?? 0,
+                          cacheReadTokens: msg.usage.cache_read_input_tokens ?? 0,
+                          cacheWriteTokens: msg.usage.cache_creation_input_tokens ?? 0,
+                          durationMs: msg.duration_ms ?? 0,
+                          numTurns: msg.num_turns ?? 0,
+                        };
+                      }
                     }
                   }
                 }
@@ -4814,11 +4955,24 @@ After generating the revised spec, output:
         } else if (msg.type === 'error') {
           // Handle error messages
           throw new Error(msg.error || 'Unknown error');
-        } else if (msg.type === 'result' && msg.subtype === 'success') {
-          // Don't replace responseText - the accumulated content is the full history
-          // The msg.result is just a summary which would lose all tool use details
-          // Just ensure final write happens
-          scheduleWrite();
+        } else if (msg.type === 'result') {
+          if (msg.subtype === 'success') {
+            // Don't replace responseText - the accumulated content is the full history
+            // The msg.result is just a summary which would lose all tool use details
+            // Just ensure final write happens
+            scheduleWrite();
+          }
+          if (msg.usage) {
+            usageEntry = {
+              label: '',
+              inputTokens: msg.usage.input_tokens ?? 0,
+              outputTokens: msg.usage.output_tokens ?? 0,
+              cacheReadTokens: msg.usage.cache_read_input_tokens ?? 0,
+              cacheWriteTokens: msg.usage.cache_creation_input_tokens ?? 0,
+              durationMs: msg.duration_ms ?? 0,
+              numTurns: msg.num_turns ?? 0,
+            };
+          }
         }
       }
 
@@ -4847,6 +5001,7 @@ After generating the revised spec, output:
         rawWriteTimeout = null;
       }
     }
+    return usageEntry;
   }
 
   private async executeFeatureWithContext(
@@ -4863,8 +5018,9 @@ After generating the revised spec, output:
     // Get customized prompts from settings
     const prompts = await getPromptCustomization(this.settingsService, '[AutoMode]');
 
-    // Build the feature prompt
-    const featurePrompt = this.buildFeaturePrompt(feature, prompts.taskExecution);
+    // Build the feature prompt with ancestor context
+    const ancestorContext = await this.buildAncestorContext(projectPath, feature);
+    const featurePrompt = this.buildFeaturePrompt(feature, prompts.taskExecution, ancestorContext);
 
     // Use the resume feature template with variable substitution
     let prompt = prompts.taskExecution.resumeFeatureTemplate;

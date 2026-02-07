@@ -264,6 +264,16 @@ export interface ProviderMessage {
   parent_tool_use_id?: string | null;
   /** Structured output from SDK when using outputFormat */
   structured_output?: Record<string, unknown>;
+  // Usage data from SDK result messages
+  total_cost_usd?: number;
+  usage?: {
+    input_tokens: number;
+    output_tokens: number;
+    cache_creation_input_tokens: number;
+    cache_read_input_tokens: number;
+  };
+  num_turns?: number;
+  duration_ms?: number;
 }
 
 /**

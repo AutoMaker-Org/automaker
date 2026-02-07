@@ -58,6 +58,8 @@ export type {
   FeatureTextFilePath,
   FeatureStatus,
   DescriptionHistoryEntry,
+  TokenUsage,
+  UsageEntry,
 } from './feature.js';
 
 // Session types
