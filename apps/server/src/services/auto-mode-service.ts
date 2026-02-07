@@ -1156,14 +1156,19 @@ export class AutoModeService {
 
       if (useWorktrees && branchName) {
         // Try to find existing worktree for this branch
-        // Worktree should already exist (created when feature was added/edited)
         worktreePath = await this.findExistingWorktreeForBranch(projectPath, branchName);
 
         if (worktreePath) {
           logger.info(`Using worktree for branch "${branchName}": ${worktreePath}`);
         } else {
-          // Worktree doesn't exist - log warning and continue with project path
-          logger.warn(`Worktree for branch "${branchName}" not found, using project path`);
+          // Worktree doesn't exist - auto-create it
+          logger.info(`Worktree for branch "${branchName}" not found, creating automatically`);
+          worktreePath = await this.createWorktreeForBranch(projectPath, branchName);
+          if (worktreePath) {
+            logger.info(`Created worktree for branch "${branchName}": ${worktreePath}`);
+          } else {
+            logger.warn(`Failed to create worktree for branch "${branchName}", using project path`);
+          }
         }
       }
 
@@ -1780,11 +1785,15 @@ Complete the pipeline step instructions above. Review the previous work and appl
       if (useWorktrees && branchName) {
         worktreePath = await this.findExistingWorktreeForBranch(projectPath, branchName);
         if (worktreePath) {
-          console.log(`[AutoMode] Using worktree for branch "${branchName}": ${worktreePath}`);
+          logger.info(`Using worktree for branch "${branchName}": ${worktreePath}`);
         } else {
-          console.warn(
-            `[AutoMode] Worktree for branch "${branchName}" not found, using project path`
-          );
+          logger.info(`Worktree for branch "${branchName}" not found, creating automatically`);
+          worktreePath = await this.createWorktreeForBranch(projectPath, branchName);
+          if (worktreePath) {
+            logger.info(`Created worktree for branch "${branchName}": ${worktreePath}`);
+          } else {
+            logger.warn(`Failed to create worktree for branch "${branchName}", using project path`);
+          }
         }
       }
 
@@ -1907,12 +1916,20 @@ Complete the pipeline step instructions above. Review the previous work and appl
     const branchName = feature?.branchName || `feature/${featureId}`;
 
     if (useWorktrees && branchName) {
-      // Try to find existing worktree for this branch
       worktreePath = await this.findExistingWorktreeForBranch(projectPath, branchName);
 
       if (worktreePath) {
         workDir = worktreePath;
         logger.info(`Follow-up using worktree for branch "${branchName}": ${workDir}`);
+      } else {
+        logger.info(`Worktree for branch "${branchName}" not found, creating automatically`);
+        worktreePath = await this.createWorktreeForBranch(projectPath, branchName);
+        if (worktreePath) {
+          workDir = worktreePath;
+          logger.info(`Created worktree for branch "${branchName}": ${workDir}`);
+        } else {
+          logger.warn(`Failed to create worktree for branch "${branchName}", using project path`);
+        }
       }
     }
 
@@ -2807,6 +2824,50 @@ Format your response as a structured markdown document.`;
 
       return null;
     } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Auto-create a git worktree for a given branch when one doesn't already exist.
+   * This ensures features with branchName set (e.g. from JSON files) get proper
+   * worktree isolation even if they weren't created through the UI.
+   */
+  private async createWorktreeForBranch(
+    projectPath: string,
+    branchName: string
+  ): Promise<string | null> {
+    try {
+      const sanitizedName = branchName.replace(/[^a-zA-Z0-9_-]/g, '-');
+      const worktreesDir = path.join(projectPath, '.worktrees');
+      const worktreePath = path.join(worktreesDir, sanitizedName);
+
+      // Create worktrees directory if it doesn't exist
+      await secureFs.mkdir(worktreesDir, { recursive: true });
+
+      // Check if branch already exists in git
+      let branchExists = false;
+      try {
+        await execAsync(`git rev-parse --verify "${branchName}"`, { cwd: projectPath });
+        branchExists = true;
+      } catch {
+        // Branch doesn't exist yet
+      }
+
+      // Create the worktree
+      if (branchExists) {
+        await execAsync(`git worktree add "${worktreePath}" "${branchName}"`, {
+          cwd: projectPath,
+        });
+      } else {
+        await execAsync(`git worktree add -b "${branchName}" "${worktreePath}" HEAD`, {
+          cwd: projectPath,
+        });
+      }
+
+      return path.resolve(worktreePath);
+    } catch (error) {
+      logger.error(`Failed to create worktree for branch "${branchName}":`, error);
       return null;
     }
   }

@@ -120,6 +120,12 @@ Based on the analysis from Step 1, create:
 
 Add additional pipeline steps if the project warrants it (e.g., ML model validation, performance benchmarking, accessibility audit).
 
+**Pipeline model & role pattern:**
+
+- Pipeline steps use the SAME model as the feature being reviewed (not a separate model)
+- Role differentiation is achieved through detailed instructions in each step, not different models
+- Each step's instructions should start with "You are a [role]" to set the agent's perspective (e.g., "You are a Security Reviewer...")
+
 **Context files** (.automaker/context/) — The files determined in Step 1. Each must be:
 
 - Actionable (tells agents exactly what to do, not just guidelines)
@@ -171,7 +177,7 @@ Create feature.json files in .automaker/features/ for EVERY feature in the spec.
   "priority": 1,
   "model": "opus|sonnet|haiku",
   "dependencies": ["other-feature-ids"],
-  "branchName": null,
+  "branchName": "feature/{feature-slug}",
   "skipTests": false,
   "thinkingLevel": "ultrathink|high|medium|low|none",
   "planningMode": "full|spec|lite|skip",
@@ -228,7 +234,17 @@ Rule: If wrong decision is expensive or hard to reverse → Tier 1.
 
 3. **Future backlog** (prefix: b, priority 3) — From "Future Enhancements" / aspirational spec sections. Lower priority but still tracked.
 
+**branchName — Worktree Isolation:**
+
+- Verified features: set `branchName: null` (they run in main, already merged)
+- Backlog features: MUST have `branchName` set (e.g. `"feature/b01-x-oauth"`) to enable git worktree isolation
+- Automaker auto-creates the worktree when executing a feature with a `branchName` set
+- Without `branchName`, features execute directly on the main branch (no isolation)
+
 **Dependencies:** Must form a valid DAG. Verified features satisfy dependencies for backlog features.
+
+**Security Pattern — OAuth One-Time Code Exchange:**
+When implementing OAuth callbacks, never pass JWTs as URL query parameters. Instead, store a one-time code in Redis on the backend, redirect the user with that code as the query parameter, and have the frontend exchange the code for the actual JWT via a POST request. This prevents token leakage through browser history, referrer headers, and server logs.
 
 ---
 
@@ -287,5 +303,7 @@ These are Automaker platform features that apply to every project:
 - Feature.json schema with all required fields
 - .automaker/ directory structure (settings, context, memory, pipeline, features)
 - Worktree isolation strategy
+- Git worktree auto-creation for features with branchName set
+- Pipeline uses single-agent, multi-role pattern (same model for all review steps, role differentiation via instructions)
 - The principle that foundation code becomes "verified" features
 ```
