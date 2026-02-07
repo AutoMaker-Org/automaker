@@ -1205,16 +1205,21 @@ export function extractAutoMergeSection(rawOutput: string): string | null {
     return null;
   }
 
-  // Look for ## Auto-Merge section - capture everything until next ## heading or <summary> tag or end
-  const autoMergeMatch = rawOutput.match(
-    /^(## Auto-Merge[^\n]*\n[\s\S]*?)(?=\n## |\n<summary>|$)/m
-  );
-  if (autoMergeMatch) {
-    return autoMergeMatch[1].trim();
+  // Find the ## Auto-Merge heading
+  const startMatch = rawOutput.match(/^## Auto-Merge/m);
+  if (!startMatch || startMatch.index === undefined) {
+    return null;
   }
 
-  return null;
+  const rest = rawOutput.substring(startMatch.index);
+
+  // Find the end: next ## heading or <summary> tag
+  const endMatch = rest.match(/\n(?=## |<summary>)/);
+  const section = endMatch ? rest.substring(0, endMatch.index) : rest;
+
+  return section.trim() || null;
 }
+
 /**
  * Extracts summary content from raw log output
  * Returns the summary text if found, or null if no summary exists
