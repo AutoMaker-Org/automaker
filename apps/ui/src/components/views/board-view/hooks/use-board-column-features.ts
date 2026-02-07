@@ -31,9 +31,14 @@ export function useBoardColumnFeatures({
     // Use a more flexible type to support dynamic pipeline statuses
     const map: Record<string, Feature[]> = {
       backlog: [],
+      ready: [],
+      assigned: [],
       in_progress: [],
+      blocked: [],
+      in_review: [],
       waiting_approval: [],
       verified: [],
+      done: [],
       completed: [], // Completed features are shown in the archive modal, not as a column
     };
     const featureMap = createFeatureMap(features);

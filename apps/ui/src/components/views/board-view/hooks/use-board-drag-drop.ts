@@ -191,117 +191,94 @@ export function useBoardDragDrop({
 
       // Handle different drag scenarios
       // Note: Worktrees are created server-side at execution time based on feature.branchName
-      if (draggedFeature.status === 'backlog') {
-        // From backlog
+      //
+      // Board flow: Backlog → Ready → Assigned → In Progress → [Pipeline] → In Review → Waiting Approval → Verified → Done
+      // "Blocked" can be reached from any status (and returned from)
+
+      const truncDesc = (desc: string) => `${desc.slice(0, 50)}${desc.length > 50 ? '...' : ''}`;
+
+      // Helper to move feature with toast
+      const doMove = (
+        status: typeof targetStatus,
+        label: string,
+        variant: 'info' | 'success' = 'info'
+      ) => {
+        moveFeature(featureId, status);
+        persistFeatureUpdate(featureId, { status, justFinishedAt: undefined });
+        if (variant === 'success') {
+          toast.success(`Feature ${label}`, { description: truncDesc(draggedFeature.description) });
+        } else {
+          toast.info(`Feature moved to ${label}`, {
+            description: truncDesc(draggedFeature.description),
+          });
+        }
+      };
+
+      if (
+        targetStatus === 'in_progress' &&
+        (draggedFeature.status === 'backlog' ||
+          draggedFeature.status === 'ready' ||
+          draggedFeature.status === 'assigned')
+      ) {
+        // Starting implementation from backlog/ready/assigned
+        await handleStartImplementation(draggedFeature);
+      } else if (targetStatus === 'blocked') {
+        // Any status can move to blocked
+        doMove('blocked', 'Blocked');
+      } else if (draggedFeature.status === 'blocked') {
+        // From blocked, allow moving to any column
         if (targetStatus === 'in_progress') {
-          // Use helper function to handle concurrency check and start implementation
-          // Server will derive workDir from feature.branchName
           await handleStartImplementation(draggedFeature);
         } else {
-          moveFeature(featureId, targetStatus);
-          persistFeatureUpdate(featureId, { status: targetStatus });
+          doMove(targetStatus, targetStatus.replace(/_/g, ' '));
+        }
+      } else if (draggedFeature.status === 'backlog') {
+        // Backlog can move to ready, assigned, or any earlier column
+        doMove(targetStatus, targetStatus.replace(/_/g, ' '));
+      } else if (draggedFeature.status === 'ready') {
+        // Ready can move to assigned, backlog, or in_progress
+        doMove(targetStatus, targetStatus.replace(/_/g, ' '));
+      } else if (draggedFeature.status === 'assigned') {
+        // Assigned can move back to ready/backlog
+        doMove(targetStatus, targetStatus.replace(/_/g, ' '));
+      } else if (draggedFeature.status === 'in_progress') {
+        if (targetStatus === 'backlog' || targetStatus === 'ready') {
+          doMove(targetStatus, targetStatus.replace(/_/g, ' '));
+        } else if (targetStatus === 'in_review') {
+          doMove('in_review', 'In Review');
+        } else if (targetStatus === 'verified' && draggedFeature.skipTests) {
+          doMove('verified', 'verified', 'success');
+        }
+      } else if (draggedFeature.status === 'in_review') {
+        // From in_review: can go to waiting_approval, verified, or back
+        if (targetStatus === 'waiting_approval') {
+          doMove('waiting_approval', 'Waiting Approval');
+        } else if (targetStatus === 'verified') {
+          doMove('verified', 'verified', 'success');
+        } else if (targetStatus === 'backlog' || targetStatus === 'in_progress') {
+          doMove(targetStatus, targetStatus.replace(/_/g, ' '));
         }
       } else if (draggedFeature.status === 'waiting_approval') {
-        // waiting_approval features can be dragged to verified for manual verification
-        // NOTE: This check must come BEFORE skipTests check because waiting_approval
-        // features often have skipTests=true, and we want status-based handling first
         if (targetStatus === 'verified') {
-          moveFeature(featureId, 'verified');
-          // Clear justFinishedAt timestamp when manually verifying via drag
-          persistFeatureUpdate(featureId, {
-            status: 'verified',
-            justFinishedAt: undefined,
-          });
-          toast.success('Feature verified', {
-            description: `Manually verified: ${draggedFeature.description.slice(
-              0,
-              50
-            )}${draggedFeature.description.length > 50 ? '...' : ''}`,
-          });
-        } else if (targetStatus === 'backlog') {
-          // Allow moving waiting_approval cards back to backlog
-          moveFeature(featureId, 'backlog');
-          // Clear justFinishedAt timestamp when moving back to backlog
-          persistFeatureUpdate(featureId, {
-            status: 'backlog',
-            justFinishedAt: undefined,
-          });
-          toast.info('Feature moved to backlog', {
-            description: `Moved to Backlog: ${draggedFeature.description.slice(
-              0,
-              50
-            )}${draggedFeature.description.length > 50 ? '...' : ''}`,
-          });
-        }
-      } else if (draggedFeature.status === 'in_progress') {
-        // Handle in_progress features being moved
-        if (targetStatus === 'backlog') {
-          // Allow moving in_progress cards back to backlog
-          moveFeature(featureId, 'backlog');
-          persistFeatureUpdate(featureId, { status: 'backlog' });
-          toast.info('Feature moved to backlog', {
-            description: `Moved to Backlog: ${draggedFeature.description.slice(
-              0,
-              50
-            )}${draggedFeature.description.length > 50 ? '...' : ''}`,
-          });
-        } else if (targetStatus === 'verified' && draggedFeature.skipTests) {
-          // Manual verify via drag (only for skipTests features)
-          moveFeature(featureId, 'verified');
-          persistFeatureUpdate(featureId, { status: 'verified' });
-          toast.success('Feature verified', {
-            description: `Marked as verified: ${draggedFeature.description.slice(
-              0,
-              50
-            )}${draggedFeature.description.length > 50 ? '...' : ''}`,
-          });
-        }
-      } else if (draggedFeature.skipTests) {
-        // skipTests feature being moved between verified and waiting_approval
-        if (targetStatus === 'waiting_approval' && draggedFeature.status === 'verified') {
-          // Move verified feature back to waiting_approval
-          moveFeature(featureId, 'waiting_approval');
-          persistFeatureUpdate(featureId, { status: 'waiting_approval' });
-          toast.info('Feature moved back', {
-            description: `Moved back to Waiting Approval: ${draggedFeature.description.slice(
-              0,
-              50
-            )}${draggedFeature.description.length > 50 ? '...' : ''}`,
-          });
-        } else if (targetStatus === 'backlog') {
-          // Allow moving skipTests cards back to backlog (from verified)
-          moveFeature(featureId, 'backlog');
-          persistFeatureUpdate(featureId, { status: 'backlog' });
-          toast.info('Feature moved to backlog', {
-            description: `Moved to Backlog: ${draggedFeature.description.slice(
-              0,
-              50
-            )}${draggedFeature.description.length > 50 ? '...' : ''}`,
-          });
+          doMove('verified', 'verified', 'success');
+        } else if (targetStatus === 'backlog' || targetStatus === 'in_review') {
+          doMove(targetStatus, targetStatus.replace(/_/g, ' '));
         }
       } else if (draggedFeature.status === 'verified') {
-        // Handle verified TDD (non-skipTests) features being moved back
-        if (targetStatus === 'waiting_approval') {
-          // Move verified feature back to waiting_approval
-          moveFeature(featureId, 'waiting_approval');
-          persistFeatureUpdate(featureId, { status: 'waiting_approval' });
-          toast.info('Feature moved back', {
-            description: `Moved back to Waiting Approval: ${draggedFeature.description.slice(
-              0,
-              50
-            )}${draggedFeature.description.length > 50 ? '...' : ''}`,
-          });
-        } else if (targetStatus === 'backlog') {
-          // Allow moving verified cards back to backlog
-          moveFeature(featureId, 'backlog');
-          persistFeatureUpdate(featureId, { status: 'backlog' });
-          toast.info('Feature moved to backlog', {
-            description: `Moved to Backlog: ${draggedFeature.description.slice(
-              0,
-              50
-            )}${draggedFeature.description.length > 50 ? '...' : ''}`,
-          });
+        if (targetStatus === 'done') {
+          doMove('done', 'Done', 'success');
+        } else if (targetStatus === 'waiting_approval' || targetStatus === 'backlog') {
+          doMove(targetStatus, targetStatus.replace(/_/g, ' '));
         }
+      } else if (draggedFeature.status === 'done') {
+        // Done can be moved back to verified or backlog if needed
+        if (targetStatus === 'verified' || targetStatus === 'backlog') {
+          doMove(targetStatus, targetStatus.replace(/_/g, ' '));
+        }
+      } else {
+        // Generic fallback for any other status combination
+        moveFeature(featureId, targetStatus);
+        persistFeatureUpdate(featureId, { status: targetStatus });
       }
     },
     [

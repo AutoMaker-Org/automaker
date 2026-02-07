@@ -119,8 +119,13 @@
   --color-status-info: var(--status-info);
   --color-status-info-bg: var(--status-info-bg);
   --color-status-backlog: var(--status-backlog);
+  --color-status-ready: var(--status-ready);
+  --color-status-assigned: var(--status-assigned);
   --color-status-in-progress: var(--status-in-progress);
+  --color-status-blocked: var(--status-blocked);
+  --color-status-in-review: var(--status-in-review);
   --color-status-waiting: var(--status-waiting);
+  --color-status-done: var(--status-done);
 
   /* Border radius */
   --radius-sm: calc(var(--radius) - 4px);
@@ -197,8 +202,13 @@
   --status-info: oklch(0.55 0.2 230);
   --status-info-bg: oklch(0.55 0.2 230 / 0.15);
   --status-backlog: oklch(0.5 0 0);
+  --status-ready: oklch(0.55 0.18 240);
+  --status-assigned: oklch(0.55 0.18 300);
   --status-in-progress: oklch(0.7 0.15 70);
+  --status-blocked: oklch(0.55 0.22 25);
+  --status-in-review: oklch(0.6 0.15 200);
   --status-waiting: oklch(0.65 0.18 50);
+  --status-done: oklch(0.45 0.18 150);
 
   /* Shadow tokens */
   --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.05);
@@ -295,8 +305,13 @@
     --status-info: oklch(0.65 0.2 230);
     --status-info-bg: oklch(0.65 0.2 230 / 0.2);
     --status-backlog: oklch(0.6 0 0);
+    --status-ready: oklch(0.65 0.18 240);
+    --status-assigned: oklch(0.65 0.18 300);
     --status-in-progress: oklch(0.75 0.15 70);
+    --status-blocked: oklch(0.65 0.22 25);
+    --status-in-review: oklch(0.7 0.15 200);
     --status-waiting: oklch(0.7 0.18 50);
+    --status-done: oklch(0.55 0.18 150);
 
     /* Shadow tokens - darker for dark mode */
     --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.3);

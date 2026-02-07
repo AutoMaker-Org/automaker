@@ -11,7 +11,7 @@ import { createLogger } from '@automaker/utils';
 const logger = createLogger('features/update');
 
 // Statuses that should trigger syncing to app_spec.txt
-const SYNC_TRIGGER_STATUSES: FeatureStatus[] = ['verified', 'completed'];
+const SYNC_TRIGGER_STATUSES: FeatureStatus[] = ['verified', 'done', 'completed'];
 
 export function createUpdateHandler(featureLoader: FeatureLoader) {
   return async (req: Request, res: Response): Promise<void> => {

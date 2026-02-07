@@ -70,4 +70,17 @@ export interface Feature {
   [key: string]: unknown; // Keep catch-all for extensibility
 }
 
-export type FeatureStatus = 'pending' | 'running' | 'completed' | 'failed' | 'verified';
+export type FeatureStatus =
+  | 'pending'
+  | 'running'
+  | 'completed'
+  | 'failed'
+  | 'verified'
+  | 'backlog'
+  | 'ready'
+  | 'assigned'
+  | 'in_progress'
+  | 'blocked'
+  | 'in_review'
+  | 'waiting_approval'
+  | 'done';

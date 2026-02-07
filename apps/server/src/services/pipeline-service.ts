@@ -250,10 +250,14 @@ export class PipelineService {
     // Sort steps by order
     const sortedSteps = [...steps].sort((a, b) => a.order - b.order);
 
-    // If no pipeline steps, use original logic
+    // Determine final status after all pipeline steps complete
+    // Flow: in_progress -> [pipeline steps] -> in_review -> (manual) waiting_approval/verified -> done
+    const postPipelineStatus: FeatureStatusWithPipeline = 'in_review';
+
+    // If no pipeline steps, go directly to in_review (or legacy behavior for skipTests)
     if (sortedSteps.length === 0) {
       if (currentStatus === 'in_progress') {
-        return skipTests ? 'waiting_approval' : 'verified';
+        return skipTests ? 'waiting_approval' : postPipelineStatus;
       }
       return currentStatus;
     }
@@ -263,14 +267,14 @@ export class PipelineService {
       return `pipeline_${sortedSteps[0].id}`;
     }
 
-    // Coming from a pipeline step -> go to next step or final status
+    // Coming from a pipeline step -> go to next step or in_review
     if (currentStatus.startsWith('pipeline_')) {
       const currentStepId = currentStatus.replace('pipeline_', '');
       const currentIndex = sortedSteps.findIndex((s) => s.id === currentStepId);
 
       if (currentIndex === -1) {
-        // Step not found, go to final status
-        return skipTests ? 'waiting_approval' : 'verified';
+        // Step not found, go to in_review
+        return postPipelineStatus;
       }
 
       if (currentIndex < sortedSteps.length - 1) {
@@ -278,8 +282,8 @@ export class PipelineService {
         return `pipeline_${sortedSteps[currentIndex + 1].id}`;
       }
 
-      // Last step completed, go to final status
-      return skipTests ? 'waiting_approval' : 'verified';
+      // Last step completed, go to in_review for final human review
+      return postPipelineStatus;
     }
 
     // For other statuses, don't change

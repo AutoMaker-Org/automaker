@@ -9,7 +9,17 @@ export type ColumnId = Feature['status'];
 export interface EmptyStateConfig {
   title: string;
   description: string;
-  icon: 'lightbulb' | 'play' | 'clock' | 'check' | 'sparkles';
+  icon:
+    | 'lightbulb'
+    | 'play'
+    | 'clock'
+    | 'check'
+    | 'sparkles'
+    | 'shield'
+    | 'eye'
+    | 'ban'
+    | 'user'
+    | 'archive';
   shortcutKey?: string; // Keyboard shortcut label (e.g., 'N', 'A')
   shortcutHint?: string; // Human-readable shortcut hint
   primaryAction?: {
@@ -33,10 +43,32 @@ export const EMPTY_STATE_CONFIGS: Record<string, EmptyStateConfig> = {
       actionType: 'none',
     },
   },
+  ready: {
+    title: 'Nothing Ready',
+    description:
+      'Refined features with acceptance criteria and clear dependencies will appear here.',
+    icon: 'check',
+  },
+  assigned: {
+    title: 'Nothing Assigned',
+    description: 'Features assigned to an agent but not yet started will appear here.',
+    icon: 'user',
+  },
   in_progress: {
     title: 'Nothing in Progress',
     description: 'Drag a feature from the backlog here or click implement to start working on it.',
     icon: 'play',
+  },
+  blocked: {
+    title: 'Nothing Blocked',
+    description: 'Features stuck on blockers will appear here with documented reasons.',
+    icon: 'ban',
+  },
+  in_review: {
+    title: 'Nothing in Review',
+    description:
+      'Features with open PRs awaiting review will appear here after pipeline steps complete.',
+    icon: 'eye',
   },
   waiting_approval: {
     title: 'No Items Awaiting Approval',
@@ -47,6 +79,11 @@ export const EMPTY_STATE_CONFIGS: Record<string, EmptyStateConfig> = {
     title: 'No Verified Features',
     description: 'Approved features will appear here. They can then be completed and archived.',
     icon: 'check',
+  },
+  done: {
+    title: 'Nothing Done',
+    description: 'Merged and deployable features will appear here.',
+    icon: 'archive',
   },
   // Pipeline step default configuration
   pipeline_default: {
@@ -74,17 +111,21 @@ export interface Column {
   pipelineStepId?: string;
 }
 
-// Base columns (start)
+// Base columns (before pipeline steps)
 const BASE_COLUMNS: Column[] = [
   { id: 'backlog', title: 'Backlog', colorClass: 'bg-[var(--status-backlog)]' },
+  { id: 'ready', title: 'Ready', colorClass: 'bg-[var(--status-ready)]' },
+  { id: 'assigned', title: 'Assigned', colorClass: 'bg-[var(--status-assigned)]' },
   {
     id: 'in_progress',
     title: 'In Progress',
     colorClass: 'bg-[var(--status-in-progress)]',
   },
+  { id: 'blocked', title: 'Blocked', colorClass: 'bg-[var(--status-blocked)]' },
+  { id: 'in_review', title: 'In Review', colorClass: 'bg-[var(--status-in-review)]' },
 ];
 
-// End columns (after pipeline)
+// End columns (after pipeline steps)
 const END_COLUMNS: Column[] = [
   {
     id: 'waiting_approval',
@@ -95,6 +136,11 @@ const END_COLUMNS: Column[] = [
     id: 'verified',
     title: 'Verified',
     colorClass: 'bg-[var(--status-success)]',
+  },
+  {
+    id: 'done',
+    title: 'Done',
+    colorClass: 'bg-[var(--status-done)]',
   },
 ];
 

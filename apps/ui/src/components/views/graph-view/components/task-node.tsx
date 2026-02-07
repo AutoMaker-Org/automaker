@@ -16,6 +16,10 @@ import {
   RotateCcw,
   GitFork,
   Trash2,
+  CircleDot,
+  UserCheck,
+  Ban,
+  Archive,
 } from 'lucide-react';
 import { TaskNodeData } from '../hooks/use-graph-nodes';
 import { GRAPH_RENDER_MODE_COMPACT } from '../constants';
@@ -40,12 +44,40 @@ const statusConfig = {
     borderClass: 'border-border',
     bgClass: 'bg-card',
   },
+  ready: {
+    icon: CircleDot,
+    label: 'Ready',
+    colorClass: 'text-[var(--status-ready)]',
+    borderClass: 'border-[var(--status-ready)]',
+    bgClass: 'bg-[var(--status-ready)]/15',
+  },
+  assigned: {
+    icon: UserCheck,
+    label: 'Assigned',
+    colorClass: 'text-[var(--status-assigned)]',
+    borderClass: 'border-[var(--status-assigned)]',
+    bgClass: 'bg-[var(--status-assigned)]/15',
+  },
   in_progress: {
     icon: Play,
     label: 'In Progress',
     colorClass: 'text-[var(--status-in-progress)]',
     borderClass: 'border-[var(--status-in-progress)]',
     bgClass: 'bg-[var(--status-in-progress-bg)]',
+  },
+  blocked: {
+    icon: Ban,
+    label: 'Blocked',
+    colorClass: 'text-[var(--status-blocked)]',
+    borderClass: 'border-[var(--status-blocked)]',
+    bgClass: 'bg-[var(--status-blocked)]/15',
+  },
+  in_review: {
+    icon: Eye,
+    label: 'In Review',
+    colorClass: 'text-[var(--status-in-review)]',
+    borderClass: 'border-[var(--status-in-review)]',
+    bgClass: 'bg-[var(--status-in-review)]/15',
   },
   waiting_approval: {
     icon: Pause,
@@ -60,6 +92,13 @@ const statusConfig = {
     colorClass: 'text-[var(--status-success)]',
     borderClass: 'border-[var(--status-success)]',
     bgClass: 'bg-[var(--status-success-bg)]',
+  },
+  done: {
+    icon: Archive,
+    label: 'Done',
+    colorClass: 'text-[var(--status-done)]',
+    borderClass: 'border-[var(--status-done)]',
+    bgClass: 'bg-[var(--status-done)]/15',
   },
 };
 
