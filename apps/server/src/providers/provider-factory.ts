@@ -94,7 +94,7 @@ export class ProviderFactory {
   /**
    * Get the appropriate provider for a given model ID
    *
-   * @param modelId Model identifier (e.g., "claude-opus-4-5-20251101", "cursor-gpt-4o", "cursor-auto")
+   * @param modelId Model identifier (e.g., "claude-opus-4-6", "cursor-gpt-4o", "cursor-auto")
    * @param options Optional settings
    * @param options.throwOnDisconnected Throw error if provider is disconnected (default: true)
    * @returns Provider instance for the model

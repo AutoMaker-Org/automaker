@@ -711,7 +711,7 @@ describe('opencode-provider.ts', () => {
       await collectAsyncGenerator(
         mockedProvider.executeQuery({
           prompt: 'Test',
-          model: 'opencode-anthropic/claude-opus-4-5',
+          model: 'opencode-anthropic/claude-opus-4-6',
           cwd: '/tmp/workspace',
         })
       );
@@ -721,7 +721,7 @@ describe('opencode-provider.ts', () => {
       expect(call.args).toContain('--format');
       expect(call.args).toContain('json');
       expect(call.args).toContain('--model');
-      expect(call.args).toContain('anthropic/claude-opus-4-5');
+      expect(call.args).toContain('anthropic/claude-opus-4-6');
     });
 
     it('should skip null-normalized events', async () => {

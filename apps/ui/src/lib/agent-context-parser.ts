@@ -27,14 +27,14 @@ export interface AgentTaskInfo {
 /**
  * Default model used by the feature executor
  */
-export const DEFAULT_MODEL = 'claude-opus-4-5-20251101';
+export const DEFAULT_MODEL = 'claude-opus-4-6';
 
 /**
  * Formats a model name for display
  */
 export function formatModelName(model: string): string {
   // Claude models
-  if (model.includes('opus')) return 'Opus 4.5';
+  if (model.includes('opus')) return 'Opus 4.6';
   if (model.includes('sonnet')) return 'Sonnet 4.5';
   if (model.includes('haiku')) return 'Haiku 4.5';
 
