@@ -21,8 +21,13 @@ export type PipelineStatus = `pipeline_${string}`;
 
 export type FeatureStatusWithPipeline =
   | 'backlog'
+  | 'ready'
+  | 'assigned'
   | 'in_progress'
+  | 'blocked'
+  | 'in_review'
   | 'waiting_approval'
   | 'verified'
+  | 'done'
   | 'completed'
   | PipelineStatus;

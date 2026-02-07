@@ -26,6 +26,20 @@ import fs from 'fs/promises';
 // =============================================================================
 
 /**
+ * Get Volta installation directories (not the tool shims)
+ * Used for allowing system-path access checks for Volta-dependent shims.
+ */
+function getVoltaDirs(): string[] {
+  if (process.platform !== 'win32') {
+    return [path.join(os.homedir(), '.volta')];
+  }
+
+  const homeDir = os.homedir();
+  const localAppData = process.env.LOCALAPPDATA || path.join(homeDir, 'AppData', 'Local');
+  return [path.join(localAppData, 'Volta'), path.join(homeDir, '.volta')];
+}
+
+/**
  * Get common paths where GitHub CLI might be installed
  */
 export function getGitHubCliPaths(): string[] {
@@ -130,17 +144,27 @@ export function getCodexCliPaths(): string[] {
   if (isWindows) {
     const appData = process.env.APPDATA || path.join(homeDir, 'AppData', 'Roaming');
     const localAppData = process.env.LOCALAPPDATA || path.join(homeDir, 'AppData', 'Local');
+    // Prefer version-manager shims (Volta/pnpm) over legacy npm global bins
+    // so Automaker picks up the same Codex version your shell resolves.
     return [
       path.join(homeDir, '.local', 'bin', 'codex.exe'),
+      // Volta on Windows
+      // - Newer Volta installs often use %LOCALAPPDATA%\\Volta\\bin
+      // - Older installs may use %USERPROFILE%\\.volta\\bin
+      path.join(localAppData, 'Volta', 'bin', 'codex.exe'),
+      path.join(localAppData, 'Volta', 'bin', 'codex.cmd'),
+      path.join(localAppData, 'Volta', 'bin', 'codex'),
+      path.join(homeDir, '.volta', 'bin', 'codex.exe'),
+      path.join(homeDir, '.volta', 'bin', 'codex.cmd'),
+      path.join(homeDir, '.volta', 'bin', 'codex'),
+      // pnpm on Windows
+      path.join(localAppData, 'pnpm', 'codex.cmd'),
+      path.join(localAppData, 'pnpm', 'codex'),
+      // npm global fallback
       path.join(appData, 'npm', 'codex.cmd'),
       path.join(appData, 'npm', 'codex'),
       path.join(appData, '.npm-global', 'bin', 'codex.cmd'),
       path.join(appData, '.npm-global', 'bin', 'codex'),
-      // Volta on Windows
-      path.join(homeDir, '.volta', 'bin', 'codex.exe'),
-      // pnpm on Windows
-      path.join(localAppData, 'pnpm', 'codex.cmd'),
-      path.join(localAppData, 'pnpm', 'codex'),
     ];
   }
 
@@ -657,6 +681,7 @@ function getAllAllowedSystemDirs(): string[] {
     // Version managers (need recursive access for version directories)
     ...getNvmPaths(),
     ...getFnmPaths(),
+    ...getVoltaDirs(),
   ];
 }
 
@@ -963,7 +988,49 @@ export async function findClaudeCliPath(): Promise<string | null> {
 }
 
 export async function findCodexCliPath(): Promise<string | null> {
-  return findFirstExistingPath(getCodexCliPaths());
+  const candidates = getCodexCliPaths();
+
+  // On Windows, Volta shims (codex.cmd / codex bash shim) require a working `volta` binary.
+  // In some setups, the shim files can exist without Volta itself being installed, which would
+  // cause Codex detection to pick an unusable path. Guard against that here.
+  if (process.platform === 'win32') {
+    const hasVolta = async (): Promise<boolean> => {
+      const homeDir = os.homedir();
+      const localAppData = process.env.LOCALAPPDATA || path.join(homeDir, 'AppData', 'Local');
+      const pathsToCheck = [
+        path.join(localAppData, 'Volta', 'bin', 'volta.exe'),
+        path.join(localAppData, 'Volta', 'bin', 'volta.cmd'),
+        path.join(homeDir, '.volta', 'bin', 'volta.exe'),
+        path.join(homeDir, '.volta', 'bin', 'volta.cmd'),
+      ];
+
+      for (const p of pathsToCheck) {
+        if (await systemPathAccess(p)) return true;
+      }
+      return false;
+    };
+
+    const voltaAvailable = await hasVolta();
+
+    for (const p of candidates) {
+      if (!(await systemPathAccess(p))) continue;
+
+      const lower = p.toLowerCase();
+      const isVoltaShim =
+        lower.includes('\\volta\\bin\\codex') || lower.includes('\\.volta\\bin\\codex');
+
+      if (isVoltaShim && !voltaAvailable) {
+        // Skip unusable shim
+        continue;
+      }
+
+      return p;
+    }
+
+    return null;
+  }
+
+  return findFirstExistingPath(candidates);
 }
 
 /**

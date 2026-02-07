@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Automaker Model Proof</title>
+    <style>
+      body {
+        font-family:
+          ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New',
+          monospace;
+        padding: 24px;
+        max-width: 1100px;
+        margin: 0 auto;
+        line-height: 1.4;
+      }
+      .ok {
+        color: #0a7;
+        font-weight: 700;
+      }
+      .bad {
+        color: #c22;
+        font-weight: 700;
+      }
+      pre {
+        background: #111827;
+        color: #e5e7eb;
+        padding: 16px;
+        border-radius: 10px;
+        overflow: auto;
+      }
+      code {
+        background: #f3f4f6;
+        padding: 2px 6px;
+        border-radius: 6px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Automaker Model Proof (authoritative)</h1>
+    <p>
+      This page calls <code>/api/debug/resolved-models</code> and displays the server-side resolved
+      model IDs. That is the real proof of what Automaker will use.
+    </p>
+
+    <p>Status: <span id="status">Loading…</span></p>
+
+    <h2>Key checks</h2>
+    <ul>
+      <li>
+        Backlog planning model resolved to:
+        <code id="backlogResolved">(loading)</code>
+      </li>
+      <li>
+        Spec generation model resolved to:
+        <code id="specResolved">(loading)</code>
+      </li>
+      <li>
+        Default feature model resolved to:
+        <code id="featureResolved">(loading)</code>
+      </li>
+    </ul>
+
+    <h2>Raw JSON</h2>
+    <pre id="json">(loading)</pre>
+
+    <script>
+      async function main() {
+        const status = document.getElementById('status');
+        try {
+          const res = await fetch('/api/debug/resolved-models', {
+            method: 'GET',
+            headers: { Accept: 'application/json' },
+            credentials: 'same-origin',
+          });
+
+          if (!res.ok) {
+            status.textContent = `HTTP ${res.status} ${res.statusText}`;
+            status.className = 'bad';
+            document.getElementById('json').textContent = await res.text();
+            return;
+          }
+
+          const data = await res.json();
+          status.textContent = 'OK';
+          status.className = 'ok';
+
+          const backlog = data?.resolved?.phaseModels?.backlogPlanningModel?.model;
+          const spec = data?.resolved?.phaseModels?.specGenerationModel?.model;
+          const feature = data?.resolved?.defaultFeatureModel?.resolved;
+
+          document.getElementById('backlogResolved').textContent = backlog ?? '(missing)';
+          document.getElementById('specResolved').textContent = spec ?? '(missing)';
+          document.getElementById('featureResolved').textContent = feature ?? '(missing)';
+
+          document.getElementById('json').textContent = JSON.stringify(data, null, 2);
+        } catch (err) {
+          status.textContent = err?.message || String(err);
+          status.className = 'bad';
+        }
+      }
+
+      main();
+    </script>
+  </body>
+</html>

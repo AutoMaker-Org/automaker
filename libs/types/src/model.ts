@@ -17,7 +17,7 @@ export type ClaudeCanonicalId = 'claude-haiku' | 'claude-sonnet' | 'claude-opus'
 export const CLAUDE_CANONICAL_MAP: Record<ClaudeCanonicalId, string> = {
   'claude-haiku': 'claude-haiku-4-5-20251001',
   'claude-sonnet': 'claude-sonnet-4-5-20250929',
-  'claude-opus': 'claude-opus-4-5-20251101',
+  'claude-opus': 'claude-opus-4-6',
 } as const;
 
 /**
@@ -28,7 +28,7 @@ export const CLAUDE_CANONICAL_MAP: Record<ClaudeCanonicalId, string> = {
 export const CLAUDE_MODEL_MAP: Record<string, string> = {
   haiku: 'claude-haiku-4-5-20251001',
   sonnet: 'claude-sonnet-4-5-20250929',
-  opus: 'claude-opus-4-5-20251101',
+  opus: 'claude-opus-4-6',
 } as const;
 
 /**
@@ -49,7 +49,9 @@ export const LEGACY_CLAUDE_ALIAS_MAP: Record<string, ClaudeCanonicalId> = {
  */
 export const CODEX_MODEL_MAP = {
   // Recommended Codex-specific models
-  /** Most advanced agentic coding model for complex software engineering (default for ChatGPT users) */
+  /** Most advanced agentic coding model for complex software engineering (when available) */
+  gpt53Codex: 'codex-gpt-5.3-codex',
+  /** Most advanced agentic coding model for complex software engineering (current default in many accounts) */
   gpt52Codex: 'codex-gpt-5.2-codex',
   /** Optimized for long-horizon, agentic coding tasks in Codex */
   gpt51CodexMax: 'codex-gpt-5.1-codex-max',
@@ -57,6 +59,8 @@ export const CODEX_MODEL_MAP = {
   gpt51CodexMini: 'codex-gpt-5.1-codex-mini',
 
   // General-purpose GPT models (also available in Codex)
+  /** Best general agentic model for tasks across industries and domains (when available) */
+  gpt53: 'codex-gpt-5.3',
   /** Best general agentic model for tasks across industries and domains */
   gpt52: 'codex-gpt-5.2',
   /** Great for coding and agentic tasks across domains */
@@ -95,9 +99,10 @@ export function getAllCodexModelIds(): CodexModelId[] {
  * Uses canonical prefixed IDs for consistent routing.
  */
 export const DEFAULT_MODELS = {
-  claude: 'claude-opus-4-5-20251101',
+  claude: 'claude-opus-4-6',
   cursor: 'cursor-auto', // Cursor's recommended default (with prefix)
-  codex: CODEX_MODEL_MAP.gpt52Codex, // GPT-5.2-Codex is the most advanced agentic coding model
+  // Keep the safe default at 5.2 until 5.3 is confirmed available in the connected Codex account.
+  codex: CODEX_MODEL_MAP.gpt52Codex,
 } as const;
 
 export type ModelAlias = keyof typeof CLAUDE_MODEL_MAP;

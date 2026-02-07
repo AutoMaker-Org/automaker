@@ -31,9 +31,15 @@ export function useBoardColumnFeatures({
     // Use a more flexible type to support dynamic pipeline statuses
     const map: Record<string, Feature[]> = {
       backlog: [],
+      ready: [],
+      assigned: [],
       in_progress: [],
+      blocked: [],
+      failed: [],
+      in_review: [],
       waiting_approval: [],
       verified: [],
+      done: [],
       completed: [], // Completed features are shown in the archive modal, not as a column
     };
     const featureMap = createFeatureMap(features);
@@ -68,8 +74,8 @@ export function useBoardColumnFeatures({
       const featureBranch = f.branchName;
 
       let matchesWorktree: boolean;
-      if (!featureBranch) {
-        // No branch assigned - show only on primary worktree
+      if (!featureBranch || f.mergedToMain) {
+        // No branch assigned or merged to main (branch cleaned up) - show on primary worktree
         const isViewingPrimary = currentWorktreePath === null;
         matchesWorktree = isViewingPrimary;
       } else if (effectiveBranch === null) {

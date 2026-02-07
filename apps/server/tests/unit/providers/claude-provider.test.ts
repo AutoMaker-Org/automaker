@@ -39,7 +39,7 @@ describe('claude-provider.ts', () => {
 
       const generator = provider.executeQuery({
         prompt: 'Hello',
-        model: 'claude-opus-4-5-20251101',
+        model: 'claude-opus-4-6',
         cwd: '/test',
       });
 
@@ -59,7 +59,7 @@ describe('claude-provider.ts', () => {
 
       const generator = provider.executeQuery({
         prompt: 'Test prompt',
-        model: 'claude-opus-4-5-20251101',
+        model: 'claude-opus-4-6',
         cwd: '/test/dir',
         systemPrompt: 'You are helpful',
         maxTurns: 10,
@@ -71,7 +71,7 @@ describe('claude-provider.ts', () => {
       expect(sdk.query).toHaveBeenCalledWith({
         prompt: 'Test prompt',
         options: expect.objectContaining({
-          model: 'claude-opus-4-5-20251101',
+          model: 'claude-opus-4-6',
           systemPrompt: 'You are helpful',
           maxTurns: 10,
           cwd: '/test/dir',
@@ -91,7 +91,7 @@ describe('claude-provider.ts', () => {
 
       const generator = provider.executeQuery({
         prompt: 'Test',
-        model: 'claude-opus-4-5-20251101',
+        model: 'claude-opus-4-6',
         cwd: '/test',
       });
 
@@ -116,7 +116,7 @@ describe('claude-provider.ts', () => {
 
       const generator = provider.executeQuery({
         prompt: 'Test',
-        model: 'claude-opus-4-5-20251101',
+        model: 'claude-opus-4-6',
         cwd: '/test',
         abortController,
       });
@@ -145,7 +145,7 @@ describe('claude-provider.ts', () => {
 
       const generator = provider.executeQuery({
         prompt: 'Current message',
-        model: 'claude-opus-4-5-20251101',
+        model: 'claude-opus-4-6',
         cwd: '/test',
         conversationHistory,
         sdkSessionId: 'test-session-id',
@@ -176,7 +176,7 @@ describe('claude-provider.ts', () => {
 
       const generator = provider.executeQuery({
         prompt: arrayPrompt as any,
-        model: 'claude-opus-4-5-20251101',
+        model: 'claude-opus-4-6',
         cwd: '/test',
       });
 
@@ -196,7 +196,7 @@ describe('claude-provider.ts', () => {
 
       const generator = provider.executeQuery({
         prompt: 'Test',
-        model: 'claude-opus-4-5-20251101',
+        model: 'claude-opus-4-6',
         cwd: '/test',
       });
 
@@ -222,7 +222,7 @@ describe('claude-provider.ts', () => {
 
       const generator = provider.executeQuery({
         prompt: 'Test',
-        model: 'claude-opus-4-5-20251101',
+        model: 'claude-opus-4-6',
         cwd: '/test',
       });
 
@@ -286,7 +286,7 @@ describe('claude-provider.ts', () => {
 
       const generator = provider.executeQuery({
         prompt: 'Test',
-        model: 'claude-opus-4-5-20251101',
+        model: 'claude-opus-4-6',
         cwd: '/test',
       });
 
@@ -313,7 +313,7 @@ describe('claude-provider.ts', () => {
 
       const generator = provider.executeQuery({
         prompt: 'Test',
-        model: 'claude-opus-4-5-20251101',
+        model: 'claude-opus-4-6',
         cwd: '/test',
       });
 
@@ -341,7 +341,7 @@ describe('claude-provider.ts', () => {
 
       const generator = provider.executeQuery({
         prompt: 'Test',
-        model: 'claude-opus-4-5-20251101',
+        model: 'claude-opus-4-6',
         cwd: '/test',
       });
 
@@ -366,12 +366,12 @@ describe('claude-provider.ts', () => {
       expect(models).toHaveLength(4);
     });
 
-    it('should include Claude Opus 4.5', () => {
+    it('should include Claude Opus 4.6', () => {
       const models = provider.getAvailableModels();
 
-      const opus = models.find((m) => m.id === 'claude-opus-4-5-20251101');
+      const opus = models.find((m) => m.id === 'claude-opus-4-6');
       expect(opus).toBeDefined();
-      expect(opus?.name).toBe('Claude Opus 4.5');
+      expect(opus?.name).toBe('Claude Opus 4.6');
       expect(opus?.provider).toBe('anthropic');
     });
 
@@ -400,7 +400,7 @@ describe('claude-provider.ts', () => {
     it('should mark Opus as default', () => {
       const models = provider.getAvailableModels();
 
-      const opus = models.find((m) => m.id === 'claude-opus-4-5-20251101');
+      const opus = models.find((m) => m.id === 'claude-opus-4-6');
       expect(opus?.default).toBe(true);
     });
 

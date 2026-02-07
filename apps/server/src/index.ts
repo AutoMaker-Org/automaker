@@ -83,6 +83,7 @@ import { createNotificationsRoutes } from './routes/notifications/index.js';
 import { getNotificationService } from './services/notification-service.js';
 import { createEventHistoryRoutes } from './routes/event-history/index.js';
 import { getEventHistoryService } from './services/event-history-service.js';
+import { createDebugRoutes } from './routes/debug/index.js';
 
 // Load environment variables
 dotenv.config();
@@ -344,6 +345,7 @@ app.use('/api/pipeline', createPipelineRoutes(pipelineService));
 app.use('/api/ideation', createIdeationRoutes(events, ideationService, featureLoader));
 app.use('/api/notifications', createNotificationsRoutes(notificationService));
 app.use('/api/event-history', createEventHistoryRoutes(eventHistoryService, settingsService));
+app.use('/api/debug', createDebugRoutes(settingsService));
 
 // Create HTTP server
 const server = createServer(app);

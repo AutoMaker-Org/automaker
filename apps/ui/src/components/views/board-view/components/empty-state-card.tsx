@@ -4,7 +4,19 @@ import { Button } from '@/components/ui/button';
 import { Kbd } from '@/components/ui/kbd';
 import { formatShortcut } from '@/store/app-store';
 import { getEmptyStateConfig, type EmptyStateConfig } from '../constants';
-import { Lightbulb, Play, Clock, CheckCircle2, Sparkles, Wand2 } from 'lucide-react';
+import {
+  Lightbulb,
+  Play,
+  Clock,
+  CheckCircle2,
+  Sparkles,
+  Wand2,
+  ShieldCheck,
+  Eye,
+  Ban,
+  UserCheck,
+  Archive,
+} from 'lucide-react';
 
 const ICON_MAP = {
   lightbulb: Lightbulb,
@@ -12,6 +24,11 @@ const ICON_MAP = {
   clock: Clock,
   check: CheckCircle2,
   sparkles: Sparkles,
+  shield: ShieldCheck,
+  eye: Eye,
+  ban: Ban,
+  user: UserCheck,
+  archive: Archive,
 } as const;
 
 interface EmptyStateCardProps {

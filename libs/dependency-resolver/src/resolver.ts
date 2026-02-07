@@ -177,6 +177,8 @@ function detectCycles(features: Feature[], featureMap: Map<string, Feature>): st
 export interface DependencySatisfactionOptions {
   /** If true, only require dependencies to not be 'running' (ignore verification requirement) */
   skipVerification?: boolean;
+  /** If true, also require dependencies to have mergedToMain === true (for worktree isolation) */
+  requireMerged?: boolean;
 }
 
 /**
@@ -197,6 +199,7 @@ export function areDependenciesSatisfied(
   }
 
   const skipVerification = options?.skipVerification ?? false;
+  const requireMerged = options?.requireMerged ?? false;
 
   return feature.dependencies.every((depId: string) => {
     const dep = allFeatures.find((f) => f.id === depId);
@@ -207,7 +210,15 @@ export function areDependenciesSatisfied(
       return dep.status !== 'running';
     }
     // Default: require 'completed' or 'verified'
-    return dep.status === 'completed' || dep.status === 'verified';
+    const statusSatisfied = dep.status === 'completed' || dep.status === 'verified';
+    if (!statusSatisfied) return false;
+
+    // When requireMerged is set, also require the dependency's branch to be merged to main
+    if (requireMerged && dep.mergedToMain !== true) {
+      return false;
+    }
+
+    return true;
   });
 }
 

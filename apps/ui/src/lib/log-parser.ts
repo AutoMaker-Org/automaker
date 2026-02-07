@@ -1197,6 +1197,30 @@ function mergeConsecutiveEntries(entries: LogEntry[]): LogEntry[] {
 }
 
 /**
+ * Extracts the ## Auto-Merge section from raw log output
+ * Returns the auto-merge section markdown if found, or null if not present
+ */
+export function extractAutoMergeSection(rawOutput: string): string | null {
+  if (!rawOutput || !rawOutput.trim()) {
+    return null;
+  }
+
+  // Find the ## Auto-Merge heading
+  const startMatch = rawOutput.match(/^## Auto-Merge/m);
+  if (!startMatch || startMatch.index === undefined) {
+    return null;
+  }
+
+  const rest = rawOutput.substring(startMatch.index);
+
+  // Find the end: next ## heading or <summary> tag
+  const endMatch = rest.match(/\n(?=## |<summary>)/);
+  const section = endMatch ? rest.substring(0, endMatch.index) : rest;
+
+  return section.trim() || null;
+}
+
+/**
  * Extracts summary content from raw log output
  * Returns the summary text if found, or null if no summary exists
  */

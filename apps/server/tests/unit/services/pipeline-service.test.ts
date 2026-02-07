@@ -632,9 +632,9 @@ describe('pipeline-service.ts', () => {
       expect(nextStatus).toBe('waiting_approval');
     });
 
-    it('should return verified when no pipeline and skipTests is false', () => {
+    it('should return in_review when no pipeline and skipTests is false', () => {
       const nextStatus = pipelineService.getNextStatus('in_progress', null, false);
-      expect(nextStatus).toBe('verified');
+      expect(nextStatus).toBe('in_review');
     });
 
     it('should return first pipeline step when coming from in_progress', () => {
@@ -686,7 +686,7 @@ describe('pipeline-service.ts', () => {
       expect(nextStatus).toBe('pipeline_step2');
     });
 
-    it('should go to final status when completing last pipeline step', () => {
+    it('should go to in_review when completing last pipeline step', () => {
       const config: PipelineConfig = {
         version: 1,
         steps: [
@@ -703,10 +703,10 @@ describe('pipeline-service.ts', () => {
       };
 
       const nextStatus = pipelineService.getNextStatus('pipeline_step1', config, false);
-      expect(nextStatus).toBe('verified');
+      expect(nextStatus).toBe('in_review');
     });
 
-    it('should go to waiting_approval when completing last step with skipTests', () => {
+    it('should go to in_review when completing last step even with skipTests', () => {
       const config: PipelineConfig = {
         version: 1,
         steps: [
@@ -723,7 +723,7 @@ describe('pipeline-service.ts', () => {
       };
 
       const nextStatus = pipelineService.getNextStatus('pipeline_step1', config, true);
-      expect(nextStatus).toBe('waiting_approval');
+      expect(nextStatus).toBe('in_review');
     });
 
     it('should handle invalid pipeline step ID gracefully', () => {
@@ -743,7 +743,7 @@ describe('pipeline-service.ts', () => {
       };
 
       const nextStatus = pipelineService.getNextStatus('pipeline_nonexistent', config, false);
-      expect(nextStatus).toBe('verified');
+      expect(nextStatus).toBe('in_review');
     });
 
     it('should preserve other statuses unchanged', () => {

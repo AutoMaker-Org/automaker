@@ -20,6 +20,8 @@ import type {
   PipelineConfig,
   ThinkingLevel,
   PlanningMode,
+  TokenUsage,
+  UsageEntry,
 } from '@automaker/types';
 import {
   DEFAULT_PHASE_MODELS,
@@ -38,11 +40,23 @@ import {
   readJsonWithRecovery,
   logRecoveryWarning,
   DEFAULT_BACKUP_COUNT,
+  extractSummary,
 } from '@automaker/utils';
 
 const logger = createLogger('AutoMode');
-import { resolveModelString, resolvePhaseModel, DEFAULT_MODELS } from '@automaker/model-resolver';
-import { resolveDependencies, areDependenciesSatisfied } from '@automaker/dependency-resolver';
+import {
+  resolveModelString,
+  resolvePhaseModel,
+  DEFAULT_MODELS,
+  getEscalatedModel,
+} from '@automaker/model-resolver';
+import {
+  resolveDependencies,
+  areDependenciesSatisfied,
+  getAncestors,
+  formatAncestorContextForPrompt,
+} from '@automaker/dependency-resolver';
+import { mergeWorktreeBranch, cleanupWorktree, getGitRepositoryDiffs } from '@automaker/git-utils';
 import {
   getFeatureDir,
   getAutomakerDir,
@@ -935,7 +949,7 @@ export class AutoModeService {
     ) {
       try {
         // Check if we have capacity
-        if (this.runningFeatures.size >= (this.config?.maxConcurrency || DEFAULT_MAX_CONCURRENCY)) {
+        if (this.runningFeatures.size >= (this.config?.maxConcurrency ?? DEFAULT_MAX_CONCURRENCY)) {
           await this.sleep(5000);
           continue;
         }
@@ -1152,18 +1166,33 @@ export class AutoModeService {
       // Derive workDir from feature.branchName
       // Worktrees should already be created when the feature is added/edited
       let worktreePath: string | null = null;
-      const branchName = feature.branchName;
+      let branchName = feature.branchName;
+
+      // Auto-generate branchName for worktree isolation if none is set.
+      // IMPORTANT: We do NOT persist this to feature.json here because doing so
+      // would move the feature out of the main worktree scope, causing the
+      // auto-loop's running count to miss it and bypass maxConcurrency limits.
+      // The branchName is saved later after the feature completes or is verified.
+      if (useWorktrees && !branchName) {
+        branchName = `feature/${feature.id}`;
+        logger.info(`Auto-generated branch name for worktree isolation: ${branchName}`);
+      }
 
       if (useWorktrees && branchName) {
         // Try to find existing worktree for this branch
-        // Worktree should already exist (created when feature was added/edited)
         worktreePath = await this.findExistingWorktreeForBranch(projectPath, branchName);
 
         if (worktreePath) {
           logger.info(`Using worktree for branch "${branchName}": ${worktreePath}`);
         } else {
-          // Worktree doesn't exist - log warning and continue with project path
-          logger.warn(`Worktree for branch "${branchName}" not found, using project path`);
+          // Worktree doesn't exist - auto-create it
+          logger.info(`Worktree for branch "${branchName}" not found, creating automatically`);
+          worktreePath = await this.createWorktreeForBranch(projectPath, branchName);
+          if (worktreePath) {
+            logger.info(`Created worktree for branch "${branchName}": ${worktreePath}`);
+          } else {
+            logger.warn(`Failed to create worktree for branch "${branchName}", using project path`);
+          }
         }
       }
 
@@ -1173,9 +1202,12 @@ export class AutoModeService {
       // Validate that working directory is allowed using centralized validation
       validateWorkingDirectory(workDir);
 
-      // Update running feature with actual worktree info
+      // Update running feature with actual worktree info.
+      // Keep the ORIGINAL feature.branchName for worktree-scoped counting so that
+      // features started from the main worktree (branchName: null) remain counted
+      // against the main worktree's maxConcurrency limit.
       tempRunningFeature.worktreePath = worktreePath;
-      tempRunningFeature.branchName = branchName ?? null;
+      tempRunningFeature.branchName = feature.branchName ?? null;
 
       // Update feature status to in_progress BEFORE emitting event
       // This ensures the frontend sees the updated status when it reloads features
@@ -1228,7 +1260,12 @@ export class AutoModeService {
         logger.info(`Using continuation prompt for feature ${featureId}`);
       } else {
         // Normal flow: build prompt with planning phase
-        const featurePrompt = this.buildFeaturePrompt(feature, prompts.taskExecution);
+        const ancestorContext = await this.buildAncestorContext(projectPath, feature);
+        const featurePrompt = this.buildFeaturePrompt(
+          feature,
+          prompts.taskExecution,
+          ancestorContext
+        );
         const planningPrefix = await this.getPlanningPromptPrefix(feature);
         prompt = planningPrefix + featurePrompt;
 
@@ -1260,7 +1297,7 @@ export class AutoModeService {
 
       // Run the agent with the feature's model and images
       // Context files are passed as system prompt for higher priority
-      await this.runAgent(
+      const mainEntry = await this.runAgent(
         workDir,
         featureId,
         prompt,
@@ -1278,6 +1315,8 @@ export class AutoModeService {
           branchName: feature.branchName ?? null,
         }
       );
+      if (mainEntry) mainEntry.label = 'Implementation';
+      let featureUsage: TokenUsage | undefined = this.accumulateUsage(undefined, mainEntry);
 
       // Check for pipeline steps and execute them
       const pipelineConfig = await pipelineService.getPipelineConfig(projectPath);
@@ -1285,7 +1324,7 @@ export class AutoModeService {
 
       if (sortedSteps.length > 0) {
         // Execute pipeline steps sequentially
-        await this.executePipelineSteps(
+        const pipelineUsage = await this.executePipelineSteps(
           projectPath,
           featureId,
           feature,
@@ -1294,6 +1333,25 @@ export class AutoModeService {
           abortController,
           autoLoadClaudeMd
         );
+        if (pipelineUsage) {
+          for (const entry of pipelineUsage.entries) {
+            featureUsage = this.accumulateUsage(featureUsage, entry);
+          }
+        }
+      }
+
+      // Self-review pass: review the diff for issues before setting final status
+      const globalSettings = await this.settingsService?.getGlobalSettings();
+      if (globalSettings?.enableSelfReview !== false) {
+        const reviewEntry = await this.executeSelfReview(
+          projectPath,
+          featureId,
+          feature,
+          workDir,
+          abortController,
+          autoLoadClaudeMd
+        );
+        featureUsage = this.accumulateUsage(featureUsage, reviewEntry);
       }
 
       // Determine final status based on testing mode:
@@ -1302,8 +1360,20 @@ export class AutoModeService {
       const finalStatus = feature.skipTests ? 'waiting_approval' : 'verified';
       await this.updateFeatureStatus(projectPath, featureId, finalStatus);
 
+      // Auto-merge verified feature branch back to main if enabled
+      await this.autoMergeIfVerified(
+        projectPath,
+        featureId,
+        finalStatus,
+        branchName ?? null,
+        worktreePath
+      );
+
       // Record success to reset consecutive failure tracking
       this.recordSuccess();
+
+      // Clear retry state on success (restore original model if escalated)
+      await this.clearRetryStateOnSuccess(projectPath, featureId);
 
       // Record learnings and memory usage after successful feature completion
       try {
@@ -1316,6 +1386,14 @@ export class AutoModeService {
             typeof outputContent === 'string' ? outputContent : outputContent.toString();
         } catch {
           // Agent output might not exist yet
+        }
+
+        // Extract summary from agent output and save to feature for dependency context
+        if (agentOutput) {
+          const summary = extractSummary(agentOutput);
+          if (summary) {
+            await this.featureLoader.update(projectPath, featureId, { summary });
+          }
         }
 
         // Record memory usage if we loaded any memory files
@@ -1335,6 +1413,29 @@ export class AutoModeService {
         console.warn('[AutoMode] Failed to record learnings:', learningError);
       }
 
+      // Persist accumulated token usage to feature
+      if (featureUsage) {
+        try {
+          const currentFeature = await this.loadFeature(projectPath, featureId);
+          if (currentFeature?.tokenUsage) {
+            featureUsage = {
+              inputTokens: currentFeature.tokenUsage.inputTokens + featureUsage.inputTokens,
+              outputTokens: currentFeature.tokenUsage.outputTokens + featureUsage.outputTokens,
+              cacheReadTokens:
+                currentFeature.tokenUsage.cacheReadTokens + featureUsage.cacheReadTokens,
+              cacheWriteTokens:
+                currentFeature.tokenUsage.cacheWriteTokens + featureUsage.cacheWriteTokens,
+              durationMs: currentFeature.tokenUsage.durationMs + featureUsage.durationMs,
+              numTurns: currentFeature.tokenUsage.numTurns + featureUsage.numTurns,
+              entries: [...currentFeature.tokenUsage.entries, ...featureUsage.entries],
+            };
+          }
+          await this.featureLoader.update(projectPath, featureId, { tokenUsage: featureUsage });
+        } catch (usageError) {
+          logger.warn(`Failed to persist token usage for feature ${featureId}:`, usageError);
+        }
+      }
+
       this.emitAutoModeEvent('auto_mode_feature_complete', {
         featureId,
         featureName: feature.title,
@@ -1346,6 +1447,7 @@ export class AutoModeService {
         projectPath,
         model: tempRunningFeature.model,
         provider: tempRunningFeature.provider,
+        tokenUsage: featureUsage,
       });
     } catch (error) {
       const errorInfo = classifyError(error);
@@ -1360,8 +1462,23 @@ export class AutoModeService {
           projectPath,
         });
       } else {
-        logger.error(`Feature ${featureId} failed:`, error);
-        await this.updateFeatureStatus(projectPath, featureId, 'backlog');
+        // Retry logic: check if we can retry before giving up
+        const retryResult = await this.handleRetryOrFail(
+          projectPath,
+          featureId,
+          feature,
+          errorInfo,
+          useWorktrees,
+          isAutoMode
+        );
+
+        if (retryResult === 'retrying') {
+          // Feature is being retried - don't track as failure, don't clean up runningFeatures
+          // (handleRetryOrFail already deleted from runningFeatures and re-called executeFeature)
+          return;
+        }
+
+        // All retries exhausted - emit error and track failure
         this.emitAutoModeEvent('auto_mode_error', {
           featureId,
           featureName: feature?.title,
@@ -1411,7 +1528,8 @@ export class AutoModeService {
     workDir: string,
     abortController: AbortController,
     autoLoadClaudeMd: boolean
-  ): Promise<void> {
+  ): Promise<TokenUsage | undefined> {
+    let pipelineUsage: TokenUsage | undefined;
     logger.info(`Executing ${steps.length} pipeline step(s) for feature ${featureId}`);
 
     // Get customized prompts from settings
@@ -1473,7 +1591,7 @@ export class AutoModeService {
       const model = resolveModelString(feature.model, DEFAULT_MODELS.claude);
 
       // Run the agent for this pipeline step
-      await this.runAgent(
+      const stepEntry = await this.runAgent(
         workDir,
         featureId,
         prompt,
@@ -1491,6 +1609,8 @@ export class AutoModeService {
           thinkingLevel: feature.thinkingLevel,
         }
       );
+      if (stepEntry) stepEntry.label = `Pipeline: ${step.name}`;
+      pipelineUsage = this.accumulateUsage(pipelineUsage, stepEntry);
 
       // Load updated context for next step
       try {
@@ -1514,6 +1634,192 @@ export class AutoModeService {
     }
 
     logger.info(`All pipeline steps completed for feature ${featureId}`);
+    return pipelineUsage;
+  }
+
+  /**
+   * Self-review pass: reviews the agent's diff for issues and optionally fixes them.
+   * Uses simpleQuery for a lightweight read-only review, then runAgent if fixes are needed.
+   */
+  private async executeSelfReview(
+    projectPath: string,
+    featureId: string,
+    feature: Feature,
+    workDir: string,
+    abortController: AbortController,
+    autoLoadClaudeMd: boolean
+  ): Promise<UsageEntry | undefined> {
+    logger.info(`Starting self-review for feature ${featureId}`);
+
+    this.emitAutoModeEvent('self_review_started', {
+      featureId,
+      featureName: feature.title,
+      projectPath,
+    });
+
+    // Get the diff of changes made by the agent
+    let diffResult: { diff: string; hasChanges: boolean };
+    try {
+      diffResult = await getGitRepositoryDiffs(workDir);
+    } catch (err) {
+      logger.warn(`Failed to get git diffs for self-review of feature ${featureId}:`, err);
+      this.emitAutoModeEvent('self_review_complete', {
+        featureId,
+        featureName: feature.title,
+        issuesFound: 0,
+        fixesApplied: false,
+        skipped: true,
+        reason: 'failed_to_get_diff',
+        projectPath,
+      });
+      return;
+    }
+
+    if (!diffResult.hasChanges || !diffResult.diff) {
+      logger.info(`No changes detected for self-review of feature ${featureId}, skipping`);
+      this.emitAutoModeEvent('self_review_complete', {
+        featureId,
+        featureName: feature.title,
+        issuesFound: 0,
+        fixesApplied: false,
+        skipped: true,
+        reason: 'no_changes',
+        projectPath,
+      });
+      return;
+    }
+
+    // Truncate diff to ~50k chars to avoid token limits
+    const MAX_DIFF_LENGTH = 50000;
+    const truncatedDiff =
+      diffResult.diff.length > MAX_DIFF_LENGTH
+        ? diffResult.diff.substring(0, MAX_DIFF_LENGTH) + '\n\n... (diff truncated)'
+        : diffResult.diff;
+
+    // Get customized prompts
+    const prompts = await getPromptCustomization(this.settingsService, '[AutoMode]');
+    const reviewTemplate = prompts.autoMode.selfReviewPromptTemplate;
+
+    // Build review prompt from template
+    const reviewPrompt = reviewTemplate
+      .replace('{{title}}', feature.title || 'Untitled Feature')
+      .replace('{{description}}', feature.description || 'No description')
+      .replace('{{diff}}', truncatedDiff);
+
+    // Prefer sonnet for review (fast, cheap), fall back to feature model
+    const featureModel = resolveModelString(feature.model, DEFAULT_MODELS.claude);
+    const model = resolveModelString('claude-sonnet', featureModel);
+
+    // Run a lightweight, read-only review
+    let reviewResponse: string;
+    try {
+      const result = await simpleQuery({
+        prompt: reviewPrompt,
+        model,
+        cwd: workDir,
+        maxTurns: 1,
+        readOnly: true,
+        abortController,
+      });
+      reviewResponse = result.text;
+    } catch (err) {
+      logger.warn(`Self-review query failed for feature ${featureId}:`, err);
+      this.emitAutoModeEvent('self_review_complete', {
+        featureId,
+        featureName: feature.title,
+        issuesFound: 0,
+        fixesApplied: false,
+        skipped: true,
+        reason: 'review_query_failed',
+        projectPath,
+      });
+      return;
+    }
+
+    // Check if issues were found
+    const noIssues = reviewResponse.includes('NO_ISSUES_FOUND');
+    let fixesApplied = false;
+    let reviewFixEntry: UsageEntry | undefined;
+
+    if (!noIssues) {
+      logger.info(`Self-review found issues for feature ${featureId}, running fix pass`);
+
+      // Build fix prompt and run an agentic fix pass
+      const fixPrompt = `## Fix Issues Found During Self-Review
+
+The following issues were found in your implementation of "${feature.title || 'Untitled Feature'}":
+
+${reviewResponse}
+
+Please fix these issues. Only fix the specific problems listed above — do not make other changes.`;
+
+      try {
+        reviewFixEntry = await this.runAgent(
+          workDir,
+          featureId,
+          fixPrompt,
+          abortController,
+          projectPath,
+          undefined,
+          model,
+          {
+            projectPath,
+            planningMode: 'skip' as PlanningMode,
+            requirePlanApproval: false,
+            autoLoadClaudeMd,
+            thinkingLevel: feature.thinkingLevel,
+            branchName: feature.branchName ?? null,
+          }
+        );
+        if (reviewFixEntry) reviewFixEntry.label = 'Self-review fix';
+        fixesApplied = true;
+
+        this.emitAutoModeEvent('self_review_fix_applied', {
+          featureId,
+          featureName: feature.title,
+          projectPath,
+        });
+      } catch (err) {
+        logger.warn(`Self-review fix pass failed for feature ${featureId}:`, err);
+      }
+    } else {
+      logger.info(`Self-review found no issues for feature ${featureId}`);
+    }
+
+    // Append review results to agent-output.md
+    try {
+      const featureDir = getFeatureDir(projectPath, featureId);
+      const outputPath = path.join(featureDir, 'agent-output.md');
+      let existingOutput = '';
+      try {
+        existingOutput = (await secureFs.readFile(outputPath, 'utf-8')) as string;
+      } catch {
+        // File may not exist yet
+      }
+
+      const reviewSection = `\n\n---\n## Self-Review Results\n\n${
+        noIssues
+          ? 'No issues found during self-review.'
+          : `### Issues Found\n${reviewResponse}\n\n${fixesApplied ? '**Fixes were applied automatically.**' : '**Fix attempt failed — issues may still exist.**'}`
+      }\n`;
+
+      await secureFs.writeFile(outputPath, existingOutput + reviewSection, 'utf-8');
+    } catch (err) {
+      logger.warn(`Failed to append self-review results to agent-output.md:`, err);
+    }
+
+    this.emitAutoModeEvent('self_review_complete', {
+      featureId,
+      featureName: feature.title,
+      issuesFound: noIssues ? 0 : 1,
+      fixesApplied,
+      projectPath,
+    });
+
+    logger.info(
+      `Self-review complete for feature ${featureId}: ${noIssues ? 'no issues' : `issues found, fixes ${fixesApplied ? 'applied' : 'failed'}`}`
+    );
+    return reviewFixEntry;
   }
 
   /**
@@ -1685,6 +1991,18 @@ Complete the pipeline step instructions above. Review the previous work and appl
 
       await this.updateFeatureStatus(projectPath, featureId, finalStatus);
 
+      // Auto-merge verified feature branch back to main if enabled
+      const resumeWorktreePath = feature.branchName
+        ? await this.findExistingWorktreeForBranch(projectPath, feature.branchName)
+        : null;
+      await this.autoMergeIfVerified(
+        projectPath,
+        featureId,
+        finalStatus,
+        feature.branchName ?? null,
+        resumeWorktreePath
+      );
+
       this.emitAutoModeEvent('auto_mode_feature_complete', {
         featureId,
         featureName: feature.title,
@@ -1780,11 +2098,15 @@ Complete the pipeline step instructions above. Review the previous work and appl
       if (useWorktrees && branchName) {
         worktreePath = await this.findExistingWorktreeForBranch(projectPath, branchName);
         if (worktreePath) {
-          console.log(`[AutoMode] Using worktree for branch "${branchName}": ${worktreePath}`);
+          logger.info(`Using worktree for branch "${branchName}": ${worktreePath}`);
         } else {
-          console.warn(
-            `[AutoMode] Worktree for branch "${branchName}" not found, using project path`
-          );
+          logger.info(`Worktree for branch "${branchName}" not found, creating automatically`);
+          worktreePath = await this.createWorktreeForBranch(projectPath, branchName);
+          if (worktreePath) {
+            logger.info(`Created worktree for branch "${branchName}": ${worktreePath}`);
+          } else {
+            logger.warn(`Failed to create worktree for branch "${branchName}", using project path`);
+          }
         }
       }
 
@@ -1835,9 +2157,31 @@ Complete the pipeline step instructions above. Review the previous work and appl
         autoLoadClaudeMd
       );
 
+      // Self-review pass after pipeline resume
+      const globalSettingsResume = await this.settingsService?.getGlobalSettings();
+      if (globalSettingsResume?.enableSelfReview !== false) {
+        await this.executeSelfReview(
+          projectPath,
+          featureId,
+          feature,
+          workDir,
+          abortController,
+          autoLoadClaudeMd
+        );
+      }
+
       // Determine final status
       const finalStatus = feature.skipTests ? 'waiting_approval' : 'verified';
       await this.updateFeatureStatus(projectPath, featureId, finalStatus);
+
+      // Auto-merge verified feature branch back to main if enabled
+      await this.autoMergeIfVerified(
+        projectPath,
+        featureId,
+        finalStatus,
+        branchName ?? null,
+        worktreePath
+      );
 
       console.log('[AutoMode] Pipeline resume completed successfully');
 
@@ -1862,8 +2206,22 @@ Complete the pipeline step instructions above. Review the previous work and appl
           projectPath,
         });
       } else {
-        console.error(`[AutoMode] Pipeline resume failed for feature ${featureId}:`, error);
-        await this.updateFeatureStatus(projectPath, featureId, 'backlog');
+        // Retry logic: check if we can retry before giving up
+        const retryResult = await this.handleRetryOrFail(
+          projectPath,
+          featureId,
+          feature,
+          errorInfo,
+          useWorktrees,
+          true // isAutoMode
+        );
+
+        if (retryResult === 'retrying') {
+          // Feature is being retried - don't track as failure
+          return;
+        }
+
+        // All retries exhausted
         this.emitAutoModeEvent('auto_mode_error', {
           featureId,
           featureName: feature.title,
@@ -1872,6 +2230,19 @@ Complete the pipeline step instructions above. Review the previous work and appl
           errorType: errorInfo.type,
           projectPath,
         });
+
+        // Track this failure and check if we should pause auto mode
+        const shouldPause = this.trackFailureAndCheckPause({
+          type: errorInfo.type,
+          message: errorInfo.message,
+        });
+
+        if (shouldPause) {
+          this.signalShouldPause({
+            type: errorInfo.type,
+            message: errorInfo.message,
+          });
+        }
       }
     } finally {
       this.runningFeatures.delete(featureId);
@@ -1907,12 +2278,20 @@ Complete the pipeline step instructions above. Review the previous work and appl
     const branchName = feature?.branchName || `feature/${featureId}`;
 
     if (useWorktrees && branchName) {
-      // Try to find existing worktree for this branch
       worktreePath = await this.findExistingWorktreeForBranch(projectPath, branchName);
 
       if (worktreePath) {
         workDir = worktreePath;
         logger.info(`Follow-up using worktree for branch "${branchName}": ${workDir}`);
+      } else {
+        logger.info(`Worktree for branch "${branchName}" not found, creating automatically`);
+        worktreePath = await this.createWorktreeForBranch(projectPath, branchName);
+        if (worktreePath) {
+          workDir = worktreePath;
+          logger.info(`Created worktree for branch "${branchName}": ${workDir}`);
+        } else {
+          logger.warn(`Failed to create worktree for branch "${branchName}", using project path`);
+        }
       }
     }
 
@@ -2072,7 +2451,7 @@ Address the follow-up instructions above. Review the previous work and make the 
       // Note: Follow-ups skip planning mode - they continue from previous work
       // Pass previousContext so the history is preserved in the output file
       // Context files are passed as system prompt for higher priority
-      await this.runAgent(
+      const followUpEntry = await this.runAgent(
         workDir,
         featureId,
         fullPrompt,
@@ -2089,6 +2468,37 @@ Address the follow-up instructions above. Review the previous work and make the 
           thinkingLevel: feature?.thinkingLevel,
         }
       );
+      if (followUpEntry) followUpEntry.label = 'Follow-up';
+      let followUpUsage: TokenUsage | undefined;
+
+      // Accumulate follow-up usage with existing feature usage
+      {
+        const currentFeature = await this.loadFeature(projectPath, featureId);
+        followUpUsage = this.accumulateUsage(currentFeature?.tokenUsage, followUpEntry);
+      }
+
+      // Self-review pass after follow-up
+      const globalSettingsFollowUp = await this.settingsService?.getGlobalSettings();
+      if (globalSettingsFollowUp?.enableSelfReview !== false && feature) {
+        const reviewEntry = await this.executeSelfReview(
+          projectPath,
+          featureId,
+          feature,
+          workDir,
+          abortController,
+          autoLoadClaudeMd
+        );
+        followUpUsage = this.accumulateUsage(followUpUsage, reviewEntry);
+      }
+
+      // Persist accumulated token usage
+      if (followUpUsage) {
+        try {
+          await this.featureLoader.update(projectPath, featureId, { tokenUsage: followUpUsage });
+        } catch (usageError) {
+          logger.warn(`Failed to persist token usage for follow-up ${featureId}:`, usageError);
+        }
+      }
 
       // Determine final status based on testing mode:
       // - skipTests=false (automated testing): go directly to 'verified' (no manual verify needed)
@@ -2096,8 +2506,20 @@ Address the follow-up instructions above. Review the previous work and make the 
       const finalStatus = feature?.skipTests ? 'waiting_approval' : 'verified';
       await this.updateFeatureStatus(projectPath, featureId, finalStatus);
 
+      // Auto-merge verified feature branch back to main if enabled
+      await this.autoMergeIfVerified(
+        projectPath,
+        featureId,
+        finalStatus,
+        branchName ?? null,
+        worktreePath
+      );
+
       // Record success to reset consecutive failure tracking
       this.recordSuccess();
+
+      // Clear retry state on success (restore original model if escalated)
+      await this.clearRetryStateOnSuccess(projectPath, featureId);
 
       this.emitAutoModeEvent('auto_mode_feature_complete', {
         featureId,
@@ -2108,6 +2530,7 @@ Address the follow-up instructions above. Review the previous work and make the 
         projectPath,
         model,
         provider,
+        tokenUsage: followUpUsage,
       });
     } catch (error) {
       const errorInfo = classifyError(error);
@@ -2811,6 +3234,50 @@ Format your response as a structured markdown document.`;
     }
   }
 
+  /**
+   * Auto-create a git worktree for a given branch when one doesn't already exist.
+   * This ensures features with branchName set (e.g. from JSON files) get proper
+   * worktree isolation even if they weren't created through the UI.
+   */
+  private async createWorktreeForBranch(
+    projectPath: string,
+    branchName: string
+  ): Promise<string | null> {
+    try {
+      const sanitizedName = branchName.replace(/[^a-zA-Z0-9_-]/g, '-');
+      const worktreesDir = path.join(projectPath, '.worktrees');
+      const worktreePath = path.join(worktreesDir, sanitizedName);
+
+      // Create worktrees directory if it doesn't exist
+      await secureFs.mkdir(worktreesDir, { recursive: true });
+
+      // Check if branch already exists in git
+      let branchExists = false;
+      try {
+        await execAsync(`git rev-parse --verify "${branchName}"`, { cwd: projectPath });
+        branchExists = true;
+      } catch {
+        // Branch doesn't exist yet
+      }
+
+      // Create the worktree
+      if (branchExists) {
+        await execAsync(`git worktree add "${worktreePath}" "${branchName}"`, {
+          cwd: projectPath,
+        });
+      } else {
+        await execAsync(`git worktree add -b "${branchName}" "${worktreePath}" HEAD`, {
+          cwd: projectPath,
+        });
+      }
+
+      return path.resolve(worktreePath);
+    } catch (error) {
+      logger.error(`Failed to create worktree for branch "${branchName}":`, error);
+      return null;
+    }
+  }
+
   private async loadFeature(projectPath: string, featureId: string): Promise<Feature | null> {
     // Features are stored in .automaker directory
     const featureDir = getFeatureDir(projectPath, featureId);
@@ -2850,6 +3317,12 @@ Format your response as a structured markdown document.`;
 
       feature.status = status;
       feature.updatedAt = new Date().toISOString();
+      // Set startedAt timestamp when moving to in_progress (for UI timer)
+      if (status === 'in_progress') {
+        feature.startedAt = new Date().toISOString();
+      } else {
+        feature.startedAt = undefined;
+      }
       // Set justFinishedAt timestamp when moving to waiting_approval (agent just completed)
       // Badge will show for 2 minutes after this timestamp
       if (status === 'waiting_approval') {
@@ -2893,6 +3366,320 @@ Format your response as a structured markdown document.`;
       }
     } catch (error) {
       logger.error(`Failed to update feature status for ${featureId}:`, error);
+    }
+  }
+
+  /**
+   * Handle retry logic for a failed feature, or mark as failed if retries exhausted.
+   * Returns 'retrying' if a retry was initiated, 'failed' if all retries exhausted.
+   */
+  private async handleRetryOrFail(
+    projectPath: string,
+    featureId: string,
+    feature: Feature | null | undefined,
+    errorInfo: { type: string; message: string; isAbort?: boolean },
+    useWorktrees: boolean,
+    isAutoMode: boolean
+  ): Promise<'retrying' | 'failed'> {
+    try {
+      const globalSettings = await this.settingsService?.getGlobalSettings();
+      const maxRetries = globalSettings?.autoModeMaxRetries ?? 1;
+      const escalateModel = globalSettings?.autoModeRetryModelEscalation ?? true;
+
+      const currentFeature = await this.loadFeature(projectPath, featureId);
+      const retryState = currentFeature?.retryState || {
+        attemptNumber: 0,
+        history: [],
+      };
+
+      if (retryState.attemptNumber < maxRetries) {
+        // Record this failure in retry history
+        retryState.attemptNumber++;
+        if (!retryState.originalModel) {
+          retryState.originalModel = currentFeature?.model;
+        }
+        retryState.history.push({
+          attempt: retryState.attemptNumber,
+          model: currentFeature?.model || 'default',
+          error: errorInfo.message,
+          errorType: errorInfo.type,
+          timestamp: new Date().toISOString(),
+        });
+
+        // Escalate model if enabled
+        let retryModel = currentFeature?.model;
+        if (escalateModel) {
+          const escalated = getEscalatedModel(retryModel || 'claude-sonnet');
+          if (escalated) retryModel = escalated;
+        }
+
+        // Update feature with retry state and new model
+        await this.updateFeatureRetryState(projectPath, featureId, retryState, retryModel);
+
+        // Log and emit retry event
+        logger.info(
+          `Feature ${featureId} failed (attempt ${retryState.attemptNumber}/${maxRetries}), retrying with model: ${retryModel}`
+        );
+        this.emitAutoModeEvent('auto_mode_feature_retry', {
+          featureId,
+          featureName: currentFeature?.title,
+          attempt: retryState.attemptNumber,
+          maxRetries,
+          previousModel: currentFeature?.model,
+          nextModel: retryModel,
+          error: errorInfo.message,
+          projectPath,
+        });
+
+        // Build retry prompt with error context
+        const retryPrompt = this.buildRetryPrompt(currentFeature, errorInfo.message, retryState);
+
+        // Remove from running features before re-executing to avoid "already running" error
+        this.runningFeatures.delete(featureId);
+
+        // Re-execute with error context (fire-and-forget, executeFeature handles its own errors)
+        this.executeFeature(projectPath, featureId, useWorktrees, isAutoMode, undefined, {
+          continuationPrompt: retryPrompt,
+        });
+
+        return 'retrying';
+      }
+    } catch (retryError) {
+      logger.error(`Error in retry logic for feature ${featureId}:`, retryError);
+    }
+
+    // All retries exhausted or retry logic failed - move to 'failed' (not 'backlog')
+    const currentFeature = await this.loadFeature(projectPath, featureId);
+    const attemptCount = currentFeature?.retryState?.attemptNumber ?? 0;
+    logger.error(`Feature ${featureId} failed after ${attemptCount} retries: ${errorInfo.message}`);
+    await this.updateFeatureStatus(projectPath, featureId, 'failed');
+    return 'failed';
+  }
+
+  /**
+   * Build a retry prompt with error context from previous attempts.
+   */
+  private buildRetryPrompt(
+    feature: Feature | null | undefined,
+    errorMessage: string,
+    retryState: NonNullable<Feature['retryState']>
+  ): string {
+    const historyLines = retryState.history
+      .map((h) => `- Attempt ${h.attempt} (${h.model}): ${h.error}`)
+      .join('\n');
+
+    return [
+      `## Retry Attempt ${retryState.attemptNumber}`,
+      '',
+      'Your previous attempt to implement this feature failed with the following error:',
+      '',
+      `**Error:** ${errorMessage}`,
+      '',
+      '**Previous attempts:**',
+      historyLines,
+      '',
+      'Please review what went wrong and try again. The feature workspace still contains your previous work.',
+      'If the error was due to an API/authentication issue, focus on completing the remaining work.',
+      'If the error was due to a code issue, fix the problem and continue.',
+      '',
+      `## Feature: ${feature?.title || 'Untitled'}`,
+      '',
+      feature?.description || '',
+    ].join('\n');
+  }
+
+  /**
+   * Update a feature's retry state and optionally its model.
+   */
+  private async updateFeatureRetryState(
+    projectPath: string,
+    featureId: string,
+    retryState: NonNullable<Feature['retryState']>,
+    newModel?: string
+  ): Promise<void> {
+    const featureDir = getFeatureDir(projectPath, featureId);
+    const featurePath = path.join(featureDir, 'feature.json');
+
+    try {
+      const result = await readJsonWithRecovery<Feature | null>(featurePath, null, {
+        maxBackups: DEFAULT_BACKUP_COUNT,
+        autoRestore: true,
+      });
+
+      const feature = result.data;
+      if (!feature) {
+        logger.warn(`Feature ${featureId} not found for retry state update`);
+        return;
+      }
+
+      feature.retryState = retryState;
+      if (newModel) {
+        feature.model = newModel;
+      }
+
+      await atomicWriteJson(featurePath, feature, { backupCount: DEFAULT_BACKUP_COUNT });
+    } catch (error) {
+      logger.error(`Failed to update retry state for feature ${featureId}:`, error);
+    }
+  }
+
+  /**
+   * Clear retry state after a successful feature completion.
+   * Restores the original model if it was escalated during retries.
+   */
+  private async clearRetryStateOnSuccess(projectPath: string, featureId: string): Promise<void> {
+    const feature = await this.loadFeature(projectPath, featureId);
+    if (!feature?.retryState) return;
+
+    const featureDir = getFeatureDir(projectPath, featureId);
+    const featurePath = path.join(featureDir, 'feature.json');
+
+    try {
+      const result = await readJsonWithRecovery<Feature | null>(featurePath, null, {
+        maxBackups: DEFAULT_BACKUP_COUNT,
+        autoRestore: true,
+      });
+
+      const current = result.data;
+      if (!current) return;
+
+      // Restore original model if it was escalated
+      if (current.retryState?.originalModel) {
+        current.model = current.retryState.originalModel;
+      }
+
+      // Clear retry state
+      current.retryState = undefined;
+
+      await atomicWriteJson(featurePath, current, { backupCount: DEFAULT_BACKUP_COUNT });
+    } catch (error) {
+      logger.error(`Failed to clear retry state for feature ${featureId}:`, error);
+    }
+  }
+
+  /**
+   * Auto-merge a verified feature's branch back to main if autoMergeOnVerify is enabled.
+   * Called after updateFeatureStatus when a feature reaches 'verified' status.
+   */
+  private async autoMergeIfVerified(
+    projectPath: string,
+    featureId: string,
+    status: string,
+    branchName: string | null,
+    worktreePath: string | null
+  ): Promise<void> {
+    // Only auto-merge on verified status
+    if (status !== 'verified') return;
+
+    // Nothing to merge if no branch or on main/master
+    if (!branchName || branchName === 'main' || branchName === 'master') return;
+
+    // Check if auto-merge is enabled
+    const settings = await this.settingsService?.getGlobalSettings();
+    if (!settings?.autoMergeOnVerify) return;
+
+    logger.info(`Auto-merging verified feature ${featureId} branch "${branchName}" to main`);
+
+    const result = await mergeWorktreeBranch(projectPath, branchName, 'main', {
+      squash: true,
+      message: `Merge feature/${featureId} (squash)`,
+    });
+
+    const notificationService = getNotificationService();
+
+    if (result.success) {
+      // Mark feature as merged in feature.json
+      const featureDir = getFeatureDir(projectPath, featureId);
+      const featurePath = path.join(featureDir, 'feature.json');
+      try {
+        const featureResult = await readJsonWithRecovery<Feature | null>(featurePath, null, {
+          maxBackups: DEFAULT_BACKUP_COUNT,
+          autoRestore: true,
+        });
+        const feature = featureResult.data;
+        if (feature) {
+          feature.mergedToMain = true;
+          feature.branchName = branchName; // Preserve branch name in the record
+          await atomicWriteJson(featurePath, feature, { backupCount: DEFAULT_BACKUP_COUNT });
+        }
+      } catch (error) {
+        logger.error(`Failed to update mergedToMain for feature ${featureId}:`, error);
+      }
+
+      // Clean up worktree and branch
+      let cleanupSucceeded = false;
+      if (worktreePath) {
+        const cleanup = await cleanupWorktree(projectPath, worktreePath, branchName);
+        cleanupSucceeded = cleanup.worktreeDeleted && cleanup.branchDeleted;
+        logger.info(
+          `Cleanup after auto-merge: worktree=${cleanup.worktreeDeleted}, branch=${cleanup.branchDeleted}`
+        );
+      }
+
+      // Append Auto-Merge section to agent-output.md
+      try {
+        const outputPath = path.join(featureDir, 'agent-output.md');
+        const timestamp = new Date().toISOString();
+        const autoMergeSection = `\n\n## Auto-Merge\n\n- **Timestamp:** ${timestamp}\n- **Branch Merged:** ${branchName}\n- **Target Branch:** main\n- **Merge Type:** squash\n- **Cleanup Succeeded:** ${cleanupSucceeded}\n`;
+
+        let existingContent = '';
+        try {
+          existingContent = (await secureFs.readFile(outputPath, 'utf-8')) as string;
+        } catch {
+          // File doesn't exist yet - will create it
+        }
+
+        if (existingContent) {
+          await secureFs.appendFile(outputPath, autoMergeSection);
+        } else {
+          await secureFs.mkdir(path.dirname(outputPath), { recursive: true });
+          await secureFs.writeFile(outputPath, autoMergeSection.trimStart());
+        }
+        logger.info(`Appended Auto-Merge section to agent-output.md for feature ${featureId}`);
+      } catch (error) {
+        logger.error(`Failed to append Auto-Merge section for feature ${featureId}:`, error);
+      }
+
+      logger.info(`Auto-merge successful for feature ${featureId}`);
+      await notificationService.createNotification({
+        type: 'feature_verified',
+        title: 'Feature Auto-Merged',
+        message: `"${featureId}" branch merged to main and cleaned up.`,
+        featureId,
+        projectPath,
+      });
+    } else if (result.hasConflicts) {
+      // Merge conflict - set feature to error status, don't clean up worktree
+      logger.error(`Auto-merge conflict for feature ${featureId}: ${result.error}`);
+      await this.updateFeatureStatus(projectPath, featureId, 'error');
+
+      // Update feature.json with error message
+      const featureDir = getFeatureDir(projectPath, featureId);
+      const featurePath = path.join(featureDir, 'feature.json');
+      try {
+        const featureResult = await readJsonWithRecovery<Feature | null>(featurePath, null, {
+          maxBackups: DEFAULT_BACKUP_COUNT,
+          autoRestore: true,
+        });
+        const feature = featureResult.data;
+        if (feature) {
+          feature.error = `Auto-merge conflict: ${result.error}`;
+          await atomicWriteJson(featurePath, feature, { backupCount: DEFAULT_BACKUP_COUNT });
+        }
+      } catch (error) {
+        logger.error(`Failed to update error for feature ${featureId}:`, error);
+      }
+
+      await notificationService.createNotification({
+        type: 'feature_waiting_approval',
+        title: 'Merge Conflict',
+        message: `Auto-merge failed for "${featureId}". Please resolve conflicts manually.`,
+        featureId,
+        projectPath,
+      });
+    } else {
+      // Other merge error - log but don't block
+      logger.error(`Auto-merge failed for feature ${featureId}: ${result.error}`);
     }
   }
 
@@ -3008,13 +3795,12 @@ Format your response as a structured markdown document.`;
 
           allFeatures.push(feature);
 
-          // Track pending features separately, filtered by worktree/branch
+          // Track ready features separately, filtered by worktree/branch
+          // Only 'ready' features are picked up - 'pending' (backlog) requires manual move to Ready
           // Note: waiting_approval is NOT included - those features have completed execution
           // and are waiting for user review, they should not be picked up again
           if (
-            feature.status === 'pending' ||
             feature.status === 'ready' ||
-            feature.status === 'backlog' ||
             (feature.planSpec?.status === 'approved' &&
               (feature.planSpec.tasksCompleted ?? 0) < (feature.planSpec.tasksTotal ?? 0))
           ) {
@@ -3052,17 +3838,16 @@ Format your response as a structured markdown document.`;
 
       const worktreeDesc = branchName ? `worktree ${branchName}` : 'main worktree';
       logger.info(
-        `[loadPendingFeatures] Found ${allFeatures.length} total features, ${pendingFeatures.length} candidates (pending/ready/backlog/approved_with_pending_tasks) for ${worktreeDesc}`
+        `[loadPendingFeatures] Found ${allFeatures.length} total features, ${pendingFeatures.length} candidates (pending/ready/approved_with_pending_tasks) for ${worktreeDesc}`
       );
 
       if (pendingFeatures.length === 0) {
         logger.warn(
           `[loadPendingFeatures] No pending features found for ${worktreeDesc}. Check branchName matching - looking for branchName: ${branchName === null ? 'null (main)' : branchName}`
         );
-        // Log all backlog features to help debug branchName matching
+        // Log all ready/pending features to help debug branchName matching
         const allBacklogFeatures = allFeatures.filter(
           (f) =>
-            f.status === 'backlog' ||
             f.status === 'pending' ||
             f.status === 'ready' ||
             (f.planSpec?.status === 'approved' &&
@@ -3078,19 +3863,27 @@ Format your response as a structured markdown document.`;
       // Apply dependency-aware ordering
       const { orderedFeatures, missingDependencies } = resolveDependencies(pendingFeatures);
 
-      // Remove missing dependencies from features and save them
-      // This allows features to proceed when their dependencies have been deleted or don't exist
+      // Remove truly missing dependencies from features and save them
+      // Only remove deps that don't exist in allFeatures at all (i.e. deleted features).
+      // Deps that exist but aren't in pendingFeatures (e.g. in_progress, verified) are NOT removed.
       if (missingDependencies.size > 0) {
         for (const [featureId, missingDepIds] of missingDependencies) {
+          // Filter to only deps that are truly gone (not in allFeatures)
+          const trulyMissingDepIds = missingDepIds.filter(
+            (depId) => !allFeatures.find((f) => f.id === depId)
+          );
+
+          if (trulyMissingDepIds.length === 0) continue;
+
           const feature = pendingFeatures.find((f) => f.id === featureId);
           if (feature && feature.dependencies) {
-            // Filter out the missing dependency IDs
+            // Filter out the truly missing dependency IDs
             const validDependencies = feature.dependencies.filter(
-              (depId) => !missingDepIds.includes(depId)
+              (depId) => !trulyMissingDepIds.includes(depId)
             );
 
             logger.warn(
-              `[loadPendingFeatures] Feature ${featureId} has missing dependencies: ${missingDepIds.join(', ')}. Removing them automatically.`
+              `[loadPendingFeatures] Feature ${featureId} has truly missing dependencies (deleted): ${trulyMissingDepIds.join(', ')}. Removing them automatically.`
             );
 
             // Update the feature in memory
@@ -3117,13 +3910,19 @@ Format your response as a structured markdown document.`;
       // Get skipVerificationInAutoMode setting
       const settings = await this.settingsService?.getGlobalSettings();
       const skipVerification = settings?.skipVerificationInAutoMode ?? false;
+      // When worktrees and auto-merge are both enabled, require dependencies to be merged to main
+      const requireMerged =
+        (settings?.useWorktrees ?? false) && (settings?.autoMergeOnVerify ?? false);
 
       // Filter to only features with satisfied dependencies
       const readyFeatures: Feature[] = [];
       const blockedFeatures: Array<{ feature: Feature; reason: string }> = [];
 
       for (const feature of orderedFeatures) {
-        const isSatisfied = areDependenciesSatisfied(feature, allFeatures, { skipVerification });
+        const isSatisfied = areDependenciesSatisfied(feature, allFeatures, {
+          skipVerification,
+          requireMerged,
+        });
         if (isSatisfied) {
           readyFeatures.push(feature);
         } else {
@@ -3215,12 +4014,28 @@ Format your response as a structured markdown document.`;
     return planningPrompt + '\n\n---\n\n## Feature Request\n\n';
   }
 
+  private async buildAncestorContext(projectPath: string, feature: Feature): Promise<string> {
+    if (!feature.dependencies || feature.dependencies.length === 0) {
+      return '';
+    }
+
+    const allFeatures = await this.featureLoader.getAll(projectPath);
+    const ancestors = getAncestors(feature, allFeatures, 2);
+    if (ancestors.length === 0) {
+      return '';
+    }
+
+    const selectedIds = new Set(ancestors.map((a) => a.id));
+    return formatAncestorContextForPrompt(ancestors, selectedIds);
+  }
+
   private buildFeaturePrompt(
     feature: Feature,
     taskExecutionPrompts: {
       implementationInstructions: string;
       playwrightVerificationInstructions: string;
-    }
+    },
+    ancestorContext?: string
   ): string {
     const title = this.extractTitleFromDescription(feature.description);
 
@@ -3236,6 +4051,10 @@ Format your response as a structured markdown document.`;
 **Specification:**
 ${feature.spec}
 `;
+    }
+
+    if (ancestorContext) {
+      prompt += `\n${ancestorContext}\n`;
     }
 
     // Add images note (like old implementation)
@@ -3272,6 +4091,33 @@ You can use the Read tool to view these images at any time during implementation
     return prompt;
   }
 
+  private accumulateUsage(
+    existing: TokenUsage | undefined,
+    entry: UsageEntry | undefined
+  ): TokenUsage | undefined {
+    if (!entry) return existing;
+    if (!existing) {
+      return {
+        inputTokens: entry.inputTokens,
+        outputTokens: entry.outputTokens,
+        cacheReadTokens: entry.cacheReadTokens,
+        cacheWriteTokens: entry.cacheWriteTokens,
+        durationMs: entry.durationMs,
+        numTurns: entry.numTurns,
+        entries: [entry],
+      };
+    }
+    return {
+      inputTokens: existing.inputTokens + entry.inputTokens,
+      outputTokens: existing.outputTokens + entry.outputTokens,
+      cacheReadTokens: existing.cacheReadTokens + entry.cacheReadTokens,
+      cacheWriteTokens: existing.cacheWriteTokens + entry.cacheWriteTokens,
+      durationMs: existing.durationMs + entry.durationMs,
+      numTurns: existing.numTurns + entry.numTurns,
+      entries: [...existing.entries, entry],
+    };
+  }
+
   private async runAgent(
     workDir: string,
     featureId: string,
@@ -3290,7 +4136,8 @@ You can use the Read tool to view these images at any time during implementation
       thinkingLevel?: ThinkingLevel;
       branchName?: string | null;
     }
-  ): Promise<void> {
+  ): Promise<UsageEntry | undefined> {
+    let usageEntry: UsageEntry | undefined;
     const finalProjectPath = options?.projectPath || projectPath;
     const branchName = options?.branchName ?? null;
     const planningMode = options?.planningMode || 'skip';
@@ -4050,8 +4897,21 @@ After generating the revised spec, output:
                       }
                     } else if (msg.type === 'error') {
                       throw new Error(msg.error || 'Unknown error during implementation');
-                    } else if (msg.type === 'result' && msg.subtype === 'success') {
-                      responseText += msg.result || '';
+                    } else if (msg.type === 'result') {
+                      if (msg.subtype === 'success') {
+                        responseText += msg.result || '';
+                      }
+                      if (msg.usage) {
+                        usageEntry = {
+                          label: '',
+                          inputTokens: msg.usage.input_tokens ?? 0,
+                          outputTokens: msg.usage.output_tokens ?? 0,
+                          cacheReadTokens: msg.usage.cache_read_input_tokens ?? 0,
+                          cacheWriteTokens: msg.usage.cache_creation_input_tokens ?? 0,
+                          durationMs: msg.duration_ms ?? 0,
+                          numTurns: msg.num_turns ?? 0,
+                        };
+                      }
                     }
                   }
                 }
@@ -4095,11 +4955,24 @@ After generating the revised spec, output:
         } else if (msg.type === 'error') {
           // Handle error messages
           throw new Error(msg.error || 'Unknown error');
-        } else if (msg.type === 'result' && msg.subtype === 'success') {
-          // Don't replace responseText - the accumulated content is the full history
-          // The msg.result is just a summary which would lose all tool use details
-          // Just ensure final write happens
-          scheduleWrite();
+        } else if (msg.type === 'result') {
+          if (msg.subtype === 'success') {
+            // Don't replace responseText - the accumulated content is the full history
+            // The msg.result is just a summary which would lose all tool use details
+            // Just ensure final write happens
+            scheduleWrite();
+          }
+          if (msg.usage) {
+            usageEntry = {
+              label: '',
+              inputTokens: msg.usage.input_tokens ?? 0,
+              outputTokens: msg.usage.output_tokens ?? 0,
+              cacheReadTokens: msg.usage.cache_read_input_tokens ?? 0,
+              cacheWriteTokens: msg.usage.cache_creation_input_tokens ?? 0,
+              durationMs: msg.duration_ms ?? 0,
+              numTurns: msg.num_turns ?? 0,
+            };
+          }
         }
       }
 
@@ -4128,6 +5001,7 @@ After generating the revised spec, output:
         rawWriteTimeout = null;
       }
     }
+    return usageEntry;
   }
 
   private async executeFeatureWithContext(
@@ -4144,8 +5018,9 @@ After generating the revised spec, output:
     // Get customized prompts from settings
     const prompts = await getPromptCustomization(this.settingsService, '[AutoMode]');
 
-    // Build the feature prompt
-    const featurePrompt = this.buildFeaturePrompt(feature, prompts.taskExecution);
+    // Build the feature prompt with ancestor context
+    const ancestorContext = await this.buildAncestorContext(projectPath, feature);
+    const featurePrompt = this.buildFeaturePrompt(feature, prompts.taskExecution, ancestorContext);
 
     // Use the resume feature template with variable substitution
     let prompt = prompts.taskExecution.resumeFeatureTemplate;

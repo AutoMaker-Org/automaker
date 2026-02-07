@@ -13,6 +13,20 @@ import { Button } from '@/components/ui/button';
 import { Markdown } from '@/components/ui/markdown';
 import { Sparkles } from 'lucide-react';
 
+function formatTokenCount(count: number): string {
+  if (count >= 1_000_000) return `${(count / 1_000_000).toFixed(1)}M`;
+  if (count >= 1_000) return `${(count / 1_000).toFixed(1)}K`;
+  return String(count);
+}
+
+function formatDuration(ms: number): string {
+  const seconds = Math.floor(ms / 1000);
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = seconds % 60;
+  return `${minutes}m ${remainingSeconds}s`;
+}
+
 interface SummaryDialogProps {
   feature: Feature;
   agentInfo: AgentTaskInfo | null;
@@ -57,6 +71,36 @@ export function SummaryDialog({
             {feature.summary || summary || agentInfo?.summary || 'No summary available'}
           </Markdown>
         </div>
+        {feature.tokenUsage && feature.tokenUsage.entries.length > 0 && (
+          <div className="mt-4 p-3 bg-muted/30 rounded-lg border border-border/30">
+            <h4 className="text-xs font-medium text-muted-foreground mb-2">Token Usage</h4>
+            <div className="space-y-1.5">
+              {feature.tokenUsage.entries.map((entry, idx) => (
+                <div key={idx} className="flex items-center justify-between text-[11px]">
+                  <span className="text-muted-foreground">{entry.label}</span>
+                  <div className="flex items-center gap-3 text-muted-foreground/70">
+                    <span>{formatTokenCount(entry.inputTokens + entry.outputTokens)} tokens</span>
+                    <span>{formatDuration(entry.durationMs)}</span>
+                  </div>
+                </div>
+              ))}
+              {feature.tokenUsage.entries.length > 1 && (
+                <div className="flex items-center justify-between text-[11px] pt-1.5 border-t border-border/30 font-medium">
+                  <span className="text-muted-foreground">Total</span>
+                  <div className="flex items-center gap-3 text-muted-foreground">
+                    <span>
+                      {formatTokenCount(
+                        feature.tokenUsage.inputTokens + feature.tokenUsage.outputTokens
+                      )}{' '}
+                      tokens
+                    </span>
+                    <span>{formatDuration(feature.tokenUsage.durationMs)}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
         <DialogFooter>
           <Button
             variant="ghost"

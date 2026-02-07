@@ -59,7 +59,7 @@ export const CLAUDE_MODELS: ModelOption[] = [
   },
   {
     id: 'opus',
-    label: 'Claude Opus',
+    label: 'Opus 4.6',
     description: 'Most capable model for complex work.',
     badge: 'Premium',
     provider: 'claude',
@@ -71,6 +71,14 @@ export const CLAUDE_MODELS: ModelOption[] = [
  * Official models from https://developers.openai.com/codex/models/
  */
 export const CODEX_MODELS: (ModelOption & { hasReasoning?: boolean })[] = [
+  {
+    id: CODEX_MODEL_MAP.gpt53Codex,
+    label: 'GPT-5.3-Codex',
+    description: 'Most advanced agentic coding model for complex software engineering.',
+    badge: 'Premium',
+    provider: 'codex',
+    hasReasoning: true,
+  },
   {
     id: CODEX_MODEL_MAP.gpt52Codex,
     label: 'GPT-5.2-Codex',
@@ -94,6 +102,14 @@ export const CODEX_MODELS: (ModelOption & { hasReasoning?: boolean })[] = [
     badge: 'Speed',
     provider: 'codex',
     hasReasoning: false,
+  },
+  {
+    id: CODEX_MODEL_MAP.gpt53,
+    label: 'GPT-5.3',
+    description: 'Best general agentic model for tasks across industries and domains.',
+    badge: 'Balanced',
+    provider: 'codex',
+    hasReasoning: true,
   },
   {
     id: CODEX_MODEL_MAP.gpt52,
@@ -193,7 +209,8 @@ export function getModelDisplayName(model: ModelAlias | string): string {
   const displayNames: Record<string, string> = {
     haiku: 'Claude Haiku',
     sonnet: 'Claude Sonnet',
-    opus: 'Claude Opus',
+    opus: 'Opus 4.6',
+    'claude-opus-4-6': 'Opus 4.6',
     [CODEX_MODEL_MAP.gpt52Codex]: 'GPT-5.2-Codex',
     [CODEX_MODEL_MAP.gpt51CodexMax]: 'GPT-5.1-Codex-Max',
     [CODEX_MODEL_MAP.gpt51CodexMini]: 'GPT-5.1-Codex-Mini',

@@ -9,6 +9,14 @@ export { BINARY_EXTENSIONS, GIT_STATUS_MAP, type FileStatus } from './types.js';
 // Export status utilities
 export { isGitRepo, parseGitStatus } from './status.js';
 
+// Export merge utilities
+export {
+  mergeWorktreeBranch,
+  cleanupWorktree,
+  type MergeResult,
+  type CleanupResult,
+} from './merge.js';
+
 // Export diff utilities
 export {
   generateSyntheticDiffForNewFile,

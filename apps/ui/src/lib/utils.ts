@@ -12,7 +12,7 @@ export function cn(...inputs: ClassValue[]) {
  * Note: This is for Claude's "thinking levels" only, not Codex's "reasoning effort"
  *
  * Rules:
- * - Claude models: support thinking (sonnet-4.5-thinking, opus-4.5-thinking, etc.)
+ * - Claude models: support thinking (sonnet-4.5-thinking, opus-4.6-thinking, etc.)
  * - Cursor models: NO thinking controls (handled internally by Cursor CLI)
  * - Codex models: NO thinking controls (they use reasoningEffort instead)
  */

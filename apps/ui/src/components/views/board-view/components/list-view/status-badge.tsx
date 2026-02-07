@@ -23,11 +23,41 @@ const BASE_STATUS_DISPLAY: Record<string, StatusDisplay> = {
     bgClass: 'bg-[var(--status-backlog)]/15',
     borderClass: 'border-[var(--status-backlog)]/30',
   },
+  ready: {
+    label: 'Ready',
+    colorClass: 'text-[var(--status-ready)]',
+    bgClass: 'bg-[var(--status-ready)]/15',
+    borderClass: 'border-[var(--status-ready)]/30',
+  },
+  assigned: {
+    label: 'Assigned',
+    colorClass: 'text-[var(--status-assigned)]',
+    bgClass: 'bg-[var(--status-assigned)]/15',
+    borderClass: 'border-[var(--status-assigned)]/30',
+  },
   in_progress: {
     label: 'In Progress',
     colorClass: 'text-[var(--status-in-progress)]',
     bgClass: 'bg-[var(--status-in-progress)]/15',
     borderClass: 'border-[var(--status-in-progress)]/30',
+  },
+  blocked: {
+    label: 'Blocked',
+    colorClass: 'text-[var(--status-blocked)]',
+    bgClass: 'bg-[var(--status-blocked)]/15',
+    borderClass: 'border-[var(--status-blocked)]/30',
+  },
+  failed: {
+    label: 'Failed',
+    colorClass: 'text-[var(--status-error)]',
+    bgClass: 'bg-[var(--status-error)]/15',
+    borderClass: 'border-[var(--status-error)]/30',
+  },
+  in_review: {
+    label: 'In Review',
+    colorClass: 'text-[var(--status-in-review)]',
+    bgClass: 'bg-[var(--status-in-review)]/15',
+    borderClass: 'border-[var(--status-in-review)]/30',
   },
   waiting_approval: {
     label: 'Waiting Approval',
@@ -40,6 +70,12 @@ const BASE_STATUS_DISPLAY: Record<string, StatusDisplay> = {
     colorClass: 'text-[var(--status-success)]',
     bgClass: 'bg-[var(--status-success)]/15',
     borderClass: 'border-[var(--status-success)]/30',
+  },
+  done: {
+    label: 'Done',
+    colorClass: 'text-[var(--status-done)]',
+    bgClass: 'bg-[var(--status-done)]/15',
+    borderClass: 'border-[var(--status-done)]/30',
   },
 };
 
@@ -204,14 +240,20 @@ export function getStatusLabel(
 export function getStatusOrder(status: FeatureStatusWithPipeline): number {
   const baseOrder: Record<string, number> = {
     backlog: 0,
-    in_progress: 1,
-    waiting_approval: 2,
-    verified: 3,
+    ready: 1,
+    assigned: 2,
+    in_progress: 3,
+    blocked: 4,
+    failed: 4.5,
+    in_review: 5,
+    waiting_approval: 7,
+    verified: 8,
+    done: 9,
   };
 
   if (isPipelineStatus(status)) {
-    // Pipeline statuses come after in_progress but before waiting_approval
-    return 1.5;
+    // Pipeline statuses come after in_review but before waiting_approval
+    return 6;
   }
 
   return baseOrder[status] ?? 0;

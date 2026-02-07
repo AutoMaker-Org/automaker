@@ -10,8 +10,8 @@ export type CursorModelId =
   | 'cursor-composer-1' // Cursor Composer agent model
   | 'cursor-sonnet-4.5' // Claude Sonnet 4.5
   | 'cursor-sonnet-4.5-thinking' // Claude Sonnet 4.5 with extended thinking
-  | 'cursor-opus-4.5' // Claude Opus 4.5
-  | 'cursor-opus-4.5-thinking' // Claude Opus 4.5 with extended thinking
+  | 'cursor-opus-4.6' // Claude Opus 4.6
+  | 'cursor-opus-4.6-thinking' // Claude Opus 4.6 with extended thinking
   | 'cursor-opus-4.1' // Claude Opus 4.1
   | 'cursor-gemini-3-pro' // Gemini 3 Pro
   | 'cursor-gemini-3-flash' // Gemini 3 Flash
@@ -37,8 +37,8 @@ export type LegacyCursorModelId =
   | 'composer-1'
   | 'sonnet-4.5'
   | 'sonnet-4.5-thinking'
-  | 'opus-4.5'
-  | 'opus-4.5-thinking'
+  | 'opus-4.6'
+  | 'opus-4.6-thinking'
   | 'opus-4.1'
   | 'gemini-3-pro'
   | 'gemini-3-flash'
@@ -89,17 +89,17 @@ export const CURSOR_MODEL_MAP: Record<CursorModelId, CursorModelConfig> = {
     hasThinking: true,
     supportsVision: false,
   },
-  'cursor-opus-4.5': {
-    id: 'cursor-opus-4.5',
-    label: 'Claude Opus 4.5',
-    description: 'Anthropic Claude Opus 4.5 via Cursor',
+  'cursor-opus-4.6': {
+    id: 'cursor-opus-4.6',
+    label: 'Claude Opus 4.6',
+    description: 'Anthropic Claude Opus 4.6 via Cursor',
     hasThinking: false,
     supportsVision: false,
   },
-  'cursor-opus-4.5-thinking': {
-    id: 'cursor-opus-4.5-thinking',
-    label: 'Claude Opus 4.5 (Thinking)',
-    description: 'Claude Opus 4.5 with extended thinking enabled',
+  'cursor-opus-4.6-thinking': {
+    id: 'cursor-opus-4.6-thinking',
+    label: 'Claude Opus 4.6 (Thinking)',
+    description: 'Claude Opus 4.6 with extended thinking enabled',
     hasThinking: true,
     supportsVision: false,
   },
@@ -225,8 +225,8 @@ export const LEGACY_CURSOR_MODEL_MAP: Record<LegacyCursorModelId, CursorModelId>
   'composer-1': 'cursor-composer-1',
   'sonnet-4.5': 'cursor-sonnet-4.5',
   'sonnet-4.5-thinking': 'cursor-sonnet-4.5-thinking',
-  'opus-4.5': 'cursor-opus-4.5',
-  'opus-4.5-thinking': 'cursor-opus-4.5-thinking',
+  'opus-4.6': 'cursor-opus-4.6',
+  'opus-4.6-thinking': 'cursor-opus-4.6-thinking',
   'opus-4.1': 'cursor-opus-4.1',
   'gemini-3-pro': 'cursor-gemini-3-pro',
   'gemini-3-flash': 'cursor-gemini-3-flash',
@@ -394,16 +394,16 @@ export const CURSOR_MODEL_GROUPS: GroupedModel[] = [
       },
     ],
   },
-  // Opus 4.5 group (thinking mode)
+  // Opus 4.6 group (thinking mode)
   {
-    baseId: 'cursor-opus-4.5-group',
-    label: 'Claude Opus 4.5',
-    description: 'Anthropic Claude Opus 4.5 via Cursor',
+    baseId: 'cursor-opus-4.6-group',
+    label: 'Claude Opus 4.6',
+    description: 'Anthropic Claude Opus 4.6 via Cursor',
     variantType: 'thinking',
     variants: [
-      { id: 'cursor-opus-4.5', label: 'Standard', description: 'Fast responses' },
+      { id: 'cursor-opus-4.6', label: 'Standard', description: 'Fast responses' },
       {
-        id: 'cursor-opus-4.5-thinking',
+        id: 'cursor-opus-4.6-thinking',
         label: 'Thinking',
         description: 'Extended reasoning',
         badge: 'Reasoning',

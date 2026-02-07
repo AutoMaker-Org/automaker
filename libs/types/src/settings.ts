@@ -276,7 +276,7 @@ export const CLAUDE_PROVIDER_TEMPLATES: ClaudeCompatibleProviderTemplate[] = [
     defaultModels: [
       { id: 'claude-haiku', displayName: 'Claude Haiku', mapsToClaudeModel: 'haiku' },
       { id: 'claude-sonnet', displayName: 'Claude Sonnet', mapsToClaudeModel: 'sonnet' },
-      { id: 'claude-opus', displayName: 'Claude Opus', mapsToClaudeModel: 'opus' },
+      { id: 'claude-opus', displayName: 'Opus 4.6', mapsToClaudeModel: 'opus' },
     ],
   },
   {
@@ -844,6 +844,14 @@ export interface GlobalSettings {
   enableDependencyBlocking: boolean;
   /** Skip verification requirement in auto-mode (treat 'completed' same as 'verified') */
   skipVerificationInAutoMode: boolean;
+  /** Auto-merge verified feature branches back to main (squash merge) */
+  autoMergeOnVerify: boolean;
+  /** Maximum retry attempts for failed features in auto-mode (0 = no retries) */
+  autoModeMaxRetries?: number;
+  /** Enable model escalation on retry (e.g., sonnet → opus) */
+  autoModeRetryModelEscalation?: boolean;
+  /** Enable self-review step after feature implementation (default: true) */
+  enableSelfReview?: boolean;
   /** Default: use git worktrees for feature branches */
   useWorktrees: boolean;
   /** Default: planning approach (skip/lite/spec/full) */
@@ -1272,6 +1280,10 @@ export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
   defaultSkipTests: true,
   enableDependencyBlocking: true,
   skipVerificationInAutoMode: false,
+  autoMergeOnVerify: true,
+  autoModeMaxRetries: 1,
+  autoModeRetryModelEscalation: true,
+  enableSelfReview: true,
   useWorktrees: true,
   defaultPlanningMode: 'skip',
   defaultRequirePlanApproval: false,
