@@ -247,6 +247,31 @@ export const DEFAULT_AUTO_MODE_CONTINUATION_PROMPT_TEMPLATE = `## Continuing Fea
 Review the previous work and continue the implementation.
 `;
 
+export const DEFAULT_AUTO_MODE_SELF_REVIEW_PROMPT_TEMPLATE = `## Self-Review: Check Your Implementation
+
+### Feature
+**Title:** {{title}}
+**Description:** {{description}}
+
+### Your Changes (Git Diff)
+\`\`\`diff
+{{diff}}
+\`\`\`
+
+### Instructions
+Review the diff above for issues. Look for:
+- Syntax errors, broken regexes, unterminated strings
+- Missing imports or unused imports
+- Logic errors or off-by-one mistakes
+- Unintended side effects or broken existing functionality
+- Hardcoded values that should be configurable
+- Security issues (injection, XSS, secrets in code)
+
+If you find issues that need fixing, list each one clearly with what file and what to change.
+If the implementation looks correct, respond with "NO_ISSUES_FOUND".
+
+Be concise. Only flag real problems, not style preferences.`;
+
 export const DEFAULT_AUTO_MODE_PIPELINE_STEP_PROMPT_TEMPLATE = `## Pipeline Step: {{stepName}}
 
 ### Feature Context
@@ -271,6 +296,7 @@ export const DEFAULT_AUTO_MODE_PROMPTS: ResolvedAutoModePrompts = {
   followUpPromptTemplate: DEFAULT_AUTO_MODE_FOLLOW_UP_PROMPT_TEMPLATE,
   continuationPromptTemplate: DEFAULT_AUTO_MODE_CONTINUATION_PROMPT_TEMPLATE,
   pipelineStepPromptTemplate: DEFAULT_AUTO_MODE_PIPELINE_STEP_PROMPT_TEMPLATE,
+  selfReviewPromptTemplate: DEFAULT_AUTO_MODE_SELF_REVIEW_PROMPT_TEMPLATE,
 };
 
 /**

@@ -850,6 +850,8 @@ export interface GlobalSettings {
   autoModeMaxRetries?: number;
   /** Enable model escalation on retry (e.g., sonnet → opus) */
   autoModeRetryModelEscalation?: boolean;
+  /** Enable self-review step after feature implementation (default: true) */
+  enableSelfReview?: boolean;
   /** Default: use git worktrees for feature branches */
   useWorktrees: boolean;
   /** Default: planning approach (skip/lite/spec/full) */
@@ -1281,6 +1283,7 @@ export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
   autoMergeOnVerify: true,
   autoModeMaxRetries: 1,
   autoModeRetryModelEscalation: true,
+  enableSelfReview: true,
   useWorktrees: true,
   defaultPlanningMode: 'skip',
   defaultRequirePlanApproval: false,

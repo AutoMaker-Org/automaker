@@ -47,6 +47,9 @@ export interface AutoModePrompts {
 
   /** Template for pipeline step execution prompts */
   pipelineStepPromptTemplate?: CustomPrompt;
+
+  /** Template for self-review prompt after feature implementation */
+  selfReviewPromptTemplate?: CustomPrompt;
 }
 
 /**
@@ -298,6 +301,7 @@ export interface ResolvedAutoModePrompts {
   followUpPromptTemplate: string;
   continuationPromptTemplate: string;
   pipelineStepPromptTemplate: string;
+  selfReviewPromptTemplate: string;
 }
 
 export interface ResolvedAgentPrompts {

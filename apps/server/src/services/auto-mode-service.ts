@@ -48,7 +48,7 @@ import {
   getEscalatedModel,
 } from '@automaker/model-resolver';
 import { resolveDependencies, areDependenciesSatisfied } from '@automaker/dependency-resolver';
-import { mergeWorktreeBranch, cleanupWorktree } from '@automaker/git-utils';
+import { mergeWorktreeBranch, cleanupWorktree, getGitRepositoryDiffs } from '@automaker/git-utils';
 import {
   getFeatureDir,
   getAutomakerDir,
@@ -1320,6 +1320,19 @@ export class AutoModeService {
         );
       }
 
+      // Self-review pass: review the diff for issues before setting final status
+      const globalSettings = await this.settingsService?.getGlobalSettings();
+      if (globalSettings?.enableSelfReview !== false) {
+        await this.executeSelfReview(
+          projectPath,
+          featureId,
+          feature,
+          workDir,
+          abortController,
+          autoLoadClaudeMd
+        );
+      }
+
       // Determine final status based on testing mode:
       // - skipTests=false (automated testing): go directly to 'verified' (no manual verify needed)
       // - skipTests=true (manual verification): go to 'waiting_approval' for manual review
@@ -1565,6 +1578,187 @@ export class AutoModeService {
     }
 
     logger.info(`All pipeline steps completed for feature ${featureId}`);
+  }
+
+  /**
+   * Self-review pass: reviews the agent's diff for issues and optionally fixes them.
+   * Uses simpleQuery for a lightweight read-only review, then runAgent if fixes are needed.
+   */
+  private async executeSelfReview(
+    projectPath: string,
+    featureId: string,
+    feature: Feature,
+    workDir: string,
+    abortController: AbortController,
+    autoLoadClaudeMd: boolean
+  ): Promise<void> {
+    logger.info(`Starting self-review for feature ${featureId}`);
+
+    this.emitAutoModeEvent('self_review_started', {
+      featureId,
+      featureName: feature.title,
+      projectPath,
+    });
+
+    // Get the diff of changes made by the agent
+    let diffResult: { diff: string; hasChanges: boolean };
+    try {
+      diffResult = await getGitRepositoryDiffs(workDir);
+    } catch (err) {
+      logger.warn(`Failed to get git diffs for self-review of feature ${featureId}:`, err);
+      this.emitAutoModeEvent('self_review_complete', {
+        featureId,
+        featureName: feature.title,
+        issuesFound: 0,
+        fixesApplied: false,
+        skipped: true,
+        reason: 'failed_to_get_diff',
+        projectPath,
+      });
+      return;
+    }
+
+    if (!diffResult.hasChanges || !diffResult.diff) {
+      logger.info(`No changes detected for self-review of feature ${featureId}, skipping`);
+      this.emitAutoModeEvent('self_review_complete', {
+        featureId,
+        featureName: feature.title,
+        issuesFound: 0,
+        fixesApplied: false,
+        skipped: true,
+        reason: 'no_changes',
+        projectPath,
+      });
+      return;
+    }
+
+    // Truncate diff to ~50k chars to avoid token limits
+    const MAX_DIFF_LENGTH = 50000;
+    const truncatedDiff =
+      diffResult.diff.length > MAX_DIFF_LENGTH
+        ? diffResult.diff.substring(0, MAX_DIFF_LENGTH) + '\n\n... (diff truncated)'
+        : diffResult.diff;
+
+    // Get customized prompts
+    const prompts = await getPromptCustomization(this.settingsService, '[AutoMode]');
+    const reviewTemplate = prompts.autoMode.selfReviewPromptTemplate;
+
+    // Build review prompt from template
+    const reviewPrompt = reviewTemplate
+      .replace('{{title}}', feature.title || 'Untitled Feature')
+      .replace('{{description}}', feature.description || 'No description')
+      .replace('{{diff}}', truncatedDiff);
+
+    // Get the model for the review (use feature model)
+    const model = resolveModelString(feature.model, DEFAULT_MODELS.claude);
+
+    // Run a lightweight, read-only review
+    let reviewResponse: string;
+    try {
+      const result = await simpleQuery({
+        prompt: reviewPrompt,
+        model,
+        cwd: workDir,
+        maxTurns: 1,
+        readOnly: true,
+        abortController,
+      });
+      reviewResponse = result.text;
+    } catch (err) {
+      logger.warn(`Self-review query failed for feature ${featureId}:`, err);
+      this.emitAutoModeEvent('self_review_complete', {
+        featureId,
+        featureName: feature.title,
+        issuesFound: 0,
+        fixesApplied: false,
+        skipped: true,
+        reason: 'review_query_failed',
+        projectPath,
+      });
+      return;
+    }
+
+    // Check if issues were found
+    const noIssues = reviewResponse.includes('NO_ISSUES_FOUND');
+    let fixesApplied = false;
+
+    if (!noIssues) {
+      logger.info(`Self-review found issues for feature ${featureId}, running fix pass`);
+
+      // Build fix prompt and run an agentic fix pass
+      const fixPrompt = `## Fix Issues Found During Self-Review
+
+The following issues were found in your implementation of "${feature.title || 'Untitled Feature'}":
+
+${reviewResponse}
+
+Please fix these issues. Only fix the specific problems listed above — do not make other changes.`;
+
+      try {
+        await this.runAgent(
+          workDir,
+          featureId,
+          fixPrompt,
+          abortController,
+          projectPath,
+          undefined,
+          model,
+          {
+            projectPath,
+            planningMode: 'skip' as PlanningMode,
+            requirePlanApproval: false,
+            autoLoadClaudeMd,
+            thinkingLevel: feature.thinkingLevel,
+            branchName: feature.branchName ?? null,
+          }
+        );
+        fixesApplied = true;
+
+        this.emitAutoModeEvent('self_review_fix_applied', {
+          featureId,
+          featureName: feature.title,
+          projectPath,
+        });
+      } catch (err) {
+        logger.warn(`Self-review fix pass failed for feature ${featureId}:`, err);
+      }
+    } else {
+      logger.info(`Self-review found no issues for feature ${featureId}`);
+    }
+
+    // Append review results to agent-output.md
+    try {
+      const featureDir = getFeatureDir(projectPath, featureId);
+      const outputPath = path.join(featureDir, 'agent-output.md');
+      let existingOutput = '';
+      try {
+        existingOutput = (await secureFs.readFile(outputPath, 'utf-8')) as string;
+      } catch {
+        // File may not exist yet
+      }
+
+      const reviewSection = `\n\n---\n## Self-Review Results\n\n${
+        noIssues
+          ? 'No issues found during self-review.'
+          : `### Issues Found\n${reviewResponse}\n\n${fixesApplied ? '**Fixes were applied automatically.**' : '**Fix attempt failed — issues may still exist.**'}`
+      }\n`;
+
+      await secureFs.writeFile(outputPath, existingOutput + reviewSection, 'utf-8');
+    } catch (err) {
+      logger.warn(`Failed to append self-review results to agent-output.md:`, err);
+    }
+
+    this.emitAutoModeEvent('self_review_complete', {
+      featureId,
+      featureName: feature.title,
+      issuesFound: noIssues ? 0 : 1,
+      fixesApplied,
+      projectPath,
+    });
+
+    logger.info(
+      `Self-review complete for feature ${featureId}: ${noIssues ? 'no issues' : `issues found, fixes ${fixesApplied ? 'applied' : 'failed'}`}`
+    );
   }
 
   /**
@@ -1902,6 +2096,19 @@ Complete the pipeline step instructions above. Review the previous work and appl
         autoLoadClaudeMd
       );
 
+      // Self-review pass after pipeline resume
+      const globalSettingsResume = await this.settingsService?.getGlobalSettings();
+      if (globalSettingsResume?.enableSelfReview !== false) {
+        await this.executeSelfReview(
+          projectPath,
+          featureId,
+          feature,
+          workDir,
+          abortController,
+          autoLoadClaudeMd
+        );
+      }
+
       // Determine final status
       const finalStatus = feature.skipTests ? 'waiting_approval' : 'verified';
       await this.updateFeatureStatus(projectPath, featureId, finalStatus);
@@ -2200,6 +2407,19 @@ Address the follow-up instructions above. Review the previous work and make the 
           thinkingLevel: feature?.thinkingLevel,
         }
       );
+
+      // Self-review pass after follow-up
+      const globalSettingsFollowUp = await this.settingsService?.getGlobalSettings();
+      if (globalSettingsFollowUp?.enableSelfReview !== false && feature) {
+        await this.executeSelfReview(
+          projectPath,
+          featureId,
+          feature,
+          workDir,
+          abortController,
+          autoLoadClaudeMd
+        );
+      }
 
       // Determine final status based on testing mode:
       // - skipTests=false (automated testing): go directly to 'verified' (no manual verify needed)
