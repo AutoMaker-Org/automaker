@@ -1152,7 +1152,24 @@ export class AutoModeService {
       // Derive workDir from feature.branchName
       // Worktrees should already be created when the feature is added/edited
       let worktreePath: string | null = null;
-      const branchName = feature.branchName;
+      let branchName = feature.branchName;
+
+      // Auto-generate branchName if worktrees are enabled but no branch is set
+      if (useWorktrees && !branchName) {
+        branchName = `feature/${feature.id}`;
+        logger.info(`Auto-generating branch name for feature ${featureId}: ${branchName}`);
+        try {
+          await this.featureLoader.update(projectPath, featureId, { branchName });
+          feature.branchName = branchName;
+          logger.info(`Saved auto-generated branch name "${branchName}" to feature ${featureId}`);
+        } catch (error) {
+          logger.error(
+            `Failed to save auto-generated branch name for feature ${featureId}:`,
+            error
+          );
+          // Continue anyway - the branchName variable is set so worktree creation will still proceed
+        }
+      }
 
       if (useWorktrees && branchName) {
         // Try to find existing worktree for this branch
