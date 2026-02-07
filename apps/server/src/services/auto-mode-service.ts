@@ -3290,19 +3290,27 @@ Format your response as a structured markdown document.`;
       // Apply dependency-aware ordering
       const { orderedFeatures, missingDependencies } = resolveDependencies(pendingFeatures);
 
-      // Remove missing dependencies from features and save them
-      // This allows features to proceed when their dependencies have been deleted or don't exist
+      // Remove truly missing dependencies from features and save them
+      // Only remove deps that don't exist in allFeatures at all (i.e. deleted features).
+      // Deps that exist but aren't in pendingFeatures (e.g. in_progress, verified) are NOT removed.
       if (missingDependencies.size > 0) {
         for (const [featureId, missingDepIds] of missingDependencies) {
+          // Filter to only deps that are truly gone (not in allFeatures)
+          const trulyMissingDepIds = missingDepIds.filter(
+            (depId) => !allFeatures.find((f) => f.id === depId)
+          );
+
+          if (trulyMissingDepIds.length === 0) continue;
+
           const feature = pendingFeatures.find((f) => f.id === featureId);
           if (feature && feature.dependencies) {
-            // Filter out the missing dependency IDs
+            // Filter out the truly missing dependency IDs
             const validDependencies = feature.dependencies.filter(
-              (depId) => !missingDepIds.includes(depId)
+              (depId) => !trulyMissingDepIds.includes(depId)
             );
 
             logger.warn(
-              `[loadPendingFeatures] Feature ${featureId} has missing dependencies: ${missingDepIds.join(', ')}. Removing them automatically.`
+              `[loadPendingFeatures] Feature ${featureId} has truly missing dependencies (deleted): ${trulyMissingDepIds.join(', ')}. Removing them automatically.`
             );
 
             // Update the feature in memory
