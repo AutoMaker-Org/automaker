@@ -650,6 +650,7 @@ export interface AppState {
   defaultSkipTests: boolean; // Default value for skip tests when creating new features
   enableDependencyBlocking: boolean; // When true, show blocked badges and warnings for features with incomplete dependencies (default: true)
   skipVerificationInAutoMode: boolean; // When true, auto-mode grabs features even if dependencies are not verified (only checks they're not running)
+  autoMergeOnVerify: boolean; // When true, auto-merge verified feature branches back to main (squash merge)
   enableAiCommitMessages: boolean; // When true, auto-generate commit messages using AI when opening commit dialog
   planUseSelectedWorktreeBranch: boolean; // When true, Plan dialog creates features on the currently selected worktree branch
   addFeatureUseSelectedWorktreeBranch: boolean; // When true, Add Feature dialog defaults to custom mode with selected worktree branch
@@ -1121,6 +1122,7 @@ export interface AppActions {
   setDefaultSkipTests: (skip: boolean) => void;
   setEnableDependencyBlocking: (enabled: boolean) => void;
   setSkipVerificationInAutoMode: (enabled: boolean) => Promise<void>;
+  setAutoMergeOnVerify: (enabled: boolean) => Promise<void>;
   setEnableAiCommitMessages: (enabled: boolean) => Promise<void>;
   setPlanUseSelectedWorktreeBranch: (enabled: boolean) => Promise<void>;
   setAddFeatureUseSelectedWorktreeBranch: (enabled: boolean) => Promise<void>;
@@ -1455,6 +1457,7 @@ const initialState: AppState = {
   defaultSkipTests: true, // Default to manual verification (tests disabled)
   enableDependencyBlocking: true, // Default to enabled (show dependency blocking UI)
   skipVerificationInAutoMode: false, // Default to disabled (require dependencies to be verified)
+  autoMergeOnVerify: true, // Default to enabled (auto-merge verified feature branches back to main)
   enableAiCommitMessages: true, // Default to enabled (auto-generate commit messages)
   planUseSelectedWorktreeBranch: true, // Default to enabled (Plan creates features on selected worktree branch)
   addFeatureUseSelectedWorktreeBranch: false, // Default to disabled (Add Feature uses normal defaults)
@@ -2431,6 +2434,17 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
     // Sync to server settings file
     const { syncSettingsToServer } = await import('@/hooks/use-settings-migration');
     await syncSettingsToServer();
+  },
+  setAutoMergeOnVerify: async (enabled) => {
+    const previous = get().autoMergeOnVerify;
+    set({ autoMergeOnVerify: enabled });
+    // Sync to server settings file
+    const { syncSettingsToServer } = await import('@/hooks/use-settings-migration');
+    const ok = await syncSettingsToServer();
+    if (!ok) {
+      logger.error('Failed to sync autoMergeOnVerify setting to server - reverting');
+      set({ autoMergeOnVerify: previous });
+    }
   },
   setEnableAiCommitMessages: async (enabled) => {
     const previous = get().enableAiCommitMessages;

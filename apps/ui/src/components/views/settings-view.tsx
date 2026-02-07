@@ -43,6 +43,8 @@ export function SettingsView() {
     setEnableDependencyBlocking,
     skipVerificationInAutoMode,
     setSkipVerificationInAutoMode,
+    autoMergeOnVerify,
+    setAutoMergeOnVerify,
     enableAiCommitMessages,
     setEnableAiCommitMessages,
     useWorktrees,
@@ -162,6 +164,7 @@ export function SettingsView() {
             defaultSkipTests={defaultSkipTests}
             enableDependencyBlocking={enableDependencyBlocking}
             skipVerificationInAutoMode={skipVerificationInAutoMode}
+            autoMergeOnVerify={autoMergeOnVerify}
             defaultPlanningMode={defaultPlanningMode}
             defaultRequirePlanApproval={defaultRequirePlanApproval}
             enableAiCommitMessages={enableAiCommitMessages}
@@ -169,6 +172,7 @@ export function SettingsView() {
             onDefaultSkipTestsChange={setDefaultSkipTests}
             onEnableDependencyBlockingChange={setEnableDependencyBlocking}
             onSkipVerificationInAutoModeChange={setSkipVerificationInAutoMode}
+            onAutoMergeOnVerifyChange={setAutoMergeOnVerify}
             onDefaultPlanningModeChange={setDefaultPlanningMode}
             onDefaultRequirePlanApprovalChange={setDefaultRequirePlanApproval}
             onEnableAiCommitMessagesChange={setEnableAiCommitMessages}

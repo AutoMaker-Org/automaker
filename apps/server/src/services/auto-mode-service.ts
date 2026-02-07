@@ -2964,6 +2964,10 @@ Format your response as a structured markdown document.`;
 
       feature.status = status;
       feature.updatedAt = new Date().toISOString();
+      // Set startedAt timestamp when moving to in_progress (for UI timer)
+      if (status === 'in_progress') {
+        feature.startedAt = new Date().toISOString();
+      }
       // Set justFinishedAt timestamp when moving to waiting_approval (agent just completed)
       // Badge will show for 2 minutes after this timestamp
       if (status === 'waiting_approval') {
@@ -3060,11 +3064,37 @@ Format your response as a structured markdown document.`;
       }
 
       // Clean up worktree and branch
+      let cleanupSucceeded = false;
       if (worktreePath) {
         const cleanup = await cleanupWorktree(projectPath, worktreePath, branchName);
+        cleanupSucceeded = cleanup.worktreeDeleted && cleanup.branchDeleted;
         logger.info(
           `Cleanup after auto-merge: worktree=${cleanup.worktreeDeleted}, branch=${cleanup.branchDeleted}`
         );
+      }
+
+      // Append Auto-Merge section to agent-output.md
+      try {
+        const outputPath = path.join(featureDir, 'agent-output.md');
+        const timestamp = new Date().toISOString();
+        const autoMergeSection = `\n\n## Auto-Merge\n\n- **Timestamp:** ${timestamp}\n- **Branch Merged:** ${branchName}\n- **Target Branch:** main\n- **Merge Type:** squash\n- **Cleanup Succeeded:** ${cleanupSucceeded}\n`;
+
+        let existingContent = '';
+        try {
+          existingContent = (await secureFs.readFile(outputPath, 'utf-8')) as string;
+        } catch {
+          // File doesn't exist yet - will create it
+        }
+
+        if (existingContent) {
+          await secureFs.appendFile(outputPath, autoMergeSection);
+        } else {
+          await secureFs.mkdir(path.dirname(outputPath), { recursive: true });
+          await secureFs.writeFile(outputPath, autoMergeSection.trimStart());
+        }
+        logger.info(`Appended Auto-Merge section to agent-output.md for feature ${featureId}`);
+      } catch (error) {
+        logger.error(`Failed to append Auto-Merge section for feature ${featureId}:`, error);
       }
 
       logger.info(`Auto-merge successful for feature ${featureId}`);
