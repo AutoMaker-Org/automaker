@@ -2967,6 +2967,8 @@ Format your response as a structured markdown document.`;
       // Set startedAt timestamp when moving to in_progress (for UI timer)
       if (status === 'in_progress') {
         feature.startedAt = new Date().toISOString();
+      } else {
+        feature.startedAt = undefined;
       }
       // Set justFinishedAt timestamp when moving to waiting_approval (agent just completed)
       // Badge will show for 2 minutes after this timestamp

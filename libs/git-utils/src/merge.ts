@@ -90,8 +90,10 @@ export async function mergeWorktreeBranch(
     ? `git merge --squash ${branchName}`
     : `git merge ${branchName} -m "${mergeMsg}"`;
 
+  let mergeOutput = '';
   try {
-    await execAsync(mergeCmd, { cwd: projectPath });
+    const result = await execAsync(mergeCmd, { cwd: projectPath });
+    mergeOutput = `${result.stdout || ''} ${result.stderr || ''}`;
   } catch (mergeError: unknown) {
     const err = mergeError as { stdout?: string; stderr?: string; message?: string };
     const output = `${err.stdout || ''} ${err.stderr || ''} ${err.message || ''}`;
@@ -108,17 +110,28 @@ export async function mergeWorktreeBranch(
     return { success: false, hasConflicts: false, error: output.trim() };
   }
 
-  // If squash merge, need to commit
+  // If squash merge, need to commit (unless there's nothing to squash)
   if (options?.squash) {
+    // "Already up to date" / "nothing to squash" means branches are identical — no commit needed
+    if (mergeOutput.includes('nothing to squash') || mergeOutput.includes('Already up to date')) {
+      logger.info(`No changes to merge from ${branchName} into ${mergeTo} (branches identical)`);
+      return { success: true, hasConflicts: false };
+    }
     try {
       const squashMsg = options?.message || `Merge ${branchName} (squash)`;
       await execAsync(`git commit -m "${squashMsg}"`, { cwd: projectPath });
     } catch (commitError: unknown) {
       const err = commitError as { message?: string };
+      const msg = err.message || '';
+      // "nothing to commit" means the branch had no new changes vs target — treat as success
+      if (msg.includes('nothing to commit') || msg.includes('no changes added')) {
+        logger.info(`No changes to merge from ${branchName} into ${mergeTo} (branches identical)`);
+        return { success: true, hasConflicts: false };
+      }
       return {
         success: false,
         hasConflicts: false,
-        error: `Squash commit failed: ${err.message || 'unknown error'}`,
+        error: `Squash commit failed: ${msg}`,
       };
     }
   }

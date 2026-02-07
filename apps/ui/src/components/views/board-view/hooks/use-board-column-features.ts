@@ -73,8 +73,8 @@ export function useBoardColumnFeatures({
       const featureBranch = f.branchName;
 
       let matchesWorktree: boolean;
-      if (!featureBranch) {
-        // No branch assigned - show only on primary worktree
+      if (!featureBranch || f.mergedToMain) {
+        // No branch assigned or merged to main (branch cleaned up) - show on primary worktree
         const isViewingPrimary = currentWorktreePath === null;
         matchesWorktree = isViewingPrimary;
       } else if (effectiveBranch === null) {

@@ -25,7 +25,7 @@ import {
 import { useAppStore } from '@/store/app-store';
 import { ViewWorktreeChangesDialog, PushToRemoteDialog, MergeWorktreeDialog } from '../dialogs';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
-import { Undo2 } from 'lucide-react';
+import { Undo2, Zap } from 'lucide-react';
 import { getElectronAPI } from '@/lib/electron';
 
 export function WorktreePanel({
@@ -120,13 +120,11 @@ export function WorktreePanel({
     [currentProject, autoModeByWorktree, getAutoModeWorktreeKey]
   );
 
-  // Handler to toggle auto-mode for a worktree
-  const handleToggleAutoMode = useCallback(
+  // Handler to actually start/stop auto-mode for a worktree (called directly for stop, or after confirmation for start)
+  const executeAutoModeToggle = useCallback(
     async (worktree: WorktreeInfo) => {
       if (!currentProject) return;
 
-      // Import the useAutoMode to get start/stop functions
-      // Since useAutoMode is a hook, we'll use the API client directly
       const api = getHttpApiClient();
       const branchName = worktree.isMain ? null : worktree.branch;
       const isRunning = isAutoModeRunningForWorktree(worktree);
@@ -157,6 +155,34 @@ export function WorktreePanel({
     [currentProject, projectPath, isAutoModeRunningForWorktree]
   );
 
+  // Auto-mode confirmation dialog state (must be before callbacks that reference it)
+  const [autoModeConfirmOpen, setAutoModeConfirmOpen] = useState(false);
+  const [autoModeConfirmWorktree, setAutoModeConfirmWorktree] = useState<WorktreeInfo | null>(null);
+
+  // Handler to toggle auto-mode: shows confirmation dialog when starting, stops directly
+  const handleToggleAutoMode = useCallback(
+    (worktree: WorktreeInfo) => {
+      const isRunning = isAutoModeRunningForWorktree(worktree);
+
+      if (isRunning) {
+        // Stop directly without confirmation
+        executeAutoModeToggle(worktree);
+      } else {
+        // Show confirmation dialog before starting
+        setAutoModeConfirmWorktree(worktree);
+        setAutoModeConfirmOpen(true);
+      }
+    },
+    [isAutoModeRunningForWorktree, executeAutoModeToggle]
+  );
+
+  // Handler for confirming auto-mode start from the confirmation dialog
+  const handleConfirmAutoModeStart = useCallback(() => {
+    if (autoModeConfirmWorktree) {
+      executeAutoModeToggle(autoModeConfirmWorktree);
+    }
+  }, [autoModeConfirmWorktree, executeAutoModeToggle]);
+
   // Check if init script exists for the project using React Query
   const { data: initScriptData } = useWorktreeInitScript(projectPath);
   const hasInitScript = initScriptData?.exists ?? false;
@@ -180,6 +206,15 @@ export function WorktreePanel({
   // Merge branch dialog state
   const [mergeDialogOpen, setMergeDialogOpen] = useState(false);
   const [mergeWorktree, setMergeWorktree] = useState<WorktreeInfo | null>(null);
+
+  // Settings for auto-mode confirmation dialog
+  const storeFeatures = useAppStore((state) => state.features);
+  const maxConcurrency = useAppStore((state) => state.maxConcurrency);
+  const autoMergeOnVerify = useAppStore((state) => state.autoMergeOnVerify);
+  const useWorktreesSetting = useAppStore((state) => state.useWorktrees);
+
+  // Count features in "ready" status
+  const readyFeaturesCount = storeFeatures.filter((f) => f.status === 'ready').length;
 
   const isMobile = useIsMobile();
 
@@ -494,6 +529,46 @@ export function WorktreePanel({
           onMerged={handleMerged}
           onCreateConflictResolutionFeature={onCreateMergeConflictResolutionFeature}
         />
+
+        {/* Auto-Mode Confirmation Dialog */}
+        <ConfirmDialog
+          open={autoModeConfirmOpen}
+          onOpenChange={setAutoModeConfirmOpen}
+          onConfirm={handleConfirmAutoModeStart}
+          title="Start Auto Mode"
+          description={`Auto Mode will automatically process features in the Ready status for "${autoModeConfirmWorktree?.branch ?? 'main'}".`}
+          icon={Zap}
+          iconClassName="text-yellow-500"
+          confirmText="Start"
+          cancelText="Cancel"
+        >
+          <div className="space-y-2 text-sm px-1">
+            <div className="flex justify-between items-center py-1.5 border-b border-border/50">
+              <span className="text-muted-foreground">Ready features</span>
+              <span className="font-medium">{readyFeaturesCount}</span>
+            </div>
+            <div className="flex justify-between items-center py-1.5 border-b border-border/50">
+              <span className="text-muted-foreground">Max concurrency</span>
+              <span className="font-medium">{maxConcurrency}</span>
+            </div>
+            <div className="flex justify-between items-center py-1.5 border-b border-border/50">
+              <span className="text-muted-foreground">Auto-merge on verify</span>
+              <span
+                className={`font-medium ${autoMergeOnVerify ? 'text-green-500' : 'text-muted-foreground'}`}
+              >
+                {autoMergeOnVerify ? 'Enabled' : 'Disabled'}
+              </span>
+            </div>
+            <div className="flex justify-between items-center py-1.5">
+              <span className="text-muted-foreground">Worktrees</span>
+              <span
+                className={`font-medium ${useWorktreesSetting ? 'text-green-500' : 'text-muted-foreground'}`}
+              >
+                {useWorktreesSetting ? 'Enabled' : 'Disabled'}
+              </span>
+            </div>
+          </div>
+        </ConfirmDialog>
       </div>
     );
   }
@@ -703,6 +778,46 @@ export function WorktreePanel({
         onMerged={handleMerged}
         onCreateConflictResolutionFeature={onCreateMergeConflictResolutionFeature}
       />
+
+      {/* Auto-Mode Confirmation Dialog */}
+      <ConfirmDialog
+        open={autoModeConfirmOpen}
+        onOpenChange={setAutoModeConfirmOpen}
+        onConfirm={handleConfirmAutoModeStart}
+        title="Start Auto Mode"
+        description={`Auto Mode will automatically process features in the Ready status for "${autoModeConfirmWorktree?.branch ?? 'main'}".`}
+        icon={Zap}
+        iconClassName="text-yellow-500"
+        confirmText="Start"
+        cancelText="Cancel"
+      >
+        <div className="space-y-2 text-sm px-1">
+          <div className="flex justify-between items-center py-1.5 border-b border-border/50">
+            <span className="text-muted-foreground">Ready features</span>
+            <span className="font-medium">{readyFeaturesCount}</span>
+          </div>
+          <div className="flex justify-between items-center py-1.5 border-b border-border/50">
+            <span className="text-muted-foreground">Max concurrency</span>
+            <span className="font-medium">{maxConcurrency}</span>
+          </div>
+          <div className="flex justify-between items-center py-1.5 border-b border-border/50">
+            <span className="text-muted-foreground">Auto-merge on verify</span>
+            <span
+              className={`font-medium ${autoMergeOnVerify ? 'text-green-500' : 'text-muted-foreground'}`}
+            >
+              {autoMergeOnVerify ? 'Enabled' : 'Disabled'}
+            </span>
+          </div>
+          <div className="flex justify-between items-center py-1.5">
+            <span className="text-muted-foreground">Worktrees</span>
+            <span
+              className={`font-medium ${useWorktreesSetting ? 'text-green-500' : 'text-muted-foreground'}`}
+            >
+              {useWorktreesSetting ? 'Enabled' : 'Disabled'}
+            </span>
+          </div>
+        </div>
+      </ConfirmDialog>
     </div>
   );
 }
