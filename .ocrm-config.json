@@ -148,7 +148,7 @@
             },
             {
               "label": "plusversion",
-              "path": "git add * && git diff --cached --quiet || git commit -m \"Cleaning w/ push\" && git push && pnpm version patch && git push && git push --tags",
+              "path": "git add . && git diff --cached --quiet || git commit -m \"Cleaning w/ push\" && git push && pnpm version patch && git push && git push --tags",
               "type": "powershellCommand",
               "hidden": true
             },
