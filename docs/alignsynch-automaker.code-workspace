@@ -1,0 +1,12 @@
+{
+	"folders": [
+		{
+			"path": ".."
+		}
+	],
+	"settings": {
+		"projectColorizer.workspaceColor": "#bf6731",
+		"workbench.colorCustomizations": {},
+		"projectColorizer.enabled": false
+	}
+}

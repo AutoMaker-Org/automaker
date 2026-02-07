@@ -1,0 +1,234 @@
+{
+  "categories": [
+    {
+      "label": "MAIN",
+      "expanded": false,
+      "type": "folder",
+      "global": true,
+      "items": []
+    },
+    {
+      "label": "CMDS",
+      "expanded": true,
+      "type": "folder",
+      "global": true,
+      "items": [
+        {
+          "label": "Format",
+          "path": "formatfile, saveall",
+          "type": "chain"
+        },
+        {
+          "label": "SAVE ALL",
+          "path": "workbench.action.files.saveAll",
+          "type": "command"
+        },
+        {
+          "label": "MONO KILL Terminals && Start DEV Server",
+          "path": "saveall, killterms, devApp",
+          "type": "chain"
+        },
+        {
+          "label": "SINGLE KILL Terminals && Start DEV Server",
+          "path": "saveall, killterms, startdevSingle",
+          "type": "chain"
+        },
+        {
+          "label": "Commit And Push Current Dir",
+          "path": "saveall, commitpush",
+          "type": "chain"
+        },
+        {
+          "label": "Save & Upgrade Patch",
+          "path": "saveall, plusversion",
+          "type": "chain"
+        },
+        {
+          "label": "MORE VSCODE CMDS",
+          "type": "folder",
+          "expanded": false,
+          "collapsibleState": 1,
+          "items": [
+            {
+              "label": "🔽 1",
+              "path": "editor.foldLevel1",
+              "type": "command"
+            },
+            {
+              "label": "🔽 2",
+              "path": "editor.foldLevel2",
+              "type": "command"
+            },
+            {
+              "label": "🔽 3",
+              "path": "editor.foldLevel3",
+              "type": "command"
+            },
+            {
+              "label": "🔽 4",
+              "path": "editor.foldLevel4",
+              "type": "command"
+            },
+            {
+              "label": "🔽 5",
+              "path": "editor.foldLevel5",
+              "type": "command"
+            },
+            {
+              "label": "🔽 6",
+              "path": "editor.foldLevel6",
+              "type": "command"
+            },
+            {
+              "label": "🔽 7",
+              "path": "editor.foldLevel7",
+              "type": "command"
+            },
+            {
+              "label": "🔼 All",
+              "path": "editor.unfoldAll",
+              "type": "command"
+            },
+            {
+              "label": "❌ editors",
+              "path": "saveall, closeeditors",
+              "type": "chain"
+            },
+            {
+              "label": "❌ Terminals",
+              "path": "workbench.action.terminal.killAll",
+              "type": "command"
+            },
+            {
+              "label": "toggle 💻",
+              "path": "workbench.action.terminal.toggleTerminal",
+              "type": "command"
+            },
+            {
+              "label": "toggle word wrap",
+              "path": "editor.action.toggleWordWrap",
+              "type": "command"
+            },
+            {
+              "label": "show commands",
+              "path": "workbench.action.showCommands",
+              "type": "command"
+            },
+            {
+              "label": "toggle zen mode",
+              "path": "workbench.action.toggleZenMode",
+              "type": "command"
+            }
+          ]
+        },
+        {
+          "label": "HIDDEN",
+          "expanded": false,
+          "type": "folder",
+          "global": true,
+          "hidden": true,
+          "items": [
+            {
+              "label": "buildpkg",
+              "path": "npm run clean-package",
+              "type": "powershellCommand",
+              "hidden": true
+            },
+            {
+              "label": "killterms",
+              "path": "workbench.action.terminal.killAll",
+              "type": "command",
+              "hidden": true
+            },
+            {
+              "label": "saveall",
+              "path": "workbench.action.files.saveAll",
+              "type": "command",
+              "hidden": true
+            },
+            {
+              "label": "plusversion",
+              "path": "git add * && git diff --cached --quiet || git commit -m \"Cleaning w/ push\" && git push && pnpm version patch && git push && git push --tags",
+              "type": "powershellCommand",
+              "hidden": true
+            },
+            {
+              "label": "plusversionVSCEPkg",
+              "path": "git add * && git diff --cached --quiet || git commit -m \"Cleaning w/ push\" && git push && pnpm version patch && git push && git push --tags && vsce package",
+              "type": "powershellCommand",
+              "hidden": true
+            },
+            {
+              "label": "commitpush",
+              "path": "git add . && git commit -m \"Cleaning w/ push\" && git push",
+              "type": "powershellCommand",
+              "hidden": true
+            },
+            {
+              "label": "closeeditors",
+              "path": "workbench.action.closeAllEditors",
+              "type": "command",
+              "hidden": true
+            },
+            {
+              "label": "formatfile",
+              "path": "editor.action.formatDocument",
+              "type": "command",
+              "hidden": true
+            },
+            {
+              "label": "patchAndPublishToNPM",
+              "type": "powershellCommand",
+              "path": "git add . && git commit -m \\\"Cleaning w/ push\\\" && git push && pnpm version patch && git push && git push --tags && npm publish",
+              "hidden": true,
+              "global": false,
+              "expanded": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "label": "FILES",
+      "type": "folder",
+      "expanded": false,
+      "global": true,
+      "items": []
+    },
+    {
+      "label": "OTHER",
+      "expanded": false,
+      "type": "folder",
+      "global": true,
+      "items": []
+    },
+    {
+      "label": "PRIMARY",
+      "expanded": true,
+      "type": "folder",
+      "items": [],
+      "global": false
+    },
+    {
+      "label": "SECONDARY",
+      "expanded": false,
+      "type": "folder",
+      "items": [],
+      "global": false
+    },
+    {
+      "label": "COMPONENTS",
+      "expanded": false,
+      "type": "folder",
+      "items": [],
+      "global": false
+    },
+    {
+      "label": "UTILS",
+      "expanded": false,
+      "type": "folder",
+      "items": [],
+      "global": false
+    }
+  ]
+}
