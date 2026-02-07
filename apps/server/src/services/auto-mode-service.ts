@@ -3088,7 +3088,6 @@ Format your response as a structured markdown document.`;
           if (
             feature.status === 'pending' ||
             feature.status === 'ready' ||
-            feature.status === 'backlog' ||
             (feature.planSpec?.status === 'approved' &&
               (feature.planSpec.tasksCompleted ?? 0) < (feature.planSpec.tasksTotal ?? 0))
           ) {
@@ -3126,17 +3125,16 @@ Format your response as a structured markdown document.`;
 
       const worktreeDesc = branchName ? `worktree ${branchName}` : 'main worktree';
       logger.info(
-        `[loadPendingFeatures] Found ${allFeatures.length} total features, ${pendingFeatures.length} candidates (pending/ready/backlog/approved_with_pending_tasks) for ${worktreeDesc}`
+        `[loadPendingFeatures] Found ${allFeatures.length} total features, ${pendingFeatures.length} candidates (pending/ready/approved_with_pending_tasks) for ${worktreeDesc}`
       );
 
       if (pendingFeatures.length === 0) {
         logger.warn(
           `[loadPendingFeatures] No pending features found for ${worktreeDesc}. Check branchName matching - looking for branchName: ${branchName === null ? 'null (main)' : branchName}`
         );
-        // Log all backlog features to help debug branchName matching
+        // Log all ready/pending features to help debug branchName matching
         const allBacklogFeatures = allFeatures.filter(
           (f) =>
-            f.status === 'backlog' ||
             f.status === 'pending' ||
             f.status === 'ready' ||
             (f.planSpec?.status === 'approved' &&
