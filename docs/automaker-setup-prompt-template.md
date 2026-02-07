@@ -242,6 +242,15 @@ Rule: If wrong decision is expensive or hard to reverse → Tier 1.
 
 **Dependencies:** Must form a valid DAG. Verified features satisfy dependencies for backlog features.
 
+**Auto-Mode Execution Workflow:**
+
+- Auto-mode only picks features with status `ready` — it ignores `backlog` entirely
+- To execute features: manually move them from Backlog → Ready in the UI, then start auto-mode
+- Auto-mode respects `maxConcurrency` (e.g., 3 concurrent agents) and picks from Ready in priority/dependency order
+- When a feature finishes, auto-mode picks the next one from Ready
+- When Ready is empty, auto-mode goes idle until you move more features to Ready
+- This gives you explicit control over what gets executed and when
+
 **Security Pattern — OAuth One-Time Code Exchange:**
 When implementing OAuth callbacks, never pass JWTs as URL query parameters. Instead, store a one-time code in Redis on the backend, redirect the user with that code as the query parameter, and have the frontend exchange the code for the actual JWT via a POST request. This prevents token leakage through browser history, referrer headers, and server logs.
 
@@ -303,6 +312,7 @@ These are Automaker platform features that apply to every project:
 - .automaker/ directory structure (settings, context, memory, pipeline, features)
 - Worktree isolation strategy
 - Git worktree auto-creation at execution time (branchName auto-generated, do NOT pre-set)
+- Auto-mode picks from Ready only (not Backlog) — user controls what gets executed
 - Pipeline uses single-agent, multi-role pattern (same model for all review steps, role differentiation via instructions)
 - The principle that foundation code becomes "verified" features
 ```
