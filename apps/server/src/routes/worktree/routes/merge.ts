@@ -8,13 +8,8 @@
  */
 
 import type { Request, Response } from 'express';
-import { exec } from 'child_process';
-import { promisify } from 'util';
-import { getErrorMessage, logError, isValidBranchName, execGitCommand } from '../common.js';
-import { createLogger } from '@automaker/utils';
-
-const execAsync = promisify(exec);
-const logger = createLogger('Worktree');
+import { getErrorMessage, logError } from '../common.js';
+import { mergeWorktreeBranch, cleanupWorktree } from '@automaker/git-utils';
 
 export function createMergeHandler() {
   return async (req: Request, res: Response): Promise<void> => {
@@ -38,102 +33,41 @@ export function createMergeHandler() {
       // Determine the target branch (default to 'main')
       const mergeTo = targetBranch || 'main';
 
-      // Validate source branch exists
-      try {
-        await execAsync(`git rev-parse --verify ${branchName}`, { cwd: projectPath });
-      } catch {
-        res.status(400).json({
-          success: false,
-          error: `Branch "${branchName}" does not exist`,
-        });
-        return;
-      }
+      // Merge using shared utility
+      const result = await mergeWorktreeBranch(projectPath, branchName, mergeTo, {
+        squash: options?.squash,
+        message: options?.message,
+      });
 
-      // Validate target branch exists
-      try {
-        await execAsync(`git rev-parse --verify ${mergeTo}`, { cwd: projectPath });
-      } catch {
-        res.status(400).json({
-          success: false,
-          error: `Target branch "${mergeTo}" does not exist`,
-        });
-        return;
-      }
-
-      // Merge the feature branch into the target branch
-      const mergeCmd = options?.squash
-        ? `git merge --squash ${branchName}`
-        : `git merge ${branchName} -m "${options?.message || `Merge ${branchName} into ${mergeTo}`}"`;
-
-      try {
-        await execAsync(mergeCmd, { cwd: projectPath });
-      } catch (mergeError: unknown) {
-        // Check if this is a merge conflict
-        const err = mergeError as { stdout?: string; stderr?: string; message?: string };
-        const output = `${err.stdout || ''} ${err.stderr || ''} ${err.message || ''}`;
-        const hasConflicts =
-          output.includes('CONFLICT') || output.includes('Automatic merge failed');
-
-        if (hasConflicts) {
-          // Return conflict-specific error message that frontend can detect
+      if (!result.success) {
+        if (result.hasConflicts) {
           res.status(409).json({
             success: false,
-            error: `Merge CONFLICT: Automatic merge of "${branchName}" into "${mergeTo}" failed. Please resolve conflicts manually.`,
+            error: result.error,
             hasConflicts: true,
           });
           return;
         }
 
-        // Re-throw non-conflict errors to be handled by outer catch
-        throw mergeError;
-      }
-
-      // If squash merge, need to commit
-      if (options?.squash) {
-        await execAsync(`git commit -m "${options?.message || `Merge ${branchName} (squash)`}"`, {
-          cwd: projectPath,
+        res.status(400).json({
+          success: false,
+          error: result.error,
         });
+        return;
       }
 
       // Optionally delete the worktree and branch after merging
-      let worktreeDeleted = false;
-      let branchDeleted = false;
+      let deleted: { worktreeDeleted: boolean; branchDeleted: boolean } | undefined;
 
       if (options?.deleteWorktreeAndBranch) {
-        // Remove the worktree
-        try {
-          await execGitCommand(['worktree', 'remove', worktreePath, '--force'], projectPath);
-          worktreeDeleted = true;
-        } catch {
-          // Try with prune if remove fails
-          try {
-            await execGitCommand(['worktree', 'prune'], projectPath);
-            worktreeDeleted = true;
-          } catch {
-            logger.warn(`Failed to remove worktree: ${worktreePath}`);
-          }
-        }
-
-        // Delete the branch (but not main/master)
-        if (branchName !== 'main' && branchName !== 'master') {
-          if (!isValidBranchName(branchName)) {
-            logger.warn(`Invalid branch name detected, skipping deletion: ${branchName}`);
-          } else {
-            try {
-              await execGitCommand(['branch', '-D', branchName], projectPath);
-              branchDeleted = true;
-            } catch {
-              logger.warn(`Failed to delete branch: ${branchName}`);
-            }
-          }
-        }
+        deleted = await cleanupWorktree(projectPath, worktreePath, branchName);
       }
 
       res.json({
         success: true,
         mergedBranch: branchName,
         targetBranch: mergeTo,
-        deleted: options?.deleteWorktreeAndBranch ? { worktreeDeleted, branchDeleted } : undefined,
+        deleted,
       });
     } catch (error) {
       logError(error, 'Merge worktree failed');

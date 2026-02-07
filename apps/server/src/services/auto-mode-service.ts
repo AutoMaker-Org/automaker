@@ -43,6 +43,7 @@ import {
 const logger = createLogger('AutoMode');
 import { resolveModelString, resolvePhaseModel, DEFAULT_MODELS } from '@automaker/model-resolver';
 import { resolveDependencies, areDependenciesSatisfied } from '@automaker/dependency-resolver';
+import { mergeWorktreeBranch, cleanupWorktree } from '@automaker/git-utils';
 import {
   getFeatureDir,
   getAutomakerDir,
@@ -1320,6 +1321,15 @@ export class AutoModeService {
       const finalStatus = feature.skipTests ? 'waiting_approval' : 'verified';
       await this.updateFeatureStatus(projectPath, featureId, finalStatus);
 
+      // Auto-merge verified feature branch back to main if enabled
+      await this.autoMergeIfVerified(
+        projectPath,
+        featureId,
+        finalStatus,
+        branchName ?? null,
+        worktreePath
+      );
+
       // Record success to reset consecutive failure tracking
       this.recordSuccess();
 
@@ -1703,6 +1713,18 @@ Complete the pipeline step instructions above. Review the previous work and appl
 
       await this.updateFeatureStatus(projectPath, featureId, finalStatus);
 
+      // Auto-merge verified feature branch back to main if enabled
+      const resumeWorktreePath = feature.branchName
+        ? await this.findExistingWorktreeForBranch(projectPath, feature.branchName)
+        : null;
+      await this.autoMergeIfVerified(
+        projectPath,
+        featureId,
+        finalStatus,
+        feature.branchName ?? null,
+        resumeWorktreePath
+      );
+
       this.emitAutoModeEvent('auto_mode_feature_complete', {
         featureId,
         featureName: feature.title,
@@ -1860,6 +1882,15 @@ Complete the pipeline step instructions above. Review the previous work and appl
       // Determine final status
       const finalStatus = feature.skipTests ? 'waiting_approval' : 'verified';
       await this.updateFeatureStatus(projectPath, featureId, finalStatus);
+
+      // Auto-merge verified feature branch back to main if enabled
+      await this.autoMergeIfVerified(
+        projectPath,
+        featureId,
+        finalStatus,
+        branchName ?? null,
+        worktreePath
+      );
 
       console.log('[AutoMode] Pipeline resume completed successfully');
 
@@ -2125,6 +2156,15 @@ Address the follow-up instructions above. Review the previous work and make the 
       // - skipTests=true (manual verification): go to 'waiting_approval' for manual review
       const finalStatus = feature?.skipTests ? 'waiting_approval' : 'verified';
       await this.updateFeatureStatus(projectPath, featureId, finalStatus);
+
+      // Auto-merge verified feature branch back to main if enabled
+      await this.autoMergeIfVerified(
+        projectPath,
+        featureId,
+        finalStatus,
+        branchName ?? null,
+        worktreePath
+      );
 
       // Record success to reset consecutive failure tracking
       this.recordSuccess();
@@ -2970,6 +3010,106 @@ Format your response as a structured markdown document.`;
     }
   }
 
+  /**
+   * Auto-merge a verified feature's branch back to main if autoMergeOnVerify is enabled.
+   * Called after updateFeatureStatus when a feature reaches 'verified' status.
+   */
+  private async autoMergeIfVerified(
+    projectPath: string,
+    featureId: string,
+    status: string,
+    branchName: string | null,
+    worktreePath: string | null
+  ): Promise<void> {
+    // Only auto-merge on verified status
+    if (status !== 'verified') return;
+
+    // Nothing to merge if no branch or on main/master
+    if (!branchName || branchName === 'main' || branchName === 'master') return;
+
+    // Check if auto-merge is enabled
+    const settings = await this.settingsService?.getGlobalSettings();
+    if (!settings?.autoMergeOnVerify) return;
+
+    logger.info(`Auto-merging verified feature ${featureId} branch "${branchName}" to main`);
+
+    const result = await mergeWorktreeBranch(projectPath, branchName, 'main', {
+      squash: true,
+      message: `Merge feature/${featureId} (squash)`,
+    });
+
+    const notificationService = getNotificationService();
+
+    if (result.success) {
+      // Mark feature as merged in feature.json
+      const featureDir = getFeatureDir(projectPath, featureId);
+      const featurePath = path.join(featureDir, 'feature.json');
+      try {
+        const featureResult = await readJsonWithRecovery<Feature | null>(featurePath, null, {
+          maxBackups: DEFAULT_BACKUP_COUNT,
+          autoRestore: true,
+        });
+        const feature = featureResult.data;
+        if (feature) {
+          feature.mergedToMain = true;
+          feature.branchName = branchName; // Preserve branch name in the record
+          await atomicWriteJson(featurePath, feature, { backupCount: DEFAULT_BACKUP_COUNT });
+        }
+      } catch (error) {
+        logger.error(`Failed to update mergedToMain for feature ${featureId}:`, error);
+      }
+
+      // Clean up worktree and branch
+      if (worktreePath) {
+        const cleanup = await cleanupWorktree(projectPath, worktreePath, branchName);
+        logger.info(
+          `Cleanup after auto-merge: worktree=${cleanup.worktreeDeleted}, branch=${cleanup.branchDeleted}`
+        );
+      }
+
+      logger.info(`Auto-merge successful for feature ${featureId}`);
+      await notificationService.createNotification({
+        type: 'feature_verified',
+        title: 'Feature Auto-Merged',
+        message: `"${featureId}" branch merged to main and cleaned up.`,
+        featureId,
+        projectPath,
+      });
+    } else if (result.hasConflicts) {
+      // Merge conflict - set feature to error status, don't clean up worktree
+      logger.error(`Auto-merge conflict for feature ${featureId}: ${result.error}`);
+      await this.updateFeatureStatus(projectPath, featureId, 'error');
+
+      // Update feature.json with error message
+      const featureDir = getFeatureDir(projectPath, featureId);
+      const featurePath = path.join(featureDir, 'feature.json');
+      try {
+        const featureResult = await readJsonWithRecovery<Feature | null>(featurePath, null, {
+          maxBackups: DEFAULT_BACKUP_COUNT,
+          autoRestore: true,
+        });
+        const feature = featureResult.data;
+        if (feature) {
+          feature.error = `Auto-merge conflict: ${result.error}`;
+          await atomicWriteJson(featurePath, feature, { backupCount: DEFAULT_BACKUP_COUNT });
+        }
+      } catch (error) {
+        logger.error(`Failed to update error for feature ${featureId}:`, error);
+      }
+
+      await notificationService.createNotification({
+        type: 'feature_waiting_approval',
+        title: 'Merge Conflict',
+        message: `Auto-merge failed for "${featureId}". Please resolve conflicts manually.`,
+        featureId,
+        projectPath,
+      });
+    } else {
+      // Other merge error - log but don't block
+      logger.error(`Auto-merge failed for feature ${featureId}: ${result.error}`);
+    }
+  }
+
   private isFeatureFinished(feature: Feature): boolean {
     const isCompleted = feature.status === 'completed' || feature.status === 'verified';
 
@@ -3189,13 +3329,19 @@ Format your response as a structured markdown document.`;
       // Get skipVerificationInAutoMode setting
       const settings = await this.settingsService?.getGlobalSettings();
       const skipVerification = settings?.skipVerificationInAutoMode ?? false;
+      // When worktrees and auto-merge are both enabled, require dependencies to be merged to main
+      const requireMerged =
+        (settings?.useWorktrees ?? false) && (settings?.autoMergeOnVerify ?? false);
 
       // Filter to only features with satisfied dependencies
       const readyFeatures: Feature[] = [];
       const blockedFeatures: Array<{ feature: Feature; reason: string }> = [];
 
       for (const feature of orderedFeatures) {
-        const isSatisfied = areDependenciesSatisfied(feature, allFeatures, { skipVerification });
+        const isSatisfied = areDependenciesSatisfied(feature, allFeatures, {
+          skipVerification,
+          requireMerged,
+        });
         if (isSatisfied) {
           readyFeatures.push(feature);
         } else {

@@ -66,6 +66,7 @@ export interface Feature {
   error?: string;
   summary?: string;
   startedAt?: string;
+  mergedToMain?: boolean; // Whether verified feature branch has been merged back to main
   descriptionHistory?: DescriptionHistoryEntry[]; // History of description changes
   [key: string]: unknown; // Keep catch-all for extensibility
 }

@@ -844,6 +844,8 @@ export interface GlobalSettings {
   enableDependencyBlocking: boolean;
   /** Skip verification requirement in auto-mode (treat 'completed' same as 'verified') */
   skipVerificationInAutoMode: boolean;
+  /** Auto-merge verified feature branches back to main (squash merge) */
+  autoMergeOnVerify: boolean;
   /** Default: use git worktrees for feature branches */
   useWorktrees: boolean;
   /** Default: planning approach (skip/lite/spec/full) */
@@ -1272,6 +1274,7 @@ export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
   defaultSkipTests: true,
   enableDependencyBlocking: true,
   skipVerificationInAutoMode: false,
+  autoMergeOnVerify: true,
   useWorktrees: true,
   defaultPlanningMode: 'skip',
   defaultRequirePlanApproval: false,
