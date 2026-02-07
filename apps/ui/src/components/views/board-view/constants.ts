@@ -64,6 +64,11 @@ export const EMPTY_STATE_CONFIGS: Record<string, EmptyStateConfig> = {
     description: 'Features stuck on blockers will appear here with documented reasons.',
     icon: 'ban',
   },
+  failed: {
+    title: 'No Failed Features',
+    description: 'Features that exhausted all retry attempts will appear here.',
+    icon: 'ban',
+  },
   in_review: {
     title: 'Nothing in Review',
     description:
@@ -122,6 +127,7 @@ const BASE_COLUMNS: Column[] = [
     colorClass: 'bg-[var(--status-in-progress)]',
   },
   { id: 'blocked', title: 'Blocked', colorClass: 'bg-[var(--status-blocked)]' },
+  { id: 'failed', title: 'Failed', colorClass: 'bg-[var(--status-error)]' },
   { id: 'in_review', title: 'In Review', colorClass: 'bg-[var(--status-in-review)]' },
 ];
 

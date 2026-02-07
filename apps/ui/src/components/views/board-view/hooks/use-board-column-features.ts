@@ -35,6 +35,7 @@ export function useBoardColumnFeatures({
       assigned: [],
       in_progress: [],
       blocked: [],
+      failed: [],
       in_review: [],
       waiting_approval: [],
       verified: [],

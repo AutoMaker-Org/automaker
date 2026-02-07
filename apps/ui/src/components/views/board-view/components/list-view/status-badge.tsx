@@ -47,6 +47,12 @@ const BASE_STATUS_DISPLAY: Record<string, StatusDisplay> = {
     bgClass: 'bg-[var(--status-blocked)]/15',
     borderClass: 'border-[var(--status-blocked)]/30',
   },
+  failed: {
+    label: 'Failed',
+    colorClass: 'text-[var(--status-error)]',
+    bgClass: 'bg-[var(--status-error)]/15',
+    borderClass: 'border-[var(--status-error)]/30',
+  },
   in_review: {
     label: 'In Review',
     colorClass: 'text-[var(--status-in-review)]',
@@ -238,6 +244,7 @@ export function getStatusOrder(status: FeatureStatusWithPipeline): number {
     assigned: 2,
     in_progress: 3,
     blocked: 4,
+    failed: 4.5,
     in_review: 5,
     waiting_approval: 7,
     verified: 8,
