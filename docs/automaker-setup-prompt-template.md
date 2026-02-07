@@ -177,7 +177,7 @@ Create feature.json files in .automaker/features/ for EVERY feature in the spec.
   "priority": 1,
   "model": "opus|sonnet|haiku",
   "dependencies": ["other-feature-ids"],
-  "branchName": "feature/{feature-slug}",
+  "branchName": null,
   "skipTests": false,
   "thinkingLevel": "ultrathink|high|medium|low|none",
   "planningMode": "full|spec|lite|skip",
@@ -236,10 +236,9 @@ Rule: If wrong decision is expensive or hard to reverse → Tier 1.
 
 **branchName — Worktree Isolation:**
 
-- Verified features: set `branchName: null` (they run in main, already merged)
-- Backlog features: MUST have `branchName` set (e.g. `"feature/b01-x-oauth"`) to enable git worktree isolation
-- Automaker auto-creates the worktree when executing a feature with a `branchName` set
-- Without `branchName`, features execute directly on the main branch (no isolation)
+- Set `branchName: null` on ALL features (both verified and backlog)
+- Automaker auto-generates a branch name (`feature/{feature-id}`) and creates the worktree automatically when execution starts
+- Do NOT pre-set branchName on backlog features — this causes them to be filtered out of the main worktree view in the UI, making them invisible on the kanban board
 
 **Dependencies:** Must form a valid DAG. Verified features satisfy dependencies for backlog features.
 
@@ -303,7 +302,7 @@ These are Automaker platform features that apply to every project:
 - Feature.json schema with all required fields
 - .automaker/ directory structure (settings, context, memory, pipeline, features)
 - Worktree isolation strategy
-- Git worktree auto-creation for features with branchName set
+- Git worktree auto-creation at execution time (branchName auto-generated, do NOT pre-set)
 - Pipeline uses single-agent, multi-role pattern (same model for all review steps, role differentiation via instructions)
 - The principle that foundation code becomes "verified" features
 ```
