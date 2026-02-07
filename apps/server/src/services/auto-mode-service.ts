@@ -3222,11 +3222,11 @@ Format your response as a structured markdown document.`;
 
           allFeatures.push(feature);
 
-          // Track pending features separately, filtered by worktree/branch
+          // Track ready features separately, filtered by worktree/branch
+          // Only 'ready' features are picked up - 'pending' (backlog) requires manual move to Ready
           // Note: waiting_approval is NOT included - those features have completed execution
           // and are waiting for user review, they should not be picked up again
           if (
-            feature.status === 'pending' ||
             feature.status === 'ready' ||
             (feature.planSpec?.status === 'approved' &&
               (feature.planSpec.tasksCompleted ?? 0) < (feature.planSpec.tasksTotal ?? 0))
