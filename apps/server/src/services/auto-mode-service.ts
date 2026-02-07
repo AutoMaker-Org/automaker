@@ -1154,21 +1154,14 @@ export class AutoModeService {
       let worktreePath: string | null = null;
       let branchName = feature.branchName;
 
-      // Auto-generate branchName if worktrees are enabled but no branch is set
+      // Auto-generate branchName for worktree isolation if none is set.
+      // IMPORTANT: We do NOT persist this to feature.json here because doing so
+      // would move the feature out of the main worktree scope, causing the
+      // auto-loop's running count to miss it and bypass maxConcurrency limits.
+      // The branchName is saved later after the feature completes or is verified.
       if (useWorktrees && !branchName) {
         branchName = `feature/${feature.id}`;
-        logger.info(`Auto-generating branch name for feature ${featureId}: ${branchName}`);
-        try {
-          await this.featureLoader.update(projectPath, featureId, { branchName });
-          feature.branchName = branchName;
-          logger.info(`Saved auto-generated branch name "${branchName}" to feature ${featureId}`);
-        } catch (error) {
-          logger.error(
-            `Failed to save auto-generated branch name for feature ${featureId}:`,
-            error
-          );
-          // Continue anyway - the branchName variable is set so worktree creation will still proceed
-        }
+        logger.info(`Auto-generated branch name for worktree isolation: ${branchName}`);
       }
 
       if (useWorktrees && branchName) {
@@ -1195,9 +1188,12 @@ export class AutoModeService {
       // Validate that working directory is allowed using centralized validation
       validateWorkingDirectory(workDir);
 
-      // Update running feature with actual worktree info
+      // Update running feature with actual worktree info.
+      // Keep the ORIGINAL feature.branchName for worktree-scoped counting so that
+      // features started from the main worktree (branchName: null) remain counted
+      // against the main worktree's maxConcurrency limit.
       tempRunningFeature.worktreePath = worktreePath;
-      tempRunningFeature.branchName = branchName ?? null;
+      tempRunningFeature.branchName = feature.branchName ?? null;
 
       // Update feature status to in_progress BEFORE emitting event
       // This ensures the frontend sees the updated status when it reloads features
