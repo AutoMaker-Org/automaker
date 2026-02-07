@@ -19,3 +19,6 @@ export {
   resolvePhaseModel,
   type ResolvedPhaseModel,
 } from './resolver.js';
+
+// Export escalation utilities
+export { getEscalatedModel } from './escalation.js';

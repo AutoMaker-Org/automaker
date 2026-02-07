@@ -41,7 +41,12 @@ import {
 } from '@automaker/utils';
 
 const logger = createLogger('AutoMode');
-import { resolveModelString, resolvePhaseModel, DEFAULT_MODELS } from '@automaker/model-resolver';
+import {
+  resolveModelString,
+  resolvePhaseModel,
+  DEFAULT_MODELS,
+  getEscalatedModel,
+} from '@automaker/model-resolver';
 import { resolveDependencies, areDependenciesSatisfied } from '@automaker/dependency-resolver';
 import { mergeWorktreeBranch, cleanupWorktree } from '@automaker/git-utils';
 import {
@@ -1333,6 +1338,9 @@ export class AutoModeService {
       // Record success to reset consecutive failure tracking
       this.recordSuccess();
 
+      // Clear retry state on success (restore original model if escalated)
+      await this.clearRetryStateOnSuccess(projectPath, featureId);
+
       // Record learnings and memory usage after successful feature completion
       try {
         const featureDir = getFeatureDir(projectPath, featureId);
@@ -1388,8 +1396,23 @@ export class AutoModeService {
           projectPath,
         });
       } else {
-        logger.error(`Feature ${featureId} failed:`, error);
-        await this.updateFeatureStatus(projectPath, featureId, 'backlog');
+        // Retry logic: check if we can retry before giving up
+        const retryResult = await this.handleRetryOrFail(
+          projectPath,
+          featureId,
+          feature,
+          errorInfo,
+          useWorktrees,
+          isAutoMode
+        );
+
+        if (retryResult === 'retrying') {
+          // Feature is being retried - don't track as failure, don't clean up runningFeatures
+          // (handleRetryOrFail already deleted from runningFeatures and re-called executeFeature)
+          return;
+        }
+
+        // All retries exhausted - emit error and track failure
         this.emitAutoModeEvent('auto_mode_error', {
           featureId,
           featureName: feature?.title,
@@ -1915,8 +1938,22 @@ Complete the pipeline step instructions above. Review the previous work and appl
           projectPath,
         });
       } else {
-        console.error(`[AutoMode] Pipeline resume failed for feature ${featureId}:`, error);
-        await this.updateFeatureStatus(projectPath, featureId, 'backlog');
+        // Retry logic: check if we can retry before giving up
+        const retryResult = await this.handleRetryOrFail(
+          projectPath,
+          featureId,
+          feature,
+          errorInfo,
+          useWorktrees,
+          true // isAutoMode
+        );
+
+        if (retryResult === 'retrying') {
+          // Feature is being retried - don't track as failure
+          return;
+        }
+
+        // All retries exhausted
         this.emitAutoModeEvent('auto_mode_error', {
           featureId,
           featureName: feature.title,
@@ -1925,6 +1962,19 @@ Complete the pipeline step instructions above. Review the previous work and appl
           errorType: errorInfo.type,
           projectPath,
         });
+
+        // Track this failure and check if we should pause auto mode
+        const shouldPause = this.trackFailureAndCheckPause({
+          type: errorInfo.type,
+          message: errorInfo.message,
+        });
+
+        if (shouldPause) {
+          this.signalShouldPause({
+            type: errorInfo.type,
+            message: errorInfo.message,
+          });
+        }
       }
     } finally {
       this.runningFeatures.delete(featureId);
@@ -2168,6 +2218,9 @@ Address the follow-up instructions above. Review the previous work and make the 
 
       // Record success to reset consecutive failure tracking
       this.recordSuccess();
+
+      // Clear retry state on success (restore original model if escalated)
+      await this.clearRetryStateOnSuccess(projectPath, featureId);
 
       this.emitAutoModeEvent('auto_mode_feature_complete', {
         featureId,
@@ -3013,6 +3066,194 @@ Format your response as a structured markdown document.`;
       }
     } catch (error) {
       logger.error(`Failed to update feature status for ${featureId}:`, error);
+    }
+  }
+
+  /**
+   * Handle retry logic for a failed feature, or mark as failed if retries exhausted.
+   * Returns 'retrying' if a retry was initiated, 'failed' if all retries exhausted.
+   */
+  private async handleRetryOrFail(
+    projectPath: string,
+    featureId: string,
+    feature: Feature | null | undefined,
+    errorInfo: { type: string; message: string; isAbort?: boolean },
+    useWorktrees: boolean,
+    isAutoMode: boolean
+  ): Promise<'retrying' | 'failed'> {
+    try {
+      const globalSettings = await this.settingsService?.getGlobalSettings();
+      const maxRetries = globalSettings?.autoModeMaxRetries ?? 1;
+      const escalateModel = globalSettings?.autoModeRetryModelEscalation ?? true;
+
+      const currentFeature = await this.loadFeature(projectPath, featureId);
+      const retryState = currentFeature?.retryState || {
+        attemptNumber: 0,
+        history: [],
+      };
+
+      if (retryState.attemptNumber < maxRetries) {
+        // Record this failure in retry history
+        retryState.attemptNumber++;
+        if (!retryState.originalModel) {
+          retryState.originalModel = currentFeature?.model;
+        }
+        retryState.history.push({
+          attempt: retryState.attemptNumber,
+          model: currentFeature?.model || 'default',
+          error: errorInfo.message,
+          errorType: errorInfo.type,
+          timestamp: new Date().toISOString(),
+        });
+
+        // Escalate model if enabled
+        let retryModel = currentFeature?.model;
+        if (escalateModel) {
+          const escalated = getEscalatedModel(retryModel || 'claude-sonnet');
+          if (escalated) retryModel = escalated;
+        }
+
+        // Update feature with retry state and new model
+        await this.updateFeatureRetryState(projectPath, featureId, retryState, retryModel);
+
+        // Log and emit retry event
+        logger.info(
+          `Feature ${featureId} failed (attempt ${retryState.attemptNumber}/${maxRetries}), retrying with model: ${retryModel}`
+        );
+        this.emitAutoModeEvent('auto_mode_feature_retry', {
+          featureId,
+          featureName: currentFeature?.title,
+          attempt: retryState.attemptNumber,
+          maxRetries,
+          previousModel: currentFeature?.model,
+          nextModel: retryModel,
+          error: errorInfo.message,
+          projectPath,
+        });
+
+        // Build retry prompt with error context
+        const retryPrompt = this.buildRetryPrompt(currentFeature, errorInfo.message, retryState);
+
+        // Remove from running features before re-executing to avoid "already running" error
+        this.runningFeatures.delete(featureId);
+
+        // Re-execute with error context (fire-and-forget, executeFeature handles its own errors)
+        this.executeFeature(projectPath, featureId, useWorktrees, isAutoMode, undefined, {
+          continuationPrompt: retryPrompt,
+        });
+
+        return 'retrying';
+      }
+    } catch (retryError) {
+      logger.error(`Error in retry logic for feature ${featureId}:`, retryError);
+    }
+
+    // All retries exhausted or retry logic failed - move to 'failed' (not 'backlog')
+    const currentFeature = await this.loadFeature(projectPath, featureId);
+    const attemptCount = currentFeature?.retryState?.attemptNumber ?? 0;
+    logger.error(`Feature ${featureId} failed after ${attemptCount} retries: ${errorInfo.message}`);
+    await this.updateFeatureStatus(projectPath, featureId, 'failed');
+    return 'failed';
+  }
+
+  /**
+   * Build a retry prompt with error context from previous attempts.
+   */
+  private buildRetryPrompt(
+    feature: Feature | null | undefined,
+    errorMessage: string,
+    retryState: NonNullable<Feature['retryState']>
+  ): string {
+    const historyLines = retryState.history
+      .map((h) => `- Attempt ${h.attempt} (${h.model}): ${h.error}`)
+      .join('\n');
+
+    return [
+      `## Retry Attempt ${retryState.attemptNumber}`,
+      '',
+      'Your previous attempt to implement this feature failed with the following error:',
+      '',
+      `**Error:** ${errorMessage}`,
+      '',
+      '**Previous attempts:**',
+      historyLines,
+      '',
+      'Please review what went wrong and try again. The feature workspace still contains your previous work.',
+      'If the error was due to an API/authentication issue, focus on completing the remaining work.',
+      'If the error was due to a code issue, fix the problem and continue.',
+      '',
+      `## Feature: ${feature?.title || 'Untitled'}`,
+      '',
+      feature?.description || '',
+    ].join('\n');
+  }
+
+  /**
+   * Update a feature's retry state and optionally its model.
+   */
+  private async updateFeatureRetryState(
+    projectPath: string,
+    featureId: string,
+    retryState: NonNullable<Feature['retryState']>,
+    newModel?: string
+  ): Promise<void> {
+    const featureDir = getFeatureDir(projectPath, featureId);
+    const featurePath = path.join(featureDir, 'feature.json');
+
+    try {
+      const result = await readJsonWithRecovery<Feature | null>(featurePath, null, {
+        maxBackups: DEFAULT_BACKUP_COUNT,
+        autoRestore: true,
+      });
+
+      const feature = result.data;
+      if (!feature) {
+        logger.warn(`Feature ${featureId} not found for retry state update`);
+        return;
+      }
+
+      feature.retryState = retryState;
+      if (newModel) {
+        feature.model = newModel;
+      }
+
+      await atomicWriteJson(featurePath, feature, { backupCount: DEFAULT_BACKUP_COUNT });
+    } catch (error) {
+      logger.error(`Failed to update retry state for feature ${featureId}:`, error);
+    }
+  }
+
+  /**
+   * Clear retry state after a successful feature completion.
+   * Restores the original model if it was escalated during retries.
+   */
+  private async clearRetryStateOnSuccess(projectPath: string, featureId: string): Promise<void> {
+    const feature = await this.loadFeature(projectPath, featureId);
+    if (!feature?.retryState) return;
+
+    const featureDir = getFeatureDir(projectPath, featureId);
+    const featurePath = path.join(featureDir, 'feature.json');
+
+    try {
+      const result = await readJsonWithRecovery<Feature | null>(featurePath, null, {
+        maxBackups: DEFAULT_BACKUP_COUNT,
+        autoRestore: true,
+      });
+
+      const current = result.data;
+      if (!current) return;
+
+      // Restore original model if it was escalated
+      if (current.retryState?.originalModel) {
+        current.model = current.retryState.originalModel;
+      }
+
+      // Clear retry state
+      current.retryState = undefined;
+
+      await atomicWriteJson(featurePath, current, { backupCount: DEFAULT_BACKUP_COUNT });
+    } catch (error) {
+      logger.error(`Failed to clear retry state for feature ${featureId}:`, error);
     }
   }
 

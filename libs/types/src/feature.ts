@@ -64,6 +64,17 @@ export interface Feature {
     tasksTotal?: number;
   };
   error?: string;
+  retryState?: {
+    attemptNumber: number;
+    originalModel?: string;
+    history: Array<{
+      attempt: number;
+      model: string;
+      error: string;
+      errorType: string;
+      timestamp: string;
+    }>;
+  };
   summary?: string;
   startedAt?: string;
   mergedToMain?: boolean; // Whether verified feature branch has been merged back to main

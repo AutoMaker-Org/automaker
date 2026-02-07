@@ -846,6 +846,10 @@ export interface GlobalSettings {
   skipVerificationInAutoMode: boolean;
   /** Auto-merge verified feature branches back to main (squash merge) */
   autoMergeOnVerify: boolean;
+  /** Maximum retry attempts for failed features in auto-mode (0 = no retries) */
+  autoModeMaxRetries?: number;
+  /** Enable model escalation on retry (e.g., sonnet → opus) */
+  autoModeRetryModelEscalation?: boolean;
   /** Default: use git worktrees for feature branches */
   useWorktrees: boolean;
   /** Default: planning approach (skip/lite/spec/full) */
@@ -1275,6 +1279,8 @@ export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
   enableDependencyBlocking: true,
   skipVerificationInAutoMode: false,
   autoMergeOnVerify: true,
+  autoModeMaxRetries: 1,
+  autoModeRetryModelEscalation: true,
   useWorktrees: true,
   defaultPlanningMode: 'skip',
   defaultRequirePlanApproval: false,
