@@ -51,33 +51,19 @@ test.describe('Settings - Gitea API Token', () => {
   });
 
   test('can enter and save a Gitea token', async ({ page }) => {
-    // Intercept the store API key request
-    let savedPayload: Record<string, unknown> | null = null;
-    await page.route('**/api/setup/store-api-key', async (route) => {
-      const request = route.request();
-      savedPayload = request.postDataJSON();
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ success: true }),
-      });
-    });
-
     // Find the Gitea input field and enter a token
     const giteaInput = page.locator('[data-testid="gitea-api-key-input"]');
     await expect(giteaInput).toBeVisible({ timeout: 10000 });
     await giteaInput.fill('test-gitea-token-12345');
 
-    // Click the Save button (the API key section has a general Save button)
+    // Click the Save button
     const saveButton = page.locator('button:has-text("Save API Keys")').first();
-    if (await saveButton.isVisible()) {
-      await saveButton.click();
-    }
+    await expect(saveButton).toBeVisible({ timeout: 5000 });
+    await saveButton.click();
 
-    // Verify the API was called with gitea token
-    if (savedPayload) {
-      expect(savedPayload).toHaveProperty('provider', 'gitea');
-    }
+    // Verify the save completed — button shows "Saved!" confirmation
+    const savedConfirmation = page.getByText('Saved!');
+    await expect(savedConfirmation).toBeVisible({ timeout: 5000 });
   });
 
   test('Gitea API Token test button exists', async ({ page }) => {

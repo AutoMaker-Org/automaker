@@ -213,6 +213,7 @@ describe('forge-detector', () => {
 
       expect(result.remoteUrl).toBe('https://github.com/owner/repo.git');
     });
+
   });
 
   describe('detectForgeCached', () => {

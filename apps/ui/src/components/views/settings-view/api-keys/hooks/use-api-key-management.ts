@@ -195,7 +195,7 @@ export function useApiKeyManagement() {
     // Basic validation - Gitea tokens are typically alphanumeric strings
     setGiteaTestResult({
       success: true,
-      message: 'Token saved. It will be used for Gitea API requests.',
+      message: 'Token format looks valid. Click "Save API Keys" to store it.',
     });
     setTestingGiteaConnection(false);
   };

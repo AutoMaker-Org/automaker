@@ -129,7 +129,7 @@ export const buildProviderConfigs = ({
     resultMessageTestId: 'gitea-test-connection-message',
     descriptionPrefix:
       'For Gitea repositories. Generate a token in User Settings > Applications at your Gitea instance.',
-    descriptionLinkHref: 'https://docs.gitea.com/development/api-usage#authentication',
+    descriptionLinkHref: 'https://docs.gitea.com/next/development/api-usage#authentication',
     descriptionLinkText: 'Gitea API docs',
     descriptionSuffix: '.',
   },

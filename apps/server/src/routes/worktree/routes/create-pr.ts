@@ -214,7 +214,7 @@ export function createCreatePRHandler(settingsService?: SettingsService) {
         }
 
         // Construct browser fallback URL for Gitea
-        browserUrl = `${forgeInfo.baseUrl}/${forgeInfo.owner}/${forgeInfo.repo}/compare/${base}...${branchName}`;
+        browserUrl = `${forgeInfo.baseUrl}/${forgeInfo.owner}/${forgeInfo.repo}/compare/${encodeURIComponent(base)}...${encodeURIComponent(branchName)}`;
 
         res.json({
           success: true,

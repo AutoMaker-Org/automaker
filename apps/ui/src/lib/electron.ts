@@ -27,6 +27,7 @@ import type {
   CreateIdeaInput,
   UpdateIdeaInput,
   ConvertToFeatureOptions,
+  ForgeType,
 } from '@automaker/types';
 import { DEFAULT_MAX_CONCURRENCY } from '@automaker/types';
 import { getJSON, setJSON, removeItem } from './storage';
@@ -285,7 +286,7 @@ export interface GitHubPR {
   body: string;
 }
 
-export type ForgeType = 'github' | 'gitea' | 'unknown';
+export type { ForgeType };
 
 export interface GitHubRemoteStatus {
   hasGitHubRemote: boolean;

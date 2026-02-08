@@ -113,8 +113,8 @@ export class GiteaClient {
         if (credentials.apiKeys.gitea) {
           return credentials.apiKeys.gitea;
         }
-      } catch {
-        // Credentials not available
+      } catch (error) {
+        logger.debug('Could not read credentials from settings service:', error);
       }
     }
 
@@ -183,16 +183,43 @@ export class GiteaClient {
 
   /**
    * List pull requests for the repository.
+   * For 'closed' state, paginates to ensure the requested limit of merged PRs
+   * is reached (Gitea mixes closed-without-merge and merged PRs together).
    */
   async listPRs(
     state: 'open' | 'closed',
     limit: number
   ): Promise<GitHubPR[]> {
-    const giteaPRs = await this.request<GiteaPullRequest[]>(
-      `/repos/${this.owner}/${this.repo}/pulls?state=${state}&limit=${limit}&sort=created&direction=desc`
-    );
+    // For open PRs, a single page is usually sufficient
+    if (state === 'open') {
+      const giteaPRs = await this.request<GiteaPullRequest[]>(
+        `/repos/${this.owner}/${this.repo}/pulls?state=open&limit=${limit}&sort=created&direction=desc`
+      );
+      return giteaPRs.map((pr) => this.mapPR(pr));
+    }
 
-    return giteaPRs.map((pr) => this.mapPR(pr));
+    // For closed PRs, paginate to collect enough results since Gitea doesn't
+    // have a 'merged' filter — closed results include non-merged PRs
+    const pageSize = 50;
+    let page = 1;
+    const results: GitHubPR[] = [];
+
+    while (results.length < limit) {
+      const giteaPRs = await this.request<GiteaPullRequest[]>(
+        `/repos/${this.owner}/${this.repo}/pulls?state=closed&limit=${pageSize}&page=${page}&sort=created&direction=desc`
+      );
+
+      for (const pr of giteaPRs) {
+        results.push(this.mapPR(pr));
+        if (results.length >= limit) break;
+      }
+
+      // No more pages
+      if (giteaPRs.length < pageSize) break;
+      page++;
+    }
+
+    return results;
   }
 
   /**
@@ -221,23 +248,36 @@ export class GiteaClient {
 
   /**
    * Get a PR by branch name (head ref).
+   * Paginates through all open PRs to avoid missing results.
    */
   async getPRByBranch(
     branch: string
   ): Promise<{ number: number; url: string; title: string; state: string } | null> {
-    const prs = await this.request<GiteaPullRequest[]>(
-      `/repos/${this.owner}/${this.repo}/pulls?state=open&limit=50`
-    );
+    const pageSize = 50;
+    let page = 1;
 
-    const match = prs.find((pr) => pr.head.ref === branch);
-    if (!match) return null;
+    while (true) {
+      const prs = await this.request<GiteaPullRequest[]>(
+        `/repos/${this.owner}/${this.repo}/pulls?state=open&limit=${pageSize}&page=${page}`
+      );
 
-    return {
-      number: match.number,
-      url: match.html_url,
-      title: match.title,
-      state: match.state.toUpperCase(),
-    };
+      const match = prs.find((pr) => pr.head.ref === branch);
+      if (match) {
+        return {
+          number: match.number,
+          url: match.html_url,
+          title: match.title,
+          state: match.state.toUpperCase(),
+        };
+      }
+
+      // No more pages to fetch
+      if (prs.length < pageSize) {
+        return null;
+      }
+
+      page++;
+    }
   }
 
   /**

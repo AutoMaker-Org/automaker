@@ -197,7 +197,7 @@ describe('create-pr (Gitea path)', () => {
 
       const result = vi.mocked(res.json).mock.calls[0][0];
       expect(result.result.browserUrl).toBe(
-        'https://gitea.example.com/testowner/testrepo/compare/main...feature/my-branch'
+        'https://gitea.example.com/testowner/testrepo/compare/main...feature%2Fmy-branch'
       );
     });
 

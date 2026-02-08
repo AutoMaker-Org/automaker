@@ -68,35 +68,47 @@ export function createPRInfoHandler(settingsService?: SettingsService) {
       const forgeInfo = await detectForgeCached(worktreePath);
 
       if (forgeInfo.type === 'gitea' && forgeInfo.baseUrl && forgeInfo.owner && forgeInfo.repo) {
-        const client = new GiteaClient({
-          baseUrl: forgeInfo.baseUrl,
-          owner: forgeInfo.owner,
-          repo: forgeInfo.repo,
-          settingsService,
-        });
+        try {
+          const client = new GiteaClient({
+            baseUrl: forgeInfo.baseUrl,
+            owner: forgeInfo.owner,
+            repo: forgeInfo.repo,
+            settingsService,
+          });
 
-        const existingPR = await client.getPRByBranch(branchName);
-        if (!existingPR) {
+          const existingPR = await client.getPRByBranch(branchName);
+          if (!existingPR) {
+            res.json({
+              success: true,
+              result: { hasPR: false, ghCliAvailable: false },
+            });
+            return;
+          }
+
+          const prInfo = await client.getPR(existingPR.number);
+          if (!prInfo) {
+            res.json({
+              success: true,
+              result: { hasPR: false, ghCliAvailable: false },
+            });
+            return;
+          }
+
           res.json({
             success: true,
-            result: { hasPR: false, ghCliAvailable: false },
+            result: { hasPR: true, ghCliAvailable: false, prInfo },
           });
-          return;
-        }
-
-        const prInfo = await client.getPR(existingPR.number);
-        if (!prInfo) {
+        } catch (error) {
+          logError(error, 'Failed to get Gitea PR info');
           res.json({
             success: true,
-            result: { hasPR: false, ghCliAvailable: false },
+            result: {
+              hasPR: false,
+              ghCliAvailable: false,
+              error: getErrorMessage(error),
+            },
           });
-          return;
         }
-
-        res.json({
-          success: true,
-          result: { hasPR: true, ghCliAvailable: false, prInfo },
-        });
         return;
       }
 

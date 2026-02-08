@@ -248,6 +248,31 @@ describe('GiteaClient', () => {
 
         expect(result[0].mergeable).toBe('UNKNOWN');
       });
+
+      it('should paginate through closed PRs to collect enough results', async () => {
+        // First page: 50 closed PRs (mix of merged and non-merged)
+        const page1 = Array.from({ length: 50 }, (_, i) => ({
+          ...GITEA_FIXTURES.mergedPullRequest,
+          number: i + 1,
+          merged: i % 2 === 0, // every other one is merged
+          state: 'closed',
+        }));
+        // Second page: more closed PRs
+        const page2 = Array.from({ length: 10 }, (_, i) => ({
+          ...GITEA_FIXTURES.mergedPullRequest,
+          number: 51 + i,
+          merged: true,
+          state: 'closed',
+        }));
+
+        mockFetchSequence([{ data: page1 }, { data: page2 }]);
+
+        const result = await client.listPRs('closed', 55);
+
+        // Should have fetched two pages (first had 50, needed more to reach 55)
+        expect(globalThis.fetch).toHaveBeenCalledTimes(2);
+        expect(result.length).toBe(55);
+      });
     });
 
     describe('createPR', () => {
@@ -298,6 +323,32 @@ describe('GiteaClient', () => {
         const result = await client.getPRByBranch('nonexistent-branch');
 
         expect(result).toBeNull();
+      });
+
+      it('should paginate through multiple pages to find a PR', async () => {
+        // First page: 50 PRs, none matching (simulate full page)
+        const page1 = Array.from({ length: 50 }, (_, i) => ({
+          ...GITEA_FIXTURES.pullRequest,
+          number: i + 1,
+          head: { ref: `branch-${i}`, label: `owner:branch-${i}` },
+        }));
+        // Second page: includes the matching PR
+        const page2 = [
+          {
+            ...GITEA_FIXTURES.pullRequest,
+            number: 99,
+            head: { ref: 'target-branch', label: 'owner:target-branch' },
+          },
+        ];
+
+        mockFetchSequence([{ data: page1 }, { data: page2 }]);
+
+        const result = await client.getPRByBranch('target-branch');
+
+        expect(result).not.toBeNull();
+        expect(result!.number).toBe(99);
+        // Verify two pages were fetched
+        expect(globalThis.fetch).toHaveBeenCalledTimes(2);
       });
     });
 
