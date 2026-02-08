@@ -36,6 +36,11 @@ services:
       # Then set it here or in your .env file:
       # - CURSOR_API_KEY=${CURSOR_API_KEY:-}
 
+      # ===== Gitea Users =====
+      # Set your Gitea API token for Gitea forge integration
+      # Generate a token from your Gitea instance: User Settings > Applications
+      # - GITEA_TOKEN=${GITEA_TOKEN:-}
+
 volumes:
   # Playwright cache volume (persists Chromium installs)
   # playwright-cache:

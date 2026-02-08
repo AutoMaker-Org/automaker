@@ -1,5 +1,5 @@
 /**
- * POST /issue-comments endpoint - Fetch comments for a GitHub issue
+ * POST /issue-comments endpoint - Fetch comments for an issue (GitHub or Gitea)
  */
 
 import { spawn } from 'child_process';
@@ -7,6 +7,9 @@ import type { Request, Response } from 'express';
 import type { GitHubComment, IssueCommentsResult } from '@automaker/types';
 import { execEnv, getErrorMessage, logError } from './common.js';
 import { checkGitHubRemote } from './check-github-remote.js';
+import { detectForgeCached } from '../../../lib/forge-detector.js';
+import { GiteaClient } from '../../../lib/gitea-client.js';
+import type { SettingsService } from '../../../services/settings-service.js';
 
 interface ListCommentsRequest {
   projectPath: string;
@@ -200,7 +203,7 @@ async function fetchIssueComments(
   };
 }
 
-export function createListCommentsHandler() {
+export function createListCommentsHandler(settingsService?: SettingsService) {
   return async (req: Request, res: Response): Promise<void> => {
     try {
       const { projectPath, issueNumber, cursor } = req.body as ListCommentsRequest;
@@ -217,12 +220,40 @@ export function createListCommentsHandler() {
         return;
       }
 
-      // First check if this is a GitHub repo and get owner/repo
+      // Detect forge type
+      const forgeInfo = await detectForgeCached(projectPath);
+
+      if (forgeInfo.type === 'gitea') {
+        // Gitea path
+        if (!forgeInfo.baseUrl || !forgeInfo.owner || !forgeInfo.repo) {
+          res.status(400).json({
+            success: false,
+            error: 'Could not determine Gitea repository details',
+          });
+          return;
+        }
+
+        const client = new GiteaClient({
+          baseUrl: forgeInfo.baseUrl,
+          owner: forgeInfo.owner,
+          repo: forgeInfo.repo,
+          settingsService,
+        });
+
+        const result = await client.listIssueComments(issueNumber);
+        res.json({
+          success: true,
+          ...result,
+        });
+        return;
+      }
+
+      // GitHub path (default)
       const remoteStatus = await checkGitHubRemote(projectPath);
       if (!remoteStatus.hasGitHubRemote || !remoteStatus.owner || !remoteStatus.repo) {
         res.status(400).json({
           success: false,
-          error: 'Project does not have a GitHub remote',
+          error: 'Project does not have a supported git remote (GitHub or Gitea)',
         });
         return;
       }

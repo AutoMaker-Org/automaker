@@ -1060,6 +1060,8 @@ export interface Credentials {
     google: string;
     /** OpenAI API key (for compatibility or alternative providers) */
     openai: string;
+    /** Gitea API token (for self-hosted Gitea instances) */
+    gitea: string;
   };
 }
 
@@ -1330,6 +1332,7 @@ export const DEFAULT_CREDENTIALS: Credentials = {
     anthropic: '',
     google: '',
     openai: '',
+    gitea: '',
   },
 };
 

@@ -12,6 +12,9 @@ import {
   isGhCliAvailable,
 } from '../common.js';
 import { createLogger } from '@automaker/utils';
+import { detectForgeCached } from '../../../lib/forge-detector.js';
+import { GiteaClient } from '../../../lib/gitea-client.js';
+import type { SettingsService } from '../../../services/settings-service.js';
 
 const logger = createLogger('PRInfo');
 
@@ -36,7 +39,7 @@ export interface PRInfo {
   reviewComments: PRComment[];
 }
 
-export function createPRInfoHandler() {
+export function createPRInfoHandler(settingsService?: SettingsService) {
   return async (req: Request, res: Response): Promise<void> => {
     try {
       const { worktreePath, branchName } = req.body as {
@@ -61,7 +64,43 @@ export function createPRInfoHandler() {
         return;
       }
 
-      // Check if gh CLI is available
+      // Detect forge type - use Gitea client for Gitea repos
+      const forgeInfo = await detectForgeCached(worktreePath);
+
+      if (forgeInfo.type === 'gitea' && forgeInfo.baseUrl && forgeInfo.owner && forgeInfo.repo) {
+        const client = new GiteaClient({
+          baseUrl: forgeInfo.baseUrl,
+          owner: forgeInfo.owner,
+          repo: forgeInfo.repo,
+          settingsService,
+        });
+
+        const existingPR = await client.getPRByBranch(branchName);
+        if (!existingPR) {
+          res.json({
+            success: true,
+            result: { hasPR: false, ghCliAvailable: false },
+          });
+          return;
+        }
+
+        const prInfo = await client.getPR(existingPR.number);
+        if (!prInfo) {
+          res.json({
+            success: true,
+            result: { hasPR: false, ghCliAvailable: false },
+          });
+          return;
+        }
+
+        res.json({
+          success: true,
+          result: { hasPR: true, ghCliAvailable: false, prInfo },
+        });
+        return;
+      }
+
+      // GitHub path (default) - Check if gh CLI is available
       const ghCliAvailable = await isGhCliAvailable();
 
       if (!ghCliAvailable) {

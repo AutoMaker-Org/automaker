@@ -1,9 +1,11 @@
 /**
- * GET /check-github-remote endpoint - Check if project has a GitHub remote
+ * POST /check-remote endpoint - Check if project has a supported git forge remote (GitHub or Gitea)
  */
 
 import type { Request, Response } from 'express';
+import type { ForgeType } from '@automaker/types';
 import { execAsync, execEnv, getErrorMessage, logError } from './common.js';
+import { detectForgeCached } from '../../../lib/forge-detector.js';
 
 const GIT_REMOTE_ORIGIN_COMMAND = 'git remote get-url origin';
 const GH_REPO_VIEW_COMMAND = 'gh repo view --json name,owner';
@@ -47,6 +49,12 @@ export interface GitHubRemoteStatus {
   remoteUrl: string | null;
   owner: string | null;
   repo: string | null;
+  /** Whether any supported forge remote was detected */
+  hasRemote?: boolean;
+  /** Detected forge type */
+  forgeType?: ForgeType;
+  /** Base URL of the forge (e.g., 'https://github.com' or 'https://gitea.example.com') */
+  baseUrl?: string | null;
 }
 
 export async function checkGitHubRemote(projectPath: string): Promise<GitHubRemoteStatus> {
@@ -55,47 +63,36 @@ export async function checkGitHubRemote(projectPath: string): Promise<GitHubRemo
     remoteUrl: null,
     owner: null,
     repo: null,
+    hasRemote: false,
+    forgeType: 'unknown',
+    baseUrl: null,
   };
 
   try {
-    let remoteUrl = '';
-    try {
-      // Get the remote URL (origin by default)
-      const { stdout } = await execAsync(GIT_REMOTE_ORIGIN_COMMAND, {
-        cwd: projectPath,
-        env: execEnv,
-      });
-      remoteUrl = stdout.trim();
-      status.remoteUrl = remoteUrl || null;
-    } catch {
-      // Ignore missing origin remote
-    }
+    // Use forge detector for comprehensive detection (includes Gitea)
+    const forgeInfo = await detectForgeCached(projectPath);
 
-    const ghRepo = await resolveRepoFromGh(projectPath);
-    if (ghRepo) {
+    status.remoteUrl = forgeInfo.remoteUrl;
+    status.owner = forgeInfo.owner;
+    status.repo = forgeInfo.repo;
+    status.forgeType = forgeInfo.type;
+    status.baseUrl = forgeInfo.baseUrl;
+
+    if (forgeInfo.type === 'github') {
       status.hasGitHubRemote = true;
-      status.owner = ghRepo.owner;
-      status.repo = ghRepo.repo;
-      if (!status.remoteUrl) {
-        status.remoteUrl = `${GITHUB_REPO_URL_PREFIX}${ghRepo.owner}/${ghRepo.repo}`;
+      status.hasRemote = true;
+
+      // Try to resolve owner/repo from gh CLI for more accuracy
+      const ghRepo = await resolveRepoFromGh(projectPath);
+      if (ghRepo) {
+        status.owner = ghRepo.owner;
+        status.repo = ghRepo.repo;
+        if (!status.remoteUrl) {
+          status.remoteUrl = `${GITHUB_REPO_URL_PREFIX}${ghRepo.owner}/${ghRepo.repo}`;
+        }
       }
-      return status;
-    }
-
-    // Check if it's a GitHub URL
-    // Formats: https://github.com/owner/repo.git, git@github.com:owner/repo.git
-    if (!remoteUrl) {
-      return status;
-    }
-
-    const httpsMatch = remoteUrl.match(GITHUB_HTTPS_REMOTE_REGEX);
-    const sshMatch = remoteUrl.match(GITHUB_SSH_REMOTE_REGEX);
-
-    const match = httpsMatch || sshMatch;
-    if (match) {
-      status.hasGitHubRemote = true;
-      status.owner = match[1];
-      status.repo = match[2].replace(/\.git$/, '');
+    } else if (forgeInfo.type === 'gitea') {
+      status.hasRemote = true;
     }
   } catch {
     // No remote or not a git repo - that's okay
@@ -120,7 +117,7 @@ export function createCheckGitHubRemoteHandler() {
         ...status,
       });
     } catch (error) {
-      logError(error, 'Check GitHub remote failed');
+      logError(error, 'Check forge remote failed');
       res.status(500).json({ success: false, error: getErrorMessage(error) });
     }
   };

@@ -18,6 +18,7 @@ export function ApiKeysSection() {
     useSetupStore();
   const [isDeletingAnthropicKey, setIsDeletingAnthropicKey] = useState(false);
   const [isDeletingOpenaiKey, setIsDeletingOpenaiKey] = useState(false);
+  const [isDeletingGiteaKey, setIsDeletingGiteaKey] = useState(false);
 
   const { providerConfigParams, handleSave, saved } = useApiKeyManagement();
 
@@ -79,6 +80,30 @@ export function ApiKeysSection() {
       setIsDeletingOpenaiKey(false);
     }
   }, [apiKeys, setApiKeys, setCodexAuthStatus]);
+
+  // Delete Gitea API token
+  const deleteGiteaKey = useCallback(async () => {
+    setIsDeletingGiteaKey(true);
+    try {
+      const api = getElectronAPI();
+      if (!api.setup?.deleteApiKey) {
+        toast.error('Delete API not available');
+        return;
+      }
+
+      const result = await api.setup.deleteApiKey('gitea');
+      if (result.success) {
+        setApiKeys({ ...apiKeys, gitea: '' });
+        toast.success('Gitea API token deleted');
+      } else {
+        toast.error(result.error || 'Failed to delete API token');
+      }
+    } catch (error) {
+      toast.error('Failed to delete API token');
+    } finally {
+      setIsDeletingGiteaKey(false);
+    }
+  }, [apiKeys, setApiKeys]);
 
   return (
     <div
@@ -193,6 +218,23 @@ export function ApiKeysSection() {
                 <Trash2 className="w-4 h-4 mr-2" />
               )}
               Delete OpenAI Key
+            </Button>
+          )}
+
+          {apiKeys.gitea && (
+            <Button
+              onClick={deleteGiteaKey}
+              disabled={isDeletingGiteaKey}
+              variant="outline"
+              className="h-10 border-red-500/30 text-red-500 hover:bg-red-500/10 hover:border-red-500/50"
+              data-testid="delete-gitea-key"
+            >
+              {isDeletingGiteaKey ? (
+                <Spinner size="sm" className="mr-2" />
+              ) : (
+                <Trash2 className="w-4 h-4 mr-2" />
+              )}
+              Delete Gitea Token
             </Button>
           )}
         </div>

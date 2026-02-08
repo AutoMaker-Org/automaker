@@ -52,6 +52,9 @@ services:
       # Note: cursor-agent stores its OAuth tokens separately from Cursor IDE
       - CURSOR_AUTH_TOKEN=${CURSOR_AUTH_TOKEN:-}
 
+      # Optional - Gitea API token (for Gitea forge integration)
+      - GITEA_TOKEN=${GITEA_TOKEN:-}
+
       # Optional - authentication, one will generate if left blank
       - AUTOMAKER_API_KEY=${AUTOMAKER_API_KEY:-}
 
@@ -131,3 +134,4 @@ volumes:
     name: automaker-opencode-cache
     # Named volume for OpenCode cache directory (~/.cache/opencode)
     # Contains version file and other cached data
+

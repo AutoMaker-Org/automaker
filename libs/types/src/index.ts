@@ -329,3 +329,6 @@ export { PR_STATES, validatePRState } from './worktree.js';
 
 // Terminal types
 export type { TerminalInfo } from './terminal.js';
+
+// Forge types (GitHub, Gitea, etc.)
+export type { ForgeType, ForgeRemoteInfo } from './forge.js';

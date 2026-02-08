@@ -71,8 +71,8 @@ export function createWorktreeRoutes(
   );
   router.post('/create', validatePathParams('projectPath'), createCreateHandler(events));
   router.post('/delete', validatePathParams('projectPath', 'worktreePath'), createDeleteHandler());
-  router.post('/create-pr', createCreatePRHandler());
-  router.post('/pr-info', createPRInfoHandler());
+  router.post('/create-pr', createCreatePRHandler(settingsService));
+  router.post('/pr-info', createPRInfoHandler(settingsService));
   router.post(
     '/commit',
     validatePathParams('worktreePath'),

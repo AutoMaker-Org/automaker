@@ -1,7 +1,7 @@
 import type { Dispatch, SetStateAction } from 'react';
 import type { ApiKeys } from '@/store/app-store';
 
-export type ProviderKey = 'anthropic' | 'google' | 'openai';
+export type ProviderKey = 'anthropic' | 'google' | 'openai' | 'gitea';
 
 export interface ProviderConfig {
   key: ProviderKey;
@@ -30,41 +30,29 @@ export interface ProviderConfig {
   descriptionSuffix?: string;
 }
 
+interface ProviderState {
+  value: string;
+  setValue: Dispatch<SetStateAction<string>>;
+  show: boolean;
+  setShow: Dispatch<SetStateAction<boolean>>;
+  testing: boolean;
+  onTest: () => Promise<void>;
+  result: { success: boolean; message: string } | null;
+}
+
 export interface ProviderConfigParams {
   apiKeys: ApiKeys;
-  anthropic: {
-    value: string;
-    setValue: Dispatch<SetStateAction<string>>;
-    show: boolean;
-    setShow: Dispatch<SetStateAction<boolean>>;
-    testing: boolean;
-    onTest: () => Promise<void>;
-    result: { success: boolean; message: string } | null;
-  };
-  google: {
-    value: string;
-    setValue: Dispatch<SetStateAction<string>>;
-    show: boolean;
-    setShow: Dispatch<SetStateAction<boolean>>;
-    testing: boolean;
-    onTest: () => Promise<void>;
-    result: { success: boolean; message: string } | null;
-  };
-  openai: {
-    value: string;
-    setValue: Dispatch<SetStateAction<string>>;
-    show: boolean;
-    setShow: Dispatch<SetStateAction<boolean>>;
-    testing: boolean;
-    onTest: () => Promise<void>;
-    result: { success: boolean; message: string } | null;
-  };
+  anthropic: ProviderState;
+  google: ProviderState;
+  openai: ProviderState;
+  gitea: ProviderState;
 }
 
 export const buildProviderConfigs = ({
   apiKeys,
   anthropic,
   openai,
+  gitea,
 }: ProviderConfigParams): ProviderConfig[] => [
   {
     key: 'anthropic',
@@ -116,6 +104,33 @@ export const buildProviderConfigs = ({
     descriptionPrefix: 'Used for Codex and OpenAI features. Get your key at',
     descriptionLinkHref: 'https://platform.openai.com/api-keys',
     descriptionLinkText: 'platform.openai.com',
+    descriptionSuffix: '.',
+  },
+  {
+    key: 'gitea',
+    label: 'Gitea API Token',
+    inputId: 'gitea-key',
+    placeholder: 'your-token-here',
+    value: gitea.value,
+    setValue: gitea.setValue,
+    showValue: gitea.show,
+    setShowValue: gitea.setShow,
+    hasStoredKey: apiKeys.gitea,
+    inputTestId: 'gitea-api-key-input',
+    toggleTestId: 'toggle-gitea-visibility',
+    testButton: {
+      onClick: gitea.onTest,
+      disabled: !gitea.value || gitea.testing,
+      loading: gitea.testing,
+      testId: 'test-gitea-connection',
+    },
+    result: gitea.result,
+    resultTestId: 'gitea-test-connection-result',
+    resultMessageTestId: 'gitea-test-connection-message',
+    descriptionPrefix:
+      'For Gitea repositories. Generate a token in User Settings > Applications at your Gitea instance.',
+    descriptionLinkHref: 'https://docs.gitea.com/development/api-usage#authentication',
+    descriptionLinkText: 'Gitea API docs',
     descriptionSuffix: '.',
   },
   // {

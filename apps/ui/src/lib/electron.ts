@@ -285,17 +285,25 @@ export interface GitHubPR {
   body: string;
 }
 
+export type ForgeType = 'github' | 'gitea' | 'unknown';
+
 export interface GitHubRemoteStatus {
   hasGitHubRemote: boolean;
   remoteUrl: string | null;
   owner: string | null;
   repo: string | null;
+  hasRemote?: boolean;
+  forgeType?: ForgeType;
+  baseUrl?: string | null;
 }
 
 export interface GitHubAPI {
   checkRemote: (projectPath: string) => Promise<{
     success: boolean;
     hasGitHubRemote?: boolean;
+    hasRemote?: boolean;
+    forgeType?: ForgeType;
+    baseUrl?: string | null;
     remoteUrl?: string | null;
     owner?: string | null;
     repo?: string | null;
@@ -3265,6 +3273,8 @@ function createMockGitHubAPI(): GitHubAPI {
       return {
         success: true,
         hasGitHubRemote: false,
+        hasRemote: false,
+        forgeType: 'unknown' as ForgeType,
         remoteUrl: null,
         owner: null,
         repo: null,

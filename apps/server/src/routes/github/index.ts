@@ -1,5 +1,5 @@
 /**
- * GitHub routes - HTTP API for GitHub integration
+ * GitHub routes - HTTP API for GitHub/Gitea integration
  */
 
 import { Router } from 'express';
@@ -26,9 +26,9 @@ export function createGitHubRoutes(
   const router = Router();
 
   router.post('/check-remote', validatePathParams('projectPath'), createCheckGitHubRemoteHandler());
-  router.post('/issues', validatePathParams('projectPath'), createListIssuesHandler());
-  router.post('/prs', validatePathParams('projectPath'), createListPRsHandler());
-  router.post('/issue-comments', validatePathParams('projectPath'), createListCommentsHandler());
+  router.post('/issues', validatePathParams('projectPath'), createListIssuesHandler(settingsService));
+  router.post('/prs', validatePathParams('projectPath'), createListPRsHandler(settingsService));
+  router.post('/issue-comments', validatePathParams('projectPath'), createListCommentsHandler(settingsService));
   router.post(
     '/validate-issue',
     validatePathParams('projectPath'),

@@ -973,12 +973,14 @@ export class SettingsService {
           anthropic?: string;
           google?: string;
           openai?: string;
+          gitea?: string;
         };
         await this.updateCredentials({
           apiKeys: {
             anthropic: apiKeys.anthropic || '',
             google: apiKeys.google || '',
             openai: apiKeys.openai || '',
+            gitea: apiKeys.gitea || '',
           },
         });
         migratedCredentials = true;

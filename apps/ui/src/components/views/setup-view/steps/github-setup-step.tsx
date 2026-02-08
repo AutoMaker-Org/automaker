@@ -29,10 +29,10 @@ interface GitHubSetupStepProps {
 
 export function GitHubSetupStep({ onNext, onBack, onSkip }: GitHubSetupStepProps) {
   const { ghCliStatus, setGhCliStatus } = useSetupStore();
-  const [isChecking, setIsChecking] = useState(false);
+  const [isCheckingGh, setIsCheckingGh] = useState(false);
 
-  const checkStatus = useCallback(async () => {
-    setIsChecking(true);
+  const checkGhStatus = useCallback(async () => {
+    setIsCheckingGh(true);
     try {
       const api = getElectronAPI();
       if (!api.setup?.getGhStatus) {
@@ -51,23 +51,23 @@ export function GitHubSetupStep({ onNext, onBack, onSkip }: GitHubSetupStepProps
     } catch (error) {
       logger.error('Failed to check gh status:', error);
     } finally {
-      setIsChecking(false);
+      setIsCheckingGh(false);
     }
   }, [setGhCliStatus]);
 
   useEffect(() => {
-    checkStatus();
-  }, [checkStatus]);
+    checkGhStatus();
+  }, [checkGhStatus]);
 
   const copyCommand = (command: string) => {
     navigator.clipboard.writeText(command);
     toast.success('Command copied to clipboard');
   };
 
-  const isReady = ghCliStatus?.installed && ghCliStatus?.authenticated;
+  const isGhReady = ghCliStatus?.installed && ghCliStatus?.authenticated;
 
-  const getStatusBadge = () => {
-    if (isChecking) {
+  const getGhStatusBadge = () => {
+    if (isCheckingGh) {
       return <StatusBadge status="checking" label="Checking..." />;
     }
     if (ghCliStatus?.authenticated) {
@@ -85,8 +85,10 @@ export function GitHubSetupStep({ onNext, onBack, onSkip }: GitHubSetupStepProps
         <div className="w-16 h-16 rounded-xl bg-zinc-800 flex items-center justify-center mx-auto mb-4">
           <Github className="w-8 h-8 text-white" />
         </div>
-        <h2 className="text-2xl font-bold text-foreground mb-2">GitHub CLI Setup</h2>
-        <p className="text-muted-foreground">Optional - Used for creating pull requests</p>
+        <h2 className="text-2xl font-bold text-foreground mb-2">Git Forge CLI Setup</h2>
+        <p className="text-muted-foreground">
+          Optional - Used for creating pull requests on GitHub and Gitea
+        </p>
       </div>
 
       {/* Info Banner */}
@@ -97,15 +99,16 @@ export function GitHubSetupStep({ onNext, onBack, onSkip }: GitHubSetupStepProps
             <div>
               <p className="font-medium text-foreground">This step is optional</p>
               <p className="text-sm text-muted-foreground mt-1">
-                The GitHub CLI allows you to create pull requests directly from the app. Without it,
-                you can still create PRs manually in your browser.
+                The GitHub CLI (<code className="text-xs bg-muted/50 px-1 rounded">gh</code>) allows
+                you to create pull requests directly from the app. For Gitea, configure an API token
+                in Settings. Without the CLI, you can still create PRs manually in your browser.
               </p>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Status Card */}
+      {/* GitHub CLI Status Card */}
       <Card className="bg-card border-border">
         <CardHeader>
           <div className="flex items-center justify-between">
@@ -114,9 +117,9 @@ export function GitHubSetupStep({ onNext, onBack, onSkip }: GitHubSetupStepProps
               GitHub CLI Status
             </CardTitle>
             <div className="flex items-center gap-2">
-              {getStatusBadge()}
-              <Button variant="ghost" size="sm" onClick={checkStatus} disabled={isChecking}>
-                {isChecking ? <Spinner size="sm" /> : <RefreshCw className="w-4 h-4" />}
+              {getGhStatusBadge()}
+              <Button variant="ghost" size="sm" onClick={checkGhStatus} disabled={isCheckingGh}>
+                {isCheckingGh ? <Spinner size="sm" /> : <RefreshCw className="w-4 h-4" />}
               </Button>
             </div>
           </div>
@@ -130,13 +133,13 @@ export function GitHubSetupStep({ onNext, onBack, onSkip }: GitHubSetupStepProps
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Success State */}
-          {isReady && (
+          {isGhReady && (
             <div className="flex items-center gap-3 p-4 rounded-lg bg-green-500/10 border border-green-500/20">
               <CheckCircle2 className="w-5 h-5 text-green-500" />
               <div>
                 <p className="font-medium text-foreground">GitHub CLI is ready!</p>
                 <p className="text-sm text-muted-foreground">
-                  You can create pull requests directly from the app.
+                  You can create pull requests on GitHub directly from the app.
                   {ghCliStatus?.version && (
                     <span className="ml-1">Version: {ghCliStatus.version}</span>
                   )}
@@ -146,14 +149,14 @@ export function GitHubSetupStep({ onNext, onBack, onSkip }: GitHubSetupStepProps
           )}
 
           {/* Not Installed */}
-          {!ghCliStatus?.installed && !isChecking && (
+          {!ghCliStatus?.installed && !isCheckingGh && (
             <div className="space-y-4">
               <div className="flex items-start gap-3 p-4 rounded-lg bg-muted/30 border border-border">
                 <XCircle className="w-5 h-5 text-muted-foreground shrink-0 mt-0.5" />
                 <div className="flex-1">
                   <p className="font-medium text-foreground">GitHub CLI not found</p>
                   <p className="text-sm text-muted-foreground mt-1">
-                    Install the GitHub CLI to enable PR creation from the app.
+                    Install the GitHub CLI to enable PR creation for GitHub repositories.
                   </p>
                 </div>
               </div>
@@ -223,7 +226,7 @@ export function GitHubSetupStep({ onNext, onBack, onSkip }: GitHubSetupStepProps
           )}
 
           {/* Installed but not authenticated */}
-          {ghCliStatus?.installed && !ghCliStatus?.authenticated && !isChecking && (
+          {ghCliStatus?.installed && !ghCliStatus?.authenticated && !isCheckingGh && (
             <div className="space-y-4">
               <div className="flex items-start gap-3 p-4 rounded-lg bg-amber-500/10 border border-amber-500/20">
                 <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
@@ -250,7 +253,7 @@ export function GitHubSetupStep({ onNext, onBack, onSkip }: GitHubSetupStepProps
           )}
 
           {/* Loading State */}
-          {isChecking && (
+          {isCheckingGh && (
             <div className="flex items-center gap-3 p-4 rounded-lg bg-blue-500/10 border border-blue-500/20">
               <Spinner size="md" />
               <div>
@@ -269,14 +272,14 @@ export function GitHubSetupStep({ onNext, onBack, onSkip }: GitHubSetupStepProps
         </Button>
         <div className="flex gap-2">
           <Button variant="ghost" onClick={onSkip} className="text-muted-foreground">
-            {isReady ? 'Skip' : 'Skip for now'}
+            {isGhReady ? 'Skip' : 'Skip for now'}
           </Button>
           <Button
             onClick={onNext}
             className="bg-brand-500 hover:bg-brand-600 text-white"
             data-testid="github-next-button"
           >
-            {isReady ? 'Continue' : 'Continue without GitHub CLI'}
+            {isGhReady ? 'Continue' : 'Continue without CLI'}
             <ArrowRight className="w-4 h-4 ml-2" />
           </Button>
         </div>

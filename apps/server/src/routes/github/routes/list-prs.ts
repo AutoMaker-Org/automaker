@@ -1,10 +1,13 @@
 /**
- * POST /list-prs endpoint - List GitHub pull requests for a project
+ * POST /list-prs endpoint - List pull requests for a project (GitHub or Gitea)
  */
 
 import type { Request, Response } from 'express';
 import { execAsync, execEnv, getErrorMessage, logError } from './common.js';
 import { checkGitHubRemote } from './check-github-remote.js';
+import { detectForgeCached } from '../../../lib/forge-detector.js';
+import { GiteaClient } from '../../../lib/gitea-client.js';
+import type { SettingsService } from '../../../services/settings-service.js';
 
 const OPEN_PRS_LIMIT = 100;
 const MERGED_PRS_LIMIT = 50;
@@ -48,7 +51,7 @@ export interface ListPRsResult {
   error?: string;
 }
 
-export function createListPRsHandler() {
+export function createListPRsHandler(settingsService?: SettingsService) {
   return async (req: Request, res: Response): Promise<void> => {
     try {
       const { projectPath } = req.body;
@@ -58,12 +61,48 @@ export function createListPRsHandler() {
         return;
       }
 
-      // First check if this is a GitHub repo
+      // Detect forge type
+      const forgeInfo = await detectForgeCached(projectPath);
+
+      if (forgeInfo.type === 'gitea') {
+        // Gitea path
+        if (!forgeInfo.baseUrl || !forgeInfo.owner || !forgeInfo.repo) {
+          res.status(400).json({
+            success: false,
+            error: 'Could not determine Gitea repository details',
+          });
+          return;
+        }
+
+        const client = new GiteaClient({
+          baseUrl: forgeInfo.baseUrl,
+          owner: forgeInfo.owner,
+          repo: forgeInfo.repo,
+          settingsService,
+        });
+
+        const [openPRs, mergedPRs] = await Promise.all([
+          client.listPRs('open', OPEN_PRS_LIMIT),
+          client.listPRs('closed', MERGED_PRS_LIMIT),
+        ]);
+
+        // Filter merged PRs from closed (Gitea returns all closed, including merged)
+        const actualMergedPRs = mergedPRs.filter((pr) => pr.state === 'MERGED');
+
+        res.json({
+          success: true,
+          openPRs,
+          mergedPRs: actualMergedPRs,
+        });
+        return;
+      }
+
+      // GitHub path (default)
       const remoteStatus = await checkGitHubRemote(projectPath);
       if (!remoteStatus.hasGitHubRemote) {
         res.status(400).json({
           success: false,
-          error: 'Project does not have a GitHub remote',
+          error: 'Project does not have a supported git remote (GitHub or Gitea)',
         });
         return;
       }
@@ -116,7 +155,7 @@ export function createListPRsHandler() {
         mergedPRs,
       });
     } catch (error) {
-      logError(error, 'List GitHub PRs failed');
+      logError(error, 'List PRs failed');
       res.status(500).json({ success: false, error: getErrorMessage(error) });
     }
   };

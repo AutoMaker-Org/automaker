@@ -14,10 +14,13 @@ import {
 import { updateWorktreePRInfo } from '../../../lib/worktree-metadata.js';
 import { createLogger } from '@automaker/utils';
 import { validatePRState } from '@automaker/types';
+import { detectForgeCached } from '../../../lib/forge-detector.js';
+import { GiteaClient } from '../../../lib/gitea-client.js';
+import type { SettingsService } from '../../../services/settings-service.js';
 
 const logger = createLogger('CreatePR');
 
-export function createCreatePRHandler() {
+export function createCreatePRHandler(settingsService?: SettingsService) {
   return async (req: Request, res: Response): Promise<void> => {
     try {
       const { worktreePath, projectPath, commitMessage, prTitle, prBody, baseBranch, draft } =
@@ -141,7 +144,7 @@ export function createCreatePRHandler() {
         return;
       }
 
-      // Create PR using gh CLI or provide browser fallback
+      // Create PR using gh CLI (GitHub) or Gitea REST API
       const base = baseBranch || 'main';
       const title = prTitle || branchName;
       const body = prBody || `Changes from branch ${branchName}`;
@@ -152,6 +155,87 @@ export function createCreatePRHandler() {
       let browserUrl: string | null = null;
       let ghCliAvailable = false;
 
+      // Detect forge type for PR creation
+      const forgeInfo = await detectForgeCached(effectiveProjectPath);
+
+      if (forgeInfo.type === 'gitea' && forgeInfo.baseUrl && forgeInfo.owner && forgeInfo.repo) {
+        // Gitea PR creation path
+        const client = new GiteaClient({
+          baseUrl: forgeInfo.baseUrl,
+          owner: forgeInfo.owner,
+          repo: forgeInfo.repo,
+          settingsService,
+        });
+
+        let prNumber: number | undefined;
+        let prAlreadyExisted = false;
+
+        // Check for existing PR
+        try {
+          const existingPR = await client.getPRByBranch(branchName);
+          if (existingPR) {
+            prUrl = existingPR.url;
+            prNumber = existingPR.number;
+            prAlreadyExisted = true;
+
+            await updateWorktreePRInfo(effectiveProjectPath, branchName, {
+              number: existingPR.number,
+              url: existingPR.url,
+              title: existingPR.title,
+              state: validatePRState(existingPR.state),
+              createdAt: new Date().toISOString(),
+            });
+            logger.info(`Existing Gitea PR found: #${existingPR.number}`);
+          }
+        } catch (error) {
+          logger.debug('Failed to check for existing Gitea PR:', error);
+        }
+
+        // Create new PR if none exists
+        if (!prUrl) {
+          try {
+            const newPR = await client.createPR(title, body, branchName, base);
+            prUrl = newPR.url;
+            prNumber = newPR.number;
+            logger.info(`Gitea PR created: #${newPR.number}`);
+
+            await updateWorktreePRInfo(effectiveProjectPath, branchName, {
+              number: newPR.number,
+              url: newPR.url,
+              title,
+              state: 'OPEN',
+              createdAt: new Date().toISOString(),
+            });
+          } catch (error) {
+            const errorMsg = error instanceof Error ? error.message : String(error);
+            logger.error('Gitea PR creation failed:', errorMsg);
+            prError = errorMsg;
+          }
+        }
+
+        // Construct browser fallback URL for Gitea
+        browserUrl = `${forgeInfo.baseUrl}/${forgeInfo.owner}/${forgeInfo.repo}/compare/${base}...${branchName}`;
+
+        res.json({
+          success: true,
+          result: {
+            branch: branchName,
+            committed: hasChanges,
+            commitHash,
+            pushed: true,
+            prUrl,
+            prNumber,
+            prCreated: !!prUrl,
+            prAlreadyExisted,
+            prError: prError || undefined,
+            browserUrl: browserUrl || undefined,
+            ghCliAvailable: false,
+          },
+        });
+        return;
+      }
+
+      // GitHub PR creation path (default)
       // Get repository URL and detect fork workflow FIRST
       // This is needed for both the existing PR check and PR creation
       let repoUrl: string | null = null;

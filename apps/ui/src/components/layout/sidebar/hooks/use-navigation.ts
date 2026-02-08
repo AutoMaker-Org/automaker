@@ -18,6 +18,7 @@ import type { NavSection, NavItem } from '../types';
 import type { KeyboardShortcut } from '@/hooks/use-keyboard-shortcuts';
 import type { Project } from '@/lib/electron';
 import { getElectronAPI } from '@/lib/electron';
+import type { ForgeType } from '@/lib/electron';
 
 interface UseNavigationProps {
   shortcuts: {
@@ -59,6 +60,18 @@ interface UseNavigationProps {
   isSpecGenerating?: boolean;
 }
 
+/** Map forge type to display label */
+function getForgeLabel(forgeType: ForgeType): string {
+  switch (forgeType) {
+    case 'github':
+      return 'GitHub';
+    case 'gitea':
+      return 'Gitea';
+    default:
+      return 'Git';
+  }
+}
+
 export function useNavigation({
   shortcuts,
   hideSpecEditor,
@@ -76,13 +89,13 @@ export function useNavigation({
   unreadNotificationsCount,
   isSpecGenerating,
 }: UseNavigationProps) {
-  // Track if current project has a GitHub remote
-  const [hasGitHubRemote, setHasGitHubRemote] = useState(false);
+  // Track the forge type for the current project
+  const [forgeType, setForgeType] = useState<ForgeType>('unknown');
 
   useEffect(() => {
-    async function checkGitHubRemote() {
+    async function checkForgeRemote() {
       if (!currentProject?.path) {
-        setHasGitHubRemote(false);
+        setForgeType('unknown');
         return;
       }
 
@@ -90,15 +103,28 @@ export function useNavigation({
         const api = getElectronAPI();
         if (api.github) {
           const result = await api.github.checkRemote(currentProject.path);
-          setHasGitHubRemote(result.success && result.hasGitHubRemote === true);
+          if (result.success) {
+            // Use forgeType if available, fall back to hasGitHubRemote for backward compat
+            if (result.forgeType) {
+              setForgeType(result.forgeType);
+            } else if (result.hasGitHubRemote) {
+              setForgeType('github');
+            } else {
+              setForgeType('unknown');
+            }
+          } else {
+            setForgeType('unknown');
+          }
         }
       } catch {
-        setHasGitHubRemote(false);
+        setForgeType('unknown');
       }
     }
 
-    checkGitHubRemote();
+    checkForgeRemote();
   }, [currentProject?.path]);
+
+  const hasForgeRemote = forgeType !== 'unknown';
 
   // Build navigation sections
   const navSections: NavSection[] = useMemo(() => {
@@ -184,10 +210,10 @@ export function useNavigation({
       },
     ];
 
-    // Add GitHub section if project has a GitHub remote
-    if (hasGitHubRemote) {
+    // Add forge section (GitHub or Gitea) if project has a supported remote
+    if (hasForgeRemote) {
       sections.push({
-        label: 'GitHub',
+        label: getForgeLabel(forgeType),
         items: [
           {
             id: 'github-issues',
@@ -232,7 +258,8 @@ export function useNavigation({
     hideSpecEditor,
     hideContext,
     hideTerminal,
-    hasGitHubRemote,
+    hasForgeRemote,
+    forgeType,
     unviewedValidationsCount,
     unreadNotificationsCount,
     isSpecGenerating,

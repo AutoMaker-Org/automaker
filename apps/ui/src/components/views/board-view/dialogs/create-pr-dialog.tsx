@@ -277,7 +277,7 @@ export function CreatePRDialog({
             <div>
               <h3 className="text-lg font-semibold">Branch Pushed!</h3>
               <p className="text-sm text-muted-foreground mt-1">
-                Your changes have been pushed to GitHub.
+                Your changes have been pushed to the remote.
                 <br />
                 Click below to create a pull request in your browser.
               </p>

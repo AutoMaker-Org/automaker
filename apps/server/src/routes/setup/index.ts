@@ -55,7 +55,6 @@ export function createSetupRoutes(): Router {
   router.post('/verify-claude-auth', createVerifyClaudeAuthHandler());
   router.post('/verify-codex-auth', createVerifyCodexAuthHandler());
   router.get('/gh-status', createGhStatusHandler());
-
   // Cursor CLI routes
   router.get('/cursor-status', createCursorStatusHandler());
   router.post('/auth-cursor', createAuthCursorHandler());

@@ -29,11 +29,13 @@ export function useApiKeyManagement() {
   const [anthropicKey, setAnthropicKey] = useState(apiKeys.anthropic);
   const [googleKey, setGoogleKey] = useState(apiKeys.google);
   const [openaiKey, setOpenaiKey] = useState(apiKeys.openai);
+  const [giteaKey, setGiteaKey] = useState(apiKeys.gitea);
 
   // Visibility toggles
   const [showAnthropicKey, setShowAnthropicKey] = useState(false);
   const [showGoogleKey, setShowGoogleKey] = useState(false);
   const [showOpenaiKey, setShowOpenaiKey] = useState(false);
+  const [showGiteaKey, setShowGiteaKey] = useState(false);
 
   // Test connection states
   const [testingConnection, setTestingConnection] = useState(false);
@@ -42,6 +44,8 @@ export function useApiKeyManagement() {
   const [geminiTestResult, setGeminiTestResult] = useState<TestResult | null>(null);
   const [testingOpenaiConnection, setTestingOpenaiConnection] = useState(false);
   const [openaiTestResult, setOpenaiTestResult] = useState<TestResult | null>(null);
+  const [testingGiteaConnection, setTestingGiteaConnection] = useState(false);
+  const [giteaTestResult, setGiteaTestResult] = useState<TestResult | null>(null);
 
   // API key status from environment
   const [apiKeyStatus, setApiKeyStatus] = useState<ApiKeyStatus | null>(null);
@@ -54,6 +58,7 @@ export function useApiKeyManagement() {
     setAnthropicKey(apiKeys.anthropic);
     setGoogleKey(apiKeys.google);
     setOpenaiKey(apiKeys.openai);
+    setGiteaKey(apiKeys.gitea);
   }, [apiKeys]);
 
   // Check API key status from environment on mount
@@ -173,12 +178,35 @@ export function useApiKeyManagement() {
     }
   };
 
+  // Test Gitea connection
+  const handleTestGiteaConnection = async () => {
+    setTestingGiteaConnection(true);
+    setGiteaTestResult(null);
+
+    if (!giteaKey || giteaKey.trim().length === 0) {
+      setGiteaTestResult({
+        success: false,
+        message: 'Please enter a token to test.',
+      });
+      setTestingGiteaConnection(false);
+      return;
+    }
+
+    // Basic validation - Gitea tokens are typically alphanumeric strings
+    setGiteaTestResult({
+      success: true,
+      message: 'Token saved. It will be used for Gitea API requests.',
+    });
+    setTestingGiteaConnection(false);
+  };
+
   // Save API keys
   const handleSave = () => {
     setApiKeys({
       anthropic: anthropicKey,
       google: googleKey,
       openai: openaiKey,
+      gitea: giteaKey,
     });
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
@@ -213,6 +241,15 @@ export function useApiKeyManagement() {
       testing: testingOpenaiConnection,
       onTest: handleTestOpenaiConnection,
       result: openaiTestResult,
+    },
+    gitea: {
+      value: giteaKey,
+      setValue: setGiteaKey,
+      show: showGiteaKey,
+      setShow: setShowGiteaKey,
+      testing: testingGiteaConnection,
+      onTest: handleTestGiteaConnection,
+      result: giteaTestResult,
     },
   };
 

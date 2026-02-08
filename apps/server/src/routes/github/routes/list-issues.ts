@@ -1,12 +1,15 @@
 /**
- * POST /list-issues endpoint - List GitHub issues for a project
+ * POST /list-issues endpoint - List issues for a project (GitHub or Gitea)
  */
 
 import { spawn } from 'child_process';
 import type { Request, Response } from 'express';
 import { execAsync, execEnv, getErrorMessage, logError } from './common.js';
 import { checkGitHubRemote } from './check-github-remote.js';
+import { detectForgeCached } from '../../../lib/forge-detector.js';
+import { GiteaClient } from '../../../lib/gitea-client.js';
 import { createLogger } from '@automaker/utils';
+import type { SettingsService } from '../../../services/settings-service.js';
 
 const logger = createLogger('ListIssues');
 const OPEN_ISSUES_LIMIT = 100;
@@ -237,7 +240,7 @@ async function fetchLinkedPRs(
   return linkedPRsMap;
 }
 
-export function createListIssuesHandler() {
+export function createListIssuesHandler(settingsService?: SettingsService) {
   return async (req: Request, res: Response): Promise<void> => {
     try {
       const { projectPath } = req.body;
@@ -247,12 +250,45 @@ export function createListIssuesHandler() {
         return;
       }
 
-      // First check if this is a GitHub repo
+      // Detect forge type
+      const forgeInfo = await detectForgeCached(projectPath);
+
+      if (forgeInfo.type === 'gitea') {
+        // Gitea path
+        if (!forgeInfo.baseUrl || !forgeInfo.owner || !forgeInfo.repo) {
+          res.status(400).json({
+            success: false,
+            error: 'Could not determine Gitea repository details',
+          });
+          return;
+        }
+
+        const client = new GiteaClient({
+          baseUrl: forgeInfo.baseUrl,
+          owner: forgeInfo.owner,
+          repo: forgeInfo.repo,
+          settingsService,
+        });
+
+        const [openIssues, closedIssues] = await Promise.all([
+          client.listIssues('open', OPEN_ISSUES_LIMIT),
+          client.listIssues('closed', CLOSED_ISSUES_LIMIT),
+        ]);
+
+        res.json({
+          success: true,
+          openIssues,
+          closedIssues,
+        });
+        return;
+      }
+
+      // GitHub path (default)
       const remoteStatus = await checkGitHubRemote(projectPath);
       if (!remoteStatus.hasGitHubRemote) {
         res.status(400).json({
           success: false,
-          error: 'Project does not have a GitHub remote',
+          error: 'Project does not have a supported git remote (GitHub or Gitea)',
         });
         return;
       }
@@ -324,7 +360,7 @@ export function createListIssuesHandler() {
         closedIssues,
       });
     } catch (error) {
-      logError(error, 'List GitHub issues failed');
+      logError(error, 'List issues failed');
       res.status(500).json({ success: false, error: getErrorMessage(error) });
     }
   };
