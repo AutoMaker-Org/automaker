@@ -97,4 +97,6 @@ export interface WorktreePanelProps {
   features?: FeatureInfo[];
   branchCardCounts?: Record<string, number>; // Map of branch name to unarchived card count
   refreshTrigger?: number;
+  /** Whether a board card is currently being dragged — used to show worktree drop targets in dropdown mode */
+  isDragging?: boolean;
 }

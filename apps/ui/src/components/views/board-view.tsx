@@ -1461,6 +1461,7 @@ export function BoardView() {
               id: f.id,
               branchName: f.branchName,
             }))}
+            isDragging={activeFeature !== null}
           />
         )}
 

@@ -2,7 +2,8 @@ import { useEffect, useRef, useCallback, useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { GitBranch, Layers, Plus, RefreshCw } from 'lucide-react';
 import { Spinner } from '@/components/ui/spinner';
-import { pathsEqual } from '@/lib/utils';
+import { cn, pathsEqual } from '@/lib/utils';
+import { useDroppable } from '@dnd-kit/core';
 import { toast } from 'sonner';
 import { getHttpApiClient } from '@/lib/http-api-client';
 import { useIsMobile } from '@/hooks/use-media-query';
@@ -40,6 +41,35 @@ import { getElectronAPI } from '@/lib/electron';
 /** Threshold for switching from tabs to dropdown layout (number of worktrees) */
 const WORKTREE_DROPDOWN_THRESHOLD = 3;
 
+/** Small pill that appears as a drop target during drag in dropdown mode */
+function WorktreeDropPill({ worktree }: { worktree: WorktreeInfo }) {
+  const { setNodeRef, isOver } = useDroppable({
+    id: `worktree-drop-${worktree.branch}`,
+    data: {
+      type: 'worktree',
+      branch: worktree.branch,
+      path: worktree.path,
+      isMain: worktree.isMain,
+    },
+  });
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={cn(
+        'h-7 px-2.5 text-xs font-mono rounded-md border transition-all duration-150',
+        'flex items-center gap-1.5',
+        isOver
+          ? 'ring-2 ring-primary ring-offset-1 ring-offset-background scale-105 bg-primary/10 border-primary text-primary'
+          : 'bg-secondary/50 border-border text-muted-foreground'
+      )}
+    >
+      <GitBranch className="w-3 h-3" />
+      {worktree.branch}
+    </div>
+  );
+}
+
 export function WorktreePanel({
   projectPath,
   onCreateWorktree,
@@ -56,6 +86,7 @@ export function WorktreePanel({
   features = [],
   branchCardCounts,
   refreshTrigger = 0,
+  isDragging = false,
 }: WorktreePanelProps) {
   const {
     isLoading,
@@ -820,6 +851,16 @@ export function WorktreePanel({
             onStopTests={handleStopTests}
             onViewTestLogs={handleViewTestLogs}
           />
+
+          {/* Worktree drop targets — appear when dragging a card in dropdown mode */}
+          {isDragging && (
+            <div className="flex items-center gap-1.5 animate-in fade-in slide-in-from-left-2 duration-200">
+              <div className="w-px h-5 bg-border" />
+              {worktrees.map((wt) => (
+                <WorktreeDropPill key={wt.path} worktree={wt} />
+              ))}
+            </div>
+          )}
 
           {useWorktreesEnabled && (
             <>
