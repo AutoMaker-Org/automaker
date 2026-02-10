@@ -516,9 +516,12 @@ export function BoardView() {
   const currentWorktreeBranch = selectedWorktree?.branch ?? currentWorktreeInfo?.branch ?? null;
 
   // Get the branch for the currently selected worktree (for defaulting new features)
-  // Use the branch from selectedWorktree, or fall back to main worktree's branch
+  // When ALL_WORKTREES_BRANCH is active, fall back to main branch to avoid
+  // assigning the sentinel value as a real branch on new features.
+  const effectiveWorktreeBranch =
+    currentWorktreeBranch === ALL_WORKTREES_BRANCH ? null : currentWorktreeBranch;
   const selectedWorktreeBranch =
-    currentWorktreeBranch || worktrees.find((w) => w.isMain)?.branch || 'main';
+    effectiveWorktreeBranch || worktrees.find((w) => w.isMain)?.branch || 'main';
 
   // Aggregate running auto tasks across all worktrees for this project
   const autoModeByWorktree = useAppStore((state) => state.autoModeByWorktree);

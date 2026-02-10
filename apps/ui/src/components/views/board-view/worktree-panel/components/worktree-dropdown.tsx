@@ -67,6 +67,8 @@ export interface WorktreeDropdownProps {
   isAllWorktreesSelected?: boolean;
   /** Callback when "All Worktrees" is selected */
   onSelectAllWorktrees?: () => void;
+  /** Pre-computed total card count across all branches (for "All Worktrees" display) */
+  totalCardCount?: number;
 
   // Branch switching props
   branches: BranchInfo[];
@@ -149,6 +151,7 @@ export function WorktreeDropdown({
   onSelectWorktree,
   isAllWorktreesSelected = false,
   onSelectAllWorktrees,
+  totalCardCount = 0,
   // Branch switching props
   branches,
   filteredBranches,
@@ -206,12 +209,6 @@ export function WorktreeDropdown({
     displayBranch,
     MAX_TRIGGER_BRANCH_NAME_LENGTH
   );
-
-  // Compute total card count across all branches for "All Worktrees" display
-  const totalCardCount = useMemo(() => {
-    if (!branchCardCounts) return 0;
-    return Object.values(branchCardCounts).reduce((sum, count) => sum + count, 0);
-  }, [branchCardCounts]);
 
   // Separate main worktree from others for grouping
   const mainWorktree = worktrees.find((w) => w.isMain);
@@ -364,7 +361,15 @@ export function WorktreeDropdown({
         <ChevronDown className="w-3 h-3 shrink-0 ml-auto" />
       </Button>
     ),
-    [isActivating, selectedStatus, truncatedBranch, selectedWorktree, branchCardCounts, isAllWorktreesSelected, totalCardCount]
+    [
+      isActivating,
+      selectedStatus,
+      truncatedBranch,
+      selectedWorktree,
+      branchCardCounts,
+      isAllWorktreesSelected,
+      totalCardCount,
+    ]
   );
 
   // Wrap trigger button with dropdown trigger first to ensure ref is passed correctly
@@ -413,12 +418,7 @@ export function WorktreeDropdown({
                   <Layers className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
 
                   {/* Label */}
-                  <span
-                    className={cn(
-                      'text-xs truncate',
-                      isAllWorktreesSelected && 'font-medium'
-                    )}
-                  >
+                  <span className={cn('text-xs truncate', isAllWorktreesSelected && 'font-medium')}>
                     All Worktrees
                   </span>
                 </div>

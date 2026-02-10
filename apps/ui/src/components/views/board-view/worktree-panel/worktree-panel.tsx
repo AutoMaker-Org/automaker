@@ -577,7 +577,12 @@ export function WorktreePanel({
           branchCardCounts={branchCardCounts}
           onSelectWorktree={handleSelectWorktree}
           isAllWorktreesSelected={isAllWorktreesSelected}
-          onSelectAllWorktrees={useWorktreesEnabled ? handleSelectAllWorktrees : undefined}
+          onSelectAllWorktrees={
+            useWorktreesEnabled && nonMainWorktrees.length > 0
+              ? handleSelectAllWorktrees
+              : undefined
+          }
+          totalCardCount={totalCardCount}
         />
 
         {/* Branch switch dropdown for the selected worktree (hidden when ALL is selected) */}
@@ -765,7 +770,10 @@ export function WorktreePanel({
             getTestSessionInfo={getTestSessionInfo}
             onSelectWorktree={handleSelectWorktree}
             isAllWorktreesSelected={isAllWorktreesSelected}
-            onSelectAllWorktrees={handleSelectAllWorktrees}
+            onSelectAllWorktrees={
+              nonMainWorktrees.length > 0 ? handleSelectAllWorktrees : undefined
+            }
+            totalCardCount={totalCardCount}
             // Branch switching props
             branches={branches}
             filteredBranches={filteredBranches}
@@ -847,8 +855,8 @@ export function WorktreePanel({
         /* Standard tabs layout for 1-2 worktrees */
         <>
           <div className="flex items-center gap-2">
-            {/* "All" tab - shown when worktrees are enabled */}
-            {useWorktreesEnabled && (
+            {/* "All" tab - shown when worktrees are enabled and at least 1 non-main worktree exists */}
+            {useWorktreesEnabled && nonMainWorktrees.length > 0 && (
               <Button
                 variant={isAllWorktreesSelected ? 'default' : 'outline'}
                 size="sm"

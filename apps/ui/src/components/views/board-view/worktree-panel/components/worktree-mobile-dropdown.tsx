@@ -1,4 +1,3 @@
-import { useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -24,6 +23,8 @@ interface WorktreeMobileDropdownProps {
   isAllWorktreesSelected?: boolean;
   /** Callback when "All Worktrees" is selected */
   onSelectAllWorktrees?: () => void;
+  /** Pre-computed total card count across all branches (for "All Worktrees" display) */
+  totalCardCount?: number;
 }
 
 export function WorktreeMobileDropdown({
@@ -35,6 +36,7 @@ export function WorktreeMobileDropdown({
   onSelectWorktree,
   isAllWorktreesSelected = false,
   onSelectAllWorktrees,
+  totalCardCount = 0,
 }: WorktreeMobileDropdownProps) {
   // Find the currently selected worktree to display in the trigger
   const selectedWorktree = isAllWorktreesSelected
@@ -43,12 +45,6 @@ export function WorktreeMobileDropdown({
   const displayBranch = isAllWorktreesSelected
     ? 'All'
     : selectedWorktree?.branch || 'Select branch';
-
-  // Compute total card count across all branches for "All Worktrees" display
-  const totalCardCount = useMemo(() => {
-    if (!branchCardCounts) return 0;
-    return Object.values(branchCardCounts).reduce((sum, count) => sum + count, 0);
-  }, [branchCardCounts]);
 
   return (
     <DropdownMenu>
@@ -96,12 +92,7 @@ export function WorktreeMobileDropdown({
                   <div className="w-3.5 h-3.5 shrink-0" />
                 )}
                 <Layers className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
-                <span
-                  className={cn(
-                    'text-xs truncate',
-                    isAllWorktreesSelected && 'font-medium'
-                  )}
-                >
+                <span className={cn('text-xs truncate', isAllWorktreesSelected && 'font-medium')}>
                   All Worktrees
                 </span>
               </div>
