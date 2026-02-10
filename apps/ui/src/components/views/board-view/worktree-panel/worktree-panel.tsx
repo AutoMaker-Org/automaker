@@ -1,6 +1,6 @@
-import { useEffect, useRef, useCallback, useState } from 'react';
+import { useEffect, useRef, useCallback, useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
-import { GitBranch, Plus, RefreshCw } from 'lucide-react';
+import { GitBranch, Layers, Plus, RefreshCw } from 'lucide-react';
 import { Spinner } from '@/components/ui/spinner';
 import { pathsEqual } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -30,7 +30,7 @@ import {
   BranchSwitchDropdown,
   WorktreeDropdown,
 } from './components';
-import { useAppStore } from '@/store/app-store';
+import { useAppStore, ALL_WORKTREES_BRANCH } from '@/store/app-store';
 import { ViewWorktreeChangesDialog, PushToRemoteDialog, MergeWorktreeDialog } from '../dialogs';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { TestLogsPanel } from '@/components/ui/test-logs-panel';
@@ -66,6 +66,22 @@ export function WorktreePanel({
     fetchWorktrees,
     handleSelectWorktree,
   } = useWorktrees({ projectPath, refreshTrigger, onRemovedWorktrees });
+
+  // Derive whether "All Worktrees" is the active selection
+  const isAllWorktreesSelected = currentWorktree?.branch === ALL_WORKTREES_BRANCH;
+
+  const setCurrentWorktree = useAppStore((s) => s.setCurrentWorktree);
+
+  // Handler to select the "All Worktrees" virtual view
+  const handleSelectAllWorktrees = useCallback(() => {
+    setCurrentWorktree(projectPath, null, ALL_WORKTREES_BRANCH);
+  }, [projectPath, setCurrentWorktree]);
+
+  // Compute total card count across all branches for "All" tab display
+  const totalCardCount = useMemo(() => {
+    if (!branchCardCounts) return 0;
+    return Object.values(branchCardCounts).reduce((sum, count) => sum + count, 0);
+  }, [branchCardCounts]);
 
   const {
     isStartingDevServer,
@@ -399,6 +415,10 @@ export function WorktreePanel({
   }, [fetchWorktrees]);
 
   const isWorktreeSelected = (worktree: WorktreeInfo) => {
+    // When "All Worktrees" is selected, no individual worktree is selected.
+    // We check both the derived flag and the branch sentinel directly so
+    // the function remains correct even if called before the flag is computed.
+    if (isAllWorktreesSelected || currentWorktree?.branch === ALL_WORKTREES_BRANCH) return false;
     return worktree.isMain
       ? currentWorktree === null || currentWorktree === undefined || currentWorktree.path === null
       : pathsEqual(worktree.path, currentWorktreePath);
@@ -556,10 +576,12 @@ export function WorktreePanel({
           isActivating={isActivating}
           branchCardCounts={branchCardCounts}
           onSelectWorktree={handleSelectWorktree}
+          isAllWorktreesSelected={isAllWorktreesSelected}
+          onSelectAllWorktrees={useWorktreesEnabled ? handleSelectAllWorktrees : undefined}
         />
 
-        {/* Branch switch dropdown for the selected worktree */}
-        {selectedWorktree && (
+        {/* Branch switch dropdown for the selected worktree (hidden when ALL is selected) */}
+        {selectedWorktree && !isAllWorktreesSelected && (
           <BranchSwitchDropdown
             worktree={selectedWorktree}
             isSelected={true}
@@ -576,8 +598,8 @@ export function WorktreePanel({
           />
         )}
 
-        {/* Actions menu for the selected worktree */}
-        {selectedWorktree && (
+        {/* Actions menu for the selected worktree (hidden when ALL is selected) */}
+        {selectedWorktree && !isAllWorktreesSelected && (
           <WorktreeActionsDropdown
             worktree={selectedWorktree}
             isSelected={true}
@@ -742,6 +764,8 @@ export function WorktreePanel({
             isTestRunningForWorktree={isTestRunningForWorktree}
             getTestSessionInfo={getTestSessionInfo}
             onSelectWorktree={handleSelectWorktree}
+            isAllWorktreesSelected={isAllWorktreesSelected}
+            onSelectAllWorktrees={handleSelectAllWorktrees}
             // Branch switching props
             branches={branches}
             filteredBranches={filteredBranches}
@@ -823,6 +847,25 @@ export function WorktreePanel({
         /* Standard tabs layout for 1-2 worktrees */
         <>
           <div className="flex items-center gap-2">
+            {/* "All" tab - shown when worktrees are enabled */}
+            {useWorktreesEnabled && (
+              <Button
+                variant={isAllWorktreesSelected ? 'default' : 'outline'}
+                size="sm"
+                className="h-7 px-3 text-xs font-mono gap-1.5"
+                onClick={handleSelectAllWorktrees}
+                title="View all worktrees"
+              >
+                <Layers className="w-3.5 h-3.5" />
+                <span>All</span>
+                {totalCardCount > 0 && (
+                  <span className="inline-flex items-center justify-center h-4 min-w-[1rem] px-1 text-[10px] font-medium rounded bg-background/80 text-foreground border border-border">
+                    {totalCardCount}
+                  </span>
+                )}
+              </Button>
+            )}
+
             {mainWorktree && (
               <WorktreeTab
                 key={mainWorktree.path}
@@ -882,6 +925,7 @@ export function WorktreePanel({
                 onViewTestLogs={handleViewTestLogs}
                 hasInitScript={hasInitScript}
                 hasTestCommand={hasTestCommand}
+                isAllWorktreesSelected={isAllWorktreesSelected}
               />
             )}
           </div>
@@ -955,6 +999,7 @@ export function WorktreePanel({
                       onViewTestLogs={handleViewTestLogs}
                       hasInitScript={hasInitScript}
                       hasTestCommand={hasTestCommand}
+                      isAllWorktreesSelected={isAllWorktreesSelected}
                     />
                   );
                 })}

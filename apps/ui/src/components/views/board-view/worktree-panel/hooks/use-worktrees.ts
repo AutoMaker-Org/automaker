@@ -1,6 +1,6 @@
 import { useEffect, useCallback, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useAppStore } from '@/store/app-store';
+import { useAppStore, ALL_WORKTREES_BRANCH } from '@/store/app-store';
 import { useWorktrees as useWorktreesQuery } from '@/hooks/queries';
 import { queryKeys } from '@/lib/query-keys';
 import { pathsEqual } from '@/lib/utils';
@@ -71,6 +71,13 @@ export function useWorktrees({
   useEffect(() => {
     if (worktrees.length > 0) {
       const current = currentWorktreeRef.current;
+
+      // Skip validation when "All Worktrees" is selected — it's a virtual
+      // selection that doesn't correspond to a real worktree path/branch
+      if (current?.branch === ALL_WORKTREES_BRANCH) {
+        return;
+      }
+
       const currentPath = current?.path;
       const currentWorktreeExists =
         currentPath === null
@@ -111,9 +118,15 @@ export function useWorktrees({
   );
 
   const currentWorktreePath = currentWorktree?.path ?? null;
-  const selectedWorktree = currentWorktreePath
-    ? worktrees.find((w) => pathsEqual(w.path, currentWorktreePath))
-    : worktrees.find((w) => w.isMain);
+
+  // When "All Worktrees" is selected, there is no single selected worktree —
+  // return undefined so consumers can handle the virtual selection gracefully.
+  const selectedWorktree =
+    currentWorktree?.branch === ALL_WORKTREES_BRANCH
+      ? undefined
+      : currentWorktreePath
+        ? worktrees.find((w) => pathsEqual(w.path, currentWorktreePath))
+        : worktrees.find((w) => w.isMain);
 
   return {
     isLoading,

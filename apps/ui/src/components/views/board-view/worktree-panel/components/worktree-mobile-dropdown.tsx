@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -7,7 +8,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { GitBranch, ChevronDown, CircleDot, Check } from 'lucide-react';
+import { GitBranch, ChevronDown, CircleDot, Check, Layers } from 'lucide-react';
 import { Spinner } from '@/components/ui/spinner';
 import { cn } from '@/lib/utils';
 import type { WorktreeInfo } from '../types';
@@ -19,6 +20,10 @@ interface WorktreeMobileDropdownProps {
   isActivating: boolean;
   branchCardCounts?: Record<string, number>;
   onSelectWorktree: (worktree: WorktreeInfo) => void;
+  /** Whether the "All Worktrees" virtual selection is active */
+  isAllWorktreesSelected?: boolean;
+  /** Callback when "All Worktrees" is selected */
+  onSelectAllWorktrees?: () => void;
 }
 
 export function WorktreeMobileDropdown({
@@ -28,10 +33,22 @@ export function WorktreeMobileDropdown({
   isActivating,
   branchCardCounts,
   onSelectWorktree,
+  isAllWorktreesSelected = false,
+  onSelectAllWorktrees,
 }: WorktreeMobileDropdownProps) {
   // Find the currently selected worktree to display in the trigger
-  const selectedWorktree = worktrees.find((w) => isWorktreeSelected(w));
-  const displayBranch = selectedWorktree?.branch || 'Select branch';
+  const selectedWorktree = isAllWorktreesSelected
+    ? undefined
+    : worktrees.find((w) => isWorktreeSelected(w));
+  const displayBranch = isAllWorktreesSelected
+    ? 'All'
+    : selectedWorktree?.branch || 'Select branch';
+
+  // Compute total card count across all branches for "All Worktrees" display
+  const totalCardCount = useMemo(() => {
+    if (!branchCardCounts) return 0;
+    return Object.values(branchCardCounts).reduce((sum, count) => sum + count, 0);
+  }, [branchCardCounts]);
 
   return (
     <DropdownMenu>
@@ -42,8 +59,17 @@ export function WorktreeMobileDropdown({
           className="h-8 px-3 gap-2 font-mono text-xs bg-secondary/50 hover:bg-secondary flex-1 min-w-0"
           disabled={isActivating}
         >
-          <GitBranch className="w-3.5 h-3.5 shrink-0" />
+          {isAllWorktreesSelected ? (
+            <Layers className="w-3.5 h-3.5 shrink-0" />
+          ) : (
+            <GitBranch className="w-3.5 h-3.5 shrink-0" />
+          )}
           <span className="truncate">{displayBranch}</span>
+          {isAllWorktreesSelected && totalCardCount > 0 && (
+            <span className="inline-flex items-center justify-center h-4 min-w-[1rem] px-1 text-[10px] font-medium rounded bg-background/80 text-foreground border border-border shrink-0">
+              {totalCardCount}
+            </span>
+          )}
           {isActivating ? (
             <Spinner size="xs" className="shrink-0" />
           ) : (
@@ -52,6 +78,44 @@ export function WorktreeMobileDropdown({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-64 max-h-80 overflow-y-auto">
+        {/* All Worktrees option */}
+        {onSelectAllWorktrees && (
+          <>
+            <DropdownMenuItem
+              onSelect={onSelectAllWorktrees}
+              className={cn(
+                'flex items-center gap-2 cursor-pointer',
+                isAllWorktreesSelected && 'bg-accent'
+              )}
+              aria-current={isAllWorktreesSelected ? 'true' : undefined}
+            >
+              <div className="flex items-center gap-2 flex-1 min-w-0">
+                {isAllWorktreesSelected ? (
+                  <Check className="w-3.5 h-3.5 shrink-0 text-primary" />
+                ) : (
+                  <div className="w-3.5 h-3.5 shrink-0" />
+                )}
+                <Layers className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
+                <span
+                  className={cn(
+                    'text-xs truncate',
+                    isAllWorktreesSelected && 'font-medium'
+                  )}
+                >
+                  All Worktrees
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5 shrink-0">
+                {totalCardCount > 0 && (
+                  <span className="inline-flex items-center justify-center h-4 min-w-[1rem] px-1 text-[10px] font-medium rounded bg-background/80 text-foreground border border-border">
+                    {totalCardCount}
+                  </span>
+                )}
+              </div>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+          </>
+        )}
         <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
           Branches & Worktrees
         </DropdownMenuLabel>

@@ -124,6 +124,9 @@ const logger = createLogger('AppStore');
 const OPENCODE_BEDROCK_PROVIDER_ID = 'amazon-bedrock';
 const OPENCODE_BEDROCK_MODEL_PREFIX = `${OPENCODE_BEDROCK_PROVIDER_ID}/`;
 
+/** Sentinel value for "show features from all worktrees/branches" instead of filtering to a specific branch */
+export const ALL_WORKTREES_BRANCH = '__all_worktrees__' as const;
+
 // Re-export types from @automaker/types for convenience
 export type {
   ModelAlias,

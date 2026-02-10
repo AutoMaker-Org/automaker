@@ -81,6 +81,8 @@ interface WorktreeTabProps {
   hasInitScript: boolean;
   /** Whether a test command is configured in project settings */
   hasTestCommand?: boolean;
+  /** Whether the "All Worktrees" virtual selection is active – hides branch switch & actions dropdowns */
+  isAllWorktreesSelected?: boolean;
 }
 
 export function WorktreeTab({
@@ -140,6 +142,7 @@ export function WorktreeTab({
   onViewTestLogs,
   hasInitScript,
   hasTestCommand = false,
+  isAllWorktreesSelected = false,
 }: WorktreeTabProps) {
   // Make the worktree tab a drop target for feature cards
   const { setNodeRef, isOver } = useDroppable({
@@ -250,7 +253,8 @@ export function WorktreeTab({
             variant={isSelected ? 'default' : 'outline'}
             size="sm"
             className={cn(
-              'h-7 px-3 text-xs font-mono gap-1.5 border-r-0 rounded-l-md rounded-r-none',
+              'h-7 px-3 text-xs font-mono gap-1.5',
+              !isAllWorktreesSelected && 'border-r-0 rounded-l-md rounded-r-none',
               isSelected && 'bg-primary text-primary-foreground',
               !isSelected && 'bg-secondary/50 hover:bg-secondary'
             )}
@@ -295,26 +299,29 @@ export function WorktreeTab({
             )}
             {prBadge}
           </Button>
-          <BranchSwitchDropdown
-            worktree={worktree}
-            isSelected={isSelected}
-            branches={branches}
-            filteredBranches={filteredBranches}
-            branchFilter={branchFilter}
-            isLoadingBranches={isLoadingBranches}
-            isSwitching={isSwitching}
-            onOpenChange={onBranchDropdownOpenChange}
-            onFilterChange={onBranchFilterChange}
-            onSwitchBranch={onSwitchBranch}
-            onCreateBranch={onCreateBranch}
-          />
+          {!isAllWorktreesSelected && (
+            <BranchSwitchDropdown
+              worktree={worktree}
+              isSelected={isSelected}
+              branches={branches}
+              filteredBranches={filteredBranches}
+              branchFilter={branchFilter}
+              isLoadingBranches={isLoadingBranches}
+              isSwitching={isSwitching}
+              onOpenChange={onBranchDropdownOpenChange}
+              onFilterChange={onBranchFilterChange}
+              onSwitchBranch={onSwitchBranch}
+              onCreateBranch={onCreateBranch}
+            />
+          )}
         </>
       ) : (
         <Button
           variant={isSelected ? 'default' : 'outline'}
           size="sm"
           className={cn(
-            'h-7 px-3 text-xs font-mono gap-1.5 rounded-l-md rounded-r-none border-r-0',
+            'h-7 px-3 text-xs font-mono gap-1.5',
+            !isAllWorktreesSelected && 'rounded-l-md rounded-r-none border-r-0',
             isSelected && 'bg-primary text-primary-foreground',
             !isSelected && 'bg-secondary/50 hover:bg-secondary',
             !worktree.hasWorktree && !isSelected && 'opacity-70'
@@ -364,7 +371,7 @@ export function WorktreeTab({
         </Button>
       )}
 
-      {isDevServerRunning && (
+      {!isAllWorktreesSelected && isDevServerRunning && (
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
@@ -388,7 +395,7 @@ export function WorktreeTab({
         </Tooltip>
       )}
 
-      {isAutoModeRunning && (
+      {!isAllWorktreesSelected && isAutoModeRunning && (
         <Tooltip>
           <TooltipTrigger asChild>
             <span
@@ -406,7 +413,7 @@ export function WorktreeTab({
         </Tooltip>
       )}
 
-      <WorktreeActionsDropdown
+      {!isAllWorktreesSelected && <WorktreeActionsDropdown
         worktree={worktree}
         isSelected={isSelected}
         aheadCount={aheadCount}
@@ -448,7 +455,7 @@ export function WorktreeTab({
         onStopTests={onStopTests}
         onViewTestLogs={onViewTestLogs}
         hasInitScript={hasInitScript}
-      />
+      />}
     </div>
   );
 }

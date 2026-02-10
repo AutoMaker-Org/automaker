@@ -1,6 +1,6 @@
 // @ts-nocheck - column filtering logic with dependency resolution and status mapping
 import { useMemo, useCallback } from 'react';
-import { Feature, useAppStore } from '@/store/app-store';
+import { Feature, useAppStore, ALL_WORKTREES_BRANCH } from '@/store/app-store';
 import {
   createFeatureMap,
   getBlockingDependenciesFromMap,
@@ -67,7 +67,10 @@ export function useBoardColumnFeatures({
       const featureBranch = f.branchName;
 
       let matchesWorktree: boolean;
-      if (!featureBranch) {
+      if (effectiveBranch === ALL_WORKTREES_BRANCH) {
+        // "All Worktrees" view — show every feature regardless of branch assignment
+        matchesWorktree = true;
+      } else if (!featureBranch) {
         // No branch assigned - show only on primary worktree
         const isViewingPrimary = currentWorktreePath === null;
         matchesWorktree = isViewingPrimary;

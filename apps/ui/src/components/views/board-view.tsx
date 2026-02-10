@@ -27,7 +27,7 @@ class DialogAwarePointerSensor extends PointerSensor {
     },
   ];
 }
-import { useAppStore, Feature } from '@/store/app-store';
+import { useAppStore, Feature, ALL_WORKTREES_BRANCH } from '@/store/app-store';
 import { getElectronAPI } from '@/lib/electron';
 import { getHttpApiClient } from '@/lib/http-api-client';
 import type { BacklogPlanResult, FeatureStatusWithPipeline } from '@automaker/types';
@@ -413,8 +413,14 @@ export function BoardView() {
   );
 
   // Get the branch for the currently selected worktree
-  // Find the worktree that matches the current selection, or use main worktree
+  // Find the worktree that matches the current selection, or use main worktree.
+  // When "All Worktrees" is selected, there is no single selected worktree —
+  // return undefined so consumers can handle the virtual selection gracefully.
   const selectedWorktree = useMemo((): WorktreeInfo | undefined => {
+    // ALL mode — no single worktree is selected
+    if (currentWorktreeInfo?.branch === ALL_WORKTREES_BRANCH) {
+      return undefined;
+    }
     let found;
     if (currentWorktreePath === null) {
       // Primary worktree selected - find the main worktree
@@ -432,7 +438,7 @@ export function BoardView() {
         (currentWorktreePath !== null ? pathsEqual(found.path, currentWorktreePath) : found.isMain),
       hasWorktree: found.hasWorktree ?? true,
     };
-  }, [worktrees, currentWorktreePath]);
+  }, [worktrees, currentWorktreePath, currentWorktreeInfo?.branch]);
 
   // Auto mode hook - pass current worktree to get worktree-specific state
   // Must be after selectedWorktree is defined
@@ -503,8 +509,12 @@ export function BoardView() {
   // Mutation to persist maxConcurrency to server settings
   const updateGlobalSettings = useUpdateGlobalSettings({ showSuccessToast: false });
 
-  // Get the current branch from the selected worktree (not from store which may be stale)
-  const currentWorktreeBranch = selectedWorktree?.branch ?? null;
+  // Derive the current branch from the selected worktree.
+  // When selectedWorktree is undefined (ALL mode), fall back to the store's branch value
+  // which carries the ALL_WORKTREES_BRANCH sentinel so downstream hooks bypass filtering.
+  // Otherwise prefer the branch from the resolved selectedWorktree object.
+  const currentWorktreeBranch =
+    selectedWorktree?.branch ?? currentWorktreeInfo?.branch ?? null;
 
   // Get the branch for the currently selected worktree (for defaulting new features)
   // Use the branch from selectedWorktree, or fall back to main worktree's branch
@@ -772,6 +782,9 @@ export function BoardView() {
         // Only backlog features
         if (f.status !== 'backlog') return false;
 
+        // "All Worktrees" view — all backlog features are selectable
+        if (currentWorktreeBranch === ALL_WORKTREES_BRANCH) return true;
+
         // Filter by current worktree branch
         const featureBranch = f.branchName;
         if (!featureBranch) {
@@ -802,6 +815,9 @@ export function BoardView() {
       .filter((f) => {
         // Only waiting_approval features
         if (f.status !== 'waiting_approval') return false;
+
+        // "All Worktrees" view — all waiting_approval features are selectable
+        if (currentWorktreeBranch === ALL_WORKTREES_BRANCH) return true;
 
         // Filter by current worktree branch
         const featureBranch = f.branchName;
