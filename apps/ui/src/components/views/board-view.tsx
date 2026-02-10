@@ -513,8 +513,7 @@ export function BoardView() {
   // When selectedWorktree is undefined (ALL mode), fall back to the store's branch value
   // which carries the ALL_WORKTREES_BRANCH sentinel so downstream hooks bypass filtering.
   // Otherwise prefer the branch from the resolved selectedWorktree object.
-  const currentWorktreeBranch =
-    selectedWorktree?.branch ?? currentWorktreeInfo?.branch ?? null;
+  const currentWorktreeBranch = selectedWorktree?.branch ?? currentWorktreeInfo?.branch ?? null;
 
   // Get the branch for the currently selected worktree (for defaulting new features)
   // Use the branch from selectedWorktree, or fall back to main worktree's branch
@@ -531,14 +530,21 @@ export function BoardView() {
       .flatMap(([, state]) => state.runningTasks ?? []);
   }, [autoModeByWorktree, currentProject?.id]);
 
+  // When "All Worktrees" is selected, use aggregated running tasks from all worktrees
+  // so feature cards correctly show running agent state instead of "Resume"
+  const effectiveRunningAutoTasks =
+    currentWorktreeBranch === ALL_WORKTREES_BRANCH
+      ? runningAutoTasksAllWorktrees
+      : runningAutoTasks;
+
   // Get in-progress features for keyboard shortcuts (needed before actions hook)
   // Must be after runningAutoTasks is defined
   const inProgressFeaturesForShortcuts = useMemo(() => {
     return hookFeatures.filter((f) => {
-      const isRunning = runningAutoTasks.includes(f.id);
+      const isRunning = effectiveRunningAutoTasks.includes(f.id);
       return isRunning || f.status === 'in_progress';
     });
-  }, [hookFeatures, runningAutoTasks]);
+  }, [hookFeatures, effectiveRunningAutoTasks]);
 
   // Calculate unarchived card counts per branch
   const branchCardCounts = useMemo(() => {
@@ -603,7 +609,7 @@ export function BoardView() {
   } = useBoardActions({
     currentProject,
     features: hookFeatures,
-    runningAutoTasks,
+    runningAutoTasks: effectiveRunningAutoTasks,
     loadFeatures,
     persistFeatureCreate,
     persistFeatureUpdate,
@@ -1092,7 +1098,7 @@ export function BoardView() {
   // Use keyboard shortcuts hook (after actions hook)
   useBoardKeyboardShortcuts({
     features: hookFeatures,
-    runningAutoTasks,
+    runningAutoTasks: effectiveRunningAutoTasks,
     onAddFeature: () => setShowAddDialog(true),
     onStartNextFeatures: handleStartNextFeatures,
     onViewOutput: handleViewOutput,
@@ -1108,7 +1114,7 @@ export function BoardView() {
   } = useBoardDragDrop({
     features: hookFeatures,
     currentProject,
-    runningAutoTasks,
+    runningAutoTasks: effectiveRunningAutoTasks,
     persistFeatureUpdate,
     handleStartImplementation,
   });
@@ -1160,7 +1166,7 @@ export function BoardView() {
   // Use column features hook
   const { getColumnFeatures, completedFeatures } = useBoardColumnFeatures({
     features: hookFeatures,
-    runningAutoTasks,
+    runningAutoTasks: effectiveRunningAutoTasks,
     searchQuery,
     currentWorktreePath,
     currentWorktreeBranch,
@@ -1346,7 +1352,7 @@ export function BoardView() {
       <BoardHeader
         projectPath={currentProject.path}
         maxConcurrency={maxConcurrency}
-        runningAgentsCount={runningAutoTasks.length}
+        runningAgentsCount={effectiveRunningAutoTasks.length}
         onConcurrencyChange={(newMaxConcurrency) => {
           if (currentProject) {
             // If selectedWorktree is undefined or it's the main worktree, branchName will be null.
@@ -1482,7 +1488,7 @@ export function BoardView() {
                   setShowAddDialog(true);
                 },
               }}
-              runningAutoTasks={runningAutoTasks}
+              runningAutoTasks={effectiveRunningAutoTasks}
               pipelineConfig={pipelineConfig}
               onAddFeature={() => setShowAddDialog(true)}
               isSelectionMode={isSelectionMode}
@@ -1521,7 +1527,7 @@ export function BoardView() {
                 setShowAddDialog(true);
               }}
               featuresWithContext={featuresWithContext}
-              runningAutoTasks={runningAutoTasks}
+              runningAutoTasks={effectiveRunningAutoTasks}
               onArchiveAllVerified={() => setShowArchiveAllVerifiedDialog(true)}
               onAddFeature={() => setShowAddDialog(true)}
               onShowCompletedModal={() => setShowCompletedModal(true)}
