@@ -6,6 +6,7 @@ import {
   Bot,
   BookOpen,
   Terminal,
+  FolderOpen,
   CircleDot,
   GitPullRequest,
   Lightbulb,
@@ -34,6 +35,7 @@ interface UseNavigationProps {
     graph: string;
     agent: string;
     terminal: string;
+    files: string;
     settings: string;
     projectSettings: string;
     ideation: string;
@@ -173,6 +175,14 @@ export function useNavigation({
         shortcut: shortcuts.terminal,
       });
     }
+
+    // Add Files to Project section
+    projectItems.push({
+      id: 'files',
+      label: 'Files',
+      icon: FolderOpen,
+      shortcut: shortcuts.files,
+    });
 
     const sections: NavSection[] = [
       // Dashboard - standalone at top (links to projects overview)

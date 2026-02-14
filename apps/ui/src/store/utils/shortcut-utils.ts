@@ -88,6 +88,7 @@ export const DEFAULT_KEYBOARD_SHORTCUTS: KeyboardShortcuts = {
   settings: 'S',
   projectSettings: 'Shift+S',
   terminal: 'T',
+  files: 'F',
   ideation: 'I',
   notifications: 'X',
   githubIssues: 'G',

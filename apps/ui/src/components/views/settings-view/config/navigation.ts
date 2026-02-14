@@ -15,6 +15,7 @@ import {
   Shield,
   GitBranch,
   Code2,
+  FileCode2,
   Webhook,
 } from 'lucide-react';
 import {
@@ -70,6 +71,7 @@ export const GLOBAL_NAV_GROUPS: NavigationGroup[] = [
     items: [
       { id: 'appearance', label: 'Appearance', icon: Palette },
       { id: 'terminal', label: 'Terminal', icon: SquareTerminal },
+      { id: 'editor', label: 'Editor', icon: FileCode2 },
       { id: 'keyboard', label: 'Keyboard Shortcuts', icon: Settings2 },
       { id: 'audio', label: 'Audio', icon: Volume2 },
       { id: 'event-hooks', label: 'Event Hooks', icon: Webhook },

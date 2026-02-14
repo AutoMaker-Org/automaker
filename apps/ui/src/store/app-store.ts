@@ -87,6 +87,11 @@ import {
   type AutoModeActivity,
   type AppState,
   type AppActions,
+  // File Editor types
+  type OpenTab,
+  type CursorPosition,
+  type FileHistoryEntry,
+  type FileEditorSettings,
   // Usage types
   type ClaudeUsage,
   type ClaudeUsageResponse,
@@ -117,7 +122,16 @@ import {
 } from './utils';
 
 // Import default values from modular defaults files
-import { defaultBackgroundSettings, defaultTerminalState, MAX_INIT_OUTPUT_LINES } from './defaults';
+import {
+  defaultBackgroundSettings,
+  defaultTerminalState,
+  MAX_INIT_OUTPUT_LINES,
+  MAX_FILE_HISTORY_ENTRIES,
+  DEFAULT_AUTO_SAVE_INTERVAL_MS,
+  DEFAULT_EDITOR_FONT_SIZE,
+  DEFAULT_EDITOR_TAB_SIZE,
+  DEFAULT_EDITOR_LINE_HEIGHT,
+} from './defaults';
 
 // Import internal theme utils (not re-exported publicly)
 import {
@@ -175,6 +189,10 @@ export type {
   AutoModeActivity,
   AppState,
   AppActions,
+  OpenTab,
+  CursorPosition,
+  FileHistoryEntry,
+  FileEditorSettings,
   ClaudeUsage,
   ClaudeUsageResponse,
   CodexPlanType,
@@ -207,7 +225,13 @@ export {
 };
 
 // Re-export defaults from ./defaults for backward compatibility
-export { defaultBackgroundSettings, defaultTerminalState, MAX_INIT_OUTPUT_LINES } from './defaults';
+export {
+  defaultBackgroundSettings,
+  defaultTerminalState,
+  MAX_INIT_OUTPUT_LINES,
+  MAX_FILE_HISTORY_ENTRIES,
+  DEFAULT_AUTO_SAVE_INTERVAL_MS,
+} from './defaults';
 
 // NOTE: Type definitions moved to ./types/ directory, utilities moved to ./utils/ directory
 // The following inline types have been replaced with imports above:
@@ -351,6 +375,29 @@ const initialState: AppState = {
   lastProjectDir: '',
   recentFolders: [],
   initScriptState: {},
+  fileEditorTabs: [],
+  fileEditorActiveTabPath: null,
+  fileEditorHistory: [],
+  fileEditorSettings: {
+    autoSaveEnabled: false,
+    autoSaveIntervalMs: DEFAULT_AUTO_SAVE_INTERVAL_MS,
+    fontSize: DEFAULT_EDITOR_FONT_SIZE,
+    fontFamily: null,
+    tabSize: DEFAULT_EDITOR_TAB_SIZE,
+    indentWithTabs: false,
+    wordWrap: false,
+    showMinimap: false,
+    ligatures: true,
+    lineHeight: DEFAULT_EDITOR_LINE_HEIGHT,
+    showLineNumbers: true,
+    showFoldGutter: true,
+    highlightActiveLine: true,
+    bracketMatching: true,
+    closeBrackets: true,
+    keybindings: 'default',
+  },
+  fileEditorSaveStatus: null,
+  fileEditorWorktreeByProject: {},
 };
 
 export const useAppStore = create<AppState & AppActions>()((set, get) => ({
@@ -2643,6 +2690,158 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
     return Object.entries(states)
       .filter(([key]) => key.startsWith(prefix))
       .map(([key, state]) => ({ key, state }));
+  },
+
+  // File Editor actions
+  openFileTab: (path, name, content, language, worktreePath?, worktreeBranch?) => {
+    set((state) => {
+      const existing = state.fileEditorTabs.find((t) => t.path === path);
+      if (existing) {
+        return { fileEditorActiveTabPath: path };
+      }
+      const newTab: OpenTab = {
+        path,
+        name,
+        content,
+        originalContent: content,
+        language,
+        isDirty: false,
+        isLoading: false,
+        cursorPosition: { line: 1, column: 1 },
+        lastModified: undefined,
+        worktreePath,
+        worktreeBranch,
+      };
+      const historyEntry: FileHistoryEntry = { path, openedAt: Date.now() };
+      const newHistory = [
+        historyEntry,
+        ...state.fileEditorHistory.filter((h) => h.path !== path),
+      ].slice(0, MAX_FILE_HISTORY_ENTRIES);
+      return {
+        fileEditorTabs: [...state.fileEditorTabs, newTab],
+        fileEditorActiveTabPath: path,
+        fileEditorHistory: newHistory,
+      };
+    });
+  },
+
+  closeFileTab: (path) => {
+    set((state) => {
+      const tabIndex = state.fileEditorTabs.findIndex((t) => t.path === path);
+      const remaining = state.fileEditorTabs.filter((t) => t.path !== path);
+      let newActiveTabPath = state.fileEditorActiveTabPath;
+      if (newActiveTabPath === path) {
+        if (remaining.length === 0) {
+          newActiveTabPath = null;
+        } else {
+          const newIndex = Math.min(tabIndex, remaining.length - 1);
+          newActiveTabPath = remaining[newIndex]?.path || null;
+        }
+      }
+      const newHistory = state.fileEditorHistory.map((h) =>
+        h.path === path && !h.closedAt ? { ...h, closedAt: Date.now() } : h
+      );
+      return {
+        fileEditorTabs: remaining,
+        fileEditorActiveTabPath: newActiveTabPath,
+        fileEditorHistory: newHistory,
+      };
+    });
+  },
+
+  setActiveFileTab: (path) => set({ fileEditorActiveTabPath: path }),
+
+  updateFileContent: (path, content) => {
+    set((state) => ({
+      fileEditorTabs: state.fileEditorTabs.map((t) =>
+        t.path === path
+          ? {
+              ...t,
+              content,
+              isDirty: content !== t.originalContent,
+              lastModified: Date.now(),
+            }
+          : t
+      ),
+    }));
+  },
+
+  markFileSaved: (path) => {
+    set((state) => ({
+      fileEditorTabs: state.fileEditorTabs.map((t) =>
+        t.path === path ? { ...t, isDirty: false, originalContent: t.content } : t
+      ),
+    }));
+  },
+
+  setFileCursorPosition: (path, position) => {
+    set((state) => ({
+      fileEditorTabs: state.fileEditorTabs.map((t) =>
+        t.path === path ? { ...t, cursorPosition: position } : t
+      ),
+    }));
+  },
+
+  setFileEditorSaveStatus: (status) => set({ fileEditorSaveStatus: status }),
+
+  setFileEditorAutoSave: (enabled) => {
+    set((state) => ({
+      fileEditorSettings: { ...state.fileEditorSettings, autoSaveEnabled: enabled },
+    }));
+  },
+
+  setFileEditorAutoSaveInterval: (intervalMs) => {
+    set((state) => ({
+      fileEditorSettings: { ...state.fileEditorSettings, autoSaveIntervalMs: intervalMs },
+    }));
+  },
+
+  setFileEditorSettings: (settings) => {
+    set((state) => ({
+      fileEditorSettings: { ...state.fileEditorSettings, ...settings },
+    }));
+  },
+
+  clearAllFileTabs: () => {
+    set({
+      fileEditorTabs: [],
+      fileEditorActiveTabPath: null,
+      fileEditorSaveStatus: null,
+    });
+  },
+
+  getActiveFileTab: () => {
+    const state = get();
+    return state.fileEditorTabs.find((t) => t.path === state.fileEditorActiveTabPath) || null;
+  },
+
+  getDirtyFileTabs: () => {
+    return get().fileEditorTabs.filter((t) => t.isDirty);
+  },
+
+  reorderFileTabs: (fromPath, toPath) => {
+    set((state) => {
+      const tabs = [...state.fileEditorTabs];
+      const fromIndex = tabs.findIndex((t) => t.path === fromPath);
+      const toIndex = tabs.findIndex((t) => t.path === toPath);
+      if (fromIndex === -1 || toIndex === -1) return state;
+      const [removed] = tabs.splice(fromIndex, 1);
+      tabs.splice(toIndex, 0, removed);
+      return { fileEditorTabs: tabs };
+    });
+  },
+
+  setFileEditorWorktree: (projectPath, worktree) => {
+    set((state) => ({
+      fileEditorWorktreeByProject: {
+        ...state.fileEditorWorktreeByProject,
+        [projectPath]: worktree,
+      },
+    }));
+  },
+
+  getFileEditorWorktree: (projectPath) => {
+    return get().fileEditorWorktreeByProject[projectPath] ?? null;
   },
 
   // Reset

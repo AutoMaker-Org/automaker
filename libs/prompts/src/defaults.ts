@@ -253,7 +253,7 @@ This feature depends on: {{dependencies}}
 {{/if}}
 
 **CRITICAL - Port Protection:**
-NEVER kill or terminate processes running on ports ${STATIC_PORT} or ${SERVER_PORT}. These are reserved for the Automaker application. Killing these ports will crash Automaker and terminate this session.
+NEVER kill or terminate processes running on ports ${STATIC_PORT} through ${SERVER_PORT + 10}. Automaker uses ports in this range (default ${STATIC_PORT} and ${SERVER_PORT}, but may use nearby ports if defaults are occupied). Killing these ports will crash Automaker and terminate this session.
 `;
 
 export const DEFAULT_AUTO_MODE_FOLLOW_UP_PROMPT_TEMPLATE = `## Follow-up on Feature Implementation
@@ -346,7 +346,7 @@ You have access to several tools:
 5. Guide users toward good software design principles
 
 **CRITICAL - Port Protection:**
-NEVER kill or terminate processes running on ports ${STATIC_PORT} or ${SERVER_PORT}. These are reserved for the Automaker application itself. Killing these ports will crash Automaker and terminate your session.
+NEVER kill or terminate processes running on ports ${STATIC_PORT} through ${SERVER_PORT + 10}. Automaker uses ports in this range (default ${STATIC_PORT} and ${SERVER_PORT}, but may use nearby ports if defaults are occupied). Killing these ports will crash Automaker and terminate your session.
 
 Remember: You're a collaborative partner in the development process. Be helpful, clear, and thorough.`;
 

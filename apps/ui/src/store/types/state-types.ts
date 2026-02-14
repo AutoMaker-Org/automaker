@@ -31,6 +31,11 @@ import type {
   BoardViewMode,
   KeyboardShortcuts,
   BackgroundSettings,
+  OpenTab,
+  CursorPosition,
+  FileHistoryEntry,
+  FileEditorSettings,
+  EditorKeybindings,
 } from './ui-types';
 import type { ApiKeys } from './settings-types';
 import type { ChatMessage, ChatSession, FeatureImage } from './chat-types';
@@ -349,6 +354,15 @@ export interface AppState {
 
   // Init Script State (keyed by "projectPath::branch" to support concurrent scripts)
   initScriptState: Record<string, InitScriptState>;
+
+  // File Editor State
+  fileEditorTabs: OpenTab[];
+  fileEditorActiveTabPath: string | null;
+  fileEditorHistory: FileHistoryEntry[];
+  fileEditorSettings: FileEditorSettings;
+  fileEditorSaveStatus: string | null;
+  // Per-project selected worktree for file browser (keyed by project path)
+  fileEditorWorktreeByProject: Record<string, { path: string; branch: string } | null>;
 }
 
 export interface AppActions {
@@ -800,6 +814,34 @@ export interface AppActions {
   getInitScriptStatesForProject: (
     projectPath: string
   ) => Array<{ key: string; state: InitScriptState }>;
+
+  // File Editor actions
+  openFileTab: (
+    path: string,
+    name: string,
+    content: string,
+    language: string,
+    worktreePath?: string,
+    worktreeBranch?: string
+  ) => void;
+  closeFileTab: (path: string) => void;
+  setActiveFileTab: (path: string | null) => void;
+  updateFileContent: (path: string, content: string) => void;
+  markFileSaved: (path: string) => void;
+  setFileCursorPosition: (path: string, position: CursorPosition) => void;
+  setFileEditorSaveStatus: (status: string | null) => void;
+  setFileEditorAutoSave: (enabled: boolean) => void;
+  setFileEditorAutoSaveInterval: (intervalMs: number) => void;
+  setFileEditorSettings: (settings: Partial<FileEditorSettings>) => void;
+  clearAllFileTabs: () => void;
+  getActiveFileTab: () => OpenTab | null;
+  getDirtyFileTabs: () => OpenTab[];
+  reorderFileTabs: (fromPath: string, toPath: string) => void;
+  setFileEditorWorktree: (
+    projectPath: string,
+    worktree: { path: string; branch: string } | null
+  ) => void;
+  getFileEditorWorktree: (projectPath: string) => { path: string; branch: string } | null;
 
   // Reset
   reset: () => void;

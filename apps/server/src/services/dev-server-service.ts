@@ -12,6 +12,7 @@ import * as secureFs from '../lib/secure-fs.js';
 import path from 'path';
 import net from 'net';
 import { createLogger } from '@automaker/utils';
+import { isAutomakerPort } from '@automaker/types';
 import type { EventEmitter } from '../lib/events.js';
 
 const logger = createLogger('DevServerService');
@@ -205,9 +206,14 @@ class DevServerService {
   }
 
   /**
-   * Kill any process running on the given port
+   * Kill any process running on the given port.
+   * Refuses to kill processes on Automaker's reserved ports.
    */
   private killProcessOnPort(port: number): void {
+    if (this.isReservedPort(port)) {
+      logger.debug(`Skipping kill on reserved Automaker port ${port}`);
+      return;
+    }
     try {
       if (process.platform === 'win32') {
         // Windows: find and kill process on port
@@ -253,7 +259,14 @@ class DevServerService {
   }
 
   /**
-   * Find the next available port, killing any process on it first
+   * Check if a port is reserved by Automaker and should never be killed
+   */
+  private isReservedPort(port: number): boolean {
+    return isAutomakerPort(port);
+  }
+
+  /**
+   * Find the next available port, killing any non-reserved process on it first
    */
   private async findAvailablePort(): Promise<number> {
     let port = BASE_PORT;
@@ -261,6 +274,12 @@ class DevServerService {
     while (port <= MAX_PORT) {
       // Skip ports we've already allocated internally
       if (this.allocatedPorts.has(port)) {
+        port++;
+        continue;
+      }
+
+      // Never kill processes on Automaker's reserved ports (UI/server)
+      if (this.isReservedPort(port)) {
         port++;
         continue;
       }

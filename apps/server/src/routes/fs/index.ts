@@ -19,6 +19,12 @@ import { createBrowseHandler } from './routes/browse.js';
 import { createImageHandler } from './routes/image.js';
 import { createSaveBoardBackgroundHandler } from './routes/save-board-background.js';
 import { createDeleteBoardBackgroundHandler } from './routes/delete-board-background.js';
+import { createRenameHandler } from './routes/rename.js';
+import { createGitStatusHandler } from './routes/git-status.js';
+import { createGitDiffHandler } from './routes/git-diff.js';
+import { createGitStageHandler } from './routes/git-stage.js';
+import { createSearchFilesHandler } from './routes/search-files.js';
+import { createSearchContentHandler } from './routes/search-content.js';
 
 export function createFsRoutes(_events: EventEmitter): Router {
   const router = Router();
@@ -30,6 +36,7 @@ export function createFsRoutes(_events: EventEmitter): Router {
   router.post('/exists', createExistsHandler());
   router.post('/stat', createStatHandler());
   router.post('/delete', createDeleteHandler());
+  router.post('/rename', createRenameHandler());
   router.post('/validate-path', createValidatePathHandler());
   router.post('/resolve-directory', createResolveDirectoryHandler());
   router.post('/save-image', createSaveImageHandler());
@@ -37,6 +44,11 @@ export function createFsRoutes(_events: EventEmitter): Router {
   router.get('/image', createImageHandler());
   router.post('/save-board-background', createSaveBoardBackgroundHandler());
   router.post('/delete-board-background', createDeleteBoardBackgroundHandler());
+  router.post('/git-status', createGitStatusHandler());
+  router.post('/git-diff', createGitDiffHandler());
+  router.post('/git-stage', createGitStageHandler());
+  router.post('/search-files', createSearchFilesHandler());
+  router.post('/search-content', createSearchContentHandler());
 
   return router;
 }

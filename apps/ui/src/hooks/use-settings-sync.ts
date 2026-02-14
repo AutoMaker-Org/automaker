@@ -99,6 +99,8 @@ const SETTINGS_FIELDS_TO_SYNC = [
   'worktreePanelCollapsed',
   'lastProjectDir',
   'recentFolders',
+  // File Editor Settings
+  'fileEditorSettings',
 ] as const;
 
 // Fields from setup store to sync
@@ -736,6 +738,19 @@ export async function refreshSettingsFromServer(): Promise<boolean> {
       recentFolders: serverSettings.recentFolders ?? [],
       // Event hooks
       eventHooks: serverSettings.eventHooks ?? [],
+      // File Editor Settings (not yet in GlobalSettings type, access via cast)
+      ...(() => {
+        const raw = serverSettings as unknown as Record<string, unknown>;
+        if (raw.fileEditorSettings && typeof raw.fileEditorSettings === 'object') {
+          return {
+            fileEditorSettings: {
+              ...currentAppState.fileEditorSettings,
+              ...(raw.fileEditorSettings as Record<string, unknown>),
+            },
+          };
+        }
+        return {};
+      })(),
       // Terminal settings (nested in terminalState)
       ...((serverSettings.terminalFontFamily || serverSettings.openTerminalMode) && {
         terminalState: {

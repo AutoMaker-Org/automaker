@@ -15,6 +15,7 @@ export type SettingsViewId =
   | 'model-defaults'
   | 'appearance'
   | 'terminal'
+  | 'editor'
   | 'keyboard'
   | 'audio'
   | 'event-hooks'

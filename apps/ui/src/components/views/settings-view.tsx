@@ -11,6 +11,7 @@ import { ApiKeysSection } from './settings-view/api-keys/api-keys-section';
 import { ModelDefaultsSection } from './settings-view/model-defaults';
 import { AppearanceSection } from './settings-view/appearance/appearance-section';
 import { TerminalSection } from './settings-view/terminal/terminal-section';
+import { EditorSection } from './settings-view/editor/editor-section';
 import { AudioSection } from './settings-view/audio/audio-section';
 import { KeyboardShortcutsSection } from './settings-view/keyboard-shortcuts/keyboard-shortcuts-section';
 import { FeatureDefaultsSection } from './settings-view/feature-defaults/feature-defaults-section';
@@ -150,6 +151,8 @@ export function SettingsView() {
         );
       case 'terminal':
         return <TerminalSection />;
+      case 'editor':
+        return <EditorSection />;
       case 'keyboard':
         return (
           <KeyboardShortcutsSection onOpenKeyboardMap={() => setShowKeyboardMapDialog(true)} />

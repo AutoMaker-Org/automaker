@@ -194,6 +194,75 @@ export interface StatResult {
   error?: string;
 }
 
+// Git status types for file tree integration
+export interface GitFileStatus {
+  status: string;
+  path: string;
+  statusText: string;
+}
+
+export interface GitStatusResult {
+  success: boolean;
+  isGitRepo?: boolean;
+  files?: GitFileStatus[];
+  error?: string;
+}
+
+export interface DiffChange {
+  type: 'add' | 'delete' | 'context';
+  line: number;
+  content: string;
+}
+
+export interface DiffHunk {
+  oldStart: number;
+  oldLines: number;
+  newStart: number;
+  newLines: number;
+  changes: DiffChange[];
+}
+
+export interface GitDiffResult {
+  success: boolean;
+  diff?: string;
+  hunks?: DiffHunk[];
+  error?: string;
+}
+
+// File search result types
+export interface FileSearchResultItem {
+  path: string;
+  relativePath: string;
+  name: string;
+  isDirectory: boolean;
+  score: number;
+}
+
+export interface FileSearchResult {
+  success: boolean;
+  results: FileSearchResultItem[];
+  error?: string;
+}
+
+export interface ContentMatchItem {
+  line: number;
+  content: string;
+  preview: string;
+}
+
+export interface ContentSearchResultItem {
+  path: string;
+  relativePath: string;
+  name: string;
+  matches: ContentMatchItem[];
+}
+
+export interface ContentSearchResult {
+  success: boolean;
+  results: ContentSearchResultItem[];
+  error?: string;
+}
+
 // Options for creating a pull request
 export interface CreatePROptions {
   projectPath?: string;
@@ -644,6 +713,25 @@ export interface ElectronAPI {
   stat: (filePath: string) => Promise<StatResult>;
   deleteFile: (filePath: string) => Promise<WriteResult>;
   trashItem?: (filePath: string) => Promise<WriteResult>;
+  rename: (oldPath: string, newPath: string) => Promise<WriteResult>;
+  gitStatus: (repoPath: string) => Promise<GitStatusResult>;
+  gitDiff: (repoPath: string, filePath?: string) => Promise<GitDiffResult>;
+  gitStage: (
+    repoPath: string,
+    filePath: string,
+    action: 'stage' | 'unstage'
+  ) => Promise<WriteResult>;
+  searchFiles: (
+    rootPath: string,
+    query: string,
+    fileTypes?: string[],
+    limit?: number
+  ) => Promise<FileSearchResult>;
+  searchContent: (
+    rootPath: string,
+    query: string,
+    options?: { fileTypes?: string[]; caseSensitive?: boolean; useRegex?: boolean; limit?: number }
+  ) => Promise<ContentSearchResult>;
   getPath: (name: string) => Promise<string>;
   openInEditor?: (
     filePath: string,
@@ -1290,6 +1378,38 @@ const _getMockElectronAPI = (): ElectronAPI => {
 
     trashItem: async () => {
       return { success: true };
+    },
+
+    rename: async () => {
+      return { success: true };
+    },
+
+    gitStatus: async () => {
+      return {
+        success: true,
+        isGitRepo: true,
+        files: [
+          { status: 'M', path: 'src/index.ts', statusText: 'Modified' },
+          { status: 'A', path: 'src/utils.ts', statusText: 'Added' },
+          { status: '?', path: 'src/components/Header.tsx', statusText: 'Untracked' },
+        ],
+      };
+    },
+
+    gitDiff: async () => {
+      return { success: true, diff: '', hunks: [] };
+    },
+
+    gitStage: async () => {
+      return { success: true };
+    },
+
+    searchFiles: async () => {
+      return { success: true, results: [] };
+    },
+
+    searchContent: async () => {
+      return { success: true, results: [] };
     },
 
     getPath: async (name: string) => {

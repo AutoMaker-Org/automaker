@@ -32,6 +32,10 @@ import type {
   NotificationsAPI,
   EventHistoryAPI,
   CreatePROptions,
+  GitStatusResult,
+  GitDiffResult,
+  FileSearchResult,
+  ContentSearchResult,
 } from './electron';
 import type {
   IdeationContextSources,
@@ -41,11 +45,7 @@ import type {
   Notification,
 } from '@automaker/types';
 import type { Message, SessionListItem } from '@/types/electron';
-import type {
-  ClaudeUsageResponse,
-  CodexUsageResponse,
-  GeminiUsage,
-} from '@/store/app-store';
+import type { ClaudeUsageResponse, CodexUsageResponse, GeminiUsage } from '@/store/app-store';
 import type { WorktreeAPI, GitAPI, ModelDefinition, ProviderStatus } from '@/types/electron';
 import type { ModelId, ThinkingLevel, ReasoningEffort, Feature } from '@automaker/types';
 import { getGlobalFileBrowser } from '@/contexts/file-browser-context';
@@ -1186,6 +1186,43 @@ export class HttpApiClient implements ElectronAPI {
   async trashItem(filePath: string): Promise<WriteResult> {
     // In web mode, trash is just delete
     return this.deleteFile(filePath);
+  }
+
+  async rename(oldPath: string, newPath: string): Promise<WriteResult> {
+    return this.post('/api/fs/rename', { oldPath, newPath });
+  }
+
+  async gitStatus(repoPath: string): Promise<GitStatusResult> {
+    return this.post('/api/fs/git-status', { repoPath });
+  }
+
+  async gitDiff(repoPath: string, filePath?: string): Promise<GitDiffResult> {
+    return this.post('/api/fs/git-diff', { repoPath, filePath });
+  }
+
+  async gitStage(
+    repoPath: string,
+    filePath: string,
+    action: 'stage' | 'unstage'
+  ): Promise<WriteResult> {
+    return this.post('/api/fs/git-stage', { repoPath, filePath, action });
+  }
+
+  async searchFiles(
+    rootPath: string,
+    query: string,
+    fileTypes?: string[],
+    limit?: number
+  ): Promise<FileSearchResult> {
+    return this.post('/api/fs/search-files', { rootPath, query, fileTypes, limit });
+  }
+
+  async searchContent(
+    rootPath: string,
+    query: string,
+    options?: { fileTypes?: string[]; caseSensitive?: boolean; useRegex?: boolean; limit?: number }
+  ): Promise<ContentSearchResult> {
+    return this.post('/api/fs/search-content', { rootPath, query, ...options });
   }
 
   async getPath(name: string): Promise<string> {
