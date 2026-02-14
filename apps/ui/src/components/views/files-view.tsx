@@ -20,12 +20,16 @@ import {
   Diff,
   ChevronDown,
   Search,
+  Eye,
+  EyeOff,
+  SplitSquareHorizontal,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 import type { ImperativePanelHandle } from 'react-resizable-panels';
 import { FileTree } from '@/components/ui/file-tree';
 import { CodeEditor, detectLanguage } from '@/components/ui/code-editor';
+import { Markdown } from '@/components/ui/markdown';
 import { DeleteConfirmDialog } from '@/components/ui/delete-confirm-dialog';
 import { FileSearchDialog } from '@/components/ui/file-search-dialog';
 import { getElectronAPI } from '@/lib/electron';
@@ -58,12 +62,47 @@ function formatRelativeDate(date: Date): string {
   return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
+/** Check if a file is a markdown file */
+function isMarkdownFile(filePath: string): boolean {
+  const ext = filePath.split('.').pop()?.toLowerCase();
+  return ext === 'md' || ext === 'mdx' || ext === 'markdown';
+}
+
 export function FilesView() {
   const { currentProject } = useAppStore();
   const tabs = useAppStore((s) => s.fileEditorTabs);
   const activeTabPath = useAppStore((s) => s.fileEditorActiveTabPath);
   const saveStatus = useAppStore((s) => s.fileEditorSaveStatus);
   const settings = useAppStore((s) => s.fileEditorSettings);
+
+  // Markdown preview state (per-file: path -> mode)
+  const [markdownPreviewMode, setMarkdownPreviewMode] = useState<
+    Record<string, 'editor' | 'preview' | 'split'>
+  >({});
+  const markdownPreviewPanelRef = useRef<ImperativePanelHandle>(null);
+
+  const activeTab = tabs.find((t) => t.path === activeTabPath) || null;
+
+  // Get markdown preview mode for active file (default to 'editor')
+  const activeMarkdownPreviewMode = useMemo(() => {
+    if (!activeTabPath) return 'editor';
+    return markdownPreviewMode[activeTabPath] ?? settings.markdownPreviewMode;
+  }, [activeTabPath, markdownPreviewMode, settings.markdownPreviewMode]);
+
+  // Check if active file is a markdown file
+  const activeFileIsMarkdown = useMemo(() => {
+    return activeTabPath ? isMarkdownFile(activeTabPath) : false;
+  }, [activeTabPath]);
+
+  // Handler to toggle markdown preview mode
+  const handleToggleMarkdownPreview = useCallback(() => {
+    if (!activeTabPath) return;
+    const currentMode = markdownPreviewMode[activeTabPath] ?? settings.markdownPreviewMode;
+    const nextMode: 'editor' | 'preview' | 'split' =
+      currentMode === 'editor' ? 'preview' : currentMode === 'preview' ? 'split' : 'editor';
+    setMarkdownPreviewMode((prev) => ({ ...prev, [activeTabPath]: nextMode }));
+  }, [activeTabPath, markdownPreviewMode, settings.markdownPreviewMode]);
+
   const openFileTab = useAppStore((s) => s.openFileTab);
   const closeFileTab = useAppStore((s) => s.closeFileTab);
   const setActiveFileTab = useAppStore((s) => s.setActiveFileTab);
@@ -135,10 +174,6 @@ export function FilesView() {
   );
   // Key to force re-mount the FileTree when files change (create/rename/delete)
   const [treeRefreshKey, setTreeRefreshKey] = useState(0);
-
-  const activeTab = tabs.find((t) => t.path === activeTabPath) || null;
-
-  // Virtual keyboard detection for mobile
   useEffect(() => {
     if (!isMobile) return;
     const handleResize = () => {
@@ -153,6 +188,7 @@ export function FilesView() {
       window.visualViewport.addEventListener('resize', handleResize);
       return () => window.visualViewport?.removeEventListener('resize', handleResize);
     }
+    const activeTab = tabs.find((t) => t.path === activeTabPath) || null;
   }, [isMobile]);
 
   // Prevent zoom on input focus for iOS
@@ -850,6 +886,25 @@ export function FilesView() {
                   Auto
                 </div>
               )}
+              {/* Markdown preview toggle (only for .md files) */}
+              {activeFileIsMarkdown && (
+                <div className="flex items-center gap-1 ml-auto">
+                  <button
+                    className="px-1.5 py-0.5 rounded text-[10px] bg-muted hover:bg-accent transition-colors"
+                    onClick={handleToggleMarkdownPreview}
+                    title={`Markdown preview: ${activeMarkdownPreviewMode}`}
+                    data-testid="markdown-preview-toggle"
+                  >
+                    {activeMarkdownPreviewMode === 'preview' ? (
+                      <Eye className="h-3 w-3 inline mr-0.5" />
+                    ) : activeMarkdownPreviewMode === 'split' ? (
+                      <SplitSquareHorizontal className="h-3 w-3 inline mr-0.5" />
+                    ) : (
+                      <EyeOff className="h-3 w-3 inline mr-0.5" />
+                    )}
+                  </button>
+                </div>
+              )}
             </>
           ) : (
             <span className="px-3 py-1.5 text-xs text-muted-foreground/50">No files open</span>
@@ -888,6 +943,36 @@ export function FilesView() {
               })}
             </div>
           </div>
+        ) : activeFileIsMarkdown && activeMarkdownPreviewMode === 'preview' ? (
+          <div className="flex-1 overflow-auto">
+            <div className="p-4 max-w-4xl mx-auto">
+              <Markdown>{activeTab.content}</Markdown>
+            </div>
+          </div>
+        ) : activeFileIsMarkdown && activeMarkdownPreviewMode === 'split' ? (
+          <PanelGroup direction="horizontal" autoSaveId="markdown-split-view">
+            <Panel defaultSize={50} minSize={20}>
+              <div className="h-full overflow-hidden">
+                <CodeEditor
+                  value={activeTab.content}
+                  onChange={handleContentChange}
+                  onCursorChange={handleCursorChange}
+                  language={activeTab.language}
+                  mobile={isMobile}
+                  diffHunks={activeDiffHunks}
+                  data-testid="code-editor"
+                />
+              </div>
+            </Panel>
+            <PanelResizeHandle className="w-[1px] bg-border hover:bg-primary/50 transition-colors" />
+            <Panel defaultSize={50} minSize={20}>
+              <div className="h-full overflow-auto">
+                <div className="p-4">
+                  <Markdown>{activeTab.content}</Markdown>
+                </div>
+              </div>
+            </Panel>
+          </PanelGroup>
         ) : (
           <div className="flex-1 overflow-hidden">
             <CodeEditor

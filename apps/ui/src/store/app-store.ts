@@ -92,6 +92,7 @@ import {
   type CursorPosition,
   type FileHistoryEntry,
   type FileEditorSettings,
+  type MarkdownPreviewMode,
   // Usage types
   type ClaudeUsage,
   type ClaudeUsageResponse,
@@ -395,6 +396,7 @@ const initialState: AppState = {
     bracketMatching: true,
     closeBrackets: true,
     keybindings: 'default',
+    markdownPreviewMode: 'editor',
   },
   fileEditorSaveStatus: null,
   fileEditorWorktreeByProject: {},

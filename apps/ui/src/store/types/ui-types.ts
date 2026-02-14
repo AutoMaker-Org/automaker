@@ -109,6 +109,8 @@ export interface OpenTab {
 
 export type EditorKeybindings = 'default' | 'vim' | 'emacs';
 
+export type MarkdownPreviewMode = 'editor' | 'preview' | 'split';
+
 export interface FileEditorSettings {
   autoSaveEnabled: boolean;
   autoSaveIntervalMs: number; // milliseconds between auto-saves (default 30000 = 30s)
@@ -126,6 +128,7 @@ export interface FileEditorSettings {
   bracketMatching: boolean; // Highlight matching brackets (default true)
   closeBrackets: boolean; // Auto-close brackets (default true)
   keybindings: EditorKeybindings; // Keybinding mode (default 'default')
+  markdownPreviewMode: MarkdownPreviewMode; // Markdown preview mode (default 'editor')
 }
 
 // Keyboard Shortcuts - stored as strings like "K", "Shift+N", "Cmd+K"
