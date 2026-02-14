@@ -409,7 +409,26 @@ export class ClaudeUsageService {
           (cleanOutput.includes('Tips for getting started') && cleanOutput.includes('Claude')) ||
           // Detect model indicator which appears when REPL is ready
           (cleanOutput.includes('Opus') && cleanOutput.includes('Claude API')) ||
-          (cleanOutput.includes('Sonnet') && cleanOutput.includes('Claude API'));
+          (cleanOutput.includes('Sonnet') && cleanOutput.includes('Claude API')) ||
+          // Additional patterns for Claude CLI v2.x
+          // The prompt often shows model name followed by a cursor/prompt indicator
+          cleanOutput.includes('claude-') ||
+          cleanOutput.includes('Claude Code') ||
+          // Look for session start indicators (Claude v2.x)
+          cleanOutput.includes('session started') ||
+          cleanOutput.includes('Session started') ||
+          // Look for the compact prompt format (model name at prompt)
+          /claude-\d+-\d+-sonnet/i.test(cleanOutput) ||
+          /claude-\d+-\d+-opus/i.test(cleanOutput) ||
+          /opus-\d+/i.test(cleanOutput) ||
+          /sonnet-\d+/i.test(cleanOutput) ||
+          // Look for cost indicator which appears in the prompt
+          cleanOutput.includes('$0.') ||
+          // Look for common prompt elements in v2.x
+          cleanOutput.includes('Type a message') ||
+          cleanOutput.includes('Enter a message') ||
+          // Detect when waiting for input (common REPL state)
+          /\s+>\s*$/.test(cleanOutput);
 
         if (!hasSentCommand && isReplReady) {
           hasSentCommand = true;
