@@ -60,6 +60,8 @@ import {
   type ShortcutKey,
   type KeyboardShortcuts,
   type BackgroundSettings,
+  type UISliceState,
+  type UISliceActions,
   // Settings types
   type ApiKeys,
   // Chat types
@@ -109,16 +111,13 @@ import {
 } from './utils';
 
 // Import default values from modular defaults files
-import { defaultBackgroundSettings, defaultTerminalState, MAX_INIT_OUTPUT_LINES } from './defaults';
+import { defaultTerminalState, MAX_INIT_OUTPUT_LINES } from './defaults';
+
+// Import UI slice
+import { createUISlice, initialUIState } from './slices';
 
 // Import internal theme utils (not re-exported publicly)
-import {
-  getEffectiveFont,
-  saveThemeToStorage,
-  saveFontSansToStorage,
-  saveFontMonoToStorage,
-  persistEffectiveThemeForProject,
-} from './utils/theme-utils';
+import { persistEffectiveThemeForProject } from './utils/theme-utils';
 
 const logger = createLogger('AppStore');
 const OPENCODE_BEDROCK_PROVIDER_ID = 'amazon-bedrock';
@@ -146,6 +145,8 @@ export type {
   ShortcutKey,
   KeyboardShortcuts,
   BackgroundSettings,
+  UISliceState,
+  UISliceActions,
   ApiKeys,
   ImageAttachment,
   TextFileAttachment,
@@ -213,56 +214,72 @@ export { defaultBackgroundSettings, defaultTerminalState, MAX_INIT_OUTPUT_LINES 
 // - defaultTerminalState (./defaults/terminal-defaults.ts)
 
 const initialState: AppState = {
+  // Spread UI slice state first
+  ...initialUIState,
+
+  // Project state
   projects: [],
   currentProject: null,
   trashedProjects: [],
   projectHistory: [],
   projectHistoryIndex: -1,
-  currentView: 'welcome',
-  sidebarOpen: true,
-  sidebarStyle: 'unified',
-  collapsedNavSections: {},
-  mobileSidebarHidden: false,
+
+  // Agent Session state
   lastSelectedSessionByProject: {},
-  theme: getStoredTheme() || 'dark',
-  fontFamilySans: getStoredFontSans(),
-  fontFamilyMono: getStoredFontMono(),
+
+  // Features/Kanban
   features: [],
+
+  // App spec
   appSpec: '',
+
+  // IPC status
   ipcConnected: false,
+
+  // API Keys
   apiKeys: {
     anthropic: '',
     google: '',
     openai: '',
   },
+
+  // Chat Sessions
   chatSessions: [],
   currentChatSession: null,
-  chatHistoryOpen: false,
+
+  // Auto Mode
   autoModeByWorktree: {},
   autoModeActivityLog: [],
   maxConcurrency: DEFAULT_MAX_CONCURRENCY,
-  boardViewMode: 'kanban',
+
+  // Feature Default Settings
   defaultSkipTests: true,
   enableDependencyBlocking: true,
   skipVerificationInAutoMode: false,
   enableAiCommitMessages: true,
   planUseSelectedWorktreeBranch: true,
   addFeatureUseSelectedWorktreeBranch: false,
+
+  // Worktree Settings
   useWorktrees: true,
   currentWorktreeByProject: {},
   worktreesByProject: {},
-  keyboardShortcuts: DEFAULT_KEYBOARD_SHORTCUTS,
-  muteDoneSound: false,
-  disableSplashScreen: false,
+
+  // Server Settings
   serverLogLevel: 'info',
   enableRequestLogging: true,
-  showQueryDevtools: true,
+
+  // Model Settings
   enhancementModel: 'claude-sonnet',
   validationModel: 'claude-opus',
   phaseModels: DEFAULT_PHASE_MODELS,
   favoriteModels: [],
+
+  // Cursor CLI Settings
   enabledCursorModels: getAllCursorModelIds(),
   cursorDefaultModel: 'cursor-auto',
+
+  // Codex CLI Settings
   enabledCodexModels: getAllCodexModelIds(),
   codexDefaultModel: 'codex-gpt-5.2-codex',
   codexAutoLoadAgents: false,
@@ -270,6 +287,8 @@ const initialState: AppState = {
   codexApprovalPolicy: 'on-request',
   codexEnableWebSearch: false,
   codexEnableImages: false,
+
+  // OpenCode CLI Settings
   enabledOpencodeModels: getAllOpencodeModelIds(),
   opencodeDefaultModel: DEFAULT_OPENCODE_MODEL,
   dynamicOpencodeModels: [],
@@ -279,60 +298,100 @@ const initialState: AppState = {
   opencodeModelsError: null,
   opencodeModelsLastFetched: null,
   opencodeModelsLastFailedAt: null,
+
+  // Gemini CLI Settings
   enabledGeminiModels: getAllGeminiModelIds(),
   geminiDefaultModel: DEFAULT_GEMINI_MODEL,
+
+  // Copilot SDK Settings
   enabledCopilotModels: getAllCopilotModelIds(),
   copilotDefaultModel: DEFAULT_COPILOT_MODEL,
+
+  // Provider Settings
   disabledProviders: [],
+
+  // Claude Agent SDK Settings
   autoLoadClaudeMd: false,
   skipSandboxWarning: false,
+
+  // MCP Servers
   mcpServers: [],
+
+  // Editor Configuration
   defaultEditorCommand: null,
+
+  // Terminal Configuration
   defaultTerminalId: null,
+
+  // Skills Configuration
   enableSkills: true,
   skillsSources: ['user', 'project'] as Array<'user' | 'project'>,
+
+  // Subagents Configuration
   enableSubagents: true,
   subagentsSources: ['user', 'project'] as Array<'user' | 'project'>,
+
+  // Prompt Customization
   promptCustomization: {},
+
+  // Event Hooks
   eventHooks: [],
+
+  // Claude-Compatible Providers
   claudeCompatibleProviders: [],
   claudeApiProfiles: [],
   activeClaudeApiProfileId: null,
+
+  // Project Analysis
   projectAnalysis: null,
   isAnalyzing: false,
-  boardBackgroundByProject: {},
-  previewTheme: null,
+
+  // Terminal state
   terminalState: defaultTerminalState,
   terminalLayoutByProject: {},
+
+  // Spec Creation
   specCreatingForProject: null,
+
+  // Planning
   defaultPlanningMode: 'skip' as PlanningMode,
   defaultRequirePlanApproval: false,
   defaultFeatureModel: DEFAULT_GLOBAL_SETTINGS.defaultFeatureModel,
   pendingPlanApproval: null,
+
+  // Claude Usage Tracking
   claudeRefreshInterval: 60,
   claudeUsage: null,
   claudeUsageLastUpdated: null,
+
+  // Codex Usage Tracking
   codexUsage: null,
   codexUsageLastUpdated: null,
+
+  // Codex Models
   codexModels: [],
   codexModelsLoading: false,
   codexModelsError: null,
   codexModelsLastFetched: null,
   codexModelsLastFailedAt: null,
+
+  // Pipeline Configuration
   pipelineConfigByProject: {},
-  worktreePanelVisibleByProject: {},
-  showInitScriptIndicatorByProject: {},
+
+  // Project-specific Worktree Settings
   defaultDeleteBranchByProject: {},
-  autoDismissInitScriptIndicatorByProject: {},
   useWorktreesByProject: {},
-  worktreePanelCollapsed: false,
-  lastProjectDir: '',
-  recentFolders: [],
+
+  // Init Script State
   initScriptState: {},
 };
 
-export const useAppStore = create<AppState & AppActions>()((set, get) => ({
+export const useAppStore = create<AppState & AppActions>()((set, get, store) => ({
+  // Spread initial non-UI state
   ...initialState,
+
+  // Spread UI slice (includes UI state and actions)
+  ...createUISlice(set, get, store),
 
   // Project actions
   setProjects: (projects) => set({ projects }),
@@ -598,28 +657,9 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
     saveProjects(get().projects);
   },
 
-  // View actions
-  setCurrentView: (view) => set({ currentView: view }),
-  toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
-  setSidebarOpen: (open) => set({ sidebarOpen: open }),
-  setSidebarStyle: (style) => set({ sidebarStyle: style }),
-  setCollapsedNavSections: (sections) => set({ collapsedNavSections: sections }),
-  toggleNavSection: (sectionLabel) =>
-    set((state) => ({
-      collapsedNavSections: {
-        ...state.collapsedNavSections,
-        [sectionLabel]: !state.collapsedNavSections[sectionLabel],
-      },
-    })),
-  toggleMobileSidebarHidden: () =>
-    set((state) => ({ mobileSidebarHidden: !state.mobileSidebarHidden })),
-  setMobileSidebarHidden: (hidden) => set({ mobileSidebarHidden: hidden }),
+  // View actions - provided by UI slice
 
-  // Theme actions
-  setTheme: (theme) => {
-    set({ theme });
-    saveThemeToStorage(theme);
-  },
+  // Theme actions (setTheme, getEffectiveTheme, setPreviewTheme provided by UI slice)
   setProjectTheme: (projectId: string, theme: ThemeMode | null) => {
     set((state) => ({
       projects: state.projects.map((p) =>
@@ -644,34 +684,17 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
     // Persist to storage
     saveProjects(get().projects);
   },
-  getEffectiveTheme: () => {
-    const state = get();
-    // If there's a preview theme, use it (for hover preview)
-    if (state.previewTheme) return state.previewTheme;
-    // Otherwise, use project theme if set, or fall back to global theme
-    const projectTheme = state.currentProject?.theme as ThemeMode | undefined;
-    return projectTheme ?? state.theme;
-  },
-  setPreviewTheme: (theme) => set({ previewTheme: theme }),
 
-  // Font actions
-  setFontSans: (fontFamily) => {
-    set({ fontFamilySans: fontFamily });
-    saveFontSansToStorage(fontFamily);
-  },
-  setFontMono: (fontFamily) => {
-    set({ fontFamilyMono: fontFamily });
-    saveFontMonoToStorage(fontFamily);
-  },
+  // Font actions (setFontSans, setFontMono, getEffectiveFontSans, getEffectiveFontMono provided by UI slice)
   setProjectFontSans: (projectId: string, fontFamily: string | null) => {
     set((state) => ({
       projects: state.projects.map((p) =>
-        p.id === projectId ? { ...p, fontSans: fontFamily ?? undefined } : p
+        p.id === projectId ? { ...p, fontFamilySans: fontFamily ?? undefined } : p
       ),
       // Also update currentProject if it's the one being changed
       currentProject:
         state.currentProject?.id === projectId
-          ? { ...state.currentProject, fontSans: fontFamily ?? undefined }
+          ? { ...state.currentProject, fontFamilySans: fontFamily ?? undefined }
           : state.currentProject,
     }));
 
@@ -681,27 +704,17 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
   setProjectFontMono: (projectId: string, fontFamily: string | null) => {
     set((state) => ({
       projects: state.projects.map((p) =>
-        p.id === projectId ? { ...p, fontMono: fontFamily ?? undefined } : p
+        p.id === projectId ? { ...p, fontFamilyMono: fontFamily ?? undefined } : p
       ),
       // Also update currentProject if it's the one being changed
       currentProject:
         state.currentProject?.id === projectId
-          ? { ...state.currentProject, fontMono: fontFamily ?? undefined }
+          ? { ...state.currentProject, fontFamilyMono: fontFamily ?? undefined }
           : state.currentProject,
     }));
 
     // Persist to storage
     saveProjects(get().projects);
-  },
-  getEffectiveFontSans: () => {
-    const state = get();
-    const projectFont = state.currentProject?.fontFamilySans;
-    return getEffectiveFont(projectFont, state.fontFamilySans, UI_SANS_FONT_OPTIONS);
-  },
-  getEffectiveFontMono: () => {
-    const state = get();
-    const projectFont = state.currentProject?.fontFamilyMono;
-    return getEffectiveFont(projectFont, state.fontFamilyMono, UI_MONO_FONT_OPTIONS);
   },
 
   // Claude API Profile actions (per-project override)
@@ -886,8 +899,7 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
       currentChatSession:
         state.currentChatSession?.id === sessionId ? null : state.currentChatSession,
     })),
-  setChatHistoryOpen: (open) => set({ chatHistoryOpen: open }),
-  toggleChatHistory: () => set((state) => ({ chatHistoryOpen: !state.chatHistoryOpen })),
+  // setChatHistoryOpen and toggleChatHistory - provided by UI slice
 
   // Auto Mode actions (per-worktree)
   getWorktreeKey: (projectId: string, branchName: string | null) =>
@@ -1018,8 +1030,7 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
     }));
   },
 
-  // Kanban Card Settings actions
-  setBoardViewMode: (mode) => set({ boardViewMode: mode }),
+  // Kanban Card Settings actions - setBoardViewMode provided by UI slice
 
   // Feature Default Settings actions
   setDefaultSkipTests: (skip) => set({ defaultSkipTests: skip }),
@@ -1094,29 +1105,17 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
     return mainWorktree?.branch ?? null;
   },
 
-  // Keyboard Shortcuts actions
-  setKeyboardShortcut: (key, value) =>
-    set((state) => ({
-      keyboardShortcuts: { ...state.keyboardShortcuts, [key]: value },
-    })),
-  setKeyboardShortcuts: (shortcuts) =>
-    set((state) => ({
-      keyboardShortcuts: { ...state.keyboardShortcuts, ...shortcuts },
-    })),
-  resetKeyboardShortcuts: () => set({ keyboardShortcuts: DEFAULT_KEYBOARD_SHORTCUTS }),
+  // Keyboard Shortcuts actions - provided by UI slice
 
-  // Audio Settings actions
-  setMuteDoneSound: (muted) => set({ muteDoneSound: muted }),
+  // Audio Settings actions - setMuteDoneSound provided by UI slice
 
-  // Splash Screen actions
-  setDisableSplashScreen: (disabled) => set({ disableSplashScreen: disabled }),
+  // Splash Screen actions - setDisableSplashScreen provided by UI slice
 
   // Server Log Level actions
   setServerLogLevel: (level) => set({ serverLogLevel: level }),
   setEnableRequestLogging: (enabled) => set({ enableRequestLogging: enabled }),
 
-  // Developer Tools actions
-  setShowQueryDevtools: (show) => set({ showQueryDevtools: show }),
+  // Developer Tools actions - setShowQueryDevtools provided by UI slice
 
   // Enhancement Model actions
   setEnhancementModel: (model) => set({ enhancementModel: model }),
@@ -1486,96 +1485,7 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
     })),
   getLastSelectedSession: (projectPath) => get().lastSelectedSessionByProject[projectPath] ?? null,
 
-  // Board Background actions
-  setBoardBackground: (projectPath, imagePath) =>
-    set((state) => ({
-      boardBackgroundByProject: {
-        ...state.boardBackgroundByProject,
-        [projectPath]: {
-          ...(state.boardBackgroundByProject[projectPath] ?? defaultBackgroundSettings),
-          imagePath,
-          imageVersion: Date.now(), // Bust cache on image change
-        },
-      },
-    })),
-  setCardOpacity: (projectPath, opacity) =>
-    set((state) => ({
-      boardBackgroundByProject: {
-        ...state.boardBackgroundByProject,
-        [projectPath]: {
-          ...(state.boardBackgroundByProject[projectPath] ?? defaultBackgroundSettings),
-          cardOpacity: opacity,
-        },
-      },
-    })),
-  setColumnOpacity: (projectPath, opacity) =>
-    set((state) => ({
-      boardBackgroundByProject: {
-        ...state.boardBackgroundByProject,
-        [projectPath]: {
-          ...(state.boardBackgroundByProject[projectPath] ?? defaultBackgroundSettings),
-          columnOpacity: opacity,
-        },
-      },
-    })),
-  setColumnBorderEnabled: (projectPath, enabled) =>
-    set((state) => ({
-      boardBackgroundByProject: {
-        ...state.boardBackgroundByProject,
-        [projectPath]: {
-          ...(state.boardBackgroundByProject[projectPath] ?? defaultBackgroundSettings),
-          columnBorderEnabled: enabled,
-        },
-      },
-    })),
-  getBoardBackground: (projectPath) =>
-    get().boardBackgroundByProject[projectPath] ?? defaultBackgroundSettings,
-  setCardGlassmorphism: (projectPath, enabled) =>
-    set((state) => ({
-      boardBackgroundByProject: {
-        ...state.boardBackgroundByProject,
-        [projectPath]: {
-          ...(state.boardBackgroundByProject[projectPath] ?? defaultBackgroundSettings),
-          cardGlassmorphism: enabled,
-        },
-      },
-    })),
-  setCardBorderEnabled: (projectPath, enabled) =>
-    set((state) => ({
-      boardBackgroundByProject: {
-        ...state.boardBackgroundByProject,
-        [projectPath]: {
-          ...(state.boardBackgroundByProject[projectPath] ?? defaultBackgroundSettings),
-          cardBorderEnabled: enabled,
-        },
-      },
-    })),
-  setCardBorderOpacity: (projectPath, opacity) =>
-    set((state) => ({
-      boardBackgroundByProject: {
-        ...state.boardBackgroundByProject,
-        [projectPath]: {
-          ...(state.boardBackgroundByProject[projectPath] ?? defaultBackgroundSettings),
-          cardBorderOpacity: opacity,
-        },
-      },
-    })),
-  setHideScrollbar: (projectPath, hide) =>
-    set((state) => ({
-      boardBackgroundByProject: {
-        ...state.boardBackgroundByProject,
-        [projectPath]: {
-          ...(state.boardBackgroundByProject[projectPath] ?? defaultBackgroundSettings),
-          hideScrollbar: hide,
-        },
-      },
-    })),
-  clearBoardBackground: (projectPath) =>
-    set((state) => {
-      const newBackgrounds = { ...state.boardBackgroundByProject };
-      delete newBackgrounds[projectPath];
-      return { boardBackgroundByProject: newBackgrounds };
-    }),
+  // Board Background actions - provided by UI slice
 
   // Terminal actions
   setTerminalUnlocked: (unlocked, token) =>
@@ -2325,27 +2235,9 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
       };
     }),
 
-  // Worktree Panel Visibility actions
-  setWorktreePanelVisible: (projectPath, visible) =>
-    set((state) => ({
-      worktreePanelVisibleByProject: {
-        ...state.worktreePanelVisibleByProject,
-        [projectPath]: visible,
-      },
-    })),
-  getWorktreePanelVisible: (projectPath) =>
-    get().worktreePanelVisibleByProject[projectPath] ?? true,
+  // Worktree Panel Visibility actions - provided by UI slice
 
-  // Init Script Indicator Visibility actions
-  setShowInitScriptIndicator: (projectPath, visible) =>
-    set((state) => ({
-      showInitScriptIndicatorByProject: {
-        ...state.showInitScriptIndicatorByProject,
-        [projectPath]: visible,
-      },
-    })),
-  getShowInitScriptIndicator: (projectPath) =>
-    get().showInitScriptIndicatorByProject[projectPath] ?? true,
+  // Init Script Indicator Visibility actions - provided by UI slice
 
   // Default Delete Branch actions
   setDefaultDeleteBranch: (projectPath, deleteBranch) =>
@@ -2357,16 +2249,7 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
     })),
   getDefaultDeleteBranch: (projectPath) => get().defaultDeleteBranchByProject[projectPath] ?? false,
 
-  // Auto-dismiss Init Script Indicator actions
-  setAutoDismissInitScriptIndicator: (projectPath, autoDismiss) =>
-    set((state) => ({
-      autoDismissInitScriptIndicatorByProject: {
-        ...state.autoDismissInitScriptIndicatorByProject,
-        [projectPath]: autoDismiss,
-      },
-    })),
-  getAutoDismissInitScriptIndicator: (projectPath) =>
-    get().autoDismissInitScriptIndicatorByProject[projectPath] ?? true,
+  // Auto-dismiss Init Script Indicator actions - provided by UI slice
 
   // Use Worktrees Override actions
   setProjectUseWorktrees: (projectPath, useWorktrees) =>
@@ -2382,15 +2265,7 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
     return projectOverride !== undefined ? projectOverride : get().useWorktrees;
   },
 
-  // UI State actions
-  setWorktreePanelCollapsed: (collapsed) => set({ worktreePanelCollapsed: collapsed }),
-  setLastProjectDir: (dir) => set({ lastProjectDir: dir }),
-  setRecentFolders: (folders) => set({ recentFolders: folders }),
-  addRecentFolder: (folder) =>
-    set((state) => {
-      const filtered = state.recentFolders.filter((f) => f !== folder);
-      return { recentFolders: [folder, ...filtered].slice(0, 10) };
-    }),
+  // UI State actions - provided by UI slice
 
   // Claude Usage Tracking actions
   setClaudeRefreshInterval: (interval) => set({ claudeRefreshInterval: interval }),
