@@ -6,6 +6,7 @@ import { getElectronAPI } from '@/lib/electron';
 import { useAppStore } from '@/store/app-store';
 import { AnthropicIcon, OpenAIIcon, ZaiIcon, GeminiIcon } from '@/components/ui/provider-icon';
 import type { GeminiUsage } from '@/store/app-store';
+import { getExpectedWeeklyPacePercentage, getPaceStatusLabel } from '@/store/utils/usage-utils';
 
 interface MobileUsageBarProps {
   showClaudeUsage: boolean;
@@ -60,13 +61,17 @@ function UsageBar({
   isStale,
   details,
   resetText,
+  pacePercentage,
 }: {
   label: string;
   percentage: number;
   isStale: boolean;
   details?: string;
   resetText?: string;
+  pacePercentage?: number | null;
 }) {
+  const paceLabel = pacePercentage != null ? getPaceStatusLabel(percentage, pacePercentage) : null;
+
   return (
     <div className="mt-1.5 first:mt-0">
       <div className="flex items-center justify-between mb-0.5">
@@ -88,7 +93,7 @@ function UsageBar({
       </div>
       <div
         className={cn(
-          'h-1 w-full bg-muted-foreground/10 rounded-full overflow-hidden transition-opacity',
+          'relative h-1 w-full bg-muted-foreground/10 rounded-full overflow-hidden transition-opacity',
           isStale && 'opacity-60'
         )}
       >
@@ -96,6 +101,13 @@ function UsageBar({
           className={cn('h-full transition-all duration-500', getProgressBarColor(percentage))}
           style={{ width: `${Math.min(percentage, 100)}%` }}
         />
+        {pacePercentage != null && pacePercentage > 0 && pacePercentage < 100 && (
+          <div
+            className="absolute top-0 h-full w-0.5 bg-foreground/60"
+            style={{ left: `${pacePercentage}%` }}
+            title={`Expected: ${Math.round(pacePercentage)}%`}
+          />
+        )}
       </div>
       {(details || resetText) && (
         <div className="flex items-center justify-between mt-0.5">
@@ -104,6 +116,16 @@ function UsageBar({
             <span className="text-[9px] text-muted-foreground ml-auto">{resetText}</span>
           )}
         </div>
+      )}
+      {paceLabel && (
+        <p
+          className={cn(
+            'text-[9px] mt-0.5',
+            percentage > (pacePercentage ?? 0) ? 'text-orange-500' : 'text-green-500'
+          )}
+        >
+          {paceLabel}
+        </p>
       )}
     </div>
   );
@@ -295,6 +317,7 @@ export function MobileUsageBar({
                 label="Weekly"
                 percentage={claudeUsage.weeklyPercentage}
                 isStale={isClaudeStale}
+                pacePercentage={getExpectedWeeklyPacePercentage(claudeUsage.weeklyResetTime)}
               />
             </>
           ) : (

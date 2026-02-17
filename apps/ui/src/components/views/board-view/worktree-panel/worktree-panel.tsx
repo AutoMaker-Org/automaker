@@ -112,6 +112,8 @@ export function WorktreePanel({
   // Use separate selectors to avoid creating new object references on each render
   const autoModeByWorktree = useAppStore((state) => state.autoModeByWorktree);
   const currentProject = useAppStore((state) => state.currentProject);
+  const setAutoModeRunning = useAppStore((state) => state.setAutoModeRunning);
+  const getMaxConcurrencyForWorktree = useAppStore((state) => state.getMaxConcurrencyForWorktree);
 
   // Helper to generate worktree key for auto-mode (inlined to avoid selector issues)
   const getAutoModeWorktreeKey = useCallback(
@@ -137,8 +139,6 @@ export function WorktreePanel({
     async (worktree: WorktreeInfo) => {
       if (!currentProject) return;
 
-      // Import the useAutoMode to get start/stop functions
-      // Since useAutoMode is a hook, we'll use the API client directly
       const api = getHttpApiClient();
       const branchName = worktree.isMain ? null : worktree.branch;
       const isRunning = isAutoModeRunningForWorktree(worktree);
@@ -147,14 +147,17 @@ export function WorktreePanel({
         if (isRunning) {
           const result = await api.autoMode.stop(projectPath, branchName);
           if (result.success) {
+            setAutoModeRunning(currentProject.id, branchName, false);
             const desc = branchName ? `worktree ${branchName}` : 'main branch';
             toast.success(`Auto Mode stopped for ${desc}`);
           } else {
             toast.error(result.error || 'Failed to stop Auto Mode');
           }
         } else {
-          const result = await api.autoMode.start(projectPath, branchName);
+          const maxConcurrency = getMaxConcurrencyForWorktree(currentProject.id, branchName);
+          const result = await api.autoMode.start(projectPath, branchName, maxConcurrency);
           if (result.success) {
+            setAutoModeRunning(currentProject.id, branchName, true, maxConcurrency);
             const desc = branchName ? `worktree ${branchName}` : 'main branch';
             toast.success(`Auto Mode started for ${desc}`);
           } else {
@@ -166,7 +169,13 @@ export function WorktreePanel({
         console.error('Auto mode toggle error:', error);
       }
     },
-    [currentProject, projectPath, isAutoModeRunningForWorktree]
+    [
+      currentProject,
+      projectPath,
+      isAutoModeRunningForWorktree,
+      setAutoModeRunning,
+      getMaxConcurrencyForWorktree,
+    ]
   );
 
   // Check if init script exists for the project using React Query

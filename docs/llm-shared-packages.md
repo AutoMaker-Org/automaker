@@ -142,7 +142,7 @@ const modelId = resolveModelString('sonnet'); // → 'claude-sonnet-4-20250514'
 
 - `haiku` → `claude-haiku-4-5` (fast, simple tasks)
 - `sonnet` → `claude-sonnet-4-20250514` (balanced, recommended)
-- `opus` → `claude-opus-4-5-20251101` (maximum capability)
+- `opus` → `claude-opus-4-6` (maximum capability)
 
 ### @automaker/dependency-resolver
 

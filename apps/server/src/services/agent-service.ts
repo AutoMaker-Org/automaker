@@ -325,8 +325,9 @@ export class AgentService {
       const effectiveThinkingLevel = thinkingLevel ?? session.thinkingLevel;
       const effectiveReasoningEffort = reasoningEffort ?? session.reasoningEffort;
 
-      // When using a provider model, use the resolved Claude model (from mapsToClaudeModel)
-      // e.g., "GLM-4.5-Air" -> "claude-haiku-4-5"
+      // When using a custom provider (GLM, MiniMax), use resolved Claude model for SDK config
+      // (thinking level budgets, allowedTools) but we MUST pass the provider's model ID
+      // (e.g. "GLM-4.7") to the API - not "claude-sonnet-4-20250514" which causes "model not found"
       const modelForSdk = providerResolvedModel || model;
       const sessionModelForSdk = providerResolvedModel ? undefined : session.model;
 
@@ -387,10 +388,18 @@ export class AgentService {
       }
 
       // Get provider for this model (with prefix)
-      const provider = ProviderFactory.getProviderForModel(effectiveModel);
+      // When using custom provider (GLM, MiniMax), requestedModel routes to Claude provider
+      const modelForProvider = claudeCompatibleProvider
+        ? (requestedModel ?? effectiveModel)
+        : effectiveModel;
+      const provider = ProviderFactory.getProviderForModel(modelForProvider);
 
       // Strip provider prefix - providers should receive bare model IDs
-      const bareModel = stripProviderPrefix(effectiveModel);
+      // CRITICAL: For custom providers (GLM, MiniMax), pass the provider's model ID (e.g. "GLM-4.7")
+      // to the API, NOT the resolved Claude model - otherwise we get "model not found"
+      const bareModel: string = claudeCompatibleProvider
+        ? (requestedModel ?? effectiveModel)
+        : stripProviderPrefix(effectiveModel);
 
       // Build options for provider
       const options: ExecuteOptions = {

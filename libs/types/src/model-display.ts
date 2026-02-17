@@ -73,9 +73,17 @@ export const CLAUDE_MODELS: ModelOption[] = [
  */
 export const CODEX_MODELS: (ModelOption & { hasReasoning?: boolean })[] = [
   {
+    id: CODEX_MODEL_MAP.gpt53Codex,
+    label: 'GPT-5.3-Codex',
+    description: 'Latest frontier agentic coding model.',
+    badge: 'Premium',
+    provider: 'codex',
+    hasReasoning: true,
+  },
+  {
     id: CODEX_MODEL_MAP.gpt52Codex,
     label: 'GPT-5.2-Codex',
-    description: 'Most advanced agentic coding model for complex software engineering.',
+    description: 'Frontier agentic coding model.',
     badge: 'Premium',
     provider: 'codex',
     hasReasoning: true,
@@ -83,7 +91,7 @@ export const CODEX_MODELS: (ModelOption & { hasReasoning?: boolean })[] = [
   {
     id: CODEX_MODEL_MAP.gpt51CodexMax,
     label: 'GPT-5.1-Codex-Max',
-    description: 'Optimized for long-horizon, agentic coding tasks in Codex.',
+    description: 'Codex-optimized flagship for deep and fast reasoning.',
     badge: 'Premium',
     provider: 'codex',
     hasReasoning: true,
@@ -91,7 +99,7 @@ export const CODEX_MODELS: (ModelOption & { hasReasoning?: boolean })[] = [
   {
     id: CODEX_MODEL_MAP.gpt51CodexMini,
     label: 'GPT-5.1-Codex-Mini',
-    description: 'Smaller, more cost-effective version for faster workflows.',
+    description: 'Optimized for codex. Cheaper, faster, but less capable.',
     badge: 'Speed',
     provider: 'codex',
     hasReasoning: false,
@@ -99,7 +107,7 @@ export const CODEX_MODELS: (ModelOption & { hasReasoning?: boolean })[] = [
   {
     id: CODEX_MODEL_MAP.gpt52,
     label: 'GPT-5.2',
-    description: 'Best general agentic model for tasks across industries and domains.',
+    description: 'Latest frontier model with improvements across knowledge, reasoning and coding.',
     badge: 'Balanced',
     provider: 'codex',
     hasReasoning: true,
@@ -141,6 +149,7 @@ export const THINKING_LEVELS: ThinkingLevelOption[] = [
   { id: 'medium', label: 'Medium' },
   { id: 'high', label: 'High' },
   { id: 'ultrathink', label: 'Ultrathink' },
+  { id: 'adaptive', label: 'Adaptive' },
 ];
 
 /**
@@ -154,6 +163,7 @@ export const THINKING_LEVEL_LABELS: Record<ThinkingLevel, string> = {
   medium: 'Med',
   high: 'High',
   ultrathink: 'Ultra',
+  adaptive: 'Adaptive',
 };
 
 /**
@@ -211,6 +221,7 @@ export function getModelDisplayName(model: ModelAlias | string): string {
     haiku: 'Claude Haiku',
     sonnet: 'Claude Sonnet',
     opus: 'Claude Opus',
+    [CODEX_MODEL_MAP.gpt53Codex]: 'GPT-5.3-Codex',
     [CODEX_MODEL_MAP.gpt52Codex]: 'GPT-5.2-Codex',
     [CODEX_MODEL_MAP.gpt51CodexMax]: 'GPT-5.1-Codex-Max',
     [CODEX_MODEL_MAP.gpt51CodexMini]: 'GPT-5.1-Codex-Mini',

@@ -3,13 +3,13 @@
  */
 
 import type { Request, Response } from 'express';
-import type { AutoModeService } from '../../../services/auto-mode-service.js';
+import type { AutoModeServiceCompat } from '../../../services/auto-mode/index.js';
 import { createLogger } from '@automaker/utils';
 import { getErrorMessage, logError } from '../common.js';
 
 const logger = createLogger('AutoMode');
 
-export function createFollowUpFeatureHandler(autoModeService: AutoModeService) {
+export function createFollowUpFeatureHandler(autoModeService: AutoModeServiceCompat) {
   return async (req: Request, res: Response): Promise<void> => {
     try {
       const { projectPath, featureId, prompt, imagePaths, useWorktrees } = req.body as {
@@ -30,16 +30,12 @@ export function createFollowUpFeatureHandler(autoModeService: AutoModeService) {
 
       // Start follow-up in background
       // followUpFeature derives workDir from feature.branchName
+      // Default to false to match run-feature/resume-feature behavior.
+      // Worktrees should only be used when explicitly enabled by the user.
       autoModeService
-        // Default to false to match run-feature/resume-feature behavior.
-        // Worktrees should only be used when explicitly enabled by the user.
         .followUpFeature(projectPath, featureId, prompt, imagePaths, useWorktrees ?? false)
         .catch((error) => {
           logger.error(`[AutoMode] Follow up feature ${featureId} error:`, error);
-        })
-        .finally(() => {
-          // Release the starting slot when follow-up completes (success or error)
-          // Note: The feature should be in runningFeatures by this point
         });
 
       res.json({ success: true });

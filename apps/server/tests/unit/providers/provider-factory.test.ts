@@ -54,8 +54,8 @@ describe('provider-factory.ts', () => {
 
   describe('getProviderForModel', () => {
     describe('Claude models (claude-* prefix)', () => {
-      it('should return ClaudeProvider for claude-opus-4-5-20251101', () => {
-        const provider = ProviderFactory.getProviderForModel('claude-opus-4-5-20251101');
+      it('should return ClaudeProvider for claude-opus-4-6', () => {
+        const provider = ProviderFactory.getProviderForModel('claude-opus-4-6');
         expect(provider).toBeInstanceOf(ClaudeProvider);
       });
 
@@ -70,7 +70,7 @@ describe('provider-factory.ts', () => {
       });
 
       it('should be case-insensitive for claude models', () => {
-        const provider = ProviderFactory.getProviderForModel('CLAUDE-OPUS-4-5-20251101');
+        const provider = ProviderFactory.getProviderForModel('CLAUDE-OPUS-4-6');
         expect(provider).toBeInstanceOf(ClaudeProvider);
       });
     });

@@ -1391,6 +1391,7 @@ export class HttpApiClient implements ElectronAPI {
     ): Promise<{
       success: boolean;
       authenticated: boolean;
+      authType?: 'oauth' | 'api_key' | 'cli';
       error?: string;
     }> => this.post('/api/setup/verify-claude-auth', { authMethod, apiKey }),
 

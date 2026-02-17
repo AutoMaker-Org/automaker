@@ -177,6 +177,66 @@ describe('claude-usage-service.ts', () => {
       // BEL is stripped, newlines and tabs preserved
       expect(result).toBe('Line 1\nLine 2\tTabbed with bell');
     });
+
+    it('should convert cursor forward (ESC[nC) to spaces', () => {
+      const service = new ClaudeUsageService();
+      // Claude CLI TUI uses ESC[1C instead of space between words
+      const input = 'Current\x1B[1Csession';
+      // @ts-expect-error - accessing private method for testing
+      const result = service.stripAnsiCodes(input);
+
+      expect(result).toBe('Current session');
+    });
+
+    it('should handle multi-character cursor forward sequences', () => {
+      const service = new ClaudeUsageService();
+      // ESC[3C = move cursor forward 3 positions = 3 spaces
+      const input = 'Hello\x1B[3Cworld';
+      // @ts-expect-error - accessing private method for testing
+      const result = service.stripAnsiCodes(input);
+
+      expect(result).toBe('Hello   world');
+    });
+
+    it('should handle real Claude CLI TUI output with cursor movement codes', () => {
+      const service = new ClaudeUsageService();
+      // Simulates actual Claude CLI /usage output where words are separated by ESC[1C
+      const input =
+        'Current\x1B[1Cweek\x1B[1C(all\x1B[1Cmodels)\n' +
+        '\x1B[32m█████████████████████████▌\x1B[0m\x1B[1C51%\x1B[1Cused\n' +
+        'Resets\x1B[1CFeb\x1B[1C19\x1B[1Cat\x1B[1C3pm\x1B[1C(America/Los_Angeles)';
+      // @ts-expect-error - accessing private method for testing
+      const result = service.stripAnsiCodes(input);
+
+      expect(result).toContain('Current week (all models)');
+      expect(result).toContain('51% used');
+      expect(result).toContain('Resets Feb 19 at 3pm (America/Los_Angeles)');
+    });
+
+    it('should parse usage output with cursor movement codes between words', () => {
+      const service = new ClaudeUsageService();
+      // Simulates the full /usage TUI output with ESC[1C between every word
+      const output =
+        'Current\x1B[1Csession\n' +
+        '\x1B[32m█████████████▌\x1B[0m\x1B[1C27%\x1B[1Cused\n' +
+        'Resets\x1B[1C9pm\x1B[1C(America/Los_Angeles)\n' +
+        '\n' +
+        'Current\x1B[1Cweek\x1B[1C(all\x1B[1Cmodels)\n' +
+        '\x1B[32m█████████████████████████▌\x1B[0m\x1B[1C51%\x1B[1Cused\n' +
+        'Resets\x1B[1CFeb\x1B[1C19\x1B[1Cat\x1B[1C3pm\x1B[1C(America/Los_Angeles)\n' +
+        '\n' +
+        'Current\x1B[1Cweek\x1B[1C(Sonnet\x1B[1Conly)\n' +
+        '\x1B[32m██▌\x1B[0m\x1B[1C5%\x1B[1Cused\n' +
+        'Resets\x1B[1CFeb\x1B[1C19\x1B[1Cat\x1B[1C11pm\x1B[1C(America/Los_Angeles)';
+      // @ts-expect-error - accessing private method for testing
+      const result = service.parseUsageOutput(output);
+
+      expect(result.sessionPercentage).toBe(27);
+      expect(result.weeklyPercentage).toBe(51);
+      expect(result.sonnetWeeklyPercentage).toBe(5);
+      expect(result.weeklyResetText).toContain('Resets Feb 19 at 3pm');
+      expect(result.weeklyResetText).not.toContain('America/Los_Angeles');
+    });
   });
 
   describe('parseResetTime', () => {

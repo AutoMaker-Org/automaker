@@ -491,5 +491,29 @@ describe('sdk-options.ts', () => {
         expect(options.maxThinkingTokens).toBeUndefined();
       });
     });
+
+    describe('adaptive thinking for Opus 4.6', () => {
+      it('should not set maxThinkingTokens for adaptive thinking (model decides)', async () => {
+        const { createAutoModeOptions } = await import('@/lib/sdk-options.js');
+
+        const options = createAutoModeOptions({
+          cwd: '/test/path',
+          thinkingLevel: 'adaptive',
+        });
+
+        expect(options.maxThinkingTokens).toBeUndefined();
+      });
+
+      it('should not include maxThinkingTokens when thinkingLevel is "none"', async () => {
+        const { createAutoModeOptions } = await import('@/lib/sdk-options.js');
+
+        const options = createAutoModeOptions({
+          cwd: '/test/path',
+          thinkingLevel: 'none',
+        });
+
+        expect(options.maxThinkingTokens).toBeUndefined();
+      });
+    });
   });
 });

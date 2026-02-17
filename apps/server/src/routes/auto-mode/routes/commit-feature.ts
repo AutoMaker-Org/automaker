@@ -3,10 +3,10 @@
  */
 
 import type { Request, Response } from 'express';
-import type { AutoModeService } from '../../../services/auto-mode-service.js';
+import type { AutoModeServiceCompat } from '../../../services/auto-mode/index.js';
 import { getErrorMessage, logError } from '../common.js';
 
-export function createCommitFeatureHandler(autoModeService: AutoModeService) {
+export function createCommitFeatureHandler(autoModeService: AutoModeServiceCompat) {
   return async (req: Request, res: Response): Promise<void> => {
     try {
       const { projectPath, featureId, worktreePath } = req.body as {

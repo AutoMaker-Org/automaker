@@ -253,11 +253,27 @@ function buildMcpOptions(config: CreateSdkOptionsConfig): McpOptions {
 /**
  * Build thinking options for SDK configuration.
  * Converts ThinkingLevel to maxThinkingTokens for the Claude SDK.
+ * For adaptive thinking (Opus 4.6), omits maxThinkingTokens to let the model
+ * decide its own reasoning depth.
  *
  * @param thinkingLevel - The thinking level to convert
- * @returns Object with maxThinkingTokens if thinking is enabled
+ * @returns Object with maxThinkingTokens if thinking is enabled with a budget
  */
 function buildThinkingOptions(thinkingLevel?: ThinkingLevel): Partial<Options> {
+  if (!thinkingLevel || thinkingLevel === 'none') {
+    return {};
+  }
+
+  // Adaptive thinking (Opus 4.6): don't set maxThinkingTokens
+  // The model will use adaptive thinking by default
+  if (thinkingLevel === 'adaptive') {
+    logger.debug(
+      `buildThinkingOptions: thinkingLevel="adaptive" -> no maxThinkingTokens (model decides)`
+    );
+    return {};
+  }
+
+  // Manual budget-based thinking for Haiku/Sonnet
   const maxThinkingTokens = getThinkingTokenBudget(thinkingLevel);
   logger.debug(
     `buildThinkingOptions: thinkingLevel="${thinkingLevel}" -> maxThinkingTokens=${maxThinkingTokens}`

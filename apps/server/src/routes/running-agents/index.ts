@@ -3,10 +3,10 @@
  */
 
 import { Router } from 'express';
-import type { AutoModeService } from '../../services/auto-mode-service.js';
+import type { AutoModeServiceCompat } from '../../services/auto-mode/index.js';
 import { createIndexHandler } from './routes/index.js';
 
-export function createRunningAgentsRoutes(autoModeService: AutoModeService): Router {
+export function createRunningAgentsRoutes(autoModeService: AutoModeServiceCompat): Router {
   const router = Router();
 
   router.get('/', createIndexHandler(autoModeService));

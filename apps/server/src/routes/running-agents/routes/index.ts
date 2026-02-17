@@ -3,16 +3,17 @@
  */
 
 import type { Request, Response } from 'express';
-import type { AutoModeService } from '../../../services/auto-mode-service.js';
+import type { AutoModeServiceCompat } from '../../../services/auto-mode/index.js';
 import { getBacklogPlanStatus, getRunningDetails } from '../../backlog-plan/common.js';
 import { getAllRunningGenerations } from '../../app-spec/common.js';
 import path from 'path';
 import { getErrorMessage, logError } from '../common.js';
 
-export function createIndexHandler(autoModeService: AutoModeService) {
+export function createIndexHandler(autoModeService: AutoModeServiceCompat) {
   return async (_req: Request, res: Response): Promise<void> => {
     try {
       const runningAgents = [...(await autoModeService.getRunningAgents())];
+
       const backlogPlanStatus = getBacklogPlanStatus();
       const backlogPlanDetails = getRunningDetails();
 

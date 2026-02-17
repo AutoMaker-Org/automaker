@@ -9,7 +9,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
-import type { CodexModelId } from '@automaker/types';
+import { supportsReasoningEffort, type CodexModelId } from '@automaker/types';
 import { OpenAIIcon } from '@/components/ui/provider-icon';
 
 interface CodexModelConfigurationProps {
@@ -27,25 +27,30 @@ interface CodexModelInfo {
 }
 
 const CODEX_MODEL_INFO: Record<CodexModelId, CodexModelInfo> = {
+  'codex-gpt-5.3-codex': {
+    id: 'codex-gpt-5.3-codex',
+    label: 'GPT-5.3-Codex',
+    description: 'Latest frontier agentic coding model',
+  },
   'codex-gpt-5.2-codex': {
     id: 'codex-gpt-5.2-codex',
     label: 'GPT-5.2-Codex',
-    description: 'Most advanced agentic coding model for complex software engineering',
+    description: 'Frontier agentic coding model',
   },
   'codex-gpt-5.1-codex-max': {
     id: 'codex-gpt-5.1-codex-max',
     label: 'GPT-5.1-Codex-Max',
-    description: 'Optimized for long-horizon, agentic coding tasks in Codex',
+    description: 'Codex-optimized flagship for deep and fast reasoning',
   },
   'codex-gpt-5.1-codex-mini': {
     id: 'codex-gpt-5.1-codex-mini',
     label: 'GPT-5.1-Codex-Mini',
-    description: 'Smaller, more cost-effective version for faster workflows',
+    description: 'Optimized for codex. Cheaper, faster, but less capable',
   },
   'codex-gpt-5.2': {
     id: 'codex-gpt-5.2',
     label: 'GPT-5.2',
-    description: 'Best general agentic model for tasks across industries and domains',
+    description: 'Latest frontier model with improvements across knowledge, reasoning and coding',
   },
   'codex-gpt-5.1': {
     id: 'codex-gpt-5.1',
@@ -156,14 +161,4 @@ export function CodexModelConfiguration({
       </div>
     </div>
   );
-}
-
-function supportsReasoningEffort(modelId: string): boolean {
-  const reasoningModels = [
-    'codex-gpt-5.2-codex',
-    'codex-gpt-5.1-codex-max',
-    'codex-gpt-5.2',
-    'codex-gpt-5.1',
-  ];
-  return reasoningModels.includes(modelId);
 }

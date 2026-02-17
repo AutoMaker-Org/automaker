@@ -58,7 +58,7 @@ import {
 import { createSettingsRoutes } from './routes/settings/index.js';
 import { AgentService } from './services/agent-service.js';
 import { FeatureLoader } from './services/feature-loader.js';
-import { AutoModeService } from './services/auto-mode-service.js';
+import { AutoModeServiceCompat } from './services/auto-mode/index.js';
 import { getTerminalService } from './services/terminal-service.js';
 import { SettingsService } from './services/settings-service.js';
 import { createSpecRegenerationRoutes } from './routes/app-spec/index.js';
@@ -128,20 +128,56 @@ const BOX_CONTENT_WIDTH = 67;
 // The Claude Agent SDK can use either ANTHROPIC_API_KEY or Claude Code CLI authentication
 (async () => {
   const hasAnthropicKey = !!process.env.ANTHROPIC_API_KEY;
+  const hasEnvOAuthToken = !!process.env.CLAUDE_CODE_OAUTH_TOKEN;
+
+  logger.debug('[CREDENTIAL_CHECK] Starting credential detection...');
+  logger.debug('[CREDENTIAL_CHECK] Environment variables:', {
+    hasAnthropicKey,
+    hasEnvOAuthToken,
+  });
 
   if (hasAnthropicKey) {
     logger.info('✓ ANTHROPIC_API_KEY detected');
     return;
   }
 
+  if (hasEnvOAuthToken) {
+    logger.info('✓ CLAUDE_CODE_OAUTH_TOKEN detected');
+    return;
+  }
+
   // Check for Claude Code CLI authentication
+  // Store indicators outside the try block so we can use them in the warning message
+  let cliAuthIndicators: Awaited<ReturnType<typeof getClaudeAuthIndicators>> | null = null;
+
   try {
-    const indicators = await getClaudeAuthIndicators();
+    cliAuthIndicators = await getClaudeAuthIndicators();
+    const indicators = cliAuthIndicators;
+
+    // Log detailed credential detection results
+    const { checks, ...indicatorSummary } = indicators;
+    logger.debug('[CREDENTIAL_CHECK] Claude CLI auth indicators:', indicatorSummary);
+
+    logger.debug('[CREDENTIAL_CHECK] File check details:', checks);
+
     const hasCliAuth =
       indicators.hasStatsCacheWithActivity ||
       (indicators.hasSettingsFile && indicators.hasProjectsSessions) ||
       (indicators.hasCredentialsFile &&
         (indicators.credentials?.hasOAuthToken || indicators.credentials?.hasApiKey));
+
+    logger.debug('[CREDENTIAL_CHECK] Auth determination:', {
+      hasCliAuth,
+      reason: hasCliAuth
+        ? indicators.hasStatsCacheWithActivity
+          ? 'stats cache with activity'
+          : indicators.hasSettingsFile && indicators.hasProjectsSessions
+            ? 'settings file + project sessions'
+            : indicators.credentials?.hasOAuthToken
+              ? 'credentials file with OAuth token'
+              : 'credentials file with API key'
+        : 'no valid credentials found',
+    });
 
     if (hasCliAuth) {
       logger.info('✓ Claude Code CLI authentication detected');
@@ -152,7 +188,7 @@ const BOX_CONTENT_WIDTH = 67;
     logger.warn('Error checking for Claude Code CLI authentication:', error);
   }
 
-  // No authentication found - show warning
+  // No authentication found - show warning with paths that were checked
   const wHeader = '⚠️  WARNING: No Claude authentication configured'.padEnd(BOX_CONTENT_WIDTH);
   const w1 = 'The Claude Agent SDK requires authentication to function.'.padEnd(BOX_CONTENT_WIDTH);
   const w2 = 'Options:'.padEnd(BOX_CONTENT_WIDTH);
@@ -165,6 +201,33 @@ const BOX_CONTENT_WIDTH = 67;
     BOX_CONTENT_WIDTH
   );
 
+  // Build paths checked summary from the indicators (if available)
+  let pathsCheckedInfo = '';
+  if (cliAuthIndicators) {
+    const pathsChecked: string[] = [];
+
+    // Collect paths that were checked (paths are always populated strings)
+    pathsChecked.push(`Settings: ${cliAuthIndicators.checks.settingsFile.path}`);
+    pathsChecked.push(`Stats cache: ${cliAuthIndicators.checks.statsCache.path}`);
+    pathsChecked.push(`Projects dir: ${cliAuthIndicators.checks.projectsDir.path}`);
+    for (const credFile of cliAuthIndicators.checks.credentialFiles) {
+      pathsChecked.push(`Credentials: ${credFile.path}`);
+    }
+
+    if (pathsChecked.length > 0) {
+      pathsCheckedInfo = `
+║                                                                     ║
+║  ${'Paths checked:'.padEnd(BOX_CONTENT_WIDTH)}║
+${pathsChecked
+  .map((p) => {
+    const maxLen = BOX_CONTENT_WIDTH - 4;
+    const display = p.length > maxLen ? '...' + p.slice(-(maxLen - 3)) : p;
+    return `║    ${display.padEnd(maxLen)}  ║`;
+  })
+  .join('\n')}`;
+    }
+  }
+
   logger.warn(`
 ╔═════════════════════════════════════════════════════════════════════╗
 ║  ${wHeader}║
@@ -176,7 +239,7 @@ const BOX_CONTENT_WIDTH = 67;
 ║  ${w3}║
 ║  ${w4}║
 ║  ${w5}║
-║  ${w6}║
+║  ${w6}║${pathsCheckedInfo}
 ║                                                                     ║
 ╚═════════════════════════════════════════════════════════════════════╝
 `);
@@ -265,7 +328,9 @@ const events: EventEmitter = createEventEmitter();
 const settingsService = new SettingsService(DATA_DIR);
 const agentService = new AgentService(DATA_DIR, events, settingsService);
 const featureLoader = new FeatureLoader();
-const autoModeService = new AutoModeService(events, settingsService);
+
+// Auto-mode services: compatibility layer provides old interface while using new architecture
+const autoModeService = new AutoModeServiceCompat(events, settingsService, featureLoader);
 const schedulerService = new SchedulerService(
   events,
   featureLoader,

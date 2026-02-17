@@ -95,3 +95,8 @@ data/.api-key
 data/credentials.json
 data/
 .codex/
+
+# GSD planning docs (local-only)
+.planning/
+.mcp.json
+.planning

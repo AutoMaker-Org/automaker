@@ -293,73 +293,77 @@ export const CardActions = memo(function CardActions({
           ) : null}
         </>
       )}
-      {!isCurrentAutoTask && (feature.status === 'backlog' || feature.status === 'scheduled') && (
-        <>
-          <Button
-            variant="secondary"
-            size="sm"
-            className="flex-1 h-7 text-xs"
-            onClick={(e) => {
-              e.stopPropagation();
-              onEdit();
-            }}
-            onPointerDown={(e) => e.stopPropagation()}
-            data-testid={`edit-backlog-${feature.id}`}
-          >
-            <Edit className="w-3 h-3 mr-1" />
-            Edit
-          </Button>
-          {/* View Logs button for scheduled features with prior runs */}
-          {feature.status === 'scheduled' && onViewOutput && (
+      {!isCurrentAutoTask &&
+        (feature.status === 'backlog' ||
+          feature.status === 'scheduled' ||
+          feature.status === 'interrupted' ||
+          feature.status === 'ready') && (
+          <>
             <Button
-              variant="outline"
-              size="sm"
-              className="h-7 text-xs px-2"
-              onClick={(e) => {
-                e.stopPropagation();
-                onViewOutput();
-              }}
-              onPointerDown={(e) => e.stopPropagation()}
-              data-testid={`view-output-scheduled-${feature.id}`}
-              title="View Logs"
-            >
-              <FileText className="w-3 h-3" />
-            </Button>
-          )}
-          {feature.planSpec?.content && onViewPlan && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-7 text-xs px-2"
-              onClick={(e) => {
-                e.stopPropagation();
-                onViewPlan();
-              }}
-              onPointerDown={(e) => e.stopPropagation()}
-              data-testid={`view-plan-${feature.id}`}
-              title="View Plan"
-            >
-              <Eye className="w-3 h-3" />
-            </Button>
-          )}
-          {onImplement && (
-            <Button
-              variant="default"
+              variant="secondary"
               size="sm"
               className="flex-1 h-7 text-xs"
               onClick={(e) => {
                 e.stopPropagation();
-                onImplement();
+                onEdit();
               }}
               onPointerDown={(e) => e.stopPropagation()}
-              data-testid={`make-${feature.id}`}
+              data-testid={`edit-backlog-${feature.id}`}
             >
-              <PlayCircle className="w-3 h-3 mr-1" />
-              {feature.status === 'scheduled' ? 'Run Now' : 'Make'}
+              <Edit className="w-3 h-3 mr-1" />
+              Edit
             </Button>
-          )}
-        </>
-      )}
+            {/* View Logs button for scheduled features with prior runs */}
+            {feature.status === 'scheduled' && onViewOutput && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 text-xs px-2"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onViewOutput();
+                }}
+                onPointerDown={(e) => e.stopPropagation()}
+                data-testid={`view-output-scheduled-${feature.id}`}
+                title="View Logs"
+              >
+                <FileText className="w-3 h-3" />
+              </Button>
+            )}
+            {feature.planSpec?.content && onViewPlan && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 text-xs px-2"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onViewPlan();
+                }}
+                onPointerDown={(e) => e.stopPropagation()}
+                data-testid={`view-plan-${feature.id}`}
+                title="View Plan"
+              >
+                <Eye className="w-3 h-3" />
+              </Button>
+            )}
+            {onImplement && (
+              <Button
+                variant="default"
+                size="sm"
+                className="flex-1 h-7 text-xs"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onImplement();
+                }}
+                onPointerDown={(e) => e.stopPropagation()}
+                data-testid={`make-${feature.id}`}
+              >
+                <PlayCircle className="w-3 h-3 mr-1" />
+                Make
+              </Button>
+            )}
+          </>
+        )}
     </div>
   );
 });

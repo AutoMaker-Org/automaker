@@ -6,10 +6,13 @@
  */
 
 import type { Request, Response } from 'express';
-import type { AutoModeService } from '../../../services/auto-mode-service.js';
+import type { AutoModeServiceCompat } from '../../../services/auto-mode/index.js';
 import { getErrorMessage, logError } from '../common.js';
 
-export function createStatusHandler(autoModeService: AutoModeService) {
+/**
+ * Create status handler.
+ */
+export function createStatusHandler(autoModeService: AutoModeServiceCompat) {
   return async (req: Request, res: Response): Promise<void> => {
     try {
       const { projectPath, branchName } = req.body as {
@@ -21,7 +24,8 @@ export function createStatusHandler(autoModeService: AutoModeService) {
       if (projectPath) {
         // Normalize branchName: undefined becomes null
         const normalizedBranchName = branchName ?? null;
-        const projectStatus = autoModeService.getStatusForProject(
+
+        const projectStatus = await autoModeService.getStatusForProject(
           projectPath,
           normalizedBranchName
         );
@@ -38,7 +42,7 @@ export function createStatusHandler(autoModeService: AutoModeService) {
         return;
       }
 
-      // Fall back to global status for backward compatibility
+      // Global status for backward compatibility
       const status = autoModeService.getStatus();
       const activeProjects = autoModeService.getActiveAutoLoopProjects();
       const activeWorktrees = autoModeService.getActiveAutoLoopWorktrees();

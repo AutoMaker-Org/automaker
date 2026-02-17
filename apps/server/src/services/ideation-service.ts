@@ -230,10 +230,9 @@ export class IdeationService {
         );
         if (providerResult.provider) {
           claudeCompatibleProvider = providerResult.provider;
-          // Use resolved model from provider if available (maps to Claude model)
-          if (providerResult.resolvedModel) {
-            modelId = providerResult.resolvedModel;
-          }
+          // CRITICAL: For custom providers, use the provider's model ID (e.g. "GLM-4.7")
+          // for the API call, NOT the resolved Claude model - otherwise we get "model not found"
+          modelId = options.model;
           credentials = providerResult.credentials ?? credentials;
         }
       }

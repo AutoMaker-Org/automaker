@@ -118,6 +118,7 @@ RUN curl -fsSL https://opencode.ai/install | bash && \
     echo "=== Checking OpenCode CLI installation ===" && \
     ls -la /home/automaker/.local/bin/ && \
     (which opencode && opencode --version) || echo "opencode installed (may need auth setup)"
+
 USER root
 
 # Add PATH to profile so it's available in all interactive shells (for login shells)
@@ -146,6 +147,15 @@ COPY --from=server-builder /app/apps/server/package*.json ./apps/server/
 
 # Copy node_modules (includes symlinks to libs)
 COPY --from=server-builder /app/node_modules ./node_modules
+
+# Install Playwright Chromium browser for AI agent verification tests
+# This adds ~300MB to the image but enables automated testing mode out of the box
+# Using the locally installed playwright ensures we use the pinned version from package-lock.json
+USER automaker
+RUN ./node_modules/.bin/playwright install chromium && \
+    echo "=== Playwright Chromium installed ===" && \
+    ls -la /home/automaker/.cache/ms-playwright/
+USER root
 
 # Create data and projects directories
 RUN mkdir -p /data /projects && chown automaker:automaker /data /projects

@@ -75,27 +75,25 @@ export function useBoardPersistence({ currentProject }: UseBoardPersistenceProps
   );
 
   // Persist feature creation to API
+  // Throws on failure so callers can handle it (e.g., remove the feature from state)
   const persistFeatureCreate = useCallback(
     async (feature: Feature) => {
       if (!currentProject) return;
 
-      try {
-        const api = getElectronAPI();
-        if (!api.features) {
-          logger.error('Features API not available');
-          return;
-        }
+      const api = getElectronAPI();
+      if (!api.features) {
+        throw new Error('Features API not available');
+      }
 
-        const result = await api.features.create(currentProject.path, feature as ApiFeature);
-        if (result.success && result.feature) {
-          updateFeature(result.feature.id, result.feature as Partial<Feature>);
-          // Invalidate React Query cache to sync UI
-          queryClient.invalidateQueries({
-            queryKey: queryKeys.features.all(currentProject.path),
-          });
-        }
-      } catch (error) {
-        logger.error('Failed to persist feature creation:', error);
+      const result = await api.features.create(currentProject.path, feature as ApiFeature);
+      if (result.success && result.feature) {
+        updateFeature(result.feature.id, result.feature as Partial<Feature>);
+        // Invalidate React Query cache to sync UI
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.features.all(currentProject.path),
+        });
+      } else if (!result.success) {
+        throw new Error(result.error || 'Failed to create feature on server');
       }
     },
     [currentProject, updateFeature, queryClient]

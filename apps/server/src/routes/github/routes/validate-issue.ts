@@ -25,7 +25,7 @@ import {
   isOpencodeModel,
   supportsStructuredOutput,
 } from '@automaker/types';
-import { resolvePhaseModel } from '@automaker/model-resolver';
+import { resolvePhaseModel, resolveModelString } from '@automaker/model-resolver';
 import { extractJson } from '../../../lib/json-extractor.js';
 import { writeValidation } from '../../../lib/validation-storage.js';
 import { streamingQuery } from '../../../providers/simple-query-service.js';
@@ -188,8 +188,12 @@ ${basePrompt}`;
       }
     }
 
-    // Use provider resolved model if available, otherwise use original model
-    const effectiveModel = providerResolvedModel || (model as string);
+    // CRITICAL: For custom providers (GLM, MiniMax), pass the provider's model ID (e.g. "GLM-4.7")
+    // to the API, NOT the resolved Claude model - otherwise we get "model not found"
+    // For standard Claude models, resolve aliases (e.g., 'opus' -> 'claude-opus-4-20250514')
+    const effectiveModel = claudeCompatibleProvider
+      ? (model as string)
+      : providerResolvedModel || resolveModelString(model as string);
     logger.info(`Using model: ${effectiveModel}`);
 
     // Use streamingQuery with event callbacks

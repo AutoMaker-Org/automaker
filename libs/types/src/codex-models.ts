@@ -6,6 +6,7 @@
  * IMPORTANT: All Codex models use 'codex-' prefix to distinguish from Cursor CLI models
  */
 export type CodexModelId =
+  | 'codex-gpt-5.3-codex'
   | 'codex-gpt-5.2-codex'
   | 'codex-gpt-5.1-codex-max'
   | 'codex-gpt-5.1-codex-mini'
@@ -29,31 +30,38 @@ export interface CodexModelConfig {
  * All keys use 'codex-' prefix to distinguish from Cursor CLI models
  */
 export const CODEX_MODEL_CONFIG_MAP: Record<CodexModelId, CodexModelConfig> = {
+  'codex-gpt-5.3-codex': {
+    id: 'codex-gpt-5.3-codex',
+    label: 'GPT-5.3-Codex',
+    description: 'Latest frontier agentic coding model',
+    hasThinking: true,
+    supportsVision: true,
+  },
   'codex-gpt-5.2-codex': {
     id: 'codex-gpt-5.2-codex',
     label: 'GPT-5.2-Codex',
-    description: 'Most advanced agentic coding model for complex software engineering',
+    description: 'Frontier agentic coding model',
     hasThinking: true,
     supportsVision: true,
   },
   'codex-gpt-5.1-codex-max': {
     id: 'codex-gpt-5.1-codex-max',
     label: 'GPT-5.1-Codex-Max',
-    description: 'Optimized for long-horizon, agentic coding tasks in Codex',
+    description: 'Codex-optimized flagship for deep and fast reasoning',
     hasThinking: true,
     supportsVision: true,
   },
   'codex-gpt-5.1-codex-mini': {
     id: 'codex-gpt-5.1-codex-mini',
     label: 'GPT-5.1-Codex-Mini',
-    description: 'Smaller, more cost-effective version for faster workflows',
+    description: 'Optimized for codex. Cheaper, faster, but less capable',
     hasThinking: false,
     supportsVision: true,
   },
   'codex-gpt-5.2': {
     id: 'codex-gpt-5.2',
     label: 'GPT-5.2 (Codex)',
-    description: 'Best general agentic model for tasks across industries and domains via Codex',
+    description: 'Latest frontier model with improvements across knowledge, reasoning and coding',
     hasThinking: true,
     supportsVision: true,
   },

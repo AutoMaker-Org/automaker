@@ -28,8 +28,11 @@ const PROGRESS_DEBOUNCE_MAX_WAIT = 2000;
  * feature moving to custom pipeline columns (fixes GitHub issue #668)
  */
 const FEATURE_LIST_INVALIDATION_EVENTS: AutoModeEvent['type'][] = [
+  'auto_mode_feature_start',
   'auto_mode_feature_complete',
   'auto_mode_error',
+  'auto_mode_started',
+  'auto_mode_stopped',
   'plan_approval_required',
   'plan_approved',
   'plan_rejected',
@@ -39,11 +42,11 @@ const FEATURE_LIST_INVALIDATION_EVENTS: AutoModeEvent['type'][] = [
 
 /**
  * Events that should invalidate a specific feature (features.single query)
- * Note: pipeline_step_started is NOT included here because it already invalidates
- * features.all() above, which also invalidates child queries (features.single)
+ * Note: auto_mode_feature_start and pipeline_step_started are NOT included here
+ * because they already invalidate features.all() above, which also invalidates
+ * child queries (features.single)
  */
 const SINGLE_FEATURE_INVALIDATION_EVENTS: AutoModeEvent['type'][] = [
-  'auto_mode_feature_start',
   'auto_mode_phase',
   'auto_mode_phase_complete',
   'auto_mode_task_status',

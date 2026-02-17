@@ -228,7 +228,13 @@ export function useBoardActions({
       };
       const createdFeature = addFeature(newFeatureData);
       // Must await to ensure feature exists on server before user can drag it
-      await persistFeatureCreate(createdFeature);
+      try {
+        await persistFeatureCreate(createdFeature);
+      } catch (error) {
+        // Remove the feature from state if server creation failed (e.g., duplicate title)
+        removeFeature(createdFeature.id);
+        throw error;
+      }
       saveCategory(featureData.category);
 
       // Handle child dependencies - update other features to depend on this new feature
@@ -279,6 +285,7 @@ export function useBoardActions({
     },
     [
       addFeature,
+      removeFeature,
       persistFeatureCreate,
       persistFeatureUpdate,
       updateFeature,

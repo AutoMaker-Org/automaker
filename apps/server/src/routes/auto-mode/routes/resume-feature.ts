@@ -3,13 +3,13 @@
  */
 
 import type { Request, Response } from 'express';
-import type { AutoModeService } from '../../../services/auto-mode-service.js';
+import type { AutoModeServiceCompat } from '../../../services/auto-mode/index.js';
 import { createLogger } from '@automaker/utils';
 import { getErrorMessage, logError } from '../common.js';
 
 const logger = createLogger('AutoMode');
 
-export function createResumeFeatureHandler(autoModeService: AutoModeService) {
+export function createResumeFeatureHandler(autoModeService: AutoModeServiceCompat) {
   return async (req: Request, res: Response): Promise<void> => {
     try {
       const { projectPath, featureId, useWorktrees } = req.body as {

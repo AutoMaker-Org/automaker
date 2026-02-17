@@ -21,6 +21,7 @@ import {
   isGroupSelected,
   getSelectedVariant,
   codexModelHasThinking,
+  getThinkingLevelsForModel,
 } from '@automaker/types';
 import {
   CLAUDE_MODELS,
@@ -28,7 +29,6 @@ import {
   OPENCODE_MODELS,
   GEMINI_MODELS,
   COPILOT_MODELS,
-  THINKING_LEVELS,
   THINKING_LEVEL_LABELS,
   REASONING_EFFORT_LEVELS,
   REASONING_EFFORT_LABELS,
@@ -1296,7 +1296,9 @@ export function PhaseModelSelector({
               <div className="px-2 py-1 text-xs font-medium text-muted-foreground">
                 Thinking Level
               </div>
-              {THINKING_LEVELS.map((level) => (
+              {getThinkingLevelsForModel(
+                model.mapsToClaudeModel === 'opus' ? 'claude-opus' : model.id || ''
+              ).map((level) => (
                 <button
                   key={level}
                   onClick={() => {
@@ -1322,6 +1324,7 @@ export function PhaseModelSelector({
                       {level === 'medium' && 'Moderate reasoning (10k tokens)'}
                       {level === 'high' && 'Deep reasoning (16k tokens)'}
                       {level === 'ultrathink' && 'Maximum reasoning (32k tokens)'}
+                      {level === 'adaptive' && 'Model decides reasoning depth'}
                     </span>
                   </div>
                   {isSelected && currentThinking === level && (
@@ -1402,7 +1405,9 @@ export function PhaseModelSelector({
               <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground border-b border-border/50 mb-1">
                 Thinking Level
               </div>
-              {THINKING_LEVELS.map((level) => (
+              {getThinkingLevelsForModel(
+                model.mapsToClaudeModel === 'opus' ? 'claude-opus' : model.id || ''
+              ).map((level) => (
                 <button
                   key={level}
                   onClick={() => {
@@ -1428,6 +1433,7 @@ export function PhaseModelSelector({
                       {level === 'medium' && 'Moderate reasoning (10k tokens)'}
                       {level === 'high' && 'Deep reasoning (16k tokens)'}
                       {level === 'ultrathink' && 'Maximum reasoning (32k tokens)'}
+                      {level === 'adaptive' && 'Model decides reasoning depth'}
                     </span>
                   </div>
                   {isSelected && currentThinking === level && (
@@ -1564,7 +1570,7 @@ export function PhaseModelSelector({
               <div className="px-2 py-1 text-xs font-medium text-muted-foreground">
                 Thinking Level
               </div>
-              {THINKING_LEVELS.map((level) => (
+              {getThinkingLevelsForModel(model.id).map((level) => (
                 <button
                   key={level}
                   onClick={() => {
@@ -1589,6 +1595,7 @@ export function PhaseModelSelector({
                       {level === 'medium' && 'Moderate reasoning (10k tokens)'}
                       {level === 'high' && 'Deep reasoning (16k tokens)'}
                       {level === 'ultrathink' && 'Maximum reasoning (32k tokens)'}
+                      {level === 'adaptive' && 'Model decides reasoning depth'}
                     </span>
                   </div>
                   {isSelected && currentThinking === level && (
@@ -1685,7 +1692,7 @@ export function PhaseModelSelector({
               <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground border-b border-border/50 mb-1">
                 Thinking Level
               </div>
-              {THINKING_LEVELS.map((level) => (
+              {getThinkingLevelsForModel(model.id).map((level) => (
                 <button
                   key={level}
                   onClick={() => {
@@ -1710,6 +1717,7 @@ export function PhaseModelSelector({
                       {level === 'medium' && 'Moderate reasoning (10k tokens)'}
                       {level === 'high' && 'Deep reasoning (16k tokens)'}
                       {level === 'ultrathink' && 'Maximum reasoning (32k tokens)'}
+                      {level === 'adaptive' && 'Model decides reasoning depth'}
                     </span>
                   </div>
                   {isSelected && currentThinking === level && (

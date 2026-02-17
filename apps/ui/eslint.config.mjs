@@ -96,6 +96,7 @@ const eslintConfig = defineConfig([
         setInterval: 'readonly',
         clearTimeout: 'readonly',
         clearInterval: 'readonly',
+        queueMicrotask: 'readonly',
         // Node.js (for scripts and Electron)
         process: 'readonly',
         require: 'readonly',

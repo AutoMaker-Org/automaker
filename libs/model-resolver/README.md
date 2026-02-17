@@ -30,15 +30,15 @@ const model2 = resolveModelString('haiku');
 // Returns: 'claude-haiku-4-5'
 
 const model3 = resolveModelString('opus');
-// Returns: 'claude-opus-4-5-20251101'
+// Returns: 'claude-opus-4-6'
 
 // Use with custom default
 const model4 = resolveModelString(undefined, 'claude-sonnet-4-20250514');
 // Returns: 'claude-sonnet-4-20250514' (default)
 
 // Direct model ID passthrough
-const model5 = resolveModelString('claude-opus-4-5-20251101');
-// Returns: 'claude-opus-4-5-20251101' (unchanged)
+const model5 = resolveModelString('claude-opus-4-6');
+// Returns: 'claude-opus-4-6' (unchanged)
 ```
 
 ### Get Effective Model
@@ -72,7 +72,7 @@ console.log(DEFAULT_MODELS.chat); // 'claude-sonnet-4-20250514'
 // Model alias mappings
 console.log(CLAUDE_MODEL_MAP.haiku); // 'claude-haiku-4-5'
 console.log(CLAUDE_MODEL_MAP.sonnet); // 'claude-sonnet-4-20250514'
-console.log(CLAUDE_MODEL_MAP.opus); // 'claude-opus-4-5-20251101'
+console.log(CLAUDE_MODEL_MAP.opus); // 'claude-opus-4-6'
 ```
 
 ## Usage Example
@@ -103,7 +103,7 @@ const feature: Feature = {
 };
 
 prepareFeatureExecution(feature);
-// Output: Executing feature with model: claude-opus-4-5-20251101
+// Output: Executing feature with model: claude-opus-4-6
 ```
 
 ## Supported Models
@@ -112,7 +112,7 @@ prepareFeatureExecution(feature);
 
 - `haiku` → `claude-haiku-4-5`
 - `sonnet` → `claude-sonnet-4-20250514`
-- `opus` → `claude-opus-4-5-20251101`
+- `opus` → `claude-opus-4-6`
 
 ### Model Selection Guide
 

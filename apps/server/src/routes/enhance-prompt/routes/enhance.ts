@@ -219,18 +219,21 @@ export function createEnhanceHandler(
         }
       }
 
-      // Resolve the model - use provider resolved model, passed model, or default to sonnet
-      const resolvedModel =
-        providerResolvedModel || resolveModelString(model, CLAUDE_MODEL_MAP.sonnet);
+      // Resolve the model for API call.
+      // CRITICAL: For custom providers (GLM, MiniMax), pass the provider's model ID (e.g. "GLM-4.7")
+      // to the API, NOT the resolved Claude model - otherwise we get "model not found"
+      const modelForApi = claudeCompatibleProvider
+        ? model
+        : providerResolvedModel || resolveModelString(model, CLAUDE_MODEL_MAP.sonnet);
 
-      logger.debug(`Using model: ${resolvedModel}`);
+      logger.debug(`Using model: ${modelForApi}`);
 
       // Use simpleQuery - provider abstraction handles routing to correct provider
       // The system prompt is combined with user prompt since some providers
       // don't have a separate system prompt concept
       const result = await simpleQuery({
         prompt: [systemPrompt, projectContext, userPrompt].filter(Boolean).join('\n\n'),
-        model: resolvedModel,
+        model: modelForApi,
         cwd: process.cwd(), // Enhancement doesn't need a specific working directory
         maxTurns: 1,
         allowedTools: [],

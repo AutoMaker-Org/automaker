@@ -167,11 +167,11 @@ export const PriorityBadges = memo(function PriorityBadges({
               className={cn(
                 uniformBadgeClass,
                 feature.priority === 1 &&
-                'bg-[var(--status-error-bg)] border-[var(--status-error)]/40 text-[var(--status-error)]',
+                  'bg-[var(--status-error-bg)] border-[var(--status-error)]/40 text-[var(--status-error)]',
                 feature.priority === 2 &&
-                'bg-[var(--status-warning-bg)] border-[var(--status-warning)]/40 text-[var(--status-warning)]',
+                  'bg-[var(--status-warning-bg)] border-[var(--status-warning)]/40 text-[var(--status-warning)]',
                 feature.priority === 3 &&
-                'bg-[var(--status-info-bg)] border-[var(--status-info)]/40 text-[var(--status-info)]'
+                  'bg-[var(--status-info-bg)] border-[var(--status-info)]/40 text-[var(--status-info)]'
               )}
               data-testid={`priority-badge-${feature.id}`}
             >

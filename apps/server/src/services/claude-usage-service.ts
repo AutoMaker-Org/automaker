@@ -294,7 +294,16 @@ export class ClaudeUsageService {
             this.killPtyProcess(ptyProcess);
           }
           // Don't fail if we have data - return it instead
-          if (output.includes('Current session')) {
+          // Check cleaned output since raw output has ANSI codes between words
+          // eslint-disable-next-line no-control-regex
+          const cleanedForCheck = output
+            .replace(/\x1B\[(\d+)C/g, (_m: string, n: string) => ' '.repeat(parseInt(n, 10)))
+            .replace(/\x1B\[[0-9;?]*[A-Za-z@]/g, '');
+          if (
+            cleanedForCheck.includes('Current session') ||
+            cleanedForCheck.includes('% used') ||
+            cleanedForCheck.includes('% left')
+          ) {
             resolve(output);
           } else if (hasSeenTrustPrompt) {
             // Trust prompt was shown but we couldn't auto-approve it
@@ -320,8 +329,13 @@ export class ClaudeUsageService {
         output += data;
 
         // Strip ANSI codes for easier matching
+        // Convert cursor forward (ESC[nC) to spaces first to preserve word boundaries,
+        // then strip remaining ANSI sequences. Without this, the Claude CLI TUI output
+        // like "Current week (all models)" becomes "Currentweek(allmodels)".
         // eslint-disable-next-line no-control-regex
-        const cleanOutput = output.replace(/\x1B\[[0-9;]*[A-Za-z]/g, '');
+        const cleanOutput = output
+          .replace(/\x1B\[(\d+)C/g, (_match: string, n: string) => ' '.repeat(parseInt(n, 10)))
+          .replace(/\x1B\[[0-9;?]*[A-Za-z@]/g, '');
 
         // Check for specific authentication/permission errors
         // Must be very specific to avoid false positives from garbled terminal encoding
@@ -356,7 +370,8 @@ export class ClaudeUsageService {
         const hasUsageIndicators =
           cleanOutput.includes('Current session') ||
           (cleanOutput.includes('Usage') && cleanOutput.includes('% left')) ||
-          // Additional patterns for winpty - look for percentage patterns
+          // Look for percentage patterns - allow optional whitespace between % and left/used
+          // since cursor movement codes may or may not create spaces after stripping
           /\d+%\s*(left|used|remaining)/i.test(cleanOutput) ||
           cleanOutput.includes('Resets in') ||
           cleanOutput.includes('Current week');
@@ -382,12 +397,15 @@ export class ClaudeUsageService {
         // Handle Trust Dialog - multiple variants:
         // - "Do you want to work in this folder?"
         // - "Ready to code here?" / "I'll need permission to work with your files"
+        // - "Quick safety check" / "Yes, I trust this folder"
         // Since we are running in cwd (project dir), it is safe to approve.
         if (
           !hasApprovedTrust &&
           (cleanOutput.includes('Do you want to work in this folder?') ||
             cleanOutput.includes('Ready to code here') ||
-            cleanOutput.includes('permission to work with your files'))
+            cleanOutput.includes('permission to work with your files') ||
+            cleanOutput.includes('trust this folder') ||
+            cleanOutput.includes('safety check'))
         ) {
           hasApprovedTrust = true;
           hasSeenTrustPrompt = true;
@@ -490,10 +508,17 @@ export class ClaudeUsageService {
    * Handles CSI, OSC, and other common ANSI sequences
    */
   private stripAnsiCodes(text: string): string {
-    // First strip ANSI sequences (colors, etc) and handle CR
+    // First, convert cursor movement sequences to whitespace to preserve word boundaries.
+    // The Claude CLI TUI uses ESC[nC (cursor forward) instead of actual spaces between words.
+    // Without this, "Current week (all models)" becomes "Currentweek(allmodels)" after stripping.
     // eslint-disable-next-line no-control-regex
     let clean = text
-      // CSI sequences: ESC [ ... (letter or @)
+      // Cursor forward (CSI n C): replace with n spaces to preserve word separation
+      .replace(/\x1B\[(\d+)C/g, (_match, n) => ' '.repeat(parseInt(n, 10)))
+      // Cursor movement (up/down/back/position): replace with newline or nothing
+      .replace(/\x1B\[\d*[ABD]/g, '') // cursor up (A), down (B), back (D)
+      .replace(/\x1B\[\d+;\d+[Hf]/g, '\n') // cursor position (H/f)
+      // Now strip remaining CSI sequences (colors, modes, etc.)
       .replace(/\x1B\[[0-9;?]*[A-Za-z@]/g, '')
       // OSC sequences: ESC ] ... terminated by BEL, ST, or another ESC
       .replace(/\x1B\][^\x07\x1B]*(?:\x07|\x1B\\)?/g, '')

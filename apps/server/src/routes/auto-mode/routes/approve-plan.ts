@@ -3,13 +3,13 @@
  */
 
 import type { Request, Response } from 'express';
-import type { AutoModeService } from '../../../services/auto-mode-service.js';
+import type { AutoModeServiceCompat } from '../../../services/auto-mode/index.js';
 import { createLogger } from '@automaker/utils';
 import { getErrorMessage, logError } from '../common.js';
 
 const logger = createLogger('AutoMode');
 
-export function createApprovePlanHandler(autoModeService: AutoModeService) {
+export function createApprovePlanHandler(autoModeService: AutoModeServiceCompat) {
   return async (req: Request, res: Response): Promise<void> => {
     try {
       const { featureId, approved, editedPlan, feedback, projectPath } = req.body as {
@@ -17,7 +17,7 @@ export function createApprovePlanHandler(autoModeService: AutoModeService) {
         approved: boolean;
         editedPlan?: string;
         feedback?: string;
-        projectPath?: string;
+        projectPath: string;
       };
 
       if (!featureId) {
@@ -36,6 +36,14 @@ export function createApprovePlanHandler(autoModeService: AutoModeService) {
         return;
       }
 
+      if (!projectPath) {
+        res.status(400).json({
+          success: false,
+          error: 'projectPath is required',
+        });
+        return;
+      }
+
       // Note: We no longer check hasPendingApproval here because resolvePlanApproval
       // can handle recovery when pending approval is not in Map but feature has planSpec.status='generated'
       // This supports cases where the server restarted while waiting for approval
@@ -48,11 +56,11 @@ export function createApprovePlanHandler(autoModeService: AutoModeService) {
 
       // Resolve the pending approval (with recovery support)
       const result = await autoModeService.resolvePlanApproval(
+        projectPath,
         featureId,
         approved,
         editedPlan,
-        feedback,
-        projectPath
+        feedback
       );
 
       if (!result.success) {

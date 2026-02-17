@@ -30,7 +30,7 @@ import type {
   ReasoningEffort,
   PhaseModelEntry,
   DescriptionHistoryEntry,
-  FeatureSchedule
+  FeatureSchedule,
 } from '@automaker/types';
 import { migrateModelId } from '@automaker/types';
 import {

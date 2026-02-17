@@ -21,9 +21,13 @@ services:
       # - ~/.local/share/opencode:/home/automaker/.local/share/opencode
       # - ~/.config/opencode:/home/automaker/.config/opencode
 
-      # Playwright browser cache - persists installed browsers across container restarts
-      # Run 'npx playwright install --with-deps chromium' once, and it will persist
+      # ===== Playwright Browser Cache (Optional) =====
+      # Playwright Chromium is PRE-INSTALLED in the Docker image for automated testing.
+      # Uncomment below to persist browser cache across container rebuilds (saves ~300MB download):
       # - playwright-cache:/home/automaker/.cache/ms-playwright
+      #
+      # To update Playwright browsers manually:
+      #   docker exec --user automaker -w /app automaker-server npx playwright install chromium
     environment:
       # Set root directory for all projects and file operations
       # Users can only create/open projects within this directory
@@ -37,6 +41,7 @@ services:
       # - CURSOR_API_KEY=${CURSOR_API_KEY:-}
 
 volumes:
-  # Playwright cache volume (persists Chromium installs)
+  # Playwright cache volume - optional, persists browser updates across container rebuilds
+  # Uncomment if you mounted the playwright-cache volume above
   # playwright-cache:
   #   name: automaker-playwright-cache

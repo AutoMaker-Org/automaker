@@ -209,6 +209,10 @@ export const ListRow = memo(function ListRow({
   blockingDependencies = [],
   className,
 }: ListRowProps) {
+  // A card in waiting_approval should not display as "actively running" even if
+  // it's still in the runningAutoTasks list. The waiting_approval UI takes precedence.
+  const isActivelyRunning = isCurrentAutoTask && feature.status !== 'waiting_approval';
+
   const handleRowClick = useCallback(
     (e: React.MouseEvent) => {
       // Don't trigger row click if clicking on checkbox or actions
@@ -349,13 +353,13 @@ export const ListRow = memo(function ListRow({
 
       {/* Actions column */}
       <div role="cell" className="flex items-center justify-end px-3 py-3 w-[80px] shrink-0">
-        <RowActions feature={feature} handlers={handlers} isCurrentAutoTask={isCurrentAutoTask} />
+        <RowActions feature={feature} handlers={handlers} isCurrentAutoTask={isActivelyRunning} />
       </div>
     </div>
   );
 
   // Wrap with animated border for currently running auto task
-  if (isCurrentAutoTask) {
+  if (isActivelyRunning) {
     return <div className="animated-border-wrapper-row">{rowContent}</div>;
   }
 

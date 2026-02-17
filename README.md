@@ -367,6 +367,42 @@ services:
 
 The Docker image supports both AMD64 and ARM64 architectures. The GitHub CLI and Claude CLI are automatically downloaded for the correct architecture during build.
 
+##### Playwright for Automated Testing
+
+The Docker image includes **Playwright Chromium pre-installed** for AI agent verification tests. When agents implement features in automated testing mode, they use Playwright to verify the implementation works correctly.
+
+**No additional setup required** - Playwright verification works out of the box.
+
+#### Optional: Persist browsers for manual updates
+
+By default, Playwright Chromium is pre-installed in the Docker image. If you need to manually update browsers or want to persist browser installations across container restarts (not image rebuilds), you can mount a volume.
+
+**Important:** When you first add this volume mount to an existing setup, the empty volume will override the pre-installed browsers. You must re-install them:
+
+```bash
+# After adding the volume mount for the first time
+docker exec --user automaker -w /app automaker-server npx playwright install chromium
+```
+
+Add this to your `docker-compose.override.yml`:
+
+```yaml
+services:
+  server:
+    volumes:
+      - playwright-cache:/home/automaker/.cache/ms-playwright
+
+volumes:
+  playwright-cache:
+    name: automaker-playwright-cache
+```
+
+**Updating browsers manually:**
+
+```bash
+docker exec --user automaker -w /app automaker-server npx playwright install chromium
+```
+
 ### Testing
 
 #### End-to-End Tests (Playwright)

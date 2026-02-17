@@ -2,19 +2,26 @@ import { Label } from '@/components/ui/label';
 import { Brain } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ThinkingLevel } from '@/store/app-store';
-import { THINKING_LEVELS, THINKING_LEVEL_LABELS } from './model-constants';
+import { THINKING_LEVEL_LABELS } from './model-constants';
+import { getThinkingLevelsForModel } from '@automaker/types';
 
 interface ThinkingLevelSelectorProps {
   selectedLevel: ThinkingLevel;
   onLevelSelect: (level: ThinkingLevel) => void;
   testIdPrefix?: string;
+  /** Model ID is required for correct thinking level filtering.
+   *  Without it, adaptive thinking won't be available for Opus 4.6. */
+  model?: string;
 }
 
 export function ThinkingLevelSelector({
   selectedLevel,
   onLevelSelect,
   testIdPrefix = 'thinking-level',
+  model,
 }: ThinkingLevelSelectorProps) {
+  const levels = getThinkingLevelsForModel(model || '');
+
   return (
     <div className="space-y-2 pt-2 border-t border-border">
       <Label className="flex items-center gap-2 text-sm">
@@ -22,7 +29,7 @@ export function ThinkingLevelSelector({
         Thinking Level
       </Label>
       <div className="flex gap-2 flex-wrap">
-        {THINKING_LEVELS.map((level) => (
+        {levels.map((level) => (
           <button
             key={level}
             type="button"
@@ -40,7 +47,9 @@ export function ThinkingLevelSelector({
         ))}
       </div>
       <p className="text-xs text-muted-foreground">
-        Higher levels give more time to reason through complex problems.
+        {levels.includes('adaptive')
+          ? 'Adaptive thinking lets the model decide how much reasoning to use.'
+          : 'Higher levels give more time to reason through complex problems.'}
       </p>
     </div>
   );

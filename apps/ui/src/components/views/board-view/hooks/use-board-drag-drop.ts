@@ -3,6 +3,7 @@ import { createLogger } from '@automaker/utils/logger';
 import { DragStartEvent, DragEndEvent } from '@dnd-kit/core';
 import { Feature } from '@/store/app-store';
 import { useAppStore } from '@/store/app-store';
+import { useAutoMode } from '@/hooks/use-auto-mode';
 import { toast } from 'sonner';
 import { COLUMNS, ColumnId } from '../constants';
 
@@ -33,6 +34,7 @@ export function useBoardDragDrop({
     null
   );
   const { moveFeature, updateFeature } = useAppStore();
+  const autoMode = useAutoMode();
 
   // Note: getOrCreateWorktreeForFeature removed - worktrees are now created server-side
   // at execution time based on feature.branchName
@@ -155,19 +157,9 @@ export function useBoardDragDrop({
         }
       }
 
-      // Determine if dragging is allowed based on status and skipTests
-      // - Backlog items can always be dragged
-      // - waiting_approval items can always be dragged (to allow manual verification via drag)
-      // - verified items can always be dragged (to allow moving back to waiting_approval)
-      // - in_progress items can be dragged (but not if they're currently running)
-      // - Non-skipTests (TDD) items that are in progress cannot be dragged if they are running
-      if (draggedFeature.status === 'in_progress') {
-        // Only allow dragging in_progress if it's not currently running
-        if (isRunningTask) {
-          logger.debug('Cannot drag feature - currently running');
-          return;
-        }
-      }
+      // Determine if dragging is allowed based on status
+      // Running in_progress features CAN be dragged to backlog (stops the agent)
+      // but cannot be dragged to other columns
 
       let targetStatus: ColumnId | null = null;
 
@@ -235,15 +227,38 @@ export function useBoardDragDrop({
       } else if (draggedFeature.status === 'in_progress') {
         // Handle in_progress features being moved
         if (targetStatus === 'backlog') {
-          // Allow moving in_progress cards back to backlog
+          // If the feature is currently running, stop it first
+          if (isRunningTask) {
+            try {
+              await autoMode.stopFeature(featureId);
+              logger.info('Stopped running feature via drag to backlog:', featureId);
+            } catch (error) {
+              logger.error('Error stopping feature during drag to backlog:', error);
+              toast.error('Failed to stop agent', {
+                description: 'The feature will still be moved to backlog.',
+              });
+            }
+          }
           moveFeature(featureId, 'backlog');
           persistFeatureUpdate(featureId, { status: 'backlog' });
-          toast.info('Feature moved to backlog', {
-            description: `Moved to Backlog: ${draggedFeature.description.slice(
-              0,
-              50
-            )}${draggedFeature.description.length > 50 ? '...' : ''}`,
+          toast.info(
+            isRunningTask
+              ? 'Agent stopped and feature moved to backlog'
+              : 'Feature moved to backlog',
+            {
+              description: `Moved to Backlog: ${draggedFeature.description.slice(
+                0,
+                50
+              )}${draggedFeature.description.length > 50 ? '...' : ''}`,
+            }
+          );
+        } else if (isRunningTask) {
+          // Running features can only be dragged to backlog, not other columns
+          logger.debug('Cannot drag running feature to', targetStatus);
+          toast.error('Cannot move running feature', {
+            description: 'Stop the agent first or drag to Backlog to stop and move.',
           });
+          return;
         } else if (targetStatus === 'verified' && draggedFeature.skipTests) {
           // Manual verify via drag (only for skipTests features)
           moveFeature(featureId, 'verified');
@@ -310,6 +325,7 @@ export function useBoardDragDrop({
       updateFeature,
       persistFeatureUpdate,
       handleStartImplementation,
+      autoMode,
     ]
   );
 

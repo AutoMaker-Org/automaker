@@ -167,7 +167,14 @@ export const ALL_MODELS: ModelOption[] = [
   ...COPILOT_MODELS,
 ];
 
-export const THINKING_LEVELS: ThinkingLevel[] = ['none', 'low', 'medium', 'high', 'ultrathink'];
+export const THINKING_LEVELS: ThinkingLevel[] = [
+  'none',
+  'low',
+  'medium',
+  'high',
+  'ultrathink',
+  'adaptive',
+];
 
 export const THINKING_LEVEL_LABELS: Record<ThinkingLevel, string> = {
   none: 'None',
@@ -175,6 +182,7 @@ export const THINKING_LEVEL_LABELS: Record<ThinkingLevel, string> = {
   medium: 'Med',
   high: 'High',
   ultrathink: 'Ultra',
+  adaptive: 'Adaptive',
 };
 
 /**

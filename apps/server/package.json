@@ -24,7 +24,7 @@
     "test:unit": "vitest run tests/unit"
   },
   "dependencies": {
-    "@anthropic-ai/claude-agent-sdk": "0.1.76",
+    "@anthropic-ai/claude-agent-sdk": "0.2.32",
     "@automaker/dependency-resolver": "1.0.0",
     "@automaker/git-utils": "1.0.0",
     "@automaker/model-resolver": "1.0.0",
@@ -34,7 +34,7 @@
     "@automaker/utils": "1.0.0",
     "@github/copilot-sdk": "^0.1.16",
     "@modelcontextprotocol/sdk": "1.25.2",
-    "@openai/codex-sdk": "^0.77.0",
+    "@openai/codex-sdk": "^0.98.0",
     "cookie-parser": "1.4.7",
     "cors": "2.8.5",
     "cron-parser": "^5.5.0",
@@ -46,6 +46,7 @@
     "yaml": "2.7.0"
   },
   "devDependencies": {
+    "@playwright/test": "1.57.0",
     "@types/cookie": "0.6.0",
     "@types/cookie-parser": "1.4.10",
     "@types/cors": "2.8.19",

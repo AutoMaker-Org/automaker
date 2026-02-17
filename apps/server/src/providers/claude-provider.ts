@@ -219,8 +219,11 @@ export class ClaudeProvider extends BaseProvider {
     // claudeCompatibleProvider takes precedence over claudeApiProfile
     const providerConfig = claudeCompatibleProvider || claudeApiProfile;
 
-    // Convert thinking level to token budget
-    const maxThinkingTokens = getThinkingTokenBudget(thinkingLevel);
+    // Build thinking configuration
+    // Adaptive thinking (Opus 4.6): don't set maxThinkingTokens, model uses adaptive by default
+    // Manual thinking (Haiku/Sonnet): use budget_tokens
+    const maxThinkingTokens =
+      thinkingLevel === 'adaptive' ? undefined : getThinkingTokenBudget(thinkingLevel);
 
     // Build Claude SDK options
     const sdkOptions: Options = {
@@ -349,13 +352,13 @@ export class ClaudeProvider extends BaseProvider {
   getAvailableModels(): ModelDefinition[] {
     const models = [
       {
-        id: 'claude-opus-4-5-20251101',
-        name: 'Claude Opus 4.5',
-        modelString: 'claude-opus-4-5-20251101',
+        id: 'claude-opus-4-6',
+        name: 'Claude Opus 4.6',
+        modelString: 'claude-opus-4-6',
         provider: 'anthropic',
-        description: 'Most capable Claude model',
+        description: 'Most capable Claude model with adaptive thinking',
         contextWindow: 200000,
-        maxOutputTokens: 16000,
+        maxOutputTokens: 128000,
         supportsVision: true,
         supportsTools: true,
         tier: 'premium' as const,

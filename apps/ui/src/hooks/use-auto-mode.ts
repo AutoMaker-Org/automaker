@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useMemo } from 'react';
+import { useEffect, useCallback, useMemo, useRef } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useQueryClient } from '@tanstack/react-query';
 import { createLogger } from '@automaker/utils/logger';
@@ -13,6 +13,12 @@ import { getGlobalEventsRecent } from '@/hooks/use-event-recency';
 const logger = createLogger('AutoMode');
 
 const AUTO_MODE_SESSION_KEY = 'automaker:autoModeRunningByWorktreeKey';
+
+function arraysEqual(a: string[], b: string[]): boolean {
+  if (a.length !== b.length) return false;
+  const set = new Set(b);
+  return a.every((id) => set.has(id));
+}
 const AUTO_MODE_POLLING_INTERVAL = 30000;
 
 /**
@@ -149,8 +155,15 @@ export function useAutoMode(worktree?: WorktreeInfo) {
   // Check if we can start a new task based on concurrency limit
   const canStartNewTask = runningAutoTasks.length < maxConcurrency;
 
+  // Ref to prevent refreshStatus from overwriting optimistic state during start/stop
+  const isTransitioningRef = useRef(false);
+
   const refreshStatus = useCallback(async () => {
     if (!currentProject) return;
+
+    // Skip sync when user is in the middle of start/stop - avoids race where
+    // refreshStatus runs before the API call completes and overwrites optimistic state
+    if (isTransitioningRef.current) return;
 
     try {
       const api = getElectronAPI();
@@ -159,18 +172,28 @@ export function useAutoMode(worktree?: WorktreeInfo) {
       const result = await api.autoMode.status(currentProject.path, branchName);
       if (result.success && result.isAutoLoopRunning !== undefined) {
         const backendIsRunning = result.isAutoLoopRunning;
+        const backendRunningFeatures = result.runningFeatures ?? [];
+        const needsSync =
+          backendIsRunning !== isAutoModeRunning ||
+          // Also sync when backend has runningFeatures we're missing (handles missed WebSocket events)
+          (backendIsRunning &&
+            Array.isArray(backendRunningFeatures) &&
+            backendRunningFeatures.length > 0 &&
+            !arraysEqual(backendRunningFeatures, runningAutoTasks));
 
-        if (backendIsRunning !== isAutoModeRunning) {
+        if (needsSync) {
           const worktreeDesc = branchName ? `worktree ${branchName}` : 'main worktree';
-          logger.info(
-            `[AutoMode] Syncing UI state with backend for ${worktreeDesc} in ${currentProject.path}: ${backendIsRunning ? 'ON' : 'OFF'}`
-          );
+          if (backendIsRunning !== isAutoModeRunning) {
+            logger.info(
+              `[AutoMode] Syncing UI state with backend for ${worktreeDesc} in ${currentProject.path}: ${backendIsRunning ? 'ON' : 'OFF'}`
+            );
+          }
           setAutoModeRunning(
             currentProject.id,
             branchName,
             backendIsRunning,
             result.maxConcurrency,
-            result.runningFeatures
+            backendRunningFeatures
           );
           setAutoModeSessionForWorktree(currentProject.path, branchName, backendIsRunning);
         }
@@ -178,7 +201,7 @@ export function useAutoMode(worktree?: WorktreeInfo) {
     } catch (error) {
       logger.error('Error syncing auto mode state with backend:', error);
     }
-  }, [branchName, currentProject, isAutoModeRunning, setAutoModeRunning]);
+  }, [branchName, currentProject, isAutoModeRunning, runningAutoTasks, setAutoModeRunning]);
 
   // On mount, query backend for current auto loop status and sync UI state.
   // This handles cases where the backend is still running after a page refresh.
@@ -582,6 +605,7 @@ export function useAutoMode(worktree?: WorktreeInfo) {
       return;
     }
 
+    isTransitioningRef.current = true;
     try {
       const api = getElectronAPI();
       if (!api?.autoMode?.start) {
@@ -612,14 +636,18 @@ export function useAutoMode(worktree?: WorktreeInfo) {
       }
 
       logger.debug(`[AutoMode] Started successfully for ${worktreeDesc}`);
+      // Sync with backend after success (gets runningFeatures if events were delayed)
+      queueMicrotask(() => void refreshStatus());
     } catch (error) {
       // Revert UI state on error
       setAutoModeSessionForWorktree(currentProject.path, branchName, false);
       setAutoModeRunning(currentProject.id, branchName, false);
       logger.error('Error starting auto mode:', error);
       throw error;
+    } finally {
+      isTransitioningRef.current = false;
     }
-  }, [currentProject, branchName, setAutoModeRunning]);
+  }, [currentProject, branchName, setAutoModeRunning, getMaxConcurrencyForWorktree]);
 
   // Stop auto mode - calls backend to stop the auto loop for this worktree
   const stop = useCallback(async () => {
@@ -628,6 +656,7 @@ export function useAutoMode(worktree?: WorktreeInfo) {
       return;
     }
 
+    isTransitioningRef.current = true;
     try {
       const api = getElectronAPI();
       if (!api?.autoMode?.stop) {
@@ -655,12 +684,16 @@ export function useAutoMode(worktree?: WorktreeInfo) {
       // NOTE: Running tasks will continue until natural completion.
       // The backend stops picking up new features but doesn't abort running ones.
       logger.info(`Stopped ${worktreeDesc} - running tasks will continue`);
+      // Sync with backend after success
+      queueMicrotask(() => void refreshStatus());
     } catch (error) {
       // Revert UI state on error
       setAutoModeSessionForWorktree(currentProject.path, branchName, true);
       setAutoModeRunning(currentProject.id, branchName, true);
       logger.error('Error stopping auto mode:', error);
       throw error;
+    } finally {
+      isTransitioningRef.current = false;
     }
   }, [currentProject, branchName, setAutoModeRunning]);
 

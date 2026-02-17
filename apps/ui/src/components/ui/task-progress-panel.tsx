@@ -59,24 +59,19 @@ export function TaskProgressPanel({
         const planSpec = feature.planSpec;
         const planTasks = planSpec.tasks; // Already guarded by the if condition above
         const currentId = planSpec.currentTaskId;
-        const completedCount = planSpec.tasksCompleted || 0;
 
-        // Convert planSpec tasks to TaskInfo with proper status
+        // Convert planSpec tasks to TaskInfo using their persisted status
         // planTasks is guaranteed to be defined due to the if condition check
-        const initialTasks: TaskInfo[] = (planTasks as ParsedTask[]).map(
-          (t: ParsedTask, index: number) => ({
-            id: t.id,
-            description: t.description,
-            filePath: t.filePath,
-            phase: t.phase,
-            status:
-              index < completedCount
-                ? ('completed' as const)
-                : t.id === currentId
-                  ? ('in_progress' as const)
-                  : ('pending' as const),
-          })
-        );
+        const initialTasks: TaskInfo[] = (planTasks as ParsedTask[]).map((t: ParsedTask) => ({
+          id: t.id,
+          description: t.description,
+          filePath: t.filePath,
+          phase: t.phase,
+          status:
+            t.id === currentId
+              ? ('in_progress' as const)
+              : (t.status as TaskInfo['status']) || ('pending' as const),
+        }));
 
         setTasks(initialTasks);
         setCurrentTaskId(currentId || null);
@@ -113,15 +108,11 @@ export function TaskProgressPanel({
               const existingIndex = prev.findIndex((t) => t.id === taskEvent.taskId);
 
               if (existingIndex !== -1) {
-                // Update status to in_progress and mark previous as completed
-                return prev.map((t, idx) => {
+                // Update only the started task to in_progress
+                // Do NOT assume previous tasks are completed - rely on actual task_complete events
+                return prev.map((t) => {
                   if (t.id === taskEvent.taskId) {
                     return { ...t, status: 'in_progress' as const };
-                  }
-                  // If we are moving to a task that is further down the list, assume previous ones are completed
-                  // This is a heuristic, but usually correct for sequential execution
-                  if (idx < existingIndex && t.status !== 'completed') {
-                    return { ...t, status: 'completed' as const };
                   }
                   return t;
                 });
@@ -149,6 +140,24 @@ export function TaskProgressPanel({
               )
             );
             setCurrentTaskId(null);
+          }
+          break;
+
+        case 'auto_mode_task_status':
+          if ('taskId' in event && 'status' in event) {
+            const taskEvent = event as Extract<AutoModeEvent, { type: 'auto_mode_task_status' }>;
+            setTasks((prev) =>
+              prev.map((t) =>
+                t.id === taskEvent.taskId
+                  ? { ...t, status: taskEvent.status as TaskInfo['status'] }
+                  : t
+              )
+            );
+            if (taskEvent.status === 'in_progress') {
+              setCurrentTaskId(taskEvent.taskId);
+            } else if (taskEvent.status === 'completed') {
+              setCurrentTaskId((current) => (current === taskEvent.taskId ? null : current));
+            }
           }
           break;
       }

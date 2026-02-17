@@ -134,6 +134,8 @@ export {
   findClaudeCliPath,
   getClaudeAuthIndicators,
   type ClaudeAuthIndicators,
+  type FileCheckResult,
+  type DirectoryCheckResult,
   findCodexCliPath,
   getCodexAuthIndicators,
   type CodexAuthIndicators,

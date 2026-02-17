@@ -7,7 +7,6 @@ import { createLogger } from '@automaker/utils/logger';
 // Note: setItem/getItem moved to ./utils/theme-utils.ts
 import { UI_SANS_FONT_OPTIONS, UI_MONO_FONT_OPTIONS } from '@/config/ui-font-options';
 import type {
-  Feature as BaseFeature,
   FeatureImagePath,
   FeatureTextFilePath,
   ModelAlias,
@@ -15,25 +14,11 @@ import type {
   ThinkingLevel,
   ReasoningEffort,
   ModelProvider,
-  CursorModelId,
-  CodexModelId,
-  OpencodeModelId,
-  GeminiModelId,
-  CopilotModelId,
-  PhaseModelConfig,
   PhaseModelKey,
   PhaseModelEntry,
-  MCPServerConfig,
-  FeatureStatusWithPipeline,
-  PipelineConfig,
   PipelineStep,
-  PromptCustomization,
   ModelDefinition,
   ServerLogLevel,
-  EventHook,
-  ClaudeApiProfile,
-  ClaudeCompatibleProvider,
-  SidebarStyle,
   ParsedTask,
   PlanSpec,
 } from '@automaker/types';
@@ -2222,7 +2207,7 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
       const updateSizes = (layout: TerminalPanelContent): TerminalPanelContent => {
         if (layout.type === 'split') {
           // Find matching panels and update sizes
-          const updatedPanels = layout.panels.map((panel, index) => {
+          const updatedPanels = layout.panels.map((panel, _index) => {
             // Generate key for this panel
             const panelKey =
               panel.type === 'split'
