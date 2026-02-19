@@ -109,6 +109,9 @@ export function CreateWorktreeDialog({
   const [availableBranches, setAvailableBranches] = useState<
     Array<{ name: string; isRemote: boolean }>
   >([]);
+  // When the branch list fetch fails, store a message to show the user and
+  // allow free-form branch entry via allowCreate as a fallback.
+  const [branchFetchError, setBranchFetchError] = useState<string | null>(null);
 
   // Fetch available branches (local + remote) when the base branch section is expanded
   const fetchBranches = useCallback(async () => {
@@ -128,8 +131,16 @@ export function CreateWorktreeDialog({
           }))
         );
       }
-    } catch {
-      // Silently fail — user can still type a branch name manually
+    } catch (err) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : 'Failed to load branches. You can type a branch name manually.';
+      setBranchFetchError(message);
+      // Provide 'main' as a safe fallback so the autocomplete is not empty,
+      // and enable free-form entry (allowCreate) so the user can still type
+      // any branch name when the remote list is unavailable.
+      setAvailableBranches([{ name: 'main', isRemote: false }]);
     } finally {
       setIsLoadingBranches(false);
     }
@@ -150,6 +161,7 @@ export function CreateWorktreeDialog({
       setShowBaseBranch(false);
       setError(null);
       setAvailableBranches([]);
+      setBranchFetchError(null);
     }
   }, [open]);
 
@@ -310,6 +322,13 @@ export function CreateWorktreeDialog({
                   </Button>
                 </div>
 
+                {branchFetchError && (
+                  <div className="flex items-center gap-1.5 text-xs text-destructive">
+                    <AlertCircle className="w-3 h-3 flex-shrink-0" />
+                    <span>Could not load branches: {branchFetchError}</span>
+                  </div>
+                )}
+
                 <BranchAutocomplete
                   value={baseBranch}
                   onChange={(value) => {
@@ -319,7 +338,7 @@ export function CreateWorktreeDialog({
                   branches={branchNames}
                   placeholder="Select base branch (default: HEAD)..."
                   disabled={isLoadingBranches}
-                  allowCreate={false}
+                  allowCreate={!!branchFetchError}
                 />
 
                 {isRemoteBaseBranch && (

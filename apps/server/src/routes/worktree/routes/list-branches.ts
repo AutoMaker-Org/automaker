@@ -130,6 +130,7 @@ export function createListBranchesHandler() {
       let aheadCount = 0;
       let behindCount = 0;
       let hasRemoteBranch = false;
+      let trackingRemote: string | undefined;
       try {
         // First check if there's a remote tracking branch
         const { stdout: upstreamOutput } = await execFileAsync(
@@ -138,8 +139,14 @@ export function createListBranchesHandler() {
           { cwd: worktreePath }
         );
 
-        if (upstreamOutput.trim()) {
+        const upstreamRef = upstreamOutput.trim();
+        if (upstreamRef) {
           hasRemoteBranch = true;
+          // Extract the remote name from the upstream ref (e.g. "origin/main" -> "origin")
+          const slashIndex = upstreamRef.indexOf('/');
+          if (slashIndex !== -1) {
+            trackingRemote = upstreamRef.slice(0, slashIndex);
+          }
           const { stdout: aheadBehindOutput } = await execFileAsync(
             'git',
             ['rev-list', '--left-right', '--count', `${currentBranch}@{upstream}...HEAD`],
@@ -174,6 +181,7 @@ export function createListBranchesHandler() {
           behindCount,
           hasRemoteBranch,
           hasAnyRemotes,
+          trackingRemote,
         },
       });
     } catch (error) {

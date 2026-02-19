@@ -229,6 +229,18 @@ export function createCreatePRHandler() {
         // Couldn't parse remotes - will try fallback
       }
 
+      // When a targetRemote is explicitly specified, validate that it is known
+      // before using it. Silently falling back to auto-detection when the caller
+      // explicitly requested a remote that doesn't exist is misleading, so we
+      // fail fast with a 400 here instead.
+      if (targetRemote && parsedRemotes.size > 0 && !parsedRemotes.has(targetRemote)) {
+        res.status(400).json({
+          success: false,
+          error: `targetRemote "${targetRemote}" not found in repository remotes`,
+        });
+        return;
+      }
+
       // When a targetRemote is explicitly specified, override fork detection
       // to use the specified remote as the PR target
       let targetRepo: string | null = null;

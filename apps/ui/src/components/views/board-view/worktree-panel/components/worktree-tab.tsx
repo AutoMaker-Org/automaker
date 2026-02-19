@@ -38,6 +38,8 @@ interface WorktreeTabProps {
   aheadCount: number;
   behindCount: number;
   hasRemoteBranch: boolean;
+  /** The name of the remote that the current branch is tracking (e.g. "origin"), if any */
+  trackingRemote?: string;
   gitRepoStatus: GitRepoStatus;
   /** Whether auto mode is running for this worktree */
   isAutoModeRunning?: boolean;
@@ -93,6 +95,12 @@ interface WorktreeTabProps {
   hasInitScript: boolean;
   /** Whether a test command is configured in project settings */
   hasTestCommand?: boolean;
+  /** List of available remotes for this worktree (used to show remote submenu) */
+  remotes?: Array<{ name: string; url: string }>;
+  /** Pull from a specific remote, bypassing the remote selection dialog */
+  onPullWithRemote?: (worktree: WorktreeInfo, remote: string) => void;
+  /** Push to a specific remote, bypassing the remote selection dialog */
+  onPushWithRemote?: (worktree: WorktreeInfo, remote: string) => void;
 }
 
 export function WorktreeTab({
@@ -116,6 +124,7 @@ export function WorktreeTab({
   aheadCount,
   behindCount,
   hasRemoteBranch,
+  trackingRemote,
   gitRepoStatus,
   isAutoModeRunning = false,
   isStartingTests = false,
@@ -158,6 +167,9 @@ export function WorktreeTab({
   onContinueOperation,
   hasInitScript,
   hasTestCommand = false,
+  remotes,
+  onPullWithRemote,
+  onPushWithRemote,
 }: WorktreeTabProps) {
   // Make the worktree tab a drop target for feature cards
   const { setNodeRef, isOver } = useDroppable({
@@ -476,6 +488,7 @@ export function WorktreeTab({
         aheadCount={aheadCount}
         behindCount={behindCount}
         hasRemoteBranch={hasRemoteBranch}
+        trackingRemote={trackingRemote}
         isPulling={isPulling}
         isPushing={isPushing}
         isStartingDevServer={isStartingDevServer}
@@ -488,10 +501,13 @@ export function WorktreeTab({
         isStartingTests={isStartingTests}
         isTestRunning={isTestRunning}
         testSessionInfo={testSessionInfo}
+        remotes={remotes}
         onOpenChange={onActionsDropdownOpenChange}
         onPull={onPull}
         onPush={onPush}
         onPushNewBranch={onPushNewBranch}
+        onPullWithRemote={onPullWithRemote}
+        onPushWithRemote={onPushWithRemote}
         onOpenInEditor={onOpenInEditor}
         onOpenInIntegratedTerminal={onOpenInIntegratedTerminal}
         onOpenInExternalTerminal={onOpenInExternalTerminal}

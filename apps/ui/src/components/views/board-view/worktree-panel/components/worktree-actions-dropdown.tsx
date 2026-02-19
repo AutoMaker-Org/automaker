@@ -81,10 +81,18 @@ interface WorktreeActionsDropdownProps {
   isTestRunning?: boolean;
   /** Active test session info for this worktree */
   testSessionInfo?: TestSessionInfo;
+  /** List of available remotes for this worktree (used to show remote submenu) */
+  remotes?: Array<{ name: string; url: string }>;
+  /** The name of the remote that the current branch is tracking (e.g. "origin"), if any */
+  trackingRemote?: string;
   onOpenChange: (open: boolean) => void;
   onPull: (worktree: WorktreeInfo) => void;
   onPush: (worktree: WorktreeInfo) => void;
   onPushNewBranch: (worktree: WorktreeInfo) => void;
+  /** Pull from a specific remote, bypassing the remote selection dialog */
+  onPullWithRemote?: (worktree: WorktreeInfo, remote: string) => void;
+  /** Push to a specific remote, bypassing the remote selection dialog */
+  onPushWithRemote?: (worktree: WorktreeInfo, remote: string) => void;
   onOpenInEditor: (worktree: WorktreeInfo, editorCommand?: string) => void;
   onOpenInIntegratedTerminal: (worktree: WorktreeInfo, mode?: 'tab' | 'split') => void;
   onOpenInExternalTerminal: (worktree: WorktreeInfo, terminalId?: string) => void;
@@ -141,10 +149,14 @@ export function WorktreeActionsDropdown({
   isStartingTests = false,
   isTestRunning = false,
   testSessionInfo,
+  remotes,
+  trackingRemote,
   onOpenChange,
   onPull,
   onPush,
   onPushNewBranch,
+  onPullWithRemote,
+  onPushWithRemote,
   onOpenInEditor,
   onOpenInIntegratedTerminal,
   onOpenInExternalTerminal,
@@ -217,7 +229,7 @@ export function WorktreeActionsDropdown({
         : null;
 
   // Determine if the changes/PR section has any visible items
-  // Always show Create PR option when there's no existing PR (even without uncommitted changes)
+  // Show Create PR when no existing PR is linked
   const showCreatePR = !hasPR;
   const showPRInfo = hasPR && !!worktree.pr;
   const hasChangesSectionContent = worktree.hasChanges || showCreatePR || showPRInfo;
@@ -438,53 +450,200 @@ export function WorktreeActionsDropdown({
           </>
         )}
         <TooltipWrapper showTooltip={!!gitOpsDisabledReason} tooltipContent={gitOpsDisabledReason}>
-          <DropdownMenuItem
-            onClick={() => isGitOpsAvailable && onPull(worktree)}
-            disabled={isPulling || !isGitOpsAvailable}
-            className={cn('text-xs', !isGitOpsAvailable && 'opacity-50 cursor-not-allowed')}
-          >
-            <Download className={cn('w-3.5 h-3.5 mr-2', isPulling && 'animate-pulse')} />
-            {isPulling ? 'Pulling...' : 'Pull'}
-            {!isGitOpsAvailable && (
-              <AlertCircle className="w-3 h-3 ml-auto text-muted-foreground" />
-            )}
-            {isGitOpsAvailable && behindCount > 0 && (
-              <span className="ml-auto text-[10px] bg-muted px-1.5 py-0.5 rounded">
-                {behindCount} behind
-              </span>
-            )}
-          </DropdownMenuItem>
+          {remotes && remotes.length > 1 && onPullWithRemote ? (
+            // Multiple remotes - show split button: click main area to pull (default behavior),
+            // chevron opens submenu showing individual remotes to pull from
+            <DropdownMenuSub>
+              <div className="flex items-center">
+                <DropdownMenuItem
+                  onClick={() => isGitOpsAvailable && onPull(worktree)}
+                  disabled={isPulling || !isGitOpsAvailable}
+                  className={cn(
+                    'text-xs flex-1 pr-0 rounded-r-none',
+                    !isGitOpsAvailable && 'opacity-50 cursor-not-allowed'
+                  )}
+                >
+                  <Download className={cn('w-3.5 h-3.5 mr-2', isPulling && 'animate-pulse')} />
+                  {isPulling ? 'Pulling...' : 'Pull'}
+                  {!isGitOpsAvailable && (
+                    <AlertCircle className="w-3 h-3 ml-auto text-muted-foreground" />
+                  )}
+                  {isGitOpsAvailable && behindCount > 0 && (
+                    <span className="ml-auto text-[10px] bg-muted px-1.5 py-0.5 rounded">
+                      {behindCount} behind
+                    </span>
+                  )}
+                </DropdownMenuItem>
+                <DropdownMenuSubTrigger
+                  className={cn(
+                    'text-xs px-1 rounded-l-none border-l border-border/30 h-8',
+                    (!isGitOpsAvailable || isPulling) && 'opacity-50 cursor-not-allowed'
+                  )}
+                  disabled={!isGitOpsAvailable || isPulling}
+                />
+              </div>
+              <DropdownMenuSubContent>
+                <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">
+                  Pull from remote
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {remotes.map((remote) => (
+                  <DropdownMenuItem
+                    key={remote.name}
+                    onClick={() => isGitOpsAvailable && onPullWithRemote(worktree, remote.name)}
+                    disabled={isPulling || !isGitOpsAvailable}
+                    className="text-xs"
+                  >
+                    <Download className="w-3.5 h-3.5 mr-2" />
+                    {remote.name}
+                    <span className="ml-auto text-[10px] text-muted-foreground max-w-[100px] truncate">
+                      {remote.url}
+                    </span>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
+          ) : (
+            // Single remote or no remotes - show simple menu item
+            <DropdownMenuItem
+              onClick={() => isGitOpsAvailable && onPull(worktree)}
+              disabled={isPulling || !isGitOpsAvailable}
+              className={cn('text-xs', !isGitOpsAvailable && 'opacity-50 cursor-not-allowed')}
+            >
+              <Download className={cn('w-3.5 h-3.5 mr-2', isPulling && 'animate-pulse')} />
+              {isPulling ? 'Pulling...' : 'Pull'}
+              {!isGitOpsAvailable && (
+                <AlertCircle className="w-3 h-3 ml-auto text-muted-foreground" />
+              )}
+              {isGitOpsAvailable && behindCount > 0 && (
+                <span className="ml-auto text-[10px] bg-muted px-1.5 py-0.5 rounded">
+                  {behindCount} behind
+                </span>
+              )}
+            </DropdownMenuItem>
+          )}
         </TooltipWrapper>
         <TooltipWrapper showTooltip={!!gitOpsDisabledReason} tooltipContent={gitOpsDisabledReason}>
-          <DropdownMenuItem
-            onClick={() => {
-              if (!isGitOpsAvailable) return;
-              if (!hasRemoteBranch) {
-                onPushNewBranch(worktree);
-              } else {
-                onPush(worktree);
-              }
-            }}
-            disabled={isPushing || (hasRemoteBranch && aheadCount === 0) || !isGitOpsAvailable}
-            className={cn('text-xs', !isGitOpsAvailable && 'opacity-50 cursor-not-allowed')}
-          >
-            <Upload className={cn('w-3.5 h-3.5 mr-2', isPushing && 'animate-pulse')} />
-            {isPushing ? 'Pushing...' : 'Push'}
-            {!isGitOpsAvailable && (
-              <AlertCircle className="w-3 h-3 ml-auto text-muted-foreground" />
-            )}
-            {isGitOpsAvailable && !hasRemoteBranch && (
-              <span className="ml-auto inline-flex items-center gap-0.5 text-[10px] bg-amber-500/20 text-amber-600 dark:text-amber-400 px-1.5 py-0.5 rounded">
-                <CloudOff className="w-2.5 h-2.5" />
-                local only
-              </span>
-            )}
-            {isGitOpsAvailable && hasRemoteBranch && aheadCount > 0 && (
-              <span className="ml-auto text-[10px] bg-primary/20 text-primary px-1.5 py-0.5 rounded">
-                {aheadCount} ahead
-              </span>
-            )}
-          </DropdownMenuItem>
+          {remotes && remotes.length > 1 && onPushWithRemote ? (
+            // Multiple remotes - show split button: click main area for default push behavior,
+            // chevron opens submenu showing individual remotes to push to
+            <DropdownMenuSub>
+              <div className="flex items-center">
+                <DropdownMenuItem
+                  onClick={() => {
+                    if (!isGitOpsAvailable) return;
+                    if (!hasRemoteBranch) {
+                      onPushNewBranch(worktree);
+                    } else {
+                      onPush(worktree);
+                    }
+                  }}
+                  disabled={
+                    isPushing || (hasRemoteBranch && aheadCount === 0) || !isGitOpsAvailable
+                  }
+                  className={cn(
+                    'text-xs flex-1 pr-0 rounded-r-none',
+                    !isGitOpsAvailable && 'opacity-50 cursor-not-allowed'
+                  )}
+                >
+                  <Upload className={cn('w-3.5 h-3.5 mr-2', isPushing && 'animate-pulse')} />
+                  {isPushing ? 'Pushing...' : 'Push'}
+                  {!isGitOpsAvailable && (
+                    <AlertCircle className="w-3 h-3 ml-auto text-muted-foreground" />
+                  )}
+                  {isGitOpsAvailable && !hasRemoteBranch && (
+                    <span className="ml-auto inline-flex items-center gap-0.5 text-[10px] bg-amber-500/20 text-amber-600 dark:text-amber-400 px-1.5 py-0.5 rounded">
+                      <CloudOff className="w-2.5 h-2.5" />
+                      local only
+                    </span>
+                  )}
+                  {isGitOpsAvailable && hasRemoteBranch && aheadCount > 0 && (
+                    <span className="ml-auto text-[10px] bg-primary/20 text-primary px-1.5 py-0.5 rounded">
+                      {aheadCount} ahead
+                    </span>
+                  )}
+                  {isGitOpsAvailable && hasRemoteBranch && trackingRemote && (
+                    <span
+                      className={cn(
+                        'text-[10px] bg-muted text-muted-foreground px-1.5 py-0.5 rounded',
+                        aheadCount > 0 ? 'ml-1' : 'ml-auto'
+                      )}
+                    >
+                      {trackingRemote}
+                    </span>
+                  )}
+                </DropdownMenuItem>
+                <DropdownMenuSubTrigger
+                  className={cn(
+                    'text-xs px-1 rounded-l-none border-l border-border/30 h-8',
+                    (!isGitOpsAvailable || isPushing) && 'opacity-50 cursor-not-allowed'
+                  )}
+                  disabled={!isGitOpsAvailable || isPushing}
+                />
+              </div>
+              <DropdownMenuSubContent>
+                <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">
+                  Push to remote
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {remotes.map((remote) => (
+                  <DropdownMenuItem
+                    key={remote.name}
+                    onClick={() => isGitOpsAvailable && onPushWithRemote(worktree, remote.name)}
+                    disabled={isPushing || !isGitOpsAvailable}
+                    className="text-xs"
+                  >
+                    <Upload className="w-3.5 h-3.5 mr-2" />
+                    {remote.name}
+                    <span className="ml-auto text-[10px] text-muted-foreground max-w-[100px] truncate">
+                      {remote.url}
+                    </span>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
+          ) : (
+            // Single remote or no remotes - show simple menu item
+            <DropdownMenuItem
+              onClick={() => {
+                if (!isGitOpsAvailable) return;
+                if (!hasRemoteBranch) {
+                  onPushNewBranch(worktree);
+                } else {
+                  onPush(worktree);
+                }
+              }}
+              disabled={isPushing || (hasRemoteBranch && aheadCount === 0) || !isGitOpsAvailable}
+              className={cn('text-xs', !isGitOpsAvailable && 'opacity-50 cursor-not-allowed')}
+            >
+              <Upload className={cn('w-3.5 h-3.5 mr-2', isPushing && 'animate-pulse')} />
+              {isPushing ? 'Pushing...' : 'Push'}
+              {!isGitOpsAvailable && (
+                <AlertCircle className="w-3 h-3 ml-auto text-muted-foreground" />
+              )}
+              {isGitOpsAvailable && !hasRemoteBranch && (
+                <span className="ml-auto inline-flex items-center gap-0.5 text-[10px] bg-amber-500/20 text-amber-600 dark:text-amber-400 px-1.5 py-0.5 rounded">
+                  <CloudOff className="w-2.5 h-2.5" />
+                  local only
+                </span>
+              )}
+              {isGitOpsAvailable && hasRemoteBranch && aheadCount > 0 && (
+                <span className="ml-auto text-[10px] bg-primary/20 text-primary px-1.5 py-0.5 rounded">
+                  {aheadCount} ahead
+                </span>
+              )}
+              {isGitOpsAvailable && hasRemoteBranch && trackingRemote && (
+                <span
+                  className={cn(
+                    'text-[10px] bg-muted text-muted-foreground px-1.5 py-0.5 rounded',
+                    aheadCount > 0 ? 'ml-1' : 'ml-auto'
+                  )}
+                >
+                  {trackingRemote}
+                </span>
+              )}
+            </DropdownMenuItem>
+          )}
         </TooltipWrapper>
         <TooltipWrapper showTooltip={!!gitOpsDisabledReason} tooltipContent={gitOpsDisabledReason}>
           <DropdownMenuItem

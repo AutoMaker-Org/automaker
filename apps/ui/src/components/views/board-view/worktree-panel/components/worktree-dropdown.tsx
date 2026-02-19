@@ -82,6 +82,8 @@ export interface WorktreeDropdownProps {
   aheadCount: number;
   behindCount: number;
   hasRemoteBranch: boolean;
+  /** The name of the remote that the current branch is tracking (e.g. "origin"), if any */
+  trackingRemote?: string;
   gitRepoStatus: GitRepoStatus;
   hasTestCommand: boolean;
   isStartingTests: boolean;
@@ -121,6 +123,12 @@ export interface WorktreeDropdownProps {
   onAbortOperation?: (worktree: WorktreeInfo) => void;
   /** Continue an in-progress merge/rebase/cherry-pick after resolving conflicts */
   onContinueOperation?: (worktree: WorktreeInfo) => void;
+  /** Remotes cache: maps worktree path to list of remotes */
+  remotesCache?: Record<string, Array<{ name: string; url: string }>>;
+  /** Pull from a specific remote, bypassing the remote selection dialog */
+  onPullWithRemote?: (worktree: WorktreeInfo, remote: string) => void;
+  /** Push to a specific remote, bypassing the remote selection dialog */
+  onPushWithRemote?: (worktree: WorktreeInfo, remote: string) => void;
 }
 
 /**
@@ -170,6 +178,7 @@ export function WorktreeDropdown({
   aheadCount,
   behindCount,
   hasRemoteBranch,
+  trackingRemote,
   gitRepoStatus,
   hasTestCommand,
   isStartingTests,
@@ -204,6 +213,9 @@ export function WorktreeDropdown({
   onCherryPick,
   onAbortOperation,
   onContinueOperation,
+  remotesCache,
+  onPullWithRemote,
+  onPushWithRemote,
 }: WorktreeDropdownProps) {
   // Find the currently selected worktree to display in the trigger
   const selectedWorktree = worktrees.find((w) => isWorktreeSelected(w));
@@ -470,6 +482,7 @@ export function WorktreeDropdown({
           aheadCount={aheadCount}
           behindCount={behindCount}
           hasRemoteBranch={hasRemoteBranch}
+          trackingRemote={trackingRemote}
           isPulling={isPulling}
           isPushing={isPushing}
           isStartingDevServer={isStartingDevServer}
@@ -482,10 +495,13 @@ export function WorktreeDropdown({
           isStartingTests={isStartingTests}
           isTestRunning={isTestRunningForWorktree(selectedWorktree)}
           testSessionInfo={getTestSessionInfo(selectedWorktree)}
+          remotes={remotesCache?.[selectedWorktree.path]}
           onOpenChange={onActionsDropdownOpenChange(selectedWorktree)}
           onPull={onPull}
           onPush={onPush}
           onPushNewBranch={onPushNewBranch}
+          onPullWithRemote={onPullWithRemote}
+          onPushWithRemote={onPushWithRemote}
           onOpenInEditor={onOpenInEditor}
           onOpenInIntegratedTerminal={onOpenInIntegratedTerminal}
           onOpenInExternalTerminal={onOpenInExternalTerminal}

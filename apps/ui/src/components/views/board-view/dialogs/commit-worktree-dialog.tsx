@@ -480,8 +480,19 @@ export function CommitWorktreeDialog({
 
   const allSelected = selectedFiles.size === files.length && files.length > 0;
 
+  // Prevent the dialog from being dismissed while a push is in progress.
+  // Overlay clicks and Escape key both route through onOpenChange(false); we
+  // intercept those here so the UI stays open until the push completes.
+  const handleOpenChange = (nextOpen: boolean) => {
+    if (!nextOpen && isPushing) {
+      // Ignore close requests during an active push.
+      return;
+    }
+    onOpenChange(nextOpen);
+  };
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-[700px] max-h-[85vh] flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">

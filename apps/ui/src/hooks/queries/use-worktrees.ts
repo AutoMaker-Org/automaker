@@ -185,6 +185,8 @@ interface BranchesResult {
   hasAnyRemotes: boolean;
   isGitRepo: boolean;
   hasCommits: boolean;
+  /** The name of the remote that the current branch is tracking (e.g. "origin"), if any */
+  trackingRemote?: string;
 }
 
 /**
@@ -242,6 +244,7 @@ export function useWorktreeBranches(worktreePath: string | undefined, includeRem
         hasAnyRemotes: result.result?.hasAnyRemotes ?? false,
         isGitRepo: true,
         hasCommits: true,
+        trackingRemote: result.result?.trackingRemote,
       };
     },
     enabled: !!worktreePath,

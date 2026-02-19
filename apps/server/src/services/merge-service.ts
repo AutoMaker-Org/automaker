@@ -7,6 +7,7 @@
 import { createLogger, isValidBranchName } from '@automaker/utils';
 import { type EventEmitter } from '../lib/events.js';
 import { execGitCommand } from '@automaker/git-utils';
+import { isValidRemoteName } from '../routes/worktree/common.js';
 const logger = createLogger('MergeService');
 
 export interface MergeOptions {
@@ -90,8 +91,20 @@ export async function performMerge(
     };
   }
 
+  // Validate and sanitize the remote name to prevent git option injection.
+  // If the caller supplied an invalid remote name, fall back to 'origin' and
+  // log a warning rather than passing a potentially dangerous value to git.
+  const rawRemote = options?.remote || 'origin';
+  let remote = rawRemote;
+  if (!isValidRemoteName(rawRemote)) {
+    logger.warn('Invalid remote name supplied to merge-service; falling back to "origin"', {
+      remote: rawRemote,
+      projectPath,
+    });
+    remote = 'origin';
+  }
+
   // Fetch latest from remote before merging to ensure we have up-to-date refs
-  const remote = options?.remote || 'origin';
   try {
     await execGitCommand(['fetch', remote], projectPath);
   } catch (fetchError) {

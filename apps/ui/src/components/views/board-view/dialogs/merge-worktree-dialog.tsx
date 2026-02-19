@@ -105,9 +105,9 @@ export function MergeWorktreeDialog({
 
       if (result.success) {
         const description = deleteWorktreeAndBranch
-          ? `Branch "${worktree.branch}" has been merged into "${targetBranch}" and the worktree and branch were deleted`
-          : `Branch "${worktree.branch}" has been merged into "${targetBranch}"`;
-        toast.success(`Branch merged to ${targetBranch}`, { description });
+          ? `Branch "${worktree.branch}" has been integrated into "${targetBranch}" and the worktree and branch were deleted`
+          : `Branch "${worktree.branch}" has been integrated into "${targetBranch}"`;
+        toast.success(`Branch integrated into ${targetBranch}`, { description });
         onMerged(worktree, deleteWorktreeAndBranch);
         onOpenChange(false);
       } else {
@@ -279,7 +279,7 @@ export function MergeWorktreeDialog({
           <DialogDescription asChild>
             <div className="space-y-4">
               <span className="block">
-                Merge <code className="font-mono bg-muted px-1 rounded">{worktree.branch}</code>{' '}
+                Integrate <code className="font-mono bg-muted px-1 rounded">{worktree.branch}</code>{' '}
                 into:
               </span>
 
@@ -327,7 +327,7 @@ export function MergeWorktreeDialog({
             className="text-sm cursor-pointer flex items-center gap-1.5"
           >
             <Trash2 className="w-3.5 h-3.5 text-destructive" />
-            Delete worktree and branch after merging
+            Delete worktree and branch after integrating
           </Label>
         </div>
 
@@ -353,12 +353,12 @@ export function MergeWorktreeDialog({
             {isLoading ? (
               <>
                 <Spinner size="sm" variant="foreground" className="mr-2" />
-                Merging...
+                Integrating...
               </>
             ) : (
               <>
                 <GitMerge className="w-4 h-4 mr-2" />
-                Merge
+                Integrate
               </>
             )}
           </Button>

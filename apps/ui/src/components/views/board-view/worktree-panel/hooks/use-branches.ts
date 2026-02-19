@@ -23,6 +23,7 @@ export function useBranches() {
   const aheadCount = branchData?.aheadCount ?? 0;
   const behindCount = branchData?.behindCount ?? 0;
   const hasRemoteBranch = branchData?.hasRemoteBranch ?? false;
+  const trackingRemote = branchData?.trackingRemote;
   // Use conservative defaults (false) until data is confirmed
   // This prevents the UI from assuming git capabilities before the query completes
   const gitRepoStatus: GitRepoStatus = {
@@ -57,6 +58,7 @@ export function useBranches() {
     aheadCount,
     behindCount,
     hasRemoteBranch,
+    trackingRemote,
     isLoadingBranches,
     branchFilter,
     setBranchFilter,

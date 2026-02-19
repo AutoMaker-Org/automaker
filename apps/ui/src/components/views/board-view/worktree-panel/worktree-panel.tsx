@@ -96,6 +96,7 @@ export function WorktreePanel({
     aheadCount,
     behindCount,
     hasRemoteBranch,
+    trackingRemote,
     isLoadingBranches,
     branchFilter,
     setBranchFilter,
@@ -434,6 +435,11 @@ export function WorktreePanel({
   const [pullDialogWorktree, setPullDialogWorktree] = useState<WorktreeInfo | null>(null);
   const [pullDialogRemote, setPullDialogRemote] = useState<string | undefined>(undefined);
 
+  // Remotes cache: maps worktree path -> list of remotes (fetched when dropdown opens)
+  const [remotesCache, setRemotesCache] = useState<
+    Record<string, Array<{ name: string; url: string }>>
+  >({});
+
   const isMobile = useIsMobile();
 
   // Periodic interval check (30 seconds) to detect branch changes on disk
@@ -467,6 +473,16 @@ export function WorktreePanel({
   const handleActionsDropdownOpenChange = (worktree: WorktreeInfo) => (open: boolean) => {
     if (open) {
       fetchBranches(worktree.path);
+      // Fetch remotes for the submenu when the dropdown opens
+      const api = getHttpApiClient();
+      api.worktree.listRemotes(worktree.path).then((result) => {
+        if (result.success && result.result) {
+          setRemotesCache((prev) => ({
+            ...prev,
+            [worktree.path]: result.result!.remotes.map((r) => ({ name: r.name, url: r.url })),
+          }));
+        }
+      });
     }
   };
 
@@ -689,6 +705,29 @@ export function WorktreePanel({
     [selectRemoteOperation, _handlePull, handlePush, fetchBranches, fetchWorktrees]
   );
 
+  // Handle pull with a specific remote selected from the submenu (bypasses the remote selection dialog)
+  const handlePullWithSpecificRemote = useCallback(
+    async (worktree: WorktreeInfo, remote: string) => {
+      setPullDialogRemote(remote);
+      setPullDialogWorktree(worktree);
+      setPullDialogOpen(true);
+      await _handlePull(worktree, remote);
+      fetchBranches(worktree.path);
+      fetchWorktrees();
+    },
+    [_handlePull, fetchBranches, fetchWorktrees]
+  );
+
+  // Handle push to a specific remote selected from the submenu (bypasses the remote selection dialog)
+  const handlePushWithSpecificRemote = useCallback(
+    async (worktree: WorktreeInfo, remote: string) => {
+      await handlePush(worktree, remote);
+      fetchBranches(worktree.path);
+      fetchWorktrees();
+    },
+    [handlePush, fetchBranches, fetchWorktrees]
+  );
+
   // Handle confirming the push to remote dialog
   const handleConfirmPushToRemote = useCallback(
     async (worktree: WorktreeInfo, remote: string) => {
@@ -777,6 +816,7 @@ export function WorktreePanel({
             aheadCount={aheadCount}
             behindCount={behindCount}
             hasRemoteBranch={hasRemoteBranch}
+            trackingRemote={trackingRemote}
             isPulling={isPulling}
             isPushing={isPushing}
             isStartingDevServer={isStartingDevServer}
@@ -789,10 +829,13 @@ export function WorktreePanel({
             isStartingTests={isStartingTests}
             isTestRunning={isTestRunningForWorktree(selectedWorktree)}
             testSessionInfo={getTestSessionInfo(selectedWorktree)}
+            remotes={remotesCache[selectedWorktree.path]}
             onOpenChange={handleActionsDropdownOpenChange(selectedWorktree)}
             onPull={handlePullWithRemoteSelection}
             onPush={handlePushWithRemoteSelection}
             onPushNewBranch={handlePushNewBranch}
+            onPullWithRemote={handlePullWithSpecificRemote}
+            onPushWithRemote={handlePushWithSpecificRemote}
             onOpenInEditor={handleOpenInEditor}
             onOpenInIntegratedTerminal={handleOpenInIntegratedTerminal}
             onOpenInExternalTerminal={handleOpenInExternalTerminal}
@@ -1019,6 +1062,7 @@ export function WorktreePanel({
             aheadCount={aheadCount}
             behindCount={behindCount}
             hasRemoteBranch={hasRemoteBranch}
+            trackingRemote={trackingRemote}
             gitRepoStatus={gitRepoStatus}
             hasTestCommand={hasTestCommand}
             isStartingTests={isStartingTests}
@@ -1027,6 +1071,9 @@ export function WorktreePanel({
             onPull={handlePullWithRemoteSelection}
             onPush={handlePushWithRemoteSelection}
             onPushNewBranch={handlePushNewBranch}
+            onPullWithRemote={handlePullWithSpecificRemote}
+            onPushWithRemote={handlePushWithSpecificRemote}
+            remotesCache={remotesCache}
             onOpenInEditor={handleOpenInEditor}
             onOpenInIntegratedTerminal={handleOpenInIntegratedTerminal}
             onOpenInExternalTerminal={handleOpenInExternalTerminal}
@@ -1112,6 +1159,7 @@ export function WorktreePanel({
                 aheadCount={aheadCount}
                 behindCount={behindCount}
                 hasRemoteBranch={hasRemoteBranch}
+                trackingRemote={trackingRemote}
                 gitRepoStatus={gitRepoStatus}
                 isAutoModeRunning={isAutoModeRunningForWorktree(mainWorktree)}
                 isStartingTests={isStartingTests}
@@ -1126,6 +1174,9 @@ export function WorktreePanel({
                 onPull={handlePullWithRemoteSelection}
                 onPush={handlePushWithRemoteSelection}
                 onPushNewBranch={handlePushNewBranch}
+                onPullWithRemote={handlePullWithSpecificRemote}
+                onPushWithRemote={handlePushWithSpecificRemote}
+                remotes={remotesCache[mainWorktree.path]}
                 onOpenInEditor={handleOpenInEditor}
                 onOpenInIntegratedTerminal={handleOpenInIntegratedTerminal}
                 onOpenInExternalTerminal={handleOpenInExternalTerminal}
@@ -1191,6 +1242,7 @@ export function WorktreePanel({
                       aheadCount={aheadCount}
                       behindCount={behindCount}
                       hasRemoteBranch={hasRemoteBranch}
+                      trackingRemote={trackingRemote}
                       gitRepoStatus={gitRepoStatus}
                       isAutoModeRunning={isAutoModeRunningForWorktree(worktree)}
                       isStartingTests={isStartingTests}
@@ -1205,6 +1257,9 @@ export function WorktreePanel({
                       onPull={handlePullWithRemoteSelection}
                       onPush={handlePushWithRemoteSelection}
                       onPushNewBranch={handlePushNewBranch}
+                      onPullWithRemote={handlePullWithSpecificRemote}
+                      onPushWithRemote={handlePushWithSpecificRemote}
+                      remotes={remotesCache[worktree.path]}
                       onOpenInEditor={handleOpenInEditor}
                       onOpenInIntegratedTerminal={handleOpenInIntegratedTerminal}
                       onOpenInExternalTerminal={handleOpenInExternalTerminal}
