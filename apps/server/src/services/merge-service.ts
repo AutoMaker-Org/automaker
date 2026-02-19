@@ -13,6 +13,8 @@ export interface MergeOptions {
   squash?: boolean;
   message?: string;
   deleteWorktreeAndBranch?: boolean;
+  /** Remote name to fetch from before merging (defaults to 'origin') */
+  remote?: string;
 }
 
 export interface MergeServiceResult {
@@ -86,6 +88,19 @@ export async function performMerge(
       success: false,
       error: `Target branch "${mergeTo}" does not exist`,
     };
+  }
+
+  // Fetch latest from remote before merging to ensure we have up-to-date refs
+  const remote = options?.remote || 'origin';
+  try {
+    await execGitCommand(['fetch', remote], projectPath);
+  } catch (fetchError) {
+    logger.warn('Failed to fetch from remote before merge; proceeding with local refs', {
+      remote,
+      projectPath,
+      error: (fetchError as Error).message,
+    });
+    // Non-fatal: proceed with local refs if fetch fails (e.g. offline)
   }
 
   // Emit merge:start after validating inputs

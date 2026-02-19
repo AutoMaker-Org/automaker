@@ -20,7 +20,12 @@ export function createMergeHandler(events: EventEmitter) {
         branchName: string;
         worktreePath: string;
         targetBranch?: string; // Branch to merge into (defaults to 'main')
-        options?: { squash?: boolean; message?: string; deleteWorktreeAndBranch?: boolean };
+        options?: {
+          squash?: boolean;
+          message?: string;
+          deleteWorktreeAndBranch?: boolean;
+          remote?: string;
+        };
       };
 
       if (!projectPath || !branchName || !worktreePath) {

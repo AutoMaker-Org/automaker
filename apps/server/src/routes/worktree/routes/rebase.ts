@@ -21,10 +21,12 @@ import { runRebase } from '../../../services/rebase-service.js';
 export function createRebaseHandler(events: EventEmitter) {
   return async (req: Request, res: Response): Promise<void> => {
     try {
-      const { worktreePath, ontoBranch } = req.body as {
+      const { worktreePath, ontoBranch, remote } = req.body as {
         worktreePath: string;
         /** The branch/ref to rebase onto (e.g., 'origin/main', 'main') */
         ontoBranch: string;
+        /** Remote name to fetch from before rebasing (defaults to 'origin') */
+        remote?: string;
       };
 
       if (!worktreePath) {
@@ -62,7 +64,7 @@ export function createRebaseHandler(events: EventEmitter) {
       });
 
       // Execute the rebase via the service
-      const result = await runRebase(resolvedWorktreePath, ontoBranch);
+      const result = await runRebase(resolvedWorktreePath, ontoBranch, { remote });
 
       if (result.success) {
         // Emit success event
