@@ -416,13 +416,6 @@
     padding-right: env(safe-area-inset-right, 0px);
   }
 
-  /* PWA standalone mode: reduced multiplier for the bottom padding to
-     avoid content being obscured by the iOS home indicator while reclaiming space. 
-     Setting this to a very small value (0.1) balances clearance with usability. */
-  :root.pwa-standalone #app {
-    padding-bottom: calc(env(safe-area-inset-bottom, 0px) * 0.1);
-  }
-
   /* Apply monospace font to code elements */
   code,
   pre,

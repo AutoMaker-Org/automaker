@@ -313,22 +313,38 @@ export function GraphViewPage() {
   // Handle add and start feature
   const handleAddAndStartFeature = useCallback(
     async (featureData: Parameters<typeof handleAddFeature>[0]) => {
+      const featuresBeforeIds = new Set(useAppStore.getState().features.map((f) => f.id));
       try {
-        const featuresBeforeIds = new Set(useAppStore.getState().features.map((f) => f.id));
         // Create feature directly with in_progress status to avoid brief backlog flash
         await handleAddFeature({ ...featureData, initialStatus: 'in_progress' });
-
-        const latestFeatures = useAppStore.getState().features;
-        const newFeature = latestFeatures.find((f) => !featuresBeforeIds.has(f.id));
-
-        if (newFeature) {
-          await handleStartImplementation(newFeature);
-        }
       } catch (error) {
-        logger.error('Failed to add and start feature:', error);
+        logger.error('Failed to create feature:', error);
         toast.error(
-          `Failed to add and start feature: ${error instanceof Error ? error.message : String(error)}`
+          `Failed to create feature: ${error instanceof Error ? error.message : String(error)}`
         );
+        return;
+      }
+
+      const latestFeatures = useAppStore.getState().features;
+      const newFeature = latestFeatures.find((f) => !featuresBeforeIds.has(f.id));
+
+      if (newFeature) {
+        try {
+          await handleStartImplementation(newFeature);
+        } catch (startError) {
+          logger.error('Failed to start implementation, rolling back feature status:', startError);
+          // Rollback: revert the newly created feature back to backlog so it isn't stuck in in_progress
+          try {
+            const { updateFeature } = useAppStore.getState();
+            updateFeature(newFeature.id, { status: 'backlog' });
+            logger.info(`Rolled back feature ${newFeature.id} status to backlog`);
+          } catch (rollbackErr) {
+            logger.error('Failed to rollback feature status:', rollbackErr);
+          }
+          toast.error(
+            `Failed to start feature: ${startError instanceof Error ? startError.message : String(startError)}`
+          );
+        }
       }
     },
     [handleAddFeature, handleStartImplementation]

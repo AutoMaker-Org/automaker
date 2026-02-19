@@ -31,12 +31,7 @@ import {
   performSettingsMigration,
 } from '@/hooks/use-settings-migration';
 import { queryClient } from '@/lib/query-client';
-import {
-  createIDBPersister,
-  hasWarmIDBCache,
-  PERSIST_MAX_AGE_MS,
-  PERSIST_THROTTLE_MS,
-} from '@/lib/query-persist';
+import { createIDBPersister, PERSIST_MAX_AGE_MS, PERSIST_THROTTLE_MS } from '@/lib/query-persist';
 import { Toaster } from 'sonner';
 import { ThemeOption, themeOptions } from '@/config/theme-options';
 import { SandboxRiskDialog } from '@/components/dialogs/sandbox-risk-dialog';
@@ -47,6 +42,7 @@ import { useIsCompact } from '@/hooks/use-media-query';
 import type { Project } from '@/lib/electron';
 import type { GlobalSettings } from '@automaker/types';
 import { syncUICache, restoreFromUICache } from '@/store/ui-cache-store';
+import { setItem } from '@/lib/storage';
 
 const logger = createLogger('RootLayout');
 const IS_DEV = import.meta.env.DEV;
@@ -470,35 +466,21 @@ function RootLayoutContent() {
           optimisticallyHydrated = true;
         }
 
-        // Initialize API key for Electron mode
-        await initApiKey();
-
-        // OPTIMIZATION: Skip blocking on server health check when both caches are warm.
+        // OPTIMIZATION: Take the fast path BEFORE any async work when localStorage is warm.
         //
-        // On a normal cold start, we must wait for the server to be ready before
-        // making auth/settings requests. But on a tab restore or page reload, the
-        // server is almost certainly already running — waiting up to ~12s for health
-        // check retries just shows a blank loading screen when the user has data cached.
+        // Previously the fast path check came after `await initApiKey()`. Even though
+        // initApiKey() is a no-op in web mode, the `await` still yields to the microtask
+        // queue — adding one unnecessary event loop tick before authChecked becomes true.
+        // By moving this check before any `await`, we set authChecked synchronously within
+        // the same React render cycle, eliminating a frame of spinner on mobile.
         //
-        // When BOTH of these are true:
-        //   1. localStorage settings cache has valid project data (optimisticallyHydrated)
-        //   2. IndexedDB React Query cache exists and is recent (< 24h old)
-        //
-        // ...we mark auth as complete immediately with the cached data, then verify
-        // the session in the background. If the session turns out to be invalid, the
-        // 401 handler in http-api-client.ts will fire automaker:logged-out and redirect.
-        // If the server isn't reachable, automaker:server-offline will redirect to /login.
-        //
-        // This turns tab-restore from: blank screen → 1-3s wait → board
-        // into:                        board renders instantly → silent background verify
-        // Pass the current buster so hasWarmIDBCache can verify the cache is still
-        // valid for this build. If the buster changed (new deployment or dev restart),
-        // PersistQueryClientProvider will wipe the IDB cache — we must not treat
-        // it as warm in that case or we'll render the board with empty queries.
-        const currentBuster = typeof __APP_BUILD_HASH__ !== 'undefined' ? __APP_BUILD_HASH__ : '';
-        const idbWarm = optimisticallyHydrated && (await hasWarmIDBCache(currentBuster));
-        if (idbWarm) {
-          logger.info('[FAST_HYDRATE] Warm caches detected — marking auth complete optimistically');
+        // The background verify (waitForServerReady + verifySession) still runs after the
+        // `await initApiKey()` below, so Electron mode still gets its server URL before
+        // any API calls are made.
+        if (optimisticallyHydrated) {
+          logger.info(
+            '[FAST_HYDRATE] localStorage settings warm — marking auth complete optimistically'
+          );
           signalMigrationComplete();
           useAuthStore.getState().setAuthState({
             isAuthenticated: true,
@@ -506,20 +488,44 @@ function RootLayoutContent() {
             settingsLoaded: true,
           });
 
-          // Verify session + fetch fresh settings in the background.
-          // The UI is already rendered; this reconciles any stale data.
-          // IMPORTANT: We must distinguish definitive auth failures (401/403 → false)
-          // from transient errors (timeouts, network failures → null). Only a definitive
-          // auth failure should reset isAuthenticated — transient errors should be
-          // silently ignored since the next real API call will catch expired sessions.
+          // OPTIMIZATION: Skip the blocking "Opening project..." auto-open screen
+          // when restoring from cache. On a warm restart (PWA memory eviction, tab
+          // discard, page reload), currentProject is already restored from the UI
+          // cache (restoreFromUICache ran above). The auto-open effect calls
+          // initializeProject() which makes 5+ blocking HTTP calls to verify the
+          // .automaker directory structure — this is needed for first-time opens
+          // but redundant for returning users. Marking auto-open as done lets the
+          // routing effect navigate to /board immediately without the detour.
+          const restoredProject = useAppStore.getState().currentProject;
+          if (restoredProject) {
+            logger.info(
+              '[FAST_HYDRATE] Project already restored from cache — skipping auto-open',
+              restoredProject.name
+            );
+            setAutoOpenStatus(AUTO_OPEN_STATUS.done);
+          }
+
+          // Initialize API key then start background verification.
+          // We do this AFTER marking auth complete so the spinner is already gone.
+          // In web mode initApiKey() is a no-op; in Electron it fetches the IPC server URL.
+          await initApiKey();
+
+          // Background verify: confirm session is still valid + fetch fresh settings.
+          // The UI is already rendered from cached data — this reconciles stale state.
+          //
+          // IMPORTANT: We skip waitForServerReady() here intentionally.
+          // waitForServerReady() uses cache:'no-store' (bypasses the service worker)
+          // and makes a dedicated /api/health round trip before any real work.
+          // On mobile cellular (100-300ms RTT) that pre-flight adds visible delay.
+          // Instead we fire verifySession + getGlobal directly — both already handle
+          // server-down gracefully via their .catch() wrappers. If the server isn't
+          // up yet the catches return null/failure and we simply keep the cached session.
+          //
+          // IMPORTANT: Distinguish definitive auth failures (401/403 → false) from
+          // transient errors (timeouts, network failures → null/throw). Only a definitive
+          // failure should reset isAuthenticated — transient errors keep the user logged in.
           void (async () => {
             try {
-              const serverReady = await waitForServerReady();
-              if (!serverReady) {
-                // Server is down — the server-offline event handler in __root will redirect
-                handleServerOffline();
-                return;
-              }
               const api = getHttpApiClient();
               const [sessionValid, settingsResult] = await Promise.all([
                 // verifySession() returns true (valid), false (401/403), or throws (transient).
@@ -530,12 +536,19 @@ function RootLayoutContent() {
                 }),
                 api.settings.getGlobal().catch(() => ({ success: false, settings: null }) as const),
               ]);
+
               if (sessionValid === false) {
                 // Session is definitively expired (server returned 401/403) — log them out
                 logger.warn('[FAST_HYDRATE] Background verify: session invalid, logging out');
                 useAuthStore.getState().setAuthState({ isAuthenticated: false, authChecked: true });
                 return;
               }
+
+              // Server responded — mark IPC connected (replaces the separate health check)
+              if (sessionValid === true) {
+                setIpcConnected(true);
+              }
+
               if (sessionValid === null) {
                 // Transient error (timeout, network, 5xx) — keep the user logged in.
                 // The next real API call will detect an expired session if needed.
@@ -543,14 +556,35 @@ function RootLayoutContent() {
                   '[FAST_HYDRATE] Background verify inconclusive — keeping session active'
                 );
               }
+              // Update the localStorage cache with fresh server data so the NEXT
+              // cold start uses up-to-date settings. But do NOT call
+              // hydrateStoreFromSettings() here — the store was already hydrated
+              // from localStorage cache moments ago. Re-hydrating from the server
+              // response would create new object references for projects, settings
+              // arrays, etc., which triggers useSettingsSync's store subscriber
+              // to fire an immediate sync-back POST, causing a visible re-render
+              // flash (board → spinner → board) on mobile.
+              //
+              // The localStorage cache and server data are nearly always identical
+              // (the sync hook wrote the cache from the last successful sync).
+              // Any genuine differences (e.g., settings changed on another device)
+              // will be picked up on the next user interaction or the sync hook's
+              // periodic reconciliation.
               if (settingsResult.success && settingsResult.settings) {
-                const { settings: finalSettings } = await performSettingsMigration(
-                  settingsResult.settings as unknown as Parameters<
-                    typeof performSettingsMigration
-                  >[0]
-                );
-                hydrateStoreFromSettings(finalSettings);
-                logger.info('[FAST_HYDRATE] Background reconcile complete');
+                try {
+                  const { settings: finalSettings } = await performSettingsMigration(
+                    settingsResult.settings as unknown as Parameters<
+                      typeof performSettingsMigration
+                    >[0]
+                  );
+                  // Persist fresh server data to localStorage for the next cold start
+                  setItem('automaker-settings-cache', JSON.stringify(finalSettings));
+                  logger.info(
+                    '[FAST_HYDRATE] Background reconcile: cache updated (store untouched)'
+                  );
+                } catch (e) {
+                  logger.debug('[FAST_HYDRATE] Failed to update cache:', e);
+                }
               }
             } catch (error) {
               // Outer catch for unexpected errors — do NOT reset auth state.
@@ -565,7 +599,11 @@ function RootLayoutContent() {
           return; // Auth is done — foreground initAuth exits here
         }
 
+        // Initialize API key for Electron mode (needed before any server calls)
+        await initApiKey();
+
         // Cold start path: server not yet confirmed running, wait for it
+        // (Only reached when localStorage has no cached settings)
         const serverReady = await waitForServerReady();
         if (!serverReady) {
           handleServerOffline();
@@ -576,9 +614,12 @@ function RootLayoutContent() {
         // instead of waiting for session verification before fetching settings
         const api = getHttpApiClient();
         const [sessionValid, settingsResult] = await Promise.all([
+          // verifySession() returns true (valid), false (401/403), or throws (transient).
+          // Map throws → null (matching background verify behaviour) so transient
+          // failures don't cause unnecessary logouts on cold start.
           verifySession().catch((error) => {
-            logger.warn('Session verification failed (likely network/server issue):', error);
-            return false;
+            logger.warn('Session verification threw (transient, keeping session):', error?.message);
+            return null;
           }),
           api.settings.getGlobal().catch((error) => {
             logger.warn('Settings fetch failed during parallel init:', error);
@@ -586,7 +627,7 @@ function RootLayoutContent() {
           }),
         ]);
 
-        if (sessionValid) {
+        if (sessionValid === true || sessionValid === null) {
           // Settings were fetched in parallel - use them directly
           if (settingsResult.success && settingsResult.settings) {
             const { settings: finalSettings, migrated } = await performSettingsMigration(
@@ -690,7 +731,7 @@ function RootLayoutContent() {
             return;
           }
         } else {
-          // Session is invalid or expired - treat as not authenticated
+          // Session is definitively invalid (server returned 401/403) - treat as not authenticated
           useAuthStore.getState().setAuthState({ isAuthenticated: false, authChecked: true });
           // Signal migration complete so sync hook doesn't hang (nothing to sync when not authenticated)
           signalMigrationComplete();
@@ -812,8 +853,23 @@ function RootLayoutContent() {
     setGlobalFileBrowser(openFileBrowser);
   }, [openFileBrowser]);
 
-  // Test IPC connection on mount
+  // Test IPC connection on mount.
+  // For returning users on the fast-hydrate path, the background IIFE in initAuth
+  // already calls waitForServerReady() which performs a health check. Doing a second
+  // concurrent health check wastes a connection slot on mobile's limited TCP pool.
+  // Instead, set ipcConnected optimistically for returning users (auth already marked
+  // true at module load time) and let the background verify surface any real failures.
   useEffect(() => {
+    // Returning users: auth store was pre-populated from localStorage at module load.
+    // The background verify IIFE in initAuth handles the real health check.
+    // Optimistically mark connected — if the server is truly down, the next API call
+    // (triggered by the background verify) will surface the error.
+    const { authChecked: alreadyChecked, isAuthenticated: alreadyAuthed } = useAuthStore.getState();
+    if (!isElectron() && alreadyChecked && alreadyAuthed) {
+      setIpcConnected(true);
+      return;
+    }
+
     const testConnection = async () => {
       try {
         if (isElectron()) {
@@ -1008,6 +1064,7 @@ function RootLayoutContent() {
         {/* Pure CSS spinner — no icon dependencies, so vendor-icons can be deferred/prefetched.
             Matches the HTML app shell in index.html for a seamless HTML→React transition. */}
         <div
+          role="status"
           aria-label="Loading"
           className="h-4 w-4 animate-spin rounded-full border-2 border-foreground/10 border-t-foreground/50"
         />

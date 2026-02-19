@@ -42,8 +42,6 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
-
-const logger = createLogger('ContextView');
 import { sanitizeFilename } from '@/lib/image-utils';
 import { Markdown } from '../ui/markdown';
 import {
@@ -53,6 +51,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Textarea } from '@/components/ui/textarea';
+
+const logger = createLogger('ContextView');
 
 interface ContextFile {
   name: string;

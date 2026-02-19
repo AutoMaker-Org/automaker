@@ -140,20 +140,19 @@ export function createCreatePRHandler() {
       }
 
       // Push the branch to remote (use selected remote or default to 'origin')
+      // Uses array-based execGitCommand to avoid shell injection from pushRemote/branchName.
       const pushRemote = remote || 'origin';
       let pushError: string | null = null;
       try {
-        await execAsync(`git push ${pushRemote} ${branchName}`, {
-          cwd: worktreePath,
-          env: execEnv,
-        });
+        await execGitCommand(['push', pushRemote, branchName], worktreePath, execEnv);
       } catch {
         // If push fails, try with --set-upstream
         try {
-          await execAsync(`git push --set-upstream ${pushRemote} ${branchName}`, {
-            cwd: worktreePath,
-            env: execEnv,
-          });
+          await execGitCommand(
+            ['push', '--set-upstream', pushRemote, branchName],
+            worktreePath,
+            execEnv
+          );
         } catch (error2: unknown) {
           // Capture push error for reporting
           const err = error2 as { stderr?: string; message?: string };

@@ -270,10 +270,39 @@ const initialInstallProgress: InstallProgress = {
 // Check if setup should be skipped (for E2E testing)
 const shouldSkipSetup = import.meta.env.VITE_SKIP_SETUP === 'true';
 
+/**
+ * Pre-flight check: read setupComplete from localStorage settings cache so that
+ * the routing effect in __root.tsx doesn't flash /setup for returning users.
+ *
+ * The setup store is intentionally NOT persisted (settings sync via API), but on
+ * first render the routing check fires before the initAuth useEffect can call
+ * hydrateStoreFromSettings(). If setupComplete starts as false, returning users
+ * who have completed setup see a /setup redirect flash.
+ *
+ * Reading from localStorage here is safe: it's the same key used by
+ * parseLocalStorageSettings() and written by the settings sync hook.
+ * On first-ever visit (no cache), this returns false as expected.
+ */
+function getInitialSetupComplete(): boolean {
+  if (shouldSkipSetup) return true;
+  try {
+    const raw = localStorage.getItem('automaker-settings-cache');
+    if (raw) {
+      const parsed = JSON.parse(raw) as { setupComplete?: boolean };
+      if (parsed?.setupComplete === true) return true;
+    }
+  } catch {
+    // localStorage unavailable or JSON invalid — fall through
+  }
+  return false;
+}
+
+const initialSetupComplete = getInitialSetupComplete();
+
 const initialState: SetupState = {
-  isFirstRun: !shouldSkipSetup,
-  setupComplete: shouldSkipSetup,
-  currentStep: shouldSkipSetup ? 'complete' : 'welcome',
+  isFirstRun: !shouldSkipSetup && !initialSetupComplete,
+  setupComplete: initialSetupComplete,
+  currentStep: initialSetupComplete ? 'complete' : 'welcome',
 
   claudeCliStatus: null,
   claudeAuthStatus: null,

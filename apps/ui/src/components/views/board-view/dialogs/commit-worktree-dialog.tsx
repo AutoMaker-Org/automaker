@@ -374,6 +374,7 @@ export function CommitWorktreeDialog({
           });
 
           // Push after commit if enabled
+          let pushSucceeded = false;
           if (pushAfterCommit && selectedRemote) {
             setIsPushing(true);
             try {
@@ -385,6 +386,7 @@ export function CommitWorktreeDialog({
                   toast.success('Pushed to remote', {
                     description: pushResult.result.message,
                   });
+                  pushSucceeded = true;
                 } else {
                   toast.error(pushResult.error || 'Failed to push to remote');
                 }
@@ -396,9 +398,16 @@ export function CommitWorktreeDialog({
             }
           }
 
-          onCommitted();
-          onOpenChange(false);
-          setMessage('');
+          // Only close the dialog when no push was requested or the push completed successfully.
+          // If push failed, keep the dialog open so the user can retry.
+          if (!pushAfterCommit || pushSucceeded) {
+            onCommitted();
+            onOpenChange(false);
+            setMessage('');
+          } else {
+            // Commit succeeded but push failed — notify parent of commit but keep dialog open for retry
+            onCommitted();
+          }
         } else {
           toast.info('No changes to commit', {
             description: result.result.message,

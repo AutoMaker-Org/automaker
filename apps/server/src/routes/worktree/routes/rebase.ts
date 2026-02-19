@@ -14,7 +14,7 @@
 
 import type { Request, Response } from 'express';
 import path from 'path';
-import { getErrorMessage, logError, isValidBranchName } from '../common.js';
+import { getErrorMessage, logError, isValidBranchName, isValidRemoteName } from '../common.js';
 import type { EventEmitter } from '../../../lib/events.js';
 import { runRebase } from '../../../services/rebase-service.js';
 
@@ -53,6 +53,15 @@ export function createRebaseHandler(events: EventEmitter) {
         res.status(400).json({
           success: false,
           error: `Invalid branch name: "${ontoBranch}"`,
+        });
+        return;
+      }
+
+      // Validate optional remote name to reject unsafe characters at the route layer
+      if (remote !== undefined && !isValidRemoteName(remote)) {
+        res.status(400).json({
+          success: false,
+          error: `Invalid remote name: "${remote}"`,
         });
         return;
       }

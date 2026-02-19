@@ -1066,7 +1066,8 @@ export interface WorktreeAPI {
   // List branches (local and optionally remote)
   listBranches: (
     worktreePath: string,
-    includeRemote?: boolean
+    includeRemote?: boolean,
+    signal?: AbortSignal
   ) => Promise<{
     success: boolean;
     result?: {

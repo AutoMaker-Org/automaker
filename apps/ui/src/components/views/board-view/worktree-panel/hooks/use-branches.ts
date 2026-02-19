@@ -2,6 +2,22 @@ import { useState, useCallback } from 'react';
 import { useWorktreeBranches } from '@/hooks/queries';
 import type { GitRepoStatus } from '../types';
 
+/** Explicit return type for the useBranches hook */
+export interface UseBranchesReturn {
+  branches: Array<{ name: string; isCurrent: boolean; isRemote: boolean }>;
+  filteredBranches: Array<{ name: string; isCurrent: boolean; isRemote: boolean }>;
+  aheadCount: number;
+  behindCount: number;
+  hasRemoteBranch: boolean;
+  trackingRemote: string | undefined;
+  isLoadingBranches: boolean;
+  branchFilter: string;
+  setBranchFilter: (filter: string) => void;
+  resetBranchFilter: () => void;
+  fetchBranches: (worktreePath: string) => void;
+  gitRepoStatus: GitRepoStatus;
+}
+
 /**
  * Hook for managing branch data with React Query
  *
@@ -9,7 +25,7 @@ import type { GitRepoStatus } from '../types';
  * the current interface for backward compatibility. Tracks which
  * worktree path is currently being viewed and fetches branches on demand.
  */
-export function useBranches() {
+export function useBranches(): UseBranchesReturn {
   const [currentWorktreePath, setCurrentWorktreePath] = useState<string | undefined>();
   const [branchFilter, setBranchFilter] = useState('');
 

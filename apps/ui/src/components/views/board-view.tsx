@@ -895,7 +895,14 @@ export function BoardView() {
       const newFeature = latestFeatures.find((f) => !featuresBeforeIds.has(f.id));
 
       if (newFeature) {
-        await handleStartImplementation(newFeature);
+        try {
+          await handleStartImplementation(newFeature);
+        } catch (startError) {
+          logger.error('Failed to start implementation for feature:', startError);
+          toast.error('Failed to start feature implementation', {
+            description: startError instanceof Error ? startError.message : 'An error occurred',
+          });
+        }
       } else {
         logger.error('Could not find newly created feature to start it automatically.');
         toast.error('Failed to auto-start feature', {

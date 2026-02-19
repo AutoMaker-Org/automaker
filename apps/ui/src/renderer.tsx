@@ -119,6 +119,54 @@ if ('serviceWorker' in navigator && !window.location.protocol.startsWith('file')
 }
 
 /**
+ * Show a user-visible notification when a new service worker version is detected.
+ * The notification offers a "Reload" action that sends SKIP_WAITING to the waiting
+ * SW and reloads the page once the new SW activates. This ensures long-lived
+ * sessions can immediately pick up new deployments.
+ */
+function showUpdateNotification(registration: ServiceWorkerRegistration): void {
+  // Create a simple DOM-based notification (avoids depending on React rendering)
+  const banner = document.createElement('div');
+  banner.setAttribute('role', 'alert');
+  banner.style.cssText =
+    'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:99999;' +
+    'background:#1a1a2e;color:#e0e0e0;padding:12px 20px;border-radius:10px;' +
+    'display:flex;align-items:center;gap:12px;font-size:14px;' +
+    'box-shadow:0 4px 24px rgba(0,0,0,0.3);font-family:system-ui,sans-serif;';
+  banner.innerHTML =
+    '<span>A new version is available.</span>' +
+    '<button id="sw-update-btn" style="background:#6366f1;color:white;border:none;' +
+    'padding:6px 14px;border-radius:6px;cursor:pointer;font-size:13px;font-weight:500;">Reload</button>' +
+    '<button id="sw-dismiss-btn" style="background:transparent;color:#888;border:none;' +
+    'padding:4px 8px;cursor:pointer;font-size:18px;line-height:1;" aria-label="Dismiss">&times;</button>';
+  document.body.appendChild(banner);
+
+  // Listen for controllerchange to reload after the new SW activates
+  let reloading = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!reloading) {
+      reloading = true;
+      window.location.reload();
+    }
+  });
+
+  banner.querySelector('#sw-update-btn')?.addEventListener('click', () => {
+    // Send SKIP_WAITING to the waiting SW — it will call skipWaiting() and
+    // the controllerchange listener above will reload the page.
+    registration.waiting?.postMessage({ type: 'SKIP_WAITING' });
+    const btn = banner.querySelector('#sw-update-btn') as HTMLButtonElement | null;
+    if (btn) {
+      btn.textContent = 'Updating…';
+      btn.disabled = true;
+    }
+  });
+
+  banner.querySelector('#sw-dismiss-btn')?.addEventListener('click', () => {
+    banner.remove();
+  });
+}
+
+/**
  * Warm the service worker's immutable cache with all critical page assets.
  * Collects URLs from modulepreload, prefetch, stylesheet, and script tags
  * and sends them to the SW via PRECACHE_ASSETS for background caching.
@@ -135,9 +183,13 @@ function warmAssetCache(registration: ServiceWorkerRegistration): void {
       ? requestIdleCallback
       : (cb: () => void) => setTimeout(cb, 2000);
 
-  // On mobile, wait a bit longer to let the critical render path complete.
-  // Mobile connections are often slower and we don't want to compete with initial data fetches.
-  const delay = isMobileDevice ? 4000 : 0;
+  // CRITICAL_ASSETS are now precached at SW install time (see sw.js install handler),
+  // so this function serves as a backup for any assets missed during install.
+  // We use a short delay on mobile to let the critical render path finish first,
+  // but keep it brief since install-time caching handles the heavy lifting.
+  // Previous 4000ms delay was too long — if the user opened the app and closed it
+  // within 4s, warmAssetCache never ran and nothing was cached via this path.
+  const delay = isMobileDevice ? 1000 : 0;
 
   const doWarm = () => {
     const assetUrls: string[] = [];

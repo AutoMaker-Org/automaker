@@ -126,11 +126,6 @@ async function addCacheTimestamp(response) {
   });
 }
 
-// Track whether the main thread has explicitly requested activation
-// (e.g., user clicked "Update available" prompt or the page is being loaded fresh).
-// This prevents the new SW from taking over a live page and causing a visible reload.
-let skipWaitingRequested = false;
-
 self.addEventListener('install', (event) => {
   // Cache the app shell AND critical JS/CSS assets so the PWA loads instantly.
   // SHELL_ASSETS go into CACHE_NAME (general cache), CRITICAL_ASSETS go into
@@ -148,11 +143,17 @@ self.addEventListener('install', (event) => {
       // Cache critical JS/CSS bundles (injected at build time by swCacheBuster).
       // Uses individual fetch+put instead of cache.addAll() so a single asset
       // failure doesn't prevent the rest from being cached.
+      //
+      // IMPORTANT: We fetch with { mode: 'cors' } because Vite's output HTML uses
+      // <script type="module" crossorigin> and <link rel="modulepreload" crossorigin>
+      // for these assets. The Cache API keys entries by URL + request mode, so a
+      // no-cors cached response won't match a cors-mode browser request. Fetching
+      // with cors mode here ensures the cached entries match what the browser requests.
       CRITICAL_ASSETS.length > 0
         ? caches.open(IMMUTABLE_CACHE).then((cache) =>
             Promise.all(
               CRITICAL_ASSETS.map((url) =>
-                fetch(url)
+                fetch(url, { mode: 'cors' })
                   .then((response) => {
                     if (response.ok) return cache.put(url, response);
                   })
@@ -184,13 +185,20 @@ self.addEventListener('activate', (event) => {
       self.registration.navigationPreload && self.registration.navigationPreload.enable(),
     ])
   );
-  // self.clients.claim() is called unconditionally so this SW immediately controls
-  // all open clients after activation. This is safe because the activate event
-  // itself only fires at safe moments: on first install (no prior SW), after
-  // self.skipWaiting() is called in response to a SKIP_WAITING message from the
-  // main thread, or after all pages controlled by the old SW have been closed.
-  // Unconditional claim() is therefore harmless — by the time activate fires,
-  // either there are no old clients or the user has explicitly requested the update.
+  // Claim clients so this SW immediately controls all open pages.
+  //
+  // This is safe in all activation scenarios:
+  // 1. First install: No old SW exists — claiming is a no-op with no side effects.
+  //    Critically, this lets the fetch handler intercept requests during the same
+  //    visit that registered the SW, populating the immutable cache.
+  // 2. SKIP_WAITING from main thread: The page is freshly loaded, so claiming
+  //    won't cause a visible flash (the SW was explicitly asked to take over).
+  // 3. Natural activation (all old-SW tabs closed): The new SW activates when
+  //    no pages are using the old SW, so claiming controls only new navigations.
+  //
+  // Without clients.claim(), the SW's fetch handler would not intercept any
+  // requests until the next full navigation — meaning the first visit after
+  // install would not benefit from the cache-first asset strategy.
   self.clients.claim();
 });
 
@@ -312,10 +320,17 @@ self.addEventListener('fetch', (event) => {
 
   // Strategy 1: Cache-first for immutable hashed assets (JS/CSS bundles, fonts)
   // These files contain content hashes in their names - they never change.
+  //
+  // Uses { ignoreVary: true } for cache matching because the same asset URL
+  // can be requested with different modes: <link rel="prefetch"> uses no-cors,
+  // <script type="module" crossorigin> and <link rel="modulepreload" crossorigin>
+  // use cors. Without ignoreVary, a cors-mode browser request won't match a
+  // no-cors cached entry (or vice versa), causing unnecessary network fetches
+  // even when the asset is already in the cache.
   if (isImmutableAsset(url)) {
     event.respondWith(
       caches.open(IMMUTABLE_CACHE).then((cache) => {
-        return cache.match(event.request).then((cachedResponse) => {
+        return cache.match(event.request, { ignoreVary: true }).then((cachedResponse) => {
           if (cachedResponse) {
             return cachedResponse;
           }
@@ -457,7 +472,6 @@ self.addEventListener('message', (event) => {
   // This is used when the user acknowledges an "Update available" prompt,
   // or during fresh page loads where it's safe to swap the SW.
   if (event.data?.type === 'SKIP_WAITING') {
-    skipWaitingRequested = true;
     self.skipWaiting();
   }
 
@@ -478,9 +492,13 @@ self.addEventListener('message', (event) => {
       caches.open(IMMUTABLE_CACHE).then((cache) => {
         return Promise.all(
           event.data.urls.map((url) => {
-            return cache.match(url).then((existing) => {
+            // Use ignoreVary so we find assets regardless of the request mode
+            // they were originally cached with (cors vs no-cors).
+            return cache.match(url, { ignoreVary: true }).then((existing) => {
               if (!existing) {
-                return fetch(url, { priority: 'low' })
+                // Fetch with cors mode to match how <script crossorigin> and
+                // <link rel="modulepreload" crossorigin> request these assets.
+                return fetch(url, { mode: 'cors', priority: 'low' })
                   .then((response) => {
                     if (response.ok) {
                       return cache.put(url, response);

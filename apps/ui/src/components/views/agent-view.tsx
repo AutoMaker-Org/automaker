@@ -132,19 +132,40 @@ export function AgentView() {
 
   // Handle creating a new session from empty state.
   // On mobile the SessionManager may be unmounted (hidden), clearing the ref.
-  // In that case, show it first and wait a frame for the component to mount
-  // and re-populate quickCreateSessionRef before invoking it.
+  // In that case, show it first and wait for the component to mount and
+  // re-populate quickCreateSessionRef before invoking it.
+  //
+  // A single requestAnimationFrame isn't always sufficient — React concurrent
+  // mode or slow devices may not have committed the SessionManager mount by
+  // the next frame. We use a double-RAF with a short retry loop to wait more
+  // robustly for the ref to be populated.
   const handleCreateSessionFromEmptyState = useCallback(async () => {
     let createFn = quickCreateSessionRef.current;
     if (!createFn) {
       // SessionManager is likely unmounted on mobile — show it so it mounts
       setShowSessionManager(true);
-      // Wait for the next frame so the component mounts and populates the ref
-      await new Promise<void>((r) => requestAnimationFrame(() => r()));
-      createFn = quickCreateSessionRef.current;
+      // Wait for mount: double RAF + retry loop (handles concurrent mode & slow devices)
+      const MAX_RETRIES = 5;
+      for (let i = 0; i < MAX_RETRIES; i++) {
+        await new Promise<void>((r) =>
+          requestAnimationFrame(() => requestAnimationFrame(() => r()))
+        );
+        createFn = quickCreateSessionRef.current;
+        if (createFn) break;
+        // Small delay between retries to give React time to commit
+        if (i < MAX_RETRIES - 1) {
+          await new Promise<void>((r) => setTimeout(r, 50));
+          createFn = quickCreateSessionRef.current;
+          if (createFn) break;
+        }
+      }
     }
     if (createFn) {
       await createFn();
+    } else {
+      console.warn(
+        '[AgentView] quickCreateSessionRef was not populated after retries — SessionManager may not have mounted'
+      );
     }
   }, []);
 

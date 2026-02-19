@@ -431,18 +431,26 @@ export function useSettingsSync(): SettingsSyncState {
         return;
       }
 
-      // If projects array changed (by reference, meaning content changed), sync immediately
-      // This is critical - projects list changes must sync right away to prevent loss
-      // when switching between Electron and web modes or closing the app
+      // If projects array changed *meaningfully*, sync immediately.
+      // This is critical — projects list changes must sync right away to prevent loss
+      // when switching between Electron and web modes or closing the app.
+      //
+      // We compare by content (IDs + names), NOT by reference. The background
+      // reconcile in __root.tsx calls hydrateStoreFromSettings() with server data,
+      // which always creates a new projects array (.map() produces a new reference).
+      // A reference-only check would trigger an immediate sync-back to the server
+      // with identical data, causing a visible re-render flash on mobile.
       if (newState.projects !== prevState.projects) {
-        logger.info('[PROJECTS_CHANGED] Projects array changed, syncing immediately', {
-          prevCount: prevState.projects?.length ?? 0,
-          newCount: newState.projects?.length ?? 0,
-          prevProjects: prevState.projects?.map((p) => p.name) ?? [],
-          newProjects: newState.projects?.map((p) => p.name) ?? [],
-        });
-        syncNow();
-        return;
+        const prevIds = prevState.projects?.map((p) => `${p.id}:${p.name}:${p.path}`).join(',');
+        const newIds = newState.projects?.map((p) => `${p.id}:${p.name}:${p.path}`).join(',');
+        if (prevIds !== newIds) {
+          logger.info('[PROJECTS_CHANGED] Projects array changed, syncing immediately', {
+            prevCount: prevState.projects?.length ?? 0,
+            newCount: newState.projects?.length ?? 0,
+          });
+          syncNow();
+          return;
+        }
       }
 
       // Check if any other synced field changed

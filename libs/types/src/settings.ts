@@ -1529,8 +1529,8 @@ export const DEFAULT_PHASE_MODELS: PhaseModelConfig = {
 export const SETTINGS_VERSION = 6;
 /** Current version of the credentials schema */
 export const CREDENTIALS_VERSION = 1;
-/** Current version of the project settings schema */
-export const PROJECT_SETTINGS_VERSION = 1;
+/** Current version of the project settings schema (bumped for terminalScripts field) */
+export const PROJECT_SETTINGS_VERSION = 2;
 
 /** Default maximum concurrent agents for auto mode */
 export const DEFAULT_MAX_CONCURRENCY = 1;

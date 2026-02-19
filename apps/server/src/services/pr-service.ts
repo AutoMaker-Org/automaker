@@ -72,8 +72,9 @@ export async function resolvePrTarget({
   pushRemote: string;
   targetRemote?: string;
 }): Promise<PrTargetResult> {
-  // Validate remote names
-  if (pushRemote !== undefined && !isValidRemoteName(pushRemote)) {
+  // Validate remote names — pushRemote is a required string so the undefined
+  // guard is unnecessary, but targetRemote is optional.
+  if (!isValidRemoteName(pushRemote)) {
     throw new Error(`Invalid push remote name: "${pushRemote}"`);
   }
   if (targetRemote !== undefined && !isValidRemoteName(targetRemote)) {
@@ -98,14 +99,20 @@ export async function resolvePrTarget({
       // Pattern 1: git@github.com:owner/repo.git (fetch)
       // Pattern 2: https://github.com/owner/repo.git (fetch)
       // Pattern 3: https://github.com/owner/repo (fetch)
-      let match = line.match(/^(\w+)\s+.*[:/]([^/]+)\/([^/\s]+?)(?:\.git)?\s+\(fetch\)/);
+      let match = line.match(
+        /^([a-zA-Z0-9._-]+)\s+.*[:/]([^/]+)\/([^/\s]+?)(?:\.git)?\s+\(fetch\)/
+      );
       if (!match) {
         // Try SSH format: git@github.com:owner/repo.git
-        match = line.match(/^(\w+)\s+git@[^:]+:([^/]+)\/([^\s]+?)(?:\.git)?\s+\(fetch\)/);
+        match = line.match(
+          /^([a-zA-Z0-9._-]+)\s+git@[^:]+:([^/]+)\/([^\s]+?)(?:\.git)?\s+\(fetch\)/
+        );
       }
       if (!match) {
         // Try HTTPS format: https://github.com/owner/repo.git
-        match = line.match(/^(\w+)\s+https?:\/\/[^/]+\/([^/]+)\/([^\s]+?)(?:\.git)?\s+\(fetch\)/);
+        match = line.match(
+          /^([a-zA-Z0-9._-]+)\s+https?:\/\/[^/]+\/([^/]+)\/([^\s]+?)(?:\.git)?\s+\(fetch\)/
+        );
       }
 
       if (match) {

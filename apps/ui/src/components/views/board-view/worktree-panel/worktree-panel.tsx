@@ -627,10 +627,15 @@ export function WorktreePanel({
     setPushToRemoteDialogOpen(true);
   }, []);
 
-  // Handle pull completed - refresh worktrees
+  // Handle pull completed - refresh branches and worktrees
   const handlePullCompleted = useCallback(() => {
+    // Refresh branch data (ahead/behind counts, tracking) and worktree list
+    // after GitPullDialog completes the pull operation
+    if (pullDialogWorktree) {
+      fetchBranches(pullDialogWorktree.path);
+    }
     fetchWorktrees({ silent: true });
-  }, [fetchWorktrees]);
+  }, [fetchWorktrees, fetchBranches, pullDialogWorktree]);
 
   // Handle pull with remote selection when multiple remotes exist
   // Now opens the pull dialog which handles stash management and conflict resolution
@@ -696,32 +701,28 @@ export function WorktreePanel({
   const handleConfirmSelectRemote = useCallback(
     async (worktree: WorktreeInfo, remote: string) => {
       if (selectRemoteOperation === 'pull') {
-        // Open the pull dialog with the selected remote
+        // Open the pull dialog — let GitPullDialog manage the pull operation
+        // via its useEffect and onPulled callback (handlePullCompleted)
         setPullDialogRemote(remote);
         setPullDialogWorktree(worktree);
         setPullDialogOpen(true);
-        await _handlePull(worktree, remote);
       } else {
         await handlePush(worktree, remote);
+        fetchBranches(worktree.path);
+        fetchWorktrees();
       }
-      fetchBranches(worktree.path);
-      fetchWorktrees();
     },
-    [selectRemoteOperation, _handlePull, handlePush, fetchBranches, fetchWorktrees]
+    [selectRemoteOperation, handlePush, fetchBranches, fetchWorktrees]
   );
 
   // Handle pull with a specific remote selected from the submenu (bypasses the remote selection dialog)
-  const handlePullWithSpecificRemote = useCallback(
-    async (worktree: WorktreeInfo, remote: string) => {
-      setPullDialogRemote(remote);
-      setPullDialogWorktree(worktree);
-      setPullDialogOpen(true);
-      await _handlePull(worktree, remote);
-      fetchBranches(worktree.path);
-      fetchWorktrees();
-    },
-    [_handlePull, fetchBranches, fetchWorktrees]
-  );
+  const handlePullWithSpecificRemote = useCallback((worktree: WorktreeInfo, remote: string) => {
+    // Open the pull dialog — let GitPullDialog manage the pull operation
+    // via its useEffect and onPulled callback (handlePullCompleted)
+    setPullDialogRemote(remote);
+    setPullDialogWorktree(worktree);
+    setPullDialogOpen(true);
+  }, []);
 
   // Handle push to a specific remote selected from the submenu (bypasses the remote selection dialog)
   const handlePushWithSpecificRemote = useCallback(

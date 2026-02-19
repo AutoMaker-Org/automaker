@@ -57,7 +57,9 @@ export function TerminalScriptsSection({ project }: TerminalScriptsSectionProps)
     setOriginalScripts([]);
   }, [project.path]);
 
-  // Sync local state when project settings load
+  // Sync local state when project settings load or project path changes.
+  // Including project.path ensures originalScripts is re-populated after a
+  // project switch even if projectSettings is cached from a previous render.
   useEffect(() => {
     if (projectSettings) {
       const configured = projectSettings.terminalScripts;
@@ -68,7 +70,7 @@ export function TerminalScriptsSection({ project }: TerminalScriptsSectionProps)
       setScripts(scriptList);
       setOriginalScripts(JSON.parse(JSON.stringify(scriptList)));
     }
-  }, [projectSettings]);
+  }, [projectSettings, project.path]);
 
   // Check if there are unsaved changes
   const hasChanges = JSON.stringify(scripts) !== JSON.stringify(originalScripts);
@@ -151,6 +153,24 @@ export function TerminalScriptsSection({ project }: TerminalScriptsSectionProps)
     [draggedIndex]
   );
 
+  // Accept the drop so the browser sets dropEffect correctly (prevents 'none')
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      if (draggedIndex !== null && dragOverIndex !== null && draggedIndex !== dragOverIndex) {
+        setScripts((prev) => {
+          const newScripts = [...prev];
+          const [removed] = newScripts.splice(draggedIndex, 1);
+          newScripts.splice(dragOverIndex, 0, removed);
+          return newScripts;
+        });
+      }
+      setDraggedIndex(null);
+      setDragOverIndex(null);
+    },
+    [draggedIndex, dragOverIndex]
+  );
+
   const handleDragEnd = useCallback(
     (e: React.DragEvent) => {
       // Only perform the reorder when the drop target accepted the drop.
@@ -226,6 +246,7 @@ export function TerminalScriptsSection({ project }: TerminalScriptsSectionProps)
                   draggable
                   onDragStart={() => handleDragStart(index)}
                   onDragOver={(e) => handleDragOver(e, index)}
+                  onDrop={(e) => handleDrop(e)}
                   onDragEnd={(e) => handleDragEnd(e)}
                 >
                   {/* Drag handle */}

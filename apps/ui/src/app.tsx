@@ -95,11 +95,28 @@ export default function App() {
     logger.error('Settings sync error:', settingsSyncState.error);
   }
 
-  // Initialize Cursor CLI status at startup
-  useCursorStatusInit();
+  // Initialize Cursor CLI and Provider auth status at startup.
+  // These populate usage display in the board header but are NOT needed for the initial
+  // board render. We defer them until after the critical path (board + features query)
+  // has had a chance to complete, so these requests don't compete for TCP connections
+  // on mobile's limited connection pool during the first ~2 seconds.
+  const [deferredReady, setDeferredReady] = useState(false);
+  useEffect(() => {
+    // requestIdleCallback is ideal — fires when browser is idle between frames.
+    // Fall back to a 2-second setTimeout for browsers that don't support it (old iOS).
+    const scheduleDeferred =
+      typeof requestIdleCallback !== 'undefined'
+        ? () => requestIdleCallback(() => setDeferredReady(true), { timeout: 3000 })
+        : () => setTimeout(() => setDeferredReady(true), 2000);
 
-  // Initialize Provider auth status at startup (for Claude/Codex usage display)
-  useProviderAuthInit();
+    // Brief initial delay to ensure critical queries (features, worktrees) have
+    // dispatched their requests before we add more to the connection queue.
+    const timer = setTimeout(scheduleDeferred, 500);
+    return () => clearTimeout(timer);
+  }, []);
+
+  useCursorStatusInit(deferredReady);
+  useProviderAuthInit(deferredReady);
 
   // Mobile-specific: Manage React Query focus/online state based on page visibility.
   // Prevents the "blank screen + reload" cycle caused by aggressive refetching

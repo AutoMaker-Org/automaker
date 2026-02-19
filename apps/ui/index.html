@@ -105,7 +105,10 @@
       .app-shell-logo-bg {
         fill: rgba(255, 255, 255, 0.08);
       }
-      /* Light themes: dark spinner + logo strokes (uses :is() to avoid repeating selector list) */
+      /* Light themes: dark spinner + logo strokes (uses :is() to avoid repeating selector list).
+         IMPORTANT: This list must be kept in sync with the light theme definitions in
+         global.css (apps/ui/src/styles/global.css). When adding a new light theme class
+         to global.css, also add it to the html:is(...) selectors below. */
       html:is(
           .light,
           .cream,

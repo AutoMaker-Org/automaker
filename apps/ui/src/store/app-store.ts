@@ -217,6 +217,44 @@ export { defaultBackgroundSettings, defaultTerminalState, MAX_INIT_OUTPUT_LINES 
 // Type definitions are imported from ./types/state-types.ts
 // AppActions interface is defined in ./types/state-types.ts
 
+/**
+ * Pre-populate sidebar/UI state from the UI cache at module load time.
+ * This runs synchronously before createRoot().render(), so the very first
+ * React render uses the correct sidebar width — eliminating the layout shift
+ * (wide sidebar → collapsed) that was visible when auth was pre-populated
+ * but sidebar state wasn't.
+ */
+function getInitialUIState(): {
+  sidebarOpen: boolean;
+  sidebarStyle: 'unified' | 'discord';
+  collapsedNavSections: Record<string, boolean>;
+} {
+  try {
+    const raw = localStorage.getItem('automaker-ui-cache');
+    if (raw) {
+      const wrapper = JSON.parse(raw);
+      // zustand/persist wraps state under a "state" key
+      const cache = wrapper?.state;
+      if (cache) {
+        return {
+          sidebarOpen:
+            typeof cache.cachedSidebarOpen === 'boolean' ? cache.cachedSidebarOpen : true,
+          sidebarStyle: cache.cachedSidebarStyle === 'discord' ? 'discord' : 'unified',
+          collapsedNavSections:
+            cache.cachedCollapsedNavSections && typeof cache.cachedCollapsedNavSections === 'object'
+              ? cache.cachedCollapsedNavSections
+              : {},
+        };
+      }
+    }
+  } catch {
+    // fall through to defaults
+  }
+  return { sidebarOpen: true, sidebarStyle: 'unified', collapsedNavSections: {} };
+}
+
+const cachedUI = getInitialUIState();
+
 const initialState: AppState = {
   projects: [],
   currentProject: null,
@@ -224,9 +262,9 @@ const initialState: AppState = {
   projectHistory: [],
   projectHistoryIndex: -1,
   currentView: 'welcome',
-  sidebarOpen: true,
-  sidebarStyle: 'unified',
-  collapsedNavSections: {},
+  sidebarOpen: cachedUI.sidebarOpen,
+  sidebarStyle: cachedUI.sidebarStyle,
+  collapsedNavSections: cachedUI.collapsedNavSections,
   mobileSidebarHidden: false,
   lastSelectedSessionByProject: {},
   theme: getStoredTheme() || 'dark',
