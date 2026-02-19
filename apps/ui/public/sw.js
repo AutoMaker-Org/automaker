@@ -120,14 +120,24 @@ async function addCacheTimestamp(response) {
   });
 }
 
+// Track whether the main thread has explicitly requested activation
+// (e.g., user clicked "Update available" prompt or the page is being loaded fresh).
+// This prevents the new SW from taking over a live page and causing a visible reload.
+let skipWaitingRequested = false;
+
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
       return cache.addAll(SHELL_ASSETS);
     })
   );
-  // Activate immediately without waiting for existing clients
-  self.skipWaiting();
+  // Only skipWaiting if explicitly requested by the main thread (via SKIP_WAITING message).
+  // Without this guard, a new SW activates immediately and clients.claim() in the activate
+  // handler takes control of the open page — the browser re-fetches the HTML and the user
+  // sees a brief reload/flash when switching back to the PWA.
+  if (skipWaitingRequested) {
+    self.skipWaiting();
+  }
 });
 
 self.addEventListener('activate', (event) => {
@@ -147,7 +157,10 @@ self.addEventListener('activate', (event) => {
       self.registration.navigationPreload && self.registration.navigationPreload.enable(),
     ])
   );
-  // Take control of all clients immediately
+  // Claim clients so the SW controls the page — but only on first install
+  // (when skipWaiting was requested) or when the page loads fresh.
+  // This is safe because without skipWaiting, the activate event only fires
+  // after all old-SW-controlled pages are closed and reopened.
   self.clients.claim();
 });
 
@@ -304,43 +317,53 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Strategy 3: Network-first for navigation requests (HTML)
-  // Uses Navigation Preload when available - the browser fires the network request
-  // in parallel with SW startup, eliminating the ~50-200ms SW boot delay on mobile.
-  // Falls back to regular fetch when Navigation Preload is not supported.
+  // Strategy 3: Cache-first with background revalidation for navigation requests (HTML)
+  //
+  // The app shell (index.html) is a thin SPA entry point — its content rarely changes
+  // meaningfully between deploys because all JS/CSS bundles are content-hashed. Serving
+  // it from cache first eliminates the visible "reload flash" that occurs when the user
+  // switches back to the PWA and the old network-first strategy went to the network.
+  //
+  // The background revalidation ensures the cache stays fresh for the NEXT navigation,
+  // so new deployments are picked up within one page visit. Navigation Preload is used
+  // for the background fetch when available (no extra latency cost).
   if (isNavigationRequest(event.request)) {
     event.respondWith(
       (async () => {
-        try {
-          // Use the preloaded response if available (fired during SW boot)
-          // This is the key mobile performance win - no waiting for SW to start
-          const preloadResponse = event.preloadResponse && (await event.preloadResponse);
-          if (preloadResponse) {
-            // Cache the preloaded response for offline use
-            if (preloadResponse.ok && preloadResponse.type === 'basic') {
-              const clone = preloadResponse.clone();
-              caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
-            }
-            return preloadResponse;
-          }
+        const cache = await caches.open(CACHE_NAME);
+        const cachedResponse = (await cache.match(event.request)) || (await cache.match('/'));
 
-          // Fallback to regular fetch if Navigation Preload is not available
-          const response = await fetch(event.request);
+        // Start a background fetch to update the cache for next time.
+        // Uses Navigation Preload if available (already in-flight, no extra cost).
+        const updateCache = async () => {
+          try {
+            const preloadResponse = event.preloadResponse && (await event.preloadResponse);
+            const freshResponse = preloadResponse || (await fetch(event.request));
+            if (freshResponse.ok && freshResponse.type === 'basic') {
+              await cache.put(event.request, freshResponse.clone());
+            }
+          } catch (_e) {
+            // Network failed — cache stays as-is, still fine for next visit
+          }
+        };
+
+        if (cachedResponse) {
+          // Serve from cache immediately — no network delay, no reload flash.
+          // Update cache in background for the next visit.
+          event.waitUntil(updateCache());
+          return cachedResponse;
+        }
+
+        // No cache yet (first visit) — must go to network
+        try {
+          const preloadResponse = event.preloadResponse && (await event.preloadResponse);
+          const response = preloadResponse || (await fetch(event.request));
           if (response.ok && response.type === 'basic') {
-            const responseClone = response.clone();
-            caches.open(CACHE_NAME).then((cache) => {
-              cache.put(event.request, responseClone);
-            });
+            cache.put(event.request, response.clone());
           }
           return response;
         } catch (_e) {
-          // Offline: serve the cached app shell
-          const cached = await caches.match('/');
-          return (
-            cached ||
-            (await caches.match(event.request)) ||
-            new Response('Offline', { status: 503 })
-          );
+          return new Response('Offline', { status: 503 });
         }
       })()
     );
@@ -389,6 +412,14 @@ self.addEventListener('message', (event) => {
         }
       });
     });
+  }
+
+  // Allow the main thread to explicitly activate a waiting service worker.
+  // This is used when the user acknowledges an "Update available" prompt,
+  // or during fresh page loads where it's safe to swap the SW.
+  if (event.data?.type === 'SKIP_WAITING') {
+    skipWaitingRequested = true;
+    self.skipWaiting();
   }
 
   // Enable/disable mobile caching mode.

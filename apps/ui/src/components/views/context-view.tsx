@@ -973,7 +973,7 @@ export function ContextView() {
               </div>
 
               {/* Content area */}
-              <div className="flex-1 overflow-hidden px-4 pb-4">
+              <div className="flex-1 overflow-hidden px-4 pb-2 sm:pb-4">
                 {selectedFile.type === 'image' ? (
                   <div
                     className="h-full flex items-center justify-center bg-card rounded-lg"

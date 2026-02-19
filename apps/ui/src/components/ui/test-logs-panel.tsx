@@ -410,7 +410,7 @@ export function TestLogsPanel({
   return (
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
       <DialogContent
-        className="w-full h-full max-w-full max-h-full sm:w-[70vw] sm:max-w-[900px] sm:max-h-[85vh] sm:h-auto sm:rounded-xl rounded-none flex flex-col gap-0 p-0 overflow-hidden"
+        className="w-full h-full max-w-full max-h-full sm:w-[70vw] sm:max-w-[900px] sm:max-h-[85vh] sm:h-auto sm:rounded-xl rounded-none flex flex-col gap-0 p-0 overflow-hidden dialog-fullscreen-mobile"
         data-testid="test-logs-panel"
         compact
       >

@@ -119,4 +119,4 @@ export {
 } from './debounce.js';
 
 // Git validation utilities
-export { isValidBranchName, MAX_BRANCH_NAME_LENGTH } from './git-validation.js';
+export { isValidBranchName, isValidRemoteName, MAX_BRANCH_NAME_LENGTH } from './git-validation.js';

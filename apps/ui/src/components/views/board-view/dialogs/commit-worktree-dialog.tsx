@@ -197,6 +197,7 @@ export function CommitWorktreeDialog({
   const [selectedRemote, setSelectedRemote] = useState<string>('');
   const [isLoadingRemotes, setIsLoadingRemotes] = useState(false);
   const [isPushing, setIsPushing] = useState(false);
+  const [remotesFetched, setRemotesFetched] = useState(false);
 
   // Parse diffs
   const parsedDiffs = useMemo(() => parseDiff(diffContent), [diffContent]);
@@ -212,7 +213,7 @@ export function CommitWorktreeDialog({
 
   // Fetch remotes when push option is enabled
   useEffect(() => {
-    if (pushAfterCommit && worktree && remotes.length === 0) {
+    if (pushAfterCommit && worktree && !remotesFetched) {
       let cancelled = false;
       setIsLoadingRemotes(true);
 
@@ -221,21 +222,25 @@ export function CommitWorktreeDialog({
           const api = getElectronAPI();
           if (api?.worktree?.listRemotes) {
             const result = await api.worktree.listRemotes(worktree.path);
-            if (!cancelled && result.success && result.result) {
-              const remoteInfos = result.result.remotes.map((r) => ({
-                name: r.name,
-                url: r.url,
-              }));
-              setRemotes(remoteInfos);
-              // Auto-select 'origin' if available, otherwise first remote
-              if (remoteInfos.length > 0) {
-                const defaultRemote =
-                  remoteInfos.find((r) => r.name === 'origin') || remoteInfos[0];
-                setSelectedRemote(defaultRemote.name);
+            if (!cancelled) {
+              setRemotesFetched(true);
+              if (result.success && result.result) {
+                const remoteInfos = result.result.remotes.map((r) => ({
+                  name: r.name,
+                  url: r.url,
+                }));
+                setRemotes(remoteInfos);
+                // Auto-select 'origin' if available, otherwise first remote
+                if (remoteInfos.length > 0) {
+                  const defaultRemote =
+                    remoteInfos.find((r) => r.name === 'origin') || remoteInfos[0];
+                  setSelectedRemote(defaultRemote.name);
+                }
               }
             }
           }
         } catch (err) {
+          if (!cancelled) setRemotesFetched(true);
           console.warn('Failed to fetch remotes:', err);
         } finally {
           if (!cancelled) setIsLoadingRemotes(false);
@@ -247,7 +252,7 @@ export function CommitWorktreeDialog({
         cancelled = true;
       };
     }
-  }, [pushAfterCommit, worktree, remotes.length]);
+  }, [pushAfterCommit, worktree, remotesFetched]);
 
   // Load diffs when dialog opens
   useEffect(() => {
@@ -262,6 +267,7 @@ export function CommitWorktreeDialog({
       setRemotes([]);
       setSelectedRemote('');
       setIsPushing(false);
+      setRemotesFetched(false);
 
       let cancelled = false;
 
@@ -725,7 +731,7 @@ export function CommitWorktreeDialog({
                         {remotes.map((remote) => (
                           <SelectItem key={remote.name} value={remote.name}>
                             <span className="font-medium">{remote.name}</span>
-                            <span className="ml-2 text-muted-foreground text-xs truncate max-w-[200px]">
+                            <span className="ml-2 text-muted-foreground text-xs inline-block truncate max-w-[200px] align-bottom">
                               {remote.url}
                             </span>
                           </SelectItem>

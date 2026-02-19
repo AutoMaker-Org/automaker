@@ -24,8 +24,8 @@ interface MergeWorktreeDialogProps {
   onOpenChange: (open: boolean) => void;
   projectPath: string;
   worktree: WorktreeInfo | null;
-  /** Called when merge is successful. deletedBranch indicates if the branch was also deleted. */
-  onMerged: (mergedWorktree: WorktreeInfo, deletedBranch: boolean) => void;
+  /** Called when integration is successful. integratedWorktree indicates the integrated worktree and deletedBranch indicates if the branch was also deleted. */
+  onIntegrated: (integratedWorktree: WorktreeInfo, deletedBranch: boolean) => void;
   onCreateConflictResolutionFeature?: (conflictInfo: MergeConflictInfo) => void;
 }
 
@@ -34,7 +34,7 @@ export function MergeWorktreeDialog({
   onOpenChange,
   projectPath,
   worktree,
-  onMerged,
+  onIntegrated,
   onCreateConflictResolutionFeature,
 }: MergeWorktreeDialogProps) {
   const [isLoading, setIsLoading] = useState(false);
@@ -108,7 +108,7 @@ export function MergeWorktreeDialog({
           ? `Branch "${worktree.branch}" has been integrated into "${targetBranch}" and the worktree and branch were deleted`
           : `Branch "${worktree.branch}" has been integrated into "${targetBranch}"`;
         toast.success(`Branch integrated into ${targetBranch}`, { description });
-        onMerged(worktree, deleteWorktreeAndBranch);
+        onIntegrated(worktree, deleteWorktreeAndBranch);
         onOpenChange(false);
       } else {
         // Check if the error indicates merge conflicts
@@ -128,7 +128,7 @@ export function MergeWorktreeDialog({
             conflictFiles: result.conflictFiles || [],
             operationType: 'merge',
           });
-          toast.error('Merge conflicts detected', {
+          toast.error('Integrate conflicts detected', {
             description: 'Choose how to resolve the conflicts below.',
           });
         } else {
@@ -153,7 +153,7 @@ export function MergeWorktreeDialog({
           conflictFiles: [],
           operationType: 'merge',
         });
-        toast.error('Merge conflicts detected', {
+        toast.error('Integrate conflicts detected', {
           description: 'Choose how to resolve the conflicts below.',
         });
       } else {
@@ -191,12 +191,12 @@ export function MergeWorktreeDialog({
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <AlertTriangle className="w-5 h-5 text-orange-500" />
-              Merge Conflicts Detected
+              Integrate Conflicts Detected
             </DialogTitle>
             <DialogDescription asChild>
               <div className="space-y-4">
                 <span className="block">
-                  There are conflicts when merging{' '}
+                  There are conflicts when integrating{' '}
                   <code className="font-mono bg-muted px-1 rounded">
                     {mergeConflict.sourceBranch}
                   </code>{' '}
@@ -308,7 +308,7 @@ export function MergeWorktreeDialog({
                   <AlertTriangle className="w-4 h-4 text-yellow-500 mt-0.5 flex-shrink-0" />
                   <span className="text-yellow-500 text-sm">
                     This worktree has {worktree.changedFilesCount} uncommitted change(s). Please
-                    commit or discard them before merging.
+                    commit or discard them before integrating.
                   </span>
                 </div>
               )}

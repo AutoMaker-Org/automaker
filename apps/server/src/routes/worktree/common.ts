@@ -2,7 +2,12 @@
  * Common utilities for worktree routes
  */
 
-import { createLogger, isValidBranchName, MAX_BRANCH_NAME_LENGTH } from '@automaker/utils';
+import {
+  createLogger,
+  isValidBranchName,
+  isValidRemoteName,
+  MAX_BRANCH_NAME_LENGTH,
+} from '@automaker/utils';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { getErrorMessage as getErrorMessageShared, createLogError } from '../common.js';
@@ -16,7 +21,7 @@ export const execAsync = promisify(exec);
 
 // Re-export git validation utilities from the canonical shared module so
 // existing consumers that import from this file continue to work.
-export { isValidBranchName, MAX_BRANCH_NAME_LENGTH };
+export { isValidBranchName, isValidRemoteName, MAX_BRANCH_NAME_LENGTH };
 
 // ============================================================================
 // Extended PATH configuration for Electron apps
@@ -59,25 +64,6 @@ export const execEnv = {
   ...process.env,
   PATH: extendedPath,
 };
-
-/**
- * Validate git remote name to prevent command injection.
- * Matches the strict validation used in add-remote.ts:
- * - Rejects empty strings and names that are too long
- * - Disallows names that start with '-' or '.'
- * - Forbids the substring '..'
- * - Rejects '/' characters
- * - Rejects NUL bytes
- * - Must consist only of alphanumerics, hyphens, underscores, and dots
- */
-export function isValidRemoteName(name: string): boolean {
-  if (!name || name.length === 0 || name.length >= MAX_BRANCH_NAME_LENGTH) return false;
-  if (name.startsWith('-') || name.startsWith('.')) return false;
-  if (name.includes('..')) return false;
-  if (name.includes('/')) return false;
-  if (name.includes('\0')) return false;
-  return /^[a-zA-Z0-9._-]+$/.test(name);
-}
 
 /**
  * Check if gh CLI is available on the system

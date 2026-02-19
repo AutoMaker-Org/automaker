@@ -96,8 +96,8 @@ export const KanbanColumn = memo(function KanbanColumn({
             '[&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]',
           // Smooth scrolling
           'scroll-smooth',
-          // Add padding at bottom if there's a footer action
-          footerAction && 'pb-14',
+          // Add padding at bottom if there's a footer action (less on mobile to reduce blank space)
+          footerAction && 'pb-12 sm:pb-14',
           contentClassName
         )}
         ref={contentRef}
@@ -109,7 +109,7 @@ export const KanbanColumn = memo(function KanbanColumn({
 
       {/* Floating Footer Action */}
       {footerAction && (
-        <div className="absolute bottom-0 left-0 right-0 z-20 p-2 bg-gradient-to-t from-card/95 via-card/80 to-transparent pt-6">
+        <div className="absolute bottom-0 left-0 right-0 z-20 p-2 bg-gradient-to-t from-card/95 via-card/80 to-transparent pt-4 sm:pt-6">
           {footerAction}
         </div>
       )}

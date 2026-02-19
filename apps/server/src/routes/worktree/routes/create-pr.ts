@@ -248,16 +248,32 @@ export function createCreatePRHandler() {
       if (targetRemote && parsedRemotes.size > 0) {
         const targetInfo = parsedRemotes.get(targetRemote);
         const pushInfo = parsedRemotes.get(pushRemote);
+
+        // If the push remote is not found in the parsed remotes, we cannot
+        // determine the push owner and would build incorrect URLs. Fail fast
+        // instead of silently proceeding with null values.
+        if (!pushInfo) {
+          logger.warn('Push remote not found in parsed remotes', {
+            pushRemote,
+            targetRemote,
+            availableRemotes: [...parsedRemotes.keys()],
+          });
+          res.status(400).json({
+            success: false,
+            error: `Push remote "${pushRemote}" not found in repository remotes`,
+          });
+          return;
+        }
+
         if (targetInfo) {
           targetRepo = `${targetInfo.owner}/${targetInfo.repo}`;
           repoUrl = `https://github.com/${targetInfo.owner}/${targetInfo.repo}`;
         }
-        if (pushInfo) {
-          pushOwner = pushInfo.owner;
-        }
+        pushOwner = pushInfo.owner;
+
         // Override the auto-detected upstream/origin with explicit targetRemote
         // Only treat as cross-remote if target differs from push remote
-        if (targetRemote !== pushRemote && targetInfo && pushInfo) {
+        if (targetRemote !== pushRemote && targetInfo) {
           upstreamRepo = targetRepo;
           originOwner = pushOwner;
         } else if (targetInfo) {
@@ -297,13 +313,16 @@ export function createCreatePRHandler() {
       if (repoUrl) {
         const encodedTitle = encodeURIComponent(title);
         const encodedBody = encodeURIComponent(body);
+        // Encode base branch and head branch to handle special chars like # or %
+        const encodedBase = encodeURIComponent(base);
+        const encodedBranch = encodeURIComponent(branchName);
 
         if (upstreamRepo && originOwner) {
           // Fork workflow (or cross-remote PR): PR to target from push remote
-          browserUrl = `https://github.com/${upstreamRepo}/compare/${base}...${originOwner}:${branchName}?expand=1&title=${encodedTitle}&body=${encodedBody}`;
+          browserUrl = `https://github.com/${upstreamRepo}/compare/${encodedBase}...${originOwner}:${encodedBranch}?expand=1&title=${encodedTitle}&body=${encodedBody}`;
         } else {
           // Regular repo
-          browserUrl = `${repoUrl}/compare/${base}...${branchName}?expand=1&title=${encodedTitle}&body=${encodedBody}`;
+          browserUrl = `${repoUrl}/compare/${encodedBase}...${encodedBranch}?expand=1&title=${encodedTitle}&body=${encodedBody}`;
         }
       }
 

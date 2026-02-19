@@ -1,12 +1,19 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './app';
-import { isMobileDevice } from './lib/mobile-detect';
+import { isMobileDevice, isPwaStandalone } from './lib/mobile-detect';
+
+// Apply PWA standalone class early, before CSS renders, so the #app container
+// can use a tighter bottom safe-area inset (the home indicator needs only minimal
+// clearance when there's no browser chrome beneath it).
+if (isPwaStandalone) {
+  document.documentElement.classList.add('pwa-standalone');
+}
 
 // Register service worker for PWA support (web mode only)
 // Uses optimized registration strategy for faster mobile loading:
 // - Registers after load event to avoid competing with critical resources
-// - Handles updates gracefully with skipWaiting support
+// - Defers SW activation to prevent reload flash when switching back to the app
 // - Triggers cache cleanup on activation
 // - Prefetches likely-needed route chunks during idle time
 // - Enables mobile-specific API caching when on a mobile device
@@ -28,11 +35,24 @@ if ('serviceWorker' in navigator && !window.location.protocol.startsWith('file')
           });
         }, updateInterval);
 
-        // When a new service worker takes over, trigger cache cleanup
+        // When a new service worker is found, DON'T activate it immediately.
+        // Instead, wait until the user navigates away or refreshes. This prevents
+        // the brief reload/flash that occurs when skipWaiting() + clients.claim()
+        // swaps the SW under a live page (especially noticeable when switching back
+        // to the PWA on mobile).
+        //
+        // The new SW will naturally activate when all tabs using the old SW are closed.
+        // For urgent updates, we send SKIP_WAITING on fresh page loads (see below).
         registration.addEventListener('updatefound', () => {
           const newWorker = registration.installing;
           if (newWorker) {
             newWorker.addEventListener('statechange', () => {
+              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                // A new SW is waiting — it will activate on next page load.
+                // No need to skipWaiting here; the cache-first HTML strategy means
+                // the user gets the new version on their next fresh visit.
+                console.debug('[SW] New service worker installed and waiting to activate');
+              }
               if (newWorker.state === 'activated') {
                 // New service worker is active - clean up old immutable cache entries
                 newWorker.postMessage({ type: 'CACHE_CLEANUP' });
@@ -40,6 +60,13 @@ if ('serviceWorker' in navigator && !window.location.protocol.startsWith('file')
             });
           }
         });
+
+        // On fresh page loads (not tab-switch-back), if there's a waiting SW,
+        // tell it to activate now. This is safe because the page is freshly loaded
+        // and won't flash. This ensures updates are picked up within one page visit.
+        if (registration.waiting) {
+          registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+        }
 
         // Notify the service worker about mobile mode.
         // This enables stale-while-revalidate caching for API responses,

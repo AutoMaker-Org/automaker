@@ -410,9 +410,17 @@
     overflow: hidden;
     overscroll-behavior: none;
     padding-top: env(safe-area-inset-top, 0px);
-    padding-bottom: env(safe-area-inset-bottom, 0px);
+    /* Default bottom inset: halved to balance home-indicator clearance with screen space */
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) * 0.5);
     padding-left: env(safe-area-inset-left, 0px);
     padding-right: env(safe-area-inset-right, 0px);
+  }
+
+  /* PWA standalone mode: further reduce bottom safe-area since there's no browser
+     chrome beneath the app. The home indicator only needs minimal clearance (~8px)
+     rather than the full 34px inset the OS reports. */
+  :root.pwa-standalone #app {
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) * 0.25);
   }
 
   /* Apply monospace font to code elements */
@@ -551,6 +559,21 @@
   /* Disable iOS long-press context menu - apply only to non-interactive chrome elements */
   .no-touch-callout {
     -webkit-touch-callout: none;
+  }
+
+  /* Safe-area padding for full-screen mobile dialogs (e.g. view changes, commits).
+     Prevents overlap with the Dynamic Island / notch on iOS.
+     On sm+ (desktop), these are removed since the dialog is centered and not full-screen. */
+  .dialog-fullscreen-mobile {
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  @media (min-width: 640px) {
+    .dialog-fullscreen-mobile {
+      padding-top: 0;
+      padding-bottom: 0;
+    }
   }
 
   .glass-subtle {

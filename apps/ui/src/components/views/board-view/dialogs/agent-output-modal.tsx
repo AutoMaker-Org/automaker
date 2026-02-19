@@ -321,11 +321,11 @@ export function AgentOutputModal({
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent
-        className="w-full h-full max-w-full max-h-full sm:w-[60vw] sm:max-w-[60vw] sm:max-h-[80vh] sm:h-auto sm:rounded-xl rounded-none flex flex-col"
+        className="w-full max-h-[85dvh] max-w-[calc(100%-2rem)] sm:w-[60vw] sm:max-w-[60vw] sm:max-h-[80vh] rounded-xl flex flex-col"
         data-testid="agent-output-modal"
       >
         <DialogHeader className="shrink-0">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pr-8">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pr-10">
             <DialogTitle className="flex items-center gap-2">
               {featureStatus !== 'verified' && featureStatus !== 'waiting_approval' && (
                 <Spinner size="md" />

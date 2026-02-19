@@ -475,14 +475,19 @@ export function WorktreePanel({
       fetchBranches(worktree.path);
       // Fetch remotes for the submenu when the dropdown opens
       const api = getHttpApiClient();
-      api.worktree.listRemotes(worktree.path).then((result) => {
-        if (result.success && result.result) {
-          setRemotesCache((prev) => ({
-            ...prev,
-            [worktree.path]: result.result!.remotes.map((r) => ({ name: r.name, url: r.url })),
-          }));
-        }
-      });
+      api.worktree
+        .listRemotes(worktree.path)
+        .then((result) => {
+          if (result.success && result.result) {
+            setRemotesCache((prev) => ({
+              ...prev,
+              [worktree.path]: result.result!.remotes.map((r) => ({ name: r.name, url: r.url })),
+            }));
+          }
+        })
+        .catch((err) => {
+          console.warn('Failed to fetch remotes for worktree:', err);
+        });
     }
   };
 
@@ -758,13 +763,13 @@ export function WorktreePanel({
     setMergeDialogOpen(true);
   }, []);
 
-  // Handle merge completion - refresh worktrees and reassign features if branch was deleted
-  const handleMerged = useCallback(
-    (mergedWorktree: WorktreeInfo, deletedBranch: boolean) => {
+  // Handle integration completion - refresh worktrees and reassign features if branch was deleted
+  const handleIntegrated = useCallback(
+    (integratedWorktree: WorktreeInfo, deletedBranch: boolean) => {
       fetchWorktrees();
       // If the branch was deleted, notify parent to reassign features to main
       if (deletedBranch && onBranchDeletedDuringMerge) {
-        onBranchDeletedDuringMerge(mergedWorktree.branch);
+        onBranchDeletedDuringMerge(integratedWorktree.branch);
       }
     },
     [fetchWorktrees, onBranchDeletedDuringMerge]
@@ -1001,7 +1006,7 @@ export function WorktreePanel({
           onOpenChange={setMergeDialogOpen}
           projectPath={projectPath}
           worktree={mergeWorktree}
-          onMerged={handleMerged}
+          onIntegrated={handleIntegrated}
           onCreateConflictResolutionFeature={onCreateMergeConflictResolutionFeature}
         />
 
@@ -1378,7 +1383,7 @@ export function WorktreePanel({
         onOpenChange={setMergeDialogOpen}
         projectPath={projectPath}
         worktree={mergeWorktree}
-        onMerged={handleMerged}
+        onIntegrated={handleIntegrated}
         onCreateConflictResolutionFeature={onCreateMergeConflictResolutionFeature}
       />
 

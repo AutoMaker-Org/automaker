@@ -4,10 +4,9 @@
  * Extracted from worktree merge route to allow internal service calls.
  */
 
-import { createLogger, isValidBranchName } from '@automaker/utils';
+import { createLogger, isValidBranchName, isValidRemoteName } from '@automaker/utils';
 import { type EventEmitter } from '../lib/events.js';
 import { execGitCommand } from '@automaker/git-utils';
-import { isValidRemoteName } from '../routes/worktree/common.js';
 const logger = createLogger('MergeService');
 
 export interface MergeOptions {
@@ -38,7 +37,11 @@ export interface MergeServiceResult {
  * @param branchName - Source branch to merge
  * @param worktreePath - Path to the worktree (used for deletion if requested)
  * @param targetBranch - Branch to merge into (defaults to 'main')
- * @param options - Merge options (squash, message, deleteWorktreeAndBranch)
+ * @param options - Merge options
+ * @param options.squash - If true, perform a squash merge
+ * @param options.message - Custom merge commit message
+ * @param options.deleteWorktreeAndBranch - If true, delete worktree and branch after merge
+ * @param options.remote - Remote name to fetch from before merging (defaults to 'origin')
  */
 export async function performMerge(
   projectPath: string,
@@ -91,18 +94,21 @@ export async function performMerge(
     };
   }
 
-  // Validate and sanitize the remote name to prevent git option injection.
-  // If the caller supplied an invalid remote name, fall back to 'origin' and
-  // log a warning rather than passing a potentially dangerous value to git.
+  // Validate the remote name to prevent git option injection.
+  // Reject invalid remote names so the caller knows their input was wrong,
+  // consistent with how invalid branch names are handled above.
   const rawRemote = options?.remote || 'origin';
-  let remote = rawRemote;
   if (!isValidRemoteName(rawRemote)) {
-    logger.warn('Invalid remote name supplied to merge-service; falling back to "origin"', {
+    logger.warn('Invalid remote name supplied to merge-service', {
       remote: rawRemote,
       projectPath,
     });
-    remote = 'origin';
+    return {
+      success: false,
+      error: `Invalid remote name: "${rawRemote}"`,
+    };
   }
+  const remote = rawRemote;
 
   // Fetch latest from remote before merging to ensure we have up-to-date refs
   try {

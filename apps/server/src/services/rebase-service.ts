@@ -7,9 +7,8 @@
 
 import fs from 'fs/promises';
 import path from 'path';
-import { createLogger, getErrorMessage } from '@automaker/utils';
+import { createLogger, getErrorMessage, isValidRemoteName } from '@automaker/utils';
 import { execGitCommand, getCurrentBranch, getConflictFiles } from '@automaker/git-utils';
-import { isValidRemoteName } from '../routes/worktree/common.js';
 
 const logger = createLogger('RebaseService');
 
@@ -70,18 +69,21 @@ export async function runRebase(
     };
   }
 
-  // Validate and sanitize the remote name to prevent git option injection.
-  // A value that starts with '-' could be misinterpreted as a git flag;
-  // fall back to the safe default 'origin' and log a warning instead.
+  // Validate the remote name to prevent git option injection.
+  // Reject invalid remote names so the caller knows their input was wrong,
+  // consistent with how invalid branch names are handled above.
   const rawRemote = options?.remote || 'origin';
-  let remote = rawRemote;
   if (!isValidRemoteName(rawRemote)) {
-    logger.warn('Invalid remote name supplied to rebase-service; falling back to "origin"', {
+    logger.warn('Invalid remote name supplied to rebase-service', {
       remote: rawRemote,
       worktreePath,
     });
-    remote = 'origin';
+    return {
+      success: false,
+      error: `Invalid remote name: "${rawRemote}"`,
+    };
   }
+  const remote = rawRemote;
 
   // Fetch latest from remote before rebasing to ensure we have up-to-date refs
   try {

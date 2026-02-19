@@ -350,7 +350,8 @@ function FileDiffSection({
 
   return (
     <div className="border border-border rounded-lg overflow-hidden">
-      <div className="w-full px-3 py-2 flex items-center gap-2 text-left bg-card hover:bg-accent/50 transition-colors">
+      <div className="w-full px-3 py-2 flex flex-col gap-1 text-left bg-card hover:bg-accent/50 transition-colors sm:flex-row sm:items-center sm:gap-2">
+        {/* File name row */}
         <button onClick={onToggle} className="flex items-center gap-2 flex-1 min-w-0 text-left">
           {isExpanded ? (
             <ChevronDown className="w-4 h-4 text-muted-foreground flex-shrink-0" />
@@ -367,7 +368,8 @@ function FileDiffSection({
             className="flex-1 text-sm font-mono text-foreground"
           />
         </button>
-        <div className="flex items-center gap-2 flex-shrink-0">
+        {/* Indicators & staging row */}
+        <div className="flex items-center gap-2 flex-shrink-0 pl-6 sm:pl-0">
           {enableStaging && stagingState && <StagingBadge state={stagingState} />}
           {fileDiff.isNew && (
             <span className="text-xs px-1.5 py-0.5 rounded bg-green-500/20 text-green-400">
@@ -776,7 +778,7 @@ export function GitDiffPanel({
             <div>
               {/* Summary bar */}
               <div className="p-4 pb-2 border-b border-border-glass">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex items-center gap-4 flex-wrap">
                     {(() => {
                       // Group files by status
@@ -817,7 +819,7 @@ export function GitDiffPanel({
                       ));
                     })()}
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1 flex-wrap">
                     {enableStaging && stagingSummary && (
                       <>
                         <Button
@@ -877,7 +879,7 @@ export function GitDiffPanel({
                 </div>
 
                 {/* Stats */}
-                <div className="flex items-center gap-4 text-sm mt-2">
+                <div className="flex items-center gap-4 text-sm mt-2 flex-wrap">
                   <span className="text-muted-foreground">
                     {files.length} {files.length === 1 ? 'file' : 'files'} changed
                   </span>
@@ -922,50 +924,56 @@ export function GitDiffPanel({
                           key={file.path}
                           className="border border-border rounded-lg overflow-hidden"
                         >
-                          <div className="w-full px-3 py-2 flex items-center gap-2 text-left bg-card">
-                            {getFileIcon(file.status)}
-                            <TruncatedFilePath
-                              path={file.path}
-                              className="flex-1 text-sm font-mono text-foreground"
-                            />
-                            {enableStaging && <StagingBadge state={stagingState} />}
-                            <span
-                              className={cn(
-                                'text-xs px-1.5 py-0.5 rounded border font-medium',
-                                getStatusBadgeColor(file.status)
-                              )}
-                            >
-                              {getStatusDisplayName(file.status)}
-                            </span>
-                            {enableStaging && (
-                              <div className="flex items-center gap-1 ml-1">
-                                {stagingInProgress.has(file.path) ? (
-                                  <Spinner size="sm" />
-                                ) : stagingState === 'staged' || stagingState === 'partial' ? (
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-6 px-2 text-xs"
-                                    onClick={() => handleUnstageFile(file.path)}
-                                    title="Unstage file"
-                                  >
-                                    <Minus className="w-3 h-3 mr-1" />
-                                    Unstage
-                                  </Button>
-                                ) : (
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-6 px-2 text-xs"
-                                    onClick={() => handleStageFile(file.path)}
-                                    title="Stage file"
-                                  >
-                                    <Plus className="w-3 h-3 mr-1" />
-                                    Stage
-                                  </Button>
+                          <div className="w-full px-3 py-2 flex flex-col gap-1 text-left bg-card sm:flex-row sm:items-center sm:gap-2">
+                            {/* File name row */}
+                            <div className="flex items-center gap-2 flex-1 min-w-0">
+                              {getFileIcon(file.status)}
+                              <TruncatedFilePath
+                                path={file.path}
+                                className="flex-1 text-sm font-mono text-foreground"
+                              />
+                            </div>
+                            {/* Indicators & staging row */}
+                            <div className="flex items-center gap-2 flex-shrink-0 pl-6 sm:pl-0">
+                              {enableStaging && <StagingBadge state={stagingState} />}
+                              <span
+                                className={cn(
+                                  'text-xs px-1.5 py-0.5 rounded border font-medium',
+                                  getStatusBadgeColor(file.status)
                                 )}
-                              </div>
-                            )}
+                              >
+                                {getStatusDisplayName(file.status)}
+                              </span>
+                              {enableStaging && (
+                                <div className="flex items-center gap-1 ml-1">
+                                  {stagingInProgress.has(file.path) ? (
+                                    <Spinner size="sm" />
+                                  ) : stagingState === 'staged' || stagingState === 'partial' ? (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-6 px-2 text-xs"
+                                      onClick={() => handleUnstageFile(file.path)}
+                                      title="Unstage file"
+                                    >
+                                      <Minus className="w-3 h-3 mr-1" />
+                                      Unstage
+                                    </Button>
+                                  ) : (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-6 px-2 text-xs"
+                                      onClick={() => handleStageFile(file.path)}
+                                      title="Stage file"
+                                    >
+                                      <Plus className="w-3 h-3 mr-1" />
+                                      Stage
+                                    </Button>
+                                  )}
+                                </div>
+                              )}
+                            </div>
                           </div>
                           <div className="px-4 py-3 text-sm text-muted-foreground bg-background border-t border-border">
                             {file.status === '?' ? (

@@ -106,7 +106,7 @@ export function CreatePRDialog({
   const needsPush = !branchHasRemote || branchAheadCount > 0 || !!worktree?.hasChanges;
 
   // Filter out current worktree branch from the list
-  // When multiple remotes exist and a target remote is selected, only show branches from that remote
+  // When a target remote is selected, only show branches from that remote
   const branches = useMemo(() => {
     if (!branchesData?.branches) return [];
     const allBranches = branchesData.branches
@@ -115,7 +115,7 @@ export function CreatePRDialog({
 
     // If a target remote is selected and we have remote info with branches,
     // only show that remote's branches (not branches from other remotes)
-    if (selectedTargetRemote && remotes.length > 1) {
+    if (selectedTargetRemote) {
       const targetRemoteInfo = remotes.find((r) => r.name === selectedTargetRemote);
       if (targetRemoteInfo?.branches && targetRemoteInfo.branches.length > 0) {
         const targetBranchNames = new Set(targetRemoteInfo.branches);
@@ -620,7 +620,7 @@ export function CreatePRDialog({
                 )}
 
                 <div className="grid gap-2">
-                  <Label htmlFor="base-branch">Base Branch</Label>
+                  <Label htmlFor="base-branch">Base Remote Branch</Label>
                   <BranchAutocomplete
                     value={baseBranch}
                     onChange={setBaseBranch}

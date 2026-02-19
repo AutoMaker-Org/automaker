@@ -64,6 +64,26 @@ export function isSlowConnection(): boolean {
 }
 
 /**
+ * Detect if the app is running as an installed PWA (standalone mode).
+ * Checks both the standard display-mode media query and the iOS-specific
+ * navigator.standalone property for comprehensive detection.
+ *
+ * When running as a PWA, the browser chrome is hidden so safe area insets
+ * can be reduced further to maximize usable screen space.
+ */
+export const isPwaStandalone: boolean = (() => {
+  if (typeof window === 'undefined') return false;
+
+  // Standard: works on Chrome, Edge, Firefox, and modern Safari
+  const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
+
+  // iOS Safari: navigator.standalone is true when launched from home screen
+  const isIOSStandalone = (navigator as Navigator & { standalone?: boolean }).standalone === true;
+
+  return isStandalone || isIOSStandalone;
+})();
+
+/**
  * Multiplier for polling intervals on mobile.
  * Mobile devices benefit from less frequent polling to save battery and bandwidth.
  * Slow connections get an even larger multiplier.

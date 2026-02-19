@@ -19,6 +19,7 @@ interface ChatAreaProps {
   messagesContainerRef: React.RefObject<HTMLDivElement | null>;
   onScroll: () => void;
   onShowSessionManager: () => void;
+  onCreateSession?: () => void;
 }
 
 export function ChatArea({
@@ -29,12 +30,14 @@ export function ChatArea({
   messagesContainerRef,
   onScroll,
   onShowSessionManager,
+  onCreateSession,
 }: ChatAreaProps) {
   if (!currentSessionId) {
     return (
       <NoSessionState
         showSessionManager={showSessionManager}
         onShowSessionManager={onShowSessionManager}
+        onCreateSession={onCreateSession}
       />
     );
   }

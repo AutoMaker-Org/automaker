@@ -124,12 +124,19 @@ export function CreateWorktreeDialog({
       // Fetch branches using the project path (use listBranches on the project root)
       const branchResult = await api.worktree.listBranches(projectPath, true);
       if (branchResult.success && branchResult.result) {
+        setBranchFetchError(null);
         setAvailableBranches(
           branchResult.result.branches.map((b: { name: string; isRemote: boolean }) => ({
             name: b.name,
             isRemote: b.isRemote,
           }))
         );
+      } else {
+        // API returned success: false — treat as an error
+        const message =
+          branchResult.error || 'Failed to load branches. You can type a branch name manually.';
+        setBranchFetchError(message);
+        setAvailableBranches([{ name: 'main', isRemote: false }]);
       }
     } catch (err) {
       const message =

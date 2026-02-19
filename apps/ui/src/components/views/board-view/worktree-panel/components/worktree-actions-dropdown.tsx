@@ -909,7 +909,7 @@ export function WorktreeActionsDropdown({
             </DropdownMenuItem>
           </TooltipWrapper>
         )}
-        {/* Show PR option for non-primary worktrees, or primary worktree with changes */}
+        {/* Show PR option when there is no existing PR (showCreatePR === !hasPR) */}
         {showCreatePR && (
           <TooltipWrapper
             showTooltip={!!gitOpsDisabledReason}

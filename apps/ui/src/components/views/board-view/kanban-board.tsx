@@ -320,13 +320,13 @@ export function KanbanBoard({
   return (
     <div
       className={cn(
-        'flex-1 overflow-x-auto px-5 pt-2 sm:pt-4 pb-1 sm:pb-4 relative',
+        'flex-1 overflow-x-auto px-5 pt-2 sm:pt-4 pb-0 sm:pb-4 relative',
         'transition-opacity duration-200',
         className
       )}
       style={backgroundImageStyle}
     >
-      <div className="h-full py-1" style={containerStyle}>
+      <div className="h-full pt-1 pb-0 sm:pb-1" style={containerStyle}>
         {columns.map((column) => {
           const columnFeatures = getColumnFeatures(column.id as ColumnId);
           return (

@@ -1225,6 +1225,7 @@ export function BoardView() {
   const { getColumnFeatures, completedFeatures } = useBoardColumnFeatures({
     features: hookFeatures,
     runningAutoTasks,
+    runningAutoTasksAllWorktrees,
     searchQuery,
     currentWorktreePath,
     currentWorktreeBranch,

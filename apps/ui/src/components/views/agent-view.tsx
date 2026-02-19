@@ -130,6 +130,13 @@ export function AgentView() {
     await clearHistory();
   };
 
+  // Handle creating a new session from empty state
+  const handleCreateSessionFromEmptyState = useCallback(async () => {
+    if (quickCreateSessionRef.current) {
+      await quickCreateSessionRef.current();
+    }
+  }, []);
+
   // Auto-focus input when session is selected/changed
   useEffect(() => {
     if (currentSessionId && inputRef.current) {
@@ -177,7 +184,7 @@ export function AgentView() {
 
       {/* Session Manager Sidebar */}
       {showSessionManager && currentProject && (
-        <div className="fixed inset-y-0 left-0 w-72 z-30 lg:relative lg:w-80 lg:z-auto border-r border-border shrink-0 bg-card">
+        <div className="fixed inset-y-0 left-0 w-72 z-30 pt-[env(safe-area-inset-top,0px)] lg:pt-0 lg:relative lg:w-80 lg:z-auto border-r border-border shrink-0 bg-card">
           <SessionManager
             currentSessionId={currentSessionId}
             onSelectSession={handleSelectSession}
@@ -212,6 +219,7 @@ export function AgentView() {
           messagesContainerRef={messagesContainerRef}
           onScroll={handleScroll}
           onShowSessionManager={() => setShowSessionManager(true)}
+          onCreateSession={handleCreateSessionFromEmptyState}
         />
 
         {/* Input Area */}

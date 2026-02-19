@@ -12,6 +12,7 @@ type ColumnId = Feature['status'];
 interface UseBoardColumnFeaturesProps {
   features: Feature[];
   runningAutoTasks: string[];
+  runningAutoTasksAllWorktrees: string[]; // Running tasks across ALL worktrees (prevents backlog flash during event timing gaps)
   searchQuery: string;
   currentWorktreePath: string | null; // Currently selected worktree path
   currentWorktreeBranch: string | null; // Branch name of the selected worktree (null = main)
@@ -21,6 +22,7 @@ interface UseBoardColumnFeaturesProps {
 export function useBoardColumnFeatures({
   features,
   runningAutoTasks,
+  runningAutoTasksAllWorktrees,
   searchQuery,
   currentWorktreePath,
   currentWorktreeBranch,
@@ -38,6 +40,10 @@ export function useBoardColumnFeatures({
     };
     const featureMap = createFeatureMap(features);
     const runningTaskIds = new Set(runningAutoTasks);
+    // Track ALL running tasks across all worktrees to prevent features from
+    // briefly appearing in backlog during the timing gap between when the server
+    // starts executing a feature and when the UI receives the event/status update.
+    const allRunningTaskIds = new Set(runningAutoTasksAllWorktrees);
 
     // Filter features by search query (case-insensitive)
     const normalizedQuery = searchQuery.toLowerCase().trim();
@@ -138,11 +144,28 @@ export function useBoardColumnFeatures({
         return;
       }
 
-      // Not running: place by status (and worktree filter)
+      // Not running (on this worktree): place by status (and worktree filter)
       // Filter all items by worktree, including backlog
       // This ensures backlog items with a branch assigned only show in that branch
-      if (status === 'backlog') {
-        if (matchesWorktree) {
+      //
+      // 'ready' and 'interrupted' are transitional statuses that don't have dedicated columns:
+      // - 'ready': Feature has an approved plan, waiting to be picked up for execution
+      // - 'interrupted': Feature execution was aborted (e.g., user stopped it, server restart)
+      // Both display in the backlog column and need the same allRunningTaskIds race-condition
+      // protection as 'backlog' to prevent briefly flashing in backlog when already executing.
+      if (status === 'backlog' || status === 'ready' || status === 'interrupted') {
+        // IMPORTANT: Check if this feature is running on ANY worktree before placing in backlog.
+        // This prevents a race condition where the feature has started executing on the server
+        // (and is tracked in a different worktree's running list) but the disk status hasn't
+        // been updated yet or the UI hasn't received the worktree-scoped event.
+        // In that case, the feature would briefly flash in the backlog column.
+        if (allRunningTaskIds.has(f.id)) {
+          // Feature is running somewhere - show in in_progress if it matches this worktree,
+          // otherwise skip it (it will appear on the correct worktree's board)
+          if (matchesWorktree) {
+            map.in_progress.push(f);
+          }
+        } else if (matchesWorktree) {
           map.backlog.push(f);
         }
       } else if (map[status]) {
@@ -159,8 +182,12 @@ export function useBoardColumnFeatures({
           map[status].push(f);
         }
       } else {
-        // Unknown status, default to backlog
-        if (matchesWorktree) {
+        // Unknown status - apply same allRunningTaskIds protection and default to backlog
+        if (allRunningTaskIds.has(f.id)) {
+          if (matchesWorktree) {
+            map.in_progress.push(f);
+          }
+        } else if (matchesWorktree) {
           map.backlog.push(f);
         }
       }
@@ -199,6 +226,7 @@ export function useBoardColumnFeatures({
   }, [
     features,
     runningAutoTasks,
+    runningAutoTasksAllWorktrees,
     searchQuery,
     currentWorktreePath,
     currentWorktreeBranch,

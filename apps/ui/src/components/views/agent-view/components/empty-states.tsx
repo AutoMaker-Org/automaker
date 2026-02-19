@@ -1,4 +1,4 @@
-import { Sparkles, Bot, PanelLeft } from 'lucide-react';
+import { Sparkles, Bot, PanelLeft, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 export function NoProjectState() {
@@ -23,9 +23,14 @@ export function NoProjectState() {
 interface NoSessionStateProps {
   showSessionManager: boolean;
   onShowSessionManager: () => void;
+  onCreateSession?: () => void;
 }
 
-export function NoSessionState({ showSessionManager, onShowSessionManager }: NoSessionStateProps) {
+export function NoSessionState({
+  showSessionManager,
+  onShowSessionManager,
+  onCreateSession,
+}: NoSessionStateProps) {
   return (
     <div
       className="flex-1 flex items-center justify-center bg-background"
@@ -39,10 +44,23 @@ export function NoSessionState({ showSessionManager, onShowSessionManager }: NoS
         <p className="text-sm text-muted-foreground mb-6 leading-relaxed">
           Create or select a session to start chatting with the AI agent
         </p>
-        <Button onClick={onShowSessionManager} variant="outline" className="gap-2">
-          <PanelLeft className="w-4 h-4" />
-          {showSessionManager ? 'View' : 'Show'} Sessions
-        </Button>
+        <div className="flex items-center justify-center gap-3">
+          {onCreateSession && (
+            <Button
+              onClick={onCreateSession}
+              variant="default"
+              className="gap-2"
+              data-testid="empty-state-new-session-button"
+            >
+              <Plus className="w-4 h-4" />
+              New Session
+            </Button>
+          )}
+          <Button onClick={onShowSessionManager} variant="outline" className="gap-2">
+            <PanelLeft className="w-4 h-4" />
+            {showSessionManager ? 'View' : 'Show'} Sessions
+          </Button>
+        </div>
       </div>
     </div>
   );
