@@ -410,17 +410,17 @@
     overflow: hidden;
     overscroll-behavior: none;
     padding-top: env(safe-area-inset-top, 0px);
-    /* Default bottom inset: halved to balance home-indicator clearance with screen space */
-    padding-bottom: calc(env(safe-area-inset-bottom, 0px) * 0.5);
+    /* Default bottom inset: reduced multiplier to balance home-indicator clearance with screen space */
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) * 0.1);
     padding-left: env(safe-area-inset-left, 0px);
     padding-right: env(safe-area-inset-right, 0px);
   }
 
-  /* PWA standalone mode: remove bottom safe-area padding entirely since the OS
-     handles home-indicator clearance at the system level. There is no browser
-     chrome beneath the app, so no extra clearance is needed here. */
+  /* PWA standalone mode: reduced multiplier for the bottom padding to
+     avoid content being obscured by the iOS home indicator while reclaiming space. 
+     Setting this to a very small value (0.1) balances clearance with usability. */
   :root.pwa-standalone #app {
-    padding-bottom: 0;
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) * 0.1);
   }
 
   /* Apply monospace font to code elements */

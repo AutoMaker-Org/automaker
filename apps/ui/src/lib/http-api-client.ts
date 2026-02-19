@@ -727,7 +727,10 @@ export class HttpApiClient implements ElectronAPI {
             this.reconnectTimer = null;
           }
           this.reconnectAttempts = 0; // Reset backoff on visibility change
-          this.connectWebSocket();
+          // Use silent mode: a 401 during visibility-change reconnect should NOT
+          // trigger a full logout cascade. The session is verified separately via
+          // verifySession() in __root.tsx's fast-hydrate path.
+          this.connectWebSocket({ silent: true });
         }
       }
     };
@@ -737,10 +740,15 @@ export class HttpApiClient implements ElectronAPI {
   }
 
   /**
-   * Fetch a short-lived WebSocket token from the server
-   * Used for secure WebSocket authentication without exposing session tokens in URLs
+   * Fetch a short-lived WebSocket token from the server.
+   * Used for secure WebSocket authentication without exposing session tokens in URLs.
+   *
+   * @param options.silent - When true, a 401/403 will NOT trigger handleUnauthorized().
+   *   Use this for background reconnections (e.g., visibility-change) where a transient
+   *   auth failure should not force a full logout cascade. The actual session validity
+   *   is verified separately via verifySession() in the fast-hydrate path.
    */
-  private async fetchWsToken(): Promise<string | null> {
+  private async fetchWsToken(options?: { silent?: boolean }): Promise<string | null> {
     try {
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
@@ -759,7 +767,11 @@ export class HttpApiClient implements ElectronAPI {
       });
 
       if (response.status === 401 || response.status === 403) {
-        handleUnauthorized();
+        if (options?.silent) {
+          logger.debug('fetchWsToken: 401/403 during silent reconnect — skipping logout');
+        } else {
+          handleUnauthorized();
+        }
         return null;
       }
 
@@ -780,7 +792,7 @@ export class HttpApiClient implements ElectronAPI {
     }
   }
 
-  private connectWebSocket(): void {
+  private connectWebSocket(options?: { silent?: boolean }): void {
     if (this.isConnecting || (this.ws && this.ws.readyState === WebSocket.OPEN)) {
       return;
     }
@@ -790,14 +802,14 @@ export class HttpApiClient implements ElectronAPI {
     // Wait for API key initialization to complete before attempting connection
     // This prevents race conditions during app startup
     waitForApiKeyInit()
-      .then(() => this.doConnectWebSocketInternal())
+      .then(() => this.doConnectWebSocketInternal(options))
       .catch((error) => {
         logger.error('Failed to initialize for WebSocket connection:', error);
         this.isConnecting = false;
       });
   }
 
-  private doConnectWebSocketInternal(): void {
+  private doConnectWebSocketInternal(options?: { silent?: boolean }): void {
     // Electron mode typically authenticates with the injected API key.
     // However, in external-server/cookie-auth flows, the API key may be unavailable.
     // In that case, fall back to the same wsToken/cookie authentication used in web mode
@@ -806,7 +818,7 @@ export class HttpApiClient implements ElectronAPI {
       const apiKey = getApiKey();
       if (!apiKey) {
         logger.warn('Electron mode: API key missing, attempting wsToken/cookie auth for WebSocket');
-        this.fetchWsToken()
+        this.fetchWsToken(options)
           .then((wsToken) => {
             const wsUrl = this.serverUrl.replace(/^http/, 'ws') + '/api/events';
             if (wsToken) {
@@ -830,7 +842,7 @@ export class HttpApiClient implements ElectronAPI {
     }
 
     // In web mode, fetch a short-lived wsToken first
-    this.fetchWsToken()
+    this.fetchWsToken(options)
       .then((wsToken) => {
         const wsUrl = this.serverUrl.replace(/^http/, 'ws') + '/api/events';
         if (wsToken) {
@@ -961,7 +973,7 @@ export class HttpApiClient implements ElectronAPI {
     return headers;
   }
 
-  private async post<T>(endpoint: string, body?: unknown): Promise<T> {
+  private async post<T>(endpoint: string, body?: unknown, signal?: AbortSignal): Promise<T> {
     // Ensure API key is initialized before making request
     await waitForApiKeyInit();
     const response = await fetch(`${this.serverUrl}${endpoint}`, {
@@ -969,6 +981,7 @@ export class HttpApiClient implements ElectronAPI {
       headers: this.getHeaders(),
       credentials: 'include', // Include cookies for session auth
       body: body ? JSON.stringify(body) : undefined,
+      signal,
     });
 
     if (response.status === 401 || response.status === 403) {
@@ -2155,8 +2168,8 @@ export class HttpApiClient implements ElectronAPI {
       }),
     checkChanges: (worktreePath: string) =>
       this.post('/api/worktree/check-changes', { worktreePath }),
-    listBranches: (worktreePath: string, includeRemote?: boolean) =>
-      this.post('/api/worktree/list-branches', { worktreePath, includeRemote }),
+    listBranches: (worktreePath: string, includeRemote?: boolean, signal?: AbortSignal) =>
+      this.post('/api/worktree/list-branches', { worktreePath, includeRemote }, signal),
     switchBranch: (worktreePath: string, branchName: string) =>
       this.post('/api/worktree/switch-branch', { worktreePath, branchName }),
     listRemotes: (worktreePath: string) =>

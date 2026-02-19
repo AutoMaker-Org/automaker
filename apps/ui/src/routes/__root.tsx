@@ -508,6 +508,10 @@ function RootLayoutContent() {
 
           // Verify session + fetch fresh settings in the background.
           // The UI is already rendered; this reconciles any stale data.
+          // IMPORTANT: We must distinguish definitive auth failures (401/403 → false)
+          // from transient errors (timeouts, network failures → null). Only a definitive
+          // auth failure should reset isAuthenticated — transient errors should be
+          // silently ignored since the next real API call will catch expired sessions.
           void (async () => {
             try {
               const serverReady = await waitForServerReady();
@@ -518,14 +522,26 @@ function RootLayoutContent() {
               }
               const api = getHttpApiClient();
               const [sessionValid, settingsResult] = await Promise.all([
-                verifySession().catch(() => false),
+                // verifySession() returns true (valid), false (401/403), or throws (transient).
+                // Map throws → null so we can distinguish "definitively invalid" from "couldn't check".
+                verifySession().catch((err) => {
+                  logger.debug('[FAST_HYDRATE] Background verify threw (transient):', err?.message);
+                  return null;
+                }),
                 api.settings.getGlobal().catch(() => ({ success: false, settings: null }) as const),
               ]);
-              if (!sessionValid) {
-                // Session expired while user was away — log them out
+              if (sessionValid === false) {
+                // Session is definitively expired (server returned 401/403) — log them out
                 logger.warn('[FAST_HYDRATE] Background verify: session invalid, logging out');
                 useAuthStore.getState().setAuthState({ isAuthenticated: false, authChecked: true });
                 return;
+              }
+              if (sessionValid === null) {
+                // Transient error (timeout, network, 5xx) — keep the user logged in.
+                // The next real API call will detect an expired session if needed.
+                logger.info(
+                  '[FAST_HYDRATE] Background verify inconclusive — keeping session active'
+                );
               }
               if (settingsResult.success && settingsResult.settings) {
                 const { settings: finalSettings } = await performSettingsMigration(
@@ -537,6 +553,8 @@ function RootLayoutContent() {
                 logger.info('[FAST_HYDRATE] Background reconcile complete');
               }
             } catch (error) {
+              // Outer catch for unexpected errors — do NOT reset auth state.
+              // If the session is truly expired, the next API call will handle it.
               logger.warn(
                 '[FAST_HYDRATE] Background verify failed (server may be restarting):',
                 error
@@ -959,11 +977,40 @@ function RootLayoutContent() {
     );
   }
 
-  // Wait for auth check before rendering protected routes (ALL modes - unified flow)
+  // Wait for auth check before rendering protected routes (ALL modes - unified flow).
+  // The visual here intentionally matches the inline HTML app shell (index.html)
+  // so the transition from HTML → React is seamless — no layout shift, no flash.
   if (!authChecked) {
     return (
-      <main className="flex h-full items-center justify-center" data-testid="app-container">
-        <LoadingState message="Loading..." />
+      <main
+        className="flex h-full flex-col items-center justify-center gap-6"
+        data-testid="app-container"
+      >
+        <svg
+          className="h-14 w-14 opacity-90"
+          viewBox="0 0 256 256"
+          xmlns="http://www.w3.org/2000/svg"
+          aria-hidden="true"
+        >
+          <rect className="fill-foreground/[0.08]" x="16" y="16" width="224" height="224" rx="56" />
+          <g
+            className="stroke-foreground/70"
+            fill="none"
+            strokeWidth="20"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M92 92 L52 128 L92 164" />
+            <path d="M144 72 L116 184" />
+            <path d="M164 92 L204 128 L164 164" />
+          </g>
+        </svg>
+        {/* Pure CSS spinner — no icon dependencies, so vendor-icons can be deferred/prefetched.
+            Matches the HTML app shell in index.html for a seamless HTML→React transition. */}
+        <div
+          aria-label="Loading"
+          className="h-4 w-4 animate-spin rounded-full border-2 border-foreground/10 border-t-foreground/50"
+        />
       </main>
     );
   }

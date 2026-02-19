@@ -45,6 +45,7 @@ const buildHash = getBuildHash();
  */
 function swCacheBuster(): Plugin {
   const CACHE_NAME_PATTERN = /const CACHE_NAME = 'automaker-v3';/;
+  const CRITICAL_ASSETS_PATTERN = /const CRITICAL_ASSETS = \[\];/;
   return {
     name: 'sw-cache-buster',
     // In build mode: copy sw.js to output with hash injected
@@ -56,7 +57,7 @@ function swCacheBuster(): Plugin {
         console.warn('[sw-cache-buster] sw.js not found in dist/ — skipping cache bust');
         return;
       }
-      const swContent = fs.readFileSync(swPath, 'utf-8');
+      let swContent = fs.readFileSync(swPath, 'utf-8');
       if (!CACHE_NAME_PATTERN.test(swContent)) {
         console.error(
           '[sw-cache-buster] Could not find CACHE_NAME declaration in sw.js. ' +
@@ -65,12 +66,46 @@ function swCacheBuster(): Plugin {
         );
         return;
       }
-      const updated = swContent.replace(
+      swContent = swContent.replace(
         CACHE_NAME_PATTERN,
         `const CACHE_NAME = 'automaker-v3-${buildHash}';`
       );
-      fs.writeFileSync(swPath, updated, 'utf-8');
       console.log(`[sw-cache-buster] Injected build hash: automaker-v3-${buildHash}`);
+
+      // Extract critical asset URLs from the built index.html and inject them
+      // into the SW so it can precache them on install (not just after the main
+      // thread sends PRECACHE_ASSETS). This ensures the very first visit populates
+      // the immutable cache, so PWA cold starts after memory eviction serve from cache.
+      const indexHtmlPath = path.resolve(__dirname, 'dist', 'index.html');
+      if (fs.existsSync(indexHtmlPath) && CRITICAL_ASSETS_PATTERN.test(swContent)) {
+        const indexHtml = fs.readFileSync(indexHtmlPath, 'utf-8');
+        const criticalAssets: string[] = [];
+
+        // Extract hashed asset URLs from all link and script tags.
+        // These are the JS/CSS bundles Vite produces with content hashes.
+        // Match: href="./assets/..." or src="./assets/..."
+        const assetRegex = /(?:href|src)="(\.\/(assets\/[^"]+))"/g;
+        let match;
+        while ((match = assetRegex.exec(indexHtml)) !== null) {
+          const assetPath = '/' + match[2]; // Convert ./assets/... to /assets/...
+          // Only include JS and CSS — skip images, fonts, etc. to keep cache small
+          if (assetPath.endsWith('.js') || assetPath.endsWith('.css')) {
+            criticalAssets.push(assetPath);
+          }
+        }
+
+        if (criticalAssets.length > 0) {
+          swContent = swContent.replace(
+            CRITICAL_ASSETS_PATTERN,
+            `const CRITICAL_ASSETS = ${JSON.stringify(criticalAssets)};`
+          );
+          console.log(
+            `[sw-cache-buster] Injected ${criticalAssets.length} critical assets for install-time precaching`
+          );
+        }
+      }
+
+      fs.writeFileSync(swPath, swContent, 'utf-8');
     },
   };
 }
@@ -97,11 +132,16 @@ function mobilePreloadOptimizer(): Plugin {
   // - vendor-xterm: /terminal route only
   // - vendor-codemirror: spec/XML editor routes only
   // - vendor-markdown: agent view, wiki, and other markdown-rendering routes
+  // - vendor-icons: lucide-react icons (587 KB) — not needed before React mounts.
+  //   The !authChecked loading state uses a pure CSS spinner instead of a Lucide icon,
+  //   so icons are not required until the authenticated UI renders (by which time this
+  //   prefetch has usually completed on typical connections).
   const deferredChunks = [
     'vendor-reactflow',
     'vendor-xterm',
     'vendor-codemirror',
     'vendor-markdown',
+    'vendor-icons',
   ];
 
   return {

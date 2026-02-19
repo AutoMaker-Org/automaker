@@ -12,14 +12,7 @@ import {
 import { useAppStore } from '@/store/app-store';
 import { useProjectSettings } from '@/hooks/queries';
 import { cn } from '@/lib/utils';
-
-/** Default scripts shown when no custom scripts are configured */
-const DEFAULT_SCRIPTS = [
-  { id: 'default-dev', name: 'Dev Server', command: 'npm run dev' },
-  { id: 'default-format', name: 'Format', command: 'npm run format' },
-  { id: 'default-test', name: 'Test', command: 'npm run test' },
-  { id: 'default-lint', name: 'Lint', command: 'npm run lint' },
-] as const;
+import { DEFAULT_TERMINAL_SCRIPTS } from '../project-settings-view/terminal-scripts-constants';
 
 interface TerminalScriptsDropdownProps {
   /** Callback to send a command + newline to the terminal */
@@ -49,7 +42,7 @@ export function TerminalScriptsDropdown({
     if (configured && configured.length > 0) {
       return configured;
     }
-    return DEFAULT_SCRIPTS as unknown as Array<{ id: string; name: string; command: string }>;
+    return DEFAULT_TERMINAL_SCRIPTS;
   }, [projectSettings?.terminalScripts]);
 
   const handleRunScript = useCallback(

@@ -125,8 +125,9 @@ export function CreateWorktreeDialog({
       try {
         const api = getHttpApiClient();
 
-        // Fetch branches using the project path (use listBranches on the project root)
-        const branchResult = await api.worktree.listBranches(projectPath, true);
+        // Fetch branches using the project path (use listBranches on the project root).
+        // Pass the AbortSignal so controller.abort() cancels the in-flight HTTP request.
+        const branchResult = await api.worktree.listBranches(projectPath, true, signal);
 
         // If the fetch was aborted while awaiting, bail out to avoid stale state writes
         if (signal?.aborted) return;
@@ -225,6 +226,9 @@ export function CreateWorktreeDialog({
   // the branch isn't in the fetched availableBranches list.
   const isRemoteBaseBranch = useMemo(() => {
     if (!baseBranch) return false;
+    // If the branch list couldn't be fetched, availableBranches is a fallback
+    // and may not reflect reality — suppress the remote hint to avoid misleading the user.
+    if (branchFetchError) return false;
     // Check fetched branch list first
     const knownRemote = availableBranches.some((b) => b.name === baseBranch && b.isRemote);
     if (knownRemote) return true;
@@ -235,7 +239,7 @@ export function CreateWorktreeDialog({
       return !isKnownLocal;
     }
     return false;
-  }, [baseBranch, availableBranches]);
+  }, [baseBranch, availableBranches, branchFetchError]);
 
   const handleCreate = async () => {
     if (!branchName.trim()) {
@@ -253,6 +257,17 @@ export function CreateWorktreeDialog({
       return;
     }
 
+    // Validate baseBranch using the same allowed-character check as branchName to prevent
+    // shell-special characters or invalid git ref names from reaching the API.
+    const trimmedBaseBranch = baseBranch.trim();
+    if (trimmedBaseBranch && !validBranchRegex.test(trimmedBaseBranch)) {
+      setError({
+        title: 'Invalid base branch name',
+        description: 'Use only letters, numbers, dots, underscores, hyphens, and slashes.',
+      });
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
 
@@ -263,8 +278,8 @@ export function CreateWorktreeDialog({
         return;
       }
 
-      // Pass baseBranch if one was selected (otherwise defaults to HEAD)
-      const effectiveBaseBranch = baseBranch.trim() || undefined;
+      // Pass the validated baseBranch if one was selected (otherwise defaults to HEAD)
+      const effectiveBaseBranch = trimmedBaseBranch || undefined;
       const result = await api.worktree.create(projectPath, branchName, effectiveBaseBranch);
 
       if (result.success && result.worktree) {

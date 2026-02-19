@@ -89,10 +89,28 @@ if ('serviceWorker' in navigator && !window.location.protocol.startsWith('file')
           }
         });
 
-        // Prefetch likely-needed route chunks during idle time.
-        // On mobile, this means subsequent navigations are instant from cache
-        // instead of requiring network round-trips over slow cellular connections.
-        prefetchRouteChunks(registration);
+        // Warm the SW's immutable cache with all page assets during idle time.
+        // This ensures that when the PWA is evicted from memory and reopened,
+        // all JS/CSS can be served instantly from SW cache instead of re-downloading.
+        warmAssetCache(registration);
+
+        // Request persistent storage to protect caches from OS eviction.
+        // Without this, iOS Safari can purge Cache Storage under memory pressure
+        // or after 7 days of inactivity, forcing a full network reload on next visit.
+        // This is a best-effort request — the browser may deny it, but it's a no-op
+        // on browsers that don't support it (no error thrown).
+        if (navigator.storage?.persist) {
+          navigator.storage
+            .persist()
+            .then((granted) => {
+              if (granted) {
+                console.debug('[SW] Persistent storage granted — caches protected from eviction');
+              }
+            })
+            .catch(() => {
+              // Silently ignore — persistent storage is a nice-to-have
+            });
+        }
       })
       .catch(() => {
         // Service worker registration failed; app still works without it
@@ -101,60 +119,64 @@ if ('serviceWorker' in navigator && !window.location.protocol.startsWith('file')
 }
 
 /**
- * Prefetch route JS chunks that the user is likely to navigate to.
- * Uses requestIdleCallback to avoid competing with the initial render,
- * and sends URLs to the service worker for background caching.
- * This is especially impactful on mobile where network latency is high.
+ * Warm the service worker's immutable cache with all critical page assets.
+ * Collects URLs from modulepreload, prefetch, stylesheet, and script tags
+ * and sends them to the SW via PRECACHE_ASSETS for background caching.
+ *
+ * This is critical for PWA cold-start performance: when iOS/Android evicts
+ * the PWA from memory, reopening it needs assets from SW cache. The SW's
+ * fetch handler caches assets on first access, but on the very first visit
+ * the SW isn't active yet when assets load. This function bridges that gap
+ * by explicitly telling the SW "cache these URLs" after registration.
  */
-function prefetchRouteChunks(registration: ServiceWorkerRegistration): void {
+function warmAssetCache(registration: ServiceWorkerRegistration): void {
   const idleCallback =
     typeof requestIdleCallback !== 'undefined'
       ? requestIdleCallback
       : (cb: () => void) => setTimeout(cb, 2000);
 
-  // On mobile, wait a bit longer before prefetching to let the critical path complete.
+  // On mobile, wait a bit longer to let the critical render path complete.
   // Mobile connections are often slower and we don't want to compete with initial data fetches.
-  const prefetchDelay = isMobileDevice ? 4000 : 0;
+  const delay = isMobileDevice ? 4000 : 0;
 
-  const doPrefetch = () => {
-    // Find all modulepreload links already in the document (Vite injects these)
-    // and any route chunks that might be linked
-    const existingPreloads = new Set(
-      Array.from(document.querySelectorAll('link[rel="modulepreload"]')).map(
-        (link) => (link as HTMLLinkElement).href
-      )
-    );
+  const doWarm = () => {
+    const assetUrls: string[] = [];
 
-    // Also collect prefetch links (Vite mobile optimization converts some to prefetch)
-    Array.from(document.querySelectorAll('link[rel="prefetch"]')).forEach((link) => {
+    // Collect ALL asset URLs from the page that should be in the SW cache:
+    // 1. modulepreload links (critical vendor chunks: react, tanstack, radix, state)
+    // 2. prefetch links (deferred chunks: icons, reactflow, xterm, codemirror, markdown)
+    // 3. stylesheet links (main CSS bundle)
+    // 4. script tags with asset paths (entry point JS)
+    document.querySelectorAll('link[rel="modulepreload"], link[rel="prefetch"]').forEach((link) => {
       const href = (link as HTMLLinkElement).href;
-      if (href) existingPreloads.add(href);
+      if (href && href.includes('/assets/')) assetUrls.push(href);
     });
 
-    // Discover route chunk URLs from the document's script tags
-    // These are the code-split route bundles that TanStack Router will lazy-load
-    const routeChunkUrls: string[] = [];
+    document.querySelectorAll('link[rel="stylesheet"]').forEach((link) => {
+      const href = (link as HTMLLinkElement).href;
+      if (href && href.includes('/assets/')) assetUrls.push(href);
+    });
+
     document.querySelectorAll('script[src*="/assets/"]').forEach((script) => {
       const src = (script as HTMLScriptElement).src;
-      if (src && !existingPreloads.has(src)) {
-        routeChunkUrls.push(src);
-      }
+      if (src) assetUrls.push(src);
     });
 
-    // Send URLs to service worker for background caching
-    if (routeChunkUrls.length > 0 && registration.active) {
+    // Send all discovered URLs to the SW for background caching.
+    // The SW's PRECACHE_ASSETS handler checks cache.match() first, so URLs
+    // already in the immutable cache won't be re-fetched.
+    if (assetUrls.length > 0 && registration.active) {
       registration.active.postMessage({
         type: 'PRECACHE_ASSETS',
-        urls: routeChunkUrls,
+        urls: assetUrls,
       });
     }
   };
 
-  // Wait for idle time after the app is interactive
-  if (prefetchDelay > 0) {
-    setTimeout(() => idleCallback(doPrefetch), prefetchDelay);
+  if (delay > 0) {
+    setTimeout(() => idleCallback(doWarm), delay);
   } else {
-    idleCallback(doPrefetch);
+    idleCallback(doWarm);
   }
 }
 

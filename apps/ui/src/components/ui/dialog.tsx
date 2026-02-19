@@ -123,7 +123,11 @@ const DialogContent = React.forwardRef<HTMLDivElement, DialogContentProps>(
             'data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95',
             'data-[state=closed]:slide-out-to-top-[2%] data-[state=open]:slide-in-from-top-[2%]',
             'duration-200',
-            compact ? 'max-w-4xl p-4' : !hasCustomMaxWidth ? 'sm:max-w-2xl p-6' : 'p-6',
+            compact
+              ? 'max-w-[min(56rem,calc(100%-2rem))] p-4'
+              : !hasCustomMaxWidth
+                ? 'sm:max-w-2xl p-6'
+                : 'p-6',
             className
           )}
           {...props}

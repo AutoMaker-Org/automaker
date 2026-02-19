@@ -848,8 +848,13 @@ export function WorktreeActionsDropdown({
             View Changes
           </DropdownMenuItem>
         )}
-        {/* Stash operations - combined submenu or simple item */}
-        {(onStashChanges || onViewStashes) && (
+        {/* Stash operations - combined submenu or simple item.
+            Only render when at least one action is meaningful:
+            - (worktree.hasChanges && onStashChanges): stashing changes is possible
+            - onViewStashes: viewing existing stashes is possible
+            Without this guard, the item would appear clickable but be a silent no-op
+            when hasChanges is false and onViewStashes is undefined. */}
+        {((worktree.hasChanges && onStashChanges) || onViewStashes) && (
           <TooltipWrapper showTooltip={!isGitOpsAvailable} tooltipContent={gitOpsDisabledReason}>
             {onViewStashes && worktree.hasChanges && onStashChanges ? (
               // Both "Stash Changes" (primary) and "View Stashes" (secondary) are available - show split submenu

@@ -20,6 +20,12 @@ const SHELL_ASSETS = [
   '/favicon.ico',
 ];
 
+// Critical JS/CSS assets extracted from index.html at build time by the swCacheBuster
+// Vite plugin. Populated during production builds; empty in dev mode.
+// These are precached on SW install so that PWA cold starts after memory eviction
+// serve instantly from cache instead of requiring a full network download.
+const CRITICAL_ASSETS = [];
+
 // Whether mobile caching is enabled (set via message from main thread).
 // Persisted to Cache Storage so it survives aggressive SW termination on mobile.
 let mobileMode = false;
@@ -126,18 +132,39 @@ async function addCacheTimestamp(response) {
 let skipWaitingRequested = false;
 
 self.addEventListener('install', (event) => {
+  // Cache the app shell AND critical JS/CSS assets so the PWA loads instantly.
+  // SHELL_ASSETS go into CACHE_NAME (general cache), CRITICAL_ASSETS go into
+  // IMMUTABLE_CACHE (long-lived, content-hashed assets). This ensures that even
+  // the very first visit populates the immutable cache — previously, assets were
+  // only cached on fetch interception, but the SW isn't active during the first
+  // page load so nothing got cached until the second visit.
+  //
+  // self.skipWaiting() is NOT called here — activation is deferred until the main
+  // thread sends a SKIP_WAITING message to avoid disrupting a live page.
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(SHELL_ASSETS);
-    })
+    Promise.all([
+      // Cache app shell (HTML, icons, manifest)
+      caches.open(CACHE_NAME).then((cache) => cache.addAll(SHELL_ASSETS)),
+      // Cache critical JS/CSS bundles (injected at build time by swCacheBuster).
+      // Uses individual fetch+put instead of cache.addAll() so a single asset
+      // failure doesn't prevent the rest from being cached.
+      CRITICAL_ASSETS.length > 0
+        ? caches.open(IMMUTABLE_CACHE).then((cache) =>
+            Promise.all(
+              CRITICAL_ASSETS.map((url) =>
+                fetch(url)
+                  .then((response) => {
+                    if (response.ok) return cache.put(url, response);
+                  })
+                  .catch(() => {
+                    // Individual asset fetch failure is non-fatal
+                  })
+              )
+            )
+          )
+        : Promise.resolve(),
+    ])
   );
-  // Only skipWaiting if explicitly requested by the main thread (via SKIP_WAITING message).
-  // Without this guard, a new SW activates immediately and clients.claim() in the activate
-  // handler takes control of the open page — the browser re-fetches the HTML and the user
-  // sees a brief reload/flash when switching back to the PWA.
-  if (skipWaitingRequested) {
-    self.skipWaiting();
-  }
 });
 
 self.addEventListener('activate', (event) => {
@@ -157,10 +184,13 @@ self.addEventListener('activate', (event) => {
       self.registration.navigationPreload && self.registration.navigationPreload.enable(),
     ])
   );
-  // Claim clients so the SW controls the page — but only on first install
-  // (when skipWaiting was requested) or when the page loads fresh.
-  // This is safe because without skipWaiting, the activate event only fires
-  // after all old-SW-controlled pages are closed and reopened.
+  // self.clients.claim() is called unconditionally so this SW immediately controls
+  // all open clients after activation. This is safe because the activate event
+  // itself only fires at safe moments: on first install (no prior SW), after
+  // self.skipWaiting() is called in response to a SKIP_WAITING message from the
+  // main thread, or after all pages controlled by the old SW have been closed.
+  // Unconditional claim() is therefore harmless — by the time activate fires,
+  // either there are no old clients or the user has explicitly requested the update.
   self.clients.claim();
 });
 
@@ -172,11 +202,13 @@ self.addEventListener('activate', (event) => {
 function isImmutableAsset(url) {
   const path = url.pathname;
   // Match Vite's hashed asset pattern: /assets/<name>-<hash>.<ext>
+  // This covers JS bundles, CSS, and font files that Vite outputs to /assets/
+  // with content hashes (e.g., /assets/font-inter-WC6UYoCP.js).
+  // Note: We intentionally do NOT cache all font files globally — only those
+  // under /assets/ (which are Vite-processed, content-hashed, and actively used).
+  // There are 639+ font files (~20MB total) across all font families; caching them
+  // all would push iOS toward its ~50MB PWA quota and trigger eviction of everything.
   if (path.startsWith('/assets/') && /-[A-Za-z0-9_-]{6,}\.\w+$/.test(path)) {
-    return true;
-  }
-  // Font files are immutable (woff2, woff, ttf, otf)
-  if (/\.(woff2?|ttf|otf)$/.test(path)) {
     return true;
   }
   return false;
@@ -442,22 +474,26 @@ self.addEventListener('message', (event) => {
   // Called from the main thread after the initial render is complete,
   // so we don't compete with critical resource loading on mobile.
   if (event.data?.type === 'PRECACHE_ASSETS' && Array.isArray(event.data.urls)) {
-    caches.open(IMMUTABLE_CACHE).then((cache) => {
-      event.data.urls.forEach((url) => {
-        cache.match(url).then((existing) => {
-          if (!existing) {
-            fetch(url, { priority: 'low' })
-              .then((response) => {
-                if (response.ok) {
-                  cache.put(url, response);
-                }
-              })
-              .catch(() => {
-                // Silently ignore precache failures
-              });
-          }
-        });
-      });
-    });
+    event.waitUntil(
+      caches.open(IMMUTABLE_CACHE).then((cache) => {
+        return Promise.all(
+          event.data.urls.map((url) => {
+            return cache.match(url).then((existing) => {
+              if (!existing) {
+                return fetch(url, { priority: 'low' })
+                  .then((response) => {
+                    if (response.ok) {
+                      return cache.put(url, response);
+                    }
+                  })
+                  .catch(() => {
+                    // Silently ignore precache failures
+                  });
+              }
+            });
+          })
+        );
+      })
+    );
   }
 });

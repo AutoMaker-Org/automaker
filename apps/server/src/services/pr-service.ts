@@ -5,8 +5,37 @@
  * inline in the create-pr route handler.
  */
 
-import { execAsync, execEnv, isValidRemoteName } from '../routes/worktree/common.js';
-import { createLogger } from '@automaker/utils';
+// TODO: Move execAsync/execEnv to a shared lib (lib/exec.ts or @automaker/utils) so that
+// services no longer depend on route internals. Tracking issue: route-to-service dependency
+// inversion. For now, a local thin wrapper is used within the service boundary.
+import { exec } from 'child_process';
+import { promisify } from 'util';
+import { createLogger, isValidRemoteName } from '@automaker/utils';
+
+// Thin local wrapper — duplicates the route-level execAsync/execEnv until a
+// shared lib/exec.ts (or @automaker/utils export) is created.
+const execAsync = promisify(exec);
+
+const pathSeparator = process.platform === 'win32' ? ';' : ':';
+const _additionalPaths: string[] = [];
+if (process.platform === 'win32') {
+  if (process.env.LOCALAPPDATA)
+    _additionalPaths.push(`${process.env.LOCALAPPDATA}\\Programs\\Git\\cmd`);
+  if (process.env.PROGRAMFILES) _additionalPaths.push(`${process.env.PROGRAMFILES}\\Git\\cmd`);
+  if (process.env['ProgramFiles(x86)'])
+    _additionalPaths.push(`${process.env['ProgramFiles(x86)']}\\Git\\cmd`);
+} else {
+  _additionalPaths.push(
+    '/opt/homebrew/bin',
+    '/usr/local/bin',
+    '/home/linuxbrew/.linuxbrew/bin',
+    `${process.env.HOME}/.local/bin`
+  );
+}
+const execEnv = {
+  ...process.env,
+  PATH: [process.env.PATH, ..._additionalPaths.filter(Boolean)].filter(Boolean).join(pathSeparator),
+};
 
 const logger = createLogger('PRService');
 
@@ -95,6 +124,17 @@ export async function resolvePrTarget({
     }
   } catch {
     // Couldn't parse remotes - will try fallback
+  }
+
+  // When targetRemote is explicitly provided but remote parsing failed entirely
+  // (parsedRemotes is empty), we cannot validate or resolve the requested remote.
+  // Silently proceeding to auto-detection would ignore the caller's explicit intent,
+  // so we fail fast with a clear error instead.
+  if (targetRemote && parsedRemotes.size === 0) {
+    throw new Error(
+      `targetRemote "${targetRemote}" was specified but no remotes could be parsed from the repository. ` +
+        `Ensure the repository has at least one configured remote (parsedRemotes is empty).`
+    );
   }
 
   // When a targetRemote is explicitly specified, validate that it is known

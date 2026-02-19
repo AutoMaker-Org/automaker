@@ -7,14 +7,7 @@ import { cn } from '@/lib/utils';
 import { useProjectSettings } from '@/hooks/queries';
 import { useUpdateProjectSettings } from '@/hooks/mutations';
 import type { Project } from '@/lib/electron';
-
-/** Default scripts shown when user hasn't customized yet */
-const DEFAULT_SCRIPTS = [
-  { id: 'default-dev', name: 'Dev Server', command: 'npm run dev' },
-  { id: 'default-format', name: 'Format', command: 'npm run format' },
-  { id: 'default-test', name: 'Test', command: 'npm run test' },
-  { id: 'default-lint', name: 'Lint', command: 'npm run lint' },
-];
+import { DEFAULT_TERMINAL_SCRIPTS } from './terminal-scripts-constants';
 
 /** Preset scripts for quick addition */
 const SCRIPT_PRESETS = [
@@ -71,7 +64,7 @@ export function TerminalScriptsSection({ project }: TerminalScriptsSectionProps)
       const scriptList =
         configured && configured.length > 0
           ? configured.map((s) => ({ id: s.id, name: s.name, command: s.command }))
-          : DEFAULT_SCRIPTS.map((s) => ({ ...s }));
+          : DEFAULT_TERMINAL_SCRIPTS.map((s) => ({ ...s }));
       setScripts(scriptList);
       setOriginalScripts(JSON.parse(JSON.stringify(scriptList)));
     }
@@ -158,18 +151,31 @@ export function TerminalScriptsSection({ project }: TerminalScriptsSectionProps)
     [draggedIndex]
   );
 
-  const handleDragEnd = useCallback(() => {
-    if (draggedIndex !== null && dragOverIndex !== null && draggedIndex !== dragOverIndex) {
-      setScripts((prev) => {
-        const newScripts = [...prev];
-        const [removed] = newScripts.splice(draggedIndex, 1);
-        newScripts.splice(dragOverIndex, 0, removed);
-        return newScripts;
-      });
-    }
-    setDraggedIndex(null);
-    setDragOverIndex(null);
-  }, [draggedIndex, dragOverIndex]);
+  const handleDragEnd = useCallback(
+    (e: React.DragEvent) => {
+      // Only perform the reorder when the drop target accepted the drop.
+      // e.dataTransfer.dropEffect === 'none' means the drag was cancelled
+      // (e.g. dropped outside a valid drop target or Escape was pressed),
+      // so we skip the splice to avoid reordering on an aborted drag.
+      if (
+        e.dataTransfer.dropEffect !== 'none' &&
+        draggedIndex !== null &&
+        dragOverIndex !== null &&
+        draggedIndex !== dragOverIndex
+      ) {
+        setScripts((prev) => {
+          const newScripts = [...prev];
+          const [removed] = newScripts.splice(draggedIndex, 1);
+          newScripts.splice(dragOverIndex, 0, removed);
+          return newScripts;
+        });
+      }
+      // Always reset drag state regardless of whether a reorder occurred.
+      setDraggedIndex(null);
+      setDragOverIndex(null);
+    },
+    [draggedIndex, dragOverIndex]
+  );
 
   return (
     <div
@@ -220,7 +226,7 @@ export function TerminalScriptsSection({ project }: TerminalScriptsSectionProps)
                   draggable
                   onDragStart={() => handleDragStart(index)}
                   onDragOver={(e) => handleDragOver(e, index)}
-                  onDragEnd={handleDragEnd}
+                  onDragEnd={(e) => handleDragEnd(e)}
                 >
                   {/* Drag handle */}
                   <div
