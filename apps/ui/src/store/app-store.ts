@@ -942,6 +942,13 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
         runningTasks: [],
         branchName,
       };
+      // Prevent duplicate entries - the same feature can trigger multiple
+      // auto_mode_feature_start events (e.g., from execution-service and
+      // pipeline-orchestrator), so we must guard against adding the same
+      // taskId more than once.
+      if (current.runningTasks.includes(taskId)) {
+        return state;
+      }
       return {
         autoModeByWorktree: {
           ...state.autoModeByWorktree,

@@ -132,7 +132,7 @@ export function MergeWorktreeDialog({
             description: 'Choose how to resolve the conflicts below.',
           });
         } else {
-          toast.error('Failed to merge branch', {
+          toast.error('Failed to integrate branch', {
             description: result.error,
           });
         }
@@ -157,7 +157,7 @@ export function MergeWorktreeDialog({
           description: 'Choose how to resolve the conflicts below.',
         });
       } else {
-        toast.error('Failed to merge branch', {
+        toast.error('Failed to integrate branch', {
           description: errorMessage,
         });
       }
@@ -274,7 +274,7 @@ export function MergeWorktreeDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <GitMerge className="w-5 h-5 text-green-600" />
-            Merge Branch
+            Integrate Branch
           </DialogTitle>
           <DialogDescription asChild>
             <div className="space-y-4">

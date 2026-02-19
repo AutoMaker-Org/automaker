@@ -960,6 +960,8 @@ export interface WorktreeAPI {
       baseBranch?: string;
       draft?: boolean;
       remote?: string;
+      /** Remote to create the PR against (e.g. upstream). If not specified, inferred from repo setup. */
+      targetRemote?: string;
     }
   ) => Promise<{
     success: boolean;

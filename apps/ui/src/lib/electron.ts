@@ -203,6 +203,8 @@ export interface CreatePROptions {
   baseBranch?: string;
   draft?: boolean;
   remote?: string;
+  /** Remote to create the PR against (e.g. upstream). If not specified, inferred from repo setup. */
+  targetRemote?: string;
 }
 
 // Re-export types from electron.d.ts for external use

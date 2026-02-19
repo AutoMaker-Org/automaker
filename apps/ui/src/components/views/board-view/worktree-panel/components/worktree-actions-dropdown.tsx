@@ -217,7 +217,8 @@ export function WorktreeActionsDropdown({
         : null;
 
   // Determine if the changes/PR section has any visible items
-  const showCreatePR = (!worktree.isMain || worktree.hasChanges) && !hasPR;
+  // Always show Create PR option when there's no existing PR (even without uncommitted changes)
+  const showCreatePR = !hasPR;
   const showPRInfo = hasPR && !!worktree.pr;
   const hasChangesSectionContent = worktree.hasChanges || showCreatePR || showPRInfo;
 
@@ -843,7 +844,7 @@ export function WorktreeActionsDropdown({
                 )}
               >
                 <GitMerge className="w-3.5 h-3.5 mr-2" />
-                Merge Branch
+                Integrate Branch
                 {!isGitOpsAvailable && (
                   <AlertCircle className="w-3 h-3 ml-auto text-muted-foreground" />
                 )}

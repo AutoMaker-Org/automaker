@@ -410,7 +410,7 @@ export function WorktreePanel({
   const [pushToRemoteDialogOpen, setPushToRemoteDialogOpen] = useState(false);
   const [pushToRemoteWorktree, setPushToRemoteWorktree] = useState<WorktreeInfo | null>(null);
 
-  // Merge branch dialog state
+  // Integrate branch dialog state
   const [mergeDialogOpen, setMergeDialogOpen] = useState(false);
   const [mergeWorktree, setMergeWorktree] = useState<WorktreeInfo | null>(null);
 
@@ -952,7 +952,7 @@ export function WorktreePanel({
           onConfirm={handleConfirmSelectRemote}
         />
 
-        {/* Merge Branch Dialog */}
+        {/* Integrate Branch Dialog */}
         <MergeWorktreeDialog
           open={mergeDialogOpen}
           onOpenChange={setMergeDialogOpen}
@@ -1317,7 +1317,7 @@ export function WorktreePanel({
         onConfirm={handleConfirmSelectRemote}
       />
 
-      {/* Merge Branch Dialog */}
+      {/* Integrate Branch Dialog */}
       <MergeWorktreeDialog
         open={mergeDialogOpen}
         onOpenChange={setMergeDialogOpen}

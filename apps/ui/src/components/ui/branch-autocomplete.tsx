@@ -11,6 +11,8 @@ interface BranchAutocompleteProps {
   className?: string;
   disabled?: boolean;
   error?: boolean;
+  allowCreate?: boolean; // Whether to allow creating new branches (default: true)
+  emptyMessage?: string; // Message shown when no branches match the search
   'data-testid'?: string;
 }
 
@@ -23,6 +25,8 @@ export function BranchAutocomplete({
   className,
   disabled = false,
   error = false,
+  allowCreate = true,
+  emptyMessage = 'No branches found.',
   'data-testid': testId,
 }: BranchAutocompleteProps) {
   // Always include "main" at the top of suggestions
@@ -52,13 +56,13 @@ export function BranchAutocomplete({
       onChange={onChange}
       options={branchOptions}
       placeholder={placeholder}
-      searchPlaceholder="Search or type new branch..."
-      emptyMessage="No branches found."
+      searchPlaceholder={allowCreate ? 'Search or type new branch...' : 'Search branches...'}
+      emptyMessage={emptyMessage}
       className={className}
       disabled={disabled}
       error={error}
       icon={GitBranch}
-      allowCreate
+      allowCreate={allowCreate}
       createLabel={(v) => `Create "${v}"`}
       data-testid={testId}
       itemTestIdPrefix="branch-option"

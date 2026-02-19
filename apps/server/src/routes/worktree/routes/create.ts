@@ -83,6 +83,41 @@ async function findExistingWorktreeForBranch(
   }
 }
 
+/**
+ * Detect whether a base branch reference is a remote branch (e.g. "origin/main").
+ * Returns the remote name if it matches a known remote, otherwise null.
+ */
+async function detectRemoteBranch(
+  projectPath: string,
+  baseBranch: string
+): Promise<{ remote: string; branch: string } | null> {
+  const slashIndex = baseBranch.indexOf('/');
+  if (slashIndex <= 0) return null;
+
+  const possibleRemote = baseBranch.substring(0, slashIndex);
+
+  try {
+    // Check if this is actually a remote name by listing remotes
+    const stdout = await execGitCommand(['remote'], projectPath);
+    const remotes = stdout
+      .trim()
+      .split('\n')
+      .map((r: string) => r.trim())
+      .filter(Boolean);
+
+    if (remotes.includes(possibleRemote)) {
+      return {
+        remote: possibleRemote,
+        branch: baseBranch.substring(slashIndex + 1),
+      };
+    }
+  } catch {
+    // Not a git repo or no remotes — fall through
+  }
+
+  return null;
+}
+
 export function createCreateHandler(events: EventEmitter, settingsService?: SettingsService) {
   const worktreeService = new WorktreeService();
 
@@ -91,7 +126,7 @@ export function createCreateHandler(events: EventEmitter, settingsService?: Sett
       const { projectPath, branchName, baseBranch } = req.body as {
         projectPath: string;
         branchName: string;
-        baseBranch?: string; // Optional base branch to create from (defaults to current HEAD)
+        baseBranch?: string; // Optional base branch to create from (defaults to current HEAD). Can be a remote branch like "origin/main".
       };
 
       if (!projectPath || !branchName) {
@@ -170,6 +205,28 @@ export function createCreateHandler(events: EventEmitter, settingsService?: Sett
 
       // Create worktrees directory if it doesn't exist
       await secureFs.mkdir(worktreesDir, { recursive: true });
+
+      // If a base branch is specified and it's a remote branch, fetch from that remote first
+      // This ensures we have the latest refs before creating the worktree
+      if (baseBranch && baseBranch !== 'HEAD') {
+        const remoteBranchInfo = await detectRemoteBranch(projectPath, baseBranch);
+        if (remoteBranchInfo) {
+          logger.info(
+            `Fetching from remote "${remoteBranchInfo.remote}" before creating worktree (base: ${baseBranch})`
+          );
+          try {
+            await execGitCommand(
+              ['fetch', remoteBranchInfo.remote, remoteBranchInfo.branch],
+              projectPath
+            );
+          } catch (fetchErr) {
+            // Non-fatal: log but continue — the ref might already be cached locally
+            logger.warn(
+              `Failed to fetch from remote "${remoteBranchInfo.remote}": ${getErrorMessage(fetchErr)}`
+            );
+          }
+        }
+      }
 
       // Check if branch exists (using array arguments to prevent injection)
       let branchExists = false;

@@ -30,6 +30,7 @@ import { useWorktreeBranches } from '@/hooks/queries';
 interface RemoteInfo {
   name: string;
   url: string;
+  branches?: string[];
 }
 
 interface WorktreeInfo {
@@ -74,13 +75,19 @@ export function CreatePRDialog({
   // Remote selection state
   const [remotes, setRemotes] = useState<RemoteInfo[]>([]);
   const [selectedRemote, setSelectedRemote] = useState<string>('');
+  // Target remote: which remote to create the PR against (may differ from push remote)
+  const [selectedTargetRemote, setSelectedTargetRemote] = useState<string>('');
   const [isLoadingRemotes, setIsLoadingRemotes] = useState(false);
   // Keep a ref in sync with selectedRemote so fetchRemotes can read the latest value
   // without needing it in its dependency array (which would cause re-fetch loops)
   const selectedRemoteRef = useRef<string>(selectedRemote);
+  const selectedTargetRemoteRef = useRef<string>(selectedTargetRemote);
   useEffect(() => {
     selectedRemoteRef.current = selectedRemote;
   }, [selectedRemote]);
+  useEffect(() => {
+    selectedTargetRemoteRef.current = selectedTargetRemote;
+  }, [selectedTargetRemote]);
 
   // Generate description state
   const [isGeneratingDescription, setIsGeneratingDescription] = useState(false);
@@ -91,11 +98,52 @@ export function CreatePRDialog({
     true // Include remote branches for PR base branch selection
   );
 
+  // Determine if push remote selection is needed:
+  // Show when there are unpushed commits, no remote tracking branch, or uncommitted changes
+  // (uncommitted changes will be committed first, then pushed)
+  const branchHasRemote = branchesData?.hasRemoteBranch ?? false;
+  const branchAheadCount = branchesData?.aheadCount ?? 0;
+  const needsPush = !branchHasRemote || branchAheadCount > 0 || !!worktree?.hasChanges;
+
   // Filter out current worktree branch from the list
+  // When multiple remotes exist and a target remote is selected, only show branches from that remote
   const branches = useMemo(() => {
     if (!branchesData?.branches) return [];
-    return branchesData.branches.map((b) => b.name).filter((name) => name !== worktree?.branch);
-  }, [branchesData?.branches, worktree?.branch]);
+    const allBranches = branchesData.branches
+      .map((b) => b.name)
+      .filter((name) => name !== worktree?.branch);
+
+    // If a target remote is selected and we have remote info with branches,
+    // only show that remote's branches (not branches from other remotes)
+    if (selectedTargetRemote && remotes.length > 1) {
+      const targetRemoteInfo = remotes.find((r) => r.name === selectedTargetRemote);
+      if (targetRemoteInfo?.branches && targetRemoteInfo.branches.length > 0) {
+        const targetBranchNames = new Set(targetRemoteInfo.branches);
+        // Filter to only include branches that exist on the target remote
+        // Match both short names (e.g. "main") and prefixed names (e.g. "upstream/main")
+        return allBranches.filter((name) => {
+          // Check if the branch name matches a target remote branch directly
+          if (targetBranchNames.has(name)) return true;
+          // Check if it's a prefixed remote branch (e.g. "upstream/main")
+          const prefix = `${selectedTargetRemote}/`;
+          if (name.startsWith(prefix) && targetBranchNames.has(name.slice(prefix.length)))
+            return true;
+          return false;
+        });
+      }
+    }
+
+    return allBranches;
+  }, [branchesData?.branches, worktree?.branch, selectedTargetRemote, remotes]);
+
+  // When branches change (e.g. target remote changed), reset base branch if current selection is no longer valid
+  useEffect(() => {
+    if (branches.length > 0 && baseBranch && !branches.includes(baseBranch)) {
+      // Current base branch is not in the filtered list — pick the best match
+      const mainBranch = branches.find((b) => b === 'main' || b === 'master');
+      setBaseBranch(mainBranch || branches[0]);
+    }
+  }, [branches, baseBranch]);
 
   // Fetch remotes when dialog opens
   const fetchRemotes = useCallback(async () => {
@@ -109,14 +157,15 @@ export function CreatePRDialog({
 
       if (result.success && result.result) {
         const remoteInfos: RemoteInfo[] = result.result.remotes.map(
-          (r: { name: string; url: string }) => ({
+          (r: { name: string; url: string; branches?: { name: string }[] }) => ({
             name: r.name,
             url: r.url,
+            branches: r.branches?.map((b: { name: string }) => b.name) || [],
           })
         );
         setRemotes(remoteInfos);
 
-        // Preserve existing selection if it's still valid; otherwise fall back to 'origin' or first remote
+        // Preserve existing push remote selection if it's still valid; otherwise fall back to 'origin' or first remote
         if (remoteInfos.length > 0) {
           const remoteNames = remoteInfos.map((r) => r.name);
           const currentSelection = selectedRemoteRef.current;
@@ -125,6 +174,19 @@ export function CreatePRDialog({
           if (!currentSelectionStillExists) {
             const defaultRemote = remoteInfos.find((r) => r.name === 'origin') || remoteInfos[0];
             setSelectedRemote(defaultRemote.name);
+          }
+
+          // Preserve existing target remote selection if it's still valid
+          const currentTargetSelection = selectedTargetRemoteRef.current;
+          const currentTargetStillExists =
+            currentTargetSelection !== '' && remoteNames.includes(currentTargetSelection);
+          if (!currentTargetStillExists) {
+            // Default target remote: 'upstream' if it exists (fork workflow), otherwise same as push remote
+            const defaultTarget =
+              remoteInfos.find((r) => r.name === 'upstream') ||
+              remoteInfos.find((r) => r.name === 'origin') ||
+              remoteInfos[0];
+            setSelectedTargetRemote(defaultTarget.name);
           }
         }
       }
@@ -154,6 +216,7 @@ export function CreatePRDialog({
     setShowBrowserFallback(false);
     setRemotes([]);
     setSelectedRemote('');
+    setSelectedTargetRemote('');
     setIsGeneratingDescription(false);
     operationCompletedRef.current = false;
   }, [defaultBaseBranch]);
@@ -215,6 +278,7 @@ export function CreatePRDialog({
         baseBranch,
         draft: isDraft,
         remote: selectedRemote || undefined,
+        targetRemote: remotes.length > 1 ? selectedTargetRemote || undefined : undefined,
       });
 
       if (result.success && result.result) {
@@ -348,7 +412,7 @@ export function CreatePRDialog({
             Create Pull Request
           </DialogTitle>
           <DialogDescription className="break-words">
-            Push changes and create a pull request from{' '}
+            {worktree.hasChanges ? 'Push changes and create' : 'Create'} a pull request from{' '}
             <code className="font-mono bg-muted px-1 rounded break-all">{worktree.branch}</code>
           </DialogDescription>
         </DialogHeader>
@@ -482,8 +546,8 @@ export function CreatePRDialog({
               </div>
 
               <div className="flex flex-col gap-4">
-                {/* Remote selector - only show if multiple remotes are available */}
-                {remotes.length > 1 && (
+                {/* Push remote selector - only show when multiple remotes and there are commits to push */}
+                {remotes.length > 1 && needsPush && (
                   <div className="grid gap-2">
                     <div className="flex items-center justify-between">
                       <Label htmlFor="remote-select">Push to Remote</Label>
@@ -525,6 +589,36 @@ export function CreatePRDialog({
                   </div>
                 )}
 
+                {/* Target remote selector - which remote to create PR against */}
+                {remotes.length > 1 && (
+                  <div className="grid gap-2">
+                    <Label htmlFor="target-remote-select">Create PR Against</Label>
+                    <Select value={selectedTargetRemote} onValueChange={setSelectedTargetRemote}>
+                      <SelectTrigger id="target-remote-select">
+                        <SelectValue placeholder="Select target remote" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {remotes.map((remote) => (
+                          <SelectItem
+                            key={remote.name}
+                            value={remote.name}
+                            description={
+                              <span className="text-xs text-muted-foreground truncate max-w-[300px]">
+                                {remote.url}
+                              </span>
+                            }
+                          >
+                            <span className="font-medium">{remote.name}</span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      The remote repository where the pull request will be created
+                    </p>
+                  </div>
+                )}
+
                 <div className="grid gap-2">
                   <Label htmlFor="base-branch">Base Branch</Label>
                   <BranchAutocomplete
@@ -533,6 +627,8 @@ export function CreatePRDialog({
                     branches={branches}
                     placeholder="Select base branch..."
                     disabled={isLoadingBranches}
+                    allowCreate={false}
+                    emptyMessage="No matching branches found."
                     data-testid="base-branch-autocomplete"
                   />
                 </div>

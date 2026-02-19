@@ -32,6 +32,7 @@ export function createCreatePRHandler() {
         baseBranch,
         draft,
         remote,
+        targetRemote,
       } = req.body as {
         worktreePath: string;
         projectPath?: string;
@@ -41,6 +42,8 @@ export function createCreatePRHandler() {
         baseBranch?: string;
         draft?: boolean;
         remote?: string;
+        /** Remote to create the PR against (e.g. upstream). If not specified, inferred from repo setup. */
+        targetRemote?: string;
       };
 
       if (!worktreePath) {
@@ -119,11 +122,18 @@ export function createCreatePRHandler() {
         }
       }
 
-      // Validate remote name before use to prevent command injection
+      // Validate remote names before use to prevent command injection
       if (remote !== undefined && !isValidRemoteName(remote)) {
         res.status(400).json({
           success: false,
           error: 'Invalid remote name contains unsafe characters',
+        });
+        return;
+      }
+      if (targetRemote !== undefined && !isValidRemoteName(targetRemote)) {
+        res.status(400).json({
+          success: false,
+          error: 'Invalid target remote name contains unsafe characters',
         });
         return;
       }
@@ -164,8 +174,6 @@ export function createCreatePRHandler() {
       const base = baseBranch || 'main';
       const title = prTitle || branchName;
       const body = prBody || `Changes from branch ${branchName}`;
-      const draftFlag = draft ? '--draft' : '';
-
       let prUrl: string | null = null;
       let prError: string | null = null;
       let browserUrl: string | null = null;
@@ -176,6 +184,8 @@ export function createCreatePRHandler() {
       let repoUrl: string | null = null;
       let upstreamRepo: string | null = null;
       let originOwner: string | null = null;
+      // Track all parsed remotes for targetRemote support
+      const parsedRemotes: Map<string, { owner: string; repo: string }> = new Map();
       try {
         const { stdout: remotes } = await execAsync('git remote -v', {
           cwd: worktreePath,
@@ -203,6 +213,7 @@ export function createCreatePRHandler() {
 
           if (match) {
             const [, remoteName, owner, repo] = match;
+            parsedRemotes.set(remoteName, { owner, repo });
             if (remoteName === 'upstream') {
               upstreamRepo = `${owner}/${repo}`;
               repoUrl = `https://github.com/${owner}/${repo}`;
@@ -216,6 +227,33 @@ export function createCreatePRHandler() {
         }
       } catch {
         // Couldn't parse remotes - will try fallback
+      }
+
+      // When a targetRemote is explicitly specified, override fork detection
+      // to use the specified remote as the PR target
+      let targetRepo: string | null = null;
+      let pushOwner: string | null = null;
+      if (targetRemote && parsedRemotes.size > 0) {
+        const targetInfo = parsedRemotes.get(targetRemote);
+        const pushInfo = parsedRemotes.get(pushRemote);
+        if (targetInfo) {
+          targetRepo = `${targetInfo.owner}/${targetInfo.repo}`;
+          repoUrl = `https://github.com/${targetInfo.owner}/${targetInfo.repo}`;
+        }
+        if (pushInfo) {
+          pushOwner = pushInfo.owner;
+        }
+        // Override the auto-detected upstream/origin with explicit targetRemote
+        // Only treat as cross-remote if target differs from push remote
+        if (targetRemote !== pushRemote && targetInfo && pushInfo) {
+          upstreamRepo = targetRepo;
+          originOwner = pushOwner;
+        } else if (targetInfo) {
+          // Same remote for push and target - regular (non-fork) workflow
+          upstreamRepo = null;
+          originOwner = targetInfo.owner;
+          repoUrl = `https://github.com/${targetInfo.owner}/${targetInfo.repo}`;
+        }
       }
 
       // Fallback: Try to get repo URL from git config if remote parsing failed
@@ -249,7 +287,7 @@ export function createCreatePRHandler() {
         const encodedBody = encodeURIComponent(body);
 
         if (upstreamRepo && originOwner) {
-          // Fork workflow: PR to upstream from origin
+          // Fork workflow (or cross-remote PR): PR to target from push remote
           browserUrl = `https://github.com/${upstreamRepo}/compare/${base}...${originOwner}:${branchName}?expand=1&title=${encodedTitle}&body=${encodedBody}`;
         } else {
           // Regular repo
@@ -263,7 +301,7 @@ export function createCreatePRHandler() {
       if (ghCliAvailable) {
         // First, check if a PR already exists for this branch using gh pr list
         // This is more reliable than gh pr view as it explicitly searches by branch name
-        // For forks, we need to use owner:branch format for the head parameter
+        // For forks/cross-remote, we need to use owner:branch format for the head parameter
         const headRef = upstreamRepo && originOwner ? `${originOwner}:${branchName}` : branchName;
         const repoArg = upstreamRepo ? ` --repo "${upstreamRepo}"` : '';
 

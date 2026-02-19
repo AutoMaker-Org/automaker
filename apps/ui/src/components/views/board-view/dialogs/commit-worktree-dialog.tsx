@@ -12,6 +12,13 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
   GitCommit,
   Sparkles,
   FilePlus,
@@ -21,6 +28,7 @@ import {
   File,
   ChevronDown,
   ChevronRight,
+  Upload,
 } from 'lucide-react';
 import { Spinner } from '@/components/ui/spinner';
 import { getElectronAPI } from '@/lib/electron';
@@ -30,6 +38,11 @@ import { cn } from '@/lib/utils';
 import { TruncatedFilePath } from '@/components/ui/truncated-file-path';
 import type { FileStatus } from '@/types/electron';
 import { parseDiff, type ParsedFileDiff } from '@/lib/diff-utils';
+
+interface RemoteInfo {
+  name: string;
+  url: string;
+}
 
 interface WorktreeInfo {
   path: string;
@@ -178,6 +191,13 @@ export function CommitWorktreeDialog({
   const [expandedFile, setExpandedFile] = useState<string | null>(null);
   const [isLoadingDiffs, setIsLoadingDiffs] = useState(false);
 
+  // Push after commit state
+  const [pushAfterCommit, setPushAfterCommit] = useState(false);
+  const [remotes, setRemotes] = useState<RemoteInfo[]>([]);
+  const [selectedRemote, setSelectedRemote] = useState<string>('');
+  const [isLoadingRemotes, setIsLoadingRemotes] = useState(false);
+  const [isPushing, setIsPushing] = useState(false);
+
   // Parse diffs
   const parsedDiffs = useMemo(() => parseDiff(diffContent), [diffContent]);
 
@@ -190,6 +210,45 @@ export function CommitWorktreeDialog({
     return map;
   }, [parsedDiffs]);
 
+  // Fetch remotes when push option is enabled
+  useEffect(() => {
+    if (pushAfterCommit && worktree && remotes.length === 0) {
+      let cancelled = false;
+      setIsLoadingRemotes(true);
+
+      const fetchRemotes = async () => {
+        try {
+          const api = getElectronAPI();
+          if (api?.worktree?.listRemotes) {
+            const result = await api.worktree.listRemotes(worktree.path);
+            if (!cancelled && result.success && result.result) {
+              const remoteInfos = result.result.remotes.map((r) => ({
+                name: r.name,
+                url: r.url,
+              }));
+              setRemotes(remoteInfos);
+              // Auto-select 'origin' if available, otherwise first remote
+              if (remoteInfos.length > 0) {
+                const defaultRemote =
+                  remoteInfos.find((r) => r.name === 'origin') || remoteInfos[0];
+                setSelectedRemote(defaultRemote.name);
+              }
+            }
+          }
+        } catch (err) {
+          console.warn('Failed to fetch remotes:', err);
+        } finally {
+          if (!cancelled) setIsLoadingRemotes(false);
+        }
+      };
+
+      fetchRemotes();
+      return () => {
+        cancelled = true;
+      };
+    }
+  }, [pushAfterCommit, worktree, remotes.length]);
+
   // Load diffs when dialog opens
   useEffect(() => {
     if (open && worktree) {
@@ -198,6 +257,11 @@ export function CommitWorktreeDialog({
       setDiffContent('');
       setSelectedFiles(new Set());
       setExpandedFile(null);
+      // Reset push state
+      setPushAfterCommit(false);
+      setRemotes([]);
+      setSelectedRemote('');
+      setIsPushing(false);
 
       let cancelled = false;
 
@@ -302,6 +366,30 @@ export function CommitWorktreeDialog({
           toast.success('Changes committed', {
             description: `Commit ${result.result.commitHash} on ${result.result.branch}`,
           });
+
+          // Push after commit if enabled
+          if (pushAfterCommit && selectedRemote) {
+            setIsPushing(true);
+            try {
+              if (!api?.worktree?.push) {
+                toast.error('Push API not available');
+              } else {
+                const pushResult = await api.worktree.push(worktree.path, false, selectedRemote);
+                if (pushResult.success && pushResult.result) {
+                  toast.success('Pushed to remote', {
+                    description: pushResult.result.message,
+                  });
+                } else {
+                  toast.error(pushResult.error || 'Failed to push to remote');
+                }
+              }
+            } catch (pushErr) {
+              toast.error(pushErr instanceof Error ? pushErr.message : 'Failed to push to remote');
+            } finally {
+              setIsPushing(false);
+            }
+          }
+
           onCommitted();
           onOpenChange(false);
           setMessage('');
@@ -325,9 +413,11 @@ export function CommitWorktreeDialog({
       e.key === 'Enter' &&
       (e.metaKey || e.ctrlKey) &&
       !isLoading &&
+      !isPushing &&
       !isGenerating &&
       message.trim() &&
-      selectedFiles.size > 0
+      selectedFiles.size > 0 &&
+      !(pushAfterCommit && !selectedRemote)
     ) {
       handleCommit();
     }
@@ -580,9 +670,66 @@ export function CommitWorktreeDialog({
             {error && <p className="text-sm text-destructive">{error}</p>}
           </div>
 
+          {/* Push after commit option */}
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="push-after-commit"
+                checked={pushAfterCommit}
+                onCheckedChange={(checked) => setPushAfterCommit(checked === true)}
+              />
+              <Label
+                htmlFor="push-after-commit"
+                className="text-sm font-medium cursor-pointer flex items-center gap-1.5"
+              >
+                <Upload className="w-3.5 h-3.5" />
+                Push to remote after commit
+              </Label>
+            </div>
+
+            {pushAfterCommit && (
+              <div className="ml-6 flex flex-col gap-1.5">
+                {isLoadingRemotes ? (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Spinner size="sm" />
+                    <span>Loading remotes...</span>
+                  </div>
+                ) : remotes.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    No remotes configured for this repository.
+                  </p>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <Label
+                      htmlFor="remote-select"
+                      className="text-xs text-muted-foreground whitespace-nowrap"
+                    >
+                      Remote:
+                    </Label>
+                    <Select value={selectedRemote} onValueChange={setSelectedRemote}>
+                      <SelectTrigger id="remote-select" className="h-8 text-xs flex-1">
+                        <SelectValue placeholder="Select remote" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {remotes.map((remote) => (
+                          <SelectItem key={remote.name} value={remote.name}>
+                            <span className="font-medium">{remote.name}</span>
+                            <span className="ml-2 text-muted-foreground text-xs truncate max-w-[200px]">
+                              {remote.url}
+                            </span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
           <p className="text-xs text-muted-foreground">
             Press <kbd className="px-1 py-0.5 bg-muted rounded text-xs">Cmd/Ctrl+Enter</kbd> to
-            commit
+            commit{pushAfterCommit ? ' & push' : ''}
           </p>
         </div>
 
@@ -590,23 +737,34 @@ export function CommitWorktreeDialog({
           <Button
             variant="ghost"
             onClick={() => onOpenChange(false)}
-            disabled={isLoading || isGenerating}
+            disabled={isLoading || isPushing || isGenerating}
           >
             Cancel
           </Button>
           <Button
             onClick={handleCommit}
-            disabled={isLoading || isGenerating || !message.trim() || selectedFiles.size === 0}
+            disabled={
+              isLoading ||
+              isPushing ||
+              isGenerating ||
+              !message.trim() ||
+              selectedFiles.size === 0 ||
+              (pushAfterCommit && !selectedRemote)
+            }
           >
-            {isLoading ? (
+            {isLoading || isPushing ? (
               <>
                 <Spinner size="sm" className="mr-2" />
-                Committing...
+                {isPushing ? 'Pushing...' : 'Committing...'}
               </>
             ) : (
               <>
-                <GitCommit className="w-4 h-4 mr-2" />
-                Commit
+                {pushAfterCommit ? (
+                  <Upload className="w-4 h-4 mr-2" />
+                ) : (
+                  <GitCommit className="w-4 h-4 mr-2" />
+                )}
+                {pushAfterCommit ? 'Commit & Push' : 'Commit'}
                 {selectedFiles.size > 0 && selectedFiles.size < files.length
                   ? ` (${selectedFiles.size} file${selectedFiles.size > 1 ? 's' : ''})`
                   : ''}
