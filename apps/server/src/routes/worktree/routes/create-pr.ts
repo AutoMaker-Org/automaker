@@ -17,6 +17,7 @@ import { spawnProcess } from '@automaker/platform';
 import { updateWorktreePRInfo } from '../../../lib/worktree-metadata.js';
 import { createLogger } from '@automaker/utils';
 import { validatePRState } from '@automaker/types';
+import { resolvePrTarget } from '../../../services/pr-service.js';
 
 const logger = createLogger('CreatePR');
 
@@ -179,131 +180,27 @@ export function createCreatePRHandler() {
       let browserUrl: string | null = null;
       let ghCliAvailable = false;
 
-      // Get repository URL and detect fork workflow FIRST
-      // This is needed for both the existing PR check and PR creation
+      // Resolve repository URL, fork workflow, and target remote information.
+      // This is needed for both the existing PR check and PR creation.
       let repoUrl: string | null = null;
       let upstreamRepo: string | null = null;
       let originOwner: string | null = null;
-      // Track all parsed remotes for targetRemote support
-      const parsedRemotes: Map<string, { owner: string; repo: string }> = new Map();
       try {
-        const { stdout: remotes } = await execAsync('git remote -v', {
-          cwd: worktreePath,
-          env: execEnv,
+        const prTarget = await resolvePrTarget({
+          worktreePath,
+          pushRemote,
+          targetRemote,
         });
-
-        // Parse remotes to detect fork workflow and get repo URL
-        const lines = remotes.split(/\r?\n/); // Handle both Unix and Windows line endings
-        for (const line of lines) {
-          // Try multiple patterns to match different remote URL formats
-          // Pattern 1: git@github.com:owner/repo.git (fetch)
-          // Pattern 2: https://github.com/owner/repo.git (fetch)
-          // Pattern 3: https://github.com/owner/repo (fetch)
-          let match = line.match(/^(\w+)\s+.*[:/]([^/]+)\/([^/\s]+?)(?:\.git)?\s+\(fetch\)/);
-          if (!match) {
-            // Try SSH format: git@github.com:owner/repo.git
-            match = line.match(/^(\w+)\s+git@[^:]+:([^/]+)\/([^\s]+?)(?:\.git)?\s+\(fetch\)/);
-          }
-          if (!match) {
-            // Try HTTPS format: https://github.com/owner/repo.git
-            match = line.match(
-              /^(\w+)\s+https?:\/\/[^/]+\/([^/]+)\/([^\s]+?)(?:\.git)?\s+\(fetch\)/
-            );
-          }
-
-          if (match) {
-            const [, remoteName, owner, repo] = match;
-            parsedRemotes.set(remoteName, { owner, repo });
-            if (remoteName === 'upstream') {
-              upstreamRepo = `${owner}/${repo}`;
-              repoUrl = `https://github.com/${owner}/${repo}`;
-            } else if (remoteName === 'origin') {
-              originOwner = owner;
-              if (!repoUrl) {
-                repoUrl = `https://github.com/${owner}/${repo}`;
-              }
-            }
-          }
-        }
-      } catch {
-        // Couldn't parse remotes - will try fallback
-      }
-
-      // When a targetRemote is explicitly specified, validate that it is known
-      // before using it. Silently falling back to auto-detection when the caller
-      // explicitly requested a remote that doesn't exist is misleading, so we
-      // fail fast with a 400 here instead.
-      if (targetRemote && parsedRemotes.size > 0 && !parsedRemotes.has(targetRemote)) {
+        repoUrl = prTarget.repoUrl;
+        upstreamRepo = prTarget.upstreamRepo;
+        originOwner = prTarget.originOwner;
+      } catch (resolveErr) {
+        // resolvePrTarget throws for validation errors (unknown targetRemote, missing pushRemote)
         res.status(400).json({
           success: false,
-          error: `targetRemote "${targetRemote}" not found in repository remotes`,
+          error: getErrorMessage(resolveErr),
         });
         return;
-      }
-
-      // When a targetRemote is explicitly specified, override fork detection
-      // to use the specified remote as the PR target
-      let targetRepo: string | null = null;
-      let pushOwner: string | null = null;
-      if (targetRemote && parsedRemotes.size > 0) {
-        const targetInfo = parsedRemotes.get(targetRemote);
-        const pushInfo = parsedRemotes.get(pushRemote);
-
-        // If the push remote is not found in the parsed remotes, we cannot
-        // determine the push owner and would build incorrect URLs. Fail fast
-        // instead of silently proceeding with null values.
-        if (!pushInfo) {
-          logger.warn('Push remote not found in parsed remotes', {
-            pushRemote,
-            targetRemote,
-            availableRemotes: [...parsedRemotes.keys()],
-          });
-          res.status(400).json({
-            success: false,
-            error: `Push remote "${pushRemote}" not found in repository remotes`,
-          });
-          return;
-        }
-
-        if (targetInfo) {
-          targetRepo = `${targetInfo.owner}/${targetInfo.repo}`;
-          repoUrl = `https://github.com/${targetInfo.owner}/${targetInfo.repo}`;
-        }
-        pushOwner = pushInfo.owner;
-
-        // Override the auto-detected upstream/origin with explicit targetRemote
-        // Only treat as cross-remote if target differs from push remote
-        if (targetRemote !== pushRemote && targetInfo) {
-          upstreamRepo = targetRepo;
-          originOwner = pushOwner;
-        } else if (targetInfo) {
-          // Same remote for push and target - regular (non-fork) workflow
-          upstreamRepo = null;
-          originOwner = targetInfo.owner;
-          repoUrl = `https://github.com/${targetInfo.owner}/${targetInfo.repo}`;
-        }
-      }
-
-      // Fallback: Try to get repo URL from git config if remote parsing failed
-      if (!repoUrl) {
-        try {
-          const { stdout: originUrl } = await execAsync('git config --get remote.origin.url', {
-            cwd: worktreePath,
-            env: execEnv,
-          });
-          const url = originUrl.trim();
-
-          // Parse URL to extract owner/repo
-          // Handle both SSH (git@github.com:owner/repo.git) and HTTPS (https://github.com/owner/repo.git)
-          let match = url.match(/[:/]([^/]+)\/([^/\s]+?)(?:\.git)?$/);
-          if (match) {
-            const [, owner, repo] = match;
-            originOwner = owner;
-            repoUrl = `https://github.com/${owner}/${repo}`;
-          }
-        } catch {
-          // Failed to get repo URL from config
-        }
       }
 
       // Check if gh CLI is available (cross-platform)

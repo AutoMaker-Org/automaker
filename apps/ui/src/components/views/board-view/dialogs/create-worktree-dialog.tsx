@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -113,62 +113,90 @@ export function CreateWorktreeDialog({
   // allow free-form branch entry via allowCreate as a fallback.
   const [branchFetchError, setBranchFetchError] = useState<string | null>(null);
 
+  // AbortController ref so in-flight branch fetches can be cancelled when the dialog closes
+  const branchFetchAbortRef = useRef<AbortController | null>(null);
+
   // Fetch available branches (local + remote) when the base branch section is expanded
-  const fetchBranches = useCallback(async () => {
-    if (!projectPath) return;
+  const fetchBranches = useCallback(
+    async (signal?: AbortSignal) => {
+      if (!projectPath) return;
 
-    setIsLoadingBranches(true);
-    try {
-      const api = getHttpApiClient();
+      setIsLoadingBranches(true);
+      try {
+        const api = getHttpApiClient();
 
-      // Fetch branches using the project path (use listBranches on the project root)
-      const branchResult = await api.worktree.listBranches(projectPath, true);
-      if (branchResult.success && branchResult.result) {
-        setBranchFetchError(null);
-        setAvailableBranches(
-          branchResult.result.branches.map((b: { name: string; isRemote: boolean }) => ({
-            name: b.name,
-            isRemote: b.isRemote,
-          }))
-        );
-      } else {
-        // API returned success: false — treat as an error
+        // Fetch branches using the project path (use listBranches on the project root)
+        const branchResult = await api.worktree.listBranches(projectPath, true);
+
+        // If the fetch was aborted while awaiting, bail out to avoid stale state writes
+        if (signal?.aborted) return;
+
+        if (branchResult.success && branchResult.result) {
+          setBranchFetchError(null);
+          setAvailableBranches(
+            branchResult.result.branches.map((b: { name: string; isRemote: boolean }) => ({
+              name: b.name,
+              isRemote: b.isRemote,
+            }))
+          );
+        } else {
+          // API returned success: false — treat as an error
+          const message =
+            branchResult.error || 'Failed to load branches. You can type a branch name manually.';
+          setBranchFetchError(message);
+          setAvailableBranches([{ name: 'main', isRemote: false }]);
+        }
+      } catch (err) {
+        // If aborted, don't update state
+        if (signal?.aborted) return;
+
         const message =
-          branchResult.error || 'Failed to load branches. You can type a branch name manually.';
+          err instanceof Error
+            ? err.message
+            : 'Failed to load branches. You can type a branch name manually.';
         setBranchFetchError(message);
+        // Provide 'main' as a safe fallback so the autocomplete is not empty,
+        // and enable free-form entry (allowCreate) so the user can still type
+        // any branch name when the remote list is unavailable.
         setAvailableBranches([{ name: 'main', isRemote: false }]);
+      } finally {
+        if (!signal?.aborted) {
+          setIsLoadingBranches(false);
+        }
       }
-    } catch (err) {
-      const message =
-        err instanceof Error
-          ? err.message
-          : 'Failed to load branches. You can type a branch name manually.';
-      setBranchFetchError(message);
-      // Provide 'main' as a safe fallback so the autocomplete is not empty,
-      // and enable free-form entry (allowCreate) so the user can still type
-      // any branch name when the remote list is unavailable.
-      setAvailableBranches([{ name: 'main', isRemote: false }]);
-    } finally {
-      setIsLoadingBranches(false);
-    }
-  }, [projectPath]);
+    },
+    [projectPath]
+  );
 
   // Fetch branches when the base branch section is expanded
   useEffect(() => {
     if (open && showBaseBranch) {
-      fetchBranches();
+      // Abort any previous in-flight fetch
+      branchFetchAbortRef.current?.abort();
+      const controller = new AbortController();
+      branchFetchAbortRef.current = controller;
+      fetchBranches(controller.signal);
     }
+    return () => {
+      branchFetchAbortRef.current?.abort();
+      branchFetchAbortRef.current = null;
+    };
   }, [open, showBaseBranch, fetchBranches]);
 
   // Reset state when dialog closes
   useEffect(() => {
     if (!open) {
+      // Abort any in-flight branch fetch to prevent stale writes
+      branchFetchAbortRef.current?.abort();
+      branchFetchAbortRef.current = null;
+
       setBranchName('');
       setBaseBranch('');
       setShowBaseBranch(false);
       setError(null);
       setAvailableBranches([]);
       setBranchFetchError(null);
+      setIsLoadingBranches(false);
     }
   }, [open]);
 
@@ -191,10 +219,22 @@ export function CreateWorktreeDialog({
     return [...local, ...remote];
   }, [availableBranches]);
 
-  // Determine if the selected base branch is a remote branch
+  // Determine if the selected base branch is a remote branch.
+  // Also detect manually entered remote-style names (e.g. "origin/feature")
+  // so the UI shows the "Remote branch — will fetch latest" hint even when
+  // the branch isn't in the fetched availableBranches list.
   const isRemoteBaseBranch = useMemo(() => {
     if (!baseBranch) return false;
-    return availableBranches.some((b) => b.name === baseBranch && b.isRemote);
+    // Check fetched branch list first
+    const knownRemote = availableBranches.some((b) => b.name === baseBranch && b.isRemote);
+    if (knownRemote) return true;
+    // Heuristic: if the branch contains '/' and isn't a known local branch,
+    // treat it as a remote ref (e.g. "origin/main")
+    if (baseBranch.includes('/')) {
+      const isKnownLocal = availableBranches.some((b) => b.name === baseBranch && !b.isRemote);
+      return !isKnownLocal;
+    }
+    return false;
   }, [baseBranch, availableBranches]);
 
   const handleCreate = async () => {
@@ -316,7 +356,12 @@ export function CreateWorktreeDialog({
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={fetchBranches}
+                    onClick={() => {
+                      branchFetchAbortRef.current?.abort();
+                      const controller = new AbortController();
+                      branchFetchAbortRef.current = controller;
+                      void fetchBranches(controller.signal);
+                    }}
                     disabled={isLoadingBranches}
                     className="h-6 px-2 text-xs"
                   >

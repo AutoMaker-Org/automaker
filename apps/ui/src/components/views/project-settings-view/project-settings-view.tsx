@@ -6,6 +6,7 @@ import { ProjectIdentitySection } from './project-identity-section';
 import { ProjectThemeSection } from './project-theme-section';
 import { WorktreePreferencesSection } from './worktree-preferences-section';
 import { CommandsSection } from './commands-section';
+import { TerminalScriptsSection } from './terminal-scripts-section';
 import { ProjectModelsSection } from './project-models-section';
 import { DataManagementSection } from './data-management-section';
 import { DangerZoneSection } from '../settings-view/danger-zone/danger-zone-section';
@@ -91,6 +92,8 @@ export function ProjectSettingsView() {
         return <WorktreePreferencesSection project={currentProject} />;
       case 'commands':
         return <CommandsSection project={currentProject} />;
+      case 'scripts':
+        return <TerminalScriptsSection project={currentProject} />;
       case 'claude':
         return <ProjectModelsSection project={currentProject} />;
       case 'data':

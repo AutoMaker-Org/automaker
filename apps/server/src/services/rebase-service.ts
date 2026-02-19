@@ -72,18 +72,17 @@ export async function runRebase(
   // Validate the remote name to prevent git option injection.
   // Reject invalid remote names so the caller knows their input was wrong,
   // consistent with how invalid branch names are handled above.
-  const rawRemote = options?.remote || 'origin';
-  if (!isValidRemoteName(rawRemote)) {
+  const remote = options?.remote || 'origin';
+  if (!isValidRemoteName(remote)) {
     logger.warn('Invalid remote name supplied to rebase-service', {
-      remote: rawRemote,
+      remote,
       worktreePath,
     });
     return {
       success: false,
-      error: `Invalid remote name: "${rawRemote}"`,
+      error: `Invalid remote name: "${remote}"`,
     };
   }
-  const remote = rawRemote;
 
   // Fetch latest from remote before rebasing to ensure we have up-to-date refs
   try {

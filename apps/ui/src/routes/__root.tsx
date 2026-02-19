@@ -232,7 +232,10 @@ function RootLayoutContent() {
     !isLoggedOutRoute &&
     !isSetupRoute &&
     !!autoOpenCandidate;
-  const shouldAutoOpen = canAutoOpen && autoOpenStatus !== AUTO_OPEN_STATUS.done;
+  // Only block the UI with "Opening project..." when on the root route.
+  // When already on /board or /dashboard, auto-open runs silently in the background —
+  // blocking here would cause a visible flash when switching back to the PWA.
+  const shouldAutoOpen = canAutoOpen && autoOpenStatus !== AUTO_OPEN_STATUS.done && isRootRoute;
   const shouldBlockForSettings =
     authChecked && isAuthenticated && !settingsLoaded && !isLoginRoute && !isLoggedOutRoute;
 

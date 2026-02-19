@@ -953,7 +953,7 @@ export function GitDiffPanel({
                                       variant="ghost"
                                       size="sm"
                                       className="h-6 px-2 text-xs"
-                                      onClick={() => handleUnstageFile(file.path)}
+                                      onClick={() => void handleUnstageFile(file.path)}
                                       title="Unstage file"
                                     >
                                       <Minus className="w-3 h-3 mr-1" />
@@ -964,7 +964,7 @@ export function GitDiffPanel({
                                       variant="ghost"
                                       size="sm"
                                       className="h-6 px-2 text-xs"
-                                      onClick={() => handleStageFile(file.path)}
+                                      onClick={() => void handleStageFile(file.path)}
                                       title="Stage file"
                                     >
                                       <Plus className="w-3 h-3 mr-1" />

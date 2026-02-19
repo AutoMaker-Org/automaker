@@ -59,6 +59,7 @@ import {
   applyStickyModifier,
   type StickyModifier,
 } from './sticky-modifier-keys';
+import { TerminalScriptsDropdown } from './terminal-scripts-dropdown';
 
 const logger = createLogger('Terminal');
 const NO_STORE_CACHE_MODE: RequestCache = 'no-store';
@@ -373,6 +374,13 @@ export function TerminalPanel({
   const sendTerminalInput = useCallback((data: string) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({ type: 'input', data }));
+    }
+  }, []);
+
+  // Send a command to the terminal (types the command and presses Enter)
+  const sendCommand = useCallback((command: string) => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ type: 'input', data: command + '\n' }));
     }
   }, []);
 
@@ -1902,6 +1910,12 @@ export function TerminalPanel({
           >
             <ZoomIn className="h-3 w-3" />
           </Button>
+
+          {/* Quick scripts dropdown */}
+          <TerminalScriptsDropdown
+            onRunCommand={sendCommand}
+            isConnected={connectionStatus === 'connected'}
+          />
 
           {/* Settings popover */}
           <Popover>

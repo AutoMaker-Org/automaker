@@ -130,10 +130,21 @@ export function AgentView() {
     await clearHistory();
   };
 
-  // Handle creating a new session from empty state
+  // Handle creating a new session from empty state.
+  // On mobile the SessionManager may be unmounted (hidden), clearing the ref.
+  // In that case, show it first and wait a frame for the component to mount
+  // and re-populate quickCreateSessionRef before invoking it.
   const handleCreateSessionFromEmptyState = useCallback(async () => {
-    if (quickCreateSessionRef.current) {
-      await quickCreateSessionRef.current();
+    let createFn = quickCreateSessionRef.current;
+    if (!createFn) {
+      // SessionManager is likely unmounted on mobile — show it so it mounts
+      setShowSessionManager(true);
+      // Wait for the next frame so the component mounts and populates the ref
+      await new Promise<void>((r) => requestAnimationFrame(() => r()));
+      createFn = quickCreateSessionRef.current;
+    }
+    if (createFn) {
+      await createFn();
     }
   }, []);
 

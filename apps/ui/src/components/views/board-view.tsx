@@ -880,7 +880,8 @@ export function BoardView() {
       // Capture existing feature IDs before adding
       const featuresBeforeIds = new Set(useAppStore.getState().features.map((f) => f.id));
       try {
-        await handleAddFeature(featureData);
+        // Create feature directly with in_progress status to avoid brief backlog flash
+        await handleAddFeature({ ...featureData, initialStatus: 'in_progress' });
       } catch (error) {
         logger.error('Failed to create feature:', error);
         toast.error('Failed to create feature', {

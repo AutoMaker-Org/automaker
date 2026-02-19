@@ -123,6 +123,7 @@ export function useBoardActions({
       dependencies?: string[];
       childDependencies?: string[]; // Feature IDs that should depend on this feature
       workMode?: 'current' | 'auto' | 'custom';
+      initialStatus?: 'backlog' | 'in_progress'; // Skip backlog flash when creating & starting immediately
     }) => {
       const workMode = featureData.workMode || 'current';
 
@@ -218,13 +219,15 @@ export function useBoardActions({
       const needsTitleGeneration =
         !titleWasGenerated && !featureData.title.trim() && featureData.description.trim();
 
+      const initialStatus = featureData.initialStatus || 'backlog';
       const newFeatureData = {
         ...featureData,
         title: titleWasGenerated ? titleForBranch : featureData.title,
         titleGenerating: needsTitleGeneration,
-        status: 'backlog' as const,
+        status: initialStatus,
         branchName: finalBranchName,
         dependencies: featureData.dependencies || [],
+        ...(initialStatus === 'in_progress' ? { startedAt: new Date().toISOString() } : {}),
       };
       const createdFeature = addFeature(newFeatureData);
       // Must await to ensure feature exists on server before user can drag it
@@ -608,20 +611,51 @@ export function useBoardActions({
         }
       }
 
-      const updates = {
-        status: 'in_progress' as const,
-        startedAt: new Date().toISOString(),
-      };
-      updateFeature(feature.id, updates);
+      // Skip status update if feature was already created with in_progress status
+      // (e.g., via "Make" button which creates directly as in_progress to avoid backlog flash)
+      const alreadyInProgress = feature.status === 'in_progress';
+
+      if (!alreadyInProgress) {
+        const updates = {
+          status: 'in_progress' as const,
+          startedAt: new Date().toISOString(),
+        };
+        updateFeature(feature.id, updates);
+
+        try {
+          // Must await to ensure feature status is persisted before starting agent
+          await persistFeatureUpdate(feature.id, updates);
+        } catch (error) {
+          // Rollback to backlog if persist fails (e.g., server offline)
+          logger.error('Failed to update feature status, rolling back to backlog:', error);
+          const rollbackUpdates = {
+            status: 'backlog' as const,
+            startedAt: undefined,
+          };
+          updateFeature(feature.id, rollbackUpdates);
+          persistFeatureUpdate(feature.id, rollbackUpdates).catch((persistError) => {
+            logger.error('Failed to persist rollback:', persistError);
+          });
+
+          if (isConnectionError(error)) {
+            handleServerOffline();
+            return false;
+          }
+
+          toast.error('Failed to start feature', {
+            description:
+              error instanceof Error ? error.message : 'Server may be offline. Please try again.',
+          });
+          return false;
+        }
+      }
 
       try {
-        // Must await to ensure feature status is persisted before starting agent
-        await persistFeatureUpdate(feature.id, updates);
         logger.info('Feature moved to in_progress, starting agent...');
         await handleRunFeature(feature);
         return true;
       } catch (error) {
-        // Rollback to backlog if persist or run fails (e.g., server offline)
+        // Rollback to backlog if run fails
         logger.error('Failed to start feature, rolling back to backlog:', error);
         const rollbackUpdates = {
           status: 'backlog' as const,

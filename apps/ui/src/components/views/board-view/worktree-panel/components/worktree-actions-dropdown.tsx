@@ -232,7 +232,8 @@ export function WorktreeActionsDropdown({
   // Show Create PR when no existing PR is linked
   const showCreatePR = !hasPR;
   const showPRInfo = hasPR && !!worktree.pr;
-  const hasChangesSectionContent = worktree.hasChanges || showCreatePR || showPRInfo;
+  const hasChangesSectionContent =
+    worktree.hasChanges || showCreatePR || showPRInfo || !!(onStashChanges || onViewStashes);
 
   // Determine if the destructive/bottom section has any visible items
   const hasDestructiveSectionContent = worktree.hasChanges || !worktree.isMain;
@@ -328,6 +329,25 @@ export function WorktreeActionsDropdown({
               {gitOpsDisabledReason}
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
+          </>
+        )}
+        {/* Auto Mode toggle */}
+        {onToggleAutoMode && (
+          <>
+            {isAutoModeRunning ? (
+              <DropdownMenuItem onClick={() => onToggleAutoMode(worktree)} className="text-xs">
+                <span className="flex items-center mr-2">
+                  <Zap className="w-3.5 h-3.5 text-yellow-500" />
+                  <span className="ml-1.5 h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+                </span>
+                Stop Auto Mode
+              </DropdownMenuItem>
+            ) : (
+              <DropdownMenuItem onClick={() => onToggleAutoMode(worktree)} className="text-xs">
+                <Zap className="w-3.5 h-3.5 mr-2" />
+                Start Auto Mode
+              </DropdownMenuItem>
+            )}
           </>
         )}
         {isDevServerRunning ? (
@@ -429,26 +449,132 @@ export function WorktreeActionsDropdown({
             )}
           </>
         )}
-        {/* Auto Mode toggle */}
-        {onToggleAutoMode && (
-          <>
-            {isAutoModeRunning ? (
-              <DropdownMenuItem onClick={() => onToggleAutoMode(worktree)} className="text-xs">
-                <span className="flex items-center mr-2">
-                  <Zap className="w-3.5 h-3.5 text-yellow-500" />
-                  <span className="ml-1.5 h-2 w-2 rounded-full bg-green-500 animate-pulse" />
-                </span>
-                Stop Auto Mode
+        {/* Open in editor - split button: click main area for default, chevron for other options */}
+        {effectiveDefaultEditor && (
+          <DropdownMenuSub>
+            <div className="flex items-center">
+              {/* Main clickable area - opens in default editor */}
+              <DropdownMenuItem
+                onClick={() => onOpenInEditor(worktree, effectiveDefaultEditor.command)}
+                className="text-xs flex-1 pr-0 rounded-r-none"
+              >
+                {DefaultEditorIcon && <DefaultEditorIcon className="w-3.5 h-3.5 mr-2" />}
+                Open in {effectiveDefaultEditor.name}
               </DropdownMenuItem>
-            ) : (
-              <DropdownMenuItem onClick={() => onToggleAutoMode(worktree)} className="text-xs">
-                <Zap className="w-3.5 h-3.5 mr-2" />
-                Start Auto Mode
+              {/* Chevron trigger for submenu with other editors and Copy Path */}
+              <DropdownMenuSubTrigger className="text-xs px-1 rounded-l-none border-l border-border/30 h-8" />
+            </div>
+            <DropdownMenuSubContent>
+              {/* Other editors */}
+              {otherEditors.map((editor) => {
+                const EditorIcon = getEditorIcon(editor.command);
+                return (
+                  <DropdownMenuItem
+                    key={editor.command}
+                    onClick={() => onOpenInEditor(worktree, editor.command)}
+                    className="text-xs"
+                  >
+                    <EditorIcon className="w-3.5 h-3.5 mr-2" />
+                    {editor.name}
+                  </DropdownMenuItem>
+                );
+              })}
+              {otherEditors.length > 0 && <DropdownMenuSeparator />}
+              <DropdownMenuItem
+                onClick={async () => {
+                  try {
+                    await navigator.clipboard.writeText(worktree.path);
+                    toast.success('Path copied to clipboard');
+                  } catch {
+                    toast.error('Failed to copy path to clipboard');
+                  }
+                }}
+                className="text-xs"
+              >
+                <Copy className="w-3.5 h-3.5 mr-2" />
+                Copy Path
               </DropdownMenuItem>
-            )}
-            <DropdownMenuSeparator />
-          </>
+            </DropdownMenuSubContent>
+          </DropdownMenuSub>
         )}
+        {/* Open in terminal - always show with integrated + external options */}
+        <DropdownMenuSub>
+          <div className="flex items-center">
+            {/* Main clickable area - opens in default terminal (integrated or external) */}
+            <DropdownMenuItem
+              onClick={() => {
+                if (effectiveDefaultTerminal) {
+                  // External terminal is the default
+                  onOpenInExternalTerminal(worktree, effectiveDefaultTerminal.id);
+                } else {
+                  // Integrated terminal is the default - use user's preferred mode
+                  const mode = openTerminalMode === 'newTab' ? 'tab' : 'split';
+                  onOpenInIntegratedTerminal(worktree, mode);
+                }
+              }}
+              className="text-xs flex-1 pr-0 rounded-r-none"
+            >
+              <DefaultTerminalIcon className="w-3.5 h-3.5 mr-2" />
+              Open in {effectiveDefaultTerminal?.name ?? 'Terminal'}
+            </DropdownMenuItem>
+            {/* Chevron trigger for submenu with all terminals */}
+            <DropdownMenuSubTrigger className="text-xs px-1 rounded-l-none border-l border-border/30 h-8" />
+          </div>
+          <DropdownMenuSubContent>
+            {/* Automaker Terminal - with submenu for new tab vs split */}
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger className="text-xs">
+                <Terminal className="w-3.5 h-3.5 mr-2" />
+                Terminal
+                {!effectiveDefaultTerminal && (
+                  <span className="ml-auto mr-2 text-[10px] text-muted-foreground">(default)</span>
+                )}
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent>
+                <DropdownMenuItem
+                  onClick={() => onOpenInIntegratedTerminal(worktree, 'tab')}
+                  className="text-xs"
+                >
+                  <SquarePlus className="w-3.5 h-3.5 mr-2" />
+                  New Tab
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => onOpenInIntegratedTerminal(worktree, 'split')}
+                  className="text-xs"
+                >
+                  <SplitSquareHorizontal className="w-3.5 h-3.5 mr-2" />
+                  Split
+                </DropdownMenuItem>
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
+            {/* External terminals */}
+            {terminals.length > 0 && <DropdownMenuSeparator />}
+            {terminals.map((terminal) => {
+              const TerminalIcon = getTerminalIcon(terminal.id);
+              const isDefault = terminal.id === effectiveDefaultTerminal?.id;
+              return (
+                <DropdownMenuItem
+                  key={terminal.id}
+                  onClick={() => onOpenInExternalTerminal(worktree, terminal.id)}
+                  className="text-xs"
+                >
+                  <TerminalIcon className="w-3.5 h-3.5 mr-2" />
+                  {terminal.name}
+                  {isDefault && (
+                    <span className="ml-auto text-[10px] text-muted-foreground">(default)</span>
+                  )}
+                </DropdownMenuItem>
+              );
+            })}
+          </DropdownMenuSubContent>
+        </DropdownMenuSub>
+        {!worktree.isMain && hasInitScript && (
+          <DropdownMenuItem onClick={() => onRunInitScript(worktree)} className="text-xs">
+            <RefreshCw className="w-3.5 h-3.5 mr-2" />
+            Re-run Init Script
+          </DropdownMenuItem>
+        )}
+        <DropdownMenuSeparator />
         <TooltipWrapper showTooltip={!!gitOpsDisabledReason} tooltipContent={gitOpsDisabledReason}>
           {remotes && remotes.length > 1 && onPullWithRemote ? (
             // Multiple remotes - show split button: click main area to pull (default behavior),
@@ -661,6 +787,27 @@ export function WorktreeActionsDropdown({
             )}
           </DropdownMenuItem>
         </TooltipWrapper>
+        {!worktree.isMain && (
+          <TooltipWrapper
+            showTooltip={!!gitOpsDisabledReason}
+            tooltipContent={gitOpsDisabledReason}
+          >
+            <DropdownMenuItem
+              onClick={() => isGitOpsAvailable && onMerge(worktree)}
+              disabled={!isGitOpsAvailable}
+              className={cn(
+                'text-xs text-green-600 focus:text-green-700',
+                !isGitOpsAvailable && 'opacity-50 cursor-not-allowed'
+              )}
+            >
+              <GitMerge className="w-3.5 h-3.5 mr-2" />
+              Integrate Branch
+              {!isGitOpsAvailable && (
+                <AlertCircle className="w-3 h-3 ml-auto text-muted-foreground" />
+              )}
+            </DropdownMenuItem>
+          </TooltipWrapper>
+        )}
         <TooltipWrapper showTooltip={!!gitOpsDisabledReason} tooltipContent={gitOpsDisabledReason}>
           <DropdownMenuItem
             onClick={() => isGitOpsAvailable && onViewCommits(worktree)}
@@ -692,6 +839,14 @@ export function WorktreeActionsDropdown({
               )}
             </DropdownMenuItem>
           </TooltipWrapper>
+        )}
+        {(hasChangesSectionContent || hasDestructiveSectionContent) && <DropdownMenuSeparator />}
+
+        {worktree.hasChanges && (
+          <DropdownMenuItem onClick={() => onViewChanges(worktree)} className="text-xs">
+            <Eye className="w-3.5 h-3.5 mr-2" />
+            View Changes
+          </DropdownMenuItem>
         )}
         {/* Stash operations - combined submenu or simple item */}
         {(onStashChanges || onViewStashes) && (
@@ -756,140 +911,6 @@ export function WorktreeActionsDropdown({
               </DropdownMenuItem>
             )}
           </TooltipWrapper>
-        )}
-        <DropdownMenuSeparator />
-        {/* Open in editor - split button: click main area for default, chevron for other options */}
-        {effectiveDefaultEditor && (
-          <DropdownMenuSub>
-            <div className="flex items-center">
-              {/* Main clickable area - opens in default editor */}
-              <DropdownMenuItem
-                onClick={() => onOpenInEditor(worktree, effectiveDefaultEditor.command)}
-                className="text-xs flex-1 pr-0 rounded-r-none"
-              >
-                {DefaultEditorIcon && <DefaultEditorIcon className="w-3.5 h-3.5 mr-2" />}
-                Open in {effectiveDefaultEditor.name}
-              </DropdownMenuItem>
-              {/* Chevron trigger for submenu with other editors and Copy Path */}
-              <DropdownMenuSubTrigger className="text-xs px-1 rounded-l-none border-l border-border/30 h-8" />
-            </div>
-            <DropdownMenuSubContent>
-              {/* Other editors */}
-              {otherEditors.map((editor) => {
-                const EditorIcon = getEditorIcon(editor.command);
-                return (
-                  <DropdownMenuItem
-                    key={editor.command}
-                    onClick={() => onOpenInEditor(worktree, editor.command)}
-                    className="text-xs"
-                  >
-                    <EditorIcon className="w-3.5 h-3.5 mr-2" />
-                    {editor.name}
-                  </DropdownMenuItem>
-                );
-              })}
-              {otherEditors.length > 0 && <DropdownMenuSeparator />}
-              <DropdownMenuItem
-                onClick={async () => {
-                  try {
-                    await navigator.clipboard.writeText(worktree.path);
-                    toast.success('Path copied to clipboard');
-                  } catch {
-                    toast.error('Failed to copy path to clipboard');
-                  }
-                }}
-                className="text-xs"
-              >
-                <Copy className="w-3.5 h-3.5 mr-2" />
-                Copy Path
-              </DropdownMenuItem>
-            </DropdownMenuSubContent>
-          </DropdownMenuSub>
-        )}
-        {/* Open in terminal - always show with integrated + external options */}
-        <DropdownMenuSub>
-          <div className="flex items-center">
-            {/* Main clickable area - opens in default terminal (integrated or external) */}
-            <DropdownMenuItem
-              onClick={() => {
-                if (effectiveDefaultTerminal) {
-                  // External terminal is the default
-                  onOpenInExternalTerminal(worktree, effectiveDefaultTerminal.id);
-                } else {
-                  // Integrated terminal is the default - use user's preferred mode
-                  const mode = openTerminalMode === 'newTab' ? 'tab' : 'split';
-                  onOpenInIntegratedTerminal(worktree, mode);
-                }
-              }}
-              className="text-xs flex-1 pr-0 rounded-r-none"
-            >
-              <DefaultTerminalIcon className="w-3.5 h-3.5 mr-2" />
-              Open in {effectiveDefaultTerminal?.name ?? 'Terminal'}
-            </DropdownMenuItem>
-            {/* Chevron trigger for submenu with all terminals */}
-            <DropdownMenuSubTrigger className="text-xs px-1 rounded-l-none border-l border-border/30 h-8" />
-          </div>
-          <DropdownMenuSubContent>
-            {/* Automaker Terminal - with submenu for new tab vs split */}
-            <DropdownMenuSub>
-              <DropdownMenuSubTrigger className="text-xs">
-                <Terminal className="w-3.5 h-3.5 mr-2" />
-                Terminal
-                {!effectiveDefaultTerminal && (
-                  <span className="ml-auto mr-2 text-[10px] text-muted-foreground">(default)</span>
-                )}
-              </DropdownMenuSubTrigger>
-              <DropdownMenuSubContent>
-                <DropdownMenuItem
-                  onClick={() => onOpenInIntegratedTerminal(worktree, 'tab')}
-                  className="text-xs"
-                >
-                  <SquarePlus className="w-3.5 h-3.5 mr-2" />
-                  New Tab
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => onOpenInIntegratedTerminal(worktree, 'split')}
-                  className="text-xs"
-                >
-                  <SplitSquareHorizontal className="w-3.5 h-3.5 mr-2" />
-                  Split
-                </DropdownMenuItem>
-              </DropdownMenuSubContent>
-            </DropdownMenuSub>
-            {/* External terminals */}
-            {terminals.length > 0 && <DropdownMenuSeparator />}
-            {terminals.map((terminal) => {
-              const TerminalIcon = getTerminalIcon(terminal.id);
-              const isDefault = terminal.id === effectiveDefaultTerminal?.id;
-              return (
-                <DropdownMenuItem
-                  key={terminal.id}
-                  onClick={() => onOpenInExternalTerminal(worktree, terminal.id)}
-                  className="text-xs"
-                >
-                  <TerminalIcon className="w-3.5 h-3.5 mr-2" />
-                  {terminal.name}
-                  {isDefault && (
-                    <span className="ml-auto text-[10px] text-muted-foreground">(default)</span>
-                  )}
-                </DropdownMenuItem>
-              );
-            })}
-          </DropdownMenuSubContent>
-        </DropdownMenuSub>
-        {!worktree.isMain && hasInitScript && (
-          <DropdownMenuItem onClick={() => onRunInitScript(worktree)} className="text-xs">
-            <RefreshCw className="w-3.5 h-3.5 mr-2" />
-            Re-run Init Script
-          </DropdownMenuItem>
-        )}
-        {(hasChangesSectionContent || hasDestructiveSectionContent) && <DropdownMenuSeparator />}
-
-        {worktree.hasChanges && (
-          <DropdownMenuItem onClick={() => onViewChanges(worktree)} className="text-xs">
-            <Eye className="w-3.5 h-3.5 mr-2" />
-            View Changes
-          </DropdownMenuItem>
         )}
         {worktree.hasChanges && (
           <TooltipWrapper
@@ -989,35 +1010,13 @@ export function WorktreeActionsDropdown({
           </TooltipWrapper>
         )}
         {!worktree.isMain && (
-          <>
-            <TooltipWrapper
-              showTooltip={!!gitOpsDisabledReason}
-              tooltipContent={gitOpsDisabledReason}
-            >
-              <DropdownMenuItem
-                onClick={() => isGitOpsAvailable && onMerge(worktree)}
-                disabled={!isGitOpsAvailable}
-                className={cn(
-                  'text-xs text-green-600 focus:text-green-700',
-                  !isGitOpsAvailable && 'opacity-50 cursor-not-allowed'
-                )}
-              >
-                <GitMerge className="w-3.5 h-3.5 mr-2" />
-                Integrate Branch
-                {!isGitOpsAvailable && (
-                  <AlertCircle className="w-3 h-3 ml-auto text-muted-foreground" />
-                )}
-              </DropdownMenuItem>
-            </TooltipWrapper>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onClick={() => onDeleteWorktree(worktree)}
-              className="text-xs text-destructive focus:text-destructive"
-            >
-              <Trash2 className="w-3.5 h-3.5 mr-2" />
-              Delete Worktree
-            </DropdownMenuItem>
-          </>
+          <DropdownMenuItem
+            onClick={() => onDeleteWorktree(worktree)}
+            className="text-xs text-destructive focus:text-destructive"
+          >
+            <Trash2 className="w-3.5 h-3.5 mr-2" />
+            Delete Worktree
+          </DropdownMenuItem>
         )}
       </DropdownMenuContent>
     </DropdownMenu>

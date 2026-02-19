@@ -212,8 +212,13 @@ ${feature.spec}
       tempRunningFeature.worktreePath = worktreePath;
       tempRunningFeature.branchName = branchName ?? null;
       // Ensure status is in_progress (may already be set from the early update above,
-      // but internal/recursive calls skip the early update and need it here)
-      if (options?._calledInternally) {
+      // but internal/recursive calls skip the early update and need it here).
+      // Mirror the external guard: only transition when the feature is still in
+      // backlog or ready to avoid overwriting a concurrent terminal status.
+      if (
+        options?._calledInternally &&
+        (feature.status === 'backlog' || feature.status === 'ready')
+      ) {
         await this.updateFeatureStatusFn(projectPath, featureId, 'in_progress');
       }
       this.eventBus.emitAutoModeEvent('auto_mode_feature_start', {

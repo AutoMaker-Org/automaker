@@ -83,12 +83,25 @@ export type DialogContentProps = Omit<
 > & {
   showCloseButton?: boolean;
   compact?: boolean;
+  /** When true, the default sm:max-w-2xl is not applied, allowing className to set max-width. */
+  noDefaultMaxWidth?: boolean;
 };
 
 const DialogContent = React.forwardRef<HTMLDivElement, DialogContentProps>(
-  ({ className, children, showCloseButton = true, compact = false, ...props }, ref) => {
-    // Check if className contains a custom max-width
-    const hasCustomMaxWidth = typeof className === 'string' && className.includes('max-w-');
+  (
+    {
+      className,
+      children,
+      showCloseButton = true,
+      compact = false,
+      noDefaultMaxWidth = false,
+      ...props
+    },
+    ref
+  ) => {
+    // Check if className contains a custom max-width (fallback heuristic)
+    const hasCustomMaxWidth =
+      noDefaultMaxWidth || (typeof className === 'string' && className.includes('max-w-'));
 
     return (
       <DialogPortal data-slot="dialog-portal">

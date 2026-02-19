@@ -64,7 +64,7 @@ export function isValidBranchName(name: string): boolean {
  * ```
  */
 export function isValidRemoteName(name: string): boolean {
-  if (!name || name.length === 0 || name.length >= MAX_BRANCH_NAME_LENGTH) return false;
+  if (!name || name.length >= MAX_BRANCH_NAME_LENGTH) return false;
   if (name.startsWith('-') || name.startsWith('.')) return false;
   if (name.includes('..')) return false;
   if (name.includes('/')) return false;

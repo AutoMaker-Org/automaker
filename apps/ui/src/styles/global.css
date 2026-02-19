@@ -416,11 +416,11 @@
     padding-right: env(safe-area-inset-right, 0px);
   }
 
-  /* PWA standalone mode: further reduce bottom safe-area since there's no browser
-     chrome beneath the app. The home indicator only needs minimal clearance (~8px)
-     rather than the full 34px inset the OS reports. */
+  /* PWA standalone mode: remove bottom safe-area padding entirely since the OS
+     handles home-indicator clearance at the system level. There is no browser
+     chrome beneath the app, so no extra clearance is needed here. */
   :root.pwa-standalone #app {
-    padding-bottom: calc(env(safe-area-inset-bottom, 0px) * 0.25);
+    padding-bottom: 0;
   }
 
   /* Apply monospace font to code elements */
@@ -563,16 +563,19 @@
 
   /* Safe-area padding for full-screen mobile dialogs (e.g. view changes, commits).
      Prevents overlap with the Dynamic Island / notch on iOS.
-     On sm+ (desktop), these are removed since the dialog is centered and not full-screen. */
+     Uses calc() to ADD safe-area insets to the existing 1.5rem (p-6) padding from
+     DialogContent, so on non-notched devices the base p-6 padding is preserved.
+     On sm+ (desktop), the dialog is centered and not full-screen, so restore
+     the plain 1.5rem top/bottom padding. */
   .dialog-fullscreen-mobile {
-    padding-top: env(safe-area-inset-top, 0px);
-    padding-bottom: env(safe-area-inset-bottom, 0px);
+    padding-top: calc(env(safe-area-inset-top, 0px) + 1.5rem);
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 1.5rem);
   }
 
   @media (min-width: 640px) {
     .dialog-fullscreen-mobile {
-      padding-top: 0;
-      padding-bottom: 0;
+      padding-top: 1.5rem;
+      padding-bottom: 1.5rem;
     }
   }
 

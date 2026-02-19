@@ -90,15 +90,15 @@
               document.documentElement.classList.add('dark');
             }
           }
+          // Detect PWA standalone mode early so CSS can apply reduced bottom safe-area
+          // before first paint, preventing a layout shift on notched devices.
+          if (
+            window.matchMedia('(display-mode: standalone)').matches ||
+            navigator.standalone === true
+          ) {
+            document.documentElement.classList.add('pwa-standalone');
+          }
         } catch (e) {}
-        // Detect PWA standalone mode early so CSS can apply reduced bottom safe-area
-        // before first paint, preventing a layout shift on notched devices.
-        if (
-          window.matchMedia('(display-mode: standalone)').matches ||
-          navigator.standalone === true
-        ) {
-          document.documentElement.classList.add('pwa-standalone');
-        }
       })();
     </script>
   </head>

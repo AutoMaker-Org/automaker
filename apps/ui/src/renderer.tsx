@@ -3,9 +3,10 @@ import { createRoot } from 'react-dom/client';
 import App from './app';
 import { isMobileDevice, isPwaStandalone } from './lib/mobile-detect';
 
-// Apply PWA standalone class early, before CSS renders, so the #app container
-// can use a tighter bottom safe-area inset (the home indicator needs only minimal
-// clearance when there's no browser chrome beneath it).
+// Defensive fallback: index.html's inline script already applies 'pwa-standalone'
+// before first paint. This re-applies it in case the inline script failed (e.g.
+// CSP restrictions or unexpected errors). The classList.add is a no-op if the
+// class is already present.
 if (isPwaStandalone) {
   document.documentElement.classList.add('pwa-standalone');
 }

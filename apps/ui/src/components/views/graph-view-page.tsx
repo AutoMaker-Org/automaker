@@ -315,7 +315,8 @@ export function GraphViewPage() {
     async (featureData: Parameters<typeof handleAddFeature>[0]) => {
       try {
         const featuresBeforeIds = new Set(useAppStore.getState().features.map((f) => f.id));
-        await handleAddFeature(featureData);
+        // Create feature directly with in_progress status to avoid brief backlog flash
+        await handleAddFeature({ ...featureData, initialStatus: 'in_progress' });
 
         const latestFeatures = useAppStore.getState().features;
         const newFeature = latestFeatures.find((f) => !featuresBeforeIds.has(f.id));

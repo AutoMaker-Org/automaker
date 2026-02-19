@@ -260,6 +260,11 @@ self.addEventListener('fetch', (event) => {
               fetchPromise,
               new Promise((resolve) => setTimeout(() => resolve(null), 2000)),
             ]);
+            if (!networkResult) {
+              // Timeout won — keep the background fetch alive so the cache update
+              // can complete even after we return the stale cached response.
+              event.waitUntil(fetchPromise.catch(() => {}));
+            }
             return networkResult || cachedResponse;
           }
 
@@ -359,7 +364,9 @@ self.addEventListener('fetch', (event) => {
           const preloadResponse = event.preloadResponse && (await event.preloadResponse);
           const response = preloadResponse || (await fetch(event.request));
           if (response.ok && response.type === 'basic') {
-            cache.put(event.request, response.clone());
+            // Use event.waitUntil to ensure the cache write completes before
+            // the service worker is terminated (mirrors the cached-path pattern).
+            event.waitUntil(cache.put(event.request, response.clone()));
           }
           return response;
         } catch (_e) {
