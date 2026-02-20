@@ -397,10 +397,16 @@ export function CommitWorktreeDialog({
 
     const api = getElectronAPI();
 
-    // If commit already succeeded on a previous attempt, skip straight to push
-    if (commitSucceeded && pushAfterCommit && selectedRemote) {
-      const ok = await performPush(api, worktree.path, selectedRemote);
-      if (ok) {
+    // If commit already succeeded on a previous attempt, skip straight to push (or close if no push needed)
+    if (commitSucceeded) {
+      if (pushAfterCommit && selectedRemote) {
+        const ok = await performPush(api, worktree.path, selectedRemote);
+        if (ok) {
+          onCommitted();
+          onOpenChange(false);
+          setMessage('');
+        }
+      } else {
         onCommitted();
         onOpenChange(false);
         setMessage('');

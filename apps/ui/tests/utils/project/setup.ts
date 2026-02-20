@@ -149,6 +149,8 @@ export async function setupRealProject(
     setAsCurrent?: boolean;
     /** Additional recent projects to include */
     additionalProjects?: TestProject[];
+    /** Optional project ID to use (if not provided, generates timestamp-based ID) */
+    projectId?: string;
   }
 ): Promise<void> {
   await page.addInitScript(
@@ -163,7 +165,7 @@ export async function setupRealProject(
       opts: typeof options;
       versions: typeof STORE_VERSIONS;
     }) => {
-      const projectId = `project-${Date.now()}`;
+      const projectId = opts?.projectId || `project-${Date.now()}`;
       const project: TestProject = {
         id: projectId,
         name: name,

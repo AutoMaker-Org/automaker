@@ -490,21 +490,23 @@ export function WorktreePanel({
   const handleActionsDropdownOpenChange = (worktree: WorktreeInfo) => (open: boolean) => {
     if (open) {
       fetchBranches(worktree.path);
-      // Fetch remotes for the submenu when the dropdown opens
-      const api = getHttpApiClient();
-      api.worktree
-        .listRemotes(worktree.path)
-        .then((result) => {
-          if (result.success && result.result) {
-            setRemotesCache((prev) => ({
-              ...prev,
-              [worktree.path]: result.result!.remotes.map((r) => ({ name: r.name, url: r.url })),
-            }));
-          }
-        })
-        .catch((err) => {
-          console.warn('Failed to fetch remotes for worktree:', err);
-        });
+      // Fetch remotes for the submenu when the dropdown opens, but only if not already cached
+      if (!remotesCache[worktree.path]) {
+        const api = getHttpApiClient();
+        api.worktree
+          .listRemotes(worktree.path)
+          .then((result) => {
+            if (result.success && result.result) {
+              setRemotesCache((prev) => ({
+                ...prev,
+                [worktree.path]: result.result!.remotes.map((r) => ({ name: r.name, url: r.url })),
+              }));
+            }
+          })
+          .catch((err) => {
+            console.warn('Failed to fetch remotes for worktree:', err);
+          });
+      }
     }
   };
 

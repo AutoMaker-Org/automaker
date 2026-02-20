@@ -133,6 +133,7 @@ jobs:
         env:
           CI: true
           VITE_SERVER_URL: http://localhost:3008
+          SERVER_URL: http://localhost:3008
           VITE_SKIP_SETUP: 'true'
           # Keep UI-side login/defaults consistent
           AUTOMAKER_API_KEY: test-api-key-for-e2e-tests

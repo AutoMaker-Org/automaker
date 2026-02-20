@@ -243,7 +243,14 @@ export function createCreatePRHandler() {
           if (upstreamRepo) {
             listArgs.push('--repo', upstreamRepo);
           }
-          listArgs.push('--head', headRef, '--json', 'number,title,url,state', '--limit', '1');
+          listArgs.push(
+            '--head',
+            headRef,
+            '--json',
+            'number,title,url,state,createdAt',
+            '--limit',
+            '1'
+          );
           logger.debug(`Running: gh ${listArgs.join(' ')}`);
           const listResult = await spawnProcess({
             command: 'gh',
@@ -280,7 +287,7 @@ export function createCreatePRHandler() {
               url: existingPr.url,
               title: existingPr.title || title,
               state: validatePRState(existingPr.state),
-              createdAt: new Date().toISOString(),
+              createdAt: existingPr.createdAt || new Date().toISOString(),
             });
             logger.debug(
               `Stored existing PR info for branch ${branchName}: PR #${existingPr.number}`
@@ -358,11 +365,26 @@ export function createCreatePRHandler() {
             if (errorMessage.toLowerCase().includes('already exists')) {
               logger.debug(`PR already exists error - trying to fetch existing PR`);
               try {
-                const { stdout: viewOutput } = await execAsync(
-                  `gh pr view --json number,title,url,state`,
-                  { cwd: worktreePath, env: execEnv }
-                );
-                const existingPr = JSON.parse(viewOutput);
+                // Build args as an array to avoid shell injection.
+                // When upstreamRepo is set (fork/cross-remote workflow) we must
+                // query the upstream repository so we find the correct PR.
+                const viewArgs = ['pr', 'view', '--json', 'number,title,url,state,createdAt'];
+                if (upstreamRepo) {
+                  viewArgs.push('--repo', upstreamRepo);
+                }
+                logger.debug(`Running: gh ${viewArgs.join(' ')}`);
+                const viewResult = await spawnProcess({
+                  command: 'gh',
+                  args: viewArgs,
+                  cwd: worktreePath,
+                  env: execEnv,
+                });
+                if (viewResult.exitCode !== 0) {
+                  throw new Error(
+                    `gh pr view failed (exit code ${viewResult.exitCode}): ${viewResult.stderr || viewResult.stdout}`
+                  );
+                }
+                const existingPr = JSON.parse(viewResult.stdout);
                 if (existingPr.url) {
                   prUrl = existingPr.url;
                   prNumber = existingPr.number;
@@ -374,7 +396,7 @@ export function createCreatePRHandler() {
                     url: existingPr.url,
                     title: existingPr.title || title,
                     state: validatePRState(existingPr.state),
-                    createdAt: new Date().toISOString(),
+                    createdAt: existingPr.createdAt || new Date().toISOString(),
                   });
                   logger.debug(`Fetched and stored existing PR: #${existingPr.number}`);
                 }
