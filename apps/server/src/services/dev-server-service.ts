@@ -19,6 +19,69 @@ const logger = createLogger('DevServerService');
 // Maximum scrollback buffer size (characters) - matches TerminalService pattern
 const MAX_SCROLLBACK_SIZE = 50000; // ~50KB per dev server
 
+// URL patterns for detecting full URLs from dev server output.
+// Defined once at module level to avoid reallocation on every call to detectUrlFromOutput.
+// Ordered from most specific (framework-specific) to least specific.
+const URL_PATTERNS: Array<{ pattern: RegExp; description: string }> = [
+  // Vite / Nuxt / SvelteKit / Astro / Angular CLI format: "Local:  http://..."
+  {
+    pattern: /(?:Local|Network|External):\s+(https?:\/\/[^\s]+)/i,
+    description: 'Vite/Nuxt/SvelteKit/Astro/Angular format',
+  },
+  // Next.js format: "ready - started server on 0.0.0.0:3000, url: http://localhost:3000"
+  // Next.js 14+: "▲ Next.js 14.0.0\n- Local: http://localhost:3000"
+  {
+    pattern: /(?:ready|started server).*?(?:url:\s*)?(https?:\/\/[^\s,]+)/i,
+    description: 'Next.js format',
+  },
+  // Remix format: "started at http://localhost:3000"
+  // Django format: "Starting development server at http://127.0.0.1:8000/"
+  // Rails / Puma: "Listening on http://127.0.0.1:3000"
+  // Generic: "listening at http://...", "available at http://...", "running at http://..."
+  {
+    pattern:
+      /(?:starting|started|listening|running|available|serving|accessible)\s+(?:at|on)\s+(https?:\/\/[^\s,)]+)/i,
+    description: 'Generic "starting/started/listening at" format',
+  },
+  // PHP built-in server: "Development Server (http://localhost:8000) started"
+  {
+    pattern: /(?:server|development server)\s*\(\s*(https?:\/\/[^\s)]+)\s*\)/i,
+    description: 'PHP server format',
+  },
+  // Webpack Dev Server: "Project is running at http://localhost:8080/"
+  {
+    pattern: /(?:project|app|application)\s+(?:is\s+)?running\s+(?:at|on)\s+(https?:\/\/[^\s,]+)/i,
+    description: 'Webpack/generic "running at" format',
+  },
+  // Go / Rust / generic: "Serving on http://...", "Server on http://..."
+  {
+    pattern: /(?:serving|server)\s+(?:on|at)\s+(https?:\/\/[^\s,]+)/i,
+    description: 'Generic "serving on" format',
+  },
+  // Localhost URL with port (conservative - must be localhost/127.0.0.1/[::]/0.0.0.0)
+  // This catches anything that looks like a dev server URL
+  {
+    pattern: /(https?:\/\/(?:localhost|127\.0\.0\.1|\[::\]|0\.0\.0\.0):\d+\S*)/i,
+    description: 'Generic localhost URL with port',
+  },
+];
+
+// Port-only patterns for detecting port numbers from dev server output
+// when a full URL is not present in the output.
+// Defined once at module level to avoid reallocation on every call to detectUrlFromOutput.
+const PORT_PATTERNS: Array<{ pattern: RegExp; description: string }> = [
+  // "listening on port 3000", "server on port 3000", "started on port 3000"
+  {
+    pattern: /(?:listening|running|started|serving|available)\s+on\s+port\s+(\d+)/i,
+    description: '"listening on port" format',
+  },
+  // "Port: 3000", "port 3000" (at start of line or after whitespace)
+  {
+    pattern: /(?:^|\s)port[:\s]+(\d{4,5})(?:\s|$|[.,;])/im,
+    description: '"port:" format',
+  },
+];
+
 // Throttle output to prevent overwhelming WebSocket under heavy load
 const OUTPUT_THROTTLE_MS = 4; // ~250fps max update rate for responsive feedback
 const OUTPUT_BATCH_SIZE = 4096; // Smaller batches for lower latency
@@ -112,7 +175,7 @@ class DevServerService {
   private stripAnsi(str: string): string {
     // Matches ANSI escape sequences: CSI sequences, OSC sequences, and simple escapes
     // eslint-disable-next-line no-control-regex
-    return str.replace(/\x1B(?:\[[0-9;]*[a-zA-Z]|\].*?(?:\x07|\x1B\\)|\[[\?]?[0-9;]*[hl])/g, '');
+    return str.replace(/\x1B(?:\[[0-9;]*[a-zA-Z]|\].*?(?:\x07|\x1B\\)|\[[?]?[0-9;]*[hl])/g, '');
   }
 
   /**
@@ -162,53 +225,8 @@ class DevServerService {
     const cleanContent = this.stripAnsi(content);
 
     // Phase 1: Try to detect a full URL from output
-    // Patterns are ordered from most specific (framework-specific) to least specific
-    const urlPatterns: Array<{ pattern: RegExp; description: string }> = [
-      // Vite / Nuxt / SvelteKit / Astro / Angular CLI format: "Local:  http://..."
-      {
-        pattern: /(?:Local|Network|External):\s+(https?:\/\/[^\s]+)/i,
-        description: 'Vite/Nuxt/SvelteKit/Astro/Angular format',
-      },
-      // Next.js format: "ready - started server on 0.0.0.0:3000, url: http://localhost:3000"
-      // Next.js 14+: "▲ Next.js 14.0.0\n- Local: http://localhost:3000"
-      {
-        pattern: /(?:ready|started server).*?(?:url:\s*)?(https?:\/\/[^\s,]+)/i,
-        description: 'Next.js format',
-      },
-      // Remix format: "started at http://localhost:3000"
-      // Django format: "Starting development server at http://127.0.0.1:8000/"
-      // Rails / Puma: "Listening on http://127.0.0.1:3000"
-      // Generic: "listening at http://...", "available at http://...", "running at http://..."
-      {
-        pattern:
-          /(?:starting|started|listening|running|available|serving|accessible)\s+(?:at|on)\s+(https?:\/\/[^\s,)]+)/i,
-        description: 'Generic "starting/started/listening at" format',
-      },
-      // PHP built-in server: "Development Server (http://localhost:8000) started"
-      {
-        pattern: /(?:server|development server)\s*\(\s*(https?:\/\/[^\s)]+)\s*\)/i,
-        description: 'PHP server format',
-      },
-      // Webpack Dev Server: "Project is running at http://localhost:8080/"
-      {
-        pattern:
-          /(?:project|app|application)\s+(?:is\s+)?running\s+(?:at|on)\s+(https?:\/\/[^\s,]+)/i,
-        description: 'Webpack/generic "running at" format',
-      },
-      // Go / Rust / generic: "Serving on http://...", "Server on http://..."
-      {
-        pattern: /(?:serving|server)\s+(?:on|at)\s+(https?:\/\/[^\s,]+)/i,
-        description: 'Generic "serving on" format',
-      },
-      // Localhost URL with port (conservative - must be localhost/127.0.0.1/[::]/0.0.0.0)
-      // This catches anything that looks like a dev server URL
-      {
-        pattern: /(https?:\/\/(?:localhost|127\.0\.0\.1|\[::\]|0\.0\.0\.0):\d+\S*)/i,
-        description: 'Generic localhost URL with port',
-      },
-    ];
-
-    for (const { pattern, description } of urlPatterns) {
+    // Patterns are defined at module level (URL_PATTERNS) and reused across calls
+    for (const { pattern, description } of URL_PATTERNS) {
       const match = cleanContent.match(pattern);
       if (match && match[1]) {
         let detectedUrl = match[1].trim();
@@ -257,20 +275,8 @@ class DevServerService {
 
     // Phase 2: Try to detect just a port number from output (no full URL)
     // Some servers only print "listening on port 3000" without a full URL
-    const portPatterns: Array<{ pattern: RegExp; description: string }> = [
-      // "listening on port 3000", "server on port 3000", "started on port 3000"
-      {
-        pattern: /(?:listening|running|started|serving|available)\s+on\s+port\s+(\d+)/i,
-        description: '"listening on port" format',
-      },
-      // "Port: 3000", "port 3000" (at start of line or after whitespace)
-      {
-        pattern: /(?:^|\s)port[:\s]+(\d{4,5})(?:\s|$|[.,;])/im,
-        description: '"port:" format',
-      },
-    ];
-
-    for (const { pattern, description } of portPatterns) {
+    // Patterns are defined at module level (PORT_PATTERNS) and reused across calls
+    for (const { pattern, description } of PORT_PATTERNS) {
       const match = cleanContent.match(pattern);
       if (match && match[1]) {
         const detectedPort = parseInt(match[1], 10);

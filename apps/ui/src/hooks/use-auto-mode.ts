@@ -324,7 +324,9 @@ export function useAutoMode(worktree?: WorktreeInfo) {
             // If we were in a restart transition (concurrency change), the arrival of
             // auto_mode_started confirms the restart is complete. Clear the transition
             // flags so future auto_mode_stopped events are processed normally.
-            if (isRestartTransitionRef.current) {
+            // Only clear transition refs when the event is for this hook's worktree,
+            // to avoid events for worktree B incorrectly affecting worktree A's state.
+            if (isRestartTransitionRef.current && eventBranchName === branchName) {
               logger.debug(`[AutoMode] Restart transition complete for ${worktreeDesc}`);
               isTransitioningRef.current = false;
               isRestartTransitionRef.current = false;
@@ -360,9 +362,12 @@ export function useAutoMode(worktree?: WorktreeInfo) {
           // Backend stopped auto loop - update UI state.
           // Skip during transitions (e.g., restartWithConcurrency) to avoid flickering the toggle
           // off between stop and start. The transition handler will set the correct final state.
+          // Only suppress (and only apply transition guard) when the event is for this hook's
+          // worktree, to avoid worktree B's stop events being incorrectly suppressed by
+          // worktree A's transition state.
           {
             const worktreeDesc = eventBranchName ? `worktree ${eventBranchName}` : 'main worktree';
-            if (isTransitioningRef.current) {
+            if (eventBranchName === branchName && isTransitioningRef.current) {
               logger.info(
                 `[AutoMode] Backend stopped auto loop for ${worktreeDesc} (ignored during transition)`
               );
@@ -632,6 +637,7 @@ export function useAutoMode(worktree?: WorktreeInfo) {
     return unsubscribe;
   }, [
     projectId,
+    branchName,
     addRunningTask,
     removeRunningTask,
     addAutoModeActivity,
@@ -640,7 +646,6 @@ export function useAutoMode(worktree?: WorktreeInfo) {
     setAutoModeRunning,
     currentProject?.path,
     getMaxConcurrencyForWorktree,
-    setMaxConcurrencyForWorktree,
     isPrimaryWorktreeBranch,
   ]);
 
@@ -695,7 +700,7 @@ export function useAutoMode(worktree?: WorktreeInfo) {
     } finally {
       isTransitioningRef.current = false;
     }
-  }, [currentProject, branchName, setAutoModeRunning, getMaxConcurrencyForWorktree]);
+  }, [currentProject, branchName, setAutoModeRunning, getMaxConcurrencyForWorktree, refreshStatus]);
 
   // Stop auto mode - calls backend to stop the auto loop for this worktree
   const stop = useCallback(async () => {
@@ -743,7 +748,7 @@ export function useAutoMode(worktree?: WorktreeInfo) {
     } finally {
       isTransitioningRef.current = false;
     }
-  }, [currentProject, branchName, setAutoModeRunning]);
+  }, [currentProject, branchName, setAutoModeRunning, refreshStatus]);
 
   // Restart auto mode with new concurrency without flickering the toggle.
   // Unlike stop() + start(), this keeps isRunning=true throughout the transition

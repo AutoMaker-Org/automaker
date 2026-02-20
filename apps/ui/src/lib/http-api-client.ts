@@ -586,7 +586,7 @@ interface DevServerUrlEvent {
   timestamp: string;
 }
 
-export interface DevServerStartedEvent extends DevServerUrlEvent {}
+export type DevServerStartedEvent = DevServerUrlEvent;
 
 export interface DevServerOutputEvent {
   worktreePath: string;
@@ -602,7 +602,7 @@ export interface DevServerStoppedEvent {
   timestamp: string;
 }
 
-export interface DevServerUrlDetectedEvent extends DevServerUrlEvent {}
+export type DevServerUrlDetectedEvent = DevServerUrlEvent;
 
 export type DevServerLogEvent =
   | { type: 'dev-server:started'; payload: DevServerStartedEvent }
