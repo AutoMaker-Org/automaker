@@ -355,6 +355,32 @@ export async function getGitRepositoryDiffs(repoPath: string): Promise<{
       } catch (mergeError) {
         // Best-effort: log and continue without merge diff
         logger.error('Failed to get merge commit diff:', mergeError);
+
+        // Ensure files[] is consistent with mergeState.mergeAffectedFiles even when the
+        // diff command failed. Without this, mergeAffectedFiles would list paths that have
+        // no corresponding entry in the files array.
+        const existingPathsAfterError = new Set(files.map((f) => f.path));
+        for (const filePath of mergeCommitInfo.mergeAffectedFiles) {
+          if (!existingPathsAfterError.has(filePath)) {
+            files.push({
+              status: 'M',
+              path: filePath,
+              statusText: 'Merged',
+              indexStatus: ' ',
+              workTreeStatus: ' ',
+              isMergeAffected: true,
+              mergeType: 'merged',
+            });
+            existingPathsAfterError.add(filePath);
+          } else {
+            // Mark existing file as also merge-affected
+            const existing = files.find((f) => f.path === filePath);
+            if (existing) {
+              existing.isMergeAffected = true;
+              existing.mergeType = 'merged';
+            }
+          }
+        }
       }
 
       // Return with merge commit info in the mergeState

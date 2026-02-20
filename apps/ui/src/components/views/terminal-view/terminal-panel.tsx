@@ -1687,12 +1687,18 @@ export function TerminalPanel({
       const touch = e.touches[0];
       if (!touch) return;
 
-      longPressTouchStartRef.current = { x: touch.clientX, y: touch.clientY };
+      // Clear any existing timer before creating a new one to avoid orphaned timeouts
+      if (longPressTimerRef.current) {
+        clearTimeout(longPressTimerRef.current);
+        longPressTimerRef.current = null;
+      }
+
+      // Capture initial touch coordinates into an immutable local snapshot
+      const startPos = { x: touch.clientX, y: touch.clientY };
+      longPressTouchStartRef.current = startPos;
 
       longPressTimerRef.current = setTimeout(() => {
-        const startPos = longPressTouchStartRef.current;
-        if (!startPos) return;
-
+        // Use the locally captured startPos rather than re-reading the ref
         // Menu dimensions (approximate)
         const menuWidth = 160;
         const menuHeight = 152;

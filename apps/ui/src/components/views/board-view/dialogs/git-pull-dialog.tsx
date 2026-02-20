@@ -511,8 +511,6 @@ export function GitPullDialog({
                   onCheckedChange={(checked) => setRememberChoice(checked === true)}
                   className="rounded border-border"
                 />
-                  className="rounded border-border"
-                />
                 <Settings className="w-3 h-3" />
                 Remember my choice for future merges
               </label>

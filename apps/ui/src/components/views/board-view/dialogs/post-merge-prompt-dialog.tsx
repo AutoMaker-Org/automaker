@@ -19,6 +19,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { GitMerge, GitCommitHorizontal, FileText, Settings } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -151,10 +152,9 @@ export function PostMergePromptDialog({
         {onSavePreference && (
           <div className="flex items-center gap-2 px-1">
             <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer">
-              <input
-                type="checkbox"
+              <Checkbox
                 checked={rememberChoice}
-                onChange={(e) => setRememberChoice(e.target.checked)}
+                onCheckedChange={(checked) => setRememberChoice(checked)}
                 className="rounded border-border"
               />
               <Settings className="w-3 h-3" />
