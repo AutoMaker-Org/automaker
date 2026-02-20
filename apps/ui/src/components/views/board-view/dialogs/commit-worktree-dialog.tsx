@@ -237,6 +237,12 @@ export function CommitWorktreeDialog({
               setSelectedRemote(defaultRemote.name);
             }
           }
+        } else {
+          // API not available — mark fetch as complete with an error so the UI
+          // shows feedback instead of remaining in an empty/loading state.
+          setRemotesFetchError('Remote listing not available');
+          setRemotesFetched(true);
+          return;
         }
       } catch (err) {
         if (signal?.cancelled) return;
@@ -356,6 +362,36 @@ export function CommitWorktreeDialog({
     setExpandedFile((prev) => (prev === filePath ? null : filePath));
   }, []);
 
+  /** Shared push helper — returns true if the push succeeded */
+  const performPush = async (
+    api: ReturnType<typeof getElectronAPI>,
+    worktreePath: string,
+    remoteName: string
+  ): Promise<boolean> => {
+    if (!api?.worktree?.push) {
+      toast.error('Push API not available');
+      return false;
+    }
+    setIsPushing(true);
+    try {
+      const pushResult = await api.worktree.push(worktreePath, false, remoteName);
+      if (pushResult.success && pushResult.result) {
+        toast.success('Pushed to remote', {
+          description: pushResult.result.message,
+        });
+        return true;
+      } else {
+        toast.error(pushResult.error || 'Failed to push to remote');
+        return false;
+      }
+    } catch (pushErr) {
+      toast.error(pushErr instanceof Error ? pushErr.message : 'Failed to push to remote');
+      return false;
+    } finally {
+      setIsPushing(false);
+    }
+  };
+
   const handleCommit = async () => {
     if (!worktree) return;
 
@@ -363,27 +399,11 @@ export function CommitWorktreeDialog({
 
     // If commit already succeeded on a previous attempt, skip straight to push
     if (commitSucceeded && pushAfterCommit && selectedRemote) {
-      setIsPushing(true);
-      try {
-        if (!api?.worktree?.push) {
-          toast.error('Push API not available');
-          return;
-        }
-        const pushResult = await api.worktree.push(worktree.path, false, selectedRemote);
-        if (pushResult.success && pushResult.result) {
-          toast.success('Pushed to remote', {
-            description: pushResult.result.message,
-          });
-          onCommitted();
-          onOpenChange(false);
-          setMessage('');
-        } else {
-          toast.error(pushResult.error || 'Failed to push to remote');
-        }
-      } catch (pushErr) {
-        toast.error(pushErr instanceof Error ? pushErr.message : 'Failed to push to remote');
-      } finally {
-        setIsPushing(false);
+      const ok = await performPush(api, worktree.path, selectedRemote);
+      if (ok) {
+        onCommitted();
+        onOpenChange(false);
+        setMessage('');
       }
       return;
     }
@@ -415,26 +435,7 @@ export function CommitWorktreeDialog({
           // Push after commit if enabled
           let pushSucceeded = false;
           if (pushAfterCommit && selectedRemote) {
-            setIsPushing(true);
-            try {
-              if (!api?.worktree?.push) {
-                toast.error('Push API not available');
-              } else {
-                const pushResult = await api.worktree.push(worktree.path, false, selectedRemote);
-                if (pushResult.success && pushResult.result) {
-                  toast.success('Pushed to remote', {
-                    description: pushResult.result.message,
-                  });
-                  pushSucceeded = true;
-                } else {
-                  toast.error(pushResult.error || 'Failed to push to remote');
-                }
-              }
-            } catch (pushErr) {
-              toast.error(pushErr instanceof Error ? pushErr.message : 'Failed to push to remote');
-            } finally {
-              setIsPushing(false);
-            }
+            pushSucceeded = await performPush(api, worktree.path, selectedRemote);
           }
 
           // Only close the dialog when no push was requested or the push completed successfully.
@@ -462,18 +463,30 @@ export function CommitWorktreeDialog({
     }
   };
 
+  // When the commit succeeded but push failed, allow retrying the push without
+  // requiring a commit message or file selection.
+  const isPushRetry = commitSucceeded && pushAfterCommit && !isPushing;
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (
       e.key === 'Enter' &&
       (e.metaKey || e.ctrlKey) &&
       !isLoading &&
       !isPushing &&
-      !isGenerating &&
-      message.trim() &&
-      selectedFiles.size > 0 &&
-      !(pushAfterCommit && !selectedRemote)
+      !isGenerating
     ) {
-      handleCommit();
+      if (isPushRetry) {
+        // Push retry only needs a selected remote
+        if (selectedRemote) {
+          handleCommit();
+        }
+      } else if (
+        message.trim() &&
+        selectedFiles.size > 0 &&
+        !(pushAfterCommit && !selectedRemote)
+      ) {
+        handleCommit();
+      }
     }
   };
 
@@ -827,15 +840,22 @@ export function CommitWorktreeDialog({
               isLoading ||
               isPushing ||
               isGenerating ||
-              !message.trim() ||
-              selectedFiles.size === 0 ||
-              (pushAfterCommit && !selectedRemote)
+              (isPushRetry
+                ? !selectedRemote
+                : !message.trim() ||
+                  selectedFiles.size === 0 ||
+                  (pushAfterCommit && !selectedRemote))
             }
           >
             {isLoading || isPushing ? (
               <>
                 <Spinner size="sm" className="mr-2" />
                 {isPushing ? 'Pushing...' : 'Committing...'}
+              </>
+            ) : isPushRetry ? (
+              <>
+                <Upload className="w-4 h-4 mr-2" />
+                Retry Push
               </>
             ) : (
               <>

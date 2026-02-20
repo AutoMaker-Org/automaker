@@ -6,6 +6,7 @@
  * automatic caching, deduplication, and background refetching.
  */
 
+import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getElectronAPI } from '@/lib/electron';
 import { queryKeys } from '@/lib/query-keys';
@@ -20,7 +21,18 @@ const FEATURES_POLLING_INTERVAL = 30000;
 const AGENT_OUTPUT_POLLING_INTERVAL = 5000;
 const FEATURES_CACHE_PREFIX = 'automaker:features-cache:';
 
+/**
+ * Bump this version whenever the Feature shape changes so stale localStorage
+ * entries with incompatible schemas are automatically discarded.
+ */
+const FEATURES_CACHE_VERSION = 1;
+
+/** Maximum number of per-project cache entries to keep in localStorage (LRU). */
+const MAX_FEATURES_CACHE_ENTRIES = 10;
+
 interface PersistedFeaturesCache {
+  /** Schema version — mismatched versions are treated as stale and discarded. */
+  schemaVersion: number;
   timestamp: number;
   features: Feature[];
 }
@@ -34,6 +46,12 @@ function readPersistedFeatures(projectPath: string): PersistedFeaturesCache | nu
     if (!parsed || !Array.isArray(parsed.features) || typeof parsed.timestamp !== 'number') {
       return null;
     }
+    // Reject entries written by an older (or newer) schema version
+    if (parsed.schemaVersion !== FEATURES_CACHE_VERSION) {
+      // Remove the stale entry so it doesn't accumulate
+      window.localStorage.removeItem(`${FEATURES_CACHE_PREFIX}${projectPath}`);
+      return null;
+    }
     return parsed;
   } catch {
     return null;
@@ -44,12 +62,56 @@ function writePersistedFeatures(projectPath: string, features: Feature[]): void 
   if (typeof window === 'undefined') return;
   try {
     const payload: PersistedFeaturesCache = {
+      schemaVersion: FEATURES_CACHE_VERSION,
       timestamp: Date.now(),
       features,
     };
     window.localStorage.setItem(`${FEATURES_CACHE_PREFIX}${projectPath}`, JSON.stringify(payload));
   } catch {
     // Best effort cache only.
+  }
+  // Run lightweight eviction after every write to keep localStorage bounded
+  evictStaleFeaturesCache();
+}
+
+/**
+ * Scan localStorage for feature-cache entries, sort by timestamp (LRU),
+ * and remove entries beyond MAX_FEATURES_CACHE_ENTRIES so orphaned project
+ * caches don't accumulate indefinitely.
+ */
+function evictStaleFeaturesCache(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    const entries: Array<{ key: string; timestamp: number }> = [];
+    for (let i = 0; i < window.localStorage.length; i++) {
+      const key = window.localStorage.key(i);
+      if (!key || !key.startsWith(FEATURES_CACHE_PREFIX)) continue;
+      try {
+        const raw = window.localStorage.getItem(key);
+        if (!raw) continue;
+        const parsed = JSON.parse(raw) as { timestamp?: number; schemaVersion?: number };
+        // Also evict entries with wrong schema version
+        if (parsed.schemaVersion !== FEATURES_CACHE_VERSION) {
+          window.localStorage.removeItem(key);
+          continue;
+        }
+        entries.push({
+          key,
+          timestamp: typeof parsed.timestamp === 'number' ? parsed.timestamp : 0,
+        });
+      } catch {
+        // Corrupt entry — remove it
+        window.localStorage.removeItem(key);
+      }
+    }
+    if (entries.length <= MAX_FEATURES_CACHE_ENTRIES) return;
+    // Sort descending by timestamp (most recent first) and remove the oldest
+    entries.sort((a, b) => b.timestamp - a.timestamp);
+    for (let i = MAX_FEATURES_CACHE_ENTRIES; i < entries.length; i++) {
+      window.localStorage.removeItem(entries[i].key);
+    }
+  } catch {
+    // Best effort — never break the app for cache housekeeping failures.
   }
 }
 
@@ -65,7 +127,13 @@ function writePersistedFeatures(projectPath: string, features: Feature[]): void 
  * ```
  */
 export function useFeatures(projectPath: string | undefined) {
-  const persisted = projectPath ? readPersistedFeatures(projectPath) : null;
+  // Memoize the persisted cache read so it only runs when projectPath changes,
+  // not on every render. Both initialData and initialDataUpdatedAt reference
+  // the same memoized value to avoid a redundant second localStorage read.
+  const persisted = useMemo(
+    () => (projectPath ? readPersistedFeatures(projectPath) : null),
+    [projectPath]
+  );
 
   return useQuery({
     queryKey: queryKeys.features.all(projectPath ?? ''),
@@ -81,8 +149,8 @@ export function useFeatures(projectPath: string | undefined) {
       return features;
     },
     enabled: !!projectPath,
-    initialData: persisted?.features,
-    initialDataUpdatedAt: persisted?.timestamp,
+    initialData: () => persisted?.features,
+    initialDataUpdatedAt: () => persisted?.timestamp,
     staleTime: STALE_TIMES.FEATURES,
     refetchInterval: createSmartPollingInterval(FEATURES_POLLING_INTERVAL),
     refetchOnWindowFocus: FEATURES_REFETCH_ON_FOCUS,

@@ -128,16 +128,25 @@ function showUpdateNotification(registration: ServiceWorkerRegistration): void {
   // Create a simple DOM-based notification (avoids depending on React rendering)
   const banner = document.createElement('div');
   banner.setAttribute('role', 'alert');
+
+  // Read theme-aware colors from CSS custom properties with sensible fallbacks
+  // so the banner matches the current dark/light theme.
+  const rootStyle = getComputedStyle(document.documentElement);
+  const bgColor = rootStyle.getPropertyValue('--background').trim() || '#1a1a2e';
+  const fgColor = rootStyle.getPropertyValue('--foreground').trim() || '#e0e0e0';
+  const accentColor = rootStyle.getPropertyValue('--primary').trim() || '#6366f1';
+  const mutedColor = rootStyle.getPropertyValue('--muted-foreground').trim() || '#888';
+
   banner.style.cssText =
     'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:99999;' +
-    'background:#1a1a2e;color:#e0e0e0;padding:12px 20px;border-radius:10px;' +
+    `background:hsl(${bgColor});color:hsl(${fgColor});padding:12px 20px;border-radius:10px;` +
     'display:flex;align-items:center;gap:12px;font-size:14px;' +
     'box-shadow:0 4px 24px rgba(0,0,0,0.3);font-family:system-ui,sans-serif;';
   banner.innerHTML =
     '<span>A new version is available.</span>' +
-    '<button id="sw-update-btn" style="background:#6366f1;color:white;border:none;' +
+    `<button id="sw-update-btn" style="background:hsl(${accentColor});color:hsl(${bgColor});border:none;` +
     'padding:6px 14px;border-radius:6px;cursor:pointer;font-size:13px;font-weight:500;">Reload</button>' +
-    '<button id="sw-dismiss-btn" style="background:transparent;color:#888;border:none;' +
+    `<button id="sw-dismiss-btn" style="background:transparent;color:hsl(${mutedColor});border:none;` +
     'padding:4px 8px;cursor:pointer;font-size:18px;line-height:1;" aria-label="Dismiss">&times;</button>';
   document.body.appendChild(banner);
 

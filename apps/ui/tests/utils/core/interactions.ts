@@ -64,6 +64,10 @@ export async function gotoWithAuth(page: Page, url: string): Promise<void> {
   await page.goto(url);
 }
 
+/** Selector matching any top-level app view by data-testid, used to detect that the app has loaded. */
+const APP_CONTENT_SELECTOR =
+  '[data-testid="welcome-view"], [data-testid="dashboard-view"], [data-testid="board-view"], [data-testid="context-view"], [data-testid="agent-view"], [data-testid="overview-view"]';
+
 /**
  * Handle login screen if it appears after navigation
  * Returns true if login was handled, false if no login screen was found
@@ -74,9 +78,7 @@ export async function handleLoginScreenIfPresent(page: Page): Promise<boolean> {
   const loginInput = page
     .locator('[data-testid="login-api-key-input"], input[type="password"][placeholder*="API key"]')
     .first();
-  const appContent = page.locator(
-    '[data-testid="welcome-view"], [data-testid="dashboard-view"], [data-testid="board-view"], [data-testid="context-view"], [data-testid="agent-view"], [data-testid="overview-view"]'
-  );
+  const appContent = page.locator(APP_CONTENT_SELECTOR);
   const loggedOutPage = page.getByRole('heading', { name: /logged out/i });
   const goToLoginButton = page.locator('button:has-text("Go to login")');
 

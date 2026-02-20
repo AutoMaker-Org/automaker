@@ -347,6 +347,29 @@ export function GraphViewPage() {
             `Failed to start feature: ${startError instanceof Error ? startError.message : String(startError)}`
           );
         }
+      } else {
+        // Feature was not found in the store after creation — it may have been
+        // persisted but not yet visible in the snapshot. Attempt to locate it
+        // and roll it back so it doesn't remain stuck in 'in_progress'.
+        logger.error(
+          'Newly created feature not found in store after handleAddFeature completed. ' +
+            `Store has ${latestFeatures.length} features, expected a new entry.`
+        );
+        // Best-effort: scan for any feature still in 'in_progress' that wasn't in the original set
+        const stuckFeature = latestFeatures.find(
+          (f) => f.status === 'in_progress' && !featuresBeforeIds.has(f.id)
+        );
+        if (stuckFeature) {
+          try {
+            const { updateFeature } = useAppStore.getState();
+            updateFeature(stuckFeature.id, { status: 'backlog' });
+            await persistFeatureUpdate(stuckFeature.id, { status: 'backlog' });
+            logger.info(`Rolled back orphaned feature ${stuckFeature.id} status to backlog`);
+          } catch (rollbackErr) {
+            logger.error('Failed to rollback orphaned feature status:', rollbackErr);
+          }
+        }
+        toast.error('Feature was created but could not be started. Please try again.');
       }
     },
     [handleAddFeature, handleStartImplementation, persistFeatureUpdate]

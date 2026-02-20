@@ -9,6 +9,11 @@ export interface UseBranchesReturn {
   aheadCount: number;
   behindCount: number;
   hasRemoteBranch: boolean;
+  /**
+   * @deprecated Use {@link getTrackingRemote}(worktreePath) instead — this value
+   * only reflects the last-queried worktree and is unreliable when multiple panels
+   * share the hook.
+   */
   trackingRemote: string | undefined;
   /** Per-worktree tracking remote lookup — avoids stale values when multiple panels share the hook */
   getTrackingRemote: (worktreePath: string) => string | undefined;
@@ -17,6 +22,8 @@ export interface UseBranchesReturn {
   setBranchFilter: (filter: string) => void;
   resetBranchFilter: () => void;
   fetchBranches: (worktreePath: string) => void;
+  /** Prune cached tracking-remote entries for worktree paths that no longer exist */
+  pruneStaleEntries: (activePaths: Set<string>) => void;
   gitRepoStatus: GitRepoStatus;
 }
 
@@ -90,6 +97,16 @@ export function useBranches(): UseBranchesReturn {
     setBranchFilter('');
   }, []);
 
+  /** Remove cached tracking-remote entries for worktree paths that no longer exist. */
+  const pruneStaleEntries = useCallback((activePaths: Set<string>) => {
+    const cache = trackingRemoteByPathRef.current;
+    for (const key of Object.keys(cache)) {
+      if (!activePaths.has(key)) {
+        delete cache[key];
+      }
+    }
+  }, []);
+
   const filteredBranches = branches.filter((b) =>
     b.name.toLowerCase().includes(branchFilter.toLowerCase())
   );
@@ -107,6 +124,7 @@ export function useBranches(): UseBranchesReturn {
     setBranchFilter,
     resetBranchFilter,
     fetchBranches,
+    pruneStaleEntries,
     gitRepoStatus,
   };
 }

@@ -435,7 +435,7 @@ export function useSettingsSync(): SettingsSyncState {
       // This is critical — projects list changes must sync right away to prevent loss
       // when switching between Electron and web modes or closing the app.
       //
-      // We compare by content (IDs + names), NOT by reference. The background
+      // We compare by content (IDs, names, and paths), NOT by reference. The background
       // reconcile in __root.tsx calls hydrateStoreFromSettings() with server data,
       // which always creates a new projects array (.map() produces a new reference).
       // A reference-only check would trigger an immediate sync-back to the server
@@ -453,7 +453,9 @@ export function useSettingsSync(): SettingsSyncState {
             newCount: newState.projects?.length ?? 0,
           });
           syncNow();
-          return;
+          // Don't return here — fall through so the general loop below can still
+          // detect and schedule a debounced sync for other project-field mutations
+          // (e.g. lastOpened) that the id/name/path comparison above doesn't cover.
         }
       }
 

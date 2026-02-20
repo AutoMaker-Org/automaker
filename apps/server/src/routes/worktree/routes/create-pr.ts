@@ -75,6 +75,52 @@ export function createCreatePRHandler() {
         return;
       }
 
+      // --- Input validation: run all validation before any git write operations ---
+
+      // Validate remote names before use to prevent command injection
+      if (remote !== undefined && !isValidRemoteName(remote)) {
+        res.status(400).json({
+          success: false,
+          error: 'Invalid remote name contains unsafe characters',
+        });
+        return;
+      }
+      if (targetRemote !== undefined && !isValidRemoteName(targetRemote)) {
+        res.status(400).json({
+          success: false,
+          error: 'Invalid target remote name contains unsafe characters',
+        });
+        return;
+      }
+
+      const pushRemote = remote || 'origin';
+
+      // Resolve repository URL, fork workflow, and target remote information.
+      // This is needed for both the existing PR check and PR creation.
+      // Resolve early so validation errors are caught before any writes.
+      let repoUrl: string | null = null;
+      let upstreamRepo: string | null = null;
+      let originOwner: string | null = null;
+      try {
+        const prTarget = await resolvePrTarget({
+          worktreePath,
+          pushRemote,
+          targetRemote,
+        });
+        repoUrl = prTarget.repoUrl;
+        upstreamRepo = prTarget.upstreamRepo;
+        originOwner = prTarget.originOwner;
+      } catch (resolveErr) {
+        // resolvePrTarget throws for validation errors (unknown targetRemote, missing pushRemote)
+        res.status(400).json({
+          success: false,
+          error: getErrorMessage(resolveErr),
+        });
+        return;
+      }
+
+      // --- Validation complete — proceed with git operations ---
+
       // Check for uncommitted changes
       logger.debug(`Checking for uncommitted changes in: ${worktreePath}`);
       const { stdout: status } = await execAsync('git status --porcelain', {
@@ -123,25 +169,8 @@ export function createCreatePRHandler() {
         }
       }
 
-      // Validate remote names before use to prevent command injection
-      if (remote !== undefined && !isValidRemoteName(remote)) {
-        res.status(400).json({
-          success: false,
-          error: 'Invalid remote name contains unsafe characters',
-        });
-        return;
-      }
-      if (targetRemote !== undefined && !isValidRemoteName(targetRemote)) {
-        res.status(400).json({
-          success: false,
-          error: 'Invalid target remote name contains unsafe characters',
-        });
-        return;
-      }
-
       // Push the branch to remote (use selected remote or default to 'origin')
       // Uses array-based execGitCommand to avoid shell injection from pushRemote/branchName.
-      const pushRemote = remote || 'origin';
       let pushError: string | null = null;
       try {
         await execGitCommand(['push', pushRemote, branchName], worktreePath, execEnv);
@@ -179,29 +208,6 @@ export function createCreatePRHandler() {
       let browserUrl: string | null = null;
       let ghCliAvailable = false;
 
-      // Resolve repository URL, fork workflow, and target remote information.
-      // This is needed for both the existing PR check and PR creation.
-      let repoUrl: string | null = null;
-      let upstreamRepo: string | null = null;
-      let originOwner: string | null = null;
-      try {
-        const prTarget = await resolvePrTarget({
-          worktreePath,
-          pushRemote,
-          targetRemote,
-        });
-        repoUrl = prTarget.repoUrl;
-        upstreamRepo = prTarget.upstreamRepo;
-        originOwner = prTarget.originOwner;
-      } catch (resolveErr) {
-        // resolvePrTarget throws for validation errors (unknown targetRemote, missing pushRemote)
-        res.status(400).json({
-          success: false,
-          error: getErrorMessage(resolveErr),
-        });
-        return;
-      }
-
       // Check if gh CLI is available (cross-platform)
       ghCliAvailable = await isGhCliAvailable();
 
@@ -230,7 +236,6 @@ export function createCreatePRHandler() {
         // This is more reliable than gh pr view as it explicitly searches by branch name
         // For forks/cross-remote, we need to use owner:branch format for the head parameter
         const headRef = upstreamRepo && originOwner ? `${originOwner}:${branchName}` : branchName;
-        const repoArg = upstreamRepo ? ` --repo "${upstreamRepo}"` : '';
 
         logger.debug(`Checking for existing PR for branch: ${branchName} (headRef: ${headRef})`);
         try {

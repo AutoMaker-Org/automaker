@@ -60,7 +60,7 @@ function swCacheBuster(): Plugin {
       let swContent = fs.readFileSync(swPath, 'utf-8');
       if (!CACHE_NAME_PATTERN.test(swContent)) {
         console.error(
-            '[sw-cache-buster] Could not find CACHE_NAME declaration in sw.js. ' +
+          '[sw-cache-buster] Could not find CACHE_NAME declaration in sw.js. ' +
             'The service worker cache will NOT be busted on this deploy! ' +
             "Check that public/sw.js still contains: const CACHE_NAME = 'automaker-v5';"
         );
@@ -233,11 +233,12 @@ export default defineConfig(({ command }) => {
     },
     server: {
       host: process.env.HOST || '0.0.0.0',
-      port: parseInt(process.env.TEST_PORT || '3007', 10),
+      port: parseInt(process.env.TEST_PORT || process.env.AUTOMAKER_WEB_PORT ||
+        '3007', 10),
       allowedHosts: true,
       proxy: {
         '/api': {
-          target: 'http://localhost:3008',
+          target: 'http://localhost:' + process.env.AUTOMAKER_SERVER_PORT || '5008',
           changeOrigin: true,
           ws: true,
         },

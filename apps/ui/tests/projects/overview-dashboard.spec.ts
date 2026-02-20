@@ -20,6 +20,68 @@ test.describe('Projects Overview Dashboard', () => {
   test.beforeEach(async ({ page }) => {
     // Set up mock projects state
     await setupMockMultipleProjects(page, 3);
+
+    // Intercept settings API to preserve mock project data and prevent
+    // the server's settings from overriding our test setup.
+    // Without this, background reconciliation can clear the mock projects.
+    await page.route('**/api/settings/global', async (route) => {
+      const method = route.request().method();
+      if (method === 'PUT') {
+        // Allow settings sync writes to pass through
+        return route.continue();
+      }
+      const response = await route.fetch();
+      const json = await response.json();
+      if (json.settings) {
+        // Ensure mock projects are preserved in the response
+        if (!json.settings.projects || json.settings.projects.length === 0) {
+          json.settings.projects = [
+            {
+              id: 'test-project-1',
+              name: 'Test Project 1',
+              path: '/mock/test-project-1',
+              lastOpened: new Date().toISOString(),
+            },
+            {
+              id: 'test-project-2',
+              name: 'Test Project 2',
+              path: '/mock/test-project-2',
+              lastOpened: new Date(Date.now() - 86400000).toISOString(),
+            },
+            {
+              id: 'test-project-3',
+              name: 'Test Project 3',
+              path: '/mock/test-project-3',
+              lastOpened: new Date(Date.now() - 172800000).toISOString(),
+            },
+          ];
+        }
+        json.settings.currentProjectId = json.settings.currentProjectId || 'test-project-1';
+        json.settings.setupComplete = true;
+        json.settings.isFirstRun = false;
+      }
+      await route.fulfill({ response, json });
+    });
+
+    // Mock the initialize-project endpoint for mock paths that don't exist on disk.
+    // This prevents auto-open from failing when it tries to verify the project directory.
+    await page.route('**/api/project/initialize', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ success: true }),
+      });
+    });
+
+    // Mock features list for mock project paths (they don't exist on disk)
+    await page.route('**/api/features/list**', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ success: true, features: [] }),
+      });
+    });
+
     await authenticateForTests(page);
   });
 

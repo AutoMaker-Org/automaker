@@ -1,7 +1,7 @@
 // Automaker Service Worker - Optimized for mobile PWA loading performance
 // NOTE: CACHE_NAME is injected with a build hash at build time by the swCacheBuster
 // Vite plugin (see vite.config.mts). In development it stays as-is; in production
-// builds it becomes e.g. 'automaker-v3-a1b2c3d4' for automatic cache invalidation.
+// builds it becomes e.g. 'automaker-v5-a1b2c3d4' for automatic cache invalidation.
 const CACHE_NAME = 'automaker-v5'; // replaced at build time → 'automaker-v5-<hash>'
 
 // Separate cache for immutable hashed assets (long-lived)
@@ -252,6 +252,10 @@ function isImmutableAsset(url) {
 /**
  * Determine if a request is for app code (JS/CSS) that should be cached aggressively.
  * This includes both production /assets/* bundles and development /src/* modules.
+ *
+ * The path.startsWith('/src/') check is dev-only — in development the Vite dev server
+ * serves source files directly from /src/*. In production all code is bundled under
+ * /assets/*, so the /src/ check is harmless but only present for developer convenience.
  */
 function isCodeAsset(url) {
   const path = url.pathname;
@@ -408,7 +412,15 @@ self.addEventListener('fetch', (event) => {
               }
               return networkResponse;
             })
-            .catch(() => cachedResponse);
+            .catch(
+              () =>
+                cachedResponse ||
+                new Response('Service Unavailable', {
+                  status: 503,
+                  statusText: 'Service Unavailable',
+                  headers: { 'Content-Type': 'text/plain' },
+                })
+            );
 
           if (cachedResponse) {
             event.waitUntil(fetchPromise.catch(() => {}));

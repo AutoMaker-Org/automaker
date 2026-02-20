@@ -710,7 +710,7 @@ export function WorktreePanel({
       } else {
         await handlePush(worktree, remote);
         fetchBranches(worktree.path);
-        fetchWorktrees();
+        fetchWorktrees({ silent: true });
       }
     },
     [selectRemoteOperation, handlePush, fetchBranches, fetchWorktrees]
@@ -730,7 +730,7 @@ export function WorktreePanel({
     async (worktree: WorktreeInfo, remote: string) => {
       await handlePush(worktree, remote);
       fetchBranches(worktree.path);
-      fetchWorktrees();
+      fetchWorktrees({ silent: true });
     },
     [handlePush, fetchBranches, fetchWorktrees]
   );

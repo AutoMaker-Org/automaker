@@ -1,5 +1,7 @@
 /**
- * POST /list endpoint - List all features for a project
+ * POST/GET /list endpoint - List all features for a project
+ *
+ * projectPath may come from req.body (POST) or req.query (GET fallback).
  *
  * Also performs orphan detection when a project is loaded to identify
  * features whose branches no longer exist. This runs on every project load/switch.

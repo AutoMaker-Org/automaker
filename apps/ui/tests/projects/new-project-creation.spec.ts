@@ -35,6 +35,11 @@ test.describe('Project Creation', () => {
     // Intercept settings API BEFORE authenticateForTests (which navigates to the page)
     // This prevents settings hydration from restoring a project and disables auto-open
     await page.route('**/api/settings/global', async (route) => {
+      const method = route.request().method();
+      if (method === 'PUT') {
+        // Allow settings sync writes to pass through
+        return route.continue();
+      }
       const response = await route.fetch();
       const json = await response.json();
       // Remove currentProjectId and clear projects to prevent auto-open
@@ -44,8 +49,26 @@ test.describe('Project Creation', () => {
         // Ensure setup is marked complete to prevent redirect to /setup on fresh CI
         json.settings.setupComplete = true;
         json.settings.isFirstRun = false;
+        // Preserve lastProjectDir so the new project modal knows where to create projects
+        json.settings.lastProjectDir = TEST_TEMP_DIR;
       }
       await route.fulfill({ response, json });
+    });
+
+    // Mock workspace config API to return a valid default directory.
+    // In CI, ALLOWED_ROOT_DIRECTORY is unset and Documents path is unavailable,
+    // so without this mock, getDefaultWorkspaceDirectory() returns null and the
+    // "Will be created at:" text never renders in the new project modal.
+    await page.route('**/api/workspace/config', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: true,
+          configured: false,
+          defaultDir: TEST_TEMP_DIR,
+        }),
+      });
     });
 
     await authenticateForTests(page);
