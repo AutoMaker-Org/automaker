@@ -11,7 +11,6 @@ import {
   Undo2,
   Redo2,
   Settings,
-  RotateCcw,
 } from 'lucide-react';
 import { createLogger } from '@automaker/utils/logger';
 import { useAppStore } from '@/store/app-store';
@@ -24,18 +23,7 @@ import {
   HeaderActionsPanelTrigger,
 } from '@/components/ui/header-actions-panel';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Slider } from '@/components/ui/slider';
-import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
-import { UI_MONO_FONT_OPTIONS, DEFAULT_FONT_VALUE } from '@/config/ui-font-options';
 
 import { toast } from 'sonner';
 import {
@@ -46,6 +34,7 @@ import {
 import { FileTree } from './components/file-tree';
 import { CodeEditor, getLanguageName, type CodeEditorHandle } from './components/code-editor';
 import { EditorTabs } from './components/editor-tabs';
+import { EditorSettingsForm } from './components/editor-settings-form';
 import {
   MarkdownPreviewPanel,
   MarkdownViewToolbar,
@@ -1319,67 +1308,14 @@ export function FileEditorView({ initialPath }: FileEditorViewProps) {
             <PopoverContent className="w-64 p-3" align="end" side="bottom">
               <div className="space-y-4">
                 <p className="text-xs font-semibold text-foreground">Editor Settings</p>
-
-                {/* Font Size */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-xs font-medium">Font Size</Label>
-                    <span className="text-xs text-muted-foreground">{editorFontSize}px</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Slider
-                      value={[editorFontSize]}
-                      min={8}
-                      max={32}
-                      step={1}
-                      onValueChange={([value]) => setEditorFontSize(value)}
-                      className="flex-1"
-                    />
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-6 w-6 shrink-0"
-                      onClick={() => setEditorFontSize(13)}
-                      disabled={editorFontSize === 13}
-                      title="Reset to default"
-                    >
-                      <RotateCcw className="h-3 w-3" />
-                    </Button>
-                  </div>
-                </div>
-
-                {/* Font Family */}
-                <div className="space-y-2">
-                  <Label className="text-xs font-medium">Font Family</Label>
-                  <Select
-                    value={editorFontFamily || DEFAULT_FONT_VALUE}
-                    onValueChange={(value) => setEditorFontFamily(value)}
-                  >
-                    <SelectTrigger className="w-full h-8 text-xs">
-                      <SelectValue placeholder="Default (Geist Mono)" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {UI_MONO_FONT_OPTIONS.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          <span
-                            style={{
-                              fontFamily:
-                                option.value === DEFAULT_FONT_VALUE ? undefined : option.value,
-                            }}
-                          >
-                            {option.label}
-                          </span>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Auto Save toggle */}
-                <div className="flex items-center justify-between">
-                  <Label className="text-xs font-medium">Auto Save</Label>
-                  <Switch checked={editorAutoSave} onCheckedChange={setEditorAutoSave} />
-                </div>
+                <EditorSettingsForm
+                  editorFontSize={editorFontSize}
+                  setEditorFontSize={setEditorFontSize}
+                  editorFontFamily={editorFontFamily}
+                  setEditorFontFamily={setEditorFontFamily}
+                  editorAutoSave={editorAutoSave}
+                  setEditorAutoSave={setEditorAutoSave}
+                />
               </div>
             </PopoverContent>
           </Popover>
@@ -1506,66 +1442,14 @@ export function FileEditorView({ initialPath }: FileEditorViewProps) {
           <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
             Editor Settings
           </span>
-
-          {/* Font Size */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label className="text-xs font-medium">Font Size</Label>
-              <span className="text-xs text-muted-foreground">{editorFontSize}px</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Slider
-                value={[editorFontSize]}
-                min={8}
-                max={32}
-                step={1}
-                onValueChange={([value]) => setEditorFontSize(value)}
-                className="flex-1"
-              />
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6 shrink-0"
-                onClick={() => setEditorFontSize(13)}
-                disabled={editorFontSize === 13}
-                title="Reset to default"
-              >
-                <RotateCcw className="h-3 w-3" />
-              </Button>
-            </div>
-          </div>
-
-          {/* Font Family */}
-          <div className="space-y-2">
-            <Label className="text-xs font-medium">Font Family</Label>
-            <Select
-              value={editorFontFamily || DEFAULT_FONT_VALUE}
-              onValueChange={(value) => setEditorFontFamily(value)}
-            >
-              <SelectTrigger className="w-full h-8 text-xs">
-                <SelectValue placeholder="Default (Geist Mono)" />
-              </SelectTrigger>
-              <SelectContent>
-                {UI_MONO_FONT_OPTIONS.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    <span
-                      style={{
-                        fontFamily: option.value === DEFAULT_FONT_VALUE ? undefined : option.value,
-                      }}
-                    >
-                      {option.label}
-                    </span>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Auto Save toggle */}
-          <div className="flex items-center justify-between">
-            <Label className="text-xs font-medium">Auto Save</Label>
-            <Switch checked={editorAutoSave} onCheckedChange={setEditorAutoSave} />
-          </div>
+          <EditorSettingsForm
+            editorFontSize={editorFontSize}
+            setEditorFontSize={setEditorFontSize}
+            editorFontFamily={editorFontFamily}
+            setEditorFontFamily={setEditorFontFamily}
+            editorAutoSave={editorAutoSave}
+            setEditorAutoSave={setEditorAutoSave}
+          />
         </div>
       </HeaderActionsPanel>
 
