@@ -658,35 +658,48 @@ export function WorktreePanel({
 
   // Handle pull with remote selection when multiple remotes exist
   // Now opens the pull dialog which handles stash management and conflict resolution
-  const handlePullWithRemoteSelection = useCallback(async (worktree: WorktreeInfo) => {
-    try {
-      const api = getHttpApiClient();
-      const result = await api.worktree.listRemotes(worktree.path);
-
-      if (result.success && result.result && result.result.remotes.length > 1) {
-        // Multiple remotes - show selection dialog first
-        setSelectRemoteWorktree(worktree);
-        setSelectRemoteOperation('pull');
-        setSelectRemoteDialogOpen(true);
-      } else if (result.success && result.result && result.result.remotes.length === 1) {
-        // Exactly one remote - open pull dialog directly with that remote
-        const remoteName = result.result.remotes[0].name;
-        setPullDialogRemote(remoteName);
+  // If the branch has a tracked remote, pull from it directly (skip the remote selection dialog)
+  const handlePullWithRemoteSelection = useCallback(
+    async (worktree: WorktreeInfo) => {
+      // If the branch already tracks a remote, pull from it directly — no dialog needed
+      const tracked = getTrackingRemote(worktree.path);
+      if (tracked) {
+        setPullDialogRemote(tracked);
         setPullDialogWorktree(worktree);
         setPullDialogOpen(true);
-      } else {
-        // No remotes - open pull dialog with default
+        return;
+      }
+
+      try {
+        const api = getHttpApiClient();
+        const result = await api.worktree.listRemotes(worktree.path);
+
+        if (result.success && result.result && result.result.remotes.length > 1) {
+          // Multiple remotes and no tracking remote - show selection dialog
+          setSelectRemoteWorktree(worktree);
+          setSelectRemoteOperation('pull');
+          setSelectRemoteDialogOpen(true);
+        } else if (result.success && result.result && result.result.remotes.length === 1) {
+          // Exactly one remote - open pull dialog directly with that remote
+          const remoteName = result.result.remotes[0].name;
+          setPullDialogRemote(remoteName);
+          setPullDialogWorktree(worktree);
+          setPullDialogOpen(true);
+        } else {
+          // No remotes - open pull dialog with default
+          setPullDialogRemote(undefined);
+          setPullDialogWorktree(worktree);
+          setPullDialogOpen(true);
+        }
+      } catch {
+        // If listing remotes fails, open pull dialog with default
         setPullDialogRemote(undefined);
         setPullDialogWorktree(worktree);
         setPullDialogOpen(true);
       }
-    } catch {
-      // If listing remotes fails, open pull dialog with default
-      setPullDialogRemote(undefined);
-      setPullDialogWorktree(worktree);
-      setPullDialogOpen(true);
-    }
-  }, []);
+    },
+    [getTrackingRemote]
+  );
 
   // Handle push with remote selection when multiple remotes exist
   const handlePushWithRemoteSelection = useCallback(
