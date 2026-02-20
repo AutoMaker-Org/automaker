@@ -240,10 +240,18 @@ function getInitialUIState(): {
           sidebarOpen:
             typeof cache.cachedSidebarOpen === 'boolean' ? cache.cachedSidebarOpen : true,
           sidebarStyle: cache.cachedSidebarStyle === 'discord' ? 'discord' : 'unified',
-          collapsedNavSections:
-            cache.cachedCollapsedNavSections && typeof cache.cachedCollapsedNavSections === 'object'
-              ? cache.cachedCollapsedNavSections
-              : {},
+          collapsedNavSections: (() => {
+            const raw = cache.cachedCollapsedNavSections;
+            if (
+              raw &&
+              typeof raw === 'object' &&
+              !Array.isArray(raw) &&
+              Object.getOwnPropertyNames(raw).every((k) => typeof raw[k] === 'boolean')
+            ) {
+              return raw as Record<string, boolean>;
+            }
+            return {};
+          })(),
         };
       }
     }

@@ -234,12 +234,19 @@ export function createCreatePRHandler() {
 
         logger.debug(`Checking for existing PR for branch: ${branchName} (headRef: ${headRef})`);
         try {
-          const listCmd = `gh pr list${repoArg} --head "${headRef}" --json number,title,url,state --limit 1`;
-          logger.debug(`Running: ${listCmd}`);
-          const { stdout: existingPrOutput } = await execAsync(listCmd, {
+          const listArgs = ['pr', 'list'];
+          if (upstreamRepo) {
+            listArgs.push('--repo', upstreamRepo);
+          }
+          listArgs.push('--head', headRef, '--json', 'number,title,url,state', '--limit', '1');
+          logger.debug(`Running: gh ${listArgs.join(' ')}`);
+          const listResult = await spawnProcess({
+            command: 'gh',
+            args: listArgs,
             cwd: worktreePath,
             env: execEnv,
           });
+          const existingPrOutput = listResult.stdout;
           logger.debug(`gh pr list output: ${existingPrOutput}`);
 
           const existingPrs = JSON.parse(existingPrOutput);

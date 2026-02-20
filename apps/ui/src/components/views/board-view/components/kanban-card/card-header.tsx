@@ -468,7 +468,7 @@ export const CardHeaderSection = memo(function CardHeaderSection({
           </div>
         )}
         <div className="flex-1 min-w-0 overflow-hidden">
-          {feature.titleGenerating ? (
+          {feature.titleGenerating && !feature.title ? (
             <div className="flex items-center gap-1.5 mb-1">
               <Spinner size="xs" />
               <span className="text-xs text-muted-foreground italic">Generating title...</span>

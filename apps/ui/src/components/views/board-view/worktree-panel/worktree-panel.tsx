@@ -97,6 +97,7 @@ export function WorktreePanel({
     behindCount,
     hasRemoteBranch,
     trackingRemote,
+    getTrackingRemote,
     isLoadingBranches,
     branchFilter,
     setBranchFilter,
@@ -822,7 +823,7 @@ export function WorktreePanel({
             aheadCount={aheadCount}
             behindCount={behindCount}
             hasRemoteBranch={hasRemoteBranch}
-            trackingRemote={trackingRemote}
+            trackingRemote={getTrackingRemote(selectedWorktree.path)}
             isPulling={isPulling}
             isPushing={isPushing}
             isStartingDevServer={isStartingDevServer}
@@ -1069,6 +1070,7 @@ export function WorktreePanel({
             behindCount={behindCount}
             hasRemoteBranch={hasRemoteBranch}
             trackingRemote={trackingRemote}
+            getTrackingRemote={getTrackingRemote}
             gitRepoStatus={gitRepoStatus}
             hasTestCommand={hasTestCommand}
             isStartingTests={isStartingTests}
@@ -1165,7 +1167,7 @@ export function WorktreePanel({
                 aheadCount={aheadCount}
                 behindCount={behindCount}
                 hasRemoteBranch={hasRemoteBranch}
-                trackingRemote={trackingRemote}
+                trackingRemote={getTrackingRemote(mainWorktree.path)}
                 gitRepoStatus={gitRepoStatus}
                 isAutoModeRunning={isAutoModeRunningForWorktree(mainWorktree)}
                 isStartingTests={isStartingTests}
@@ -1248,7 +1250,7 @@ export function WorktreePanel({
                       aheadCount={aheadCount}
                       behindCount={behindCount}
                       hasRemoteBranch={hasRemoteBranch}
-                      trackingRemote={trackingRemote}
+                      trackingRemote={getTrackingRemote(worktree.path)}
                       gitRepoStatus={gitRepoStatus}
                       isAutoModeRunning={isAutoModeRunningForWorktree(worktree)}
                       isStartingTests={isStartingTests}

@@ -77,6 +77,19 @@ export async function setupWelcomeView(
       };
       localStorage.setItem('automaker-setup', JSON.stringify(setupState));
 
+      // Set settings cache to ensure setupComplete is recognized on cold start.
+      // This prevents the server's setupComplete value (which may be false on fresh CI)
+      // from overriding the setup store and causing a redirect to /setup.
+      const settingsCache = {
+        setupComplete: true,
+        isFirstRun: false,
+        projects: opts?.recentProjects || [],
+        theme: 'dark',
+        sidebarOpen: true,
+        maxConcurrency: 3,
+      };
+      localStorage.setItem('automaker-settings-cache', JSON.stringify(settingsCache));
+
       // Set workspace directory if provided
       if (opts?.workspaceDir) {
         localStorage.setItem('automaker:lastProjectDir', opts.workspaceDir);
@@ -181,6 +194,24 @@ export async function setupRealProject(
         version: versions.SETUP_STORE,
       };
       localStorage.setItem('automaker-setup', JSON.stringify(setupState));
+
+      // Set settings cache to ensure setupComplete is recognized on cold start.
+      // This prevents the server's setupComplete value (which may be false on fresh CI)
+      // from overriding the setup store and causing a redirect to /setup.
+      const settingsCache = {
+        setupComplete: true,
+        isFirstRun: false,
+        projects: allProjects.map((p) => ({
+          id: p.id,
+          name: p.name,
+          path: p.path,
+          lastOpened: p.lastOpened,
+        })),
+        theme: 'dark',
+        sidebarOpen: true,
+        maxConcurrency: 3,
+      };
+      localStorage.setItem('automaker-settings-cache', JSON.stringify(settingsCache));
 
       // Disable splash screen in tests
       sessionStorage.setItem('automaker-splash-shown', 'true');
@@ -621,34 +652,69 @@ export async function setupMockMultipleProjects(
   page: Page,
   projectCount: number = 3
 ): Promise<void> {
-  await page.addInitScript((count: number) => {
-    const mockProjects: TestProject[] = [];
-    for (let i = 0; i < count; i++) {
-      mockProjects.push({
-        id: `test-project-${i + 1}`,
-        name: `Test Project ${i + 1}`,
-        path: `/mock/test-project-${i + 1}`,
-        lastOpened: new Date(Date.now() - i * 86400000).toISOString(),
-      });
-    }
+  await page.addInitScript(
+    ({ count, versions }: { count: number; versions: typeof STORE_VERSIONS }) => {
+      const mockProjects: TestProject[] = [];
+      for (let i = 0; i < count; i++) {
+        mockProjects.push({
+          id: `test-project-${i + 1}`,
+          name: `Test Project ${i + 1}`,
+          path: `/mock/test-project-${i + 1}`,
+          lastOpened: new Date(Date.now() - i * 86400000).toISOString(),
+        });
+      }
 
-    const mockState = {
-      state: {
-        projects: mockProjects,
-        currentProject: mockProjects[0],
-        currentView: 'board',
+      const mockState = {
+        state: {
+          projects: mockProjects,
+          currentProject: mockProjects[0],
+          currentView: 'board',
+          theme: 'dark',
+          sidebarOpen: true,
+          apiKeys: { anthropic: '', google: '' },
+          chatSessions: [],
+          chatHistoryOpen: false,
+          maxConcurrency: 3,
+        },
+        version: versions.APP_STORE,
+      };
+
+      localStorage.setItem('automaker-storage', JSON.stringify(mockState));
+
+      // Mark setup as complete to prevent redirect to /setup
+      const setupState = {
+        state: {
+          isFirstRun: false,
+          setupComplete: true,
+          skipClaudeSetup: false,
+        },
+        version: versions.SETUP_STORE,
+      };
+      localStorage.setItem('automaker-setup', JSON.stringify(setupState));
+
+      // Set settings cache so the fast hydrate path is taken on page load.
+      // This prevents the server's setupComplete value (which may be false on fresh CI)
+      // from overwriting the setup store and causing a redirect to /setup.
+      const settingsCache = {
+        setupComplete: true,
+        isFirstRun: false,
+        projects: mockProjects.map((p) => ({
+          id: p.id,
+          name: p.name,
+          path: p.path,
+          lastOpened: p.lastOpened,
+        })),
         theme: 'dark',
         sidebarOpen: true,
-        apiKeys: { anthropic: '', google: '' },
-        chatSessions: [],
-        chatHistoryOpen: false,
         maxConcurrency: 3,
-      },
-      version: 2, // Must match app-store.ts persist version
-    };
+      };
+      localStorage.setItem('automaker-settings-cache', JSON.stringify(settingsCache));
 
-    localStorage.setItem('automaker-storage', JSON.stringify(mockState));
-  }, projectCount);
+      // Disable splash screen in tests
+      sessionStorage.setItem('automaker-splash-shown', 'true');
+    },
+    { count: projectCount, versions: STORE_VERSIONS }
+  );
 }
 
 /**

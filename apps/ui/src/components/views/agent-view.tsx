@@ -49,6 +49,8 @@ export function AgentView() {
 
   // Ref for quick create session function from SessionManager
   const quickCreateSessionRef = useRef<(() => Promise<void>) | null>(null);
+  // Guard to prevent concurrent invocations of handleCreateSessionFromEmptyState
+  const createSessionInFlightRef = useRef(false);
 
   // Session management hook
   const { currentSessionId, handleSelectSession } = useAgentSession({
@@ -140,32 +142,38 @@ export function AgentView() {
   // the next frame. We use a double-RAF with a short retry loop to wait more
   // robustly for the ref to be populated.
   const handleCreateSessionFromEmptyState = useCallback(async () => {
-    let createFn = quickCreateSessionRef.current;
-    if (!createFn) {
-      // SessionManager is likely unmounted on mobile — show it so it mounts
-      setShowSessionManager(true);
-      // Wait for mount: double RAF + retry loop (handles concurrent mode & slow devices)
-      const MAX_RETRIES = 5;
-      for (let i = 0; i < MAX_RETRIES; i++) {
-        await new Promise<void>((r) =>
-          requestAnimationFrame(() => requestAnimationFrame(() => r()))
-        );
-        createFn = quickCreateSessionRef.current;
-        if (createFn) break;
-        // Small delay between retries to give React time to commit
-        if (i < MAX_RETRIES - 1) {
-          await new Promise<void>((r) => setTimeout(r, 50));
+    if (createSessionInFlightRef.current) return;
+    createSessionInFlightRef.current = true;
+    try {
+      let createFn = quickCreateSessionRef.current;
+      if (!createFn) {
+        // SessionManager is likely unmounted on mobile — show it so it mounts
+        setShowSessionManager(true);
+        // Wait for mount: double RAF + retry loop (handles concurrent mode & slow devices)
+        const MAX_RETRIES = 5;
+        for (let i = 0; i < MAX_RETRIES; i++) {
+          await new Promise<void>((r) =>
+            requestAnimationFrame(() => requestAnimationFrame(() => r()))
+          );
           createFn = quickCreateSessionRef.current;
           if (createFn) break;
+          // Small delay between retries to give React time to commit
+          if (i < MAX_RETRIES - 1) {
+            await new Promise<void>((r) => setTimeout(r, 50));
+            createFn = quickCreateSessionRef.current;
+            if (createFn) break;
+          }
         }
       }
-    }
-    if (createFn) {
-      await createFn();
-    } else {
-      console.warn(
-        '[AgentView] quickCreateSessionRef was not populated after retries — SessionManager may not have mounted'
-      );
+      if (createFn) {
+        await createFn();
+      } else {
+        console.warn(
+          '[AgentView] quickCreateSessionRef was not populated after retries — SessionManager may not have mounted'
+        );
+      }
+    } finally {
+      createSessionInFlightRef.current = false;
     }
   }, []);
 

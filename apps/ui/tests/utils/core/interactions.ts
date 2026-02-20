@@ -75,7 +75,7 @@ export async function handleLoginScreenIfPresent(page: Page): Promise<boolean> {
     .locator('[data-testid="login-api-key-input"], input[type="password"][placeholder*="API key"]')
     .first();
   const appContent = page.locator(
-    '[data-testid="welcome-view"], [data-testid="dashboard-view"], [data-testid="board-view"], [data-testid="context-view"], [data-testid="agent-view"]'
+    '[data-testid="welcome-view"], [data-testid="dashboard-view"], [data-testid="board-view"], [data-testid="context-view"], [data-testid="agent-view"], [data-testid="overview-view"]'
   );
   const loggedOutPage = page.getByRole('heading', { name: /logged out/i });
   const goToLoginButton = page.locator('button:has-text("Go to login")');

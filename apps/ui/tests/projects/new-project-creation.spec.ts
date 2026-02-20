@@ -41,6 +41,9 @@ test.describe('Project Creation', () => {
       if (json.settings) {
         json.settings.currentProjectId = null;
         json.settings.projects = [];
+        // Ensure setup is marked complete to prevent redirect to /setup on fresh CI
+        json.settings.setupComplete = true;
+        json.settings.isFirstRun = false;
       }
       await route.fulfill({ response, json });
     });

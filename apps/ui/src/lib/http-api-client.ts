@@ -1912,7 +1912,8 @@ export class HttpApiClient implements ElectronAPI {
       error?: string;
     }>;
   } = {
-    getAll: (projectPath: string) => this.post('/api/features/list', { projectPath }),
+    getAll: (projectPath: string) =>
+      this.get(`/api/features/list?projectPath=${encodeURIComponent(projectPath)}`),
     get: (projectPath: string, featureId: string) =>
       this.post('/api/features/get', { projectPath, featureId }),
     create: (projectPath: string, feature: Feature) =>

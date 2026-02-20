@@ -105,10 +105,7 @@
       .app-shell-logo-bg {
         fill: rgba(255, 255, 255, 0.08);
       }
-      /* Light themes: dark spinner + logo strokes (uses :is() to avoid repeating selector list).
-         IMPORTANT: This list must be kept in sync with the light theme definitions in
-         global.css (apps/ui/src/styles/global.css). When adding a new light theme class
-         to global.css, also add it to the html:is(...) selectors below. */
+      /* Light themes: dark spinner + logo strokes (uses :is() to avoid repeating selector list) */
       html:is(
           .light,
           .cream,
@@ -208,18 +205,27 @@
       // Prevent theme flash - apply stored theme before React hydrates
       (function () {
         try {
-          var stored = localStorage.getItem('automaker-storage');
-          if (stored) {
-            var data = JSON.parse(stored);
-            var theme = data.state?.theme;
-            if (theme && theme !== 'system' && theme !== 'light') {
-              document.documentElement.classList.add(theme);
-            } else if (
-              theme === 'system' &&
-              window.matchMedia('(prefers-color-scheme: dark)').matches
-            ) {
-              document.documentElement.classList.add('dark');
+          // Primary key used by current builds for pre-React theme persistence.
+          var theme = localStorage.getItem('automaker:theme');
+
+          // Backward compatibility: older builds stored theme in the Zustand blob.
+          if (!theme) {
+            var stored = localStorage.getItem('automaker-storage');
+            if (stored) {
+              var data = JSON.parse(stored);
+              theme = data?.state?.theme || data?.theme || null;
             }
+          }
+
+          if (theme && theme !== 'system') {
+            // Apply the stored theme class directly (covers 'light', 'dark', and
+            // all named themes like 'cream', 'nord', etc.)
+            document.documentElement.classList.add(theme);
+          } else if (
+            theme === 'system' &&
+            window.matchMedia('(prefers-color-scheme: dark)').matches
+          ) {
+            document.documentElement.classList.add('dark');
           }
           // Detect PWA standalone mode early so CSS can apply reduced bottom safe-area
           // before first paint, preventing a layout shift on notched devices.
@@ -227,7 +233,7 @@
             window.matchMedia('(display-mode: standalone)').matches ||
             navigator.standalone === true
           ) {
-            document.documentElement.classList.add('pwa-standalone');
+            document.documentElement.setAttribute('data-pwa', 'standalone');
           }
         } catch (e) {}
       })();

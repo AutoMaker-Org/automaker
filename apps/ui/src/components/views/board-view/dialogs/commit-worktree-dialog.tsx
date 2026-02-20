@@ -198,6 +198,9 @@ export function CommitWorktreeDialog({
   const [isLoadingRemotes, setIsLoadingRemotes] = useState(false);
   const [isPushing, setIsPushing] = useState(false);
   const [remotesFetched, setRemotesFetched] = useState(false);
+  const [remotesFetchError, setRemotesFetchError] = useState<string | null>(null);
+  // Track whether the commit already succeeded so retries can skip straight to push
+  const [commitSucceeded, setCommitSucceeded] = useState(false);
 
   // Parse diffs
   const parsedDiffs = useMemo(() => parseDiff(diffContent), [diffContent]);
@@ -212,47 +215,50 @@ export function CommitWorktreeDialog({
   }, [parsedDiffs]);
 
   // Fetch remotes when push option is enabled
-  useEffect(() => {
-    if (pushAfterCommit && worktree && !remotesFetched) {
-      let cancelled = false;
+  const fetchRemotesForWorktree = useCallback(
+    async (worktreePath: string, signal?: { cancelled: boolean }) => {
       setIsLoadingRemotes(true);
-
-      const fetchRemotes = async () => {
-        try {
-          const api = getElectronAPI();
-          if (api?.worktree?.listRemotes) {
-            const result = await api.worktree.listRemotes(worktree.path);
-            if (!cancelled) {
-              setRemotesFetched(true);
-              if (result.success && result.result) {
-                const remoteInfos = result.result.remotes.map((r) => ({
-                  name: r.name,
-                  url: r.url,
-                }));
-                setRemotes(remoteInfos);
-                // Auto-select 'origin' if available, otherwise first remote
-                if (remoteInfos.length > 0) {
-                  const defaultRemote =
-                    remoteInfos.find((r) => r.name === 'origin') || remoteInfos[0];
-                  setSelectedRemote(defaultRemote.name);
-                }
-              }
+      setRemotesFetchError(null);
+      try {
+        const api = getElectronAPI();
+        if (api?.worktree?.listRemotes) {
+          const result = await api.worktree.listRemotes(worktreePath);
+          if (signal?.cancelled) return;
+          setRemotesFetched(true);
+          if (result.success && result.result) {
+            const remoteInfos = result.result.remotes.map((r) => ({
+              name: r.name,
+              url: r.url,
+            }));
+            setRemotes(remoteInfos);
+            // Auto-select 'origin' if available, otherwise first remote
+            if (remoteInfos.length > 0) {
+              const defaultRemote = remoteInfos.find((r) => r.name === 'origin') || remoteInfos[0];
+              setSelectedRemote(defaultRemote.name);
             }
           }
-        } catch (err) {
-          if (!cancelled) setRemotesFetched(true);
-          console.warn('Failed to fetch remotes:', err);
-        } finally {
-          if (!cancelled) setIsLoadingRemotes(false);
         }
-      };
+      } catch (err) {
+        if (signal?.cancelled) return;
+        // Don't mark as successfully fetched — show an error with retry instead
+        setRemotesFetchError(err instanceof Error ? err.message : 'Failed to fetch remotes');
+        console.warn('Failed to fetch remotes:', err);
+      } finally {
+        if (!signal?.cancelled) setIsLoadingRemotes(false);
+      }
+    },
+    []
+  );
 
-      fetchRemotes();
+  useEffect(() => {
+    if (pushAfterCommit && worktree && !remotesFetched && !remotesFetchError) {
+      const signal = { cancelled: false };
+      fetchRemotesForWorktree(worktree.path, signal);
       return () => {
-        cancelled = true;
+        signal.cancelled = true;
       };
     }
-  }, [pushAfterCommit, worktree, remotesFetched]);
+  }, [pushAfterCommit, worktree, remotesFetched, remotesFetchError, fetchRemotesForWorktree]);
 
   // Load diffs when dialog opens
   useEffect(() => {
@@ -268,6 +274,8 @@ export function CommitWorktreeDialog({
       setSelectedRemote('');
       setIsPushing(false);
       setRemotesFetched(false);
+      setRemotesFetchError(null);
+      setCommitSucceeded(false);
 
       let cancelled = false;
 
@@ -349,13 +357,43 @@ export function CommitWorktreeDialog({
   }, []);
 
   const handleCommit = async () => {
-    if (!worktree || !message.trim() || selectedFiles.size === 0) return;
+    if (!worktree) return;
+
+    const api = getElectronAPI();
+
+    // If commit already succeeded on a previous attempt, skip straight to push
+    if (commitSucceeded && pushAfterCommit && selectedRemote) {
+      setIsPushing(true);
+      try {
+        if (!api?.worktree?.push) {
+          toast.error('Push API not available');
+          return;
+        }
+        const pushResult = await api.worktree.push(worktree.path, false, selectedRemote);
+        if (pushResult.success && pushResult.result) {
+          toast.success('Pushed to remote', {
+            description: pushResult.result.message,
+          });
+          onCommitted();
+          onOpenChange(false);
+          setMessage('');
+        } else {
+          toast.error(pushResult.error || 'Failed to push to remote');
+        }
+      } catch (pushErr) {
+        toast.error(pushErr instanceof Error ? pushErr.message : 'Failed to push to remote');
+      } finally {
+        setIsPushing(false);
+      }
+      return;
+    }
+
+    if (!message.trim() || selectedFiles.size === 0) return;
 
     setIsLoading(true);
     setError(null);
 
     try {
-      const api = getElectronAPI();
       if (!api?.worktree?.commit) {
         setError('Worktree API not available');
         return;
@@ -369,6 +407,7 @@ export function CommitWorktreeDialog({
 
       if (result.success && result.result) {
         if (result.result.committed) {
+          setCommitSucceeded(true);
           toast.success('Changes committed', {
             description: `Commit ${result.result.commitHash} on ${result.result.branch}`,
           });
@@ -720,11 +759,26 @@ export function CommitWorktreeDialog({
                     <Spinner size="sm" />
                     <span>Loading remotes...</span>
                   </div>
-                ) : remotes.length === 0 ? (
+                ) : remotesFetchError ? (
+                  <div className="flex items-center gap-2 text-sm text-destructive">
+                    <span>Failed to load remotes.</span>
+                    <button
+                      className="text-xs underline hover:text-foreground transition-colors"
+                      onClick={() => {
+                        if (worktree) {
+                          setRemotesFetchError(null);
+                          fetchRemotesForWorktree(worktree.path);
+                        }
+                      }}
+                    >
+                      Retry
+                    </button>
+                  </div>
+                ) : remotes.length === 0 && remotesFetched ? (
                   <p className="text-sm text-muted-foreground">
                     No remotes configured for this repository.
                   </p>
-                ) : (
+                ) : remotes.length > 0 ? (
                   <div className="flex items-center gap-2">
                     <Label
                       htmlFor="remote-select"
@@ -748,7 +802,7 @@ export function CommitWorktreeDialog({
                       </SelectContent>
                     </Select>
                   </div>
-                )}
+                ) : null}
               </div>
             )}
           </div>

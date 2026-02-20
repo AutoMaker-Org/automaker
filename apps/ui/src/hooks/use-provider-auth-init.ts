@@ -15,11 +15,8 @@ const logger = createLogger('ProviderAuthInit');
  * Hook to initialize Claude, Codex, z.ai, and Gemini authentication statuses on app startup.
  * This ensures that usage tracking information is available in the board header
  * without needing to visit the settings page first.
- *
- * @param ready - When false (default: false), the hook waits before firing.
- *   Pass true once non-critical startup work can begin (i.e., after board renders).
  */
-export function useProviderAuthInit(ready = false) {
+export function useProviderAuthInit() {
   const {
     setClaudeAuthStatus,
     setCodexAuthStatus,
@@ -36,177 +33,174 @@ export function useProviderAuthInit(ready = false) {
   const refreshStatuses = useCallback(async () => {
     const api = getHttpApiClient();
 
-    // Fire all 4 provider status checks in parallel — no sequential awaits.
-    // On cellular (100-300ms RTT), the old sequential pattern cost 4× RTT (~800ms).
-    // Promise.allSettled ensures each result is handled independently; one failure
-    // does not block the others.
-    await Promise.allSettled([
-      // 1. Claude Auth Status
-      api.setup
-        .getClaudeStatus()
-        .then((result) => {
-          if (result.success && result.auth) {
-            // Cast to extended type that includes server-added fields
-            const auth = result.auth as typeof result.auth & {
-              oauthTokenValid?: boolean;
-              apiKeyValid?: boolean;
-            };
+    // 1. Claude Auth Status
+    try {
+      const result = await api.setup.getClaudeStatus();
+      if (result.success && result.auth) {
+        // Cast to extended type that includes server-added fields
+        const auth = result.auth as typeof result.auth & {
+          oauthTokenValid?: boolean;
+          apiKeyValid?: boolean;
+        };
 
-            const validMethods: ClaudeAuthMethod[] = [
-              'oauth_token_env',
-              'oauth_token',
-              'api_key',
-              'api_key_env',
-              'credentials_file',
-              'cli_authenticated',
-              'none',
-            ];
+        const validMethods: ClaudeAuthMethod[] = [
+          'oauth_token_env',
+          'oauth_token',
+          'api_key',
+          'api_key_env',
+          'credentials_file',
+          'cli_authenticated',
+          'none',
+        ];
 
-            const method = validMethods.includes(auth.method as ClaudeAuthMethod)
-              ? (auth.method as ClaudeAuthMethod)
-              : ((auth.authenticated ? 'api_key' : 'none') as ClaudeAuthMethod);
+        const method = validMethods.includes(auth.method as ClaudeAuthMethod)
+          ? (auth.method as ClaudeAuthMethod)
+          : ((auth.authenticated ? 'api_key' : 'none') as ClaudeAuthMethod);
 
-            setClaudeAuthStatus({
-              authenticated: auth.authenticated,
-              method,
-              hasCredentialsFile: auth.hasCredentialsFile ?? false,
-              oauthTokenValid: !!(
-                auth.oauthTokenValid ||
-                auth.hasStoredOAuthToken ||
-                auth.hasEnvOAuthToken
-              ),
-              apiKeyValid: !!(auth.apiKeyValid || auth.hasStoredApiKey || auth.hasEnvApiKey),
-              hasEnvOAuthToken: !!auth.hasEnvOAuthToken,
-              hasEnvApiKey: !!auth.hasEnvApiKey,
-            });
-          }
-        })
-        .catch((error) => {
-          logger.error('Failed to init Claude auth status:', error);
-        }),
+        setClaudeAuthStatus({
+          authenticated: auth.authenticated,
+          method,
+          hasCredentialsFile: auth.hasCredentialsFile ?? false,
+          oauthTokenValid: !!(
+            auth.oauthTokenValid ||
+            auth.hasStoredOAuthToken ||
+            auth.hasEnvOAuthToken
+          ),
+          apiKeyValid: !!(auth.apiKeyValid || auth.hasStoredApiKey || auth.hasEnvApiKey),
+          hasEnvOAuthToken: !!auth.hasEnvOAuthToken,
+          hasEnvApiKey: !!auth.hasEnvApiKey,
+        });
+      }
+    } catch (error) {
+      logger.error('Failed to init Claude auth status:', error);
+    }
 
-      // 2. Codex Auth Status
-      api.setup
-        .getCodexStatus()
-        .then((result) => {
-          if (result.success && result.auth) {
-            const auth = result.auth;
+    // 2. Codex Auth Status
+    try {
+      const result = await api.setup.getCodexStatus();
+      if (result.success && result.auth) {
+        const auth = result.auth;
 
-            const validMethods: CodexAuthMethod[] = [
-              'api_key_env',
-              'api_key',
-              'cli_authenticated',
-              'none',
-            ];
+        const validMethods: CodexAuthMethod[] = [
+          'api_key_env',
+          'api_key',
+          'cli_authenticated',
+          'none',
+        ];
 
-            const method = validMethods.includes(auth.method as CodexAuthMethod)
-              ? (auth.method as CodexAuthMethod)
-              : ((auth.authenticated ? 'api_key' : 'none') as CodexAuthMethod);
+        const method = validMethods.includes(auth.method as CodexAuthMethod)
+          ? (auth.method as CodexAuthMethod)
+          : ((auth.authenticated ? 'api_key' : 'none') as CodexAuthMethod);
 
-            setCodexAuthStatus({
-              authenticated: auth.authenticated,
-              method,
-              hasAuthFile: auth.hasAuthFile ?? false,
-              hasApiKey: auth.hasApiKey ?? false,
-              hasEnvApiKey: auth.hasEnvApiKey ?? false,
-            });
-          }
-        })
-        .catch((error) => {
-          logger.error('Failed to init Codex auth status:', error);
-        }),
+        setCodexAuthStatus({
+          authenticated: auth.authenticated,
+          method,
+          hasAuthFile: auth.hasAuthFile ?? false,
+          hasApiKey: auth.hasApiKey ?? false,
+          hasEnvApiKey: auth.hasEnvApiKey ?? false,
+        });
+      }
+    } catch (error) {
+      logger.error('Failed to init Codex auth status:', error);
+    }
 
-      // 3. z.ai Auth Status
-      api.zai
-        .getStatus()
-        .then((result) => {
-          if (result.success || result.available !== undefined) {
-            const available = !!result.available;
-            const hasApiKey = !!(result.hasApiKey ?? result.available);
-            const hasEnvApiKey = !!(result.hasEnvApiKey ?? false);
+    // 3. z.ai Auth Status
+    try {
+      const result = await api.zai.getStatus();
+      if (result.success || result.available !== undefined) {
+        const available = !!result.available;
+        const hasApiKey = !!(result.hasApiKey ?? result.available);
+        const hasEnvApiKey = !!(result.hasEnvApiKey ?? false);
 
-            let method: ZaiAuthMethod = 'none';
-            if (hasEnvApiKey) {
-              method = 'api_key_env';
-            } else if (hasApiKey || available) {
-              method = 'api_key';
-            }
+        let method: ZaiAuthMethod = 'none';
+        if (hasEnvApiKey) {
+          method = 'api_key_env';
+        } else if (hasApiKey || available) {
+          method = 'api_key';
+        }
 
-            setZaiAuthStatus({ authenticated: available, method, hasApiKey, hasEnvApiKey });
-          } else {
-            setZaiAuthStatus({
-              authenticated: false,
-              method: 'none',
-              hasApiKey: false,
-              hasEnvApiKey: false,
-            });
-          }
-        })
-        .catch((error) => {
-          logger.error('Failed to init z.ai auth status:', error);
-          setZaiAuthStatus({
-            authenticated: false,
-            method: 'none',
-            hasApiKey: false,
-            hasEnvApiKey: false,
-          });
-        }),
+        setZaiAuthStatus({
+          authenticated: available,
+          method,
+          hasApiKey,
+          hasEnvApiKey,
+        });
+      } else {
+        // Non-success path - set default unauthenticated status
+        setZaiAuthStatus({
+          authenticated: false,
+          method: 'none',
+          hasApiKey: false,
+          hasEnvApiKey: false,
+        });
+      }
+    } catch (error) {
+      logger.error('Failed to init z.ai auth status:', error);
+      // Set default status on error to prevent stale state
+      setZaiAuthStatus({
+        authenticated: false,
+        method: 'none',
+        hasApiKey: false,
+        hasEnvApiKey: false,
+      });
+    }
 
-      // 4. Gemini Auth Status
-      api.setup
-        .getGeminiStatus()
-        .then((result) => {
-          // Always set CLI status if any CLI info is available
-          if (
-            result.installed !== undefined ||
-            result.version !== undefined ||
-            result.path !== undefined
-          ) {
-            setGeminiCliStatus({
-              installed: result.installed ?? false,
-              version: result.version,
-              path: result.path,
-            });
-          }
+    // 4. Gemini Auth Status
+    try {
+      const result = await api.setup.getGeminiStatus();
 
-          if (result.success && result.auth) {
-            const auth = result.auth;
-            const validMethods: GeminiAuthStatus['method'][] = [
-              'google_login',
-              'api_key',
-              'vertex_ai',
-              'none',
-            ];
+      // Always set CLI status if any CLI info is available
+      if (
+        result.installed !== undefined ||
+        result.version !== undefined ||
+        result.path !== undefined
+      ) {
+        setGeminiCliStatus({
+          installed: result.installed ?? false,
+          version: result.version,
+          path: result.path,
+        });
+      }
 
-            const method = validMethods.includes(auth.method as GeminiAuthStatus['method'])
-              ? (auth.method as GeminiAuthStatus['method'])
-              : ((auth.authenticated ? 'google_login' : 'none') as GeminiAuthStatus['method']);
+      // Always set auth status regardless of result.success
+      if (result.success && result.auth) {
+        const auth = result.auth;
+        const validMethods: GeminiAuthStatus['method'][] = [
+          'google_login',
+          'api_key',
+          'vertex_ai',
+          'none',
+        ];
 
-            setGeminiAuthStatus({
-              authenticated: auth.authenticated,
-              method,
-              hasApiKey: auth.hasApiKey ?? false,
-              hasEnvApiKey: auth.hasEnvApiKey ?? false,
-            });
-          } else {
-            setGeminiAuthStatus({
-              authenticated: false,
-              method: 'none',
-              hasApiKey: false,
-              hasEnvApiKey: false,
-            });
-          }
-        })
-        .catch((error) => {
-          logger.error('Failed to init Gemini auth status:', error);
-          setGeminiAuthStatus({
-            authenticated: false,
-            method: 'none',
-            hasApiKey: false,
-            hasEnvApiKey: false,
-          });
-        }),
-    ]);
+        const method = validMethods.includes(auth.method as GeminiAuthStatus['method'])
+          ? (auth.method as GeminiAuthStatus['method'])
+          : ((auth.authenticated ? 'google_login' : 'none') as GeminiAuthStatus['method']);
+
+        setGeminiAuthStatus({
+          authenticated: auth.authenticated,
+          method,
+          hasApiKey: auth.hasApiKey ?? false,
+          hasEnvApiKey: auth.hasEnvApiKey ?? false,
+        });
+      } else {
+        // result.success is false or result.auth is missing — set default unauthenticated status
+        setGeminiAuthStatus({
+          authenticated: false,
+          method: 'none',
+          hasApiKey: false,
+          hasEnvApiKey: false,
+        });
+      }
+    } catch (error) {
+      logger.error('Failed to init Gemini auth status:', error);
+      // Set default status on error to prevent infinite retries
+      setGeminiAuthStatus({
+        authenticated: false,
+        method: 'none',
+        hasApiKey: false,
+        hasEnvApiKey: false,
+      });
+    }
   }, [
     setClaudeAuthStatus,
     setCodexAuthStatus,
@@ -216,10 +210,6 @@ export function useProviderAuthInit(ready = false) {
   ]);
 
   useEffect(() => {
-    // Wait until caller signals it's OK to fire (deferred to avoid competing
-    // with critical startup requests on mobile's limited TCP connection pool)
-    if (!ready) return;
-
     // Skip if already initialized in this session
     if (initialized.current) {
       return;
@@ -229,5 +219,5 @@ export function useProviderAuthInit(ready = false) {
     // Always call refreshStatuses() to background re-validate on app restart,
     // even when statuses are pre-populated from persisted storage (cache case).
     void refreshStatuses();
-  }, [ready, refreshStatuses, claudeAuthStatus, codexAuthStatus, zaiAuthStatus, geminiAuthStatus]);
+  }, [refreshStatuses, claudeAuthStatus, codexAuthStatus, zaiAuthStatus, geminiAuthStatus]);
 }

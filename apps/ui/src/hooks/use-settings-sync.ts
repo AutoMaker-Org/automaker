@@ -441,8 +441,12 @@ export function useSettingsSync(): SettingsSyncState {
       // A reference-only check would trigger an immediate sync-back to the server
       // with identical data, causing a visible re-render flash on mobile.
       if (newState.projects !== prevState.projects) {
-        const prevIds = prevState.projects?.map((p) => `${p.id}:${p.name}:${p.path}`).join(',');
-        const newIds = newState.projects?.map((p) => `${p.id}:${p.name}:${p.path}`).join(',');
+        const prevIds = prevState.projects
+          ?.map((p) => JSON.stringify([p.id, p.name, p.path]))
+          .join(',');
+        const newIds = newState.projects
+          ?.map((p) => JSON.stringify([p.id, p.name, p.path]))
+          .join(',');
         if (prevIds !== newIds) {
           logger.info('[PROJECTS_CHANGED] Projects array changed, syncing immediately', {
             prevCount: prevState.projects?.length ?? 0,

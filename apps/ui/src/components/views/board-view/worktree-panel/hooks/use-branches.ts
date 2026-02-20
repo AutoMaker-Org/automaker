@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { useWorktreeBranches } from '@/hooks/queries';
 import type { GitRepoStatus } from '../types';
 
@@ -10,6 +10,8 @@ export interface UseBranchesReturn {
   behindCount: number;
   hasRemoteBranch: boolean;
   trackingRemote: string | undefined;
+  /** Per-worktree tracking remote lookup — avoids stale values when multiple panels share the hook */
+  getTrackingRemote: (worktreePath: string) => string | undefined;
   isLoadingBranches: boolean;
   branchFilter: string;
   setBranchFilter: (filter: string) => void;
@@ -40,6 +42,30 @@ export function useBranches(): UseBranchesReturn {
   const behindCount = branchData?.behindCount ?? 0;
   const hasRemoteBranch = branchData?.hasRemoteBranch ?? false;
   const trackingRemote = branchData?.trackingRemote;
+
+  // Per-worktree tracking remote cache: keeps results from previous fetchBranches()
+  // calls so multiple WorktreePanel instances don't all share a single stale value.
+  const trackingRemoteByPathRef = useRef<Record<string, string | undefined>>({});
+
+  // Update cache whenever query data changes for the current path
+  useEffect(() => {
+    if (currentWorktreePath && branchData) {
+      trackingRemoteByPathRef.current[currentWorktreePath] = branchData.trackingRemote;
+    }
+  }, [currentWorktreePath, branchData]);
+
+  const getTrackingRemote = useCallback(
+    (worktreePath: string): string | undefined => {
+      // If asking about the currently active query path, use fresh data
+      if (worktreePath === currentWorktreePath) {
+        return trackingRemote;
+      }
+      // Otherwise fall back to the cached value from a previous fetch
+      return trackingRemoteByPathRef.current[worktreePath];
+    },
+    [currentWorktreePath, trackingRemote]
+  );
+
   // Use conservative defaults (false) until data is confirmed
   // This prevents the UI from assuming git capabilities before the query completes
   const gitRepoStatus: GitRepoStatus = {
@@ -75,6 +101,7 @@ export function useBranches(): UseBranchesReturn {
     behindCount,
     hasRemoteBranch,
     trackingRemote,
+    getTrackingRemote,
     isLoadingBranches,
     branchFilter,
     setBranchFilter,

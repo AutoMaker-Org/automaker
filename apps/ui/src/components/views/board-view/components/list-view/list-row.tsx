@@ -297,7 +297,7 @@ export const ListRow = memo(function ListRow({
             <span
               className={cn(
                 'font-medium truncate',
-                feature.titleGenerating && 'animate-pulse text-muted-foreground'
+                feature.titleGenerating && !feature.title && 'animate-pulse text-muted-foreground'
               )}
               title={feature.title || feature.description}
             >

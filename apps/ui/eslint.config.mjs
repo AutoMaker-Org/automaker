@@ -53,6 +53,7 @@ const eslintConfig = defineConfig([
         requestAnimationFrame: 'readonly',
         cancelAnimationFrame: 'readonly',
         requestIdleCallback: 'readonly',
+        cancelIdleCallback: 'readonly',
         alert: 'readonly',
         // DOM Element Types
         HTMLElement: 'readonly',

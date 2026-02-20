@@ -804,7 +804,8 @@ export interface WorktreeAPI {
   // Rebase the current branch onto a target branch
   rebase: (
     worktreePath: string,
-    ontoBranch: string
+    ontoBranch: string,
+    remote?: string
   ) => Promise<{
     success: boolean;
     result?: {

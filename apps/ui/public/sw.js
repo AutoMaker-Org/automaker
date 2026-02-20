@@ -2,7 +2,7 @@
 // NOTE: CACHE_NAME is injected with a build hash at build time by the swCacheBuster
 // Vite plugin (see vite.config.mts). In development it stays as-is; in production
 // builds it becomes e.g. 'automaker-v3-a1b2c3d4' for automatic cache invalidation.
-const CACHE_NAME = 'automaker-v3'; // replaced at build time → 'automaker-v3-<hash>'
+const CACHE_NAME = 'automaker-v5'; // replaced at build time → 'automaker-v5-<hash>'
 
 // Separate cache for immutable hashed assets (long-lived)
 const IMMUTABLE_CACHE = 'automaker-immutable-v2';
@@ -13,6 +13,7 @@ const API_CACHE = 'automaker-api-v1';
 // Assets to cache on install (app shell for instant loading)
 const SHELL_ASSETS = [
   '/',
+  '/index.html',
   '/manifest.json',
   '/logo.png',
   '/logo_larger.png',
@@ -66,7 +67,10 @@ async function restoreMobileMode() {
 }
 
 // Restore mobileMode immediately on SW startup
-restoreMobileMode();
+// Keep a promise so fetch handlers can await restoration on cold SW starts.
+// This prevents a race where early API requests run before mobileMode is loaded
+// from Cache Storage, incorrectly falling back to network-first.
+const mobileModeRestorePromise = restoreMobileMode();
 
 // API endpoints that are safe to serve from stale cache on mobile.
 // These are GET-only, read-heavy endpoints where showing slightly stale data
@@ -138,8 +142,31 @@ self.addEventListener('install', (event) => {
   // thread sends a SKIP_WAITING message to avoid disrupting a live page.
   event.waitUntil(
     Promise.all([
-      // Cache app shell (HTML, icons, manifest)
-      caches.open(CACHE_NAME).then((cache) => cache.addAll(SHELL_ASSETS)),
+      // Cache app shell (HTML, icons, manifest) using individual fetch+put instead of
+      // cache.addAll(). This is critical because cache.addAll() respects the server's
+      // Cache-Control response headers — if the server sends 'Cache-Control: no-store'
+      // (which Vite dev server does for index.html), addAll() silently skips caching
+      // and the pre-React loading spinner is never served from cache.
+      //
+      // cache.put() bypasses Cache-Control headers entirely, ensuring the app shell
+      // is always cached on install regardless of what the server sends. This is the
+      // correct approach for SW-managed caches where the SW (not HTTP headers) controls
+      // freshness via the activate event's cache cleanup and the navigation strategy's
+      // background revalidation.
+      caches.open(CACHE_NAME).then((cache) =>
+        Promise.all(
+          SHELL_ASSETS.map((url) =>
+            fetch(url)
+              .then((response) => {
+                if (response.ok) return cache.put(url, response);
+              })
+              .catch(() => {
+                // Individual asset fetch failure is non-fatal — the SW still activates
+                // and the next navigation will populate the cache via Strategy 3.
+              })
+          )
+        )
+      ),
       // Cache critical JS/CSS bundles (injected at build time by swCacheBuster).
       // Uses individual fetch+put instead of cache.addAll() so a single asset
       // failure doesn't prevent the rest from being cached.
@@ -183,23 +210,23 @@ self.addEventListener('activate', (event) => {
       // When enabled, the browser fires the navigation fetch in parallel with
       // service worker boot, eliminating the SW startup delay (~50-200ms on mobile).
       self.registration.navigationPreload && self.registration.navigationPreload.enable(),
+      // Claim clients so this SW immediately controls all open pages.
+      //
+      // This is safe in all activation scenarios:
+      // 1. First install: No old SW exists — claiming is a no-op with no side effects.
+      //    Critically, this lets the fetch handler intercept requests during the same
+      //    visit that registered the SW, populating the immutable cache.
+      // 2. SKIP_WAITING from main thread: The page is freshly loaded, so claiming
+      //    won't cause a visible flash (the SW was explicitly asked to take over).
+      // 3. Natural activation (all old-SW tabs closed): The new SW activates when
+      //    no pages are using the old SW, so claiming controls only new navigations.
+      //
+      // Without clients.claim(), the SW's fetch handler would not intercept any
+      // requests until the next full navigation — meaning the first visit after
+      // install would not benefit from the cache-first asset strategy.
+      self.clients.claim(),
     ])
   );
-  // Claim clients so this SW immediately controls all open pages.
-  //
-  // This is safe in all activation scenarios:
-  // 1. First install: No old SW exists — claiming is a no-op with no side effects.
-  //    Critically, this lets the fetch handler intercept requests during the same
-  //    visit that registered the SW, populating the immutable cache.
-  // 2. SKIP_WAITING from main thread: The page is freshly loaded, so claiming
-  //    won't cause a visible flash (the SW was explicitly asked to take over).
-  // 3. Natural activation (all old-SW tabs closed): The new SW activates when
-  //    no pages are using the old SW, so claiming controls only new navigations.
-  //
-  // Without clients.claim(), the SW's fetch handler would not intercept any
-  // requests until the next full navigation — meaning the first visit after
-  // install would not benefit from the cache-first asset strategy.
-  self.clients.claim();
 });
 
 /**
@@ -220,6 +247,17 @@ function isImmutableAsset(url) {
     return true;
   }
   return false;
+}
+
+/**
+ * Determine if a request is for app code (JS/CSS) that should be cached aggressively.
+ * This includes both production /assets/* bundles and development /src/* modules.
+ */
+function isCodeAsset(url) {
+  const path = url.pathname;
+  const isScriptOrStyle = /\.(m?js|css|tsx?)$/.test(path);
+  if (!isScriptOrStyle) return false;
+  return path.startsWith('/assets/') || path.startsWith('/src/');
 }
 
 /**
@@ -256,65 +294,75 @@ self.addEventListener('fetch', (event) => {
   // The main thread's React Query layer handles the eventual fresh data via its
   // own refetching mechanism, so the user sees updates within seconds.
   if (url.pathname.startsWith('/api/')) {
-    if (mobileMode && isCacheableApiRequest(url)) {
-      event.respondWith(
-        (async () => {
-          const cache = await caches.open(API_CACHE);
-          const cachedResponse = await cache.match(event.request);
+    event.respondWith(
+      (async () => {
+        // On mobile, service workers are frequently terminated and restarted.
+        // Ensure persisted mobileMode is restored before deciding strategy so the
+        // very first API requests after restart can hit cache immediately.
+        try {
+          await mobileModeRestorePromise;
+        } catch (_e) {
+          // Best-effort restore — keep default mobileMode value on failure.
+        }
 
-          // Helper: start a network fetch that updates the cache on success.
-          // Lazily invoked so we don't fire a network request when the cache
-          // is already fresh — saves bandwidth and battery on mobile.
-          const startNetworkFetch = () =>
-            fetch(event.request)
-              .then(async (networkResponse) => {
-                if (networkResponse.ok) {
-                  // Store with timestamp for freshness checking
-                  const timestampedResponse = await addCacheTimestamp(networkResponse);
-                  cache.put(event.request, timestampedResponse);
-                }
-                return networkResponse;
-              })
-              .catch((err) => {
-                // Network failed - if we have cache, that's fine (returned below)
-                // If no cache, propagate the error
-                if (cachedResponse) return null;
-                throw err;
-              });
+        if (!(mobileMode && isCacheableApiRequest(url))) {
+          // Non-mobile or non-cacheable API: skip SW caching and use network.
+          return fetch(event.request);
+        }
 
-          // If we have a fresh-enough cached response, return it immediately
-          // without firing a background fetch — React Query's own refetching
-          // will request fresh data when its stale time expires.
-          if (cachedResponse && isApiCacheFresh(cachedResponse)) {
-            return cachedResponse;
+        const cache = await caches.open(API_CACHE);
+        const cachedResponse = await cache.match(event.request);
+
+        // Helper: start a network fetch that updates the cache on success.
+        // Lazily invoked so we don't fire a network request when the cache
+        // is already fresh — saves bandwidth and battery on mobile.
+        const startNetworkFetch = () =>
+          fetch(event.request)
+            .then(async (networkResponse) => {
+              if (networkResponse.ok) {
+                // Store with timestamp for freshness checking
+                const timestampedResponse = await addCacheTimestamp(networkResponse);
+                cache.put(event.request, timestampedResponse);
+              }
+              return networkResponse;
+            })
+            .catch((err) => {
+              // Network failed - if we have cache, that's fine (returned below)
+              // If no cache, propagate the error
+              if (cachedResponse) return null;
+              throw err;
+            });
+
+        // If we have a fresh-enough cached response, return it immediately
+        // without firing a background fetch — React Query's own refetching
+        // will request fresh data when its stale time expires.
+        if (cachedResponse && isApiCacheFresh(cachedResponse)) {
+          return cachedResponse;
+        }
+
+        // From here the cache is either stale or missing — start the network fetch.
+        const fetchPromise = startNetworkFetch();
+
+        // If we have a stale cached response but network is slow, race them:
+        // Return whichever resolves first (cached immediately vs network)
+        if (cachedResponse) {
+          // Give network a brief window (2s) to respond, otherwise use stale cache
+          const networkResult = await Promise.race([
+            fetchPromise,
+            new Promise((resolve) => setTimeout(() => resolve(null), 2000)),
+          ]);
+          if (!networkResult) {
+            // Timeout won — keep the background fetch alive so the cache update
+            // can complete even after we return the stale cached response.
+            event.waitUntil(fetchPromise.catch(() => {}));
           }
+          return networkResult || cachedResponse;
+        }
 
-          // From here the cache is either stale or missing — start the network fetch.
-          const fetchPromise = startNetworkFetch();
-
-          // If we have a stale cached response but network is slow, race them:
-          // Return whichever resolves first (cached immediately vs network)
-          if (cachedResponse) {
-            // Give network a brief window (2s) to respond, otherwise use stale cache
-            const networkResult = await Promise.race([
-              fetchPromise,
-              new Promise((resolve) => setTimeout(() => resolve(null), 2000)),
-            ]);
-            if (!networkResult) {
-              // Timeout won — keep the background fetch alive so the cache update
-              // can complete even after we return the stale cached response.
-              event.waitUntil(fetchPromise.catch(() => {}));
-            }
-            return networkResult || cachedResponse;
-          }
-
-          // No cache at all - must wait for network
-          return fetchPromise;
-        })()
-      );
-      return;
-    }
-    // Non-mobile or non-cacheable API: skip SW, let browser handle normally
+        // No cache at all - must wait for network
+        return fetchPromise;
+      })()
+    );
     return;
   }
 
@@ -342,6 +390,34 @@ self.addEventListener('fetch', (event) => {
           });
         });
       })
+    );
+    return;
+  }
+
+  // Strategy 1b: Cache-first for app code assets that are not immutable-hashed.
+  // This removes network-coupled startup delays for pre-React boot files when
+  // they are served without content hashes (for example, dev-like module paths).
+  if (isCodeAsset(url)) {
+    event.respondWith(
+      caches.open(CACHE_NAME).then((cache) =>
+        cache.match(event.request).then((cachedResponse) => {
+          const fetchPromise = fetch(event.request)
+            .then((networkResponse) => {
+              if (networkResponse.ok) {
+                cache.put(event.request, networkResponse.clone());
+              }
+              return networkResponse;
+            })
+            .catch(() => cachedResponse);
+
+          if (cachedResponse) {
+            event.waitUntil(fetchPromise.catch(() => {}));
+            return cachedResponse;
+          }
+
+          return fetchPromise;
+        })
+      )
     );
     return;
   }

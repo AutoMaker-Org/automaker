@@ -129,8 +129,9 @@ export async function resolvePrTarget({
         }
       }
     }
-  } catch {
-    // Couldn't parse remotes - will try fallback
+  } catch (err) {
+    // Log the failure for debugging — control flow falls through to auto-detection
+    logger.debug('Failed to parse git remotes', { worktreePath, error: err });
   }
 
   // When targetRemote is explicitly provided but remote parsing failed entirely

@@ -225,6 +225,14 @@ export class FeatureLoader {
           return null;
         }
 
+        // Clear transient runtime flag - titleGenerating is only meaningful during
+        // the current session's async title generation. If it was persisted (e.g.,
+        // app closed before generation completed), it would cause the UI to show
+        // "Generating title..." indefinitely.
+        if (feature.titleGenerating) {
+          delete feature.titleGenerating;
+        }
+
         return feature;
       });
 
@@ -323,7 +331,14 @@ export class FeatureLoader {
 
     logRecoveryWarning(result, `Feature ${featureId}`, logger);
 
-    return result.data;
+    const feature = result.data;
+
+    // Clear transient runtime flag (same as in getAll)
+    if (feature?.titleGenerating) {
+      delete feature.titleGenerating;
+    }
+
+    return feature;
   }
 
   /**
@@ -367,8 +382,15 @@ export class FeatureLoader {
       descriptionHistory: initialHistory,
     };
 
+    // Remove transient runtime fields before persisting to disk.
+    // titleGenerating is UI-only state that tracks in-flight async title generation.
+    // Persisting it can cause cards to show "Generating title..." indefinitely
+    // if the app restarts before generation completes.
+    const featureToWrite = { ...feature };
+    delete featureToWrite.titleGenerating;
+
     // Write feature.json atomically with backup support
-    await atomicWriteJson(featureJsonPath, feature, { backupCount: DEFAULT_BACKUP_COUNT });
+    await atomicWriteJson(featureJsonPath, featureToWrite, { backupCount: DEFAULT_BACKUP_COUNT });
 
     logger.info(`Created feature ${featureId}`);
     return feature;
@@ -452,9 +474,13 @@ export class FeatureLoader {
       descriptionHistory: updatedHistory,
     };
 
+    // Remove transient runtime fields before persisting (same as create)
+    const featureToWrite = { ...updatedFeature };
+    delete featureToWrite.titleGenerating;
+
     // Write back to file atomically with backup support
     const featureJsonPath = this.getFeatureJsonPath(projectPath, featureId);
-    await atomicWriteJson(featureJsonPath, updatedFeature, { backupCount: DEFAULT_BACKUP_COUNT });
+    await atomicWriteJson(featureJsonPath, featureToWrite, { backupCount: DEFAULT_BACKUP_COUNT });
 
     logger.info(`Updated feature ${featureId}`);
     return updatedFeature;

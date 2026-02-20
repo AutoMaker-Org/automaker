@@ -337,6 +337,8 @@ export function GraphViewPage() {
           try {
             const { updateFeature } = useAppStore.getState();
             updateFeature(newFeature.id, { status: 'backlog' });
+            // Also persist the rollback so it survives page refresh
+            await persistFeatureUpdate(newFeature.id, { status: 'backlog' });
             logger.info(`Rolled back feature ${newFeature.id} status to backlog`);
           } catch (rollbackErr) {
             logger.error('Failed to rollback feature status:', rollbackErr);
@@ -347,7 +349,7 @@ export function GraphViewPage() {
         }
       }
     },
-    [handleAddFeature, handleStartImplementation]
+    [handleAddFeature, handleStartImplementation, persistFeatureUpdate]
   );
 
   if (!currentProject) {

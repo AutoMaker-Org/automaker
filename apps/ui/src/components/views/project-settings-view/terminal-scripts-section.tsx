@@ -171,31 +171,13 @@ export function TerminalScriptsSection({ project }: TerminalScriptsSectionProps)
     [draggedIndex, dragOverIndex]
   );
 
-  const handleDragEnd = useCallback(
-    (e: React.DragEvent) => {
-      // Only perform the reorder when the drop target accepted the drop.
-      // e.dataTransfer.dropEffect === 'none' means the drag was cancelled
-      // (e.g. dropped outside a valid drop target or Escape was pressed),
-      // so we skip the splice to avoid reordering on an aborted drag.
-      if (
-        e.dataTransfer.dropEffect !== 'none' &&
-        draggedIndex !== null &&
-        dragOverIndex !== null &&
-        draggedIndex !== dragOverIndex
-      ) {
-        setScripts((prev) => {
-          const newScripts = [...prev];
-          const [removed] = newScripts.splice(draggedIndex, 1);
-          newScripts.splice(dragOverIndex, 0, removed);
-          return newScripts;
-        });
-      }
-      // Always reset drag state regardless of whether a reorder occurred.
-      setDraggedIndex(null);
-      setDragOverIndex(null);
-    },
-    [draggedIndex, dragOverIndex]
-  );
+  const handleDragEnd = useCallback((_e: React.DragEvent) => {
+    // The reorder is already performed in handleDrop. This handler only
+    // needs to reset the drag state (e.g. when the drop was cancelled by
+    // releasing outside a valid target or pressing Escape).
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+  }, []);
 
   return (
     <div

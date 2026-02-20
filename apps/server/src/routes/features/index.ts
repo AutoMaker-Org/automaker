@@ -33,6 +33,11 @@ export function createFeaturesRoutes(
     validatePathParams('projectPath'),
     createListHandler(featureLoader, autoModeService)
   );
+  router.get(
+    '/list',
+    validatePathParams('projectPath'),
+    createListHandler(featureLoader, autoModeService)
+  );
   router.post('/get', validatePathParams('projectPath'), createGetHandler(featureLoader));
   router.post(
     '/create',

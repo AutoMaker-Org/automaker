@@ -19,7 +19,17 @@ export function createListHandler(
 ) {
   return async (req: Request, res: Response): Promise<void> => {
     try {
-      const { projectPath } = req.body as { projectPath: string };
+      const bodyProjectPath =
+        typeof req.body === 'object' && req.body !== null
+          ? (req.body as { projectPath?: unknown }).projectPath
+          : undefined;
+      const queryProjectPath = req.query.projectPath;
+      const projectPath =
+        typeof bodyProjectPath === 'string'
+          ? bodyProjectPath
+          : typeof queryProjectPath === 'string'
+            ? queryProjectPath
+            : undefined;
 
       if (!projectPath) {
         res.status(400).json({ success: false, error: 'projectPath is required' });

@@ -36,7 +36,7 @@ const buildHash = getBuildHash();
 /**
  * Vite plugin to inject the build hash into sw.js for cache busting.
  *
- * Problem: CACHE_NAME = 'automaker-v3' is hardcoded in the service worker.
+ * Problem: CACHE_NAME is hardcoded in the service worker.
  * After a deployment, users may continue getting stale HTML from the SW cache
  * if someone forgets to manually bump the version.
  *
@@ -44,7 +44,7 @@ const buildHash = getBuildHash();
  * SW cache is automatically invalidated on each deployment.
  */
 function swCacheBuster(): Plugin {
-  const CACHE_NAME_PATTERN = /const CACHE_NAME = 'automaker-v3';/;
+  const CACHE_NAME_PATTERN = /const CACHE_NAME = 'automaker-v5';/;
   const CRITICAL_ASSETS_PATTERN = /const CRITICAL_ASSETS = \[\];/;
   return {
     name: 'sw-cache-buster',
@@ -60,17 +60,17 @@ function swCacheBuster(): Plugin {
       let swContent = fs.readFileSync(swPath, 'utf-8');
       if (!CACHE_NAME_PATTERN.test(swContent)) {
         console.error(
-          '[sw-cache-buster] Could not find CACHE_NAME declaration in sw.js. ' +
+            '[sw-cache-buster] Could not find CACHE_NAME declaration in sw.js. ' +
             'The service worker cache will NOT be busted on this deploy! ' +
-            "Check that public/sw.js still contains: const CACHE_NAME = 'automaker-v3';"
+            "Check that public/sw.js still contains: const CACHE_NAME = 'automaker-v5';"
         );
         return;
       }
       swContent = swContent.replace(
         CACHE_NAME_PATTERN,
-        `const CACHE_NAME = 'automaker-v3-${buildHash}';`
+        `const CACHE_NAME = 'automaker-v5-${buildHash}';`
       );
-      console.log(`[sw-cache-buster] Injected build hash: automaker-v3-${buildHash}`);
+      console.log(`[sw-cache-buster] Injected build hash: automaker-v5-${buildHash}`);
 
       // Extract critical asset URLs from the built index.html and inject them
       // into the SW so it can precache them on install (not just after the main

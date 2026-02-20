@@ -84,6 +84,8 @@ export interface WorktreeDropdownProps {
   hasRemoteBranch: boolean;
   /** The name of the remote that the current branch is tracking (e.g. "origin"), if any */
   trackingRemote?: string;
+  /** Per-worktree tracking remote lookup */
+  getTrackingRemote?: (worktreePath: string) => string | undefined;
   gitRepoStatus: GitRepoStatus;
   hasTestCommand: boolean;
   isStartingTests: boolean;
@@ -179,6 +181,7 @@ export function WorktreeDropdown({
   behindCount,
   hasRemoteBranch,
   trackingRemote,
+  getTrackingRemote,
   gitRepoStatus,
   hasTestCommand,
   isStartingTests,
@@ -482,7 +485,9 @@ export function WorktreeDropdown({
           aheadCount={aheadCount}
           behindCount={behindCount}
           hasRemoteBranch={hasRemoteBranch}
-          trackingRemote={trackingRemote}
+          trackingRemote={
+            getTrackingRemote ? getTrackingRemote(selectedWorktree.path) : trackingRemote
+          }
           isPulling={isPulling}
           isPushing={isPushing}
           isStartingDevServer={isStartingDevServer}

@@ -18,6 +18,40 @@ const FEATURES_REFETCH_ON_RECONNECT = false;
 const FEATURES_POLLING_INTERVAL = 30000;
 /** Default polling interval for agent output when WebSocket is inactive */
 const AGENT_OUTPUT_POLLING_INTERVAL = 5000;
+const FEATURES_CACHE_PREFIX = 'automaker:features-cache:';
+
+interface PersistedFeaturesCache {
+  timestamp: number;
+  features: Feature[];
+}
+
+function readPersistedFeatures(projectPath: string): PersistedFeaturesCache | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.localStorage.getItem(`${FEATURES_CACHE_PREFIX}${projectPath}`);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as PersistedFeaturesCache;
+    if (!parsed || !Array.isArray(parsed.features) || typeof parsed.timestamp !== 'number') {
+      return null;
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function writePersistedFeatures(projectPath: string, features: Feature[]): void {
+  if (typeof window === 'undefined') return;
+  try {
+    const payload: PersistedFeaturesCache = {
+      timestamp: Date.now(),
+      features,
+    };
+    window.localStorage.setItem(`${FEATURES_CACHE_PREFIX}${projectPath}`, JSON.stringify(payload));
+  } catch {
+    // Best effort cache only.
+  }
+}
 
 /**
  * Fetch all features for a project
@@ -31,6 +65,8 @@ const AGENT_OUTPUT_POLLING_INTERVAL = 5000;
  * ```
  */
 export function useFeatures(projectPath: string | undefined) {
+  const persisted = projectPath ? readPersistedFeatures(projectPath) : null;
+
   return useQuery({
     queryKey: queryKeys.features.all(projectPath ?? ''),
     queryFn: async (): Promise<Feature[]> => {
@@ -40,9 +76,13 @@ export function useFeatures(projectPath: string | undefined) {
       if (!result?.success) {
         throw new Error(result?.error || 'Failed to fetch features');
       }
-      return (result.features ?? []) as Feature[];
+      const features = (result.features ?? []) as Feature[];
+      writePersistedFeatures(projectPath, features);
+      return features;
     },
     enabled: !!projectPath,
+    initialData: persisted?.features,
+    initialDataUpdatedAt: persisted?.timestamp,
     staleTime: STALE_TIMES.FEATURES,
     refetchInterval: createSmartPollingInterval(FEATURES_POLLING_INTERVAL),
     refetchOnWindowFocus: FEATURES_REFETCH_ON_FOCUS,

@@ -34,7 +34,6 @@ import type { BacklogPlanResult, FeatureStatusWithPipeline } from '@automaker/ty
 import { pathsEqual } from '@/lib/utils';
 import { toast } from 'sonner';
 import { BoardBackgroundModal } from '@/components/dialogs/board-background-modal';
-import { Spinner } from '@/components/ui/spinner';
 import { useShallow } from 'zustand/react/shallow';
 import { useAutoMode } from '@/hooks/use-auto-mode';
 import { resolveModelString } from '@automaker/model-resolver';
@@ -1398,14 +1397,6 @@ export function BoardView() {
     return (
       <div className="flex-1 flex items-center justify-center" data-testid="board-view-no-project">
         <p className="text-muted-foreground">No project selected</p>
-      </div>
-    );
-  }
-
-  if (isLoading) {
-    return (
-      <div className="flex-1 flex items-center justify-center" data-testid="board-view-loading">
-        <Spinner size="lg" />
       </div>
     );
   }

@@ -345,7 +345,11 @@ export const useSetupStore = create<SetupState & SetupActions>()((set, get) => (
   resetSetup: () =>
     set({
       ...initialState,
-      isFirstRun: false, // Don't reset first run flag
+      // Explicitly override runtime-critical fields that may be stale in the
+      // module-level initialState (captured at import time from localStorage).
+      setupComplete: false,
+      currentStep: 'welcome',
+      isFirstRun: false, // Don't reset first run flag — user has visited before
     }),
 
   setIsFirstRun: (isFirstRun) => set({ isFirstRun }),
