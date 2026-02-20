@@ -233,8 +233,7 @@ export default defineConfig(({ command }) => {
     },
     server: {
       host: process.env.HOST || '0.0.0.0',
-      port: parseInt(process.env.TEST_PORT || process.env.AUTOMAKER_WEB_PORT ||
-        '3007', 10),
+      port: parseInt(process.env.TEST_PORT || process.env.AUTOMAKER_WEB_PORT || '3007', 10),
       allowedHosts: true,
       proxy: {
         '/api': {
