@@ -103,7 +103,15 @@ export function ProjectSwitcher() {
   };
 
   const handleProjectClick = useCallback(
-    (project: Project) => {
+    async (project: Project) => {
+      try {
+        // Ensure .automaker directory structure exists before switching
+        await initializeProject(project.path);
+      } catch (error) {
+        console.error('Failed to initialize project during switch:', error);
+        // Continue with switch even if initialization fails -
+        // the project may already be initialized
+      }
       setCurrentProject(project);
       // Navigate to board view when switching projects
       navigate({ to: '/board' });

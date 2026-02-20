@@ -138,6 +138,8 @@ export interface IssueDetailPanelProps {
   onClose: () => void;
   /** Called when user wants to revalidate - receives the validation options including comments/linkedPRs */
   onShowRevalidateConfirm: (options: ValidateIssueOptions) => void;
+  /** Called when user wants to create a feature to address this issue */
+  onCreateFeature: (issue: GitHubIssue) => void;
   formatDate: (date: string) => string;
   /** Model override state */
   modelOverride: {
@@ -146,4 +148,6 @@ export interface IssueDetailPanelProps {
     isOverridden: boolean;
     setOverride: (entry: PhaseModelEntry | null) => void;
   };
+  /** Whether the view is in mobile mode - shows back button and full-screen detail */
+  isMobile?: boolean;
 }

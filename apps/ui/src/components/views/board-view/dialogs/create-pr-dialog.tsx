@@ -105,43 +105,106 @@ export function CreatePRDialog({
   const branchAheadCount = branchesData?.aheadCount ?? 0;
   const needsPush = !branchHasRemote || branchAheadCount > 0 || !!worktree?.hasChanges;
 
-  // Filter out current worktree branch from the list
-  // When a target remote is selected, only show branches from that remote
-  const branches = useMemo(() => {
-    if (!branchesData?.branches) return [];
-    const allBranches = branchesData.branches
-      .map((b) => b.name)
-      .filter((name) => name !== worktree?.branch);
+  // Determine the active remote to scope branches to.
+  // For multi-remote: use the selected target remote.
+  // For single remote: automatically scope to that remote.
+  const activeRemote = useMemo(() => {
+    if (remotes.length === 1) return remotes[0].name;
+    if (selectedTargetRemote) return selectedTargetRemote;
+    return '';
+  }, [remotes, selectedTargetRemote]);
 
-    // If a target remote is selected and we have remote info with branches,
-    // only show that remote's branches (not branches from other remotes)
-    if (selectedTargetRemote) {
-      const targetRemoteInfo = remotes.find((r) => r.name === selectedTargetRemote);
-      if (targetRemoteInfo?.branches && targetRemoteInfo.branches.length > 0) {
-        const targetBranchNames = new Set(targetRemoteInfo.branches);
-        // Filter to only include branches that exist on the target remote
-        // Match both short names (e.g. "main") and prefixed names (e.g. "upstream/main")
-        return allBranches.filter((name) => {
-          // Check if the branch name matches a target remote branch directly
-          if (targetBranchNames.has(name)) return true;
-          // Check if it's a prefixed remote branch (e.g. "upstream/main")
-          const prefix = `${selectedTargetRemote}/`;
-          if (name.startsWith(prefix) && targetBranchNames.has(name.slice(prefix.length)))
-            return true;
-          return false;
+  // Filter branches by the active remote and strip remote prefixes for display.
+  // Returns display names (e.g. "main") without remote prefix.
+  // Also builds a map from display name → full ref (e.g. "origin/main") for PR creation.
+  const { branches, branchFullRefMap } = useMemo(() => {
+    if (!branchesData?.branches)
+      return { branches: [], branchFullRefMap: new Map<string, string>() };
+
+    const refMap = new Map<string, string>();
+
+    // If we have an active remote with branch info from the remotes endpoint, use that as the source
+    const activeRemoteInfo = activeRemote
+      ? remotes.find((r) => r.name === activeRemote)
+      : undefined;
+
+    if (activeRemoteInfo?.branches && activeRemoteInfo.branches.length > 0) {
+      // Use the remote's branch list — these are already short names (e.g. "main")
+      const filteredBranches = activeRemoteInfo.branches
+        .filter((branchName) => {
+          // Exclude the current worktree branch
+          return branchName !== worktree?.branch;
+        })
+        .map((branchName) => {
+          // Map display name to full ref
+          const fullRef = `${activeRemote}/${branchName}`;
+          refMap.set(branchName, fullRef);
+          return branchName;
         });
+
+      return { branches: filteredBranches, branchFullRefMap: refMap };
+    }
+
+    // Fallback: if no remote info available, use the branches from the branches endpoint
+    // Filter and strip prefixes
+    const seen = new Set<string>();
+    const filteredBranches: string[] = [];
+
+    for (const b of branchesData.branches) {
+      // Skip the current worktree branch
+      if (b.name === worktree?.branch) continue;
+
+      if (b.isRemote) {
+        // Remote branch: check if it belongs to the active remote
+        const slashIndex = b.name.indexOf('/');
+        if (slashIndex === -1) continue;
+
+        const remoteName = b.name.substring(0, slashIndex);
+        const branchName = b.name.substring(slashIndex + 1);
+
+        // If we have an active remote, only include branches from that remote
+        if (activeRemote && remoteName !== activeRemote) continue;
+
+        // Strip the remote prefix for display
+        if (!seen.has(branchName)) {
+          seen.add(branchName);
+          filteredBranches.push(branchName);
+          refMap.set(branchName, b.name);
+        }
+      } else {
+        // Local branch — only include if it has a remote counterpart on the active remote
+        // or if no active remote is set (no remotes at all)
+        if (!activeRemote) {
+          if (!seen.has(b.name)) {
+            seen.add(b.name);
+            filteredBranches.push(b.name);
+            refMap.set(b.name, b.name);
+          }
+        }
+        // When active remote is set, skip local-only branches — the remote version
+        // will be included from the remote branches above
       }
     }
 
-    return allBranches;
-  }, [branchesData?.branches, worktree?.branch, selectedTargetRemote, remotes]);
+    return { branches: filteredBranches, branchFullRefMap: refMap };
+  }, [branchesData?.branches, worktree?.branch, activeRemote, remotes]);
 
   // When branches change (e.g. target remote changed), reset base branch if current selection is no longer valid
   useEffect(() => {
     if (branches.length > 0 && baseBranch && !branches.includes(baseBranch)) {
       // Current base branch is not in the filtered list — pick the best match
-      const mainBranch = branches.find((b) => b === 'main' || b === 'master');
-      setBaseBranch(mainBranch || branches[0]);
+      // Strip any existing remote prefix from the current base branch for comparison
+      const strippedBaseBranch = baseBranch.includes('/')
+        ? baseBranch.substring(baseBranch.indexOf('/') + 1)
+        : baseBranch;
+
+      // Check if the stripped version exists in the list
+      if (branches.includes(strippedBaseBranch)) {
+        setBaseBranch(strippedBaseBranch);
+      } else {
+        const mainBranch = branches.find((b) => b === 'main' || b === 'master');
+        setBaseBranch(mainBranch || branches[0]);
+      }
     }
   }, [branches, baseBranch]);
 
@@ -234,7 +297,12 @@ export function CreatePRDialog({
 
     try {
       const api = getHttpApiClient();
-      const result = await api.worktree.generatePRDescription(worktree.path, baseBranch);
+      // Resolve the display name to the actual branch name for the API
+      const resolvedRef = branchFullRefMap.get(baseBranch) || baseBranch;
+      const branchNameForApi = resolvedRef.includes('/')
+        ? resolvedRef.substring(resolvedRef.indexOf('/') + 1)
+        : resolvedRef;
+      const result = await api.worktree.generatePRDescription(worktree.path, branchNameForApi);
 
       if (result.success) {
         if (result.title) {
@@ -270,12 +338,24 @@ export function CreatePRDialog({
         setError('Worktree API not available');
         return;
       }
+      // Resolve the display branch name to the full ref for the API call.
+      // The baseBranch state holds the display name (e.g. "main"), but the API
+      // may need the short name without the remote prefix. We pass the display name
+      // since the backend handles branch resolution. However, if the full ref is
+      // available, we can use it for more precise targeting.
+      const resolvedBaseBranch = branchFullRefMap.get(baseBranch) || baseBranch;
+      // Strip the remote prefix from the resolved ref for the API call
+      // (e.g. "origin/main" → "main") since the backend expects the branch name only
+      const baseBranchForApi = resolvedBaseBranch.includes('/')
+        ? resolvedBaseBranch.substring(resolvedBaseBranch.indexOf('/') + 1)
+        : resolvedBaseBranch;
+
       const result = await api.worktree.createPR(worktree.path, {
         projectPath: projectPath || undefined,
         commitMessage: commitMessage || undefined,
         prTitle: title || worktree.branch,
         prBody: body || `Changes from branch ${worktree.branch}`,
-        baseBranch,
+        baseBranch: baseBranchForApi,
         draft: isDraft,
         remote: selectedRemote || undefined,
         targetRemote: remotes.length > 1 ? selectedTargetRemote || undefined : undefined,
@@ -626,9 +706,13 @@ export function CreatePRDialog({
                     onChange={setBaseBranch}
                     branches={branches}
                     placeholder="Select base branch..."
-                    disabled={isLoadingBranches}
+                    disabled={isLoadingBranches || isLoadingRemotes}
                     allowCreate={false}
-                    emptyMessage="No matching branches found."
+                    emptyMessage={
+                      activeRemote
+                        ? `No branches found on remote "${activeRemote}".`
+                        : 'No matching branches found.'
+                    }
                     data-testid="base-branch-autocomplete"
                   />
                 </div>

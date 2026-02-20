@@ -5,4 +5,6 @@ export { FileBrowserDialog } from './file-browser-dialog';
 export { NewProjectModal } from './new-project-modal';
 export { SandboxRejectionScreen } from './sandbox-rejection-screen';
 export { SandboxRiskDialog } from './sandbox-risk-dialog';
+export { PRCommentResolutionDialog } from './pr-comment-resolution-dialog';
+export type { PRCommentResolutionPRInfo } from './pr-comment-resolution-dialog';
 export { WorkspacePickerModal } from './workspace-picker-modal';

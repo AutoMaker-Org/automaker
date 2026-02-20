@@ -62,6 +62,7 @@ export {
   useValidateIssue,
   useMarkValidationViewed,
   useGetValidationStatus,
+  useResolveReviewThread,
 } from './use-github-mutations';
 
 // Ideation mutations

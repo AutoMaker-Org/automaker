@@ -123,6 +123,18 @@ interface AddFeatureDialogProps {
    * This is used when the "Default to worktree mode" setting is disabled.
    */
   forceCurrentBranchMode?: boolean;
+  /**
+   * Pre-filled title for the feature (e.g., from a GitHub issue).
+   */
+  prefilledTitle?: string;
+  /**
+   * Pre-filled description for the feature (e.g., from a GitHub issue).
+   */
+  prefilledDescription?: string;
+  /**
+   * Pre-filled category for the feature (e.g., 'From GitHub').
+   */
+  prefilledCategory?: string;
 }
 
 /**
@@ -149,6 +161,9 @@ export function AddFeatureDialog({
   projectPath,
   selectedNonMainWorktreeBranch,
   forceCurrentBranchMode,
+  prefilledTitle,
+  prefilledDescription,
+  prefilledCategory,
 }: AddFeatureDialogProps) {
   const isSpawnMode = !!parentFeature;
   const navigate = useNavigate();
@@ -211,6 +226,11 @@ export function AddFeatureDialog({
     wasOpenRef.current = open;
 
     if (justOpened) {
+      // Initialize with prefilled values if provided, otherwise use defaults
+      setTitle(prefilledTitle || '');
+      setDescription(prefilledDescription || '');
+      setCategory(prefilledCategory || '');
+
       setSkipTests(defaultSkipTests);
       // When a non-main worktree is selected, use its branch name for custom mode
       // Otherwise, use the default branch
@@ -254,6 +274,9 @@ export function AddFeatureDialog({
     forceCurrentBranchMode,
     parentFeature,
     allFeatures,
+    prefilledTitle,
+    prefilledDescription,
+    prefilledCategory,
   ]);
 
   // Clear requirePlanApproval when planning mode is skip or lite

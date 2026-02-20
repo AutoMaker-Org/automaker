@@ -67,6 +67,7 @@ interface WorktreeTabProps {
   onCommit: (worktree: WorktreeInfo) => void;
   onCreatePR: (worktree: WorktreeInfo) => void;
   onAddressPRComments: (worktree: WorktreeInfo, prInfo: PRInfo) => void;
+  onAutoAddressPRComments: (worktree: WorktreeInfo, prInfo: PRInfo) => void;
   onResolveConflicts: (worktree: WorktreeInfo) => void;
   onMerge: (worktree: WorktreeInfo) => void;
   onDeleteWorktree: (worktree: WorktreeInfo) => void;
@@ -101,6 +102,12 @@ interface WorktreeTabProps {
   onPullWithRemote?: (worktree: WorktreeInfo, remote: string) => void;
   /** Push to a specific remote, bypassing the remote selection dialog */
   onPushWithRemote?: (worktree: WorktreeInfo, remote: string) => void;
+  /** Terminal quick scripts configured for the project */
+  terminalScripts?: import('@/components/views/project-settings-view/terminal-scripts-constants').TerminalScript[];
+  /** Callback to run a terminal quick script in a new terminal session */
+  onRunTerminalScript?: (worktree: WorktreeInfo, command: string) => void;
+  /** Callback to open the script editor UI */
+  onEditScripts?: () => void;
 }
 
 export function WorktreeTab({
@@ -148,6 +155,7 @@ export function WorktreeTab({
   onCommit,
   onCreatePR,
   onAddressPRComments,
+  onAutoAddressPRComments,
   onResolveConflicts,
   onMerge,
   onDeleteWorktree,
@@ -170,6 +178,9 @@ export function WorktreeTab({
   remotes,
   onPullWithRemote,
   onPushWithRemote,
+  terminalScripts,
+  onRunTerminalScript,
+  onEditScripts,
 }: WorktreeTabProps) {
   // Make the worktree tab a drop target for feature cards
   const { setNodeRef, isOver } = useDroppable({
@@ -440,7 +451,7 @@ export function WorktreeTab({
         </Button>
       )}
 
-      {isDevServerRunning && (
+      {isDevServerRunning && devServerInfo?.urlDetected !== false && (
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
@@ -517,6 +528,7 @@ export function WorktreeTab({
         onCommit={onCommit}
         onCreatePR={onCreatePR}
         onAddressPRComments={onAddressPRComments}
+        onAutoAddressPRComments={onAutoAddressPRComments}
         onResolveConflicts={onResolveConflicts}
         onMerge={onMerge}
         onDeleteWorktree={onDeleteWorktree}
@@ -535,6 +547,9 @@ export function WorktreeTab({
         onAbortOperation={onAbortOperation}
         onContinueOperation={onContinueOperation}
         hasInitScript={hasInitScript}
+        terminalScripts={terminalScripts}
+        onRunTerminalScript={onRunTerminalScript}
+        onEditScripts={onEditScripts}
       />
     </div>
   );

@@ -2407,6 +2407,10 @@ export class HttpApiClient implements ElectronAPI {
       this.subscribeToEvent('issue-validation:event', callback as EventCallback),
     getIssueComments: (projectPath: string, issueNumber: number, cursor?: string) =>
       this.post('/api/github/issue-comments', { projectPath, issueNumber, cursor }),
+    getPRReviewComments: (projectPath: string, prNumber: number) =>
+      this.post('/api/github/pr-review-comments', { projectPath, prNumber }),
+    resolveReviewThread: (projectPath: string, threadId: string, resolve: boolean) =>
+      this.post('/api/github/resolve-pr-comment', { projectPath, threadId, resolve }),
   };
 
   // Workspace API

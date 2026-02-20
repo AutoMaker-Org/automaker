@@ -6,6 +6,14 @@ export const Route = createLazyFileRoute('/terminal')({
 });
 
 function RouteComponent() {
-  const { cwd, branch, mode, nonce } = useSearch({ from: '/terminal' });
-  return <TerminalView initialCwd={cwd} initialBranch={branch} initialMode={mode} nonce={nonce} />;
+  const { cwd, branch, mode, nonce, command } = useSearch({ from: '/terminal' });
+  return (
+    <TerminalView
+      initialCwd={cwd}
+      initialBranch={branch}
+      initialMode={mode}
+      nonce={nonce}
+      initialCommand={command}
+    />
+  );
 }

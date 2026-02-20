@@ -25,7 +25,7 @@ export interface SortableProjectItemProps {
   project: Project;
   currentProjectId: string | undefined;
   isHighlighted: boolean;
-  onSelect: (project: Project) => void;
+  onSelect: (project: Project) => void | Promise<void>;
 }
 
 export interface ThemeMenuItemProps {

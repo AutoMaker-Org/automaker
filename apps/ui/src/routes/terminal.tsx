@@ -6,6 +6,7 @@ const terminalSearchSchema = z.object({
   branch: z.string().optional(),
   mode: z.enum(['tab', 'split']).optional(),
   nonce: z.coerce.number().optional(),
+  command: z.string().optional(),
 });
 
 // Component is lazy-loaded via terminal.lazy.tsx for code splitting

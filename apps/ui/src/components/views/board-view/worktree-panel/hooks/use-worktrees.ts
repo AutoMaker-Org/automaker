@@ -90,8 +90,16 @@ export function useWorktrees({
   const handleSelectWorktree = useCallback(
     (worktree: WorktreeInfo) => {
       setCurrentWorktree(projectPath, worktree.isMain ? null : worktree.path, worktree.branch);
+
+      // Invalidate feature queries when switching worktrees to ensure fresh data.
+      // Without this, feature cards that remount after the worktree switch may have stale
+      // or missing planSpec/task data, causing todo lists to appear empty until the next
+      // polling cycle or user interaction triggers a re-render.
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.features.all(projectPath),
+      });
     },
-    [projectPath, setCurrentWorktree]
+    [projectPath, setCurrentWorktree, queryClient]
   );
 
   // fetchWorktrees for backward compatibility - now just triggers a refetch

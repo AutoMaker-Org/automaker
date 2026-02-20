@@ -313,6 +313,34 @@ export interface GitHubRemoteStatus {
   repo: string | null;
 }
 
+/** A review comment on a pull request (inline code comment or general PR comment) */
+export interface PRReviewComment {
+  id: string;
+  author: string;
+  avatarUrl?: string;
+  body: string;
+  /** File path for inline review comments */
+  path?: string;
+  /** Line number for inline review comments */
+  line?: number;
+  createdAt: string;
+  updatedAt?: string;
+  /** Whether this is an inline code review comment (vs general PR comment) */
+  isReviewComment: boolean;
+  /** Whether this comment is outdated (code has changed since) */
+  isOutdated?: boolean;
+  /** Whether the review thread containing this comment has been resolved */
+  isResolved?: boolean;
+  /** The GraphQL node ID of the review thread (used for resolve/unresolve mutations) */
+  threadId?: string;
+  /** The diff hunk context for the comment */
+  diffHunk?: string;
+  /** The side of the diff (LEFT or RIGHT) */
+  side?: string;
+  /** The commit ID the comment was made on */
+  commitId?: string;
+}
+
 export interface GitHubAPI {
   checkRemote: (projectPath: string) => Promise<{
     success: boolean;
@@ -387,6 +415,26 @@ export interface GitHubAPI {
     totalCount?: number;
     hasNextPage?: boolean;
     endCursor?: string;
+    error?: string;
+  }>;
+  /** Fetch review comments for a specific pull request */
+  getPRReviewComments: (
+    projectPath: string,
+    prNumber: number
+  ) => Promise<{
+    success: boolean;
+    comments?: PRReviewComment[];
+    totalCount?: number;
+    error?: string;
+  }>;
+  /** Resolve or unresolve a PR review thread */
+  resolveReviewThread: (
+    projectPath: string,
+    threadId: string,
+    resolve: boolean
+  ) => Promise<{
+    success: boolean;
+    isResolved?: boolean;
     error?: string;
   }>;
 }
@@ -3926,6 +3974,21 @@ function createMockGitHubAPI(): GitHubAPI {
         comments: [],
         totalCount: 0,
         hasNextPage: false,
+      };
+    },
+    getPRReviewComments: async (projectPath: string, prNumber: number) => {
+      console.log('[Mock] Getting PR review comments:', { projectPath, prNumber });
+      return {
+        success: true,
+        comments: [],
+        totalCount: 0,
+      };
+    },
+    resolveReviewThread: async (projectPath: string, threadId: string, resolve: boolean) => {
+      console.log('[Mock] Resolving review thread:', { projectPath, threadId, resolve });
+      return {
+        success: true,
+        isResolved: resolve,
       };
     },
   };

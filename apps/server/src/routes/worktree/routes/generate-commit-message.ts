@@ -213,8 +213,10 @@ export function createGenerateCommitMessageHandler(
             }
           }
         } else if (msg.type === 'result' && msg.subtype === 'success' && msg.result) {
-          // Use result if available (some providers return final text here)
-          responseText = msg.result;
+          // Use result text if longer than accumulated text (consistent with simpleQuery pattern)
+          if (msg.result.length > responseText.length) {
+            responseText = msg.result;
+          }
         }
       }
 

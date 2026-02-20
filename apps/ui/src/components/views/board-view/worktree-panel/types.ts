@@ -122,6 +122,7 @@ export interface WorktreePanelProps {
   onCreatePR: (worktree: WorktreeInfo) => void;
   onCreateBranch: (worktree: WorktreeInfo) => void;
   onAddressPRComments: (worktree: WorktreeInfo, prInfo: PRInfo) => void;
+  onAutoAddressPRComments: (worktree: WorktreeInfo, prInfo: PRInfo) => void;
   onResolveConflicts: (worktree: WorktreeInfo) => void;
   onCreateMergeConflictResolutionFeature?: (conflictInfo: MergeConflictInfo) => void;
   /** Called when branch switch stash reapply results in merge conflicts */

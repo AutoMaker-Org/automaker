@@ -103,6 +103,7 @@ export interface WorktreeDropdownProps {
   onCommit: (worktree: WorktreeInfo) => void;
   onCreatePR: (worktree: WorktreeInfo) => void;
   onAddressPRComments: (worktree: WorktreeInfo, prInfo: PRInfo) => void;
+  onAutoAddressPRComments: (worktree: WorktreeInfo, prInfo: PRInfo) => void;
   onResolveConflicts: (worktree: WorktreeInfo) => void;
   onMerge: (worktree: WorktreeInfo) => void;
   onDeleteWorktree: (worktree: WorktreeInfo) => void;
@@ -131,6 +132,12 @@ export interface WorktreeDropdownProps {
   onPullWithRemote?: (worktree: WorktreeInfo, remote: string) => void;
   /** Push to a specific remote, bypassing the remote selection dialog */
   onPushWithRemote?: (worktree: WorktreeInfo, remote: string) => void;
+  /** Terminal quick scripts configured for the project */
+  terminalScripts?: import('@/components/views/project-settings-view/terminal-scripts-constants').TerminalScript[];
+  /** Callback to run a terminal quick script in a new terminal session */
+  onRunTerminalScript?: (worktree: WorktreeInfo, command: string) => void;
+  /** Callback to open the script editor UI */
+  onEditScripts?: () => void;
 }
 
 /**
@@ -199,6 +206,7 @@ export function WorktreeDropdown({
   onCommit,
   onCreatePR,
   onAddressPRComments,
+  onAutoAddressPRComments,
   onResolveConflicts,
   onMerge,
   onDeleteWorktree,
@@ -219,6 +227,9 @@ export function WorktreeDropdown({
   remotesCache,
   onPullWithRemote,
   onPushWithRemote,
+  terminalScripts,
+  onRunTerminalScript,
+  onEditScripts,
 }: WorktreeDropdownProps) {
   // Find the currently selected worktree to display in the trigger
   const selectedWorktree = worktrees.find((w) => isWorktreeSelected(w));
@@ -304,15 +315,11 @@ export function WorktreeDropdown({
           </span>
         )}
 
-        {/* Dev server indicator */}
-        {selectedStatus.devServerRunning && (
+        {/* Dev server indicator - only shown when port is confirmed detected */}
+        {selectedStatus.devServerRunning && selectedStatus.devServerInfo?.urlDetected !== false && (
           <span
             className="inline-flex items-center justify-center h-4 w-4 text-green-500 shrink-0"
-            title={
-              selectedStatus.devServerInfo?.urlDetected === false
-                ? 'Dev server starting...'
-                : `Dev server running on port ${selectedStatus.devServerInfo?.port}`
-            }
+            title={`Dev server running on port ${selectedStatus.devServerInfo?.port}`}
           >
             <Globe className="w-3 h-3" />
           </span>
@@ -520,6 +527,7 @@ export function WorktreeDropdown({
           onCommit={onCommit}
           onCreatePR={onCreatePR}
           onAddressPRComments={onAddressPRComments}
+          onAutoAddressPRComments={onAutoAddressPRComments}
           onResolveConflicts={onResolveConflicts}
           onMerge={onMerge}
           onDeleteWorktree={onDeleteWorktree}
@@ -538,6 +546,9 @@ export function WorktreeDropdown({
           onAbortOperation={onAbortOperation}
           onContinueOperation={onContinueOperation}
           hasInitScript={hasInitScript}
+          terminalScripts={terminalScripts}
+          onRunTerminalScript={onRunTerminalScript}
+          onEditScripts={onEditScripts}
         />
       )}
     </div>

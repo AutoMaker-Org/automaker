@@ -70,6 +70,9 @@ export const queryKeys = {
     /** Issue comments */
     issueComments: (projectPath: string, issueNumber: number) =>
       ['github', 'issues', projectPath, issueNumber, 'comments'] as const,
+    /** PR review comments */
+    prReviewComments: (projectPath: string, prNumber: number) =>
+      ['github', 'prs', projectPath, prNumber, 'review-comments'] as const,
     /** Remote info */
     remote: (projectPath: string) => ['github', 'remote', projectPath] as const,
   },

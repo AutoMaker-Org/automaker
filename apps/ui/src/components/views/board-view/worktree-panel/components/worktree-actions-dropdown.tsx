@@ -40,6 +40,7 @@ import {
   AlertTriangle,
   XCircle,
   CheckCircle,
+  Settings2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -54,6 +55,7 @@ import {
 import { getEditorIcon } from '@/components/icons/editor-icons';
 import { getTerminalIcon } from '@/components/icons/terminal-icons';
 import { useAppStore } from '@/store/app-store';
+import type { TerminalScript } from '@/components/views/project-settings-view/terminal-scripts-constants';
 
 interface WorktreeActionsDropdownProps {
   worktree: WorktreeInfo;
@@ -102,6 +104,7 @@ interface WorktreeActionsDropdownProps {
   onCommit: (worktree: WorktreeInfo) => void;
   onCreatePR: (worktree: WorktreeInfo) => void;
   onAddressPRComments: (worktree: WorktreeInfo, prInfo: PRInfo) => void;
+  onAutoAddressPRComments: (worktree: WorktreeInfo, prInfo: PRInfo) => void;
   onResolveConflicts: (worktree: WorktreeInfo) => void;
   onDeleteWorktree: (worktree: WorktreeInfo) => void;
   onStartDevServer: (worktree: WorktreeInfo) => void;
@@ -128,6 +131,12 @@ interface WorktreeActionsDropdownProps {
   /** Continue an in-progress merge/rebase/cherry-pick after resolving conflicts */
   onContinueOperation?: (worktree: WorktreeInfo) => void;
   hasInitScript: boolean;
+  /** Terminal quick scripts configured for the project */
+  terminalScripts?: TerminalScript[];
+  /** Callback to run a terminal quick script in a new terminal session */
+  onRunTerminalScript?: (worktree: WorktreeInfo, command: string) => void;
+  /** Callback to open the script editor UI */
+  onEditScripts?: () => void;
 }
 
 export function WorktreeActionsDropdown({
@@ -166,6 +175,7 @@ export function WorktreeActionsDropdown({
   onCommit,
   onCreatePR,
   onAddressPRComments,
+  onAutoAddressPRComments,
   onResolveConflicts,
   onDeleteWorktree,
   onStartDevServer,
@@ -184,6 +194,9 @@ export function WorktreeActionsDropdown({
   onAbortOperation,
   onContinueOperation,
   hasInitScript,
+  terminalScripts,
+  onRunTerminalScript,
+  onEditScripts,
 }: WorktreeActionsDropdownProps) {
   // Get available editors for the "Open In" submenu
   const { editors } = useAvailableEditors();
@@ -358,19 +371,16 @@ export function WorktreeActionsDropdown({
                 ? 'Dev Server Starting...'
                 : `Dev Server Running (:${devServerInfo?.port})`}
             </DropdownMenuLabel>
-            <DropdownMenuItem
-              onClick={() => onOpenDevServerUrl(worktree)}
-              className="text-xs"
-              disabled={devServerInfo?.urlDetected === false}
-              aria-label={
-                devServerInfo?.urlDetected === false
-                  ? 'Open dev server in browser'
-                  : `Open dev server on port ${devServerInfo?.port} in browser`
-              }
-            >
-              <Globe className="w-3.5 h-3.5 mr-2" aria-hidden="true" />
-              Open in Browser
-            </DropdownMenuItem>
+            {devServerInfo?.urlDetected !== false && (
+              <DropdownMenuItem
+                onClick={() => onOpenDevServerUrl(worktree)}
+                className="text-xs"
+                aria-label={`Open dev server on port ${devServerInfo?.port} in browser`}
+              >
+                <Globe className="w-3.5 h-3.5 mr-2" aria-hidden="true" />
+                Open in Browser
+              </DropdownMenuItem>
+            )}
             <DropdownMenuItem onClick={() => onViewDevServerLogs(worktree)} className="text-xs">
               <ScrollText className="w-3.5 h-3.5 mr-2" />
               View Logs
@@ -575,12 +585,52 @@ export function WorktreeActionsDropdown({
             })}
           </DropdownMenuSubContent>
         </DropdownMenuSub>
-        {!worktree.isMain && hasInitScript && (
-          <DropdownMenuItem onClick={() => onRunInitScript(worktree)} className="text-xs">
-            <RefreshCw className="w-3.5 h-3.5 mr-2" />
-            Re-run Init Script
-          </DropdownMenuItem>
-        )}
+        {/* Scripts submenu - consolidates init script and terminal quick scripts */}
+        <DropdownMenuSub>
+          <DropdownMenuSubTrigger className="text-xs">
+            <ScrollText className="w-3.5 h-3.5 mr-2" />
+            Scripts
+          </DropdownMenuSubTrigger>
+          <DropdownMenuSubContent className="w-52">
+            {/* Re-run Init Script - always shown for non-main worktrees, disabled when no init script configured */}
+            {!worktree.isMain && (
+              <>
+                <DropdownMenuItem
+                  onClick={() => onRunInitScript(worktree)}
+                  className="text-xs"
+                  disabled={!hasInitScript}
+                >
+                  <RefreshCw className="w-3.5 h-3.5 mr-2" />
+                  Re-run Init Script
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+              </>
+            )}
+            {/* Terminal quick scripts */}
+            {terminalScripts && terminalScripts.length > 0 ? (
+              terminalScripts.map((script) => (
+                <DropdownMenuItem
+                  key={script.id}
+                  onClick={() => onRunTerminalScript?.(worktree, script.command)}
+                  className="text-xs"
+                >
+                  <Play className="w-3.5 h-3.5 mr-2 shrink-0" />
+                  <span className="truncate">{script.name}</span>
+                </DropdownMenuItem>
+              ))
+            ) : (
+              <DropdownMenuItem disabled className="text-xs text-muted-foreground">
+                No scripts configured
+              </DropdownMenuItem>
+            )}
+            {/* Divider before Edit Commands & Scripts */}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => onEditScripts?.()} className="text-xs">
+              <Settings2 className="w-3.5 h-3.5 mr-2" />
+              Edit Commands & Scripts
+            </DropdownMenuItem>
+          </DropdownMenuSubContent>
+        </DropdownMenuSub>
         <DropdownMenuSeparator />
         <TooltipWrapper showTooltip={!!gitOpsDisabledReason} tooltipContent={gitOpsDisabledReason}>
           {remotes && remotes.length > 1 && onPullWithRemote ? (
@@ -815,32 +865,67 @@ export function WorktreeActionsDropdown({
             </DropdownMenuItem>
           </TooltipWrapper>
         )}
-        <TooltipWrapper showTooltip={!!gitOpsDisabledReason} tooltipContent={gitOpsDisabledReason}>
-          <DropdownMenuItem
-            onClick={() => isGitOpsAvailable && onViewCommits(worktree)}
-            disabled={!isGitOpsAvailable}
-            className={cn('text-xs', !isGitOpsAvailable && 'opacity-50 cursor-not-allowed')}
-          >
-            <History className="w-3.5 h-3.5 mr-2" />
-            View Commits
-            {!isGitOpsAvailable && (
-              <AlertCircle className="w-3 h-3 ml-auto text-muted-foreground" />
-            )}
-          </DropdownMenuItem>
-        </TooltipWrapper>
-        {/* Cherry-pick commits from another branch */}
-        {onCherryPick && (
+        {/* View Commits - split button when Cherry Pick is available:
+            click main area to view commits directly, chevron opens sub-menu with Cherry Pick */}
+        {onCherryPick ? (
+          <DropdownMenuSub>
+            <TooltipWrapper
+              showTooltip={!!gitOpsDisabledReason}
+              tooltipContent={gitOpsDisabledReason}
+            >
+              <div className="flex items-center">
+                {/* Main clickable area - opens commit history directly */}
+                <DropdownMenuItem
+                  onClick={() => isGitOpsAvailable && onViewCommits(worktree)}
+                  disabled={!isGitOpsAvailable}
+                  className={cn(
+                    'text-xs flex-1 pr-0 rounded-r-none',
+                    !isGitOpsAvailable && 'opacity-50 cursor-not-allowed'
+                  )}
+                >
+                  <History className="w-3.5 h-3.5 mr-2" />
+                  View Commits
+                  {!isGitOpsAvailable && (
+                    <AlertCircle className="w-3 h-3 ml-auto text-muted-foreground" />
+                  )}
+                </DropdownMenuItem>
+                {/* Chevron trigger for sub-menu containing Cherry Pick */}
+                <DropdownMenuSubTrigger
+                  disabled={!isGitOpsAvailable}
+                  className={cn(
+                    'text-xs px-1 rounded-l-none border-l border-border/30 h-8',
+                    !isGitOpsAvailable && 'opacity-50 cursor-not-allowed'
+                  )}
+                />
+              </div>
+            </TooltipWrapper>
+            <DropdownMenuSubContent>
+              {/* Cherry-pick commits from another branch */}
+              <DropdownMenuItem
+                onClick={() => isGitOpsAvailable && onCherryPick(worktree)}
+                disabled={!isGitOpsAvailable}
+                className={cn('text-xs', !isGitOpsAvailable && 'opacity-50 cursor-not-allowed')}
+              >
+                <Cherry className="w-3.5 h-3.5 mr-2" />
+                Cherry Pick
+                {!isGitOpsAvailable && (
+                  <AlertCircle className="w-3 h-3 ml-auto text-muted-foreground" />
+                )}
+              </DropdownMenuItem>
+            </DropdownMenuSubContent>
+          </DropdownMenuSub>
+        ) : (
           <TooltipWrapper
             showTooltip={!!gitOpsDisabledReason}
             tooltipContent={gitOpsDisabledReason}
           >
             <DropdownMenuItem
-              onClick={() => isGitOpsAvailable && onCherryPick(worktree)}
+              onClick={() => isGitOpsAvailable && onViewCommits(worktree)}
               disabled={!isGitOpsAvailable}
               className={cn('text-xs', !isGitOpsAvailable && 'opacity-50 cursor-not-allowed')}
             >
-              <Cherry className="w-3.5 h-3.5 mr-2" />
-              Cherry Pick
+              <History className="w-3.5 h-3.5 mr-2" />
+              View Commits
               {!isGitOpsAvailable && (
                 <AlertCircle className="w-3 h-3 ml-auto text-muted-foreground" />
               )}
@@ -849,80 +934,65 @@ export function WorktreeActionsDropdown({
         )}
         {(hasChangesSectionContent || hasDestructiveSectionContent) && <DropdownMenuSeparator />}
 
-        {worktree.hasChanges && (
-          <DropdownMenuItem onClick={() => onViewChanges(worktree)} className="text-xs">
-            <Eye className="w-3.5 h-3.5 mr-2" />
-            View Changes
-          </DropdownMenuItem>
-        )}
-        {/* Stash operations - combined submenu or simple item.
+        {/* View Changes split button - main action views changes directly, chevron reveals stash options.
             Only render when at least one action is meaningful:
-            - (worktree.hasChanges && onStashChanges): stashing changes is possible
-            - onViewStashes: viewing existing stashes is possible
-            Without this guard, the item would appear clickable but be a silent no-op
-            when hasChanges is false and onViewStashes is undefined. */}
-        {((worktree.hasChanges && onStashChanges) || onViewStashes) && (
-          <TooltipWrapper showTooltip={!isGitOpsAvailable} tooltipContent={gitOpsDisabledReason}>
-            {onViewStashes && worktree.hasChanges && onStashChanges ? (
-              // Both "Stash Changes" (primary) and "View Stashes" (secondary) are available - show split submenu
-              <DropdownMenuSub>
-                <div className="flex items-center">
-                  {/* Main clickable area - stash changes (primary action) */}
+            - worktree.hasChanges: View Changes action is available
+            - (worktree.hasChanges && onStashChanges): Create Stash action is possible
+            - onViewStashes: viewing existing stashes is possible */}
+        {(worktree.hasChanges || onViewStashes) && (
+          <DropdownMenuSub>
+            <div className="flex items-center">
+              {/* Main clickable area - view changes (primary action) */}
+              {worktree.hasChanges ? (
+                <DropdownMenuItem
+                  onClick={() => onViewChanges(worktree)}
+                  className="text-xs flex-1 pr-0 rounded-r-none"
+                >
+                  <Eye className="w-3.5 h-3.5 mr-2" />
+                  View Changes
+                </DropdownMenuItem>
+              ) : (
+                <DropdownMenuItem
+                  onClick={() => onViewStashes!(worktree)}
+                  className="text-xs flex-1 pr-0 rounded-r-none"
+                >
+                  <Eye className="w-3.5 h-3.5 mr-2" />
+                  View Stashes
+                </DropdownMenuItem>
+              )}
+              {/* Chevron trigger for submenu with stash options */}
+              <DropdownMenuSubTrigger className="text-xs px-1 rounded-l-none border-l border-border/30 h-8" />
+            </div>
+            <DropdownMenuSubContent>
+              {worktree.hasChanges && onStashChanges && (
+                <TooltipWrapper
+                  showTooltip={!isGitOpsAvailable}
+                  tooltipContent={gitOpsDisabledReason}
+                >
                   <DropdownMenuItem
                     onClick={() => {
                       if (!isGitOpsAvailable) return;
                       onStashChanges(worktree);
                     }}
                     disabled={!isGitOpsAvailable}
-                    className={cn(
-                      'text-xs flex-1 pr-0 rounded-r-none',
-                      !isGitOpsAvailable && 'opacity-50 cursor-not-allowed'
-                    )}
+                    className={cn('text-xs', !isGitOpsAvailable && 'opacity-50 cursor-not-allowed')}
                   >
                     <Archive className="w-3.5 h-3.5 mr-2" />
-                    Stash Changes
+                    Create Stash
                     {!isGitOpsAvailable && (
                       <AlertCircle className="w-3 h-3 ml-auto text-muted-foreground" />
                     )}
                   </DropdownMenuItem>
-                  {/* Chevron trigger for submenu with stash options */}
-                  <DropdownMenuSubTrigger
-                    className={cn(
-                      'text-xs px-1 rounded-l-none border-l border-border/30 h-8',
-                      !isGitOpsAvailable && 'opacity-50 cursor-not-allowed'
-                    )}
-                    disabled={!isGitOpsAvailable}
-                  />
-                </div>
-                <DropdownMenuSubContent>
-                  <DropdownMenuItem onClick={() => onViewStashes(worktree)} className="text-xs">
-                    <Eye className="w-3.5 h-3.5 mr-2" />
-                    View Stashes
-                  </DropdownMenuItem>
-                </DropdownMenuSubContent>
-              </DropdownMenuSub>
-            ) : (
-              // Only one action is meaningful - render a simple menu item without submenu
-              <DropdownMenuItem
-                onClick={() => {
-                  if (!isGitOpsAvailable) return;
-                  if (worktree.hasChanges && onStashChanges) {
-                    onStashChanges(worktree);
-                  } else if (onViewStashes) {
-                    onViewStashes(worktree);
-                  }
-                }}
-                disabled={!isGitOpsAvailable}
-                className={cn('text-xs', !isGitOpsAvailable && 'opacity-50 cursor-not-allowed')}
-              >
-                <Archive className="w-3.5 h-3.5 mr-2" />
-                {worktree.hasChanges && onStashChanges ? 'Stash Changes' : 'Stashes'}
-                {!isGitOpsAvailable && (
-                  <AlertCircle className="w-3 h-3 ml-auto text-muted-foreground" />
-                )}
-              </DropdownMenuItem>
-            )}
-          </TooltipWrapper>
+                </TooltipWrapper>
+              )}
+              {onViewStashes && (
+                <DropdownMenuItem onClick={() => onViewStashes(worktree)} className="text-xs">
+                  <Eye className="w-3.5 h-3.5 mr-2" />
+                  View Stashes
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuSubContent>
+          </DropdownMenuSub>
         )}
         {worktree.hasChanges && (
           <TooltipWrapper
@@ -961,43 +1031,69 @@ export function WorktreeActionsDropdown({
             </DropdownMenuItem>
           </TooltipWrapper>
         )}
-        {/* Show PR info and Address Comments button if PR exists */}
+        {/* Show PR info with Address Comments in sub-menu if PR exists */}
         {showPRInfo && worktree.pr && (
-          <>
-            <DropdownMenuItem
-              onClick={() => {
-                window.open(worktree.pr!.url, '_blank', 'noopener,noreferrer');
-              }}
-              className="text-xs"
-            >
-              <GitPullRequest className="w-3 h-3 mr-2" />
-              PR #{worktree.pr.number}
-              <span className="ml-auto text-[10px] bg-green-500/20 text-green-600 px-1.5 py-0.5 rounded uppercase">
-                {worktree.pr.state}
-              </span>
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => {
-                // Convert stored PR info to the full PRInfo format for the handler
-                // The handler will fetch full comments from GitHub
-                const prInfo: PRInfo = {
-                  number: worktree.pr!.number,
-                  title: worktree.pr!.title,
-                  url: worktree.pr!.url,
-                  state: worktree.pr!.state,
-                  author: '', // Will be fetched
-                  body: '', // Will be fetched
-                  comments: [],
-                  reviewComments: [],
-                };
-                onAddressPRComments(worktree, prInfo);
-              }}
-              className="text-xs text-blue-500 focus:text-blue-600"
-            >
-              <MessageSquare className="w-3.5 h-3.5 mr-2" />
-              Address PR Comments
-            </DropdownMenuItem>
-          </>
+          <DropdownMenuSub>
+            <div className="flex items-center">
+              {/* Main clickable area - opens PR in browser */}
+              <DropdownMenuItem
+                onClick={() => {
+                  window.open(worktree.pr!.url, '_blank', 'noopener,noreferrer');
+                }}
+                className="text-xs flex-1 pr-0 rounded-r-none"
+              >
+                <GitPullRequest className="w-3 h-3 mr-2" />
+                PR #{worktree.pr.number}
+                <span className="ml-auto mr-1 text-[10px] bg-green-500/20 text-green-600 px-1.5 py-0.5 rounded uppercase">
+                  {worktree.pr.state}
+                </span>
+              </DropdownMenuItem>
+              {/* Chevron trigger for submenu with PR actions */}
+              <DropdownMenuSubTrigger className="text-xs px-1 rounded-l-none border-l border-border/30 h-8" />
+            </div>
+            <DropdownMenuSubContent>
+              <DropdownMenuItem
+                onClick={() => {
+                  // Convert stored PR info to the full PRInfo format for the handler
+                  // The handler will fetch full comments from GitHub
+                  const prInfo: PRInfo = {
+                    number: worktree.pr!.number,
+                    title: worktree.pr!.title,
+                    url: worktree.pr!.url,
+                    state: worktree.pr!.state,
+                    author: '', // Will be fetched
+                    body: '', // Will be fetched
+                    comments: [],
+                    reviewComments: [],
+                  };
+                  onAddressPRComments(worktree, prInfo);
+                }}
+                className="text-xs text-blue-500 focus:text-blue-600"
+              >
+                <MessageSquare className="w-3.5 h-3.5 mr-2" />
+                Manage PR Comments
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => {
+                  const prInfo: PRInfo = {
+                    number: worktree.pr!.number,
+                    title: worktree.pr!.title,
+                    url: worktree.pr!.url,
+                    state: worktree.pr!.state,
+                    author: '',
+                    body: '',
+                    comments: [],
+                    reviewComments: [],
+                  };
+                  onAutoAddressPRComments(worktree, prInfo);
+                }}
+                className="text-xs text-blue-500 focus:text-blue-600"
+              >
+                <Zap className="w-3.5 h-3.5 mr-2" />
+                Address PR Comments
+              </DropdownMenuItem>
+            </DropdownMenuSubContent>
+          </DropdownMenuSub>
         )}
         {hasChangesSectionContent && hasDestructiveSectionContent && <DropdownMenuSeparator />}
         {worktree.hasChanges && (

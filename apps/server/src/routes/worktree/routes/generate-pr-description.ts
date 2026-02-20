@@ -30,6 +30,8 @@ const MAX_DIFF_SIZE = 15_000;
 
 const PR_DESCRIPTION_SYSTEM_PROMPT = `You are a pull request description generator. Your task is to create a clear, well-structured PR title and description based on the git diff and branch information provided.
 
+IMPORTANT: Do NOT include any conversational text, explanations, or preamble. Do NOT say things like "I'll analyze..." or "Here is...". Output ONLY the structured format below and nothing else.
+
 Output your response in EXACTLY this format (including the markers):
 ---TITLE---
 <a concise PR title, 50-72 chars, imperative mood>
@@ -41,6 +43,7 @@ Output your response in EXACTLY this format (including the markers):
 <Detailed list of what was changed and why>
 
 Rules:
+- Your ENTIRE response must start with ---TITLE--- and contain nothing before it
 - The title should be concise and descriptive (50-72 characters)
 - Use imperative mood for the title (e.g., "Add dark mode toggle" not "Added dark mode toggle")
 - The description should explain WHAT changed and WHY
@@ -397,7 +400,10 @@ export function createGeneratePRDescriptionHandler(
             }
           }
         } else if (msg.type === 'result' && msg.subtype === 'success' && msg.result) {
-          responseText = msg.result;
+          // Use result text if longer than accumulated text (consistent with simpleQuery pattern)
+          if (msg.result.length > responseText.length) {
+            responseText = msg.result;
+          }
         }
       }
 
@@ -413,7 +419,9 @@ export function createGeneratePRDescriptionHandler(
         return;
       }
 
-      // Parse the response to extract title and body
+      // Parse the response to extract title and body.
+      // The model may include conversational preamble before the structured markers,
+      // so we search for the markers anywhere in the response, not just at the start.
       let title = '';
       let body = '';
 
@@ -424,14 +432,46 @@ export function createGeneratePRDescriptionHandler(
         title = titleMatch[1].trim();
         body = bodyMatch[1].trim();
       } else {
-        // Fallback: treat first line as title, rest as body
-        const lines = fullResponse.split('\n');
-        title = lines[0].trim();
-        body = lines.slice(1).join('\n').trim();
+        // Fallback: try to extract meaningful content, skipping any conversational preamble.
+        // Common preamble patterns start with "I'll", "I will", "Here", "Let me", "Based on", etc.
+        const lines = fullResponse.split('\n').filter((line) => line.trim().length > 0);
+
+        // Skip lines that look like conversational preamble
+        let startIndex = 0;
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i].trim();
+          // Check if this line looks like conversational AI preamble
+          if (
+            /^(I'll|I will|Here('s| is| are)|Let me|Based on|Looking at|Analyzing|Sure|OK|Okay|Of course)/i.test(
+              line
+            ) ||
+            /^(The following|Below is|This (is|will)|After (analyzing|reviewing|looking))/i.test(
+              line
+            )
+          ) {
+            startIndex = i + 1;
+            continue;
+          }
+          break;
+        }
+
+        // Use remaining lines after skipping preamble
+        const contentLines = lines.slice(startIndex);
+        if (contentLines.length > 0) {
+          title = contentLines[0].trim();
+          body = contentLines.slice(1).join('\n').trim();
+        } else {
+          // If all lines were filtered as preamble, use the original first non-empty line
+          title = lines[0]?.trim() || '';
+          body = lines.slice(1).join('\n').trim();
+        }
       }
 
-      // Clean up title - remove any markdown or quotes
-      title = title.replace(/^#+\s*/, '').replace(/^["']|["']$/g, '');
+      // Clean up title - remove any markdown headings, quotes, or marker artifacts
+      title = title
+        .replace(/^#+\s*/, '')
+        .replace(/^["']|["']$/g, '')
+        .replace(/^---\w+---\s*/, '');
 
       logger.info(`Generated PR title: ${title.substring(0, 100)}...`);
 

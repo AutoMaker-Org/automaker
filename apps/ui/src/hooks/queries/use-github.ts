@@ -8,7 +8,13 @@ import { useQuery, useInfiniteQuery } from '@tanstack/react-query';
 import { getElectronAPI } from '@/lib/electron';
 import { queryKeys } from '@/lib/query-keys';
 import { STALE_TIMES } from '@/lib/query-client';
-import type { GitHubIssue, GitHubPR, GitHubComment, StoredValidation } from '@/lib/electron';
+import type {
+  GitHubIssue,
+  GitHubPR,
+  GitHubComment,
+  PRReviewComment,
+  StoredValidation,
+} from '@/lib/electron';
 
 interface GitHubIssuesResult {
   openIssues: GitHubIssue[];
@@ -194,6 +200,48 @@ export function useGitHubIssueComments(
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (lastPage) => (lastPage.hasNextPage ? lastPage.endCursor : undefined),
     enabled: !!projectPath && !!issueNumber,
+    staleTime: STALE_TIMES.GITHUB,
+  });
+}
+
+/**
+ * Fetch review comments for a GitHub PR
+ *
+ * Fetches both regular PR comments and inline code review comments
+ * with file path and line context for each.
+ *
+ * @param projectPath - Path to the project
+ * @param prNumber - PR number
+ * @returns Query result with review comments
+ *
+ * @example
+ * ```tsx
+ * const { data, isLoading } = useGitHubPRReviewComments(projectPath, prNumber);
+ * const comments = data?.comments ?? [];
+ * ```
+ */
+export function useGitHubPRReviewComments(
+  projectPath: string | undefined,
+  prNumber: number | undefined
+) {
+  return useQuery({
+    queryKey: queryKeys.github.prReviewComments(projectPath ?? '', prNumber ?? 0),
+    queryFn: async (): Promise<{ comments: PRReviewComment[]; totalCount: number }> => {
+      if (!projectPath || !prNumber) throw new Error('Missing project path or PR number');
+      const api = getElectronAPI();
+      if (!api.github) {
+        throw new Error('GitHub API not available');
+      }
+      const result = await api.github.getPRReviewComments(projectPath, prNumber);
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to fetch PR review comments');
+      }
+      return {
+        comments: (result.comments ?? []) as PRReviewComment[],
+        totalCount: result.totalCount ?? 0,
+      };
+    },
+    enabled: !!projectPath && !!prNumber,
     staleTime: STALE_TIMES.GITHUB,
   });
 }

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
+import { useNavigate } from '@tanstack/react-router';
 import { createLogger } from '@automaker/utils/logger';
 import {
   X,
@@ -90,6 +91,7 @@ interface TerminalPanelProps {
   onSplitHorizontal: () => void;
   onSplitVertical: () => void;
   onNewTab?: () => void;
+  onRunCommandInNewTab?: (command: string) => void; // Run a script command in a new terminal tab
   onNavigateUp?: () => void; // Navigate to terminal pane above
   onNavigateDown?: () => void; // Navigate to terminal pane below
   onNavigateLeft?: () => void; // Navigate to terminal pane on the left
@@ -120,6 +122,7 @@ export function TerminalPanel({
   onSplitHorizontal,
   onSplitVertical,
   onNewTab,
+  onRunCommandInNewTab,
   onNavigateUp,
   onNavigateDown,
   onNavigateLeft,
@@ -135,6 +138,7 @@ export function TerminalPanel({
   onToggleMaximize,
   branchName,
 }: TerminalPanelProps) {
+  const navigate = useNavigate();
   const terminalRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const xtermRef = useRef<XTerminal | null>(null);
@@ -2071,7 +2075,11 @@ export function TerminalPanel({
           {/* Quick scripts dropdown */}
           <TerminalScriptsDropdown
             onRunCommand={sendCommand}
+            onRunCommandInNewTab={onRunCommandInNewTab}
             isConnected={connectionStatus === 'connected'}
+            onOpenSettings={() =>
+              navigate({ to: '/project-settings', search: { section: 'commands-scripts' } })
+            }
           />
 
           {/* Settings popover */}

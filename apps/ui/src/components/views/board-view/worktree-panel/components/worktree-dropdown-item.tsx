@@ -144,8 +144,8 @@ export function WorktreeDropdownItem({
           </span>
         )}
 
-        {/* Dev server indicator */}
-        {devServerRunning && (
+        {/* Dev server indicator - only shown when port is confirmed detected */}
+        {devServerRunning && devServerInfo?.urlDetected !== false && (
           <span
             className="inline-flex items-center justify-center h-4 w-4 text-green-500"
             title={`Dev server running on port ${devServerInfo?.port}`}

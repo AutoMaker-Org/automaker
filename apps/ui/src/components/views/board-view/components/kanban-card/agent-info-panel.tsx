@@ -1,4 +1,5 @@
 import { memo, useEffect, useState, useMemo, useRef } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Feature, ThinkingLevel, ReasoningEffort, ParsedTask } from '@/store/app-store';
 import { getProviderFromModel } from '@/lib/utils';
 import { parseAgentContext, formatModelName, DEFAULT_MODEL } from '@/lib/agent-context-parser';
@@ -10,6 +11,7 @@ import { getElectronAPI } from '@/lib/electron';
 import { SummaryDialog } from './summary-dialog';
 import { getProviderIconForModel } from '@/components/ui/provider-icon';
 import { useFeature, useAgentOutput } from '@/hooks/queries';
+import { queryKeys } from '@/lib/query-keys';
 
 /**
  * Formats thinking level for compact display
@@ -58,6 +60,7 @@ export const AgentInfoPanel = memo(function AgentInfoPanel({
   summary,
   isActivelyRunning,
 }: AgentInfoPanelProps) {
+  const queryClient = useQueryClient();
   const [isSummaryDialogOpen, setIsSummaryDialogOpen] = useState(false);
   const [isTodosExpanded, setIsTodosExpanded] = useState(false);
   // Track real-time task status updates from WebSocket events
@@ -129,6 +132,25 @@ export const AgentInfoPanel = memo(function AgentInfoPanel({
     enabled: shouldFetchData && !contextContent,
     pollingInterval,
   });
+
+  // On mount, ensure feature and agent output queries are fresh.
+  // This handles the worktree switch scenario where cards unmount when filtered out
+  // and remount when the user switches back. Without this, the React Query cache
+  // may serve stale data (or no data) for the individual feature query, causing
+  // the todo list to appear empty until the next polling cycle.
+  useEffect(() => {
+    if (shouldFetchData && projectPath && feature.id && !contextContent) {
+      // Invalidate both the single feature and agent output queries to trigger immediate refetch
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.features.single(projectPath, feature.id),
+      });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.features.agentOutput(projectPath, feature.id),
+      });
+    }
+    // Only run on mount (feature.id and projectPath identify this specific card instance)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [feature.id, projectPath]);
 
   // Parse agent output into agentInfo
   const agentInfo = useMemo(() => {
@@ -305,9 +327,11 @@ export const AgentInfoPanel = memo(function AgentInfoPanel({
 
   // Agent Info Panel for non-backlog cards
   // Show panel if we have agentInfo OR planSpec.tasks (for spec/full mode)
+  // OR if the feature has effective todos from any source (handles initial mount after worktree switch)
+  // OR if the feature is actively running (ensures panel stays visible during execution)
   // Note: hasPlanSpecTasks is already defined above and includes freshPlanSpec
   // (The backlog case was already handled above and returned early)
-  if (agentInfo || hasPlanSpecTasks) {
+  if (agentInfo || hasPlanSpecTasks || effectiveTodos.length > 0 || isActivelyRunning) {
     return (
       <>
         <div className="mb-3 space-y-2 overflow-hidden">

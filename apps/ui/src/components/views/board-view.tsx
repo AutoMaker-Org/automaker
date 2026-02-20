@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { createLogger } from '@automaker/utils/logger';
 import type { PointerEvent as ReactPointerEvent } from 'react';
 import {
@@ -34,6 +34,10 @@ import type { BacklogPlanResult, FeatureStatusWithPipeline } from '@automaker/ty
 import { pathsEqual } from '@/lib/utils';
 import { toast } from 'sonner';
 import { BoardBackgroundModal } from '@/components/dialogs/board-background-modal';
+import {
+  PRCommentResolutionDialog,
+  type PRCommentResolutionPRInfo,
+} from '@/components/dialogs/pr-comment-resolution-dialog';
 import { useShallow } from 'zustand/react/shallow';
 import { useAutoMode } from '@/hooks/use-auto-mode';
 import { resolveModelString } from '@automaker/model-resolver';
@@ -184,6 +188,9 @@ export function BoardView() {
   const [showCreatePRDialog, setShowCreatePRDialog] = useState(false);
   const [showCreateBranchDialog, setShowCreateBranchDialog] = useState(false);
   const [showMergeRebaseDialog, setShowMergeRebaseDialog] = useState(false);
+  const [showPRCommentDialog, setShowPRCommentDialog] = useState(false);
+  const [prCommentDialogPRInfo, setPRCommentDialogPRInfo] =
+    useState<PRCommentResolutionPRInfo | null>(null);
   const [selectedWorktreeForAction, setSelectedWorktreeForAction] = useState<WorktreeInfo | null>(
     null
   );
@@ -429,6 +436,29 @@ export function BoardView() {
   // This needs to be before useBoardActions so we can pass currentWorktreeBranch
   const currentWorktreeInfo = currentProject ? getCurrentWorktree(currentProject.path) : null;
   const currentWorktreePath = currentWorktreeInfo?.path ?? null;
+
+  // Track the previous worktree path to detect worktree switches
+  const prevWorktreePathRef = useRef<string | null | undefined>(undefined);
+
+  // When the active worktree changes, invalidate feature queries to ensure
+  // feature cards (especially their todo lists / planSpec tasks) render fresh data.
+  // Without this, cards that unmount when filtered out and remount when the user
+  // switches back may show stale or missing todo list data until the next polling cycle.
+  useEffect(() => {
+    // Skip the initial mount (prevWorktreePathRef starts as undefined)
+    if (prevWorktreePathRef.current === undefined) {
+      prevWorktreePathRef.current = currentWorktreePath;
+      return;
+    }
+    // Only invalidate when the worktree actually changed
+    if (prevWorktreePathRef.current !== currentWorktreePath && currentProject?.path) {
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.features.all(currentProject.path),
+      });
+    }
+    prevWorktreePathRef.current = currentWorktreePath;
+  }, [currentWorktreePath, currentProject?.path, queryClient]);
+
   const worktreesByProject = useAppStore((s) => s.worktreesByProject);
   const worktrees = useMemo(
     () =>
@@ -922,26 +952,39 @@ export function BoardView() {
     [handleAddFeature, handleStartImplementation]
   );
 
-  // Handler for addressing PR comments - creates a feature and starts it automatically
-  const handleAddressPRComments = useCallback(
+  // Handler for managing PR comments - opens the PR Comment Resolution dialog
+  const handleAddressPRComments = useCallback((worktree: WorktreeInfo, prInfo: PRInfo) => {
+    setPRCommentDialogPRInfo({
+      number: prInfo.number,
+      title: prInfo.title,
+      // Pass the worktree's branch so features are created on the correct worktree
+      headRefName: worktree.branch,
+    });
+    setShowPRCommentDialog(true);
+  }, []);
+
+  // Handler for auto-addressing PR comments - immediately creates and starts a feature task
+  const handleAutoAddressPRComments = useCallback(
     async (worktree: WorktreeInfo, prInfo: PRInfo) => {
-      // Use a simple prompt that instructs the agent to read and address PR feedback
-      // The agent will fetch the PR comments directly, which is more reliable and up-to-date
-      const prNumber = prInfo.number;
-      const description = `Read the review requests on PR #${prNumber} and address any feedback the best you can.`;
+      if (!prInfo.number) {
+        toast.error('Cannot address PR comments', {
+          description: 'No PR number available for this worktree.',
+        });
+        return;
+      }
 
       const featureData = {
-        title: `Address PR #${prNumber} Review Comments`,
-        category: 'PR Review',
-        description,
+        title: `Address PR #${prInfo.number} Review Comments`,
+        category: 'Maintenance',
+        description: `Read the review requests on PR #${prInfo.number} and address any feedback the best you can.`,
         images: [],
         imagePaths: [],
         skipTests: defaultSkipTests,
-        model: 'opus' as const,
+        model: resolveModelString('opus'),
         thinkingLevel: 'none' as const,
         branchName: worktree.branch,
-        workMode: 'custom' as const, // Use the worktree's branch
-        priority: 1, // High priority for PR feedback
+        workMode: 'custom' as const,
+        priority: 1,
         planningMode: 'skip' as const,
         requirePlanApproval: false,
       };
@@ -1508,6 +1551,7 @@ export function BoardView() {
               setShowCreateBranchDialog(true);
             }}
             onAddressPRComments={handleAddressPRComments}
+            onAutoAddressPRComments={handleAutoAddressPRComments}
             onResolveConflicts={handleResolveConflicts}
             onCreateMergeConflictResolutionFeature={handleCreateMergeConflictResolutionFeature}
             onBranchSwitchConflict={handleBranchSwitchConflict}
@@ -1984,6 +2028,18 @@ export function BoardView() {
           setSelectedWorktreeForAction(null);
         }}
       />
+
+      {/* PR Comment Resolution Dialog */}
+      {prCommentDialogPRInfo && (
+        <PRCommentResolutionDialog
+          open={showPRCommentDialog}
+          onOpenChange={(open) => {
+            setShowPRCommentDialog(open);
+            if (!open) setPRCommentDialogPRInfo(null);
+          }}
+          pr={prCommentDialogPRInfo}
+        />
+      )}
 
       {/* Init Script Indicator - floating overlay for worktree init script status */}
       {getShowInitScriptIndicator(currentProject.path) && (

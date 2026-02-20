@@ -20,6 +20,7 @@ export {
   useGitHubValidations,
   useGitHubRemote,
   useGitHubIssueComments,
+  useGitHubPRReviewComments,
 } from './use-github';
 
 // Usage

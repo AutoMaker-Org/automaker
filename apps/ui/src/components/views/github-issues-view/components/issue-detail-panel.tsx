@@ -12,6 +12,8 @@ import {
   MessageSquare,
   ChevronDown,
   ChevronUp,
+  Plus,
+  ArrowLeft,
 } from 'lucide-react';
 import { Spinner } from '@/components/ui/spinner';
 import { useState } from 'react';
@@ -34,8 +36,10 @@ export function IssueDetailPanel({
   onOpenInGitHub,
   onClose,
   onShowRevalidateConfirm,
+  onCreateFeature,
   formatDate,
   modelOverride,
+  isMobile = false,
 }: IssueDetailPanelProps) {
   const isValidating = validatingIssues.has(issue.number);
   const cached = cachedValidations.get(issue.number);
@@ -71,8 +75,13 @@ export function IssueDetailPanel({
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
       {/* Detail Header */}
-      <div className="flex items-center justify-between p-3 border-b border-border bg-muted/30">
+      <div className="flex items-center justify-between p-3 border-b border-border bg-muted/30 gap-2">
         <div className="flex items-center gap-2 min-w-0">
+          {isMobile && (
+            <Button variant="ghost" size="sm" onClick={onClose} className="shrink-0 -ml-1">
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+          )}
           {issue.state === 'OPEN' ? (
             <Circle className="h-4 w-4 text-green-500 shrink-0" />
           ) : (
@@ -82,12 +91,12 @@ export function IssueDetailPanel({
             #{issue.number} {issue.title}
           </span>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
+        <div className={cn('flex items-center gap-2 shrink-0', isMobile && 'gap-1')}>
           {(() => {
             if (isValidating) {
               return (
                 <Button variant="default" size="sm" loading>
-                  Validating...
+                  {isMobile ? '...' : 'Validating...'}
                 </Button>
               );
             }
@@ -97,7 +106,7 @@ export function IssueDetailPanel({
                 <>
                   <Button variant="outline" size="sm" onClick={() => onViewCachedValidation(issue)}>
                     <CheckCircle className="h-4 w-4 mr-1 text-green-500" />
-                    View Result
+                    {!isMobile && 'View Result'}
                   </Button>
                   <Button
                     variant="ghost"
@@ -116,7 +125,7 @@ export function IssueDetailPanel({
                 <>
                   <Button variant="outline" size="sm" onClick={() => onViewCachedValidation(issue)}>
                     <Clock className="h-4 w-4 mr-1 text-yellow-500" />
-                    View (stale)
+                    {!isMobile && 'View (stale)'}
                   </Button>
                   <ModelOverrideTrigger
                     currentModelEntry={modelOverride.effectiveModelEntry}
@@ -133,7 +142,7 @@ export function IssueDetailPanel({
                     onClick={() => onValidateIssue(issue, getValidationOptions(true))}
                   >
                     <Wand2 className="h-4 w-4 mr-1" />
-                    Re-validate
+                    {!isMobile && 'Re-validate'}
                   </Button>
                 </>
               );
@@ -156,23 +165,36 @@ export function IssueDetailPanel({
                   onClick={() => onValidateIssue(issue, getValidationOptions())}
                 >
                   <Wand2 className="h-4 w-4 mr-1" />
-                  Validate with AI
+                  {!isMobile && 'Validate with AI'}
                 </Button>
               </>
             );
           })()}
+          {!isMobile && (
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => onCreateFeature(issue)}
+              title="Create a new feature to address this issue"
+            >
+              <Plus className="h-4 w-4 mr-1" />
+              Create Feature
+            </Button>
+          )}
           <Button variant="outline" size="sm" onClick={() => onOpenInGitHub(issue.url)}>
-            <ExternalLink className="h-4 w-4 mr-1" />
-            Open in GitHub
+            <ExternalLink className="h-4 w-4" />
+            {!isMobile && <span className="ml-1">Open in GitHub</span>}
           </Button>
-          <Button variant="ghost" size="sm" onClick={onClose}>
-            <X className="h-4 w-4" />
-          </Button>
+          {!isMobile && (
+            <Button variant="ghost" size="sm" onClick={onClose}>
+              <X className="h-4 w-4" />
+            </Button>
+          )}
         </div>
       </div>
 
       {/* Issue Detail Content */}
-      <div className="flex-1 overflow-auto p-6">
+      <div className={cn('flex-1 overflow-auto', isMobile ? 'p-4' : 'p-6')}>
         {/* Title */}
         <h1 className="text-xl font-bold mb-2">{issue.title}</h1>
 
@@ -344,8 +366,25 @@ export function IssueDetailPanel({
           )}
         </div>
 
+        {/* Create Feature CTA - shown on mobile since it's hidden from the header */}
+        {isMobile && (
+          <div className="mt-6 p-4 rounded-lg bg-primary/5 border border-primary/20">
+            <div className="flex items-center gap-2 mb-2">
+              <Plus className="h-4 w-4 text-primary" />
+              <span className="text-sm font-medium">Create Feature</span>
+            </div>
+            <p className="text-sm text-muted-foreground mb-3">
+              Create a new feature task to address this issue.
+            </p>
+            <Button variant="secondary" onClick={() => onCreateFeature(issue)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Create Feature
+            </Button>
+          </div>
+        )}
+
         {/* Open in GitHub CTA */}
-        <div className="mt-8 p-4 rounded-lg bg-muted/50 border border-border">
+        <div className="mt-4 p-4 rounded-lg bg-muted/50 border border-border">
           <p className="text-sm text-muted-foreground mb-3">
             View comments, add reactions, and more on GitHub.
           </p>

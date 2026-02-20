@@ -1,3 +1,4 @@
+import { useCallback } from 'react';
 import {
   Folder,
   ChevronDown,
@@ -15,6 +16,8 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatShortcut, type ThemeMode, useAppStore } from '@/store/app-store';
+import { initializeProject } from '@/lib/project-init';
+import type { Project } from '@/lib/electron';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -87,6 +90,22 @@ export function ProjectSelectorWithOptions({
   } = useAppStore();
 
   const shortcuts = useKeyboardShortcutsConfig();
+  // Wrap setCurrentProject to ensure .automaker is initialized before switching
+  const setCurrentProjectWithInit = useCallback(
+    async (p: Project) => {
+      try {
+        // Ensure .automaker directory structure exists before switching
+        await initializeProject(p.path);
+      } catch (error) {
+        console.error('Failed to initialize project during switch:', error);
+        // Continue with switch even if initialization fails -
+        // the project may already be initialized
+      }
+      setCurrentProject(p);
+    },
+    [setCurrentProject]
+  );
+
   const {
     projectSearchQuery,
     setProjectSearchQuery,
@@ -99,13 +118,21 @@ export function ProjectSelectorWithOptions({
     currentProject,
     isProjectPickerOpen,
     setIsProjectPickerOpen,
-    setCurrentProject,
+    setCurrentProject: setCurrentProjectWithInit,
   });
 
   const { sensors, handleDragEnd } = useDragAndDrop({ projects, reorderProjects });
 
   const { globalTheme, setProjectTheme, setPreviewTheme, handlePreviewEnter, handlePreviewLeave } =
     useProjectTheme();
+
+  const handleSelectProject = useCallback(
+    async (p: Project) => {
+      await setCurrentProjectWithInit(p);
+      setIsProjectPickerOpen(false);
+    },
+    [setCurrentProjectWithInit, setIsProjectPickerOpen]
+  );
 
   if (!sidebarOpen || projects.length === 0) {
     return null;
@@ -204,10 +231,7 @@ export function ProjectSelectorWithOptions({
                       project={project}
                       currentProjectId={currentProject?.id}
                       isHighlighted={index === selectedProjectIndex}
-                      onSelect={(p) => {
-                        setCurrentProject(p);
-                        setIsProjectPickerOpen(false);
-                      }}
+                      onSelect={handleSelectProject}
                     />
                   ))}
                 </div>

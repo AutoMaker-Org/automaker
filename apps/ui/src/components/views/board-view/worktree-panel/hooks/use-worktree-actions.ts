@@ -163,6 +163,24 @@ export function useWorktreeActions(options?: UseWorktreeActionsOptions) {
     [navigate]
   );
 
+  const handleRunTerminalScript = useCallback(
+    (worktree: WorktreeInfo, command: string) => {
+      // Navigate to the terminal view with the worktree path, branch, and command to run
+      // The terminal view will create a new terminal and automatically execute the command
+      navigate({
+        to: '/terminal',
+        search: {
+          cwd: worktree.path,
+          branch: worktree.branch,
+          mode: 'tab' as const,
+          nonce: Date.now(),
+          command,
+        },
+      });
+    },
+    [navigate]
+  );
+
   const handleOpenInEditor = useCallback(
     async (worktree: WorktreeInfo, editorCommand?: string) => {
       openInEditorMutation.mutate({
@@ -204,6 +222,7 @@ export function useWorktreeActions(options?: UseWorktreeActionsOptions) {
     handlePull,
     handlePush,
     handleOpenInIntegratedTerminal,
+    handleRunTerminalScript,
     handleOpenInEditor,
     handleOpenInExternalTerminal,
     // Stash confirmation state for branch switching

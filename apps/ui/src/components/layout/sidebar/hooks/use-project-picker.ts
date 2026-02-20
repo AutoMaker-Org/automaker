@@ -6,7 +6,7 @@ interface UseProjectPickerProps {
   currentProject: Project | null;
   isProjectPickerOpen: boolean;
   setIsProjectPickerOpen: (value: boolean | ((prev: boolean) => boolean)) => void;
-  setCurrentProject: (project: Project) => void;
+  setCurrentProject: (project: Project) => void | Promise<void>;
 }
 
 export function useProjectPicker({
@@ -92,9 +92,9 @@ export function useProjectPicker({
   }, [selectedProjectIndex, isProjectPickerOpen, filteredProjects, scrollToProject]);
 
   // Handle selecting the currently highlighted project
-  const selectHighlightedProject = useCallback(() => {
+  const selectHighlightedProject = useCallback(async () => {
     if (filteredProjects.length > 0 && selectedProjectIndex < filteredProjects.length) {
-      setCurrentProject(filteredProjects[selectedProjectIndex]);
+      await setCurrentProject(filteredProjects[selectedProjectIndex]);
       setIsProjectPickerOpen(false);
     }
   }, [filteredProjects, selectedProjectIndex, setCurrentProject, setIsProjectPickerOpen]);

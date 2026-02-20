@@ -5,8 +5,7 @@ import { Button } from '@/components/ui/button';
 import { ProjectIdentitySection } from './project-identity-section';
 import { ProjectThemeSection } from './project-theme-section';
 import { WorktreePreferencesSection } from './worktree-preferences-section';
-import { CommandsSection } from './commands-section';
-import { TerminalScriptsSection } from './terminal-scripts-section';
+import { CommandsAndScriptsSection } from './commands-and-scripts-section';
 import { ProjectModelsSection } from './project-models-section';
 import { DataManagementSection } from './data-management-section';
 import { DangerZoneSection } from '../settings-view/danger-zone/danger-zone-section';
@@ -15,6 +14,8 @@ import { RemoveFromAutomakerDialog } from '../settings-view/components/remove-fr
 import { ProjectSettingsNavigation } from './components/project-settings-navigation';
 import { useProjectSettingsView } from './hooks/use-project-settings-view';
 import type { Project as ElectronProject } from '@/lib/electron';
+import { useSearch } from '@tanstack/react-router';
+import type { ProjectSettingsViewId } from './hooks/use-project-settings-view';
 
 // Breakpoint constant for mobile (matches Tailwind lg breakpoint)
 const LG_BREAKPOINT = 1024;
@@ -34,8 +35,18 @@ export function ProjectSettingsView() {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showRemoveFromAutomakerDialog, setShowRemoveFromAutomakerDialog] = useState(false);
 
+  // Read the optional section search param to support deep-linking to a specific section
+  const search = useSearch({ strict: false }) as { section?: ProjectSettingsViewId };
+  // Map legacy 'commands' and 'scripts' IDs to the combined 'commands-scripts' section
+  const resolvedSection: ProjectSettingsViewId | undefined =
+    search.section === 'commands' || search.section === 'scripts'
+      ? 'commands-scripts'
+      : search.section;
+
   // Use project settings view navigation hook
-  const { activeView, navigateTo } = useProjectSettingsView();
+  const { activeView, navigateTo } = useProjectSettingsView({
+    initialView: resolvedSection ?? 'identity',
+  });
 
   // Mobile navigation state - default to showing on desktop, hidden on mobile
   const [showNavigation, setShowNavigation] = useState(() => {
@@ -91,9 +102,9 @@ export function ProjectSettingsView() {
       case 'worktrees':
         return <WorktreePreferencesSection project={currentProject} />;
       case 'commands':
-        return <CommandsSection project={currentProject} />;
       case 'scripts':
-        return <TerminalScriptsSection project={currentProject} />;
+      case 'commands-scripts':
+        return <CommandsAndScriptsSection project={currentProject} />;
       case 'claude':
         return <ProjectModelsSection project={currentProject} />;
       case 'data':

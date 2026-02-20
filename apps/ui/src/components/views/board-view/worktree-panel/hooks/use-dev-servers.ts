@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { createLogger } from '@automaker/utils/logger';
 import { getElectronAPI } from '@/lib/electron';
 import { normalizePath } from '@/lib/utils';
@@ -11,9 +11,31 @@ interface UseDevServersOptions {
   projectPath: string;
 }
 
+/**
+ * Helper to build the browser-accessible dev server URL by rewriting the hostname
+ * to match the current window's hostname (supports remote access).
+ * Returns null if the URL is invalid or uses an unsupported protocol.
+ */
+function buildDevServerBrowserUrl(serverUrl: string): string | null {
+  try {
+    const devServerUrl = new URL(serverUrl);
+    // Security: Only allow http/https protocols
+    if (devServerUrl.protocol !== 'http:' && devServerUrl.protocol !== 'https:') {
+      return null;
+    }
+    devServerUrl.hostname = window.location.hostname;
+    return devServerUrl.toString();
+  } catch {
+    return null;
+  }
+}
+
 export function useDevServers({ projectPath }: UseDevServersOptions) {
   const [isStartingDevServer, setIsStartingDevServer] = useState(false);
   const [runningDevServers, setRunningDevServers] = useState<Map<string, DevServerInfo>>(new Map());
+
+  // Track which worktrees have had their url-detected toast shown to prevent re-triggering
+  const toastShownForRef = useRef<Set<string>>(new Set());
 
   const fetchDevServers = useCallback(async () => {
     try {
@@ -25,10 +47,16 @@ export function useDevServers({ projectPath }: UseDevServersOptions) {
       if (result.success && result.result?.servers) {
         const serversMap = new Map<string, DevServerInfo>();
         for (const server of result.result.servers) {
-          serversMap.set(normalizePath(server.worktreePath), {
+          const key = normalizePath(server.worktreePath);
+          serversMap.set(key, {
             ...server,
             urlDetected: server.urlDetected ?? true,
           });
+          // Mark already-detected servers as having shown the toast
+          // so we don't re-trigger on initial load
+          if (server.urlDetected !== false) {
+            toastShownForRef.current.add(key);
+          }
         }
         setRunningDevServers(serversMap);
       }
@@ -41,7 +69,7 @@ export function useDevServers({ projectPath }: UseDevServersOptions) {
     fetchDevServers();
   }, [fetchDevServers]);
 
-  // Subscribe to url-detected events to update port/url when the actual dev server port is detected
+  // Subscribe to all dev server lifecycle events for reactive state updates
   useEffect(() => {
     const api = getElectronAPI();
     if (!api?.worktree?.onDevServerLogEvent) return;
@@ -54,6 +82,8 @@ export function useDevServers({ projectPath }: UseDevServersOptions) {
         setRunningDevServers((prev) => {
           const existing = prev.get(key);
           if (!existing) return prev;
+          // Avoid updating if already detected with same url/port
+          if (existing.urlDetected && existing.url === url && existing.port === port) return prev;
           const next = new Map(prev);
           next.set(key, {
             ...existing,
@@ -66,8 +96,53 @@ export function useDevServers({ projectPath }: UseDevServersOptions) {
         });
         if (didUpdate) {
           logger.info(`Dev server URL detected for ${worktreePath}: ${url} (port ${port})`);
-          toast.success(`Dev server running on port ${port}`);
+          // Only show toast on the transition from undetected → detected (not on re-renders/polls)
+          if (!toastShownForRef.current.has(key)) {
+            toastShownForRef.current.add(key);
+            const browserUrl = buildDevServerBrowserUrl(url);
+            toast.success(`Dev server running on port ${port}`, {
+              description: browserUrl ? browserUrl : url,
+              action: browserUrl
+                ? {
+                    label: 'Open in Browser',
+                    onClick: () => {
+                      window.open(browserUrl, '_blank', 'noopener,noreferrer');
+                    },
+                  }
+                : undefined,
+              duration: 8000,
+            });
+          }
         }
+      } else if (event.type === 'dev-server:stopped') {
+        // Reactively remove the server from state when it stops
+        const { worktreePath } = event.payload;
+        const key = normalizePath(worktreePath);
+        setRunningDevServers((prev) => {
+          if (!prev.has(key)) return prev;
+          const next = new Map(prev);
+          next.delete(key);
+          return next;
+        });
+        // Clear the toast tracking so a fresh detection will show a new toast
+        toastShownForRef.current.delete(key);
+        logger.info(`Dev server stopped for ${worktreePath} (reactive update)`);
+      } else if (event.type === 'dev-server:started') {
+        // Reactively add/update the server when it starts
+        const { worktreePath, port, url } = event.payload;
+        const key = normalizePath(worktreePath);
+        // Clear previous toast tracking for this key so a new detection triggers a fresh toast
+        toastShownForRef.current.delete(key);
+        setRunningDevServers((prev) => {
+          const next = new Map(prev);
+          next.set(key, {
+            worktreePath,
+            port,
+            url,
+            urlDetected: false,
+          });
+          return next;
+        });
       }
     });
 
@@ -98,9 +173,12 @@ export function useDevServers({ projectPath }: UseDevServersOptions) {
         const result = await api.worktree.startDevServer(projectPath, targetPath);
 
         if (result.success && result.result) {
+          const key = normalizePath(targetPath);
+          // Clear toast tracking so the new port detection shows a fresh toast
+          toastShownForRef.current.delete(key);
           setRunningDevServers((prev) => {
             const next = new Map(prev);
-            next.set(normalizePath(targetPath), {
+            next.set(key, {
               worktreePath: result.result!.worktreePath,
               port: result.result!.port,
               url: result.result!.url,
@@ -135,11 +213,14 @@ export function useDevServers({ projectPath }: UseDevServersOptions) {
         const result = await api.worktree.stopDevServer(targetPath);
 
         if (result.success) {
+          const key = normalizePath(targetPath);
           setRunningDevServers((prev) => {
             const next = new Map(prev);
-            next.delete(normalizePath(targetPath));
+            next.delete(key);
             return next;
           });
+          // Clear toast tracking so future restarts get a fresh toast
+          toastShownForRef.current.delete(key);
           toast.success(result.result?.message || 'Dev server stopped');
         } else {
           toast.error(result.error || 'Failed to stop dev server');
@@ -163,30 +244,16 @@ export function useDevServers({ projectPath }: UseDevServersOptions) {
         return;
       }
 
-      try {
-        // Rewrite URL hostname to match the current browser's hostname.
-        // This ensures dev server URLs work when accessing Automaker from
-        // remote machines (e.g., 192.168.x.x or hostname.local instead of localhost).
-        const devServerUrl = new URL(serverInfo.url);
-
-        // Security: Only allow http/https protocols to prevent potential attacks
-        // via data:, javascript:, file:, or other dangerous URL schemes
-        if (devServerUrl.protocol !== 'http:' && devServerUrl.protocol !== 'https:') {
-          logger.error('Invalid dev server URL protocol:', devServerUrl.protocol);
-          toast.error('Invalid dev server URL', {
-            description: 'The server returned an unsupported URL protocol.',
-          });
-          return;
-        }
-
-        devServerUrl.hostname = window.location.hostname;
-        window.open(devServerUrl.toString(), '_blank', 'noopener,noreferrer');
-      } catch (error) {
-        logger.error('Failed to parse dev server URL:', error);
-        toast.error('Failed to open dev server', {
-          description: 'The server URL could not be processed. Please try again.',
+      const browserUrl = buildDevServerBrowserUrl(serverInfo.url);
+      if (!browserUrl) {
+        logger.error('Invalid dev server URL:', serverInfo.url);
+        toast.error('Invalid dev server URL', {
+          description: 'The server returned an unsupported URL protocol.',
         });
+        return;
       }
+
+      window.open(browserUrl, '_blank', 'noopener,noreferrer');
     },
     [runningDevServers, getWorktreeKey]
   );

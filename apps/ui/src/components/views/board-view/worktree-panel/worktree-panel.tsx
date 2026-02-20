@@ -1,4 +1,5 @@
-import { useEffect, useRef, useCallback, useState } from 'react';
+import { useEffect, useRef, useCallback, useState, useMemo } from 'react';
+import { useNavigate } from '@tanstack/react-router';
 import { Button } from '@/components/ui/button';
 import { GitBranch, Plus, RefreshCw } from 'lucide-react';
 import { Spinner } from '@/components/ui/spinner';
@@ -9,6 +10,7 @@ import { useIsMobile } from '@/hooks/use-media-query';
 import { useWorktreeInitScript, useProjectSettings } from '@/hooks/queries';
 import { useTestRunnerEvents } from '@/hooks/use-test-runners';
 import { useTestRunnersStore } from '@/store/test-runners-store';
+import { DEFAULT_TERMINAL_SCRIPTS } from '@/components/views/project-settings-view/terminal-scripts-constants';
 import type {
   TestRunnerStartedEvent,
   TestRunnerOutputEvent,
@@ -59,6 +61,7 @@ export function WorktreePanel({
   onCreatePR,
   onCreateBranch,
   onAddressPRComments,
+  onAutoAddressPRComments,
   onResolveConflicts,
   onCreateMergeConflictResolutionFeature,
   onBranchSwitchConflict,
@@ -116,6 +119,7 @@ export function WorktreePanel({
     handlePull: _handlePull,
     handlePush,
     handleOpenInIntegratedTerminal,
+    handleRunTerminalScript,
     handleOpenInEditor,
     handleOpenInExternalTerminal,
     pendingSwitch,
@@ -208,6 +212,21 @@ export function WorktreePanel({
   // Check if test command is configured in project settings
   const { data: projectSettings } = useProjectSettings(projectPath);
   const hasTestCommand = !!projectSettings?.testCommand;
+
+  // Get terminal quick scripts from project settings (or fall back to defaults)
+  const terminalScripts = useMemo(() => {
+    const configured = projectSettings?.terminalScripts;
+    if (configured && configured.length > 0) {
+      return configured;
+    }
+    return DEFAULT_TERMINAL_SCRIPTS;
+  }, [projectSettings?.terminalScripts]);
+
+  // Navigate to project settings to edit scripts
+  const navigate = useNavigate();
+  const handleEditScripts = useCallback(() => {
+    navigate({ to: '/project-settings', search: { section: 'commands-scripts' } });
+  }, [navigate]);
 
   // Test runner state management
   // Use the test runners store to get global state for all worktrees
@@ -914,6 +933,7 @@ export function WorktreePanel({
             onCommit={onCommit}
             onCreatePR={onCreatePR}
             onAddressPRComments={onAddressPRComments}
+            onAutoAddressPRComments={onAutoAddressPRComments}
             onResolveConflicts={onResolveConflicts}
             onMerge={handleMerge}
             onDeleteWorktree={onDeleteWorktree}
@@ -932,6 +952,9 @@ export function WorktreePanel({
             onAbortOperation={handleAbortOperation}
             onContinueOperation={handleContinueOperation}
             hasInitScript={hasInitScript}
+            terminalScripts={terminalScripts}
+            onRunTerminalScript={handleRunTerminalScript}
+            onEditScripts={handleEditScripts}
           />
         )}
 
@@ -1154,6 +1177,7 @@ export function WorktreePanel({
             onCommit={onCommit}
             onCreatePR={onCreatePR}
             onAddressPRComments={onAddressPRComments}
+            onAutoAddressPRComments={onAutoAddressPRComments}
             onResolveConflicts={onResolveConflicts}
             onMerge={handleMerge}
             onDeleteWorktree={onDeleteWorktree}
@@ -1171,6 +1195,9 @@ export function WorktreePanel({
             onCherryPick={handleCherryPick}
             onAbortOperation={handleAbortOperation}
             onContinueOperation={handleContinueOperation}
+            terminalScripts={terminalScripts}
+            onRunTerminalScript={handleRunTerminalScript}
+            onEditScripts={handleEditScripts}
           />
 
           {useWorktreesEnabled && (
@@ -1257,6 +1284,7 @@ export function WorktreePanel({
                 onCommit={onCommit}
                 onCreatePR={onCreatePR}
                 onAddressPRComments={onAddressPRComments}
+                onAutoAddressPRComments={onAutoAddressPRComments}
                 onResolveConflicts={onResolveConflicts}
                 onMerge={handleMerge}
                 onDeleteWorktree={onDeleteWorktree}
@@ -1276,6 +1304,9 @@ export function WorktreePanel({
                 onContinueOperation={handleContinueOperation}
                 hasInitScript={hasInitScript}
                 hasTestCommand={hasTestCommand}
+                terminalScripts={terminalScripts}
+                onRunTerminalScript={handleRunTerminalScript}
+                onEditScripts={handleEditScripts}
               />
             )}
           </div>
@@ -1340,6 +1371,7 @@ export function WorktreePanel({
                       onCommit={onCommit}
                       onCreatePR={onCreatePR}
                       onAddressPRComments={onAddressPRComments}
+                      onAutoAddressPRComments={onAutoAddressPRComments}
                       onResolveConflicts={onResolveConflicts}
                       onMerge={handleMerge}
                       onDeleteWorktree={onDeleteWorktree}
@@ -1359,6 +1391,9 @@ export function WorktreePanel({
                       onContinueOperation={handleContinueOperation}
                       hasInitScript={hasInitScript}
                       hasTestCommand={hasTestCommand}
+                      terminalScripts={terminalScripts}
+                      onRunTerminalScript={handleRunTerminalScript}
+                      onEditScripts={handleEditScripts}
                     />
                   );
                 })}
