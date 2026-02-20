@@ -2315,23 +2315,23 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
   setDefaultRequirePlanApproval: (require) => set({ defaultRequirePlanApproval: require }),
   setDefaultFeatureModel: (entry) => set({ defaultFeatureModel: entry }),
 
-  setDefaultThinkingLevel: (level) => {
+  setDefaultThinkingLevel: async (level) => {
     set({ defaultThinkingLevel: level });
     // Sync to server
     try {
       const httpApi = getHttpApiClient();
-      httpApi.put('/api/settings', { defaultThinkingLevel: level });
+      await httpApi.put('/api/settings', { defaultThinkingLevel: level });
     } catch (error) {
       logger.error('Failed to sync defaultThinkingLevel:', error);
     }
   },
 
-  setDefaultReasoningEffort: (effort) => {
+  setDefaultReasoningEffort: async (effort) => {
     set({ defaultReasoningEffort: effort });
     // Sync to server
     try {
       const httpApi = getHttpApiClient();
-      httpApi.put('/api/settings', { defaultReasoningEffort: effort });
+      await httpApi.put('/api/settings', { defaultReasoningEffort: effort });
     } catch (error) {
       logger.error('Failed to sync defaultReasoningEffort:', error);
     }
