@@ -994,17 +994,17 @@ export function TerminalPanel({
         const otherModKey = isMacRef.current ? event.ctrlKey : event.metaKey;
 
         // Ctrl+Shift+C / Cmd+Shift+C - Always copy (Linux terminal convention)
+        // Don't preventDefault() — allow the native browser copy to work alongside our custom copy
         if (modKey && !otherModKey && event.shiftKey && !event.altKey && code === 'KeyC') {
-          event.preventDefault();
           copySelectionRef.current();
           return false;
         }
 
         // Ctrl+C / Cmd+C - Copy if text is selected, otherwise send SIGINT
+        // Don't preventDefault() when copying — allow the native browser copy to work alongside our custom copy
         if (modKey && !otherModKey && !event.shiftKey && !event.altKey && code === 'KeyC') {
           const hasSelection = terminal.hasSelection();
           if (hasSelection) {
-            event.preventDefault();
             copySelectionRef.current();
             terminal.clearSelection();
             return false;
@@ -1014,9 +1014,11 @@ export function TerminalPanel({
         }
 
         // Ctrl+V / Cmd+V or Ctrl+Shift+V / Cmd+Shift+V - Paste
+        // Don't preventDefault() — allow the native browser paste to work.
+        // Return false to prevent xterm from sending \x16 (literal next),
+        // but the browser's native paste event will still fire and xterm will
+        // receive the pasted text through its onData handler.
         if (modKey && !otherModKey && !event.altKey && code === 'KeyV') {
-          event.preventDefault();
-          pasteFromClipboardRef.current();
           return false;
         }
 
