@@ -767,7 +767,7 @@ export function CommitWorktreeDialog({
 
             {pushAfterCommit && (
               <div className="ml-6 flex flex-col gap-1.5">
-                {isLoadingRemotes ? (
+                {isLoadingRemotes || (!remotesFetched && !remotesFetchError) ? (
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Spinner size="sm" />
                     <span>Loading remotes...</span>
@@ -780,7 +780,6 @@ export function CommitWorktreeDialog({
                       onClick={() => {
                         if (worktree) {
                           setRemotesFetchError(null);
-                          fetchRemotesForWorktree(worktree.path);
                         }
                       }}
                     >

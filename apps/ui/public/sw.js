@@ -327,7 +327,11 @@ self.addEventListener('fetch', (event) => {
                 // Store with timestamp for freshness checking
                 const timestampedResponse = await addCacheTimestamp(networkResponse);
                 cache.put(event.request, timestampedResponse);
+                return networkResponse;
               }
+              // Non-ok response (e.g. 5xx) — don't resolve with it for the race
+              // so the caller falls back to cachedResponse instead of showing an error page.
+              if (cachedResponse) return null;
               return networkResponse;
             })
             .catch((err) => {
@@ -412,15 +416,32 @@ self.addEventListener('fetch', (event) => {
               }
               return networkResponse;
             })
-            .catch(
-              () =>
-                cachedResponse ||
-                new Response('Service Unavailable', {
+            .catch(() => {
+              if (cachedResponse) return cachedResponse;
+              // Return a safe no-op response matching the asset type so the browser
+              // can parse it without errors, instead of a plain-text 503.
+              const dest = event.request.destination;
+              const urlPath = url.pathname;
+              if (dest === 'script' || urlPath.endsWith('.js') || urlPath.endsWith('.mjs')) {
+                return new Response('// offline', {
                   status: 503,
                   statusText: 'Service Unavailable',
-                  headers: { 'Content-Type': 'text/plain' },
-                })
-            );
+                  headers: { 'Content-Type': 'application/javascript' },
+                });
+              }
+              if (dest === 'style' || urlPath.endsWith('.css')) {
+                return new Response('/* offline */', {
+                  status: 503,
+                  statusText: 'Service Unavailable',
+                  headers: { 'Content-Type': 'text/css' },
+                });
+              }
+              return new Response('Service Unavailable', {
+                status: 503,
+                statusText: 'Service Unavailable',
+                headers: { 'Content-Type': 'text/plain' },
+              });
+            });
 
           if (cachedResponse) {
             event.waitUntil(fetchPromise.catch(() => {}));

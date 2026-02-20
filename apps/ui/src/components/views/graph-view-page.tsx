@@ -355,8 +355,11 @@ export function GraphViewPage() {
           'Newly created feature not found in store after handleAddFeature completed. ' +
             `Store has ${latestFeatures.length} features, expected a new entry.`
         );
-        // Best-effort: scan for any feature still in 'in_progress' that wasn't in the original set
-        const stuckFeature = latestFeatures.find(
+        // Best-effort: re-read the store to find any feature still in 'in_progress'
+        // that wasn't in the original set. We must use a fresh snapshot here because
+        // latestFeatures was captured before the async gap and may not contain the new entry.
+        const freshFeatures = useAppStore.getState().features;
+        const stuckFeature = freshFeatures.find(
           (f) => f.status === 'in_progress' && !featuresBeforeIds.has(f.id)
         );
         if (stuckFeature) {

@@ -103,6 +103,7 @@ export function WorktreePanel({
     setBranchFilter,
     resetBranchFilter,
     fetchBranches,
+    pruneStaleEntries,
     gitRepoStatus,
   } = useBranches();
 
@@ -457,6 +458,21 @@ export function WorktreePanel({
       }
     };
   }, [fetchWorktrees]);
+
+  // Prune stale tracking-remote cache entries and remotes cache when worktrees change
+  useEffect(() => {
+    const activePaths = new Set(worktrees.map((w) => w.path));
+    pruneStaleEntries(activePaths);
+    setRemotesCache((prev) => {
+      const next: typeof prev = {};
+      for (const key of Object.keys(prev)) {
+        if (activePaths.has(key)) {
+          next[key] = prev[key];
+        }
+      }
+      return next;
+    });
+  }, [worktrees, pruneStaleEntries]);
 
   const isWorktreeSelected = (worktree: WorktreeInfo) => {
     return worktree.isMain

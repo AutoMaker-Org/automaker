@@ -456,6 +456,12 @@ export function useSettingsSync(): SettingsSyncState {
           // Don't return here — fall through so the general loop below can still
           // detect and schedule a debounced sync for other project-field mutations
           // (e.g. lastOpened) that the id/name/path comparison above doesn't cover.
+        } else {
+          // The projects array reference changed but id/name/path are identical.
+          // This means nested project fields mutated (e.g. lastOpened, remotes).
+          // Schedule a debounced sync so these mutations reach the server.
+          logger.debug('[PROJECTS_NESTED_CHANGE] Projects nested fields changed, scheduling sync');
+          scheduleSyncToServer();
         }
       }
 

@@ -105,81 +105,17 @@
       .app-shell-logo-bg {
         fill: rgba(255, 255, 255, 0.08);
       }
-      /* Light themes: dark spinner + logo strokes (uses :is() to avoid repeating selector list) */
-      html:is(
-          .light,
-          .cream,
-          .solarizedlight,
-          .github,
-          .paper,
-          .rose,
-          .mint,
-          .lavender,
-          .sand,
-          .sky,
-          .peach,
-          .snow,
-          .sepia,
-          .gruvboxlight,
-          .nordlight,
-          .blossom,
-          .ayu-light,
-          .onelight,
-          .bluloco,
-          .feather
-        )
-        .app-shell-spinner {
+      /* Light themes: dark spinner + logo strokes.
+         The theme script below sets data-theme-type="light" on <html> for any light
+         theme, so future theme additions only need to update the script — not CSS. */
+      html[data-theme-type='light'] .app-shell-spinner {
         border-color: rgba(0, 0, 0, 0.08);
         border-top-color: rgba(0, 0, 0, 0.4);
       }
-      html:is(
-          .light,
-          .cream,
-          .solarizedlight,
-          .github,
-          .paper,
-          .rose,
-          .mint,
-          .lavender,
-          .sand,
-          .sky,
-          .peach,
-          .snow,
-          .sepia,
-          .gruvboxlight,
-          .nordlight,
-          .blossom,
-          .ayu-light,
-          .onelight,
-          .bluloco,
-          .feather
-        )
-        .app-shell-logo-stroke {
+      html[data-theme-type='light'] .app-shell-logo-stroke {
         stroke: rgba(0, 0, 0, 0.55);
       }
-      html:is(
-          .light,
-          .cream,
-          .solarizedlight,
-          .github,
-          .paper,
-          .rose,
-          .mint,
-          .lavender,
-          .sand,
-          .sky,
-          .peach,
-          .snow,
-          .sepia,
-          .gruvboxlight,
-          .nordlight,
-          .blossom,
-          .ayu-light,
-          .onelight,
-          .bluloco,
-          .feather
-        )
-        .app-shell-logo-bg {
+      html[data-theme-type='light'] .app-shell-logo-bg {
         fill: rgba(0, 0, 0, 0.06);
       }
       /* System light preference when no theme class is applied yet */
@@ -217,15 +153,48 @@
             }
           }
 
+          // Light theme names — kept in sync with the background-color rule above.
+          // Adding a new light theme only requires updating this array.
+          var lightThemes = [
+            'light',
+            'cream',
+            'solarizedlight',
+            'github',
+            'paper',
+            'rose',
+            'mint',
+            'lavender',
+            'sand',
+            'sky',
+            'peach',
+            'snow',
+            'sepia',
+            'gruvboxlight',
+            'nordlight',
+            'blossom',
+            'ayu-light',
+            'onelight',
+            'bluloco',
+            'feather',
+          ];
+
           if (theme && theme !== 'system') {
             // Apply the stored theme class directly (covers 'light', 'dark', and
             // all named themes like 'cream', 'nord', etc.)
             document.documentElement.classList.add(theme);
+            if (lightThemes.indexOf(theme) !== -1) {
+              document.documentElement.setAttribute('data-theme-type', 'light');
+            }
           } else if (
             theme === 'system' &&
             window.matchMedia('(prefers-color-scheme: dark)').matches
           ) {
             document.documentElement.classList.add('dark');
+          } else if (
+            theme === 'system' &&
+            window.matchMedia('(prefers-color-scheme: light)').matches
+          ) {
+            document.documentElement.setAttribute('data-theme-type', 'light');
           }
           // Detect PWA standalone mode early so CSS can apply reduced bottom safe-area
           // before first paint, preventing a layout shift on notched devices.
@@ -263,7 +232,7 @@
             <path d="M164 92 L204 128 L164 164" />
           </g>
         </svg>
-        <div class="app-shell-spinner" role="status" aria-label="Loading\u2026"></div>
+        <div class="app-shell-spinner" role="status" aria-label="Loading…"></div>
       </div>
     </div>
     <script type="module" src="/src/renderer.tsx"></script>

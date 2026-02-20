@@ -251,6 +251,15 @@ export function createCreatePRHandler() {
             cwd: worktreePath,
             env: execEnv,
           });
+          if (listResult.exitCode !== 0) {
+            logger.error(
+              `gh pr list failed with exit code ${listResult.exitCode}: ` +
+                `stderr=${listResult.stderr}, stdout=${listResult.stdout}`
+            );
+            throw new Error(
+              `gh pr list failed (exit code ${listResult.exitCode}): ${listResult.stderr || listResult.stdout}`
+            );
+          }
           const existingPrOutput = listResult.stdout;
           logger.debug(`gh pr list output: ${existingPrOutput}`);
 

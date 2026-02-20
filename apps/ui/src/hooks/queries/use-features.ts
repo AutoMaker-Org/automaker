@@ -82,33 +82,49 @@ function writePersistedFeatures(projectPath: string, features: Feature[]): void 
 function evictStaleFeaturesCache(): void {
   if (typeof window === 'undefined') return;
   try {
-    const entries: Array<{ key: string; timestamp: number }> = [];
+    // First pass: collect all matching keys without mutating localStorage.
+    // Iterating forward while calling removeItem() shifts indexes and can skip keys.
+    const allKeys: string[] = [];
     for (let i = 0; i < window.localStorage.length; i++) {
       const key = window.localStorage.key(i);
-      if (!key || !key.startsWith(FEATURES_CACHE_PREFIX)) continue;
+      if (key && key.startsWith(FEATURES_CACHE_PREFIX)) {
+        allKeys.push(key);
+      }
+    }
+
+    // Second pass: classify collected keys — remove stale/corrupt, keep valid.
+    const validEntries: Array<{ key: string; timestamp: number }> = [];
+    const keysToRemove: string[] = [];
+    for (const key of allKeys) {
       try {
         const raw = window.localStorage.getItem(key);
         if (!raw) continue;
         const parsed = JSON.parse(raw) as { timestamp?: number; schemaVersion?: number };
-        // Also evict entries with wrong schema version
+        // Evict entries with wrong schema version
         if (parsed.schemaVersion !== FEATURES_CACHE_VERSION) {
-          window.localStorage.removeItem(key);
+          keysToRemove.push(key);
           continue;
         }
-        entries.push({
+        validEntries.push({
           key,
           timestamp: typeof parsed.timestamp === 'number' ? parsed.timestamp : 0,
         });
       } catch {
-        // Corrupt entry — remove it
-        window.localStorage.removeItem(key);
+        // Corrupt entry — mark for removal
+        keysToRemove.push(key);
       }
     }
-    if (entries.length <= MAX_FEATURES_CACHE_ENTRIES) return;
-    // Sort descending by timestamp (most recent first) and remove the oldest
-    entries.sort((a, b) => b.timestamp - a.timestamp);
-    for (let i = MAX_FEATURES_CACHE_ENTRIES; i < entries.length; i++) {
-      window.localStorage.removeItem(entries[i].key);
+
+    // Remove stale/corrupt entries
+    for (const key of keysToRemove) {
+      window.localStorage.removeItem(key);
+    }
+
+    // Enforce max entries: sort by timestamp (newest first), remove excess oldest
+    if (validEntries.length <= MAX_FEATURES_CACHE_ENTRIES) return;
+    validEntries.sort((a, b) => b.timestamp - a.timestamp);
+    for (let i = MAX_FEATURES_CACHE_ENTRIES; i < validEntries.length; i++) {
+      window.localStorage.removeItem(validEntries[i].key);
     }
   } catch {
     // Best effort — never break the app for cache housekeeping failures.

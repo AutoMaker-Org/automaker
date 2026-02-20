@@ -33,30 +33,29 @@ test.describe('Projects Overview Dashboard', () => {
       const response = await route.fetch();
       const json = await response.json();
       if (json.settings) {
-        // Ensure mock projects are preserved in the response
-        if (!json.settings.projects || json.settings.projects.length === 0) {
-          json.settings.projects = [
-            {
-              id: 'test-project-1',
-              name: 'Test Project 1',
-              path: '/mock/test-project-1',
-              lastOpened: new Date().toISOString(),
-            },
-            {
-              id: 'test-project-2',
-              name: 'Test Project 2',
-              path: '/mock/test-project-2',
-              lastOpened: new Date(Date.now() - 86400000).toISOString(),
-            },
-            {
-              id: 'test-project-3',
-              name: 'Test Project 3',
-              path: '/mock/test-project-3',
-              lastOpened: new Date(Date.now() - 172800000).toISOString(),
-            },
-          ];
-        }
-        json.settings.currentProjectId = json.settings.currentProjectId || 'test-project-1';
+        // Always overwrite projects with mock data so CI-provided projects
+        // that don't contain 'test-project-1' can't break hydration.
+        json.settings.projects = [
+          {
+            id: 'test-project-1',
+            name: 'Test Project 1',
+            path: '/mock/test-project-1',
+            lastOpened: new Date().toISOString(),
+          },
+          {
+            id: 'test-project-2',
+            name: 'Test Project 2',
+            path: '/mock/test-project-2',
+            lastOpened: new Date(Date.now() - 86400000).toISOString(),
+          },
+          {
+            id: 'test-project-3',
+            name: 'Test Project 3',
+            path: '/mock/test-project-3',
+            lastOpened: new Date(Date.now() - 172800000).toISOString(),
+          },
+        ];
+        json.settings.currentProjectId = 'test-project-1';
         json.settings.setupComplete = true;
         json.settings.isFirstRun = false;
       }

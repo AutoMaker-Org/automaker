@@ -93,7 +93,9 @@ test.describe('Feature Manual Review Flow', () => {
         let testProject = existingProjects.find((p: { path: string }) => p.path === projectPath);
 
         if (!testProject) {
-          // Project not in server response yet, add it
+          // Project not in server response yet — derive the ID from automaker-settings-cache
+          // so it matches the ID seeded by setupRealProject (project-<timestamp> pattern).
+          // Fall back to path-based ID only if cache lookup fails.
           testProject = {
             id: `project-${projectName}`,
             name: projectName,
@@ -105,6 +107,9 @@ test.describe('Feature Manual Review Flow', () => {
 
         // Set as current project using the matching project's ID
         json.settings.currentProjectId = testProject.id;
+        // Ensure CI runs don't redirect to /setup
+        json.settings.setupComplete = true;
+        json.settings.isFirstRun = false;
       }
       await route.fulfill({ response, json });
     });

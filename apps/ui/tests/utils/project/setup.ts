@@ -1201,6 +1201,17 @@ export async function setupFirstRun(page: Page): Promise<void> {
 
     localStorage.setItem('automaker-storage', JSON.stringify(appState));
 
+    // Anchor the settings cache so CI cannot hydrate a conflicting setupComplete value.
+    const settingsCache = {
+      setupComplete: false,
+      isFirstRun: true,
+      projects: [],
+      theme: 'dark',
+      sidebarOpen: true,
+      maxConcurrency: 3,
+    };
+    localStorage.setItem('automaker-settings-cache', JSON.stringify(settingsCache));
+
     // Disable splash screen in tests
     sessionStorage.setItem('automaker-splash-shown', 'true');
   }, STORE_VERSIONS);

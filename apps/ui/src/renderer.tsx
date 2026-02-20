@@ -150,14 +150,17 @@ function showUpdateNotification(registration: ServiceWorkerRegistration): void {
     'padding:4px 8px;cursor:pointer;font-size:18px;line-height:1;" aria-label="Dismiss">&times;</button>';
   document.body.appendChild(banner);
 
-  // Listen for controllerchange to reload after the new SW activates
+  // Listen for controllerchange to reload after the new SW activates.
+  // Named handler so it can be cleaned up when the banner is dismissed or after reload.
   let reloading = false;
-  navigator.serviceWorker.addEventListener('controllerchange', () => {
+  const onControllerChange = () => {
     if (!reloading) {
       reloading = true;
+      navigator.serviceWorker.removeEventListener('controllerchange', onControllerChange);
       window.location.reload();
     }
-  });
+  };
+  navigator.serviceWorker.addEventListener('controllerchange', onControllerChange);
 
   banner.querySelector('#sw-update-btn')?.addEventListener('click', () => {
     // Send SKIP_WAITING to the waiting SW — it will call skipWaiting() and
@@ -171,6 +174,7 @@ function showUpdateNotification(registration: ServiceWorkerRegistration): void {
   });
 
   banner.querySelector('#sw-dismiss-btn')?.addEventListener('click', () => {
+    navigator.serviceWorker.removeEventListener('controllerchange', onControllerChange);
     banner.remove();
   });
 }
