@@ -8,7 +8,7 @@ import type {
   ZaiUsageResponse,
   GeminiUsageResponse,
 } from '@/store/app-store';
-import type { ParsedTask, FeatureStatusWithPipeline } from '@automaker/types';
+import type { ParsedTask, FeatureStatusWithPipeline, MergeStateInfo } from '@automaker/types';
 
 export interface ImageAttachment {
   id?: string; // Optional - may not be present in messages loaded from server
@@ -763,22 +763,6 @@ export interface FileStatus {
   isMergeAffected?: boolean;
   /** Type of merge involvement (e.g. 'both-modified', 'added-by-us', etc.) */
   mergeType?: string;
-}
-
-/** Merge state information for a git repository */
-export interface MergeStateInfo {
-  /** Whether a merge is currently in progress */
-  isMerging: boolean;
-  /** Type of merge operation */
-  mergeOperationType: 'merge' | 'rebase' | 'cherry-pick' | null;
-  /** Whether the merge completed cleanly (no conflicts) */
-  isCleanMerge: boolean;
-  /** Files affected by the merge */
-  mergeAffectedFiles: string[];
-  /** Files with unresolved conflicts */
-  conflictFiles: string[];
-  /** Whether the current HEAD is a completed merge commit (has multiple parents) */
-  isMergeCommit?: boolean;
 }
 
 export interface FileDiffsResult {

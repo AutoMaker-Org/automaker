@@ -296,10 +296,11 @@ export async function getGitRepositoryDiffs(repoPath: string): Promise<{
         });
 
         // Add merge-affected files to the file list (avoid duplicates with working tree changes)
-        const existingPaths = new Set(files.map((f) => f.path));
+        const fileByPath = new Map(files.map((f) => [f.path, f]));
+        const existingPaths = new Set(fileByPath.keys());
         for (const filePath of mergeCommitInfo.mergeAffectedFiles) {
           if (!existingPaths.has(filePath)) {
-            files.push({
+            const newFile = {
               status: 'M',
               path: filePath,
               statusText: 'Merged',
@@ -307,10 +308,13 @@ export async function getGitRepositoryDiffs(repoPath: string): Promise<{
               workTreeStatus: ' ',
               isMergeAffected: true,
               mergeType: 'merged',
-            });
+            };
+            files.push(newFile);
+            fileByPath.set(filePath, newFile);
+            existingPaths.add(filePath);
           } else {
             // Mark existing file as also merge-affected
-            const existing = files.find((f) => f.path === filePath);
+            const existing = fileByPath.get(filePath);
             if (existing) {
               existing.isMergeAffected = true;
               existing.mergeType = 'merged';

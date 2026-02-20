@@ -78,6 +78,9 @@ const LARGE_PASTE_WARNING_THRESHOLD = 1024 * 1024; // 1MB - show warning for pas
 const PASTE_CHUNK_SIZE = 8 * 1024; // 8KB chunks for large pastes
 const PASTE_CHUNK_DELAY_MS = 10; // Small delay between chunks to prevent overwhelming WebSocket
 
+// Mobile overlay buffer cap - limit lines read from terminal buffer to avoid DOM blow-up on mobile
+const MAX_OVERLAY_LINES = 1000; // Maximum number of lines to read for the mobile select-mode overlay
+
 interface TerminalPanelProps {
   sessionId: string;
   authToken: string | null;
@@ -460,7 +463,9 @@ export function TerminalPanel({
     const buffer = terminal.buffer.active;
     const lines: string[] = [];
 
-    for (let i = 0; i < buffer.length; i++) {
+    // Cap the number of lines read to MAX_OVERLAY_LINES to avoid blowing up the DOM on mobile
+    const startIndex = Math.max(0, buffer.length - MAX_OVERLAY_LINES);
+    for (let i = startIndex; i < buffer.length; i++) {
       const line = buffer.getLine(i);
       if (line) {
         lines.push(line.translateToString(true));

@@ -495,7 +495,7 @@ export interface AppActions {
   setEnableDependencyBlocking: (enabled: boolean) => void;
   setSkipVerificationInAutoMode: (enabled: boolean) => Promise<void>;
   setEnableAiCommitMessages: (enabled: boolean) => Promise<void>;
-  setMergePostAction: (action: 'commit' | 'manual' | null) => void;
+  setMergePostAction: (action: 'commit' | 'manual' | null) => Promise<void>;
   setPlanUseSelectedWorktreeBranch: (enabled: boolean) => Promise<void>;
   setAddFeatureUseSelectedWorktreeBranch: (enabled: boolean) => Promise<void>;
 

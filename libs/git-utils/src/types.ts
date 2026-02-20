@@ -2,6 +2,9 @@
  * Git utilities types and constants
  */
 
+// Re-export MergeStateInfo from the centralized @automaker/types package
+export type { MergeStateInfo } from '@automaker/types';
+
 // Binary file extensions to skip
 export const BINARY_EXTENSIONS = new Set([
   '.png',
@@ -78,22 +81,4 @@ export interface FileStatus {
   isMergeAffected?: boolean;
   /** Type of merge involvement: 'both-modified' | 'added-by-us' | 'added-by-them' | 'deleted-by-us' | 'deleted-by-them' | 'both-added' | 'both-deleted' */
   mergeType?: string;
-}
-
-/**
- * Merge state information for a git repository
- */
-export interface MergeStateInfo {
-  /** Whether a merge is currently in progress */
-  isMerging: boolean;
-  /** Type of merge operation: 'merge' | 'rebase' | 'cherry-pick' | null */
-  mergeOperationType: 'merge' | 'rebase' | 'cherry-pick' | null;
-  /** Whether the merge completed cleanly (no conflicts) */
-  isCleanMerge: boolean;
-  /** Files affected by the merge */
-  mergeAffectedFiles: string[];
-  /** Files with unresolved conflicts */
-  conflictFiles: string[];
-  /** Whether the current HEAD is a completed merge commit (has multiple parents) */
-  isMergeCommit?: boolean;
 }

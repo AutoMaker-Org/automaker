@@ -143,7 +143,7 @@ export async function detectMergeCommit(
     // Check how many parents HEAD has using rev-parse
     // For a merge commit, HEAD^2 exists (second parent); for non-merge commits it doesn't
     try {
-      await execAsync('git rev-parse --verify HEAD^2', { cwd: repoPath });
+      await execAsync('git rev-parse --verify "HEAD^2"', { cwd: repoPath });
     } catch {
       // HEAD^2 doesn't exist — not a merge commit
       return { isMergeCommit: false, mergeAffectedFiles: [] };
@@ -152,7 +152,7 @@ export async function detectMergeCommit(
     // HEAD is a merge commit - get the files it changed relative to first parent
     let mergeAffectedFiles: string[] = [];
     try {
-      const { stdout: diffOutput } = await execAsync('git diff --name-only HEAD~1 HEAD', {
+      const { stdout: diffOutput } = await execAsync('git diff --name-only "HEAD~1" "HEAD"', {
         cwd: repoPath,
       });
       mergeAffectedFiles = diffOutput

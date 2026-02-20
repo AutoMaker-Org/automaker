@@ -9,7 +9,7 @@
  * The user's choice can be persisted as a preference to avoid repeated prompts.
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -56,6 +56,14 @@ export function PostMergePromptDialog({
 }: PostMergePromptDialogProps) {
   const [rememberChoice, setRememberChoice] = useState(false);
   const [showFiles, setShowFiles] = useState(false);
+
+  // Reset transient state each time the dialog is opened
+  useEffect(() => {
+    if (open) {
+      setRememberChoice(false);
+      setShowFiles(false);
+    }
+  }, [open]);
 
   const handleCommitMerge = useCallback(() => {
     if (rememberChoice && onSavePreference) {

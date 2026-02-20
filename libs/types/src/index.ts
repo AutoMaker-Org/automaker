@@ -360,6 +360,7 @@ export type {
   AddRemoteResult,
   AddRemoteResponse,
   AddRemoteErrorResponse,
+  MergeStateInfo,
 } from './worktree.js';
 export { PR_STATES, validatePRState } from './worktree.js';
 

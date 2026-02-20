@@ -185,6 +185,31 @@ function isConflictError(errorOutput: string): boolean {
 }
 
 /**
+ * Determine whether the current HEAD commit is a merge commit by checking
+ * whether it has two or more parent hashes.
+ *
+ * Runs `git show -s --pretty=%P HEAD` which prints the parent SHAs separated
+ * by spaces.  A merge commit has at least two parents; a regular commit has one.
+ *
+ * @param worktreePath - Path to the git worktree
+ * @returns true if HEAD is a merge commit, false otherwise
+ */
+async function isMergeCommit(worktreePath: string): Promise<boolean> {
+  try {
+    const output = await execGitCommand(['show', '-s', '--pretty=%P', 'HEAD'], worktreePath);
+    // Each parent SHA is separated by a space; two or more means it's a merge
+    const parents = output
+      .trim()
+      .split(/\s+/)
+      .filter((p) => p.length > 0);
+    return parents.length >= 2;
+  } catch {
+    // If the check fails for any reason, assume it is not a merge commit
+    return false;
+  }
+}
+
+/**
  * Check whether an output string indicates a stash conflict.
  */
 function isStashConflict(output: string): boolean {
@@ -312,10 +337,12 @@ export async function performPull(
     const pullOutput = await execGitCommand(pullArgs, worktreePath);
 
     const alreadyUpToDate = pullOutput.includes('Already up to date');
-    // Detect merge vs fast-forward from git pull output
+    // Detect fast-forward from git pull output
     const isFastForward =
       pullOutput.includes('Fast-forward') || pullOutput.includes('fast-forward');
-    const isMerge = !alreadyUpToDate && !isFastForward && pullOutput.includes('Merge');
+    // Detect merge by checking whether the new HEAD has two parents (more reliable
+    // than string-matching localised pull output which may not contain 'Merge').
+    const isMerge = !alreadyUpToDate && !isFastForward ? await isMergeCommit(worktreePath) : false;
 
     // If it was a real merge (not fast-forward), get the affected files
     let mergeAffectedFiles: string[] = [];

@@ -1120,8 +1120,15 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
       logger.error('Failed to sync enableAiCommitMessages:', error);
     }
   },
-  setMergePostAction: (action) => {
+  setMergePostAction: async (action) => {
     set({ mergePostAction: action });
+    // Sync to server
+    try {
+      const httpApi = getHttpApiClient();
+      await httpApi.put('/api/settings', { mergePostAction: action });
+    } catch (error) {
+      logger.error('Failed to sync mergePostAction:', error);
+    }
   },
   setPlanUseSelectedWorktreeBranch: async (enabled) => {
     set({ planUseSelectedWorktreeBranch: enabled });

@@ -718,6 +718,7 @@ export async function refreshSettingsFromServer(): Promise<boolean> {
       defaultSkipTests: serverSettings.defaultSkipTests,
       enableDependencyBlocking: serverSettings.enableDependencyBlocking,
       skipVerificationInAutoMode: serverSettings.skipVerificationInAutoMode,
+      mergePostAction: serverSettings.mergePostAction ?? null,
       useWorktrees: serverSettings.useWorktrees,
       defaultPlanningMode: serverSettings.defaultPlanningMode,
       defaultRequirePlanApproval: serverSettings.defaultRequirePlanApproval,

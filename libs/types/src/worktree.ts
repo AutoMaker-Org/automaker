@@ -74,3 +74,21 @@ export interface AddRemoteErrorResponse {
   /** Optional error code for specific error types (e.g., 'REMOTE_EXISTS') */
   code?: string;
 }
+
+/**
+ * Merge state information for a git repository
+ */
+export interface MergeStateInfo {
+  /** Whether a merge is currently in progress */
+  isMerging: boolean;
+  /** Type of merge operation: 'merge' | 'rebase' | 'cherry-pick' | null */
+  mergeOperationType: 'merge' | 'rebase' | 'cherry-pick' | null;
+  /** Whether the merge completed cleanly (no conflicts) */
+  isCleanMerge: boolean;
+  /** Files affected by the merge */
+  mergeAffectedFiles: string[];
+  /** Files with unresolved conflicts */
+  conflictFiles: string[];
+  /** Whether the current HEAD is a completed merge commit (has multiple parents) */
+  isMergeCommit?: boolean;
+}

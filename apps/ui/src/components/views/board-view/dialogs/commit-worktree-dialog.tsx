@@ -689,7 +689,9 @@ export function CommitWorktreeDialog({
                   const isStaged = idx !== ' ' && idx !== '?';
                   const isUnstaged = wt !== ' ' && wt !== '?';
                   const isUntracked = idx === '?' && wt === '?';
-                  const isMergeFile = file.isMergeAffected;
+                  const isMergeFile =
+                    file.isMergeAffected ||
+                    (mergeState?.mergeAffectedFiles?.includes(file.path) ?? false);
 
                   return (
                     <div

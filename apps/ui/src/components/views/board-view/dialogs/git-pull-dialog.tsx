@@ -23,6 +23,7 @@ import {
   Settings,
 } from 'lucide-react';
 import { Spinner } from '@/components/ui/spinner';
+import { Checkbox } from '@/components/ui/checkbox';
 import { getElectronAPI } from '@/lib/electron';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -505,22 +506,34 @@ export function GitPullDialog({
             {/* Remember choice option */}
             <div className="flex items-center gap-2 px-1">
               <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer">
-                <input
-                  type="checkbox"
+                <Checkbox
                   checked={rememberChoice}
-                  onChange={(e) => setRememberChoice(e.target.checked)}
+                  onCheckedChange={(checked) => setRememberChoice(checked)}
                   className="rounded border-border"
                 />
                 <Settings className="w-3 h-3" />
                 Remember my choice for future merges
               </label>
-              {mergePostAction && (
-                <button
-                  onClick={() => setMergePostAction(null)}
-                  className="text-xs text-muted-foreground hover:text-foreground transition-colors ml-auto"
-                >
-                  Reset preference
-                </button>
+              {(rememberChoice || mergePostAction) && (
+                <span className="text-xs text-muted-foreground ml-auto flex items-center gap-2">
+                  <span className="opacity-70">
+                    Current:{' '}
+                    {mergePostAction === 'commit'
+                      ? 'auto-commit'
+                      : mergePostAction === 'manual'
+                        ? 'manual review'
+                        : 'auto-commit'}
+                  </span>
+                  <button
+                    onClick={() => {
+                      setMergePostAction(null);
+                      setRememberChoice(false);
+                    }}
+                    className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    Reset preference
+                  </button>
+                </span>
               )}
             </div>
 
