@@ -354,12 +354,18 @@ export function WorktreeActionsDropdown({
           <>
             <DropdownMenuLabel className="text-xs flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-              Dev Server Running (:{devServerInfo?.port})
+              {devServerInfo?.urlDetected === false
+                ? 'Dev Server Starting...'
+                : `Dev Server Running (:${devServerInfo?.port})`}
             </DropdownMenuLabel>
             <DropdownMenuItem
               onClick={() => onOpenDevServerUrl(worktree)}
               className="text-xs"
-              aria-label={`Open dev server on port ${devServerInfo?.port} in browser`}
+              aria-label={
+                devServerInfo?.urlDetected === false
+                  ? 'Open dev server in browser'
+                  : `Open dev server on port ${devServerInfo?.port} in browser`
+              }
             >
               <Globe className="w-3.5 h-3.5 mr-2" aria-hidden="true" />
               Open in Browser

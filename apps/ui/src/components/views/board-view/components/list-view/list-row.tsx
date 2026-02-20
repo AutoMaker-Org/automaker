@@ -209,15 +209,22 @@ export const ListRow = memo(function ListRow({
   blockingDependencies = [],
   className,
 }: ListRowProps) {
-  // A row should only display as "actively running" if it's both in the
-  // runningAutoTasks list AND in an execution-compatible status. Features in resting
-  // states (backlog, ready, waiting_approval, verified, completed) should never
-  // show running controls, even if they appear in runningAutoTasks due to stale
-  // state (e.g., after a server restart that reconciled features back to backlog).
+  // A row should display as "actively running" if it's in the runningAutoTasks list
+  // AND in an execution-compatible status. However, there's a race window where a feature
+  // is tracked as running but its status hasn't caught up yet (still 'backlog', 'ready',
+  // or 'interrupted'). We handle this with isRunningWithStaleStatus.
   const isInExecutionState =
     feature.status === 'in_progress' ||
     (typeof feature.status === 'string' && feature.status.startsWith('pipeline_'));
   const isActivelyRunning = isCurrentAutoTask && isInExecutionState;
+  // Feature is tracked as running but status hasn't updated yet - show running UI
+  const isRunningWithStaleStatus =
+    isCurrentAutoTask &&
+    !isInExecutionState &&
+    (feature.status === 'backlog' ||
+      feature.status === 'ready' ||
+      feature.status === 'interrupted');
+  const showRunningVisuals = isActivelyRunning || isRunningWithStaleStatus;
 
   const handleRowClick = useCallback(
     (e: React.MouseEvent) => {
@@ -359,13 +366,18 @@ export const ListRow = memo(function ListRow({
 
       {/* Actions column */}
       <div role="cell" className="flex items-center justify-end px-3 py-3 w-[80px] shrink-0">
-        <RowActions feature={feature} handlers={handlers} isCurrentAutoTask={isActivelyRunning} />
+        <RowActions
+          feature={feature}
+          handlers={handlers}
+          isCurrentAutoTask={isActivelyRunning}
+          isRunningTask={!!isCurrentAutoTask}
+        />
       </div>
     </div>
   );
 
-  // Wrap with animated border for currently running auto task
-  if (isActivelyRunning) {
+  // Wrap with animated border for currently running auto task (including stale status)
+  if (showRunningVisuals) {
     return <div className="animated-border-wrapper-row">{rowContent}</div>;
   }
 

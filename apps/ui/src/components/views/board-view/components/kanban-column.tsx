@@ -42,7 +42,12 @@ export const KanbanColumn = memo(function KanbanColumn({
   contentStyle,
   disableItemSpacing = false,
 }: KanbanColumnProps) {
-  const { setNodeRef, isOver } = useDroppable({ id });
+  const { setNodeRef, isOver: isColumnOver } = useDroppable({ id });
+  // Also make the header explicitly a drop target so dragging to the top of the column works
+  const { setNodeRef: setHeaderDropRef, isOver: isHeaderOver } = useDroppable({
+    id: `column-header-${id}`,
+  });
+  const isOver = isColumnOver || isHeaderOver;
 
   // Use inline style for width if provided, otherwise use default w-72
   const widthStyle = width ? { width: `${width}px`, flexShrink: 0 } : undefined;
@@ -70,8 +75,9 @@ export const KanbanColumn = memo(function KanbanColumn({
         style={{ opacity: opacity / 100 }}
       />
 
-      {/* Column Header */}
+      {/* Column Header - also registered as a drop target so dragging to the header area works */}
       <div
+        ref={setHeaderDropRef}
         className={cn(
           'relative z-10 flex items-center gap-3 px-3 py-2.5',
           showBorder && 'border-b border-border/40'

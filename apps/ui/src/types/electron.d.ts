@@ -1286,6 +1286,7 @@ export interface WorktreeAPI {
         worktreePath: string;
         port: number;
         url: string;
+        urlDetected: boolean;
       }>;
     };
     error?: string;
@@ -1304,7 +1305,7 @@ export interface WorktreeAPI {
     error?: string;
   }>;
 
-  // Subscribe to dev server log events (started, output, stopped)
+  // Subscribe to dev server log events (started, output, stopped, url-detected)
   onDevServerLogEvent: (
     callback: (
       event:
@@ -1323,6 +1324,15 @@ export interface WorktreeAPI {
               port: number;
               exitCode: number | null;
               error?: string;
+              timestamp: string;
+            };
+          }
+        | {
+            type: 'dev-server:url-detected';
+            payload: {
+              worktreePath: string;
+              url: string;
+              port: number;
               timestamp: string;
             };
           }

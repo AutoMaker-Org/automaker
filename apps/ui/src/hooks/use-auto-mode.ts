@@ -157,8 +157,29 @@ export function useAutoMode(worktree?: WorktreeInfo) {
   // Check if we can start a new task based on concurrency limit
   const canStartNewTask = runningAutoTasks.length < maxConcurrency;
 
-  // Ref to prevent refreshStatus from overwriting optimistic state during start/stop
+  // Ref to prevent refreshStatus and WebSocket handlers from overwriting optimistic state
+  // during start/stop transitions.
   const isTransitioningRef = useRef(false);
+  // Tracks specifically a restart-for-concurrency transition. When true, the
+  // auto_mode_started WebSocket handler will clear isTransitioningRef, ensuring
+  // delayed auto_mode_stopped events that arrive after the HTTP calls complete
+  // (but before the WebSocket events) are still suppressed.
+  const isRestartTransitionRef = useRef(false);
+  // Safety timeout ID to clear the transition flag if the auto_mode_started event never arrives
+  const restartSafetyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Use refs for mutable state in refreshStatus to avoid unstable callback identity.
+  // This prevents the useEffect that calls refreshStatus on mount from re-firing
+  // every time isAutoModeRunning or runningAutoTasks changes, which was a source of
+  // flickering as refreshStatus would race with WebSocket events and optimistic updates.
+  const isAutoModeRunningRef = useRef(isAutoModeRunning);
+  const runningAutoTasksRef = useRef(runningAutoTasks);
+  useEffect(() => {
+    isAutoModeRunningRef.current = isAutoModeRunning;
+  }, [isAutoModeRunning]);
+  useEffect(() => {
+    runningAutoTasksRef.current = runningAutoTasks;
+  }, [runningAutoTasks]);
 
   const refreshStatus = useCallback(async () => {
     if (!currentProject) return;
@@ -175,20 +196,25 @@ export function useAutoMode(worktree?: WorktreeInfo) {
       if (result.success && result.isAutoLoopRunning !== undefined) {
         const backendIsRunning = result.isAutoLoopRunning;
         const backendRunningFeatures = result.runningFeatures ?? [];
+        // Read latest state from refs to avoid stale closure values
+        const currentIsRunning = isAutoModeRunningRef.current;
+        const currentRunningTasks = runningAutoTasksRef.current;
         const needsSync =
-          backendIsRunning !== isAutoModeRunning ||
+          backendIsRunning !== currentIsRunning ||
           // Also sync when backend has runningFeatures we're missing (handles missed WebSocket events)
           (backendIsRunning &&
             Array.isArray(backendRunningFeatures) &&
             backendRunningFeatures.length > 0 &&
-            !arraysEqual(backendRunningFeatures, runningAutoTasks)) ||
+            !arraysEqual(backendRunningFeatures, currentRunningTasks)) ||
           // Also sync when UI has stale running tasks but backend has none
           // (handles server restart where features were reconciled to backlog/ready)
-          (!backendIsRunning && runningAutoTasks.length > 0 && backendRunningFeatures.length === 0);
+          (!backendIsRunning &&
+            currentRunningTasks.length > 0 &&
+            backendRunningFeatures.length === 0);
 
         if (needsSync) {
           const worktreeDesc = branchName ? `worktree ${branchName}` : 'main worktree';
-          if (backendIsRunning !== isAutoModeRunning) {
+          if (backendIsRunning !== currentIsRunning) {
             logger.info(
               `[AutoMode] Syncing UI state with backend for ${worktreeDesc} in ${currentProject.path}: ${backendIsRunning ? 'ON' : 'OFF'}`
             );
@@ -206,7 +232,7 @@ export function useAutoMode(worktree?: WorktreeInfo) {
     } catch (error) {
       logger.error('Error syncing auto mode state with backend:', error);
     }
-  }, [branchName, currentProject, isAutoModeRunning, runningAutoTasks, setAutoModeRunning]);
+  }, [branchName, currentProject, setAutoModeRunning]);
 
   // On mount, query backend for current auto loop status and sync UI state.
   // This handles cases where the backend is still running after a page refresh.
@@ -281,7 +307,20 @@ export function useAutoMode(worktree?: WorktreeInfo) {
                 'maxConcurrency' in event && typeof event.maxConcurrency === 'number'
                   ? event.maxConcurrency
                   : getMaxConcurrencyForWorktree(eventProjectId, eventBranchName);
+              // Always apply start events even during transitions - this confirms the optimistic state
               setAutoModeRunning(eventProjectId, eventBranchName, true, eventMaxConcurrency);
+            }
+            // If we were in a restart transition (concurrency change), the arrival of
+            // auto_mode_started confirms the restart is complete. Clear the transition
+            // flags so future auto_mode_stopped events are processed normally.
+            if (isRestartTransitionRef.current) {
+              logger.debug(`[AutoMode] Restart transition complete for ${worktreeDesc}`);
+              isTransitioningRef.current = false;
+              isRestartTransitionRef.current = false;
+              if (restartSafetyTimeoutRef.current) {
+                clearTimeout(restartSafetyTimeoutRef.current);
+                restartSafetyTimeoutRef.current = null;
+              }
             }
           }
           break;
@@ -307,12 +346,20 @@ export function useAutoMode(worktree?: WorktreeInfo) {
           break;
 
         case 'auto_mode_stopped':
-          // Backend stopped auto loop - update UI state
+          // Backend stopped auto loop - update UI state.
+          // Skip during transitions (e.g., restartWithConcurrency) to avoid flickering the toggle
+          // off between stop and start. The transition handler will set the correct final state.
           {
             const worktreeDesc = eventBranchName ? `worktree ${eventBranchName}` : 'main worktree';
-            logger.info(`[AutoMode] Backend stopped auto loop for ${worktreeDesc}`);
-            if (eventProjectId) {
-              setAutoModeRunning(eventProjectId, eventBranchName, false);
+            if (isTransitioningRef.current) {
+              logger.info(
+                `[AutoMode] Backend stopped auto loop for ${worktreeDesc} (ignored during transition)`
+              );
+            } else {
+              logger.info(`[AutoMode] Backend stopped auto loop for ${worktreeDesc}`);
+              if (eventProjectId) {
+                setAutoModeRunning(eventProjectId, eventBranchName, false);
+              }
             }
           }
           break;
@@ -624,8 +671,10 @@ export function useAutoMode(worktree?: WorktreeInfo) {
       }
 
       logger.debug(`[AutoMode] Started successfully for ${worktreeDesc}`);
-      // Sync with backend after success (gets runningFeatures if events were delayed)
-      queueMicrotask(() => void refreshStatus());
+      // Sync with backend after a short delay to get runningFeatures if events were delayed.
+      // The delay ensures the backend has fully processed the start before we poll status,
+      // avoiding a race where status returns stale data and briefly flickers the toggle.
+      setTimeout(() => void refreshStatus(), 500);
     } catch (error) {
       // Revert UI state on error
       setAutoModeSessionForWorktree(currentProject.path, branchName, false);
@@ -672,8 +721,8 @@ export function useAutoMode(worktree?: WorktreeInfo) {
       // NOTE: Running tasks will continue until natural completion.
       // The backend stops picking up new features but doesn't abort running ones.
       logger.info(`Stopped ${worktreeDesc} - running tasks will continue`);
-      // Sync with backend after success
-      queueMicrotask(() => void refreshStatus());
+      // Sync with backend after a short delay to confirm stopped state
+      setTimeout(() => void refreshStatus(), 500);
     } catch (error) {
       // Revert UI state on error
       setAutoModeSessionForWorktree(currentProject.path, branchName, true);
@@ -684,6 +733,89 @@ export function useAutoMode(worktree?: WorktreeInfo) {
       isTransitioningRef.current = false;
     }
   }, [currentProject, branchName, setAutoModeRunning]);
+
+  // Restart auto mode with new concurrency without flickering the toggle.
+  // Unlike stop() + start(), this keeps isRunning=true throughout the transition
+  // so the toggle switch never visually turns off.
+  //
+  // IMPORTANT: isTransitioningRef is NOT cleared in the finally block here.
+  // Instead, it stays true until the auto_mode_started WebSocket event arrives,
+  // which confirms the backend restart is complete. This prevents a race condition
+  // where a delayed auto_mode_stopped WebSocket event (sent by the backend during
+  // stop()) arrives after the HTTP calls complete but before the WebSocket events,
+  // which would briefly set isRunning=false and cause a visible toggle flicker.
+  // A safety timeout ensures the flag is cleared even if the event never arrives.
+  const restartWithConcurrency = useCallback(async () => {
+    if (!currentProject) {
+      logger.error('No project selected');
+      return;
+    }
+
+    // Clear any previous safety timeout
+    if (restartSafetyTimeoutRef.current) {
+      clearTimeout(restartSafetyTimeoutRef.current);
+      restartSafetyTimeoutRef.current = null;
+    }
+
+    isTransitioningRef.current = true;
+    isRestartTransitionRef.current = true;
+    try {
+      const api = getElectronAPI();
+      if (!api?.autoMode?.stop || !api?.autoMode?.start) {
+        throw new Error('Auto mode API not available');
+      }
+
+      const worktreeDesc = branchName ? `worktree ${branchName}` : 'main worktree';
+      logger.info(
+        `[AutoMode] Restarting with new concurrency for ${worktreeDesc} in ${currentProject.path}`
+      );
+
+      // Stop backend without updating UI state (keep isRunning=true)
+      const stopResult = await api.autoMode.stop(currentProject.path, branchName);
+
+      if (!stopResult.success) {
+        logger.error('Failed to stop auto mode during restart:', stopResult.error);
+        // Don't throw - try to start anyway since the goal is to update concurrency
+      }
+
+      // Start backend with the new concurrency (UI state stays isRunning=true)
+      const currentMaxConcurrency = getMaxConcurrencyForWorktree(currentProject.id, branchName);
+      const startResult = await api.autoMode.start(
+        currentProject.path,
+        branchName,
+        currentMaxConcurrency
+      );
+
+      if (!startResult.success) {
+        // If start fails, we need to revert UI state since we're actually stopped now
+        isTransitioningRef.current = false;
+        isRestartTransitionRef.current = false;
+        setAutoModeSessionForWorktree(currentProject.path, branchName, false);
+        setAutoModeRunning(currentProject.id, branchName, false);
+        logger.error('Failed to restart auto mode with new concurrency:', startResult.error);
+        throw new Error(startResult.error || 'Failed to restart auto mode');
+      }
+
+      logger.debug(`[AutoMode] Restarted successfully for ${worktreeDesc}`);
+
+      // Don't clear isTransitioningRef here - let the auto_mode_started WebSocket
+      // event handler clear it. Set a safety timeout in case the event never arrives.
+      restartSafetyTimeoutRef.current = setTimeout(() => {
+        if (isRestartTransitionRef.current) {
+          logger.warn('[AutoMode] Restart transition safety timeout - clearing transition flag');
+          isTransitioningRef.current = false;
+          isRestartTransitionRef.current = false;
+          restartSafetyTimeoutRef.current = null;
+        }
+      }, 5000);
+    } catch (error) {
+      // On error, clear the transition flags immediately
+      isTransitioningRef.current = false;
+      isRestartTransitionRef.current = false;
+      logger.error('Error restarting auto mode:', error);
+      throw error;
+    }
+  }, [currentProject, branchName, setAutoModeRunning, getMaxConcurrencyForWorktree]);
 
   // Stop a specific feature
   const stopFeature = useCallback(
@@ -731,6 +863,7 @@ export function useAutoMode(worktree?: WorktreeInfo) {
     start,
     stop,
     stopFeature,
+    restartWithConcurrency,
     refreshStatus,
   };
 }

@@ -568,6 +568,7 @@ type EventType =
   | 'dev-server:started'
   | 'dev-server:output'
   | 'dev-server:stopped'
+  | 'dev-server:url-detected'
   | 'test-runner:started'
   | 'test-runner:output'
   | 'test-runner:completed'
@@ -597,10 +598,18 @@ export interface DevServerStoppedEvent {
   timestamp: string;
 }
 
+export interface DevServerUrlDetectedEvent {
+  worktreePath: string;
+  url: string;
+  port: number;
+  timestamp: string;
+}
+
 export type DevServerLogEvent =
   | { type: 'dev-server:started'; payload: DevServerStartedEvent }
   | { type: 'dev-server:output'; payload: DevServerOutputEvent }
-  | { type: 'dev-server:stopped'; payload: DevServerStoppedEvent };
+  | { type: 'dev-server:stopped'; payload: DevServerStoppedEvent }
+  | { type: 'dev-server:url-detected'; payload: DevServerUrlDetectedEvent };
 
 /**
  * Test runner event payloads for WebSocket streaming
@@ -2204,10 +2213,14 @@ export class HttpApiClient implements ElectronAPI {
       const unsub3 = this.subscribeToEvent('dev-server:stopped', (payload) =>
         callback({ type: 'dev-server:stopped', payload: payload as DevServerStoppedEvent })
       );
+      const unsub4 = this.subscribeToEvent('dev-server:url-detected', (payload) =>
+        callback({ type: 'dev-server:url-detected', payload: payload as DevServerUrlDetectedEvent })
+      );
       return () => {
         unsub1();
         unsub2();
         unsub3();
+        unsub4();
       };
     },
     getPRInfo: (worktreePath: string, branchName: string) =>

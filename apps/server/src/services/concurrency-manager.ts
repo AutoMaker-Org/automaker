@@ -170,17 +170,28 @@ export class ConcurrencyManager {
    * @param projectPath - The project path
    * @param branchName - The branch name, or null for main worktree
    *                     (features without branchName or matching primary branch)
+   * @param options.autoModeOnly - If true, only count features started by auto mode.
+   *                               Note: The auto-loop coordinator now counts ALL
+   *                               running features (not just auto-mode) to ensure
+   *                               total system load is respected. This option is
+   *                               retained for other callers that may need filtered counts.
    * @returns Number of running features for the worktree
    */
   async getRunningCountForWorktree(
     projectPath: string,
-    branchName: string | null
+    branchName: string | null,
+    options?: { autoModeOnly?: boolean }
   ): Promise<number> {
     // Get the actual primary branch name for the project
     const primaryBranch = await this.getCurrentBranch(projectPath);
 
     let count = 0;
     for (const [, feature] of this.runningFeatures) {
+      // If autoModeOnly is set, skip manually started features
+      if (options?.autoModeOnly && !feature.isAutoMode) {
+        continue;
+      }
+
       // Filter by project path AND branchName to get accurate worktree-specific count
       const featureBranch = feature.branchName ?? null;
       if (branchName === null) {

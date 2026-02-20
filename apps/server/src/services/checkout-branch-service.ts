@@ -10,6 +10,7 @@
  * Follows the same pattern as worktree-branch-service.ts (performSwitchBranch).
  *
  * The workflow:
+ * 0. Fetch latest from all remotes (ensures remote refs are up-to-date)
  * 1. Validate inputs (branch name, base branch)
  * 2. Get current branch name
  * 3. Check if target branch already exists
@@ -19,10 +20,49 @@
  * 7. Handle error recovery (restore stash if checkout fails)
  */
 
-import { getErrorMessage } from '@automaker/utils';
+import { createLogger, getErrorMessage } from '@automaker/utils';
 import { execGitCommand } from '../lib/git.js';
 import type { EventEmitter } from '../lib/events.js';
 import { hasAnyChanges, stashChanges, popStash, localBranchExists } from './branch-utils.js';
+
+const logger = createLogger('CheckoutBranchService');
+
+// ============================================================================
+// Local Helpers
+// ============================================================================
+
+/** Timeout for git fetch operations (30 seconds) */
+const FETCH_TIMEOUT_MS = 30_000;
+
+/**
+ * Fetch latest from all remotes (silently, with timeout).
+ *
+ * A process-level timeout is enforced via an AbortController so that a
+ * slow or unresponsive remote does not block the branch creation flow
+ * indefinitely.  Timeout errors are logged and treated as non-fatal
+ * (the same as network-unavailable errors) so the rest of the workflow
+ * continues normally.  This is called before creating the new branch to
+ * ensure remote refs are up-to-date when a remote base branch is used.
+ */
+async function fetchRemotes(cwd: string): Promise<void> {
+  const controller = new AbortController();
+  const timerId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+
+  try {
+    await execGitCommand(['fetch', '--all', '--quiet'], cwd, undefined, controller);
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Process aborted') {
+      logger.warn(
+        `fetchRemotes timed out after ${FETCH_TIMEOUT_MS}ms - continuing without latest remote refs`
+      );
+    }
+    // Ignore all fetch errors (timeout or otherwise) - we may be offline or the
+    // remote may be temporarily unavailable.  The branch creation should proceed
+    // with whatever refs are locally available.
+  } finally {
+    clearTimeout(timerId);
+  }
+}
 
 // ============================================================================
 // Types
@@ -77,6 +117,11 @@ export async function performCheckoutBranch(
 
   // Emit start event
   events?.emit('switch:start', { worktreePath, branchName, operation: 'checkout' });
+
+  // 0. Fetch latest from all remotes before creating the branch
+  //    This ensures remote refs are up-to-date so that base branch validation
+  //    works correctly for remote branch references (e.g. "origin/main").
+  await fetchRemotes(worktreePath);
 
   // 1. Get current branch
   let previousBranch: string;

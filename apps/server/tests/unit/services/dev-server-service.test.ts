@@ -486,7 +486,7 @@ describe('dev-server-service.ts', () => {
       await service.startDevServer(testDir, testDir);
 
       // Simulate HTTPS dev server
-      mockProcess.stdout.emit('data', Buffer.from('Server at https://localhost:3443\n'));
+      mockProcess.stdout.emit('data', Buffer.from('Server listening at https://localhost:3443\n'));
 
       await new Promise((resolve) => setTimeout(resolve, 50));
 
@@ -520,6 +520,368 @@ describe('dev-server-service.ts', () => {
       const serverInfo = service.getServerInfo(testDir);
       expect(serverInfo?.url).toBe(firstUrl);
       expect(serverInfo?.url).toBe('http://localhost:5173/');
+    });
+
+    it('should detect Astro format URL', async () => {
+      vi.mocked(secureFs.access).mockResolvedValue(undefined);
+
+      const mockProcess = createMockProcess();
+      vi.mocked(spawn).mockReturnValue(mockProcess as any);
+
+      const { getDevServerService } = await import('@/services/dev-server-service.js');
+      const service = getDevServerService();
+
+      await service.startDevServer(testDir, testDir);
+
+      // Astro uses the same "Local:" prefix as Vite
+      mockProcess.stdout.emit('data', Buffer.from('  🚀  astro  v4.0.0 started in 200ms\n'));
+      mockProcess.stdout.emit('data', Buffer.from('  ┃ Local    http://localhost:4321/\n'));
+
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      const serverInfo = service.getServerInfo(testDir);
+      // Astro doesn't use "Local:" with colon, so it should be caught by the localhost URL pattern
+      expect(serverInfo?.url).toBe('http://localhost:4321/');
+      expect(serverInfo?.urlDetected).toBe(true);
+    });
+
+    it('should detect Remix format URL', async () => {
+      vi.mocked(secureFs.access).mockResolvedValue(undefined);
+
+      const mockProcess = createMockProcess();
+      vi.mocked(spawn).mockReturnValue(mockProcess as any);
+
+      const { getDevServerService } = await import('@/services/dev-server-service.js');
+      const service = getDevServerService();
+
+      await service.startDevServer(testDir, testDir);
+
+      mockProcess.stdout.emit(
+        'data',
+        Buffer.from('Remix App Server started at http://localhost:3000\n')
+      );
+
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      const serverInfo = service.getServerInfo(testDir);
+      expect(serverInfo?.url).toBe('http://localhost:3000');
+      expect(serverInfo?.urlDetected).toBe(true);
+    });
+
+    it('should detect Django format URL', async () => {
+      vi.mocked(secureFs.access).mockResolvedValue(undefined);
+
+      const mockProcess = createMockProcess();
+      vi.mocked(spawn).mockReturnValue(mockProcess as any);
+
+      const { getDevServerService } = await import('@/services/dev-server-service.js');
+      const service = getDevServerService();
+
+      await service.startDevServer(testDir, testDir);
+
+      mockProcess.stdout.emit(
+        'data',
+        Buffer.from('Starting development server at http://127.0.0.1:8000/\n')
+      );
+
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      const serverInfo = service.getServerInfo(testDir);
+      expect(serverInfo?.url).toBe('http://127.0.0.1:8000/');
+      expect(serverInfo?.urlDetected).toBe(true);
+    });
+
+    it('should detect Webpack Dev Server format URL', async () => {
+      vi.mocked(secureFs.access).mockResolvedValue(undefined);
+
+      const mockProcess = createMockProcess();
+      vi.mocked(spawn).mockReturnValue(mockProcess as any);
+
+      const { getDevServerService } = await import('@/services/dev-server-service.js');
+      const service = getDevServerService();
+
+      await service.startDevServer(testDir, testDir);
+
+      mockProcess.stdout.emit(
+        'data',
+        Buffer.from('<i> [webpack-dev-server] Project is running at http://localhost:8080/\n')
+      );
+
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      const serverInfo = service.getServerInfo(testDir);
+      expect(serverInfo?.url).toBe('http://localhost:8080/');
+      expect(serverInfo?.urlDetected).toBe(true);
+    });
+
+    it('should detect PHP built-in server format URL', async () => {
+      vi.mocked(secureFs.access).mockResolvedValue(undefined);
+
+      const mockProcess = createMockProcess();
+      vi.mocked(spawn).mockReturnValue(mockProcess as any);
+
+      const { getDevServerService } = await import('@/services/dev-server-service.js');
+      const service = getDevServerService();
+
+      await service.startDevServer(testDir, testDir);
+
+      mockProcess.stdout.emit(
+        'data',
+        Buffer.from('Development Server (http://localhost:8000) started\n')
+      );
+
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      const serverInfo = service.getServerInfo(testDir);
+      expect(serverInfo?.url).toBe('http://localhost:8000');
+      expect(serverInfo?.urlDetected).toBe(true);
+    });
+
+    it('should detect "listening on port" format (port-only detection)', async () => {
+      vi.mocked(secureFs.access).mockResolvedValue(undefined);
+
+      const mockProcess = createMockProcess();
+      vi.mocked(spawn).mockReturnValue(mockProcess as any);
+
+      const { getDevServerService } = await import('@/services/dev-server-service.js');
+      const service = getDevServerService();
+
+      await service.startDevServer(testDir, testDir);
+
+      // Some servers only print the port number, not a full URL
+      mockProcess.stdout.emit('data', Buffer.from('Server listening on port 4000\n'));
+
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      const serverInfo = service.getServerInfo(testDir);
+      expect(serverInfo?.url).toBe('http://localhost:4000');
+      expect(serverInfo?.urlDetected).toBe(true);
+    });
+
+    it('should detect "running on port" format (port-only detection)', async () => {
+      vi.mocked(secureFs.access).mockResolvedValue(undefined);
+
+      const mockProcess = createMockProcess();
+      vi.mocked(spawn).mockReturnValue(mockProcess as any);
+
+      const { getDevServerService } = await import('@/services/dev-server-service.js');
+      const service = getDevServerService();
+
+      await service.startDevServer(testDir, testDir);
+
+      mockProcess.stdout.emit('data', Buffer.from('Application running on port 9000\n'));
+
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      const serverInfo = service.getServerInfo(testDir);
+      expect(serverInfo?.url).toBe('http://localhost:9000');
+      expect(serverInfo?.urlDetected).toBe(true);
+    });
+
+    it('should strip ANSI escape codes before detecting URL', async () => {
+      vi.mocked(secureFs.access).mockResolvedValue(undefined);
+
+      const mockProcess = createMockProcess();
+      vi.mocked(spawn).mockReturnValue(mockProcess as any);
+
+      const { getDevServerService } = await import('@/services/dev-server-service.js');
+      const service = getDevServerService();
+
+      await service.startDevServer(testDir, testDir);
+
+      // Simulate Vite output with ANSI color codes
+      mockProcess.stdout.emit(
+        'data',
+        Buffer.from(
+          '  \x1B[32m➜\x1B[0m  \x1B[1mLocal:\x1B[0m   \x1B[36mhttp://localhost:5173/\x1B[0m\n'
+        )
+      );
+
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      const serverInfo = service.getServerInfo(testDir);
+      expect(serverInfo?.url).toBe('http://localhost:5173/');
+      expect(serverInfo?.urlDetected).toBe(true);
+    });
+
+    it('should normalize 0.0.0.0 to localhost', async () => {
+      vi.mocked(secureFs.access).mockResolvedValue(undefined);
+
+      const mockProcess = createMockProcess();
+      vi.mocked(spawn).mockReturnValue(mockProcess as any);
+
+      const { getDevServerService } = await import('@/services/dev-server-service.js');
+      const service = getDevServerService();
+
+      await service.startDevServer(testDir, testDir);
+
+      mockProcess.stdout.emit('data', Buffer.from('Server listening at http://0.0.0.0:3000\n'));
+
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      const serverInfo = service.getServerInfo(testDir);
+      expect(serverInfo?.url).toBe('http://localhost:3000');
+      expect(serverInfo?.urlDetected).toBe(true);
+    });
+
+    it('should normalize [::] to localhost', async () => {
+      vi.mocked(secureFs.access).mockResolvedValue(undefined);
+
+      const mockProcess = createMockProcess();
+      vi.mocked(spawn).mockReturnValue(mockProcess as any);
+
+      const { getDevServerService } = await import('@/services/dev-server-service.js');
+      const service = getDevServerService();
+
+      await service.startDevServer(testDir, testDir);
+
+      mockProcess.stdout.emit('data', Buffer.from('Local: http://[::]:4000/\n'));
+
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      const serverInfo = service.getServerInfo(testDir);
+      expect(serverInfo?.url).toBe('http://localhost:4000/');
+      expect(serverInfo?.urlDetected).toBe(true);
+    });
+
+    it('should update port field when detected URL has different port', async () => {
+      vi.mocked(secureFs.access).mockResolvedValue(undefined);
+
+      const mockProcess = createMockProcess();
+      vi.mocked(spawn).mockReturnValue(mockProcess as any);
+
+      const { getDevServerService } = await import('@/services/dev-server-service.js');
+      const service = getDevServerService();
+
+      const result = await service.startDevServer(testDir, testDir);
+      const allocatedPort = result.result?.port;
+
+      // Server starts on a completely different port (ignoring PORT env var)
+      mockProcess.stdout.emit('data', Buffer.from('Local: http://localhost:9999/\n'));
+
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      const serverInfo = service.getServerInfo(testDir);
+      expect(serverInfo?.url).toBe('http://localhost:9999/');
+      expect(serverInfo?.port).toBe(9999);
+      // The port should be different from what was initially allocated
+      if (allocatedPort !== 9999) {
+        expect(serverInfo?.port).not.toBe(allocatedPort);
+      }
+    });
+
+    it('should detect URL from stderr output', async () => {
+      vi.mocked(secureFs.access).mockResolvedValue(undefined);
+
+      const mockProcess = createMockProcess();
+      vi.mocked(spawn).mockReturnValue(mockProcess as any);
+
+      const { getDevServerService } = await import('@/services/dev-server-service.js');
+      const service = getDevServerService();
+
+      await service.startDevServer(testDir, testDir);
+
+      // Some servers output URL info to stderr
+      mockProcess.stderr.emit('data', Buffer.from('Local: http://localhost:3000/\n'));
+
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      const serverInfo = service.getServerInfo(testDir);
+      expect(serverInfo?.url).toBe('http://localhost:3000/');
+      expect(serverInfo?.urlDetected).toBe(true);
+    });
+
+    it('should not match URLs without a port (non-dev-server URLs)', async () => {
+      vi.mocked(secureFs.access).mockResolvedValue(undefined);
+
+      const mockProcess = createMockProcess();
+      vi.mocked(spawn).mockReturnValue(mockProcess as any);
+
+      const { getDevServerService } = await import('@/services/dev-server-service.js');
+      const service = getDevServerService();
+
+      const result = await service.startDevServer(testDir, testDir);
+
+      // CDN/external URLs should not be detected
+      mockProcess.stdout.emit(
+        'data',
+        Buffer.from('Downloading from https://cdn.example.com/bundle.js\n')
+      );
+      mockProcess.stdout.emit('data', Buffer.from('Fetching https://registry.npmjs.org/package\n'));
+
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      const serverInfo = service.getServerInfo(testDir);
+      // Should keep the initial allocated URL since external URLs don't match
+      expect(serverInfo?.url).toBe(result.result?.url);
+      expect(serverInfo?.urlDetected).toBe(false);
+    });
+
+    it('should handle URLs with trailing punctuation', async () => {
+      vi.mocked(secureFs.access).mockResolvedValue(undefined);
+
+      const mockProcess = createMockProcess();
+      vi.mocked(spawn).mockReturnValue(mockProcess as any);
+
+      const { getDevServerService } = await import('@/services/dev-server-service.js');
+      const service = getDevServerService();
+
+      await service.startDevServer(testDir, testDir);
+
+      // URL followed by punctuation
+      mockProcess.stdout.emit('data', Buffer.from('Server started at http://localhost:3000.\n'));
+
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      const serverInfo = service.getServerInfo(testDir);
+      expect(serverInfo?.url).toBe('http://localhost:3000');
+      expect(serverInfo?.urlDetected).toBe(true);
+    });
+
+    it('should detect Express/Fastify format URL', async () => {
+      vi.mocked(secureFs.access).mockResolvedValue(undefined);
+
+      const mockProcess = createMockProcess();
+      vi.mocked(spawn).mockReturnValue(mockProcess as any);
+
+      const { getDevServerService } = await import('@/services/dev-server-service.js');
+      const service = getDevServerService();
+
+      await service.startDevServer(testDir, testDir);
+
+      mockProcess.stdout.emit('data', Buffer.from('Server listening on http://localhost:3000\n'));
+
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      const serverInfo = service.getServerInfo(testDir);
+      expect(serverInfo?.url).toBe('http://localhost:3000');
+      expect(serverInfo?.urlDetected).toBe(true);
+    });
+
+    it('should detect Angular CLI format URL', async () => {
+      vi.mocked(secureFs.access).mockResolvedValue(undefined);
+
+      const mockProcess = createMockProcess();
+      vi.mocked(spawn).mockReturnValue(mockProcess as any);
+
+      const { getDevServerService } = await import('@/services/dev-server-service.js');
+      const service = getDevServerService();
+
+      await service.startDevServer(testDir, testDir);
+
+      // Angular CLI output
+      mockProcess.stderr.emit(
+        'data',
+        Buffer.from(
+          '** Angular Live Development Server is listening on localhost:4200, open your browser on http://localhost:4200/ **\n'
+        )
+      );
+
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      const serverInfo = service.getServerInfo(testDir);
+      expect(serverInfo?.url).toBe('http://localhost:4200/');
+      expect(serverInfo?.urlDetected).toBe(true);
     });
   });
 });

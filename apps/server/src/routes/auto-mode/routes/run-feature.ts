@@ -26,23 +26,10 @@ export function createRunFeatureHandler(autoModeService: AutoModeServiceCompat) 
         return;
       }
 
-      // Check per-worktree capacity before starting
-      const capacity = await autoModeService.checkWorktreeCapacity(projectPath, featureId);
-      if (!capacity.hasCapacity) {
-        const worktreeDesc = capacity.branchName
-          ? `worktree "${capacity.branchName}"`
-          : 'main worktree';
-        res.status(429).json({
-          success: false,
-          error: `Agent limit reached for ${worktreeDesc} (${capacity.currentAgents}/${capacity.maxAgents}). Wait for running tasks to complete or increase the limit.`,
-          details: {
-            currentAgents: capacity.currentAgents,
-            maxAgents: capacity.maxAgents,
-            branchName: capacity.branchName,
-          },
-        });
-        return;
-      }
+      // Note: No concurrency limit check here. Manual feature starts always run
+      // immediately and bypass the concurrency limit. However, their presence IS
+      // counted by the auto-loop coordinator when deciding whether to dispatch
+      // new auto-mode tasks, ensuring total system load is respected.
 
       // Start execution in background
       // executeFeature derives workDir from feature.branchName

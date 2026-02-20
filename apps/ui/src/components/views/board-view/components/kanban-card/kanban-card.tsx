@@ -114,15 +114,27 @@ export const KanbanCard = memo(function KanbanCard({
       currentProject: state.currentProject,
     }))
   );
-  // A card should only display as "actively running" if it's both in the
-  // runningAutoTasks list AND in an execution-compatible status. Cards in resting
-  // states (backlog, ready, waiting_approval, verified, completed) should never
-  // show running controls, even if they appear in runningAutoTasks due to stale
-  // state (e.g., after a server restart that reconciled features back to backlog).
+  // A card should display as "actively running" if it's in the runningAutoTasks list
+  // AND in an execution-compatible status. However, there's a race window where a feature
+  // is tracked as running (in runningAutoTasks) but its disk/UI status hasn't caught up yet
+  // (still 'backlog', 'ready', or 'interrupted'). In this case, we still want to show
+  // running controls (Logs/Stop) and animated border, but not the full "actively running"
+  // state that gates all UI behavior.
   const isInExecutionState =
     feature.status === 'in_progress' ||
     (typeof feature.status === 'string' && feature.status.startsWith('pipeline_'));
   const isActivelyRunning = !!isCurrentAutoTask && isInExecutionState;
+  // isRunningWithStaleStatus: feature is tracked as running but status hasn't updated yet.
+  // This happens during the timing gap between when the server starts a feature and when
+  // the UI receives the status update. Show running UI to prevent "Make" button flash.
+  const isRunningWithStaleStatus =
+    !!isCurrentAutoTask &&
+    !isInExecutionState &&
+    (feature.status === 'backlog' ||
+      feature.status === 'ready' ||
+      feature.status === 'interrupted');
+  // Show running visual treatment for both fully confirmed and stale-status running tasks
+  const showRunningVisuals = isActivelyRunning || isRunningWithStaleStatus;
   const [isLifted, setIsLifted] = useState(false);
 
   useLayoutEffect(() => {
@@ -135,6 +147,7 @@ export const KanbanCard = memo(function KanbanCard({
 
   const isDraggable =
     !isSelectionMode &&
+    !isRunningWithStaleStatus &&
     (feature.status === 'backlog' ||
       feature.status === 'interrupted' ||
       feature.status === 'ready' ||
@@ -198,13 +211,13 @@ export const KanbanCard = memo(function KanbanCard({
     'kanban-card-content h-full relative',
     reduceEffects ? 'shadow-none' : 'shadow-sm',
     'transition-all duration-200 ease-out',
-    // Disable hover translate for in-progress cards to prevent gap showing gradient
+    // Disable hover translate for running cards to prevent gap showing gradient
     isInteractive &&
       !reduceEffects &&
-      !isActivelyRunning &&
+      !showRunningVisuals &&
       'hover:-translate-y-0.5 hover:shadow-md hover:shadow-black/10 bg-transparent',
     !glassmorphism && 'backdrop-blur-[0px]!',
-    !isActivelyRunning &&
+    !showRunningVisuals &&
       cardBorderEnabled &&
       (cardBorderOpacity === 100 ? 'border-border/50' : 'border'),
     hasError && 'border-[var(--status-error)] border-2 shadow-[var(--status-error-bg)] shadow-lg',
@@ -221,7 +234,7 @@ export const KanbanCard = memo(function KanbanCard({
 
   const renderCardContent = () => (
     <Card
-      style={isActivelyRunning ? undefined : cardStyle}
+      style={showRunningVisuals ? undefined : cardStyle}
       className={innerCardClasses}
       onDoubleClick={isSelectionMode ? undefined : onEdit}
       onClick={handleCardClick}
@@ -290,6 +303,7 @@ export const KanbanCard = memo(function KanbanCard({
         <CardActions
           feature={feature}
           isCurrentAutoTask={isActivelyRunning}
+          isRunningTask={!!isCurrentAutoTask}
           hasContext={hasContext}
           shortcutKey={shortcutKey}
           isSelectionMode={isSelectionMode}
@@ -316,7 +330,7 @@ export const KanbanCard = memo(function KanbanCard({
       className={wrapperClasses}
       data-testid={`kanban-card-${feature.id}`}
     >
-      {isActivelyRunning ? (
+      {showRunningVisuals ? (
         <div className="animated-border-wrapper">{renderCardContent()}</div>
       ) : (
         renderCardContent()

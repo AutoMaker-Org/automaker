@@ -1445,6 +1445,7 @@ export function WorktreePanel({
         onOpenChange={setViewStashesDialogOpen}
         worktree={viewStashesWorktree}
         onStashApplied={handleStashApplied}
+        onStashApplyConflict={onStashApplyConflict}
       />
 
       {/* Cherry Pick Dialog */}

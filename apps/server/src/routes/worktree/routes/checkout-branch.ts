@@ -22,6 +22,34 @@ import { getErrorMessage, logError, isValidBranchName } from '../common.js';
 import { execGitCommand } from '../../../lib/git.js';
 import type { EventEmitter } from '../../../lib/events.js';
 import { performCheckoutBranch } from '../../../services/checkout-branch-service.js';
+import { createLogger } from '@automaker/utils';
+
+const logger = createLogger('CheckoutBranchRoute');
+
+/** Timeout for git fetch operations (30 seconds) */
+const FETCH_TIMEOUT_MS = 30_000;
+
+/**
+ * Fetch latest from all remotes (silently, with timeout).
+ * Non-fatal: fetch errors are logged and swallowed so the workflow continues.
+ */
+async function fetchRemotes(cwd: string): Promise<void> {
+  const controller = new AbortController();
+  const timerId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+
+  try {
+    await execGitCommand(['fetch', '--all', '--quiet'], cwd, undefined, controller);
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Process aborted') {
+      logger.warn(
+        `fetchRemotes timed out after ${FETCH_TIMEOUT_MS}ms - continuing without latest remote refs`
+      );
+    }
+    // Non-fatal: continue with locally available refs
+  } finally {
+    clearTimeout(timerId);
+  }
+}
 
 export function createCheckoutBranchHandler(events?: EventEmitter) {
   return async (req: Request, res: Response): Promise<void> => {
@@ -127,6 +155,10 @@ export function createCheckoutBranchHandler(events?: EventEmitter) {
       }
 
       // Original simple flow (no stash handling)
+      // Fetch latest remote refs before creating the branch so that
+      // base branch validation works for remote references like "origin/main"
+      await fetchRemotes(resolvedPath);
+
       const currentBranchOutput = await execGitCommand(
         ['rev-parse', '--abbrev-ref', 'HEAD'],
         resolvedPath

@@ -60,6 +60,8 @@ export interface RowActionsProps {
   handlers: RowActionHandlers;
   /** Whether this feature is the current auto task (agent is running) */
   isCurrentAutoTask?: boolean;
+  /** Whether this feature is tracked as a running task (may be true even before status updates to in_progress) */
+  isRunningTask?: boolean;
   /** Whether the dropdown menu is open */
   isOpen?: boolean;
   /** Callback when the dropdown open state changes */
@@ -115,7 +117,8 @@ const MenuItem = memo(function MenuItem({
 function getPrimaryAction(
   feature: Feature,
   handlers: RowActionHandlers,
-  isCurrentAutoTask: boolean
+  isCurrentAutoTask: boolean,
+  isRunningTask: boolean = false
 ): {
   icon: React.ComponentType<{ className?: string }>;
   label: string;
@@ -133,6 +136,24 @@ function getPrimaryAction(
       };
     }
     return null;
+  }
+
+  // Running task with stale status - show stop instead of Make
+  // This handles the race window where the feature is tracked as running
+  // but status hasn't updated to in_progress yet
+  if (
+    isRunningTask &&
+    (feature.status === 'backlog' ||
+      feature.status === 'ready' ||
+      feature.status === 'interrupted') &&
+    handlers.onForceStop
+  ) {
+    return {
+      icon: StopCircle,
+      label: 'Stop',
+      onClick: handlers.onForceStop,
+      variant: 'destructive',
+    };
   }
 
   // Backlog - implement is primary
@@ -263,6 +284,7 @@ export const RowActions = memo(function RowActions({
   feature,
   handlers,
   isCurrentAutoTask = false,
+  isRunningTask = false,
   isOpen,
   onOpenChange,
   className,
@@ -286,7 +308,7 @@ export const RowActions = memo(function RowActions({
     [setOpen]
   );
 
-  const primaryAction = getPrimaryAction(feature, handlers, isCurrentAutoTask);
+  const primaryAction = getPrimaryAction(feature, handlers, isCurrentAutoTask, isRunningTask);
   const secondaryActions = getSecondaryActions(feature, handlers);
 
   // Helper to close menu after action
@@ -403,7 +425,7 @@ export const RowActions = memo(function RowActions({
           )}
 
           {/* Backlog actions */}
-          {!isCurrentAutoTask && feature.status === 'backlog' && (
+          {!isCurrentAutoTask && !isRunningTask && feature.status === 'backlog' && (
             <>
               <MenuItem icon={Edit} label="Edit" onClick={withClose(handlers.onEdit)} />
               {feature.planSpec?.content && handlers.onViewPlan && (

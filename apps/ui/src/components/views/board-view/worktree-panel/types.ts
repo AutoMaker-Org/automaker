@@ -34,6 +34,8 @@ export interface DevServerInfo {
   worktreePath: string;
   port: number;
   url: string;
+  /** Whether the actual URL/port has been detected from server output */
+  urlDetected?: boolean;
 }
 
 export interface TestSessionInfo {

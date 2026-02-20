@@ -308,7 +308,11 @@ export function WorktreeDropdown({
         {selectedStatus.devServerRunning && (
           <span
             className="inline-flex items-center justify-center h-4 w-4 text-green-500 shrink-0"
-            title={`Dev server running on port ${selectedStatus.devServerInfo?.port}`}
+            title={
+              selectedStatus.devServerInfo?.urlDetected === false
+                ? 'Dev server starting...'
+                : `Dev server running on port ${selectedStatus.devServerInfo?.port}`
+            }
           >
             <Globe className="w-3 h-3" />
           </span>

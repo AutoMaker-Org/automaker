@@ -416,6 +416,90 @@ describe('ConcurrencyManager', () => {
       expect(mainCount).toBe(2);
     });
 
+    it('should count only auto-mode features when autoModeOnly is true', async () => {
+      // Auto-mode feature on main worktree
+      manager.acquire({
+        featureId: 'feature-auto',
+        projectPath: '/test/project',
+        isAutoMode: true,
+      });
+
+      // Manual feature on main worktree
+      manager.acquire({
+        featureId: 'feature-manual',
+        projectPath: '/test/project',
+        isAutoMode: false,
+      });
+
+      // Without autoModeOnly: counts both
+      const totalCount = await manager.getRunningCountForWorktree('/test/project', null);
+      expect(totalCount).toBe(2);
+
+      // With autoModeOnly: counts only auto-mode features
+      const autoModeCount = await manager.getRunningCountForWorktree('/test/project', null, {
+        autoModeOnly: true,
+      });
+      expect(autoModeCount).toBe(1);
+    });
+
+    it('should count only auto-mode features on specific worktree when autoModeOnly is true', async () => {
+      // Auto-mode feature on feature branch
+      manager.acquire({
+        featureId: 'feature-auto',
+        projectPath: '/test/project',
+        isAutoMode: true,
+      });
+      manager.updateRunningFeature('feature-auto', { branchName: 'feature-branch' });
+
+      // Manual feature on same feature branch
+      manager.acquire({
+        featureId: 'feature-manual',
+        projectPath: '/test/project',
+        isAutoMode: false,
+      });
+      manager.updateRunningFeature('feature-manual', { branchName: 'feature-branch' });
+
+      // Another auto-mode feature on different branch (should not be counted)
+      manager.acquire({
+        featureId: 'feature-other',
+        projectPath: '/test/project',
+        isAutoMode: true,
+      });
+      manager.updateRunningFeature('feature-other', { branchName: 'other-branch' });
+
+      const autoModeCount = await manager.getRunningCountForWorktree(
+        '/test/project',
+        'feature-branch',
+        { autoModeOnly: true }
+      );
+      expect(autoModeCount).toBe(1);
+
+      const totalCount = await manager.getRunningCountForWorktree(
+        '/test/project',
+        'feature-branch'
+      );
+      expect(totalCount).toBe(2);
+    });
+
+    it('should return 0 when autoModeOnly is true and only manual features are running', async () => {
+      manager.acquire({
+        featureId: 'feature-manual-1',
+        projectPath: '/test/project',
+        isAutoMode: false,
+      });
+
+      manager.acquire({
+        featureId: 'feature-manual-2',
+        projectPath: '/test/project',
+        isAutoMode: false,
+      });
+
+      const autoModeCount = await manager.getRunningCountForWorktree('/test/project', null, {
+        autoModeOnly: true,
+      });
+      expect(autoModeCount).toBe(0);
+    });
+
     it('should filter by both projectPath and branchName', async () => {
       manager.acquire({
         featureId: 'feature-1',

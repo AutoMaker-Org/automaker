@@ -206,6 +206,16 @@ export function useDevServerLogs({ worktreePath, autoSubscribe = true }: UseDevS
           }));
           break;
         }
+        case 'dev-server:url-detected': {
+          const { payload } = event;
+          logger.info('Dev server URL detected:', payload);
+          setState((prev) => ({
+            ...prev,
+            url: payload.url,
+            port: payload.port,
+          }));
+          break;
+        }
       }
     });
 

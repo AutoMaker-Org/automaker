@@ -163,13 +163,22 @@ export function useBoardDragDrop({
 
       let targetStatus: ColumnId | null = null;
 
+      // Normalize the over ID: strip 'column-header-' prefix if the card was dropped
+      // directly onto the column header droppable zone (e.g. 'column-header-backlog' → 'backlog')
+      const effectiveOverId = overId.startsWith('column-header-')
+        ? overId.replace('column-header-', '')
+        : overId;
+
       // Check if we dropped on a column
-      const column = COLUMNS.find((c) => c.id === overId);
+      const column = COLUMNS.find((c) => c.id === effectiveOverId);
       if (column) {
         targetStatus = column.id;
+      } else if (effectiveOverId.startsWith('pipeline_')) {
+        // Pipeline step column (not in static COLUMNS list)
+        targetStatus = effectiveOverId as ColumnId;
       } else {
         // Dropped on another feature - find its column
-        const overFeature = features.find((f) => f.id === overId);
+        const overFeature = features.find((f) => f.id === effectiveOverId);
         if (overFeature) {
           targetStatus = overFeature.status;
         }

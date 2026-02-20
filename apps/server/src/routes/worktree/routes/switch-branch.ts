@@ -9,7 +9,7 @@
  * For remote branches (e.g., "origin/feature"), automatically creates a
  * local tracking branch and checks it out.
  *
- * Also fetches the latest remote refs after switching.
+ * Also fetches the latest remote refs before switching to ensure accurate branch detection.
  *
  * Git business logic is delegated to worktree-branch-service.ts.
  * Events are emitted at key lifecycle points for WebSocket subscribers.

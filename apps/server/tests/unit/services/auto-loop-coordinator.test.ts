@@ -328,6 +328,86 @@ describe('auto-loop-coordinator.ts', () => {
       // Should not have executed features because at capacity
       expect(mockExecuteFeature).not.toHaveBeenCalled();
     });
+
+    it('counts all running features (auto + manual) against concurrency limit', async () => {
+      vi.mocked(mockLoadPendingFeatures).mockResolvedValue([testFeature]);
+      // 2 manual features running — total count is 2
+      vi.mocked(mockConcurrencyManager.getRunningCountForWorktree).mockResolvedValue(2);
+
+      await coordinator.startAutoLoopForProject('/test/project', null, 2);
+
+      await vi.advanceTimersByTimeAsync(6000);
+
+      await coordinator.stopAutoLoopForProject('/test/project', null);
+
+      // Should NOT execute because total running count (2) meets the concurrency limit (2)
+      expect(mockExecuteFeature).not.toHaveBeenCalled();
+      // Verify it was called WITHOUT autoModeOnly (counts all tasks)
+      // The coordinator's wrapper passes options through as undefined when not specified
+      expect(mockConcurrencyManager.getRunningCountForWorktree).toHaveBeenCalledWith(
+        '/test/project',
+        null,
+        undefined
+      );
+    });
+
+    it('allows auto dispatch when manual tasks finish and capacity becomes available', async () => {
+      vi.mocked(mockLoadPendingFeatures).mockResolvedValue([testFeature]);
+      // First call: at capacity (2 manual features running)
+      // Second call: capacity freed (1 feature running)
+      vi.mocked(mockConcurrencyManager.getRunningCountForWorktree)
+        .mockResolvedValueOnce(2) // at capacity
+        .mockResolvedValueOnce(1); // capacity available after manual task completes
+
+      await coordinator.startAutoLoopForProject('/test/project', null, 2);
+
+      // First iteration: at capacity, should wait
+      await vi.advanceTimersByTimeAsync(5000);
+
+      // Second iteration: capacity available, should execute
+      await vi.advanceTimersByTimeAsync(6000);
+
+      await coordinator.stopAutoLoopForProject('/test/project', null);
+
+      // Should execute after capacity freed
+      expect(mockExecuteFeature).toHaveBeenCalledWith('/test/project', 'feature-1', true, true);
+    });
+
+    it('waits when manually started tasks already fill concurrency limit at auto mode activation', async () => {
+      vi.mocked(mockLoadPendingFeatures).mockResolvedValue([testFeature]);
+      // Manual tasks already fill the limit
+      vi.mocked(mockConcurrencyManager.getRunningCountForWorktree).mockResolvedValue(3);
+
+      await coordinator.startAutoLoopForProject('/test/project', null, 3);
+
+      await vi.advanceTimersByTimeAsync(6000);
+
+      await coordinator.stopAutoLoopForProject('/test/project', null);
+
+      // Auto mode should remain waiting, not dispatch
+      expect(mockExecuteFeature).not.toHaveBeenCalled();
+    });
+
+    it('resumes dispatching when all running tasks complete simultaneously', async () => {
+      vi.mocked(mockLoadPendingFeatures).mockResolvedValue([testFeature]);
+      // First check: all 3 slots occupied
+      // Second check: all tasks completed simultaneously
+      vi.mocked(mockConcurrencyManager.getRunningCountForWorktree)
+        .mockResolvedValueOnce(3) // all slots full
+        .mockResolvedValueOnce(0); // all tasks completed at once
+
+      await coordinator.startAutoLoopForProject('/test/project', null, 3);
+
+      // First iteration: at capacity
+      await vi.advanceTimersByTimeAsync(5000);
+      // Second iteration: all freed
+      await vi.advanceTimersByTimeAsync(6000);
+
+      await coordinator.stopAutoLoopForProject('/test/project', null);
+
+      // Should execute after all tasks freed capacity
+      expect(mockExecuteFeature).toHaveBeenCalledWith('/test/project', 'feature-1', true, true);
+    });
   });
 
   describe('priority-based feature selection', () => {
@@ -788,7 +868,23 @@ describe('auto-loop-coordinator.ts', () => {
       expect(count).toBe(3);
       expect(mockConcurrencyManager.getRunningCountForWorktree).toHaveBeenCalledWith(
         '/test/project',
-        null
+        null,
+        undefined
+      );
+    });
+
+    it('passes autoModeOnly option to ConcurrencyManager', async () => {
+      vi.mocked(mockConcurrencyManager.getRunningCountForWorktree).mockResolvedValue(1);
+
+      const count = await coordinator.getRunningCountForWorktree('/test/project', null, {
+        autoModeOnly: true,
+      });
+
+      expect(count).toBe(1);
+      expect(mockConcurrencyManager.getRunningCountForWorktree).toHaveBeenCalledWith(
+        '/test/project',
+        null,
+        { autoModeOnly: true }
       );
     });
   });

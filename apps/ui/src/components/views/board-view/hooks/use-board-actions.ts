@@ -561,38 +561,9 @@ export function useBoardActions({
 
   const handleStartImplementation = useCallback(
     async (feature: Feature) => {
-      // Check capacity for the feature's specific worktree, not the current view
-      // Normalize the branch name: if the feature's branch is the primary worktree branch,
-      // treat it as null (main worktree) to match how running tasks are stored
-      const rawBranchName = feature.branchName ?? null;
-      const featureBranchName =
-        currentProject?.path &&
-        rawBranchName &&
-        isPrimaryWorktreeBranch(currentProject.path, rawBranchName)
-          ? null
-          : rawBranchName;
-      const featureWorktreeState = currentProject
-        ? getAutoModeState(currentProject.id, featureBranchName)
-        : null;
-      // Use getMaxConcurrencyForWorktree which correctly falls back to global maxConcurrency
-      // instead of autoMode.maxConcurrency which only falls back to DEFAULT_MAX_CONCURRENCY (1)
-      const featureMaxConcurrency = currentProject
-        ? getMaxConcurrencyForWorktree(currentProject.id, featureBranchName)
-        : autoMode.maxConcurrency;
-      const featureRunningCount = featureWorktreeState?.runningTasks?.length ?? 0;
-      const canStartInWorktree = featureRunningCount < featureMaxConcurrency;
-
-      if (!canStartInWorktree) {
-        const worktreeDesc = featureBranchName
-          ? `worktree "${featureBranchName}"`
-          : 'main worktree';
-        toast.error('Concurrency limit reached', {
-          description: `${worktreeDesc} can only have ${featureMaxConcurrency} task${
-            featureMaxConcurrency > 1 ? 's' : ''
-          } running at a time. Wait for a task to complete or increase the limit.`,
-        });
-        return false;
-      }
+      // Note: No concurrency limit check here. Manual feature starts should never
+      // be blocked by the auto mode concurrency limit. The concurrency limit only
+      // governs how many features the auto-loop picks up automatically.
 
       // Check for blocking dependencies and show warning if enabled
       if (enableDependencyBlocking) {
@@ -681,18 +652,7 @@ export function useBoardActions({
         return false;
       }
     },
-    [
-      autoMode,
-      enableDependencyBlocking,
-      features,
-      updateFeature,
-      persistFeatureUpdate,
-      handleRunFeature,
-      currentProject,
-      getAutoModeState,
-      getMaxConcurrencyForWorktree,
-      isPrimaryWorktreeBranch,
-    ]
+    [enableDependencyBlocking, features, updateFeature, persistFeatureUpdate, handleRunFeature]
   );
 
   const handleVerifyFeature = useCallback(

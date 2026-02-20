@@ -375,10 +375,20 @@ export function BoardView() {
       return specificTargetCollisions;
     }
 
-    // Priority 2: Columns
-    const columnCollisions = pointerCollisions.filter((collision: Collision) =>
-      COLUMNS.some((col) => col.id === collision.id)
-    );
+    // Priority 2: Columns (including column headers and pipeline columns)
+    const columnCollisions = pointerCollisions.filter((collision: Collision) => {
+      const colId = String(collision.id);
+      // Direct column ID match (e.g. 'backlog', 'in_progress')
+      if (COLUMNS.some((col) => col.id === colId)) return true;
+      // Column header droppable (e.g. 'column-header-backlog')
+      if (colId.startsWith('column-header-')) {
+        const baseId = colId.replace('column-header-', '');
+        return COLUMNS.some((col) => col.id === baseId) || baseId.startsWith('pipeline_');
+      }
+      // Pipeline column IDs (e.g. 'pipeline_tests')
+      if (colId.startsWith('pipeline_')) return true;
+      return false;
+    });
 
     // If we found a column collision, use that
     if (columnCollisions.length > 0) {
@@ -1426,13 +1436,12 @@ export function BoardView() {
               },
             });
 
-            // Also update backend if auto mode is running
+            // Also update backend if auto mode is running.
+            // Use restartWithConcurrency to avoid toggle flickering - it restarts
+            // the backend without toggling isRunning off/on in the UI.
             if (autoMode.isRunning) {
-              // Restart auto mode with new concurrency (backend will handle this)
-              autoMode.stop().then(() => {
-                autoMode.start().catch((error) => {
-                  logger.error('[AutoMode] Failed to restart with new concurrency:', error);
-                });
+              autoMode.restartWithConcurrency().catch((error) => {
+                logger.error('[AutoMode] Failed to restart with new concurrency:', error);
               });
             }
           }

@@ -17,6 +17,8 @@ import {
 interface CardActionsProps {
   feature: Feature;
   isCurrentAutoTask: boolean;
+  /** Whether this feature is tracked as a running task (may be true even before status updates to in_progress) */
+  isRunningTask?: boolean;
   hasContext?: boolean;
   shortcutKey?: string;
   isSelectionMode?: boolean;
@@ -36,6 +38,7 @@ interface CardActionsProps {
 export const CardActions = memo(function CardActions({
   feature,
   isCurrentAutoTask,
+  isRunningTask = false,
   hasContext: _hasContext,
   shortcutKey,
   isSelectionMode = false,
@@ -340,7 +343,57 @@ export const CardActions = memo(function CardActions({
           ) : null}
         </>
       )}
+      {/* Running task with stale status: feature is tracked as running but status hasn't updated yet.
+          Show Logs/Stop controls instead of Make to avoid confusing UI. */}
       {!isCurrentAutoTask &&
+        isRunningTask &&
+        (feature.status === 'backlog' ||
+          feature.status === 'interrupted' ||
+          feature.status === 'ready') && (
+          <>
+            {onViewOutput && (
+              <Button
+                variant="secondary"
+                size="sm"
+                className="flex-1 h-7 text-[11px]"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onViewOutput();
+                }}
+                onPointerDown={(e) => e.stopPropagation()}
+                data-testid={`view-output-${feature.id}`}
+              >
+                <FileText className="w-3 h-3 mr-1 shrink-0" />
+                <span className="truncate">Logs</span>
+                {shortcutKey && (
+                  <span
+                    className="ml-1.5 px-1 py-0.5 text-[9px] font-mono rounded bg-foreground/10"
+                    data-testid={`shortcut-key-${feature.id}`}
+                  >
+                    {shortcutKey}
+                  </span>
+                )}
+              </Button>
+            )}
+            {onForceStop && (
+              <Button
+                variant="destructive"
+                size="sm"
+                className="h-7 text-[11px] px-2 shrink-0"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onForceStop();
+                }}
+                onPointerDown={(e) => e.stopPropagation()}
+                data-testid={`force-stop-${feature.id}`}
+              >
+                <StopCircle className="w-3 h-3" />
+              </Button>
+            )}
+          </>
+        )}
+      {!isCurrentAutoTask &&
+        !isRunningTask &&
         (feature.status === 'backlog' ||
           feature.status === 'interrupted' ||
           feature.status === 'ready') && (

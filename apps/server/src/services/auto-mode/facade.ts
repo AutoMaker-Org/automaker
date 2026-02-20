@@ -357,11 +357,54 @@ export class AutoModeServiceFacade {
       (pPath, featureId) => getFacade().contextExists(featureId),
       (pPath, featureId, useWorktrees, _calledInternally) =>
         getFacade().resumeFeature(featureId, useWorktrees, _calledInternally),
-      (errorInfo) =>
-        autoLoopCoordinator.trackFailureAndCheckPauseForProject(projectPath, null, errorInfo),
-      (errorInfo) => autoLoopCoordinator.signalShouldPauseForProject(projectPath, null, errorInfo),
+      (errorInfo) => {
+        // Track failure against all active auto loops for this project.
+        // The ExecutionService callbacks don't receive branchName, so we
+        // track against all active worktrees to ensure failures are recorded
+        // correctly regardless of which worktree the feature belongs to.
+        const activeWorktrees = autoLoopCoordinator.getActiveWorktrees();
+        const projectWorktrees = activeWorktrees.filter((w) => w.projectPath === projectPath);
+        if (projectWorktrees.length === 0) {
+          // Fallback: track against main worktree
+          return autoLoopCoordinator.trackFailureAndCheckPauseForProject(
+            projectPath,
+            null,
+            errorInfo
+          );
+        }
+        // Track against all active worktrees for this project and return
+        // true if any of them should pause
+        return projectWorktrees.some((w) =>
+          autoLoopCoordinator.trackFailureAndCheckPauseForProject(
+            projectPath,
+            w.branchName,
+            errorInfo
+          )
+        );
+      },
+      (errorInfo) => {
+        const activeWorktrees = autoLoopCoordinator.getActiveWorktrees();
+        const projectWorktrees = activeWorktrees.filter((w) => w.projectPath === projectPath);
+        if (projectWorktrees.length === 0) {
+          autoLoopCoordinator.signalShouldPauseForProject(projectPath, null, errorInfo);
+          return;
+        }
+        for (const w of projectWorktrees) {
+          autoLoopCoordinator.signalShouldPauseForProject(projectPath, w.branchName, errorInfo);
+        }
+      },
       () => {
-        /* recordSuccess - no-op */
+        // Record success to clear failure tracking. This prevents failures
+        // from accumulating over time and incorrectly pausing auto mode.
+        const activeWorktrees = autoLoopCoordinator.getActiveWorktrees();
+        const projectWorktrees = activeWorktrees.filter((w) => w.projectPath === projectPath);
+        if (projectWorktrees.length === 0) {
+          autoLoopCoordinator.recordSuccessForProject(projectPath, null);
+          return;
+        }
+        for (const w of projectWorktrees) {
+          autoLoopCoordinator.recordSuccessForProject(projectPath, w.branchName);
+        }
       },
       (_pPath) => getFacade().saveExecutionState(),
       loadContextFiles

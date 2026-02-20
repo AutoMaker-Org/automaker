@@ -9,7 +9,8 @@
  * For remote branches (e.g., "origin/feature"), automatically creates a
  * local tracking branch and checks it out.
  *
- * Also fetches the latest remote refs after switching.
+ * Fetches the latest remote refs before switching to ensure remote branch
+ * references are up-to-date for accurate detection and checkout.
  *
  * Extracted from the worktree switch-branch route to improve organization
  * and testability. Follows the same pattern as pull-service.ts and
@@ -57,7 +58,8 @@ const FETCH_TIMEOUT_MS = 30_000;
  * slow or unresponsive remote does not block the branch-switch flow
  * indefinitely.  Timeout errors are logged and treated as non-fatal
  * (the same as network-unavailable errors) so the rest of the workflow
- * continues normally.
+ * continues normally.  This is called before the branch switch to
+ * ensure remote refs are up-to-date for branch detection and checkout.
  */
 async function fetchRemotes(cwd: string): Promise<void> {
   const controller = new AbortController();
@@ -73,8 +75,8 @@ async function fetchRemotes(cwd: string): Promise<void> {
       );
     }
     // Ignore all fetch errors (timeout or otherwise) - we may be offline or the
-    // remote may be temporarily unavailable.  The branch switch itself has
-    // already succeeded at this point.
+    // remote may be temporarily unavailable.  The branch switch should proceed
+    // with whatever refs are locally available.
   } finally {
     clearTimeout(timerId);
   }
@@ -126,13 +128,13 @@ async function isRemoteBranch(cwd: string, branchName: string): Promise<boolean>
  * Perform a full branch switch workflow on the given worktree.
  *
  * The workflow:
- * 1. Get current branch name
- * 2. Detect remote vs local branch and determine target
- * 3. Return early if already on target branch
- * 4. Validate branch existence
- * 5. Stash local changes if any
- * 6. Checkout the target branch
- * 7. Fetch latest from remotes
+ * 1. Fetch latest from all remotes (ensures remote refs are up-to-date)
+ * 2. Get current branch name
+ * 3. Detect remote vs local branch and determine target
+ * 4. Return early if already on target branch
+ * 5. Validate branch existence
+ * 6. Stash local changes if any
+ * 7. Checkout the target branch
  * 8. Reapply stashed changes (detect conflicts)
  * 9. Handle error recovery (restore stash if checkout fails)
  *
@@ -149,14 +151,20 @@ export async function performSwitchBranch(
   // Emit start event
   events?.emit('switch:start', { worktreePath, branchName });
 
-  // 1. Get current branch
+  // 1. Fetch latest from all remotes before switching
+  //    This ensures remote branch refs are up-to-date so that isRemoteBranch()
+  //    can detect newly created remote branches and local tracking branches
+  //    are aware of upstream changes.
+  await fetchRemotes(worktreePath);
+
+  // 2. Get current branch
   const currentBranchOutput = await execGitCommand(
     ['rev-parse', '--abbrev-ref', 'HEAD'],
     worktreePath
   );
   const previousBranch = currentBranchOutput.trim();
 
-  // 2. Determine the actual target branch name for checkout
+  // 3. Determine the actual target branch name for checkout
   let targetBranch = branchName;
   let isRemote = false;
 
@@ -180,7 +188,7 @@ export async function performSwitchBranch(
     }
   }
 
-  // 3. Return early if already on the target branch
+  // 4. Return early if already on the target branch
   if (previousBranch === targetBranch) {
     events?.emit('switch:done', {
       worktreePath,
@@ -198,7 +206,7 @@ export async function performSwitchBranch(
     };
   }
 
-  // 4. Check if target branch exists as a local branch
+  // 5. Check if target branch exists as a local branch
   if (!isRemote) {
     if (!(await localBranchExists(worktreePath, branchName))) {
       events?.emit('switch:error', {
@@ -213,7 +221,7 @@ export async function performSwitchBranch(
     }
   }
 
-  // 5. Stash local changes if any exist
+  // 6. Stash local changes if any exist
   const hadChanges = await hasAnyChanges(worktreePath, { excludeWorktreePaths: true });
   let didStash = false;
 
@@ -242,7 +250,7 @@ export async function performSwitchBranch(
   }
 
   try {
-    // 6. Switch to the target branch
+    // 7. Switch to the target branch
     events?.emit('switch:checkout', {
       worktreePath,
       targetBranch,
@@ -264,9 +272,6 @@ export async function performSwitchBranch(
     } else {
       await execGitCommand(['checkout', targetBranch], worktreePath);
     }
-
-    // 7. Fetch latest from remotes after switching
-    await fetchRemotes(worktreePath);
 
     // 8. Reapply stashed changes if we stashed earlier
     let hasConflicts = false;
@@ -347,7 +352,7 @@ export async function performSwitchBranch(
       };
     }
   } catch (checkoutError) {
-    // 9. If checkout failed and we stashed, try to restore the stash
+    // 9. Error recovery: if checkout failed and we stashed, try to restore the stash
     if (didStash) {
       const popResult = await popStash(worktreePath);
       if (popResult.hasConflicts) {

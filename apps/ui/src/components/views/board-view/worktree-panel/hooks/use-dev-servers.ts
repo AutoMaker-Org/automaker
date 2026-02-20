@@ -25,7 +25,10 @@ export function useDevServers({ projectPath }: UseDevServersOptions) {
       if (result.success && result.result?.servers) {
         const serversMap = new Map<string, DevServerInfo>();
         for (const server of result.result.servers) {
-          serversMap.set(server.worktreePath, server);
+          serversMap.set(server.worktreePath, {
+            ...server,
+            urlDetected: server.urlDetected ?? true,
+          });
         }
         setRunningDevServers(serversMap);
       }
@@ -37,6 +40,35 @@ export function useDevServers({ projectPath }: UseDevServersOptions) {
   useEffect(() => {
     fetchDevServers();
   }, [fetchDevServers]);
+
+  // Subscribe to url-detected events to update port/url when the actual dev server port is detected
+  useEffect(() => {
+    const api = getElectronAPI();
+    if (!api?.worktree?.onDevServerLogEvent) return;
+
+    const unsubscribe = api.worktree.onDevServerLogEvent((event) => {
+      if (event.type === 'dev-server:url-detected') {
+        const { worktreePath, url, port } = event.payload;
+        logger.info(`Dev server URL detected for ${worktreePath}: ${url} (port ${port})`);
+        setRunningDevServers((prev) => {
+          const key = normalizePath(worktreePath);
+          const existing = prev.get(key);
+          if (!existing) return prev;
+          const next = new Map(prev);
+          next.set(key, {
+            ...existing,
+            url,
+            port,
+            urlDetected: true,
+          });
+          return next;
+        });
+        toast.success(`Dev server running on port ${port}`);
+      }
+    });
+
+    return unsubscribe;
+  }, []);
 
   const getWorktreeKey = useCallback(
     (worktree: WorktreeInfo) => {
@@ -68,10 +100,11 @@ export function useDevServers({ projectPath }: UseDevServersOptions) {
               worktreePath: result.result!.worktreePath,
               port: result.result!.port,
               url: result.result!.url,
+              urlDetected: false,
             });
             return next;
           });
-          toast.success(`Dev server started on port ${result.result.port}`);
+          toast.success('Dev server started, detecting port...');
         } else {
           toast.error(result.error || 'Failed to start dev server');
         }
