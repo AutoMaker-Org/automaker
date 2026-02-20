@@ -524,7 +524,7 @@ export function GitPullDialog({
                       ? 'auto-commit'
                       : mergePostAction === 'manual'
                         ? 'manual review'
-                        : 'auto-commit'}
+                        : 'ask every time'}
                   </span>
                   <button
                     onClick={() => {
