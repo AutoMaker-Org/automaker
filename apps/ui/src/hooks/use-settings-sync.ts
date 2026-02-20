@@ -58,6 +58,7 @@ const SETTINGS_FIELDS_TO_SYNC = [
   'defaultSkipTests',
   'enableDependencyBlocking',
   'skipVerificationInAutoMode',
+  'mergePostAction',
   'useWorktrees',
   'defaultPlanningMode',
   'defaultRequirePlanApproval',

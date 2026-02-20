@@ -54,7 +54,7 @@ export function ViewWorktreeChangesDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex-1 sm:min-h-[600px] sm:max-h-[60vh]  overflow-y-auto scrollbar-visible -mx-6 -mb-6">
+        <div className="flex-1 min-h-0 overflow-y-auto scrollbar-visible -mx-6 -mb-6">
           <div className="h-full px-6 pb-6">
             <GitDiffPanel
               projectPath={projectPath}

@@ -10,6 +10,7 @@ import {
   ChevronRight,
   RefreshCw,
   GitBranch,
+  GitMerge,
   AlertCircle,
   Plus,
   Minus,
@@ -20,7 +21,7 @@ import { Button } from './button';
 import { useWorktreeDiffs, useGitDiffs } from '@/hooks/queries';
 import { getElectronAPI } from '@/lib/electron';
 import { toast } from 'sonner';
-import type { FileStatus } from '@/types/electron';
+import type { FileStatus, MergeStateInfo } from '@/types/electron';
 
 interface GitDiffPanelProps {
   projectPath: string;
@@ -318,6 +319,86 @@ function StagingBadge({ state }: { state: 'staged' | 'unstaged' | 'partial' }) {
   );
 }
 
+function MergeBadge({ mergeType }: { mergeType?: string }) {
+  if (!mergeType) return null;
+
+  const label = (() => {
+    switch (mergeType) {
+      case 'both-modified':
+        return 'Both Modified';
+      case 'added-by-us':
+        return 'Added by Us';
+      case 'added-by-them':
+        return 'Added by Them';
+      case 'deleted-by-us':
+        return 'Deleted by Us';
+      case 'deleted-by-them':
+        return 'Deleted by Them';
+      case 'both-added':
+        return 'Both Added';
+      case 'both-deleted':
+        return 'Both Deleted';
+      case 'merged':
+        return 'Merged';
+      default:
+        return 'Merge';
+    }
+  })();
+
+  return (
+    <span className="text-[10px] px-1.5 py-0.5 rounded border font-medium bg-purple-500/15 text-purple-400 border-purple-500/30 inline-flex items-center gap-1">
+      <GitMerge className="w-2.5 h-2.5" />
+      {label}
+    </span>
+  );
+}
+
+function MergeStateBanner({ mergeState }: { mergeState: MergeStateInfo }) {
+  // Completed merge commit (HEAD is a merge)
+  if (mergeState.isMergeCommit && !mergeState.isMerging) {
+    return (
+      <div className="mx-4 mt-3 flex items-start gap-2 p-3 rounded-md bg-purple-500/10 border border-purple-500/20">
+        <GitMerge className="w-4 h-4 text-purple-500 mt-0.5 flex-shrink-0" />
+        <div className="text-sm">
+          <span className="font-medium text-purple-400">Merge commit</span>
+          <span className="text-purple-400/80 ml-1">
+            &mdash; {mergeState.mergeAffectedFiles.length} file
+            {mergeState.mergeAffectedFiles.length !== 1 ? 's' : ''} changed in merge
+          </span>
+        </div>
+      </div>
+    );
+  }
+
+  // In-progress merge/rebase/cherry-pick
+  const operationLabel =
+    mergeState.mergeOperationType === 'cherry-pick'
+      ? 'Cherry-pick'
+      : mergeState.mergeOperationType === 'rebase'
+        ? 'Rebase'
+        : 'Merge';
+
+  return (
+    <div className="mx-4 mt-3 flex items-start gap-2 p-3 rounded-md bg-purple-500/10 border border-purple-500/20">
+      <GitMerge className="w-4 h-4 text-purple-500 mt-0.5 flex-shrink-0" />
+      <div className="text-sm">
+        <span className="font-medium text-purple-400">{operationLabel} in progress</span>
+        {mergeState.conflictFiles.length > 0 ? (
+          <span className="text-purple-400/80 ml-1">
+            &mdash; {mergeState.conflictFiles.length} file
+            {mergeState.conflictFiles.length !== 1 ? 's' : ''} with conflicts
+          </span>
+        ) : mergeState.isCleanMerge ? (
+          <span className="text-purple-400/80 ml-1">
+            &mdash; Clean merge, {mergeState.mergeAffectedFiles.length} file
+            {mergeState.mergeAffectedFiles.length !== 1 ? 's' : ''} affected
+          </span>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 function FileDiffSection({
   fileDiff,
   isExpanded,
@@ -348,9 +429,21 @@ function FileDiffSection({
 
   const stagingState = fileStatus ? getStagingState(fileStatus) : undefined;
 
+  const isMergeFile = fileStatus?.isMergeAffected;
+
   return (
-    <div className="border border-border rounded-lg overflow-hidden">
-      <div className="w-full px-3 py-2 flex flex-col gap-1 text-left bg-card hover:bg-accent/50 transition-colors sm:flex-row sm:items-center sm:gap-2">
+    <div
+      className={cn(
+        'border rounded-lg overflow-hidden',
+        isMergeFile ? 'border-purple-500/40' : 'border-border'
+      )}
+    >
+      <div
+        className={cn(
+          'w-full px-3 py-2 flex flex-col gap-1 text-left transition-colors sm:flex-row sm:items-center sm:gap-2',
+          isMergeFile ? 'bg-purple-500/5 hover:bg-purple-500/10' : 'bg-card hover:bg-accent/50'
+        )}
+      >
         {/* File name row */}
         <button onClick={onToggle} className="flex items-center gap-2 flex-1 min-w-0 text-left">
           {isExpanded ? (
@@ -358,7 +451,9 @@ function FileDiffSection({
           ) : (
             <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
           )}
-          {fileStatus ? (
+          {isMergeFile ? (
+            <GitMerge className="w-4 h-4 text-purple-500 flex-shrink-0" />
+          ) : fileStatus ? (
             getFileIcon(fileStatus.status)
           ) : (
             <FileText className="w-4 h-4 text-muted-foreground flex-shrink-0" />
@@ -370,6 +465,7 @@ function FileDiffSection({
         </button>
         {/* Indicators & staging row */}
         <div className="flex items-center gap-2 flex-shrink-0 pl-6 sm:pl-0">
+          {fileStatus?.isMergeAffected && <MergeBadge mergeType={fileStatus.mergeType} />}
           {enableStaging && stagingState && <StagingBadge state={stagingState} />}
           {fileDiff.isNew && (
             <span className="text-xs px-1.5 py-0.5 rounded bg-green-500/20 text-green-400">
@@ -483,9 +579,10 @@ export function GitDiffPanel({
   const isLoading = useWorktrees ? isLoadingWorktree : isLoadingGit;
   const queryError = useWorktrees ? worktreeError : gitError;
 
-  // Extract files and diff content from the data
+  // Extract files, diff content, and merge state from the data
   const files: FileStatus[] = diffsData?.files ?? [];
   const diffContent = diffsData?.diff ?? '';
+  const mergeState: MergeStateInfo | undefined = diffsData?.mergeState;
   const error = queryError
     ? queryError instanceof Error
       ? queryError.message
@@ -495,8 +592,6 @@ export function GitDiffPanel({
   // Refetch function
   const loadDiffs = useWorktrees ? refetchWorktree : refetchGit;
 
-  const parsedDiffs = useMemo(() => parseDiff(diffContent), [diffContent]);
-
   // Build a map from file path to FileStatus for quick lookup
   const fileStatusMap = useMemo(() => {
     const map = new Map<string, FileStatus>();
@@ -505,6 +600,24 @@ export function GitDiffPanel({
     }
     return map;
   }, [files]);
+
+  const parsedDiffs = useMemo(() => {
+    const diffs = parseDiff(diffContent);
+    // Sort: merge-affected files first, then preserve original order
+    if (mergeState?.isMerging || mergeState?.isMergeCommit) {
+      const mergeSet = new Set(mergeState.mergeAffectedFiles);
+      diffs.sort((a, b) => {
+        const aIsMerge =
+          mergeSet.has(a.filePath) || (fileStatusMap.get(a.filePath)?.isMergeAffected ?? false);
+        const bIsMerge =
+          mergeSet.has(b.filePath) || (fileStatusMap.get(b.filePath)?.isMergeAffected ?? false);
+        if (aIsMerge && !bIsMerge) return -1;
+        if (!aIsMerge && bIsMerge) return 1;
+        return 0;
+      });
+    }
+    return diffs;
+  }, [diffContent, mergeState, fileStatusMap]);
 
   const toggleFile = (filePath: string) => {
     setExpandedFiles((prev) => {
@@ -682,6 +795,18 @@ export function GitDiffPanel({
     );
   }, [worktreePath, projectPath, useWorktrees, enableStaging, files, executeStagingAction]);
 
+  // Compute merge summary
+  const mergeSummary = useMemo(() => {
+    const mergeFiles = files.filter((f) => f.isMergeAffected);
+    if (mergeFiles.length === 0) return null;
+    return {
+      total: mergeFiles.length,
+      conflicted: mergeFiles.filter(
+        (f) => f.mergeType === 'both-modified' || f.mergeType === 'both-added'
+      ).length,
+    };
+  }, [files]);
+
   // Compute staging summary
   const stagingSummary = useMemo(() => {
     if (!enableStaging) return null;
@@ -776,6 +901,11 @@ export function GitDiffPanel({
             </div>
           ) : (
             <div>
+              {/* Merge state banner */}
+              {(mergeState?.isMerging || mergeState?.isMergeCommit) && (
+                <MergeStateBanner mergeState={mergeState} />
+              )}
+
               {/* Summary bar */}
               <div className="p-4 pb-2 border-b border-border-glass">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -799,7 +929,7 @@ export function GitDiffPanel({
                         {} as Record<string, { count: number; statusText: string; files: string[] }>
                       );
 
-                      return Object.entries(statusGroups).map(([status, group]) => (
+                      const groups = Object.entries(statusGroups).map(([status, group]) => (
                         <div
                           key={status}
                           className="flex items-center gap-1.5"
@@ -817,6 +947,24 @@ export function GitDiffPanel({
                           </span>
                         </div>
                       ));
+
+                      // Add merge group indicator if merge files exist
+                      if (mergeSummary) {
+                        groups.unshift(
+                          <div
+                            key="merge"
+                            className="flex items-center gap-1.5"
+                            data-testid="git-status-group-merge"
+                          >
+                            <GitMerge className="w-4 h-4 text-purple-500" />
+                            <span className="text-xs px-1.5 py-0.5 rounded border font-medium bg-purple-500/20 text-purple-400 border-purple-500/30">
+                              {mergeSummary.total} Merge
+                            </span>
+                          </div>
+                        );
+                      }
+
+                      return groups;
                     })()}
                   </div>
                   <div className="flex items-center gap-1 flex-wrap">
@@ -907,7 +1055,7 @@ export function GitDiffPanel({
                     fileDiff={fileDiff}
                     isExpanded={expandedFiles.has(fileDiff.filePath)}
                     onToggle={() => toggleFile(fileDiff.filePath)}
-                    fileStatus={enableStaging ? fileStatusMap.get(fileDiff.filePath) : undefined}
+                    fileStatus={fileStatusMap.get(fileDiff.filePath)}
                     enableStaging={enableStaging}
                     onStage={enableStaging ? handleStageFile : undefined}
                     onUnstage={enableStaging ? handleUnstageFile : undefined}
@@ -919,15 +1067,28 @@ export function GitDiffPanel({
                   <div className="space-y-2">
                     {files.map((file) => {
                       const stagingState = getStagingState(file);
+                      const isFileMerge = file.isMergeAffected;
                       return (
                         <div
                           key={file.path}
-                          className="border border-border rounded-lg overflow-hidden"
+                          className={cn(
+                            'border rounded-lg overflow-hidden',
+                            isFileMerge ? 'border-purple-500/40' : 'border-border'
+                          )}
                         >
-                          <div className="w-full px-3 py-2 flex flex-col gap-1 text-left bg-card sm:flex-row sm:items-center sm:gap-2">
+                          <div
+                            className={cn(
+                              'w-full px-3 py-2 flex flex-col gap-1 text-left sm:flex-row sm:items-center sm:gap-2',
+                              isFileMerge ? 'bg-purple-500/5 hover:bg-purple-500/10' : 'bg-card'
+                            )}
+                          >
                             {/* File name row */}
                             <div className="flex items-center gap-2 flex-1 min-w-0">
-                              {getFileIcon(file.status)}
+                              {isFileMerge ? (
+                                <GitMerge className="w-4 h-4 text-purple-500 flex-shrink-0" />
+                              ) : (
+                                getFileIcon(file.status)
+                              )}
                               <TruncatedFilePath
                                 path={file.path}
                                 className="flex-1 text-sm font-mono text-foreground"
@@ -935,6 +1096,7 @@ export function GitDiffPanel({
                             </div>
                             {/* Indicators & staging row */}
                             <div className="flex items-center gap-2 flex-shrink-0 pl-6 sm:pl-0">
+                              {isFileMerge && <MergeBadge mergeType={file.mergeType} />}
                               {enableStaging && <StagingBadge state={stagingState} />}
                               <span
                                 className={cn(

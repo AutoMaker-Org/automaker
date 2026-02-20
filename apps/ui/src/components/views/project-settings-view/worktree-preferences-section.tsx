@@ -25,6 +25,9 @@ import { getHttpApiClient } from '@/lib/http-api-client';
 import type { Project } from '@/lib/electron';
 import { ProjectFileSelectorDialog } from '@/components/dialogs/project-file-selector-dialog';
 
+// Stable empty array reference to prevent unnecessary re-renders when no copy files are set
+const EMPTY_FILES: string[] = [];
+
 interface WorktreePreferencesSectionProps {
   project: Project;
 }
@@ -38,20 +41,30 @@ interface InitScriptResponse {
 }
 
 export function WorktreePreferencesSection({ project }: WorktreePreferencesSectionProps) {
+  // Use direct store subscriptions (not getter functions) so the component
+  // properly re-renders when these values change in the store.
   const globalUseWorktrees = useAppStore((s) => s.useWorktrees);
-  const getProjectUseWorktrees = useAppStore((s) => s.getProjectUseWorktrees);
+  const projectUseWorktrees = useAppStore((s) => s.useWorktreesByProject[project.path]);
   const setProjectUseWorktrees = useAppStore((s) => s.setProjectUseWorktrees);
-  const getShowInitScriptIndicator = useAppStore((s) => s.getShowInitScriptIndicator);
+  const showIndicator = useAppStore(
+    (s) => s.showInitScriptIndicatorByProject[project.path] ?? true
+  );
   const setShowInitScriptIndicator = useAppStore((s) => s.setShowInitScriptIndicator);
-  const getDefaultDeleteBranch = useAppStore((s) => s.getDefaultDeleteBranch);
+  const defaultDeleteBranch = useAppStore(
+    (s) => s.defaultDeleteBranchByProject[project.path] ?? false
+  );
   const setDefaultDeleteBranch = useAppStore((s) => s.setDefaultDeleteBranch);
-  const getAutoDismissInitScriptIndicator = useAppStore((s) => s.getAutoDismissInitScriptIndicator);
+  const autoDismiss = useAppStore(
+    (s) => s.autoDismissInitScriptIndicatorByProject[project.path] ?? true
+  );
   const setAutoDismissInitScriptIndicator = useAppStore((s) => s.setAutoDismissInitScriptIndicator);
-  const copyFiles = useAppStore((s) => s.worktreeCopyFilesByProject[project.path] ?? []);
+  // Use a stable empty array reference to prevent new array on every render when
+  // worktreeCopyFilesByProject[project.path] is undefined (not yet loaded).
+  const copyFilesFromStore = useAppStore((s) => s.worktreeCopyFilesByProject[project.path]);
+  const copyFiles = copyFilesFromStore ?? EMPTY_FILES;
   const setWorktreeCopyFiles = useAppStore((s) => s.setWorktreeCopyFiles);
 
   // Get effective worktrees setting (project override or global fallback)
-  const projectUseWorktrees = getProjectUseWorktrees(project.path);
   const effectiveUseWorktrees = projectUseWorktrees ?? globalUseWorktrees;
 
   const [scriptContent, setScriptContent] = useState('');
@@ -64,11 +77,6 @@ export function WorktreePreferencesSection({ project }: WorktreePreferencesSecti
   // Copy files state
   const [newCopyFilePath, setNewCopyFilePath] = useState('');
   const [fileSelectorOpen, setFileSelectorOpen] = useState(false);
-
-  // Get the current settings for this project
-  const showIndicator = getShowInitScriptIndicator(project.path);
-  const defaultDeleteBranch = getDefaultDeleteBranch(project.path);
-  const autoDismiss = getAutoDismissInitScriptIndicator(project.path);
 
   // Check if there are unsaved changes
   const hasChanges = scriptContent !== originalContent;

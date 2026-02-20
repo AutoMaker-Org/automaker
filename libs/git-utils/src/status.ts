@@ -4,7 +4,9 @@
 
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { GIT_STATUS_MAP, type FileStatus } from './types.js';
+import fs from 'fs/promises';
+import path from 'path';
+import { GIT_STATUS_MAP, type FileStatus, type MergeStateInfo } from './types.js';
 
 const execAsync = promisify(exec);
 
@@ -95,12 +97,161 @@ export function parseGitStatus(statusOutput: string): FileStatus[] {
         primaryStatus = workTreeStatus; // Working tree change
       }
 
+      // Detect merge-affected files: when both X and Y are 'U', or U appears in either position
+      // In merge state, git uses 'U' (unmerged) to indicate merge-affected entries
+      const isMergeAffected =
+        indexStatus === 'U' ||
+        workTreeStatus === 'U' ||
+        (indexStatus === 'A' && workTreeStatus === 'A') || // both-added
+        (indexStatus === 'D' && workTreeStatus === 'D'); // both-deleted (during merge)
+
+      let mergeType: string | undefined;
+      if (isMergeAffected) {
+        if (indexStatus === 'U' && workTreeStatus === 'U') mergeType = 'both-modified';
+        else if (indexStatus === 'A' && workTreeStatus === 'U') mergeType = 'added-by-us';
+        else if (indexStatus === 'U' && workTreeStatus === 'A') mergeType = 'added-by-them';
+        else if (indexStatus === 'D' && workTreeStatus === 'U') mergeType = 'deleted-by-us';
+        else if (indexStatus === 'U' && workTreeStatus === 'D') mergeType = 'deleted-by-them';
+        else if (indexStatus === 'A' && workTreeStatus === 'A') mergeType = 'both-added';
+        else if (indexStatus === 'D' && workTreeStatus === 'D') mergeType = 'both-deleted';
+        else mergeType = 'unmerged';
+      }
+
       return {
         status: primaryStatus,
         path: filePath,
         statusText: getStatusText(indexStatus, workTreeStatus),
         indexStatus,
         workTreeStatus,
+        ...(isMergeAffected && { isMergeAffected: true }),
+        ...(mergeType && { mergeType }),
       };
     });
+}
+
+/**
+ * Check if the current HEAD commit is a merge commit (has more than one parent).
+ * This is used to detect completed merge commits so we can show what the merge changed.
+ *
+ * @param repoPath - Path to the git repository or worktree
+ * @returns Object with isMergeCommit flag and the list of files affected by the merge
+ */
+export async function detectMergeCommit(
+  repoPath: string
+): Promise<{ isMergeCommit: boolean; mergeAffectedFiles: string[] }> {
+  try {
+    // Check how many parents HEAD has using rev-parse
+    // For a merge commit, HEAD^2 exists (second parent); for non-merge commits it doesn't
+    try {
+      await execAsync('git rev-parse --verify HEAD^2', { cwd: repoPath });
+    } catch {
+      // HEAD^2 doesn't exist — not a merge commit
+      return { isMergeCommit: false, mergeAffectedFiles: [] };
+    }
+
+    // HEAD is a merge commit - get the files it changed relative to first parent
+    let mergeAffectedFiles: string[] = [];
+    try {
+      const { stdout: diffOutput } = await execAsync('git diff --name-only HEAD~1 HEAD', {
+        cwd: repoPath,
+      });
+      mergeAffectedFiles = diffOutput
+        .trim()
+        .split('\n')
+        .filter((f) => f.trim().length > 0);
+    } catch {
+      // Ignore errors getting affected files
+    }
+
+    return { isMergeCommit: true, mergeAffectedFiles };
+  } catch {
+    return { isMergeCommit: false, mergeAffectedFiles: [] };
+  }
+}
+
+/**
+ * Detect the current merge state of a git repository.
+ * Checks for .git/MERGE_HEAD, .git/REBASE_HEAD, .git/CHERRY_PICK_HEAD
+ * to determine if a merge/rebase/cherry-pick is in progress.
+ *
+ * @param repoPath - Path to the git repository or worktree
+ * @returns MergeStateInfo describing the current merge state
+ */
+export async function detectMergeState(repoPath: string): Promise<MergeStateInfo> {
+  const defaultState: MergeStateInfo = {
+    isMerging: false,
+    mergeOperationType: null,
+    isCleanMerge: false,
+    mergeAffectedFiles: [],
+    conflictFiles: [],
+  };
+
+  try {
+    // Find the actual .git directory (handles worktrees with .git file pointing to main repo)
+    const { stdout: gitDirRaw } = await execAsync('git rev-parse --git-dir', { cwd: repoPath });
+    const gitDir = path.resolve(repoPath, gitDirRaw.trim());
+
+    // Check for merge/rebase/cherry-pick indicators
+    let mergeOperationType: 'merge' | 'rebase' | 'cherry-pick' | null = null;
+
+    const checks = [
+      { file: 'MERGE_HEAD', type: 'merge' as const },
+      { file: 'REBASE_HEAD', type: 'rebase' as const },
+      { file: 'rebase-merge', type: 'rebase' as const },
+      { file: 'rebase-apply', type: 'rebase' as const },
+      { file: 'CHERRY_PICK_HEAD', type: 'cherry-pick' as const },
+    ];
+
+    for (const check of checks) {
+      try {
+        await fs.access(path.join(gitDir, check.file));
+        mergeOperationType = check.type;
+        break;
+      } catch {
+        // File doesn't exist, continue checking
+      }
+    }
+
+    if (!mergeOperationType) {
+      return defaultState;
+    }
+
+    // Get unmerged files (files with conflicts)
+    let conflictFiles: string[] = [];
+    try {
+      const { stdout: diffOutput } = await execAsync('git diff --name-only --diff-filter=U', {
+        cwd: repoPath,
+      });
+      conflictFiles = diffOutput
+        .trim()
+        .split('\n')
+        .filter((f) => f.trim().length > 0);
+    } catch {
+      // Ignore errors getting conflict files
+    }
+
+    // Get all files affected by the merge (staged files that came from the merge)
+    let mergeAffectedFiles: string[] = [];
+    try {
+      const { stdout: statusOutput } = await execAsync('git status --porcelain', {
+        cwd: repoPath,
+      });
+      const files = parseGitStatus(statusOutput);
+      mergeAffectedFiles = files
+        .filter((f) => f.isMergeAffected || (f.indexStatus !== ' ' && f.indexStatus !== '?'))
+        .map((f) => f.path);
+    } catch {
+      // Ignore errors
+    }
+
+    return {
+      isMerging: true,
+      mergeOperationType,
+      isCleanMerge: conflictFiles.length === 0,
+      mergeAffectedFiles,
+      conflictFiles,
+    };
+  } catch {
+    return defaultState;
+  }
 }

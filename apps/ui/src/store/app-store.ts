@@ -298,6 +298,7 @@ const initialState: AppState = {
   enableDependencyBlocking: true,
   skipVerificationInAutoMode: false,
   enableAiCommitMessages: true,
+  mergePostAction: null,
   planUseSelectedWorktreeBranch: true,
   addFeatureUseSelectedWorktreeBranch: false,
   useWorktrees: true,
@@ -1118,6 +1119,9 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
     } catch (error) {
       logger.error('Failed to sync enableAiCommitMessages:', error);
     }
+  },
+  setMergePostAction: (action) => {
+    set({ mergePostAction: action });
   },
   setPlanUseSelectedWorktreeBranch: async (enabled) => {
     set({ planUseSelectedWorktreeBranch: enabled });

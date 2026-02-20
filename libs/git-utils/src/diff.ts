@@ -7,8 +7,8 @@ import { secureFs } from '@automaker/platform';
 import path from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { BINARY_EXTENSIONS, type FileStatus } from './types.js';
-import { isGitRepo, parseGitStatus } from './status.js';
+import { BINARY_EXTENSIONS, type FileStatus, type MergeStateInfo } from './types.js';
+import { isGitRepo, parseGitStatus, detectMergeState, detectMergeCommit } from './status.js';
 
 const execAsync = promisify(exec);
 const logger = createLogger('GitUtils');
@@ -243,11 +243,15 @@ export async function generateDiffsForNonGitDirectory(
 
 /**
  * Get git repository diffs for a given path
- * Handles both git repos and non-git directories
+ * Handles both git repos and non-git directories.
+ * Also detects merge state and annotates files accordingly.
  */
-export async function getGitRepositoryDiffs(
-  repoPath: string
-): Promise<{ diff: string; files: FileStatus[]; hasChanges: boolean }> {
+export async function getGitRepositoryDiffs(repoPath: string): Promise<{
+  diff: string;
+  files: FileStatus[];
+  hasChanges: boolean;
+  mergeState?: MergeStateInfo;
+}> {
   // Check if it's a git repository
   const isRepo = await isGitRepo(repoPath);
 
@@ -273,11 +277,103 @@ export async function getGitRepositoryDiffs(
   const files = parseGitStatus(status);
 
   // Generate synthetic diffs for untracked (new) files
-  const combinedDiff = await appendUntrackedFileDiffs(repoPath, diff, files);
+  let combinedDiff = await appendUntrackedFileDiffs(repoPath, diff, files);
+
+  // Detect merge state (in-progress merge/rebase/cherry-pick)
+  const mergeState = await detectMergeState(repoPath);
+
+  // If no in-progress merge, check if HEAD is a completed merge commit
+  // and include merge commit changes in the diff and file list
+  if (!mergeState.isMerging) {
+    const mergeCommitInfo = await detectMergeCommit(repoPath);
+
+    if (mergeCommitInfo.isMergeCommit && mergeCommitInfo.mergeAffectedFiles.length > 0) {
+      // Get the diff of the merge commit relative to first parent
+      try {
+        const { stdout: mergeDiff } = await execAsync('git diff HEAD~1 HEAD', {
+          cwd: repoPath,
+          maxBuffer: 10 * 1024 * 1024,
+        });
+
+        // Add merge-affected files to the file list (avoid duplicates with working tree changes)
+        const existingPaths = new Set(files.map((f) => f.path));
+        for (const filePath of mergeCommitInfo.mergeAffectedFiles) {
+          if (!existingPaths.has(filePath)) {
+            files.push({
+              status: 'M',
+              path: filePath,
+              statusText: 'Merged',
+              indexStatus: ' ',
+              workTreeStatus: ' ',
+              isMergeAffected: true,
+              mergeType: 'merged',
+            });
+          } else {
+            // Mark existing file as also merge-affected
+            const existing = files.find((f) => f.path === filePath);
+            if (existing) {
+              existing.isMergeAffected = true;
+              existing.mergeType = 'merged';
+            }
+          }
+        }
+
+        // Prepend merge diff to the combined diff so merge changes appear
+        // For files that only exist in the merge (not in working tree), we need their diffs
+        if (mergeDiff.trim()) {
+          // Parse the existing working tree diff to find which files it covers
+          const workingTreeDiffPaths = new Set<string>();
+          const diffLines = combinedDiff.split('\n');
+          for (const line of diffLines) {
+            if (line.startsWith('diff --git')) {
+              const match = line.match(/diff --git a\/(.*?) b\/(.*)/);
+              if (match) {
+                workingTreeDiffPaths.add(match[2]);
+              }
+            }
+          }
+
+          // Only include merge diff entries for files NOT already in working tree diff
+          const mergeDiffFiles = mergeDiff.split(/(?=diff --git)/);
+          const newMergeDiffs: string[] = [];
+          for (const fileDiff of mergeDiffFiles) {
+            if (!fileDiff.trim()) continue;
+            const match = fileDiff.match(/diff --git a\/(.*?) b\/(.*)/);
+            if (match && !workingTreeDiffPaths.has(match[2])) {
+              newMergeDiffs.push(fileDiff);
+            }
+          }
+
+          if (newMergeDiffs.length > 0) {
+            combinedDiff = newMergeDiffs.join('') + combinedDiff;
+          }
+        }
+      } catch (mergeError) {
+        // Best-effort: log and continue without merge diff
+        logger.error('Failed to get merge commit diff:', mergeError);
+      }
+
+      // Return with merge commit info in the mergeState
+      return {
+        diff: combinedDiff,
+        files,
+        hasChanges: files.length > 0,
+        mergeState: {
+          isMerging: false,
+          mergeOperationType: 'merge',
+          isCleanMerge: true,
+          mergeAffectedFiles: mergeCommitInfo.mergeAffectedFiles,
+          conflictFiles: [],
+          isMergeCommit: true,
+        },
+      };
+    }
+  }
 
   return {
     diff: combinedDiff,
     files,
     hasChanges: files.length > 0,
+    ...(mergeState.isMerging ? { mergeState } : {}),
   };
 }

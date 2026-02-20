@@ -83,6 +83,9 @@ function mapResultToResponse(res: Response, result: PullResult): void {
       stashed: result.stashed,
       stashRestored: result.stashRestored,
       message: result.message,
+      isMerge: result.isMerge,
+      isFastForward: result.isFastForward,
+      mergeAffectedFiles: result.mergeAffectedFiles,
     },
   });
 }

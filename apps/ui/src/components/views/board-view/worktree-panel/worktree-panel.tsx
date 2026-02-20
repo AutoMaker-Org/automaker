@@ -646,15 +646,38 @@ export function WorktreePanel({
     setPushToRemoteDialogOpen(true);
   }, []);
 
+  // Keep a ref to pullDialogWorktree so handlePullCompleted can access the current
+  // value without including it in the dependency array. If pullDialogWorktree were
+  // a dep of handlePullCompleted, changing it would recreate the callback, which
+  // would propagate into GitPullDialog's onPulled prop and ultimately re-trigger
+  // the pull-check effect inside the dialog (causing the flow to run twice).
+  const pullDialogWorktreeRef = useRef(pullDialogWorktree);
+  useEffect(() => {
+    pullDialogWorktreeRef.current = pullDialogWorktree;
+  }, [pullDialogWorktree]);
+
   // Handle pull completed - refresh branches and worktrees
   const handlePullCompleted = useCallback(() => {
     // Refresh branch data (ahead/behind counts, tracking) and worktree list
     // after GitPullDialog completes the pull operation
-    if (pullDialogWorktree) {
-      fetchBranches(pullDialogWorktree.path);
+    if (pullDialogWorktreeRef.current) {
+      fetchBranches(pullDialogWorktreeRef.current.path);
     }
     fetchWorktrees({ silent: true });
-  }, [fetchWorktrees, fetchBranches, pullDialogWorktree]);
+  }, [fetchWorktrees, fetchBranches]);
+
+  // Wrapper for onCommit that works with the pull dialog's simpler WorktreeInfo.
+  // Uses the full pullDialogWorktree when available (via ref to avoid making it
+  // a dep that would cascade into handleSuccessfulPull → checkForLocalChanges recreations).
+  const handleCommitMerge = useCallback(
+    (_simpleWorktree: { path: string; branch: string; isMain: boolean }) => {
+      // Prefer the full worktree object we already have (from ref)
+      if (pullDialogWorktreeRef.current) {
+        onCommit(pullDialogWorktreeRef.current);
+      }
+    },
+    [onCommit]
+  );
 
   // Handle pull with remote selection when multiple remotes exist
   // Now opens the pull dialog which handles stash management and conflict resolution
@@ -702,14 +725,22 @@ export function WorktreePanel({
   );
 
   // Handle push with remote selection when multiple remotes exist
+  // If the branch has a tracked remote, push to it directly (skip the remote selection dialog)
   const handlePushWithRemoteSelection = useCallback(
     async (worktree: WorktreeInfo) => {
+      // If the branch already tracks a remote, push to it directly — no dialog needed
+      const tracked = getTrackingRemote(worktree.path);
+      if (tracked) {
+        handlePush(worktree, tracked);
+        return;
+      }
+
       try {
         const api = getHttpApiClient();
         const result = await api.worktree.listRemotes(worktree.path);
 
         if (result.success && result.result && result.result.remotes.length > 1) {
-          // Multiple remotes - show selection dialog
+          // Multiple remotes and no tracking remote - show selection dialog
           setSelectRemoteWorktree(worktree);
           setSelectRemoteOperation('push');
           setSelectRemoteDialogOpen(true);
@@ -726,7 +757,7 @@ export function WorktreePanel({
         handlePush(worktree);
       }
     },
-    [handlePush]
+    [handlePush, getTrackingRemote]
   );
 
   // Handle confirming remote selection for pull/push
@@ -1005,6 +1036,7 @@ export function WorktreePanel({
           remote={pullDialogRemote}
           onPulled={handlePullCompleted}
           onCreateConflictResolutionFeature={onCreateMergeConflictResolutionFeature}
+          onCommitMerge={handleCommitMerge}
         />
 
         {/* Dev Server Logs Panel */}
@@ -1477,6 +1509,7 @@ export function WorktreePanel({
         worktree={pullDialogWorktree}
         remote={pullDialogRemote}
         onPulled={handlePullCompleted}
+        onCommitMerge={handleCommitMerge}
         onCreateConflictResolutionFeature={onCreateMergeConflictResolutionFeature}
       />
     </div>

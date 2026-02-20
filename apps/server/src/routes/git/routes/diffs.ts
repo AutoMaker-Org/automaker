@@ -23,6 +23,7 @@ export function createDiffsHandler() {
           diff: result.diff,
           files: result.files,
           hasChanges: result.hasChanges,
+          ...(result.mergeState ? { mergeState: result.mergeState } : {}),
         });
       } catch (innerError) {
         logError(innerError, 'Git diff failed');

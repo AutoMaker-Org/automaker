@@ -160,6 +160,7 @@ export function useWorktreeDiffs(projectPath: string | undefined, featureId: str
       return {
         files: result.files ?? [],
         diff: result.diff ?? '',
+        ...(result.mergeState ? { mergeState: result.mergeState } : {}),
       };
     },
     enabled: !!projectPath && !!featureId,

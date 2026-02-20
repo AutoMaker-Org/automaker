@@ -46,6 +46,12 @@ export interface PullResult {
   conflictSource?: 'pull' | 'stash';
   conflictFiles?: string[];
   message?: string;
+  /** Whether the pull resulted in a merge commit (not fast-forward) */
+  isMerge?: boolean;
+  /** Whether the pull was a fast-forward (no merge commit needed) */
+  isFastForward?: boolean;
+  /** Files affected by the merge (only present when isMerge is true) */
+  mergeAffectedFiles?: string[];
 }
 
 // ============================================================================
@@ -306,6 +312,28 @@ export async function performPull(
     const pullOutput = await execGitCommand(pullArgs, worktreePath);
 
     const alreadyUpToDate = pullOutput.includes('Already up to date');
+    // Detect merge vs fast-forward from git pull output
+    const isFastForward =
+      pullOutput.includes('Fast-forward') || pullOutput.includes('fast-forward');
+    const isMerge = !alreadyUpToDate && !isFastForward && pullOutput.includes('Merge');
+
+    // If it was a real merge (not fast-forward), get the affected files
+    let mergeAffectedFiles: string[] = [];
+    if (isMerge) {
+      try {
+        // Get files changed in the merge commit
+        const diffOutput = await execGitCommand(
+          ['diff', '--name-only', 'HEAD~1', 'HEAD'],
+          worktreePath
+        );
+        mergeAffectedFiles = diffOutput
+          .trim()
+          .split('\n')
+          .filter((f: string) => f.trim().length > 0);
+      } catch {
+        // Ignore errors - this is best-effort
+      }
+    }
 
     // If no stash to reapply, return success
     if (!didStash) {
@@ -317,6 +345,8 @@ export async function performPull(
         stashed: false,
         stashRestored: false,
         message: alreadyUpToDate ? 'Already up to date' : 'Pulled latest changes',
+        ...(isMerge ? { isMerge: true, mergeAffectedFiles } : {}),
+        ...(isFastForward ? { isFastForward: true } : {}),
       };
     }
   } catch (pullError: unknown) {

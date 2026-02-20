@@ -74,4 +74,26 @@ export interface FileStatus {
   indexStatus?: string;
   /** Raw working tree status character from git porcelain format */
   workTreeStatus?: string;
+  /** Whether this file is involved in a merge operation (both-modified, added-by-us, etc.) */
+  isMergeAffected?: boolean;
+  /** Type of merge involvement: 'both-modified' | 'added-by-us' | 'added-by-them' | 'deleted-by-us' | 'deleted-by-them' | 'both-added' | 'both-deleted' */
+  mergeType?: string;
+}
+
+/**
+ * Merge state information for a git repository
+ */
+export interface MergeStateInfo {
+  /** Whether a merge is currently in progress */
+  isMerging: boolean;
+  /** Type of merge operation: 'merge' | 'rebase' | 'cherry-pick' | null */
+  mergeOperationType: 'merge' | 'rebase' | 'cherry-pick' | null;
+  /** Whether the merge completed cleanly (no conflicts) */
+  isCleanMerge: boolean;
+  /** Files affected by the merge */
+  mergeAffectedFiles: string[];
+  /** Files with unresolved conflicts */
+  conflictFiles: string[];
+  /** Whether the current HEAD is a completed merge commit (has multiple parents) */
+  isMergeCommit?: boolean;
 }

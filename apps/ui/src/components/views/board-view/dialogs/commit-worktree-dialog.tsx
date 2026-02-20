@@ -20,6 +20,7 @@ import {
 } from '@/components/ui/select';
 import {
   GitCommit,
+  GitMerge,
   Sparkles,
   FilePlus,
   FileX,
@@ -36,7 +37,7 @@ import { toast } from 'sonner';
 import { useAppStore } from '@/store/app-store';
 import { cn } from '@/lib/utils';
 import { TruncatedFilePath } from '@/components/ui/truncated-file-path';
-import type { FileStatus } from '@/types/electron';
+import type { FileStatus, MergeStateInfo } from '@/types/electron';
 import { parseDiff, type ParsedFileDiff } from '@/lib/diff-utils';
 
 interface RemoteInfo {
@@ -116,6 +117,27 @@ const getStatusBadgeColor = (status: string) => {
   }
 };
 
+const getMergeTypeLabel = (mergeType?: string) => {
+  switch (mergeType) {
+    case 'both-modified':
+      return 'Both Modified';
+    case 'added-by-us':
+      return 'Added by Us';
+    case 'added-by-them':
+      return 'Added by Them';
+    case 'deleted-by-us':
+      return 'Deleted by Us';
+    case 'deleted-by-them':
+      return 'Deleted by Them';
+    case 'both-added':
+      return 'Both Added';
+    case 'both-deleted':
+      return 'Both Deleted';
+    default:
+      return 'Merge';
+  }
+};
+
 function DiffLine({
   type,
   content,
@@ -190,6 +212,7 @@ export function CommitWorktreeDialog({
   const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
   const [expandedFile, setExpandedFile] = useState<string | null>(null);
   const [isLoadingDiffs, setIsLoadingDiffs] = useState(false);
+  const [mergeState, setMergeState] = useState<MergeStateInfo | undefined>(undefined);
 
   // Push after commit state
   const [pushAfterCommit, setPushAfterCommit] = useState(false);
@@ -274,6 +297,7 @@ export function CommitWorktreeDialog({
       setDiffContent('');
       setSelectedFiles(new Set());
       setExpandedFile(null);
+      setMergeState(undefined);
       // Reset push state
       setPushAfterCommit(false);
       setRemotes([]);
@@ -292,8 +316,20 @@ export function CommitWorktreeDialog({
             const result = await api.git.getDiffs(worktree.path);
             if (result.success) {
               const fileList = result.files ?? [];
+              // Sort merge-affected files first when a merge is in progress
+              if (result.mergeState?.isMerging) {
+                const mergeSet = new Set(result.mergeState.mergeAffectedFiles);
+                fileList.sort((a, b) => {
+                  const aIsMerge = mergeSet.has(a.path) || (a.isMergeAffected ?? false);
+                  const bIsMerge = mergeSet.has(b.path) || (b.isMergeAffected ?? false);
+                  if (aIsMerge && !bIsMerge) return -1;
+                  if (!aIsMerge && bIsMerge) return 1;
+                  return 0;
+                });
+              }
               if (!cancelled) setFiles(fileList);
               if (!cancelled) setDiffContent(result.diff ?? '');
+              if (!cancelled) setMergeState(result.mergeState);
               // If any files are already staged, pre-select only staged files
               // Otherwise select all files by default
               const stagedFiles = fileList.filter((f) => {
@@ -579,6 +615,34 @@ export function CommitWorktreeDialog({
         </DialogHeader>
 
         <div className="flex flex-col gap-3 py-2 min-h-0 flex-1 overflow-hidden">
+          {/* Merge state banner */}
+          {mergeState?.isMerging && (
+            <div className="flex items-start gap-2 p-3 rounded-md bg-purple-500/10 border border-purple-500/20">
+              <GitMerge className="w-4 h-4 text-purple-500 mt-0.5 flex-shrink-0" />
+              <div className="text-sm">
+                <span className="font-medium text-purple-400">
+                  {mergeState.mergeOperationType === 'cherry-pick'
+                    ? 'Cherry-pick'
+                    : mergeState.mergeOperationType === 'rebase'
+                      ? 'Rebase'
+                      : 'Merge'}{' '}
+                  in progress
+                </span>
+                {mergeState.conflictFiles.length > 0 ? (
+                  <span className="text-purple-400/80 ml-1">
+                    &mdash; {mergeState.conflictFiles.length} file
+                    {mergeState.conflictFiles.length !== 1 ? 's' : ''} with conflicts
+                  </span>
+                ) : mergeState.isCleanMerge ? (
+                  <span className="text-purple-400/80 ml-1">
+                    &mdash; Clean merge, {mergeState.mergeAffectedFiles.length} file
+                    {mergeState.mergeAffectedFiles.length !== 1 ? 's' : ''} affected
+                  </span>
+                ) : null}
+              </div>
+            </div>
+          )}
+
           {/* File Selection */}
           <div className="flex flex-col min-h-0">
             <div className="flex items-center justify-between mb-1.5">
@@ -625,13 +689,23 @@ export function CommitWorktreeDialog({
                   const isStaged = idx !== ' ' && idx !== '?';
                   const isUnstaged = wt !== ' ' && wt !== '?';
                   const isUntracked = idx === '?' && wt === '?';
+                  const isMergeFile = file.isMergeAffected;
 
                   return (
-                    <div key={file.path} className="border-b border-border last:border-b-0">
+                    <div
+                      key={file.path}
+                      className={cn(
+                        'border-b last:border-b-0',
+                        isMergeFile ? 'border-purple-500/30' : 'border-border'
+                      )}
+                    >
                       <div
                         className={cn(
-                          'flex items-center gap-2 px-3 py-1.5 hover:bg-accent/50 transition-colors group',
-                          isExpanded && 'bg-accent/30'
+                          'flex items-center gap-2 px-3 py-1.5 transition-colors group',
+                          isMergeFile
+                            ? 'bg-purple-500/5 hover:bg-purple-500/10'
+                            : 'hover:bg-accent/50',
+                          isExpanded && (isMergeFile ? 'bg-purple-500/10' : 'bg-accent/30')
                         )}
                       >
                         {/* Checkbox */}
@@ -651,11 +725,21 @@ export function CommitWorktreeDialog({
                           ) : (
                             <ChevronRight className="w-3 h-3 text-muted-foreground flex-shrink-0" />
                           )}
-                          {getFileIcon(file.status)}
+                          {isMergeFile ? (
+                            <GitMerge className="w-3.5 h-3.5 text-purple-500 flex-shrink-0" />
+                          ) : (
+                            getFileIcon(file.status)
+                          )}
                           <TruncatedFilePath
                             path={file.path}
                             className="text-xs font-mono flex-1 text-foreground"
                           />
+                          {isMergeFile && (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded border font-medium flex-shrink-0 bg-purple-500/15 text-purple-400 border-purple-500/30 inline-flex items-center gap-0.5">
+                              <GitMerge className="w-2.5 h-2.5" />
+                              {getMergeTypeLabel(file.mergeType)}
+                            </span>
+                          )}
                           <span
                             className={cn(
                               'text-[10px] px-1.5 py-0.5 rounded border font-medium flex-shrink-0',

@@ -34,6 +34,7 @@ export function createDiffsHandler() {
           diff: result.diff,
           files: result.files,
           hasChanges: result.hasChanges,
+          ...(result.mergeState ? { mergeState: result.mergeState } : {}),
         });
         return;
       }
@@ -55,6 +56,7 @@ export function createDiffsHandler() {
           diff: result.diff,
           files: result.files,
           hasChanges: result.hasChanges,
+          ...(result.mergeState ? { mergeState: result.mergeState } : {}),
         });
       } catch (innerError) {
         // Worktree doesn't exist - fallback to main project path
@@ -71,6 +73,7 @@ export function createDiffsHandler() {
             diff: result.diff,
             files: result.files,
             hasChanges: result.hasChanges,
+            ...(result.mergeState ? { mergeState: result.mergeState } : {}),
           });
         } catch (fallbackError) {
           logError(fallbackError, 'Fallback to main project also failed');

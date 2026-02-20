@@ -32,6 +32,7 @@ export function useGitDiffs(projectPath: string | undefined, enabled = true) {
       return {
         files: result.files ?? [],
         diff: result.diff ?? '',
+        ...(result.mergeState ? { mergeState: result.mergeState } : {}),
       };
     },
     enabled: !!projectPath && enabled,
