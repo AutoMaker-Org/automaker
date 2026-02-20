@@ -12,6 +12,7 @@ import {
   Redo2,
   Settings,
   RotateCcw,
+  HardDriveDownload,
 } from 'lucide-react';
 import { createLogger } from '@automaker/utils/logger';
 import { useAppStore } from '@/store/app-store';
@@ -33,6 +34,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
 import { UI_MONO_FONT_OPTIONS, DEFAULT_FONT_VALUE } from '@/config/ui-font-options';
 
@@ -130,11 +132,16 @@ export function FileEditorView({ initialPath }: FileEditorViewProps) {
   const editorFontFamily = useAppStore((s) => s.editorFontFamily);
   const setEditorFontSize = useAppStore((s) => s.setEditorFontSize);
   const setEditorFontFamily = useAppStore((s) => s.setEditorFontFamily);
+  // Auto-save settings
+  const editorAutoSave = useAppStore((s) => s.editorAutoSave);
+  const editorAutoSaveDelay = useAppStore((s) => s.editorAutoSaveDelay);
+  const setEditorAutoSave = useAppStore((s) => s.setEditorAutoSave);
   const store = useFileEditorStore();
   const isMobile = useIsMobile();
   const loadedProjectRef = useRef<string | null>(null);
   const refreshTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const editorRef = useRef<CodeEditorHandle>(null);
+  const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showActionsPanel, setShowActionsPanel] = useState(false);
 
   // Derive the effective working path from the current worktree selection.
@@ -472,6 +479,77 @@ export function FileEditorView({ initialPath }: FileEditorViewProps) {
       logger.error('Failed to save file:', error);
     }
   }, [activeTab, markTabSaved, loadGitStatus]);
+
+  // ─── Auto Save: save a specific tab by ID ───────────────────
+  const saveTabById = useCallback(
+    async (tabId: string) => {
+      const { tabs: currentTabs } = useFileEditorStore.getState();
+      const tab = currentTabs.find((t) => t.id === tabId);
+      if (!tab || !tab.isDirty) return;
+
+      try {
+        const api = getElectronAPI();
+        const result = await api.writeFile(tab.filePath, tab.content);
+
+        if (result.success) {
+          markTabSaved(tab.id, tab.content);
+          loadGitStatus();
+        } else {
+          logger.error('Auto-save failed:', result.error);
+        }
+      } catch (error) {
+        logger.error('Auto-save failed:', error);
+      }
+    },
+    [markTabSaved, loadGitStatus]
+  );
+
+  // ─── Auto Save: on tab switch ──────────────────────────────
+  const prevActiveTabIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!editorAutoSave) {
+      prevActiveTabIdRef.current = activeTabId;
+      return;
+    }
+
+    const prevTabId = prevActiveTabIdRef.current;
+    prevActiveTabIdRef.current = activeTabId;
+
+    // When switching away from a dirty tab, auto-save it
+    if (prevTabId && prevTabId !== activeTabId) {
+      saveTabById(prevTabId);
+    }
+  }, [activeTabId, editorAutoSave, saveTabById]);
+
+  // ─── Auto Save: after timeout on content change ────────────
+  useEffect(() => {
+    if (!editorAutoSave || !activeTab || !activeTab.isDirty) {
+      // Clear any pending auto-save timer
+      if (autoSaveTimerRef.current) {
+        clearTimeout(autoSaveTimerRef.current);
+        autoSaveTimerRef.current = null;
+      }
+      return;
+    }
+
+    // Debounce: set a timer to save after the configured delay
+    if (autoSaveTimerRef.current) {
+      clearTimeout(autoSaveTimerRef.current);
+    }
+
+    autoSaveTimerRef.current = setTimeout(() => {
+      handleSave();
+      autoSaveTimerRef.current = null;
+    }, editorAutoSaveDelay);
+
+    return () => {
+      if (autoSaveTimerRef.current) {
+        clearTimeout(autoSaveTimerRef.current);
+        autoSaveTimerRef.current = null;
+      }
+    };
+  }, [editorAutoSave, editorAutoSaveDelay, activeTab?.isDirty, activeTab?.content, handleSave]);
 
   // ─── Handle Search ──────────────────────────────────────────
   const handleSearch = useCallback(() => {
@@ -1230,10 +1308,10 @@ export function FileEditorView({ initialPath }: FileEditorViewProps) {
                 onClick={handleSave}
                 disabled={!activeTab.isDirty}
                 className="hidden lg:flex"
-                title="Save file (Ctrl+S)"
+                title={editorAutoSave ? 'Auto-save enabled (Ctrl+S)' : 'Save file (Ctrl+S)'}
               >
-                <Save className="w-4 h-4 mr-2" />
-                Save
+                <HardDriveDownload className="w-4 h-4 mr-2" />
+                {editorAutoSave ? 'Auto' : 'Save'}
               </Button>
             )}
 
@@ -1307,9 +1385,33 @@ export function FileEditorView({ initialPath }: FileEditorViewProps) {
                     </SelectContent>
                   </Select>
                 </div>
+
+                {/* Auto Save toggle */}
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs font-medium">Auto Save</Label>
+                  <Switch checked={editorAutoSave} onCheckedChange={setEditorAutoSave} />
+                </div>
               </div>
             </PopoverContent>
           </Popover>
+
+          {/* Mobile: Save button in main toolbar */}
+          {activeTab &&
+            !activeTab.isBinary &&
+            !activeTab.isTooLarge &&
+            isMobile &&
+            !mobileBrowserVisible && (
+              <Button
+                variant="outline"
+                size="icon-sm"
+                onClick={handleSave}
+                disabled={!activeTab.isDirty}
+                className="lg:hidden"
+                title={editorAutoSave ? 'Auto-save enabled (Ctrl+S)' : 'Save file (Ctrl+S)'}
+              >
+                <HardDriveDownload className="w-4 h-4" />
+              </Button>
+            )}
 
           {/* Tablet/Mobile: actions panel trigger */}
           <HeaderActionsPanelTrigger
@@ -1392,8 +1494,8 @@ export function FileEditorView({ initialPath }: FileEditorViewProps) {
               setShowActionsPanel(false);
             }}
           >
-            <Save className="w-4 h-4 mr-2" />
-            Save Changes
+            <HardDriveDownload className="w-4 h-4 mr-2" />
+            {editorAutoSave ? 'Save Now (Auto-save on)' : 'Save Changes'}
           </Button>
         )}
 
@@ -1468,6 +1570,12 @@ export function FileEditorView({ initialPath }: FileEditorViewProps) {
                 ))}
               </SelectContent>
             </Select>
+          </div>
+
+          {/* Auto Save toggle */}
+          <div className="flex items-center justify-between">
+            <Label className="text-xs font-medium">Auto Save</Label>
+            <Switch checked={editorAutoSave} onCheckedChange={setEditorAutoSave} />
           </div>
         </div>
       </HeaderActionsPanel>

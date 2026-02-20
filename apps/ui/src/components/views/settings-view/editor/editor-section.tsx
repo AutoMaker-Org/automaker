@@ -1,5 +1,6 @@
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
+import { Switch } from '@/components/ui/switch';
 import {
   Select,
   SelectContent,
@@ -25,8 +26,14 @@ const EDITOR_FONT_OPTIONS = UI_MONO_FONT_OPTIONS.map((option) => {
 });
 
 export function EditorSection() {
-  const { editorFontSize, editorFontFamily, setEditorFontSize, setEditorFontFamily } =
-    useAppStore();
+  const {
+    editorFontSize,
+    editorFontFamily,
+    editorAutoSave,
+    setEditorFontSize,
+    setEditorFontFamily,
+    setEditorAutoSave,
+  } = useAppStore();
 
   return (
     <div className="space-y-6">
@@ -92,6 +99,19 @@ export function EditorSection() {
               onValueChange={([value]) => setEditorFontSize(value)}
               className="flex-1"
             />
+          </div>
+
+          {/* Auto Save */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <Label className="text-foreground font-medium">Auto Save</Label>
+                <p className="text-xs text-muted-foreground/80 mt-0.5">
+                  Automatically save files after changes or when switching tabs
+                </p>
+              </div>
+              <Switch checked={editorAutoSave} onCheckedChange={setEditorAutoSave} />
+            </div>
           </div>
         </div>
       </div>

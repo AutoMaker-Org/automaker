@@ -240,6 +240,8 @@ export interface AppState {
   // File Editor Settings
   editorFontSize: number; // Font size for file editor (default: 13)
   editorFontFamily: string; // Font family for file editor (default: 'default' = use theme mono font)
+  editorAutoSave: boolean; // Enable auto-save for file editor (default: false)
+  editorAutoSaveDelay: number; // Auto-save delay in milliseconds (default: 1000)
 
   // Terminal Configuration
   defaultTerminalId: string | null; // Default external terminal for "Open In Terminal" action (null = integrated)
@@ -618,6 +620,8 @@ export interface AppActions {
   // File Editor Settings actions
   setEditorFontSize: (size: number) => void;
   setEditorFontFamily: (fontFamily: string) => void;
+  setEditorAutoSave: (enabled: boolean) => void;
+  setEditorAutoSaveDelay: (delay: number) => void;
 
   // Terminal Configuration actions
   setDefaultTerminalId: (terminalId: string | null) => void;

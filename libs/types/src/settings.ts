@@ -1010,6 +1010,10 @@ export interface GlobalSettings {
   editorFontSize?: number;
   /** File editor font family CSS value (default: 'default' = use theme mono font) */
   editorFontFamily?: string;
+  /** Enable auto-save for file editor (default: false) */
+  editorAutoSave?: boolean;
+  /** Auto-save delay in milliseconds (default: 1000) */
+  editorAutoSaveDelay?: number;
 
   // Terminal Configuration
   /** How to open terminals from "Open in Terminal" worktree action */
