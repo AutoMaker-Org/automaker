@@ -761,6 +761,8 @@ export function hydrateStoreFromSettings(settings: GlobalSettings): void {
     // File editor settings
     editorFontSize: settings.editorFontSize ?? 13,
     editorFontFamily: settings.editorFontFamily ?? 'default',
+    editorAutoSave: settings.editorAutoSave ?? false,
+    editorAutoSaveDelay: settings.editorAutoSaveDelay ?? 1000,
     // Terminal font (nested in terminalState)
     ...(settings.terminalFontFamily && {
       terminalState: {
@@ -853,6 +855,8 @@ function buildSettingsUpdateFromStore(): Record<string, unknown> {
     recentFolders: state.recentFolders,
     editorFontSize: state.editorFontSize,
     editorFontFamily: state.editorFontFamily,
+    editorAutoSave: state.editorAutoSave,
+    editorAutoSaveDelay: state.editorAutoSaveDelay,
     terminalFontFamily: state.terminalState.fontFamily,
   };
 }

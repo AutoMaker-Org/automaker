@@ -9,11 +9,11 @@ import path from 'path';
 import { PathNotAllowedError } from '@automaker/platform';
 import { getErrorMessage, logError } from '../common.js';
 import { createReadStream } from 'fs';
-import { exec } from 'child_process';
+import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { tmpdir } from 'os';
 
-const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 /**
  * Get total size of a directory recursively
@@ -68,12 +68,11 @@ export function createDownloadHandler() {
 
         try {
           // Use system zip command (available on macOS and Linux)
-          await execAsync(
-            `cd "${path.dirname(filePath)}" && zip -r "${tmpZipPath}" "${fileName}"`,
-            {
-              maxBuffer: 50 * 1024 * 1024,
-            }
-          );
+          // Use execFile to avoid shell injection via user-provided paths
+          await execFileAsync('zip', ['-r', tmpZipPath, fileName], {
+            cwd: path.dirname(filePath),
+            maxBuffer: 50 * 1024 * 1024,
+          });
 
           const zipStats = await secureFs.stat(tmpZipPath);
 

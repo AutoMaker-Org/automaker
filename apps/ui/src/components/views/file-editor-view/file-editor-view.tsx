@@ -666,46 +666,36 @@ export function FileEditorView({ initialPath }: FileEditorViewProps) {
 
       try {
         const api = getElectronAPI();
-        // Read old content, write to new path, delete old
-        const statResult = await api.stat(oldPath);
-        const isDir = statResult.success && statResult.stats?.isDirectory;
 
-        if (isDir) {
-          // For directories, create new and can't easily move - just refresh
-          // In a real implementation, we'd need a rename IPC call
-          await api.mkdir(newPath);
-          await api.deleteFile(oldPath);
-        } else {
-          const result = await api.readFile(oldPath);
-          if (result.success && result.content !== undefined) {
-            await api.writeFile(newPath, result.content);
-            await api.deleteFile(oldPath);
+        // Use the moveItem API for an atomic rename (works for both files and directories)
+        const result = await api.moveItem?.(oldPath, newPath);
 
-            // Update the open tab if it was renamed
-            const tab = tabs.find((t) => t.filePath === oldPath);
-            if (tab) {
-              closeTab(tab.id);
-              if (isMobile) {
-                handleMobileFileSelect(newPath);
-              } else {
-                handleFileSelect(newPath);
-              }
+        if (result?.success) {
+          // Update the open tab if it was renamed
+          const tab = tabs.find((t) => t.filePath === oldPath);
+          if (tab) {
+            closeTab(tab.id);
+            if (isMobile) {
+              handleMobileFileSelect(newPath);
+            } else {
+              handleFileSelect(newPath);
             }
           }
-        }
 
-        // If the new name starts with a dot, auto-enable hidden files visibility
-        // so the renamed file doesn't "disappear" from the tree
-        if (newName.startsWith('.')) {
-          const { showHiddenFiles } = useFileEditorStore.getState();
-          if (!showHiddenFiles) {
-            store.setShowHiddenFiles(true);
+          // If the new name starts with a dot, auto-enable hidden files visibility
+          // so the renamed file doesn't "disappear" from the tree
+          if (newName.startsWith('.')) {
+            const { showHiddenFiles } = useFileEditorStore.getState();
+            if (!showHiddenFiles) {
+              store.setShowHiddenFiles(true);
+            }
           }
-        }
 
-        // Preserve expanded folders so the parent directory stays open after rename
-        await loadTree(undefined, { preserveExpanded: true });
-        loadGitStatus();
+          await loadTree(undefined, { preserveExpanded: true });
+          loadGitStatus();
+        } else {
+          toast.error('Rename failed', { description: result?.error });
+        }
       } catch (error) {
         logger.error('Failed to rename item:', error);
       }

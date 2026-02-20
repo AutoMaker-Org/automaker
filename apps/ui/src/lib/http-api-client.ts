@@ -1288,6 +1288,11 @@ export class HttpApiClient implements ElectronAPI {
       body: JSON.stringify({ filePath }),
     });
 
+    if (response.status === 401 || response.status === 403) {
+      handleUnauthorized();
+      throw new Error('Unauthorized');
+    }
+
     if (!response.ok) {
       const error = await response.json().catch(() => ({ error: 'Download failed' }));
       throw new Error(error.error || `Download failed with status ${response.status}`);

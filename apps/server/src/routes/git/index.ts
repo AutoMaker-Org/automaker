@@ -20,7 +20,7 @@ export function createGitRoutes(): Router {
     validatePathParams('projectPath', 'files[]'),
     createStageFilesHandler()
   );
-  router.post('/details', validatePathParams('projectPath'), createDetailsHandler());
+  router.post('/details', validatePathParams('projectPath', 'filePath?'), createDetailsHandler());
   router.post('/enhanced-status', validatePathParams('projectPath'), createEnhancedStatusHandler());
 
   return router;

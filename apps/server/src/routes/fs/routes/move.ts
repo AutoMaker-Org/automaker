@@ -25,9 +25,14 @@ export function createMoveHandler() {
         return;
       }
 
-      // Prevent moving a folder into its own descendant
+      // Prevent moving to same location or into its own descendant
       const resolvedSrc = path.resolve(sourcePath);
       const resolvedDest = path.resolve(destinationPath);
+      if (resolvedDest === resolvedSrc) {
+        // No-op: source and destination are the same
+        res.json({ success: true });
+        return;
+      }
       if (resolvedDest.startsWith(resolvedSrc + path.sep)) {
         res.status(400).json({
           success: false,

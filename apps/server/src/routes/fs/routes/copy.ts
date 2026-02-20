@@ -44,6 +44,17 @@ export function createCopyHandler() {
         return;
       }
 
+      // Prevent copying a folder into itself or its own descendant (infinite recursion)
+      const resolvedSrc = path.resolve(sourcePath);
+      const resolvedDest = path.resolve(destinationPath);
+      if (resolvedDest === resolvedSrc || resolvedDest.startsWith(resolvedSrc + path.sep)) {
+        res.status(400).json({
+          success: false,
+          error: 'Cannot copy a folder into itself or one of its own descendants',
+        });
+        return;
+      }
+
       // Check if destination already exists
       try {
         await secureFs.stat(destinationPath);
@@ -56,6 +67,8 @@ export function createCopyHandler() {
           });
           return;
         }
+        // If overwrite is true, remove the existing destination first to avoid merging
+        await secureFs.rm(destinationPath, { recursive: true });
       } catch {
         // Destination doesn't exist - good to proceed
       }

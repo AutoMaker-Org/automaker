@@ -344,6 +344,16 @@ export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(function
   const editorRef = useRef<ReactCodeMirrorRef>(null);
   const isMobile = useIsMobile();
 
+  // Stable refs for callbacks to avoid frequent extension rebuilds
+  const onSaveRef = useRef(onSave);
+  const onCursorChangeRef = useRef(onCursorChange);
+  useEffect(() => {
+    onSaveRef.current = onSave;
+  }, [onSave]);
+  useEffect(() => {
+    onCursorChangeRef.current = onCursorChange;
+  }, [onCursorChange]);
+
   // Expose imperative methods to parent components
   useImperativeHandle(
     ref,
@@ -519,34 +529,34 @@ export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(function
   );
 
   // Build extensions list
+  // Uses refs for onSave/onCursorChange to avoid frequent extension rebuilds
+  // when parent passes inline arrow functions
   const extensions = useMemo(() => {
     const exts: Extension[] = [
       syntaxHighlighting(syntaxColors),
       editorTheme,
       search(),
       EditorView.updateListener.of((update) => {
-        if (update.selectionSet && onCursorChange) {
+        if (update.selectionSet && onCursorChangeRef.current) {
           const pos = update.state.selection.main.head;
           const line = update.state.doc.lineAt(pos);
-          onCursorChange(line.number, pos - line.from + 1);
+          onCursorChangeRef.current(line.number, pos - line.from + 1);
         }
       }),
     ];
 
-    // Add save keybinding
-    if (onSave) {
-      exts.push(
-        keymap.of([
-          {
-            key: 'Mod-s',
-            run: () => {
-              onSave();
-              return true;
-            },
+    // Add save keybinding (always register, check ref at call time)
+    exts.push(
+      keymap.of([
+        {
+          key: 'Mod-s',
+          run: () => {
+            onSaveRef.current?.();
+            return true;
           },
-        ])
-      );
-    }
+        },
+      ])
+    );
 
     // Add word wrap
     if (wordWrap) {
@@ -563,7 +573,7 @@ export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(function
     }
 
     return exts;
-  }, [filePath, wordWrap, tabSize, editorTheme, onSave, onCursorChange]);
+  }, [filePath, wordWrap, tabSize, editorTheme]);
 
   return (
     <div className={cn('h-full w-full', className)}>

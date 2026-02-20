@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist, type StorageValue } from 'zustand/middleware';
 
 export interface FileTreeNode {
   name: string;
@@ -162,126 +163,209 @@ const initialState = {
   selectedPaths: new Set<string>(),
 };
 
-export const useFileEditorStore = create<FileEditorState>((set, get) => ({
-  ...initialState,
+/** Shape of the persisted subset (Sets are stored as arrays for JSON compatibility) */
+interface PersistedFileEditorState {
+  tabs: EditorTab[];
+  activeTabId: string | null;
+  expandedFolders: string[];
+  markdownViewMode: MarkdownViewMode;
+}
 
-  setFileTree: (tree) => set({ fileTree: tree }),
+const STORE_NAME = 'automaker-file-editor';
 
-  toggleFolder: (path) => {
-    const { expandedFolders } = get();
-    const next = new Set(expandedFolders);
-    if (next.has(path)) {
-      next.delete(path);
-    } else {
-      next.add(path);
+export const useFileEditorStore = create<FileEditorState>()(
+  persist(
+    (set, get) => ({
+      ...initialState,
+
+      setFileTree: (tree) => set({ fileTree: tree }),
+
+      toggleFolder: (path) => {
+        const { expandedFolders } = get();
+        const next = new Set(expandedFolders);
+        if (next.has(path)) {
+          next.delete(path);
+        } else {
+          next.add(path);
+        }
+        set({ expandedFolders: next });
+      },
+
+      setShowHiddenFiles: (show) => set({ showHiddenFiles: show }),
+
+      setExpandedFolders: (folders) => set({ expandedFolders: folders }),
+
+      openTab: (tabData) => {
+        const { tabs } = get();
+        // Check if file is already open
+        const existing = tabs.find((t) => t.filePath === tabData.filePath);
+        if (existing) {
+          set({ activeTabId: existing.id });
+          return;
+        }
+
+        const id = `tab-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        const newTab: EditorTab = { ...tabData, id };
+        set({
+          tabs: [...tabs, newTab],
+          activeTabId: id,
+        });
+      },
+
+      closeTab: (tabId) => {
+        const { tabs, activeTabId } = get();
+        const idx = tabs.findIndex((t) => t.id === tabId);
+        if (idx === -1) return;
+
+        const newTabs = tabs.filter((t) => t.id !== tabId);
+        let newActiveId = activeTabId;
+
+        if (activeTabId === tabId) {
+          if (newTabs.length === 0) {
+            newActiveId = null;
+          } else if (idx >= newTabs.length) {
+            newActiveId = newTabs[newTabs.length - 1].id;
+          } else {
+            newActiveId = newTabs[idx].id;
+          }
+        }
+
+        set({ tabs: newTabs, activeTabId: newActiveId });
+      },
+
+      closeAllTabs: () => {
+        set({ tabs: [], activeTabId: null });
+      },
+
+      setActiveTab: (tabId) => set({ activeTabId: tabId }),
+
+      updateTabContent: (tabId, content) => {
+        set({
+          tabs: get().tabs.map((t) =>
+            t.id === tabId ? { ...t, content, isDirty: content !== t.originalContent } : t
+          ),
+        });
+      },
+
+      markTabSaved: (tabId, content) => {
+        set({
+          tabs: get().tabs.map((t) =>
+            t.id === tabId ? { ...t, content, originalContent: content, isDirty: false } : t
+          ),
+        });
+      },
+
+      updateTabScroll: (tabId, scrollTop) => {
+        set({
+          tabs: get().tabs.map((t) => (t.id === tabId ? { ...t, scrollTop } : t)),
+        });
+      },
+
+      updateTabCursor: (tabId, line, col) => {
+        set({
+          tabs: get().tabs.map((t) =>
+            t.id === tabId ? { ...t, cursorLine: line, cursorCol: col } : t
+          ),
+        });
+      },
+
+      setMarkdownViewMode: (mode) => set({ markdownViewMode: mode }),
+
+      setMobileBrowserVisible: (visible) => set({ mobileBrowserVisible: visible }),
+
+      setTabSize: (size) => set({ tabSize: size }),
+      setWordWrap: (wrap) => set({ wordWrap: wrap }),
+      setFontSize: (size) => set({ fontSize: size }),
+
+      setGitStatusMap: (map) => set({ gitStatusMap: map }),
+      setEnhancedGitStatusMap: (map) => set({ enhancedGitStatusMap: map }),
+      setGitBranch: (branch) => set({ gitBranch: branch }),
+      setActiveFileGitDetails: (details) => set({ activeFileGitDetails: details }),
+
+      setDragState: (state) => set({ dragState: state }),
+      setSelectedPaths: (paths) => set({ selectedPaths: paths }),
+      toggleSelectedPath: (path) => {
+        const { selectedPaths } = get();
+        const next = new Set(selectedPaths);
+        if (next.has(path)) {
+          next.delete(path);
+        } else {
+          next.add(path);
+        }
+        set({ selectedPaths: next });
+      },
+      clearSelectedPaths: () => set({ selectedPaths: new Set() }),
+
+      reset: () => set(initialState),
+    }),
+    {
+      name: STORE_NAME,
+      version: 1,
+      // Only persist tab session state, not transient data (git status, file tree, drag state)
+      partialize: (state) =>
+        ({
+          tabs: state.tabs,
+          activeTabId: state.activeTabId,
+          expandedFolders: state.expandedFolders,
+          markdownViewMode: state.markdownViewMode,
+        }) as unknown as FileEditorState,
+      // Custom storage adapter to handle Set<string> serialization
+      storage: {
+        getItem: (name: string): StorageValue<FileEditorState> | null => {
+          const raw = localStorage.getItem(name);
+          if (!raw) return null;
+          try {
+            const parsed = JSON.parse(raw) as StorageValue<PersistedFileEditorState>;
+            if (!parsed?.state) return null;
+            // Convert arrays back to Sets
+            return {
+              ...parsed,
+              state: {
+                ...parsed.state,
+                expandedFolders: new Set(parsed.state.expandedFolders ?? []),
+              },
+            } as unknown as StorageValue<FileEditorState>;
+          } catch {
+            return null;
+          }
+        },
+        setItem: (name: string, value: StorageValue<FileEditorState>): void => {
+          try {
+            const state = value.state as unknown as FileEditorState;
+            // Convert Sets to arrays for JSON serialization
+            const serializable: StorageValue<PersistedFileEditorState> = {
+              ...value,
+              state: {
+                tabs: state.tabs ?? [],
+                activeTabId: state.activeTabId ?? null,
+                expandedFolders: Array.from(state.expandedFolders ?? []),
+                markdownViewMode: state.markdownViewMode ?? 'split',
+              },
+            };
+            localStorage.setItem(name, JSON.stringify(serializable));
+          } catch {
+            // localStorage might be full or disabled
+          }
+        },
+        removeItem: (name: string): void => {
+          try {
+            localStorage.removeItem(name);
+          } catch {
+            // Ignore
+          }
+        },
+      },
+      migrate: (persistedState: unknown, version: number) => {
+        const state = persistedState as Record<string, unknown>;
+        if (version < 1) {
+          // Initial migration: ensure all fields exist
+          state.tabs = state.tabs ?? [];
+          state.activeTabId = state.activeTabId ?? null;
+          state.expandedFolders = state.expandedFolders ?? new Set<string>();
+          state.markdownViewMode = state.markdownViewMode ?? 'split';
+        }
+        return state as unknown as FileEditorState;
+      },
     }
-    set({ expandedFolders: next });
-  },
-
-  setShowHiddenFiles: (show) => set({ showHiddenFiles: show }),
-
-  setExpandedFolders: (folders) => set({ expandedFolders: folders }),
-
-  openTab: (tabData) => {
-    const { tabs } = get();
-    // Check if file is already open
-    const existing = tabs.find((t) => t.filePath === tabData.filePath);
-    if (existing) {
-      set({ activeTabId: existing.id });
-      return;
-    }
-
-    const id = `tab-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-    const newTab: EditorTab = { ...tabData, id };
-    set({
-      tabs: [...tabs, newTab],
-      activeTabId: id,
-    });
-  },
-
-  closeTab: (tabId) => {
-    const { tabs, activeTabId } = get();
-    const idx = tabs.findIndex((t) => t.id === tabId);
-    if (idx === -1) return;
-
-    const newTabs = tabs.filter((t) => t.id !== tabId);
-    let newActiveId = activeTabId;
-
-    if (activeTabId === tabId) {
-      if (newTabs.length === 0) {
-        newActiveId = null;
-      } else if (idx >= newTabs.length) {
-        newActiveId = newTabs[newTabs.length - 1].id;
-      } else {
-        newActiveId = newTabs[idx].id;
-      }
-    }
-
-    set({ tabs: newTabs, activeTabId: newActiveId });
-  },
-
-  closeAllTabs: () => {
-    set({ tabs: [], activeTabId: null });
-  },
-
-  setActiveTab: (tabId) => set({ activeTabId: tabId }),
-
-  updateTabContent: (tabId, content) => {
-    set({
-      tabs: get().tabs.map((t) =>
-        t.id === tabId ? { ...t, content, isDirty: content !== t.originalContent } : t
-      ),
-    });
-  },
-
-  markTabSaved: (tabId, content) => {
-    set({
-      tabs: get().tabs.map((t) =>
-        t.id === tabId ? { ...t, content, originalContent: content, isDirty: false } : t
-      ),
-    });
-  },
-
-  updateTabScroll: (tabId, scrollTop) => {
-    set({
-      tabs: get().tabs.map((t) => (t.id === tabId ? { ...t, scrollTop } : t)),
-    });
-  },
-
-  updateTabCursor: (tabId, line, col) => {
-    set({
-      tabs: get().tabs.map((t) =>
-        t.id === tabId ? { ...t, cursorLine: line, cursorCol: col } : t
-      ),
-    });
-  },
-
-  setMarkdownViewMode: (mode) => set({ markdownViewMode: mode }),
-
-  setMobileBrowserVisible: (visible) => set({ mobileBrowserVisible: visible }),
-
-  setTabSize: (size) => set({ tabSize: size }),
-  setWordWrap: (wrap) => set({ wordWrap: wrap }),
-  setFontSize: (size) => set({ fontSize: size }),
-
-  setGitStatusMap: (map) => set({ gitStatusMap: map }),
-  setEnhancedGitStatusMap: (map) => set({ enhancedGitStatusMap: map }),
-  setGitBranch: (branch) => set({ gitBranch: branch }),
-  setActiveFileGitDetails: (details) => set({ activeFileGitDetails: details }),
-
-  setDragState: (state) => set({ dragState: state }),
-  setSelectedPaths: (paths) => set({ selectedPaths: paths }),
-  toggleSelectedPath: (path) => {
-    const { selectedPaths } = get();
-    const next = new Set(selectedPaths);
-    if (next.has(path)) {
-      next.delete(path);
-    } else {
-      next.add(path);
-    }
-    set({ selectedPaths: next });
-  },
-  clearSelectedPaths: () => set({ selectedPaths: new Set() }),
-
-  reset: () => set(initialState),
-}));
+  )
+);

@@ -4,11 +4,13 @@
  */
 
 import type { Request, Response } from 'express';
-import { exec } from 'child_process';
+import { exec, execFile } from 'child_process';
 import { promisify } from 'util';
+import * as secureFs from '../../../lib/secure-fs.js';
 import { getErrorMessage, logError } from '../common.js';
 
 const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 interface GitFileDetails {
   branch: string;
@@ -60,8 +62,9 @@ export function createDetailsHandler() {
         let lastCommitTimestamp = '';
 
         try {
-          const { stdout: logOutput } = await execAsync(
-            `git log -1 --format="%H|%s|%an|%aI" -- "${filePath}"`,
+          const { stdout: logOutput } = await execFileAsync(
+            'git',
+            ['log', '-1', '--format=%H|%s|%an|%aI', '--', filePath],
             { cwd: projectPath }
           );
 
@@ -82,24 +85,29 @@ export function createDetailsHandler() {
 
         try {
           // Check if file is untracked first
-          const { stdout: statusLine } = await execAsync(
-            `git status --porcelain -- "${filePath}"`,
+          const { stdout: statusLine } = await execFileAsync(
+            'git',
+            ['status', '--porcelain', '--', filePath],
             { cwd: projectPath }
           );
 
           if (statusLine.trim().startsWith('??')) {
-            // Untracked file - count all lines as added
+            // Untracked file - count all lines as added using Node.js instead of shell
             try {
-              const { stdout: wcOutput } = await execAsync(`wc -l < "${filePath}"`, {
-                cwd: projectPath,
-              });
-              linesAdded = parseInt(wcOutput.trim(), 10) || 0;
+              const fileContent = (await secureFs.readFile(filePath, 'utf-8')).toString();
+              const lines = fileContent.split('\n');
+              // Don't count trailing empty line from final newline
+              linesAdded =
+                lines.length > 0 && lines[lines.length - 1] === ''
+                  ? lines.length - 1
+                  : lines.length;
             } catch {
               // Ignore
             }
           } else {
-            const { stdout: diffStatRaw } = await execAsync(
-              `git diff --numstat HEAD -- "${filePath}"`,
+            const { stdout: diffStatRaw } = await execFileAsync(
+              'git',
+              ['diff', '--numstat', 'HEAD', '--', filePath],
               { cwd: projectPath }
             );
 
@@ -110,8 +118,9 @@ export function createDetailsHandler() {
             }
 
             // Also check staged diff stats
-            const { stdout: stagedDiffStatRaw } = await execAsync(
-              `git diff --numstat --cached -- "${filePath}"`,
+            const { stdout: stagedDiffStatRaw } = await execFileAsync(
+              'git',
+              ['diff', '--numstat', '--cached', '--', filePath],
               { cwd: projectPath }
             );
 
@@ -132,8 +141,9 @@ export function createDetailsHandler() {
         let statusLabel = '';
 
         try {
-          const { stdout: statusOutput } = await execAsync(
-            `git status --porcelain -- "${filePath}"`,
+          const { stdout: statusOutput } = await execFileAsync(
+            'git',
+            ['status', '--porcelain', '--', filePath],
             { cwd: projectPath }
           );
 
