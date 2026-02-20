@@ -126,7 +126,7 @@ const SelectItem = React.forwardRef<
     </span>
 
     {description ? (
-      <div className="flex flex-col items-start">
+      <div className="flex flex-col items-start w-full min-w-0">
         <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
         {description}
       </div>

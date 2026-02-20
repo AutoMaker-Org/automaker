@@ -244,6 +244,11 @@ class DevServerService {
             /\/\/\[::\](:\d+)?/,
             (_, port) => `//localhost${port || ''}`
           );
+          // Normalize [::1] (IPv6 loopback) to localhost for browser accessibility
+          detectedUrl = detectedUrl.replace(
+            /\/\/\[::1\](:\d+)?/,
+            (_, port) => `//localhost${port || ''}`
+          );
 
           server.url = detectedUrl;
           server.urlDetected = true;

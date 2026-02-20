@@ -1,6 +1,18 @@
 import { useCallback, useRef, useEffect, useState } from 'react';
-import { ArrowUp, ArrowDown, ArrowLeft, ArrowRight, ChevronUp, ChevronDown } from 'lucide-react';
+import {
+  ArrowUp,
+  ArrowDown,
+  ArrowLeft,
+  ArrowRight,
+  ChevronUp,
+  ChevronDown,
+  Copy,
+  ClipboardPaste,
+  CheckSquare,
+  TextSelect,
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { StickyModifierKeys, type StickyModifier } from './sticky-modifier-keys';
 
 /**
  * ANSI escape sequences for special keys.
@@ -37,6 +49,20 @@ interface MobileTerminalShortcutsProps {
   onSendInput: (data: string) => void;
   /** Whether the terminal is connected and ready */
   isConnected: boolean;
+  /** Currently active sticky modifier (Ctrl or Alt) */
+  activeModifier: StickyModifier;
+  /** Callback when sticky modifier is toggled */
+  onModifierChange: (modifier: StickyModifier) => void;
+  /** Callback to copy selected text to clipboard */
+  onCopy?: () => void;
+  /** Callback to paste from clipboard into terminal */
+  onPaste?: () => void;
+  /** Callback to select all terminal content */
+  onSelectAll?: () => void;
+  /** Callback to toggle text selection mode (renders selectable text overlay) */
+  onToggleSelectMode?: () => void;
+  /** Whether text selection mode is currently active */
+  isSelectMode?: boolean;
 }
 
 /**
@@ -50,6 +76,13 @@ interface MobileTerminalShortcutsProps {
 export function MobileTerminalShortcuts({
   onSendInput,
   isConnected,
+  activeModifier,
+  onModifierChange,
+  onCopy,
+  onPaste,
+  onSelectAll,
+  onToggleSelectMode,
+  isSelectMode,
 }: MobileTerminalShortcutsProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
 
@@ -131,6 +164,54 @@ export function MobileTerminalShortcuts({
       >
         <ChevronUp className="h-4 w-4" />
       </button>
+
+      {/* Separator */}
+      <div className="w-px h-6 bg-border shrink-0" />
+
+      {/* Sticky modifier keys (Ctrl, Alt) - at the beginning of the bar */}
+      <StickyModifierKeys
+        activeModifier={activeModifier}
+        onModifierChange={onModifierChange}
+        isConnected={isConnected}
+      />
+
+      {/* Separator */}
+      <div className="w-px h-6 bg-border shrink-0" />
+
+      {/* Clipboard actions */}
+      {onToggleSelectMode && (
+        <IconShortcutButton
+          icon={TextSelect}
+          title={isSelectMode ? 'Exit select mode' : 'Select text'}
+          onPress={onToggleSelectMode}
+          disabled={!isConnected}
+          active={isSelectMode}
+        />
+      )}
+      {onSelectAll && (
+        <IconShortcutButton
+          icon={CheckSquare}
+          title="Select all"
+          onPress={onSelectAll}
+          disabled={!isConnected}
+        />
+      )}
+      {onCopy && (
+        <IconShortcutButton
+          icon={Copy}
+          title="Copy selection"
+          onPress={onCopy}
+          disabled={!isConnected}
+        />
+      )}
+      {onPaste && (
+        <IconShortcutButton
+          icon={ClipboardPaste}
+          title="Paste from clipboard"
+          onPress={onPaste}
+          disabled={!isConnected}
+        />
+      )}
 
       {/* Separator */}
       <div className="w-px h-6 bg-border shrink-0" />
@@ -294,6 +375,45 @@ function ArrowButton({
       onPointerUp={onRelease}
       onPointerLeave={onRelease}
       onPointerCancel={onRelease}
+      disabled={disabled}
+    >
+      <Icon className="h-4 w-4" />
+    </button>
+  );
+}
+
+/**
+ * Icon-based shortcut button for clipboard actions.
+ * Uses a Lucide icon instead of text label for a cleaner mobile UI.
+ */
+function IconShortcutButton({
+  icon: Icon,
+  title,
+  onPress,
+  disabled = false,
+  active = false,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  title: string;
+  onPress: () => void;
+  disabled?: boolean;
+  active?: boolean;
+}) {
+  return (
+    <button
+      className={cn(
+        'p-2 rounded-md shrink-0 select-none transition-colors min-w-[36px] min-h-[36px] flex items-center justify-center',
+        'active:scale-95 touch-manipulation',
+        active
+          ? 'bg-brand-500/20 text-brand-500 ring-1 ring-brand-500/40'
+          : 'bg-muted/80 text-foreground hover:bg-accent',
+        disabled && 'opacity-40 pointer-events-none'
+      )}
+      onPointerDown={(e) => {
+        e.preventDefault(); // Prevent focus stealing from terminal
+        onPress();
+      }}
+      title={title}
       disabled={disabled}
     >
       <Icon className="h-4 w-4" />

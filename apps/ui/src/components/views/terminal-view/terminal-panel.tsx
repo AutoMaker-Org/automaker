@@ -51,14 +51,11 @@ import { DEFAULT_FONT_VALUE } from '@/config/ui-font-options';
 import { toast } from 'sonner';
 import { getElectronAPI } from '@/lib/electron';
 import { getApiKey, getSessionToken, getServerUrlSync } from '@/lib/http-api-client';
+import { writeToClipboard, readFromClipboard } from '@/lib/clipboard-utils';
 import { useIsMobile } from '@/hooks/use-media-query';
 import { useVirtualKeyboardResize } from '@/hooks/use-virtual-keyboard-resize';
 import { MobileTerminalShortcuts } from './mobile-terminal-shortcuts';
-import {
-  StickyModifierKeys,
-  applyStickyModifier,
-  type StickyModifier,
-} from './sticky-modifier-keys';
+import { applyStickyModifier, type StickyModifier } from './sticky-modifier-keys';
 import { TerminalScriptsDropdown } from './terminal-scripts-dropdown';
 
 const logger = createLogger('Terminal');
@@ -157,6 +154,9 @@ export function TerminalPanel({
   const [isImageDragOver, setIsImageDragOver] = useState(false);
   const [isProcessingImage, setIsProcessingImage] = useState(false);
   const hasRunInitialCommandRef = useRef(false);
+  // Long-press timer for mobile context menu
+  const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const longPressTouchStartRef = useRef<{ x: number; y: number } | null>(null);
   // Tracks whether the connected shell is a Windows shell (PowerShell, cmd, etc.).
   // Maintained as a ref (not state) so sendCommand can read the current value without
   // causing unnecessary re-renders or stale closure issues. Set inside ws.onmessage
@@ -168,6 +168,10 @@ export function TerminalPanel({
   const [searchQuery, setSearchQuery] = useState('');
   const showSearchRef = useRef(false);
   const [isAtBottom, setIsAtBottom] = useState(true);
+
+  // Mobile text selection mode - renders terminal buffer as selectable DOM text
+  const [isSelectMode, setIsSelectMode] = useState(false);
+  const [selectModeText, setSelectModeText] = useState('');
 
   // Sticky modifier key state (Ctrl or Alt) for the terminal toolbar
   const [stickyModifier, setStickyModifier] = useState<StickyModifier>(null);
@@ -330,9 +334,16 @@ export function TerminalPanel({
     try {
       // Strip any ANSI escape codes that might be in the selection
       const cleanText = stripAnsi(selection);
-      await navigator.clipboard.writeText(cleanText);
-      toast.success('Copied to clipboard');
-      return true;
+      const success = await writeToClipboard(cleanText);
+      if (success) {
+        toast.success('Copied to clipboard');
+        return true;
+      } else {
+        toast.error('Copy failed', {
+          description: 'Could not access clipboard',
+        });
+        return false;
+      }
     } catch (err) {
       logger.error('Copy failed:', err);
       const errorMessage = err instanceof Error ? err.message : 'Unknown error';
@@ -399,7 +410,7 @@ export function TerminalPanel({
     if (!terminal || !wsRef.current) return;
 
     try {
-      const text = await navigator.clipboard.readText();
+      const text = await readFromClipboard();
       if (!text) {
         toast.error('Nothing to paste', {
           description: 'Clipboard is empty',
@@ -428,7 +439,9 @@ export function TerminalPanel({
       toast.error('Paste failed', {
         description: errorMessage.includes('permission')
           ? 'Clipboard permission denied'
-          : 'Could not read from clipboard',
+          : errorMessage.includes('not supported')
+            ? errorMessage
+            : 'Could not read from clipboard',
       });
     }
   }, [sendTextInChunks]);
@@ -438,6 +451,43 @@ export function TerminalPanel({
   const selectAll = useCallback(() => {
     xtermRef.current?.selectAll();
   }, []);
+
+  // Extract terminal buffer text for mobile selection mode overlay
+  const getTerminalBufferText = useCallback((): string => {
+    const terminal = xtermRef.current;
+    if (!terminal) return '';
+
+    const buffer = terminal.buffer.active;
+    const lines: string[] = [];
+
+    for (let i = 0; i < buffer.length; i++) {
+      const line = buffer.getLine(i);
+      if (line) {
+        lines.push(line.translateToString(true));
+      }
+    }
+
+    // Trim trailing empty lines but keep internal structure
+    while (lines.length > 0 && lines[lines.length - 1].trim() === '') {
+      lines.pop();
+    }
+
+    return lines.join('\n');
+  }, []);
+
+  // Toggle mobile text selection mode
+  const toggleSelectMode = useCallback(() => {
+    if (isSelectMode) {
+      setIsSelectMode(false);
+      setSelectModeText('');
+    } else {
+      const text = getTerminalBufferText();
+      // Strip ANSI escape codes for clean display
+      const cleanText = stripAnsi(text);
+      setSelectModeText(cleanText);
+      setIsSelectMode(true);
+    }
+  }, [isSelectMode, getTerminalBufferText]);
 
   // Clear terminal
   const clearTerminal = useCallback(() => {
@@ -1012,6 +1062,12 @@ export function TerminalPanel({
       if (resizeDebounceRef.current) {
         clearTimeout(resizeDebounceRef.current);
         resizeDebounceRef.current = null;
+      }
+
+      // Clear long-press timer
+      if (longPressTimerRef.current) {
+        clearTimeout(longPressTimerRef.current);
+        longPressTimerRef.current = null;
       }
 
       // Clear search decorations before disposing to prevent visual artifacts
@@ -1602,6 +1658,71 @@ export function TerminalPanel({
     setContextMenu({ x, y });
   }, []);
 
+  // Long-press handlers for mobile context menu
+  // On mobile, there's no right-click, so we trigger the context menu on long-press (500ms hold)
+  const LONG_PRESS_DURATION = 500; // ms
+  const LONG_PRESS_MOVE_THRESHOLD = 10; // px - cancel if finger moves more than this
+
+  const handleTouchStart = useCallback(
+    (e: React.TouchEvent) => {
+      if (!isMobile) return;
+      const touch = e.touches[0];
+      if (!touch) return;
+
+      longPressTouchStartRef.current = { x: touch.clientX, y: touch.clientY };
+
+      longPressTimerRef.current = setTimeout(() => {
+        const startPos = longPressTouchStartRef.current;
+        if (!startPos) return;
+
+        // Menu dimensions (approximate)
+        const menuWidth = 160;
+        const menuHeight = 152;
+        const padding = 8;
+
+        let x = startPos.x;
+        let y = startPos.y;
+
+        // Boundary checks
+        if (x + menuWidth + padding > window.innerWidth) {
+          x = window.innerWidth - menuWidth - padding;
+        }
+        if (y + menuHeight + padding > window.innerHeight) {
+          y = window.innerHeight - menuHeight - padding;
+        }
+        x = Math.max(padding, x);
+        y = Math.max(padding, y);
+
+        setContextMenu({ x, y });
+        longPressTouchStartRef.current = null;
+      }, LONG_PRESS_DURATION);
+    },
+    [isMobile]
+  );
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (!longPressTimerRef.current || !longPressTouchStartRef.current) return;
+    const touch = e.touches[0];
+    if (!touch) return;
+
+    const dx = touch.clientX - longPressTouchStartRef.current.x;
+    const dy = touch.clientY - longPressTouchStartRef.current.y;
+    if (Math.sqrt(dx * dx + dy * dy) > LONG_PRESS_MOVE_THRESHOLD) {
+      // Finger moved too far, cancel long-press
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+      longPressTouchStartRef.current = null;
+    }
+  }, []);
+
+  const handleTouchEnd = useCallback(() => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+    longPressTouchStartRef.current = null;
+  }, []);
+
   // Convert file to base64
   const fileToBase64 = useCallback((file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
@@ -2092,15 +2213,6 @@ export function TerminalPanel({
 
           <div className="w-px h-3 mx-0.5 bg-border" />
 
-          {/* Sticky modifier keys (Ctrl, Alt) */}
-          <StickyModifierKeys
-            activeModifier={stickyModifier}
-            onModifierChange={handleStickyModifierChange}
-            isConnected={connectionStatus === 'connected'}
-          />
-
-          <div className="w-px h-3 mx-0.5 bg-border" />
-
           {/* Split/close buttons */}
           <Button
             variant="ghost"
@@ -2221,24 +2333,116 @@ export function TerminalPanel({
         </div>
       )}
 
-      {/* Mobile shortcuts bar - special keys and arrow keys for touch devices */}
+      {/* Mobile shortcuts bar - special keys, clipboard, and arrow keys for touch devices */}
       {isMobile && (
         <MobileTerminalShortcuts
           onSendInput={sendTerminalInput}
           isConnected={connectionStatus === 'connected'}
+          activeModifier={stickyModifier}
+          onModifierChange={handleStickyModifierChange}
+          onSelectAll={selectAll}
+          onCopy={() => {
+            // On mobile, if nothing is selected, auto-select all before copying.
+            // This provides a convenient "tap to copy all" experience since
+            // touch-based text selection in xterm.js canvas is not possible.
+            const terminal = xtermRef.current;
+            if (terminal && !terminal.hasSelection()) {
+              terminal.selectAll();
+            }
+            copySelectionRef.current();
+          }}
+          onPaste={() => pasteFromClipboardRef.current()}
+          onToggleSelectMode={toggleSelectMode}
+          isSelectMode={isSelectMode}
         />
       )}
 
-      {/* Terminal container - uses terminal theme */}
-      <div
-        ref={terminalRef}
-        className="flex-1 overflow-hidden relative"
-        style={{ backgroundColor: currentTerminalTheme.background }}
-        onContextMenu={handleContextMenu}
-        onDragOver={handleImageDragOver}
-        onDragLeave={handleImageDragLeave}
-        onDrop={handleImageDrop}
-      />
+      {/* Terminal area wrapper - relative container for the terminal and selection overlay */}
+      <div className="flex-1 overflow-hidden relative">
+        {/* Terminal container - xterm.js mounts here */}
+        <div
+          ref={terminalRef}
+          className="absolute inset-0"
+          style={{ backgroundColor: currentTerminalTheme.background }}
+          onContextMenu={handleContextMenu}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+          onTouchCancel={handleTouchEnd}
+          onDragOver={handleImageDragOver}
+          onDragLeave={handleImageDragLeave}
+          onDrop={handleImageDrop}
+        />
+
+        {/* Mobile text selection overlay - renders terminal buffer as native selectable text.
+            Overlays the canvas so users can use native touch selection on real DOM text.
+            xterm.js renders to a <canvas>, which prevents native text selection on mobile.
+            This overlay shows the same content as real DOM text that supports touch selection. */}
+        {isSelectMode && isMobile && (
+          <div className="absolute inset-0 z-30 flex flex-col">
+            {/* Header bar with copy/done actions */}
+            <div className="flex items-center justify-between px-3 py-2 bg-brand-500/95 backdrop-blur-sm text-white shrink-0">
+              <span className="text-xs font-medium">Touch &amp; hold to select text</span>
+              <div className="flex items-center gap-2">
+                <button
+                  className="px-3 py-1.5 text-xs font-medium rounded-md bg-white/20 hover:bg-white/30 active:scale-95 transition-all touch-manipulation"
+                  onClick={async () => {
+                    const selection = window.getSelection();
+                    const selectedText = selection?.toString();
+                    if (selectedText) {
+                      const success = await writeToClipboard(selectedText);
+                      if (success) {
+                        toast.success('Copied to clipboard');
+                      } else {
+                        toast.error('Copy failed');
+                      }
+                    } else {
+                      const success = await writeToClipboard(selectModeText);
+                      if (success) {
+                        toast.success('Copied all text to clipboard');
+                      } else {
+                        toast.error('Copy failed');
+                      }
+                    }
+                  }}
+                >
+                  Copy
+                </button>
+                <button
+                  className="px-3 py-1.5 text-xs font-medium rounded-md bg-white/20 hover:bg-white/30 active:scale-95 transition-all touch-manipulation"
+                  onClick={() => {
+                    setIsSelectMode(false);
+                    setSelectModeText('');
+                  }}
+                >
+                  Done
+                </button>
+              </div>
+            </div>
+            {/* Scrollable text content matching terminal appearance */}
+            <div
+              className="flex-1 overflow-auto"
+              style={
+                {
+                  backgroundColor: currentTerminalTheme.background,
+                  color: currentTerminalTheme.foreground,
+                  fontFamily: getTerminalFontFamily(fontFamily),
+                  fontSize: `${fontSize}px`,
+                  lineHeight: `${lineHeight || 1.0}`,
+                  padding: '12px 16px',
+                  whiteSpace: 'pre-wrap',
+                  wordBreak: 'break-all',
+                  userSelect: 'text',
+                  WebkitUserSelect: 'text',
+                  touchAction: 'auto',
+                } as React.CSSProperties
+              }
+            >
+              {selectModeText || 'No terminal content to select.'}
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Jump to bottom button - shown when scrolled up */}
       {!isAtBottom && (

@@ -13,6 +13,7 @@ import {
   X,
   SquarePlus,
   Settings,
+  GitBranch,
 } from 'lucide-react';
 import { Spinner } from '@/components/ui/spinner';
 import { getServerUrlSync } from '@/lib/http-api-client';
@@ -255,6 +256,7 @@ export function TerminalView({ initialCwd, initialBranch, initialMode, nonce }: 
     setTerminalScrollbackLines,
     setTerminalScreenReaderMode,
     updateTerminalPanelSizes,
+    currentWorktreeByProject,
   } = useAppStore();
 
   const navigate = useNavigate();
@@ -1502,6 +1504,15 @@ export function TerminalView({ initialCwd, initialBranch, initialMode, nonce }: 
 
   // No terminals yet - show welcome screen
   if (terminalState.tabs.length === 0) {
+    // Get the current worktree for this project (if any)
+    const currentWorktreeInfo = currentProject
+      ? (currentWorktreeByProject[currentProject.path] ?? null)
+      : null;
+    // Only show worktree button when the current worktree has a specific path set
+    // (non-null path means a worktree is selected, as opposed to the main project)
+    const currentWorktreePath = currentWorktreeInfo?.path ?? null;
+    const currentWorktreeBranch = currentWorktreeInfo?.branch ?? null;
+
     return (
       <div className="flex-1 flex flex-col items-center justify-center text-center p-6">
         <div className="p-4 rounded-full bg-brand-500/10 mb-4">
@@ -1518,10 +1529,33 @@ export function TerminalView({ initialCwd, initialBranch, initialMode, nonce }: 
           )}
         </p>
 
-        <Button onClick={() => createTerminal()}>
-          <Plus className="h-4 w-4 mr-2" />
-          New Terminal
-        </Button>
+        <div className="flex flex-col items-center gap-3 w-full max-w-xs">
+          {currentWorktreePath && (
+            <Button
+              className="w-full flex-col h-auto py-2"
+              onClick={() => createTerminal(undefined, undefined, currentWorktreePath)}
+            >
+              <span className="flex items-center">
+                <GitBranch className="h-4 w-4 mr-2 shrink-0" />
+                Open Terminal in Worktree
+              </span>
+              {currentWorktreeBranch && (
+                <span className="text-xs opacity-70 truncate max-w-full px-2">
+                  {currentWorktreeBranch}
+                </span>
+              )}
+            </Button>
+          )}
+
+          <Button
+            className="w-full"
+            variant={currentWorktreePath ? 'outline' : 'default'}
+            onClick={() => createTerminal()}
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            New Terminal
+          </Button>
+        </div>
 
         {status?.platform && (
           <p className="text-xs text-muted-foreground mt-6">

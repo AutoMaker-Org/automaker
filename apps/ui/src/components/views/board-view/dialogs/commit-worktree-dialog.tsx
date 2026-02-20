@@ -810,11 +810,16 @@ export function CommitWorktreeDialog({
                       </SelectTrigger>
                       <SelectContent>
                         {remotes.map((remote) => (
-                          <SelectItem key={remote.name} value={remote.name}>
+                          <SelectItem
+                            key={remote.name}
+                            value={remote.name}
+                            description={
+                              <span className="text-xs text-muted-foreground truncate w-full block">
+                                {remote.url}
+                              </span>
+                            }
+                          >
                             <span className="font-medium">{remote.name}</span>
-                            <span className="ml-2 text-muted-foreground text-xs inline-block truncate max-w-[200px] align-bottom">
-                              {remote.url}
-                            </span>
                           </SelectItem>
                         ))}
                       </SelectContent>
