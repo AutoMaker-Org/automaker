@@ -9,6 +9,7 @@ import type {
   GeminiUsageResponse,
 } from '@/store/app-store';
 import type { ParsedTask, FeatureStatusWithPipeline, MergeStateInfo } from '@automaker/types';
+export type { MergeStateInfo } from '@automaker/types';
 
 export interface ImageAttachment {
   id?: string; // Optional - may not be present in messages loaded from server
@@ -641,6 +642,27 @@ export interface ElectronAPI {
     success: boolean;
     error?: string;
   }>;
+
+  // Copy, Move, Download APIs
+  copyItem?: (
+    sourcePath: string,
+    destinationPath: string,
+    overwrite?: boolean
+  ) => Promise<{
+    success: boolean;
+    error?: string;
+    exists?: boolean;
+  }>;
+  moveItem?: (
+    sourcePath: string,
+    destinationPath: string,
+    overwrite?: boolean
+  ) => Promise<{
+    success: boolean;
+    error?: string;
+    exists?: boolean;
+  }>;
+  downloadItem?: (filePath: string) => Promise<void>;
 
   // App APIs
   getPath: (name: string) => Promise<string>;
@@ -1695,6 +1717,45 @@ export interface TestRunnerCompletedEvent {
   timestamp: string;
 }
 
+export interface GitFileDetails {
+  branch: string;
+  lastCommitHash: string;
+  lastCommitMessage: string;
+  lastCommitAuthor: string;
+  lastCommitTimestamp: string;
+  linesAdded: number;
+  linesRemoved: number;
+  isConflicted: boolean;
+  isStaged: boolean;
+  isUnstaged: boolean;
+  statusLabel: string;
+}
+
+export interface EnhancedFileStatus {
+  path: string;
+  indexStatus: string;
+  workTreeStatus: string;
+  isConflicted: boolean;
+  isStaged: boolean;
+  isUnstaged: boolean;
+  linesAdded: number;
+  linesRemoved: number;
+  statusLabel: string;
+}
+
+export interface EnhancedStatusResult {
+  success: boolean;
+  branch?: string;
+  files?: EnhancedFileStatus[];
+  error?: string;
+}
+
+export interface GitDetailsResult {
+  success: boolean;
+  details?: GitFileDetails;
+  error?: string;
+}
+
 export interface GitAPI {
   // Get diffs for the main project (not a worktree)
   getDiffs: (projectPath: string) => Promise<FileDiffsResult>;
@@ -1715,6 +1776,12 @@ export interface GitAPI {
     };
     error?: string;
   }>;
+
+  // Get detailed git info for a file (branch, last commit, diff stats, conflict status)
+  getDetails: (projectPath: string, filePath?: string) => Promise<GitDetailsResult>;
+
+  // Get enhanced status with per-file diff stats and staged/unstaged differentiation
+  getEnhancedStatus: (projectPath: string) => Promise<EnhancedStatusResult>;
 }
 
 // Model definition type

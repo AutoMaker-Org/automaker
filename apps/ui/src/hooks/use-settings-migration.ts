@@ -758,6 +758,9 @@ export function hydrateStoreFromSettings(settings: GlobalSettings): void {
     worktreePanelCollapsed: settings.worktreePanelCollapsed ?? false,
     lastProjectDir: settings.lastProjectDir ?? '',
     recentFolders: settings.recentFolders ?? [],
+    // File editor settings
+    editorFontSize: settings.editorFontSize ?? 13,
+    editorFontFamily: settings.editorFontFamily ?? 'default',
     // Terminal font (nested in terminalState)
     ...(settings.terminalFontFamily && {
       terminalState: {
@@ -848,6 +851,8 @@ function buildSettingsUpdateFromStore(): Record<string, unknown> {
     worktreePanelCollapsed: state.worktreePanelCollapsed,
     lastProjectDir: state.lastProjectDir,
     recentFolders: state.recentFolders,
+    editorFontSize: state.editorFontSize,
+    editorFontFamily: state.editorFontFamily,
     terminalFontFamily: state.terminalState.fontFamily,
   };
 }

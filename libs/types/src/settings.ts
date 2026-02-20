@@ -1005,6 +1005,12 @@ export interface GlobalSettings {
   /** Terminal font family (undefined = use default Menlo/Monaco) */
   terminalFontFamily?: string;
 
+  // File Editor Configuration
+  /** File editor font size in pixels (default: 13) */
+  editorFontSize?: number;
+  /** File editor font family CSS value (default: 'default' = use theme mono font) */
+  editorFontFamily?: string;
+
   // Terminal Configuration
   /** How to open terminals from "Open in Terminal" worktree action */
   openTerminalMode?: 'newTab' | 'split';

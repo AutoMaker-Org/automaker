@@ -647,6 +647,17 @@ export interface ElectronAPI {
   stat: (filePath: string) => Promise<StatResult>;
   deleteFile: (filePath: string) => Promise<WriteResult>;
   trashItem?: (filePath: string) => Promise<WriteResult>;
+  copyItem?: (
+    sourcePath: string,
+    destinationPath: string,
+    overwrite?: boolean
+  ) => Promise<WriteResult & { exists?: boolean }>;
+  moveItem?: (
+    sourcePath: string,
+    destinationPath: string,
+    overwrite?: boolean
+  ) => Promise<WriteResult & { exists?: boolean }>;
+  downloadItem?: (filePath: string) => Promise<void>;
   getPath: (name: string) => Promise<string>;
   openInEditor?: (
     filePath: string,
@@ -2854,6 +2865,47 @@ function createMockGitAPI(): GitAPI {
           operation,
           filesCount: files.length,
         },
+      };
+    },
+
+    getDetails: async (projectPath: string, filePath?: string) => {
+      console.log('[Mock] Git details:', { projectPath, filePath });
+      return {
+        success: true,
+        details: {
+          branch: 'main',
+          lastCommitHash: 'abc1234567890',
+          lastCommitMessage: 'Initial commit',
+          lastCommitAuthor: 'Developer',
+          lastCommitTimestamp: new Date().toISOString(),
+          linesAdded: 5,
+          linesRemoved: 2,
+          isConflicted: false,
+          isStaged: false,
+          isUnstaged: true,
+          statusLabel: 'Modified',
+        },
+      };
+    },
+
+    getEnhancedStatus: async (projectPath: string) => {
+      console.log('[Mock] Git enhanced status:', { projectPath });
+      return {
+        success: true,
+        branch: 'main',
+        files: [
+          {
+            path: 'src/feature.ts',
+            indexStatus: ' ',
+            workTreeStatus: 'M',
+            isConflicted: false,
+            isStaged: false,
+            isUnstaged: true,
+            linesAdded: 10,
+            linesRemoved: 3,
+            statusLabel: 'Modified',
+          },
+        ],
       };
     },
   };

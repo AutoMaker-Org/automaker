@@ -10,6 +10,7 @@ import { SettingsNavigation } from './settings-view/components/settings-navigati
 import { ApiKeysSection } from './settings-view/api-keys/api-keys-section';
 import { ModelDefaultsSection } from './settings-view/model-defaults';
 import { AppearanceSection } from './settings-view/appearance/appearance-section';
+import { EditorSection } from './settings-view/editor';
 import { TerminalSection } from './settings-view/terminal/terminal-section';
 import { AudioSection } from './settings-view/audio/audio-section';
 import { KeyboardShortcutsSection } from './settings-view/keyboard-shortcuts/keyboard-shortcuts-section';
@@ -148,6 +149,8 @@ export function SettingsView() {
             onThemeChange={(newTheme) => setTheme(newTheme as typeof theme)}
           />
         );
+      case 'editor':
+        return <EditorSection />;
       case 'terminal':
         return <TerminalSection />;
       case 'keyboard':
