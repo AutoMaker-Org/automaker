@@ -508,7 +508,9 @@ export function GitPullDialog({
               <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer">
                 <Checkbox
                   checked={rememberChoice}
-                  onCheckedChange={(checked) => setRememberChoice(checked)}
+                  onCheckedChange={(checked) => setRememberChoice(checked === true)}
+                  className="rounded border-border"
+                />
                   className="rounded border-border"
                 />
                 <Settings className="w-3 h-3" />
