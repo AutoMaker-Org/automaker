@@ -55,10 +55,10 @@ async function fetchRemotes(cwd: string): Promise<void> {
       logger.warn(
         `fetchRemotes timed out after ${FETCH_TIMEOUT_MS}ms - continuing without latest remote refs`
       );
+    } else {
+      logger.warn(`fetchRemotes failed: ${getErrorMessage(error)} - continuing with local refs`);
     }
-    // Ignore all fetch errors (timeout or otherwise) - we may be offline or the
-    // remote may be temporarily unavailable.  The branch creation should proceed
-    // with whatever refs are locally available.
+    // Non-fatal: continue with locally available refs regardless of failure type
   } finally {
     clearTimeout(timerId);
   }

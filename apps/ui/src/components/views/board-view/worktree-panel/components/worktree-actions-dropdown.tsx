@@ -361,6 +361,7 @@ export function WorktreeActionsDropdown({
             <DropdownMenuItem
               onClick={() => onOpenDevServerUrl(worktree)}
               className="text-xs"
+              disabled={devServerInfo?.urlDetected === false}
               aria-label={
                 devServerInfo?.urlDetected === false
                   ? 'Open dev server in browser'

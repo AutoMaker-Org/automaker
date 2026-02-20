@@ -577,12 +577,16 @@ type EventType =
 /**
  * Dev server log event payloads for WebSocket streaming
  */
-export interface DevServerStartedEvent {
+
+/** Shared base for dev server events that carry URL/port information */
+interface DevServerUrlEvent {
   worktreePath: string;
-  port: number;
   url: string;
+  port: number;
   timestamp: string;
 }
+
+export interface DevServerStartedEvent extends DevServerUrlEvent {}
 
 export interface DevServerOutputEvent {
   worktreePath: string;
@@ -598,12 +602,7 @@ export interface DevServerStoppedEvent {
   timestamp: string;
 }
 
-export interface DevServerUrlDetectedEvent {
-  worktreePath: string;
-  url: string;
-  port: number;
-  timestamp: string;
-}
+export interface DevServerUrlDetectedEvent extends DevServerUrlEvent {}
 
 export type DevServerLogEvent =
   | { type: 'dev-server:started'; payload: DevServerStartedEvent }

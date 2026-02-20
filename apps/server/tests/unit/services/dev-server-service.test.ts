@@ -893,6 +893,7 @@ function createMockProcess() {
   mockProcess.stderr = new EventEmitter();
   mockProcess.kill = vi.fn();
   mockProcess.killed = false;
+  mockProcess.pid = 12345;
 
   // Don't exit immediately - let the test control the lifecycle
   return mockProcess;

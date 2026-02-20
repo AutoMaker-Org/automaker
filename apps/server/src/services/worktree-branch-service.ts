@@ -68,15 +68,15 @@ async function fetchRemotes(cwd: string): Promise<void> {
   try {
     await execGitCommand(['fetch', '--all', '--quiet'], cwd, undefined, controller);
   } catch (error) {
-    if (error instanceof Error && error.message === 'Process aborted') {
+    if (controller.signal.aborted) {
       // Fetch timed out - log and continue; callers should not be blocked by a slow remote
       logger.warn(
         `fetchRemotes timed out after ${FETCH_TIMEOUT_MS}ms - continuing without latest remote refs`
       );
+    } else {
+      logger.warn(`fetchRemotes failed: ${getErrorMessage(error)} - continuing with local refs`);
     }
-    // Ignore all fetch errors (timeout or otherwise) - we may be offline or the
-    // remote may be temporarily unavailable.  The branch switch should proceed
-    // with whatever refs are locally available.
+    // Non-fatal: continue with locally available refs regardless of failure type
   } finally {
     clearTimeout(timerId);
   }

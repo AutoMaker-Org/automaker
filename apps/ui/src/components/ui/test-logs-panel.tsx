@@ -215,7 +215,7 @@ function TestLogsPanelContent({
   return (
     <>
       {/* Header */}
-      <DialogHeader className="shrink-0 px-4 py-3 border-b border-border/50 pr-12">
+      <DialogHeader className="shrink-0 px-4 py-3 border-b border-border/50 pr-12 dialog-compact-header-mobile">
         <div className="flex items-center justify-between">
           <DialogTitle className="flex items-center gap-2 text-base">
             <FlaskConical className="w-4 h-4 text-primary" />

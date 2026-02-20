@@ -116,8 +116,10 @@ class DevServerService {
   }
 
   /**
-   * Extract port number from a URL string
-   * Returns the port if present, or the default port for the protocol
+   * Extract port number from a URL string.
+   * Returns the explicit port if present, or null if no port is specified.
+   * Default protocol ports (80/443) are intentionally NOT returned to avoid
+   * overwriting allocated dev server ports with protocol defaults.
    */
   private extractPortFromUrl(url: string): number | null {
     try {
@@ -125,9 +127,6 @@ class DevServerService {
       if (parsed.port) {
         return parseInt(parsed.port, 10);
       }
-      // Default ports
-      if (parsed.protocol === 'https:') return 443;
-      if (parsed.protocol === 'http:') return 80;
       return null;
     } catch {
       return null;
@@ -182,8 +181,8 @@ class DevServerService {
       // Generic: "listening at http://...", "available at http://...", "running at http://..."
       {
         pattern:
-          /(?:started|listening|running|available|serving|accessible)\s+(?:at|on)\s+(https?:\/\/[^\s,)]+)/i,
-        description: 'Generic "started/listening at" format',
+          /(?:starting|started|listening|running|available|serving|accessible)\s+(?:at|on)\s+(https?:\/\/[^\s,)]+)/i,
+        description: 'Generic "starting/started/listening at" format',
       },
       // PHP built-in server: "Development Server (http://localhost:8000) started"
       {
@@ -218,9 +217,15 @@ class DevServerService {
 
         if (detectedUrl.startsWith('http://') || detectedUrl.startsWith('https://')) {
           // Normalize 0.0.0.0 to localhost for browser accessibility
-          detectedUrl = detectedUrl.replace(/\/\/0\.0\.0\.0(:\d+)/, '//localhost$1');
+          detectedUrl = detectedUrl.replace(
+            /\/\/0\.0\.0\.0(:\d+)?/,
+            (_, port) => `//localhost${port || ''}`
+          );
           // Normalize [::] to localhost for browser accessibility
-          detectedUrl = detectedUrl.replace(/\/\/\[::\](:\d+)/, '//localhost$1');
+          detectedUrl = detectedUrl.replace(
+            /\/\/\[::\](:\d+)?/,
+            (_, port) => `//localhost${port || ''}`
+          );
 
           server.url = detectedUrl;
           server.urlDetected = true;

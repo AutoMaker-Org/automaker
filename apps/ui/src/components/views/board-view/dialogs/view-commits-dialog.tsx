@@ -251,7 +251,7 @@ export function ViewCommitsDialog({ open, onOpenChange, worktree }: ViewCommitsD
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-full h-full max-w-full max-h-full sm:w-[90vw] sm:max-w-[640px] sm:max-h-[100dvh] sm:h-auto sm:rounded-xl rounded-none flex flex-col dialog-fullscreen-mobile">
+      <DialogContent className="w-full h-full max-w-full max-h-full sm:w-[90vw] sm:max-w-[640px] sm:max-h-[85dvh] sm:h-auto sm:rounded-xl rounded-none flex flex-col dialog-fullscreen-mobile">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <GitCommit className="w-5 h-5" />
@@ -263,7 +263,7 @@ export function ViewCommitsDialog({ open, onOpenChange, worktree }: ViewCommitsD
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex-1 sm:min-h-[400px] sm:max-h-[60vh] overflow-y-auto scrollbar-visible -mx-6 -mb-6">
+        <div className="flex-1 min-h-0 sm:min-h-[400px] sm:max-h-[60vh] overflow-y-auto scrollbar-visible -mx-6 -mb-6">
           <div className="h-full px-6 pb-6">
             {isLoading && (
               <div className="flex items-center justify-center py-12">

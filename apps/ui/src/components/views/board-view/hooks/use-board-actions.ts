@@ -94,8 +94,6 @@ export function useBoardActions({
     skipVerificationInAutoMode,
     isPrimaryWorktreeBranch,
     getPrimaryWorktreeBranch,
-    getAutoModeState,
-    getMaxConcurrencyForWorktree,
   } = useAppStore();
   const autoMode = useAutoMode();
 

@@ -572,6 +572,34 @@
     }
   }
 
+  /* Safe-area-aware close button positioning for full-screen mobile dialogs.
+     On mobile, shift the close button down by the safe-area-inset-top so it
+     remains reachable and not hidden behind the notch or Dynamic Island.
+     On sm+ (desktop), use standard top positioning. */
+  .dialog-fullscreen-mobile [data-slot='dialog-close'] {
+    top: calc(env(safe-area-inset-top, 0px) + 0.75rem);
+  }
+
+  @media (min-width: 640px) {
+    .dialog-fullscreen-mobile [data-slot='dialog-close'] {
+      top: 0.75rem;
+    }
+  }
+
+  /* Safe-area-aware top padding for compact dialog headers (p-0 dialogs with own header).
+     Ensures the header content starts below the Dynamic Island / notch on iOS.
+     Used in dev-server-logs and test-logs panels that use p-0 on DialogContent.
+     On sm+ (desktop), the dialog is centered so no safe-area adjustment needed. */
+  .dialog-compact-header-mobile {
+    padding-top: calc(env(safe-area-inset-top, 0px) + 0.75rem);
+  }
+
+  @media (min-width: 640px) {
+    .dialog-compact-header-mobile {
+      padding-top: 0.75rem;
+    }
+  }
+
   .glass-subtle {
     @apply backdrop-blur-sm border-white/5;
   }

@@ -30,6 +30,9 @@ import { runInitScript } from '../../../services/init-script-service.js';
 
 const logger = createLogger('Worktree');
 
+/** Timeout for git fetch operations (30 seconds) */
+const FETCH_TIMEOUT_MS = 30_000;
+
 const execAsync = promisify(exec);
 
 /**
@@ -179,7 +182,7 @@ export function createCreateHandler(events: EventEmitter, settingsService?: Sett
       logger.info('Fetching from all remotes before creating worktree');
       try {
         const controller = new AbortController();
-        const timerId = setTimeout(() => controller.abort(), 30_000);
+        const timerId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
         try {
           await execGitCommand(['fetch', '--all', '--quiet'], projectPath, undefined, controller);
         } finally {

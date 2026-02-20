@@ -181,6 +181,17 @@ export function useAutoMode(worktree?: WorktreeInfo) {
     runningAutoTasksRef.current = runningAutoTasks;
   }, [runningAutoTasks]);
 
+  // Clean up safety timeout on unmount to prevent timer leaks and misleading log warnings
+  useEffect(() => {
+    return () => {
+      if (restartSafetyTimeoutRef.current) {
+        clearTimeout(restartSafetyTimeoutRef.current);
+        restartSafetyTimeoutRef.current = null;
+      }
+      isRestartTransitionRef.current = false;
+    };
+  }, []);
+
   const refreshStatus = useCallback(async () => {
     if (!currentProject) return;
 
@@ -812,6 +823,11 @@ export function useAutoMode(worktree?: WorktreeInfo) {
       // On error, clear the transition flags immediately
       isTransitioningRef.current = false;
       isRestartTransitionRef.current = false;
+      // Revert UI state since the backend may be stopped after a partial restart
+      if (currentProject) {
+        setAutoModeSessionForWorktree(currentProject.path, branchName, false);
+        setAutoModeRunning(currentProject.id, branchName, false);
+      }
       logger.error('Error restarting auto mode:', error);
       throw error;
     }

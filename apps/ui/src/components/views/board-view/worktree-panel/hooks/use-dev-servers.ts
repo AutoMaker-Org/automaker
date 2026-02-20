@@ -25,7 +25,7 @@ export function useDevServers({ projectPath }: UseDevServersOptions) {
       if (result.success && result.result?.servers) {
         const serversMap = new Map<string, DevServerInfo>();
         for (const server of result.result.servers) {
-          serversMap.set(server.worktreePath, {
+          serversMap.set(normalizePath(server.worktreePath), {
             ...server,
             urlDetected: server.urlDetected ?? true,
           });
@@ -49,9 +49,9 @@ export function useDevServers({ projectPath }: UseDevServersOptions) {
     const unsubscribe = api.worktree.onDevServerLogEvent((event) => {
       if (event.type === 'dev-server:url-detected') {
         const { worktreePath, url, port } = event.payload;
-        logger.info(`Dev server URL detected for ${worktreePath}: ${url} (port ${port})`);
+        const key = normalizePath(worktreePath);
+        let didUpdate = false;
         setRunningDevServers((prev) => {
-          const key = normalizePath(worktreePath);
           const existing = prev.get(key);
           if (!existing) return prev;
           const next = new Map(prev);
@@ -61,9 +61,13 @@ export function useDevServers({ projectPath }: UseDevServersOptions) {
             port,
             urlDetected: true,
           });
+          didUpdate = true;
           return next;
         });
-        toast.success(`Dev server running on port ${port}`);
+        if (didUpdate) {
+          logger.info(`Dev server URL detected for ${worktreePath}: ${url} (port ${port})`);
+          toast.success(`Dev server running on port ${port}`);
+        }
       }
     });
 

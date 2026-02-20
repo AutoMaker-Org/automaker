@@ -302,6 +302,11 @@ export class AutoLoopCoordinator {
     return Array.from(activeProjects);
   }
 
+  /**
+   * Get the number of running features for a worktree.
+   * By default counts ALL running features (both auto-mode and manual).
+   * Pass `autoModeOnly: true` to count only auto-mode features.
+   */
   async getRunningCountForWorktree(
     projectPath: string,
     branchName: string | null,

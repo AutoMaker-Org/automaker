@@ -27,9 +27,8 @@ export function createRunFeatureHandler(autoModeService: AutoModeServiceCompat) 
       }
 
       // Note: No concurrency limit check here. Manual feature starts always run
-      // immediately and bypass the concurrency limit. However, their presence IS
-      // counted by the auto-loop coordinator when deciding whether to dispatch
-      // new auto-mode tasks, ensuring total system load is respected.
+      // immediately and bypass the concurrency limit. Their presence IS counted
+      // by the auto-loop coordinator when deciding whether to dispatch new auto-mode tasks.
 
       // Start execution in background
       // executeFeature derives workDir from feature.branchName
