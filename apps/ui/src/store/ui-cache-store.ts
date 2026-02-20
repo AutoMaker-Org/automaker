@@ -35,6 +35,8 @@ interface UICacheState {
   cachedWorktreePanelCollapsed: boolean;
   /** Collapsed nav sections */
   cachedCollapsedNavSections: Record<string, boolean>;
+  /** Selected worktree per project (path + branch) for instant restore on PWA reload */
+  cachedCurrentWorktreeByProject: Record<string, { path: string | null; branch: string }>;
 }
 
 interface UICacheActions {
@@ -52,19 +54,29 @@ export const useUICacheStore = create<UICacheState & UICacheActions>()(
       cachedSidebarStyle: 'unified',
       cachedWorktreePanelCollapsed: false,
       cachedCollapsedNavSections: {},
+      cachedCurrentWorktreeByProject: {},
 
       updateFromAppStore: (state) => set(state),
     }),
     {
       name: STORE_NAME,
-      version: 1,
+      version: 2,
       partialize: (state) => ({
         cachedProjectId: state.cachedProjectId,
         cachedSidebarOpen: state.cachedSidebarOpen,
         cachedSidebarStyle: state.cachedSidebarStyle,
         cachedWorktreePanelCollapsed: state.cachedWorktreePanelCollapsed,
         cachedCollapsedNavSections: state.cachedCollapsedNavSections,
+        cachedCurrentWorktreeByProject: state.cachedCurrentWorktreeByProject,
       }),
+      migrate: (persistedState: unknown, version: number) => {
+        const state = persistedState as Record<string, unknown>;
+        if (version < 2) {
+          // Migration from v1: add cachedCurrentWorktreeByProject
+          state.cachedCurrentWorktreeByProject = {};
+        }
+        return state as unknown as UICacheState & UICacheActions;
+      },
     }
   )
 );
@@ -82,6 +94,7 @@ export function syncUICache(appState: {
   sidebarStyle?: 'unified' | 'discord';
   worktreePanelCollapsed?: boolean;
   collapsedNavSections?: Record<string, boolean>;
+  currentWorktreeByProject?: Record<string, { path: string | null; branch: string }>;
 }): void {
   const update: Partial<UICacheState> = {};
 
@@ -99,6 +112,9 @@ export function syncUICache(appState: {
   }
   if ('collapsedNavSections' in appState) {
     update.cachedCollapsedNavSections = appState.collapsedNavSections;
+  }
+  if ('currentWorktreeByProject' in appState) {
+    update.cachedCurrentWorktreeByProject = appState.currentWorktreeByProject;
   }
 
   if (Object.keys(update).length > 0) {
@@ -141,6 +157,15 @@ export function restoreFromUICache(
     worktreePanelCollapsed: cache.cachedWorktreePanelCollapsed,
     collapsedNavSections: cache.cachedCollapsedNavSections,
   };
+
+  // Restore last selected worktree per project so the board doesn't
+  // reset to main branch after PWA memory eviction or tab discard.
+  if (
+    cache.cachedCurrentWorktreeByProject &&
+    Object.keys(cache.cachedCurrentWorktreeByProject).length > 0
+  ) {
+    stateUpdate.currentWorktreeByProject = cache.cachedCurrentWorktreeByProject;
+  }
 
   // Restore the project context when the project object is available.
   // When projects are not yet loaded (empty array), currentProject remains

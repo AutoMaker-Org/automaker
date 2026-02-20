@@ -268,6 +268,16 @@ export function getThinkingLevelsForModel(model: string): ThinkingLevel[] {
   return ['none', 'low', 'medium', 'high', 'ultrathink'];
 }
 
+/**
+ * Get the default thinking level for a given model.
+ * Used when selecting a model via the primary button in the two-stage selector.
+ * Always returns 'none' — users can configure their preferred default
+ * via the defaultThinkingLevel setting in the model defaults page.
+ */
+export function getDefaultThinkingLevel(_model: string): ThinkingLevel {
+  return 'none';
+}
+
 /** ModelProvider - AI model provider for credentials and API key management */
 export type ModelProvider = 'claude' | 'cursor' | 'codex' | 'opencode' | 'gemini' | 'copilot';
 
@@ -1086,6 +1096,15 @@ export interface GlobalSettings {
   /** Phase-specific AI model configuration */
   phaseModels: PhaseModelConfig;
 
+  /** Default thinking level applied when selecting a model via the primary button
+   * in the two-stage model selector. Users can still adjust per-model via the expand arrow.
+   * Defaults to 'none' (no extended thinking). */
+  defaultThinkingLevel?: ThinkingLevel;
+
+  /** Default reasoning effort applied when selecting a Codex model via the primary button
+   * in the two-stage model selector. Defaults to 'none'. */
+  defaultReasoningEffort?: ReasoningEffort;
+
   // Legacy AI Model Selection (deprecated - use phaseModels instead)
   /** @deprecated Use phaseModels.enhancementModel instead */
   enhancementModel: ModelAlias;
@@ -1149,6 +1168,10 @@ export interface GlobalSettings {
   // Session Tracking
   /** Maps project path -> last selected session ID in that project */
   lastSelectedSessionByProject: Record<string, string>;
+
+  // Worktree Selection Tracking
+  /** Maps project path -> last selected worktree (path + branch) for restoring on PWA reload */
+  currentWorktreeByProject?: Record<string, { path: string | null; branch: string }>;
 
   // Window State (Electron only)
   /** Persisted window bounds for restoring position/size across sessions */
@@ -1585,6 +1608,8 @@ export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
   showQueryDevtools: true,
   enableAiCommitMessages: true,
   phaseModels: DEFAULT_PHASE_MODELS,
+  defaultThinkingLevel: 'none',
+  defaultReasoningEffort: 'none',
   enhancementModel: 'sonnet', // Legacy alias still supported
   validationModel: 'opus', // Legacy alias still supported
   enabledCursorModels: getAllCursorModelIds(), // Returns prefixed IDs
@@ -1607,6 +1632,7 @@ export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
   recentFolders: [],
   worktreePanelCollapsed: false,
   lastSelectedSessionByProject: {},
+  currentWorktreeByProject: {},
   autoLoadClaudeMd: true,
   skipSandboxWarning: false,
   codexAutoLoadAgents: DEFAULT_CODEX_AUTO_LOAD_AGENTS,

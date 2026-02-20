@@ -1627,6 +1627,17 @@ export function TerminalPanel({
     buttons[focusedMenuIndex]?.focus();
   }, [focusedMenuIndex, contextMenu]);
 
+  // Reset select mode when viewport transitions from mobile to non-mobile.
+  // The select-mode overlay is only rendered when (isSelectMode && isMobile), so if the
+  // viewport becomes non-mobile while isSelectMode is true the overlay disappears but the
+  // state is left dirty with no UI to clear it. Resetting here keeps state consistent.
+  useEffect(() => {
+    if (!isMobile && isSelectMode) {
+      setIsSelectMode(false);
+      setSelectModeText('');
+    }
+  }, [isMobile]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Handle right-click context menu with boundary checking
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault();

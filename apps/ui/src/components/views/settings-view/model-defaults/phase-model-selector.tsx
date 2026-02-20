@@ -35,7 +35,7 @@ import {
   REASONING_EFFORT_LABELS,
   type ModelOption,
 } from '@/components/views/board-view/shared/model-constants';
-import { Check, ChevronsUpDown, Star, ChevronRight } from 'lucide-react';
+import { Check, ChevronsUpDown, Star, ChevronRight, ChevronDown } from 'lucide-react';
 import {
   AnthropicIcon,
   CursorIcon,
@@ -184,6 +184,8 @@ export function PhaseModelSelector({
     enabledDynamicModelIds,
     disabledProviders,
     claudeCompatibleProviders,
+    defaultThinkingLevel: storeDefaultThinkingLevel,
+    defaultReasoningEffort: storeDefaultReasoningEffort,
   } = useAppStore();
 
   // Use React Query for OpenCode models so that changes made in the settings tab
@@ -372,7 +374,17 @@ export function PhaseModelSelector({
 
     // Check Codex models
     const codexModel = transformedCodexModels.find((m) => m.id === selectedModel);
-    if (codexModel) return { ...codexModel, icon: OpenAIIcon };
+    if (codexModel) {
+      const reasoningLabel =
+        selectedReasoningEffort !== 'none'
+          ? ` (${REASONING_EFFORT_LABELS[selectedReasoningEffort]} Reasoning)`
+          : '';
+      return {
+        ...codexModel,
+        label: `${codexModel.label}${reasoningLabel}`,
+        icon: OpenAIIcon,
+      };
+    }
 
     // Check Gemini models
     // Note: Gemini CLI doesn't support thinking level configuration
@@ -492,6 +504,7 @@ export function PhaseModelSelector({
     selectedModel,
     selectedProviderId,
     selectedThinkingLevel,
+    selectedReasoningEffort,
     availableCursorModels,
     availableGeminiModels,
     availableCopilotModels,
@@ -809,14 +822,25 @@ export function PhaseModelSelector({
       );
     }
 
-    // Model supports reasoning - show popover with reasoning effort options
+    // Model supports reasoning - two-stage interaction pattern:
+    // Primary zone: selects model with default reasoning effort (medium)
+    // Secondary zone (chevron): expands reasoning effort sub-menu
+
     // On mobile, render inline expansion instead of nested popover
     if (isMobile) {
       return (
         <div key={model.id}>
           <CommandItem
             value={model.label}
-            onSelect={() => setExpandedCodexModel(isExpanded ? null : (model.id as CodexModelId))}
+            onSelect={() => {
+              // Primary action: select model with default reasoning effort
+              onChange({
+                model: model.id as CodexModelId,
+                reasoningEffort: storeDefaultReasoningEffort,
+              });
+              setExpandedCodexModel(null);
+              setOpen(false);
+            }}
             className="group flex items-center justify-between py-2"
           >
             <div className="flex items-center gap-3 overflow-hidden">
@@ -856,12 +880,27 @@ export function PhaseModelSelector({
                 <Star className={cn('h-3.5 w-3.5', isFavorite && 'fill-current')} />
               </Button>
               {isSelected && !isExpanded && <Check className="h-4 w-4 text-primary shrink-0" />}
-              <ChevronRight
+              {/* Secondary zone: expand reasoning effort sub-menu */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  e.preventDefault();
+                  setExpandedCodexModel(isExpanded ? null : (model.id as CodexModelId));
+                }}
                 className={cn(
-                  'h-4 w-4 text-muted-foreground transition-transform',
-                  isExpanded && 'rotate-90'
+                  'flex items-center justify-center h-7 w-7 rounded-sm',
+                  'hover:bg-accent/80 transition-colors',
+                  isExpanded && 'bg-accent'
                 )}
-              />
+                title="Adjust reasoning effort"
+              >
+                <ChevronDown
+                  className={cn(
+                    'h-4 w-4 text-muted-foreground transition-transform',
+                    isExpanded && 'rotate-180'
+                  )}
+                />
+              </button>
             </div>
           </CommandItem>
 
@@ -871,164 +910,201 @@ export function PhaseModelSelector({
               <div className="px-2 py-1 text-xs font-medium text-muted-foreground">
                 Reasoning Effort
               </div>
-              {REASONING_EFFORT_LEVELS.map((effort) => (
-                <button
-                  key={effort}
-                  onClick={() => {
-                    onChange({
-                      model: model.id as CodexModelId,
-                      reasoningEffort: effort,
-                    });
-                    setExpandedCodexModel(null);
-                    setOpen(false);
-                  }}
-                  className={cn(
-                    'w-full flex items-center justify-between px-2 py-2 rounded-sm text-sm',
-                    'hover:bg-accent cursor-pointer transition-colors',
-                    isSelected && currentReasoning === effort && 'bg-accent text-accent-foreground'
-                  )}
-                >
-                  <div className="flex flex-col items-start">
-                    <span className="font-medium text-xs">{REASONING_EFFORT_LABELS[effort]}</span>
-                    <span className="text-[10px] text-muted-foreground">
-                      {effort === 'none' && 'No reasoning capability'}
-                      {effort === 'minimal' && 'Minimal reasoning'}
-                      {effort === 'low' && 'Light reasoning'}
-                      {effort === 'medium' && 'Moderate reasoning'}
-                      {effort === 'high' && 'Deep reasoning'}
-                      {effort === 'xhigh' && 'Maximum reasoning'}
-                    </span>
-                  </div>
-                  {isSelected && currentReasoning === effort && (
-                    <Check className="h-3.5 w-3.5 text-primary" />
-                  )}
-                </button>
-              ))}
+              {REASONING_EFFORT_LEVELS.map((effort) => {
+                const isActiveEffort = isSelected && currentReasoning === effort;
+                return (
+                  <button
+                    key={effort}
+                    onClick={() => {
+                      onChange({
+                        model: model.id as CodexModelId,
+                        reasoningEffort: effort,
+                      });
+                      setExpandedCodexModel(null);
+                      setOpen(false);
+                    }}
+                    className={cn(
+                      'w-full flex items-center justify-between px-2 py-2 rounded-sm text-sm',
+                      'hover:bg-accent cursor-pointer transition-colors',
+                      isActiveEffort
+                        ? 'bg-primary/10 text-primary border border-primary/20'
+                        : 'border border-transparent'
+                    )}
+                  >
+                    <div className="flex flex-col items-start">
+                      <span className={cn('font-medium text-xs', isActiveEffort && 'text-primary')}>
+                        {REASONING_EFFORT_LABELS[effort]}
+                      </span>
+                      <span className="text-[10px] text-muted-foreground">
+                        {effort === 'none' && 'No reasoning capability'}
+                        {effort === 'minimal' && 'Minimal reasoning'}
+                        {effort === 'low' && 'Light reasoning'}
+                        {effort === 'medium' && 'Moderate reasoning'}
+                        {effort === 'high' && 'Deep reasoning'}
+                        {effort === 'xhigh' && 'Maximum reasoning'}
+                      </span>
+                    </div>
+                    {isActiveEffort && <Check className="h-3.5 w-3.5 text-primary" />}
+                  </button>
+                );
+              })}
             </div>
           )}
         </div>
       );
     }
 
-    // Desktop: Use nested popover
+    // Desktop: Two-stage pattern with nested popover for reasoning effort
     return (
       <CommandItem
         key={model.id}
         value={model.label}
-        onSelect={() => setExpandedCodexModel(isExpanded ? null : (model.id as CodexModelId))}
+        onSelect={() => {
+          // Primary action: select model with default reasoning effort
+          onChange({
+            model: model.id as CodexModelId,
+            reasoningEffort: storeDefaultReasoningEffort,
+          });
+          setExpandedCodexModel(null);
+          setOpen(false);
+        }}
         className="p-0 data-[selected=true]:bg-transparent"
       >
-        <Popover
-          open={isExpanded}
-          onOpenChange={(isOpen) => {
-            if (!isOpen) {
-              setExpandedCodexModel(null);
-            }
-          }}
+        <div
+          className={cn(
+            'w-full group flex items-center justify-between py-2 px-2 rounded-sm cursor-pointer',
+            'hover:bg-accent',
+            isExpanded && 'bg-accent'
+          )}
         >
-          <PopoverTrigger asChild>
-            <div
-              ref={isExpanded ? expandedCodexTriggerRef : undefined}
+          <div className="flex items-center gap-3 overflow-hidden">
+            <OpenAIIcon
               className={cn(
-                'w-full group flex items-center justify-between py-2 px-2 rounded-sm cursor-pointer',
-                'hover:bg-accent',
-                isExpanded && 'bg-accent'
+                'h-4 w-4 shrink-0',
+                isSelected ? 'text-primary' : 'text-muted-foreground'
               )}
-            >
-              <div className="flex items-center gap-3 overflow-hidden">
-                <OpenAIIcon
-                  className={cn(
-                    'h-4 w-4 shrink-0',
-                    isSelected ? 'text-primary' : 'text-muted-foreground'
-                  )}
-                />
-                <div className="flex flex-col truncate">
-                  <span className={cn('truncate font-medium', isSelected && 'text-primary')}>
-                    {model.label}
-                  </span>
-                  <span className="truncate text-xs text-muted-foreground">
-                    {isSelected && currentReasoning !== 'none'
-                      ? `Reasoning: ${REASONING_EFFORT_LABELS[currentReasoning]}`
-                      : model.description}
-                  </span>
-                </div>
-              </div>
+            />
+            <div className="flex flex-col truncate">
+              <span className={cn('truncate font-medium', isSelected && 'text-primary')}>
+                {model.label}
+              </span>
+              <span className="truncate text-xs text-muted-foreground">
+                {isSelected && currentReasoning !== 'none'
+                  ? `Reasoning: ${REASONING_EFFORT_LABELS[currentReasoning]}`
+                  : model.description}
+              </span>
+            </div>
+          </div>
 
-              <div className="flex items-center gap-1 ml-2">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className={cn(
-                    'h-6 w-6 hover:bg-transparent hover:text-yellow-500 focus:ring-0',
-                    isFavorite
-                      ? 'text-yellow-500 opacity-100'
-                      : 'opacity-0 group-hover:opacity-100 text-muted-foreground'
-                  )}
+          <div className="flex items-center gap-1 ml-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              className={cn(
+                'h-6 w-6 hover:bg-transparent hover:text-yellow-500 focus:ring-0',
+                isFavorite
+                  ? 'text-yellow-500 opacity-100'
+                  : 'opacity-0 group-hover:opacity-100 text-muted-foreground'
+              )}
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleFavoriteModel(model.id);
+              }}
+            >
+              <Star className={cn('h-3.5 w-3.5', isFavorite && 'fill-current')} />
+            </Button>
+            {isSelected && <Check className="h-4 w-4 text-primary shrink-0" />}
+            {/* Secondary zone: expand reasoning effort popover */}
+            <Popover
+              open={isExpanded}
+              onOpenChange={(isOpen) => {
+                if (!isOpen) {
+                  setExpandedCodexModel(null);
+                }
+              }}
+            >
+              <PopoverTrigger asChild>
+                <button
+                  ref={
+                    isExpanded
+                      ? (expandedCodexTriggerRef as unknown as React.RefObject<HTMLButtonElement>)
+                      : undefined
+                  }
                   onClick={(e) => {
                     e.stopPropagation();
-                    toggleFavoriteModel(model.id);
-                  }}
-                >
-                  <Star className={cn('h-3.5 w-3.5', isFavorite && 'fill-current')} />
-                </Button>
-                {isSelected && <Check className="h-4 w-4 text-primary shrink-0" />}
-                <ChevronRight
-                  className={cn(
-                    'h-4 w-4 text-muted-foreground transition-transform',
-                    isExpanded && 'rotate-90'
-                  )}
-                />
-              </div>
-            </div>
-          </PopoverTrigger>
-          <PopoverContent
-            side="right"
-            align="start"
-            className="w-[220px] p-1"
-            sideOffset={8}
-            collisionPadding={16}
-            onCloseAutoFocus={(e) => e.preventDefault()}
-          >
-            <div className="space-y-1">
-              <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground border-b border-border/50 mb-1">
-                Reasoning Effort
-              </div>
-              {REASONING_EFFORT_LEVELS.map((effort) => (
-                <button
-                  key={effort}
-                  onClick={() => {
-                    onChange({
-                      model: model.id as CodexModelId,
-                      reasoningEffort: effort,
-                    });
-                    setExpandedCodexModel(null);
-                    setOpen(false);
+                    e.preventDefault();
+                    setExpandedCodexModel(isExpanded ? null : (model.id as CodexModelId));
                   }}
                   className={cn(
-                    'w-full flex items-center justify-between px-2 py-2 rounded-sm text-sm',
-                    'hover:bg-accent cursor-pointer transition-colors',
-                    isSelected && currentReasoning === effort && 'bg-accent text-accent-foreground'
+                    'flex items-center justify-center h-7 w-7 rounded-sm',
+                    'hover:bg-accent/80 transition-colors',
+                    isExpanded && 'bg-accent'
                   )}
+                  title="Adjust reasoning effort"
                 >
-                  <div className="flex flex-col items-start">
-                    <span className="font-medium">{REASONING_EFFORT_LABELS[effort]}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {effort === 'none' && 'No reasoning capability'}
-                      {effort === 'minimal' && 'Minimal reasoning'}
-                      {effort === 'low' && 'Light reasoning'}
-                      {effort === 'medium' && 'Moderate reasoning'}
-                      {effort === 'high' && 'Deep reasoning'}
-                      {effort === 'xhigh' && 'Maximum reasoning'}
-                    </span>
-                  </div>
-                  {isSelected && currentReasoning === effort && (
-                    <Check className="h-3.5 w-3.5 text-primary" />
-                  )}
+                  <ChevronDown
+                    className={cn(
+                      'h-4 w-4 text-muted-foreground transition-transform',
+                      isExpanded && 'rotate-180'
+                    )}
+                  />
                 </button>
-              ))}
-            </div>
-          </PopoverContent>
-        </Popover>
+              </PopoverTrigger>
+              <PopoverContent
+                side="right"
+                align="start"
+                className="w-[220px] p-1"
+                sideOffset={8}
+                collisionPadding={16}
+                onCloseAutoFocus={(e) => e.preventDefault()}
+              >
+                <div className="space-y-1">
+                  <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground border-b border-border/50 mb-1">
+                    Reasoning Effort
+                  </div>
+                  {REASONING_EFFORT_LEVELS.map((effort) => {
+                    const isActiveEffort = isSelected && currentReasoning === effort;
+                    return (
+                      <button
+                        key={effort}
+                        onClick={() => {
+                          onChange({
+                            model: model.id as CodexModelId,
+                            reasoningEffort: effort,
+                          });
+                          setExpandedCodexModel(null);
+                          setOpen(false);
+                        }}
+                        className={cn(
+                          'w-full flex items-center justify-between px-2 py-2 rounded-sm text-sm',
+                          'hover:bg-accent cursor-pointer transition-colors',
+                          isActiveEffort
+                            ? 'bg-primary/10 text-primary border border-primary/20'
+                            : 'border border-transparent'
+                        )}
+                      >
+                        <div className="flex flex-col items-start">
+                          <span className={cn('font-medium', isActiveEffort && 'text-primary')}>
+                            {REASONING_EFFORT_LABELS[effort]}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            {effort === 'none' && 'No reasoning capability'}
+                            {effort === 'minimal' && 'Minimal reasoning'}
+                            {effort === 'low' && 'Light reasoning'}
+                            {effort === 'medium' && 'Moderate reasoning'}
+                            {effort === 'high' && 'Deep reasoning'}
+                            {effort === 'xhigh' && 'Maximum reasoning'}
+                          </span>
+                        </div>
+                        {isActiveEffort && <Check className="h-3.5 w-3.5 text-primary" />}
+                      </button>
+                    );
+                  })}
+                </div>
+              </PopoverContent>
+            </Popover>
+          </div>
+        </div>
       </CommandItem>
     );
   };
@@ -1202,6 +1278,7 @@ export function PhaseModelSelector({
   };
 
   // Render ClaudeCompatibleProvider model item with thinking level support
+  // Two-stage pattern: primary selects model with default thinking, chevron expands thinking level
   const renderProviderModelItem = (
     provider: ClaudeCompatibleProvider,
     model: ProviderModel,
@@ -1215,6 +1292,13 @@ export function PhaseModelSelector({
     const displayName = showProviderSuffix
       ? `${model.displayName} (${provider.name})`
       : model.displayName;
+    // Use the user's preferred default, clamped to available levels for this provider model
+    const providerAvailableLevels = getThinkingLevelsForModel(
+      model.mapsToClaudeModel === 'opus' ? 'claude-opus' : model.id || ''
+    );
+    const defaultThinking = providerAvailableLevels.includes(storeDefaultThinkingLevel)
+      ? storeDefaultThinkingLevel
+      : providerAvailableLevels[0];
 
     // Build description showing all mapped Claude models
     const modelLabelMap: Record<ClaudeModelAlias, string> = {
@@ -1255,7 +1339,16 @@ export function PhaseModelSelector({
         <div key={`${provider.id}-${model.id}`}>
           <CommandItem
             value={`${provider.name} ${model.displayName}`}
-            onSelect={() => setExpandedProviderModel(isExpanded ? null : expandKey)}
+            onSelect={() => {
+              // Primary action: select provider model with default thinking level
+              onChange({
+                providerId: provider.id,
+                model: model.id,
+                thinkingLevel: defaultThinking,
+              });
+              setExpandedProviderModel(null);
+              setOpen(false);
+            }}
             className="group flex items-center justify-between py-2"
           >
             <div className="flex items-center gap-3 overflow-hidden">
@@ -1279,12 +1372,27 @@ export function PhaseModelSelector({
 
             <div className="flex items-center gap-1 ml-2">
               {isSelected && !isExpanded && <Check className="h-4 w-4 text-primary shrink-0" />}
-              <ChevronRight
+              {/* Secondary zone: expand thinking level sub-menu */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  e.preventDefault();
+                  setExpandedProviderModel(isExpanded ? null : expandKey);
+                }}
                 className={cn(
-                  'h-4 w-4 text-muted-foreground transition-transform',
-                  isExpanded && 'rotate-90'
+                  'flex items-center justify-center h-7 w-7 rounded-sm',
+                  'hover:bg-accent/80 transition-colors',
+                  isExpanded && 'bg-accent'
                 )}
-              />
+                title="Adjust thinking level"
+              >
+                <ChevronDown
+                  className={cn(
+                    'h-4 w-4 text-muted-foreground transition-transform',
+                    isExpanded && 'rotate-180'
+                  )}
+                />
+              </button>
             </div>
           </CommandItem>
 
@@ -1296,152 +1404,190 @@ export function PhaseModelSelector({
               </div>
               {getThinkingLevelsForModel(
                 model.mapsToClaudeModel === 'opus' ? 'claude-opus' : model.id || ''
-              ).map((level) => (
-                <button
-                  key={level}
-                  onClick={() => {
-                    onChange({
-                      providerId: provider.id,
-                      model: model.id,
-                      thinkingLevel: level,
-                    });
-                    setExpandedProviderModel(null);
-                    setOpen(false);
-                  }}
-                  className={cn(
-                    'w-full flex items-center justify-between px-2 py-2 rounded-sm text-sm',
-                    'hover:bg-accent cursor-pointer transition-colors',
-                    isSelected && currentThinking === level && 'bg-accent text-accent-foreground'
-                  )}
-                >
-                  <div className="flex flex-col items-start">
-                    <span className="font-medium text-xs">{THINKING_LEVEL_LABELS[level]}</span>
-                    <span className="text-[10px] text-muted-foreground">
-                      {level === 'none' && 'No extended thinking'}
-                      {level === 'low' && 'Light reasoning (1k tokens)'}
-                      {level === 'medium' && 'Moderate reasoning (10k tokens)'}
-                      {level === 'high' && 'Deep reasoning (16k tokens)'}
-                      {level === 'ultrathink' && 'Maximum reasoning (32k tokens)'}
-                      {level === 'adaptive' && 'Model decides reasoning depth'}
-                    </span>
-                  </div>
-                  {isSelected && currentThinking === level && (
-                    <Check className="h-3.5 w-3.5 text-primary" />
-                  )}
-                </button>
-              ))}
+              ).map((level) => {
+                const isActiveLevel = isSelected && currentThinking === level;
+                return (
+                  <button
+                    key={level}
+                    onClick={() => {
+                      onChange({
+                        providerId: provider.id,
+                        model: model.id,
+                        thinkingLevel: level,
+                      });
+                      setExpandedProviderModel(null);
+                      setOpen(false);
+                    }}
+                    className={cn(
+                      'w-full flex items-center justify-between px-2 py-2 rounded-sm text-sm',
+                      'hover:bg-accent cursor-pointer transition-colors',
+                      isActiveLevel
+                        ? 'bg-primary/10 text-primary border border-primary/20'
+                        : 'border border-transparent'
+                    )}
+                  >
+                    <div className="flex flex-col items-start">
+                      <span className={cn('font-medium text-xs', isActiveLevel && 'text-primary')}>
+                        {THINKING_LEVEL_LABELS[level]}
+                      </span>
+                      <span className="text-[10px] text-muted-foreground">
+                        {level === 'none' && 'No extended thinking'}
+                        {level === 'low' && 'Light reasoning (1k tokens)'}
+                        {level === 'medium' && 'Moderate reasoning (10k tokens)'}
+                        {level === 'high' && 'Deep reasoning (16k tokens)'}
+                        {level === 'ultrathink' && 'Maximum reasoning (32k tokens)'}
+                        {level === 'adaptive' && 'Model decides reasoning depth'}
+                      </span>
+                    </div>
+                    {isActiveLevel && <Check className="h-3.5 w-3.5 text-primary" />}
+                  </button>
+                );
+              })}
             </div>
           )}
         </div>
       );
     }
 
-    // Desktop: Use nested popover
+    // Desktop: Two-stage pattern with nested popover for thinking level
     return (
       <CommandItem
         key={`${provider.id}-${model.id}`}
         value={`${provider.name} ${model.displayName}`}
-        onSelect={() => setExpandedProviderModel(isExpanded ? null : expandKey)}
+        onSelect={() => {
+          // Primary action: select provider model with default thinking level
+          onChange({
+            providerId: provider.id,
+            model: model.id,
+            thinkingLevel: defaultThinking,
+          });
+          setExpandedProviderModel(null);
+          setOpen(false);
+        }}
         className="p-0 data-[selected=true]:bg-transparent"
       >
-        <Popover
-          open={isExpanded}
-          onOpenChange={(isOpen) => {
-            if (!isOpen) {
-              setExpandedProviderModel(null);
-            }
-          }}
+        <div
+          className={cn(
+            'w-full group flex items-center justify-between py-2 px-2 rounded-sm cursor-pointer',
+            'hover:bg-accent',
+            isExpanded && 'bg-accent'
+          )}
         >
-          <PopoverTrigger asChild>
-            <div
-              ref={isExpanded ? expandedProviderTriggerRef : undefined}
+          <div className="flex items-center gap-3 overflow-hidden">
+            <ProviderIcon
               className={cn(
-                'w-full group flex items-center justify-between py-2 px-2 rounded-sm cursor-pointer',
-                'hover:bg-accent',
-                isExpanded && 'bg-accent'
+                'h-4 w-4 shrink-0',
+                isSelected ? 'text-primary' : 'text-muted-foreground'
               )}
-            >
-              <div className="flex items-center gap-3 overflow-hidden">
-                <ProviderIcon
-                  className={cn(
-                    'h-4 w-4 shrink-0',
-                    isSelected ? 'text-primary' : 'text-muted-foreground'
-                  )}
-                />
-                <div className="flex flex-col truncate">
-                  <span className={cn('truncate font-medium', isSelected && 'text-primary')}>
-                    {displayName}
-                  </span>
-                  <span className="truncate text-xs text-muted-foreground">
-                    {isSelected && currentThinking !== 'none'
-                      ? `Thinking: ${THINKING_LEVEL_LABELS[currentThinking]}`
-                      : `Maps to ${mappedModelLabel}`}
-                  </span>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-1 ml-2">
-                {isSelected && <Check className="h-4 w-4 text-primary shrink-0" />}
-                <ChevronRight
-                  className={cn(
-                    'h-4 w-4 text-muted-foreground transition-transform',
-                    isExpanded && 'rotate-90'
-                  )}
-                />
-              </div>
+            />
+            <div className="flex flex-col truncate">
+              <span className={cn('truncate font-medium', isSelected && 'text-primary')}>
+                {displayName}
+              </span>
+              <span className="truncate text-xs text-muted-foreground">
+                {isSelected && currentThinking !== 'none'
+                  ? `Thinking: ${THINKING_LEVEL_LABELS[currentThinking]}`
+                  : `Maps to ${mappedModelLabel}`}
+              </span>
             </div>
-          </PopoverTrigger>
-          <PopoverContent
-            side="right"
-            align="start"
-            className="w-[220px] p-1"
-            sideOffset={8}
-            collisionPadding={16}
-            onCloseAutoFocus={(e) => e.preventDefault()}
-          >
-            <div className="space-y-1">
-              <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground border-b border-border/50 mb-1">
-                Thinking Level
-              </div>
-              {getThinkingLevelsForModel(
-                model.mapsToClaudeModel === 'opus' ? 'claude-opus' : model.id || ''
-              ).map((level) => (
+          </div>
+
+          <div className="flex items-center gap-1 ml-2">
+            {isSelected && <Check className="h-4 w-4 text-primary shrink-0" />}
+            {/* Secondary zone: expand thinking level popover */}
+            <Popover
+              open={isExpanded}
+              onOpenChange={(isOpen) => {
+                if (!isOpen) {
+                  setExpandedProviderModel(null);
+                }
+              }}
+            >
+              <PopoverTrigger asChild>
                 <button
-                  key={level}
-                  onClick={() => {
-                    onChange({
-                      providerId: provider.id,
-                      model: model.id,
-                      thinkingLevel: level,
-                    });
-                    setExpandedProviderModel(null);
-                    setOpen(false);
+                  ref={
+                    isExpanded
+                      ? (expandedProviderTriggerRef as unknown as React.RefObject<HTMLButtonElement>)
+                      : undefined
+                  }
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    setExpandedProviderModel(isExpanded ? null : expandKey);
                   }}
                   className={cn(
-                    'w-full flex items-center justify-between px-2 py-2 rounded-sm text-sm',
-                    'hover:bg-accent cursor-pointer transition-colors',
-                    isSelected && currentThinking === level && 'bg-accent text-accent-foreground'
+                    'flex items-center justify-center h-7 w-7 rounded-sm',
+                    'hover:bg-accent/80 transition-colors',
+                    isExpanded && 'bg-accent'
                   )}
+                  title="Adjust thinking level"
                 >
-                  <div className="flex flex-col items-start">
-                    <span className="font-medium">{THINKING_LEVEL_LABELS[level]}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {level === 'none' && 'No extended thinking'}
-                      {level === 'low' && 'Light reasoning (1k tokens)'}
-                      {level === 'medium' && 'Moderate reasoning (10k tokens)'}
-                      {level === 'high' && 'Deep reasoning (16k tokens)'}
-                      {level === 'ultrathink' && 'Maximum reasoning (32k tokens)'}
-                      {level === 'adaptive' && 'Model decides reasoning depth'}
-                    </span>
-                  </div>
-                  {isSelected && currentThinking === level && (
-                    <Check className="h-3.5 w-3.5 text-primary" />
-                  )}
+                  <ChevronDown
+                    className={cn(
+                      'h-4 w-4 text-muted-foreground transition-transform',
+                      isExpanded && 'rotate-180'
+                    )}
+                  />
                 </button>
-              ))}
-            </div>
-          </PopoverContent>
-        </Popover>
+              </PopoverTrigger>
+              <PopoverContent
+                side="right"
+                align="start"
+                className="w-[220px] p-1"
+                sideOffset={8}
+                collisionPadding={16}
+                onCloseAutoFocus={(e) => e.preventDefault()}
+              >
+                <div className="space-y-1">
+                  <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground border-b border-border/50 mb-1">
+                    Thinking Level
+                  </div>
+                  {getThinkingLevelsForModel(
+                    model.mapsToClaudeModel === 'opus' ? 'claude-opus' : model.id || ''
+                  ).map((level) => {
+                    const isActiveLevel = isSelected && currentThinking === level;
+                    return (
+                      <button
+                        key={level}
+                        onClick={() => {
+                          onChange({
+                            providerId: provider.id,
+                            model: model.id,
+                            thinkingLevel: level,
+                          });
+                          setExpandedProviderModel(null);
+                          setOpen(false);
+                        }}
+                        className={cn(
+                          'w-full flex items-center justify-between px-2 py-2 rounded-sm text-sm',
+                          'hover:bg-accent cursor-pointer transition-colors',
+                          isActiveLevel
+                            ? 'bg-primary/10 text-primary border border-primary/20'
+                            : 'border border-transparent'
+                        )}
+                      >
+                        <div className="flex flex-col items-start">
+                          <span className={cn('font-medium', isActiveLevel && 'text-primary')}>
+                            {THINKING_LEVEL_LABELS[level]}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            {level === 'none' && 'No extended thinking'}
+                            {level === 'low' && 'Light reasoning (1k tokens)'}
+                            {level === 'medium' && 'Moderate reasoning (10k tokens)'}
+                            {level === 'high' && 'Deep reasoning (16k tokens)'}
+                            {level === 'ultrathink' && 'Maximum reasoning (32k tokens)'}
+                            {level === 'adaptive' && 'Model decides reasoning depth'}
+                          </span>
+                        </div>
+                        {isActiveLevel && <Check className="h-3.5 w-3.5 text-primary" />}
+                      </button>
+                    );
+                  })}
+                </div>
+              </PopoverContent>
+            </Popover>
+          </div>
+        </div>
       </CommandItem>
     );
   };
@@ -1506,6 +1652,16 @@ export function PhaseModelSelector({
     const isFavorite = favoriteModels.includes(model.id);
     const isExpanded = expandedClaudeModel === model.id;
     const currentThinking = isSelected ? selectedThinkingLevel : 'none';
+    // Use the user's preferred default thinking level from settings.
+    // For adaptive-only models (Opus 4.6), clamp to a valid level.
+    const availableLevels = getThinkingLevelsForModel(model.id);
+    const defaultThinking = availableLevels.includes(storeDefaultThinkingLevel)
+      ? storeDefaultThinkingLevel
+      : availableLevels[0]; // Fall back to first available (typically 'none')
+
+    // Two-stage interaction pattern:
+    // - Primary zone (model icon + name): selects model with default thinking level
+    // - Secondary zone (chevron arrow): expands thinking level sub-menu
 
     // On mobile, render inline expansion instead of nested popover
     if (isMobile) {
@@ -1513,7 +1669,15 @@ export function PhaseModelSelector({
         <div key={model.id}>
           <CommandItem
             value={model.label}
-            onSelect={() => setExpandedClaudeModel(isExpanded ? null : (model.id as ModelAlias))}
+            onSelect={() => {
+              // Primary action: select model with its default thinking level
+              onChange({
+                model: model.id as ModelAlias,
+                thinkingLevel: defaultThinking,
+              });
+              setExpandedClaudeModel(null);
+              setOpen(false);
+            }}
             className="group flex items-center justify-between py-2"
           >
             <div className="flex items-center gap-3 overflow-hidden">
@@ -1553,12 +1717,27 @@ export function PhaseModelSelector({
                 <Star className={cn('h-3.5 w-3.5', isFavorite && 'fill-current')} />
               </Button>
               {isSelected && !isExpanded && <Check className="h-4 w-4 text-primary shrink-0" />}
-              <ChevronRight
+              {/* Secondary zone: expand thinking level sub-menu */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  e.preventDefault();
+                  setExpandedClaudeModel(isExpanded ? null : (model.id as ModelAlias));
+                }}
                 className={cn(
-                  'h-4 w-4 text-muted-foreground transition-transform',
-                  isExpanded && 'rotate-90'
+                  'flex items-center justify-center h-7 w-7 rounded-sm',
+                  'hover:bg-accent/80 transition-colors',
+                  isExpanded && 'bg-accent'
                 )}
-              />
+                title="Adjust thinking level"
+              >
+                <ChevronDown
+                  className={cn(
+                    'h-4 w-4 text-muted-foreground transition-transform',
+                    isExpanded && 'rotate-180'
+                  )}
+                />
+              </button>
             </div>
           </CommandItem>
 
@@ -1568,164 +1747,203 @@ export function PhaseModelSelector({
               <div className="px-2 py-1 text-xs font-medium text-muted-foreground">
                 Thinking Level
               </div>
-              {getThinkingLevelsForModel(model.id).map((level) => (
-                <button
-                  key={level}
-                  onClick={() => {
-                    onChange({
-                      model: model.id as ModelAlias,
-                      thinkingLevel: level,
-                    });
-                    setExpandedClaudeModel(null);
-                    setOpen(false);
-                  }}
-                  className={cn(
-                    'w-full flex items-center justify-between px-2 py-2 rounded-sm text-sm',
-                    'hover:bg-accent cursor-pointer transition-colors',
-                    isSelected && currentThinking === level && 'bg-accent text-accent-foreground'
-                  )}
-                >
-                  <div className="flex flex-col items-start">
-                    <span className="font-medium text-xs">{THINKING_LEVEL_LABELS[level]}</span>
-                    <span className="text-[10px] text-muted-foreground">
-                      {level === 'none' && 'No extended thinking'}
-                      {level === 'low' && 'Light reasoning (1k tokens)'}
-                      {level === 'medium' && 'Moderate reasoning (10k tokens)'}
-                      {level === 'high' && 'Deep reasoning (16k tokens)'}
-                      {level === 'ultrathink' && 'Maximum reasoning (32k tokens)'}
-                      {level === 'adaptive' && 'Model decides reasoning depth'}
-                    </span>
-                  </div>
-                  {isSelected && currentThinking === level && (
-                    <Check className="h-3.5 w-3.5 text-primary" />
-                  )}
-                </button>
-              ))}
+              {getThinkingLevelsForModel(model.id).map((level) => {
+                const isActiveLevel = isSelected && currentThinking === level;
+                return (
+                  <button
+                    key={level}
+                    onClick={() => {
+                      onChange({
+                        model: model.id as ModelAlias,
+                        thinkingLevel: level,
+                      });
+                      setExpandedClaudeModel(null);
+                      setOpen(false);
+                    }}
+                    className={cn(
+                      'w-full flex items-center justify-between px-2 py-2 rounded-sm text-sm',
+                      'hover:bg-accent cursor-pointer transition-colors',
+                      isActiveLevel
+                        ? 'bg-primary/10 text-primary border border-primary/20'
+                        : 'border border-transparent'
+                    )}
+                  >
+                    <div className="flex flex-col items-start">
+                      <span className={cn('font-medium text-xs', isActiveLevel && 'text-primary')}>
+                        {THINKING_LEVEL_LABELS[level]}
+                      </span>
+                      <span className="text-[10px] text-muted-foreground">
+                        {level === 'none' && 'No extended thinking'}
+                        {level === 'low' && 'Light reasoning (1k tokens)'}
+                        {level === 'medium' && 'Moderate reasoning (10k tokens)'}
+                        {level === 'high' && 'Deep reasoning (16k tokens)'}
+                        {level === 'ultrathink' && 'Maximum reasoning (32k tokens)'}
+                        {level === 'adaptive' && 'Model decides reasoning depth'}
+                      </span>
+                    </div>
+                    {isActiveLevel && <Check className="h-3.5 w-3.5 text-primary" />}
+                  </button>
+                );
+              })}
             </div>
           )}
         </div>
       );
     }
 
-    // Desktop: Use nested popover
+    // Desktop: Two-stage pattern with nested popover for thinking level
+    // Primary zone: clicking model name/icon area selects the model with default thinking
+    // Secondary zone: clicking chevron arrow opens thinking level popover
     return (
       <CommandItem
         key={model.id}
         value={model.label}
-        onSelect={() => setExpandedClaudeModel(isExpanded ? null : (model.id as ModelAlias))}
+        onSelect={() => {
+          // Primary action: select model with default thinking level
+          onChange({
+            model: model.id as ModelAlias,
+            thinkingLevel: defaultThinking,
+          });
+          setExpandedClaudeModel(null);
+          setOpen(false);
+        }}
         className="p-0 data-[selected=true]:bg-transparent"
       >
-        <Popover
-          open={isExpanded}
-          onOpenChange={(isOpen) => {
-            if (!isOpen) {
-              setExpandedClaudeModel(null);
-            }
-          }}
+        <div
+          className={cn(
+            'w-full group flex items-center justify-between py-2 px-2 rounded-sm cursor-pointer',
+            'hover:bg-accent',
+            isExpanded && 'bg-accent'
+          )}
         >
-          <PopoverTrigger asChild>
-            <div
-              ref={isExpanded ? expandedClaudeTriggerRef : undefined}
+          <div className="flex items-center gap-3 overflow-hidden">
+            <AnthropicIcon
               className={cn(
-                'w-full group flex items-center justify-between py-2 px-2 rounded-sm cursor-pointer',
-                'hover:bg-accent',
-                isExpanded && 'bg-accent'
+                'h-4 w-4 shrink-0',
+                isSelected ? 'text-primary' : 'text-muted-foreground'
               )}
-            >
-              <div className="flex items-center gap-3 overflow-hidden">
-                <AnthropicIcon
-                  className={cn(
-                    'h-4 w-4 shrink-0',
-                    isSelected ? 'text-primary' : 'text-muted-foreground'
-                  )}
-                />
-                <div className="flex flex-col truncate">
-                  <span className={cn('truncate font-medium', isSelected && 'text-primary')}>
-                    {model.label}
-                  </span>
-                  <span className="truncate text-xs text-muted-foreground">
-                    {isSelected && currentThinking !== 'none'
-                      ? `Thinking: ${THINKING_LEVEL_LABELS[currentThinking]}`
-                      : model.description}
-                  </span>
-                </div>
-              </div>
+            />
+            <div className="flex flex-col truncate">
+              <span className={cn('truncate font-medium', isSelected && 'text-primary')}>
+                {model.label}
+              </span>
+              <span className="truncate text-xs text-muted-foreground">
+                {isSelected && currentThinking !== 'none'
+                  ? `Thinking: ${THINKING_LEVEL_LABELS[currentThinking]}`
+                  : model.description}
+              </span>
+            </div>
+          </div>
 
-              <div className="flex items-center gap-1 ml-2">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className={cn(
-                    'h-6 w-6 hover:bg-transparent hover:text-yellow-500 focus:ring-0',
-                    isFavorite
-                      ? 'text-yellow-500 opacity-100'
-                      : 'opacity-0 group-hover:opacity-100 text-muted-foreground'
-                  )}
+          <div className="flex items-center gap-1 ml-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              className={cn(
+                'h-6 w-6 hover:bg-transparent hover:text-yellow-500 focus:ring-0',
+                isFavorite
+                  ? 'text-yellow-500 opacity-100'
+                  : 'opacity-0 group-hover:opacity-100 text-muted-foreground'
+              )}
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleFavoriteModel(model.id);
+              }}
+            >
+              <Star className={cn('h-3.5 w-3.5', isFavorite && 'fill-current')} />
+            </Button>
+            {isSelected && <Check className="h-4 w-4 text-primary shrink-0" />}
+            {/* Secondary zone: expand thinking level popover */}
+            <Popover
+              open={isExpanded}
+              onOpenChange={(isOpen) => {
+                if (!isOpen) {
+                  setExpandedClaudeModel(null);
+                }
+              }}
+            >
+              <PopoverTrigger asChild>
+                <button
+                  ref={
+                    isExpanded
+                      ? (expandedClaudeTriggerRef as unknown as React.RefObject<HTMLButtonElement>)
+                      : undefined
+                  }
                   onClick={(e) => {
                     e.stopPropagation();
-                    toggleFavoriteModel(model.id);
-                  }}
-                >
-                  <Star className={cn('h-3.5 w-3.5', isFavorite && 'fill-current')} />
-                </Button>
-                {isSelected && <Check className="h-4 w-4 text-primary shrink-0" />}
-                <ChevronRight
-                  className={cn(
-                    'h-4 w-4 text-muted-foreground transition-transform',
-                    isExpanded && 'rotate-90'
-                  )}
-                />
-              </div>
-            </div>
-          </PopoverTrigger>
-          <PopoverContent
-            side="right"
-            align="start"
-            className="w-[220px] p-1"
-            sideOffset={8}
-            collisionPadding={16}
-            onCloseAutoFocus={(e) => e.preventDefault()}
-          >
-            <div className="space-y-1">
-              <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground border-b border-border/50 mb-1">
-                Thinking Level
-              </div>
-              {getThinkingLevelsForModel(model.id).map((level) => (
-                <button
-                  key={level}
-                  onClick={() => {
-                    onChange({
-                      model: model.id as ModelAlias,
-                      thinkingLevel: level,
-                    });
-                    setExpandedClaudeModel(null);
-                    setOpen(false);
+                    e.preventDefault();
+                    setExpandedClaudeModel(isExpanded ? null : (model.id as ModelAlias));
                   }}
                   className={cn(
-                    'w-full flex items-center justify-between px-2 py-2 rounded-sm text-sm',
-                    'hover:bg-accent cursor-pointer transition-colors',
-                    isSelected && currentThinking === level && 'bg-accent text-accent-foreground'
+                    'flex items-center justify-center h-7 w-7 rounded-sm',
+                    'hover:bg-accent/80 transition-colors',
+                    isExpanded && 'bg-accent'
                   )}
+                  title="Adjust thinking level"
                 >
-                  <div className="flex flex-col items-start">
-                    <span className="font-medium">{THINKING_LEVEL_LABELS[level]}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {level === 'none' && 'No extended thinking'}
-                      {level === 'low' && 'Light reasoning (1k tokens)'}
-                      {level === 'medium' && 'Moderate reasoning (10k tokens)'}
-                      {level === 'high' && 'Deep reasoning (16k tokens)'}
-                      {level === 'ultrathink' && 'Maximum reasoning (32k tokens)'}
-                      {level === 'adaptive' && 'Model decides reasoning depth'}
-                    </span>
-                  </div>
-                  {isSelected && currentThinking === level && (
-                    <Check className="h-3.5 w-3.5 text-primary" />
-                  )}
+                  <ChevronDown
+                    className={cn(
+                      'h-4 w-4 text-muted-foreground transition-transform',
+                      isExpanded && 'rotate-180'
+                    )}
+                  />
                 </button>
-              ))}
-            </div>
-          </PopoverContent>
-        </Popover>
+              </PopoverTrigger>
+              <PopoverContent
+                side="right"
+                align="start"
+                className="w-[220px] p-1"
+                sideOffset={8}
+                collisionPadding={16}
+                onCloseAutoFocus={(e) => e.preventDefault()}
+              >
+                <div className="space-y-1">
+                  <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground border-b border-border/50 mb-1">
+                    Thinking Level
+                  </div>
+                  {getThinkingLevelsForModel(model.id).map((level) => {
+                    const isActiveLevel = isSelected && currentThinking === level;
+                    return (
+                      <button
+                        key={level}
+                        onClick={() => {
+                          onChange({
+                            model: model.id as ModelAlias,
+                            thinkingLevel: level,
+                          });
+                          setExpandedClaudeModel(null);
+                          setOpen(false);
+                        }}
+                        className={cn(
+                          'w-full flex items-center justify-between px-2 py-2 rounded-sm text-sm',
+                          'hover:bg-accent cursor-pointer transition-colors',
+                          isActiveLevel
+                            ? 'bg-primary/10 text-primary border border-primary/20'
+                            : 'border border-transparent'
+                        )}
+                      >
+                        <div className="flex flex-col items-start">
+                          <span className={cn('font-medium', isActiveLevel && 'text-primary')}>
+                            {THINKING_LEVEL_LABELS[level]}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            {level === 'none' && 'No extended thinking'}
+                            {level === 'low' && 'Light reasoning (1k tokens)'}
+                            {level === 'medium' && 'Moderate reasoning (10k tokens)'}
+                            {level === 'high' && 'Deep reasoning (16k tokens)'}
+                            {level === 'ultrathink' && 'Maximum reasoning (32k tokens)'}
+                            {level === 'adaptive' && 'Model decides reasoning depth'}
+                          </span>
+                        </div>
+                        {isActiveLevel && <Check className="h-3.5 w-3.5 text-primary" />}
+                      </button>
+                    );
+                  })}
+                </div>
+              </PopoverContent>
+            </Popover>
+          </div>
+        </div>
       </CommandItem>
     );
   };
@@ -1928,6 +2146,31 @@ export function PhaseModelSelector({
     );
   };
 
+  // Compute a short badge label for the active thinking/reasoning level
+  const activeLevelBadge = useMemo(() => {
+    if (selectedThinkingLevel !== 'none') {
+      return { label: THINKING_LEVEL_LABELS[selectedThinkingLevel], type: 'thinking' as const };
+    }
+    if (selectedReasoningEffort !== 'none') {
+      return {
+        label: REASONING_EFFORT_LABELS[selectedReasoningEffort],
+        type: 'reasoning' as const,
+      };
+    }
+    return null;
+  }, [selectedThinkingLevel, selectedReasoningEffort]);
+
+  // Strip the thinking/reasoning parenthetical from the model name for the trigger
+  // since we show it as a separate badge
+  const triggerModelName = useMemo(() => {
+    const label = currentModel?.label || 'Select model...';
+    // Remove " (Med Thinking)", " (High Reasoning)" etc. from label since badge shows it
+    return label.replace(
+      /\s*\((?:None|Low|Med|Medium|High|Ultra|Adaptive|XHigh|Min)\s+(?:Thinking|Reasoning)\)$/i,
+      ''
+    );
+  }, [currentModel?.label]);
+
   // Compact trigger button (for agent view etc.)
   const compactTrigger = (
     <Button
@@ -1942,9 +2185,19 @@ export function PhaseModelSelector({
       data-testid="model-selector"
     >
       {currentModel?.icon && <currentModel.icon className="h-4 w-4 text-muted-foreground/70" />}
-      <span className="truncate text-sm">
-        {currentModel?.label?.replace('Claude ', '') || 'Select model...'}
-      </span>
+      <span className="truncate text-sm">{triggerModelName?.replace('Claude ', '')}</span>
+      {activeLevelBadge && (
+        <span
+          className={cn(
+            'shrink-0 px-1.5 py-0.5 rounded text-[10px] font-semibold leading-none',
+            activeLevelBadge.type === 'thinking'
+              ? 'bg-purple-500/15 text-purple-600 dark:text-purple-400'
+              : 'bg-blue-500/15 text-blue-600 dark:text-blue-400'
+          )}
+        >
+          {activeLevelBadge.label}
+        </span>
+      )}
       <ChevronsUpDown className="ml-1 h-3 w-3 shrink-0 opacity-50" />
     </Button>
   );
@@ -1957,13 +2210,25 @@ export function PhaseModelSelector({
       aria-expanded={open}
       disabled={disabled}
       className={cn(
-        'w-[260px] justify-between h-9 px-3 bg-background/50 border-border/50 hover:bg-background/80 hover:text-foreground',
+        'w-[280px] justify-between h-9 px-3 bg-background/50 border-border/50 hover:bg-background/80 hover:text-foreground',
         triggerClassName
       )}
     >
       <div className="flex items-center gap-2 truncate">
         {currentModel?.icon && <currentModel.icon className="h-4 w-4 text-muted-foreground/70" />}
-        <span className="truncate text-sm">{currentModel?.label || 'Select model...'}</span>
+        <span className="truncate text-sm">{triggerModelName}</span>
+        {activeLevelBadge && (
+          <span
+            className={cn(
+              'shrink-0 px-1.5 py-0.5 rounded text-[10px] font-semibold leading-none',
+              activeLevelBadge.type === 'thinking'
+                ? 'bg-purple-500/15 text-purple-600 dark:text-purple-400'
+                : 'bg-blue-500/15 text-blue-600 dark:text-blue-400'
+            )}
+          >
+            {activeLevelBadge.label}
+          </span>
+        )}
       </div>
       <ChevronsUpDown className="ml-2 h-3.5 w-3.5 shrink-0 opacity-50" />
     </Button>

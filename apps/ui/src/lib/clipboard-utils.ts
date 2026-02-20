@@ -61,8 +61,15 @@ export async function readFromClipboard(): Promise<string> {
   if (isClipboardApiAvailable()) {
     try {
       return await navigator.clipboard.readText();
-    } catch {
-      // Fall through to legacy approach
+    } catch (err) {
+      // Check if this is a permission-related error
+      if (err instanceof Error) {
+        // Re-throw permission errors so they propagate to the caller
+        if (err.name === 'NotAllowedError' || err.name === 'NotReadableError') {
+          throw err;
+        }
+      }
+      // For other errors, fall through to legacy approach
     }
   }
 

@@ -200,6 +200,7 @@ export {
   getThinkingTokenBudget,
   isAdaptiveThinkingModel,
   getThinkingLevelsForModel,
+  getDefaultThinkingLevel,
   // Event hook constants
   EVENT_HOOK_TRIGGER_LABELS,
   // Claude-compatible provider templates (new)

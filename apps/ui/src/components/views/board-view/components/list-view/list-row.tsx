@@ -275,7 +275,7 @@ export const ListRow = memo(function ListRow({
     >
       {/* Checkbox column */}
       {showCheckbox && (
-        <div role="cell" className="flex items-center justify-center w-10 px-2 py-3 shrink-0">
+        <div role="cell" className="flex items-center justify-center w-10 px-2 py-2 shrink-0">
           <input
             type="checkbox"
             checked={isSelected}
@@ -294,7 +294,7 @@ export const ListRow = memo(function ListRow({
       <div
         role="cell"
         className={cn(
-          'flex items-center pl-3 pr-0 py-3 gap-0',
+          'flex items-center pl-3 pr-0 py-2 gap-0',
           getColumnWidth('title'),
           getColumnAlign('title')
         )}
@@ -303,7 +303,7 @@ export const ListRow = memo(function ListRow({
           <div className="flex items-center">
             <span
               className={cn(
-                'font-medium truncate',
+                'text-sm font-medium truncate',
                 feature.titleGenerating && !feature.title && 'animate-pulse text-muted-foreground'
               )}
               title={feature.title || feature.description}
@@ -332,7 +332,7 @@ export const ListRow = memo(function ListRow({
       <div
         role="cell"
         className={cn(
-          'flex items-center pl-0 pr-3 py-3 shrink-0',
+          'flex items-center pl-0 pr-3 py-2 shrink-0',
           getColumnWidth('priority'),
           getColumnAlign('priority')
         )}
@@ -365,7 +365,7 @@ export const ListRow = memo(function ListRow({
       </div>
 
       {/* Actions column */}
-      <div role="cell" className="flex items-center justify-end px-3 py-3 w-[80px] shrink-0">
+      <div role="cell" className="flex items-center justify-end px-3 py-2 w-[80px] shrink-0">
         <RowActions
           feature={feature}
           handlers={handlers}

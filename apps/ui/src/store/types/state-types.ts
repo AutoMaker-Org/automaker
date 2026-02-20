@@ -21,6 +21,8 @@ import type {
   ClaudeApiProfile,
   ClaudeCompatibleProvider,
   SidebarStyle,
+  ThinkingLevel,
+  ReasoningEffort,
 } from '@automaker/types';
 
 import type {
@@ -174,6 +176,10 @@ export interface AppState {
   // Phase Model Settings - per-phase AI model configuration
   phaseModels: PhaseModelConfig;
   favoriteModels: string[];
+
+  // Default thinking/reasoning levels for two-stage model selector primary button
+  defaultThinkingLevel: ThinkingLevel;
+  defaultReasoningEffort: ReasoningEffort;
 
   // Cursor CLI Settings (global)
   enabledCursorModels: CursorModelId[]; // Which Cursor models are available in feature modal
@@ -548,6 +554,8 @@ export interface AppActions {
   setPhaseModels: (models: Partial<PhaseModelConfig>) => Promise<void>;
   resetPhaseModels: () => Promise<void>;
   toggleFavoriteModel: (modelId: string) => void;
+  setDefaultThinkingLevel: (level: ThinkingLevel) => void;
+  setDefaultReasoningEffort: (effort: ReasoningEffort) => void;
 
   // Cursor CLI Settings actions
   setEnabledCursorModels: (models: CursorModelId[]) => void;

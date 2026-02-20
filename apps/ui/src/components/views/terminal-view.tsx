@@ -951,10 +951,12 @@ export function TerminalView({ initialCwd, initialBranch, initialMode, nonce }: 
   // Create a new terminal session
   // targetSessionId: the terminal to split (if splitting an existing terminal)
   // customCwd: optional working directory to use instead of the current project path
+  // branchName: optional branch name to display in the terminal panel header
   const createTerminal = async (
     direction?: 'horizontal' | 'vertical',
     targetSessionId?: string,
-    customCwd?: string
+    customCwd?: string,
+    branchName?: string
   ) => {
     if (!canCreateTerminal('[Terminal] Debounced terminal creation')) {
       return;
@@ -973,7 +975,7 @@ export function TerminalView({ initialCwd, initialBranch, initialMode, nonce }: 
       const data = await response.json();
 
       if (data.success) {
-        addTerminalToLayout(data.data.id, direction, targetSessionId);
+        addTerminalToLayout(data.data.id, direction, targetSessionId, branchName);
         // Mark this session as new for running initial command
         if (defaultRunScript) {
           setNewSessionIds((prev) => new Set(prev).add(data.data.id));
@@ -1533,7 +1535,14 @@ export function TerminalView({ initialCwd, initialBranch, initialMode, nonce }: 
           {currentWorktreePath && (
             <Button
               className="w-full flex-col h-auto py-2"
-              onClick={() => createTerminal(undefined, undefined, currentWorktreePath)}
+              onClick={() =>
+                createTerminal(
+                  undefined,
+                  undefined,
+                  currentWorktreePath,
+                  currentWorktreeBranch ?? undefined
+                )
+              }
             >
               <span className="flex items-center">
                 <GitBranch className="h-4 w-4 mr-2 shrink-0" />

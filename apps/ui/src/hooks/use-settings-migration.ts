@@ -718,6 +718,8 @@ export function hydrateStoreFromSettings(settings: GlobalSettings): void {
     enhancementModel: settings.enhancementModel ?? 'claude-sonnet',
     validationModel: settings.validationModel ?? 'claude-opus',
     phaseModels: settings.phaseModels ?? current.phaseModels,
+    defaultThinkingLevel: settings.defaultThinkingLevel ?? 'none',
+    defaultReasoningEffort: settings.defaultReasoningEffort ?? 'none',
     enabledCursorModels: allCursorModels, // Always use ALL cursor models
     cursorDefaultModel: sanitizedCursorDefaultModel,
     enabledOpencodeModels: sanitizedEnabledOpencodeModels,
@@ -749,6 +751,7 @@ export function hydrateStoreFromSettings(settings: GlobalSettings): void {
     projectHistory: settings.projectHistory ?? [],
     projectHistoryIndex: settings.projectHistoryIndex ?? -1,
     lastSelectedSessionByProject: settings.lastSelectedSessionByProject ?? {},
+    currentWorktreeByProject: settings.currentWorktreeByProject ?? {},
     // UI State
     worktreePanelCollapsed: settings.worktreePanelCollapsed ?? false,
     lastProjectDir: settings.lastProjectDir ?? '',
@@ -812,6 +815,8 @@ function buildSettingsUpdateFromStore(): Record<string, unknown> {
     enhancementModel: state.enhancementModel,
     validationModel: state.validationModel,
     phaseModels: state.phaseModels,
+    defaultThinkingLevel: state.defaultThinkingLevel,
+    defaultReasoningEffort: state.defaultReasoningEffort,
     enabledDynamicModelIds: state.enabledDynamicModelIds,
     disabledProviders: state.disabledProviders,
     autoLoadClaudeMd: state.autoLoadClaudeMd,
@@ -836,6 +841,7 @@ function buildSettingsUpdateFromStore(): Record<string, unknown> {
     projectHistory: state.projectHistory,
     projectHistoryIndex: state.projectHistoryIndex,
     lastSelectedSessionByProject: state.lastSelectedSessionByProject,
+    currentWorktreeByProject: state.currentWorktreeByProject,
     worktreePanelCollapsed: state.worktreePanelCollapsed,
     lastProjectDir: state.lastProjectDir,
     recentFolders: state.recentFolders,

@@ -305,6 +305,7 @@ function RootLayoutContent() {
         sidebarStyle: state.sidebarStyle,
         worktreePanelCollapsed: state.worktreePanelCollapsed,
         collapsedNavSections: state.collapsedNavSections,
+        currentWorktreeByProject: state.currentWorktreeByProject,
       });
     });
     return unsubscribe;
