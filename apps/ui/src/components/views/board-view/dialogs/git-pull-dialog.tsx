@@ -119,9 +119,10 @@ export function GitPullDialog({
           setPhase('success');
           onPulled?.();
         } else {
-          // No preference — show merge prompt
+          // No preference — show merge prompt; onPulled will be called from the
+          // user-action handlers (handleCommitMerge / handleMergeManually) once
+          // the user makes their choice, consistent with the conflict phase.
           setPhase('merge-complete');
-          onPulled?.();
         }
       } else {
         setPhase('success');
@@ -254,14 +255,21 @@ export function GitPullDialog({
   }, [worktree, pullResult, remote, onCreateConflictResolutionFeature, onOpenChange]);
 
   const handleCommitMerge = useCallback(() => {
+    if (!worktree || !onCommitMerge) {
+      // No handler available — show feedback and bail without persisting preference
+      toast.error('Commit merge is not available', {
+        description: 'The commit merge action is not configured for this context.',
+        duration: 4000,
+      });
+      return;
+    }
     if (rememberChoice) {
       setMergePostAction('commit');
     }
-    if (worktree && onCommitMerge) {
-      onCommitMerge(worktree);
-    }
+    onPulled?.();
+    onCommitMerge(worktree);
     onOpenChange(false);
-  }, [rememberChoice, setMergePostAction, worktree, onCommitMerge, onOpenChange]);
+  }, [rememberChoice, setMergePostAction, worktree, onCommitMerge, onPulled, onOpenChange]);
 
   const handleMergeManually = useCallback(() => {
     if (rememberChoice) {
@@ -271,8 +279,9 @@ export function GitPullDialog({
       description: 'Review the merged files and commit when ready.',
       duration: 5000,
     });
+    onPulled?.();
     onOpenChange(false);
-  }, [rememberChoice, setMergePostAction, onOpenChange]);
+  }, [rememberChoice, setMergePostAction, onPulled, onOpenChange]);
 
   const handleClose = useCallback(() => {
     onOpenChange(false);
@@ -542,13 +551,15 @@ export function GitPullDialog({
                 <FileText className="w-4 h-4 mr-2" />
                 Review Manually
               </Button>
-              <Button
-                onClick={handleCommitMerge}
-                className="w-full sm:w-auto bg-purple-600 hover:bg-purple-700 text-white"
-              >
-                <GitCommitHorizontal className="w-4 h-4 mr-2" />
-                Commit Merge
-              </Button>
+              {worktree && onCommitMerge && (
+                <Button
+                  onClick={handleCommitMerge}
+                  className="w-full sm:w-auto bg-purple-600 hover:bg-purple-700 text-white"
+                >
+                  <GitCommitHorizontal className="w-4 h-4 mr-2" />
+                  Commit Merge
+                </Button>
+              )}
             </DialogFooter>
           </>
         )}
