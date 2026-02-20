@@ -12,7 +12,6 @@ import {
   Redo2,
   Settings,
   RotateCcw,
-  HardDriveDownload,
 } from 'lucide-react';
 import { createLogger } from '@automaker/utils/logger';
 import { useAppStore } from '@/store/app-store';
@@ -1310,7 +1309,7 @@ export function FileEditorView({ initialPath }: FileEditorViewProps) {
                 className="hidden lg:flex"
                 title={editorAutoSave ? 'Auto-save enabled (Ctrl+S)' : 'Save file (Ctrl+S)'}
               >
-                <HardDriveDownload className="w-4 h-4 mr-2" />
+                <Save className="w-4 h-4 mr-2" />
                 {editorAutoSave ? 'Auto' : 'Save'}
               </Button>
             )}
@@ -1409,7 +1408,7 @@ export function FileEditorView({ initialPath }: FileEditorViewProps) {
                 className="lg:hidden"
                 title={editorAutoSave ? 'Auto-save enabled (Ctrl+S)' : 'Save file (Ctrl+S)'}
               >
-                <HardDriveDownload className="w-4 h-4" />
+                <Save className="w-4 h-4" />
               </Button>
             )}
 
@@ -1494,7 +1493,7 @@ export function FileEditorView({ initialPath }: FileEditorViewProps) {
               setShowActionsPanel(false);
             }}
           >
-            <HardDriveDownload className="w-4 h-4 mr-2" />
+            <Save className="w-4 h-4 mr-2" />
             {editorAutoSave ? 'Save Now (Auto-save on)' : 'Save Changes'}
           </Button>
         )}
