@@ -99,11 +99,10 @@ export class AgentExecutor {
       workDir,
       false
     );
-    const resolvedMaxTurns = sdkOptions?.maxTurns;
-    if (resolvedMaxTurns == null) {
-      logger.warn(
-        `[execute] Feature ${featureId}: sdkOptions.maxTurns is not set (undefined). ` +
-          `The provider will use its internal default, which may cause premature completion. ` +
+    const resolvedMaxTurns = sdkOptions?.maxTurns ?? 1000;
+    if (sdkOptions?.maxTurns == null) {
+      logger.info(
+        `[execute] Feature ${featureId}: sdkOptions.maxTurns is not set, defaulting to ${resolvedMaxTurns}. ` +
           `Model: ${effectiveBareModel}`
       );
     } else {

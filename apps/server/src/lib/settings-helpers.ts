@@ -48,8 +48,8 @@ export async function getAutoLoadClaudeMdSetting(
   logPrefix = '[SettingsHelper]'
 ): Promise<boolean> {
   if (!settingsService) {
-    logger.info(`${logPrefix} SettingsService not available, autoLoadClaudeMd disabled`);
-    return false;
+    logger.info(`${logPrefix} SettingsService not available, autoLoadClaudeMd defaulting to true`);
+    return true;
   }
 
   try {

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
@@ -67,6 +67,13 @@ export function FeatureDefaultsSection({
   onDefaultMaxTurnsChange,
 }: FeatureDefaultsSectionProps) {
   const [maxTurnsInput, setMaxTurnsInput] = useState(String(defaultMaxTurns));
+
+  // Keep the displayed input in sync if the prop changes after mount
+  // (e.g. when settings are loaded asynchronously or reset from parent)
+  useEffect(() => {
+    setMaxTurnsInput(String(defaultMaxTurns));
+  }, [defaultMaxTurns]);
+
   return (
     <div
       className={cn(
@@ -127,16 +134,17 @@ export function FeatureDefaultsSection({
                 type="number"
                 min={1}
                 max={2000}
+                step={1}
                 value={maxTurnsInput}
                 onChange={(e) => {
                   setMaxTurnsInput(e.target.value);
                 }}
                 onBlur={() => {
-                  const parsed = parseInt(maxTurnsInput, 10);
-                  if (!isNaN(parsed) && parsed >= 1 && parsed <= 2000) {
-                    onDefaultMaxTurnsChange(parsed);
+                  const value = Number(maxTurnsInput);
+                  if (Number.isInteger(value) && value >= 1 && value <= 2000) {
+                    onDefaultMaxTurnsChange(value);
                   } else {
-                    // Reset to current valid value if invalid
+                    // Reset to current valid value if invalid (including decimals like "1.5")
                     setMaxTurnsInput(String(defaultMaxTurns));
                   }
                 }}

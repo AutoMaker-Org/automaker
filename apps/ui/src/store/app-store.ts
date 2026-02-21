@@ -2370,8 +2370,10 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
   },
 
   setDefaultMaxTurns: async (maxTurns: number) => {
+    // Guard against NaN/Infinity before flooring and clamping
+    const safeValue = Number.isFinite(maxTurns) ? maxTurns : 1;
     // Clamp to valid range
-    const clamped = Math.max(1, Math.min(2000, Math.floor(maxTurns)));
+    const clamped = Math.max(1, Math.min(2000, Math.floor(safeValue)));
     set({ defaultMaxTurns: clamped });
     // Sync to server
     try {

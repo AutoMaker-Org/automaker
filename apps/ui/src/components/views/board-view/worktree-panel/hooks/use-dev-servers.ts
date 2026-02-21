@@ -220,6 +220,9 @@ export function useDevServers({ projectPath }: UseDevServersOptions) {
   useEffect(() => {
     const reconcile = async () => {
       if (!initialFetchDone.current) return;
+      // Skip reconciliation when the tab/panel is not visible to avoid
+      // unnecessary API calls while the user isn't looking at the panel.
+      if (document.hidden) return;
 
       try {
         const api = getElectronAPI();

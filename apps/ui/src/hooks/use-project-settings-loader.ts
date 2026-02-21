@@ -115,18 +115,20 @@ export function useProjectSettingsLoader() {
 
     // Check if we need to update the project
     const storeState = useAppStore.getState();
-    const updatedProject = storeState.currentProject;
-    if (updatedProject && updatedProject.path === projectPath) {
+    // snapshotProject is the store's current value at this point in time;
+    // it is distinct from updatedProjectData which is the new value we build below.
+    const snapshotProject = storeState.currentProject;
+    if (snapshotProject && snapshotProject.path === projectPath) {
       const needsUpdate =
         (activeClaudeApiProfileId !== undefined &&
-          updatedProject.activeClaudeApiProfileId !== activeClaudeApiProfileId) ||
+          snapshotProject.activeClaudeApiProfileId !== activeClaudeApiProfileId) ||
         (phaseModelOverrides !== undefined &&
-          JSON.stringify(updatedProject.phaseModelOverrides) !==
+          JSON.stringify(snapshotProject.phaseModelOverrides) !==
             JSON.stringify(phaseModelOverrides));
 
       if (needsUpdate) {
         const updatedProjectData = {
-          ...updatedProject,
+          ...snapshotProject,
           ...(activeClaudeApiProfileId !== undefined && { activeClaudeApiProfileId }),
           ...(phaseModelOverrides !== undefined && { phaseModelOverrides }),
         };
@@ -135,7 +137,7 @@ export function useProjectSettingsLoader() {
         // to avoid two separate re-renders that can cascade during initialization
         // and contribute to React error #185 (maximum update depth exceeded).
         const updatedProjects = storeState.projects.map((p) =>
-          p.id === updatedProject.id ? updatedProjectData : p
+          p.id === snapshotProject.id ? updatedProjectData : p
         );
         // NOTE: Intentionally bypasses setCurrentProject() to avoid a second
         // render cycle that can trigger React error #185 (maximum update depth

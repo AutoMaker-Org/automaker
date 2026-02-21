@@ -94,15 +94,33 @@ async function getTrackingBranch(
 }
 
 /**
- * Check whether a branch is checked out in the main worktree (i.e., the
- * current HEAD of the project). We can only do a fast-forward merge on a
- * branch that is currently checked out. For branches that are NOT checked
- * out, we use `git fetch` + `git update-ref` instead.
+ * Check whether a branch is checked out in ANY worktree (main or linked).
+ * Uses `git worktree list --porcelain` to enumerate all worktrees and
+ * checks if any of them has the given branch as their HEAD.
+ *
+ * This prevents using `git update-ref` on a branch that is checked out in
+ * a linked worktree, which would desync that worktree's HEAD.
  */
 async function isBranchCheckedOut(projectPath: string, branchName: string): Promise<boolean> {
   try {
-    const headBranch = await execGitCommand(['rev-parse', '--abbrev-ref', 'HEAD'], projectPath);
-    return headBranch.trim() === branchName;
+    const { stdout } = await execAsync('git worktree list --porcelain', { cwd: projectPath });
+    const lines = stdout.split('\n');
+    let currentBranch: string | null = null;
+
+    for (const line of lines) {
+      if (line.startsWith('branch ')) {
+        currentBranch = line.slice(7).replace('refs/heads/', '');
+      } else if (line === '') {
+        // End of a worktree entry — reset for the next
+        currentBranch = null;
+      }
+
+      if (currentBranch === branchName) {
+        return true;
+      }
+    }
+
+    return false;
   } catch {
     return false;
   }

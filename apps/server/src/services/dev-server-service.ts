@@ -131,6 +131,30 @@ class DevServerService {
   }
 
   /**
+   * Prune a stale server entry whose process has exited without cleanup.
+   * Clears any pending timers, removes the port from allocatedPorts, deletes
+   * the entry from runningServers, and emits the "dev-server:stopped" event
+   * so all callers consistently notify the frontend when pruning entries.
+   *
+   * @param worktreePath - The key used in runningServers
+   * @param server - The DevServerInfo entry to prune
+   */
+  private pruneStaleServer(worktreePath: string, server: DevServerInfo): void {
+    if (server.flushTimeout) clearTimeout(server.flushTimeout);
+    if (server.urlDetectionTimeout) clearTimeout(server.urlDetectionTimeout);
+    this.allocatedPorts.delete(server.port);
+    this.runningServers.delete(worktreePath);
+    if (this.emitter) {
+      this.emitter.emit('dev-server:stopped', {
+        worktreePath,
+        port: server.port,
+        exitCode: server.process?.exitCode ?? null,
+        timestamp: new Date().toISOString(),
+      });
+    }
+  }
+
+  /**
    * Append data to scrollback buffer with size limit enforcement
    * Evicts oldest data when buffer exceeds MAX_SCROLLBACK_SIZE
    */
@@ -924,26 +948,10 @@ class DevServerService {
     for (const stalePath of stalePaths) {
       const server = this.runningServers.get(stalePath);
       if (server) {
-        // Clean up timers
-        if (server.flushTimeout) {
-          clearTimeout(server.flushTimeout);
-        }
-        if (server.urlDetectionTimeout) {
-          clearTimeout(server.urlDetectionTimeout);
-        }
-        // Emit stopped event so frontend gets immediate notification
-        // (consistent with cleanupAndEmitStop and stopDevServer paths)
-        if (this.emitter) {
-          this.emitter.emit('dev-server:stopped', {
-            worktreePath: stalePath,
-            port: server.port,
-            exitCode: server.process?.exitCode ?? null,
-            timestamp: new Date().toISOString(),
-          });
-        }
-        this.allocatedPorts.delete(server.port);
+        // Delegate to the shared helper so timers, ports, and the stopped event
+        // are all handled consistently with isRunning and getServerInfo.
+        this.pruneStaleServer(stalePath, server);
       }
-      this.runningServers.delete(stalePath);
     }
 
     const servers = Array.from(this.runningServers.values()).map((s) => ({
@@ -969,10 +977,7 @@ class DevServerService {
     if (!server) return false;
     // Prune stale entry if the process has exited
     if (server.process && typeof server.process.exitCode === 'number') {
-      if (server.flushTimeout) clearTimeout(server.flushTimeout);
-      if (server.urlDetectionTimeout) clearTimeout(server.urlDetectionTimeout);
-      this.allocatedPorts.delete(server.port);
-      this.runningServers.delete(worktreePath);
+      this.pruneStaleServer(worktreePath, server);
       return false;
     }
     return true;
@@ -987,10 +992,7 @@ class DevServerService {
     if (!server) return undefined;
     // Prune stale entry if the process has exited
     if (server.process && typeof server.process.exitCode === 'number') {
-      if (server.flushTimeout) clearTimeout(server.flushTimeout);
-      if (server.urlDetectionTimeout) clearTimeout(server.urlDetectionTimeout);
-      this.allocatedPorts.delete(server.port);
-      this.runningServers.delete(worktreePath);
+      this.pruneStaleServer(worktreePath, server);
       return undefined;
     }
     return server;
