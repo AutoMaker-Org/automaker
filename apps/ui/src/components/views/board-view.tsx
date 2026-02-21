@@ -33,11 +33,11 @@ import { getHttpApiClient } from '@/lib/http-api-client';
 import type { BacklogPlanResult, FeatureStatusWithPipeline } from '@automaker/types';
 import { pathsEqual } from '@/lib/utils';
 import { toast } from 'sonner';
-import { BoardBackgroundModal } from '@/components/dialogs/board-background-modal';
 import {
+  BoardBackgroundModal,
   PRCommentResolutionDialog,
   type PRCommentResolutionPRInfo,
-} from '@/components/dialogs/pr-comment-resolution-dialog';
+} from '@/components/dialogs';
 import { useShallow } from 'zustand/react/shallow';
 import { useAutoMode } from '@/hooks/use-auto-mode';
 import { resolveModelString } from '@automaker/model-resolver';

@@ -1,6 +1,7 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './app';
+import { AppErrorBoundary } from './components/ui/app-error-boundary';
 import { isMobileDevice, isPwaStandalone } from './lib/mobile-detect';
 
 // Defensive fallback: index.html's inline script already applies data-pwa="standalone"
@@ -250,8 +251,12 @@ function warmAssetCache(registration: ServiceWorkerRegistration): void {
 }
 
 // Render the app - prioritize First Contentful Paint
+// AppErrorBoundary catches uncaught React errors and shows a friendly error screen
+// instead of TanStack Router's default "Something went wrong!" overlay.
 createRoot(document.getElementById('app')!).render(
   <StrictMode>
-    <App />
+    <AppErrorBoundary>
+      <App />
+    </AppErrorBoundary>
   </StrictMode>
 );

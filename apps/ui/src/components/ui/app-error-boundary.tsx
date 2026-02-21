@@ -1,0 +1,129 @@
+import { Component, type ReactNode, type ErrorInfo } from 'react';
+import { createLogger } from '@automaker/utils/logger';
+
+const logger = createLogger('AppErrorBoundary');
+
+interface Props {
+  children: ReactNode;
+}
+
+interface State {
+  hasError: boolean;
+  error: Error | null;
+}
+
+/**
+ * Root-level error boundary for the entire application.
+ *
+ * Catches uncaught React errors that would otherwise show TanStack Router's
+ * default "Something went wrong!" screen with a raw error message.
+ *
+ * Provides a user-friendly error screen with a reload button to recover.
+ * This is especially important for transient errors during initial app load
+ * (e.g., race conditions during auth/hydration on fresh browser sessions).
+ */
+export class AppErrorBoundary extends Component<Props, State> {
+  constructor(props: Props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error): State {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    logger.error('Uncaught application error:', {
+      error: error.message,
+      stack: error.stack,
+      componentStack: errorInfo.componentStack,
+    });
+  }
+
+  handleReload = () => {
+    window.location.reload();
+  };
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div
+          className="flex h-screen w-full flex-col items-center justify-center gap-6 bg-background p-6 text-foreground"
+          data-testid="app-error-boundary"
+        >
+          {/* Logo matching the app shell in index.html */}
+          <svg
+            className="h-14 w-14 opacity-90"
+            viewBox="0 0 256 256"
+            xmlns="http://www.w3.org/2000/svg"
+            aria-hidden="true"
+          >
+            <rect
+              className="fill-foreground/[0.08]"
+              x="16"
+              y="16"
+              width="224"
+              height="224"
+              rx="56"
+            />
+            <g
+              className="stroke-foreground/70"
+              fill="none"
+              strokeWidth="20"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M92 92 L52 128 L92 164" />
+              <path d="M144 72 L116 184" />
+              <path d="M164 92 L204 128 L164 164" />
+            </g>
+          </svg>
+
+          <div className="text-center space-y-2">
+            <h1 className="text-xl font-semibold">Something went wrong</h1>
+            <p className="text-sm text-muted-foreground max-w-md">
+              The application encountered an unexpected error. This is usually temporary and can be
+              resolved by reloading the page.
+            </p>
+          </div>
+
+          <button
+            onClick={this.handleReload}
+            className="inline-flex items-center gap-2 rounded-md border border-border bg-background px-4 py-2 text-sm font-medium text-foreground shadow-sm transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <svg
+              className="h-4 w-4"
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+              <path d="M3 3v5h5" />
+              <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
+              <path d="M16 21h5v-5" />
+            </svg>
+            Reload Page
+          </button>
+
+          {/* Collapsible technical details for debugging */}
+          {this.state.error && (
+            <details className="text-xs text-muted-foreground max-w-lg w-full">
+              <summary className="cursor-pointer hover:text-foreground text-center">
+                Technical details
+              </summary>
+              <pre className="mt-2 p-3 bg-muted/50 rounded-md text-left overflow-auto max-h-32 border border-border">
+                {this.state.error.message}
+              </pre>
+            </details>
+          )}
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}

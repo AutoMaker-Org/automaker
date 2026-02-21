@@ -117,6 +117,8 @@ const eslintConfig = defineConfig([
         Electron: 'readonly',
         // Console
         console: 'readonly',
+        // Structured clone (modern browser/Node API)
+        structuredClone: 'readonly',
         // Vite defines
         __APP_VERSION__: 'readonly',
         __APP_BUILD_HASH__: 'readonly',

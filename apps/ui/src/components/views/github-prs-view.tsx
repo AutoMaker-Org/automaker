@@ -25,7 +25,7 @@ import { cn, generateUUID } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-media-query';
 import { useGitHubPRs } from '@/hooks/queries';
 import { useCreateFeature } from '@/hooks/mutations/use-feature-mutations';
-import { PRCommentResolutionDialog } from '@/components/dialogs/pr-comment-resolution-dialog';
+import { PRCommentResolutionDialog } from '@/components/dialogs';
 import { resolveModelString } from '@automaker/model-resolver';
 import { toast } from 'sonner';
 import {
@@ -92,11 +92,17 @@ export function GitHubPRsView() {
 
         // Start the feature immediately after creation
         const api = getElectronAPI();
-        await api.features?.run(currentProject.path, featureId);
-
-        toast.success('Feature created and started', {
-          description: `Addressing review comments on PR #${pr.number}`,
-        });
+        if (api.features?.run) {
+          await api.features.run(currentProject.path, featureId);
+          toast.success('Feature created and started', {
+            description: `Addressing review comments on PR #${pr.number}`,
+          });
+        } else {
+          toast.error('Cannot start feature', {
+            description:
+              'Feature API is not available. The feature was created but could not be started.',
+          });
+        }
       } catch (error) {
         toast.error('Failed to create feature', {
           description: error instanceof Error ? error.message : 'An error occurred',

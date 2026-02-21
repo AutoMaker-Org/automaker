@@ -101,28 +101,25 @@ export function CommandsAndScriptsSection({ project }: CommandsAndScriptsSection
     setOriginalScripts([]);
   }, [project.path]);
 
-  // Sync commands state when project settings load
+  // Sync commands and scripts state when project settings load
   useEffect(() => {
     if (projectSettings) {
+      // Commands
       const dev = projectSettings.devCommand || '';
       const test = projectSettings.testCommand || '';
       setDevCommand(dev);
       setOriginalDevCommand(dev);
       setTestCommand(test);
       setOriginalTestCommand(test);
-    }
-  }, [projectSettings, project.path]);
 
-  // Sync scripts state when project settings load
-  useEffect(() => {
-    if (projectSettings) {
+      // Scripts
       const configured = projectSettings.terminalScripts;
       const scriptList =
         configured && configured.length > 0
           ? configured.map((s) => ({ id: s.id, name: s.name, command: s.command }))
           : DEFAULT_TERMINAL_SCRIPTS.map((s) => ({ ...s }));
       setScripts(scriptList);
-      setOriginalScripts(JSON.parse(JSON.stringify(scriptList)));
+      setOriginalScripts(structuredClone(scriptList));
     }
   }, [projectSettings, project.path]);
 
@@ -161,7 +158,7 @@ export function CommandsAndScriptsSection({ project }: CommandsAndScriptsSection
           setTestCommand(normalizedTestCommand);
           setOriginalTestCommand(normalizedTestCommand);
           setScripts(normalizedScripts);
-          setOriginalScripts(JSON.parse(JSON.stringify(normalizedScripts)));
+          setOriginalScripts(structuredClone(normalizedScripts));
         },
       }
     );
@@ -171,7 +168,7 @@ export function CommandsAndScriptsSection({ project }: CommandsAndScriptsSection
   const handleReset = useCallback(() => {
     setDevCommand(originalDevCommand);
     setTestCommand(originalTestCommand);
-    setScripts(JSON.parse(JSON.stringify(originalScripts)));
+    setScripts(structuredClone(originalScripts));
   }, [originalDevCommand, originalTestCommand, originalScripts]);
 
   // ── Command handlers ──
@@ -260,6 +257,36 @@ export function CommandsAndScriptsSection({ project }: CommandsAndScriptsSection
     setDraggedIndex(null);
     setDragOverIndex(null);
   }, []);
+
+  // ── Keyboard reorder helpers for accessibility ──
+  const moveScript = useCallback((fromIndex: number, toIndex: number) => {
+    setScripts((prev) => {
+      if (toIndex < 0 || toIndex >= prev.length) return prev;
+      const newScripts = [...prev];
+      const [removed] = newScripts.splice(fromIndex, 1);
+      newScripts.splice(toIndex, 0, removed);
+      return newScripts;
+    });
+  }, []);
+
+  const handleDragHandleKeyDown = useCallback(
+    (e: React.KeyboardEvent, index: number) => {
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        moveScript(index, index - 1);
+      } else if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        moveScript(index, index + 1);
+      } else if (e.key === 'Home') {
+        e.preventDefault();
+        moveScript(index, 0);
+      } else if (e.key === 'End') {
+        e.preventDefault();
+        moveScript(index, scripts.length - 1);
+      }
+    },
+    [moveScript, scripts.length]
+  );
 
   return (
     <div className="space-y-6">
@@ -479,10 +506,14 @@ export function CommandsAndScriptsSection({ project }: CommandsAndScriptsSection
                     onDrop={(e) => handleDrop(e)}
                     onDragEnd={(e) => handleDragEnd(e)}
                   >
-                    {/* Drag handle */}
+                    {/* Drag handle - keyboard accessible */}
                     <div
-                      className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground shrink-0 p-0.5"
-                      title="Drag to reorder"
+                      className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground focus:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 rounded shrink-0 p-0.5"
+                      title="Drag to reorder (or use Arrow keys)"
+                      tabIndex={0}
+                      role="button"
+                      aria-label={`Reorder ${script.name || 'script'}. Use arrow keys to move.`}
+                      onKeyDown={(e) => handleDragHandleKeyDown(e, index)}
                     >
                       <GripVertical className="w-4 h-4" />
                     </div>

@@ -24,7 +24,9 @@ export function createWriteHandler() {
 
       // Ensure parent directory exists (symlink-safe)
       await mkdirSafe(path.dirname(path.resolve(filePath)));
-      await secureFs.writeFile(filePath, content, 'utf-8');
+      // Default content to empty string if undefined/null to prevent writing
+      // "undefined" as literal text (e.g. when content field is missing from request)
+      await secureFs.writeFile(filePath, content ?? '', 'utf-8');
 
       res.json({ success: true });
     } catch (error) {

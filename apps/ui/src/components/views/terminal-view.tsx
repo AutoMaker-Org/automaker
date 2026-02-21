@@ -1162,6 +1162,18 @@ export function TerminalView({
       // Always remove from UI - even if server says 404 (session may have already exited)
       removeTerminalFromLayout(sessionId);
 
+      // Clean up stale entries for killed sessions
+      setSessionCommandOverrides((prev) => {
+        const next = new Map(prev);
+        next.delete(sessionId);
+        return next;
+      });
+      setNewSessionIds((prev) => {
+        const next = new Set(prev);
+        next.delete(sessionId);
+        return next;
+      });
+
       if (!response.ok && response.status !== 404) {
         // Log non-404 errors but still proceed with UI cleanup
         const data = await response.json().catch(() => ({}));
@@ -1207,6 +1219,22 @@ export function TerminalView({
         }
       })
     );
+
+    // Clean up stale entries for all killed sessions in this tab
+    setSessionCommandOverrides((prev) => {
+      const next = new Map(prev);
+      for (const sessionId of sessionIds) {
+        next.delete(sessionId);
+      }
+      return next;
+    });
+    setNewSessionIds((prev) => {
+      const next = new Set(prev);
+      for (const sessionId of sessionIds) {
+        next.delete(sessionId);
+      }
+      return next;
+    });
 
     // Now remove the tab from state
     removeTerminalTab(tabId);
@@ -2025,6 +2053,13 @@ export function TerminalView({
                 onFontSizeChange={(size) =>
                   setTerminalPanelFontSize(terminalState.maximizedSessionId!, size)
                 }
+                runCommandOnConnect={
+                  newSessionIds.has(terminalState.maximizedSessionId)
+                    ? sessionCommandOverrides.get(terminalState.maximizedSessionId) ||
+                      defaultRunScript
+                    : undefined
+                }
+                onCommandRan={() => handleCommandRan(terminalState.maximizedSessionId!)}
                 isMaximized={true}
                 onToggleMaximize={() => toggleTerminalMaximized(terminalState.maximizedSessionId!)}
               />

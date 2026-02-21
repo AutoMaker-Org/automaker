@@ -724,33 +724,31 @@ function RootLayoutContent() {
             }
 
             // If we can't load settings, we must NOT start syncing defaults to the server.
+            // Only update auth state — the routing effect handles navigation to /logged-out.
+            // Calling navigate() here AND in the routing effect causes duplicate navigations
+            // that can trigger React error #185 (maximum update depth exceeded) on cold start.
             useAuthStore.getState().setAuthState({ isAuthenticated: false, authChecked: true });
             signalMigrationComplete();
-            if (location.pathname !== '/logged-out' && location.pathname !== '/login') {
-              navigate({ to: '/logged-out' });
-            }
             return;
           }
         } else {
-          // Session is definitively invalid (server returned 401/403) - treat as not authenticated
+          // Session is definitively invalid (server returned 401/403) - treat as not authenticated.
+          // Only update auth state — the routing effect handles navigation to /logged-out.
+          // Calling navigate() here AND in the routing effect causes duplicate navigations
+          // that can trigger React error #185 (maximum update depth exceeded) on cold start.
           useAuthStore.getState().setAuthState({ isAuthenticated: false, authChecked: true });
           // Signal migration complete so sync hook doesn't hang (nothing to sync when not authenticated)
           signalMigrationComplete();
-
-          // Redirect to logged-out if not already there or login
-          if (location.pathname !== '/logged-out' && location.pathname !== '/login') {
-            navigate({ to: '/logged-out' });
-          }
         }
       } catch (error) {
         logger.error('Failed to initialize auth:', error);
-        // On error, treat as not authenticated
+        // On error, treat as not authenticated.
+        // Only update auth state — the routing effect handles navigation to /logged-out.
+        // Calling navigate() here AND in the routing effect causes duplicate navigations
+        // that can trigger React error #185 (maximum update depth exceeded) on cold start.
         useAuthStore.getState().setAuthState({ isAuthenticated: false, authChecked: true });
         // Signal migration complete so sync hook doesn't hang
         signalMigrationComplete();
-        if (location.pathname !== '/logged-out' && location.pathname !== '/login') {
-          navigate({ to: '/logged-out' });
-        }
       } finally {
         authCheckRunning.current = false;
       }

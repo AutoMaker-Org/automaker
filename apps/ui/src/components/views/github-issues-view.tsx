@@ -179,6 +179,7 @@ export function GitHubIssuesView() {
       branchName: string;
       planningMode: string;
       requirePlanApproval: boolean;
+      excludedPipelineSteps?: string[];
       workMode: string;
     }) => {
       if (!currentProject?.path) {
@@ -204,6 +205,7 @@ export function GitHubIssuesView() {
             branchName: featureData.workMode === 'current' ? currentBranch : featureData.branchName,
             planningMode: featureData.planningMode,
             requirePlanApproval: featureData.requirePlanApproval,
+            excludedPipelineSteps: featureData.excludedPipelineSteps,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
           };
@@ -241,7 +243,7 @@ export function GitHubIssuesView() {
         const api = getElectronAPI();
         if (api.features?.create) {
           // Build description from issue body + validation info
-          const description = [
+          const parts = [
             `**From GitHub Issue #${issue.number}**`,
             '',
             issue.body || 'No description provided.',
@@ -250,13 +252,18 @@ export function GitHubIssuesView() {
             '',
             '**AI Validation Analysis:**',
             validation.reasoning,
-            validation.suggestedFix ? `\n**Suggested Approach:**\n${validation.suggestedFix}` : '',
-            validation.relatedFiles?.length
-              ? `\n**Related Files:**\n${validation.relatedFiles.map((f) => `- \`${f}\``).join('\n')}`
-              : '',
-          ]
-            .filter(Boolean)
-            .join('\n');
+          ];
+          if (validation.suggestedFix) {
+            parts.push('', `**Suggested Approach:**`, validation.suggestedFix);
+          }
+          if (validation.relatedFiles?.length) {
+            parts.push(
+              '',
+              '**Related Files:**',
+              ...validation.relatedFiles.map((f) => `- \`${f}\``)
+            );
+          }
+          const description = parts.join('\n');
 
           const feature = {
             id: `issue-${issue.number}-${generateUUID()}`,

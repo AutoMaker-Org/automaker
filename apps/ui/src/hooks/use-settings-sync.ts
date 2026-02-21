@@ -100,6 +100,7 @@ const SETTINGS_FIELDS_TO_SYNC = [
   'projectHistory',
   'projectHistoryIndex',
   'lastSelectedSessionByProject',
+  'currentWorktreeByProject',
   // Codex CLI Settings
   'codexAutoLoadAgents',
   'codexSandboxMode',

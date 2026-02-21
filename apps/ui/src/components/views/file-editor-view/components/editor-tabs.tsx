@@ -1,4 +1,4 @@
-import { X, Circle, MoreHorizontal } from 'lucide-react';
+import { X, Circle, MoreHorizontal, Save } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { EditorTab } from '../use-file-editor-store';
 import {
@@ -14,6 +14,12 @@ interface EditorTabsProps {
   onTabSelect: (tabId: string) => void;
   onTabClose: (tabId: string) => void;
   onCloseAll: () => void;
+  /** Called when the save button is clicked (mobile only) */
+  onSave?: () => void;
+  /** Whether there are unsaved changes (controls enabled state of save button) */
+  isDirty?: boolean;
+  /** Whether to show the save button in the tab bar (intended for mobile) */
+  showSaveButton?: boolean;
 }
 
 /** Get a file icon color based on extension */
@@ -74,6 +80,9 @@ export function EditorTabs({
   onTabSelect,
   onTabClose,
   onCloseAll,
+  onSave,
+  isDirty,
+  showSaveButton,
 }: EditorTabsProps) {
   if (tabs.length === 0) return null;
 
@@ -128,8 +137,25 @@ export function EditorTabs({
         );
       })}
 
-      {/* Tab actions dropdown (close all, etc.) */}
-      <div className="ml-auto shrink-0 flex items-center px-1">
+      {/* Tab actions: save button (mobile) + close-all dropdown */}
+      <div className="ml-auto shrink-0 flex items-center px-1 gap-0.5">
+        {/* Save button — shown in the tab bar on mobile */}
+        {showSaveButton && onSave && (
+          <button
+            onClick={onSave}
+            disabled={!isDirty}
+            className={cn(
+              'p-1 rounded transition-colors',
+              isDirty
+                ? 'text-primary hover:text-primary hover:bg-muted/50'
+                : 'text-muted-foreground/40 cursor-not-allowed'
+            )}
+            title="Save file (Ctrl+S)"
+          >
+            <Save className="w-4 h-4" />
+          </button>
+        )}
+
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button

@@ -37,7 +37,7 @@ import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
 import { Markdown } from '@/components/ui/markdown';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { cn, modelSupportsThinking } from '@/lib/utils';
+import { cn, modelSupportsThinking, generateUUID } from '@/lib/utils';
 import { useAppStore } from '@/store/app-store';
 import { useGitHubPRReviewComments } from '@/hooks/queries';
 import { useCreateFeature, useResolveReviewThread } from '@/hooks/mutations';
@@ -47,7 +47,7 @@ import type { Feature } from '@/store/app-store';
 import type { PhaseModelEntry } from '@automaker/types';
 import { supportsReasoningEffort, isAdaptiveThinkingModel } from '@automaker/types';
 import { resolveModelString } from '@automaker/model-resolver';
-import { PhaseModelSelector } from '@/components/views/settings-view/model-defaults/phase-model-selector';
+import { PhaseModelSelector } from '@/components/views/settings-view/model-defaults';
 
 // ============================================
 // Types
@@ -76,7 +76,7 @@ interface PRCommentResolutionDialogProps {
 
 /** Generate a feature ID */
 function generateFeatureId(): string {
-  return `feature-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  return generateUUID();
 }
 
 /** Format a date string for display */

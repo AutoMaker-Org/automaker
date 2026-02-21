@@ -592,13 +592,13 @@ export function WorktreeActionsDropdown({
             Scripts
           </DropdownMenuSubTrigger>
           <DropdownMenuSubContent className="w-52">
-            {/* Re-run Init Script - always shown for non-main worktrees, disabled when no init script configured */}
+            {/* Re-run Init Script - always shown for non-main worktrees, disabled when no init script configured or no handler */}
             {!worktree.isMain && (
               <>
                 <DropdownMenuItem
                   onClick={() => onRunInitScript(worktree)}
                   className="text-xs"
-                  disabled={!hasInitScript}
+                  disabled={!hasInitScript || !onRunInitScript}
                 >
                   <RefreshCw className="w-3.5 h-3.5 mr-2" />
                   Re-run Init Script
@@ -613,6 +613,7 @@ export function WorktreeActionsDropdown({
                   key={script.id}
                   onClick={() => onRunTerminalScript?.(worktree, script.command)}
                   className="text-xs"
+                  disabled={!onRunTerminalScript}
                 >
                   <Play className="w-3.5 h-3.5 mr-2 shrink-0" />
                   <span className="truncate">{script.name}</span>
@@ -625,7 +626,11 @@ export function WorktreeActionsDropdown({
             )}
             {/* Divider before Edit Commands & Scripts */}
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => onEditScripts?.()} className="text-xs">
+            <DropdownMenuItem
+              onClick={() => onEditScripts?.()}
+              className="text-xs"
+              disabled={!onEditScripts}
+            >
               <Settings2 className="w-3.5 h-3.5 mr-2" />
               Edit Commands & Scripts
             </DropdownMenuItem>

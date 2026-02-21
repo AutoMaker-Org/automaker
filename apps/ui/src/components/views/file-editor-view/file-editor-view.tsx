@@ -650,6 +650,12 @@ export function FileEditorView({ initialPath }: FileEditorViewProps) {
 
   const handleRenameItem = useCallback(
     async (oldPath: string, newName: string) => {
+      // Extract the current file/folder name from the old path
+      const oldName = oldPath.split('/').pop() || '';
+
+      // If the name hasn't changed, skip the rename entirely (no-op)
+      if (newName === oldName) return;
+
       const parentPath = oldPath.substring(0, oldPath.lastIndexOf('/'));
       const newPath = `${parentPath}/${newName}`;
 
@@ -1028,6 +1034,9 @@ export function FileEditorView({ initialPath }: FileEditorViewProps) {
         onTabSelect={setActiveTab}
         onTabClose={handleTabClose}
         onCloseAll={handleCloseAll}
+        onSave={handleSave}
+        isDirty={activeTab?.isDirty && !activeTab?.isBinary && !activeTab?.isTooLarge}
+        showSaveButton={isMobile && !!activeTab && !activeTab.isBinary && !activeTab.isTooLarge}
       />
 
       {/* Editor content */}
@@ -1319,24 +1328,6 @@ export function FileEditorView({ initialPath }: FileEditorViewProps) {
               </div>
             </PopoverContent>
           </Popover>
-
-          {/* Mobile: Save button in main toolbar */}
-          {activeTab &&
-            !activeTab.isBinary &&
-            !activeTab.isTooLarge &&
-            isMobile &&
-            !mobileBrowserVisible && (
-              <Button
-                variant="outline"
-                size="icon-sm"
-                onClick={handleSave}
-                disabled={!activeTab.isDirty}
-                className="lg:hidden"
-                title={editorAutoSave ? 'Auto-save enabled (Ctrl+S)' : 'Save file (Ctrl+S)'}
-              >
-                <Save className="w-4 h-4" />
-              </Button>
-            )}
 
           {/* Tablet/Mobile: actions panel trigger */}
           <HeaderActionsPanelTrigger
