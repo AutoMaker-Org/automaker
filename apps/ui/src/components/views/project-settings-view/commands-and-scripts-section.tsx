@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, type KeyboardEvent } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef, type KeyboardEvent } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import {
@@ -91,18 +91,25 @@ export function CommandsAndScriptsSection({ project }: CommandsAndScriptsSection
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
-  // Reset local state when project changes
-  useEffect(() => {
-    setDevCommand('');
-    setOriginalDevCommand('');
-    setTestCommand('');
-    setOriginalTestCommand('');
-    setScripts([]);
-    setOriginalScripts([]);
-  }, [project.path]);
+  // Track previous project path to detect project switches
+  const prevProjectPathRef = useRef(project.path);
 
-  // Sync commands and scripts state when project settings load
+  // Sync commands and scripts state when project settings load or project changes
   useEffect(() => {
+    const projectChanged = prevProjectPathRef.current !== project.path;
+    prevProjectPathRef.current = project.path;
+
+    // Always clear local state on project change to avoid flashing stale data
+    if (projectChanged) {
+      setDevCommand('');
+      setOriginalDevCommand('');
+      setTestCommand('');
+      setOriginalTestCommand('');
+      setScripts([]);
+      setOriginalScripts([]);
+    }
+
+    // Apply project settings only when they are available
     if (projectSettings) {
       // Commands
       const dev = projectSettings.devCommand || '';

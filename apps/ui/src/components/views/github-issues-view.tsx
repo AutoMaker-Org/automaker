@@ -159,6 +159,12 @@ export function GitHubIssuesView() {
     [cachedValidations]
   );
 
+  // Memoize the prefilled description to avoid recomputing on every render
+  const prefilledDescription = useMemo(
+    () => (createFeatureIssue ? buildIssueDescription(createFeatureIssue) : undefined),
+    [createFeatureIssue, buildIssueDescription]
+  );
+
   // Open the Add Feature dialog with pre-filled data from a GitHub issue
   const handleCreateFeature = useCallback((issue: GitHubIssue) => {
     setCreateFeatureIssue(issue);
@@ -460,9 +466,7 @@ export function GitHubIssuesView() {
         isMaximized={false}
         projectPath={currentProject?.path}
         prefilledTitle={createFeatureIssue?.title}
-        prefilledDescription={
-          createFeatureIssue ? buildIssueDescription(createFeatureIssue) : undefined
-        }
+        prefilledDescription={prefilledDescription}
         prefilledCategory="From GitHub"
       />
 

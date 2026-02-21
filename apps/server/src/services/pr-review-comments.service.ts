@@ -8,6 +8,7 @@
 
 import { spawn, execFile } from 'child_process';
 import { promisify } from 'util';
+import { createLogger } from '@automaker/utils';
 import { execEnv, logError } from '../routes/github/routes/common.js';
 
 const execFileAsync = promisify(execFile);
@@ -58,6 +59,9 @@ interface GraphQLReviewThread {
   id: string;
   isResolved: boolean;
   comments: {
+    pageInfo?: {
+      hasNextPage: boolean;
+    };
     nodes: GraphQLReviewThreadComment[];
   };
 }
@@ -83,9 +87,8 @@ interface ReviewThreadInfo {
   threadId: string;
 }
 
-// ── Logger helper ──
+// ── Logger ──
 
-import { createLogger } from '@automaker/utils';
 const logger = createLogger('PRReviewCommentsService');
 
 // ── Service functions ──
@@ -118,6 +121,9 @@ export async function fetchReviewThreadResolvedStatus(
               id
               isResolved
               comments(first: 100) {
+                pageInfo {
+                  hasNextPage
+                }
                 nodes {
                   databaseId
                 }
@@ -188,6 +194,12 @@ export async function fetchReviewThreadResolvedStatus(
 
     const threads = response.data?.repository?.pullRequest?.reviewThreads?.nodes ?? [];
     for (const thread of threads) {
+      if (thread.comments.pageInfo?.hasNextPage) {
+        logger.warn(
+          `Review thread ${thread.id} in PR #${prNumber} has more than 100 comments — ` +
+            'comment list is truncated. Some comments may be missing resolved status.'
+        );
+      }
       const info: ReviewThreadInfo = { isResolved: thread.isResolved, threadId: thread.id };
       for (const comment of thread.comments.nodes) {
         resolvedMap.set(String(comment.databaseId), info);
@@ -223,6 +235,7 @@ export async function fetchPRReviewComments(
       {
         cwd: projectPath,
         env: execEnv,
+        timeout: GITHUB_API_TIMEOUT_MS,
       }
     );
 
@@ -263,6 +276,7 @@ export async function fetchPRReviewComments(
         cwd: projectPath,
         env: execEnv,
         maxBuffer: 1024 * 1024 * 10, // 10MB buffer for large PRs
+        timeout: GITHUB_API_TIMEOUT_MS,
       }
     );
 

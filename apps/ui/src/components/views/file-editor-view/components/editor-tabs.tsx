@@ -151,6 +151,7 @@ export function EditorTabs({
                 : 'text-muted-foreground/40 cursor-not-allowed'
             )}
             title="Save file (Ctrl+S)"
+            aria-label="Save file"
           >
             <Save className="w-4 h-4" />
           </button>

@@ -1186,6 +1186,17 @@ export function TerminalView({
       logger.error('Kill session error:', err);
       // Still remove from UI on network error - better UX than leaving broken terminal
       removeTerminalFromLayout(sessionId);
+      // Clean up stale entries for killed sessions (same cleanup as try block)
+      setSessionCommandOverrides((prev) => {
+        const next = new Map(prev);
+        next.delete(sessionId);
+        return next;
+      });
+      setNewSessionIds((prev) => {
+        const next = new Set(prev);
+        next.delete(sessionId);
+        return next;
+      });
     }
   };
 

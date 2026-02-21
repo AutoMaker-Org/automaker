@@ -6,8 +6,8 @@
  * automatic caching, deduplication, and background refetching.
  */
 
-import { useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useMemo, useEffect, useRef } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { getElectronAPI } from '@/lib/electron';
 import { queryKeys } from '@/lib/query-keys';
 import { STALE_TIMES } from '@/lib/query-client';
@@ -151,6 +151,34 @@ export function useFeatures(projectPath: string | undefined) {
     [projectPath]
   );
 
+  const queryClient = useQueryClient();
+
+  // Subscribe to React Query cache changes for features and sync to localStorage.
+  // This ensures optimistic updates (e.g., status changes to 'verified') are
+  // persisted to localStorage immediately, not just when queryFn runs.
+  // Without this, a page refresh after an optimistic update could show stale
+  // localStorage data where features appear in the wrong column (e.g., verified
+  // features showing up in backlog).
+  const projectPathRef = useRef(projectPath);
+  projectPathRef.current = projectPath;
+  useEffect(() => {
+    if (!projectPath) return;
+    const targetQueryHash = JSON.stringify(queryKeys.features.all(projectPath));
+    const unsubscribe = queryClient.getQueryCache().subscribe((event) => {
+      if (
+        event.type === 'updated' &&
+        event.action.type === 'success' &&
+        event.query.queryHash === targetQueryHash
+      ) {
+        const features = event.query.state.data as Feature[] | undefined;
+        if (features && projectPathRef.current) {
+          writePersistedFeatures(projectPathRef.current, features);
+        }
+      }
+    });
+    return unsubscribe;
+  }, [projectPath, queryClient]);
+
   return useQuery({
     queryKey: queryKeys.features.all(projectPath ?? ''),
     queryFn: async (): Promise<Feature[]> => {
@@ -166,7 +194,11 @@ export function useFeatures(projectPath: string | undefined) {
     },
     enabled: !!projectPath,
     initialData: () => persisted?.features,
-    initialDataUpdatedAt: () => persisted?.timestamp,
+    // Always treat localStorage cache as stale so React Query immediately
+    // fetches fresh data from the server on page load. This prevents stale
+    // feature statuses (e.g., 'verified' features appearing in backlog)
+    // while still showing cached data instantly for a fast initial render.
+    initialDataUpdatedAt: 0,
     staleTime: STALE_TIMES.FEATURES,
     refetchInterval: createSmartPollingInterval(FEATURES_POLLING_INTERVAL),
     refetchOnWindowFocus: FEATURES_REFETCH_ON_FOCUS,

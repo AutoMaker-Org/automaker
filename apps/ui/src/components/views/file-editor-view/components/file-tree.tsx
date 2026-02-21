@@ -574,14 +574,18 @@ function TreeNode({
                 <DropdownMenuItem
                   onClick={async (e) => {
                     e.stopPropagation();
-                    const parentPath = node.path.substring(0, node.path.lastIndexOf('/')) || '/';
-                    const destPath = await openFileBrowser({
-                      title: `Copy "${node.name}" To...`,
-                      description: 'Select the destination folder for the copy operation',
-                      initialPath: parentPath,
-                    });
-                    if (destPath) {
-                      await onCopyItem(node.path, destPath);
+                    try {
+                      const parentPath = node.path.substring(0, node.path.lastIndexOf('/')) || '/';
+                      const destPath = await openFileBrowser({
+                        title: `Copy "${node.name}" To...`,
+                        description: 'Select the destination folder for the copy operation',
+                        initialPath: parentPath,
+                      });
+                      if (destPath) {
+                        await onCopyItem(node.path, destPath);
+                      }
+                    } catch (err) {
+                      console.error('Copy operation failed:', err);
                     }
                   }}
                   className="gap-2"
@@ -596,14 +600,18 @@ function TreeNode({
                 <DropdownMenuItem
                   onClick={async (e) => {
                     e.stopPropagation();
-                    const parentPath = node.path.substring(0, node.path.lastIndexOf('/')) || '/';
-                    const destPath = await openFileBrowser({
-                      title: `Move "${node.name}" To...`,
-                      description: 'Select the destination folder for the move operation',
-                      initialPath: parentPath,
-                    });
-                    if (destPath) {
-                      await onMoveItem(node.path, destPath);
+                    try {
+                      const parentPath = node.path.substring(0, node.path.lastIndexOf('/')) || '/';
+                      const destPath = await openFileBrowser({
+                        title: `Move "${node.name}" To...`,
+                        description: 'Select the destination folder for the move operation',
+                        initialPath: parentPath,
+                      });
+                      if (destPath) {
+                        await onMoveItem(node.path, destPath);
+                      }
+                    } catch (err) {
+                      console.error('Move operation failed:', err);
                     }
                   }}
                   className="gap-2"
@@ -733,8 +741,15 @@ export function FileTree({
   onDragDropMove,
   effectivePath,
 }: FileTreeProps) {
-  const { fileTree, showHiddenFiles, setShowHiddenFiles, gitStatusMap, setDragState, gitBranch } =
-    useFileEditorStore();
+  const {
+    fileTree,
+    showHiddenFiles,
+    setShowHiddenFiles,
+    gitStatusMap,
+    dragState,
+    setDragState,
+    gitBranch,
+  } = useFileEditorStore();
   const [isCreatingFile, setIsCreatingFile] = useState(false);
   const [isCreatingFolder, setIsCreatingFolder] = useState(false);
 
@@ -749,10 +764,10 @@ export function FileTree({
       e.preventDefault();
       if (effectivePath) {
         e.dataTransfer.dropEffect = 'move';
-        setDragState({ draggedPaths: [], dropTargetPath: effectivePath });
+        setDragState({ ...dragState, dropTargetPath: effectivePath });
       }
     },
-    [effectivePath, setDragState]
+    [effectivePath, dragState, setDragState]
   );
 
   const handleRootDrop = useCallback(

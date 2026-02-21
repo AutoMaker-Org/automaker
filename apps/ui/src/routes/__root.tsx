@@ -400,19 +400,16 @@ function RootLayoutContent() {
   useEffect(() => {
     const handleLoggedOut = () => {
       logger.warn('automaker:logged-out event received!');
+      // Only update auth state — the centralized routing effect will handle
+      // navigation to /logged-out when it detects isAuthenticated is false
       useAuthStore.getState().setAuthState({ isAuthenticated: false, authChecked: true });
-
-      if (location.pathname !== '/logged-out') {
-        logger.warn('Navigating to /logged-out due to logged-out event');
-        navigate({ to: '/logged-out' });
-      }
     };
 
     window.addEventListener('automaker:logged-out', handleLoggedOut);
     return () => {
       window.removeEventListener('automaker:logged-out', handleLoggedOut);
     };
-  }, [location.pathname, navigate]);
+  }, []);
 
   // Global listener for server offline/connection errors.
   // This is triggered when a connection error is detected (e.g., server stopped).

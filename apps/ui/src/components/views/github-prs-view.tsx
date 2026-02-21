@@ -80,7 +80,7 @@ export function GitHubPRsView() {
         category: 'bug-fix',
         description: `Read the review requests on PR #${pr.number} and address any feedback the best you can.`,
         steps: [],
-        status: 'in_progress',
+        status: 'backlog',
         model: resolveModelString('opus'),
         thinkingLevel: 'none',
         planningMode: 'skip',
@@ -93,10 +93,19 @@ export function GitHubPRsView() {
         // Start the feature immediately after creation
         const api = getElectronAPI();
         if (api.features?.run) {
-          await api.features.run(currentProject.path, featureId);
-          toast.success('Feature created and started', {
-            description: `Addressing review comments on PR #${pr.number}`,
-          });
+          try {
+            await api.features.run(currentProject.path, featureId);
+            toast.success('Feature created and started', {
+              description: `Addressing review comments on PR #${pr.number}`,
+            });
+          } catch (runError) {
+            toast.error('Feature created but failed to start', {
+              description:
+                runError instanceof Error
+                  ? runError.message
+                  : 'An error occurred while starting the feature',
+            });
+          }
         } else {
           toast.error('Cannot start feature', {
             description:

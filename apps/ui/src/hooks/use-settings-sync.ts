@@ -769,6 +769,8 @@ export async function refreshSettingsFromServer(): Promise<boolean> {
       projectHistory: serverSettings.projectHistory,
       projectHistoryIndex: serverSettings.projectHistoryIndex,
       lastSelectedSessionByProject: serverSettings.lastSelectedSessionByProject,
+      currentWorktreeByProject:
+        serverSettings.currentWorktreeByProject ?? currentAppState.currentWorktreeByProject,
       // UI State (previously in localStorage)
       worktreePanelCollapsed: serverSettings.worktreePanelCollapsed ?? false,
       lastProjectDir: serverSettings.lastProjectDir ?? '',

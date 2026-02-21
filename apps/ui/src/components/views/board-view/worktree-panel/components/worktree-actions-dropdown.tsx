@@ -1064,7 +1064,16 @@ export function WorktreeActionsDropdown({
                   >
                     <GitPullRequest className="w-3 h-3 mr-2" />
                     PR #{worktree.pr!.number}
-                    <span className="ml-auto mr-1 text-[10px] bg-green-500/20 text-green-600 px-1.5 py-0.5 rounded uppercase">
+                    <span
+                      className={cn(
+                        'ml-auto mr-1 text-[10px] px-1.5 py-0.5 rounded uppercase',
+                        worktree.pr!.state === 'MERGED'
+                          ? 'bg-purple-500/20 text-purple-600'
+                          : worktree.pr!.state === 'CLOSED'
+                            ? 'bg-gray-500/20 text-gray-500'
+                            : 'bg-green-500/20 text-green-600'
+                      )}
+                    >
                       {worktree.pr!.state}
                     </span>
                   </DropdownMenuItem>

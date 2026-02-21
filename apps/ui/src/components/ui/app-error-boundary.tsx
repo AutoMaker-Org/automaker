@@ -88,6 +88,7 @@ export class AppErrorBoundary extends Component<Props, State> {
           </div>
 
           <button
+            type="button"
             onClick={this.handleReload}
             className="inline-flex items-center gap-2 rounded-md border border-border bg-background px-4 py-2 text-sm font-medium text-foreground shadow-sm transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
@@ -116,7 +117,7 @@ export class AppErrorBoundary extends Component<Props, State> {
                 Technical details
               </summary>
               <pre className="mt-2 p-3 bg-muted/50 rounded-md text-left overflow-auto max-h-32 border border-border">
-                {this.state.error.message}
+                {this.state.error.stack || this.state.error.message}
               </pre>
             </details>
           )}

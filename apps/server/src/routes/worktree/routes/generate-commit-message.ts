@@ -241,7 +241,7 @@ export function createGenerateCommitMessageHandler(
 
       const message = responseText.trim();
 
-      if (!message || message.trim().length === 0) {
+      if (!message) {
         logger.warn('Received empty response from model');
         const response: GenerateCommitMessageErrorResponse = {
           success: false,
