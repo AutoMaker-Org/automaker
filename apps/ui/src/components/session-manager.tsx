@@ -155,6 +155,7 @@ export function SessionManager({
     if (result.data) {
       await checkRunningSessions(result.data);
     }
+    return result;
   }, [queryClient, refetchSessions, checkRunningSessions]);
 
   // Check running state on initial load (runs only once when sessions first load)
@@ -297,10 +298,11 @@ export function SessionManager({
 
     const result = await api.sessions.delete(sessionId);
     if (result.success) {
-      await invalidateSessions();
+      const refetchResult = await invalidateSessions();
       if (currentSessionId === sessionId) {
-        // Switch to another session or create a new one
-        const activeSessionsList = scopedSessions.filter((s) => !s.isArchived);
+        // Switch to another session using fresh data, excluding the deleted session
+        const freshSessions = refetchResult?.data ?? [];
+        const activeSessionsList = freshSessions.filter((s) => !s.isArchived && s.id !== sessionId);
         if (activeSessionsList.length > 0) {
           onSelectSession(activeSessionsList[0].id);
         }
