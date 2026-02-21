@@ -19,6 +19,7 @@ import { cn } from '@/lib/utils';
 import { useProjectSettings } from '@/hooks/queries';
 import { useUpdateProjectSettings } from '@/hooks/mutations';
 import type { Project } from '@/lib/electron';
+import { toast } from 'sonner';
 import { DEFAULT_TERMINAL_SCRIPTS } from './terminal-scripts-constants';
 
 /** Preset dev server commands for quick selection */
@@ -93,6 +94,8 @@ export function CommandsAndScriptsSection({ project }: CommandsAndScriptsSection
 
   // Track previous project path to detect project switches
   const prevProjectPathRef = useRef(project.path);
+  // Track whether we've done the initial sync for the current project
+  const isInitializedRef = useRef(false);
 
   // Sync commands and scripts state when project settings load or project changes
   useEffect(() => {
@@ -101,6 +104,7 @@ export function CommandsAndScriptsSection({ project }: CommandsAndScriptsSection
 
     // Always clear local state on project change to avoid flashing stale data
     if (projectChanged) {
+      isInitializedRef.current = false;
       setDevCommand('');
       setOriginalDevCommand('');
       setTestCommand('');
@@ -111,23 +115,36 @@ export function CommandsAndScriptsSection({ project }: CommandsAndScriptsSection
 
     // Apply project settings only when they are available
     if (projectSettings) {
-      // Commands
-      const dev = projectSettings.devCommand || '';
-      const test = projectSettings.testCommand || '';
-      setDevCommand(dev);
-      setOriginalDevCommand(dev);
-      setTestCommand(test);
-      setOriginalTestCommand(test);
+      // Only sync from server if this is the initial load or if there are no unsaved edits.
+      // This prevents background refetches from overwriting in-progress local edits.
+      const isDirty =
+        isInitializedRef.current &&
+        (devCommand !== originalDevCommand ||
+          testCommand !== originalTestCommand ||
+          JSON.stringify(scripts) !== JSON.stringify(originalScripts));
 
-      // Scripts
-      const configured = projectSettings.terminalScripts;
-      const scriptList =
-        configured && configured.length > 0
-          ? configured.map((s) => ({ id: s.id, name: s.name, command: s.command }))
-          : DEFAULT_TERMINAL_SCRIPTS.map((s) => ({ ...s }));
-      setScripts(scriptList);
-      setOriginalScripts(structuredClone(scriptList));
+      if (!isInitializedRef.current || !isDirty) {
+        // Commands
+        const dev = projectSettings.devCommand || '';
+        const test = projectSettings.testCommand || '';
+        setDevCommand(dev);
+        setOriginalDevCommand(dev);
+        setTestCommand(test);
+        setOriginalTestCommand(test);
+
+        // Scripts
+        const configured = projectSettings.terminalScripts;
+        const scriptList =
+          configured && configured.length > 0
+            ? configured.map((s) => ({ id: s.id, name: s.name, command: s.command }))
+            : DEFAULT_TERMINAL_SCRIPTS.map((s) => ({ ...s }));
+        setScripts(scriptList);
+        setOriginalScripts(structuredClone(scriptList));
+
+        isInitializedRef.current = true;
+      }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectSettings, project.path]);
 
   // ── Change detection ──
@@ -166,6 +183,11 @@ export function CommandsAndScriptsSection({ project }: CommandsAndScriptsSection
           setOriginalTestCommand(normalizedTestCommand);
           setScripts(normalizedScripts);
           setOriginalScripts(structuredClone(normalizedScripts));
+        },
+        onError: (error) => {
+          toast.error('Failed to save settings', {
+            description: error instanceof Error ? error.message : 'An unexpected error occurred',
+          });
         },
       }
     );

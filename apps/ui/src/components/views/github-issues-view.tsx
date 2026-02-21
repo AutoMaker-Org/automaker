@@ -187,6 +187,8 @@ export function GitHubIssuesView() {
       requirePlanApproval: boolean;
       excludedPipelineSteps?: string[];
       workMode: string;
+      imagePaths?: Array<{ id: string; path: string; description?: string }>;
+      textFilePaths?: Array<{ id: string; path: string; description?: string }>;
     }) => {
       if (!currentProject?.path) {
         toast.error('No project selected');
@@ -212,6 +214,10 @@ export function GitHubIssuesView() {
             planningMode: featureData.planningMode,
             requirePlanApproval: featureData.requirePlanApproval,
             excludedPipelineSteps: featureData.excludedPipelineSteps,
+            ...(featureData.imagePaths?.length ? { imagePaths: featureData.imagePaths } : {}),
+            ...(featureData.textFilePaths?.length
+              ? { textFilePaths: featureData.textFilePaths }
+              : {}),
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
           };

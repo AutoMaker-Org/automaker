@@ -258,164 +258,177 @@ export function GitHubPRsView() {
       </div>
 
       {/* PR Detail Panel */}
-      {selectedPR && (
-        <div className="flex-1 flex flex-col overflow-hidden">
-          {/* Detail Header */}
-          <div className="flex items-center justify-between p-3 border-b border-border bg-muted/30 gap-2">
-            <div className="flex items-center gap-2 min-w-0">
-              {isMobile && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setSelectedPR(null)}
-                  className="shrink-0 -ml-1"
-                >
-                  <ArrowLeft className="h-4 w-4" />
-                </Button>
-              )}
-              {selectedPR.state === 'MERGED' ? (
-                <GitMerge className="h-4 w-4 text-purple-500 shrink-0" />
-              ) : (
-                <GitPullRequest className="h-4 w-4 text-green-500 shrink-0" />
-              )}
-              <span className="text-sm font-medium truncate">
-                #{selectedPR.number} {selectedPR.title}
-              </span>
-              {selectedPR.isDraft && (
-                <span className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-muted text-muted-foreground">
-                  Draft
-                </span>
-              )}
-            </div>
-            <div className={cn('flex items-center gap-2 shrink-0', isMobile && 'gap-1')}>
-              {!isMobile && (
-                <Button variant="outline" size="sm" onClick={() => setCommentDialogPR(selectedPR)}>
-                  <MessageSquare className="h-4 w-4 mr-1" />
-                  Manage Comments
-                </Button>
-              )}
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handleOpenInGitHub(selectedPR.url)}
-              >
-                <ExternalLink className="h-4 w-4" />
-                {!isMobile && <span className="ml-1">Open in GitHub</span>}
-              </Button>
-              {!isMobile && (
-                <Button variant="ghost" size="sm" onClick={() => setSelectedPR(null)}>
-                  <X className="h-4 w-4" />
-                </Button>
-              )}
-            </div>
-          </div>
-
-          {/* PR Detail Content */}
-          <div className={cn('flex-1 overflow-auto', isMobile ? 'p-4' : 'p-6')}>
-            {/* Title */}
-            <h1 className="text-xl font-bold mb-2">{selectedPR.title}</h1>
-
-            {/* Meta info */}
-            <div className="flex items-center gap-3 text-sm text-muted-foreground mb-4 flex-wrap">
-              <span
-                className={cn(
-                  'px-2 py-0.5 rounded-full text-xs font-medium',
-                  selectedPR.state === 'MERGED'
-                    ? 'bg-purple-500/10 text-purple-500'
-                    : selectedPR.isDraft
-                      ? 'bg-muted text-muted-foreground'
-                      : 'bg-green-500/10 text-green-500'
-                )}
-              >
-                {selectedPR.state === 'MERGED' ? 'Merged' : selectedPR.isDraft ? 'Draft' : 'Open'}
-              </span>
-              {getReviewStatus(selectedPR) && (
-                <span
-                  className={cn(
-                    'px-2 py-0.5 rounded-full text-xs font-medium',
-                    getReviewStatus(selectedPR)!.bg,
-                    getReviewStatus(selectedPR)!.color
+      {selectedPR &&
+        (() => {
+          const reviewStatus = getReviewStatus(selectedPR);
+          return (
+            <div className="flex-1 flex flex-col overflow-hidden">
+              {/* Detail Header */}
+              <div className="flex items-center justify-between p-3 border-b border-border bg-muted/30 gap-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  {isMobile && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setSelectedPR(null)}
+                      className="shrink-0 -ml-1"
+                    >
+                      <ArrowLeft className="h-4 w-4" />
+                    </Button>
                   )}
-                >
-                  {getReviewStatus(selectedPR)!.label}
-                </span>
-              )}
-              <span>
-                #{selectedPR.number} opened {formatDate(selectedPR.createdAt)} by{' '}
-                <span className="font-medium text-foreground">{selectedPR.author.login}</span>
-              </span>
-            </div>
-
-            {/* Branch info */}
-            {selectedPR.headRefName && (
-              <div className="flex items-center gap-2 mb-4">
-                <span className="text-xs text-muted-foreground">Branch:</span>
-                <span className="text-xs font-mono bg-muted px-2 py-0.5 rounded">
-                  {selectedPR.headRefName}
-                </span>
-              </div>
-            )}
-
-            {/* Labels */}
-            {selectedPR.labels.length > 0 && (
-              <div className="flex items-center gap-2 mb-6 flex-wrap">
-                {selectedPR.labels.map((label) => (
-                  <span
-                    key={label.name}
-                    className="px-2 py-0.5 text-xs font-medium rounded-full"
-                    style={{
-                      backgroundColor: `#${label.color}20`,
-                      color: `#${label.color}`,
-                      border: `1px solid #${label.color}40`,
-                    }}
-                  >
-                    {label.name}
+                  {selectedPR.state === 'MERGED' ? (
+                    <GitMerge className="h-4 w-4 text-purple-500 shrink-0" />
+                  ) : (
+                    <GitPullRequest className="h-4 w-4 text-green-500 shrink-0" />
+                  )}
+                  <span className="text-sm font-medium truncate">
+                    #{selectedPR.number} {selectedPR.title}
                   </span>
-                ))}
+                  {selectedPR.isDraft && (
+                    <span className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-muted text-muted-foreground">
+                      Draft
+                    </span>
+                  )}
+                </div>
+                <div className={cn('flex items-center gap-2 shrink-0', isMobile && 'gap-1')}>
+                  {!isMobile && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCommentDialogPR(selectedPR)}
+                    >
+                      <MessageSquare className="h-4 w-4 mr-1" />
+                      Manage Comments
+                    </Button>
+                  )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleOpenInGitHub(selectedPR.url)}
+                  >
+                    <ExternalLink className="h-4 w-4" />
+                    {!isMobile && <span className="ml-1">Open in GitHub</span>}
+                  </Button>
+                  {!isMobile && (
+                    <Button variant="ghost" size="sm" onClick={() => setSelectedPR(null)}>
+                      <X className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
               </div>
-            )}
 
-            {/* Body */}
-            {selectedPR.body ? (
-              <Markdown className="text-sm">{selectedPR.body}</Markdown>
-            ) : (
-              <p className="text-sm text-muted-foreground italic">No description provided.</p>
-            )}
+              {/* PR Detail Content */}
+              <div className={cn('flex-1 overflow-auto', isMobile ? 'p-4' : 'p-6')}>
+                {/* Title */}
+                <h1 className="text-xl font-bold mb-2">{selectedPR.title}</h1>
 
-            {/* Review Comments CTA */}
-            <div className="mt-8 p-4 rounded-lg bg-blue-500/5 border border-blue-500/20">
-              <div className="flex items-center gap-2 mb-2">
-                <MessageSquare className="h-4 w-4 text-blue-500" />
-                <span className="text-sm font-medium">Review Comments</span>
-              </div>
-              <p className="text-sm text-muted-foreground mb-3">
-                Manage review comments individually or let AI address all feedback automatically.
-              </p>
-              <div className={cn('flex gap-2', isMobile ? 'flex-col' : 'items-center')}>
-                <Button variant="outline" onClick={() => setCommentDialogPR(selectedPR)}>
-                  <MessageSquare className="h-4 w-4 mr-2" />
-                  Manage Review Comments
-                </Button>
-                <Button variant="outline" onClick={() => handleAutoAddressComments(selectedPR)}>
-                  <Zap className="h-4 w-4 mr-2" />
-                  Address Review Comments
-                </Button>
+                {/* Meta info */}
+                <div className="flex items-center gap-3 text-sm text-muted-foreground mb-4 flex-wrap">
+                  <span
+                    className={cn(
+                      'px-2 py-0.5 rounded-full text-xs font-medium',
+                      selectedPR.state === 'MERGED'
+                        ? 'bg-purple-500/10 text-purple-500'
+                        : selectedPR.isDraft
+                          ? 'bg-muted text-muted-foreground'
+                          : 'bg-green-500/10 text-green-500'
+                    )}
+                  >
+                    {selectedPR.state === 'MERGED'
+                      ? 'Merged'
+                      : selectedPR.isDraft
+                        ? 'Draft'
+                        : 'Open'}
+                  </span>
+                  {reviewStatus && (
+                    <span
+                      className={cn(
+                        'px-2 py-0.5 rounded-full text-xs font-medium',
+                        reviewStatus.bg,
+                        reviewStatus.color
+                      )}
+                    >
+                      {reviewStatus.label}
+                    </span>
+                  )}
+                  <span>
+                    #{selectedPR.number} opened {formatDate(selectedPR.createdAt)} by{' '}
+                    <span className="font-medium text-foreground">{selectedPR.author.login}</span>
+                  </span>
+                </div>
+
+                {/* Branch info */}
+                {selectedPR.headRefName && (
+                  <div className="flex items-center gap-2 mb-4">
+                    <span className="text-xs text-muted-foreground">Branch:</span>
+                    <span className="text-xs font-mono bg-muted px-2 py-0.5 rounded">
+                      {selectedPR.headRefName}
+                    </span>
+                  </div>
+                )}
+
+                {/* Labels */}
+                {selectedPR.labels.length > 0 && (
+                  <div className="flex items-center gap-2 mb-6 flex-wrap">
+                    {selectedPR.labels.map((label) => (
+                      <span
+                        key={label.name}
+                        className="px-2 py-0.5 text-xs font-medium rounded-full"
+                        style={{
+                          backgroundColor: `#${label.color}20`,
+                          color: `#${label.color}`,
+                          border: `1px solid #${label.color}40`,
+                        }}
+                      >
+                        {label.name}
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                {/* Body */}
+                {selectedPR.body ? (
+                  <Markdown className="text-sm">{selectedPR.body}</Markdown>
+                ) : (
+                  <p className="text-sm text-muted-foreground italic">No description provided.</p>
+                )}
+
+                {/* Review Comments CTA */}
+                <div className="mt-8 p-4 rounded-lg bg-blue-500/5 border border-blue-500/20">
+                  <div className="flex items-center gap-2 mb-2">
+                    <MessageSquare className="h-4 w-4 text-blue-500" />
+                    <span className="text-sm font-medium">Review Comments</span>
+                  </div>
+                  <p className="text-sm text-muted-foreground mb-3">
+                    Manage review comments individually or let AI address all feedback
+                    automatically.
+                  </p>
+                  <div className={cn('flex gap-2', isMobile ? 'flex-col' : 'items-center')}>
+                    <Button variant="outline" onClick={() => setCommentDialogPR(selectedPR)}>
+                      <MessageSquare className="h-4 w-4 mr-2" />
+                      Manage Review Comments
+                    </Button>
+                    <Button variant="outline" onClick={() => handleAutoAddressComments(selectedPR)}>
+                      <Zap className="h-4 w-4 mr-2" />
+                      Address Review Comments
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Open in GitHub CTA */}
+                <div className="mt-4 p-4 rounded-lg bg-muted/50 border border-border">
+                  <p className="text-sm text-muted-foreground mb-3">
+                    View code changes, comments, and reviews on GitHub.
+                  </p>
+                  <Button onClick={() => handleOpenInGitHub(selectedPR.url)}>
+                    <ExternalLink className="h-4 w-4 mr-2" />
+                    View Full PR on GitHub
+                  </Button>
+                </div>
               </div>
             </div>
-
-            {/* Open in GitHub CTA */}
-            <div className="mt-4 p-4 rounded-lg bg-muted/50 border border-border">
-              <p className="text-sm text-muted-foreground mb-3">
-                View code changes, comments, and reviews on GitHub.
-              </p>
-              <Button onClick={() => handleOpenInGitHub(selectedPR.url)}>
-                <ExternalLink className="h-4 w-4 mr-2" />
-                View Full PR on GitHub
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+          );
+        })()}
 
       {/* PR Comment Resolution Dialog */}
       {commentDialogPR && (

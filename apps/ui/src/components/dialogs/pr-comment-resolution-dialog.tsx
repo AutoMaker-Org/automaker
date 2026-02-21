@@ -566,8 +566,8 @@ export function PRCommentResolutionDialog({
   >([]);
   const [detailComment, setDetailComment] = useState<PRReviewComment | null>(null);
 
-  // Per-thread resolving state - tracks which thread is currently being resolved/unresolved
-  const [resolvingThreadId, setResolvingThreadId] = useState<string | null>(null);
+  // Per-thread resolving state - tracks which threads are currently being resolved/unresolved
+  const [resolvingThreads, setResolvingThreads] = useState<Set<string>>(new Set());
 
   // Model selection state
   const [modelEntry, setModelEntry] = useState<PhaseModelEntry>({ model: 'claude-sonnet' });
@@ -639,8 +639,8 @@ export function PRCommentResolutionDialog({
   const resolveThread = useResolveReviewThread(currentProject?.path ?? '', pr.number);
 
   // Derived state
-  const allSelected = comments.length > 0 && selectedIds.size === comments.length;
-  const someSelected = selectedIds.size > 0 && selectedIds.size < comments.length;
+  const allSelected = comments.length > 0 && comments.every((c) => selectedIds.has(c.id));
+  const someSelected = selectedIds.size > 0 && !allSelected;
   const noneSelected = selectedIds.size === 0;
 
   // ============================================
@@ -662,12 +662,21 @@ export function PRCommentResolutionDialog({
   const handleResolveComment = useCallback(
     (comment: PRReviewComment, resolve: boolean) => {
       if (!comment.threadId) return;
-      setResolvingThreadId(comment.threadId);
+      const threadId = comment.threadId;
+      setResolvingThreads((prev) => {
+        const next = new Set(prev);
+        next.add(threadId);
+        return next;
+      });
       resolveThread.mutate(
-        { threadId: comment.threadId, resolve },
+        { threadId, resolve },
         {
           onSettled: () => {
-            setResolvingThreadId(null);
+            setResolvingThreads((prev) => {
+              const next = new Set(prev);
+              next.delete(threadId);
+              return next;
+            });
           },
         }
       );
@@ -822,7 +831,7 @@ export function PRCommentResolutionDialog({
         setShowResolved(false);
         setCreationErrors([]);
         setDetailComment(null);
-        setResolvingThreadId(null);
+        setResolvingThreads(new Set());
         setModelEntry(effectiveDefaultFeatureModel);
       }
       onOpenChange(newOpen);
@@ -1021,7 +1030,9 @@ export function PRCommentResolutionDialog({
                       onToggle={() => handleToggleComment(comment.id)}
                       onExpandDetail={() => setDetailComment(comment)}
                       onResolve={handleResolveComment}
-                      isResolvingThread={comment.threadId === resolvingThreadId}
+                      isResolvingThread={
+                        !!comment.threadId && resolvingThreads.has(comment.threadId)
+                      }
                     />
                   ))}
                 </div>

@@ -7,7 +7,7 @@
  */
 
 import { spawn } from 'child_process';
-import { execEnv } from '../routes/github/routes/common.js';
+import { execEnv } from '../lib/exec-utils.js';
 
 /** Timeout for GitHub GraphQL API requests in milliseconds */
 const GITHUB_API_TIMEOUT_MS = 30000;

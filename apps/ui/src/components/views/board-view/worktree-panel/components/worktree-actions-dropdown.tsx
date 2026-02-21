@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -251,6 +252,21 @@ export function WorktreeActionsDropdown({
   // Determine if the destructive/bottom section has any visible items
   const hasDestructiveSectionContent = worktree.hasChanges || !worktree.isMain;
 
+  // Pre-compute PR info for the PR submenu (avoids an IIFE in JSX)
+  const prInfo = useMemo<PRInfo | null>(() => {
+    if (!showPRInfo || !worktree.pr) return null;
+    return {
+      number: worktree.pr.number,
+      title: worktree.pr.title,
+      url: worktree.pr.url,
+      state: worktree.pr.state,
+      author: '',
+      body: '',
+      comments: [],
+      reviewComments: [],
+    };
+  }, [showPRInfo, worktree.pr]);
+
   return (
     <DropdownMenu onOpenChange={onOpenChange}>
       <DropdownMenuTrigger asChild>
@@ -371,16 +387,18 @@ export function WorktreeActionsDropdown({
                 ? 'Dev Server Starting...'
                 : `Dev Server Running (:${devServerInfo?.port})`}
             </DropdownMenuLabel>
-            {devServerInfo?.urlDetected !== false && (
-              <DropdownMenuItem
-                onClick={() => onOpenDevServerUrl(worktree)}
-                className="text-xs"
-                aria-label={`Open dev server on port ${devServerInfo?.port} in browser`}
-              >
-                <Globe className="w-3.5 h-3.5 mr-2" aria-hidden="true" />
-                Open in Browser
-              </DropdownMenuItem>
-            )}
+            {devServerInfo != null &&
+              devServerInfo.port != null &&
+              devServerInfo.urlDetected !== false && (
+                <DropdownMenuItem
+                  onClick={() => onOpenDevServerUrl(worktree)}
+                  className="text-xs"
+                  aria-label={`Open dev server on port ${devServerInfo.port} in browser`}
+                >
+                  <Globe className="w-3.5 h-3.5 mr-2" aria-hidden="true" />
+                  Open in Browser
+                </DropdownMenuItem>
+              )}
             <DropdownMenuItem onClick={() => onViewDevServerLogs(worktree)} className="text-xs">
               <ScrollText className="w-3.5 h-3.5 mr-2" />
               View Logs
@@ -598,7 +616,7 @@ export function WorktreeActionsDropdown({
                 <DropdownMenuItem
                   onClick={() => onRunInitScript(worktree)}
                   className="text-xs"
-                  disabled={!hasInitScript || !onRunInitScript}
+                  disabled={!hasInitScript}
                 >
                   <RefreshCw className="w-3.5 h-3.5 mr-2" />
                   Re-run Init Script
@@ -944,32 +962,23 @@ export function WorktreeActionsDropdown({
             - worktree.hasChanges: View Changes action is available
             - (worktree.hasChanges && onStashChanges): Create Stash action is possible
             - onViewStashes: viewing existing stashes is possible */}
-        {(worktree.hasChanges || onViewStashes) && (
+        {/* View Changes split button - show submenu only when there are non-duplicate sub-actions */}
+        {worktree.hasChanges && (onStashChanges || onViewStashes) ? (
           <DropdownMenuSub>
             <div className="flex items-center">
               {/* Main clickable area - view changes (primary action) */}
-              {worktree.hasChanges ? (
-                <DropdownMenuItem
-                  onClick={() => onViewChanges(worktree)}
-                  className="text-xs flex-1 pr-0 rounded-r-none"
-                >
-                  <Eye className="w-3.5 h-3.5 mr-2" />
-                  View Changes
-                </DropdownMenuItem>
-              ) : (
-                <DropdownMenuItem
-                  onClick={() => onViewStashes!(worktree)}
-                  className="text-xs flex-1 pr-0 rounded-r-none"
-                >
-                  <Eye className="w-3.5 h-3.5 mr-2" />
-                  View Stashes
-                </DropdownMenuItem>
-              )}
+              <DropdownMenuItem
+                onClick={() => onViewChanges(worktree)}
+                className="text-xs flex-1 pr-0 rounded-r-none"
+              >
+                <Eye className="w-3.5 h-3.5 mr-2" />
+                View Changes
+              </DropdownMenuItem>
               {/* Chevron trigger for submenu with stash options */}
               <DropdownMenuSubTrigger className="text-xs px-1 rounded-l-none border-l border-border/30 h-8" />
             </div>
             <DropdownMenuSubContent>
-              {worktree.hasChanges && onStashChanges && (
+              {onStashChanges && (
                 <TooltipWrapper
                   showTooltip={!isGitOpsAvailable}
                   tooltipContent={gitOpsDisabledReason}
@@ -998,7 +1007,17 @@ export function WorktreeActionsDropdown({
               )}
             </DropdownMenuSubContent>
           </DropdownMenuSub>
-        )}
+        ) : worktree.hasChanges ? (
+          <DropdownMenuItem onClick={() => onViewChanges(worktree)} className="text-xs">
+            <Eye className="w-3.5 h-3.5 mr-2" />
+            View Changes
+          </DropdownMenuItem>
+        ) : onViewStashes ? (
+          <DropdownMenuItem onClick={() => onViewStashes(worktree)} className="text-xs">
+            <Eye className="w-3.5 h-3.5 mr-2" />
+            View Stashes
+          </DropdownMenuItem>
+        ) : null}
         {worktree.hasChanges && (
           <TooltipWrapper
             showTooltip={!!gitOpsDisabledReason}
@@ -1037,68 +1056,52 @@ export function WorktreeActionsDropdown({
           </TooltipWrapper>
         )}
         {/* Show PR info with Address Comments in sub-menu if PR exists */}
-        {showPRInfo &&
-          worktree.pr &&
-          (() => {
-            // Convert stored PR info to the full PRInfo format for the handlers
-            // The handlers will fetch full comments from GitHub
-            const prInfo: PRInfo = {
-              number: worktree.pr!.number,
-              title: worktree.pr!.title,
-              url: worktree.pr!.url,
-              state: worktree.pr!.state,
-              author: '',
-              body: '',
-              comments: [],
-              reviewComments: [],
-            };
-            return (
-              <DropdownMenuSub>
-                <div className="flex items-center">
-                  {/* Main clickable area - opens PR in browser */}
-                  <DropdownMenuItem
-                    onClick={() => {
-                      window.open(worktree.pr!.url, '_blank', 'noopener,noreferrer');
-                    }}
-                    className="text-xs flex-1 pr-0 rounded-r-none"
-                  >
-                    <GitPullRequest className="w-3 h-3 mr-2" />
-                    PR #{worktree.pr!.number}
-                    <span
-                      className={cn(
-                        'ml-auto mr-1 text-[10px] px-1.5 py-0.5 rounded uppercase',
-                        worktree.pr!.state === 'MERGED'
-                          ? 'bg-purple-500/20 text-purple-600'
-                          : worktree.pr!.state === 'CLOSED'
-                            ? 'bg-gray-500/20 text-gray-500'
-                            : 'bg-green-500/20 text-green-600'
-                      )}
-                    >
-                      {worktree.pr!.state}
-                    </span>
-                  </DropdownMenuItem>
-                  {/* Chevron trigger for submenu with PR actions */}
-                  <DropdownMenuSubTrigger className="text-xs px-1 rounded-l-none border-l border-border/30 h-8" />
-                </div>
-                <DropdownMenuSubContent>
-                  <DropdownMenuItem
-                    onClick={() => onAddressPRComments(worktree, prInfo)}
-                    className="text-xs text-blue-500 focus:text-blue-600"
-                  >
-                    <MessageSquare className="w-3.5 h-3.5 mr-2" />
-                    Manage PR Comments
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={() => onAutoAddressPRComments(worktree, prInfo)}
-                    className="text-xs text-blue-500 focus:text-blue-600"
-                  >
-                    <Zap className="w-3.5 h-3.5 mr-2" />
-                    Address PR Comments
-                  </DropdownMenuItem>
-                </DropdownMenuSubContent>
-              </DropdownMenuSub>
-            );
-          })()}
+        {prInfo && worktree.pr && (
+          <DropdownMenuSub>
+            <div className="flex items-center">
+              {/* Main clickable area - opens PR in browser */}
+              <DropdownMenuItem
+                onClick={() => {
+                  window.open(worktree.pr!.url, '_blank', 'noopener,noreferrer');
+                }}
+                className="text-xs flex-1 pr-0 rounded-r-none"
+              >
+                <GitPullRequest className="w-3 h-3 mr-2" />
+                PR #{worktree.pr.number}
+                <span
+                  className={cn(
+                    'ml-auto mr-1 text-[10px] px-1.5 py-0.5 rounded uppercase',
+                    worktree.pr.state === 'MERGED'
+                      ? 'bg-purple-500/20 text-purple-600'
+                      : worktree.pr.state === 'CLOSED'
+                        ? 'bg-gray-500/20 text-gray-500'
+                        : 'bg-green-500/20 text-green-600'
+                  )}
+                >
+                  {worktree.pr.state}
+                </span>
+              </DropdownMenuItem>
+              {/* Chevron trigger for submenu with PR actions */}
+              <DropdownMenuSubTrigger className="text-xs px-1 rounded-l-none border-l border-border/30 h-8" />
+            </div>
+            <DropdownMenuSubContent>
+              <DropdownMenuItem
+                onClick={() => onAddressPRComments(worktree, prInfo)}
+                className="text-xs text-blue-500 focus:text-blue-600"
+              >
+                <MessageSquare className="w-3.5 h-3.5 mr-2" />
+                Manage PR Comments
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => onAutoAddressPRComments(worktree, prInfo)}
+                className="text-xs text-blue-500 focus:text-blue-600"
+              >
+                <Zap className="w-3.5 h-3.5 mr-2" />
+                Address PR Comments
+              </DropdownMenuItem>
+            </DropdownMenuSubContent>
+          </DropdownMenuSub>
+        )}
         {hasChangesSectionContent && hasDestructiveSectionContent && <DropdownMenuSeparator />}
         {worktree.hasChanges && (
           <TooltipWrapper

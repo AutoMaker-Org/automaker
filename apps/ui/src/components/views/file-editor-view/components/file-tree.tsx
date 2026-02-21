@@ -133,6 +133,7 @@ function InlineInput({
   placeholder?: string;
 }) {
   const [value, setValue] = useState(defaultValue || '');
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   // Guard against double-submission: pressing Enter triggers onKeyDown AND may
   // immediately trigger onBlur (e.g. when the component unmounts after submit).
@@ -161,39 +162,51 @@ function InlineInput({
       return;
     }
     if (!isValidFileName(trimmed)) {
-      // Invalid name — don't submit, keep editing so the user can fix it
+      // Invalid name — surface error, keep editing so the user can fix it
+      setErrorMessage('Invalid name: avoid /, \\, ".", or ".."');
+      inputRef.current?.focus();
       return;
     }
+    setErrorMessage(null);
     submittedRef.current = true;
     onSubmit(trimmed);
   }, [value, onSubmit, onCancel]);
 
   return (
-    <input
-      ref={inputRef}
-      value={value}
-      onChange={(e) => setValue(e.target.value)}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter') {
-          handleSubmit();
-        } else if (e.key === 'Escape') {
-          onCancel();
-        }
-      }}
-      onBlur={() => {
-        // Prevent duplicate submission if onKeyDown already triggered onSubmit
-        if (submittedRef.current) return;
-        const trimmed = value.trim();
-        if (trimmed && isValidFileName(trimmed)) {
-          submittedRef.current = true;
-          onSubmit(trimmed);
-        } else {
-          onCancel();
-        }
-      }}
-      placeholder={placeholder}
-      className="text-sm bg-muted border border-border rounded px-1 py-0.5 w-full outline-none focus:border-primary"
-    />
+    <div className="flex flex-col gap-0.5">
+      <input
+        ref={inputRef}
+        value={value}
+        onChange={(e) => {
+          setValue(e.target.value);
+          if (errorMessage) setErrorMessage(null);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            handleSubmit();
+          } else if (e.key === 'Escape') {
+            onCancel();
+          }
+        }}
+        onBlur={() => {
+          // Prevent duplicate submission if onKeyDown already triggered onSubmit
+          if (submittedRef.current) return;
+          const trimmed = value.trim();
+          if (trimmed && isValidFileName(trimmed)) {
+            submittedRef.current = true;
+            onSubmit(trimmed);
+          } else {
+            onCancel();
+          }
+        }}
+        placeholder={placeholder}
+        className={cn(
+          'text-sm bg-muted border rounded px-1 py-0.5 w-full outline-none focus:border-primary',
+          errorMessage ? 'border-red-500' : 'border-border'
+        )}
+      />
+      {errorMessage && <span className="text-[10px] text-red-500 px-0.5">{errorMessage}</span>}
+    </div>
   );
 }
 
@@ -764,7 +777,10 @@ export function FileTree({
       e.preventDefault();
       if (effectivePath) {
         e.dataTransfer.dropEffect = 'move';
-        setDragState({ ...dragState, dropTargetPath: effectivePath });
+        // Skip redundant state update if already targeting the same path
+        if (dragState.dropTargetPath !== effectivePath) {
+          setDragState({ ...dragState, dropTargetPath: effectivePath });
+        }
       }
     },
     [effectivePath, dragState, setDragState]

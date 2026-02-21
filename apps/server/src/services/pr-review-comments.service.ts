@@ -9,7 +9,7 @@
 import { spawn, execFile } from 'child_process';
 import { promisify } from 'util';
 import { createLogger } from '@automaker/utils';
-import { execEnv, logError } from '../routes/github/routes/common.js';
+import { execEnv, logError } from '../lib/exec-utils.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -235,6 +235,7 @@ export async function fetchPRReviewComments(
       {
         cwd: projectPath,
         env: execEnv,
+        maxBuffer: 1024 * 1024 * 10, // 10MB buffer for large PRs
         timeout: GITHUB_API_TIMEOUT_MS,
       }
     );
@@ -322,13 +323,11 @@ export async function fetchPRReviewComments(
 
   // Wait for resolved status and apply to inline review comments
   const resolvedMap = await resolvedStatusPromise;
-  if (resolvedMap.size > 0) {
-    for (const comment of allComments) {
-      if (comment.isReviewComment && resolvedMap.has(comment.id)) {
-        const info = resolvedMap.get(comment.id);
-        comment.isResolved = info?.isResolved ?? false;
-        comment.threadId = info?.threadId;
-      }
+  for (const comment of allComments) {
+    if (comment.isReviewComment && resolvedMap.has(comment.id)) {
+      const info = resolvedMap.get(comment.id)!;
+      comment.isResolved = info.isResolved;
+      comment.threadId = info.threadId;
     }
   }
 
