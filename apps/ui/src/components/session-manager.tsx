@@ -301,8 +301,13 @@ export function SessionManager({
       const refetchResult = await invalidateSessions();
       if (currentSessionId === sessionId) {
         // Switch to another session using fresh data, excluding the deleted session
+        // Filter to sessions within the same worktree to avoid jumping to a different worktree
         const freshSessions = refetchResult?.data ?? [];
-        const activeSessionsList = freshSessions.filter((s) => !s.isArchived && s.id !== sessionId);
+        const activeSessionsList = freshSessions.filter((s) => {
+          if (s.isArchived || s.id === sessionId) return false;
+          const sessionDir = s.workingDirectory || s.projectPath;
+          return pathsEqual(sessionDir, effectiveWorkingDirectory);
+        });
         if (activeSessionsList.length > 0) {
           onSelectSession(activeSessionsList[0].id);
         }

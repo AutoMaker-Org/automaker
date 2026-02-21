@@ -220,6 +220,7 @@ export function useBoardActions({
       const {
         initialStatus: requestedStatus,
         workMode: _workMode,
+        childDependencies,
         ...restFeatureData
       } = featureData;
       const initialStatus = requestedStatus || 'backlog';
@@ -244,8 +245,8 @@ export function useBoardActions({
       saveCategory(featureData.category);
 
       // Handle child dependencies - update other features to depend on this new feature
-      if (featureData.childDependencies && featureData.childDependencies.length > 0) {
-        for (const childId of featureData.childDependencies) {
+      if (childDependencies && childDependencies.length > 0) {
+        for (const childId of childDependencies) {
           const childFeature = features.find((f) => f.id === childId);
           if (childFeature) {
             const childDeps = childFeature.dependencies || [];
