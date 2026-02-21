@@ -35,7 +35,8 @@ const logger = createLogger('SettingsHelper');
 
 /**
  * Get the autoLoadClaudeMd setting, with project settings taking precedence over global.
- * Returns false if settings service is not available.
+ * Falls back to global settings and defaults to true when unset.
+ * Returns true if settings service is not available.
  *
  * @param projectPath - Path to the project
  * @param settingsService - Optional settings service instance

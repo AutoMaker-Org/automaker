@@ -713,7 +713,7 @@ export class AgentExecutor {
       .replace(/\{\{approvedPlan\}\}/g, planContent);
     let responseText = initialResponseText;
     for await (const msg of provider.executeQuery(
-      this.buildExecOpts(options, contPrompt, options.sdkOptions?.maxTurns)
+      this.buildExecOpts(options, contPrompt, options.sdkOptions?.maxTurns ?? 1000)
     )) {
       if (msg.type === 'assistant' && msg.message?.content)
         for (const b of msg.message.content) {

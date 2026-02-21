@@ -92,6 +92,8 @@ const OUTPUT_BATCH_SIZE = 4096; // Smaller batches for lower latency
 
 export interface DevServerInfo {
   worktreePath: string;
+  /** The port originally reserved by findAvailablePort() – never mutated after startDevServer sets it */
+  allocatedPort: number;
   port: number;
   url: string;
   process: ChildProcess | null;
@@ -142,12 +144,14 @@ class DevServerService {
   private pruneStaleServer(worktreePath: string, server: DevServerInfo): void {
     if (server.flushTimeout) clearTimeout(server.flushTimeout);
     if (server.urlDetectionTimeout) clearTimeout(server.urlDetectionTimeout);
-    this.allocatedPorts.delete(server.port);
+    // Use allocatedPort (immutable) to free the reserved slot; server.port may have
+    // been mutated by detectUrlFromOutput to reflect the actual detected port.
+    this.allocatedPorts.delete(server.allocatedPort);
     this.runningServers.delete(worktreePath);
     if (this.emitter) {
       this.emitter.emit('dev-server:stopped', {
         worktreePath,
-        port: server.port,
+        port: server.port, // Report the externally-visible (detected) port
         exitCode: server.process?.exitCode ?? null,
         timestamp: new Date().toISOString(),
       });
@@ -702,6 +706,7 @@ class DevServerService {
     const hostname = process.env.HOSTNAME || 'localhost';
     const serverInfo: DevServerInfo = {
       worktreePath,
+      allocatedPort: port, // Immutable: records which port we reserved; never changed after this point
       port,
       url: `http://${hostname}:${port}`, // Initial URL, may be updated by detectUrlFromOutput
       process: devProcess,
@@ -904,8 +909,10 @@ class DevServerService {
       server.process.kill('SIGTERM');
     }
 
-    // Free the port
-    this.allocatedPorts.delete(server.port);
+    // Free the originally-reserved port slot (allocatedPort is immutable and always
+    // matches what was added to allocatedPorts in startDevServer; server.port may
+    // have been updated by detectUrlFromOutput to the actual detected port).
+    this.allocatedPorts.delete(server.allocatedPort);
     this.runningServers.delete(worktreePath);
 
     return {
