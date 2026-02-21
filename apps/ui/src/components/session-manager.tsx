@@ -300,7 +300,7 @@ export function SessionManager({
       await invalidateSessions();
       if (currentSessionId === sessionId) {
         // Switch to another session or create a new one
-        const activeSessionsList = sessions.filter((s) => !s.isArchived);
+        const activeSessionsList = scopedSessions.filter((s) => !s.isArchived);
         if (activeSessionsList.length > 0) {
           onSelectSession(activeSessionsList[0].id);
         }

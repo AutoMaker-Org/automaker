@@ -139,6 +139,9 @@ async function executeGraphQL(projectPath: string, requestBody: string): Promise
       }
     });
 
+    gh.stdin.on('error', () => {
+      // Ignore stdin errors (e.g. when the child process is killed)
+    });
     gh.stdin.write(requestBody);
     gh.stdin.end();
   });
@@ -335,9 +338,10 @@ export async function fetchPRReviewComments(
         side?: string;
         commit_id?: string;
         position?: number | null;
+        performed_via_github_app?: { slug: string } | null;
       }) => ({
         id: String(c.id),
-        author: c.user?.login || 'unknown',
+        author: c.user?.login || c.performed_via_github_app?.slug || 'unknown',
         avatarUrl: c.user?.avatar_url,
         body: c.body,
         path: c.path,
@@ -349,7 +353,7 @@ export async function fetchPRReviewComments(
         isOutdated: c.position === null,
         // isResolved will be filled in below from GraphQL data
         isResolved: false,
-        isBot: c.user?.type === 'Bot',
+        isBot: c.user?.type === 'Bot' || !!c.performed_via_github_app,
         diffHunk: c.diff_hunk,
         side: c.side,
         commitId: c.commit_id,
@@ -391,16 +395,17 @@ export async function fetchPRReviewComments(
           body: string;
           state: string;
           submitted_at: string;
+          performed_via_github_app?: { slug: string } | null;
         }) => ({
           id: `review-${r.id}`,
-          author: r.user?.login || 'unknown',
+          author: r.user?.login || r.performed_via_github_app?.slug || 'unknown',
           avatarUrl: r.user?.avatar_url,
           body: r.body,
           createdAt: r.submitted_at,
           isReviewComment: false,
           isOutdated: false,
           isResolved: false,
-          isBot: r.user?.type === 'Bot',
+          isBot: r.user?.type === 'Bot' || !!r.performed_via_github_app,
         })
       );
 
