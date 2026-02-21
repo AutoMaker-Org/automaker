@@ -36,7 +36,6 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
 import { Markdown } from '@/components/ui/markdown';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn, modelSupportsThinking, generateUUID } from '@/lib/utils';
 import { useAppStore } from '@/store/app-store';
 import { useGitHubPRReviewComments } from '@/hooks/queries';
@@ -414,7 +413,7 @@ function CommentDetailDialog({ comment, open, onOpenChange }: CommentDetailDialo
           </DialogDescription>
         </DialogHeader>
 
-        <ScrollArea className="flex-1 min-h-0 h-full -mx-6 px-6">
+        <div className="flex-1 min-h-0 overflow-y-auto -mx-6 px-6">
           <div className="space-y-4 pb-2">
             {/* Author & metadata section */}
             <div className="flex items-center gap-3 flex-wrap">
@@ -496,7 +495,7 @@ function CommentDetailDialog({ comment, open, onOpenChange }: CommentDetailDialo
               </div>
             )}
           </div>
-        </ScrollArea>
+        </div>
 
         <DialogFooter className="mt-4">
           <Button variant="outline" onClick={() => onOpenChange(false)}>

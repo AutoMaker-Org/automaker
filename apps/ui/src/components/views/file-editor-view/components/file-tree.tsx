@@ -195,8 +195,12 @@ function InlineInput({
           if (trimmed && isValidFileName(trimmed)) {
             submittedRef.current = true;
             onSubmit(trimmed);
-          } else {
-            onCancel();
+          }
+          // If the name is empty or invalid, do NOT call onCancel — keep the
+          // input open so the user can correct the value (mirrors handleSubmit).
+          // Optionally re-focus so the user can continue editing.
+          else {
+            inputRef.current?.focus();
           }
         }}
         placeholder={placeholder}
@@ -807,47 +811,54 @@ export function FileTree({
   return (
     <div className="flex flex-col h-full" data-testid="file-tree">
       {/* Tree toolbar */}
-      <div className="flex items-center justify-between px-2 py-1.5 border-b border-border">
-        <div className="flex items-center gap-1.5">
-          <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Explorer
-          </span>
-          {gitBranch && (
-            <span className="text-[10px] text-primary font-medium px-1 py-0.5 bg-primary/10 rounded">
+      <div className="px-2 py-1.5 border-b border-border">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Explorer
+            </span>
+          </div>
+          <div className="flex items-center gap-0.5">
+            <button
+              onClick={() => setIsCreatingFile(true)}
+              className="p-1 hover:bg-accent rounded"
+              title="New file"
+            >
+              <FilePlus className="w-3.5 h-3.5 text-muted-foreground" />
+            </button>
+            <button
+              onClick={() => setIsCreatingFolder(true)}
+              className="p-1 hover:bg-accent rounded"
+              title="New folder"
+            >
+              <FolderPlus className="w-3.5 h-3.5 text-muted-foreground" />
+            </button>
+            <button
+              onClick={() => setShowHiddenFiles(!showHiddenFiles)}
+              className="p-1 hover:bg-accent rounded"
+              title={showHiddenFiles ? 'Hide dotfiles' : 'Show dotfiles'}
+            >
+              {showHiddenFiles ? (
+                <Eye className="w-3.5 h-3.5 text-muted-foreground" />
+              ) : (
+                <EyeOff className="w-3.5 h-3.5 text-muted-foreground" />
+              )}
+            </button>
+            <button onClick={onRefresh} className="p-1 hover:bg-accent rounded" title="Refresh">
+              <RefreshCw className="w-3.5 h-3.5 text-muted-foreground" />
+            </button>
+          </div>
+        </div>
+        {gitBranch && (
+          <div className="mt-1 min-w-0">
+            <span
+              className="inline-block max-w-full truncate whitespace-nowrap text-[10px] text-primary font-medium px-1 py-0.5 bg-primary/10 rounded"
+              title={gitBranch}
+            >
               {gitBranch}
             </span>
-          )}
-        </div>
-        <div className="flex items-center gap-0.5">
-          <button
-            onClick={() => setIsCreatingFile(true)}
-            className="p-1 hover:bg-accent rounded"
-            title="New file"
-          >
-            <FilePlus className="w-3.5 h-3.5 text-muted-foreground" />
-          </button>
-          <button
-            onClick={() => setIsCreatingFolder(true)}
-            className="p-1 hover:bg-accent rounded"
-            title="New folder"
-          >
-            <FolderPlus className="w-3.5 h-3.5 text-muted-foreground" />
-          </button>
-          <button
-            onClick={() => setShowHiddenFiles(!showHiddenFiles)}
-            className="p-1 hover:bg-accent rounded"
-            title={showHiddenFiles ? 'Hide dotfiles' : 'Show dotfiles'}
-          >
-            {showHiddenFiles ? (
-              <Eye className="w-3.5 h-3.5 text-muted-foreground" />
-            ) : (
-              <EyeOff className="w-3.5 h-3.5 text-muted-foreground" />
-            )}
-          </button>
-          <button onClick={onRefresh} className="p-1 hover:bg-accent rounded" title="Refresh">
-            <RefreshCw className="w-3.5 h-3.5 text-muted-foreground" />
-          </button>
-        </div>
+          </div>
+        )}
       </div>
 
       {/* Tree content */}
