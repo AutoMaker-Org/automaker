@@ -28,10 +28,21 @@ export function useWorktrees({
   const { data, isLoading, refetch } = useWorktreesQuery(projectPath);
   const worktrees = (data?.worktrees ?? []) as WorktreeInfo[];
 
-  // Sync worktrees to Zustand store when they change
+  // Sync worktrees to Zustand store when they change.
+  // Use a ref to track the previous worktrees and skip the store update when the
+  // data hasn't structurally changed. Without this check, every React Query refetch
+  // (triggered by WebSocket event invalidations) would update the store even when
+  // the worktree list is identical, causing a cascade of re-renders in BoardView →
+  // selectedWorktree → useAutoMode → refreshStatus that can trigger React error #185.
+  const prevWorktreesJsonRef = useRef<string>('');
   useEffect(() => {
     if (worktrees.length > 0) {
-      setWorktreesInStore(projectPath, worktrees);
+      // Compare serialized worktrees to skip no-op store updates
+      const json = JSON.stringify(worktrees);
+      if (json !== prevWorktreesJsonRef.current) {
+        prevWorktreesJsonRef.current = json;
+        setWorktreesInStore(projectPath, worktrees);
+      }
     }
   }, [worktrees, projectPath, setWorktreesInStore]);
 

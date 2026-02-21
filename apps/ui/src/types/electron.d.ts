@@ -910,6 +910,19 @@ export interface WorktreeAPI {
       path: string;
       branch: string;
       isNew: boolean;
+      /** Short commit hash the worktree is based on */
+      baseCommitHash?: string;
+      /** Result of syncing the base branch with its remote tracking branch */
+      syncResult?: {
+        /** Whether the sync succeeded */
+        synced: boolean;
+        /** The remote that was synced from */
+        remote?: string;
+        /** Human-readable message about the sync result */
+        message?: string;
+        /** Whether the branch had diverged (local commits ahead of remote) */
+        diverged?: boolean;
+      };
     };
     error?: string;
   }>;

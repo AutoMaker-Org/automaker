@@ -170,14 +170,16 @@ describe('PipelineOrchestrator', () => {
     } as unknown as WorktreeResolver;
 
     mockConcurrencyManager = {
-      acquire: vi.fn().mockReturnValue({
-        featureId: 'feature-1',
+      acquire: vi.fn().mockImplementation(({ featureId, isAutoMode }) => ({
+        featureId,
         projectPath: '/test/project',
         abortController: new AbortController(),
         branchName: null,
         worktreePath: null,
-      }),
+        isAutoMode: isAutoMode ?? false,
+      })),
       release: vi.fn(),
+      getRunningFeature: vi.fn().mockReturnValue(undefined),
     } as unknown as ConcurrencyManager;
 
     mockSettingsService = null;
@@ -541,8 +543,18 @@ describe('PipelineOrchestrator', () => {
       );
     });
 
-    it('should emit auto_mode_feature_complete on success', async () => {
+    it('should emit auto_mode_feature_complete on success when isAutoMode is true', async () => {
       vi.mocked(performMerge).mockResolvedValue({ success: true });
+      vi.mocked(mockConcurrencyManager.getRunningFeature).mockReturnValue({
+        featureId: 'feature-1',
+        projectPath: '/test/project',
+        abortController: new AbortController(),
+        branchName: null,
+        worktreePath: null,
+        isAutoMode: true,
+        startTime: Date.now(),
+        leaseCount: 1,
+      });
 
       const context = createMergeContext();
       await orchestrator.attemptMerge(context);
@@ -551,6 +563,19 @@ describe('PipelineOrchestrator', () => {
         'auto_mode_feature_complete',
         expect.objectContaining({ featureId: 'feature-1', passes: true })
       );
+    });
+
+    it('should not emit auto_mode_feature_complete on success when isAutoMode is false', async () => {
+      vi.mocked(performMerge).mockResolvedValue({ success: true });
+      vi.mocked(mockConcurrencyManager.getRunningFeature).mockReturnValue(undefined);
+
+      const context = createMergeContext();
+      await orchestrator.attemptMerge(context);
+
+      const completeCalls = vi
+        .mocked(mockEventBus.emitAutoModeEvent)
+        .mock.calls.filter((call) => call[0] === 'auto_mode_feature_complete');
+      expect(completeCalls.length).toBe(0);
     });
 
     it('should return needsAgentResolution true on conflict', async () => {
@@ -623,12 +648,23 @@ describe('PipelineOrchestrator', () => {
       expect(mockExecuteFeatureFn).toHaveBeenCalled();
     });
 
-    it('should complete feature when step no longer exists', async () => {
+    it('should complete feature when step no longer exists and emit event when isAutoMode=true', async () => {
       const invalidPipelineInfo: PipelineStatusInfo = {
         ...validPipelineInfo,
         stepIndex: -1,
         step: null,
       };
+
+      vi.mocked(mockConcurrencyManager.getRunningFeature).mockReturnValue({
+        featureId: 'feature-1',
+        projectPath: '/test/project',
+        abortController: new AbortController(),
+        branchName: null,
+        worktreePath: null,
+        isAutoMode: true,
+        startTime: Date.now(),
+        leaseCount: 1,
+      });
 
       await orchestrator.resumePipeline('/test/project', testFeature, true, invalidPipelineInfo);
 
@@ -641,6 +677,28 @@ describe('PipelineOrchestrator', () => {
         'auto_mode_feature_complete',
         expect.objectContaining({ message: expect.stringContaining('no longer exists') })
       );
+    });
+
+    it('should not emit feature_complete when step no longer exists and isAutoMode=false', async () => {
+      const invalidPipelineInfo: PipelineStatusInfo = {
+        ...validPipelineInfo,
+        stepIndex: -1,
+        step: null,
+      };
+
+      vi.mocked(mockConcurrencyManager.getRunningFeature).mockReturnValue(undefined);
+
+      await orchestrator.resumePipeline('/test/project', testFeature, true, invalidPipelineInfo);
+
+      expect(mockUpdateFeatureStatusFn).toHaveBeenCalledWith(
+        '/test/project',
+        'feature-1',
+        'verified'
+      );
+      const completeCalls = vi
+        .mocked(mockEventBus.emitAutoModeEvent)
+        .mock.calls.filter((call) => call[0] === 'auto_mode_feature_complete');
+      expect(completeCalls.length).toBe(0);
     });
   });
 
@@ -666,7 +724,7 @@ describe('PipelineOrchestrator', () => {
       expect(mockRunAgentFn).toHaveBeenCalled();
     });
 
-    it('should complete feature when all remaining steps excluded', async () => {
+    it('should complete feature when all remaining steps excluded and emit event when isAutoMode=true', async () => {
       const featureWithAllExcluded: Feature = {
         ...testFeature,
         excludedPipelineSteps: ['step-1', 'step-2'],
@@ -674,6 +732,16 @@ describe('PipelineOrchestrator', () => {
 
       vi.mocked(pipelineService.getNextStatus).mockReturnValue('verified');
       vi.mocked(pipelineService.isPipelineStatus).mockReturnValue(false);
+      vi.mocked(mockConcurrencyManager.getRunningFeature).mockReturnValue({
+        featureId: 'feature-1',
+        projectPath: '/test/project',
+        abortController: new AbortController(),
+        branchName: null,
+        worktreePath: null,
+        isAutoMode: true,
+        startTime: Date.now(),
+        leaseCount: 1,
+      });
 
       await orchestrator.resumeFromStep(
         '/test/project',
@@ -1033,7 +1101,7 @@ describe('PipelineOrchestrator', () => {
         );
       });
 
-      it('handles all steps excluded during resume', async () => {
+      it('handles all steps excluded during resume and emits event when isAutoMode=true', async () => {
         const featureWithAllExcluded: Feature = {
           ...testFeature,
           excludedPipelineSteps: ['step-1', 'step-2'],
@@ -1041,6 +1109,16 @@ describe('PipelineOrchestrator', () => {
 
         vi.mocked(pipelineService.getNextStatus).mockReturnValue('verified');
         vi.mocked(pipelineService.isPipelineStatus).mockReturnValue(false);
+        vi.mocked(mockConcurrencyManager.getRunningFeature).mockReturnValue({
+          featureId: 'feature-1',
+          projectPath: '/test/project',
+          abortController: new AbortController(),
+          branchName: null,
+          worktreePath: null,
+          isAutoMode: true,
+          startTime: Date.now(),
+          leaseCount: 1,
+        });
 
         await orchestrator.resumeFromStep(
           '/test/project',

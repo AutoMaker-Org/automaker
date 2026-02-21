@@ -728,6 +728,11 @@ export function hydrateStoreFromSettings(settings: GlobalSettings): void {
     opencodeDefaultModel: sanitizedOpencodeDefaultModel,
     enabledDynamicModelIds: sanitizedDynamicModelIds,
     disabledProviders: settings.disabledProviders ?? [],
+    enableAiCommitMessages: settings.enableAiCommitMessages ?? true,
+    enableSkills: settings.enableSkills ?? true,
+    skillsSources: settings.skillsSources ?? ['user', 'project'],
+    enableSubagents: settings.enableSubagents ?? true,
+    subagentsSources: settings.subagentsSources ?? ['user', 'project'],
     autoLoadClaudeMd: settings.autoLoadClaudeMd ?? false,
     skipSandboxWarning: settings.skipSandboxWarning ?? false,
     codexAutoLoadAgents: settings.codexAutoLoadAgents ?? false,
@@ -763,11 +768,25 @@ export function hydrateStoreFromSettings(settings: GlobalSettings): void {
     editorFontFamily: settings.editorFontFamily ?? 'default',
     editorAutoSave: settings.editorAutoSave ?? false,
     editorAutoSaveDelay: settings.editorAutoSaveDelay ?? 1000,
-    // Terminal font (nested in terminalState)
-    ...(settings.terminalFontFamily && {
+    // Terminal settings (nested in terminalState)
+    ...((settings.terminalFontFamily ||
+      (settings as unknown as Record<string, unknown>).terminalCustomBackgroundColor !==
+        undefined ||
+      (settings as unknown as Record<string, unknown>).terminalCustomForegroundColor !==
+        undefined) && {
       terminalState: {
         ...current.terminalState,
-        fontFamily: settings.terminalFontFamily,
+        ...(settings.terminalFontFamily && { fontFamily: settings.terminalFontFamily }),
+        ...((settings as unknown as Record<string, unknown>).terminalCustomBackgroundColor !==
+          undefined && {
+          customBackgroundColor: (settings as unknown as Record<string, unknown>)
+            .terminalCustomBackgroundColor as string | null,
+        }),
+        ...((settings as unknown as Record<string, unknown>).terminalCustomForegroundColor !==
+          undefined && {
+          customForegroundColor: (settings as unknown as Record<string, unknown>)
+            .terminalCustomForegroundColor as string | null,
+        }),
       },
     }),
   });
@@ -827,6 +846,11 @@ function buildSettingsUpdateFromStore(): Record<string, unknown> {
     defaultReasoningEffort: state.defaultReasoningEffort,
     enabledDynamicModelIds: state.enabledDynamicModelIds,
     disabledProviders: state.disabledProviders,
+    enableAiCommitMessages: state.enableAiCommitMessages,
+    enableSkills: state.enableSkills,
+    skillsSources: state.skillsSources,
+    enableSubagents: state.enableSubagents,
+    subagentsSources: state.subagentsSources,
     autoLoadClaudeMd: state.autoLoadClaudeMd,
     skipSandboxWarning: state.skipSandboxWarning,
     codexAutoLoadAgents: state.codexAutoLoadAgents,
@@ -858,6 +882,8 @@ function buildSettingsUpdateFromStore(): Record<string, unknown> {
     editorAutoSave: state.editorAutoSave,
     editorAutoSaveDelay: state.editorAutoSaveDelay,
     terminalFontFamily: state.terminalState.fontFamily,
+    terminalCustomBackgroundColor: state.terminalState.customBackgroundColor,
+    terminalCustomForegroundColor: state.terminalState.customForegroundColor,
   };
 }
 

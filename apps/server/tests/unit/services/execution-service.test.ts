@@ -175,7 +175,10 @@ describe('execution-service.ts', () => {
     } as unknown as TypedEventBus;
 
     mockConcurrencyManager = {
-      acquire: vi.fn().mockImplementation(({ featureId }) => createRunningFeature(featureId)),
+      acquire: vi.fn().mockImplementation(({ featureId, isAutoMode }) => ({
+        ...createRunningFeature(featureId),
+        isAutoMode: isAutoMode ?? false,
+      })),
       release: vi.fn(),
       getRunningFeature: vi.fn(),
       isRunning: vi.fn(),
@@ -550,8 +553,8 @@ describe('execution-service.ts', () => {
       expect(mockRunAgentFn).not.toHaveBeenCalled();
     });
 
-    it('emits feature_complete event on success', async () => {
-      await service.executeFeature('/test/project', 'feature-1');
+    it('emits feature_complete event on success when isAutoMode is true', async () => {
+      await service.executeFeature('/test/project', 'feature-1', false, true);
 
       expect(mockEventBus.emitAutoModeEvent).toHaveBeenCalledWith(
         'auto_mode_feature_complete',
@@ -560,6 +563,15 @@ describe('execution-service.ts', () => {
           passes: true,
         })
       );
+    });
+
+    it('does not emit feature_complete event on success when isAutoMode is false', async () => {
+      await service.executeFeature('/test/project', 'feature-1', false, false);
+
+      const completeCalls = vi
+        .mocked(mockEventBus.emitAutoModeEvent)
+        .mock.calls.filter((call) => call[0] === 'auto_mode_feature_complete');
+      expect(completeCalls.length).toBe(0);
     });
   });
 
@@ -1110,7 +1122,7 @@ describe('execution-service.ts', () => {
       );
     });
 
-    it('handles abort signal without error event', async () => {
+    it('handles abort signal without error event (emits feature_complete when isAutoMode=true)', async () => {
       const abortError = new Error('abort');
       abortError.name = 'AbortError';
       mockRunAgentFn = vi.fn().mockRejectedValue(abortError);
@@ -1136,7 +1148,7 @@ describe('execution-service.ts', () => {
         mockLoadContextFilesFn
       );
 
-      await svc.executeFeature('/test/project', 'feature-1');
+      await svc.executeFeature('/test/project', 'feature-1', false, true);
 
       // Should emit feature_complete with stopped by user
       expect(mockEventBus.emitAutoModeEvent).toHaveBeenCalledWith(
@@ -1149,6 +1161,47 @@ describe('execution-service.ts', () => {
       );
 
       // Should NOT emit error event
+      const errorCalls = vi
+        .mocked(mockEventBus.emitAutoModeEvent)
+        .mock.calls.filter((call) => call[0] === 'auto_mode_error');
+      expect(errorCalls.length).toBe(0);
+    });
+
+    it('handles abort signal without emitting feature_complete when isAutoMode=false', async () => {
+      const abortError = new Error('abort');
+      abortError.name = 'AbortError';
+      mockRunAgentFn = vi.fn().mockRejectedValue(abortError);
+
+      const svc = new ExecutionService(
+        mockEventBus,
+        mockConcurrencyManager,
+        mockWorktreeResolver,
+        mockSettingsService,
+        mockRunAgentFn,
+        mockExecutePipelineFn,
+        mockUpdateFeatureStatusFn,
+        mockLoadFeatureFn,
+        mockGetPlanningPromptPrefixFn,
+        mockSaveFeatureSummaryFn,
+        mockRecordLearningsFn,
+        mockContextExistsFn,
+        mockResumeFeatureFn,
+        mockTrackFailureFn,
+        mockSignalPauseFn,
+        mockRecordSuccessFn,
+        mockSaveExecutionStateFn,
+        mockLoadContextFilesFn
+      );
+
+      await svc.executeFeature('/test/project', 'feature-1', false, false);
+
+      // Should NOT emit feature_complete when isAutoMode is false
+      const completeCalls = vi
+        .mocked(mockEventBus.emitAutoModeEvent)
+        .mock.calls.filter((call) => call[0] === 'auto_mode_feature_complete');
+      expect(completeCalls.length).toBe(0);
+
+      // Should NOT emit error event (abort is not an error)
       const errorCalls = vi
         .mocked(mockEventBus.emitAutoModeEvent)
         .mock.calls.filter((call) => call[0] === 'auto_mode_error');
@@ -1339,8 +1392,8 @@ describe('execution-service.ts', () => {
     it('handles missing agent output gracefully', async () => {
       vi.mocked(secureFs.readFile).mockRejectedValue(new Error('ENOENT'));
 
-      // Should not throw
-      await service.executeFeature('/test/project', 'feature-1');
+      // Should not throw (isAutoMode=true so event is emitted)
+      await service.executeFeature('/test/project', 'feature-1', false, true);
 
       // Feature should still complete successfully
       expect(mockEventBus.emitAutoModeEvent).toHaveBeenCalledWith(

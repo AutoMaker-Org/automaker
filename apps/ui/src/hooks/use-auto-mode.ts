@@ -108,10 +108,17 @@ export function useAutoMode(worktree?: WorktreeInfo) {
   // Derive branchName from worktree:
   // If worktree is provided, use its branch name (even for main worktree, as it might be on a feature branch)
   // If not provided, default to null (main worktree default)
+  // IMPORTANT: Depend on primitive values (isMain, branch) instead of the worktree object
+  // reference to avoid re-computing when the parent passes a new object with the same values.
+  // This prevents a cascading re-render loop: new worktree ref → new branchName useMemo →
+  // new refreshStatus callback → effect re-fires → store update → re-render → React error #185.
+  const worktreeIsMain = worktree?.isMain;
+  const worktreeBranch = worktree?.branch;
+  const hasWorktree = worktree !== undefined;
   const branchName = useMemo(() => {
-    if (!worktree) return null;
-    return worktree.isMain ? null : worktree.branch || null;
-  }, [worktree]);
+    if (!hasWorktree) return null;
+    return worktreeIsMain ? null : worktreeBranch || null;
+  }, [hasWorktree, worktreeIsMain, worktreeBranch]);
 
   // Helper to look up project ID from path
   const getProjectIdFromPath = useCallback(

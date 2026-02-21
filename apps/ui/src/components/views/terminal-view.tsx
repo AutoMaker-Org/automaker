@@ -16,6 +16,9 @@ import {
   GitBranch,
   ChevronDown,
   FolderGit,
+  Palette,
+  RotateCcw,
+  Type,
 } from 'lucide-react';
 import { Spinner } from '@/components/ui/spinner';
 import { getServerUrlSync } from '@/lib/http-api-client';
@@ -276,6 +279,8 @@ export function TerminalView({
     setTerminalLineHeight,
     setTerminalScrollbackLines,
     setTerminalScreenReaderMode,
+    setTerminalBackgroundColor,
+    setTerminalForegroundColor,
     updateTerminalPanelSizes,
     currentWorktreeByProject,
     worktreesByProject,
@@ -1995,6 +2000,119 @@ export function TerminalView({
                         });
                       }}
                     />
+                  </div>
+
+                  {/* Background Color */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs font-medium">Background Color</Label>
+                      {terminalState.customBackgroundColor && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-5 w-5"
+                          onClick={() => setTerminalBackgroundColor(null)}
+                          title="Reset to theme default"
+                        >
+                          <RotateCcw className="h-3 w-3" />
+                        </Button>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div
+                        className="w-7 h-7 rounded border border-border/50 shrink-0 flex items-center justify-center"
+                        style={{
+                          backgroundColor: terminalState.customBackgroundColor || 'var(--card)',
+                        }}
+                      >
+                        <Palette
+                          className={cn(
+                            'h-3 w-3',
+                            terminalState.customBackgroundColor
+                              ? 'text-white/80'
+                              : 'text-muted-foreground'
+                          )}
+                        />
+                      </div>
+                      <Input
+                        type="color"
+                        value={terminalState.customBackgroundColor || '#000000'}
+                        onChange={(e) => setTerminalBackgroundColor(e.target.value)}
+                        className="w-10 h-7 p-0.5 cursor-pointer bg-transparent border-border/50 shrink-0"
+                        title="Pick a background color"
+                      />
+                      <Input
+                        type="text"
+                        value={terminalState.customBackgroundColor || ''}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          if (value === '' || /^#[0-9A-Fa-f]{0,6}$/.test(value)) {
+                            if (value === '' || /^#[0-9A-Fa-f]{6}$/.test(value)) {
+                              setTerminalBackgroundColor(value || null);
+                            }
+                          }
+                        }}
+                        placeholder="#1a1a1a"
+                        className="flex-1 h-7 text-xs font-mono"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Foreground Color */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs font-medium">Foreground Color</Label>
+                      {terminalState.customForegroundColor && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-5 w-5"
+                          onClick={() => setTerminalForegroundColor(null)}
+                          title="Reset to theme default"
+                        >
+                          <RotateCcw className="h-3 w-3" />
+                        </Button>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div
+                        className="w-7 h-7 rounded border border-border/50 shrink-0 flex items-center justify-center"
+                        style={{
+                          backgroundColor:
+                            terminalState.customForegroundColor || 'var(--foreground)',
+                        }}
+                      >
+                        <Type
+                          className={cn(
+                            'h-3 w-3',
+                            terminalState.customForegroundColor
+                              ? 'text-black/80'
+                              : 'text-background'
+                          )}
+                        />
+                      </div>
+                      <Input
+                        type="color"
+                        value={terminalState.customForegroundColor || '#ffffff'}
+                        onChange={(e) => setTerminalForegroundColor(e.target.value)}
+                        className="w-10 h-7 p-0.5 cursor-pointer bg-transparent border-border/50 shrink-0"
+                        title="Pick a foreground color"
+                      />
+                      <Input
+                        type="text"
+                        value={terminalState.customForegroundColor || ''}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          if (value === '' || /^#[0-9A-Fa-f]{0,6}$/.test(value)) {
+                            if (value === '' || /^#[0-9A-Fa-f]{6}$/.test(value)) {
+                              setTerminalForegroundColor(value || null);
+                            }
+                          }
+                        }}
+                        placeholder="#ffffff"
+                        className="flex-1 h-7 text-xs font-mono"
+                      />
+                    </div>
                   </div>
 
                   {/* Screen Reader */}

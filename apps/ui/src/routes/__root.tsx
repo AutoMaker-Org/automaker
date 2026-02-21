@@ -182,25 +182,34 @@ function selectAutoOpenProject(
 
 function RootLayoutContent() {
   const location = useLocation();
-  const {
-    setIpcConnected,
-    projects,
-    currentProject,
-    projectHistory,
-    upsertAndSetCurrentProject,
-    getEffectiveTheme,
-    getEffectiveFontSans,
-    getEffectiveFontMono,
-    // Subscribe to theme and font state to trigger re-renders when they change
-    theme,
-    fontFamilySans,
-    fontFamilyMono,
-    sidebarStyle,
-    skipSandboxWarning,
-    setSkipSandboxWarning,
-    fetchCodexModels,
-  } = useAppStore();
-  const { setupComplete, codexCliStatus } = useSetupStore();
+
+  // IMPORTANT: Use individual selectors instead of bare useAppStore() to prevent
+  // re-rendering on every store mutation. The bare call subscribes to the ENTIRE store,
+  // which during initialization causes cascading re-renders as multiple effects write
+  // to the store (settings hydration, project settings, auto-open, etc.). With enough
+  // rapid mutations, React hits the maximum update depth limit (error #185).
+  //
+  // Each selector only triggers a re-render when its specific slice of state changes.
+  const projects = useAppStore((s) => s.projects);
+  const currentProject = useAppStore((s) => s.currentProject);
+  const projectHistory = useAppStore((s) => s.projectHistory);
+  const sidebarStyle = useAppStore((s) => s.sidebarStyle);
+  const skipSandboxWarning = useAppStore((s) => s.skipSandboxWarning);
+  // Subscribe to theme and font state to trigger re-renders when they change
+  const theme = useAppStore((s) => s.theme);
+  const fontFamilySans = useAppStore((s) => s.fontFamilySans);
+  const fontFamilyMono = useAppStore((s) => s.fontFamilyMono);
+  // Actions (stable references from Zustand - never change between renders)
+  const setIpcConnected = useAppStore((s) => s.setIpcConnected);
+  const upsertAndSetCurrentProject = useAppStore((s) => s.upsertAndSetCurrentProject);
+  const getEffectiveTheme = useAppStore((s) => s.getEffectiveTheme);
+  const getEffectiveFontSans = useAppStore((s) => s.getEffectiveFontSans);
+  const getEffectiveFontMono = useAppStore((s) => s.getEffectiveFontMono);
+  const setSkipSandboxWarning = useAppStore((s) => s.setSkipSandboxWarning);
+  const fetchCodexModels = useAppStore((s) => s.fetchCodexModels);
+
+  const setupComplete = useSetupStore((s) => s.setupComplete);
+  const codexCliStatus = useSetupStore((s) => s.codexCliStatus);
   const navigate = useNavigate();
   const [isMounted, setIsMounted] = useState(false);
   const [streamerPanelOpen, setStreamerPanelOpen] = useState(false);

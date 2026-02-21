@@ -33,6 +33,8 @@ export interface TerminalState {
   maxSessions: number; // Maximum concurrent terminal sessions (server setting)
   lastActiveProjectPath: string | null; // Last project path to detect route changes vs project switches
   openTerminalMode: 'newTab' | 'split'; // How to open terminals from "Open in Terminal" action
+  customBackgroundColor: string | null; // Custom background color override (hex color string, null = use theme default)
+  customForegroundColor: string | null; // Custom foreground/text color override (hex color string, null = use theme default)
 }
 
 // Persisted terminal layout - now includes sessionIds for reconnection
@@ -79,4 +81,6 @@ export interface PersistedTerminalSettings {
   lineHeight: number;
   maxSessions: number;
   openTerminalMode: 'newTab' | 'split';
+  customBackgroundColor: string | null; // Custom background color override (hex color string, null = use theme default)
+  customForegroundColor: string | null; // Custom foreground/text color override (hex color string, null = use theme default)
 }

@@ -991,7 +991,7 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
     const key = get().getWorktreeKey(projectId, branchName);
     set((state) => {
       const current = state.autoModeByWorktree[key] || {
-        isRunning: true,
+        isRunning: false,
         runningTasks: [],
         branchName,
       };
@@ -1945,6 +1945,16 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
   setOpenTerminalMode: (mode) =>
     set((state) => ({
       terminalState: { ...state.terminalState, openTerminalMode: mode },
+    })),
+
+  setTerminalBackgroundColor: (color) =>
+    set((state) => ({
+      terminalState: { ...state.terminalState, customBackgroundColor: color },
+    })),
+
+  setTerminalForegroundColor: (color) =>
+    set((state) => ({
+      terminalState: { ...state.terminalState, customForegroundColor: color },
     })),
 
   addTerminalTab: (name) => {

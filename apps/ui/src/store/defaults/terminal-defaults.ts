@@ -18,4 +18,6 @@ export const defaultTerminalState: TerminalState = {
   maxSessions: 100,
   lastActiveProjectPath: null,
   openTerminalMode: 'newTab',
+  customBackgroundColor: null,
+  customForegroundColor: null,
 };

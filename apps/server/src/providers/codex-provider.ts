@@ -738,6 +738,16 @@ export class CodexProvider extends BaseProvider {
       );
       const baseSystemPrompt = resolveSystemPrompt(options.systemPrompt);
       const resolvedMaxTurns = resolveMaxTurns(options.maxTurns);
+      if (resolvedMaxTurns === null && options.maxTurns === undefined) {
+        logger.warn(
+          `[executeQuery] maxTurns not provided — Codex CLI will use its internal default. ` +
+            `This may cause premature completion. Model: ${options.model}`
+        );
+      } else {
+        logger.info(
+          `[executeQuery] maxTurns: requested=${options.maxTurns}, resolved=${resolvedMaxTurns}, model=${options.model}`
+        );
+      }
       const resolvedAllowedTools = options.allowedTools ?? Array.from(DEFAULT_ALLOWED_TOOLS);
       const restrictTools = !hasMcpServers || options.mcpUnrestrictedTools === false;
       const wantsOutputSchema = Boolean(

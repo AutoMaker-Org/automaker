@@ -92,9 +92,9 @@ export function GitHubPRsView() {
 
         // Start the feature immediately after creation
         const api = getElectronAPI();
-        if (api.features?.run) {
+        if (api.autoMode?.runFeature) {
           try {
-            await api.features.run(currentProject.path, featureId);
+            await api.autoMode.runFeature(currentProject.path, featureId);
             toast.success('Feature created and started', {
               description: `Addressing review comments on PR #${pr.number}`,
             });

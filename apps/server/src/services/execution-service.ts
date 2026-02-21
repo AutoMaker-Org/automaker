@@ -441,28 +441,32 @@ Please continue from where you left off and complete all remaining tasks. Use th
       if (hasIncompleteTasks)
         completionMessage += ` (${completedTasks}/${totalTasks} tasks completed)`;
 
-      this.eventBus.emitAutoModeEvent('auto_mode_feature_complete', {
-        featureId,
-        featureName: feature.title,
-        branchName: feature.branchName ?? null,
-        passes: true,
-        message: completionMessage,
-        projectPath,
-        model: tempRunningFeature.model,
-        provider: tempRunningFeature.provider,
-      });
+      if (isAutoMode) {
+        this.eventBus.emitAutoModeEvent('auto_mode_feature_complete', {
+          featureId,
+          featureName: feature.title,
+          branchName: feature.branchName ?? null,
+          passes: true,
+          message: completionMessage,
+          projectPath,
+          model: tempRunningFeature.model,
+          provider: tempRunningFeature.provider,
+        });
+      }
     } catch (error) {
       const errorInfo = classifyError(error);
       if (errorInfo.isAbort) {
         await this.updateFeatureStatusFn(projectPath, featureId, 'interrupted');
-        this.eventBus.emitAutoModeEvent('auto_mode_feature_complete', {
-          featureId,
-          featureName: feature?.title,
-          branchName: feature?.branchName ?? null,
-          passes: false,
-          message: 'Feature stopped by user',
-          projectPath,
-        });
+        if (isAutoMode) {
+          this.eventBus.emitAutoModeEvent('auto_mode_feature_complete', {
+            featureId,
+            featureName: feature?.title,
+            branchName: feature?.branchName ?? null,
+            passes: false,
+            message: 'Feature stopped by user',
+            projectPath,
+          });
+        }
       } else {
         logger.error(`Feature ${featureId} failed:`, error);
         await this.updateFeatureStatusFn(projectPath, featureId, 'backlog');

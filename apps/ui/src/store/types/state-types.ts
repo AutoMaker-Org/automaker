@@ -708,6 +708,8 @@ export interface AppActions {
   setTerminalMaxSessions: (maxSessions: number) => void;
   setTerminalLastActiveProjectPath: (projectPath: string | null) => void;
   setOpenTerminalMode: (mode: 'newTab' | 'split') => void;
+  setTerminalBackgroundColor: (color: string | null) => void;
+  setTerminalForegroundColor: (color: string | null) => void;
   addTerminalTab: (name?: string) => string;
   removeTerminalTab: (tabId: string) => void;
   setActiveTerminalTab: (tabId: string) => void;

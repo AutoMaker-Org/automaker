@@ -459,13 +459,21 @@ export function BoardView() {
     prevWorktreePathRef.current = currentWorktreePath;
   }, [currentWorktreePath, currentProject?.path, queryClient]);
 
-  const worktreesByProject = useAppStore((s) => s.worktreesByProject);
-  const worktrees = useMemo(
-    () =>
-      currentProject
-        ? (worktreesByProject[currentProject.path] ?? EMPTY_WORKTREES)
-        : EMPTY_WORKTREES,
-    [currentProject, worktreesByProject]
+  // Select worktrees for the current project directly from the store.
+  // Using a project-scoped selector prevents re-renders when OTHER projects'
+  // worktrees change (the old selector subscribed to the entire worktreesByProject
+  // object, causing unnecessary re-renders that cascaded into selectedWorktree →
+  // useAutoMode → refreshStatus → setAutoModeRunning → store update → re-render loop
+  // that could trigger React error #185 on initial project open).
+  const currentProjectPath = currentProject?.path;
+  const worktrees = useAppStore(
+    useCallback(
+      (s) =>
+        currentProjectPath
+          ? (s.worktreesByProject[currentProjectPath] ?? EMPTY_WORKTREES)
+          : EMPTY_WORKTREES,
+      [currentProjectPath]
+    )
   );
 
   // Get the branch for the currently selected worktree

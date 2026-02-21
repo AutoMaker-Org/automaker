@@ -99,10 +99,23 @@ export class AgentExecutor {
       workDir,
       false
     );
+    const resolvedMaxTurns = sdkOptions?.maxTurns;
+    if (!resolvedMaxTurns) {
+      logger.warn(
+        `[execute] Feature ${featureId}: sdkOptions.maxTurns is not set (undefined). ` +
+          `The provider will use its internal default, which may cause premature completion. ` +
+          `Model: ${effectiveBareModel}`
+      );
+    } else {
+      logger.info(
+        `[execute] Feature ${featureId}: maxTurns=${resolvedMaxTurns}, model=${effectiveBareModel}`
+      );
+    }
+
     const executeOptions: ExecuteOptions = {
       prompt: promptContent,
       model: effectiveBareModel,
-      maxTurns: sdkOptions?.maxTurns,
+      maxTurns: resolvedMaxTurns,
       cwd: workDir,
       allowedTools: sdkOptions?.allowedTools as string[] | undefined,
       abortController,
@@ -279,6 +292,13 @@ export class AgentExecutor {
           throw new Error(AgentExecutor.sanitizeProviderError(msg.error));
         } else if (msg.type === 'result' && msg.subtype === 'success') scheduleWrite();
       }
+
+      const streamElapsedMs = Date.now() - streamStartTime;
+      logger.info(
+        `[execute] Stream ended for feature ${featureId} after ${Math.round(streamElapsedMs / 1000)}s. ` +
+          `aborted=${aborted}, specDetected=${specDetected}, responseLength=${responseText.length}`
+      );
+
       await writeToFile();
       if (enableRawOutput && rawOutputLines.length > 0) {
         try {
@@ -351,8 +371,13 @@ export class AgentExecutor {
         taskPrompts.taskExecution.taskPromptTemplate,
         userFeedback
       );
+      const taskMaxTurns = Math.min(sdkOptions?.maxTurns ?? 100, 100);
+      logger.info(
+        `[executeTasksLoop] Feature ${featureId}, task ${task.id} (${taskIndex + 1}/${tasks.length}): ` +
+          `maxTurns=${taskMaxTurns} (sdkOptions.maxTurns=${sdkOptions?.maxTurns ?? 'undefined'})`
+      );
       const taskStream = provider.executeQuery(
-        this.buildExecOpts(options, taskPrompt, Math.min(sdkOptions?.maxTurns ?? 100, 100))
+        this.buildExecOpts(options, taskPrompt, taskMaxTurns)
       );
       let taskOutput = '',
         taskStartDetected = false,

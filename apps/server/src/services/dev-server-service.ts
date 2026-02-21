@@ -19,6 +19,10 @@ const logger = createLogger('DevServerService');
 // Maximum scrollback buffer size (characters) - matches TerminalService pattern
 const MAX_SCROLLBACK_SIZE = 50000; // ~50KB per dev server
 
+// Timeout (ms) before falling back to the allocated port if URL detection hasn't succeeded.
+// This handles cases where the dev server output format is not recognized by any pattern.
+const URL_DETECTION_TIMEOUT_MS = 30_000;
+
 // URL patterns for detecting full URLs from dev server output.
 // Defined once at module level to avoid reallocation on every call to detectUrlFromOutput.
 // Ordered from most specific (framework-specific) to least specific.
@@ -102,6 +106,8 @@ export interface DevServerInfo {
   stopping: boolean;
   // Flag to indicate if URL has been detected from output
   urlDetected: boolean;
+  // Timer for URL detection timeout fallback
+  urlDetectionTimeout: NodeJS.Timeout | null;
 }
 
 // Port allocation starts at 3001 to avoid conflicts with common dev ports
@@ -253,6 +259,12 @@ class DevServerService {
           server.url = detectedUrl;
           server.urlDetected = true;
 
+          // Clear the URL detection timeout since we found the URL
+          if (server.urlDetectionTimeout) {
+            clearTimeout(server.urlDetectionTimeout);
+            server.urlDetectionTimeout = null;
+          }
+
           // Update the port to match the detected URL's actual port
           const detectedPort = this.extractPortFromUrl(detectedUrl);
           if (detectedPort && detectedPort !== server.port) {
@@ -290,6 +302,12 @@ class DevServerService {
           const detectedUrl = `http://localhost:${detectedPort}`;
           server.url = detectedUrl;
           server.urlDetected = true;
+
+          // Clear the URL detection timeout since we found the port
+          if (server.urlDetectionTimeout) {
+            clearTimeout(server.urlDetectionTimeout);
+            server.urlDetectionTimeout = null;
+          }
 
           if (detectedPort !== server.port) {
             logger.info(
@@ -669,6 +687,7 @@ class DevServerService {
       flushTimeout: null,
       stopping: false,
       urlDetected: false, // Will be set to true when actual URL is detected from output
+      urlDetectionTimeout: null, // Will be set after server starts successfully
     };
 
     // Capture stdout with buffer management and event emission
@@ -690,6 +709,12 @@ class DevServerService {
       if (serverInfo.flushTimeout) {
         clearTimeout(serverInfo.flushTimeout);
         serverInfo.flushTimeout = null;
+      }
+
+      // Clear URL detection timeout to prevent stale fallback emission
+      if (serverInfo.urlDetectionTimeout) {
+        clearTimeout(serverInfo.urlDetectionTimeout);
+        serverInfo.urlDetectionTimeout = null;
       }
 
       // Emit stopped event (only if not already stopping - prevents duplicate events)
@@ -749,6 +774,43 @@ class DevServerService {
       });
     }
 
+    // Set up URL detection timeout fallback.
+    // If URL detection hasn't succeeded after URL_DETECTION_TIMEOUT_MS, check if
+    // the allocated port is actually in use (server probably started successfully)
+    // and emit a url-detected event with the allocated port as fallback.
+    // Also re-scan the scrollback buffer in case the URL was printed before
+    // our patterns could match (e.g., it was split across multiple data chunks).
+    serverInfo.urlDetectionTimeout = setTimeout(() => {
+      serverInfo.urlDetectionTimeout = null;
+
+      // Only run fallback if server is still running and URL wasn't detected
+      if (serverInfo.stopping || serverInfo.urlDetected || !this.runningServers.has(worktreePath)) {
+        return;
+      }
+
+      // Re-scan the entire scrollback buffer for URL patterns
+      // This catches cases where the URL was split across multiple output chunks
+      logger.info(`URL detection timeout for ${worktreePath}, re-scanning scrollback buffer`);
+      this.detectUrlFromOutput(serverInfo, serverInfo.scrollbackBuffer);
+
+      // If still not detected after full rescan, use the allocated port as fallback
+      if (!serverInfo.urlDetected) {
+        logger.info(`URL detection fallback: using allocated port ${port} for ${worktreePath}`);
+        const fallbackUrl = `http://${hostname}:${port}`;
+        serverInfo.url = fallbackUrl;
+        serverInfo.urlDetected = true;
+
+        if (this.emitter) {
+          this.emitter.emit('dev-server:url-detected', {
+            worktreePath,
+            url: fallbackUrl,
+            port,
+            timestamp: new Date().toISOString(),
+          });
+        }
+      }
+    }, URL_DETECTION_TIMEOUT_MS);
+
     return {
       success: true,
       result: {
@@ -794,6 +856,12 @@ class DevServerService {
       server.flushTimeout = null;
     }
 
+    // Clean up URL detection timeout
+    if (server.urlDetectionTimeout) {
+      clearTimeout(server.urlDetectionTimeout);
+      server.urlDetectionTimeout = null;
+    }
+
     // Clear any pending output buffer
     server.outputBuffer = '';
 
@@ -827,6 +895,7 @@ class DevServerService {
 
   /**
    * List all running dev servers
+   * Also verifies that each server's process is still alive, removing stale entries
    */
   listDevServers(): {
     success: boolean;
@@ -836,14 +905,43 @@ class DevServerService {
         port: number;
         url: string;
         urlDetected: boolean;
+        startedAt: string;
       }>;
     };
   } {
+    // Prune any servers whose process has died without us being notified
+    // This handles edge cases where the process exited but the 'exit' event was missed
+    const stalePaths: string[] = [];
+    for (const [worktreePath, server] of this.runningServers) {
+      // Check if exitCode is a number (not null/undefined) - indicates process has exited
+      if (server.process && typeof server.process.exitCode === 'number') {
+        logger.info(
+          `Pruning stale server entry for ${worktreePath} (process exited with code ${server.process.exitCode})`
+        );
+        stalePaths.push(worktreePath);
+      }
+    }
+    for (const stalePath of stalePaths) {
+      const server = this.runningServers.get(stalePath);
+      if (server) {
+        // Clean up timers
+        if (server.flushTimeout) {
+          clearTimeout(server.flushTimeout);
+        }
+        if (server.urlDetectionTimeout) {
+          clearTimeout(server.urlDetectionTimeout);
+        }
+        this.allocatedPorts.delete(server.port);
+      }
+      this.runningServers.delete(stalePath);
+    }
+
     const servers = Array.from(this.runningServers.values()).map((s) => ({
       worktreePath: s.worktreePath,
       port: s.port,
       url: s.url,
       urlDetected: s.urlDetected,
+      startedAt: s.startedAt.toISOString(),
     }));
 
     return {

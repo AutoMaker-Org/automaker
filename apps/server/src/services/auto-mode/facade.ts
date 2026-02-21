@@ -20,8 +20,12 @@ import { resolveModelString } from '@automaker/model-resolver';
 import { createLogger, loadContextFiles, classifyError } from '@automaker/utils';
 import { getFeatureDir } from '@automaker/platform';
 import * as secureFs from '../../lib/secure-fs.js';
-import { validateWorkingDirectory } from '../../lib/sdk-options.js';
-import { getPromptCustomization, getProviderByModelId } from '../../lib/settings-helpers.js';
+import { validateWorkingDirectory, createAutoModeOptions } from '../../lib/sdk-options.js';
+import {
+  getPromptCustomization,
+  getProviderByModelId,
+  getMCPServersFromSettings,
+} from '../../lib/settings-helpers.js';
 import { execGitCommand } from '@automaker/git-utils';
 import { TypedEventBus } from '../typed-event-bus.js';
 import { ConcurrencyManager } from '../concurrency-manager.js';
@@ -234,6 +238,41 @@ export class AutoModeServiceFacade {
           }
         }
 
+        // Build sdkOptions with proper maxTurns and allowedTools for auto-mode.
+        // Without this, maxTurns would be undefined, causing providers to use their
+        // internal defaults which may be much lower than intended (e.g., Codex CLI's
+        // default turn limit can cause feature runs to stop prematurely).
+        const autoLoadClaudeMd = opts?.autoLoadClaudeMd ?? false;
+        let mcpServers: Record<string, unknown> | undefined;
+        try {
+          if (settingsService) {
+            const servers = await getMCPServersFromSettings(settingsService, '[AutoModeFacade]');
+            if (Object.keys(servers).length > 0) {
+              mcpServers = servers;
+            }
+          }
+        } catch {
+          // MCP servers are optional - continue without them
+        }
+
+        const sdkOpts = createAutoModeOptions({
+          cwd: workDir,
+          model: resolvedModel,
+          systemPrompt: opts?.systemPrompt,
+          abortController,
+          autoLoadClaudeMd,
+          thinkingLevel: opts?.thinkingLevel,
+          mcpServers: mcpServers as
+            | Record<string, import('@automaker/types').McpServerConfig>
+            | undefined,
+        });
+
+        logger.info(
+          `[createRunAgentFn] Feature ${featureId}: model=${resolvedModel}, ` +
+            `maxTurns=${sdkOpts.maxTurns}, allowedTools=${(sdkOpts.allowedTools as string[])?.length ?? 'default'}, ` +
+            `provider=${provider.getName()}`
+        );
+
         await agentExecutor.execute(
           {
             workDir,
@@ -254,6 +293,15 @@ export class AutoModeServiceFacade {
             effectiveBareModel,
             credentials,
             claudeCompatibleProvider,
+            mcpServers,
+            sdkOptions: {
+              maxTurns: sdkOpts.maxTurns,
+              allowedTools: sdkOpts.allowedTools as string[] | undefined,
+              systemPrompt: sdkOpts.systemPrompt,
+              settingSources: sdkOpts.settingSources as
+                | Array<'user' | 'project' | 'local'>
+                | undefined,
+            },
           },
           {
             waitForApproval: (fId, projPath) => planApprovalService.waitForApproval(fId, projPath),
@@ -702,16 +750,19 @@ export class AutoModeServiceFacade {
       }
     }
 
-    this.eventBus.emitAutoModeEvent('auto_mode_feature_complete', {
-      featureId,
-      featureName: feature?.title,
-      branchName: feature?.branchName ?? null,
-      passes: allPassed,
-      message: allPassed
-        ? 'All verification checks passed'
-        : `Verification failed: ${results.find((r) => !r.passed)?.check || 'Unknown'}`,
-      projectPath: this.projectPath,
-    });
+    const runningEntryForVerify = this.concurrencyManager.getRunningFeature(featureId);
+    if (runningEntryForVerify?.isAutoMode) {
+      this.eventBus.emitAutoModeEvent('auto_mode_feature_complete', {
+        featureId,
+        featureName: feature?.title,
+        branchName: feature?.branchName ?? null,
+        passes: allPassed,
+        message: allPassed
+          ? 'All verification checks passed'
+          : `Verification failed: ${results.find((r) => !r.passed)?.check || 'Unknown'}`,
+        projectPath: this.projectPath,
+      });
+    }
 
     return allPassed;
   }
@@ -761,14 +812,17 @@ export class AutoModeServiceFacade {
       await execGitCommand(['commit', '-m', commitMessage], workDir);
       const hash = await execGitCommand(['rev-parse', 'HEAD'], workDir);
 
-      this.eventBus.emitAutoModeEvent('auto_mode_feature_complete', {
-        featureId,
-        featureName: feature?.title,
-        branchName: feature?.branchName ?? null,
-        passes: true,
-        message: `Changes committed: ${hash.trim().substring(0, 8)}`,
-        projectPath: this.projectPath,
-      });
+      const runningEntryForCommit = this.concurrencyManager.getRunningFeature(featureId);
+      if (runningEntryForCommit?.isAutoMode) {
+        this.eventBus.emitAutoModeEvent('auto_mode_feature_complete', {
+          featureId,
+          featureName: feature?.title,
+          branchName: feature?.branchName ?? null,
+          passes: true,
+          message: `Changes committed: ${hash.trim().substring(0, 8)}`,
+          projectPath: this.projectPath,
+        });
+      }
 
       return hash.trim();
     } catch (error) {

@@ -26,7 +26,6 @@ export function useProjectSettingsLoader() {
     (state) => state.setAutoDismissInitScriptIndicator
   );
   const setWorktreeCopyFiles = useAppStore((state) => state.setWorktreeCopyFiles);
-  const setCurrentProject = useAppStore((state) => state.setCurrentProject);
 
   const appliedProjectRef = useRef<{ path: string; dataUpdatedAt: number } | null>(null);
 
@@ -132,14 +131,16 @@ export function useProjectSettingsLoader() {
           ...(phaseModelOverrides !== undefined && { phaseModelOverrides }),
         };
 
-        // Update currentProject
-        setCurrentProject(updatedProjectData);
-
-        // Also update the project in the projects array to keep them in sync
+        // Update both currentProject and projects array in a single setState call
+        // to avoid two separate re-renders that can cascade during initialization
+        // and contribute to React error #185 (maximum update depth exceeded).
         const updatedProjects = storeState.projects.map((p) =>
           p.id === updatedProject.id ? updatedProjectData : p
         );
-        useAppStore.setState({ projects: updatedProjects });
+        useAppStore.setState({
+          currentProject: updatedProjectData,
+          projects: updatedProjects,
+        });
       }
     }
   }, [
@@ -159,6 +160,5 @@ export function useProjectSettingsLoader() {
     setDefaultDeleteBranch,
     setAutoDismissInitScriptIndicator,
     setWorktreeCopyFiles,
-    setCurrentProject,
   ]);
 }

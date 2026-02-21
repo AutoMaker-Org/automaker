@@ -9,12 +9,12 @@
 import type { ThemeMode } from '@automaker/types';
 import type { TerminalTheme } from './rc-generator.js';
 
-// Dark theme (default)
+// Dark theme (default) - true black background with white foreground
 const darkTheme: TerminalTheme = {
-  background: '#0a0a0a',
-  foreground: '#d4d4d4',
-  cursor: '#d4d4d4',
-  cursorAccent: '#0a0a0a',
+  background: '#000000',
+  foreground: '#ffffff',
+  cursor: '#ffffff',
+  cursorAccent: '#000000',
   selectionBackground: '#264f78',
   black: '#1e1e1e',
   red: '#f44747',

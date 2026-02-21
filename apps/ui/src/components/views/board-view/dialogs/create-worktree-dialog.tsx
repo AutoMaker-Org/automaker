@@ -284,11 +284,33 @@ export function CreateWorktreeDialog({
 
       if (result.success && result.worktree) {
         const baseDesc = effectiveBaseBranch ? ` from ${effectiveBaseBranch}` : '';
-        toast.success(`Worktree created for branch "${result.worktree.branch}"`, {
-          description: result.worktree.isNew
-            ? `New branch created${baseDesc}`
-            : 'Using existing branch',
-        });
+        const commitInfo = result.worktree.baseCommitHash
+          ? ` (${result.worktree.baseCommitHash})`
+          : '';
+
+        // Show sync result feedback
+        const syncResult = result.worktree.syncResult;
+        if (syncResult?.diverged) {
+          // Branch had diverged — warn the user
+          toast.warning(`Worktree created for branch "${result.worktree.branch}"`, {
+            description: `${syncResult.message}`,
+            duration: 8000,
+          });
+        } else if (syncResult && !syncResult.synced && syncResult.message) {
+          // Sync was attempted but failed (network error, etc.)
+          toast.warning(`Worktree created for branch "${result.worktree.branch}"`, {
+            description: `Created with local copy. ${syncResult.message}`,
+            duration: 6000,
+          });
+        } else {
+          // Normal success — include commit info if available
+          toast.success(`Worktree created for branch "${result.worktree.branch}"`, {
+            description: result.worktree.isNew
+              ? `New branch created${baseDesc}${commitInfo}`
+              : `Using existing branch${commitInfo}`,
+          });
+        }
+
         onCreated({ path: result.worktree.path, branch: result.worktree.branch });
         onOpenChange(false);
         setBranchName('');
@@ -414,6 +436,12 @@ export function CreateWorktreeDialog({
                     <span>Remote branch — will fetch latest before creating worktree</span>
                   </div>
                 )}
+                {!isRemoteBaseBranch && baseBranch && !branchFetchError && (
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <RefreshCw className="w-3 h-3" />
+                    <span>Will sync with remote tracking branch if available</span>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -454,7 +482,7 @@ export function CreateWorktreeDialog({
             {isLoading ? (
               <>
                 <Spinner size="sm" className="mr-2" />
-                {isRemoteBaseBranch ? 'Fetching & Creating...' : 'Creating...'}
+                {baseBranch.trim() ? 'Syncing & Creating...' : 'Creating...'}
               </>
             ) : (
               <>

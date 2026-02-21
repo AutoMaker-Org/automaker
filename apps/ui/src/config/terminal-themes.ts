@@ -81,12 +81,12 @@ export function getTerminalFontFamily(fontValue: string | undefined): string {
   return fontValue;
 }
 
-// Dark theme (default)
+// Dark theme (default) - true black background with white foreground
 const darkTheme: TerminalTheme = {
-  background: '#0a0a0a',
-  foreground: '#d4d4d4',
-  cursor: '#d4d4d4',
-  cursorAccent: '#0a0a0a',
+  background: '#000000',
+  foreground: '#ffffff',
+  cursor: '#ffffff',
+  cursorAccent: '#000000',
   selectionBackground: '#264f78',
   black: '#1e1e1e',
   red: '#f44747',
@@ -624,6 +624,31 @@ export function getTerminalTheme(theme: ThemeMode): TerminalTheme {
     return darkTheme; // Default to dark for SSR
   }
   return terminalThemes[theme] || darkTheme;
+}
+
+/**
+ * Get terminal theme with optional custom color overrides
+ * @param theme - The app theme mode
+ * @param customBackgroundColor - Optional custom background color (hex string) to override theme default
+ * @param customForegroundColor - Optional custom foreground/text color (hex string) to override theme default
+ * @returns Terminal theme with custom colors if provided
+ */
+export function getTerminalThemeWithOverride(
+  theme: ThemeMode,
+  customBackgroundColor: string | null,
+  customForegroundColor?: string | null
+): TerminalTheme {
+  const baseTheme = getTerminalTheme(theme);
+
+  if (customBackgroundColor || customForegroundColor) {
+    return {
+      ...baseTheme,
+      ...(customBackgroundColor && { background: customBackgroundColor }),
+      ...(customForegroundColor && { foreground: customForegroundColor }),
+    };
+  }
+
+  return baseTheme;
 }
 
 export default terminalThemes;

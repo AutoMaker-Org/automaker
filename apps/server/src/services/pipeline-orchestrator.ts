@@ -226,14 +226,17 @@ export class PipelineOrchestrator {
       logger.warn(`Step ${pipelineInfo.stepId} no longer exists, completing feature`);
       const finalStatus = feature.skipTests ? 'waiting_approval' : 'verified';
       await this.updateFeatureStatusFn(projectPath, featureId, finalStatus);
-      this.eventBus.emitAutoModeEvent('auto_mode_feature_complete', {
-        featureId,
-        featureName: feature.title,
-        branchName: feature.branchName ?? null,
-        passes: true,
-        message: 'Pipeline step no longer exists',
-        projectPath,
-      });
+      const runningEntryForStep = this.concurrencyManager.getRunningFeature(featureId);
+      if (runningEntryForStep?.isAutoMode) {
+        this.eventBus.emitAutoModeEvent('auto_mode_feature_complete', {
+          featureId,
+          featureName: feature.title,
+          branchName: feature.branchName ?? null,
+          passes: true,
+          message: 'Pipeline step no longer exists',
+          projectPath,
+        });
+      }
       return;
     }
 
@@ -272,14 +275,17 @@ export class PipelineOrchestrator {
       );
       if (!pipelineService.isPipelineStatus(nextStatus)) {
         await this.updateFeatureStatusFn(projectPath, featureId, nextStatus);
-        this.eventBus.emitAutoModeEvent('auto_mode_feature_complete', {
-          featureId,
-          featureName: feature.title,
-          branchName: feature.branchName ?? null,
-          passes: true,
-          message: 'Pipeline completed (remaining steps excluded)',
-          projectPath,
-        });
+        const runningEntryForExcluded = this.concurrencyManager.getRunningFeature(featureId);
+        if (runningEntryForExcluded?.isAutoMode) {
+          this.eventBus.emitAutoModeEvent('auto_mode_feature_complete', {
+            featureId,
+            featureName: feature.title,
+            branchName: feature.branchName ?? null,
+            passes: true,
+            message: 'Pipeline completed (remaining steps excluded)',
+            projectPath,
+          });
+        }
         return;
       }
       const nextStepId = pipelineService.getStepIdFromStatus(nextStatus);
@@ -294,14 +300,17 @@ export class PipelineOrchestrator {
     if (stepsToExecute.length === 0) {
       const finalStatus = feature.skipTests ? 'waiting_approval' : 'verified';
       await this.updateFeatureStatusFn(projectPath, featureId, finalStatus);
-      this.eventBus.emitAutoModeEvent('auto_mode_feature_complete', {
-        featureId,
-        featureName: feature.title,
-        branchName: feature.branchName ?? null,
-        passes: true,
-        message: 'Pipeline completed (all steps excluded)',
-        projectPath,
-      });
+      const runningEntryForAllExcluded = this.concurrencyManager.getRunningFeature(featureId);
+      if (runningEntryForAllExcluded?.isAutoMode) {
+        this.eventBus.emitAutoModeEvent('auto_mode_feature_complete', {
+          featureId,
+          featureName: feature.title,
+          branchName: feature.branchName ?? null,
+          passes: true,
+          message: 'Pipeline completed (all steps excluded)',
+          projectPath,
+        });
+      }
       return;
     }
 
@@ -370,25 +379,29 @@ export class PipelineOrchestrator {
         await this.updateFeatureStatusFn(projectPath, featureId, finalStatus);
       }
       logger.info(`Pipeline resume completed for feature ${featureId}`);
-      this.eventBus.emitAutoModeEvent('auto_mode_feature_complete', {
-        featureId,
-        featureName: feature.title,
-        branchName: feature.branchName ?? null,
-        passes: true,
-        message: 'Pipeline resumed successfully',
-        projectPath,
-      });
-    } catch (error) {
-      const errorInfo = classifyError(error);
-      if (errorInfo.isAbort) {
+      if (runningEntry.isAutoMode) {
         this.eventBus.emitAutoModeEvent('auto_mode_feature_complete', {
           featureId,
           featureName: feature.title,
           branchName: feature.branchName ?? null,
-          passes: false,
-          message: 'Pipeline stopped by user',
+          passes: true,
+          message: 'Pipeline resumed successfully',
           projectPath,
         });
+      }
+    } catch (error) {
+      const errorInfo = classifyError(error);
+      if (errorInfo.isAbort) {
+        if (runningEntry.isAutoMode) {
+          this.eventBus.emitAutoModeEvent('auto_mode_feature_complete', {
+            featureId,
+            featureName: feature.title,
+            branchName: feature.branchName ?? null,
+            passes: false,
+            message: 'Pipeline stopped by user',
+            projectPath,
+          });
+        }
       } else {
         logger.error(`Pipeline resume failed for ${featureId}:`, error);
         await this.updateFeatureStatusFn(projectPath, featureId, 'backlog');
@@ -537,14 +550,17 @@ export class PipelineOrchestrator {
       }
 
       logger.info(`Auto-merge successful for feature ${featureId}`);
-      this.eventBus.emitAutoModeEvent('auto_mode_feature_complete', {
-        featureId,
-        featureName: feature.title,
-        branchName,
-        passes: true,
-        message: 'Pipeline completed and merged',
-        projectPath,
-      });
+      const runningEntryForMerge = this.concurrencyManager.getRunningFeature(featureId);
+      if (runningEntryForMerge?.isAutoMode) {
+        this.eventBus.emitAutoModeEvent('auto_mode_feature_complete', {
+          featureId,
+          featureName: feature.title,
+          branchName,
+          passes: true,
+          message: 'Pipeline completed and merged',
+          projectPath,
+        });
+      }
       return { success: true };
     } catch (error) {
       logger.error(`Merge failed for ${featureId}:`, error);

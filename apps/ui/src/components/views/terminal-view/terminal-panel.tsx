@@ -202,16 +202,25 @@ export function TerminalPanel({
   const currentProject = useAppStore((state) => state.currentProject);
 
   // Get terminal settings from store - grouped with shallow comparison to reduce re-renders
-  const { defaultRunScript, screenReaderMode, fontFamily, scrollbackLines, lineHeight } =
-    useAppStore(
-      useShallow((state) => ({
-        defaultRunScript: state.terminalState.defaultRunScript,
-        screenReaderMode: state.terminalState.screenReaderMode,
-        fontFamily: state.terminalState.fontFamily,
-        scrollbackLines: state.terminalState.scrollbackLines,
-        lineHeight: state.terminalState.lineHeight,
-      }))
-    );
+  const {
+    defaultRunScript,
+    screenReaderMode,
+    fontFamily,
+    scrollbackLines,
+    lineHeight,
+    customBackgroundColor,
+    customForegroundColor,
+  } = useAppStore(
+    useShallow((state) => ({
+      defaultRunScript: state.terminalState.defaultRunScript,
+      screenReaderMode: state.terminalState.screenReaderMode,
+      fontFamily: state.terminalState.fontFamily,
+      scrollbackLines: state.terminalState.scrollbackLines,
+      lineHeight: state.terminalState.lineHeight,
+      customBackgroundColor: state.terminalState.customBackgroundColor,
+      customForegroundColor: state.terminalState.customForegroundColor,
+    }))
+  );
 
   // Action setters are stable references, can use individual selectors
   const setTerminalDefaultRunScript = useAppStore((state) => state.setTerminalDefaultRunScript);
@@ -679,7 +688,7 @@ export function TerminalPanel({
       if (!mounted || !terminalRef.current) return;
 
       // Get terminal theme matching the app theme
-      const terminalTheme = getTerminalTheme(themeRef.current);
+      const baseTheme = getTerminalTheme(themeRef.current);
 
       // Get settings from store (read at initialization time)
       const terminalSettings = useAppStore.getState().terminalState;
@@ -687,6 +696,18 @@ export function TerminalPanel({
       const terminalFontFamily = getTerminalFontFamily(terminalSettings.fontFamily);
       const terminalScrollback = terminalSettings.scrollbackLines || 5000;
       const terminalLineHeight = terminalSettings.lineHeight || 1.0;
+      const customBgColor = terminalSettings.customBackgroundColor;
+      const customFgColor = terminalSettings.customForegroundColor;
+
+      // Apply custom colors if set
+      const terminalTheme =
+        customBgColor || customFgColor
+          ? {
+              ...baseTheme,
+              ...(customBgColor && { background: customBgColor }),
+              ...(customFgColor && { foreground: customFgColor }),
+            }
+          : baseTheme;
 
       // Create terminal instance with the current global font size and theme
       const terminal = new Terminal({
@@ -1484,15 +1505,23 @@ export function TerminalPanel({
     }
   }, [fontSize, isTerminalReady]);
 
-  // Update terminal theme when app theme changes (including system preference)
+  // Update terminal theme when app theme or custom colors change (including system preference)
   useEffect(() => {
     if (xtermRef.current && isTerminalReady) {
       // Clear any search decorations first to prevent stale color artifacts
       searchAddonRef.current?.clearDecorations();
-      const terminalTheme = getTerminalTheme(resolvedTheme);
+      const baseTheme = getTerminalTheme(resolvedTheme);
+      const terminalTheme =
+        customBackgroundColor || customForegroundColor
+          ? {
+              ...baseTheme,
+              ...(customBackgroundColor && { background: customBackgroundColor }),
+              ...(customForegroundColor && { foreground: customForegroundColor }),
+            }
+          : baseTheme;
       xtermRef.current.options.theme = terminalTheme;
     }
-  }, [resolvedTheme, isTerminalReady]);
+  }, [resolvedTheme, customBackgroundColor, customForegroundColor, isTerminalReady]);
 
   // Handle keyboard shortcuts for zoom (Ctrl+Plus, Ctrl+Minus, Ctrl+0)
   useEffect(() => {
@@ -1924,6 +1953,9 @@ export function TerminalPanel({
 
   // Get current terminal theme for xterm styling (resolved for system preference)
   const currentTerminalTheme = getTerminalTheme(resolvedTheme);
+
+  // Apply custom background color if set, otherwise use theme default
+  const terminalBackgroundColor = customBackgroundColor ?? currentTerminalTheme.background;
 
   return (
     <div
@@ -2395,7 +2427,7 @@ export function TerminalPanel({
         <div
           ref={terminalRef}
           className="absolute inset-0"
-          style={{ backgroundColor: currentTerminalTheme.background }}
+          style={{ backgroundColor: terminalBackgroundColor }}
           onContextMenu={handleContextMenu}
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
@@ -2456,7 +2488,7 @@ export function TerminalPanel({
               className="flex-1 overflow-auto"
               style={
                 {
-                  backgroundColor: currentTerminalTheme.background,
+                  backgroundColor: terminalBackgroundColor,
                   color: currentTerminalTheme.foreground,
                   fontFamily: getTerminalFontFamily(fontFamily),
                   fontSize: `${fontSize}px`,

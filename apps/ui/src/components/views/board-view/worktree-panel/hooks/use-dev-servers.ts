@@ -7,6 +7,11 @@ import type { DevServerInfo, WorktreeInfo } from '../types';
 
 const logger = createLogger('DevServers');
 
+// Timeout (ms) for port detection before showing a warning to the user
+const PORT_DETECTION_TIMEOUT_MS = 30_000;
+// Interval (ms) for periodic state reconciliation with the backend
+const STATE_RECONCILE_INTERVAL_MS = 5_000;
+
 interface UseDevServersOptions {
   projectPath: string;
 }
@@ -30,12 +35,142 @@ function buildDevServerBrowserUrl(serverUrl: string): string | null {
   }
 }
 
+/**
+ * Show a toast notification for a detected dev server URL.
+ * Extracted to avoid duplication between event handler and reconciliation paths.
+ */
+function showUrlDetectedToast(url: string, port: number): void {
+  const browserUrl = buildDevServerBrowserUrl(url);
+  toast.success(`Dev server running on port ${port}`, {
+    description: browserUrl ? browserUrl : url,
+    action: browserUrl
+      ? {
+          label: 'Open in Browser',
+          onClick: () => {
+            window.open(browserUrl, '_blank', 'noopener,noreferrer');
+          },
+        }
+      : undefined,
+    duration: 8000,
+  });
+}
+
 export function useDevServers({ projectPath }: UseDevServersOptions) {
   const [isStartingDevServer, setIsStartingDevServer] = useState(false);
   const [runningDevServers, setRunningDevServers] = useState<Map<string, DevServerInfo>>(new Map());
 
   // Track which worktrees have had their url-detected toast shown to prevent re-triggering
   const toastShownForRef = useRef<Set<string>>(new Set());
+
+  // Track port detection timeouts per worktree key
+  const portDetectionTimers = useRef<Map<string, NodeJS.Timeout>>(new Map());
+
+  // Track whether initial fetch has completed to avoid reconciliation race
+  const initialFetchDone = useRef(false);
+
+  /**
+   * Clear a port detection timeout for a given key
+   */
+  const clearPortDetectionTimer = useCallback((key: string) => {
+    const timer = portDetectionTimers.current.get(key);
+    if (timer) {
+      clearTimeout(timer);
+      portDetectionTimers.current.delete(key);
+    }
+  }, []);
+
+  /**
+   * Start a port detection timeout for a server that hasn't detected its URL yet.
+   * After PORT_DETECTION_TIMEOUT_MS, if still undetected, show a warning toast
+   * and attempt to reconcile state with the backend.
+   */
+  const startPortDetectionTimer = useCallback(
+    (key: string) => {
+      // Clear any existing timer for this key
+      clearPortDetectionTimer(key);
+
+      const timer = setTimeout(async () => {
+        portDetectionTimers.current.delete(key);
+
+        // Check if the server is still in undetected state
+        setRunningDevServers((prev) => {
+          const server = prev.get(key);
+          if (!server || server.urlDetected) return prev; // Already detected or removed
+
+          // Attempt to reconcile with backend before showing warning
+          logger.warn(`Port detection timeout for ${key} after ${PORT_DETECTION_TIMEOUT_MS}ms`);
+          return prev;
+        });
+
+        // Try to reconcile with backend - the server may have detected the URL
+        // but the WebSocket event was missed
+        try {
+          const api = getElectronAPI();
+          if (!api?.worktree?.listDevServers) return;
+          const result = await api.worktree.listDevServers();
+          if (result.success && result.result?.servers) {
+            const backendServer = result.result.servers.find(
+              (s) => normalizePath(s.worktreePath) === key
+            );
+            if (backendServer && backendServer.urlDetected) {
+              // Backend has detected the URL - update our state
+              logger.info(`Port detection reconciled from backend for ${key}`);
+              setRunningDevServers((prev) => {
+                const next = new Map(prev);
+                next.set(key, {
+                  ...backendServer,
+                  urlDetected: true,
+                });
+                return next;
+              });
+              if (!toastShownForRef.current.has(key)) {
+                toastShownForRef.current.add(key);
+                showUrlDetectedToast(backendServer.url, backendServer.port);
+              }
+              return;
+            }
+
+            if (!backendServer) {
+              // Server is no longer running on the backend - remove from state
+              logger.info(`Server ${key} no longer running on backend, removing from state`);
+              setRunningDevServers((prev) => {
+                if (!prev.has(key)) return prev;
+                const next = new Map(prev);
+                next.delete(key);
+                return next;
+              });
+              toastShownForRef.current.delete(key);
+              return;
+            }
+          }
+        } catch (error) {
+          logger.error('Failed to reconcile port detection:', error);
+        }
+
+        // If we get here, the backend also hasn't detected the URL - show warning
+        toast.warning('Port detection is taking longer than expected', {
+          description:
+            'The dev server may be slow to start, or the port output format is not recognized.',
+          action: {
+            label: 'Retry',
+            onClick: () => {
+              // Use ref to get the latest startPortDetectionTimer, avoiding stale closure
+              startPortDetectionTimerRef.current(key);
+            },
+          },
+          duration: 10000,
+        });
+      }, PORT_DETECTION_TIMEOUT_MS);
+
+      portDetectionTimers.current.set(key, timer);
+    },
+    [clearPortDetectionTimer]
+  );
+
+  // Ref to hold the latest startPortDetectionTimer callback, avoiding stale closures
+  // in long-lived callbacks like toast action handlers
+  const startPortDetectionTimerRef = useRef(startPortDetectionTimer);
+  startPortDetectionTimerRef.current = startPortDetectionTimer;
 
   const fetchDevServers = useCallback(async () => {
     try {
@@ -56,18 +191,113 @@ export function useDevServers({ projectPath }: UseDevServersOptions) {
           // so we don't re-trigger on initial load
           if (server.urlDetected !== false) {
             toastShownForRef.current.add(key);
+            // Clear any pending detection timer since URL is already detected
+            clearPortDetectionTimer(key);
+          } else {
+            // Server running but URL not yet detected - start timeout
+            startPortDetectionTimer(key);
           }
         }
         setRunningDevServers(serversMap);
       }
+      initialFetchDone.current = true;
     } catch (error) {
       logger.error('Failed to fetch dev servers:', error);
+      initialFetchDone.current = true;
     }
-  }, []);
+  }, [clearPortDetectionTimer, startPortDetectionTimer]);
 
   useEffect(() => {
     fetchDevServers();
   }, [fetchDevServers]);
+
+  // Periodic state reconciliation: poll backend to catch missed WebSocket events
+  // This handles edge cases like PWA restart, WebSocket reconnection gaps, etc.
+  useEffect(() => {
+    const reconcile = async () => {
+      if (!initialFetchDone.current) return;
+
+      try {
+        const api = getElectronAPI();
+        if (!api?.worktree?.listDevServers) return;
+
+        const result = await api.worktree.listDevServers();
+        if (!result.success || !result.result?.servers) return;
+
+        const backendServers = new Map<string, (typeof result.result.servers)[number]>();
+        for (const server of result.result.servers) {
+          backendServers.set(normalizePath(server.worktreePath), server);
+        }
+
+        setRunningDevServers((prev) => {
+          let changed = false;
+          const next = new Map(prev);
+
+          // Add or update servers from backend
+          for (const [key, server] of backendServers) {
+            const existing = next.get(key);
+            if (!existing) {
+              // Server running on backend but not in our state - add it
+              logger.info(`Reconciliation: adding missing server ${key}`);
+              next.set(key, {
+                ...server,
+                urlDetected: server.urlDetected ?? true,
+              });
+              if (server.urlDetected !== false) {
+                toastShownForRef.current.add(key);
+                clearPortDetectionTimer(key);
+              }
+              changed = true;
+            } else if (!existing.urlDetected && server.urlDetected) {
+              // URL was detected on backend but we missed the event - update
+              logger.info(`Reconciliation: URL detected for ${key}`);
+              next.set(key, {
+                ...server,
+                urlDetected: true,
+              });
+              clearPortDetectionTimer(key);
+              if (!toastShownForRef.current.has(key)) {
+                toastShownForRef.current.add(key);
+                showUrlDetectedToast(server.url, server.port);
+              }
+              changed = true;
+            } else if (
+              existing.urlDetected &&
+              server.urlDetected &&
+              (existing.port !== server.port || existing.url !== server.url)
+            ) {
+              // Port or URL changed between sessions - update
+              logger.info(`Reconciliation: port/URL changed for ${key}`);
+              next.set(key, {
+                ...server,
+                urlDetected: true,
+              });
+              changed = true;
+            }
+          }
+
+          // Remove servers from our state that are no longer on the backend
+          for (const [key] of next) {
+            if (!backendServers.has(key)) {
+              logger.info(`Reconciliation: removing stale server ${key}`);
+              next.delete(key);
+              toastShownForRef.current.delete(key);
+              clearPortDetectionTimer(key);
+              changed = true;
+            }
+          }
+
+          return changed ? next : prev;
+        });
+      } catch (error) {
+        // Reconciliation failures are non-critical - just log and continue
+        logger.debug('State reconciliation failed:', error);
+      }
+    };
+
+    const intervalId = setInterval(reconcile, STATE_RECONCILE_INTERVAL_MS);
+    return () => clearInterval(intervalId);
+  }, [clearPortDetectionTimer]);
 
   // Subscribe to all dev server lifecycle events for reactive state updates
   useEffect(() => {
@@ -78,10 +308,24 @@ export function useDevServers({ projectPath }: UseDevServersOptions) {
       if (event.type === 'dev-server:url-detected') {
         const { worktreePath, url, port } = event.payload;
         const key = normalizePath(worktreePath);
+        // Clear the port detection timeout since URL was successfully detected
+        clearPortDetectionTimer(key);
         let didUpdate = false;
         setRunningDevServers((prev) => {
           const existing = prev.get(key);
-          if (!existing) return prev;
+          // If the server isn't in our state yet (e.g., race condition on first load
+          // where url-detected arrives before fetchDevServers completes), create the entry
+          if (!existing) {
+            const next = new Map(prev);
+            next.set(key, {
+              worktreePath,
+              url,
+              port,
+              urlDetected: true,
+            });
+            didUpdate = true;
+            return next;
+          }
           // Avoid updating if already detected with same url/port
           if (existing.urlDetected && existing.url === url && existing.port === port) return prev;
           const next = new Map(prev);
@@ -99,25 +343,15 @@ export function useDevServers({ projectPath }: UseDevServersOptions) {
           // Only show toast on the transition from undetected → detected (not on re-renders/polls)
           if (!toastShownForRef.current.has(key)) {
             toastShownForRef.current.add(key);
-            const browserUrl = buildDevServerBrowserUrl(url);
-            toast.success(`Dev server running on port ${port}`, {
-              description: browserUrl ? browserUrl : url,
-              action: browserUrl
-                ? {
-                    label: 'Open in Browser',
-                    onClick: () => {
-                      window.open(browserUrl, '_blank', 'noopener,noreferrer');
-                    },
-                  }
-                : undefined,
-              duration: 8000,
-            });
+            showUrlDetectedToast(url, port);
           }
         }
       } else if (event.type === 'dev-server:stopped') {
         // Reactively remove the server from state when it stops
         const { worktreePath } = event.payload;
         const key = normalizePath(worktreePath);
+        // Clear any pending port detection timeout
+        clearPortDetectionTimer(key);
         setRunningDevServers((prev) => {
           if (!prev.has(key)) return prev;
           const next = new Map(prev);
@@ -143,10 +377,22 @@ export function useDevServers({ projectPath }: UseDevServersOptions) {
           });
           return next;
         });
+        // Start port detection timeout for the new server
+        startPortDetectionTimer(key);
       }
     });
 
     return unsubscribe;
+  }, [clearPortDetectionTimer, startPortDetectionTimer]);
+
+  // Cleanup all port detection timers on unmount
+  useEffect(() => {
+    return () => {
+      for (const timer of portDetectionTimers.current.values()) {
+        clearTimeout(timer);
+      }
+      portDetectionTimers.current.clear();
+    };
   }, []);
 
   const getWorktreeKey = useCallback(
@@ -186,6 +432,8 @@ export function useDevServers({ projectPath }: UseDevServersOptions) {
             });
             return next;
           });
+          // Start port detection timeout
+          startPortDetectionTimer(key);
           toast.success('Dev server started, detecting port...');
         } else {
           toast.error(result.error || 'Failed to start dev server');
@@ -197,7 +445,7 @@ export function useDevServers({ projectPath }: UseDevServersOptions) {
         setIsStartingDevServer(false);
       }
     },
-    [isStartingDevServer, projectPath]
+    [isStartingDevServer, projectPath, startPortDetectionTimer]
   );
 
   const handleStopDevServer = useCallback(
@@ -214,6 +462,8 @@ export function useDevServers({ projectPath }: UseDevServersOptions) {
 
         if (result.success) {
           const key = normalizePath(targetPath);
+          // Clear port detection timeout
+          clearPortDetectionTimer(key);
           setRunningDevServers((prev) => {
             const next = new Map(prev);
             next.delete(key);
@@ -230,7 +480,7 @@ export function useDevServers({ projectPath }: UseDevServersOptions) {
         toast.error('Failed to stop dev server');
       }
     },
-    [projectPath]
+    [projectPath, clearPortDetectionTimer]
   );
 
   const handleOpenDevServerUrl = useCallback(

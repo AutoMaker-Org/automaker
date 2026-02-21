@@ -170,13 +170,15 @@ export class EventHookService {
 
     // Build context for variable substitution
     // Use loaded featureName (from feature.title) or fall back to payload.featureName
+    // Only populate error/errorType for error triggers - don't leak success messages into error fields
+    const isErrorTrigger = trigger === 'feature_error' || trigger === 'auto_mode_error';
     const context: HookContext = {
       featureId: payload.featureId,
       featureName: featureName || payload.featureName,
       projectPath: payload.projectPath,
       projectName: payload.projectPath ? this.extractProjectName(payload.projectPath) : undefined,
-      error: payload.error || payload.message,
-      errorType: payload.errorType,
+      error: isErrorTrigger ? payload.error || payload.message : undefined,
+      errorType: isErrorTrigger ? payload.errorType : undefined,
       timestamp: new Date().toISOString(),
       eventType: trigger,
     };

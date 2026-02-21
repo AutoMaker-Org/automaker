@@ -16,6 +16,9 @@ import {
   Terminal,
   SquarePlus,
   SplitSquareHorizontal,
+  Palette,
+  Type,
+  X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAppStore } from '@/store/app-store';
@@ -38,6 +41,8 @@ export function TerminalSection() {
     defaultTerminalId,
     setDefaultTerminalId,
     setOpenTerminalMode,
+    setTerminalBackgroundColor,
+    setTerminalForegroundColor,
   } = useAppStore();
 
   const {
@@ -48,6 +53,8 @@ export function TerminalSection() {
     lineHeight,
     defaultFontSize,
     openTerminalMode,
+    customBackgroundColor,
+    customForegroundColor,
   } = terminalState;
 
   // Get available external terminals
@@ -203,6 +210,138 @@ export function TerminalSection() {
                 ))}
               </SelectContent>
             </Select>
+          </div>
+
+          {/* Background Color */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <Label className="text-foreground font-medium">Background Color</Label>
+              {customBackgroundColor && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
+                  onClick={() => {
+                    setTerminalBackgroundColor(null);
+                    toast.success('Background color reset to theme default');
+                  }}
+                >
+                  <X className="w-3 h-3 mr-1" />
+                  Reset
+                </Button>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Override the terminal background color. Leave empty to use the theme default.
+            </p>
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 flex-1">
+                <div
+                  className="w-10 h-10 rounded-lg border border-border/50 shadow-sm flex items-center justify-center"
+                  style={{
+                    backgroundColor: customBackgroundColor || 'var(--card)',
+                  }}
+                >
+                  <Palette
+                    className={cn(
+                      'w-5 h-5',
+                      customBackgroundColor ? 'text-white/80' : 'text-muted-foreground'
+                    )}
+                  />
+                </div>
+                <Input
+                  type="color"
+                  value={customBackgroundColor || '#000000'}
+                  onChange={(e) => {
+                    const color = e.target.value;
+                    setTerminalBackgroundColor(color);
+                  }}
+                  className="w-14 h-10 p-1 cursor-pointer bg-transparent border-border/50"
+                  title="Pick a color"
+                />
+                <Input
+                  type="text"
+                  value={customBackgroundColor || ''}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    // Validate hex color format
+                    if (value === '' || /^#[0-9A-Fa-f]{0,6}$/.test(value)) {
+                      if (value === '' || /^#[0-9A-Fa-f]{6}$/.test(value)) {
+                        setTerminalBackgroundColor(value || null);
+                      }
+                    }
+                  }}
+                  placeholder="e.g., #1a1a1a"
+                  className="flex-1 bg-accent/30 border-border/50 font-mono text-sm"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Foreground Color */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <Label className="text-foreground font-medium">Foreground Color</Label>
+              {customForegroundColor && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
+                  onClick={() => {
+                    setTerminalForegroundColor(null);
+                    toast.success('Foreground color reset to theme default');
+                  }}
+                >
+                  <X className="w-3 h-3 mr-1" />
+                  Reset
+                </Button>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Override the terminal text/foreground color. Leave empty to use the theme default.
+            </p>
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 flex-1">
+                <div
+                  className="w-10 h-10 rounded-lg border border-border/50 shadow-sm flex items-center justify-center"
+                  style={{
+                    backgroundColor: customForegroundColor || 'var(--foreground)',
+                  }}
+                >
+                  <Type
+                    className={cn(
+                      'w-5 h-5',
+                      customForegroundColor ? 'text-black/80' : 'text-background'
+                    )}
+                  />
+                </div>
+                <Input
+                  type="color"
+                  value={customForegroundColor || '#ffffff'}
+                  onChange={(e) => {
+                    const color = e.target.value;
+                    setTerminalForegroundColor(color);
+                  }}
+                  className="w-14 h-10 p-1 cursor-pointer bg-transparent border-border/50"
+                  title="Pick a color"
+                />
+                <Input
+                  type="text"
+                  value={customForegroundColor || ''}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    // Validate hex color format
+                    if (value === '' || /^#[0-9A-Fa-f]{0,6}$/.test(value)) {
+                      if (value === '' || /^#[0-9A-Fa-f]{6}$/.test(value)) {
+                        setTerminalForegroundColor(value || null);
+                      }
+                    }
+                  }}
+                  placeholder="e.g., #ffffff"
+                  className="flex-1 bg-accent/30 border-border/50 font-mono text-sm"
+                />
+              </div>
+            </div>
           </div>
 
           {/* Default Font Size */}
