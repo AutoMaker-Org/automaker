@@ -456,9 +456,13 @@ export function useDevServers({ projectPath }: UseDevServersOptions) {
           });
           // Start port detection timeout
           startPortDetectionTimer(key);
-          toast.success('Dev server started, detecting port...');
+          toast.success('Dev server started, detecting port...', {
+            description: 'Logs are now visible in the dev server panel.',
+          });
         } else {
-          toast.error(result.error || 'Failed to start dev server');
+          toast.error(result.error || 'Failed to start dev server', {
+            description: 'Check the dev server logs panel for details.',
+          });
         }
       } catch (error) {
         logger.error('Start dev server failed:', error);
