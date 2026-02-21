@@ -160,11 +160,31 @@ export function restoreFromUICache(
 
   // Restore last selected worktree per project so the board doesn't
   // reset to main branch after PWA memory eviction or tab discard.
+  //
+  // IMPORTANT: Only restore entries where path is null (main branch selection).
+  // Non-null paths point to worktree directories on disk that may have been
+  // deleted while the PWA was evicted. Restoring a stale worktree path causes
+  // the board to render with an invalid selection, and if the server can't
+  // validate it fast enough, the app enters an unrecoverable crash loop
+  // (the error boundary reloads, which restores the same bad cache).
+  // Main branch (path=null) is always valid and safe to restore.
   if (
     cache.cachedCurrentWorktreeByProject &&
     Object.keys(cache.cachedCurrentWorktreeByProject).length > 0
   ) {
-    stateUpdate.currentWorktreeByProject = cache.cachedCurrentWorktreeByProject;
+    const sanitized: Record<string, { path: string | null; branch: string }> = {};
+    for (const [projectPath, worktree] of Object.entries(cache.cachedCurrentWorktreeByProject)) {
+      if (worktree.path === null) {
+        // Main branch selection — always safe to restore
+        sanitized[projectPath] = worktree;
+      }
+      // Non-null paths are dropped; the app will re-discover actual worktrees
+      // from the server and the validation effect in use-worktrees will handle
+      // resetting to main if the cached worktree no longer exists.
+    }
+    if (Object.keys(sanitized).length > 0) {
+      stateUpdate.currentWorktreeByProject = sanitized;
+    }
   }
 
   // Restore the project context when the project object is available.
