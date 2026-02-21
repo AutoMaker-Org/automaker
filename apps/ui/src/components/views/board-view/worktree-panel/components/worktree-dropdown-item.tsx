@@ -144,7 +144,7 @@ export function WorktreeDropdownItem({
           </span>
         )}
 
-        {/* Dev server indicator - only shown when port is confirmed detected */}
+        {/* Dev server indicator - hidden when URL detection explicitly failed */}
         {devServerRunning && devServerInfo?.urlDetected !== false && (
           <span
             className="inline-flex items-center justify-center h-4 w-4 text-green-500"

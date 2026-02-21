@@ -33,20 +33,32 @@ async function* withTimeout<T>(
   generator: AsyncIterable<T>,
   timeoutMs: number
 ): AsyncGenerator<T, void, unknown> {
+  let timerId: ReturnType<typeof setTimeout> | undefined;
+
   const timeoutPromise = new Promise<never>((_, reject) => {
-    setTimeout(() => reject(new Error(`AI provider timed out after ${timeoutMs}ms`)), timeoutMs);
+    timerId = setTimeout(
+      () => reject(new Error(`AI provider timed out after ${timeoutMs}ms`)),
+      timeoutMs
+    );
   });
 
   const iterator = generator[Symbol.asyncIterator]();
   let done = false;
 
-  while (!done) {
-    const result = await Promise.race([iterator.next(), timeoutPromise]);
-    if (result.done) {
-      done = true;
-    } else {
-      yield result.value;
+  try {
+    while (!done) {
+      const result = await Promise.race([iterator.next(), timeoutPromise]).catch(async (err) => {
+        await iterator.return?.();
+        throw err;
+      });
+      if (result.done) {
+        done = true;
+      } else {
+        yield result.value;
+      }
     }
+  } finally {
+    clearTimeout(timerId);
   }
 }
 

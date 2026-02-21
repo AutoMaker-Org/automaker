@@ -227,9 +227,9 @@ export function AddFeatureDialog({
 
     if (justOpened) {
       // Initialize with prefilled values if provided, otherwise use defaults
-      setTitle(prefilledTitle || '');
-      setDescription(prefilledDescription || '');
-      setCategory(prefilledCategory || '');
+      setTitle(prefilledTitle ?? '');
+      setDescription(prefilledDescription ?? '');
+      setCategory(prefilledCategory ?? '');
 
       setSkipTests(defaultSkipTests);
       // When a non-main worktree is selected, use its branch name for custom mode

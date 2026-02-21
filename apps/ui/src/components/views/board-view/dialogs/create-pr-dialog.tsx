@@ -299,9 +299,13 @@ export function CreatePRDialog({
       const api = getHttpApiClient();
       // Resolve the display name to the actual branch name for the API
       const resolvedRef = branchFullRefMap.get(baseBranch) || baseBranch;
-      const branchNameForApi = resolvedRef.includes('/')
-        ? resolvedRef.substring(resolvedRef.indexOf('/') + 1)
-        : resolvedRef;
+      // Only strip the remote prefix if the resolved ref differs from the original
+      // (indicating it was resolved from a full ref like "origin/main").
+      // This preserves local branch names that contain slashes (e.g. "release/1.0").
+      const branchNameForApi =
+        resolvedRef !== baseBranch && resolvedRef.includes('/')
+          ? resolvedRef.substring(resolvedRef.indexOf('/') + 1)
+          : resolvedRef;
       const result = await api.worktree.generatePRDescription(worktree.path, branchNameForApi);
 
       if (result.success) {
@@ -344,11 +348,13 @@ export function CreatePRDialog({
       // since the backend handles branch resolution. However, if the full ref is
       // available, we can use it for more precise targeting.
       const resolvedBaseBranch = branchFullRefMap.get(baseBranch) || baseBranch;
-      // Strip the remote prefix from the resolved ref for the API call
-      // (e.g. "origin/main" → "main") since the backend expects the branch name only
-      const baseBranchForApi = resolvedBaseBranch.includes('/')
-        ? resolvedBaseBranch.substring(resolvedBaseBranch.indexOf('/') + 1)
-        : resolvedBaseBranch;
+      // Only strip the remote prefix if the resolved ref differs from the original
+      // (indicating it was resolved from a full ref like "origin/main").
+      // This preserves local branch names that contain slashes (e.g. "release/1.0").
+      const baseBranchForApi =
+        resolvedBaseBranch !== baseBranch && resolvedBaseBranch.includes('/')
+          ? resolvedBaseBranch.substring(resolvedBaseBranch.indexOf('/') + 1)
+          : resolvedBaseBranch;
 
       const result = await api.worktree.createPR(worktree.path, {
         projectPath: projectPath || undefined,

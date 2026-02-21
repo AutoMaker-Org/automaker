@@ -78,7 +78,14 @@ export function IssueDetailPanel({
       <div className="flex items-center justify-between p-3 border-b border-border bg-muted/30 gap-2">
         <div className="flex items-center gap-2 min-w-0">
           {isMobile && (
-            <Button variant="ghost" size="sm" onClick={onClose} className="shrink-0 -ml-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onClose}
+              className="shrink-0 -ml-1"
+              aria-label="Back"
+              title="Back"
+            >
               <ArrowLeft className="h-4 w-4" />
             </Button>
           )}
@@ -104,7 +111,13 @@ export function IssueDetailPanel({
             if (cached && !isStale) {
               return (
                 <>
-                  <Button variant="outline" size="sm" onClick={() => onViewCachedValidation(issue)}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => onViewCachedValidation(issue)}
+                    aria-label="View Result"
+                    title="View Result"
+                  >
                     <CheckCircle className="h-4 w-4 mr-1 text-green-500" />
                     {!isMobile && 'View Result'}
                   </Button>
@@ -123,7 +136,13 @@ export function IssueDetailPanel({
             if (cached && isStale) {
               return (
                 <>
-                  <Button variant="outline" size="sm" onClick={() => onViewCachedValidation(issue)}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => onViewCachedValidation(issue)}
+                    aria-label="View (stale)"
+                    title="View (stale)"
+                  >
                     <Clock className="h-4 w-4 mr-1 text-yellow-500" />
                     {!isMobile && 'View (stale)'}
                   </Button>
@@ -140,6 +159,8 @@ export function IssueDetailPanel({
                     variant="default"
                     size="sm"
                     onClick={() => onValidateIssue(issue, getValidationOptions(true))}
+                    aria-label="Re-validate"
+                    title="Re-validate"
                   >
                     <Wand2 className="h-4 w-4 mr-1" />
                     {!isMobile && 'Re-validate'}
@@ -163,6 +184,8 @@ export function IssueDetailPanel({
                   variant="default"
                   size="sm"
                   onClick={() => onValidateIssue(issue, getValidationOptions())}
+                  aria-label="Validate with AI"
+                  title="Validate with AI"
                 >
                   <Wand2 className="h-4 w-4 mr-1" />
                   {!isMobile && 'Validate with AI'}
@@ -181,7 +204,13 @@ export function IssueDetailPanel({
               Create Feature
             </Button>
           )}
-          <Button variant="outline" size="sm" onClick={() => onOpenInGitHub(issue.url)}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onOpenInGitHub(issue.url)}
+            aria-label="Open in GitHub"
+            title="Open in GitHub"
+          >
             <ExternalLink className="h-4 w-4" />
             {!isMobile && <span className="ml-1">Open in GitHub</span>}
           </Button>

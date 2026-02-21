@@ -1031,7 +1031,7 @@ export function BoardView() {
         images: [],
         imagePaths: [],
         skipTests: defaultSkipTests,
-        model: 'opus' as const,
+        model: resolveModelString('opus'),
         thinkingLevel: 'none' as const,
         branchName: conflictInfo.targetBranch,
         workMode: 'custom' as const, // Use the target branch where conflicts need to be resolved

@@ -18,6 +18,7 @@ import { IssueRow, IssueDetailPanel, IssuesListHeader } from './github-issues-vi
 import { ValidationDialog } from './github-issues-view/dialogs';
 import { AddFeatureDialog } from './board-view/dialogs';
 import { formatDate, getFeaturePriority } from './github-issues-view/utils';
+import { resolveModelString } from '@automaker/model-resolver';
 import { useModelOverride } from '@/components/shared';
 import type {
   ValidateIssueOptions,
@@ -153,7 +154,7 @@ export function GitHubIssuesView() {
         }
       }
 
-      return parts.filter(Boolean).join('\n');
+      return parts.join('\n');
     },
     [cachedValidations]
   );
@@ -265,7 +266,7 @@ export function GitHubIssuesView() {
             status: 'backlog' as const,
             passes: false,
             priority: getFeaturePriority(validation.estimatedComplexity),
-            model: 'opus',
+            model: resolveModelString('opus'),
             thinkingLevel: 'none' as const,
             branchName: currentBranch,
             createdAt: new Date().toISOString(),

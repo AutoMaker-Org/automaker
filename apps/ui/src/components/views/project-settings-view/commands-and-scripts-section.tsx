@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, type KeyboardEvent } from 'react';
+import { useState, useEffect, useCallback, useMemo, type KeyboardEvent } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import {
@@ -111,7 +111,7 @@ export function CommandsAndScriptsSection({ project }: CommandsAndScriptsSection
       setTestCommand(test);
       setOriginalTestCommand(test);
     }
-  }, [projectSettings]);
+  }, [projectSettings, project.path]);
 
   // Sync scripts state when project settings load
   useEffect(() => {
@@ -130,7 +130,10 @@ export function CommandsAndScriptsSection({ project }: CommandsAndScriptsSection
   const hasDevChanges = devCommand !== originalDevCommand;
   const hasTestChanges = testCommand !== originalTestCommand;
   const hasCommandChanges = hasDevChanges || hasTestChanges;
-  const hasScriptChanges = JSON.stringify(scripts) !== JSON.stringify(originalScripts);
+  const hasScriptChanges = useMemo(
+    () => JSON.stringify(scripts) !== JSON.stringify(originalScripts),
+    [scripts, originalScripts]
+  );
   const hasChanges = hasCommandChanges || hasScriptChanges;
   const isSaving = updateSettingsMutation.isPending;
 

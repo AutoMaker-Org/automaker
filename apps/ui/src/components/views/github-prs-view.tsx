@@ -21,11 +21,12 @@ import { getElectronAPI, type GitHubPR } from '@/lib/electron';
 import { useAppStore, type Feature } from '@/store/app-store';
 import { Button } from '@/components/ui/button';
 import { Markdown } from '@/components/ui/markdown';
-import { cn } from '@/lib/utils';
+import { cn, generateUUID } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-media-query';
 import { useGitHubPRs } from '@/hooks/queries';
 import { useCreateFeature } from '@/hooks/mutations/use-feature-mutations';
 import { PRCommentResolutionDialog } from '@/components/dialogs/pr-comment-resolution-dialog';
+import { resolveModelString } from '@automaker/model-resolver';
 import { toast } from 'sonner';
 import {
   DropdownMenu,
@@ -72,7 +73,7 @@ export function GitHubPRsView() {
         return;
       }
 
-      const featureId = `feature-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      const featureId = `pr-${pr.number}-${generateUUID()}`;
       const feature: Feature = {
         id: featureId,
         title: `Address PR #${pr.number} Review Comments`,
@@ -80,7 +81,7 @@ export function GitHubPRsView() {
         description: `Read the review requests on PR #${pr.number} and address any feedback the best you can.`,
         steps: [],
         status: 'in_progress',
-        model: 'opus',
+        model: resolveModelString('opus'),
         thinkingLevel: 'none',
         planningMode: 'skip',
         ...(pr.headRefName ? { branchName: pr.headRefName } : {}),

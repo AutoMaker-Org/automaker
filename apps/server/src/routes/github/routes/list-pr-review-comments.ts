@@ -5,9 +5,12 @@
  * for a specific pull request, providing file path and line context.
  */
 
-import { spawn } from 'child_process';
+import { spawn, execFile } from 'child_process';
+import { promisify } from 'util';
 import type { Request, Response } from 'express';
-import { execAsync, execEnv, getErrorMessage, logError } from './common.js';
+import { execEnv, getErrorMessage, logError } from './common.js';
+
+const execFileAsync = promisify(execFile);
 import { checkGitHubRemote } from './check-github-remote.js';
 
 export interface PRReviewComment {
@@ -124,6 +127,11 @@ async function fetchReviewThreadResolvedStatus(
         env: execEnv,
       });
 
+      gh.on('error', (err) => {
+        clearTimeout(timeoutId);
+        reject(err);
+      });
+
       const timeoutId = setTimeout(() => {
         gh.kill();
         reject(new Error('GitHub GraphQL API request timed out'));
@@ -185,8 +193,9 @@ async function fetchPRReviewComments(
 
   // 1. Fetch regular PR comments (issue-level comments)
   try {
-    const { stdout: commentsOutput } = await execAsync(
-      `gh pr view ${prNumber} -R ${owner}/${repo} --json comments`,
+    const { stdout: commentsOutput } = await execFileAsync(
+      'gh',
+      ['pr', 'view', String(prNumber), '-R', `${owner}/${repo}`, '--json', 'comments'],
       {
         cwd: projectPath,
         env: execEnv,
@@ -223,10 +232,15 @@ async function fetchPRReviewComments(
   // 2. Fetch inline review comments (code-level comments with file/line info)
   try {
     const reviewsEndpoint = `repos/${owner}/${repo}/pulls/${prNumber}/comments`;
-    const { stdout: reviewsOutput } = await execAsync(`gh api ${reviewsEndpoint} --paginate`, {
-      cwd: projectPath,
-      env: execEnv,
-    });
+    const { stdout: reviewsOutput } = await execFileAsync(
+      'gh',
+      ['api', reviewsEndpoint, '--paginate', '--slurp', '--jq', 'add // []'],
+      {
+        cwd: projectPath,
+        env: execEnv,
+        maxBuffer: 1024 * 1024 * 10, // 10MB buffer for large PRs
+      }
+    );
 
     const reviewsData = JSON.parse(reviewsOutput);
     const reviewComments = (Array.isArray(reviewsData) ? reviewsData : []).map(
@@ -254,7 +268,7 @@ async function fetchPRReviewComments(
         updatedAt: c.updated_at,
         isReviewComment: true,
         // A review comment is "outdated" if position is null (code has changed)
-        isOutdated: c.position === null && !c.line,
+        isOutdated: c.position === null,
         // isResolved will be filled in below from GraphQL data
         isResolved: false,
         diffHunk: c.diff_hunk,

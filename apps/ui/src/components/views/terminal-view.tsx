@@ -588,7 +588,7 @@ export function TerminalView({
 
     // Skip if we've already handled this exact request (prevents duplicate terminals)
     // Include mode and nonce in the key to allow opening same cwd multiple times
-    const cwdKey = `${initialCwd}:${initialMode || 'default'}:${nonce || 0}`;
+    const cwdKey = `${initialCwd}:${initialMode || 'default'}:${nonce || 0}:${initialCommand || ''}`;
     if (initialCwdHandledRef.current === cwdKey) return;
 
     // Skip if terminal is not enabled or not unlocked

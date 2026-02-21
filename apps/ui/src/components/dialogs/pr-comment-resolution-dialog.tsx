@@ -46,6 +46,7 @@ import type { PRReviewComment } from '@/lib/electron';
 import type { Feature } from '@/store/app-store';
 import type { PhaseModelEntry } from '@automaker/types';
 import { supportsReasoningEffort, isAdaptiveThinkingModel } from '@automaker/types';
+import { resolveModelString } from '@automaker/model-resolver';
 import { PhaseModelSelector } from '@/components/views/settings-view/model-defaults/phase-model-selector';
 
 // ============================================
@@ -703,7 +704,7 @@ export function PRCommentResolutionDialog({
     const selectedComments = comments.filter((c) => selectedIds.has(c.id));
 
     // Resolve model settings from the current model entry
-    const selectedModel = modelEntry.model;
+    const selectedModel = resolveModelString(modelEntry.model);
     const normalizedThinking = modelSupportsThinking(selectedModel)
       ? modelEntry.thinkingLevel || 'none'
       : 'none';

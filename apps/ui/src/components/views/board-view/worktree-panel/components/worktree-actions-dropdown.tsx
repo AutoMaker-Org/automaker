@@ -1032,69 +1032,59 @@ export function WorktreeActionsDropdown({
           </TooltipWrapper>
         )}
         {/* Show PR info with Address Comments in sub-menu if PR exists */}
-        {showPRInfo && worktree.pr && (
-          <DropdownMenuSub>
-            <div className="flex items-center">
-              {/* Main clickable area - opens PR in browser */}
-              <DropdownMenuItem
-                onClick={() => {
-                  window.open(worktree.pr!.url, '_blank', 'noopener,noreferrer');
-                }}
-                className="text-xs flex-1 pr-0 rounded-r-none"
-              >
-                <GitPullRequest className="w-3 h-3 mr-2" />
-                PR #{worktree.pr.number}
-                <span className="ml-auto mr-1 text-[10px] bg-green-500/20 text-green-600 px-1.5 py-0.5 rounded uppercase">
-                  {worktree.pr.state}
-                </span>
-              </DropdownMenuItem>
-              {/* Chevron trigger for submenu with PR actions */}
-              <DropdownMenuSubTrigger className="text-xs px-1 rounded-l-none border-l border-border/30 h-8" />
-            </div>
-            <DropdownMenuSubContent>
-              <DropdownMenuItem
-                onClick={() => {
-                  // Convert stored PR info to the full PRInfo format for the handler
-                  // The handler will fetch full comments from GitHub
-                  const prInfo: PRInfo = {
-                    number: worktree.pr!.number,
-                    title: worktree.pr!.title,
-                    url: worktree.pr!.url,
-                    state: worktree.pr!.state,
-                    author: '', // Will be fetched
-                    body: '', // Will be fetched
-                    comments: [],
-                    reviewComments: [],
-                  };
-                  onAddressPRComments(worktree, prInfo);
-                }}
-                className="text-xs text-blue-500 focus:text-blue-600"
-              >
-                <MessageSquare className="w-3.5 h-3.5 mr-2" />
-                Manage PR Comments
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => {
-                  const prInfo: PRInfo = {
-                    number: worktree.pr!.number,
-                    title: worktree.pr!.title,
-                    url: worktree.pr!.url,
-                    state: worktree.pr!.state,
-                    author: '',
-                    body: '',
-                    comments: [],
-                    reviewComments: [],
-                  };
-                  onAutoAddressPRComments(worktree, prInfo);
-                }}
-                className="text-xs text-blue-500 focus:text-blue-600"
-              >
-                <Zap className="w-3.5 h-3.5 mr-2" />
-                Address PR Comments
-              </DropdownMenuItem>
-            </DropdownMenuSubContent>
-          </DropdownMenuSub>
-        )}
+        {showPRInfo &&
+          worktree.pr &&
+          (() => {
+            // Convert stored PR info to the full PRInfo format for the handlers
+            // The handlers will fetch full comments from GitHub
+            const prInfo: PRInfo = {
+              number: worktree.pr!.number,
+              title: worktree.pr!.title,
+              url: worktree.pr!.url,
+              state: worktree.pr!.state,
+              author: '',
+              body: '',
+              comments: [],
+              reviewComments: [],
+            };
+            return (
+              <DropdownMenuSub>
+                <div className="flex items-center">
+                  {/* Main clickable area - opens PR in browser */}
+                  <DropdownMenuItem
+                    onClick={() => {
+                      window.open(worktree.pr!.url, '_blank', 'noopener,noreferrer');
+                    }}
+                    className="text-xs flex-1 pr-0 rounded-r-none"
+                  >
+                    <GitPullRequest className="w-3 h-3 mr-2" />
+                    PR #{worktree.pr!.number}
+                    <span className="ml-auto mr-1 text-[10px] bg-green-500/20 text-green-600 px-1.5 py-0.5 rounded uppercase">
+                      {worktree.pr!.state}
+                    </span>
+                  </DropdownMenuItem>
+                  {/* Chevron trigger for submenu with PR actions */}
+                  <DropdownMenuSubTrigger className="text-xs px-1 rounded-l-none border-l border-border/30 h-8" />
+                </div>
+                <DropdownMenuSubContent>
+                  <DropdownMenuItem
+                    onClick={() => onAddressPRComments(worktree, prInfo)}
+                    className="text-xs text-blue-500 focus:text-blue-600"
+                  >
+                    <MessageSquare className="w-3.5 h-3.5 mr-2" />
+                    Manage PR Comments
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => onAutoAddressPRComments(worktree, prInfo)}
+                    className="text-xs text-blue-500 focus:text-blue-600"
+                  >
+                    <Zap className="w-3.5 h-3.5 mr-2" />
+                    Address PR Comments
+                  </DropdownMenuItem>
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
+            );
+          })()}
         {hasChangesSectionContent && hasDestructiveSectionContent && <DropdownMenuSeparator />}
         {worktree.hasChanges && (
           <TooltipWrapper

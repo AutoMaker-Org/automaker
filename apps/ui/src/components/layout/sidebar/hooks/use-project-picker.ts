@@ -108,7 +108,9 @@ export function useProjectPicker({
         setIsProjectPickerOpen(false);
       } else if (event.key === 'Enter') {
         event.preventDefault();
-        selectHighlightedProject();
+        selectHighlightedProject().catch(() => {
+          /* Error already logged upstream */
+        });
       } else if (event.key === 'ArrowDown') {
         event.preventDefault();
         setSelectedProjectIndex((prev) => (prev < filteredProjects.length - 1 ? prev + 1 : prev));

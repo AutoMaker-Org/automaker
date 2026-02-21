@@ -66,6 +66,11 @@ async function executeReviewThreadMutation(
       env: execEnv,
     });
 
+    gh.on('error', (err) => {
+      clearTimeout(timeoutId);
+      rej(err);
+    });
+
     const timeoutId = setTimeout(() => {
       gh.kill();
       rej(new Error('GitHub GraphQL API request timed out'));
