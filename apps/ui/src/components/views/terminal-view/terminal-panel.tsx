@@ -1954,8 +1954,9 @@ export function TerminalPanel({
   // Get current terminal theme for xterm styling (resolved for system preference)
   const currentTerminalTheme = getTerminalTheme(resolvedTheme);
 
-  // Apply custom background color if set, otherwise use theme default
+  // Apply custom background/foreground colors if set, otherwise use theme defaults
   const terminalBackgroundColor = customBackgroundColor ?? currentTerminalTheme.background;
+  const terminalForegroundColor = customForegroundColor ?? currentTerminalTheme.foreground;
 
   return (
     <div
@@ -2489,7 +2490,7 @@ export function TerminalPanel({
               style={
                 {
                   backgroundColor: terminalBackgroundColor,
-                  color: currentTerminalTheme.foreground,
+                  color: terminalForegroundColor,
                   fontFamily: getTerminalFontFamily(fontFamily),
                   fontSize: `${fontSize}px`,
                   lineHeight: `${lineHeight || 1.0}`,

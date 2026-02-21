@@ -213,6 +213,12 @@ export function parseLocalStorageSettings(): Partial<GlobalSettings> | null {
       // Claude Compatible Providers (new system)
       claudeCompatibleProviders:
         (state.claudeCompatibleProviders as GlobalSettings['claudeCompatibleProviders']) ?? [],
+      // Settings that were previously missing from migration (added for sync parity)
+      enableAiCommitMessages: state.enableAiCommitMessages as boolean | undefined,
+      enableSkills: state.enableSkills as boolean | undefined,
+      skillsSources: state.skillsSources as GlobalSettings['skillsSources'] | undefined,
+      enableSubagents: state.enableSubagents as boolean | undefined,
+      subagentsSources: state.subagentsSources as GlobalSettings['subagentsSources'] | undefined,
     };
   } catch (error) {
     logger.error('Failed to parse localStorage settings:', error);
@@ -355,6 +361,27 @@ export function mergeSettings(
     localSettings.claudeCompatibleProviders.length > 0
   ) {
     merged.claudeCompatibleProviders = localSettings.claudeCompatibleProviders;
+  }
+
+  // Preserve new settings fields from localStorage if server has defaults
+  // Use nullish coalescing to accept stored falsy values (e.g. false)
+  if (localSettings.enableAiCommitMessages != null && merged.enableAiCommitMessages == null) {
+    merged.enableAiCommitMessages = localSettings.enableAiCommitMessages;
+  }
+  if (localSettings.enableSkills != null && merged.enableSkills == null) {
+    merged.enableSkills = localSettings.enableSkills;
+  }
+  if (localSettings.skillsSources && (!merged.skillsSources || merged.skillsSources.length === 0)) {
+    merged.skillsSources = localSettings.skillsSources;
+  }
+  if (localSettings.enableSubagents != null && merged.enableSubagents == null) {
+    merged.enableSubagents = localSettings.enableSubagents;
+  }
+  if (
+    localSettings.subagentsSources &&
+    (!merged.subagentsSources || merged.subagentsSources.length === 0)
+  ) {
+    merged.subagentsSources = localSettings.subagentsSources;
   }
 
   return merged;
@@ -733,7 +760,7 @@ export function hydrateStoreFromSettings(settings: GlobalSettings): void {
     skillsSources: settings.skillsSources ?? ['user', 'project'],
     enableSubagents: settings.enableSubagents ?? true,
     subagentsSources: settings.subagentsSources ?? ['user', 'project'],
-    autoLoadClaudeMd: settings.autoLoadClaudeMd ?? false,
+    autoLoadClaudeMd: settings.autoLoadClaudeMd ?? true,
     skipSandboxWarning: settings.skipSandboxWarning ?? false,
     codexAutoLoadAgents: settings.codexAutoLoadAgents ?? false,
     codexSandboxMode: settings.codexSandboxMode ?? 'workspace-write',

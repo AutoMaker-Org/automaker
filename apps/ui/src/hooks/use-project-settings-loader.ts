@@ -137,6 +137,11 @@ export function useProjectSettingsLoader() {
         const updatedProjects = storeState.projects.map((p) =>
           p.id === updatedProject.id ? updatedProjectData : p
         );
+        // NOTE: Intentionally bypasses setCurrentProject() to avoid a second
+        // render cycle that can trigger React error #185 (maximum update depth
+        // exceeded). This means persistEffectiveThemeForProject() is skipped,
+        // which is safe because only activeClaudeApiProfileId and
+        // phaseModelOverrides are mutated here — not the project theme.
         useAppStore.setState({
           currentProject: updatedProjectData,
           projects: updatedProjects,

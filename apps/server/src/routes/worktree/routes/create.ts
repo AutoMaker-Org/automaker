@@ -109,6 +109,35 @@ async function isBranchCheckedOut(projectPath: string, branchName: string): Prom
 }
 
 /**
+ * Build a BaseBranchSyncResult for cases where we proceed with a stale local copy.
+ * Extracts the repeated pattern of getting the short commit hash with a fallback.
+ */
+async function buildStaleResult(
+  projectPath: string,
+  branchName: string,
+  remote: string | undefined,
+  message: string,
+  extra?: Partial<BaseBranchSyncResult>
+): Promise<BaseBranchSyncResult> {
+  let commitHash: string | undefined;
+  try {
+    const hash = await execGitCommand(['rev-parse', '--short', branchName], projectPath);
+    commitHash = hash.trim();
+  } catch {
+    /* ignore — commit hash is non-critical */
+  }
+  return {
+    attempted: true,
+    synced: false,
+    remote,
+    commitHash,
+    message,
+    canProceedWithStale: true,
+    ...extra,
+  };
+}
+
+/**
  * Sync a local base branch with its remote tracking branch using fast-forward only.
  *
  * This function:
@@ -126,33 +155,34 @@ async function syncBaseBranch(
   projectPath: string,
   branchName: string
 ): Promise<BaseBranchSyncResult> {
-  // Skip if the branch is a remote ref like "origin/main" — those are already
-  // updated by the fetch --all that runs before this function.
-  if (branchName.includes('/')) {
-    // Get the commit hash of the remote ref for logging
+  // Check if the branch exists as a local branch (under refs/heads/).
+  // This correctly handles branch names containing slashes (e.g. "feature/abc",
+  // "fix/issue-123") which are valid local branch names, not remote refs.
+  let existsLocally = false;
+  try {
+    await execGitCommand(['rev-parse', '--verify', `refs/heads/${branchName}`], projectPath);
+    existsLocally = true;
+  } catch {
+    existsLocally = false;
+  }
+
+  if (!existsLocally) {
+    // Not a local branch — check if it's a valid ref (remote ref, tag, or commit hash)
     try {
       const commitHash = await execGitCommand(['rev-parse', '--short', branchName], projectPath);
       return {
         attempted: false,
         synced: true,
         commitHash: commitHash.trim(),
-        message: `Using remote ref ${branchName} (already fetched)`,
+        message: `Using ref ${branchName} (not a local branch)`,
       };
     } catch {
-      return { attempted: false, synced: false, message: `Remote ref ${branchName} not found` };
+      return {
+        attempted: false,
+        synced: false,
+        message: `Ref '${branchName}' not found`,
+      };
     }
-  }
-
-  // Check if the branch exists locally
-  try {
-    await execGitCommand(['rev-parse', '--verify', branchName], projectPath);
-  } catch {
-    // Branch doesn't exist locally — nothing to sync
-    return {
-      attempted: false,
-      synced: false,
-      message: `Local branch '${branchName}' does not exist`,
-    };
   }
 
   // Detect remote tracking branch
@@ -201,25 +231,12 @@ async function syncBaseBranch(
     // Allow proceeding with stale local copy
     const errMsg = getErrorMessage(fetchErr);
     logger.warn(`Failed to fetch ${tracking.remote}/${tracking.remoteBranch}: ${errMsg}`);
-    try {
-      const commitHash = await execGitCommand(['rev-parse', '--short', branchName], projectPath);
-      return {
-        attempted: true,
-        synced: false,
-        remote: tracking.remote,
-        commitHash: commitHash.trim(),
-        message: `Failed to fetch from remote: ${errMsg}. Proceeding with local copy.`,
-        canProceedWithStale: true,
-      };
-    } catch {
-      return {
-        attempted: true,
-        synced: false,
-        remote: tracking.remote,
-        message: `Failed to fetch from remote: ${errMsg}. Proceeding with local copy.`,
-        canProceedWithStale: true,
-      };
-    }
+    return buildStaleResult(
+      projectPath,
+      branchName,
+      tracking.remote,
+      `Failed to fetch from remote: ${errMsg}. Proceeding with local copy.`
+    );
   }
 
   // Check if the local branch is behind, ahead, or diverged from the remote
@@ -249,19 +266,16 @@ async function syncBaseBranch(
 
     if (ahead > 0 && behind > 0) {
       // Branch has diverged — cannot fast-forward
-      const commitHash = await execGitCommand(['rev-parse', '--short', branchName], projectPath);
       logger.warn(
         `Branch '${branchName}' has diverged from ${remoteRef} (${ahead} ahead, ${behind} behind)`
       );
-      return {
-        attempted: true,
-        synced: false,
-        remote: tracking.remote,
-        commitHash: commitHash.trim(),
-        message: `Branch '${branchName}' has diverged from ${remoteRef} (${ahead} commit(s) ahead, ${behind} behind). Using local copy to avoid overwriting local commits.`,
-        diverged: true,
-        canProceedWithStale: true,
-      };
+      return buildStaleResult(
+        projectPath,
+        branchName,
+        tracking.remote,
+        `Branch '${branchName}' has diverged from ${remoteRef} (${ahead} commit(s) ahead, ${behind} behind). Using local copy to avoid overwriting local commits.`,
+        { diverged: true }
+      );
     }
 
     if (ahead > 0 && behind === 0) {
@@ -292,15 +306,12 @@ async function syncBaseBranch(
       } catch (mergeErr) {
         const errMsg = getErrorMessage(mergeErr);
         logger.warn(`Fast-forward merge failed for '${branchName}': ${errMsg}`);
-        const commitHash = await execGitCommand(['rev-parse', '--short', branchName], projectPath);
-        return {
-          attempted: true,
-          synced: false,
-          remote: tracking.remote,
-          commitHash: commitHash.trim(),
-          message: `Fast-forward merge failed: ${errMsg}. Proceeding with local copy.`,
-          canProceedWithStale: true,
-        };
+        return buildStaleResult(
+          projectPath,
+          branchName,
+          tracking.remote,
+          `Fast-forward merge failed: ${errMsg}. Proceeding with local copy.`
+        );
       }
     } else {
       // Branch is NOT checked out — use git update-ref to fast-forward without checkout
@@ -314,15 +325,12 @@ async function syncBaseBranch(
       } catch (updateErr) {
         const errMsg = getErrorMessage(updateErr);
         logger.warn(`update-ref failed for '${branchName}': ${errMsg}`);
-        const commitHash = await execGitCommand(['rev-parse', '--short', branchName], projectPath);
-        return {
-          attempted: true,
-          synced: false,
-          remote: tracking.remote,
-          commitHash: commitHash.trim(),
-          message: `Failed to fast-forward branch: ${errMsg}. Proceeding with local copy.`,
-          canProceedWithStale: true,
-        };
+        return buildStaleResult(
+          projectPath,
+          branchName,
+          tracking.remote,
+          `Failed to fast-forward branch: ${errMsg}. Proceeding with local copy.`
+        );
       }
     }
 
@@ -340,25 +348,12 @@ async function syncBaseBranch(
     // Unexpected error during rev-list or merge — proceed with stale
     const errMsg = getErrorMessage(err);
     logger.warn(`Unexpected error syncing '${branchName}': ${errMsg}`);
-    try {
-      const commitHash = await execGitCommand(['rev-parse', '--short', branchName], projectPath);
-      return {
-        attempted: true,
-        synced: false,
-        remote: tracking.remote,
-        commitHash: commitHash.trim(),
-        message: `Sync failed: ${errMsg}. Proceeding with local copy.`,
-        canProceedWithStale: true,
-      };
-    } catch {
-      return {
-        attempted: true,
-        synced: false,
-        remote: tracking.remote,
-        message: `Sync failed: ${errMsg}. Proceeding with local copy.`,
-        canProceedWithStale: true,
-      };
-    }
+    return buildStaleResult(
+      projectPath,
+      branchName,
+      tracking.remote,
+      `Sync failed: ${errMsg}. Proceeding with local copy.`
+    );
   }
 }
 

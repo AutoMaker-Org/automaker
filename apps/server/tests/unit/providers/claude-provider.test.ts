@@ -198,7 +198,7 @@ describe('claude-provider.ts', () => {
       expect(typeof callArgs.prompt).not.toBe('string');
     });
 
-    it('should use maxTurns default of 100', async () => {
+    it('should use maxTurns default of 1000', async () => {
       vi.mocked(sdk.query).mockReturnValue(
         (async function* () {
           yield { type: 'text', text: 'test' };
@@ -216,7 +216,7 @@ describe('claude-provider.ts', () => {
       expect(sdk.query).toHaveBeenCalledWith({
         prompt: 'Test',
         options: expect.objectContaining({
-          maxTurns: 100,
+          maxTurns: 1000,
         }),
       });
     });

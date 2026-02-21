@@ -931,6 +931,16 @@ class DevServerService {
         if (server.urlDetectionTimeout) {
           clearTimeout(server.urlDetectionTimeout);
         }
+        // Emit stopped event so frontend gets immediate notification
+        // (consistent with cleanupAndEmitStop and stopDevServer paths)
+        if (this.emitter) {
+          this.emitter.emit('dev-server:stopped', {
+            worktreePath: stalePath,
+            port: server.port,
+            exitCode: server.process?.exitCode ?? null,
+            timestamp: new Date().toISOString(),
+          });
+        }
         this.allocatedPorts.delete(server.port);
       }
       this.runningServers.delete(stalePath);
@@ -951,17 +961,39 @@ class DevServerService {
   }
 
   /**
-   * Check if a worktree has a running dev server
+   * Check if a worktree has a running dev server.
+   * Also prunes stale entries where the process has exited.
    */
   isRunning(worktreePath: string): boolean {
-    return this.runningServers.has(worktreePath);
+    const server = this.runningServers.get(worktreePath);
+    if (!server) return false;
+    // Prune stale entry if the process has exited
+    if (server.process && typeof server.process.exitCode === 'number') {
+      if (server.flushTimeout) clearTimeout(server.flushTimeout);
+      if (server.urlDetectionTimeout) clearTimeout(server.urlDetectionTimeout);
+      this.allocatedPorts.delete(server.port);
+      this.runningServers.delete(worktreePath);
+      return false;
+    }
+    return true;
   }
 
   /**
-   * Get info for a specific worktree's dev server
+   * Get info for a specific worktree's dev server.
+   * Also prunes stale entries where the process has exited.
    */
   getServerInfo(worktreePath: string): DevServerInfo | undefined {
-    return this.runningServers.get(worktreePath);
+    const server = this.runningServers.get(worktreePath);
+    if (!server) return undefined;
+    // Prune stale entry if the process has exited
+    if (server.process && typeof server.process.exitCode === 'number') {
+      if (server.flushTimeout) clearTimeout(server.flushTimeout);
+      if (server.urlDetectionTimeout) clearTimeout(server.urlDetectionTimeout);
+      this.allocatedPorts.delete(server.port);
+      this.runningServers.delete(worktreePath);
+      return undefined;
+    }
+    return server;
   }
 
   /**

@@ -63,6 +63,8 @@ export function SettingsView() {
     setPromptCustomization,
     skipSandboxWarning,
     setSkipSandboxWarning,
+    defaultMaxTurns,
+    setDefaultMaxTurns,
   } = useAppStore();
 
   // Global theme (project-specific themes are managed in Project Settings)
@@ -173,6 +175,7 @@ export function SettingsView() {
             defaultRequirePlanApproval={defaultRequirePlanApproval}
             enableAiCommitMessages={enableAiCommitMessages}
             defaultFeatureModel={defaultFeatureModel}
+            defaultMaxTurns={defaultMaxTurns}
             onDefaultSkipTestsChange={setDefaultSkipTests}
             onEnableDependencyBlockingChange={setEnableDependencyBlocking}
             onSkipVerificationInAutoModeChange={setSkipVerificationInAutoMode}
@@ -180,6 +183,7 @@ export function SettingsView() {
             onDefaultRequirePlanApprovalChange={setDefaultRequirePlanApproval}
             onEnableAiCommitMessagesChange={setEnableAiCommitMessages}
             onDefaultFeatureModelChange={setDefaultFeatureModel}
+            onDefaultMaxTurnsChange={setDefaultMaxTurns}
           />
         );
       case 'worktrees':

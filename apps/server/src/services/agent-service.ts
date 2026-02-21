@@ -28,6 +28,7 @@ import {
   getSubagentsConfiguration,
   getCustomSubagents,
   getProviderByModelId,
+  getDefaultMaxTurnsSetting,
 } from '../lib/settings-helpers.js';
 
 interface Message {
@@ -437,6 +438,9 @@ export class AgentService {
       const modelForSdk = providerResolvedModel || model;
       const sessionModelForSdk = providerResolvedModel ? undefined : session.model;
 
+      // Read user-configured max turns from settings
+      const userMaxTurns = await getDefaultMaxTurnsSetting(this.settingsService, '[AgentService]');
+
       const sdkOptions = createChatOptions({
         cwd: effectiveWorkDir,
         model: modelForSdk,
@@ -445,6 +449,7 @@ export class AgentService {
         abortController: session.abortController!,
         autoLoadClaudeMd,
         thinkingLevel: effectiveThinkingLevel, // Pass thinking level for Claude models
+        maxTurns: userMaxTurns, // User-configured max turns from settings
         mcpServers: Object.keys(mcpServers).length > 0 ? mcpServers : undefined,
       });
 

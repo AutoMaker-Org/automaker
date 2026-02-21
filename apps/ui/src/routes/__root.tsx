@@ -199,6 +199,11 @@ function RootLayoutContent() {
   const theme = useAppStore((s) => s.theme);
   const fontFamilySans = useAppStore((s) => s.fontFamilySans);
   const fontFamilyMono = useAppStore((s) => s.fontFamilyMono);
+  // Subscribe to previewTheme so that getEffectiveTheme() re-renders when
+  // hover previews change the document theme. Without this, the selector
+  // for getEffectiveTheme (a stable function ref) won't trigger re-renders.
+  const previewTheme = useAppStore((s) => s.previewTheme);
+  void previewTheme; // Used only for subscription
   // Actions (stable references from Zustand - never change between renders)
   const setIpcConnected = useAppStore((s) => s.setIpcConnected);
   const upsertAndSetCurrentProject = useAppStore((s) => s.upsertAndSetCurrentProject);

@@ -1117,6 +1117,15 @@ export interface GlobalSettings {
    * in the two-stage model selector. Defaults to 'none'. */
   defaultReasoningEffort?: ReasoningEffort;
 
+  /** Default maximum number of agent turns (tool call round-trips) for feature execution.
+   * Controls how many iterations the AI agent can perform before stopping.
+   * Higher values allow more complex tasks but use more API credits.
+   * Defaults to 1000. Range: 1-2000.
+   *
+   * Note: Currently supported by Claude (via SDK) and Codex (via CLI config).
+   * Gemini and OpenCode CLI providers do not support max turns configuration. */
+  defaultMaxTurns?: number;
+
   // Legacy AI Model Selection (deprecated - use phaseModels instead)
   /** @deprecated Use phaseModels.enhancementModel instead */
   enhancementModel: ModelAlias;
@@ -1623,6 +1632,7 @@ export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
   phaseModels: DEFAULT_PHASE_MODELS,
   defaultThinkingLevel: 'none',
   defaultReasoningEffort: 'none',
+  defaultMaxTurns: 1000,
   enhancementModel: 'sonnet', // Legacy alias still supported
   validationModel: 'opus', // Legacy alias still supported
   enabledCursorModels: getAllCursorModelIds(), // Returns prefixed IDs

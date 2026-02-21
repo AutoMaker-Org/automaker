@@ -25,6 +25,7 @@ import {
   getPromptCustomization,
   getProviderByModelId,
   getMCPServersFromSettings,
+  getDefaultMaxTurnsSetting,
 } from '../../lib/settings-helpers.js';
 import { execGitCommand } from '@automaker/git-utils';
 import { TypedEventBus } from '../typed-event-bus.js';
@@ -255,6 +256,9 @@ export class AutoModeServiceFacade {
           // MCP servers are optional - continue without them
         }
 
+        // Read user-configured max turns from settings
+        const userMaxTurns = await getDefaultMaxTurnsSetting(settingsService, '[AutoModeFacade]');
+
         const sdkOpts = createAutoModeOptions({
           cwd: workDir,
           model: resolvedModel,
@@ -262,6 +266,7 @@ export class AutoModeServiceFacade {
           abortController,
           autoLoadClaudeMd,
           thinkingLevel: opts?.thinkingLevel,
+          maxTurns: userMaxTurns,
           mcpServers: mcpServers as
             | Record<string, import('@automaker/types').McpServerConfig>
             | undefined,

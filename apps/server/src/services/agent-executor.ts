@@ -100,7 +100,7 @@ export class AgentExecutor {
       false
     );
     const resolvedMaxTurns = sdkOptions?.maxTurns;
-    if (!resolvedMaxTurns) {
+    if (resolvedMaxTurns == null) {
       logger.warn(
         `[execute] Feature ${featureId}: sdkOptions.maxTurns is not set (undefined). ` +
           `The provider will use its internal default, which may cause premature completion. ` +
@@ -371,7 +371,7 @@ export class AgentExecutor {
         taskPrompts.taskExecution.taskPromptTemplate,
         userFeedback
       );
-      const taskMaxTurns = Math.min(sdkOptions?.maxTurns ?? 100, 100);
+      const taskMaxTurns = sdkOptions?.maxTurns ?? 1000;
       logger.info(
         `[executeTasksLoop] Feature ${featureId}, task ${task.id} (${taskIndex + 1}/${tasks.length}): ` +
           `maxTurns=${taskMaxTurns} (sdkOptions.maxTurns=${sdkOptions?.maxTurns ?? 'undefined'})`
@@ -596,7 +596,7 @@ export class AgentExecutor {
           });
           let revText = '';
           for await (const msg of provider.executeQuery(
-            this.buildExecOpts(options, revPrompt, sdkOptions?.maxTurns ?? 100)
+            this.buildExecOpts(options, revPrompt, sdkOptions?.maxTurns ?? 1000)
           )) {
             if (msg.type === 'assistant' && msg.message?.content)
               for (const b of msg.message.content)

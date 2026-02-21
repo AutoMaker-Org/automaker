@@ -367,6 +367,11 @@ export interface CreateSdkOptionsConfig {
 
   /** Extended thinking level for Claude models */
   thinkingLevel?: ThinkingLevel;
+
+  /** Optional user-configured max turns override (from settings).
+   * When provided, overrides the preset MAX_TURNS for the use case.
+   * Range: 1-2000. */
+  maxTurns?: number;
 }
 
 // Re-export MCP types from @automaker/types for convenience
@@ -403,7 +408,7 @@ export function createSpecGenerationOptions(config: CreateSdkOptionsConfig): Opt
     // See: https://github.com/AutoMaker-Org/automaker/issues/149
     permissionMode: 'default',
     model: getModelForUseCase('spec', config.model),
-    maxTurns: MAX_TURNS.maximum,
+    maxTurns: config.maxTurns ?? MAX_TURNS.maximum,
     cwd: config.cwd,
     allowedTools: [...TOOL_PRESETS.specGeneration],
     ...claudeMdOptions,
@@ -437,7 +442,7 @@ export function createFeatureGenerationOptions(config: CreateSdkOptionsConfig): 
     // Override permissionMode - feature generation only needs read-only tools
     permissionMode: 'default',
     model: getModelForUseCase('features', config.model),
-    maxTurns: MAX_TURNS.quick,
+    maxTurns: config.maxTurns ?? MAX_TURNS.quick,
     cwd: config.cwd,
     allowedTools: [...TOOL_PRESETS.readOnly],
     ...claudeMdOptions,
@@ -468,7 +473,7 @@ export function createSuggestionsOptions(config: CreateSdkOptionsConfig): Option
   return {
     ...getBaseOptions(),
     model: getModelForUseCase('suggestions', config.model),
-    maxTurns: MAX_TURNS.extended,
+    maxTurns: config.maxTurns ?? MAX_TURNS.extended,
     cwd: config.cwd,
     allowedTools: [...TOOL_PRESETS.readOnly],
     ...claudeMdOptions,
@@ -506,7 +511,7 @@ export function createChatOptions(config: CreateSdkOptionsConfig): Options {
   return {
     ...getBaseOptions(),
     model: getModelForUseCase('chat', effectiveModel),
-    maxTurns: MAX_TURNS.standard,
+    maxTurns: config.maxTurns ?? MAX_TURNS.standard,
     cwd: config.cwd,
     allowedTools: [...TOOL_PRESETS.chat],
     ...claudeMdOptions,
@@ -541,7 +546,7 @@ export function createAutoModeOptions(config: CreateSdkOptionsConfig): Options {
   return {
     ...getBaseOptions(),
     model: getModelForUseCase('auto', config.model),
-    maxTurns: MAX_TURNS.maximum,
+    maxTurns: config.maxTurns ?? MAX_TURNS.maximum,
     cwd: config.cwd,
     allowedTools: [...TOOL_PRESETS.fullAccess],
     ...claudeMdOptions,

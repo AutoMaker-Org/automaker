@@ -117,6 +117,8 @@ const SETTINGS_FIELDS_TO_SYNC = [
   'codexEnableImages',
   'codexAdditionalDirs',
   'codexThreadId',
+  // Max Turns Setting
+  'defaultMaxTurns',
   // UI State (previously in localStorage)
   'worktreePanelCollapsed',
   'lastProjectDir',
@@ -755,6 +757,7 @@ export async function refreshSettingsFromServer(): Promise<boolean> {
         ? migratePhaseModelEntry(serverSettings.defaultFeatureModel)
         : { model: 'claude-opus' },
       muteDoneSound: serverSettings.muteDoneSound,
+      defaultMaxTurns: serverSettings.defaultMaxTurns ?? 1000,
       disableSplashScreen: serverSettings.disableSplashScreen ?? false,
       serverLogLevel: serverSettings.serverLogLevel ?? 'info',
       enableRequestLogging: serverSettings.enableRequestLogging ?? true,
@@ -771,7 +774,7 @@ export async function refreshSettingsFromServer(): Promise<boolean> {
       copilotDefaultModel: sanitizedCopilotDefaultModel,
       enabledDynamicModelIds: sanitizedDynamicModelIds,
       disabledProviders: serverSettings.disabledProviders ?? [],
-      autoLoadClaudeMd: serverSettings.autoLoadClaudeMd ?? false,
+      autoLoadClaudeMd: serverSettings.autoLoadClaudeMd ?? true,
       keyboardShortcuts: {
         ...currentAppState.keyboardShortcuts,
         ...(serverSettings.keyboardShortcuts as unknown as Partial<

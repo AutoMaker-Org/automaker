@@ -64,12 +64,44 @@ export async function getAutoLoadClaudeMdSetting(
 
     // Fall back to global settings
     const globalSettings = await settingsService.getGlobalSettings();
-    const result = globalSettings.autoLoadClaudeMd ?? false;
+    const result = globalSettings.autoLoadClaudeMd ?? true;
     logger.info(`${logPrefix} autoLoadClaudeMd from global settings: ${result}`);
     return result;
   } catch (error) {
     logger.error(`${logPrefix} Failed to load autoLoadClaudeMd setting:`, error);
     throw error;
+  }
+}
+
+/**
+ * Get the default max turns setting from global settings.
+ *
+ * Reads the user's configured `defaultMaxTurns` setting, which controls the maximum
+ * number of agent turns (tool-call round-trips) for feature execution.
+ *
+ * @param settingsService - Settings service instance (may be null)
+ * @param logPrefix - Logging prefix for debugging
+ * @returns The user's configured max turns, or 1000 as default
+ */
+export async function getDefaultMaxTurnsSetting(
+  settingsService?: SettingsService | null,
+  logPrefix = '[SettingsHelper]'
+): Promise<number> {
+  if (!settingsService) {
+    logger.info(`${logPrefix} SettingsService not available, using default maxTurns=1000`);
+    return 1000;
+  }
+
+  try {
+    const globalSettings = await settingsService.getGlobalSettings();
+    const result = globalSettings.defaultMaxTurns ?? 1000;
+    // Clamp to valid range
+    const clamped = Math.max(1, Math.min(2000, Math.floor(result)));
+    logger.debug(`${logPrefix} defaultMaxTurns from global settings: ${clamped}`);
+    return clamped;
+  } catch (error) {
+    logger.error(`${logPrefix} Failed to load defaultMaxTurns setting:`, error);
+    return 1000;
   }
 }
 

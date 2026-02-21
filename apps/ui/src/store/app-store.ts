@@ -369,6 +369,7 @@ const initialState: AppState = {
   defaultFeatureModel: DEFAULT_GLOBAL_SETTINGS.defaultFeatureModel,
   defaultThinkingLevel: DEFAULT_GLOBAL_SETTINGS.defaultThinkingLevel ?? 'none',
   defaultReasoningEffort: DEFAULT_GLOBAL_SETTINGS.defaultReasoningEffort ?? 'none',
+  defaultMaxTurns: DEFAULT_GLOBAL_SETTINGS.defaultMaxTurns ?? 1000,
   pendingPlanApproval: null,
   claudeRefreshInterval: 60,
   claudeUsage: null,
@@ -1375,7 +1376,7 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
     set({ autoLoadClaudeMd: enabled });
     try {
       const httpApi = getHttpApiClient();
-      await httpApi.put('/api/settings', { autoLoadClaudeMd: enabled });
+      await httpApi.settings.updateGlobal({ autoLoadClaudeMd: enabled });
     } catch (error) {
       logger.error('Failed to sync autoLoadClaudeMd:', error);
     }
@@ -1384,7 +1385,7 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
     set({ skipSandboxWarning: skip });
     try {
       const httpApi = getHttpApiClient();
-      await httpApi.put('/api/settings', { skipSandboxWarning: skip });
+      await httpApi.settings.updateGlobal({ skipSandboxWarning: skip });
     } catch (error) {
       logger.error('Failed to sync skipSandboxWarning:', error);
     }
@@ -2365,6 +2366,19 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
       await httpApi.put('/api/settings', { defaultReasoningEffort: effort });
     } catch (error) {
       logger.error('Failed to sync defaultReasoningEffort:', error);
+    }
+  },
+
+  setDefaultMaxTurns: async (maxTurns: number) => {
+    // Clamp to valid range
+    const clamped = Math.max(1, Math.min(2000, Math.floor(maxTurns)));
+    set({ defaultMaxTurns: clamped });
+    // Sync to server
+    try {
+      const httpApi = getHttpApiClient();
+      await httpApi.put('/api/settings', { defaultMaxTurns: clamped });
+    } catch (error) {
+      logger.error('Failed to sync defaultMaxTurns:', error);
     }
   },
 

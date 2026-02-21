@@ -92,15 +92,19 @@ export function useDevServers({ projectPath }: UseDevServersOptions) {
       const timer = setTimeout(async () => {
         portDetectionTimers.current.delete(key);
 
-        // Check if the server is still in undetected state
+        // Check if the server is still in undetected state.
+        // Use a setState-updater-as-reader to access the latest state snapshot,
+        // but keep the updater pure (no side effects, just reads).
+        let needsReconciliation = false;
         setRunningDevServers((prev) => {
           const server = prev.get(key);
-          if (!server || server.urlDetected) return prev; // Already detected or removed
-
-          // Attempt to reconcile with backend before showing warning
-          logger.warn(`Port detection timeout for ${key} after ${PORT_DETECTION_TIMEOUT_MS}ms`);
-          return prev;
+          needsReconciliation = !!server && !server.urlDetected;
+          return prev; // no state change
         });
+
+        if (!needsReconciliation) return;
+
+        logger.warn(`Port detection timeout for ${key} after ${PORT_DETECTION_TIMEOUT_MS}ms`);
 
         // Try to reconcile with backend - the server may have detected the URL
         // but the WebSocket event was missed
@@ -229,6 +233,10 @@ export function useDevServers({ projectPath }: UseDevServersOptions) {
           backendServers.set(normalizePath(server.worktreePath), server);
         }
 
+        // Collect side-effect actions in a local array so the setState updater
+        // remains pure. Side effects are executed after the state update.
+        const sideEffects: Array<() => void> = [];
+
         setRunningDevServers((prev) => {
           let changed = false;
           const next = new Map(prev);
@@ -238,28 +246,34 @@ export function useDevServers({ projectPath }: UseDevServersOptions) {
             const existing = next.get(key);
             if (!existing) {
               // Server running on backend but not in our state - add it
-              logger.info(`Reconciliation: adding missing server ${key}`);
+              sideEffects.push(() => logger.info(`Reconciliation: adding missing server ${key}`));
               next.set(key, {
                 ...server,
                 urlDetected: server.urlDetected ?? true,
               });
               if (server.urlDetected !== false) {
-                toastShownForRef.current.add(key);
-                clearPortDetectionTimer(key);
+                sideEffects.push(() => {
+                  toastShownForRef.current.add(key);
+                  clearPortDetectionTimer(key);
+                });
+              } else {
+                sideEffects.push(() => startPortDetectionTimer(key));
               }
               changed = true;
             } else if (!existing.urlDetected && server.urlDetected) {
               // URL was detected on backend but we missed the event - update
-              logger.info(`Reconciliation: URL detected for ${key}`);
+              sideEffects.push(() => {
+                logger.info(`Reconciliation: URL detected for ${key}`);
+                clearPortDetectionTimer(key);
+                if (!toastShownForRef.current.has(key)) {
+                  toastShownForRef.current.add(key);
+                  showUrlDetectedToast(server.url, server.port);
+                }
+              });
               next.set(key, {
                 ...server,
                 urlDetected: true,
               });
-              clearPortDetectionTimer(key);
-              if (!toastShownForRef.current.has(key)) {
-                toastShownForRef.current.add(key);
-                showUrlDetectedToast(server.url, server.port);
-              }
               changed = true;
             } else if (
               existing.urlDetected &&
@@ -267,7 +281,7 @@ export function useDevServers({ projectPath }: UseDevServersOptions) {
               (existing.port !== server.port || existing.url !== server.url)
             ) {
               // Port or URL changed between sessions - update
-              logger.info(`Reconciliation: port/URL changed for ${key}`);
+              sideEffects.push(() => logger.info(`Reconciliation: port/URL changed for ${key}`));
               next.set(key, {
                 ...server,
                 urlDetected: true,
@@ -279,16 +293,21 @@ export function useDevServers({ projectPath }: UseDevServersOptions) {
           // Remove servers from our state that are no longer on the backend
           for (const [key] of next) {
             if (!backendServers.has(key)) {
-              logger.info(`Reconciliation: removing stale server ${key}`);
+              sideEffects.push(() => {
+                logger.info(`Reconciliation: removing stale server ${key}`);
+                toastShownForRef.current.delete(key);
+                clearPortDetectionTimer(key);
+              });
               next.delete(key);
-              toastShownForRef.current.delete(key);
-              clearPortDetectionTimer(key);
               changed = true;
             }
           }
 
           return changed ? next : prev;
         });
+
+        // Execute side effects outside the updater
+        for (const fn of sideEffects) fn();
       } catch (error) {
         // Reconciliation failures are non-critical - just log and continue
         logger.debug('State reconciliation failed:', error);
@@ -297,7 +316,7 @@ export function useDevServers({ projectPath }: UseDevServersOptions) {
 
     const intervalId = setInterval(reconcile, STATE_RECONCILE_INTERVAL_MS);
     return () => clearInterval(intervalId);
-  }, [clearPortDetectionTimer]);
+  }, [clearPortDetectionTimer, startPortDetectionTimer]);
 
   // Subscribe to all dev server lifecycle events for reactive state updates
   useEffect(() => {
