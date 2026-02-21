@@ -209,9 +209,10 @@ COPY libs ./libs
 COPY apps/ui ./apps/ui
 
 # Build packages in dependency order, then build UI
-# VITE_SERVER_URL tells the UI where to find the API server
-# Use ARG to allow overriding at build time: --build-arg VITE_SERVER_URL=http://api.example.com
-ARG VITE_SERVER_URL=http://localhost:3008
+# When VITE_SERVER_URL is empty, the UI uses relative URLs (e.g., /api/...) which nginx proxies
+# to the server container. This avoids CORS issues entirely in Docker Compose setups.
+# Override at build time if needed: --build-arg VITE_SERVER_URL=http://api.example.com
+ARG VITE_SERVER_URL=
 ENV VITE_SKIP_ELECTRON=true
 ENV VITE_SERVER_URL=${VITE_SERVER_URL}
 RUN npm run build:packages && npm run build --workspace=apps/ui
