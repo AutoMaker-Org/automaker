@@ -750,7 +750,7 @@ class DevServerService {
       if (this.emitter && !serverInfo.stopping) {
         this.emitter.emit('dev-server:stopped', {
           worktreePath,
-          port,
+          port: serverInfo.port, // Use the detected port (may differ from allocated port if detectUrlFromOutput updated it)
           exitCode,
           error: errorMessage,
           timestamp: new Date().toISOString(),

@@ -683,7 +683,7 @@ export class AgentExecutor {
     return { responseText, tasksCompleted };
   }
 
-  private buildExecOpts(o: AgentExecutionOptions, prompt: string, maxTurns?: number) {
+  private buildExecOpts(o: AgentExecutionOptions, prompt: string, maxTurns: number) {
     return {
       prompt,
       model: o.effectiveBareModel,

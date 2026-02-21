@@ -21,6 +21,7 @@ import {
   Maximize2,
   Check,
   Undo2,
+  RefreshCw,
 } from 'lucide-react';
 import {
   Dialog,
@@ -574,16 +575,6 @@ export function PRCommentResolutionDialog({
   // Track previous open state to detect when dialog opens
   const wasOpenRef = useRef(false);
 
-  // Sync model defaults only when dialog opens (transitions from closed to open)
-  useEffect(() => {
-    const justOpened = open && !wasOpenRef.current;
-    wasOpenRef.current = open;
-
-    if (justOpened) {
-      setModelEntry(effectiveDefaultFeatureModel);
-    }
-  }, [open, effectiveDefaultFeatureModel]);
-
   const handleModelChange = useCallback((entry: PhaseModelEntry) => {
     // Normalize thinking level when switching between adaptive and non-adaptive models
     const isNewModelAdaptive =
@@ -605,9 +596,22 @@ export function PRCommentResolutionDialog({
   const {
     data,
     isLoading: loading,
+    isFetching: refreshing,
     error,
     refetch,
   } = useGitHubPRReviewComments(currentProject?.path, open ? pr.number : undefined);
+
+  // Sync model defaults and refresh comments when dialog opens (transitions from closed to open)
+  useEffect(() => {
+    const justOpened = open && !wasOpenRef.current;
+    wasOpenRef.current = open;
+
+    if (justOpened) {
+      setModelEntry(effectiveDefaultFeatureModel);
+      // Force refresh PR comments from GitHub when dialog opens
+      refetch();
+    }
+  }, [open, effectiveDefaultFeatureModel, refetch]);
 
   const allComments = useMemo(() => {
     const raw = data?.comments ?? [];
@@ -846,10 +850,22 @@ export function PRCommentResolutionDialog({
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-w-3xl max-h-[80vh] flex flex-col">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <MessageSquare className="h-5 w-5 text-blue-500" />
-            Manage PR Review Comments
-          </DialogTitle>
+          <div className="flex items-center justify-between">
+            <DialogTitle className="flex items-center gap-2">
+              <MessageSquare className="h-5 w-5 text-blue-500" />
+              Manage PR Review Comments
+            </DialogTitle>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 w-7 p-0 shrink-0"
+              onClick={() => refetch()}
+              disabled={refreshing}
+              title="Refresh comments"
+            >
+              <RefreshCw className={cn('h-4 w-4', refreshing && 'animate-spin')} />
+            </Button>
+          </div>
           <DialogDescription>
             Select comments from PR #{pr.number} to create feature tasks that address them.
           </DialogDescription>
