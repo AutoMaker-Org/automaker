@@ -339,6 +339,8 @@ export interface PRReviewComment {
   side?: string;
   /** The commit ID the comment was made on */
   commitId?: string;
+  /** Whether the comment author is a bot/app account */
+  isBot?: boolean;
 }
 
 export interface GitHubAPI {

@@ -6,6 +6,7 @@ const logger = createLogger('AgentSession');
 
 interface UseAgentSessionOptions {
   projectPath: string | undefined;
+  workingDirectory?: string; // Current worktree path for per-worktree session persistence
 }
 
 interface UseAgentSessionResult {
@@ -13,49 +14,56 @@ interface UseAgentSessionResult {
   handleSelectSession: (sessionId: string | null) => void;
 }
 
-export function useAgentSession({ projectPath }: UseAgentSessionOptions): UseAgentSessionResult {
+export function useAgentSession({
+  projectPath,
+  workingDirectory,
+}: UseAgentSessionOptions): UseAgentSessionResult {
   const { setLastSelectedSession, getLastSelectedSession } = useAppStore();
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
 
   // Track if initial session has been loaded
   const initialSessionLoadedRef = useRef(false);
 
+  // Use workingDirectory as the persistence key so sessions are scoped per worktree
+  const persistenceKey = workingDirectory || projectPath;
+
   // Handle session selection with persistence
   const handleSelectSession = useCallback(
     (sessionId: string | null) => {
       setCurrentSessionId(sessionId);
-      // Persist the selection for this project
-      if (projectPath) {
-        setLastSelectedSession(projectPath, sessionId);
+      // Persist the selection for this worktree/project
+      if (persistenceKey) {
+        setLastSelectedSession(persistenceKey, sessionId);
       }
     },
-    [projectPath, setLastSelectedSession]
+    [persistenceKey, setLastSelectedSession]
   );
 
-  // Restore last selected session when switching to Agent view or when project changes
+  // Restore last selected session when switching to Agent view or when worktree changes
   useEffect(() => {
-    if (!projectPath) {
+    if (!persistenceKey) {
       // No project, reset
       setCurrentSessionId(null);
       initialSessionLoadedRef.current = false;
       return;
     }
 
-    // Only restore once per project
+    // Only restore once per persistence key
     if (initialSessionLoadedRef.current) return;
     initialSessionLoadedRef.current = true;
 
-    const lastSessionId = getLastSelectedSession(projectPath);
+    const lastSessionId = getLastSelectedSession(persistenceKey);
     if (lastSessionId) {
       logger.info('Restoring last selected session:', lastSessionId);
       setCurrentSessionId(lastSessionId);
     }
-  }, [projectPath, getLastSelectedSession]);
+  }, [persistenceKey, getLastSelectedSession]);
 
-  // Reset initialSessionLoadedRef when project changes
+  // Reset when worktree/project changes - clear current session and allow restore
   useEffect(() => {
     initialSessionLoadedRef.current = false;
-  }, [projectPath]);
+    setCurrentSessionId(null);
+  }, [persistenceKey]);
 
   return {
     currentSessionId,

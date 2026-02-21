@@ -6,6 +6,7 @@ export interface AgentSession {
   id: string;
   name: string;
   projectPath: string;
+  workingDirectory?: string; // The worktree/directory this session runs in
   createdAt: string;
   updatedAt: string;
   messageCount: number;

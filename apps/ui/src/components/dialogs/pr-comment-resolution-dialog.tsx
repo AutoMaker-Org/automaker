@@ -248,39 +248,22 @@ function CommentRow({
   return (
     <div
       className={cn(
-        'flex items-start gap-3 p-3 rounded-lg border border-border transition-colors cursor-pointer',
+        'flex items-start gap-3 p-3 rounded-lg border border-border transition-colors',
+        needsExpansion ? 'cursor-pointer' : 'cursor-default',
         isSelected ? 'bg-accent/50 border-primary/30' : 'hover:bg-accent/30'
       )}
-      onClick={onToggle}
+      onClick={needsExpansion ? () => setIsExpanded((prev) => !prev) : undefined}
     >
       <Checkbox
         checked={isSelected}
         onCheckedChange={() => onToggle()}
-        className="mt-0.5"
+        className="mt-0.5 shrink-0"
         onClick={(e) => e.stopPropagation()}
       />
 
       <div className="flex-1 min-w-0">
         {/* Header: disclosure triangle + author + file location + tags */}
         <div className="flex items-start gap-1.5 flex-wrap mb-1">
-          {/* Disclosure triangle - always shown, toggles expand/collapse */}
-          {needsExpansion ? (
-            <button
-              type="button"
-              onClick={handleExpandToggle}
-              className="mt-0.5 shrink-0 text-muted-foreground hover:text-foreground transition-colors"
-              title={isExpanded ? 'Collapse comment' : 'Expand comment'}
-            >
-              {isExpanded ? (
-                <ChevronDown className="h-3.5 w-3.5" />
-              ) : (
-                <ChevronDown className="h-3.5 w-3.5 -rotate-90" />
-              )}
-            </button>
-          ) : (
-            <span className="mt-0.5 shrink-0 w-3.5 h-3.5" />
-          )}
-
           <div className="flex items-center gap-2 flex-wrap flex-1 min-w-0">
             <div className="flex items-center gap-1.5">
               {comment.avatarUrl ? (
@@ -302,6 +285,12 @@ function CommentRow({
                 <FileCode className="h-3 w-3" />
                 <span className="font-mono">{fileLocation}</span>
               </div>
+            )}
+
+            {comment.isBot && (
+              <span className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-purple-500/10 text-purple-500">
+                Bot
+              </span>
             )}
 
             {comment.isOutdated && (
@@ -347,27 +336,47 @@ function CommentRow({
               </button>
             )}
 
-            {/* Expand detail button */}
-            <button
-              type="button"
-              onClick={handleExpandDetail}
-              className="ml-auto shrink-0 text-muted-foreground hover:text-foreground transition-colors p-0.5 rounded hover:bg-muted"
-              title="View full comment details"
-            >
-              <Maximize2 className="h-3.5 w-3.5" />
-            </button>
+            <div className="ml-auto shrink-0 flex items-center gap-1">
+              {/* Disclosure triangle - toggles expand/collapse */}
+              {needsExpansion ? (
+                <button
+                  type="button"
+                  onClick={handleExpandToggle}
+                  className="text-muted-foreground hover:text-foreground transition-colors p-0.5 rounded hover:bg-muted"
+                  title={isExpanded ? 'Collapse comment' : 'Expand comment'}
+                >
+                  {isExpanded ? (
+                    <ChevronDown className="h-3.5 w-3.5" />
+                  ) : (
+                    <ChevronDown className="h-3.5 w-3.5 -rotate-90" />
+                  )}
+                </button>
+              ) : (
+                <span className="w-4 h-4" />
+              )}
+
+              {/* Expand detail button */}
+              <button
+                type="button"
+                onClick={handleExpandDetail}
+                className="text-muted-foreground hover:text-foreground transition-colors p-0.5 rounded hover:bg-muted"
+                title="View full comment details"
+              >
+                <Maximize2 className="h-3.5 w-3.5" />
+              </button>
+            </div>
           </div>
         </div>
 
         {/* Comment body - collapsible, rendered as markdown */}
         {isExpanded ? (
-          <div className="pl-5" onClick={(e) => e.stopPropagation()}>
+          <div onClick={(e) => e.stopPropagation()}>
             <Markdown className="text-sm [&_p]:text-muted-foreground [&_li]:text-muted-foreground">
               {comment.body}
             </Markdown>
           </div>
         ) : (
-          <div className="pl-5 line-clamp-2">
+          <div className="line-clamp-2">
             <Markdown className="text-sm [&_p]:text-muted-foreground [&_li]:text-muted-foreground [&_p]:my-0 [&_ul]:my-0 [&_ol]:my-0 [&_h1]:text-sm [&_h2]:text-sm [&_h3]:text-sm [&_h4]:text-sm [&_h1]:my-0 [&_h2]:my-0 [&_h3]:my-0 [&_h4]:my-0 [&_pre]:my-0 [&_blockquote]:my-0">
               {comment.body}
             </Markdown>
@@ -375,7 +384,7 @@ function CommentRow({
         )}
 
         {/* Date row */}
-        <div className="flex items-center mt-1 pl-5">
+        <div className="flex items-center mt-1">
           <div className="flex flex-col">
             <div className="text-xs text-muted-foreground">{formatDate(comment.createdAt)}</div>
             <div className="text-xs text-muted-foreground/70">{formatTime(comment.createdAt)}</div>
@@ -440,6 +449,11 @@ function CommentDetailDialog({ comment, open, onOpenChange }: CommentDetailDialo
 
               {/* Badges */}
               <div className="flex items-center gap-1.5 ml-auto">
+                {comment.isBot && (
+                  <span className="px-2 py-0.5 text-xs font-medium rounded bg-purple-500/10 text-purple-500">
+                    Bot
+                  </span>
+                )}
                 {comment.isOutdated && (
                   <span className="px-2 py-0.5 text-xs font-medium rounded bg-yellow-500/10 text-yellow-500">
                     Outdated
@@ -850,7 +864,7 @@ export function PRCommentResolutionDialog({
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-w-3xl max-h-[80vh] flex flex-col">
         <DialogHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between pr-10">
             <DialogTitle className="flex items-center gap-2">
               <MessageSquare className="h-5 w-5 text-blue-500" />
               Manage PR Review Comments

@@ -19,7 +19,7 @@ import {
   ArchiveRestore,
 } from 'lucide-react';
 import { Spinner } from '@/components/ui/spinner';
-import { cn } from '@/lib/utils';
+import { cn, pathsEqual } from '@/lib/utils';
 import type { SessionListItem } from '@/types/electron';
 import { useKeyboardShortcutsConfig } from '@/hooks/use-keyboard-shortcuts';
 import { getElectronAPI } from '@/lib/electron';
@@ -93,6 +93,7 @@ interface SessionManagerProps {
   currentSessionId: string | null;
   onSelectSession: (sessionId: string | null) => void;
   projectPath: string;
+  workingDirectory?: string; // Current worktree path for scoping sessions
   isCurrentSessionThinking?: boolean;
   onQuickCreateRef?: React.MutableRefObject<(() => Promise<void>) | null>;
 }
@@ -101,6 +102,7 @@ export function SessionManager({
   currentSessionId,
   onSelectSession,
   projectPath,
+  workingDirectory,
   isCurrentSessionThinking = false,
   onQuickCreateRef,
 }: SessionManagerProps) {
@@ -177,6 +179,9 @@ export function SessionManager({
     return () => clearInterval(interval);
   }, [sessions, runningSessions.size, isCurrentSessionThinking, checkRunningSessions]);
 
+  // Effective working directory for session creation (worktree path or project path)
+  const effectiveWorkingDirectory = workingDirectory || projectPath;
+
   // Create new session with random name
   const handleCreateSession = async () => {
     const api = getElectronAPI();
@@ -184,7 +189,7 @@ export function SessionManager({
 
     const sessionName = newSessionName.trim() || generateRandomSessionName();
 
-    const result = await api.sessions.create(sessionName, projectPath, projectPath);
+    const result = await api.sessions.create(sessionName, projectPath, effectiveWorkingDirectory);
 
     if (result.success && result.session?.id) {
       setNewSessionName('');
@@ -201,7 +206,7 @@ export function SessionManager({
 
     const sessionName = generateRandomSessionName();
 
-    const result = await api.sessions.create(sessionName, projectPath, projectPath);
+    const result = await api.sessions.create(sessionName, projectPath, effectiveWorkingDirectory);
 
     if (result.success && result.session?.id) {
       await invalidateSessions();
@@ -318,8 +323,16 @@ export function SessionManager({
     setIsDeleteAllArchivedDialogOpen(false);
   };
 
-  const activeSessions = sessions.filter((s) => !s.isArchived);
-  const archivedSessions = sessions.filter((s) => s.isArchived);
+  // Filter sessions by current working directory (worktree scoping)
+  const scopedSessions = sessions.filter((s) => {
+    const sessionDir = s.workingDirectory || s.projectPath;
+    // Match sessions whose workingDirectory matches the current effective directory
+    // Use pathsEqual for cross-platform path normalization (trailing slashes, separators)
+    return pathsEqual(sessionDir, effectiveWorkingDirectory);
+  });
+
+  const activeSessions = scopedSessions.filter((s) => !s.isArchived);
+  const archivedSessions = scopedSessions.filter((s) => s.isArchived);
   const displayedSessions = activeTab === 'active' ? activeSessions : archivedSessions;
 
   return (
