@@ -14,6 +14,7 @@ export type SettingsViewId =
   | 'prompts'
   | 'model-defaults'
   | 'appearance'
+  | 'editor'
   | 'terminal'
   | 'keyboard'
   | 'audio'

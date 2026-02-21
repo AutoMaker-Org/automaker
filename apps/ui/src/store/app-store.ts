@@ -343,6 +343,10 @@ const initialState: AppState = {
   skipSandboxWarning: false,
   mcpServers: [],
   defaultEditorCommand: null,
+  editorFontSize: 13,
+  editorFontFamily: 'default',
+  editorAutoSave: false,
+  editorAutoSaveDelay: 1000,
   defaultTerminalId: null,
   enableSkills: true,
   skillsSources: ['user', 'project'] as Array<'user' | 'project'>,
@@ -1388,6 +1392,12 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
 
   // Editor Configuration actions
   setDefaultEditorCommand: (command) => set({ defaultEditorCommand: command }),
+
+  // File Editor Settings actions
+  setEditorFontSize: (size) => set({ editorFontSize: size }),
+  setEditorFontFamily: (fontFamily) => set({ editorFontFamily: fontFamily }),
+  setEditorAutoSave: (enabled) => set({ editorAutoSave: enabled }),
+  setEditorAutoSaveDelay: (delay) => set({ editorAutoSaveDelay: delay }),
 
   // Terminal Configuration actions
   setDefaultTerminalId: (terminalId) => set({ defaultTerminalId: terminalId }),

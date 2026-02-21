@@ -1251,6 +1251,69 @@ export class HttpApiClient implements ElectronAPI {
     return this.deleteFile(filePath);
   }
 
+  async copyItem(
+    sourcePath: string,
+    destinationPath: string,
+    overwrite?: boolean
+  ): Promise<WriteResult & { exists?: boolean }> {
+    return this.post('/api/fs/copy', { sourcePath, destinationPath, overwrite });
+  }
+
+  async moveItem(
+    sourcePath: string,
+    destinationPath: string,
+    overwrite?: boolean
+  ): Promise<WriteResult & { exists?: boolean }> {
+    return this.post('/api/fs/move', { sourcePath, destinationPath, overwrite });
+  }
+
+  async downloadItem(filePath: string): Promise<void> {
+    const serverUrl = getServerUrl();
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    const apiKey = getApiKey();
+    if (apiKey) {
+      headers['X-API-Key'] = apiKey;
+    }
+    const token = getSessionToken();
+    if (token) {
+      headers['X-Session-Token'] = token;
+    }
+
+    const response = await fetch(`${serverUrl}/api/fs/download`, {
+      method: 'POST',
+      headers,
+      credentials: 'include',
+      body: JSON.stringify({ filePath }),
+    });
+
+    if (response.status === 401 || response.status === 403) {
+      handleUnauthorized();
+      throw new Error('Unauthorized');
+    }
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Download failed' }));
+      throw new Error(error.error || `Download failed with status ${response.status}`);
+    }
+
+    // Create download from response blob
+    const blob = await response.blob();
+    const contentDisposition = response.headers.get('Content-Disposition');
+    const fileNameMatch = contentDisposition?.match(/filename="(.+)"/);
+    const fileName = fileNameMatch ? fileNameMatch[1] : filePath.split('/').pop() || 'download';
+
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
   async getPath(name: string): Promise<string> {
     // Server provides data directory
     if (name === 'userData') {
@@ -2311,6 +2374,10 @@ export class HttpApiClient implements ElectronAPI {
       this.post('/api/git/file-diff', { projectPath, filePath }),
     stageFiles: (projectPath: string, files: string[], operation: 'stage' | 'unstage') =>
       this.post('/api/git/stage-files', { projectPath, files, operation }),
+    getDetails: (projectPath: string, filePath?: string) =>
+      this.post('/api/git/details', { projectPath, filePath }),
+    getEnhancedStatus: (projectPath: string) =>
+      this.post('/api/git/enhanced-status', { projectPath }),
   };
 
   // Spec Regeneration API

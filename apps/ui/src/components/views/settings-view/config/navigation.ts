@@ -16,6 +16,7 @@ import {
   GitBranch,
   Code2,
   Webhook,
+  FileCode2,
 } from 'lucide-react';
 import {
   AnthropicIcon,
@@ -69,6 +70,7 @@ export const GLOBAL_NAV_GROUPS: NavigationGroup[] = [
     label: 'Interface',
     items: [
       { id: 'appearance', label: 'Appearance', icon: Palette },
+      { id: 'editor', label: 'File Editor', icon: FileCode2 },
       { id: 'terminal', label: 'Terminal', icon: SquareTerminal },
       { id: 'keyboard', label: 'Keyboard Shortcuts', icon: Settings2 },
       { id: 'audio', label: 'Audio', icon: Volume2 },

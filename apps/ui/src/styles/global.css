@@ -944,6 +944,19 @@
   animation: accordion-up 0.2s ease-out forwards;
 }
 
+/* ========================================
+   CODE EDITOR - MOBILE RESPONSIVE STYLES
+   Reduce line number gutter width on mobile
+   ======================================== */
+
+/* On small screens (mobile), reduce line number gutter width to save horizontal space */
+@media (max-width: 640px) {
+  .cm-lineNumbers .cm-gutterElement {
+    min-width: 1.75rem !important;
+    padding-right: 0.25rem !important;
+  }
+}
+
 /* Terminal scrollbar theming */
 .xterm-viewport::-webkit-scrollbar {
   width: 8px;

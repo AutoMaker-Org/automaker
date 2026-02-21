@@ -2,6 +2,7 @@ import { useMemo, useState, useEffect } from 'react';
 import type { NavigateOptions } from '@tanstack/react-router';
 import {
   FileText,
+  Folder,
   LayoutGrid,
   Bot,
   BookOpen,
@@ -142,7 +143,7 @@ export function useNavigation({
       return true;
     });
 
-    // Build project items - Terminal is conditionally included
+    // Build project items - Terminal and File Editor are conditionally included
     const projectItems: NavItem[] = [
       {
         id: 'board',
@@ -155,6 +156,11 @@ export function useNavigation({
         label: 'Graph View',
         icon: Network,
         shortcut: shortcuts.graph,
+      },
+      {
+        id: 'file-editor',
+        label: 'File Editor',
+        icon: Folder,
       },
       {
         id: 'agent',
