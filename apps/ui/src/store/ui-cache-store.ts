@@ -174,13 +174,19 @@ export function restoreFromUICache(
   ) {
     const sanitized: Record<string, { path: string | null; branch: string }> = {};
     for (const [projectPath, worktree] of Object.entries(cache.cachedCurrentWorktreeByProject)) {
-      if (worktree.path === null) {
+      if (
+        typeof worktree === 'object' &&
+        worktree !== null &&
+        'path' in worktree &&
+        worktree.path === null
+      ) {
         // Main branch selection — always safe to restore
         sanitized[projectPath] = worktree;
       }
       // Non-null paths are dropped; the app will re-discover actual worktrees
       // from the server and the validation effect in use-worktrees will handle
       // resetting to main if the cached worktree no longer exists.
+      // Null/malformed entries are also dropped to prevent crashes.
     }
     if (Object.keys(sanitized).length > 0) {
       stateUpdate.currentWorktreeByProject = sanitized;
