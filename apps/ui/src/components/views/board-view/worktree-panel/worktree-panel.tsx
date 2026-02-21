@@ -659,6 +659,18 @@ export function WorktreePanel({
     // Keep logPanelWorktree set for smooth close animation
   }, []);
 
+  // Wrap handleStartDevServer to auto-open the logs panel so the user
+  // can see output immediately (including failure reasons)
+  const handleStartDevServerAndShowLogs = useCallback(
+    async (worktree: WorktreeInfo) => {
+      // Open logs panel immediately so output is visible from the start
+      setLogPanelWorktree(worktree);
+      setLogPanelOpen(true);
+      await handleStartDevServer(worktree);
+    },
+    [handleStartDevServer]
+  );
+
   // Handle opening the push to remote dialog
   const handlePushNewBranch = useCallback((worktree: WorktreeInfo) => {
     setPushToRemoteWorktree(worktree);
@@ -937,7 +949,7 @@ export function WorktreePanel({
             onResolveConflicts={onResolveConflicts}
             onMerge={handleMerge}
             onDeleteWorktree={onDeleteWorktree}
-            onStartDevServer={handleStartDevServer}
+            onStartDevServer={handleStartDevServerAndShowLogs}
             onStopDevServer={handleStopDevServer}
             onOpenDevServerUrl={handleOpenDevServerUrl}
             onViewDevServerLogs={handleViewDevServerLogs}
@@ -1181,7 +1193,7 @@ export function WorktreePanel({
             onResolveConflicts={onResolveConflicts}
             onMerge={handleMerge}
             onDeleteWorktree={onDeleteWorktree}
-            onStartDevServer={handleStartDevServer}
+            onStartDevServer={handleStartDevServerAndShowLogs}
             onStopDevServer={handleStopDevServer}
             onOpenDevServerUrl={handleOpenDevServerUrl}
             onViewDevServerLogs={handleViewDevServerLogs}
@@ -1288,7 +1300,7 @@ export function WorktreePanel({
                 onResolveConflicts={onResolveConflicts}
                 onMerge={handleMerge}
                 onDeleteWorktree={onDeleteWorktree}
-                onStartDevServer={handleStartDevServer}
+                onStartDevServer={handleStartDevServerAndShowLogs}
                 onStopDevServer={handleStopDevServer}
                 onOpenDevServerUrl={handleOpenDevServerUrl}
                 onViewDevServerLogs={handleViewDevServerLogs}
@@ -1375,7 +1387,7 @@ export function WorktreePanel({
                       onResolveConflicts={onResolveConflicts}
                       onMerge={handleMerge}
                       onDeleteWorktree={onDeleteWorktree}
-                      onStartDevServer={handleStartDevServer}
+                      onStartDevServer={handleStartDevServerAndShowLogs}
                       onStopDevServer={handleStopDevServer}
                       onOpenDevServerUrl={handleOpenDevServerUrl}
                       onViewDevServerLogs={handleViewDevServerLogs}

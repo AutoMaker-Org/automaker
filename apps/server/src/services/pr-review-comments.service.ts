@@ -37,6 +37,8 @@ export interface PRReviewComment {
   side?: string;
   /** The commit ID the comment was made on */
   commitId?: string;
+  /** Whether the comment author is a bot/app account */
+  isBot?: boolean;
 }
 
 export interface ListPRReviewCommentsResult {
@@ -51,6 +53,9 @@ export interface ListPRReviewCommentsResult {
 /** Timeout for GitHub GraphQL API requests in milliseconds */
 const GITHUB_API_TIMEOUT_MS = 30000;
 
+/** Maximum number of pagination pages to prevent infinite loops */
+const MAX_PAGINATION_PAGES = 20;
+
 interface GraphQLReviewThreadComment {
   databaseId: number;
 }
@@ -61,6 +66,7 @@ interface GraphQLReviewThread {
   comments: {
     pageInfo?: {
       hasNextPage: boolean;
+      endCursor?: string | null;
     };
     nodes: GraphQLReviewThreadComment[];
   };
@@ -74,6 +80,7 @@ interface GraphQLResponse {
           nodes: GraphQLReviewThread[];
           pageInfo?: {
             hasNextPage: boolean;
+            endCursor?: string | null;
           };
         };
       } | null;
@@ -94,7 +101,61 @@ const logger = createLogger('PRReviewCommentsService');
 // ── Service functions ──
 
 /**
+ * Execute a GraphQL query via the `gh` CLI and return the parsed response.
+ */
+async function executeGraphQL(projectPath: string, requestBody: string): Promise<GraphQLResponse> {
+  let timeoutId: NodeJS.Timeout | undefined;
+
+  const response = await new Promise<GraphQLResponse>((resolve, reject) => {
+    const gh = spawn('gh', ['api', 'graphql', '--input', '-'], {
+      cwd: projectPath,
+      env: execEnv,
+    });
+
+    gh.on('error', (err) => {
+      clearTimeout(timeoutId);
+      reject(err);
+    });
+
+    timeoutId = setTimeout(() => {
+      gh.kill();
+      reject(new Error('GitHub GraphQL API request timed out'));
+    }, GITHUB_API_TIMEOUT_MS);
+
+    let stdout = '';
+    let stderr = '';
+    gh.stdout.on('data', (data: Buffer) => (stdout += data.toString()));
+    gh.stderr.on('data', (data: Buffer) => (stderr += data.toString()));
+
+    gh.on('close', (code) => {
+      clearTimeout(timeoutId);
+      if (code !== 0) {
+        return reject(new Error(`gh process exited with code ${code}: ${stderr}`));
+      }
+      try {
+        resolve(JSON.parse(stdout));
+      } catch (e) {
+        reject(e);
+      }
+    });
+
+    gh.stdin.on('error', () => {
+      // Ignore stdin errors (e.g. when the child process is killed)
+    });
+    gh.stdin.write(requestBody);
+    gh.stdin.end();
+  });
+
+  if (response.errors && response.errors.length > 0) {
+    throw new Error(response.errors[0].message);
+  }
+
+  return response;
+}
+
+/**
  * Fetch review thread resolved status and thread IDs using GitHub GraphQL API.
+ * Uses cursor-based pagination to handle PRs with more than 100 review threads.
  * Returns a map of comment ID (string) -> { isResolved, threadId }.
  */
 export async function fetchReviewThreadResolvedStatus(
@@ -110,12 +171,14 @@ export async function fetchReviewThreadResolvedStatus(
       $owner: String!
       $repo: String!
       $prNumber: Int!
+      $cursor: String
     ) {
       repository(owner: $owner, name: $repo) {
         pullRequest(number: $prNumber) {
-          reviewThreads(first: 100) {
+          reviewThreads(first: 100, after: $cursor) {
             pageInfo {
               hasNextPage
+              endCursor
             }
             nodes {
               id
@@ -123,6 +186,7 @@ export async function fetchReviewThreadResolvedStatus(
               comments(first: 100) {
                 pageInfo {
                   hasNextPage
+                  endCursor
                 }
                 nodes {
                   databaseId
@@ -134,76 +198,48 @@ export async function fetchReviewThreadResolvedStatus(
       }
     }`;
 
-  const variables = { owner, repo, prNumber };
-  const requestBody = JSON.stringify({ query, variables });
-
   try {
-    let timeoutId: NodeJS.Timeout | undefined;
+    let cursor: string | null = null;
+    let pageCount = 0;
 
-    const response = await new Promise<GraphQLResponse>((resolve, reject) => {
-      const gh = spawn('gh', ['api', 'graphql', '--input', '-'], {
-        cwd: projectPath,
-        env: execEnv,
-      });
+    do {
+      const variables = { owner, repo, prNumber, cursor };
+      const requestBody = JSON.stringify({ query, variables });
+      const response = await executeGraphQL(projectPath, requestBody);
 
-      gh.on('error', (err) => {
-        clearTimeout(timeoutId);
-        reject(err);
-      });
+      const reviewThreads = response.data?.repository?.pullRequest?.reviewThreads;
+      const threads = reviewThreads?.nodes ?? [];
 
-      timeoutId = setTimeout(() => {
-        gh.kill();
-        reject(new Error('GitHub GraphQL API request timed out'));
-      }, GITHUB_API_TIMEOUT_MS);
-
-      let stdout = '';
-      let stderr = '';
-      gh.stdout.on('data', (data: Buffer) => (stdout += data.toString()));
-      gh.stderr.on('data', (data: Buffer) => (stderr += data.toString()));
-
-      gh.on('close', (code) => {
-        clearTimeout(timeoutId);
-        if (code !== 0) {
-          return reject(new Error(`gh process exited with code ${code}: ${stderr}`));
+      for (const thread of threads) {
+        if (thread.comments.pageInfo?.hasNextPage) {
+          logger.debug(
+            `Review thread ${thread.id} in PR #${prNumber} has >100 comments — ` +
+              'some comments may be missing resolved status'
+          );
         }
-        try {
-          resolve(JSON.parse(stdout));
-        } catch (e) {
-          reject(e);
+        const info: ReviewThreadInfo = { isResolved: thread.isResolved, threadId: thread.id };
+        for (const comment of thread.comments.nodes) {
+          resolvedMap.set(String(comment.databaseId), info);
         }
-      });
+      }
 
-      gh.stdin.write(requestBody);
-      gh.stdin.end();
-    });
-
-    if (response.errors && response.errors.length > 0) {
-      throw new Error(response.errors[0].message);
-    }
-
-    // Check if reviewThreads data was truncated (more than 100 threads)
-    const pageInfo = response.data?.repository?.pullRequest?.reviewThreads?.pageInfo;
-    if (pageInfo?.hasNextPage) {
-      logger.warn(
-        `PR #${prNumber} in ${owner}/${repo} has more than 100 review threads — ` +
-          'results are truncated. Some comments may be missing resolved status.'
-      );
-      // TODO: Implement cursor-based pagination by iterating with
-      // reviewThreads.nodes pageInfo.endCursor across spawn calls.
-    }
-
-    const threads = response.data?.repository?.pullRequest?.reviewThreads?.nodes ?? [];
-    for (const thread of threads) {
-      if (thread.comments.pageInfo?.hasNextPage) {
-        logger.warn(
-          `Review thread ${thread.id} in PR #${prNumber} has more than 100 comments — ` +
-            'comment list is truncated. Some comments may be missing resolved status.'
+      const pageInfo = reviewThreads?.pageInfo;
+      if (pageInfo?.hasNextPage && pageInfo.endCursor) {
+        cursor = pageInfo.endCursor;
+        pageCount++;
+        logger.debug(
+          `Fetching next page of review threads for PR #${prNumber} (page ${pageCount + 1})`
         );
+      } else {
+        cursor = null;
       }
-      const info: ReviewThreadInfo = { isResolved: thread.isResolved, threadId: thread.id };
-      for (const comment of thread.comments.nodes) {
-        resolvedMap.set(String(comment.databaseId), info);
-      }
+    } while (cursor && pageCount < MAX_PAGINATION_PAGES);
+
+    if (pageCount >= MAX_PAGINATION_PAGES) {
+      logger.warn(
+        `PR #${prNumber} in ${owner}/${repo} has more than ${MAX_PAGINATION_PAGES * 100} review threads — ` +
+          'pagination limit reached. Some comments may be missing resolved status.'
+      );
     }
   } catch (error) {
     // Log but don't fail — resolved status is best-effort
@@ -214,7 +250,7 @@ export async function fetchReviewThreadResolvedStatus(
 }
 
 /**
- * Fetch all comments for a PR (both regular and inline review comments)
+ * Fetch all comments for a PR (regular, inline review, and review body comments)
  */
 export async function fetchPRReviewComments(
   projectPath: string,
@@ -228,10 +264,14 @@ export async function fetchPRReviewComments(
   const resolvedStatusPromise = fetchReviewThreadResolvedStatus(projectPath, owner, repo, prNumber);
 
   // 1. Fetch regular PR comments (issue-level comments)
+  // Uses the REST API issues endpoint instead of `gh pr view --json comments`
+  // because the latter uses GraphQL internally where bot/app authors can return
+  // null, causing bot comments to be silently dropped or display as "unknown".
   try {
+    const issueCommentsEndpoint = `repos/${owner}/${repo}/issues/${prNumber}/comments`;
     const { stdout: commentsOutput } = await execFileAsync(
       'gh',
-      ['pr', 'view', String(prNumber), '-R', `${owner}/${repo}`, '--json', 'comments'],
+      ['api', issueCommentsEndpoint, '--paginate'],
       {
         cwd: projectPath,
         env: execEnv,
@@ -241,22 +281,24 @@ export async function fetchPRReviewComments(
     );
 
     const commentsData = JSON.parse(commentsOutput);
-    const regularComments = (commentsData.comments || []).map(
+    const regularComments = (Array.isArray(commentsData) ? commentsData : []).map(
       (c: {
-        id: string;
-        author: { login: string; avatarUrl?: string };
+        id: number;
+        user: { login: string; avatar_url?: string; type?: string } | null;
         body: string;
-        createdAt: string;
-        updatedAt?: string;
+        created_at: string;
+        updated_at?: string;
+        performed_via_github_app?: { slug: string } | null;
       }) => ({
         id: String(c.id),
-        author: c.author?.login || 'unknown',
-        avatarUrl: c.author?.avatarUrl,
+        author: c.user?.login || c.performed_via_github_app?.slug || 'unknown',
+        avatarUrl: c.user?.avatar_url,
         body: c.body,
-        createdAt: c.createdAt,
-        updatedAt: c.updatedAt,
+        createdAt: c.created_at,
+        updatedAt: c.updated_at,
         isReviewComment: false,
         isOutdated: false,
+        isBot: c.user?.type === 'Bot' || !!c.performed_via_github_app,
         // Regular PR comments are not part of review threads, so not resolvable
         isResolved: false,
       })
@@ -272,7 +314,7 @@ export async function fetchPRReviewComments(
     const reviewsEndpoint = `repos/${owner}/${repo}/pulls/${prNumber}/comments`;
     const { stdout: reviewsOutput } = await execFileAsync(
       'gh',
-      ['api', reviewsEndpoint, '--paginate', '--slurp', '--jq', 'add // []'],
+      ['api', reviewsEndpoint, '--paginate'],
       {
         cwd: projectPath,
         env: execEnv,
@@ -285,7 +327,7 @@ export async function fetchPRReviewComments(
     const reviewComments = (Array.isArray(reviewsData) ? reviewsData : []).map(
       (c: {
         id: number;
-        user: { login: string; avatar_url?: string };
+        user: { login: string; avatar_url?: string; type?: string } | null;
         body: string;
         path: string;
         line?: number;
@@ -296,9 +338,10 @@ export async function fetchPRReviewComments(
         side?: string;
         commit_id?: string;
         position?: number | null;
+        performed_via_github_app?: { slug: string } | null;
       }) => ({
         id: String(c.id),
-        author: c.user?.login || 'unknown',
+        author: c.user?.login || c.performed_via_github_app?.slug || 'unknown',
         avatarUrl: c.user?.avatar_url,
         body: c.body,
         path: c.path,
@@ -310,6 +353,7 @@ export async function fetchPRReviewComments(
         isOutdated: c.position === null,
         // isResolved will be filled in below from GraphQL data
         isResolved: false,
+        isBot: c.user?.type === 'Bot' || !!c.performed_via_github_app,
         diffHunk: c.diff_hunk,
         side: c.side,
         commitId: c.commit_id,
@@ -319,6 +363,55 @@ export async function fetchPRReviewComments(
     allComments.push(...reviewComments);
   } catch (error) {
     logError(error, 'Failed to fetch inline review comments');
+  }
+
+  // 3. Fetch review body comments (summary text submitted with each review)
+  // These are the top-level comments written when submitting a review
+  // (Approve, Request Changes, Comment). They are separate from inline code comments
+  // and issue-level comments. Only include reviews that have a non-empty body.
+  try {
+    const reviewsEndpoint = `repos/${owner}/${repo}/pulls/${prNumber}/reviews`;
+    const { stdout: reviewBodiesOutput } = await execFileAsync(
+      'gh',
+      ['api', reviewsEndpoint, '--paginate'],
+      {
+        cwd: projectPath,
+        env: execEnv,
+        maxBuffer: 1024 * 1024 * 10, // 10MB buffer for large PRs
+        timeout: GITHUB_API_TIMEOUT_MS,
+      }
+    );
+
+    const reviewBodiesData = JSON.parse(reviewBodiesOutput);
+    const reviewBodyComments = (Array.isArray(reviewBodiesData) ? reviewBodiesData : [])
+      .filter(
+        (r: { body?: string; state?: string }) =>
+          r.body && r.body.trim().length > 0 && r.state !== 'PENDING'
+      )
+      .map(
+        (r: {
+          id: number;
+          user: { login: string; avatar_url?: string; type?: string } | null;
+          body: string;
+          state: string;
+          submitted_at: string;
+          performed_via_github_app?: { slug: string } | null;
+        }) => ({
+          id: `review-${r.id}`,
+          author: r.user?.login || r.performed_via_github_app?.slug || 'unknown',
+          avatarUrl: r.user?.avatar_url,
+          body: r.body,
+          createdAt: r.submitted_at,
+          isReviewComment: false,
+          isOutdated: false,
+          isResolved: false,
+          isBot: r.user?.type === 'Bot' || !!r.performed_via_github_app,
+        })
+      );
+
+    allComments.push(...reviewBodyComments);
+  } catch (error) {
+    logError(error, 'Failed to fetch review body comments');
   }
 
   // Wait for resolved status and apply to inline review comments

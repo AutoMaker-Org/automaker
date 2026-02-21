@@ -20,9 +20,13 @@ import { AgentInputArea } from './agent-view/input-area';
 const LG_BREAKPOINT = 1024;
 
 export function AgentView() {
-  const { currentProject } = useAppStore();
+  const { currentProject, getCurrentWorktree } = useAppStore();
   const [input, setInput] = useState('');
   const [currentTool, setCurrentTool] = useState<string | null>(null);
+
+  // Get the current worktree to scope sessions and agent working directory
+  const currentWorktree = currentProject ? getCurrentWorktree(currentProject.path) : null;
+  const effectiveWorkingDirectory = currentWorktree?.path || currentProject?.path;
   // Initialize session manager state - starts as true to match SSR
   // Then updates on mount based on actual screen size to prevent hydration mismatch
   const [showSessionManager, setShowSessionManager] = useState(true);
@@ -52,9 +56,10 @@ export function AgentView() {
   // Guard to prevent concurrent invocations of handleCreateSessionFromEmptyState
   const createSessionInFlightRef = useRef(false);
 
-  // Session management hook
+  // Session management hook - scoped to current worktree
   const { currentSessionId, handleSelectSession } = useAgentSession({
     projectPath: currentProject?.path,
+    workingDirectory: effectiveWorkingDirectory,
   });
 
   // Use the Electron agent hook (only if we have a session)
@@ -71,7 +76,7 @@ export function AgentView() {
     clearServerQueue,
   } = useElectronAgent({
     sessionId: currentSessionId || '',
-    workingDirectory: currentProject?.path,
+    workingDirectory: effectiveWorkingDirectory,
     model: modelSelection.model,
     thinkingLevel: modelSelection.thinkingLevel,
     onToolUse: (toolName) => {
@@ -229,6 +234,7 @@ export function AgentView() {
             currentSessionId={currentSessionId}
             onSelectSession={handleSelectSession}
             projectPath={currentProject.path}
+            workingDirectory={effectiveWorkingDirectory}
             isCurrentSessionThinking={isProcessing}
             onQuickCreateRef={quickCreateSessionRef}
           />
@@ -248,6 +254,7 @@ export function AgentView() {
           showSessionManager={showSessionManager}
           onToggleSessionManager={() => setShowSessionManager(!showSessionManager)}
           onClearChat={handleClearChat}
+          worktreeBranch={currentWorktree?.branch}
         />
 
         {/* Messages */}

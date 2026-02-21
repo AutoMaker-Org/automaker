@@ -1,4 +1,4 @@
-import { Bot, PanelLeftClose, PanelLeft, Wrench, Trash2 } from 'lucide-react';
+import { Bot, PanelLeftClose, PanelLeft, Wrench, Trash2, GitBranch } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface AgentHeaderProps {
@@ -11,6 +11,7 @@ interface AgentHeaderProps {
   showSessionManager: boolean;
   onToggleSessionManager: () => void;
   onClearChat: () => void;
+  worktreeBranch?: string;
 }
 
 export function AgentHeader({
@@ -23,6 +24,7 @@ export function AgentHeader({
   showSessionManager,
   onToggleSessionManager,
   onClearChat,
+  worktreeBranch,
 }: AgentHeaderProps) {
   return (
     <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-card/50 backdrop-blur-sm">
@@ -32,10 +34,18 @@ export function AgentHeader({
         </div>
         <div>
           <h1 className="text-lg font-semibold text-foreground">AI Agent</h1>
-          <p className="text-sm text-muted-foreground">
-            {projectName}
-            {currentSessionId && !isConnected && ' - Connecting...'}
-          </p>
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <span>
+              {projectName}
+              {currentSessionId && !isConnected && ' - Connecting...'}
+            </span>
+            {worktreeBranch && (
+              <span className="inline-flex items-center gap-1 text-xs bg-muted/50 px-2 py-0.5 rounded-full border border-border">
+                <GitBranch className="w-3 h-3 shrink-0" />
+                <span className="max-w-[180px] truncate">{worktreeBranch}</span>
+              </span>
+            )}
+          </div>
         </div>
       </div>
 

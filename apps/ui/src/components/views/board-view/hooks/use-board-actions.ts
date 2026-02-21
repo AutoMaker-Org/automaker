@@ -217,9 +217,14 @@ export function useBoardActions({
       const needsTitleGeneration =
         !titleWasGenerated && !featureData.title.trim() && featureData.description.trim();
 
-      const initialStatus = featureData.initialStatus || 'backlog';
+      const {
+        initialStatus: requestedStatus,
+        workMode: _workMode,
+        ...restFeatureData
+      } = featureData;
+      const initialStatus = requestedStatus || 'backlog';
       const newFeatureData = {
-        ...featureData,
+        ...restFeatureData,
         title: titleWasGenerated ? titleForBranch : featureData.title,
         titleGenerating: needsTitleGeneration,
         status: initialStatus,
@@ -1161,10 +1166,15 @@ export function useBoardActions({
 
   const handleDuplicateFeature = useCallback(
     async (feature: Feature, asChild: boolean = false) => {
-      // Copy all feature data, stripping id, status (handled by create), and runtime/state fields
+      // Copy all feature data, stripping id, status (handled by create), and runtime/state fields.
+      // Also strip initialStatus and workMode which are transient creation parameters that
+      // should not carry over to duplicates (initialStatus: 'in_progress' would cause
+      // the duplicate to immediately appear in "In Progress" instead of "Backlog").
       const {
         id: _id,
         status: _status,
+        initialStatus: _initialStatus,
+        workMode: _workMode,
         startedAt: _startedAt,
         error: _error,
         summary: _summary,
@@ -1212,6 +1222,8 @@ export function useBoardActions({
         const {
           id: _id,
           status: _status,
+          initialStatus: _initialStatus,
+          workMode: _workMode,
           startedAt: _startedAt,
           error: _error,
           summary: _summary,

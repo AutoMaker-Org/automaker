@@ -399,29 +399,57 @@ export function WorktreeActionsDropdown({
                   Open in Browser
                 </DropdownMenuItem>
               )}
-            <DropdownMenuItem onClick={() => onViewDevServerLogs(worktree)} className="text-xs">
-              <ScrollText className="w-3.5 h-3.5 mr-2" />
-              View Logs
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => onStopDevServer(worktree)}
-              className="text-xs text-destructive focus:text-destructive"
-            >
-              <Square className="w-3.5 h-3.5 mr-2" />
-              Stop Dev Server
-            </DropdownMenuItem>
+            {/* Stop Dev Server - split button: click main area to stop, chevron for view logs */}
+            <DropdownMenuSub>
+              <div className="flex items-center">
+                <DropdownMenuItem
+                  onClick={() => onStopDevServer(worktree)}
+                  className="text-xs flex-1 pr-0 rounded-r-none text-destructive focus:text-destructive"
+                >
+                  <Square className="w-3.5 h-3.5 mr-2" />
+                  Stop Dev Server
+                </DropdownMenuItem>
+                <DropdownMenuSubTrigger className="text-xs px-1 rounded-l-none border-l border-border/30 h-8" />
+              </div>
+              <DropdownMenuSubContent>
+                <DropdownMenuItem onClick={() => onViewDevServerLogs(worktree)} className="text-xs">
+                  <ScrollText className="w-3.5 h-3.5 mr-2" />
+                  View Dev Server Logs
+                </DropdownMenuItem>
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
             <DropdownMenuSeparator />
           </>
         ) : (
           <>
-            <DropdownMenuItem
-              onClick={() => onStartDevServer(worktree)}
-              disabled={isStartingDevServer}
-              className="text-xs"
-            >
-              <Play className={cn('w-3.5 h-3.5 mr-2', isStartingDevServer && 'animate-pulse')} />
-              {isStartingDevServer ? 'Starting...' : 'Start Dev Server'}
-            </DropdownMenuItem>
+            {/* Start Dev Server - split button: click main area to start, chevron for view logs */}
+            <DropdownMenuSub>
+              <div className="flex items-center">
+                <DropdownMenuItem
+                  onClick={() => onStartDevServer(worktree)}
+                  disabled={isStartingDevServer}
+                  className="text-xs flex-1 pr-0 rounded-r-none"
+                >
+                  <Play
+                    className={cn('w-3.5 h-3.5 mr-2', isStartingDevServer && 'animate-pulse')}
+                  />
+                  {isStartingDevServer ? 'Starting...' : 'Start Dev Server'}
+                </DropdownMenuItem>
+                <DropdownMenuSubTrigger
+                  className={cn(
+                    'text-xs px-1 rounded-l-none border-l border-border/30 h-8',
+                    isStartingDevServer && 'opacity-50 cursor-not-allowed'
+                  )}
+                  disabled={isStartingDevServer}
+                />
+              </div>
+              <DropdownMenuSubContent>
+                <DropdownMenuItem onClick={() => onViewDevServerLogs(worktree)} className="text-xs">
+                  <ScrollText className="w-3.5 h-3.5 mr-2" />
+                  View Dev Server Logs
+                </DropdownMenuItem>
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
             <DropdownMenuSeparator />
           </>
         )}

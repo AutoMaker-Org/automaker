@@ -486,6 +486,11 @@ export function BoardView() {
     } else {
       // Specific worktree selected - find it by path
       found = worktrees.find((w) => !w.isMain && pathsEqual(w.path, currentWorktreePath));
+      // If the selected worktree no longer exists (e.g. just deleted),
+      // fall back to main to prevent rendering with undefined worktree
+      if (!found) {
+        found = worktrees.find((w) => w.isMain);
+      }
     }
     if (!found) return undefined;
     // Ensure all required WorktreeInfo fields are present
@@ -1953,6 +1958,16 @@ export function BoardView() {
         }
         defaultDeleteBranch={getDefaultDeleteBranch(currentProject.path)}
         onDeleted={(deletedWorktree, _deletedBranch) => {
+          // If the deleted worktree was currently selected, immediately reset to main
+          // to prevent the UI from trying to render a non-existent worktree view
+          if (
+            currentWorktreePath !== null &&
+            pathsEqual(currentWorktreePath, deletedWorktree.path)
+          ) {
+            const mainBranch = worktrees.find((w) => w.isMain)?.branch || 'main';
+            setCurrentWorktree(currentProject.path, null, mainBranch);
+          }
+
           // Reset features that were assigned to the deleted worktree (by branch)
           hookFeatures.forEach((feature) => {
             // Match by branch name since worktreePath is no longer stored
