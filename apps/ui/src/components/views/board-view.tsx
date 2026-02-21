@@ -480,6 +480,7 @@ export function BoardView() {
   // Find the worktree that matches the current selection, or use main worktree
   const selectedWorktree = useMemo((): WorktreeInfo | undefined => {
     let found;
+    let usedFallback = false;
     if (currentWorktreePath === null) {
       // Primary worktree selected - find the main worktree
       found = worktrees.find((w) => w.isMain);
@@ -487,9 +488,11 @@ export function BoardView() {
       // Specific worktree selected - find it by path
       found = worktrees.find((w) => !w.isMain && pathsEqual(w.path, currentWorktreePath));
       // If the selected worktree no longer exists (e.g. just deleted),
-      // fall back to main to prevent rendering with undefined worktree
+      // fall back to main to prevent rendering with undefined worktree.
+      // onDeleted will call setCurrentWorktree(…, null) to reset properly.
       if (!found) {
         found = worktrees.find((w) => w.isMain);
+        usedFallback = true;
       }
     }
     if (!found) return undefined;
@@ -498,7 +501,11 @@ export function BoardView() {
       ...found,
       isCurrent:
         found.isCurrent ??
-        (currentWorktreePath !== null ? pathsEqual(found.path, currentWorktreePath) : found.isMain),
+        (usedFallback
+          ? found.isMain // treat main as current during the transient fallback render
+          : currentWorktreePath !== null
+            ? pathsEqual(found.path, currentWorktreePath)
+            : found.isMain),
       hasWorktree: found.hasWorktree ?? true,
     };
   }, [worktrees, currentWorktreePath]);

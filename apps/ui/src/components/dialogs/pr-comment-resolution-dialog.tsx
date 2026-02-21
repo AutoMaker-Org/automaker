@@ -914,7 +914,7 @@ export function PRCommentResolutionDialog({
           {!loading && !error && allComments.length > 0 && (
             <>
               {/* Controls Bar */}
-              <div className="flex items-center justify-between gap-4 px-1">
+              <div className="flex flex-wrap items-center justify-between gap-2 px-1">
                 {/* Select All - only interactive when there are visible comments */}
                 <div className="flex items-center gap-2">
                   <Checkbox
@@ -935,7 +935,7 @@ export function PRCommentResolutionDialog({
                   </Label>
                 </div>
 
-                <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center gap-2">
                   {/* Show/Hide Resolved Filter Toggle - always visible */}
                   <Button
                     variant="ghost"
@@ -990,7 +990,7 @@ export function PRCommentResolutionDialog({
                   </Button>
 
                   {/* Mode Toggle */}
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 shrink-0">
                     <Label
                       className={cn(
                         'text-xs cursor-pointer',

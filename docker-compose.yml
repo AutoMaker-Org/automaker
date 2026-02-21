@@ -64,8 +64,10 @@ services:
       # Optional - data directory for sessions, settings, etc. (container-only)
       - DATA_DIR=/data
 
-      # Optional - CORS origin (default allows all)
-      - CORS_ORIGIN=${CORS_ORIGIN:-http://localhost:3007}
+      # Optional - CORS origin (default: auto-detect local network origins)
+      # With nginx proxying API requests, CORS is not needed for same-origin access.
+      # Set explicitly only if accessing the API from a different domain.
+      - CORS_ORIGIN=${CORS_ORIGIN:-}
 
       # Internal - indicates the API is running in a containerized sandbox environment
       # This is used by the UI to determine if sandbox risk warnings should be shown

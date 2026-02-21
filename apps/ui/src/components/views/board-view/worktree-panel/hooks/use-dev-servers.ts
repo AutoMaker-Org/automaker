@@ -467,8 +467,7 @@ export function useDevServers({ projectPath }: UseDevServersOptions) {
       } catch (error) {
         logger.error('Start dev server failed:', error);
         toast.error('Failed to start dev server', {
-          description:
-            error instanceof Error ? error.message : 'Check the dev server logs panel for details.',
+          description: error instanceof Error ? error.message : undefined,
         });
       } finally {
         setIsStartingDevServer(false);

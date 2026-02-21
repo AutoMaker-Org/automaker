@@ -281,6 +281,13 @@ export function WorktreeActionsDropdown({
     };
   }, [showPRInfo, worktree.pr]);
 
+  const viewDevServerLogsItem = (
+    <DropdownMenuItem onClick={() => onViewDevServerLogs(worktree)} className="text-xs">
+      <ScrollText className="w-3.5 h-3.5 mr-2" />
+      View Dev Server Logs
+    </DropdownMenuItem>
+  );
+
   return (
     <DropdownMenu onOpenChange={onOpenChange}>
       <DropdownMenuTrigger asChild>
@@ -425,12 +432,7 @@ export function WorktreeActionsDropdown({
                 </DropdownMenuItem>
                 <DropdownMenuSubTrigger className="text-xs px-1 rounded-l-none border-l border-border/30 h-8" />
               </div>
-              <DropdownMenuSubContent>
-                <DropdownMenuItem onClick={() => onViewDevServerLogs(worktree)} className="text-xs">
-                  <ScrollText className="w-3.5 h-3.5 mr-2" />
-                  View Dev Server Logs
-                </DropdownMenuItem>
-              </DropdownMenuSubContent>
+              <DropdownMenuSubContent>{viewDevServerLogsItem}</DropdownMenuSubContent>
             </DropdownMenuSub>
             <DropdownMenuSeparator />
           </>
@@ -457,12 +459,7 @@ export function WorktreeActionsDropdown({
                   disabled={isStartingDevServer}
                 />
               </div>
-              <DropdownMenuSubContent>
-                <DropdownMenuItem onClick={() => onViewDevServerLogs(worktree)} className="text-xs">
-                  <ScrollText className="w-3.5 h-3.5 mr-2" />
-                  View Dev Server Logs
-                </DropdownMenuItem>
-              </DropdownMenuSubContent>
+              <DropdownMenuSubContent>{viewDevServerLogsItem}</DropdownMenuSubContent>
             </DropdownMenuSub>
             <DropdownMenuSeparator />
           </>

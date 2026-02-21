@@ -267,6 +267,26 @@ app.use(
 // CORS configuration
 // When using credentials (cookies), origin cannot be '*'
 // We dynamically allow the requesting origin for local development
+
+// Check if origin is a local/private network address
+function isLocalOrigin(origin: string): boolean {
+  try {
+    const url = new URL(origin);
+    const hostname = url.hostname;
+    return (
+      hostname === 'localhost' ||
+      hostname === '127.0.0.1' ||
+      hostname === '[::1]' ||
+      hostname === '0.0.0.0' ||
+      hostname.startsWith('192.168.') ||
+      hostname.startsWith('10.') ||
+      /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(hostname)
+    );
+  } catch {
+    return false;
+  }
+}
+
 app.use(
   cors({
     origin: (origin, callback) => {
@@ -277,35 +297,25 @@ app.use(
       }
 
       // If CORS_ORIGIN is set, use it (can be comma-separated list)
-      const allowedOrigins = process.env.CORS_ORIGIN?.split(',').map((o) => o.trim());
-      if (allowedOrigins && allowedOrigins.length > 0 && allowedOrigins[0] !== '*') {
-        if (allowedOrigins.includes(origin)) {
-          callback(null, origin);
-        } else {
-          callback(new Error('Not allowed by CORS'));
+      const allowedOrigins = process.env.CORS_ORIGIN?.split(',')
+        .map((o) => o.trim())
+        .filter(Boolean);
+      if (allowedOrigins && allowedOrigins.length > 0) {
+        if (allowedOrigins.includes('*')) {
+          callback(null, true);
+          return;
         }
-        return;
-      }
-
-      // For local development, allow all localhost/loopback origins (any port)
-      try {
-        const url = new URL(origin);
-        const hostname = url.hostname;
-
-        if (
-          hostname === 'localhost' ||
-          hostname === '127.0.0.1' ||
-          hostname === '::1' ||
-          hostname === '0.0.0.0' ||
-          hostname.startsWith('192.168.') ||
-          hostname.startsWith('10.') ||
-          hostname.startsWith('172.')
-        ) {
+        if (allowedOrigins.includes(origin)) {
           callback(null, origin);
           return;
         }
-      } catch {
-        // Ignore URL parsing errors
+        // Fall through to local network check below
+      }
+
+      // Allow all localhost/loopback/private network origins (any port)
+      if (isLocalOrigin(origin)) {
+        callback(null, origin);
+        return;
       }
 
       // Reject other origins by default for security
