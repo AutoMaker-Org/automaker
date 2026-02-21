@@ -94,11 +94,13 @@ export async function getTrackingBranch(
       // Upstream doesn't start with the expected prefix — fall through to split
     }
 
-    // Fall back: split on the LAST slash so that remotes containing slashes are
-    // preserved as the remote name (e.g. "acme/origin/feature" → remote="acme/origin",
-    // remoteBranch="feature") rather than the first slash which would lose the full
-    // remote name.
-    const slashIndex = trimmed.lastIndexOf('/');
+    // Fall back: split on the FIRST slash, which favors the common case of
+    // single-name remotes with slash-containing branch names (e.g.
+    // "origin/feature/foo" → remote="origin", remoteBranch="feature/foo").
+    // Remotes with slashes in their names are uncommon and are already handled
+    // by the git-config lookup above; this fallback only runs when that lookup
+    // fails, so optimizing for single-name remotes is the safer default.
+    const slashIndex = trimmed.indexOf('/');
     if (slashIndex > 0) {
       return {
         remote: trimmed.substring(0, slashIndex),
@@ -117,34 +119,46 @@ export async function getTrackingBranch(
  * Uses `git worktree list --porcelain` to enumerate all worktrees and
  * checks if any of them has the given branch as their HEAD.
  *
+ * Returns the absolute path of the worktree where the branch is checked out,
+ * or null if the branch is not checked out anywhere. Callers can use the
+ * returned path to run commands (e.g. `git merge`) inside the correct worktree.
+ *
  * This prevents using `git update-ref` on a branch that is checked out in
  * a linked worktree, which would desync that worktree's HEAD.
  */
 export async function isBranchCheckedOut(
   projectPath: string,
   branchName: string
-): Promise<boolean> {
+): Promise<string | null> {
   try {
     const stdout = await execGitCommand(['worktree', 'list', '--porcelain'], projectPath);
     const lines = stdout.split('\n');
+    let currentWorktreePath: string | null = null;
     let currentBranch: string | null = null;
 
     for (const line of lines) {
-      if (line.startsWith('branch ')) {
+      if (line.startsWith('worktree ')) {
+        currentWorktreePath = line.slice(9);
+      } else if (line.startsWith('branch ')) {
         currentBranch = line.slice(7).replace('refs/heads/', '');
       } else if (line === '') {
-        // End of a worktree entry — reset for the next
+        // End of a worktree entry — check for match, then reset for the next
+        if (currentBranch === branchName && currentWorktreePath) {
+          return currentWorktreePath;
+        }
+        currentWorktreePath = null;
         currentBranch = null;
-      }
-
-      if (currentBranch === branchName) {
-        return true;
       }
     }
 
-    return false;
+    // Check the last entry (if output doesn't end with a blank line)
+    if (currentBranch === branchName && currentWorktreePath) {
+      return currentWorktreePath;
+    }
+
+    return null;
   } catch {
-    return false;
+    return null;
   }
 }
 
@@ -186,18 +200,20 @@ export async function buildStaleResult(
  *
  * This function:
  * 1. Detects the remote tracking branch for the given local branch
- * 2. Fetches latest from that remote
+ * 2. Fetches latest from that remote (unless skipFetch is true)
  * 3. Attempts a fast-forward-only update of the local branch
  * 4. If the branch has diverged, reports the divergence and allows proceeding with stale copy
  * 5. If no remote tracking branch exists, skips silently
  *
  * @param projectPath - Path to the git repository
  * @param branchName - The local branch name to sync (e.g. 'main')
+ * @param skipFetch - When true, skip the internal git fetch (caller has already fetched)
  * @returns Sync result with status information
  */
 export async function syncBaseBranch(
   projectPath: string,
-  branchName: string
+  branchName: string,
+  skipFetch = false
 ): Promise<BaseBranchSyncResult> {
   // Check if the branch exists as a local branch (under refs/heads/).
   // This correctly handles branch names containing slashes (e.g. "feature/abc",
@@ -257,32 +273,36 @@ export async function syncBaseBranch(
     `Syncing base branch '${branchName}' from ${tracking.remote}/${tracking.remoteBranch}`
   );
 
-  // Fetch the specific remote (may have already been fetched by --all, but
-  // this ensures we have the very latest for this specific remote)
-  try {
-    const fetchController = new AbortController();
-    const fetchTimer = setTimeout(() => fetchController.abort(), FETCH_TIMEOUT_MS);
+  // Fetch the specific remote unless the caller has already performed a fetch
+  // (e.g. via `git fetch --all`) and passed skipFetch=true to avoid redundant work.
+  if (!skipFetch) {
     try {
-      await execGitCommand(
-        ['fetch', tracking.remote, tracking.remoteBranch, '--quiet'],
+      const fetchController = new AbortController();
+      const fetchTimer = setTimeout(() => fetchController.abort(), FETCH_TIMEOUT_MS);
+      try {
+        await execGitCommand(
+          ['fetch', tracking.remote, tracking.remoteBranch, '--quiet'],
+          projectPath,
+          undefined,
+          fetchController
+        );
+      } finally {
+        clearTimeout(fetchTimer);
+      }
+    } catch (fetchErr) {
+      // Fetch failed — network error, auth error, etc.
+      // Allow proceeding with stale local copy
+      const errMsg = getErrorMessage(fetchErr);
+      logger.warn(`Failed to fetch ${tracking.remote}/${tracking.remoteBranch}: ${errMsg}`);
+      return buildStaleResult(
         projectPath,
-        undefined,
-        fetchController
+        branchName,
+        tracking.remote,
+        `Failed to fetch from remote: ${errMsg}. Proceeding with local copy.`
       );
-    } finally {
-      clearTimeout(fetchTimer);
     }
-  } catch (fetchErr) {
-    // Fetch failed — network error, auth error, etc.
-    // Allow proceeding with stale local copy
-    const errMsg = getErrorMessage(fetchErr);
-    logger.warn(`Failed to fetch ${tracking.remote}/${tracking.remoteBranch}: ${errMsg}`);
-    return buildStaleResult(
-      projectPath,
-      branchName,
-      tracking.remote,
-      `Failed to fetch from remote: ${errMsg}. Proceeding with local copy.`
-    );
+  } else {
+    logger.info(`Skipping fetch for '${branchName}' (caller already fetched from remotes)`);
   }
 
   // Check if the local branch is behind, ahead, or diverged from the remote
@@ -342,13 +362,15 @@ export async function syncBaseBranch(
       `Branch '${branchName}' is ${behind} commit(s) behind ${remoteRef}, fast-forwarding`
     );
 
-    // Determine whether the branch is currently checked out
-    const checkedOut = await isBranchCheckedOut(projectPath, branchName);
+    // Determine whether the branch is currently checked out (returns the
+    // worktree path where it is checked out, or null if not checked out)
+    const worktreePath = await isBranchCheckedOut(projectPath, branchName);
 
-    if (checkedOut) {
-      // Branch is the current HEAD — use git merge --ff-only
+    if (worktreePath) {
+      // Branch is checked out in a worktree — use git merge --ff-only
+      // Run the merge inside the worktree that has the branch checked out
       try {
-        await execGitCommand(['merge', '--ff-only', remoteRef], projectPath);
+        await execGitCommand(['merge', '--ff-only', remoteRef], worktreePath);
       } catch (mergeErr) {
         const errMsg = getErrorMessage(mergeErr);
         logger.warn(`Fast-forward merge failed for '${branchName}': ${errMsg}`);

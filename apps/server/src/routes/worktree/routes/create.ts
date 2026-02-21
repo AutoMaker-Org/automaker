@@ -206,9 +206,10 @@ export function createCreateHandler(events: EventEmitter, settingsService?: Sett
       let syncResult: BaseBranchSyncResult = { attempted: false, synced: false };
 
       // Only sync if the base is a real branch (not 'HEAD')
+      // Pass skipFetch=true because we already fetched all remotes above.
       if (effectiveBase !== 'HEAD') {
         logger.info(`Syncing base branch '${effectiveBase}' before creating worktree`);
-        syncResult = await syncBaseBranch(projectPath, effectiveBase);
+        syncResult = await syncBaseBranch(projectPath, effectiveBase, true);
         if (syncResult.attempted) {
           if (syncResult.synced) {
             logger.info(`Base branch sync result: ${syncResult.message}`);
@@ -218,6 +219,7 @@ export function createCreateHandler(events: EventEmitter, settingsService?: Sett
         }
       } else {
         // When using HEAD, try to sync the currently checked-out branch
+        // Pass skipFetch=true because we already fetched all remotes above.
         try {
           const currentBranch = await execGitCommand(
             ['rev-parse', '--abbrev-ref', 'HEAD'],
@@ -228,7 +230,7 @@ export function createCreateHandler(events: EventEmitter, settingsService?: Sett
             logger.info(
               `Syncing current branch '${trimmedBranch}' (HEAD) before creating worktree`
             );
-            syncResult = await syncBaseBranch(projectPath, trimmedBranch);
+            syncResult = await syncBaseBranch(projectPath, trimmedBranch, true);
             if (syncResult.attempted) {
               if (syncResult.synced) {
                 logger.info(`HEAD branch sync result: ${syncResult.message}`);

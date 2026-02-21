@@ -757,7 +757,7 @@ class DevServerService {
         });
       }
 
-      this.allocatedPorts.delete(port);
+      this.allocatedPorts.delete(serverInfo.allocatedPort);
       this.runningServers.delete(worktreePath);
     };
 
@@ -1024,6 +1024,15 @@ class DevServerService {
     const server = this.runningServers.get(worktreePath);
 
     if (!server) {
+      return {
+        success: false,
+        error: `No dev server running for worktree: ${worktreePath}`,
+      };
+    }
+
+    // Prune stale entry if the process has been killed or has exited
+    if (server.process && (server.process.killed || server.process.exitCode != null)) {
+      this.pruneStaleServer(worktreePath, server);
       return {
         success: false,
         error: `No dev server running for worktree: ${worktreePath}`,

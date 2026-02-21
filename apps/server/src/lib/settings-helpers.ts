@@ -33,6 +33,12 @@ import {
 
 const logger = createLogger('SettingsHelper');
 
+/** Default number of agent turns used when no value is configured. */
+export const DEFAULT_MAX_TURNS = 1000;
+
+/** Upper bound for the max-turns clamp; values above this are capped here. */
+export const MAX_ALLOWED_TURNS = 2000;
+
 /**
  * Get the autoLoadClaudeMd setting, with project settings taking precedence over global.
  * Falls back to global settings and defaults to true when unset.
@@ -82,27 +88,30 @@ export async function getAutoLoadClaudeMdSetting(
  *
  * @param settingsService - Settings service instance (may be null)
  * @param logPrefix - Logging prefix for debugging
- * @returns The user's configured max turns, or 1000 as default
+ * @returns The user's configured max turns, or {@link DEFAULT_MAX_TURNS} as default
  */
 export async function getDefaultMaxTurnsSetting(
   settingsService?: SettingsService | null,
   logPrefix = '[SettingsHelper]'
 ): Promise<number> {
   if (!settingsService) {
-    logger.info(`${logPrefix} SettingsService not available, using default maxTurns=1000`);
-    return 1000;
+    logger.info(
+      `${logPrefix} SettingsService not available, using default maxTurns=${DEFAULT_MAX_TURNS}`
+    );
+    return DEFAULT_MAX_TURNS;
   }
 
   try {
     const globalSettings = await settingsService.getGlobalSettings();
-    const result = globalSettings.defaultMaxTurns ?? 1000;
+    const raw = globalSettings.defaultMaxTurns;
+    const result = Number.isFinite(raw) ? (raw as number) : DEFAULT_MAX_TURNS;
     // Clamp to valid range
-    const clamped = Math.max(1, Math.min(2000, Math.floor(result)));
+    const clamped = Math.max(1, Math.min(MAX_ALLOWED_TURNS, Math.floor(result)));
     logger.debug(`${logPrefix} defaultMaxTurns from global settings: ${clamped}`);
     return clamped;
   } catch (error) {
     logger.error(`${logPrefix} Failed to load defaultMaxTurns setting:`, error);
-    return 1000;
+    return DEFAULT_MAX_TURNS;
   }
 }
 

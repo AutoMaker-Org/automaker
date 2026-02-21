@@ -38,6 +38,8 @@ export type {
 
 const logger = createLogger('AgentExecutor');
 
+const DEFAULT_MAX_TURNS = 1000;
+
 export class AgentExecutor {
   private static readonly WRITE_DEBOUNCE_MS = 500;
   private static readonly STREAM_HEARTBEAT_MS = 15_000;
@@ -99,7 +101,7 @@ export class AgentExecutor {
       workDir,
       false
     );
-    const resolvedMaxTurns = sdkOptions?.maxTurns ?? 1000;
+    const resolvedMaxTurns = sdkOptions?.maxTurns ?? DEFAULT_MAX_TURNS;
     if (sdkOptions?.maxTurns == null) {
       logger.info(
         `[execute] Feature ${featureId}: sdkOptions.maxTurns is not set, defaulting to ${resolvedMaxTurns}. ` +
@@ -291,6 +293,10 @@ export class AgentExecutor {
           throw new Error(AgentExecutor.sanitizeProviderError(msg.error));
         } else if (msg.type === 'result' && msg.subtype === 'success') scheduleWrite();
       }
+    } finally {
+      clearInterval(streamHeartbeat);
+      if (writeTimeout) clearTimeout(writeTimeout);
+      if (rawWriteTimeout) clearTimeout(rawWriteTimeout);
 
       const streamElapsedMs = Date.now() - streamStartTime;
       logger.info(
@@ -307,10 +313,6 @@ export class AgentExecutor {
           /* ignore */
         }
       }
-    } finally {
-      clearInterval(streamHeartbeat);
-      if (writeTimeout) clearTimeout(writeTimeout);
-      if (rawWriteTimeout) clearTimeout(rawWriteTimeout);
     }
     return { responseText, specDetected, tasksCompleted, aborted };
   }
@@ -370,7 +372,7 @@ export class AgentExecutor {
         taskPrompts.taskExecution.taskPromptTemplate,
         userFeedback
       );
-      const taskMaxTurns = sdkOptions?.maxTurns ?? 1000;
+      const taskMaxTurns = sdkOptions?.maxTurns ?? DEFAULT_MAX_TURNS;
       logger.info(
         `[executeTasksLoop] Feature ${featureId}, task ${task.id} (${taskIndex + 1}/${tasks.length}): ` +
           `maxTurns=${taskMaxTurns} (sdkOptions.maxTurns=${sdkOptions?.maxTurns ?? 'undefined'})`
@@ -595,7 +597,7 @@ export class AgentExecutor {
           });
           let revText = '';
           for await (const msg of provider.executeQuery(
-            this.buildExecOpts(options, revPrompt, sdkOptions?.maxTurns ?? 1000)
+            this.buildExecOpts(options, revPrompt, sdkOptions?.maxTurns ?? DEFAULT_MAX_TURNS)
           )) {
             if (msg.type === 'assistant' && msg.message?.content)
               for (const b of msg.message.content)
@@ -713,7 +715,7 @@ export class AgentExecutor {
       .replace(/\{\{approvedPlan\}\}/g, planContent);
     let responseText = initialResponseText;
     for await (const msg of provider.executeQuery(
-      this.buildExecOpts(options, contPrompt, options.sdkOptions?.maxTurns ?? 1000)
+      this.buildExecOpts(options, contPrompt, options.sdkOptions?.maxTurns ?? DEFAULT_MAX_TURNS)
     )) {
       if (msg.type === 'assistant' && msg.message?.content)
         for (const b of msg.message.content) {
