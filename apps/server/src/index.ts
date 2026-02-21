@@ -300,7 +300,11 @@ app.use(
       const allowedOrigins = process.env.CORS_ORIGIN?.split(',')
         .map((o) => o.trim())
         .filter(Boolean);
-      if (allowedOrigins && allowedOrigins.length > 0 && allowedOrigins[0] !== '*') {
+      if (allowedOrigins && allowedOrigins.length > 0) {
+        if (allowedOrigins.includes('*')) {
+          callback(null, true);
+          return;
+        }
         if (allowedOrigins.includes(origin)) {
           callback(null, origin);
           return;
