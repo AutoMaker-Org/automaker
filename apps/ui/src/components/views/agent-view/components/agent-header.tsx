@@ -41,8 +41,8 @@ export function AgentHeader({
             </span>
             {worktreeBranch && (
               <span className="inline-flex items-center gap-1 text-xs bg-muted/50 px-2 py-0.5 rounded-full border border-border">
-                <GitBranch className="w-3 h-3" />
-                {worktreeBranch}
+                <GitBranch className="w-3 h-3 shrink-0" />
+                <span className="max-w-[180px] truncate">{worktreeBranch}</span>
               </span>
             )}
           </div>

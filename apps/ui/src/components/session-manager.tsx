@@ -200,7 +200,7 @@ export function SessionManager({
   };
 
   // Create new session directly with a random name (one-click)
-  const handleQuickCreateSession = async () => {
+  const handleQuickCreateSession = useCallback(async () => {
     const api = getElectronAPI();
     if (!api?.sessions) return;
 
@@ -212,7 +212,7 @@ export function SessionManager({
       await invalidateSessions();
       onSelectSession(result.session.id);
     }
-  };
+  }, [effectiveWorkingDirectory, projectPath, invalidateSessions, onSelectSession]);
 
   // Expose the quick create function via ref for keyboard shortcuts
   useEffect(() => {
@@ -224,7 +224,7 @@ export function SessionManager({
         onQuickCreateRef.current = null;
       }
     };
-  }, [onQuickCreateRef, projectPath]);
+  }, [onQuickCreateRef, handleQuickCreateSession]);
 
   // Rename session
   const handleRenameSession = async (sessionId: string) => {

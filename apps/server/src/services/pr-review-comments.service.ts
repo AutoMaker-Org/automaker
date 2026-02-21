@@ -295,7 +295,7 @@ export async function fetchPRReviewComments(
         updatedAt: c.updated_at,
         isReviewComment: false,
         isOutdated: false,
-        isBot: c.user?.type === 'Bot',
+        isBot: c.user?.type === 'Bot' || !!c.performed_via_github_app,
         // Regular PR comments are not part of review threads, so not resolvable
         isResolved: false,
       })
