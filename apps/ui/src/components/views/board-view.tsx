@@ -116,7 +116,6 @@ export function BoardView() {
     setPendingPlanApproval,
     updateFeature,
     batchUpdateFeatures,
-    getCurrentWorktree,
     setCurrentWorktree,
     getWorktrees,
     setWorktrees,
@@ -135,7 +134,6 @@ export function BoardView() {
       setPendingPlanApproval: state.setPendingPlanApproval,
       updateFeature: state.updateFeature,
       batchUpdateFeatures: state.batchUpdateFeatures,
-      getCurrentWorktree: state.getCurrentWorktree,
       setCurrentWorktree: state.setCurrentWorktree,
       getWorktrees: state.getWorktrees,
       setWorktrees: state.setWorktrees,
@@ -444,9 +442,17 @@ export function BoardView() {
     [batchResetBranchFeatures]
   );
 
-  // Get current worktree info (path) for filtering features
-  // This needs to be before useBoardActions so we can pass currentWorktreeBranch
-  const currentWorktreeInfo = currentProject ? getCurrentWorktree(currentProject.path) : null;
+  const currentProjectPath = currentProject?.path;
+
+  // Get current worktree info (path/branch) for filtering features.
+  // Subscribe to the selected project's current worktree value directly so worktree
+  // switches trigger an immediate re-render and instant kanban/list re-filtering.
+  const currentWorktreeInfo = useAppStore(
+    useCallback(
+      (s) => (currentProjectPath ? (s.currentWorktreeByProject[currentProjectPath] ?? null) : null),
+      [currentProjectPath]
+    )
+  );
   const currentWorktreePath = currentWorktreeInfo?.path ?? null;
 
   // Select worktrees for the current project directly from the store.
@@ -455,7 +461,6 @@ export function BoardView() {
   // object, causing unnecessary re-renders that cascaded into selectedWorktree →
   // useAutoMode → refreshStatus → setAutoModeRunning → store update → re-render loop
   // that could trigger React error #185 on initial project open).
-  const currentProjectPath = currentProject?.path;
   const worktrees = useAppStore(
     useCallback(
       (s) =>

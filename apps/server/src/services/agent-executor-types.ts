@@ -29,6 +29,7 @@ export interface AgentExecutionOptions {
   credentials?: Credentials;
   claudeCompatibleProvider?: ClaudeCompatibleProvider;
   mcpServers?: Record<string, unknown>;
+  sdkSessionId?: string;
   sdkOptions?: {
     maxTurns?: number;
     allowedTools?: string[];

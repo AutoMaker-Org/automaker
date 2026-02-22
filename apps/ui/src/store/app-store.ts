@@ -275,6 +275,7 @@ const initialState: AppState = {
   collapsedNavSections: cachedUI.collapsedNavSections,
   mobileSidebarHidden: false,
   lastSelectedSessionByProject: {},
+  agentModelBySession: {},
   theme: getStoredTheme() || 'dark',
   fontFamilySans: getStoredFontSans(),
   fontFamilyMono: getStoredFontMono(),
@@ -1597,6 +1598,16 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
       } as Record<string, string>,
     })),
   getLastSelectedSession: (projectPath) => get().lastSelectedSessionByProject[projectPath] ?? null,
+
+  // Agent model selection actions
+  setAgentModelForSession: (sessionId, model) =>
+    set((state) => ({
+      agentModelBySession: {
+        ...state.agentModelBySession,
+        [sessionId]: model,
+      },
+    })),
+  getAgentModelForSession: (sessionId) => get().agentModelBySession[sessionId] ?? null,
 
   // Board Background actions
   setBoardBackground: (projectPath, imagePath) =>

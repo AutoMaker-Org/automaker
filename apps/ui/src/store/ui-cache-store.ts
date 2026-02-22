@@ -114,19 +114,20 @@ export function syncUICache(appState: {
     update.cachedCollapsedNavSections = appState.collapsedNavSections;
   }
   if ('currentWorktreeByProject' in appState && appState.currentWorktreeByProject) {
-    // Sanitize on write: only persist entries where path is null (main branch).
-    // Non-null paths point to worktree directories on disk that may be deleted
-    // while the app is not running. Persisting stale paths can cause crash loops
-    // on restore (the board renders with an invalid selection, the error boundary
-    // reloads, which restores the same bad cache). This mirrors the sanitization
-    // in restoreFromUICache() for defense-in-depth.
+    // Persist all valid worktree selections (both main branch and feature worktrees).
+    // Validation against actual worktrees happens at restore time in:
+    // 1. restoreFromUICache() - early restore with validation
+    // 2. use-worktrees.ts - runtime validation that resets to main if deleted
+    // This allows users to have their feature worktree selection persist across refreshes.
     const sanitized: Record<string, { path: string | null; branch: string }> = {};
     for (const [projectPath, worktree] of Object.entries(appState.currentWorktreeByProject)) {
       if (
         typeof worktree === 'object' &&
         worktree !== null &&
         'path' in worktree &&
-        worktree.path === null
+        'branch' in worktree &&
+        typeof worktree.branch === 'string' &&
+        (worktree.path === null || typeof worktree.path === 'string')
       ) {
         sanitized[projectPath] = worktree;
       }
@@ -178,32 +179,27 @@ export function restoreFromUICache(
   // Restore last selected worktree per project so the board doesn't
   // reset to main branch after PWA memory eviction or tab discard.
   //
-  // IMPORTANT: Only restore entries where path is null (main branch selection).
-  // Non-null paths point to worktree directories on disk that may have been
-  // deleted while the PWA was evicted. Restoring a stale worktree path causes
-  // the board to render with an invalid selection, and if the server can't
-  // validate it fast enough, the app enters an unrecoverable crash loop
-  // (the error boundary reloads, which restores the same bad cache).
-  // Main branch (path=null) is always valid and safe to restore.
+  // Restore all valid worktree selections (both main branch and feature worktrees).
+  // The validation effect in use-worktrees.ts will handle resetting to main branch
+  // if the cached worktree no longer exists when worktree data loads.
   if (
     cache.cachedCurrentWorktreeByProject &&
     Object.keys(cache.cachedCurrentWorktreeByProject).length > 0
   ) {
     const sanitized: Record<string, { path: string | null; branch: string }> = {};
     for (const [projectPath, worktree] of Object.entries(cache.cachedCurrentWorktreeByProject)) {
+      // Validate structure only - keep both null (main) and non-null (worktree) paths
+      // Runtime validation in use-worktrees.ts handles deleted worktrees gracefully
       if (
         typeof worktree === 'object' &&
         worktree !== null &&
         'path' in worktree &&
-        worktree.path === null
+        'branch' in worktree &&
+        typeof worktree.branch === 'string' &&
+        (worktree.path === null || typeof worktree.path === 'string')
       ) {
-        // Main branch selection — always safe to restore
         sanitized[projectPath] = worktree;
       }
-      // Non-null paths are dropped; the app will re-discover actual worktrees
-      // from the server and the validation effect in use-worktrees will handle
-      // resetting to main if the cached worktree no longer exists.
-      // Null/malformed entries are also dropped to prevent crashes.
     }
     if (Object.keys(sanitized).length > 0) {
       stateUpdate.currentWorktreeByProject = sanitized;

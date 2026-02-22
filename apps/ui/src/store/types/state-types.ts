@@ -83,6 +83,8 @@ export interface AppState {
 
   // Agent Session state (per-project, keyed by project path)
   lastSelectedSessionByProject: Record<string, string>; // projectPath -> sessionId
+  // Agent model selection (per-session, keyed by sessionId)
+  agentModelBySession: Record<string, PhaseModelEntry>; // sessionId -> model selection
 
   // Theme
   theme: ThemeMode;
@@ -669,6 +671,9 @@ export interface AppActions {
   // Agent Session actions
   setLastSelectedSession: (projectPath: string, sessionId: string | null) => void;
   getLastSelectedSession: (projectPath: string) => string | null;
+  // Agent model selection actions
+  setAgentModelForSession: (sessionId: string, model: PhaseModelEntry) => void;
+  getAgentModelForSession: (sessionId: string) => PhaseModelEntry | null;
 
   // Board Background actions
   setBoardBackground: (projectPath: string, imagePath: string | null) => void;

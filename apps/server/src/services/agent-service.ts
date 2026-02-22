@@ -329,12 +329,6 @@ export class AgentService {
       timestamp: new Date().toISOString(),
     };
 
-    // Build conversation history from existing messages BEFORE adding current message
-    const conversationHistory = session.messages.map((msg) => ({
-      role: msg.role,
-      content: msg.content,
-    }));
-
     session.messages.push(userMessage);
     session.isRunning = true;
     session.abortController = new AbortController();
@@ -406,6 +400,7 @@ export class AgentService {
         }
       }
 
+      let combinedSystemPrompt: string | undefined;
       // Load project context files (CLAUDE.md, CODE_QUALITY.md, etc.) and memory files
       // Use the user's message as task context for smart memory selection
       const contextResult = await loadContextFiles({
@@ -423,7 +418,7 @@ export class AgentService {
 
       // Build combined system prompt with base prompt and context files
       const baseSystemPrompt = await this.getSystemPrompt();
-      const combinedSystemPrompt = contextFilesPrompt
+      combinedSystemPrompt = contextFilesPrompt
         ? `${contextFilesPrompt}\n\n${baseSystemPrompt}`
         : baseSystemPrompt;
 
@@ -513,6 +508,14 @@ export class AgentService {
         : stripProviderPrefix(effectiveModel);
 
       // Build options for provider
+      const conversationHistory = session.messages
+        .slice(0, -1)
+        .map((msg) => ({
+          role: msg.role,
+          content: msg.content,
+        }))
+        .filter((msg) => msg.content.trim().length > 0);
+
       const options: ExecuteOptions = {
         prompt: '', // Will be set below based on images
         model: bareModel, // Bare model ID (e.g., "gpt-5.1-codex-max", "composer-1")
@@ -522,7 +525,8 @@ export class AgentService {
         maxTurns: maxTurns,
         allowedTools: allowedTools,
         abortController: session.abortController!,
-        conversationHistory: conversationHistory.length > 0 ? conversationHistory : undefined,
+        conversationHistory:
+          conversationHistory && conversationHistory.length > 0 ? conversationHistory : undefined,
         settingSources: settingSources.length > 0 ? settingSources : undefined,
         sdkSessionId: session.sdkSessionId, // Pass SDK session ID for resuming
         mcpServers: Object.keys(mcpServers).length > 0 ? mcpServers : undefined, // Pass MCP servers configuration

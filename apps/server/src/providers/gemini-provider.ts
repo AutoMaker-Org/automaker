@@ -270,6 +270,11 @@ export class GeminiProvider extends CliProvider {
       cliArgs.push('--include-directories', options.cwd);
     }
 
+    // Resume an existing Gemini session when one is available
+    if (options.sdkSessionId) {
+      cliArgs.push('--resume', options.sdkSessionId);
+    }
+
     // Note: Gemini CLI doesn't have a --thinking-level flag.
     // Thinking capabilities are determined by the model selection (e.g., gemini-2.5-pro).
     // The model handles thinking internally based on the task complexity.

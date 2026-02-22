@@ -1,17 +1,35 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { CopilotProvider, CopilotErrorCode } from '@/providers/copilot-provider.js';
+import { collectAsyncGenerator } from '../../utils/helpers.js';
+import { CopilotClient } from '@github/copilot-sdk';
+
+const createSessionMock = vi.fn();
+const resumeSessionMock = vi.fn();
+
+function createMockSession(sessionId = 'test-session') {
+  let eventHandler: ((event: any) => void) | null = null;
+  return {
+    sessionId,
+    send: vi.fn().mockImplementation(async () => {
+      if (eventHandler) {
+        eventHandler({ type: 'assistant.message', data: { content: 'hello' } });
+        eventHandler({ type: 'session.idle' });
+      }
+    }),
+    destroy: vi.fn().mockResolvedValue(undefined),
+    on: vi.fn().mockImplementation((handler: (event: any) => void) => {
+      eventHandler = handler;
+    }),
+  };
+}
 
 // Mock the Copilot SDK
 vi.mock('@github/copilot-sdk', () => ({
   CopilotClient: vi.fn().mockImplementation(() => ({
     start: vi.fn().mockResolvedValue(undefined),
     stop: vi.fn().mockResolvedValue(undefined),
-    createSession: vi.fn().mockResolvedValue({
-      sessionId: 'test-session',
-      send: vi.fn().mockResolvedValue(undefined),
-      destroy: vi.fn().mockResolvedValue(undefined),
-      on: vi.fn(),
-    }),
+    createSession: createSessionMock,
+    resumeSession: resumeSessionMock,
   })),
 }));
 
@@ -49,6 +67,16 @@ describe('copilot-provider.ts', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(CopilotClient).mockImplementation(function () {
+      return {
+        start: vi.fn().mockResolvedValue(undefined),
+        stop: vi.fn().mockResolvedValue(undefined),
+        createSession: createSessionMock,
+        resumeSession: resumeSessionMock,
+      } as any;
+    });
+    createSessionMock.mockResolvedValue(createMockSession());
+    resumeSessionMock.mockResolvedValue(createMockSession('resumed-session'));
 
     // Mock fs.existsSync for CLI path validation
     vi.mocked(fs.existsSync).mockReturnValue(true);
@@ -512,6 +540,47 @@ describe('copilot-provider.ts', () => {
       const result = provider.normalizeEvent(event);
       const todoInput = (result?.message?.content?.[0] as any)?.input;
       expect(todoInput.todos[0].status).toBe('completed');
+    });
+  });
+
+  describe('executeQuery resume behavior', () => {
+    it('uses resumeSession when sdkSessionId is provided', async () => {
+      const results = await collectAsyncGenerator(
+        provider.executeQuery({
+          prompt: 'Hello',
+          model: 'claude-sonnet-4.6',
+          cwd: '/tmp/project',
+          sdkSessionId: 'session-123',
+        })
+      );
+
+      expect(resumeSessionMock).toHaveBeenCalledWith(
+        'session-123',
+        expect.objectContaining({ model: 'claude-sonnet-4.6', streaming: true })
+      );
+      expect(createSessionMock).not.toHaveBeenCalled();
+      expect(results.some((msg) => msg.session_id === 'resumed-session')).toBe(true);
+    });
+
+    it('falls back to createSession when resumeSession fails', async () => {
+      resumeSessionMock.mockRejectedValueOnce(new Error('session not found'));
+      createSessionMock.mockResolvedValueOnce(createMockSession('fresh-session'));
+
+      const results = await collectAsyncGenerator(
+        provider.executeQuery({
+          prompt: 'Hello',
+          model: 'claude-sonnet-4.6',
+          cwd: '/tmp/project',
+          sdkSessionId: 'stale-session',
+        })
+      );
+
+      expect(resumeSessionMock).toHaveBeenCalledWith(
+        'stale-session',
+        expect.objectContaining({ model: 'claude-sonnet-4.6', streaming: true })
+      );
+      expect(createSessionMock).toHaveBeenCalledTimes(1);
+      expect(results.some((msg) => msg.session_id === 'fresh-session')).toBe(true);
     });
   });
 });

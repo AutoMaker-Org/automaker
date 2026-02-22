@@ -450,6 +450,11 @@ export class CursorProvider extends CliProvider {
       cliArgs.push('--model', model);
     }
 
+    // Resume an existing chat when a provider session ID is available
+    if (options.sdkSessionId) {
+      cliArgs.push('--resume', options.sdkSessionId);
+    }
+
     // Use '-' to indicate reading prompt from stdin
     cliArgs.push('-');
 

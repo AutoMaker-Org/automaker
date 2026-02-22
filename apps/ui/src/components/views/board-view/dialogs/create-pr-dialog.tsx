@@ -26,6 +26,7 @@ import { getElectronAPI } from '@/lib/electron';
 import { getHttpApiClient } from '@/lib/http-api-client';
 import { toast } from 'sonner';
 import { useWorktreeBranches } from '@/hooks/queries';
+import { ModelOverrideTrigger, useModelOverride } from '@/components/shared';
 
 interface RemoteInfo {
   name: string;
@@ -91,6 +92,9 @@ export function CreatePRDialog({
 
   // Generate description state
   const [isGeneratingDescription, setIsGeneratingDescription] = useState(false);
+
+  // PR description model override
+  const prDescriptionModelOverride = useModelOverride({ phase: 'prDescriptionModel' });
 
   // Use React Query for branch fetching - only enabled when dialog is open
   const { data: branchesData, isLoading: isLoadingBranches } = useWorktreeBranches(
@@ -306,7 +310,13 @@ export function CreatePRDialog({
         resolvedRef !== baseBranch && resolvedRef.includes('/')
           ? resolvedRef.substring(resolvedRef.indexOf('/') + 1)
           : resolvedRef;
-      const result = await api.worktree.generatePRDescription(worktree.path, branchNameForApi);
+      const result = await api.worktree.generatePRDescription(
+        worktree.path,
+        branchNameForApi,
+        prDescriptionModelOverride.effectiveModel,
+        prDescriptionModelOverride.effectiveModelEntry.thinkingLevel,
+        prDescriptionModelOverride.effectiveModelEntry.providerId
+      );
 
       if (result.success) {
         if (result.title) {
@@ -587,30 +597,40 @@ export function CreatePRDialog({
               <div className="grid gap-2">
                 <div className="flex items-center justify-between">
                   <Label htmlFor="pr-title">PR Title</Label>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleGenerateDescription}
-                    disabled={isGeneratingDescription || isLoading}
-                    className="h-6 px-2 text-xs"
-                    title={
-                      worktree.hasChanges
-                        ? 'Generate title and description from commits and uncommitted changes'
-                        : 'Generate title and description from commits'
-                    }
-                  >
-                    {isGeneratingDescription ? (
-                      <>
-                        <Spinner size="xs" className="mr-1" />
-                        Generating...
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles className="w-3 h-3 mr-1" />
-                        Generate with AI
-                      </>
-                    )}
-                  </Button>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleGenerateDescription}
+                      disabled={isGeneratingDescription || isLoading}
+                      className="h-6 px-2 text-xs"
+                      title={
+                        worktree.hasChanges
+                          ? 'Generate title and description from commits and uncommitted changes'
+                          : 'Generate title and description from commits'
+                      }
+                    >
+                      {isGeneratingDescription ? (
+                        <>
+                          <Spinner size="xs" className="mr-1" />
+                          Generating...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="w-3 h-3 mr-1" />
+                          Generate with AI
+                        </>
+                      )}
+                    </Button>
+                    <ModelOverrideTrigger
+                      currentModelEntry={prDescriptionModelOverride.effectiveModelEntry}
+                      onModelChange={prDescriptionModelOverride.setOverride}
+                      phase="prDescriptionModel"
+                      isOverridden={prDescriptionModelOverride.isOverridden}
+                      size="sm"
+                      variant="icon"
+                    />
+                  </div>
                 </div>
                 <Input
                   id="pr-title"

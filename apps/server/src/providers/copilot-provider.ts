@@ -116,6 +116,12 @@ export interface CopilotError extends Error {
   suggestion?: string;
 }
 
+type CopilotSession = Awaited<ReturnType<CopilotClient['createSession']>>;
+type CopilotSessionOptions = Parameters<CopilotClient['createSession']>[0];
+type ResumableCopilotClient = CopilotClient & {
+  resumeSession?: (sessionId: string, options: CopilotSessionOptions) => Promise<CopilotSession>;
+};
+
 // =============================================================================
 // Tool Name Normalization
 // =============================================================================
@@ -558,8 +564,7 @@ export class CopilotProvider extends CliProvider {
       await client.start();
       logger.debug(`CopilotClient started with cwd: ${workingDirectory}`);
 
-      // Create session with streaming enabled for real-time events
-      const session = await client.createSession({
+      const sessionOptions: CopilotSessionOptions = {
         model: bareModel,
         streaming: true,
         // AUTONOMOUS MODE: Auto-approve all permission requests.
@@ -572,7 +577,24 @@ export class CopilotProvider extends CliProvider {
           logger.debug(`Permission request: ${request.kind}`);
           return { kind: 'approved' };
         },
-      });
+      };
+
+      // Resume the previous Copilot session when possible; otherwise create a fresh one.
+      let session: CopilotSession;
+      const resumableClient = client as ResumableCopilotClient;
+      if (options.sdkSessionId && typeof resumableClient.resumeSession === 'function') {
+        try {
+          session = await resumableClient.resumeSession(options.sdkSessionId, sessionOptions);
+          logger.debug(`Resumed Copilot session: ${session.sessionId}`);
+        } catch (resumeError) {
+          logger.warn(
+            `Failed to resume Copilot session "${options.sdkSessionId}", creating a new session: ${resumeError}`
+          );
+          session = await client.createSession(sessionOptions);
+        }
+      } else {
+        session = await client.createSession(sessionOptions);
+      }
 
       const sessionId = session.sessionId;
       logger.debug(`Session created: ${sessionId}`);

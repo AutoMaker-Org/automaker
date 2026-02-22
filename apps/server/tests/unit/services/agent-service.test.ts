@@ -303,6 +303,36 @@ describe('agent-service.ts', () => {
 
       expect(fs.writeFile).toHaveBeenCalled();
     });
+
+    it('should include context/history preparation for Gemini requests', async () => {
+      let capturedOptions: any;
+      const mockProvider = {
+        getName: () => 'gemini',
+        executeQuery: async function* (options: any) {
+          capturedOptions = options;
+          yield {
+            type: 'result',
+            subtype: 'success',
+          };
+        },
+      };
+
+      vi.mocked(ProviderFactory.getProviderForModelName).mockReturnValue('gemini');
+      vi.mocked(ProviderFactory.getProviderForModel).mockReturnValue(mockProvider as any);
+      vi.mocked(promptBuilder.buildPromptWithImages).mockResolvedValue({
+        content: 'Hello',
+        hasImages: false,
+      });
+
+      await service.sendMessage({
+        sessionId: 'session-1',
+        message: 'Hello',
+        model: 'gemini-2.5-flash',
+      });
+
+      expect(contextLoader.loadContextFiles).toHaveBeenCalled();
+      expect(capturedOptions).toBeDefined();
+    });
   });
 
   describe('stopExecution', () => {

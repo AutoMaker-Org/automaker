@@ -170,6 +170,27 @@ describe('codex-provider.ts', () => {
       expect(call.args).toContain('--json');
     });
 
+    it('uses exec resume when sdkSessionId is provided', async () => {
+      vi.mocked(spawnJSONLProcess).mockReturnValue((async function* () {})());
+
+      await collectAsyncGenerator(
+        provider.executeQuery({
+          prompt: 'Continue',
+          model: 'gpt-5.2',
+          cwd: '/tmp',
+          sdkSessionId: 'codex-session-123',
+        })
+      );
+
+      const call = vi.mocked(spawnJSONLProcess).mock.calls[0][0];
+      expect(call.args[0]).toBe('exec');
+      expect(call.args[1]).toBe('resume');
+      expect(call.args).toContain('codex-session-123');
+      expect(call.args).toContain('--json');
+      expect(call.args).not.toContain('--output-schema');
+      expect(call.args).not.toContain('--add-dir');
+    });
+
     it('overrides approval policy when MCP auto-approval is enabled', async () => {
       // Note: With full-permissions always on (--dangerously-bypass-approvals-and-sandbox),
       // approval policy is bypassed, not configured via --config

@@ -959,7 +959,12 @@ export interface WorktreeAPI {
   }>;
 
   // Generate an AI commit message from git diff
-  generateCommitMessage: (worktreePath: string) => Promise<{
+  generateCommitMessage: (
+    worktreePath: string,
+    model?: string,
+    thinkingLevel?: string,
+    providerId?: string
+  ) => Promise<{
     success: boolean;
     message?: string;
     error?: string;
@@ -968,7 +973,10 @@ export interface WorktreeAPI {
   // Generate an AI PR title and description from branch diff
   generatePRDescription: (
     worktreePath: string,
-    baseBranch?: string
+    baseBranch?: string,
+    model?: string,
+    thinkingLevel?: string,
+    providerId?: string
   ) => Promise<{
     success: boolean;
     title?: string;
