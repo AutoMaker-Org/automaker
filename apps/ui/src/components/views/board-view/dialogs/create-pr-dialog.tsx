@@ -739,7 +739,7 @@ export function CreatePRDialog({
               {error && <p className="text-sm text-destructive">{error}</p>}
             </div>
 
-            <DialogFooter className="flex-shrink-0 pt-2 border-t">
+            <DialogFooter className="shrink-0 pt-2 border-t">
               <Button variant="ghost" onClick={handleClose} disabled={isLoading}>
                 Cancel
               </Button>
