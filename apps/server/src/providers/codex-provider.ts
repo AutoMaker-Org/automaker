@@ -33,7 +33,6 @@ import {
   supportsReasoningEffort,
   validateBareModelId,
   calculateReasoningTimeout,
-  DEFAULT_TIMEOUT_MS,
   type CodexApprovalPolicy,
   type CodexSandboxMode,
   type CodexAuthStatus,
@@ -98,7 +97,7 @@ const TEXT_ENCODING = 'utf-8';
  *
  * @see calculateReasoningTimeout from @automaker/types
  */
-const CODEX_CLI_TIMEOUT_MS = DEFAULT_TIMEOUT_MS;
+const CODEX_CLI_TIMEOUT_MS = 120000; // 2 minutes — matches CLI provider base timeout
 const CODEX_FEATURE_GENERATION_BASE_TIMEOUT_MS = 300000; // 5 minutes for feature generation
 const SYSTEM_PROMPT_SEPARATOR = '\n\n';
 const CODEX_INSTRUCTIONS_DIR = '.codex';

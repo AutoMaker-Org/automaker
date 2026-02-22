@@ -14,7 +14,11 @@ interface UseBoardPersistenceProps {
 }
 
 export function useBoardPersistence({ currentProject }: UseBoardPersistenceProps) {
-  const { updateFeature } = useAppStore();
+  // IMPORTANT: Use individual selector instead of bare useAppStore() to prevent
+  // subscribing to the entire store. Bare useAppStore() causes the host component
+  // (BoardView) to re-render on EVERY store change, which cascades through effects
+  // and triggers React error #185 (maximum update depth exceeded).
+  const updateFeature = useAppStore((s) => s.updateFeature);
   const queryClient = useQueryClient();
 
   // Persist feature update to API (replaces saveFeatures)
