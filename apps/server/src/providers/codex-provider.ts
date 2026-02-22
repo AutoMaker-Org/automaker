@@ -356,9 +356,14 @@ function resolveSystemPrompt(systemPrompt?: unknown): string | null {
   return null;
 }
 
+function buildPromptText(options: ExecuteOptions): string {
+  return typeof options.prompt === 'string'
+    ? options.prompt
+    : extractTextFromContent(options.prompt);
+}
+
 function buildCombinedPrompt(options: ExecuteOptions, systemPromptText?: string | null): string {
-  const promptText =
-    typeof options.prompt === 'string' ? options.prompt : extractTextFromContent(options.prompt);
+  const promptText = buildPromptText(options);
   const historyText = options.conversationHistory
     ? formatHistoryAsText(options.conversationHistory)
     : '';
@@ -369,6 +374,11 @@ function buildCombinedPrompt(options: ExecuteOptions, systemPromptText?: string 
     : '';
 
   return `${historyText}${systemSection}${HISTORY_HEADER}${promptText}`;
+}
+
+function buildResumePrompt(options: ExecuteOptions): string {
+  const promptText = buildPromptText(options);
+  return `${HISTORY_HEADER}${promptText}`;
 }
 
 function formatConfigValue(value: string | number | boolean): string {
@@ -807,7 +817,9 @@ export class CodexProvider extends BaseProvider {
             ? 'never'
             : 'on-request'
           : codexSettings.approvalPolicy;
-      const promptText = buildCombinedPrompt(options, combinedSystemPrompt);
+      const promptText = isResumeQuery
+        ? buildResumePrompt(options)
+        : buildCombinedPrompt(options, combinedSystemPrompt);
       const commandPath = executionPlan.cliPath || CODEX_COMMAND;
 
       // Build config overrides for max turns and reasoning effort

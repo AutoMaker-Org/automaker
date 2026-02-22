@@ -5,12 +5,12 @@
  * 1. Discard ALL changes (when no files array is provided)
  *    - Resets staged changes (git reset HEAD)
  *    - Discards modified tracked files (git checkout .)
- *    - Removes untracked files and directories (git clean -fd)
+ *    - Removes untracked files and directories (git clean -ffd)
  *
  * 2. Discard SELECTED files (when files array is provided)
  *    - Unstages selected staged files (git reset HEAD -- <files>)
  *    - Reverts selected tracked file changes (git checkout -- <files>)
- *    - Removes selected untracked files (git clean -fd -- <files>)
+ *    - Removes selected untracked files (git clean -ffd -- <files>)
  *
  * Note: Git repository validation (isGitRepo) is handled by
  * the requireGitRepoOnly middleware in index.ts
@@ -52,6 +52,22 @@ function validateFilePath(filePath: string, worktreePath: string): boolean {
   }
 }
 
+/**
+ * Parse a file path from git status --porcelain output, handling renames.
+ * For renamed files (R status), git reports "old_path -> new_path" and
+ * we need the new path to match what parseGitStatus() returns in git-utils.
+ */
+function parseFilePath(rawPath: string, indexStatus: string, workTreeStatus: string): string {
+  const trimmedPath = rawPath.trim();
+  if (indexStatus === 'R' || workTreeStatus === 'R') {
+    const arrowIndex = trimmedPath.indexOf(' -> ');
+    if (arrowIndex !== -1) {
+      return trimmedPath.slice(arrowIndex + 4);
+    }
+  }
+  return trimmedPath;
+}
+
 export function createDiscardChangesHandler() {
   return async (req: Request, res: Response): Promise<void> => {
     try {
@@ -91,11 +107,16 @@ export function createDiscardChangesHandler() {
 
       // Parse the status output to categorize files
       // Git --porcelain format: XY PATH where X=index status, Y=worktree status
-      // Preserve the exact two-character XY status (no trim) to keep index vs worktree info
+      // For renamed files: XY OLD_PATH -> NEW_PATH
       const statusLines = status.trim().split('\n').filter(Boolean);
       const allFiles = statusLines.map((line) => {
         const fileStatus = line.substring(0, 2);
-        const filePath = line.slice(3).trim();
+        const rawPath = line.slice(3);
+        const indexStatus = fileStatus.charAt(0);
+        const workTreeStatus = fileStatus.charAt(1);
+        // Parse path consistently with parseGitStatus() in git-utils,
+        // which extracts the new path for renames
+        const filePath = parseFilePath(rawPath, indexStatus, workTreeStatus);
         return { status: fileStatus, path: filePath };
       });
 
@@ -122,8 +143,12 @@ export function createDiscardChangesHandler() {
         const untrackedFiles: string[] = []; // Untracked files (?)
         const warnings: string[] = [];
 
+        // Track which requested files were matched so we can handle unmatched ones
+        const matchedFiles = new Set<string>();
+
         for (const file of allFiles) {
           if (!filesToDiscard.has(file.path)) continue;
+          matchedFiles.add(file.path);
 
           // file.status is the raw two-character XY git porcelain status (no trim)
           // X = index/staging status, Y = worktree status
@@ -151,6 +176,16 @@ export function createDiscardChangesHandler() {
           }
         }
 
+        // Handle files from the UI that didn't match any entry in allFiles.
+        // This can happen due to timing differences between the UI loading diffs
+        // and the discard request, or path format differences.
+        // Attempt to clean unmatched files directly as untracked files.
+        for (const requestedFile of files) {
+          if (!matchedFiles.has(requestedFile)) {
+            untrackedFiles.push(requestedFile);
+          }
+        }
+
         // 1. Unstage selected staged files (using execFile to bypass shell)
         if (stagedFiles.length > 0) {
           try {
@@ -174,9 +209,10 @@ export function createDiscardChangesHandler() {
         }
 
         // 3. Remove selected untracked files
+        // Use -ffd (double force) to also handle nested git repositories
         if (untrackedFiles.length > 0) {
           try {
-            await execGitCommand(['clean', '-fd', '--', ...untrackedFiles], worktreePath);
+            await execGitCommand(['clean', '-ffd', '--', ...untrackedFiles], worktreePath);
           } catch (error) {
             const msg = getErrorMessage(error);
             logError(error, `Failed to clean untracked files: ${msg}`);
@@ -234,11 +270,12 @@ export function createDiscardChangesHandler() {
         }
 
         // 3. Remove untracked files and directories
+        // Use -ffd (double force) to also handle nested git repositories
         try {
-          await execGitCommand(['clean', '-fd'], worktreePath);
+          await execGitCommand(['clean', '-ffd', '--'], worktreePath);
         } catch (error) {
           const msg = getErrorMessage(error);
-          logError(error, `git clean -fd failed: ${msg}`);
+          logError(error, `git clean -ffd failed: ${msg}`);
           warnings.push(`Failed to remove untracked files: ${msg}`);
         }
 
