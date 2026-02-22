@@ -363,6 +363,15 @@ export function mergeSettings(
     merged.claudeCompatibleProviders = localSettings.claudeCompatibleProviders;
   }
 
+  // Event hooks - preserve from localStorage if server is empty
+  if (
+    (!serverSettings.eventHooks || serverSettings.eventHooks.length === 0) &&
+    localSettings.eventHooks &&
+    localSettings.eventHooks.length > 0
+  ) {
+    merged.eventHooks = localSettings.eventHooks;
+  }
+
   // Preserve new settings fields from localStorage if server has defaults
   // Use nullish coalescing to accept stored falsy values (e.g. false)
   if (localSettings.enableAiCommitMessages != null && merged.enableAiCommitMessages == null) {

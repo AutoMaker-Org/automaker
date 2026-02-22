@@ -634,7 +634,7 @@ export interface AppActions {
   setPromptCustomization: (customization: PromptCustomization) => Promise<void>;
 
   // Event Hook actions
-  setEventHooks: (hooks: EventHook[]) => void;
+  setEventHooks: (hooks: EventHook[]) => Promise<void>;
 
   // Claude-Compatible Provider actions (new system)
   addClaudeCompatibleProvider: (provider: ClaudeCompatibleProvider) => Promise<void>;

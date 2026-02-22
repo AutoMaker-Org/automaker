@@ -1415,7 +1415,15 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
   },
 
   // Event Hook actions
-  setEventHooks: (hooks) => set({ eventHooks: hooks }),
+  setEventHooks: async (hooks) => {
+    set({ eventHooks: hooks });
+    try {
+      const httpApi = getHttpApiClient();
+      await httpApi.settings.updateGlobal({ eventHooks: hooks });
+    } catch (error) {
+      logger.error('Failed to sync event hooks:', error);
+    }
+  },
 
   // Claude-Compatible Provider actions (new system)
   addClaudeCompatibleProvider: async (provider) => {

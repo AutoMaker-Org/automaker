@@ -571,6 +571,7 @@ export class SettingsService {
     ignoreEmptyArrayOverwrite('mcpServers');
     ignoreEmptyArrayOverwrite('enabledCursorModels');
     ignoreEmptyArrayOverwrite('claudeApiProfiles');
+    ignoreEmptyArrayOverwrite('eventHooks');
     // Note: claudeCompatibleProviders intentionally NOT guarded - users should be able to delete all providers
 
     // Empty object overwrite guard

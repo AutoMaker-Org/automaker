@@ -1672,6 +1672,8 @@ export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
   skillsSources: ['user', 'project'],
   enableSubagents: true,
   subagentsSources: ['user', 'project'],
+  // Event hooks
+  eventHooks: [],
   // New provider system
   claudeCompatibleProviders: [],
   // Deprecated - kept for migration
