@@ -53,9 +53,9 @@ export function createSetTrackingHandler() {
         }
       }
 
-      // Set upstream tracking
+      // Set upstream tracking (pass local branch name as final arg to be explicit)
       await execGitCommand(
-        ['branch', '--set-upstream-to', `${remote}/${targetBranch}`],
+        ['branch', '--set-upstream-to', `${remote}/${targetBranch}`, targetBranch],
         worktreePath
       );
 

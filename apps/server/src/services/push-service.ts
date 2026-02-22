@@ -55,12 +55,13 @@ export interface PushResult {
  */
 function isDivergenceError(errorOutput: string): boolean {
   const lower = errorOutput.toLowerCase();
-  return (
-    lower.includes('rejected') ||
-    lower.includes('non-fast-forward') ||
-    lower.includes('fetch first') ||
-    lower.includes('failed to push some refs')
-  );
+  // Require specific divergence indicators rather than just 'rejected' alone,
+  // which could match pre-receive hook rejections or protected branch errors.
+  const hasNonFastForward = lower.includes('non-fast-forward');
+  const hasFetchFirst = lower.includes('fetch first');
+  const hasFailedToPush = lower.includes('failed to push some refs');
+  const hasRejected = lower.includes('rejected');
+  return hasNonFastForward || hasFetchFirst || (hasRejected && hasFailedToPush);
 }
 
 // ============================================================================
@@ -72,11 +73,12 @@ function isDivergenceError(errorOutput: string): boolean {
  *
  * The workflow:
  * 1. Get current branch name (detect detached HEAD)
- * 2. Attempt `git push -u <remote> <branch>` with safe array args
+ * 2. Attempt `git push <remote> <branch>` with safe array args
  * 3. If push fails with divergence and autoResolve is true:
  *    a. Pull from the same remote (with stash support)
  *    b. If pull succeeds without conflicts, retry push
- * 4. Return structured result
+ * 4. If push fails with "no upstream" error, retry with --set-upstream
+ * 5. Return structured result
  *
  * @param worktreePath - Path to the git worktree
  * @param options - Push options (remote, force, autoResolve)
@@ -109,8 +111,8 @@ export async function performPush(
     };
   }
 
-  // 3. Build push args
-  const pushArgs = ['push', '-u', targetRemote, branchName];
+  // 3. Build push args (no -u flag; upstream is set in the fallback path only when needed)
+  const pushArgs = ['push', targetRemote, branchName];
   if (force) {
     pushArgs.push('--force');
   }
@@ -215,28 +217,42 @@ export async function performPush(
       }
     }
 
-    // 6b. Non-divergence error - try with --set-upstream
-    try {
-      const setUpstreamArgs = ['push', '--set-upstream', targetRemote, branchName];
-      if (force) {
-        setUpstreamArgs.push('--force');
-      }
-      await execGitCommand(setUpstreamArgs, worktreePath);
+    // 6b. Non-divergence error (e.g. no upstream configured) - retry with --set-upstream
+    const isNoUpstreamError =
+      errorOutput.toLowerCase().includes('no upstream') ||
+      errorOutput.toLowerCase().includes('has no upstream branch') ||
+      errorOutput.toLowerCase().includes('set-upstream');
+    if (isNoUpstreamError) {
+      try {
+        const setUpstreamArgs = ['push', '--set-upstream', targetRemote, branchName];
+        if (force) {
+          setUpstreamArgs.push('--force');
+        }
+        await execGitCommand(setUpstreamArgs, worktreePath);
 
-      return {
-        success: true,
-        branch: branchName,
-        pushed: true,
-        message: `Successfully pushed ${branchName} to ${targetRemote} (set upstream)`,
-      };
-    } catch (upstreamError: unknown) {
-      const upstreamErr = upstreamError as { stderr?: string; message?: string };
-      return {
-        success: false,
-        branch: branchName,
-        pushed: false,
-        error: upstreamErr.stderr || upstreamErr.message || getErrorMessage(pushError),
-      };
+        return {
+          success: true,
+          branch: branchName,
+          pushed: true,
+          message: `Successfully pushed ${branchName} to ${targetRemote} (set upstream)`,
+        };
+      } catch (upstreamError: unknown) {
+        const upstreamErr = upstreamError as { stderr?: string; message?: string };
+        return {
+          success: false,
+          branch: branchName,
+          pushed: false,
+          error: upstreamErr.stderr || upstreamErr.message || getErrorMessage(pushError),
+        };
+      }
     }
+
+    // 6c. Other push error - return as-is
+    return {
+      success: false,
+      branch: branchName,
+      pushed: false,
+      error: err.stderr || err.message || getErrorMessage(pushError),
+    };
   }
 }
