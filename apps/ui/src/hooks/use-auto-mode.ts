@@ -252,10 +252,19 @@ export function useAutoMode(worktree?: WorktreeInfo) {
     }
   }, [branchName, currentProject, setAutoModeRunning]);
 
-  // On mount, query backend for current auto loop status and sync UI state.
+  // On mount (and when refreshStatus identity changes, e.g. project switch),
+  // query backend for current auto loop status and sync UI state.
   // This handles cases where the backend is still running after a page refresh.
+  //
+  // IMPORTANT: Debounce with a short delay to prevent a synchronous cascade
+  // during project switches. Without this, the sequence is:
+  //   refreshStatus() → setAutoModeRunning() → store update → re-render →
+  //   other effects fire → more store updates → React error #185.
+  // The 150ms delay lets React settle the initial mount renders before we
+  // trigger additional store mutations from the API response.
   useEffect(() => {
-    void refreshStatus();
+    const timer = setTimeout(() => void refreshStatus(), 150);
+    return () => clearTimeout(timer);
   }, [refreshStatus]);
 
   // Periodic polling fallback when WebSocket events are stale.

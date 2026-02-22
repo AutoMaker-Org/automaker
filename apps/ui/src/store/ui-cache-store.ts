@@ -113,8 +113,25 @@ export function syncUICache(appState: {
   if ('collapsedNavSections' in appState) {
     update.cachedCollapsedNavSections = appState.collapsedNavSections;
   }
-  if ('currentWorktreeByProject' in appState) {
-    update.cachedCurrentWorktreeByProject = appState.currentWorktreeByProject;
+  if ('currentWorktreeByProject' in appState && appState.currentWorktreeByProject) {
+    // Sanitize on write: only persist entries where path is null (main branch).
+    // Non-null paths point to worktree directories on disk that may be deleted
+    // while the app is not running. Persisting stale paths can cause crash loops
+    // on restore (the board renders with an invalid selection, the error boundary
+    // reloads, which restores the same bad cache). This mirrors the sanitization
+    // in restoreFromUICache() for defense-in-depth.
+    const sanitized: Record<string, { path: string | null; branch: string }> = {};
+    for (const [projectPath, worktree] of Object.entries(appState.currentWorktreeByProject)) {
+      if (
+        typeof worktree === 'object' &&
+        worktree !== null &&
+        'path' in worktree &&
+        worktree.path === null
+      ) {
+        sanitized[projectPath] = worktree;
+      }
+    }
+    update.cachedCurrentWorktreeByProject = sanitized;
   }
 
   if (Object.keys(update).length > 0) {

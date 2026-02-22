@@ -478,6 +478,13 @@ export function BoardView() {
 
   // Get the branch for the currently selected worktree
   // Find the worktree that matches the current selection, or use main worktree
+  //
+  // IMPORTANT: Stabilize the returned object reference using a ref to prevent
+  // cascading re-renders during project switches. The spread `{ ...found, ... }`
+  // creates a new object every time, even when the underlying data is identical.
+  // Without stabilization, the new reference propagates to useAutoMode and other
+  // consumers, contributing to the re-render cascade that triggers React error #185.
+  const prevSelectedWorktreeRef = useRef<WorktreeInfo | undefined>(undefined);
   const selectedWorktree = useMemo((): WorktreeInfo | undefined => {
     let found;
     let usedFallback = false;
@@ -495,9 +502,12 @@ export function BoardView() {
         usedFallback = true;
       }
     }
-    if (!found) return undefined;
+    if (!found) {
+      prevSelectedWorktreeRef.current = undefined;
+      return undefined;
+    }
     // Ensure all required WorktreeInfo fields are present
-    return {
+    const result: WorktreeInfo = {
       ...found,
       isCurrent:
         found.isCurrent ??
@@ -508,6 +518,21 @@ export function BoardView() {
             : found.isMain),
       hasWorktree: found.hasWorktree ?? true,
     };
+    // Return the previous reference if the key fields haven't changed,
+    // preventing downstream hooks from seeing a "new" worktree on every render.
+    const prev = prevSelectedWorktreeRef.current;
+    if (
+      prev &&
+      prev.path === result.path &&
+      prev.branch === result.branch &&
+      prev.isMain === result.isMain &&
+      prev.isCurrent === result.isCurrent &&
+      prev.hasWorktree === result.hasWorktree
+    ) {
+      return prev;
+    }
+    prevSelectedWorktreeRef.current = result;
+    return result;
   }, [worktrees, currentWorktreePath]);
 
   // Auto mode hook - pass current worktree to get worktree-specific state

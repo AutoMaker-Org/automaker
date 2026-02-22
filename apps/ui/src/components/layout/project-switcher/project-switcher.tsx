@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, startTransition } from 'react';
 import { Plus, Bug, FolderOpen, BookOpen } from 'lucide-react';
 import { useNavigate, useLocation } from '@tanstack/react-router';
 import { cn, isMac } from '@/lib/utils';
@@ -112,9 +112,17 @@ export function ProjectSwitcher() {
         // Continue with switch even if initialization fails -
         // the project may already be initialized
       }
-      setCurrentProject(project);
-      // Navigate to board view when switching projects
-      navigate({ to: '/board' });
+      // Wrap in startTransition to let React batch the project switch and
+      // navigation into a single low-priority update. Without this, the two
+      // synchronous calls fire separate renders where currentProject points
+      // to the new project but per-project state (worktrees, features) is
+      // still stale, causing a cascade of effects and store mutations that
+      // can trigger React error #185 (maximum update depth exceeded).
+      startTransition(() => {
+        setCurrentProject(project);
+        // Navigate to board view when switching projects
+        navigate({ to: '/board' });
+      });
     },
     [setCurrentProject, navigate]
   );
