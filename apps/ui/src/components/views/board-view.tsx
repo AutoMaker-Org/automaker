@@ -99,6 +99,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/query-keys';
 import { useAutoModeQueryInvalidation } from '@/hooks/use-query-invalidation';
 import { useUpdateGlobalSettings } from '@/hooks/mutations/use-settings-mutations';
+import { forceSyncSettingsToServer } from '@/hooks/use-settings-sync';
 
 // Stable empty array to avoid infinite loop in selector
 const EMPTY_WORKTREES: ReturnType<ReturnType<typeof useAppStore.getState>['getWorktrees']> = [];
@@ -114,6 +115,7 @@ export function BoardView() {
     pendingPlanApproval,
     setPendingPlanApproval,
     updateFeature,
+    batchUpdateFeatures,
     getCurrentWorktree,
     setCurrentWorktree,
     getWorktrees,
@@ -132,6 +134,7 @@ export function BoardView() {
       pendingPlanApproval: state.pendingPlanApproval,
       setPendingPlanApproval: state.setPendingPlanApproval,
       updateFeature: state.updateFeature,
+      batchUpdateFeatures: state.batchUpdateFeatures,
       getCurrentWorktree: state.getCurrentWorktree,
       setCurrentWorktree: state.setCurrentWorktree,
       getWorktrees: state.getWorktrees,
@@ -411,53 +414,40 @@ export function BoardView() {
     currentProject,
   });
 
+  // Shared helper: batch-reset branch assignment and persist for each affected feature.
+  // Used when worktrees are deleted or branches are removed during merge.
+  const batchResetBranchFeatures = useCallback(
+    (branchName: string) => {
+      const affectedIds = hookFeatures.filter((f) => f.branchName === branchName).map((f) => f.id);
+      if (affectedIds.length === 0) return;
+      const updates: Partial<Feature> = { branchName: null };
+      batchUpdateFeatures(affectedIds, updates);
+      for (const id of affectedIds) {
+        persistFeatureUpdate(id, updates).catch((err: unknown) => {
+          console.error(
+            `[batchResetBranchFeatures] Failed to persist update for feature ${id}:`,
+            err
+          );
+        });
+      }
+    },
+    [hookFeatures, batchUpdateFeatures, persistFeatureUpdate]
+  );
+
   // Memoize the removed worktrees handler to prevent infinite loops
   const handleRemovedWorktrees = useCallback(
     (removedWorktrees: Array<{ path: string; branch: string }>) => {
-      // Reset features that were assigned to the removed worktrees (by branch)
-      hookFeatures.forEach((feature) => {
-        const matchesRemovedWorktree = removedWorktrees.some((removed) => {
-          // Match by branch name since worktreePath is no longer stored
-          return feature.branchName === removed.branch;
-        });
-
-        if (matchesRemovedWorktree) {
-          // Reset the feature's branch assignment - update both local state and persist
-          const updates = { branchName: null as unknown as string | undefined };
-          updateFeature(feature.id, updates);
-          persistFeatureUpdate(feature.id, updates);
-        }
-      });
+      for (const { branch } of removedWorktrees) {
+        batchResetBranchFeatures(branch);
+      }
     },
-    [hookFeatures, updateFeature, persistFeatureUpdate]
+    [batchResetBranchFeatures]
   );
 
   // Get current worktree info (path) for filtering features
   // This needs to be before useBoardActions so we can pass currentWorktreeBranch
   const currentWorktreeInfo = currentProject ? getCurrentWorktree(currentProject.path) : null;
   const currentWorktreePath = currentWorktreeInfo?.path ?? null;
-
-  // Track the previous worktree path to detect worktree switches
-  const prevWorktreePathRef = useRef<string | null | undefined>(undefined);
-
-  // When the active worktree changes, invalidate feature queries to ensure
-  // feature cards (especially their todo lists / planSpec tasks) render fresh data.
-  // Without this, cards that unmount when filtered out and remount when the user
-  // switches back may show stale or missing todo list data until the next polling cycle.
-  useEffect(() => {
-    // Skip the initial mount (prevWorktreePathRef starts as undefined)
-    if (prevWorktreePathRef.current === undefined) {
-      prevWorktreePathRef.current = currentWorktreePath;
-      return;
-    }
-    // Only invalidate when the worktree actually changed
-    if (prevWorktreePathRef.current !== currentWorktreePath && currentProject?.path) {
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.features.all(currentProject.path),
-      });
-    }
-    prevWorktreePathRef.current = currentWorktreePath;
-  }, [currentWorktreePath, currentProject?.path, queryClient]);
 
   // Select worktrees for the current project directly from the store.
   // Using a project-scoped selector prevents re-renders when OTHER projects'
@@ -1603,17 +1593,7 @@ export function BoardView() {
             onStashPopConflict={handleStashPopConflict}
             onStashApplyConflict={handleStashApplyConflict}
             onBranchDeletedDuringMerge={(branchName) => {
-              // Reset features that were assigned to the deleted branch (same logic as onDeleted in DeleteWorktreeDialog)
-              hookFeatures.forEach((feature) => {
-                if (feature.branchName === branchName) {
-                  // Reset the feature's branch assignment - update both local state and persist
-                  const updates = {
-                    branchName: null as unknown as string | undefined,
-                  };
-                  updateFeature(feature.id, updates);
-                  persistFeatureUpdate(feature.id, updates);
-                }
-              });
+              batchResetBranchFeatures(branchName);
               setWorktreeRefreshKey((k) => k + 1);
             }}
             onRemovedWorktrees={handleRemovedWorktrees}
@@ -1990,31 +1970,76 @@ export function BoardView() {
         }
         defaultDeleteBranch={getDefaultDeleteBranch(currentProject.path)}
         onDeleted={(deletedWorktree, _deletedBranch) => {
-          // If the deleted worktree was currently selected, immediately reset to main
-          // to prevent the UI from trying to render a non-existent worktree view
-          if (
-            currentWorktreePath !== null &&
-            pathsEqual(currentWorktreePath, deletedWorktree.path)
-          ) {
-            const mainBranch = worktrees.find((w) => w.isMain)?.branch || 'main';
-            setCurrentWorktree(currentProject.path, null, mainBranch);
-          }
+          // 1. Reset current worktree to main FIRST. This must happen
+          //    BEFORE removing from the list to ensure downstream hooks
+          //    (useAutoMode, useBoardFeatures) see a valid worktree and
+          //    never try to render the deleted worktree.
+          const mainBranch = worktrees.find((w) => w.isMain)?.branch || 'main';
+          setCurrentWorktree(currentProject.path, null, mainBranch);
 
-          // Reset features that were assigned to the deleted worktree (by branch)
-          hookFeatures.forEach((feature) => {
-            // Match by branch name since worktreePath is no longer stored
-            if (feature.branchName === deletedWorktree.branch) {
-              // Reset the feature's branch assignment - update both local state and persist
-              const updates = {
-                branchName: null as unknown as string | undefined,
+          // 2. Immediately remove the deleted worktree from the store's
+          //    worktree list so the UI never renders a stale tab/dropdown
+          //    item that can be clicked and cause a crash.
+          const remainingWorktrees = worktrees.filter(
+            (w) => !pathsEqual(w.path, deletedWorktree.path)
+          );
+          setWorktrees(currentProject.path, remainingWorktrees);
+
+          // 3. Cancel any in-flight worktree queries, then optimistically
+          //    update the React Query cache so the worktree disappears
+          //    from the dropdown immediately. Cancelling first prevents a
+          //    pending refetch from overwriting our optimistic update with
+          //    stale server data.
+          const worktreeQueryKey = queryKeys.worktrees.all(currentProject.path);
+          void queryClient.cancelQueries({ queryKey: worktreeQueryKey });
+          queryClient.setQueryData(
+            worktreeQueryKey,
+            (
+              old:
+                | {
+                    worktrees: WorktreeInfo[];
+                    removedWorktrees: Array<{ path: string; branch: string }>;
+                  }
+                | undefined
+            ) => {
+              if (!old) return old;
+              return {
+                ...old,
+                worktrees: old.worktrees.filter(
+                  (w: WorktreeInfo) => !pathsEqual(w.path, deletedWorktree.path)
+                ),
               };
-              updateFeature(feature.id, updates);
-              persistFeatureUpdate(feature.id, updates);
+            }
+          );
+
+          // 4. Batch-reset features assigned to the deleted worktree in one
+          //    store mutation to avoid N individual updateFeature calls that
+          //    cascade into React error #185.
+          batchResetBranchFeatures(deletedWorktree.branch);
+
+          // 5. Do NOT trigger setWorktreeRefreshKey here. The optimistic
+          //    cache update (step 3) already removed the worktree from
+          //    both the Zustand store and React Query cache. Incrementing
+          //    the refresh key would cause invalidateQueries → server
+          //    refetch, and if the server's .worktrees/ directory scan
+          //    finds remnants of the deleted worktree, it would re-add
+          //    it to the dropdown. The 30-second polling interval in
+          //    WorktreePanel will eventually reconcile with the server.
+          setSelectedWorktreeForAction(null);
+
+          // 6. Force-sync settings immediately so the reset worktree
+          //    selection is persisted before any potential page reload.
+          //    Without this, the debounced sync (1s) may not complete
+          //    in time and the stale worktree path survives in
+          //    server settings, causing the deleted worktree to
+          //    reappear on next load.
+          forceSyncSettingsToServer().then((ok) => {
+            if (!ok) {
+              logger.warn(
+                'forceSyncSettingsToServer failed after worktree deletion; stale path may reappear on reload'
+              );
             }
           });
-
-          setWorktreeRefreshKey((k) => k + 1);
-          setSelectedWorktreeForAction(null);
         }}
       />
 

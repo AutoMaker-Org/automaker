@@ -159,7 +159,7 @@ export class GlobalAutoModeService {
           if (feature) {
             title = feature.title;
             description = feature.description;
-            branchName = feature.branchName;
+            branchName = feature.branchName ?? undefined;
           }
         } catch {
           // Silently ignore

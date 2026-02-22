@@ -17,17 +17,16 @@ const logger = createLogger('ProviderAuthInit');
  * without needing to visit the settings page first.
  */
 export function useProviderAuthInit() {
-  const {
-    setClaudeAuthStatus,
-    setCodexAuthStatus,
-    setZaiAuthStatus,
-    setGeminiCliStatus,
-    setGeminiAuthStatus,
-    claudeAuthStatus,
-    codexAuthStatus,
-    zaiAuthStatus,
-    geminiAuthStatus,
-  } = useSetupStore();
+  // IMPORTANT: Use individual selectors instead of bare useSetupStore() to prevent
+  // re-rendering on every setup store mutation. The bare call subscribes to the ENTIRE
+  // store, which during initialization causes cascading re-renders as multiple status
+  // setters fire in rapid succession. With enough rapid mutations, React hits the
+  // maximum update depth limit (error #185).
+  const setClaudeAuthStatus = useSetupStore((s) => s.setClaudeAuthStatus);
+  const setCodexAuthStatus = useSetupStore((s) => s.setCodexAuthStatus);
+  const setZaiAuthStatus = useSetupStore((s) => s.setZaiAuthStatus);
+  const setGeminiCliStatus = useSetupStore((s) => s.setGeminiCliStatus);
+  const setGeminiAuthStatus = useSetupStore((s) => s.setGeminiAuthStatus);
   const initialized = useRef(false);
 
   const refreshStatuses = useCallback(async () => {
@@ -219,5 +218,9 @@ export function useProviderAuthInit() {
     // Always call refreshStatuses() to background re-validate on app restart,
     // even when statuses are pre-populated from persisted storage (cache case).
     void refreshStatuses();
-  }, [refreshStatuses, claudeAuthStatus, codexAuthStatus, zaiAuthStatus, geminiAuthStatus]);
+    // Only depend on the callback ref. The status values were previously included
+    // but they are outputs of refreshStatuses(), not inputs — including them caused
+    // cascading re-renders during initialization that triggered React error #185
+    // (maximum update depth exceeded) on first run.
+  }, [refreshStatuses]);
 }

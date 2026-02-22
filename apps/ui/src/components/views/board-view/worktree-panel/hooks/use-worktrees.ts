@@ -111,13 +111,17 @@ export function useWorktrees({
 
       setCurrentWorktree(projectPath, worktree.isMain ? null : worktree.path, worktree.branch);
 
-      // Invalidate feature queries when switching worktrees to ensure fresh data.
-      // Without this, feature cards that remount after the worktree switch may have stale
-      // or missing planSpec/task data, causing todo lists to appear empty until the next
-      // polling cycle or user interaction triggers a re-render.
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.features.all(projectPath),
-      });
+      // Defer feature query invalidation so the store update and client-side
+      // re-filtering happen in the current render cycle first. The features
+      // list is the same regardless of worktree (filtering is client-side),
+      // so the board updates instantly. The deferred invalidation ensures
+      // feature card details (planSpec, todo lists) are refreshed in the
+      // background without blocking the worktree switch.
+      setTimeout(() => {
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.features.all(projectPath),
+        });
+      }, 0);
     },
     [projectPath, setCurrentWorktree, queryClient, currentWorktreePath]
   );

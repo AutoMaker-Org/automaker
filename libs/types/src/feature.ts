@@ -91,7 +91,7 @@ export interface Feature {
   imagePaths?: Array<string | FeatureImagePath | { path: string; [key: string]: unknown }>;
   textFilePaths?: FeatureTextFilePath[];
   // Branch info - worktree path is derived at runtime from branchName
-  branchName?: string; // Name of the feature branch (undefined = use current worktree)
+  branchName?: string | null; // Name of the feature branch (undefined/null = use current worktree)
   skipTests?: boolean;
   excludedPipelineSteps?: string[]; // Array of pipeline step IDs to skip for this feature
   thinkingLevel?: ThinkingLevel;

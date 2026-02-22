@@ -72,9 +72,19 @@ export function DeleteWorktreeDialog({
             ? `Branch "${worktree.branch}" was also deleted`
             : `Branch "${worktree.branch}" was kept`,
         });
-        onDeleted(worktree, deleteBranch);
+        // Close the dialog first, then notify the parent.
+        // This ensures the dialog unmounts before the parent
+        // triggers potentially heavy state updates (feature branch
+        // resets, worktree refresh), reducing concurrent re-renders
+        // that can cascade into React error #185.
         onOpenChange(false);
         setDeleteBranch(false);
+        try {
+          onDeleted(worktree, deleteBranch);
+        } catch (error) {
+          // Prevent errors in onDeleted from propagating to the error boundary
+          console.error('onDeleted callback failed:', error);
+        }
       } else {
         toast.error('Failed to delete worktree', {
           description: result.error,

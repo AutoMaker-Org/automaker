@@ -912,7 +912,7 @@ export class AutoModeServiceFacade {
           if (feature) {
             title = feature.title;
             description = feature.description;
-            branchName = feature.branchName;
+            branchName = feature.branchName ?? undefined;
           }
         } catch {
           // Silently ignore
@@ -1142,10 +1142,31 @@ export class AutoModeServiceFacade {
   // ===========================================================================
 
   /**
-   * Save execution state for recovery
+   * Save execution state for recovery.
+   *
+   * Uses the active auto-loop config for each worktree so that the persisted
+   * state reflects the real branch and maxConcurrency values rather than the
+   * hard-coded fallbacks (null / DEFAULT_MAX_CONCURRENCY).
    */
   private async saveExecutionState(): Promise<void> {
-    return this.saveExecutionStateForProject(null, DEFAULT_MAX_CONCURRENCY);
+    const projectWorktrees = this.autoLoopCoordinator
+      .getActiveWorktrees()
+      .filter((w) => w.projectPath === this.projectPath);
+
+    if (projectWorktrees.length === 0) {
+      // No active auto loops — save with defaults as a best-effort fallback.
+      return this.saveExecutionStateForProject(null, DEFAULT_MAX_CONCURRENCY);
+    }
+
+    // Save state for every active worktree using its real config values.
+    for (const { branchName } of projectWorktrees) {
+      const config = this.autoLoopCoordinator.getAutoLoopConfigForProject(
+        this.projectPath,
+        branchName
+      );
+      const maxConcurrency = config?.maxConcurrency ?? DEFAULT_MAX_CONCURRENCY;
+      await this.saveExecutionStateForProject(branchName, maxConcurrency);
+    }
   }
 
   /**

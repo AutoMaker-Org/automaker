@@ -26,6 +26,7 @@ import { useEffect, useState, useRef } from 'react';
 import { createLogger } from '@automaker/utils/logger';
 import { getHttpApiClient, waitForApiKeyInit } from '@/lib/http-api-client';
 import { getItem, setItem } from '@/lib/storage';
+import { sanitizeWorktreeByProject } from '@/lib/settings-utils';
 import { useAppStore, THEME_STORAGE_KEY } from '@/store/app-store';
 import { useSetupStore } from '@/store/setup-store';
 import {
@@ -794,7 +795,14 @@ export function hydrateStoreFromSettings(settings: GlobalSettings): void {
     projectHistory: settings.projectHistory ?? [],
     projectHistoryIndex: settings.projectHistoryIndex ?? -1,
     lastSelectedSessionByProject: settings.lastSelectedSessionByProject ?? {},
-    currentWorktreeByProject: settings.currentWorktreeByProject ?? {},
+    // Sanitize currentWorktreeByProject: only restore entries where path is null
+    // (main branch). Non-null paths point to worktree directories that may have
+    // been deleted while the app was closed. Restoring a stale path causes the
+    // board to render an invalid worktree selection, triggering a crash loop
+    // (error boundary reloads → restores same bad path → crash again).
+    // The use-worktrees validation effect will re-discover valid worktrees
+    // from the server once they load.
+    currentWorktreeByProject: sanitizeWorktreeByProject(settings.currentWorktreeByProject),
     // UI State
     worktreePanelCollapsed: settings.worktreePanelCollapsed ?? false,
     lastProjectDir: settings.lastProjectDir ?? '',
