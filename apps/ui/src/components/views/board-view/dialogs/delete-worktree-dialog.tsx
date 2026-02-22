@@ -81,8 +81,9 @@ export function DeleteWorktreeDialog({
         setDeleteBranch(false);
         try {
           onDeleted(worktree, deleteBranch);
-        } catch {
+        } catch (error) {
           // Prevent errors in onDeleted from propagating to the error boundary
+          console.error('onDeleted callback failed:', error);
         }
       } else {
         toast.error('Failed to delete worktree', {

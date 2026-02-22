@@ -8,12 +8,21 @@ import { getHttpApiClient } from '@/lib/http-api-client';
  * before the user opens feature dialogs.
  */
 export function useCursorStatusInit() {
-  const { setCursorCliStatus, cursorCliStatus } = useSetupStore();
+  // Use individual selectors instead of bare useSetupStore() to prevent
+  // re-rendering on every setup store mutation during initialization.
+  const setCursorCliStatus = useSetupStore((s) => s.setCursorCliStatus);
   const initialized = useRef(false);
 
   useEffect(() => {
     // Only initialize once per session
-    if (initialized.current || cursorCliStatus !== null) {
+    if (initialized.current) {
+      return;
+    }
+    // Check current status at call time rather than via dependency to avoid
+    // re-renders when other setup store fields change during initialization.
+    const currentStatus = useSetupStore.getState().cursorCliStatus;
+    if (currentStatus !== null) {
+      initialized.current = true;
       return;
     }
     initialized.current = true;
@@ -42,5 +51,5 @@ export function useCursorStatusInit() {
     };
 
     initCursorStatus();
-  }, [setCursorCliStatus, cursorCliStatus]);
+  }, [setCursorCliStatus]);
 }

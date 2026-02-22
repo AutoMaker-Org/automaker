@@ -19,6 +19,7 @@ import { useAppStore, type ThemeMode, THEME_STORAGE_KEY } from '@/store/app-stor
 import { useSetupStore } from '@/store/setup-store';
 import { useAuthStore } from '@/store/auth-store';
 import { waitForMigrationComplete, resetMigrationState } from './use-settings-migration';
+import { sanitizeWorktreeByProject } from '@/lib/settings-utils';
 import {
   DEFAULT_OPENCODE_MODEL,
   DEFAULT_GEMINI_MODEL,
@@ -38,29 +39,6 @@ import {
 } from '@automaker/types';
 
 const logger = createLogger('SettingsSync');
-
-/**
- * Drop currentWorktreeByProject entries with non-null paths.
- * Non-null paths reference worktree directories that may have been deleted,
- * and restoring them causes crash loops.
- */
-function sanitizeWorktreeByProject(
-  raw: Record<string, { path: string | null; branch: string }> | undefined
-): Record<string, { path: string | null; branch: string }> {
-  if (!raw) return {};
-  const sanitized: Record<string, { path: string | null; branch: string }> = {};
-  for (const [projectPath, worktree] of Object.entries(raw)) {
-    if (
-      typeof worktree === 'object' &&
-      worktree !== null &&
-      'path' in worktree &&
-      worktree.path === null
-    ) {
-      sanitized[projectPath] = worktree;
-    }
-  }
-  return sanitized;
-}
 
 // Debounce delay for syncing settings to server (ms)
 const SYNC_DEBOUNCE_MS = 1000;

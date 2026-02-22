@@ -64,8 +64,23 @@ export function createDeleteHandler() {
         });
         try {
           await execGitCommand(['worktree', 'prune'], projectPath);
+
+          // Verify the specific worktree is no longer registered after prune.
+          // `git worktree prune` exits 0 even if worktreePath was never registered,
+          // so we must explicitly check the worktree list to avoid false positives.
+          const { stdout: listOut } = await execAsync('git worktree list --porcelain', {
+            cwd: projectPath,
+          });
+          if (listOut.includes(worktreePath)) {
+            // Prune didn't clean up our entry - treat as failure
+            throw removeError;
+          }
           removeSucceeded = true;
         } catch (pruneError) {
+          // If pruneError is the original removeError re-thrown, propagate it
+          if (pruneError === removeError) {
+            throw removeError;
+          }
           logger.warn('git worktree prune also failed', {
             error: getErrorMessage(pruneError),
           });
@@ -88,9 +103,15 @@ export function createDeleteHandler() {
         }
       }
 
-      // Optionally delete the branch
+      // Optionally delete the branch (only if worktree was successfully removed)
       let branchDeleted = false;
-      if (deleteBranch && branchName && branchName !== 'main' && branchName !== 'master') {
+      if (
+        removeSucceeded &&
+        deleteBranch &&
+        branchName &&
+        branchName !== 'main' &&
+        branchName !== 'master'
+      ) {
         // Validate branch name to prevent command injection
         if (!isValidBranchName(branchName)) {
           logger.warn(`Invalid branch name detected, skipping deletion: ${branchName}`);

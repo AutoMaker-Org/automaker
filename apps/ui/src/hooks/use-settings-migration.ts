@@ -26,6 +26,7 @@ import { useEffect, useState, useRef } from 'react';
 import { createLogger } from '@automaker/utils/logger';
 import { getHttpApiClient, waitForApiKeyInit } from '@/lib/http-api-client';
 import { getItem, setItem } from '@/lib/storage';
+import { sanitizeWorktreeByProject } from '@/lib/settings-utils';
 import { useAppStore, THEME_STORAGE_KEY } from '@/store/app-store';
 import { useSetupStore } from '@/store/setup-store';
 import {
@@ -621,30 +622,6 @@ export function useSettingsMigration(): MigrationState {
   }, []);
 
   return state;
-}
-
-/**
- * Sanitize currentWorktreeByProject: keep only entries with path === null.
- * Non-null paths reference worktree directories on disk that may have been
- * deleted. Restoring a stale path causes a crash loop (board renders invalid
- * worktree → error boundary reloads → restores same stale path).
- */
-function sanitizeWorktreeByProject(
-  raw: Record<string, { path: string | null; branch: string }> | undefined
-): Record<string, { path: string | null; branch: string }> {
-  if (!raw) return {};
-  const sanitized: Record<string, { path: string | null; branch: string }> = {};
-  for (const [projectPath, worktree] of Object.entries(raw)) {
-    if (
-      typeof worktree === 'object' &&
-      worktree !== null &&
-      'path' in worktree &&
-      worktree.path === null
-    ) {
-      sanitized[projectPath] = worktree;
-    }
-  }
-  return sanitized;
 }
 
 /**

@@ -414,26 +414,29 @@ export function BoardView() {
     currentProject,
   });
 
-  // Memoize the removed worktrees handler to prevent infinite loops
-  const handleRemovedWorktrees = useCallback(
-    (removedWorktrees: Array<{ path: string; branch: string }>) => {
-      // Collect affected feature IDs, then batch-update once to avoid N individual
-      // store mutations that can cascade into React error #185.
-      const removedBranches = new Set(removedWorktrees.map((r) => r.branch));
-      const affectedIds = hookFeatures
-        .filter((f) => f.branchName && removedBranches.has(f.branchName))
-        .map((f) => f.id);
-
+  // Shared helper: batch-reset branch assignment and persist for each affected feature.
+  // Used when worktrees are deleted or branches are removed during merge.
+  const batchResetBranchFeatures = useCallback(
+    (branchName: string) => {
+      const affectedIds = hookFeatures.filter((f) => f.branchName === branchName).map((f) => f.id);
       if (affectedIds.length === 0) return;
-
-      const updates = { branchName: null as unknown as string | undefined };
+      const updates: Partial<Feature> = { branchName: null };
       batchUpdateFeatures(affectedIds, updates);
-      // Persist each update to the server (async, non-blocking)
       for (const id of affectedIds) {
         persistFeatureUpdate(id, updates);
       }
     },
     [hookFeatures, batchUpdateFeatures, persistFeatureUpdate]
+  );
+
+  // Memoize the removed worktrees handler to prevent infinite loops
+  const handleRemovedWorktrees = useCallback(
+    (removedWorktrees: Array<{ path: string; branch: string }>) => {
+      for (const { branch } of removedWorktrees) {
+        batchResetBranchFeatures(branch);
+      }
+    },
+    [batchResetBranchFeatures]
   );
 
   // Get current worktree info (path) for filtering features
@@ -1607,17 +1610,7 @@ export function BoardView() {
             onStashPopConflict={handleStashPopConflict}
             onStashApplyConflict={handleStashApplyConflict}
             onBranchDeletedDuringMerge={(branchName) => {
-              // Batch-reset features assigned to the deleted branch in one store mutation
-              const affectedIds = hookFeatures
-                .filter((f) => f.branchName === branchName)
-                .map((f) => f.id);
-              if (affectedIds.length > 0) {
-                const updates = { branchName: null as unknown as string | undefined };
-                batchUpdateFeatures(affectedIds, updates);
-                for (const id of affectedIds) {
-                  persistFeatureUpdate(id, updates);
-                }
-              }
+              batchResetBranchFeatures(branchName);
               setWorktreeRefreshKey((k) => k + 1);
             }}
             onRemovedWorktrees={handleRemovedWorktrees}
@@ -2039,16 +2032,7 @@ export function BoardView() {
           // 4. Batch-reset features assigned to the deleted worktree in one
           //    store mutation to avoid N individual updateFeature calls that
           //    cascade into React error #185.
-          const affectedIds = hookFeatures
-            .filter((f) => f.branchName === deletedWorktree.branch)
-            .map((f) => f.id);
-          if (affectedIds.length > 0) {
-            const updates = { branchName: null as unknown as string | undefined };
-            batchUpdateFeatures(affectedIds, updates);
-            for (const id of affectedIds) {
-              persistFeatureUpdate(id, updates);
-            }
-          }
+          batchResetBranchFeatures(deletedWorktree.branch);
 
           // 5. Do NOT trigger setWorktreeRefreshKey here. The optimistic
           //    cache update (step 3) already removed the worktree from
@@ -2066,7 +2050,13 @@ export function BoardView() {
           //    in time and the stale worktree path survives in
           //    server settings, causing the deleted worktree to
           //    reappear on next load.
-          void forceSyncSettingsToServer();
+          forceSyncSettingsToServer().then((ok) => {
+            if (!ok) {
+              logger.warn(
+                'forceSyncSettingsToServer failed after worktree deletion; stale path may reappear on reload'
+              );
+            }
+          });
         }}
       />
 
