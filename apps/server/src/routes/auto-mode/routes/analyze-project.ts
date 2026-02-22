@@ -19,11 +19,11 @@ export function createAnalyzeProjectHandler(autoModeService: AutoModeServiceComp
         return;
       }
 
-      // Await the call so that a rejected promise (e.g. "not implemented"
-      // thrown by the facade) is caught by the outer try/catch and returned
-      // as an actual error rather than silently swallowed while the route
-      // returns { success: true }.
-      await autoModeService.analyzeProject(projectPath);
+      // Kick off analysis in the background; attach a rejection handler so
+      // unhandled-promise warnings don't surface and errors are at least logged.
+      // Synchronous throws (e.g. "not implemented") still propagate here.
+      const analysisPromise = autoModeService.analyzeProject(projectPath);
+      analysisPromise.catch((err) => logError(err, 'Background analyzeProject failed'));
 
       res.json({ success: true, message: 'Project analysis started' });
     } catch (error) {
