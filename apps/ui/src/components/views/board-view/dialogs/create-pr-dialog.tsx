@@ -491,7 +491,7 @@ export function CreatePRDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[550px]">
+      <DialogContent className="sm:max-w-[550px] flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <GitPullRequest className="w-5 h-5" />
@@ -565,7 +565,7 @@ export function CreatePRDialog({
           </div>
         ) : (
           <>
-            <div className="grid gap-4 py-4">
+            <div className="grid gap-4 py-4 overflow-y-auto min-h-0 flex-1">
               {worktree.hasChanges && (
                 <div className="grid gap-2">
                   <Label htmlFor="commit-message">
@@ -739,7 +739,7 @@ export function CreatePRDialog({
               {error && <p className="text-sm text-destructive">{error}</p>}
             </div>
 
-            <DialogFooter>
+            <DialogFooter className="shrink-0 pt-2 border-t">
               <Button variant="ghost" onClick={handleClose} disabled={isLoading}>
                 Cancel
               </Button>

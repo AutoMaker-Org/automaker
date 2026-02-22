@@ -53,7 +53,9 @@ Rules:
 - Focus on the user-facing impact when possible
 - If there are breaking changes, mention them prominently
 - The diff may include both committed changes and uncommitted working directory changes. Treat all changes as part of the PR since uncommitted changes will be committed when the PR is created
-- Do NOT distinguish between committed and uncommitted changes in the output - describe all changes as a unified set of PR changes`;
+- Do NOT distinguish between committed and uncommitted changes in the output - describe all changes as a unified set of PR changes
+- EXCLUDE any files that are gitignored (e.g., node_modules, dist, build, .env files, lock files, generated files, binary artifacts, coverage reports, cache directories). These should not be mentioned in the description even if they appear in the diff
+- Focus only on meaningful source code changes that are tracked by git and relevant to reviewers`;
 
 /**
  * Wraps an async generator with a timeout.
