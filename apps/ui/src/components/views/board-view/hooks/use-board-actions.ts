@@ -92,7 +92,7 @@ export function useBoardActions({
   const updateFeature = useAppStore((s) => s.updateFeature);
   const removeFeature = useAppStore((s) => s.removeFeature);
   const moveFeature = useAppStore((s) => s.moveFeature);
-  const useWorktreesEnabled = useAppStore((s) => s.useWorktrees);
+  const worktreesEnabled = useAppStore((s) => s.useWorktrees);
   const enableDependencyBlocking = useAppStore((s) => s.enableDependencyBlocking);
   const skipVerificationInAutoMode = useAppStore((s) => s.skipVerificationInAutoMode);
   const isPrimaryWorktreeBranch = useAppStore((s) => s.isPrimaryWorktreeBranch);
@@ -551,7 +551,7 @@ export function useBoardActions({
       const result = await api.autoMode.runFeature(
         currentProject.path,
         feature.id,
-        useWorktreesEnabled
+        worktreesEnabled
         // No worktreePath - server derives from feature.branchName
       );
 
@@ -562,7 +562,7 @@ export function useBoardActions({
         throw new Error(result.error || 'Failed to start feature');
       }
     },
-    [currentProject, useWorktreesEnabled]
+    [currentProject, worktreesEnabled]
   );
 
   const handleStartImplementation = useCallback(
@@ -695,9 +695,9 @@ export function useBoardActions({
         logger.error('No current project');
         return;
       }
-      resumeFeatureMutation.mutate({ featureId: feature.id, useWorktrees: useWorktreesEnabled });
+      resumeFeatureMutation.mutate({ featureId: feature.id, useWorktrees: worktreesEnabled });
     },
-    [currentProject, resumeFeatureMutation, useWorktreesEnabled]
+    [currentProject, resumeFeatureMutation, worktreesEnabled]
   );
 
   const handleManualVerify = useCallback(
@@ -782,7 +782,7 @@ export function useBoardActions({
         followUpFeature.id,
         followUpPrompt,
         imagePaths,
-        useWorktreesEnabled
+        worktreesEnabled
       );
 
       if (!result.success) {
@@ -820,7 +820,7 @@ export function useBoardActions({
     setFollowUpPrompt,
     setFollowUpImagePaths,
     setFollowUpPreviewMap,
-    useWorktreesEnabled,
+    worktreesEnabled,
   ]);
 
   const handleCommitFeature = useCallback(
