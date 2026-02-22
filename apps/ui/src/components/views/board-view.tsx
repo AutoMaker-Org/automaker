@@ -423,7 +423,12 @@ export function BoardView() {
       const updates: Partial<Feature> = { branchName: null };
       batchUpdateFeatures(affectedIds, updates);
       for (const id of affectedIds) {
-        persistFeatureUpdate(id, updates);
+        persistFeatureUpdate(id, updates).catch((err: unknown) => {
+          console.error(
+            `[batchResetBranchFeatures] Failed to persist update for feature ${id}:`,
+            err
+          );
+        });
       }
     },
     [hookFeatures, batchUpdateFeatures, persistFeatureUpdate]
@@ -443,28 +448,6 @@ export function BoardView() {
   // This needs to be before useBoardActions so we can pass currentWorktreeBranch
   const currentWorktreeInfo = currentProject ? getCurrentWorktree(currentProject.path) : null;
   const currentWorktreePath = currentWorktreeInfo?.path ?? null;
-
-  // Track the previous worktree path to detect worktree switches
-  const prevWorktreePathRef = useRef<string | null | undefined>(undefined);
-
-  // When the active worktree changes, invalidate feature queries to ensure
-  // feature cards (especially their todo lists / planSpec tasks) render fresh data.
-  // Without this, cards that unmount when filtered out and remount when the user
-  // switches back may show stale or missing todo list data until the next polling cycle.
-  useEffect(() => {
-    // Skip the initial mount (prevWorktreePathRef starts as undefined)
-    if (prevWorktreePathRef.current === undefined) {
-      prevWorktreePathRef.current = currentWorktreePath;
-      return;
-    }
-    // Only invalidate when the worktree actually changed
-    if (prevWorktreePathRef.current !== currentWorktreePath && currentProject?.path) {
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.features.all(currentProject.path),
-      });
-    }
-    prevWorktreePathRef.current = currentWorktreePath;
-  }, [currentWorktreePath, currentProject?.path, queryClient]);
 
   // Select worktrees for the current project directly from the store.
   // Using a project-scoped selector prevents re-renders when OTHER projects'

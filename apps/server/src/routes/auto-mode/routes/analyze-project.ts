@@ -19,10 +19,11 @@ export function createAnalyzeProjectHandler(autoModeService: AutoModeServiceComp
         return;
       }
 
-      // Start analysis in background
-      autoModeService.analyzeProject(projectPath).catch((error) => {
-        logger.error(`[AutoMode] Project analysis error:`, error);
-      });
+      // Await the call so that a rejected promise (e.g. "not implemented"
+      // thrown by the facade) is caught by the outer try/catch and returned
+      // as an actual error rather than silently swallowed while the route
+      // returns { success: true }.
+      await autoModeService.analyzeProject(projectPath);
 
       res.json({ success: true, message: 'Project analysis started' });
     } catch (error) {

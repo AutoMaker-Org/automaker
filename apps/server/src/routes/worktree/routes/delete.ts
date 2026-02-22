@@ -71,7 +71,15 @@ export function createDeleteHandler() {
           const { stdout: listOut } = await execAsync('git worktree list --porcelain', {
             cwd: projectPath,
           });
-          if (listOut.includes(worktreePath)) {
+          // Parse porcelain output and check for an exact path match.
+          // Using substring .includes() can produce false positives when one
+          // worktree path is a prefix of another (e.g. /foo vs /foobar).
+          const stillRegistered = listOut
+            .split('\n')
+            .filter((line) => line.startsWith('worktree '))
+            .map((line) => line.slice('worktree '.length).trim())
+            .some((registeredPath) => registeredPath === worktreePath);
+          if (stillRegistered) {
             // Prune didn't clean up our entry - treat as failure
             throw removeError;
           }
