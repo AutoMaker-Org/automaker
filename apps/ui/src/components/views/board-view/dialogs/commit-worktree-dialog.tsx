@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -572,6 +572,13 @@ export function CommitWorktreeDialog({
     }
   }, [worktree, commitEffectiveModel, commitEffectiveModelEntry]);
 
+  // Keep a stable ref to generateCommitMessage so the open-dialog effect
+  // doesn't re-fire (and erase user edits) when the model override changes.
+  const generateCommitMessageRef = useRef(generateCommitMessage);
+  useEffect(() => {
+    generateCommitMessageRef.current = generateCommitMessage;
+  });
+
   // Generate AI commit message when dialog opens (if enabled)
   useEffect(() => {
     if (open && worktree) {
@@ -583,9 +590,9 @@ export function CommitWorktreeDialog({
         return;
       }
 
-      generateCommitMessage();
+      generateCommitMessageRef.current();
     }
-  }, [open, worktree, enableAiCommitMessages, generateCommitMessage]);
+  }, [open, worktree, enableAiCommitMessages]);
 
   if (!worktree) return null;
 
@@ -595,8 +602,8 @@ export function CommitWorktreeDialog({
   // Overlay clicks and Escape key both route through onOpenChange(false); we
   // intercept those here so the UI stays open until the operation completes.
   const handleOpenChange = (nextOpen: boolean) => {
-    if (!nextOpen && (isPushing || isGenerating)) {
-      // Ignore close requests during an active push or generation.
+    if (!nextOpen && (isLoading || isPushing || isGenerating)) {
+      // Ignore close requests during an active commit, push, or generation.
       return;
     }
     onOpenChange(nextOpen);
@@ -826,29 +833,33 @@ export function CommitWorktreeDialog({
                 )}
               </Label>
               <div className="flex items-center gap-1">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={generateCommitMessage}
-                  disabled={isGenerating || isLoading}
-                  className="h-6 px-2 text-xs"
-                  title="Regenerate commit message"
-                >
-                  {isGenerating ? (
-                    <Spinner size="xs" className="mr-1" />
-                  ) : (
-                    <RefreshCw className="w-3 h-3 mr-1" />
-                  )}
-                  Regenerate
-                </Button>
-                <ModelOverrideTrigger
-                  currentModelEntry={commitModelOverride.effectiveModelEntry}
-                  onModelChange={commitModelOverride.setOverride}
-                  phase="commitMessageModel"
-                  isOverridden={commitModelOverride.isOverridden}
-                  size="sm"
-                  variant="icon"
-                />
+                {enableAiCommitMessages && (
+                  <>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={generateCommitMessage}
+                      disabled={isGenerating || isLoading}
+                      className="h-6 px-2 text-xs"
+                      title="Regenerate commit message"
+                    >
+                      {isGenerating ? (
+                        <Spinner size="xs" className="mr-1" />
+                      ) : (
+                        <RefreshCw className="w-3 h-3 mr-1" />
+                      )}
+                      Regenerate
+                    </Button>
+                    <ModelOverrideTrigger
+                      currentModelEntry={commitModelOverride.effectiveModelEntry}
+                      onModelChange={commitModelOverride.setOverride}
+                      phase="commitMessageModel"
+                      isOverridden={commitModelOverride.isOverridden}
+                      size="sm"
+                      variant="icon"
+                    />
+                  </>
+                )}
               </div>
             </div>
             <Textarea

@@ -83,7 +83,7 @@ export const useUICacheStore = create<UICacheState & UICacheActions>()(
 
 /**
  * Check whether an unknown value is a valid cached worktree entry.
- * Accepts objects with a string branch and a path that is null or a string.
+ * Accepts objects with a non-empty string branch and a path that is null or a string.
  */
 function isValidCachedWorktreeEntry(
   worktree: unknown
@@ -92,9 +92,25 @@ function isValidCachedWorktreeEntry(
     typeof worktree === 'object' &&
     worktree !== null &&
     typeof (worktree as Record<string, unknown>).branch === 'string' &&
+    ((worktree as Record<string, unknown>).branch as string).trim().length > 0 &&
     ((worktree as Record<string, unknown>).path === null ||
       typeof (worktree as Record<string, unknown>).path === 'string')
   );
+}
+
+/**
+ * Filter a raw worktree map, discarding entries that fail structural validation.
+ */
+function sanitizeCachedWorktreeByProject(
+  raw: Record<string, unknown>
+): Record<string, { path: string | null; branch: string }> {
+  const sanitized: Record<string, { path: string | null; branch: string }> = {};
+  for (const [key, worktree] of Object.entries(raw)) {
+    if (isValidCachedWorktreeEntry(worktree)) {
+      sanitized[key] = worktree;
+    }
+  }
+  return sanitized;
 }
 
 /**
@@ -135,13 +151,9 @@ export function syncUICache(appState: {
     // 1. restoreFromUICache() - early restore with validation
     // 2. use-worktrees.ts - runtime validation that resets to main if deleted
     // This allows users to have their feature worktree selection persist across refreshes.
-    const sanitized: Record<string, { path: string | null; branch: string }> = {};
-    for (const [projectPath, worktree] of Object.entries(appState.currentWorktreeByProject)) {
-      if (isValidCachedWorktreeEntry(worktree)) {
-        sanitized[projectPath] = worktree;
-      }
-    }
-    update.cachedCurrentWorktreeByProject = sanitized;
+    update.cachedCurrentWorktreeByProject = sanitizeCachedWorktreeByProject(
+      appState.currentWorktreeByProject as Record<string, unknown>
+    );
   }
 
   if (Object.keys(update).length > 0) {
@@ -195,14 +207,11 @@ export function restoreFromUICache(
     cache.cachedCurrentWorktreeByProject &&
     Object.keys(cache.cachedCurrentWorktreeByProject).length > 0
   ) {
-    const sanitized: Record<string, { path: string | null; branch: string }> = {};
-    for (const [projectPath, worktree] of Object.entries(cache.cachedCurrentWorktreeByProject)) {
-      // Validate structure only - keep both null (main) and non-null (worktree) paths
-      // Runtime validation in use-worktrees.ts handles deleted worktrees gracefully
-      if (isValidCachedWorktreeEntry(worktree)) {
-        sanitized[projectPath] = worktree;
-      }
-    }
+    // Validate structure only - keep both null (main) and non-null (worktree) paths
+    // Runtime validation in use-worktrees.ts handles deleted worktrees gracefully
+    const sanitized = sanitizeCachedWorktreeByProject(
+      cache.cachedCurrentWorktreeByProject as Record<string, unknown>
+    );
     if (Object.keys(sanitized).length > 0) {
       stateUpdate.currentWorktreeByProject = sanitized;
     }

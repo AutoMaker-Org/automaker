@@ -523,7 +523,11 @@ export class CopilotProvider extends CliProvider {
     }
 
     const promptText = this.extractPromptText(options);
-    const bareModel = resolveModelString(options.model || DEFAULT_BARE_MODEL);
+    // resolveModelString may return dash-separated canonical names (e.g. "claude-sonnet-4-6"),
+    // but the Copilot SDK expects dot-separated version suffixes (e.g. "claude-sonnet-4.6").
+    // Normalize by converting the last dash-separated numeric pair to dot notation.
+    const resolvedModel = resolveModelString(options.model || DEFAULT_BARE_MODEL);
+    const bareModel = resolvedModel.replace(/-(\d+)-(\d+)$/, '-$1.$2');
     const workingDirectory = options.cwd || process.cwd();
 
     logger.debug(
@@ -561,6 +565,9 @@ export class CopilotProvider extends CliProvider {
       });
     };
 
+    // Declare session outside try so it's accessible in the catch block for cleanup.
+    let session: CopilotSession | undefined;
+
     try {
       await client.start();
       logger.debug(`CopilotClient started with cwd: ${workingDirectory}`);
@@ -581,11 +588,12 @@ export class CopilotProvider extends CliProvider {
       };
 
       // Resume the previous Copilot session when possible; otherwise create a fresh one.
-      let session: CopilotSession;
       const resumableClient = client as ResumableCopilotClient;
+      let sessionResumed = false;
       if (options.sdkSessionId && typeof resumableClient.resumeSession === 'function') {
         try {
           session = await resumableClient.resumeSession(options.sdkSessionId, sessionOptions);
+          sessionResumed = true;
           logger.debug(`Resumed Copilot session: ${session.sessionId}`);
         } catch (resumeError) {
           logger.warn(
@@ -597,11 +605,13 @@ export class CopilotProvider extends CliProvider {
         session = await client.createSession(sessionOptions);
       }
 
-      const sessionId = session.sessionId;
-      logger.debug(`Session created: ${sessionId}`);
+      // session is always assigned by this point (both branches above assign it)
+      const activeSession = session!;
+      const sessionId = activeSession.sessionId;
+      logger.debug(`Session ${sessionResumed ? 'resumed' : 'created'}: ${sessionId}`);
 
       // Set up event handler to push events to queue
-      session.on((event: SdkEvent) => {
+      activeSession.on((event: SdkEvent) => {
         logger.debug(`SDK event: ${event.type}`);
 
         if (event.type === 'session.idle') {
@@ -619,7 +629,7 @@ export class CopilotProvider extends CliProvider {
       });
 
       // Send the prompt (non-blocking)
-      await session.send({ prompt: promptText });
+      await activeSession.send({ prompt: promptText });
 
       // Process events as they arrive
       while (!sessionComplete || eventQueue.length > 0) {
@@ -627,7 +637,7 @@ export class CopilotProvider extends CliProvider {
 
         // Check for errors first (before processing events to avoid race condition)
         if (sessionError) {
-          await session.destroy();
+          await activeSession.destroy();
           await client.stop();
           throw sessionError;
         }
@@ -647,11 +657,19 @@ export class CopilotProvider extends CliProvider {
       }
 
       // Cleanup
-      await session.destroy();
+      await activeSession.destroy();
       await client.stop();
       logger.debug('CopilotClient stopped successfully');
     } catch (error) {
-      // Ensure client is stopped on error
+      // Ensure session is destroyed and client is stopped on error to prevent leaks.
+      // The session may have been created/resumed before the error occurred.
+      if (session) {
+        try {
+          await session.destroy();
+        } catch (sessionCleanupError) {
+          logger.debug(`Failed to destroy session during cleanup: ${sessionCleanupError}`);
+        }
+      }
       try {
         await client.stop();
       } catch (cleanupError) {

@@ -847,8 +847,9 @@ export class CodexProvider extends BaseProvider {
         }
       }
 
-      // If images were written to disk, add the image directory so the CLI can access them
-      if (!isResumeQuery && imagePaths.length > 0) {
+      // If images were written to disk, add the image directory so the CLI can access them.
+      // Note: imagePaths is set to [] when isResumeQuery is true, so this check is sufficient.
+      if (imagePaths.length > 0) {
         const imageDir = path.join(options.cwd, CODEX_INSTRUCTIONS_DIR, IMAGE_TEMP_DIR);
         preExecArgs.push(CODEX_ADD_DIR_FLAG, imageDir);
       }

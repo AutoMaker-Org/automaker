@@ -56,7 +56,7 @@ export function useAgentSession({
     (sessionId: string) => {
       const persistedModel = getAgentModelForSession(sessionId);
       if (persistedModel) {
-        logger.debug('Restoring model selection for session:', sessionId, 'restored model');
+        logger.debug('Restoring model selection for session:', sessionId, persistedModel);
         setModelSelectionState(persistedModel);
       } else {
         setModelSelectionState(DEFAULT_MODEL_SELECTION);
@@ -85,7 +85,11 @@ export function useAgentSession({
   const setModelSelection = useCallback(
     (model: PhaseModelEntry) => {
       setModelSelectionState(model);
-      // Persist model selection for current session
+      // Persist model selection for current session.
+      // If currentSessionId is null (no active session), we only update local state
+      // and skip persistence — this is intentional because the model picker should be
+      // disabled (or hidden) in the UI whenever there is no active session, so this
+      // path is only reached if the UI allows selection before a session is established.
       if (currentSessionId) {
         setAgentModelForSession(currentSessionId, model);
       }
