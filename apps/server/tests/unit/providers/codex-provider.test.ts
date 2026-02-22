@@ -320,8 +320,10 @@ describe('codex-provider.ts', () => {
       );
 
       const call = vi.mocked(spawnJSONLProcess).mock.calls[0][0];
-      // High reasoning effort should have 3x the default timeout (90000ms)
-      expect(call.timeout).toBe(DEFAULT_TIMEOUT_MS * REASONING_TIMEOUT_MULTIPLIERS.high);
+      // High reasoning effort should have 3x the CLI base timeout (120000ms)
+      // CODEX_CLI_TIMEOUT_MS = 120000, multiplier for 'high' = 3.0 → 360000ms
+      const CODEX_CLI_TIMEOUT_MS = 120000;
+      expect(call.timeout).toBe(CODEX_CLI_TIMEOUT_MS * REASONING_TIMEOUT_MULTIPLIERS.high);
     });
 
     it('passes extended timeout for xhigh reasoning effort', async () => {
@@ -357,8 +359,10 @@ describe('codex-provider.ts', () => {
       );
 
       const call = vi.mocked(spawnJSONLProcess).mock.calls[0][0];
-      // No reasoning effort should use the default timeout
-      expect(call.timeout).toBe(DEFAULT_TIMEOUT_MS);
+      // No reasoning effort should use the CLI base timeout (2 minutes)
+      // CODEX_CLI_TIMEOUT_MS = 120000ms, no multiplier applied
+      const CODEX_CLI_TIMEOUT_MS = 120000;
+      expect(call.timeout).toBe(CODEX_CLI_TIMEOUT_MS);
     });
   });
 
