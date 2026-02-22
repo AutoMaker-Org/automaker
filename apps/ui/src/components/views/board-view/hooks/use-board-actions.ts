@@ -84,17 +84,19 @@ export function useBoardActions({
   onWorktreeAutoSelect,
   currentWorktreeBranch,
 }: UseBoardActionsProps) {
-  const {
-    addFeature,
-    updateFeature,
-    removeFeature,
-    moveFeature,
-    useWorktrees,
-    enableDependencyBlocking,
-    skipVerificationInAutoMode,
-    isPrimaryWorktreeBranch,
-    getPrimaryWorktreeBranch,
-  } = useAppStore();
+  // IMPORTANT: Use individual selectors instead of bare useAppStore() to prevent
+  // subscribing to the entire store. Bare useAppStore() causes the host component
+  // (BoardView) to re-render on EVERY store change, which cascades through effects
+  // and triggers React error #185 (maximum update depth exceeded).
+  const addFeature = useAppStore((s) => s.addFeature);
+  const updateFeature = useAppStore((s) => s.updateFeature);
+  const removeFeature = useAppStore((s) => s.removeFeature);
+  const moveFeature = useAppStore((s) => s.moveFeature);
+  const worktreesEnabled = useAppStore((s) => s.useWorktrees);
+  const enableDependencyBlocking = useAppStore((s) => s.enableDependencyBlocking);
+  const skipVerificationInAutoMode = useAppStore((s) => s.skipVerificationInAutoMode);
+  const isPrimaryWorktreeBranch = useAppStore((s) => s.isPrimaryWorktreeBranch);
+  const getPrimaryWorktreeBranch = useAppStore((s) => s.getPrimaryWorktreeBranch);
   const autoMode = useAutoMode();
 
   // React Query mutations for feature operations
@@ -549,7 +551,7 @@ export function useBoardActions({
       const result = await api.autoMode.runFeature(
         currentProject.path,
         feature.id,
-        useWorktrees
+        worktreesEnabled
         // No worktreePath - server derives from feature.branchName
       );
 
@@ -560,7 +562,7 @@ export function useBoardActions({
         throw new Error(result.error || 'Failed to start feature');
       }
     },
-    [currentProject, useWorktrees]
+    [currentProject, worktreesEnabled]
   );
 
   const handleStartImplementation = useCallback(
@@ -693,9 +695,9 @@ export function useBoardActions({
         logger.error('No current project');
         return;
       }
-      resumeFeatureMutation.mutate({ featureId: feature.id, useWorktrees });
+      resumeFeatureMutation.mutate({ featureId: feature.id, useWorktrees: worktreesEnabled });
     },
-    [currentProject, resumeFeatureMutation, useWorktrees]
+    [currentProject, resumeFeatureMutation, worktreesEnabled]
   );
 
   const handleManualVerify = useCallback(
@@ -780,7 +782,7 @@ export function useBoardActions({
         followUpFeature.id,
         followUpPrompt,
         imagePaths,
-        useWorktrees
+        worktreesEnabled
       );
 
       if (!result.success) {
@@ -818,7 +820,7 @@ export function useBoardActions({
     setFollowUpPrompt,
     setFollowUpImagePaths,
     setFollowUpPreviewMap,
-    useWorktrees,
+    worktreesEnabled,
   ]);
 
   const handleCommitFeature = useCallback(

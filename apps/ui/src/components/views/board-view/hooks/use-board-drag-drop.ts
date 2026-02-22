@@ -33,7 +33,12 @@ export function useBoardDragDrop({
   const [pendingDependencyLink, setPendingDependencyLink] = useState<PendingDependencyLink | null>(
     null
   );
-  const { moveFeature, updateFeature } = useAppStore();
+  // IMPORTANT: Use individual selectors instead of bare useAppStore() to prevent
+  // subscribing to the entire store. Bare useAppStore() causes the host component
+  // (BoardView) to re-render on EVERY store change, which cascades through effects
+  // and triggers React error #185 (maximum update depth exceeded).
+  const moveFeature = useAppStore((s) => s.moveFeature);
+  const updateFeature = useAppStore((s) => s.updateFeature);
   const autoMode = useAutoMode();
 
   // Note: getOrCreateWorktreeForFeature removed - worktrees are now created server-side
