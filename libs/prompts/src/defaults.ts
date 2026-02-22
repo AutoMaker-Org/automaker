@@ -490,6 +490,7 @@ Rules:
 - Focus on WHAT changed and WHY (if clear from the diff), not HOW
 - No quotes, backticks, or extra formatting
 - If there are multiple changes, provide a brief summary on the first line
+- Ignore changes to gitignored files (e.g., node_modules, dist, build, .env files, lock files, generated files, binary artifacts, coverage reports, cache directories). Focus only on meaningful source code changes that are tracked by git
 
 Examples:
 - feat: Add dark mode toggle to settings
