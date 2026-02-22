@@ -573,6 +573,17 @@ export class SettingsService {
     ignoreEmptyArrayOverwrite('claudeApiProfiles');
     // Note: claudeCompatibleProviders intentionally NOT guarded - users should be able to delete all providers
 
+    // Check for explicit permission to clear eventHooks (escape hatch for intentional clearing)
+    const allowEmptyEventHooks =
+      (sanitizedUpdates as Record<string, unknown>).__allowEmptyEventHooks === true;
+    // Remove the flag so it doesn't get persisted
+    delete (sanitizedUpdates as Record<string, unknown>).__allowEmptyEventHooks;
+
+    // Only guard eventHooks if explicit permission wasn't granted
+    if (!allowEmptyEventHooks) {
+      ignoreEmptyArrayOverwrite('eventHooks');
+    }
+
     // Empty object overwrite guard
     const ignoreEmptyObjectOverwrite = <K extends keyof GlobalSettings>(key: K): void => {
       const nextVal = sanitizedUpdates[key] as unknown;
