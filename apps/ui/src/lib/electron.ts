@@ -2268,7 +2268,12 @@ function createMockWorktreeAPI(): WorktreeAPI {
       };
     },
 
-    push: async (worktreePath: string, force?: boolean, remote?: string) => {
+    push: async (
+      worktreePath: string,
+      force?: boolean,
+      remote?: string,
+      _autoResolve?: boolean
+    ) => {
       const targetRemote = remote || 'origin';
       console.log('[Mock] Pushing worktree:', { worktreePath, force, remote: targetRemote });
       return {
@@ -2277,6 +2282,38 @@ function createMockWorktreeAPI(): WorktreeAPI {
           branch: 'feature-branch',
           pushed: true,
           message: `Successfully pushed to ${targetRemote}/feature-branch`,
+        },
+      };
+    },
+
+    sync: async (worktreePath: string, remote?: string) => {
+      const targetRemote = remote || 'origin';
+      console.log('[Mock] Syncing worktree:', { worktreePath, remote: targetRemote });
+      return {
+        success: true,
+        result: {
+          branch: 'feature-branch',
+          pulled: true,
+          pushed: true,
+          message: `Synced with ${targetRemote}`,
+        },
+      };
+    },
+
+    setTracking: async (worktreePath: string, remote: string, branch?: string) => {
+      const targetBranch = branch || 'feature-branch';
+      console.log('[Mock] Setting tracking branch:', {
+        worktreePath,
+        remote,
+        branch: targetBranch,
+      });
+      return {
+        success: true,
+        result: {
+          branch: targetBranch,
+          remote,
+          upstream: `${remote}/${targetBranch}`,
+          message: `Set tracking branch to ${remote}/${targetBranch}`,
         },
       };
     },

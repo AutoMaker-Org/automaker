@@ -67,6 +67,8 @@ import { createAbortOperationHandler } from './routes/abort-operation.js';
 import { createContinueOperationHandler } from './routes/continue-operation.js';
 import { createStageFilesHandler } from './routes/stage-files.js';
 import { createCheckChangesHandler } from './routes/check-changes.js';
+import { createSetTrackingHandler } from './routes/set-tracking.js';
+import { createSyncHandler } from './routes/sync.js';
 import type { SettingsService } from '../../services/settings-service.js';
 
 export function createWorktreeRoutes(
@@ -117,6 +119,18 @@ export function createWorktreeRoutes(
     validatePathParams('worktreePath'),
     requireValidWorktree,
     createPullHandler()
+  );
+  router.post(
+    '/sync',
+    validatePathParams('worktreePath'),
+    requireValidWorktree,
+    createSyncHandler()
+  );
+  router.post(
+    '/set-tracking',
+    validatePathParams('worktreePath'),
+    requireValidWorktree,
+    createSetTrackingHandler()
   );
   router.post(
     '/checkout-branch',

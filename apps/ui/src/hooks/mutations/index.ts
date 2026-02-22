@@ -46,6 +46,8 @@ export {
   useCommitWorktree,
   usePushWorktree,
   usePullWorktree,
+  useSyncWorktree,
+  useSetTracking,
   useCreatePullRequest,
   useMergeWorktree,
   useSwitchBranch,

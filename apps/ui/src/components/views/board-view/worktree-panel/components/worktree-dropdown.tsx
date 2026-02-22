@@ -140,6 +140,14 @@ export interface WorktreeDropdownProps {
   onEditScripts?: () => void;
   /** When false, the trigger button uses a subdued style instead of the primary highlight. Defaults to true. */
   highlightTrigger?: boolean;
+  /** Whether sync is in progress */
+  isSyncing?: boolean;
+  /** Sync (pull + push) callback */
+  onSync?: (worktree: WorktreeInfo) => void;
+  /** Sync with a specific remote */
+  onSyncWithRemote?: (worktree: WorktreeInfo, remote: string) => void;
+  /** Set tracking branch to a specific remote */
+  onSetTracking?: (worktree: WorktreeInfo, remote: string) => void;
 }
 
 /**
@@ -233,6 +241,10 @@ export function WorktreeDropdown({
   onRunTerminalScript,
   onEditScripts,
   highlightTrigger = true,
+  isSyncing = false,
+  onSync,
+  onSyncWithRemote,
+  onSetTracking,
 }: WorktreeDropdownProps) {
   // Find the currently selected worktree to display in the trigger
   const selectedWorktree = worktrees.find((w) => isWorktreeSelected(w));
@@ -572,6 +584,10 @@ export function WorktreeDropdown({
           terminalScripts={terminalScripts}
           onRunTerminalScript={onRunTerminalScript}
           onEditScripts={onEditScripts}
+          isSyncing={isSyncing}
+          onSync={onSync}
+          onSyncWithRemote={onSyncWithRemote}
+          onSetTracking={onSetTracking}
         />
       )}
     </div>
