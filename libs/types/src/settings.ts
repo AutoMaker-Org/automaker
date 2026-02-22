@@ -791,6 +791,8 @@ export interface PhaseModelConfig {
   // Quick tasks - commit messages
   /** Model for generating git commit messages from diffs */
   commitMessageModel: PhaseModelEntry;
+  /** Model for generating pull request descriptions from branch diffs */
+  prDescriptionModel: PhaseModelEntry;
 }
 
 /** Keys of PhaseModelConfig for type-safe access */
@@ -1192,6 +1194,8 @@ export interface GlobalSettings {
   // Session Tracking
   /** Maps project path -> last selected session ID in that project */
   lastSelectedSessionByProject: Record<string, string>;
+  /** Maps session ID -> persisted model selection for that session */
+  agentModelBySession?: Record<string, PhaseModelEntry>;
 
   // Worktree Selection Tracking
   /** Maps project path -> last selected worktree (path + branch) for restoring on PWA reload */
@@ -1587,6 +1591,8 @@ export const DEFAULT_PHASE_MODELS: PhaseModelConfig = {
 
   // Commit messages - use fast model for speed
   commitMessageModel: { model: 'claude-haiku' },
+  // PR descriptions - use balanced model for better quality descriptions
+  prDescriptionModel: { model: 'claude-sonnet' },
 };
 
 /** Current version of the global settings schema */

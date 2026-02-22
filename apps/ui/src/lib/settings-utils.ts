@@ -3,10 +3,14 @@
  */
 
 /**
- * Drop currentWorktreeByProject entries with non-null paths.
- * Non-null paths reference worktree directories that may have been deleted,
- * and restoring them causes crash loops (board renders invalid worktree
- * -> error boundary reloads -> restores same stale path).
+ * Validate and sanitize currentWorktreeByProject entries.
+ *
+ * Keeps all valid entries (both main branch and feature worktrees).
+ * The validation against actual worktrees happens in use-worktrees.ts
+ * which resets to main branch if the selected worktree no longer exists.
+ *
+ * Only drops entries with invalid structure (not an object, missing/invalid
+ * path or branch).
  */
 export function sanitizeWorktreeByProject(
   raw: Record<string, { path: string | null; branch: string }> | undefined
@@ -14,11 +18,13 @@ export function sanitizeWorktreeByProject(
   if (!raw) return {};
   const sanitized: Record<string, { path: string | null; branch: string }> = {};
   for (const [projectPath, worktree] of Object.entries(raw)) {
+    // Only validate structure - keep both null (main) and non-null (worktree) paths
+    // Runtime validation in use-worktrees.ts handles deleted worktrees
     if (
       typeof worktree === 'object' &&
       worktree !== null &&
-      'path' in worktree &&
-      worktree.path === null
+      typeof worktree.branch === 'string' &&
+      (worktree.path === null || typeof worktree.path === 'string')
     ) {
       sanitized[projectPath] = worktree;
     }

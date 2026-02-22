@@ -93,6 +93,7 @@ export class AgentExecutor {
       credentials,
       claudeCompatibleProvider,
       mcpServers,
+      sdkSessionId,
       sdkOptions,
     } = options;
     const { content: promptContent } = await buildPromptWithImages(
@@ -129,6 +130,7 @@ export class AgentExecutor {
       thinkingLevel: options.thinkingLevel,
       credentials,
       claudeCompatibleProvider,
+      sdkSessionId,
     };
     const featureDirForOutput = getFeatureDir(projectPath, featureId);
     const outputPath = path.join(featureDirForOutput, 'agent-output.md');
@@ -217,6 +219,9 @@ export class AgentExecutor {
     try {
       const stream = provider.executeQuery(executeOptions);
       streamLoop: for await (const msg of stream) {
+        if (msg.session_id && msg.session_id !== options.sdkSessionId) {
+          options.sdkSessionId = msg.session_id;
+        }
         receivedAnyStreamMessage = true;
         appendRawEvent(msg);
         if (abortController.signal.aborted) {
@@ -385,6 +390,9 @@ export class AgentExecutor {
         taskCompleteDetected = false;
 
       for await (const msg of taskStream) {
+        if (msg.session_id && msg.session_id !== options.sdkSessionId) {
+          options.sdkSessionId = msg.session_id;
+        }
         if (msg.type === 'assistant' && msg.message?.content) {
           for (const b of msg.message.content) {
             if (b.type === 'text') {
@@ -599,6 +607,9 @@ export class AgentExecutor {
           for await (const msg of provider.executeQuery(
             this.buildExecOpts(options, revPrompt, sdkOptions?.maxTurns ?? DEFAULT_MAX_TURNS)
           )) {
+            if (msg.session_id && msg.session_id !== options.sdkSessionId) {
+              options.sdkSessionId = msg.session_id;
+            }
             if (msg.type === 'assistant' && msg.message?.content)
               for (const b of msg.message.content)
                 if (b.type === 'text') {
@@ -698,6 +709,7 @@ export class AgentExecutor {
           : undefined,
       credentials: o.credentials,
       claudeCompatibleProvider: o.claudeCompatibleProvider,
+      sdkSessionId: o.sdkSessionId,
     };
   }
 
@@ -717,6 +729,9 @@ export class AgentExecutor {
     for await (const msg of provider.executeQuery(
       this.buildExecOpts(options, contPrompt, options.sdkOptions?.maxTurns ?? DEFAULT_MAX_TURNS)
     )) {
+      if (msg.session_id && msg.session_id !== options.sdkSessionId) {
+        options.sdkSessionId = msg.session_id;
+      }
       if (msg.type === 'assistant' && msg.message?.content)
         for (const b of msg.message.content) {
           if (b.type === 'text') {

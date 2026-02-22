@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -30,13 +30,17 @@ import {
   ChevronDown,
   ChevronRight,
   Upload,
+  RefreshCw,
 } from 'lucide-react';
 import { Spinner } from '@/components/ui/spinner';
 import { getElectronAPI } from '@/lib/electron';
+import { getHttpApiClient } from '@/lib/http-api-client';
 import { toast } from 'sonner';
 import { useAppStore } from '@/store/app-store';
+import { resolveModelString } from '@automaker/model-resolver';
 import { cn } from '@/lib/utils';
 import { TruncatedFilePath } from '@/components/ui/truncated-file-path';
+import { ModelOverrideTrigger, useModelOverride } from '@/components/shared';
 import type { FileStatus, MergeStateInfo } from '@/types/electron';
 import { parseDiff, type ParsedFileDiff } from '@/lib/diff-utils';
 
@@ -205,6 +209,11 @@ export function CommitWorktreeDialog({
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const enableAiCommitMessages = useAppStore((state) => state.enableAiCommitMessages);
+
+  // Commit message model override
+  const commitModelOverride = useModelOverride({ phase: 'commitMessageModel' });
+  const { effectiveModel: commitEffectiveModel, effectiveModelEntry: commitEffectiveModelEntry } =
+    commitModelOverride;
 
   // File selection state
   const [files, setFiles] = useState<FileStatus[]>([]);
@@ -532,6 +541,46 @@ export function CommitWorktreeDialog({
     }
   };
 
+  // Generate AI commit message
+  const generateCommitMessage = useCallback(async () => {
+    if (!worktree) return;
+
+    setIsGenerating(true);
+    try {
+      const resolvedCommitModel = resolveModelString(commitEffectiveModel);
+      const api = getHttpApiClient();
+      const result = await api.worktree.generateCommitMessage(
+        worktree.path,
+        resolvedCommitModel,
+        commitEffectiveModelEntry?.thinkingLevel,
+        commitEffectiveModelEntry?.providerId
+      );
+
+      if (result.success && result.message) {
+        setMessage(result.message);
+      } else {
+        console.warn('Failed to generate commit message:', result.error);
+        toast.error('Failed to generate commit message', {
+          description: result.error || 'Unknown error',
+        });
+      }
+    } catch (err) {
+      console.warn('Error generating commit message:', err);
+      toast.error('Failed to generate commit message', {
+        description: err instanceof Error ? err.message : 'Unknown error',
+      });
+    } finally {
+      setIsGenerating(false);
+    }
+  }, [worktree, commitEffectiveModel, commitEffectiveModelEntry]);
+
+  // Keep a stable ref to generateCommitMessage so the open-dialog effect
+  // doesn't re-fire (and erase user edits) when the model override changes.
+  const generateCommitMessageRef = useRef(generateCommitMessage);
+  useEffect(() => {
+    generateCommitMessageRef.current = generateCommitMessage;
+  });
+
   // Generate AI commit message when dialog opens (if enabled)
   useEffect(() => {
     if (open && worktree) {
@@ -543,45 +592,7 @@ export function CommitWorktreeDialog({
         return;
       }
 
-      setIsGenerating(true);
-      let cancelled = false;
-
-      const generateMessage = async () => {
-        try {
-          const api = getElectronAPI();
-          if (!api?.worktree?.generateCommitMessage) {
-            if (!cancelled) {
-              setIsGenerating(false);
-            }
-            return;
-          }
-
-          const result = await api.worktree.generateCommitMessage(worktree.path);
-
-          if (cancelled) return;
-
-          if (result.success && result.message) {
-            setMessage(result.message);
-          } else {
-            console.warn('Failed to generate commit message:', result.error);
-            setMessage('');
-          }
-        } catch (err) {
-          if (cancelled) return;
-          console.warn('Error generating commit message:', err);
-          setMessage('');
-        } finally {
-          if (!cancelled) {
-            setIsGenerating(false);
-          }
-        }
-      };
-
-      generateMessage();
-
-      return () => {
-        cancelled = true;
-      };
+      generateCommitMessageRef.current();
     }
   }, [open, worktree, enableAiCommitMessages]);
 
@@ -589,12 +600,12 @@ export function CommitWorktreeDialog({
 
   const allSelected = selectedFiles.size === files.length && files.length > 0;
 
-  // Prevent the dialog from being dismissed while a push is in progress.
+  // Prevent the dialog from being dismissed while a push or generation is in progress.
   // Overlay clicks and Escape key both route through onOpenChange(false); we
-  // intercept those here so the UI stays open until the push completes.
+  // intercept those here so the UI stays open until the operation completes.
   const handleOpenChange = (nextOpen: boolean) => {
-    if (!nextOpen && isPushing) {
-      // Ignore close requests during an active push.
+    if (!nextOpen && (isLoading || isPushing || isGenerating)) {
+      // Ignore close requests during an active commit, push, or generation.
       return;
     }
     onOpenChange(nextOpen);
@@ -813,15 +824,46 @@ export function CommitWorktreeDialog({
 
           {/* Commit Message */}
           <div className="grid gap-1.5">
-            <Label htmlFor="commit-message" className="flex items-center gap-2">
-              Commit Message
-              {isGenerating && (
-                <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                  <Sparkles className="w-3 h-3 animate-pulse" />
-                  Generating...
-                </span>
-              )}
-            </Label>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="commit-message" className="flex items-center gap-2">
+                Commit Message
+                {isGenerating && (
+                  <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                    <Sparkles className="w-3 h-3 animate-pulse" />
+                    Generating...
+                  </span>
+                )}
+              </Label>
+              <div className="flex items-center gap-1">
+                {enableAiCommitMessages && (
+                  <>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={generateCommitMessage}
+                      disabled={isGenerating || isLoading}
+                      className="h-6 px-2 text-xs"
+                      title="Regenerate commit message"
+                    >
+                      {isGenerating ? (
+                        <Spinner size="xs" className="mr-1" />
+                      ) : (
+                        <RefreshCw className="w-3 h-3 mr-1" />
+                      )}
+                      Regenerate
+                    </Button>
+                    <ModelOverrideTrigger
+                      currentModelEntry={commitModelOverride.effectiveModelEntry}
+                      onModelChange={commitModelOverride.setOverride}
+                      phase="commitMessageModel"
+                      isOverridden={commitModelOverride.isOverridden}
+                      size="sm"
+                      variant="icon"
+                    />
+                  </>
+                )}
+              </div>
+            </div>
             <Textarea
               id="commit-message"
               placeholder={

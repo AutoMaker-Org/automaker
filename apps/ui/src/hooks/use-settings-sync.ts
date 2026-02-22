@@ -109,6 +109,7 @@ const SETTINGS_FIELDS_TO_SYNC = [
   'projectHistory',
   'projectHistoryIndex',
   'lastSelectedSessionByProject',
+  'agentModelBySession',
   'currentWorktreeByProject',
   // Codex CLI Settings
   'codexAutoLoadAgents',
@@ -172,6 +173,17 @@ function getSettingsFieldValue(
       };
     }
     return persistedSettings;
+  }
+  if (field === 'agentModelBySession') {
+    // Cap to the 50 most-recently-inserted session entries to prevent unbounded growth.
+    // agentModelBySession grows by one entry per agent session — without pruning this
+    // will bloat settings.json, every debounced sync payload, and the localStorage cache.
+    const map = appState.agentModelBySession as Record<string, unknown>;
+    const MAX_ENTRIES = 50;
+    const entries = Object.entries(map);
+    if (entries.length <= MAX_ENTRIES) return map;
+    // Keep the last MAX_ENTRIES entries (insertion-order approximation for recency)
+    return Object.fromEntries(entries.slice(-MAX_ENTRIES));
   }
   return appState[field as keyof typeof appState];
 }
@@ -806,6 +818,13 @@ export async function refreshSettingsFromServer(): Promise<boolean> {
       projectHistory: serverSettings.projectHistory,
       projectHistoryIndex: serverSettings.projectHistoryIndex,
       lastSelectedSessionByProject: serverSettings.lastSelectedSessionByProject,
+      agentModelBySession: serverSettings.agentModelBySession
+        ? Object.fromEntries(
+            Object.entries(serverSettings.agentModelBySession as Record<string, unknown>).map(
+              ([sessionId, entry]) => [sessionId, migratePhaseModelEntry(entry)]
+            )
+          )
+        : currentAppState.agentModelBySession,
       // Sanitize: only restore entries with path === null (main branch).
       // Non-null paths may reference deleted worktrees, causing crash loops.
       currentWorktreeByProject: sanitizeWorktreeByProject(

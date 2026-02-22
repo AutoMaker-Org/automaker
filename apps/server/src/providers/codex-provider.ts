@@ -51,6 +51,7 @@ import { CODEX_MODELS } from './codex-models.js';
 
 const CODEX_COMMAND = 'codex';
 const CODEX_EXEC_SUBCOMMAND = 'exec';
+const CODEX_RESUME_SUBCOMMAND = 'resume';
 const CODEX_JSON_FLAG = '--json';
 const CODEX_MODEL_FLAG = '--model';
 const CODEX_VERSION_FLAG = '--version';
@@ -360,9 +361,14 @@ function resolveSystemPrompt(systemPrompt?: unknown): string | null {
   return null;
 }
 
+function buildPromptText(options: ExecuteOptions): string {
+  return typeof options.prompt === 'string'
+    ? options.prompt
+    : extractTextFromContent(options.prompt);
+}
+
 function buildCombinedPrompt(options: ExecuteOptions, systemPromptText?: string | null): string {
-  const promptText =
-    typeof options.prompt === 'string' ? options.prompt : extractTextFromContent(options.prompt);
+  const promptText = buildPromptText(options);
   const historyText = options.conversationHistory
     ? formatHistoryAsText(options.conversationHistory)
     : '';
@@ -373,6 +379,11 @@ function buildCombinedPrompt(options: ExecuteOptions, systemPromptText?: string 
     : '';
 
   return `${historyText}${systemSection}${HISTORY_HEADER}${promptText}`;
+}
+
+function buildResumePrompt(options: ExecuteOptions): string {
+  const promptText = buildPromptText(options);
+  return `${HISTORY_HEADER}${promptText}`;
 }
 
 function formatConfigValue(value: string | number | boolean): string {
@@ -798,16 +809,22 @@ export class CodexProvider extends BaseProvider {
       }
       const searchEnabled =
         codexSettings.enableWebSearch || resolveSearchEnabled(resolvedAllowedTools, restrictTools);
-      const schemaPath = await writeOutputSchemaFile(options.cwd, options.outputFormat);
-      const imageBlocks = codexSettings.enableImages ? extractImageBlocks(options.prompt) : [];
-      const imagePaths = await writeImageFiles(options.cwd, imageBlocks);
+      const isResumeQuery = Boolean(options.sdkSessionId);
+      const schemaPath = isResumeQuery
+        ? null
+        : await writeOutputSchemaFile(options.cwd, options.outputFormat);
+      const imageBlocks =
+        !isResumeQuery && codexSettings.enableImages ? extractImageBlocks(options.prompt) : [];
+      const imagePaths = isResumeQuery ? [] : await writeImageFiles(options.cwd, imageBlocks);
       const approvalPolicy =
         hasMcpServers && options.mcpAutoApproveTools !== undefined
           ? options.mcpAutoApproveTools
             ? 'never'
             : 'on-request'
           : codexSettings.approvalPolicy;
-      const promptText = buildCombinedPrompt(options, combinedSystemPrompt);
+      const promptText = isResumeQuery
+        ? buildResumePrompt(options)
+        : buildCombinedPrompt(options, combinedSystemPrompt);
       const commandPath = executionPlan.cliPath || CODEX_COMMAND;
 
       // Build config overrides for max turns and reasoning effort
@@ -837,21 +854,30 @@ export class CodexProvider extends BaseProvider {
       const preExecArgs: string[] = [];
 
       // Add additional directories with write access
-      if (codexSettings.additionalDirs && codexSettings.additionalDirs.length > 0) {
+      if (
+        !isResumeQuery &&
+        codexSettings.additionalDirs &&
+        codexSettings.additionalDirs.length > 0
+      ) {
         for (const dir of codexSettings.additionalDirs) {
           preExecArgs.push(CODEX_ADD_DIR_FLAG, dir);
         }
       }
 
-      // If images were written to disk, add the image directory so the CLI can access them
+      // If images were written to disk, add the image directory so the CLI can access them.
+      // Note: imagePaths is set to [] when isResumeQuery is true, so this check is sufficient.
       if (imagePaths.length > 0) {
         const imageDir = path.join(options.cwd, CODEX_INSTRUCTIONS_DIR, IMAGE_TEMP_DIR);
         preExecArgs.push(CODEX_ADD_DIR_FLAG, imageDir);
       }
 
       // Model is already bare (no prefix) - validated by executeQuery
+      const codexCommand = isResumeQuery
+        ? [CODEX_EXEC_SUBCOMMAND, CODEX_RESUME_SUBCOMMAND]
+        : [CODEX_EXEC_SUBCOMMAND];
+
       const args = [
-        CODEX_EXEC_SUBCOMMAND,
+        ...codexCommand,
         CODEX_YOLO_FLAG,
         CODEX_SKIP_GIT_REPO_CHECK_FLAG,
         ...preExecArgs,
@@ -860,6 +886,7 @@ export class CodexProvider extends BaseProvider {
         CODEX_JSON_FLAG,
         ...configOverrideArgs,
         ...(schemaPath ? [CODEX_OUTPUT_SCHEMA_FLAG, schemaPath] : []),
+        ...(options.sdkSessionId ? [options.sdkSessionId] : []),
         '-', // Read prompt from stdin to avoid shell escaping issues
       ];
 

@@ -1,6 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { useAppStore } from '@/store/app-store';
-import type { PhaseModelEntry } from '@automaker/types';
 import { useElectronAgent } from '@/hooks/use-electron-agent';
 import { SessionManager } from '@/components/session-manager';
 
@@ -46,8 +45,6 @@ export function AgentView() {
     return () => window.removeEventListener('resize', updateVisibility);
   }, []);
 
-  const [modelSelection, setModelSelection] = useState<PhaseModelEntry>({ model: 'claude-sonnet' });
-
   // Input ref for auto-focus
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -57,10 +54,12 @@ export function AgentView() {
   const createSessionInFlightRef = useRef(false);
 
   // Session management hook - scoped to current worktree
-  const { currentSessionId, handleSelectSession } = useAgentSession({
-    projectPath: currentProject?.path,
-    workingDirectory: effectiveWorkingDirectory,
-  });
+  // Also handles model selection persistence per session
+  const { currentSessionId, handleSelectSession, modelSelection, setModelSelection } =
+    useAgentSession({
+      projectPath: currentProject?.path,
+      workingDirectory: effectiveWorkingDirectory,
+    });
 
   // Use the Electron agent hook (only if we have a session)
   const {
