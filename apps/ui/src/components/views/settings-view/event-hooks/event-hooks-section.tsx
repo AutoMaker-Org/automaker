@@ -9,6 +9,10 @@ import type { EventHook, EventHookTrigger } from '@automaker/types';
 import { EVENT_HOOK_TRIGGER_LABELS } from '@automaker/types';
 import { EventHookDialog } from './event-hook-dialog';
 import { EventHistoryView } from './event-history-view';
+import { toast } from 'sonner';
+import { createLogger } from '@automaker/utils/logger';
+
+const logger = createLogger('EventHooks');
 
 export function EventHooksSection() {
   const { eventHooks, setEventHooks } = useAppStore();
@@ -26,24 +30,39 @@ export function EventHooksSection() {
     setDialogOpen(true);
   };
 
-  const handleDeleteHook = (hookId: string) => {
-    setEventHooks(eventHooks.filter((h) => h.id !== hookId));
-  };
-
-  const handleToggleHook = (hookId: string, enabled: boolean) => {
-    setEventHooks(eventHooks.map((h) => (h.id === hookId ? { ...h, enabled } : h)));
-  };
-
-  const handleSaveHook = (hook: EventHook) => {
-    if (editingHook) {
-      // Update existing
-      setEventHooks(eventHooks.map((h) => (h.id === hook.id ? hook : h)));
-    } else {
-      // Add new
-      setEventHooks([...eventHooks, hook]);
+  const handleDeleteHook = async (hookId: string) => {
+    try {
+      await setEventHooks(eventHooks.filter((h) => h.id !== hookId));
+    } catch (error) {
+      logger.error('Failed to delete event hook:', error);
+      toast.error('Failed to delete event hook');
     }
-    setDialogOpen(false);
-    setEditingHook(null);
+  };
+
+  const handleToggleHook = async (hookId: string, enabled: boolean) => {
+    try {
+      await setEventHooks(eventHooks.map((h) => (h.id === hookId ? { ...h, enabled } : h)));
+    } catch (error) {
+      logger.error('Failed to toggle event hook:', error);
+      toast.error('Failed to update event hook');
+    }
+  };
+
+  const handleSaveHook = async (hook: EventHook) => {
+    try {
+      if (editingHook) {
+        // Update existing
+        await setEventHooks(eventHooks.map((h) => (h.id === hook.id ? hook : h)));
+      } else {
+        // Add new
+        await setEventHooks([...eventHooks, hook]);
+      }
+      setDialogOpen(false);
+      setEditingHook(null);
+    } catch (error) {
+      logger.error('Failed to save event hook:', error);
+      toast.error('Failed to save event hook');
+    }
   };
 
   // Group hooks by trigger type for better organization
