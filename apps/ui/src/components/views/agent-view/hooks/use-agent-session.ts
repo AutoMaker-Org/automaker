@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { createLogger } from '@automaker/utils/logger';
 import type { PhaseModelEntry } from '@automaker/types';
 import { useAppStore } from '@/store/app-store';
+import { useShallow } from 'zustand/react/shallow';
 
 const logger = createLogger('AgentSession');
 
@@ -30,7 +31,14 @@ export function useAgentSession({
     getLastSelectedSession,
     setAgentModelForSession,
     getAgentModelForSession,
-  } = useAppStore();
+  } = useAppStore(
+    useShallow((state) => ({
+      setLastSelectedSession: state.setLastSelectedSession,
+      getLastSelectedSession: state.getLastSelectedSession,
+      setAgentModelForSession: state.setAgentModelForSession,
+      getAgentModelForSession: state.getAgentModelForSession,
+    }))
+  );
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [modelSelection, setModelSelectionState] =
     useState<PhaseModelEntry>(DEFAULT_MODEL_SELECTION);
@@ -40,6 +48,22 @@ export function useAgentSession({
 
   // Use workingDirectory as the persistence key so sessions are scoped per worktree
   const persistenceKey = workingDirectory || projectPath;
+
+  /**
+   * Fetch persisted model for sessionId and update local state, or fall back to default.
+   */
+  const restoreModelForSession = useCallback(
+    (sessionId: string) => {
+      const persistedModel = getAgentModelForSession(sessionId);
+      if (persistedModel) {
+        logger.debug('Restoring model selection for session:', sessionId, 'restored model');
+        setModelSelectionState(persistedModel);
+      } else {
+        setModelSelectionState(DEFAULT_MODEL_SELECTION);
+      }
+    },
+    [getAgentModelForSession]
+  );
 
   // Handle session selection with persistence
   const handleSelectSession = useCallback(
@@ -51,17 +75,10 @@ export function useAgentSession({
       }
       // Restore model selection for this session if available
       if (sessionId) {
-        const persistedModel = getAgentModelForSession(sessionId);
-        if (persistedModel) {
-          logger.info('Restoring model selection for session:', sessionId, persistedModel);
-          setModelSelectionState(persistedModel);
-        } else {
-          // Reset to default for new sessions
-          setModelSelectionState(DEFAULT_MODEL_SELECTION);
-        }
+        restoreModelForSession(sessionId);
       }
     },
-    [persistenceKey, setLastSelectedSession, getAgentModelForSession]
+    [persistenceKey, setLastSelectedSession, restoreModelForSession]
   );
 
   // Wrapper for setModelSelection that also persists
@@ -107,16 +124,12 @@ export function useAgentSession({
 
     const lastSessionId = getLastSelectedSession(persistenceKey);
     if (lastSessionId) {
-      logger.info('Restoring last selected session:', lastSessionId);
+      logger.debug('Restoring last selected session:', lastSessionId);
       setCurrentSessionId(lastSessionId);
       // Also restore model selection for this session
-      const persistedModel = getAgentModelForSession(lastSessionId);
-      if (persistedModel) {
-        logger.info('Restoring model selection:', persistedModel);
-        setModelSelectionState(persistedModel);
-      }
+      restoreModelForSession(lastSessionId);
     }
-  }, [persistenceKey, getLastSelectedSession, getAgentModelForSession]);
+  }, [persistenceKey, getLastSelectedSession, restoreModelForSession]);
 
   return {
     currentSessionId,

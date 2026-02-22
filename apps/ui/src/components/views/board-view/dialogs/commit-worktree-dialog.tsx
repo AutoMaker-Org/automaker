@@ -211,6 +211,8 @@ export function CommitWorktreeDialog({
 
   // Commit message model override
   const commitModelOverride = useModelOverride({ phase: 'commitMessageModel' });
+  const { effectiveModel: commitEffectiveModel, effectiveModelEntry: commitEffectiveModelEntry } =
+    commitModelOverride;
 
   // File selection state
   const [files, setFiles] = useState<FileStatus[]>([]);
@@ -547,9 +549,9 @@ export function CommitWorktreeDialog({
       const api = getHttpApiClient();
       const result = await api.worktree.generateCommitMessage(
         worktree.path,
-        commitModelOverride.effectiveModel,
-        commitModelOverride.effectiveModelEntry.thinkingLevel,
-        commitModelOverride.effectiveModelEntry.providerId
+        commitEffectiveModel,
+        commitEffectiveModelEntry?.thinkingLevel,
+        commitEffectiveModelEntry?.providerId
       );
 
       if (result.success && result.message) {
@@ -568,7 +570,7 @@ export function CommitWorktreeDialog({
     } finally {
       setIsGenerating(false);
     }
-  }, [worktree, commitModelOverride]);
+  }, [worktree, commitEffectiveModel, commitEffectiveModelEntry]);
 
   // Generate AI commit message when dialog opens (if enabled)
   useEffect(() => {
@@ -589,12 +591,12 @@ export function CommitWorktreeDialog({
 
   const allSelected = selectedFiles.size === files.length && files.length > 0;
 
-  // Prevent the dialog from being dismissed while a push is in progress.
+  // Prevent the dialog from being dismissed while a push or generation is in progress.
   // Overlay clicks and Escape key both route through onOpenChange(false); we
-  // intercept those here so the UI stays open until the push completes.
+  // intercept those here so the UI stays open until the operation completes.
   const handleOpenChange = (nextOpen: boolean) => {
-    if (!nextOpen && isPushing) {
-      // Ignore close requests during an active push.
+    if (!nextOpen && (isPushing || isGenerating)) {
+      // Ignore close requests during an active push or generation.
       return;
     }
     onOpenChange(nextOpen);

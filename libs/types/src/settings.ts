@@ -1191,6 +1191,8 @@ export interface GlobalSettings {
   // Session Tracking
   /** Maps project path -> last selected session ID in that project */
   lastSelectedSessionByProject: Record<string, string>;
+  /** Maps session ID -> persisted model selection for that session */
+  agentModelBySession?: Record<string, PhaseModelEntry>;
 
   // Worktree Selection Tracking
   /** Maps project path -> last selected worktree (path + branch) for restoring on PWA reload */

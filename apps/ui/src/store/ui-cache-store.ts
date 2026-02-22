@@ -82,6 +82,22 @@ export const useUICacheStore = create<UICacheState & UICacheActions>()(
 );
 
 /**
+ * Check whether an unknown value is a valid cached worktree entry.
+ * Accepts objects with a string branch and a path that is null or a string.
+ */
+function isValidCachedWorktreeEntry(
+  worktree: unknown
+): worktree is { path: string | null; branch: string } {
+  return (
+    typeof worktree === 'object' &&
+    worktree !== null &&
+    typeof (worktree as Record<string, unknown>).branch === 'string' &&
+    ((worktree as Record<string, unknown>).path === null ||
+      typeof (worktree as Record<string, unknown>).path === 'string')
+  );
+}
+
+/**
  * Sync critical UI state from the main app store to the UI cache.
  * Call this whenever the app store changes to keep the cache up to date.
  *
@@ -121,14 +137,7 @@ export function syncUICache(appState: {
     // This allows users to have their feature worktree selection persist across refreshes.
     const sanitized: Record<string, { path: string | null; branch: string }> = {};
     for (const [projectPath, worktree] of Object.entries(appState.currentWorktreeByProject)) {
-      if (
-        typeof worktree === 'object' &&
-        worktree !== null &&
-        'path' in worktree &&
-        'branch' in worktree &&
-        typeof worktree.branch === 'string' &&
-        (worktree.path === null || typeof worktree.path === 'string')
-      ) {
+      if (isValidCachedWorktreeEntry(worktree)) {
         sanitized[projectPath] = worktree;
       }
     }
@@ -190,14 +199,7 @@ export function restoreFromUICache(
     for (const [projectPath, worktree] of Object.entries(cache.cachedCurrentWorktreeByProject)) {
       // Validate structure only - keep both null (main) and non-null (worktree) paths
       // Runtime validation in use-worktrees.ts handles deleted worktrees gracefully
-      if (
-        typeof worktree === 'object' &&
-        worktree !== null &&
-        'path' in worktree &&
-        'branch' in worktree &&
-        typeof worktree.branch === 'string' &&
-        (worktree.path === null || typeof worktree.path === 'string')
-      ) {
+      if (isValidCachedWorktreeEntry(worktree)) {
         sanitized[projectPath] = worktree;
       }
     }

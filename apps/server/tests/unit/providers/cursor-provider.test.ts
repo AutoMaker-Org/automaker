@@ -20,5 +20,20 @@ describe('cursor-provider.ts', () => {
       expect(resumeIndex).toBeGreaterThan(-1);
       expect(args[resumeIndex + 1]).toBe('cursor-session-123');
     });
+
+    it('does not add --resume when sdkSessionId is omitted', () => {
+      const provider = Object.create(CursorProvider.prototype) as CursorProvider & {
+        cliPath?: string;
+      };
+      provider.cliPath = '/usr/local/bin/cursor-agent';
+
+      const args = provider.buildCliArgs({
+        prompt: 'Start a new task',
+        model: 'gpt-5',
+        cwd: '/tmp/project',
+      });
+
+      expect(args).not.toContain('--resume');
+    });
   });
 });

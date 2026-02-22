@@ -963,11 +963,15 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
       ),
     })),
   deleteChatSession: (sessionId) =>
-    set((state) => ({
-      chatSessions: state.chatSessions.filter((s) => s.id !== sessionId),
-      currentChatSession:
-        state.currentChatSession?.id === sessionId ? null : state.currentChatSession,
-    })),
+    set((state) => {
+      const { [sessionId]: _removed, ...remainingAgentModels } = state.agentModelBySession;
+      return {
+        chatSessions: state.chatSessions.filter((s) => s.id !== sessionId),
+        currentChatSession:
+          state.currentChatSession?.id === sessionId ? null : state.currentChatSession,
+        agentModelBySession: remainingAgentModels,
+      };
+    }),
   setChatHistoryOpen: (open) => set({ chatHistoryOpen: open }),
   toggleChatHistory: () => set((state) => ({ chatHistoryOpen: !state.chatHistoryOpen })),
 

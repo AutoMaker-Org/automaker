@@ -30,6 +30,7 @@ import {
   type CopilotRuntimeModel,
 } from '@automaker/types';
 import { createLogger, isAbortError } from '@automaker/utils';
+import { resolveModelString } from '@automaker/model-resolver';
 import { CopilotClient, type PermissionRequest } from '@github/copilot-sdk';
 import {
   normalizeTodos,
@@ -522,7 +523,7 @@ export class CopilotProvider extends CliProvider {
     }
 
     const promptText = this.extractPromptText(options);
-    const bareModel = options.model || DEFAULT_BARE_MODEL;
+    const bareModel = resolveModelString(options.model || DEFAULT_BARE_MODEL);
     const workingDirectory = options.cwd || process.cwd();
 
     logger.debug(

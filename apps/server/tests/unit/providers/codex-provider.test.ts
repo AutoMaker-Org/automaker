@@ -179,6 +179,8 @@ describe('codex-provider.ts', () => {
           model: 'gpt-5.2',
           cwd: '/tmp',
           sdkSessionId: 'codex-session-123',
+          outputFormat: { type: 'json_schema', schema: { type: 'object', properties: {} } },
+          codexSettings: { additionalDirs: ['/extra/dir'] },
         })
       );
 
@@ -187,6 +189,7 @@ describe('codex-provider.ts', () => {
       expect(call.args[1]).toBe('resume');
       expect(call.args).toContain('codex-session-123');
       expect(call.args).toContain('--json');
+      // Resume queries must not include --output-schema or --add-dir
       expect(call.args).not.toContain('--output-schema');
       expect(call.args).not.toContain('--add-dir');
     });

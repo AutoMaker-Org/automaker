@@ -9,7 +9,8 @@
  * The validation against actual worktrees happens in use-worktrees.ts
  * which resets to main branch if the selected worktree no longer exists.
  *
- * Only drops entries with invalid structure (not an object, missing path).
+ * Only drops entries with invalid structure (not an object, missing/invalid
+ * path or branch).
  */
 export function sanitizeWorktreeByProject(
   raw: Record<string, { path: string | null; branch: string }> | undefined
@@ -22,8 +23,6 @@ export function sanitizeWorktreeByProject(
     if (
       typeof worktree === 'object' &&
       worktree !== null &&
-      'path' in worktree &&
-      'branch' in worktree &&
       typeof worktree.branch === 'string' &&
       (worktree.path === null || typeof worktree.path === 'string')
     ) {

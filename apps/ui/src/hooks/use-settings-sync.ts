@@ -109,6 +109,7 @@ const SETTINGS_FIELDS_TO_SYNC = [
   'projectHistory',
   'projectHistoryIndex',
   'lastSelectedSessionByProject',
+  'agentModelBySession',
   'currentWorktreeByProject',
   // Codex CLI Settings
   'codexAutoLoadAgents',
@@ -806,6 +807,8 @@ export async function refreshSettingsFromServer(): Promise<boolean> {
       projectHistory: serverSettings.projectHistory,
       projectHistoryIndex: serverSettings.projectHistoryIndex,
       lastSelectedSessionByProject: serverSettings.lastSelectedSessionByProject,
+      agentModelBySession:
+        serverSettings.agentModelBySession ?? currentAppState.agentModelBySession,
       // Sanitize: only restore entries with path === null (main branch).
       // Non-null paths may reference deleted worktrees, causing crash loops.
       currentWorktreeByProject: sanitizeWorktreeByProject(

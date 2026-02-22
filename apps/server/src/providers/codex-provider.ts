@@ -798,8 +798,9 @@ export class CodexProvider extends BaseProvider {
       const schemaPath = isResumeQuery
         ? null
         : await writeOutputSchemaFile(options.cwd, options.outputFormat);
-      const imageBlocks = codexSettings.enableImages ? extractImageBlocks(options.prompt) : [];
-      const imagePaths = await writeImageFiles(options.cwd, imageBlocks);
+      const imageBlocks =
+        !isResumeQuery && codexSettings.enableImages ? extractImageBlocks(options.prompt) : [];
+      const imagePaths = isResumeQuery ? [] : await writeImageFiles(options.cwd, imageBlocks);
       const approvalPolicy =
         hasMcpServers && options.mcpAutoApproveTools !== undefined
           ? options.mcpAutoApproveTools
