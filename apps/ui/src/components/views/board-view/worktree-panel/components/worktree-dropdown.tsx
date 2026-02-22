@@ -138,6 +138,14 @@ export interface WorktreeDropdownProps {
   onRunTerminalScript?: (worktree: WorktreeInfo, command: string) => void;
   /** Callback to open the script editor UI */
   onEditScripts?: () => void;
+  /** Whether sync is in progress */
+  isSyncing?: boolean;
+  /** Sync (pull + push) callback */
+  onSync?: (worktree: WorktreeInfo) => void;
+  /** Sync with a specific remote */
+  onSyncWithRemote?: (worktree: WorktreeInfo, remote: string) => void;
+  /** Set tracking branch to a specific remote */
+  onSetTracking?: (worktree: WorktreeInfo, remote: string) => void;
 }
 
 /**
@@ -230,6 +238,10 @@ export function WorktreeDropdown({
   terminalScripts,
   onRunTerminalScript,
   onEditScripts,
+  isSyncing = false,
+  onSync,
+  onSyncWithRemote,
+  onSetTracking,
 }: WorktreeDropdownProps) {
   // Find the currently selected worktree to display in the trigger
   const selectedWorktree = worktrees.find((w) => isWorktreeSelected(w));
@@ -549,6 +561,10 @@ export function WorktreeDropdown({
           terminalScripts={terminalScripts}
           onRunTerminalScript={onRunTerminalScript}
           onEditScripts={onEditScripts}
+          isSyncing={isSyncing}
+          onSync={onSync}
+          onSyncWithRemote={onSyncWithRemote}
+          onSetTracking={onSetTracking}
         />
       )}
     </div>

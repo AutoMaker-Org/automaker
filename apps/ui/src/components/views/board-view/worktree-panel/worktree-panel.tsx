@@ -113,11 +113,14 @@ export function WorktreePanel({
   const {
     isPulling,
     isPushing,
+    isSyncing,
     isSwitching,
     isActivating,
     handleSwitchBranch,
     handlePull: _handlePull,
     handlePush,
+    handleSync,
+    handleSetTracking,
     handleOpenInIntegratedTerminal,
     handleRunTerminalScript,
     handleOpenInEditor,
@@ -828,6 +831,30 @@ export function WorktreePanel({
     [handlePush, fetchBranches, fetchWorktrees]
   );
 
+  // Handle sync (pull + push) with optional remote selection
+  const handleSyncWithRemoteSelection = useCallback(
+    (worktree: WorktreeInfo) => {
+      handleSync(worktree);
+    },
+    [handleSync]
+  );
+
+  // Handle sync with a specific remote selected from the submenu
+  const handleSyncWithSpecificRemote = useCallback(
+    (worktree: WorktreeInfo, remote: string) => {
+      handleSync(worktree, remote);
+    },
+    [handleSync]
+  );
+
+  // Handle set tracking branch for a specific remote
+  const handleSetTrackingForRemote = useCallback(
+    (worktree: WorktreeInfo, remote: string) => {
+      handleSetTracking(worktree, remote);
+    },
+    [handleSetTracking]
+  );
+
   // Handle confirming the push to remote dialog
   const handleConfirmPushToRemote = useCallback(
     async (worktree: WorktreeInfo, remote: string) => {
@@ -936,6 +963,10 @@ export function WorktreePanel({
             onPushNewBranch={handlePushNewBranch}
             onPullWithRemote={handlePullWithSpecificRemote}
             onPushWithRemote={handlePushWithSpecificRemote}
+            isSyncing={isSyncing}
+            onSync={handleSyncWithRemoteSelection}
+            onSyncWithRemote={handleSyncWithSpecificRemote}
+            onSetTracking={handleSetTrackingForRemote}
             onOpenInEditor={handleOpenInEditor}
             onOpenInIntegratedTerminal={handleOpenInIntegratedTerminal}
             onOpenInExternalTerminal={handleOpenInExternalTerminal}
@@ -1179,6 +1210,10 @@ export function WorktreePanel({
             onPushNewBranch={handlePushNewBranch}
             onPullWithRemote={handlePullWithSpecificRemote}
             onPushWithRemote={handlePushWithSpecificRemote}
+            isSyncing={isSyncing}
+            onSync={handleSyncWithRemoteSelection}
+            onSyncWithRemote={handleSyncWithSpecificRemote}
+            onSetTracking={handleSetTrackingForRemote}
             remotesCache={remotesCache}
             onOpenInEditor={handleOpenInEditor}
             onOpenInIntegratedTerminal={handleOpenInIntegratedTerminal}
@@ -1286,6 +1321,10 @@ export function WorktreePanel({
                 onPushNewBranch={handlePushNewBranch}
                 onPullWithRemote={handlePullWithSpecificRemote}
                 onPushWithRemote={handlePushWithSpecificRemote}
+                isSyncing={isSyncing}
+                onSync={handleSyncWithRemoteSelection}
+                onSyncWithRemote={handleSyncWithSpecificRemote}
+                onSetTracking={handleSetTrackingForRemote}
                 remotes={remotesCache[mainWorktree.path]}
                 onOpenInEditor={handleOpenInEditor}
                 onOpenInIntegratedTerminal={handleOpenInIntegratedTerminal}
@@ -1373,6 +1412,10 @@ export function WorktreePanel({
                       onPushNewBranch={handlePushNewBranch}
                       onPullWithRemote={handlePullWithSpecificRemote}
                       onPushWithRemote={handlePushWithSpecificRemote}
+                      isSyncing={isSyncing}
+                      onSync={handleSyncWithRemoteSelection}
+                      onSyncWithRemote={handleSyncWithSpecificRemote}
+                      onSetTracking={handleSetTrackingForRemote}
                       remotes={remotesCache[worktree.path]}
                       onOpenInEditor={handleOpenInEditor}
                       onOpenInIntegratedTerminal={handleOpenInIntegratedTerminal}

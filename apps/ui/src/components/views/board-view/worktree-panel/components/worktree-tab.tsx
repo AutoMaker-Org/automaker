@@ -108,6 +108,14 @@ interface WorktreeTabProps {
   onRunTerminalScript?: (worktree: WorktreeInfo, command: string) => void;
   /** Callback to open the script editor UI */
   onEditScripts?: () => void;
+  /** Whether sync is in progress */
+  isSyncing?: boolean;
+  /** Sync (pull + push) callback */
+  onSync?: (worktree: WorktreeInfo) => void;
+  /** Sync with a specific remote */
+  onSyncWithRemote?: (worktree: WorktreeInfo, remote: string) => void;
+  /** Set tracking branch to a specific remote */
+  onSetTracking?: (worktree: WorktreeInfo, remote: string) => void;
 }
 
 export function WorktreeTab({
@@ -181,6 +189,10 @@ export function WorktreeTab({
   terminalScripts,
   onRunTerminalScript,
   onEditScripts,
+  isSyncing = false,
+  onSync,
+  onSyncWithRemote,
+  onSetTracking,
 }: WorktreeTabProps) {
   // Make the worktree tab a drop target for feature cards
   const { setNodeRef, isOver } = useDroppable({
@@ -550,6 +562,10 @@ export function WorktreeTab({
         terminalScripts={terminalScripts}
         onRunTerminalScript={onRunTerminalScript}
         onEditScripts={onEditScripts}
+        isSyncing={isSyncing}
+        onSync={onSync}
+        onSyncWithRemote={onSyncWithRemote}
+        onSetTracking={onSetTracking}
       />
     </div>
   );

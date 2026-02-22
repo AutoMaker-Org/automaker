@@ -8,6 +8,8 @@ import {
   useSwitchBranch,
   usePullWorktree,
   usePushWorktree,
+  useSyncWorktree,
+  useSetTracking,
   useOpenInEditor,
 } from '@/hooks/mutations';
 import type { WorktreeInfo } from '../types';
@@ -51,6 +53,8 @@ export function useWorktreeActions(options?: UseWorktreeActionsOptions) {
   });
   const pullMutation = usePullWorktree();
   const pushMutation = usePushWorktree();
+  const syncMutation = useSyncWorktree();
+  const setTrackingMutation = useSetTracking();
   const openInEditorMutation = useOpenInEditor();
 
   /**
@@ -150,6 +154,28 @@ export function useWorktreeActions(options?: UseWorktreeActionsOptions) {
     [pushMutation]
   );
 
+  const handleSync = useCallback(
+    async (worktree: WorktreeInfo, remote?: string) => {
+      if (syncMutation.isPending) return;
+      syncMutation.mutate({
+        worktreePath: worktree.path,
+        remote,
+      });
+    },
+    [syncMutation]
+  );
+
+  const handleSetTracking = useCallback(
+    async (worktree: WorktreeInfo, remote: string) => {
+      if (setTrackingMutation.isPending) return;
+      setTrackingMutation.mutate({
+        worktreePath: worktree.path,
+        remote,
+      });
+    },
+    [setTrackingMutation]
+  );
+
   const handleOpenInIntegratedTerminal = useCallback(
     (worktree: WorktreeInfo, mode?: 'tab' | 'split') => {
       // Navigate to the terminal view with the worktree path and branch name
@@ -215,12 +241,15 @@ export function useWorktreeActions(options?: UseWorktreeActionsOptions) {
   return {
     isPulling: pullMutation.isPending,
     isPushing: pushMutation.isPending,
+    isSyncing: syncMutation.isPending,
     isSwitching: switchBranchMutation.isPending,
     isActivating,
     setIsActivating,
     handleSwitchBranch,
     handlePull,
     handlePush,
+    handleSync,
+    handleSetTracking,
     handleOpenInIntegratedTerminal,
     handleRunTerminalScript,
     handleOpenInEditor,

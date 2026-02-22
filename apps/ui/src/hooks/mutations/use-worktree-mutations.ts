@@ -198,6 +198,76 @@ export function usePullWorktree() {
 }
 
 /**
+ * Sync worktree branch (pull then push)
+ *
+ * @returns Mutation for syncing changes
+ */
+export function useSyncWorktree() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ worktreePath, remote }: { worktreePath: string; remote?: string }) => {
+      const api = getElectronAPI();
+      if (!api.worktree) throw new Error('Worktree API not available');
+      const result = await api.worktree.sync(worktreePath, remote);
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to sync');
+      }
+      return result.result;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['worktrees'] });
+      toast.success('Branch synced with remote');
+    },
+    onError: (error: Error) => {
+      toast.error('Failed to sync', {
+        description: error.message,
+      });
+    },
+  });
+}
+
+/**
+ * Set upstream tracking branch
+ *
+ * @returns Mutation for setting tracking branch
+ */
+export function useSetTracking() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      worktreePath,
+      remote,
+      branch,
+    }: {
+      worktreePath: string;
+      remote: string;
+      branch?: string;
+    }) => {
+      const api = getElectronAPI();
+      if (!api.worktree) throw new Error('Worktree API not available');
+      const result = await api.worktree.setTracking(worktreePath, remote, branch);
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to set tracking branch');
+      }
+      return result.result;
+    },
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ['worktrees'] });
+      toast.success('Tracking branch set', {
+        description: result?.message,
+      });
+    },
+    onError: (error: Error) => {
+      toast.error('Failed to set tracking branch', {
+        description: error.message,
+      });
+    },
+  });
+}
+
+/**
  * Create a pull request from a worktree
  *
  * @returns Mutation for creating a PR

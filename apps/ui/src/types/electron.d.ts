@@ -980,16 +980,59 @@ export interface WorktreeAPI {
   push: (
     worktreePath: string,
     force?: boolean,
-    remote?: string
+    remote?: string,
+    autoResolve?: boolean
   ) => Promise<{
     success: boolean;
     result?: {
       branch: string;
       pushed: boolean;
+      diverged?: boolean;
+      autoResolved?: boolean;
       message: string;
     };
     error?: string;
+    diverged?: boolean;
+    hasConflicts?: boolean;
+    conflictFiles?: string[];
     code?: 'NOT_GIT_REPO' | 'NO_COMMITS';
+  }>;
+
+  // Sync a worktree branch (pull then push)
+  sync: (
+    worktreePath: string,
+    remote?: string
+  ) => Promise<{
+    success: boolean;
+    result?: {
+      branch: string;
+      pulled: boolean;
+      pushed: boolean;
+      isFastForward?: boolean;
+      isMerge?: boolean;
+      autoResolved?: boolean;
+      message: string;
+    };
+    error?: string;
+    hasConflicts?: boolean;
+    conflictFiles?: string[];
+    conflictSource?: 'pull' | 'stash';
+  }>;
+
+  // Set the upstream tracking branch
+  setTracking: (
+    worktreePath: string,
+    remote: string,
+    branch?: string
+  ) => Promise<{
+    success: boolean;
+    result?: {
+      branch: string;
+      remote: string;
+      upstream: string;
+      message: string;
+    };
+    error?: string;
   }>;
 
   // Create a pull request from a worktree

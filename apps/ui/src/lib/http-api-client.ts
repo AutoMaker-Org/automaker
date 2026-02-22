@@ -2208,8 +2208,12 @@ export class HttpApiClient implements ElectronAPI {
       this.post('/api/worktree/generate-commit-message', { worktreePath }),
     generatePRDescription: (worktreePath: string, baseBranch?: string) =>
       this.post('/api/worktree/generate-pr-description', { worktreePath, baseBranch }),
-    push: (worktreePath: string, force?: boolean, remote?: string) =>
-      this.post('/api/worktree/push', { worktreePath, force, remote }),
+    push: (worktreePath: string, force?: boolean, remote?: string, autoResolve?: boolean) =>
+      this.post('/api/worktree/push', { worktreePath, force, remote, autoResolve }),
+    sync: (worktreePath: string, remote?: string) =>
+      this.post('/api/worktree/sync', { worktreePath, remote }),
+    setTracking: (worktreePath: string, remote: string, branch?: string) =>
+      this.post('/api/worktree/set-tracking', { worktreePath, remote, branch }),
     createPR: (worktreePath: string, options?: CreatePROptions) =>
       this.post('/api/worktree/create-pr', { worktreePath, ...options }),
     getDiffs: (projectPath: string, featureId: string) =>

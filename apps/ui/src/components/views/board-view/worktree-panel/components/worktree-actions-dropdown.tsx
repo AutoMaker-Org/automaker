@@ -14,6 +14,7 @@ import {
 import {
   Trash2,
   MoreHorizontal,
+  GitBranch,
   GitCommit,
   GitPullRequest,
   Download,
@@ -138,6 +139,14 @@ interface WorktreeActionsDropdownProps {
   onRunTerminalScript?: (worktree: WorktreeInfo, command: string) => void;
   /** Callback to open the script editor UI */
   onEditScripts?: () => void;
+  /** Whether sync is in progress */
+  isSyncing?: boolean;
+  /** Sync (pull + push) callback */
+  onSync?: (worktree: WorktreeInfo) => void;
+  /** Sync with a specific remote */
+  onSyncWithRemote?: (worktree: WorktreeInfo, remote: string) => void;
+  /** Set tracking branch to a specific remote */
+  onSetTracking?: (worktree: WorktreeInfo, remote: string) => void;
 }
 
 export function WorktreeActionsDropdown({
@@ -198,6 +207,10 @@ export function WorktreeActionsDropdown({
   terminalScripts,
   onRunTerminalScript,
   onEditScripts,
+  isSyncing = false,
+  onSync,
+  onSyncWithRemote,
+  onSetTracking,
 }: WorktreeActionsDropdownProps) {
   // Get available editors for the "Open In" submenu
   const { editors } = useAvailableEditors();
@@ -718,20 +731,56 @@ export function WorktreeActionsDropdown({
                   Pull from remote
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                {remotes.map((remote) => (
-                  <DropdownMenuItem
-                    key={remote.name}
-                    onClick={() => isGitOpsAvailable && onPullWithRemote(worktree, remote.name)}
-                    disabled={isPulling || !isGitOpsAvailable}
-                    className="text-xs"
-                  >
-                    <Download className="w-3.5 h-3.5 mr-2" />
-                    {remote.name}
-                    <span className="ml-auto text-[10px] text-muted-foreground max-w-[100px] truncate">
-                      {remote.url}
-                    </span>
-                  </DropdownMenuItem>
-                ))}
+                {remotes.map((remote) =>
+                  onSetTracking ? (
+                    <DropdownMenuSub key={remote.name}>
+                      <div className="flex items-center">
+                        <DropdownMenuItem
+                          onClick={() =>
+                            isGitOpsAvailable && onPullWithRemote(worktree, remote.name)
+                          }
+                          disabled={isPulling || !isGitOpsAvailable}
+                          className="text-xs flex-1 pr-0 rounded-r-none"
+                        >
+                          <Download className="w-3.5 h-3.5 mr-2" />
+                          {remote.name}
+                          {trackingRemote === remote.name && (
+                            <span className="ml-auto text-[10px] text-muted-foreground mr-1">
+                              tracking
+                            </span>
+                          )}
+                        </DropdownMenuItem>
+                        <DropdownMenuSubTrigger
+                          className="text-xs px-1 rounded-l-none border-l border-border/30 h-8"
+                          disabled={!isGitOpsAvailable}
+                        />
+                      </div>
+                      <DropdownMenuSubContent>
+                        <DropdownMenuItem
+                          onClick={() => isGitOpsAvailable && onSetTracking(worktree, remote.name)}
+                          disabled={!isGitOpsAvailable}
+                          className="text-xs"
+                        >
+                          <GitBranch className="w-3.5 h-3.5 mr-2" />
+                          Set as Tracking Branch
+                        </DropdownMenuItem>
+                      </DropdownMenuSubContent>
+                    </DropdownMenuSub>
+                  ) : (
+                    <DropdownMenuItem
+                      key={remote.name}
+                      onClick={() => isGitOpsAvailable && onPullWithRemote(worktree, remote.name)}
+                      disabled={isPulling || !isGitOpsAvailable}
+                      className="text-xs"
+                    >
+                      <Download className="w-3.5 h-3.5 mr-2" />
+                      {remote.name}
+                      <span className="ml-auto text-[10px] text-muted-foreground max-w-[100px] truncate">
+                        {remote.url}
+                      </span>
+                    </DropdownMenuItem>
+                  )
+                )}
               </DropdownMenuSubContent>
             </DropdownMenuSub>
           ) : (
@@ -817,20 +866,56 @@ export function WorktreeActionsDropdown({
                   Push to remote
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                {remotes.map((remote) => (
-                  <DropdownMenuItem
-                    key={remote.name}
-                    onClick={() => isGitOpsAvailable && onPushWithRemote(worktree, remote.name)}
-                    disabled={isPushing || !isGitOpsAvailable}
-                    className="text-xs"
-                  >
-                    <Upload className="w-3.5 h-3.5 mr-2" />
-                    {remote.name}
-                    <span className="ml-auto text-[10px] text-muted-foreground max-w-[100px] truncate">
-                      {remote.url}
-                    </span>
-                  </DropdownMenuItem>
-                ))}
+                {remotes.map((remote) =>
+                  onSetTracking ? (
+                    <DropdownMenuSub key={remote.name}>
+                      <div className="flex items-center">
+                        <DropdownMenuItem
+                          onClick={() =>
+                            isGitOpsAvailable && onPushWithRemote(worktree, remote.name)
+                          }
+                          disabled={isPushing || !isGitOpsAvailable}
+                          className="text-xs flex-1 pr-0 rounded-r-none"
+                        >
+                          <Upload className="w-3.5 h-3.5 mr-2" />
+                          {remote.name}
+                          {trackingRemote === remote.name && (
+                            <span className="ml-auto text-[10px] text-muted-foreground mr-1">
+                              tracking
+                            </span>
+                          )}
+                        </DropdownMenuItem>
+                        <DropdownMenuSubTrigger
+                          className="text-xs px-1 rounded-l-none border-l border-border/30 h-8"
+                          disabled={!isGitOpsAvailable}
+                        />
+                      </div>
+                      <DropdownMenuSubContent>
+                        <DropdownMenuItem
+                          onClick={() => isGitOpsAvailable && onSetTracking(worktree, remote.name)}
+                          disabled={!isGitOpsAvailable}
+                          className="text-xs"
+                        >
+                          <GitBranch className="w-3.5 h-3.5 mr-2" />
+                          Set as Tracking Branch
+                        </DropdownMenuItem>
+                      </DropdownMenuSubContent>
+                    </DropdownMenuSub>
+                  ) : (
+                    <DropdownMenuItem
+                      key={remote.name}
+                      onClick={() => isGitOpsAvailable && onPushWithRemote(worktree, remote.name)}
+                      disabled={isPushing || !isGitOpsAvailable}
+                      className="text-xs"
+                    >
+                      <Upload className="w-3.5 h-3.5 mr-2" />
+                      {remote.name}
+                      <span className="ml-auto text-[10px] text-muted-foreground max-w-[100px] truncate">
+                        {remote.url}
+                      </span>
+                    </DropdownMenuItem>
+                  )
+                )}
               </DropdownMenuSubContent>
             </DropdownMenuSub>
           ) : (
@@ -876,6 +961,72 @@ export function WorktreeActionsDropdown({
             </DropdownMenuItem>
           )}
         </TooltipWrapper>
+        {onSync && (
+          <TooltipWrapper
+            showTooltip={!!gitOpsDisabledReason}
+            tooltipContent={gitOpsDisabledReason}
+          >
+            {remotes && remotes.length > 1 && onSyncWithRemote ? (
+              <DropdownMenuSub>
+                <div className="flex items-center">
+                  <DropdownMenuItem
+                    onClick={() => isGitOpsAvailable && onSync(worktree)}
+                    disabled={isSyncing || !isGitOpsAvailable}
+                    className={cn(
+                      'text-xs flex-1 pr-0 rounded-r-none',
+                      !isGitOpsAvailable && 'opacity-50 cursor-not-allowed'
+                    )}
+                  >
+                    <RefreshCw className={cn('w-3.5 h-3.5 mr-2', isSyncing && 'animate-spin')} />
+                    {isSyncing ? 'Syncing...' : 'Sync'}
+                    {!isGitOpsAvailable && (
+                      <AlertCircle className="w-3 h-3 ml-auto text-muted-foreground" />
+                    )}
+                  </DropdownMenuItem>
+                  <DropdownMenuSubTrigger
+                    className={cn(
+                      'text-xs px-1 rounded-l-none border-l border-border/30 h-8',
+                      (!isGitOpsAvailable || isSyncing) && 'opacity-50 cursor-not-allowed'
+                    )}
+                    disabled={!isGitOpsAvailable || isSyncing}
+                  />
+                </div>
+                <DropdownMenuSubContent>
+                  <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">
+                    Sync with remote
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  {remotes.map((remote) => (
+                    <DropdownMenuItem
+                      key={`sync-${remote.name}`}
+                      onClick={() => isGitOpsAvailable && onSyncWithRemote(worktree, remote.name)}
+                      disabled={isSyncing || !isGitOpsAvailable}
+                      className="text-xs"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5 mr-2" />
+                      {remote.name}
+                      <span className="ml-auto text-[10px] text-muted-foreground max-w-[100px] truncate">
+                        {remote.url}
+                      </span>
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
+            ) : (
+              <DropdownMenuItem
+                onClick={() => isGitOpsAvailable && onSync(worktree)}
+                disabled={isSyncing || !isGitOpsAvailable}
+                className={cn('text-xs', !isGitOpsAvailable && 'opacity-50 cursor-not-allowed')}
+              >
+                <RefreshCw className={cn('w-3.5 h-3.5 mr-2', isSyncing && 'animate-spin')} />
+                {isSyncing ? 'Syncing...' : 'Sync'}
+                {!isGitOpsAvailable && (
+                  <AlertCircle className="w-3 h-3 ml-auto text-muted-foreground" />
+                )}
+              </DropdownMenuItem>
+            )}
+          </TooltipWrapper>
+        )}
         <TooltipWrapper showTooltip={!!gitOpsDisabledReason} tooltipContent={gitOpsDisabledReason}>
           <DropdownMenuItem
             onClick={() => isGitOpsAvailable && onResolveConflicts(worktree)}
