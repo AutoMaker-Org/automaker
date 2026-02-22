@@ -1373,6 +1373,10 @@ export function WorktreePanel({
             onSetTracking={handleSetTrackingForRemote}
             remotesWithBranch={remotesWithBranch}
             remotes={remotesCache[mainWorktree.path]}
+            isSyncing={isSyncing}
+            onSync={handleSyncWithRemoteSelection}
+            onSyncWithRemote={handleSyncWithSpecificRemote}
+            onSetTracking={handleSetTrackingForRemote}
             onOpenInEditor={handleOpenInEditor}
             onOpenInIntegratedTerminal={handleOpenInIntegratedTerminal}
             onOpenInExternalTerminal={handleOpenInExternalTerminal}
@@ -1494,6 +1498,10 @@ export function WorktreePanel({
               slotIndex={slotIndex >= 0 ? slotIndex : undefined}
               onSwapWorktree={slotIndex >= 0 ? handleSwapWorktreeSlot : undefined}
               pinnedBranches={pinnedWorktrees.map((w) => w.branch)}
+              isSyncing={isSyncing}
+              onSync={handleSyncWithRemoteSelection}
+              onSyncWithRemote={handleSyncWithSpecificRemote}
+              onSetTracking={handleSetTrackingForRemote}
             />
           );
         })

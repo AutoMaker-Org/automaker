@@ -159,6 +159,85 @@ interface WorktreeActionsDropdownProps {
   onSwapWorktree?: (slotIndex: number, newBranch: string) => void;
   /** List of currently pinned branch names (to show which are pinned in the swap dropdown) */
   pinnedBranches?: string[];
+  /** Whether sync is in progress */
+  isSyncing?: boolean;
+  /** Sync (pull + push) callback */
+  onSync?: (worktree: WorktreeInfo) => void;
+  /** Sync with a specific remote */
+  onSyncWithRemote?: (worktree: WorktreeInfo, remote: string) => void;
+  /** Set tracking branch to a specific remote */
+  onSetTracking?: (worktree: WorktreeInfo, remote: string) => void;
+}
+
+/**
+ * A remote item that either renders as a split-button with "Set as Tracking Branch"
+ * sub-action, or a plain menu item if onSetTracking is not provided.
+ */
+function RemoteActionMenuItem({
+  remote,
+  icon: Icon,
+  trackingRemote,
+  isDisabled,
+  isGitOpsAvailable,
+  onAction,
+  onSetTracking,
+}: {
+  remote: { name: string; url: string };
+  icon: typeof Download;
+  trackingRemote?: string;
+  isDisabled: boolean;
+  isGitOpsAvailable: boolean;
+  onAction: () => void;
+  onSetTracking?: () => void;
+}) {
+  if (onSetTracking) {
+    return (
+      <DropdownMenuSub key={remote.name}>
+        <div className="flex items-center">
+          <DropdownMenuItem
+            onClick={onAction}
+            disabled={isDisabled || !isGitOpsAvailable}
+            className="text-xs flex-1 pr-0 rounded-r-none"
+          >
+            <Icon className="w-3.5 h-3.5 mr-2" />
+            {remote.name}
+            {trackingRemote === remote.name && (
+              <span className="ml-auto text-[10px] text-muted-foreground mr-1">tracking</span>
+            )}
+          </DropdownMenuItem>
+          <DropdownMenuSubTrigger
+            className="text-xs px-1 rounded-l-none border-l border-border/30 h-8"
+            disabled={!isGitOpsAvailable}
+          />
+        </div>
+        <DropdownMenuSubContent>
+          <DropdownMenuItem
+            onClick={onSetTracking}
+            disabled={!isGitOpsAvailable}
+            className="text-xs"
+          >
+            <GitBranch className="w-3.5 h-3.5 mr-2" />
+            Set as Tracking Branch
+          </DropdownMenuItem>
+        </DropdownMenuSubContent>
+      </DropdownMenuSub>
+    );
+  }
+
+  return (
+    <DropdownMenuItem
+      key={remote.name}
+      onClick={onAction}
+      disabled={isDisabled || !isGitOpsAvailable}
+      className="text-xs"
+    >
+      <Icon className="w-3.5 h-3.5 mr-2" />
+      {remote.name}
+      <span className="ml-auto text-[10px] text-muted-foreground max-w-[100px] truncate">
+        {remote.url}
+      </span>
+    </DropdownMenuItem>
+  );
 }
 
 /**
@@ -301,6 +380,10 @@ export function WorktreeActionsDropdown({
   slotIndex,
   onSwapWorktree,
   pinnedBranches,
+  isSyncing = false,
+  onSync,
+  onSyncWithRemote,
+  onSetTracking,
 }: WorktreeActionsDropdownProps) {
   // Get available editors for the "Open In" submenu
   const { editors } = useAvailableEditors();
