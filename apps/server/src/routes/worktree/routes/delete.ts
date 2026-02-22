@@ -5,6 +5,7 @@
 import type { Request, Response } from 'express';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import fs from 'fs/promises';
 import { isGitRepo } from '@automaker/git-utils';
 import { getErrorMessage, logError, isValidBranchName } from '../common.js';
 import { execGitCommand } from '../../../lib/git.js';
@@ -46,15 +47,45 @@ export function createDeleteHandler() {
         });
         branchName = stdout.trim();
       } catch {
-        // Could not get branch name
+        // Could not get branch name - worktree directory may already be gone
+        logger.debug('Could not determine branch for worktree, directory may be missing');
       }
 
       // Remove the worktree (using array arguments to prevent injection)
+      let removeSucceeded = false;
       try {
         await execGitCommand(['worktree', 'remove', worktreePath, '--force'], projectPath);
-      } catch {
-        // Try with prune if remove fails
-        await execGitCommand(['worktree', 'prune'], projectPath);
+        removeSucceeded = true;
+      } catch (removeError) {
+        // `git worktree remove` can fail if the directory is already missing
+        // or in a bad state. Try pruning stale worktree entries as a fallback.
+        logger.debug('git worktree remove failed, trying prune', {
+          error: getErrorMessage(removeError),
+        });
+        try {
+          await execGitCommand(['worktree', 'prune'], projectPath);
+          removeSucceeded = true;
+        } catch (pruneError) {
+          logger.warn('git worktree prune also failed', {
+            error: getErrorMessage(pruneError),
+          });
+          // If both remove and prune fail, still try to return success
+          // if the worktree directory no longer exists (it may have been
+          // manually deleted already).
+          let dirExists = false;
+          try {
+            await fs.access(worktreePath);
+            dirExists = true;
+          } catch {
+            // Directory doesn't exist
+          }
+          if (dirExists) {
+            // Directory still exists - this is a real failure
+            throw removeError;
+          }
+          // Directory is gone, treat as success
+          removeSucceeded = true;
+        }
       }
 
       // Optionally delete the branch

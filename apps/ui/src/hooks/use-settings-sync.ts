@@ -39,6 +39,29 @@ import {
 
 const logger = createLogger('SettingsSync');
 
+/**
+ * Drop currentWorktreeByProject entries with non-null paths.
+ * Non-null paths reference worktree directories that may have been deleted,
+ * and restoring them causes crash loops.
+ */
+function sanitizeWorktreeByProject(
+  raw: Record<string, { path: string | null; branch: string }> | undefined
+): Record<string, { path: string | null; branch: string }> {
+  if (!raw) return {};
+  const sanitized: Record<string, { path: string | null; branch: string }> = {};
+  for (const [projectPath, worktree] of Object.entries(raw)) {
+    if (
+      typeof worktree === 'object' &&
+      worktree !== null &&
+      'path' in worktree &&
+      worktree.path === null
+    ) {
+      sanitized[projectPath] = worktree;
+    }
+  }
+  return sanitized;
+}
+
 // Debounce delay for syncing settings to server (ms)
 const SYNC_DEBOUNCE_MS = 1000;
 
@@ -584,6 +607,15 @@ export async function forceSyncSettingsToServer(): Promise<boolean> {
       updates[field] = setupState[field as keyof typeof setupState];
     }
 
+    // Update localStorage cache immediately so a page reload before the
+    // server response arrives still sees the latest state (e.g. after
+    // deleting a worktree, the stale worktree path won't survive in cache).
+    try {
+      setItem('automaker-settings-cache', JSON.stringify(updates));
+    } catch (storageError) {
+      logger.warn('Failed to update localStorage cache during force sync:', storageError);
+    }
+
     const result = await api.settings.updateGlobal(updates);
     return result.success;
   } catch (error) {
@@ -796,8 +828,11 @@ export async function refreshSettingsFromServer(): Promise<boolean> {
       projectHistory: serverSettings.projectHistory,
       projectHistoryIndex: serverSettings.projectHistoryIndex,
       lastSelectedSessionByProject: serverSettings.lastSelectedSessionByProject,
-      currentWorktreeByProject:
-        serverSettings.currentWorktreeByProject ?? currentAppState.currentWorktreeByProject,
+      // Sanitize: only restore entries with path === null (main branch).
+      // Non-null paths may reference deleted worktrees, causing crash loops.
+      currentWorktreeByProject: sanitizeWorktreeByProject(
+        serverSettings.currentWorktreeByProject ?? currentAppState.currentWorktreeByProject
+      ),
       // UI State (previously in localStorage)
       worktreePanelCollapsed: serverSettings.worktreePanelCollapsed ?? false,
       lastProjectDir: serverSettings.lastProjectDir ?? '',

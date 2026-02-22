@@ -99,6 +99,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/query-keys';
 import { useAutoModeQueryInvalidation } from '@/hooks/use-query-invalidation';
 import { useUpdateGlobalSettings } from '@/hooks/mutations/use-settings-mutations';
+import { forceSyncSettingsToServer } from '@/hooks/use-settings-sync';
 
 // Stable empty array to avoid infinite loop in selector
 const EMPTY_WORKTREES: ReturnType<ReturnType<typeof useAppStore.getState>['getWorktrees']> = [];
@@ -114,6 +115,7 @@ export function BoardView() {
     pendingPlanApproval,
     setPendingPlanApproval,
     updateFeature,
+    batchUpdateFeatures,
     getCurrentWorktree,
     setCurrentWorktree,
     getWorktrees,
@@ -132,6 +134,7 @@ export function BoardView() {
       pendingPlanApproval: state.pendingPlanApproval,
       setPendingPlanApproval: state.setPendingPlanApproval,
       updateFeature: state.updateFeature,
+      batchUpdateFeatures: state.batchUpdateFeatures,
       getCurrentWorktree: state.getCurrentWorktree,
       setCurrentWorktree: state.setCurrentWorktree,
       getWorktrees: state.getWorktrees,
@@ -414,22 +417,23 @@ export function BoardView() {
   // Memoize the removed worktrees handler to prevent infinite loops
   const handleRemovedWorktrees = useCallback(
     (removedWorktrees: Array<{ path: string; branch: string }>) => {
-      // Reset features that were assigned to the removed worktrees (by branch)
-      hookFeatures.forEach((feature) => {
-        const matchesRemovedWorktree = removedWorktrees.some((removed) => {
-          // Match by branch name since worktreePath is no longer stored
-          return feature.branchName === removed.branch;
-        });
+      // Collect affected feature IDs, then batch-update once to avoid N individual
+      // store mutations that can cascade into React error #185.
+      const removedBranches = new Set(removedWorktrees.map((r) => r.branch));
+      const affectedIds = hookFeatures
+        .filter((f) => f.branchName && removedBranches.has(f.branchName))
+        .map((f) => f.id);
 
-        if (matchesRemovedWorktree) {
-          // Reset the feature's branch assignment - update both local state and persist
-          const updates = { branchName: null as unknown as string | undefined };
-          updateFeature(feature.id, updates);
-          persistFeatureUpdate(feature.id, updates);
-        }
-      });
+      if (affectedIds.length === 0) return;
+
+      const updates = { branchName: null as unknown as string | undefined };
+      batchUpdateFeatures(affectedIds, updates);
+      // Persist each update to the server (async, non-blocking)
+      for (const id of affectedIds) {
+        persistFeatureUpdate(id, updates);
+      }
     },
-    [hookFeatures, updateFeature, persistFeatureUpdate]
+    [hookFeatures, batchUpdateFeatures, persistFeatureUpdate]
   );
 
   // Get current worktree info (path) for filtering features
@@ -1603,17 +1607,17 @@ export function BoardView() {
             onStashPopConflict={handleStashPopConflict}
             onStashApplyConflict={handleStashApplyConflict}
             onBranchDeletedDuringMerge={(branchName) => {
-              // Reset features that were assigned to the deleted branch (same logic as onDeleted in DeleteWorktreeDialog)
-              hookFeatures.forEach((feature) => {
-                if (feature.branchName === branchName) {
-                  // Reset the feature's branch assignment - update both local state and persist
-                  const updates = {
-                    branchName: null as unknown as string | undefined,
-                  };
-                  updateFeature(feature.id, updates);
-                  persistFeatureUpdate(feature.id, updates);
+              // Batch-reset features assigned to the deleted branch in one store mutation
+              const affectedIds = hookFeatures
+                .filter((f) => f.branchName === branchName)
+                .map((f) => f.id);
+              if (affectedIds.length > 0) {
+                const updates = { branchName: null as unknown as string | undefined };
+                batchUpdateFeatures(affectedIds, updates);
+                for (const id of affectedIds) {
+                  persistFeatureUpdate(id, updates);
                 }
-              });
+              }
               setWorktreeRefreshKey((k) => k + 1);
             }}
             onRemovedWorktrees={handleRemovedWorktrees}
@@ -1990,31 +1994,79 @@ export function BoardView() {
         }
         defaultDeleteBranch={getDefaultDeleteBranch(currentProject.path)}
         onDeleted={(deletedWorktree, _deletedBranch) => {
-          // If the deleted worktree was currently selected, immediately reset to main
-          // to prevent the UI from trying to render a non-existent worktree view
-          if (
-            currentWorktreePath !== null &&
-            pathsEqual(currentWorktreePath, deletedWorktree.path)
-          ) {
-            const mainBranch = worktrees.find((w) => w.isMain)?.branch || 'main';
-            setCurrentWorktree(currentProject.path, null, mainBranch);
+          // 1. Reset current worktree to main FIRST. This must happen
+          //    BEFORE removing from the list to ensure downstream hooks
+          //    (useAutoMode, useBoardFeatures) see a valid worktree and
+          //    never try to render the deleted worktree.
+          const mainBranch = worktrees.find((w) => w.isMain)?.branch || 'main';
+          setCurrentWorktree(currentProject.path, null, mainBranch);
+
+          // 2. Immediately remove the deleted worktree from the store's
+          //    worktree list so the UI never renders a stale tab/dropdown
+          //    item that can be clicked and cause a crash.
+          const remainingWorktrees = worktrees.filter(
+            (w) => !pathsEqual(w.path, deletedWorktree.path)
+          );
+          setWorktrees(currentProject.path, remainingWorktrees);
+
+          // 3. Cancel any in-flight worktree queries, then optimistically
+          //    update the React Query cache so the worktree disappears
+          //    from the dropdown immediately. Cancelling first prevents a
+          //    pending refetch from overwriting our optimistic update with
+          //    stale server data.
+          const worktreeQueryKey = queryKeys.worktrees.all(currentProject.path);
+          void queryClient.cancelQueries({ queryKey: worktreeQueryKey });
+          queryClient.setQueryData(
+            worktreeQueryKey,
+            (
+              old:
+                | {
+                    worktrees: WorktreeInfo[];
+                    removedWorktrees: Array<{ path: string; branch: string }>;
+                  }
+                | undefined
+            ) => {
+              if (!old) return old;
+              return {
+                ...old,
+                worktrees: old.worktrees.filter(
+                  (w: WorktreeInfo) => !pathsEqual(w.path, deletedWorktree.path)
+                ),
+              };
+            }
+          );
+
+          // 4. Batch-reset features assigned to the deleted worktree in one
+          //    store mutation to avoid N individual updateFeature calls that
+          //    cascade into React error #185.
+          const affectedIds = hookFeatures
+            .filter((f) => f.branchName === deletedWorktree.branch)
+            .map((f) => f.id);
+          if (affectedIds.length > 0) {
+            const updates = { branchName: null as unknown as string | undefined };
+            batchUpdateFeatures(affectedIds, updates);
+            for (const id of affectedIds) {
+              persistFeatureUpdate(id, updates);
+            }
           }
 
-          // Reset features that were assigned to the deleted worktree (by branch)
-          hookFeatures.forEach((feature) => {
-            // Match by branch name since worktreePath is no longer stored
-            if (feature.branchName === deletedWorktree.branch) {
-              // Reset the feature's branch assignment - update both local state and persist
-              const updates = {
-                branchName: null as unknown as string | undefined,
-              };
-              updateFeature(feature.id, updates);
-              persistFeatureUpdate(feature.id, updates);
-            }
-          });
-
-          setWorktreeRefreshKey((k) => k + 1);
+          // 5. Do NOT trigger setWorktreeRefreshKey here. The optimistic
+          //    cache update (step 3) already removed the worktree from
+          //    both the Zustand store and React Query cache. Incrementing
+          //    the refresh key would cause invalidateQueries → server
+          //    refetch, and if the server's .worktrees/ directory scan
+          //    finds remnants of the deleted worktree, it would re-add
+          //    it to the dropdown. The 30-second polling interval in
+          //    WorktreePanel will eventually reconcile with the server.
           setSelectedWorktreeForAction(null);
+
+          // 6. Force-sync settings immediately so the reset worktree
+          //    selection is persisted before any potential page reload.
+          //    Without this, the debounced sync (1s) may not complete
+          //    in time and the stale worktree path survives in
+          //    server settings, causing the deleted worktree to
+          //    reappear on next load.
+          void forceSyncSettingsToServer();
         }}
       />
 

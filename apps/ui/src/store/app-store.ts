@@ -878,6 +878,13 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
     set((state) => ({
       features: state.features.map((f) => (f.id === id ? { ...f, ...updates } : f)),
     })),
+  batchUpdateFeatures: (ids, updates) => {
+    if (ids.length === 0) return;
+    const idSet = new Set(ids);
+    set((state) => ({
+      features: state.features.map((f) => (idSet.has(f.id) ? { ...f, ...updates } : f)),
+    }));
+  },
   addFeature: (feature) => {
     const id = feature.id ?? `feature-${Date.now()}-${Math.random().toString(36).slice(2)}`;
     const newFeature = { ...feature, id } as Feature;

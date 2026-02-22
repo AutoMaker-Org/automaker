@@ -592,6 +592,7 @@ type CodexCliSettings = {
   enableImages: boolean;
   additionalDirs: string[];
   threadId?: string;
+  cliTimeoutMs?: number;
 };
 
 function getCodexSettingsDir(): string {
@@ -610,6 +611,7 @@ async function loadCodexCliSettings(
     enableImages: true,
     additionalDirs: [],
     threadId: undefined,
+    cliTimeoutMs: undefined,
   };
 
   try {

@@ -624,6 +624,30 @@ export function useSettingsMigration(): MigrationState {
 }
 
 /**
+ * Sanitize currentWorktreeByProject: keep only entries with path === null.
+ * Non-null paths reference worktree directories on disk that may have been
+ * deleted. Restoring a stale path causes a crash loop (board renders invalid
+ * worktree → error boundary reloads → restores same stale path).
+ */
+function sanitizeWorktreeByProject(
+  raw: Record<string, { path: string | null; branch: string }> | undefined
+): Record<string, { path: string | null; branch: string }> {
+  if (!raw) return {};
+  const sanitized: Record<string, { path: string | null; branch: string }> = {};
+  for (const [projectPath, worktree] of Object.entries(raw)) {
+    if (
+      typeof worktree === 'object' &&
+      worktree !== null &&
+      'path' in worktree &&
+      worktree.path === null
+    ) {
+      sanitized[projectPath] = worktree;
+    }
+  }
+  return sanitized;
+}
+
+/**
  * Hydrate the Zustand store from settings object
  */
 export function hydrateStoreFromSettings(settings: GlobalSettings): void {
@@ -785,7 +809,14 @@ export function hydrateStoreFromSettings(settings: GlobalSettings): void {
     projectHistory: settings.projectHistory ?? [],
     projectHistoryIndex: settings.projectHistoryIndex ?? -1,
     lastSelectedSessionByProject: settings.lastSelectedSessionByProject ?? {},
-    currentWorktreeByProject: settings.currentWorktreeByProject ?? {},
+    // Sanitize currentWorktreeByProject: only restore entries where path is null
+    // (main branch). Non-null paths point to worktree directories that may have
+    // been deleted while the app was closed. Restoring a stale path causes the
+    // board to render an invalid worktree selection, triggering a crash loop
+    // (error boundary reloads → restores same bad path → crash again).
+    // The use-worktrees validation effect will re-discover valid worktrees
+    // from the server once they load.
+    currentWorktreeByProject: sanitizeWorktreeByProject(settings.currentWorktreeByProject),
     // UI State
     worktreePanelCollapsed: settings.worktreePanelCollapsed ?? false,
     lastProjectDir: settings.lastProjectDir ?? '',
