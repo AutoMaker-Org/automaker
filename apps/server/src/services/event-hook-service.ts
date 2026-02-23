@@ -135,6 +135,18 @@ function isFeatureStatusChangedPayload(
 }
 
 /**
+ * Feature completed event payload structure
+ */
+interface FeatureCompletedPayload {
+  featureId: string;
+  featureName?: string;
+  projectPath: string;
+  passes?: boolean;
+  message?: string;
+  executionMode?: 'auto' | 'manual';
+}
+
+/**
  * Event Hook Service
  *
  * Manages execution of user-configured event hooks in response to system events.
