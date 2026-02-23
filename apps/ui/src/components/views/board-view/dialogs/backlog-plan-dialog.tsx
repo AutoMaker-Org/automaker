@@ -29,7 +29,10 @@ import { useAppStore } from '@/store/app-store';
 /**
  * Normalize PhaseModelEntry or string to PhaseModelEntry
  */
-function normalizeEntry(entry: PhaseModelEntry | string): PhaseModelEntry {
+function normalizeEntry(entry: PhaseModelEntry | string | undefined | null): PhaseModelEntry {
+  if (!entry) {
+    return { model: 'claude-sonnet' as ModelAlias };
+  }
   if (typeof entry === 'string') {
     return { model: entry as ModelAlias | CursorModelId };
   }
@@ -110,7 +113,12 @@ export function BacklogPlanDialog({
     // Use model override if set, otherwise use global default (extract model string from PhaseModelEntry)
     const effectiveModelEntry = modelOverride || normalizeEntry(phaseModels.backlogPlanningModel);
     const effectiveModel = effectiveModelEntry.model;
-    const result = await api.backlogPlan.generate(projectPath, prompt, effectiveModel);
+    const result = await api.backlogPlan.generate(
+      projectPath,
+      prompt,
+      effectiveModel,
+      currentBranch
+    );
     if (!result.success) {
       logger.error('Backlog plan generation failed to start', {
         error: result.error,
@@ -131,7 +139,15 @@ export function BacklogPlanDialog({
     });
     setPrompt('');
     onClose();
-  }, [projectPath, prompt, modelOverride, phaseModels, setIsGeneratingPlan, onClose]);
+  }, [
+    projectPath,
+    prompt,
+    modelOverride,
+    phaseModels,
+    setIsGeneratingPlan,
+    onClose,
+    currentBranch,
+  ]);
 
   const handleApply = useCallback(async () => {
     if (!pendingPlanResult) return;

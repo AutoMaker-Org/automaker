@@ -114,9 +114,20 @@ export function mapBacklogPlanError(rawMessage: string): string {
     return 'Claude CLI could not be launched. Make sure the Claude CLI is installed and available in PATH, or check that Node.js is correctly installed. Try running "which claude" or "claude --version" in your terminal to verify.';
   }
 
-  // Claude Code process crash
+  // Claude Code process crash - extract exit code for diagnostics
   if (rawMessage.includes('Claude Code process exited')) {
-    return 'Claude exited unexpectedly. Try again. If it keeps happening, re-run `claude login` or update your API key in Setup.';
+    const exitCodeMatch = rawMessage.match(/exited with code (\d+)/);
+    const exitCode = exitCodeMatch ? exitCodeMatch[1] : 'unknown';
+    logger.error(`[BacklogPlan] Claude process exit code: ${exitCode}`);
+    return `Claude exited unexpectedly (exit code: ${exitCode}). This is usually a transient issue. Try again. If it keeps happening, re-run \`claude login\` or update your API key in Setup.`;
+  }
+
+  // Claude Code process killed by signal
+  if (rawMessage.includes('Claude Code process terminated by signal')) {
+    const signalMatch = rawMessage.match(/terminated by signal (\w+)/);
+    const signal = signalMatch ? signalMatch[1] : 'unknown';
+    logger.error(`[BacklogPlan] Claude process terminated by signal: ${signal}`);
+    return `Claude was terminated by signal ${signal}. This may indicate a resource issue. Try again.`;
   }
 
   // Rate limiting

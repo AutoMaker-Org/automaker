@@ -17,6 +17,7 @@ import {
   Code2,
   Webhook,
   FileCode2,
+  FileText,
 } from 'lucide-react';
 import {
   AnthropicIcon,
@@ -49,6 +50,7 @@ export const GLOBAL_NAV_GROUPS: NavigationGroup[] = [
       { id: 'model-defaults', label: 'Model Defaults', icon: Workflow },
       { id: 'worktrees', label: 'Worktrees', icon: GitBranch },
       { id: 'prompts', label: 'Prompt Customization', icon: MessageSquareText },
+      { id: 'templates', label: 'Templates', icon: FileText },
       { id: 'api-keys', label: 'API Keys', icon: Key },
       {
         id: 'providers',

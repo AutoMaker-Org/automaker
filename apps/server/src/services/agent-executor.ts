@@ -128,6 +128,7 @@ export class AgentExecutor {
           ? (mcpServers as Record<string, { command: string }>)
           : undefined,
       thinkingLevel: options.thinkingLevel,
+      reasoningEffort: options.reasoningEffort,
       credentials,
       claudeCompatibleProvider,
       sdkSessionId,
@@ -703,6 +704,7 @@ export class AgentExecutor {
       allowedTools: o.sdkOptions?.allowedTools as string[] | undefined,
       abortController: o.abortController,
       thinkingLevel: o.thinkingLevel,
+      reasoningEffort: o.reasoningEffort,
       mcpServers:
         o.mcpServers && Object.keys(o.mcpServers).length > 0
           ? (o.mcpServers as Record<string, { command: string }>)

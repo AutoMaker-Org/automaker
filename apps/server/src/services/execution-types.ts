@@ -5,7 +5,7 @@
  * allowing the service to delegate to other services without circular dependencies.
  */
 
-import type { Feature, PlanningMode, ThinkingLevel } from '@automaker/types';
+import type { Feature, PlanningMode, ThinkingLevel, ReasoningEffort } from '@automaker/types';
 import type { loadContextFiles } from '@automaker/utils';
 import type { PipelineContext } from './pipeline-orchestrator.js';
 
@@ -31,7 +31,9 @@ export type RunAgentFn = (
     previousContent?: string;
     systemPrompt?: string;
     autoLoadClaudeMd?: boolean;
+    useClaudeCodeSystemPrompt?: boolean;
     thinkingLevel?: ThinkingLevel;
+    reasoningEffort?: ReasoningEffort;
     branchName?: string | null;
   }
 ) => Promise<void>;

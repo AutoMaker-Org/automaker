@@ -13,11 +13,20 @@ import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { Button } from '@/components/ui/button';
 import { KanbanColumn, KanbanCard, EmptyStateCard } from './components';
 import { Feature, useAppStore, formatShortcut } from '@/store/app-store';
-import { Archive, Settings2, CheckSquare, GripVertical, Plus, CheckCircle2 } from 'lucide-react';
+import {
+  Archive,
+  Settings2,
+  CheckSquare,
+  GripVertical,
+  Plus,
+  CheckCircle2,
+  Zap,
+} from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useResponsiveKanban } from '@/hooks/use-responsive-kanban';
 import { getColumnsWithPipeline, type ColumnId } from './constants';
-import type { PipelineConfig } from '@automaker/types';
+import type { PipelineConfig, FeatureTemplate } from '@automaker/types';
+import { AddFeatureButton } from './components/add-feature-button';
 import { cn } from '@/lib/utils';
 interface KanbanBoardProps {
   activeFeature: Feature | null;
@@ -53,6 +62,10 @@ interface KanbanBoardProps {
   runningAutoTasks: string[];
   onArchiveAllVerified: () => void;
   onAddFeature: () => void;
+  onQuickAdd: () => void;
+  onTemplateSelect: (template: FeatureTemplate) => void;
+  templates: FeatureTemplate[];
+  addFeatureShortcut?: string;
   onShowCompletedModal: () => void;
   completedCount: number;
   pipelineConfig: PipelineConfig | null;
@@ -292,6 +305,10 @@ export function KanbanBoard({
   runningAutoTasks,
   onArchiveAllVerified,
   onAddFeature,
+  onQuickAdd,
+  onTemplateSelect,
+  templates,
+  addFeatureShortcut: addFeatureShortcutProp,
   onShowCompletedModal,
   completedCount,
   pipelineConfig,
@@ -311,7 +328,7 @@ export function KanbanBoard({
 
   // Get the keyboard shortcut for adding features
   const keyboardShortcuts = useAppStore((state) => state.keyboardShortcuts);
-  const addFeatureShortcut = keyboardShortcuts.addFeature || 'N';
+  const addFeatureShortcut = addFeatureShortcutProp || keyboardShortcuts.addFeature || 'N';
 
   // Use responsive column widths based on window size
   // containerStyle handles centering and ensures columns fit without horizontal scroll in Electron
@@ -408,16 +425,28 @@ export function KanbanBoard({
                       </div>
                     ) : column.id === 'backlog' ? (
                       <div className="flex items-center gap-1">
-                        <Button
-                          variant="default"
-                          size="sm"
-                          className="h-6 w-6 p-0"
-                          onClick={onAddFeature}
-                          title="Add Feature"
-                          data-testid="add-feature-button"
-                        >
-                          <Plus className="w-3.5 h-3.5" />
-                        </Button>
+                        <div className="flex items-center">
+                          <Button
+                            variant="default"
+                            size="sm"
+                            className="h-6 w-6 p-0 rounded-r-none"
+                            onClick={onAddFeature}
+                            title="Add Feature"
+                            data-testid="add-feature-button"
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                          </Button>
+                          <Button
+                            variant="default"
+                            size="sm"
+                            className="h-6 w-6 p-0 rounded-l-none border-l border-primary-foreground/20"
+                            onClick={onQuickAdd}
+                            title="Quick Add Feature"
+                            data-testid="quick-add-feature-button"
+                          >
+                            <Zap className="w-3.5 h-3.5" />
+                          </Button>
+                        </div>
                         <Button
                           variant="ghost"
                           size="sm"
@@ -494,19 +523,14 @@ export function KanbanBoard({
                   }
                   footerAction={
                     column.id === 'backlog' ? (
-                      <Button
-                        variant="default"
-                        size="sm"
-                        className="w-full h-9 text-sm"
-                        onClick={onAddFeature}
-                        data-testid="add-feature-floating-button"
-                      >
-                        <Plus className="w-4 h-4 mr-2" />
-                        Add Feature
-                        <span className="ml-auto pl-2 text-[10px] font-mono opacity-70 bg-black/20 px-1.5 py-0.5 rounded">
-                          {formatShortcut(addFeatureShortcut, true)}
-                        </span>
-                      </Button>
+                      <AddFeatureButton
+                        onAddFeature={onAddFeature}
+                        onQuickAdd={onQuickAdd}
+                        onTemplateSelect={onTemplateSelect}
+                        templates={templates}
+                        fullWidth
+                        shortcut={formatShortcut(addFeatureShortcut, true)}
+                      />
                     ) : undefined
                   }
                 >

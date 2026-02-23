@@ -170,127 +170,125 @@ export function createGeneratePRDescriptionHandler(
       // Determine the base branch for comparison
       const base = baseBranch || 'main';
 
-      // Get the diff between current branch and base branch (committed changes)
-      // Track whether the diff method used only includes committed changes.
-      // `git diff base...HEAD` and `git diff origin/base...HEAD` only show committed changes,
-      // while the fallback methods (`git diff HEAD`, `git diff --cached + git diff`) already
-      // include uncommitted working directory changes.
-      let diff = '';
-      let diffIncludesUncommitted = false;
+      // Collect diffs in three layers and combine them:
+      //   1. Committed changes on the branch: `git diff base...HEAD`
+      //   2. Staged (cached) changes not yet committed: `git diff --cached`
+      //   3. Unstaged changes to tracked files: `git diff` (no --cached flag)
+      //
+      // Untracked files are intentionally excluded — they are typically build artifacts,
+      // planning files, hidden dotfiles, or other files unrelated to the PR.
+      // `git diff` and `git diff --cached` only show changes to files already tracked by git,
+      // which is exactly the correct scope.
+      //
+      // We combine all three sources and deduplicate by file path so that a file modified
+      // in commits AND with additional uncommitted changes is not double-counted.
+
+      /** Parse a unified diff into per-file hunks keyed by file path */
+      function parseDiffIntoFileHunks(diffText: string): Map<string, string> {
+        const fileHunks = new Map<string, string>();
+        if (!diffText.trim()) return fileHunks;
+
+        // Split on "diff --git" boundaries (keep the delimiter)
+        const sections = diffText.split(/(?=^diff --git )/m);
+        for (const section of sections) {
+          if (!section.trim()) continue;
+          // Use a back-reference pattern so the "b/" side must match the "a/" capture,
+          // correctly handling paths that contain " b/" in their name.
+          // Falls back to a two-capture pattern to handle renames (a/ and b/ differ).
+          const backrefMatch = section.match(/^diff --git a\/(.+) b\/\1$/m);
+          const renameMatch = !backrefMatch ? section.match(/^diff --git a\/(.+) b\/(.+)$/m) : null;
+          const match = backrefMatch || renameMatch;
+          if (match) {
+            // Prefer the backref capture (identical paths); for renames use the destination (match[2])
+            const filePath = backrefMatch ? match[1] : match[2];
+            // Merge hunks if the same file appears in multiple diff sources
+            const existing = fileHunks.get(filePath) ?? '';
+            fileHunks.set(filePath, existing + section);
+          }
+        }
+        return fileHunks;
+      }
+
+      // --- Step 1: committed changes (branch vs base) ---
+      let committedDiff = '';
       try {
-        // First, try to get diff against the base branch
-        const { stdout: branchDiff } = await execFileAsync('git', ['diff', `${base}...HEAD`], {
+        const { stdout } = await execFileAsync('git', ['diff', `${base}...HEAD`], {
           cwd: worktreePath,
-          maxBuffer: 1024 * 1024 * 5, // 5MB buffer
+          maxBuffer: 1024 * 1024 * 5,
         });
-        diff = branchDiff;
-        // git diff base...HEAD only shows committed changes
-        diffIncludesUncommitted = false;
+        committedDiff = stdout;
       } catch {
-        // If branch comparison fails (e.g., base branch doesn't exist locally),
-        // try fetching and comparing against remote base
+        // Base branch may not exist locally; try the remote tracking branch
         try {
-          const { stdout: remoteDiff } = await execFileAsync(
-            'git',
-            ['diff', `origin/${base}...HEAD`],
-            {
-              cwd: worktreePath,
-              maxBuffer: 1024 * 1024 * 5,
-            }
-          );
-          diff = remoteDiff;
-          // git diff origin/base...HEAD only shows committed changes
-          diffIncludesUncommitted = false;
+          const { stdout } = await execFileAsync('git', ['diff', `origin/${base}...HEAD`], {
+            cwd: worktreePath,
+            maxBuffer: 1024 * 1024 * 5,
+          });
+          committedDiff = stdout;
         } catch {
-          // Fall back to getting all uncommitted + committed changes
-          try {
-            const { stdout: allDiff } = await execFileAsync('git', ['diff', 'HEAD'], {
-              cwd: worktreePath,
-              maxBuffer: 1024 * 1024 * 5,
-            });
-            diff = allDiff;
-            // git diff HEAD includes uncommitted changes
-            diffIncludesUncommitted = true;
-          } catch {
-            // Last resort: get staged + unstaged changes
-            const { stdout: stagedDiff } = await execFileAsync('git', ['diff', '--cached'], {
-              cwd: worktreePath,
-              maxBuffer: 1024 * 1024 * 5,
-            });
-            const { stdout: unstagedDiff } = await execFileAsync('git', ['diff'], {
-              cwd: worktreePath,
-              maxBuffer: 1024 * 1024 * 5,
-            });
-            diff = stagedDiff + unstagedDiff;
-            // These already include uncommitted changes
-            diffIncludesUncommitted = true;
-          }
+          // Cannot compare against base — leave committedDiff empty; the uncommitted
+          // changes gathered below will still be included.
+          logger.warn(`Could not get committed diff against ${base} or origin/${base}`);
         }
       }
 
-      // Check for uncommitted changes (staged + unstaged) to include in the description.
-      // When creating a PR, uncommitted changes will be auto-committed, so they should be
-      // reflected in the generated description. We only need to fetch uncommitted diffs
-      // when the primary diff method (base...HEAD) was used, since it only shows committed changes.
-      let hasUncommittedChanges = false;
+      // --- Step 2: staged changes (tracked files only) ---
+      let stagedDiff = '';
       try {
-        const { stdout: statusOutput } = await execFileAsync('git', ['status', '--porcelain'], {
+        const { stdout } = await execFileAsync('git', ['diff', '--cached'], {
           cwd: worktreePath,
+          maxBuffer: 1024 * 1024 * 5,
         });
-        hasUncommittedChanges = statusOutput.trim().length > 0;
-
-        if (hasUncommittedChanges && !diffIncludesUncommitted) {
-          logger.info('Uncommitted changes detected, including in PR description context');
-
-          let uncommittedDiff = '';
-
-          // Get staged changes
-          try {
-            const { stdout: stagedDiff } = await execFileAsync('git', ['diff', '--cached'], {
-              cwd: worktreePath,
-              maxBuffer: 1024 * 1024 * 5,
-            });
-            if (stagedDiff.trim()) {
-              uncommittedDiff += stagedDiff;
-            }
-          } catch {
-            // Ignore staged diff errors
-          }
-
-          // Get unstaged changes (tracked files only)
-          try {
-            const { stdout: unstagedDiff } = await execFileAsync('git', ['diff'], {
-              cwd: worktreePath,
-              maxBuffer: 1024 * 1024 * 5,
-            });
-            if (unstagedDiff.trim()) {
-              uncommittedDiff += unstagedDiff;
-            }
-          } catch {
-            // Ignore unstaged diff errors
-          }
-
-          // Get list of untracked files for context
-          const untrackedFiles = statusOutput
-            .split('\n')
-            .filter((line) => line.startsWith('??'))
-            .map((line) => line.substring(3).trim());
-
-          if (untrackedFiles.length > 0) {
-            // Add a summary of untracked (new) files as context
-            uncommittedDiff += `\n# New untracked files:\n${untrackedFiles.map((f) => `# + ${f}`).join('\n')}\n`;
-          }
-
-          // Append uncommitted changes to the committed diff
-          if (uncommittedDiff.trim()) {
-            diff = diff + uncommittedDiff;
-          }
-        }
-      } catch {
-        // Ignore errors checking for uncommitted changes
+        stagedDiff = stdout;
+      } catch (err) {
+        // Non-fatal — staged diff is a best-effort supplement
+        logger.debug('Failed to get staged diff', err);
       }
 
-      // Also get the commit log for context
+      // --- Step 3: unstaged changes (tracked files only) ---
+      let unstagedDiff = '';
+      try {
+        const { stdout } = await execFileAsync('git', ['diff'], {
+          cwd: worktreePath,
+          maxBuffer: 1024 * 1024 * 5,
+        });
+        unstagedDiff = stdout;
+      } catch (err) {
+        // Non-fatal — unstaged diff is a best-effort supplement
+        logger.debug('Failed to get unstaged diff', err);
+      }
+
+      // --- Combine and deduplicate ---
+      // Build a map of filePath → diff content by concatenating hunks from all sources
+      // in chronological order (committed → staged → unstaged) so that no changes
+      // are lost when a file appears in multiple diff sources.
+      const combinedFileHunks = new Map<string, string>();
+
+      for (const source of [committedDiff, stagedDiff, unstagedDiff]) {
+        const hunks = parseDiffIntoFileHunks(source);
+        for (const [filePath, hunk] of hunks) {
+          if (combinedFileHunks.has(filePath)) {
+            combinedFileHunks.set(filePath, combinedFileHunks.get(filePath)! + hunk);
+          } else {
+            combinedFileHunks.set(filePath, hunk);
+          }
+        }
+      }
+
+      const diff = Array.from(combinedFileHunks.values()).join('');
+
+      // Log what files were included for observability
+      if (combinedFileHunks.size > 0) {
+        logger.info(`PR description scope: ${combinedFileHunks.size} file(s)`);
+        logger.debug(
+          `PR description scope files: ${Array.from(combinedFileHunks.keys()).join(', ')}`
+        );
+      }
+
+      // Also get the commit log for context — always scoped to the selected base branch
+      // so the log only contains commits that are part of this PR.
+      // We do NOT fall back to an unscoped `git log` because that would include commits
+      // from the base branch itself and produce misleading AI context.
       let commitLog = '';
       try {
         const { stdout: logOutput } = await execFileAsync(
@@ -303,11 +301,11 @@ export function createGeneratePRDescriptionHandler(
         );
         commitLog = logOutput.trim();
       } catch {
-        // If comparing against base fails, fall back to recent commits
+        // Base branch not available locally — try the remote tracking branch
         try {
           const { stdout: logOutput } = await execFileAsync(
             'git',
-            ['log', '--oneline', '-10', '--no-decorate'],
+            ['log', `origin/${base}..HEAD`, '--oneline', '--no-decorate'],
             {
               cwd: worktreePath,
               maxBuffer: 1024 * 1024,
@@ -315,7 +313,9 @@ export function createGeneratePRDescriptionHandler(
           );
           commitLog = logOutput.trim();
         } catch {
-          // Ignore commit log errors
+          // Cannot scope commit log to base branch — leave empty rather than
+          // including unscoped commits that would pollute the AI context.
+          logger.warn(`Could not get commit log against ${base} or origin/${base}`);
         }
       }
 
@@ -339,10 +339,6 @@ export function createGeneratePRDescriptionHandler(
 
       if (commitLog) {
         userPrompt += `\nCommit History:\n${commitLog}\n`;
-      }
-
-      if (hasUncommittedChanges) {
-        userPrompt += `\nNote: This branch has uncommitted changes that will be included in the PR.\n`;
       }
 
       if (truncatedDiff) {

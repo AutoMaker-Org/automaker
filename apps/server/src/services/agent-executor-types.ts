@@ -5,6 +5,7 @@
 import type {
   PlanningMode,
   ThinkingLevel,
+  ReasoningEffort,
   ParsedTask,
   ClaudeCompatibleProvider,
   Credentials,
@@ -24,7 +25,9 @@ export interface AgentExecutionOptions {
   previousContent?: string;
   systemPrompt?: string;
   autoLoadClaudeMd?: boolean;
+  useClaudeCodeSystemPrompt?: boolean;
   thinkingLevel?: ThinkingLevel;
+  reasoningEffort?: ReasoningEffort;
   branchName?: string | null;
   credentials?: Credentials;
   claudeCompatibleProvider?: ClaudeCompatibleProvider;

@@ -1,4 +1,5 @@
 export { AddFeatureDialog } from './add-feature-dialog';
+export { QuickAddDialog } from './quick-add-dialog';
 export { AgentOutputModal } from './agent-output-modal';
 export { BacklogPlanDialog } from './backlog-plan-dialog';
 export { CompletedFeaturesModal } from './completed-features-modal';

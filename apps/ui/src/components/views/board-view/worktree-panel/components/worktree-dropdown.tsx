@@ -148,6 +148,8 @@ export interface WorktreeDropdownProps {
   onSyncWithRemote?: (worktree: WorktreeInfo, remote: string) => void;
   /** Set tracking branch to a specific remote */
   onSetTracking?: (worktree: WorktreeInfo, remote: string) => void;
+  /** List of remote names that have a branch matching the current branch name */
+  remotesWithBranch?: string[];
 }
 
 /**
@@ -245,6 +247,7 @@ export function WorktreeDropdown({
   onSync,
   onSyncWithRemote,
   onSetTracking,
+  remotesWithBranch,
 }: WorktreeDropdownProps) {
   // Find the currently selected worktree to display in the trigger
   const selectedWorktree = worktrees.find((w) => isWorktreeSelected(w));
@@ -588,6 +591,7 @@ export function WorktreeDropdown({
           onSync={onSync}
           onSyncWithRemote={onSyncWithRemote}
           onSetTracking={onSetTracking}
+          remotesWithBranch={remotesWithBranch}
         />
       )}
     </div>

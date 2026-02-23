@@ -120,6 +120,17 @@ export function useAutoMode(worktree?: WorktreeInfo) {
     return worktreeIsMain ? null : worktreeBranch || null;
   }, [hasWorktree, worktreeIsMain, worktreeBranch]);
 
+  // Use a ref for branchName inside refreshStatus to prevent the callback identity
+  // from changing on every worktree switch. Without this, switching worktrees causes:
+  //   branchName changes → refreshStatus identity changes → useEffect fires →
+  //   API call → setAutoModeRunning → store update → re-render cascade → React error #185
+  // On mobile Safari/PWA this cascade is especially problematic as it triggers
+  // "A problem repeatedly occurred" crash loops.
+  const branchNameRef = useRef(branchName);
+  useEffect(() => {
+    branchNameRef.current = branchName;
+  }, [branchName]);
+
   // Helper to look up project ID from path
   const getProjectIdFromPath = useCallback(
     (path: string): string | undefined => {
@@ -199,6 +210,11 @@ export function useAutoMode(worktree?: WorktreeInfo) {
     };
   }, []);
 
+  // refreshStatus uses branchNameRef instead of branchName in its dependency array
+  // to keep a stable callback identity across worktree switches. This prevents the
+  // useEffect([refreshStatus]) from re-firing on every worktree change, which on
+  // mobile Safari/PWA causes a cascading re-render that triggers "A problem
+  // repeatedly occurred" crash loops.
   const refreshStatus = useCallback(async () => {
     if (!currentProject) return;
 
@@ -206,11 +222,15 @@ export function useAutoMode(worktree?: WorktreeInfo) {
     // refreshStatus runs before the API call completes and overwrites optimistic state
     if (isTransitioningRef.current) return;
 
+    // Read branchName from ref to always use the latest value without
+    // adding it to the dependency array (which would destabilize the callback).
+    const currentBranchName = branchNameRef.current;
+
     try {
       const api = getElectronAPI();
       if (!api?.autoMode?.status) return;
 
-      const result = await api.autoMode.status(currentProject.path, branchName);
+      const result = await api.autoMode.status(currentProject.path, currentBranchName);
       if (result.success && result.isAutoLoopRunning !== undefined) {
         const backendIsRunning = result.isAutoLoopRunning;
         const backendRunningFeatures = result.runningFeatures ?? [];
@@ -231,7 +251,9 @@ export function useAutoMode(worktree?: WorktreeInfo) {
             backendRunningFeatures.length === 0);
 
         if (needsSync) {
-          const worktreeDesc = branchName ? `worktree ${branchName}` : 'main worktree';
+          const worktreeDesc = currentBranchName
+            ? `worktree ${currentBranchName}`
+            : 'main worktree';
           if (backendIsRunning !== currentIsRunning) {
             logger.info(
               `[AutoMode] Syncing UI state with backend for ${worktreeDesc} in ${currentProject.path}: ${backendIsRunning ? 'ON' : 'OFF'}`
@@ -239,18 +261,18 @@ export function useAutoMode(worktree?: WorktreeInfo) {
           }
           setAutoModeRunning(
             currentProject.id,
-            branchName,
+            currentBranchName,
             backendIsRunning,
             result.maxConcurrency,
             backendRunningFeatures
           );
-          setAutoModeSessionForWorktree(currentProject.path, branchName, backendIsRunning);
+          setAutoModeSessionForWorktree(currentProject.path, currentBranchName, backendIsRunning);
         }
       }
     } catch (error) {
       logger.error('Error syncing auto mode state with backend:', error);
     }
-  }, [branchName, currentProject, setAutoModeRunning]);
+  }, [currentProject, setAutoModeRunning]);
 
   // On mount (and when refreshStatus identity changes, e.g. project switch),
   // query backend for current auto loop status and sync UI state.
@@ -266,6 +288,18 @@ export function useAutoMode(worktree?: WorktreeInfo) {
     const timer = setTimeout(() => void refreshStatus(), 150);
     return () => clearTimeout(timer);
   }, [refreshStatus]);
+
+  // When the user switches worktrees, re-sync auto mode status for the new branch.
+  // Uses a longer debounce (300ms) than the mount effect (150ms) to let the worktree
+  // switch settle (store update, feature re-filtering, query invalidation) before
+  // triggering another API call. Without this delay, on mobile Safari the cascade of
+  // store mutations from the worktree switch + refreshStatus response overwhelms React's
+  // batching, causing "A problem repeatedly occurred" crash loops.
+  useEffect(() => {
+    const timer = setTimeout(() => void refreshStatus(), 300);
+    return () => clearTimeout(timer);
+    // branchName is the trigger; refreshStatus is stable (uses ref internally)
+  }, [branchName, refreshStatus]);
 
   // Periodic polling fallback when WebSocket events are stale.
   useEffect(() => {

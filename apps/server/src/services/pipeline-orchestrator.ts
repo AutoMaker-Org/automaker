@@ -16,6 +16,7 @@ import * as secureFs from '../lib/secure-fs.js';
 import {
   getPromptCustomization,
   getAutoLoadClaudeMdSetting,
+  getUseClaudeCodeSystemPromptSetting,
   filterClaudeMdFromContext,
 } from '../lib/settings-helpers.js';
 import { validateWorkingDirectory } from '../lib/sdk-options.js';
@@ -70,8 +71,16 @@ export class PipelineOrchestrator {
   ) {}
 
   async executePipeline(ctx: PipelineContext): Promise<void> {
-    const { projectPath, featureId, feature, steps, workDir, abortController, autoLoadClaudeMd } =
-      ctx;
+    const {
+      projectPath,
+      featureId,
+      feature,
+      steps,
+      workDir,
+      abortController,
+      autoLoadClaudeMd,
+      useClaudeCodeSystemPrompt,
+    } = ctx;
     const prompts = await getPromptCustomization(this.settingsService, '[AutoMode]');
     const contextResult = await this.loadContextFilesFn({
       projectPath,
@@ -121,7 +130,9 @@ export class PipelineOrchestrator {
           previousContent: previousContext,
           systemPrompt: contextFilesPrompt || undefined,
           autoLoadClaudeMd,
+          useClaudeCodeSystemPrompt,
           thinkingLevel: feature.thinkingLevel,
+          reasoningEffort: feature.reasoningEffort,
         }
       );
       try {
@@ -357,6 +368,11 @@ export class PipelineOrchestrator {
         this.settingsService,
         '[AutoMode]'
       );
+      const useClaudeCodeSystemPrompt = await getUseClaudeCodeSystemPromptSetting(
+        projectPath,
+        this.settingsService,
+        '[AutoMode]'
+      );
       const context: PipelineContext = {
         projectPath,
         featureId,
@@ -367,6 +383,7 @@ export class PipelineOrchestrator {
         branchName: branchName ?? null,
         abortController,
         autoLoadClaudeMd,
+        useClaudeCodeSystemPrompt,
         testAttempts: 0,
         maxTestAttempts: 5,
       };
@@ -467,7 +484,14 @@ export class PipelineOrchestrator {
           projectPath,
           undefined,
           undefined,
-          { projectPath, planningMode: 'skip', requirePlanApproval: false }
+          {
+            projectPath,
+            planningMode: 'skip',
+            requirePlanApproval: false,
+            useClaudeCodeSystemPrompt: context.useClaudeCodeSystemPrompt,
+            autoLoadClaudeMd: context.autoLoadClaudeMd,
+            reasoningEffort: context.feature.reasoningEffort,
+          }
         );
       }
     }
@@ -602,7 +626,7 @@ export class PipelineOrchestrator {
       }
       // Only capture assertion details when they appear in failure context
       // or match explicit assertion error / expect patterns
-      if (trimmed.includes('AssertionError') || trimmed.includes('AssertionError')) {
+      if (trimmed.includes('AssertionError')) {
         failedTests.push(trimmed);
       } else if (
         inFailureContext &&

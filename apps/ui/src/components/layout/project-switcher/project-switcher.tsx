@@ -40,14 +40,12 @@ export function ProjectSwitcher() {
   const location = useLocation();
   const { hideWiki } = SIDEBAR_FEATURE_FLAGS;
   const isWikiActive = location.pathname === '/wiki';
-  const {
-    projects,
-    currentProject,
-    setCurrentProject,
-    upsertAndSetCurrentProject,
-    specCreatingForProject,
-    setSpecCreatingForProject,
-  } = useAppStore();
+  const projects = useAppStore((s) => s.projects);
+  const currentProject = useAppStore((s) => s.currentProject);
+  const setCurrentProject = useAppStore((s) => s.setCurrentProject);
+  const upsertAndSetCurrentProject = useAppStore((s) => s.upsertAndSetCurrentProject);
+  const specCreatingForProject = useAppStore((s) => s.specCreatingForProject);
+  const setSpecCreatingForProject = useAppStore((s) => s.setSpecCreatingForProject);
   const [contextMenuProject, setContextMenuProject] = useState<Project | null>(null);
   const [contextMenuPosition, setContextMenuPosition] = useState<{ x: number; y: number } | null>(
     null
@@ -104,6 +102,10 @@ export function ProjectSwitcher() {
 
   const handleProjectClick = useCallback(
     async (project: Project) => {
+      if (project.id === currentProject?.id) {
+        navigate({ to: '/board' });
+        return;
+      }
       try {
         // Ensure .automaker directory structure exists before switching
         await initializeProject(project.path);
@@ -124,7 +126,7 @@ export function ProjectSwitcher() {
         navigate({ to: '/board' });
       });
     },
-    [setCurrentProject, navigate]
+    [currentProject?.id, setCurrentProject, navigate]
   );
 
   const handleNewProject = () => {

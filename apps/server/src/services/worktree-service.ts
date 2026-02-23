@@ -8,8 +8,63 @@
 
 import path from 'path';
 import fs from 'fs/promises';
+import { execFile } from 'child_process';
+import { promisify } from 'util';
 import type { EventEmitter } from '../lib/events.js';
 import type { SettingsService } from './settings-service.js';
+
+const execFileAsync = promisify(execFile);
+
+/**
+ * Get the list of remote names that have a branch matching the given branch name.
+ *
+ * Uses `git for-each-ref` to check cached remote refs, returning the names of
+ * any remotes that already have a branch with the same name as `currentBranch`.
+ * Returns an empty array when `hasAnyRemotes` is false or when no matching
+ * remote refs are found.
+ *
+ * This helps the UI distinguish between "branch exists on the tracking remote"
+ * vs "branch was pushed to a different remote".
+ *
+ * @param worktreePath  - Path to the git worktree
+ * @param currentBranch - Branch name to search for on remotes
+ * @param hasAnyRemotes - Whether the repository has any remotes configured
+ * @returns Array of remote names (e.g. ["origin", "upstream"]) that contain the branch
+ */
+export async function getRemotesWithBranch(
+  worktreePath: string,
+  currentBranch: string,
+  hasAnyRemotes: boolean
+): Promise<string[]> {
+  if (!hasAnyRemotes) {
+    return [];
+  }
+
+  try {
+    const { stdout: remoteRefsOutput } = await execFileAsync(
+      'git',
+      ['for-each-ref', '--format=%(refname:short)', `refs/remotes/*/${currentBranch}`],
+      { cwd: worktreePath }
+    );
+
+    if (!remoteRefsOutput.trim()) {
+      return [];
+    }
+
+    return remoteRefsOutput
+      .trim()
+      .split('\n')
+      .map((ref) => {
+        // Extract remote name from "remote/branch" format
+        const slashIdx = ref.indexOf('/');
+        return slashIdx !== -1 ? ref.slice(0, slashIdx) : ref;
+      })
+      .filter((name) => name.length > 0);
+  } catch {
+    // Ignore errors - return empty array
+    return [];
+  }
+}
 
 /**
  * Error thrown when one or more file copy operations fail during

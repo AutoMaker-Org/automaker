@@ -12,6 +12,7 @@ import * as secureFs from '../lib/secure-fs.js';
 import {
   getPromptCustomization,
   getAutoLoadClaudeMdSetting,
+  getUseClaudeCodeSystemPromptSetting,
   filterClaudeMdFromContext,
 } from '../lib/settings-helpers.js';
 import { validateWorkingDirectory } from '../lib/sdk-options.js';
@@ -241,6 +242,11 @@ ${feature.spec}
         this.settingsService,
         '[ExecutionService]'
       );
+      const useClaudeCodeSystemPrompt = await getUseClaudeCodeSystemPromptSetting(
+        projectPath,
+        this.settingsService,
+        '[ExecutionService]'
+      );
       const prompts = await getPromptCustomization(this.settingsService, '[ExecutionService]');
       let prompt: string;
       const contextResult = await this.loadContextFilesFn({
@@ -289,7 +295,9 @@ ${feature.spec}
           requirePlanApproval: feature.requirePlanApproval,
           systemPrompt: combinedSystemPrompt || undefined,
           autoLoadClaudeMd,
+          useClaudeCodeSystemPrompt,
           thinkingLevel: feature.thinkingLevel,
+          reasoningEffort: feature.reasoningEffort,
           branchName: feature.branchName ?? null,
         }
       );
@@ -353,7 +361,9 @@ Please continue from where you left off and complete all remaining tasks. Use th
             requirePlanApproval: false,
             systemPrompt: combinedSystemPrompt || undefined,
             autoLoadClaudeMd,
+            useClaudeCodeSystemPrompt,
             thinkingLevel: feature.thinkingLevel,
+            reasoningEffort: feature.reasoningEffort,
             branchName: feature.branchName ?? null,
           }
         );
@@ -388,6 +398,7 @@ Please continue from where you left off and complete all remaining tasks. Use th
           branchName: feature.branchName ?? null,
           abortController,
           autoLoadClaudeMd,
+          useClaudeCodeSystemPrompt,
           testAttempts: 0,
           maxTestAttempts: 5,
         });

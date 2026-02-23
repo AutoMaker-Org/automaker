@@ -29,8 +29,13 @@ export interface UseModelOverrideResult {
 
 /**
  * Normalize PhaseModelEntry or string to PhaseModelEntry
+ * Handles undefined/null gracefully (e.g., when phaseModels from server settings
+ * is missing a recently-added phase key)
  */
-function normalizeEntry(entry: PhaseModelEntry | string): PhaseModelEntry {
+function normalizeEntry(entry: PhaseModelEntry | string | undefined | null): PhaseModelEntry {
+  if (!entry) {
+    return { model: 'claude-sonnet' as ModelId };
+  }
   if (typeof entry === 'string') {
     return { model: entry as ModelId };
   }

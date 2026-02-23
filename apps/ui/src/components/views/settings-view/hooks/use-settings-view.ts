@@ -12,6 +12,7 @@ export type SettingsViewId =
   | 'copilot-provider'
   | 'mcp-servers'
   | 'prompts'
+  | 'templates'
   | 'model-defaults'
   | 'appearance'
   | 'editor'

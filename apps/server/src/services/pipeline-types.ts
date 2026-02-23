@@ -14,6 +14,7 @@ export interface PipelineContext {
   branchName: string | null;
   abortController: AbortController;
   autoLoadClaudeMd: boolean;
+  useClaudeCodeSystemPrompt?: boolean;
   testAttempts: number;
   maxTestAttempts: number;
 }

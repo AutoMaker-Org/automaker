@@ -17,10 +17,11 @@ import type { SettingsService } from '../../../services/settings-service.js';
 export function createGenerateHandler(events: EventEmitter, settingsService?: SettingsService) {
   return async (req: Request, res: Response): Promise<void> => {
     try {
-      const { projectPath, prompt, model } = req.body as {
+      const { projectPath, prompt, model, branchName } = req.body as {
         projectPath: string;
         prompt: string;
         model?: string;
+        branchName?: string;
       };
 
       if (!projectPath) {
@@ -42,28 +43,30 @@ export function createGenerateHandler(events: EventEmitter, settingsService?: Se
         return;
       }
 
-      setRunningState(true);
+      const abortController = new AbortController();
+      setRunningState(true, abortController);
       setRunningDetails({
         projectPath,
         prompt,
         model,
         startedAt: new Date().toISOString(),
       });
-      const abortController = new AbortController();
-      setRunningState(true, abortController);
 
       // Start generation in background
-      // Note: generateBacklogPlan handles its own error event emission,
-      // so we only log here to avoid duplicate error toasts
-      generateBacklogPlan(projectPath, prompt, events, abortController, settingsService, model)
-        .catch((error) => {
-          // Just log - error event already emitted by generateBacklogPlan
-          logError(error, 'Generate backlog plan failed (background)');
-        })
-        .finally(() => {
-          setRunningState(false, null);
-          setRunningDetails(null);
-        });
+      // Note: generateBacklogPlan handles its own error event emission
+      // and state cleanup in its finally block, so we only log here
+      generateBacklogPlan(
+        projectPath,
+        prompt,
+        events,
+        abortController,
+        settingsService,
+        model,
+        branchName
+      ).catch((error) => {
+        // Just log - error event already emitted by generateBacklogPlan
+        logError(error, 'Generate backlog plan failed (background)');
+      });
 
       res.json({ success: true });
     } catch (error) {

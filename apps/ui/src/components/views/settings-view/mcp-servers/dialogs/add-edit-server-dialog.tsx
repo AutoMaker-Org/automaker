@@ -41,7 +41,7 @@ export function AddEditServerDialog({
 }: AddEditServerDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent data-testid="mcp-server-dialog">
+      <DialogContent className="sm:max-w-lg" data-testid="mcp-server-dialog">
         <DialogHeader>
           <DialogTitle>{editingServer ? 'Edit MCP Server' : 'Add MCP Server'}</DialogTitle>
           <DialogDescription>

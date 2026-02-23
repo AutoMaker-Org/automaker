@@ -3,6 +3,9 @@
  *
  * Model is configurable via phaseModels.backlogPlanningModel in settings
  * (defaults to Sonnet). Can be overridden per-call via model parameter.
+ *
+ * Includes automatic retry for transient CLI failures (e.g., "Claude Code
+ * process exited unexpectedly") to improve reliability.
  */
 
 import type { EventEmitter } from '../../lib/events.js';
@@ -12,8 +15,10 @@ import {
   isCursorModel,
   stripProviderPrefix,
   type ThinkingLevel,
+  type SystemPromptPreset,
 } from '@automaker/types';
 import { resolvePhaseModel } from '@automaker/model-resolver';
+import { getCurrentBranch } from '@automaker/git-utils';
 import { FeatureLoader } from '../../services/feature-loader.js';
 import { ProviderFactory } from '../../providers/provider-factory.js';
 import { extractJsonWithArray } from '../../lib/json-extractor.js';
@@ -27,9 +32,26 @@ import {
 import type { SettingsService } from '../../services/settings-service.js';
 import {
   getAutoLoadClaudeMdSetting,
+  getUseClaudeCodeSystemPromptSetting,
   getPromptCustomization,
   getPhaseModelWithOverrides,
 } from '../../lib/settings-helpers.js';
+
+/** Maximum number of retry attempts for transient CLI failures */
+const MAX_RETRIES = 2;
+/** Delay between retries in milliseconds */
+const RETRY_DELAY_MS = 2000;
+
+/**
+ * Check if an error is retryable (transient CLI process failure)
+ */
+function isRetryableError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return (
+    message.includes('Claude Code process exited') ||
+    message.includes('Claude Code process terminated by signal')
+  );
+}
 
 const featureLoader = new FeatureLoader();
 
@@ -85,6 +107,53 @@ function parsePlanResponse(response: string): BacklogPlanResult {
 }
 
 /**
+ * Try to parse a valid plan response without fallback behavior.
+ * Returns null if parsing fails.
+ */
+function tryParsePlanResponse(response: string): BacklogPlanResult | null {
+  if (!response || response.trim().length === 0) {
+    return null;
+  }
+  return extractJsonWithArray<BacklogPlanResult>(response, 'changes', { logger });
+}
+
+/**
+ * Choose the most reliable response text between streamed assistant chunks
+ * and provider final result payload.
+ */
+function selectBestResponseText(accumulatedText: string, providerResultText: string): string {
+  const hasAccumulated = accumulatedText.trim().length > 0;
+  const hasProviderResult = providerResultText.trim().length > 0;
+
+  if (!hasProviderResult) {
+    return accumulatedText;
+  }
+  if (!hasAccumulated) {
+    return providerResultText;
+  }
+
+  const accumulatedParsed = tryParsePlanResponse(accumulatedText);
+  const providerParsed = tryParsePlanResponse(providerResultText);
+
+  if (providerParsed && !accumulatedParsed) {
+    logger.info('[BacklogPlan] Using provider result (parseable JSON)');
+    return providerResultText;
+  }
+  if (accumulatedParsed && !providerParsed) {
+    logger.info('[BacklogPlan] Keeping accumulated text (parseable JSON)');
+    return accumulatedText;
+  }
+
+  if (providerResultText.length > accumulatedText.length) {
+    logger.info('[BacklogPlan] Using provider result (longer content)');
+    return providerResultText;
+  }
+
+  logger.info('[BacklogPlan] Keeping accumulated text (longer content)');
+  return accumulatedText;
+}
+
+/**
  * Generate a backlog modification plan based on user prompt
  */
 export async function generateBacklogPlan(
@@ -93,11 +162,40 @@ export async function generateBacklogPlan(
   events: EventEmitter,
   abortController: AbortController,
   settingsService?: SettingsService,
-  model?: string
+  model?: string,
+  branchName?: string
 ): Promise<BacklogPlanResult> {
   try {
     // Load current features
-    const features = await featureLoader.getAll(projectPath);
+    const allFeatures = await featureLoader.getAll(projectPath);
+
+    // Filter features by branch if specified (worktree-scoped backlog)
+    let features: Feature[];
+    if (branchName) {
+      // Determine the primary branch so unassigned features show for the main worktree
+      let primaryBranch: string | null = null;
+      try {
+        primaryBranch = await getCurrentBranch(projectPath);
+      } catch {
+        // If git fails, fall back to 'main' so unassigned features are visible
+        // when branchName matches a common default branch name
+        primaryBranch = 'main';
+      }
+      const isMainBranch = branchName === primaryBranch;
+
+      features = allFeatures.filter((f) => {
+        if (!f.branchName) {
+          // Unassigned features belong to the main/primary worktree
+          return isMainBranch;
+        }
+        return f.branchName === branchName;
+      });
+      logger.info(
+        `[BacklogPlan] Filtered to ${features.length}/${allFeatures.length} features for branch: ${branchName}`
+      );
+    } else {
+      features = allFeatures;
+    }
 
     events.emit('backlog-plan:event', {
       type: 'backlog_plan_progress',
@@ -162,8 +260,13 @@ export async function generateBacklogPlan(
     // Strip provider prefix - providers expect bare model IDs
     const bareModel = stripProviderPrefix(effectiveModel);
 
-    // Get autoLoadClaudeMd setting
+    // Get autoLoadClaudeMd and useClaudeCodeSystemPrompt settings
     const autoLoadClaudeMd = await getAutoLoadClaudeMdSetting(
+      projectPath,
+      settingsService,
+      '[BacklogPlan]'
+    );
+    const useClaudeCodeSystemPrompt = await getUseClaudeCodeSystemPromptSetting(
       projectPath,
       settingsService,
       '[BacklogPlan]'
@@ -172,7 +275,8 @@ export async function generateBacklogPlan(
     // For Cursor models, we need to combine prompts with explicit instructions
     // because Cursor doesn't support systemPrompt separation like Claude SDK
     let finalPrompt = userPrompt;
-    let finalSystemPrompt: string | undefined = systemPrompt;
+    let finalSystemPrompt: string | SystemPromptPreset | undefined = systemPrompt;
+    let finalSettingSources: Array<'user' | 'project' | 'local'> | undefined;
 
     if (isCursorModel(effectiveModel)) {
       logger.info('[BacklogPlan] Using Cursor model - adding explicit no-file-write instructions');
@@ -187,54 +291,141 @@ CRITICAL INSTRUCTIONS:
 
 ${userPrompt}`;
       finalSystemPrompt = undefined; // System prompt is now embedded in the user prompt
+    } else if (useClaudeCodeSystemPrompt) {
+      // Use claude_code preset for Claude models so the SDK subprocess
+      // authenticates via CLI OAuth or API key the same way all other SDK calls do.
+      finalSystemPrompt = {
+        type: 'preset',
+        preset: 'claude_code',
+        append: systemPrompt,
+      };
+    }
+    // Include settingSources when autoLoadClaudeMd is enabled
+    if (autoLoadClaudeMd) {
+      finalSettingSources = ['user', 'project'];
     }
 
-    // Execute the query
-    const stream = provider.executeQuery({
+    // Execute the query with retry logic for transient CLI failures
+    const queryOptions = {
       prompt: finalPrompt,
       model: bareModel,
       cwd: projectPath,
       systemPrompt: finalSystemPrompt,
       maxTurns: 1,
-      allowedTools: [], // No tools needed for this
+      tools: [] as string[], // Disable all built-in tools - plan generation only needs text output
       abortController,
-      settingSources: autoLoadClaudeMd ? ['user', 'project'] : undefined,
-      readOnly: true, // Plan generation only generates text, doesn't write files
+      settingSources: finalSettingSources,
       thinkingLevel, // Pass thinking level for extended thinking
       claudeCompatibleProvider, // Pass provider for alternative endpoint configuration
       credentials, // Pass credentials for resolving 'credentials' apiKeySource
-    });
+    };
 
     let responseText = '';
+    let bestResponseText = ''; // Preserve best response across all retry attempts
+    let recoveredResult: BacklogPlanResult | null = null;
+    let lastError: unknown = null;
 
-    for await (const msg of stream) {
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
       if (abortController.signal.aborted) {
         throw new Error('Generation aborted');
       }
 
-      if (msg.type === 'assistant') {
-        if (msg.message?.content) {
-          for (const block of msg.message.content) {
-            if (block.type === 'text') {
-              responseText += block.text;
+      if (attempt > 0) {
+        logger.info(
+          `[BacklogPlan] Retry attempt ${attempt}/${MAX_RETRIES} after transient failure`
+        );
+        events.emit('backlog-plan:event', {
+          type: 'backlog_plan_progress',
+          content: `Retrying... (attempt ${attempt + 1}/${MAX_RETRIES + 1})`,
+        });
+        await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
+      }
+
+      let accumulatedText = '';
+      let providerResultText = '';
+
+      try {
+        const stream = provider.executeQuery(queryOptions);
+
+        for await (const msg of stream) {
+          if (abortController.signal.aborted) {
+            throw new Error('Generation aborted');
+          }
+
+          if (msg.type === 'assistant') {
+            if (msg.message?.content) {
+              for (const block of msg.message.content) {
+                if (block.type === 'text') {
+                  accumulatedText += block.text;
+                }
+              }
             }
+          } else if (msg.type === 'result' && msg.subtype === 'success' && msg.result) {
+            providerResultText = msg.result;
+            logger.info(
+              '[BacklogPlan] Received result from provider, length:',
+              providerResultText.length
+            );
+            logger.info('[BacklogPlan] Accumulated response length:', accumulatedText.length);
           }
         }
-      } else if (msg.type === 'result' && msg.subtype === 'success' && msg.result) {
-        // Use result if it's a final accumulated message (from Cursor provider)
-        logger.info('[BacklogPlan] Received result from Cursor, length:', msg.result.length);
-        logger.info('[BacklogPlan] Previous responseText length:', responseText.length);
-        if (msg.result.length > responseText.length) {
-          logger.info('[BacklogPlan] Using Cursor result (longer than accumulated text)');
-          responseText = msg.result;
-        } else {
-          logger.info('[BacklogPlan] Keeping accumulated text (longer than Cursor result)');
+
+        responseText = selectBestResponseText(accumulatedText, providerResultText);
+
+        // If we got here, the stream completed successfully
+        lastError = null;
+        break;
+      } catch (error) {
+        lastError = error;
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        responseText = selectBestResponseText(accumulatedText, providerResultText);
+
+        // Preserve the best response text across all attempts so that if a retry
+        // crashes immediately (empty response), we can still recover from an earlier attempt
+        bestResponseText = selectBestResponseText(bestResponseText, responseText);
+
+        // Claude SDK can occasionally exit non-zero after emitting a complete response.
+        // If we already have valid JSON, recover instead of failing the entire planning flow.
+        if (isRetryableError(error)) {
+          const parsed = tryParsePlanResponse(bestResponseText);
+          if (parsed) {
+            logger.warn(
+              '[BacklogPlan] Recovered from transient CLI exit using accumulated valid response'
+            );
+            recoveredResult = parsed;
+            lastError = null;
+            break;
+          }
+
+          // On final retryable failure, degrade gracefully if we have text from any attempt.
+          if (attempt >= MAX_RETRIES && bestResponseText.trim().length > 0) {
+            logger.warn(
+              '[BacklogPlan] Final retryable CLI failure with non-empty response, attempting fallback parse'
+            );
+            recoveredResult = parsePlanResponse(bestResponseText);
+            lastError = null;
+            break;
+          }
         }
+
+        // Only retry on transient CLI failures, not on user aborts or other errors
+        if (!isRetryableError(error) || attempt >= MAX_RETRIES) {
+          throw error;
+        }
+
+        logger.warn(
+          `[BacklogPlan] Transient CLI failure (attempt ${attempt + 1}/${MAX_RETRIES + 1}): ${errorMessage}`
+        );
       }
     }
 
+    // If we exhausted retries, throw the last error
+    if (lastError) {
+      throw lastError;
+    }
+
     // Parse the response
-    const result = parsePlanResponse(responseText);
+    const result = recoveredResult ?? parsePlanResponse(responseText);
 
     await saveBacklogPlan(projectPath, {
       savedAt: new Date().toISOString(),

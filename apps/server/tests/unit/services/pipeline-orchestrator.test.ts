@@ -57,6 +57,7 @@ vi.mock('../../../src/lib/settings-helpers.js', () => ({
     },
   }),
   getAutoLoadClaudeMdSetting: vi.fn().mockResolvedValue(true),
+  getUseClaudeCodeSystemPromptSetting: vi.fn().mockResolvedValue(true),
   filterClaudeMdFromContext: vi.fn().mockReturnValue('context prompt'),
 }));
 

@@ -142,11 +142,33 @@ function mapDescribeImageError(rawMessage: string | undefined): {
 
   if (!rawMessage) return baseResponse;
 
-  if (rawMessage.includes('Claude Code process exited')) {
+  if (
+    rawMessage.includes('Claude Code process exited') ||
+    rawMessage.includes('Claude Code process terminated by signal')
+  ) {
+    const exitCodeMatch = rawMessage.match(/exited with code (\d+)/);
+    const signalMatch = rawMessage.match(/terminated by signal (\w+)/);
+    const detail = exitCodeMatch
+      ? ` (exit code: ${exitCodeMatch[1]})`
+      : signalMatch
+        ? ` (signal: ${signalMatch[1]})`
+        : '';
+
+    // Crash/OS-kill signals suggest a process crash, not an auth failure —
+    // omit auth recovery advice and suggest retry/reporting instead.
+    const crashSignals = ['SIGSEGV', 'SIGABRT', 'SIGKILL', 'SIGBUS', 'SIGTRAP'];
+    const isCrashSignal = signalMatch ? crashSignals.includes(signalMatch[1]) : false;
+
+    if (isCrashSignal) {
+      return {
+        statusCode: 503,
+        userMessage: `Claude crashed unexpectedly${detail} while describing the image. This may be a transient condition. Please try again. If the problem persists, collect logs and report the issue.`,
+      };
+    }
+
     return {
       statusCode: 503,
-      userMessage:
-        'Claude exited unexpectedly while describing the image. Try again. If it keeps happening, re-run `claude login` or update your API key in Setup so Claude can restart cleanly.',
+      userMessage: `Claude exited unexpectedly${detail} while describing the image. This is usually a transient issue. Try again. If it keeps happening, re-run \`claude login\` or update your API key in Setup.`,
     };
   }
 

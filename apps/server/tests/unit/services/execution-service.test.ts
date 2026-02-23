@@ -34,6 +34,7 @@ import { getFeatureDir } from '@automaker/platform';
 import {
   getPromptCustomization,
   getAutoLoadClaudeMdSetting,
+  getUseClaudeCodeSystemPromptSetting,
   filterClaudeMdFromContext,
 } from '../../../src/lib/settings-helpers.js';
 import { extractSummary } from '../../../src/services/spec-parser.js';
@@ -67,6 +68,7 @@ vi.mock('../../../src/lib/settings-helpers.js', () => ({
     },
   }),
   getAutoLoadClaudeMdSetting: vi.fn().mockResolvedValue(true),
+  getUseClaudeCodeSystemPromptSetting: vi.fn().mockResolvedValue(true),
   filterClaudeMdFromContext: vi.fn().mockReturnValue('context prompt'),
 }));
 
@@ -230,6 +232,7 @@ describe('execution-service.ts', () => {
       },
     } as Awaited<ReturnType<typeof getPromptCustomization>>);
     vi.mocked(getAutoLoadClaudeMdSetting).mockResolvedValue(true);
+    vi.mocked(getUseClaudeCodeSystemPromptSetting).mockResolvedValue(true);
     vi.mocked(filterClaudeMdFromContext).mockReturnValue('context prompt');
 
     // Re-setup spec-parser mock

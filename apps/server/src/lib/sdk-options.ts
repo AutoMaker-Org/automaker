@@ -290,11 +290,15 @@ function buildThinkingOptions(thinkingLevel?: ThinkingLevel): Partial<Options> {
 }
 
 /**
- * Build system prompt configuration based on autoLoadClaudeMd setting.
- * When autoLoadClaudeMd is true:
- * - Uses preset mode with 'claude_code' to enable CLAUDE.md auto-loading
- * - If there's a custom systemPrompt, appends it to the preset
- * - Sets settingSources to ['project'] for SDK to load CLAUDE.md files
+ * Build system prompt and settingSources based on two independent settings:
+ * - useClaudeCodeSystemPrompt: controls whether to use the 'claude_code' preset as the base prompt
+ * - autoLoadClaudeMd: controls whether to add settingSources for SDK to load CLAUDE.md files
+ *
+ * These combine independently (4 possible states):
+ * 1. Both ON: preset + settingSources (full Claude Code experience)
+ * 2. useClaudeCodeSystemPrompt ON, autoLoadClaudeMd OFF: preset only (no CLAUDE.md auto-loading)
+ * 3. useClaudeCodeSystemPrompt OFF, autoLoadClaudeMd ON: plain string + settingSources
+ * 4. Both OFF: plain string only
  *
  * @param config - The SDK options config
  * @returns Object with systemPrompt and settingSources for SDK options
@@ -303,27 +307,34 @@ function buildClaudeMdOptions(config: CreateSdkOptionsConfig): {
   systemPrompt?: string | SystemPromptConfig;
   settingSources?: Array<'user' | 'project' | 'local'>;
 } {
-  if (!config.autoLoadClaudeMd) {
-    // Standard mode - just pass through the system prompt as-is
-    return config.systemPrompt ? { systemPrompt: config.systemPrompt } : {};
-  }
-
-  // Auto-load CLAUDE.md mode - use preset with settingSources
   const result: {
-    systemPrompt: SystemPromptConfig;
-    settingSources: Array<'user' | 'project' | 'local'>;
-  } = {
-    systemPrompt: {
+    systemPrompt?: string | SystemPromptConfig;
+    settingSources?: Array<'user' | 'project' | 'local'>;
+  } = {};
+
+  // Determine system prompt format based on useClaudeCodeSystemPrompt
+  if (config.useClaudeCodeSystemPrompt) {
+    // Use Claude Code's built-in system prompt as the base
+    const presetConfig: SystemPromptConfig = {
       type: 'preset',
       preset: 'claude_code',
-    },
-    // Load both user (~/.claude/CLAUDE.md) and project (.claude/CLAUDE.md) settings
-    settingSources: ['user', 'project'],
-  };
+    };
+    // If there's a custom system prompt, append it to the preset
+    if (config.systemPrompt) {
+      presetConfig.append = config.systemPrompt;
+    }
+    result.systemPrompt = presetConfig;
+  } else {
+    // Standard mode - just pass through the system prompt as-is
+    if (config.systemPrompt) {
+      result.systemPrompt = config.systemPrompt;
+    }
+  }
 
-  // If there's a custom system prompt, append it to the preset
-  if (config.systemPrompt) {
-    result.systemPrompt.append = config.systemPrompt;
+  // Determine settingSources based on autoLoadClaudeMd
+  if (config.autoLoadClaudeMd) {
+    // Load both user (~/.claude/CLAUDE.md) and project (.claude/CLAUDE.md) settings
+    result.settingSources = ['user', 'project'];
   }
 
   return result;
@@ -331,12 +342,14 @@ function buildClaudeMdOptions(config: CreateSdkOptionsConfig): {
 
 /**
  * System prompt configuration for SDK options
- * When using preset mode with claude_code, CLAUDE.md files are automatically loaded
+ * The 'claude_code' preset provides the system prompt only — it does NOT auto-load
+ * CLAUDE.md files. CLAUDE.md auto-loading is controlled independently by
+ * settingSources (set via autoLoadClaudeMd). These two settings are orthogonal.
  */
 export interface SystemPromptConfig {
-  /** Use preset mode with claude_code to enable CLAUDE.md auto-loading */
+  /** Use preset mode to select the base system prompt */
   type: 'preset';
-  /** The preset to use - 'claude_code' enables CLAUDE.md loading */
+  /** The preset to use - 'claude_code' uses the Claude Code system prompt */
   preset: 'claude_code';
   /** Optional additional prompt to append to the preset */
   append?: string;
@@ -369,6 +382,9 @@ export interface CreateSdkOptionsConfig {
 
   /** Enable auto-loading of CLAUDE.md files via SDK's settingSources */
   autoLoadClaudeMd?: boolean;
+
+  /** Use Claude Code's built-in system prompt (claude_code preset) as the base prompt */
+  useClaudeCodeSystemPrompt?: boolean;
 
   /** MCP servers to make available to the agent */
   mcpServers?: Record<string, McpServerConfig>;

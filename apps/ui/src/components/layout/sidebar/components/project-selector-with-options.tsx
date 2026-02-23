@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, startTransition } from 'react';
 import {
   Folder,
   ChevronDown,
@@ -78,21 +78,22 @@ export function ProjectSelectorWithOptions({
   setShowDeleteProjectDialog,
   setShowRemoveFromAutomakerDialog,
 }: ProjectSelectorWithOptionsProps) {
-  const {
-    projects,
-    currentProject,
-    projectHistory,
-    setCurrentProject,
-    reorderProjects,
-    cyclePrevProject,
-    cycleNextProject,
-    clearProjectHistory,
-  } = useAppStore();
+  const projects = useAppStore((s) => s.projects);
+  const currentProject = useAppStore((s) => s.currentProject);
+  const projectHistory = useAppStore((s) => s.projectHistory);
+  const setCurrentProject = useAppStore((s) => s.setCurrentProject);
+  const reorderProjects = useAppStore((s) => s.reorderProjects);
+  const cyclePrevProject = useAppStore((s) => s.cyclePrevProject);
+  const cycleNextProject = useAppStore((s) => s.cycleNextProject);
+  const clearProjectHistory = useAppStore((s) => s.clearProjectHistory);
 
   const shortcuts = useKeyboardShortcutsConfig();
   // Wrap setCurrentProject to ensure .automaker is initialized before switching
   const setCurrentProjectWithInit = useCallback(
     async (p: Project) => {
+      if (p.id === currentProject?.id) {
+        return;
+      }
       try {
         // Ensure .automaker directory structure exists before switching
         await initializeProject(p.path);
@@ -101,9 +102,12 @@ export function ProjectSelectorWithOptions({
         // Continue with switch even if initialization fails -
         // the project may already be initialized
       }
-      setCurrentProject(p);
+      // Defer project switch update to avoid synchronous render cascades.
+      startTransition(() => {
+        setCurrentProject(p);
+      });
     },
-    [setCurrentProject]
+    [currentProject?.id, setCurrentProject]
   );
 
   const {

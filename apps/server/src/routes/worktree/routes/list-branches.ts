@@ -9,6 +9,7 @@ import type { Request, Response } from 'express';
 import { exec, execFile } from 'child_process';
 import { promisify } from 'util';
 import { getErrorMessage, logWorktreeError } from '../common.js';
+import { getRemotesWithBranch } from '../../../services/worktree-service.js';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -131,6 +132,8 @@ export function createListBranchesHandler() {
       let behindCount = 0;
       let hasRemoteBranch = false;
       let trackingRemote: string | undefined;
+      // List of remote names that have a branch matching the current branch name
+      let remotesWithBranch: string[] = [];
       try {
         // First check if there's a remote tracking branch
         const { stdout: upstreamOutput } = await execFileAsync(
@@ -172,6 +175,12 @@ export function createListBranchesHandler() {
         }
       }
 
+      // Check which remotes have a branch matching the current branch name.
+      // This helps the UI distinguish between "branch exists on tracking remote" vs
+      // "branch was pushed to a different remote" (e.g., pushed to 'upstream' but tracking 'origin').
+      // Use for-each-ref to check cached remote refs (already fetched above if includeRemote was true)
+      remotesWithBranch = await getRemotesWithBranch(worktreePath, currentBranch, hasAnyRemotes);
+
       res.json({
         success: true,
         result: {
@@ -182,6 +191,7 @@ export function createListBranchesHandler() {
           hasRemoteBranch,
           hasAnyRemotes,
           trackingRemote,
+          remotesWithBranch,
         },
       });
     } catch (error) {

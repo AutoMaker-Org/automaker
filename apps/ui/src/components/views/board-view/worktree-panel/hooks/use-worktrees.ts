@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useRef } from 'react';
+import { useEffect, useCallback, useRef, startTransition } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAppStore } from '@/store/app-store';
 import { useWorktrees as useWorktreesQuery } from '@/hooks/queries';
@@ -93,7 +93,15 @@ export function useWorktrees({
         // Fallback to "main" only if worktrees haven't loaded yet
         const mainWorktree = worktrees.find((w) => w.isMain);
         const mainBranch = mainWorktree?.branch || 'main';
-        setCurrentWorktree(projectPath, null, mainBranch);
+        // Note: Zustand uses useSyncExternalStore so setCurrentWorktree updates
+        // are flushed synchronously. The real guard against React error #185 is
+        // dependency isolation — currentWorktree is intentionally excluded from
+        // the validation effect deps below (via currentWorktreeRef) so we don't
+        // create a feedback loop. startTransition may still help batch unrelated
+        // React state updates but does NOT defer or prevent Zustand-driven cascades.
+        startTransition(() => {
+          setCurrentWorktree(projectPath, null, mainBranch);
+        });
       }
     }
   }, [worktrees, projectPath, setCurrentWorktree]);
@@ -109,7 +117,16 @@ export function useWorktrees({
 
       if (isSameWorktree) return;
 
-      setCurrentWorktree(projectPath, worktree.isMain ? null : worktree.path, worktree.branch);
+      // Note: Zustand uses useSyncExternalStore so setCurrentWorktree updates are
+      // flushed synchronously — startTransition does NOT prevent Zustand-driven
+      // cascades. The actual protection against React error #185 is dependency
+      // isolation via currentWorktreeRef (currentWorktree is excluded from the
+      // validation effect's dependency array). startTransition may still help
+      // batch unrelated concurrent React state updates but should not be relied
+      // upon for Zustand update ordering.
+      startTransition(() => {
+        setCurrentWorktree(projectPath, worktree.isMain ? null : worktree.path, worktree.branch);
+      });
 
       // Defer feature query invalidation so the store update and client-side
       // re-filtering happen in the current render cycle first. The features
@@ -121,7 +138,7 @@ export function useWorktrees({
         queryClient.invalidateQueries({
           queryKey: queryKeys.features.all(projectPath),
         });
-      }, 0);
+      }, 100);
     },
     [projectPath, setCurrentWorktree, queryClient, currentWorktreePath]
   );

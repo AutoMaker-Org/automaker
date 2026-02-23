@@ -33,8 +33,23 @@ const logger = createLogger('ClaudeProvider');
  */
 type ProviderConfig = ClaudeApiProfile | ClaudeCompatibleProvider;
 
-// System vars are always passed from process.env regardless of profile
-const SYSTEM_ENV_VARS = ['PATH', 'HOME', 'SHELL', 'TERM', 'USER', 'LANG', 'LC_ALL'];
+// System vars are always passed from process.env regardless of profile.
+// Includes filesystem, locale, and temp directory vars that the Claude CLI
+// needs internally for config resolution and temp file creation.
+const SYSTEM_ENV_VARS = [
+  'PATH',
+  'HOME',
+  'SHELL',
+  'TERM',
+  'USER',
+  'LANG',
+  'LC_ALL',
+  'TMPDIR',
+  'XDG_CONFIG_HOME',
+  'XDG_DATA_HOME',
+  'XDG_CACHE_HOME',
+  'XDG_STATE_HOME',
+];
 
 /**
  * Check if the config is a ClaudeCompatibleProvider (new system)
@@ -213,6 +228,8 @@ export class ClaudeProvider extends BaseProvider {
       env: buildEnv(providerConfig, credentials),
       // Pass through allowedTools if provided by caller (decided by sdk-options.ts)
       ...(allowedTools && { allowedTools }),
+      // Restrict available built-in tools if specified (tools: [] disables all tools)
+      ...(options.tools && { tools: options.tools }),
       // AUTONOMOUS MODE: Always bypass permissions for fully autonomous operation
       permissionMode: 'bypassPermissions',
       allowDangerouslySkipPermissions: true,

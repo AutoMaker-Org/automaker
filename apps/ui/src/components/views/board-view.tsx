@@ -27,10 +27,14 @@ class DialogAwarePointerSensor extends PointerSensor {
     },
   ];
 }
-import { useAppStore, Feature } from '@/store/app-store';
+import { useAppStore, Feature, type ModelAlias, type ThinkingLevel } from '@/store/app-store';
 import { getElectronAPI } from '@/lib/electron';
 import { getHttpApiClient } from '@/lib/http-api-client';
-import type { BacklogPlanResult, FeatureStatusWithPipeline } from '@automaker/types';
+import type {
+  BacklogPlanResult,
+  FeatureStatusWithPipeline,
+  FeatureTemplate,
+} from '@automaker/types';
 import { pathsEqual } from '@/lib/utils';
 import { toast } from 'sonner';
 import {
@@ -58,6 +62,7 @@ import {
   FollowUpDialog,
   PlanApprovalDialog,
   MergeRebaseDialog,
+  QuickAddDialog,
 } from './board-view/dialogs';
 import type { DependencyLinkType } from './board-view/dialogs';
 import { PipelineSettingsDialog } from './board-view/dialogs/pipeline-settings-dialog';
@@ -75,6 +80,7 @@ import type {
   StashPopConflictInfo,
   StashApplyConflictInfo,
 } from './board-view/worktree-panel/types';
+import { BoardErrorBoundary } from './board-view/board-error-boundary';
 import { COLUMNS, getColumnsWithPipeline } from './board-view/constants';
 import {
   useBoardFeatures,
@@ -124,6 +130,7 @@ export function BoardView() {
     isPrimaryWorktreeBranch,
     getPrimaryWorktreeBranch,
     setPipelineConfig,
+    featureTemplates,
   } = useAppStore(
     useShallow((state) => ({
       currentProject: state.currentProject,
@@ -142,8 +149,11 @@ export function BoardView() {
       isPrimaryWorktreeBranch: state.isPrimaryWorktreeBranch,
       getPrimaryWorktreeBranch: state.getPrimaryWorktreeBranch,
       setPipelineConfig: state.setPipelineConfig,
+      featureTemplates: state.featureTemplates,
     }))
   );
+  // Also get keyboard shortcuts for the add feature shortcut
+  const keyboardShortcuts = useAppStore((state) => state.keyboardShortcuts);
   // Fetch pipeline config via React Query
   const { data: pipelineConfig } = usePipelineConfig(currentProject?.path);
   const queryClient = useQueryClient();
@@ -165,6 +175,7 @@ export function BoardView() {
   } = useBoardFeatures({ currentProject });
   const [editingFeature, setEditingFeature] = useState<Feature | null>(null);
   const [showAddDialog, setShowAddDialog] = useState(false);
+  const [showQuickAddDialog, setShowQuickAddDialog] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
   const [showOutputModal, setShowOutputModal] = useState(false);
   const [outputFeature, setOutputFeature] = useState<Feature | null>(null);
@@ -418,7 +429,7 @@ export function BoardView() {
     (branchName: string) => {
       const affectedIds = hookFeatures.filter((f) => f.branchName === branchName).map((f) => f.id);
       if (affectedIds.length === 0) return;
-      const updates: Partial<Feature> = { branchName: null };
+      const updates: Partial<Feature> = { branchName: undefined };
       batchUpdateFeatures(affectedIds, updates);
       for (const id of affectedIds) {
         persistFeatureUpdate(id, updates).catch((err: unknown) => {
@@ -641,6 +652,15 @@ export function BoardView() {
       {} as Record<string, number>
     );
   }, [hookFeatures, worktrees]);
+
+  // Recovery handler for BoardErrorBoundary: reset worktree selection to main
+  // so the board can re-render without the stale worktree state that caused the crash.
+  const handleBoardRecover = useCallback(() => {
+    if (!currentProject) return;
+    const mainWorktree = worktrees.find((w) => w.isMain);
+    const mainBranch = mainWorktree?.branch || 'main';
+    setCurrentWorktree(currentProject.path, null, mainBranch);
+  }, [currentProject, worktrees, setCurrentWorktree]);
 
   // Helper function to add and select a worktree
   const addAndSelectWorktree = useCallback(
@@ -990,6 +1010,87 @@ export function BoardView() {
       }
     },
     [handleAddFeature, handleStartImplementation]
+  );
+
+  // Handler for Quick Add - creates a feature with minimal data using defaults
+  const handleQuickAdd = useCallback(
+    async (
+      description: string,
+      modelEntry: { model: string; thinkingLevel?: string; reasoningEffort?: string }
+    ) => {
+      // Generate a title from the first line of the description
+      const title = description.split('\n')[0].substring(0, 100);
+
+      await handleAddFeature({
+        title,
+        description,
+        category: '',
+        images: [],
+        imagePaths: [],
+        skipTests: defaultSkipTests,
+        model: resolveModelString(modelEntry.model) as ModelAlias,
+        thinkingLevel: (modelEntry.thinkingLevel as ThinkingLevel) || 'none',
+        branchName: addFeatureUseSelectedWorktreeBranch ? selectedWorktreeBranch : '',
+        priority: 2,
+        planningMode: useAppStore.getState().defaultPlanningMode ?? 'skip',
+        requirePlanApproval: useAppStore.getState().defaultRequirePlanApproval ?? false,
+        dependencies: [],
+        workMode: addFeatureUseSelectedWorktreeBranch ? 'custom' : 'current',
+      });
+    },
+    [
+      handleAddFeature,
+      defaultSkipTests,
+      addFeatureUseSelectedWorktreeBranch,
+      selectedWorktreeBranch,
+    ]
+  );
+
+  // Handler for Quick Add & Start - creates and immediately starts a feature
+  const handleQuickAddAndStart = useCallback(
+    async (
+      description: string,
+      modelEntry: { model: string; thinkingLevel?: string; reasoningEffort?: string }
+    ) => {
+      // Generate a title from the first line of the description
+      const title = description.split('\n')[0].substring(0, 100);
+
+      await handleAddAndStartFeature({
+        title,
+        description,
+        category: '',
+        images: [],
+        imagePaths: [],
+        skipTests: defaultSkipTests,
+        model: resolveModelString(modelEntry.model) as ModelAlias,
+        thinkingLevel: (modelEntry.thinkingLevel as ThinkingLevel) || 'none',
+        branchName: addFeatureUseSelectedWorktreeBranch ? selectedWorktreeBranch : '',
+        priority: 2,
+        planningMode: useAppStore.getState().defaultPlanningMode ?? 'skip',
+        requirePlanApproval: useAppStore.getState().defaultRequirePlanApproval ?? false,
+        dependencies: [],
+        workMode: addFeatureUseSelectedWorktreeBranch ? 'custom' : 'current',
+        initialStatus: 'in_progress',
+      });
+    },
+    [
+      handleAddAndStartFeature,
+      defaultSkipTests,
+      addFeatureUseSelectedWorktreeBranch,
+      selectedWorktreeBranch,
+    ]
+  );
+
+  // Handler for template selection - creates a feature from a template
+  const handleTemplateSelect = useCallback(
+    async (template: FeatureTemplate) => {
+      const modelEntry = template.model ||
+        useAppStore.getState().defaultFeatureModel || { model: 'claude-opus' };
+
+      // Start the template immediately (same behavior as clicking "Make")
+      await handleQuickAddAndStart(template.prompt, modelEntry);
+    },
+    [handleQuickAddAndStart]
   );
 
   // Handler for managing PR comments - opens the PR Comment Resolution dialog
@@ -1561,147 +1662,159 @@ export function BoardView() {
         onViewModeChange={setViewMode}
       />
 
-      {/* DndContext wraps both WorktreePanel and main content area to enable drag-to-worktree */}
-      <DndContext
-        sensors={sensors}
-        collisionDetection={collisionDetectionStrategy}
-        onDragStart={handleDragStart}
-        onDragEnd={handleDragEnd}
-      >
-        {/* Worktree Panel - conditionally rendered based on visibility setting */}
-        {(worktreePanelVisibleByProject[currentProject.path] ?? true) && (
-          <WorktreePanel
-            refreshTrigger={worktreeRefreshKey}
-            projectPath={currentProject.path}
-            onCreateWorktree={() => setShowCreateWorktreeDialog(true)}
-            onDeleteWorktree={(worktree) => {
-              setSelectedWorktreeForAction(worktree);
-              setShowDeleteWorktreeDialog(true);
-            }}
-            onCommit={(worktree) => {
-              setSelectedWorktreeForAction(worktree);
-              setShowCommitWorktreeDialog(true);
-            }}
-            onCreatePR={(worktree) => {
-              setSelectedWorktreeForAction(worktree);
-              setShowCreatePRDialog(true);
-            }}
-            onCreateBranch={(worktree) => {
-              setSelectedWorktreeForAction(worktree);
-              setShowCreateBranchDialog(true);
-            }}
-            onAddressPRComments={handleAddressPRComments}
-            onAutoAddressPRComments={handleAutoAddressPRComments}
-            onResolveConflicts={handleResolveConflicts}
-            onCreateMergeConflictResolutionFeature={handleCreateMergeConflictResolutionFeature}
-            onBranchSwitchConflict={handleBranchSwitchConflict}
-            onStashPopConflict={handleStashPopConflict}
-            onStashApplyConflict={handleStashApplyConflict}
-            onBranchDeletedDuringMerge={(branchName) => {
-              batchResetBranchFeatures(branchName);
-              setWorktreeRefreshKey((k) => k + 1);
-            }}
-            onRemovedWorktrees={handleRemovedWorktrees}
-            runningFeatureIds={runningAutoTasksAllWorktrees}
-            branchCardCounts={branchCardCounts}
-            features={hookFeatures.map((f) => ({
-              id: f.id,
-              branchName: f.branchName,
-            }))}
-          />
-        )}
-
-        {/* Main Content Area */}
-        <div className="flex-1 flex flex-col overflow-hidden">
-          {/* View Content - Kanban Board or List View */}
-          {isListView ? (
-            <ListView
-              columnFeaturesMap={columnFeaturesMap}
-              allFeatures={hookFeatures}
-              sortConfig={sortConfig}
-              onSortChange={setSortColumn}
-              actionHandlers={{
-                onEdit: (feature) => setEditingFeature(feature),
-                onDelete: (featureId) => handleDeleteFeature(featureId),
-                onViewOutput: handleViewOutput,
-                onVerify: handleVerifyFeature,
-                onResume: handleResumeFeature,
-                onForceStop: handleForceStopFeature,
-                onManualVerify: handleManualVerify,
-                onFollowUp: handleOpenFollowUp,
-                onImplement: handleStartImplementation,
-                onComplete: handleCompleteFeature,
-                onViewPlan: (feature) => setViewPlanFeature(feature),
-                onApprovePlan: handleOpenApprovalDialog,
-                onSpawnTask: (feature) => {
-                  setSpawnParentFeature(feature);
-                  setShowAddDialog(true);
-                },
-                onDuplicate: (feature) => handleDuplicateFeature(feature, false),
-                onDuplicateAsChild: (feature) => handleDuplicateFeature(feature, true),
-                onDuplicateAsChildMultiple: (feature) => setDuplicateMultipleFeature(feature),
+      {/* BoardErrorBoundary catches render errors during worktree switches (e.g. React
+          error #185 re-render cascades on mobile Safari PWA) and provides a recovery UI
+          that resets to main branch instead of crashing the entire page. */}
+      <BoardErrorBoundary onRecover={handleBoardRecover}>
+        {/* DndContext wraps both WorktreePanel and main content area to enable drag-to-worktree */}
+        <DndContext
+          sensors={sensors}
+          collisionDetection={collisionDetectionStrategy}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+        >
+          {/* Worktree Panel - conditionally rendered based on visibility setting */}
+          {(worktreePanelVisibleByProject[currentProject.path] ?? true) && (
+            <WorktreePanel
+              refreshTrigger={worktreeRefreshKey}
+              projectPath={currentProject.path}
+              onCreateWorktree={() => setShowCreateWorktreeDialog(true)}
+              onDeleteWorktree={(worktree) => {
+                setSelectedWorktreeForAction(worktree);
+                setShowDeleteWorktreeDialog(true);
               }}
-              runningAutoTasks={runningAutoTasksAllWorktrees}
-              pipelineConfig={pipelineConfig}
-              onAddFeature={() => setShowAddDialog(true)}
-              isSelectionMode={isSelectionMode}
-              selectedFeatureIds={selectedFeatureIds}
-              onToggleFeatureSelection={toggleFeatureSelection}
-              onRowClick={(feature) => {
-                if (feature.status === 'backlog') {
-                  setEditingFeature(feature);
-                } else {
-                  handleViewOutput(feature);
-                }
+              onCommit={(worktree) => {
+                setSelectedWorktreeForAction(worktree);
+                setShowCommitWorktreeDialog(true);
               }}
-              className="transition-opacity duration-200"
-            />
-          ) : (
-            <KanbanBoard
-              activeFeature={activeFeature}
-              getColumnFeatures={getColumnFeatures}
-              backgroundImageStyle={backgroundImageStyle}
-              backgroundSettings={backgroundSettings}
-              onEdit={(feature) => setEditingFeature(feature)}
-              onDelete={(featureId) => handleDeleteFeature(featureId)}
-              onViewOutput={handleViewOutput}
-              onVerify={handleVerifyFeature}
-              onResume={handleResumeFeature}
-              onForceStop={handleForceStopFeature}
-              onManualVerify={handleManualVerify}
-              onMoveBackToInProgress={handleMoveBackToInProgress}
-              onFollowUp={handleOpenFollowUp}
-              onComplete={handleCompleteFeature}
-              onImplement={handleStartImplementation}
-              onViewPlan={(feature) => setViewPlanFeature(feature)}
-              onApprovePlan={handleOpenApprovalDialog}
-              onSpawnTask={(feature) => {
-                setSpawnParentFeature(feature);
-                setShowAddDialog(true);
+              onCreatePR={(worktree) => {
+                setSelectedWorktreeForAction(worktree);
+                setShowCreatePRDialog(true);
               }}
-              onDuplicate={(feature) => handleDuplicateFeature(feature, false)}
-              onDuplicateAsChild={(feature) => handleDuplicateFeature(feature, true)}
-              onDuplicateAsChildMultiple={(feature) => setDuplicateMultipleFeature(feature)}
-              featuresWithContext={featuresWithContext}
-              runningAutoTasks={runningAutoTasksAllWorktrees}
-              onArchiveAllVerified={() => setShowArchiveAllVerifiedDialog(true)}
-              onAddFeature={() => setShowAddDialog(true)}
-              onShowCompletedModal={() => setShowCompletedModal(true)}
-              completedCount={completedFeatures.length}
-              pipelineConfig={pipelineConfig ?? null}
-              onOpenPipelineSettings={() => setShowPipelineSettings(true)}
-              isSelectionMode={isSelectionMode}
-              selectionTarget={selectionTarget}
-              selectedFeatureIds={selectedFeatureIds}
-              onToggleFeatureSelection={toggleFeatureSelection}
-              onToggleSelectionMode={toggleSelectionMode}
-              isDragging={activeFeature !== null}
-              onAiSuggest={() => setShowPlanDialog(true)}
-              className="transition-opacity duration-200"
+              onCreateBranch={(worktree) => {
+                setSelectedWorktreeForAction(worktree);
+                setShowCreateBranchDialog(true);
+              }}
+              onAddressPRComments={handleAddressPRComments}
+              onAutoAddressPRComments={handleAutoAddressPRComments}
+              onResolveConflicts={handleResolveConflicts}
+              onCreateMergeConflictResolutionFeature={handleCreateMergeConflictResolutionFeature}
+              onBranchSwitchConflict={handleBranchSwitchConflict}
+              onStashPopConflict={handleStashPopConflict}
+              onStashApplyConflict={handleStashApplyConflict}
+              onBranchDeletedDuringMerge={(branchName) => {
+                batchResetBranchFeatures(branchName);
+                setWorktreeRefreshKey((k) => k + 1);
+              }}
+              onRemovedWorktrees={handleRemovedWorktrees}
+              runningFeatureIds={runningAutoTasksAllWorktrees}
+              branchCardCounts={branchCardCounts}
+              features={hookFeatures.map((f) => ({
+                id: f.id,
+                branchName: f.branchName,
+              }))}
             />
           )}
-        </div>
-      </DndContext>
+
+          {/* Main Content Area */}
+          <div className="flex-1 flex flex-col overflow-hidden">
+            {/* View Content - Kanban Board or List View */}
+            {isListView ? (
+              <ListView
+                columnFeaturesMap={columnFeaturesMap}
+                allFeatures={hookFeatures}
+                sortConfig={sortConfig}
+                onSortChange={setSortColumn}
+                actionHandlers={{
+                  onEdit: (feature) => setEditingFeature(feature),
+                  onDelete: (featureId) => handleDeleteFeature(featureId),
+                  onViewOutput: handleViewOutput,
+                  onVerify: handleVerifyFeature,
+                  onResume: handleResumeFeature,
+                  onForceStop: handleForceStopFeature,
+                  onManualVerify: handleManualVerify,
+                  onFollowUp: handleOpenFollowUp,
+                  onImplement: handleStartImplementation,
+                  onComplete: handleCompleteFeature,
+                  onViewPlan: (feature) => setViewPlanFeature(feature),
+                  onApprovePlan: handleOpenApprovalDialog,
+                  onSpawnTask: (feature) => {
+                    setSpawnParentFeature(feature);
+                    setShowAddDialog(true);
+                  },
+                  onDuplicate: (feature) => handleDuplicateFeature(feature, false),
+                  onDuplicateAsChild: (feature) => handleDuplicateFeature(feature, true),
+                  onDuplicateAsChildMultiple: (feature) => setDuplicateMultipleFeature(feature),
+                }}
+                runningAutoTasks={runningAutoTasksAllWorktrees}
+                pipelineConfig={pipelineConfig}
+                onAddFeature={() => setShowAddDialog(true)}
+                onQuickAdd={() => setShowQuickAddDialog(true)}
+                onTemplateSelect={handleTemplateSelect}
+                templates={featureTemplates}
+                isSelectionMode={isSelectionMode}
+                selectedFeatureIds={selectedFeatureIds}
+                onToggleFeatureSelection={toggleFeatureSelection}
+                onRowClick={(feature) => {
+                  if (feature.status === 'backlog') {
+                    setEditingFeature(feature);
+                  } else {
+                    handleViewOutput(feature);
+                  }
+                }}
+                className="transition-opacity duration-200"
+              />
+            ) : (
+              <KanbanBoard
+                activeFeature={activeFeature}
+                getColumnFeatures={getColumnFeatures}
+                backgroundImageStyle={backgroundImageStyle}
+                backgroundSettings={backgroundSettings}
+                onEdit={(feature) => setEditingFeature(feature)}
+                onDelete={(featureId) => handleDeleteFeature(featureId)}
+                onViewOutput={handleViewOutput}
+                onVerify={handleVerifyFeature}
+                onResume={handleResumeFeature}
+                onForceStop={handleForceStopFeature}
+                onManualVerify={handleManualVerify}
+                onMoveBackToInProgress={handleMoveBackToInProgress}
+                onFollowUp={handleOpenFollowUp}
+                onComplete={handleCompleteFeature}
+                onImplement={handleStartImplementation}
+                onViewPlan={(feature) => setViewPlanFeature(feature)}
+                onApprovePlan={handleOpenApprovalDialog}
+                onSpawnTask={(feature) => {
+                  setSpawnParentFeature(feature);
+                  setShowAddDialog(true);
+                }}
+                onDuplicate={(feature) => handleDuplicateFeature(feature, false)}
+                onDuplicateAsChild={(feature) => handleDuplicateFeature(feature, true)}
+                onDuplicateAsChildMultiple={(feature) => setDuplicateMultipleFeature(feature)}
+                featuresWithContext={featuresWithContext}
+                runningAutoTasks={runningAutoTasksAllWorktrees}
+                onArchiveAllVerified={() => setShowArchiveAllVerifiedDialog(true)}
+                onAddFeature={() => setShowAddDialog(true)}
+                onQuickAdd={() => setShowQuickAddDialog(true)}
+                onTemplateSelect={handleTemplateSelect}
+                templates={featureTemplates}
+                addFeatureShortcut={keyboardShortcuts.addFeature}
+                onShowCompletedModal={() => setShowCompletedModal(true)}
+                completedCount={completedFeatures.length}
+                pipelineConfig={pipelineConfig ?? null}
+                onOpenPipelineSettings={() => setShowPipelineSettings(true)}
+                isSelectionMode={isSelectionMode}
+                selectionTarget={selectionTarget}
+                selectedFeatureIds={selectedFeatureIds}
+                onToggleFeatureSelection={toggleFeatureSelection}
+                onToggleSelectionMode={toggleSelectionMode}
+                isDragging={activeFeature !== null}
+                onAiSuggest={() => setShowPlanDialog(true)}
+                className="transition-opacity duration-200"
+              />
+            )}
+          </div>
+        </DndContext>
+      </BoardErrorBoundary>
 
       {/* Selection Action Bar */}
       {isSelectionMode && (
@@ -1795,6 +1908,14 @@ export function BoardView() {
         }
         // When the worktree setting is disabled, force 'current' branch mode
         forceCurrentBranchMode={!addFeatureUseSelectedWorktreeBranch}
+      />
+
+      {/* Quick Add Dialog */}
+      <QuickAddDialog
+        open={showQuickAddDialog}
+        onOpenChange={setShowQuickAddDialog}
+        onAdd={handleQuickAdd}
+        onAddAndStart={handleQuickAddAndStart}
       />
 
       {/* Dependency Link Dialog */}
@@ -2022,14 +2143,19 @@ export function BoardView() {
           //    cascade into React error #185.
           batchResetBranchFeatures(deletedWorktree.branch);
 
-          // 5. Do NOT trigger setWorktreeRefreshKey here. The optimistic
-          //    cache update (step 3) already removed the worktree from
-          //    both the Zustand store and React Query cache. Incrementing
-          //    the refresh key would cause invalidateQueries → server
-          //    refetch, and if the server's .worktrees/ directory scan
-          //    finds remnants of the deleted worktree, it would re-add
-          //    it to the dropdown. The 30-second polling interval in
-          //    WorktreePanel will eventually reconcile with the server.
+          // 5. Schedule a deferred refetch to reconcile with the server.
+          //    The server has already completed the deletion, so this
+          //    refetch will return data without the deleted worktree.
+          //    This protects against stale in-flight polling responses
+          //    that may slip through the cancelQueries window and
+          //    overwrite the optimistic update above.
+          const projectPathForRefetch = currentProject.path;
+          setTimeout(() => {
+            queryClient.invalidateQueries({
+              queryKey: queryKeys.worktrees.all(projectPathForRefetch),
+            });
+          }, 1500);
+
           setSelectedWorktreeForAction(null);
 
           // 6. Force-sync settings immediately so the reset worktree

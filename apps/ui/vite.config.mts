@@ -242,6 +242,10 @@ export default defineConfig(({ command }) => {
       alias: {
         '@': path.resolve(__dirname, './src'),
       },
+      // Deduplicate React to prevent "Cannot read properties of null (reading 'useState')"
+      // errors caused by CJS packages (like use-sync-external-store used by zustand@4 inside
+      // @xyflow/react) resolving React to a different instance than the pre-bundled ESM React.
+      dedupe: ['react', 'react-dom'],
     },
     server: {
       host: process.env.HOST || '0.0.0.0',
@@ -281,7 +285,13 @@ export default defineConfig(({ command }) => {
           // Manual chunks for optimal caching and loading on mobile
           manualChunks(id) {
             // Vendor: React core (rarely changes, cache long-term)
-            if (id.includes('node_modules/react/') || id.includes('node_modules/react-dom/')) {
+            // Also include use-sync-external-store here since it uses CJS require('react')
+            // and must be in the same chunk as React to prevent null dispatcher errors.
+            if (
+              id.includes('node_modules/react/') ||
+              id.includes('node_modules/react-dom/') ||
+              id.includes('node_modules/use-sync-external-store/')
+            ) {
               return 'vendor-react';
             }
             // Vendor: TanStack Router + Query (used on every page)
@@ -328,6 +338,11 @@ export default defineConfig(({ command }) => {
     },
     optimizeDeps: {
       exclude: ['@automaker/platform'],
+      // Ensure CJS packages that use require('react') are pre-bundled together with React
+      // so that the CJS interop resolves to the same React instance as the rest of the app.
+      // Without this, use-sync-external-store (used by zustand@4 inside @xyflow/react) may
+      // get a null React reference, causing "Cannot read properties of null (reading 'useState')".
+      include: ['react', 'react-dom', 'use-sync-external-store'],
     },
     define: {
       __APP_VERSION__: JSON.stringify(appVersion),

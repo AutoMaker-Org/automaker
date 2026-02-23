@@ -14,7 +14,7 @@
 import path from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import type { Feature, PlanningMode, ThinkingLevel } from '@automaker/types';
+import type { Feature, PlanningMode, ThinkingLevel, ReasoningEffort } from '@automaker/types';
 import { DEFAULT_MAX_CONCURRENCY, DEFAULT_MODELS, stripProviderPrefix } from '@automaker/types';
 import { resolveModelString } from '@automaker/model-resolver';
 import { createLogger, loadContextFiles, classifyError } from '@automaker/utils';
@@ -213,7 +213,9 @@ export class AutoModeServiceFacade {
           previousContent?: string;
           systemPrompt?: string;
           autoLoadClaudeMd?: boolean;
+          useClaudeCodeSystemPrompt?: boolean;
           thinkingLevel?: ThinkingLevel;
+          reasoningEffort?: ReasoningEffort;
           branchName?: string | null;
           [key: string]: unknown;
         }
@@ -244,6 +246,7 @@ export class AutoModeServiceFacade {
         // internal defaults which may be much lower than intended (e.g., Codex CLI's
         // default turn limit can cause feature runs to stop prematurely).
         const autoLoadClaudeMd = opts?.autoLoadClaudeMd ?? false;
+        const useClaudeCodeSystemPrompt = opts?.useClaudeCodeSystemPrompt ?? true;
         let mcpServers: Record<string, unknown> | undefined;
         try {
           if (settingsService) {
@@ -265,6 +268,7 @@ export class AutoModeServiceFacade {
           systemPrompt: opts?.systemPrompt,
           abortController,
           autoLoadClaudeMd,
+          useClaudeCodeSystemPrompt,
           thinkingLevel: opts?.thinkingLevel,
           maxTurns: userMaxTurns,
           mcpServers: mcpServers as
@@ -292,7 +296,9 @@ export class AutoModeServiceFacade {
             previousContent: opts?.previousContent as string | undefined,
             systemPrompt: opts?.systemPrompt as string | undefined,
             autoLoadClaudeMd: opts?.autoLoadClaudeMd as boolean | undefined,
+            useClaudeCodeSystemPrompt,
             thinkingLevel: opts?.thinkingLevel as ThinkingLevel | undefined,
+            reasoningEffort: opts?.reasoningEffort as ReasoningEffort | undefined,
             branchName: opts?.branchName as string | null | undefined,
             provider,
             effectiveBareModel,
