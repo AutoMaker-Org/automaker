@@ -60,6 +60,7 @@ export function WorktreePanel({
   onDeleteWorktree,
   onCommit,
   onCreatePR,
+  onChangePRNumber,
   onCreateBranch,
   onAddressPRComments,
   onAutoAddressPRComments,
@@ -215,14 +216,22 @@ export function WorktreePanel({
     const otherSlotCount = Math.max(0, pinnedWorktreesCount);
 
     const storedBranches = useAppStore.getState().pinnedWorktreeBranchesByProject[projectPath];
-    if (
-      otherSlotCount > 0 &&
-      otherWts.length > 0 &&
-      (!storedBranches || storedBranches.length === 0)
-    ) {
-      // Initialize with default ordering
-      const defaultBranches = otherWts.slice(0, otherSlotCount).map((w) => w.branch);
-      setPinnedWorktreeBranches(projectPath, defaultBranches);
+    if (otherSlotCount > 0 && otherWts.length > 0) {
+      const existing = storedBranches ?? [];
+      if (existing.length < otherSlotCount) {
+        const used = new Set(existing.filter(Boolean));
+        const filled = [...existing];
+        for (const wt of otherWts) {
+          if (filled.length >= otherSlotCount) break;
+          if (!used.has(wt.branch)) {
+            filled.push(wt.branch);
+            used.add(wt.branch);
+          }
+        }
+        if (filled.length > 0) {
+          setPinnedWorktreeBranches(projectPath, filled);
+        }
+      }
     }
   }, [worktrees, pinnedWorktreesCount, projectPath, setPinnedWorktreeBranches]);
 
@@ -737,18 +746,6 @@ export function WorktreePanel({
     // Keep logPanelWorktree set for smooth close animation
   }, []);
 
-  // Wrap handleStartDevServer to auto-open the logs panel so the user
-  // can see output immediately (including failure reasons)
-  const handleStartDevServerAndShowLogs = useCallback(
-    async (worktree: WorktreeInfo) => {
-      // Open logs panel immediately so output is visible from the start
-      setLogPanelWorktree(worktree);
-      setLogPanelOpen(true);
-      await handleStartDevServer(worktree);
-    },
-    [handleStartDevServer]
-  );
-
   // Handle opening the push to remote dialog
   const handlePushNewBranch = useCallback((worktree: WorktreeInfo) => {
     setPushToRemoteWorktree(worktree);
@@ -1050,12 +1047,13 @@ export function WorktreePanel({
             onDiscardChanges={handleDiscardChanges}
             onCommit={onCommit}
             onCreatePR={onCreatePR}
+            onChangePRNumber={onChangePRNumber}
             onAddressPRComments={onAddressPRComments}
             onAutoAddressPRComments={onAutoAddressPRComments}
             onResolveConflicts={onResolveConflicts}
             onMerge={handleMerge}
             onDeleteWorktree={onDeleteWorktree}
-            onStartDevServer={handleStartDevServerAndShowLogs}
+            onStartDevServer={handleStartDevServer}
             onStopDevServer={handleStopDevServer}
             onOpenDevServerUrl={handleOpenDevServerUrl}
             onViewDevServerLogs={handleViewDevServerLogs}
@@ -1287,12 +1285,13 @@ export function WorktreePanel({
           onDiscardChanges={handleDiscardChanges}
           onCommit={onCommit}
           onCreatePR={onCreatePR}
+          onChangePRNumber={onChangePRNumber}
           onAddressPRComments={onAddressPRComments}
           onAutoAddressPRComments={onAutoAddressPRComments}
           onResolveConflicts={onResolveConflicts}
           onMerge={handleMerge}
           onDeleteWorktree={onDeleteWorktree}
-          onStartDevServer={handleStartDevServerAndShowLogs}
+          onStartDevServer={handleStartDevServer}
           onStopDevServer={handleStopDevServer}
           onOpenDevServerUrl={handleOpenDevServerUrl}
           onViewDevServerLogs={handleViewDevServerLogs}
@@ -1366,12 +1365,13 @@ export function WorktreePanel({
             onDiscardChanges={handleDiscardChanges}
             onCommit={onCommit}
             onCreatePR={onCreatePR}
+            onChangePRNumber={onChangePRNumber}
             onAddressPRComments={onAddressPRComments}
             onAutoAddressPRComments={onAutoAddressPRComments}
             onResolveConflicts={onResolveConflicts}
             onMerge={handleMerge}
             onDeleteWorktree={onDeleteWorktree}
-            onStartDevServer={handleStartDevServerAndShowLogs}
+            onStartDevServer={handleStartDevServer}
             onStopDevServer={handleStopDevServer}
             onOpenDevServerUrl={handleOpenDevServerUrl}
             onViewDevServerLogs={handleViewDevServerLogs}
@@ -1451,12 +1451,13 @@ export function WorktreePanel({
               onDiscardChanges={handleDiscardChanges}
               onCommit={onCommit}
               onCreatePR={onCreatePR}
+              onChangePRNumber={onChangePRNumber}
               onAddressPRComments={onAddressPRComments}
               onAutoAddressPRComments={onAutoAddressPRComments}
               onResolveConflicts={onResolveConflicts}
               onMerge={handleMerge}
               onDeleteWorktree={onDeleteWorktree}
-              onStartDevServer={handleStartDevServerAndShowLogs}
+              onStartDevServer={handleStartDevServer}
               onStopDevServer={handleStopDevServer}
               onOpenDevServerUrl={handleOpenDevServerUrl}
               onViewDevServerLogs={handleViewDevServerLogs}

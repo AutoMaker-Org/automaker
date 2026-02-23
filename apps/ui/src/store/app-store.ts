@@ -2667,7 +2667,7 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
         [projectPath]: count,
       },
     })),
-  getPinnedWorktreesCount: (projectPath) => get().pinnedWorktreesCountByProject[projectPath] ?? 1,
+  getPinnedWorktreesCount: (projectPath) => get().pinnedWorktreesCountByProject[projectPath] ?? 0,
   setPinnedWorktreeBranches: (projectPath, branches) =>
     set((state) => ({
       pinnedWorktreeBranchesByProject: {
@@ -2716,7 +2716,7 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
       },
     })),
   getAlwaysUseWorktreeDropdown: (projectPath) =>
-    get().alwaysUseWorktreeDropdownByProject[projectPath] ?? false,
+    get().alwaysUseWorktreeDropdownByProject[projectPath] ?? true,
 
   // UI State actions
   setWorktreePanelCollapsed: (collapsed) => set({ worktreePanelCollapsed: collapsed }),

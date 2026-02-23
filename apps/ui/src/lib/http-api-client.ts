@@ -2238,6 +2238,8 @@ export class HttpApiClient implements ElectronAPI {
       this.post('/api/worktree/set-tracking', { worktreePath, remote, branch }),
     createPR: (worktreePath: string, options?: CreatePROptions) =>
       this.post('/api/worktree/create-pr', { worktreePath, ...options }),
+    updatePRNumber: (worktreePath: string, prNumber: number, projectPath?: string) =>
+      this.post('/api/worktree/update-pr-number', { worktreePath, prNumber, projectPath }),
     getDiffs: (projectPath: string, featureId: string) =>
       this.post('/api/worktree/diffs', { projectPath, featureId }),
     getFileDiff: (projectPath: string, featureId: string, filePath: string) =>

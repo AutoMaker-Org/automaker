@@ -272,6 +272,9 @@ export class EventHookService {
   private async handleFeatureCompletedEvent(payload: FeatureCompletedPayload): Promise<void> {
     if (!payload.featureId || !payload.projectPath) return;
 
+    // Mark as handled to prevent duplicate firing if feature_status_changed also fires
+    this.markFeatureHandled(payload.featureId);
+
     const passes = payload.passes ?? true;
     const trigger: EventHookTrigger = passes ? 'feature_success' : 'feature_error';
 

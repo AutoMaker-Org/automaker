@@ -292,7 +292,7 @@ function createDiffDecorations(diffContent: string | null | undefined): Extensio
         const doc = view.state.doc;
 
         for (const lineNum of addedLines) {
-          if (lineNum <= doc.lines) {
+          if (lineNum >= 1 && lineNum <= doc.lines) {
             const linePos = doc.line(lineNum).from;
             builder.add(linePos, linePos, addedLineDecoration);
           }
@@ -315,7 +315,7 @@ function createDiffDecorations(diffContent: string | null | undefined): Extensio
 
       for (const pos of positions) {
         const deletedLines = deletedGroups.get(pos)!;
-        if (pos <= doc.lines) {
+        if (pos >= 1 && pos <= doc.lines) {
           const linePos = doc.line(pos).from;
           builder.add(
             linePos,

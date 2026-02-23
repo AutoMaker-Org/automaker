@@ -66,6 +66,7 @@ interface WorktreeTabProps {
   onDiscardChanges: (worktree: WorktreeInfo) => void;
   onCommit: (worktree: WorktreeInfo) => void;
   onCreatePR: (worktree: WorktreeInfo) => void;
+  onChangePRNumber?: (worktree: WorktreeInfo) => void;
   onAddressPRComments: (worktree: WorktreeInfo, prInfo: PRInfo) => void;
   onAutoAddressPRComments: (worktree: WorktreeInfo, prInfo: PRInfo) => void;
   onResolveConflicts: (worktree: WorktreeInfo) => void;
@@ -172,6 +173,7 @@ export function WorktreeTab({
   onDiscardChanges,
   onCommit,
   onCreatePR,
+  onChangePRNumber,
   onAddressPRComments,
   onAutoAddressPRComments,
   onResolveConflicts,
@@ -554,6 +556,7 @@ export function WorktreeTab({
         onDiscardChanges={onDiscardChanges}
         onCommit={onCommit}
         onCreatePR={onCreatePR}
+        onChangePRNumber={onChangePRNumber}
         onAddressPRComments={onAddressPRComments}
         onAutoAddressPRComments={onAutoAddressPRComments}
         onResolveConflicts={onResolveConflicts}

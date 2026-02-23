@@ -68,9 +68,7 @@ export function WorktreePreferencesSection({ project }: WorktreePreferencesSecti
   const setWorktreeCopyFiles = useAppStore((s) => s.setWorktreeCopyFiles);
 
   // Worktree display settings
-  const pinnedWorktreesCount = useAppStore(
-    (s) => s.pinnedWorktreesCountByProject[project.path] ?? 0
-  );
+  const pinnedWorktreesCount = useAppStore((s) => s.getPinnedWorktreesCount(project.path));
   const setPinnedWorktreesCount = useAppStore((s) => s.setPinnedWorktreesCount);
 
   // Get effective worktrees setting (project override or global fallback)
@@ -559,11 +557,11 @@ export function WorktreePreferencesSection({ project }: WorktreePreferencesSecti
                 value={[pinnedWorktreesCount]}
                 onValueChange={(value) => {
                   // Update local state immediately for visual feedback
-                  const newValue = value[0] ?? 1;
+                  const newValue = value[0] ?? pinnedWorktreesCount;
                   setPinnedWorktreesCount(project.path, newValue);
                 }}
                 onValueCommit={async (value) => {
-                  const newValue = value[0] ?? 1;
+                  const newValue = value[0] ?? pinnedWorktreesCount;
 
                   // Persist to server
                   try {

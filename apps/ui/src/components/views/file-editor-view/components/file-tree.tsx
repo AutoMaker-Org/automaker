@@ -116,6 +116,7 @@ const STATUS_PRIORITY: Record<string, number> = {
   A: 4, // Added
   M: 3, // Modified
   R: 2, // Renamed
+  C: 2, // Copied
   S: 1, // Staged
   '?': 0, // Untracked
 };
@@ -536,7 +537,7 @@ function TreeNode({
                   'bg-cyan-500': folderRollup.dominantStatus === 'C',
                   'bg-orange-500': folderRollup.dominantStatus === 'U',
                 })}
-                title={`${getGitStatusLabel(folderRollup.dominantStatus ?? undefined)} (${folderRollup.count})`}
+                title={`${folderRollup.dominantStatus ? getGitStatusLabel(folderRollup.dominantStatus) : 'Changed'} (${folderRollup.count})`}
               />
             </>
           )}

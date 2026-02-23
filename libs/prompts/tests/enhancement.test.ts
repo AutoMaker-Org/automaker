@@ -331,11 +331,12 @@ describe('enhancement.ts', () => {
 
     describe('all modes', () => {
       it('should work for all valid enhancement modes', () => {
-        const modes: Array<'improve' | 'technical' | 'simplify' | 'acceptance'> = [
+        const modes: Array<'improve' | 'technical' | 'simplify' | 'acceptance' | 'ux-reviewer'> = [
           'improve',
           'technical',
           'simplify',
           'acceptance',
+          'ux-reviewer',
         ];
 
         modes.forEach((mode) => {

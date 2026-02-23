@@ -69,6 +69,7 @@ import { createStageFilesHandler } from './routes/stage-files.js';
 import { createCheckChangesHandler } from './routes/check-changes.js';
 import { createSetTrackingHandler } from './routes/set-tracking.js';
 import { createSyncHandler } from './routes/sync.js';
+import { createUpdatePRNumberHandler } from './routes/update-pr-number.js';
 import type { SettingsService } from '../../services/settings-service.js';
 
 export function createWorktreeRoutes(
@@ -96,6 +97,11 @@ export function createWorktreeRoutes(
   router.post('/delete', validatePathParams('projectPath', 'worktreePath'), createDeleteHandler());
   router.post('/create-pr', createCreatePRHandler());
   router.post('/pr-info', createPRInfoHandler());
+  router.post(
+    '/update-pr-number',
+    validatePathParams('worktreePath'),
+    createUpdatePRNumberHandler()
+  );
   router.post(
     '/commit',
     validatePathParams('worktreePath'),

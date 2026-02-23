@@ -45,6 +45,7 @@ import {
   Settings2,
   ArrowLeftRight,
   Check,
+  Hash,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -107,6 +108,7 @@ interface WorktreeActionsDropdownProps {
   onDiscardChanges: (worktree: WorktreeInfo) => void;
   onCommit: (worktree: WorktreeInfo) => void;
   onCreatePR: (worktree: WorktreeInfo) => void;
+  onChangePRNumber?: (worktree: WorktreeInfo) => void;
   onAddressPRComments: (worktree: WorktreeInfo, prInfo: PRInfo) => void;
   onAutoAddressPRComments: (worktree: WorktreeInfo, prInfo: PRInfo) => void;
   onResolveConflicts: (worktree: WorktreeInfo) => void;
@@ -269,6 +271,7 @@ export function WorktreeActionsDropdown({
   onDiscardChanges,
   onCommit,
   onCreatePR,
+  onChangePRNumber,
   onAddressPRComments,
   onAutoAddressPRComments,
   onResolveConflicts,
@@ -1348,6 +1351,12 @@ export function WorktreeActionsDropdown({
                 <Zap className="w-3.5 h-3.5 mr-2" />
                 Address PR Comments
               </DropdownMenuItem>
+              {onChangePRNumber && (
+                <DropdownMenuItem onClick={() => onChangePRNumber(worktree)} className="text-xs">
+                  <Hash className="w-3.5 h-3.5 mr-2" />
+                  Change PR Number
+                </DropdownMenuItem>
+              )}
             </DropdownMenuSubContent>
           </DropdownMenuSub>
         )}

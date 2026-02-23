@@ -102,6 +102,7 @@ export interface WorktreeDropdownProps {
   onDiscardChanges: (worktree: WorktreeInfo) => void;
   onCommit: (worktree: WorktreeInfo) => void;
   onCreatePR: (worktree: WorktreeInfo) => void;
+  onChangePRNumber?: (worktree: WorktreeInfo) => void;
   onAddressPRComments: (worktree: WorktreeInfo, prInfo: PRInfo) => void;
   onAutoAddressPRComments: (worktree: WorktreeInfo, prInfo: PRInfo) => void;
   onResolveConflicts: (worktree: WorktreeInfo) => void;
@@ -217,6 +218,7 @@ export function WorktreeDropdown({
   onDiscardChanges,
   onCommit,
   onCreatePR,
+  onChangePRNumber,
   onAddressPRComments,
   onAutoAddressPRComments,
   onResolveConflicts,
@@ -251,7 +253,9 @@ export function WorktreeDropdown({
 }: WorktreeDropdownProps) {
   // Find the currently selected worktree to display in the trigger
   const selectedWorktree = worktrees.find((w) => isWorktreeSelected(w));
-  const displayBranch = selectedWorktree?.branch || `+${worktrees.length} more`;
+  const displayBranch =
+    selectedWorktree?.branch ??
+    (worktrees.length > 0 ? `+${worktrees.length} more` : 'Select worktree');
   const { truncated: truncatedBranch, isTruncated: isBranchNameTruncated } = truncateBranchName(
     displayBranch,
     MAX_TRIGGER_BRANCH_NAME_LENGTH
@@ -564,6 +568,7 @@ export function WorktreeDropdown({
           onDiscardChanges={onDiscardChanges}
           onCommit={onCommit}
           onCreatePR={onCreatePR}
+          onChangePRNumber={onChangePRNumber}
           onAddressPRComments={onAddressPRComments}
           onAutoAddressPRComments={onAutoAddressPRComments}
           onResolveConflicts={onResolveConflicts}

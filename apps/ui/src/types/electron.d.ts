@@ -1075,6 +1075,27 @@ export interface WorktreeAPI {
     error?: string;
   }>;
 
+  // Update the tracked PR number for a worktree branch
+  updatePRNumber: (
+    worktreePath: string,
+    prNumber: number,
+    projectPath?: string
+  ) => Promise<{
+    success: boolean;
+    result?: {
+      branch: string;
+      prInfo: {
+        number: number;
+        url: string;
+        title: string;
+        state: string;
+        createdAt: string;
+      };
+      ghCliUnavailable?: boolean;
+    };
+    error?: string;
+  }>;
+
   // Get file diffs for a feature worktree
   getDiffs: (projectPath: string, featureId: string) => Promise<FileDiffsResult>;
 

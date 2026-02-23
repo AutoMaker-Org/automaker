@@ -2334,6 +2334,23 @@ function createMockWorktreeAPI(): WorktreeAPI {
       };
     },
 
+    updatePRNumber: async (worktreePath: string, prNumber: number, projectPath?: string) => {
+      console.log('[Mock] Updating PR number:', { worktreePath, prNumber, projectPath });
+      return {
+        success: true,
+        result: {
+          branch: 'feature-branch',
+          prInfo: {
+            number: prNumber,
+            url: `https://github.com/example/repo/pull/${prNumber}`,
+            title: `PR #${prNumber}`,
+            state: 'OPEN',
+            createdAt: new Date().toISOString(),
+          },
+        },
+      };
+    },
+
     getDiffs: async (projectPath: string, featureId: string) => {
       console.log('[Mock] Getting file diffs:', { projectPath, featureId });
       return {

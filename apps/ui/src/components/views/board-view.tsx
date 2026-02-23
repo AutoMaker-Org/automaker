@@ -70,6 +70,7 @@ import { CreateWorktreeDialog } from './board-view/dialogs/create-worktree-dialo
 import { DeleteWorktreeDialog } from './board-view/dialogs/delete-worktree-dialog';
 import { CommitWorktreeDialog } from './board-view/dialogs/commit-worktree-dialog';
 import { CreatePRDialog } from './board-view/dialogs/create-pr-dialog';
+import { ChangePRNumberDialog } from './board-view/dialogs/change-pr-number-dialog';
 import { CreateBranchDialog } from './board-view/dialogs/create-branch-dialog';
 import { WorktreePanel } from './board-view/worktree-panel';
 import type {
@@ -198,6 +199,7 @@ export function BoardView() {
   const [showDeleteWorktreeDialog, setShowDeleteWorktreeDialog] = useState(false);
   const [showCommitWorktreeDialog, setShowCommitWorktreeDialog] = useState(false);
   const [showCreatePRDialog, setShowCreatePRDialog] = useState(false);
+  const [showChangePRNumberDialog, setShowChangePRNumberDialog] = useState(false);
   const [showCreateBranchDialog, setShowCreateBranchDialog] = useState(false);
   const [showMergeRebaseDialog, setShowMergeRebaseDialog] = useState(false);
   const [showPRCommentDialog, setShowPRCommentDialog] = useState(false);
@@ -1693,6 +1695,10 @@ export function BoardView() {
                 setSelectedWorktreeForAction(worktree);
                 setShowCreatePRDialog(true);
               }}
+              onChangePRNumber={(worktree) => {
+                setSelectedWorktreeForAction(worktree);
+                setShowChangePRNumberDialog(true);
+              }}
               onCreateBranch={(worktree) => {
                 setSelectedWorktreeForAction(worktree);
                 setShowCreateBranchDialog(true);
@@ -2226,6 +2232,18 @@ export function BoardView() {
               featuresToUpdate.map((feature) => persistFeatureUpdate(feature.id, { prUrl }))
             ).catch((err) => logger.error('Error in handleMove:', err));
           }
+          setWorktreeRefreshKey((k) => k + 1);
+          setSelectedWorktreeForAction(null);
+        }}
+      />
+
+      {/* Change PR Number Dialog */}
+      <ChangePRNumberDialog
+        open={showChangePRNumberDialog}
+        onOpenChange={setShowChangePRNumberDialog}
+        worktree={selectedWorktreeForAction}
+        projectPath={currentProject?.path || null}
+        onChanged={() => {
           setWorktreeRefreshKey((k) => k + 1);
           setSelectedWorktreeForAction(null);
         }}

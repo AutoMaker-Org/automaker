@@ -29,7 +29,7 @@ import { swift } from '@codemirror/legacy-modes/mode/swift';
 
 /** Detect language extension based on file extension */
 export function getLanguageExtension(filePath: string): Extension | null {
-  const name = filePath.split('/').pop()?.toLowerCase() || '';
+  const name = filePath.split(/[/\\]/).pop()?.toLowerCase() || '';
   const dotIndex = name.lastIndexOf('.');
   // Files without an extension (no dot, or dotfile with dot at position 0)
   const ext = dotIndex > 0 ? name.slice(dotIndex + 1) : '';
