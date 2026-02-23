@@ -18,7 +18,7 @@ import {
 
 /**
  * Helper to build overview API response bodies.
- * Each test sets `overviewMockResponse` before navigating so the single
+ * Each test sets `overviewMock` before navigating so the single
  * route handler registered in `beforeEach` returns the right data.
  */
 function makeOverviewResponse(
@@ -73,34 +73,38 @@ test.describe('Projects Overview Dashboard', () => {
       if (method === 'PUT') {
         return route.continue();
       }
-      const response = await route.fetch();
-      const json = await response.json();
-      if (json.settings) {
-        json.settings.projects = [
-          {
-            id: 'test-project-1',
-            name: 'Test Project 1',
-            path: '/mock/test-project-1',
-            lastOpened: new Date().toISOString(),
-          },
-          {
-            id: 'test-project-2',
-            name: 'Test Project 2',
-            path: '/mock/test-project-2',
-            lastOpened: new Date(Date.now() - 86400000).toISOString(),
-          },
-          {
-            id: 'test-project-3',
-            name: 'Test Project 3',
-            path: '/mock/test-project-3',
-            lastOpened: new Date(Date.now() - 172800000).toISOString(),
-          },
-        ];
-        json.settings.currentProjectId = 'test-project-1';
-        json.settings.setupComplete = true;
-        json.settings.isFirstRun = false;
+      try {
+        const response = await route.fetch();
+        const json = await response.json();
+        if (json.settings) {
+          json.settings.projects = [
+            {
+              id: 'test-project-1',
+              name: 'Test Project 1',
+              path: '/mock/test-project-1',
+              lastOpened: new Date().toISOString(),
+            },
+            {
+              id: 'test-project-2',
+              name: 'Test Project 2',
+              path: '/mock/test-project-2',
+              lastOpened: new Date(Date.now() - 86400000).toISOString(),
+            },
+            {
+              id: 'test-project-3',
+              name: 'Test Project 3',
+              path: '/mock/test-project-3',
+              lastOpened: new Date(Date.now() - 172800000).toISOString(),
+            },
+          ];
+          json.settings.currentProjectId = 'test-project-1';
+          json.settings.setupComplete = true;
+          json.settings.isFirstRun = false;
+        }
+        await route.fulfill({ response, json });
+      } catch {
+        // Route may be called after test ends; swallow errors from closed context
       }
-      await route.fulfill({ response, json });
     });
 
     // Mock the initialize-project endpoint for mock paths that don't exist on disk.

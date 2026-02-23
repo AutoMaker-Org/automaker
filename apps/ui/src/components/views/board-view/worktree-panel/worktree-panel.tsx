@@ -1358,10 +1358,6 @@ export function WorktreePanel({
             onSetTracking={handleSetTrackingForRemote}
             remotesWithBranch={remotesWithBranch}
             remotes={remotesCache[mainWorktree.path]}
-            isSyncing={isSyncing}
-            onSync={handleSyncWithRemoteSelection}
-            onSyncWithRemote={handleSyncWithSpecificRemote}
-            onSetTracking={handleSetTrackingForRemote}
             onOpenInEditor={handleOpenInEditor}
             onOpenInIntegratedTerminal={handleOpenInIntegratedTerminal}
             onOpenInExternalTerminal={handleOpenInExternalTerminal}

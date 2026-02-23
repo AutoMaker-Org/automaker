@@ -19,6 +19,7 @@ export default defineConfig({
     baseURL: `http://localhost:${port}`,
     trace: 'on-failure',
     screenshot: 'only-on-failure',
+    serviceWorkers: 'block',
   },
   // Global setup - authenticate before each test
   globalSetup: require.resolve('./tests/global-setup.ts'),
