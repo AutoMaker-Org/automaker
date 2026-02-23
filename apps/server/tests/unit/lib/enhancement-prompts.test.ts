@@ -168,7 +168,7 @@ describe('enhancement-prompts.ts', () => {
       const prompt = buildUserPrompt('improve', testText);
       expect(prompt).toContain('Example 1:');
       expect(prompt).toContain(testText);
-      expect(prompt).toContain('Now, please enhance the following task description:');
+      expect(prompt).toContain('Please enhance the following task description:');
     });
 
     it('should build prompt without examples when includeExamples is false', () => {

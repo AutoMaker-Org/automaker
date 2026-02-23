@@ -1206,7 +1206,7 @@ export interface GlobalSettings {
   /** Default maximum number of agent turns (tool call round-trips) for feature execution.
    * Controls how many iterations the AI agent can perform before stopping.
    * Higher values allow more complex tasks but use more API credits.
-   * Defaults to 1000. Range: 1-2000.
+   * Defaults to 10000. Range: 1-10000.
    *
    * Note: Currently supported by Claude (via SDK) and Codex (via CLI config).
    * Gemini and OpenCode CLI providers do not support max turns configuration. */
@@ -1750,7 +1750,7 @@ export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
   phaseModels: DEFAULT_PHASE_MODELS,
   defaultThinkingLevel: 'adaptive',
   defaultReasoningEffort: 'none',
-  defaultMaxTurns: 1000,
+  defaultMaxTurns: 10000,
   enhancementModel: 'sonnet', // Legacy alias still supported
   validationModel: 'opus', // Legacy alias still supported
   enabledCursorModels: getAllCursorModelIds(), // Returns prefixed IDs

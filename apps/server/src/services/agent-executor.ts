@@ -38,7 +38,7 @@ export type {
 
 const logger = createLogger('AgentExecutor');
 
-const DEFAULT_MAX_TURNS = 1000;
+const DEFAULT_MAX_TURNS = 10000;
 
 export class AgentExecutor {
   private static readonly WRITE_DEBOUNCE_MS = 500;

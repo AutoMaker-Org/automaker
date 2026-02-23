@@ -239,7 +239,7 @@ describe('enhancement.ts', () => {
       it("should include examples by default for 'technical' mode", () => {
         const result = buildUserPrompt('technical', testText);
 
-        expect(result).toContain('Here are some examples');
+        expect(result).toContain('Here are examples of the additional details section');
         expect(result).toContain('Example 1:');
         expect(result).toContain(TECHNICAL_EXAMPLES[0].input);
         expect(result).toContain(testText);
@@ -268,10 +268,10 @@ describe('enhancement.ts', () => {
         expect(dividerCount).toBe(IMPROVE_EXAMPLES.length);
       });
 
-      it("should include 'Now, please enhance' before user text", () => {
+      it("should include 'Please enhance' before user text", () => {
         const result = buildUserPrompt('improve', testText);
 
-        expect(result).toContain('Now, please enhance the following');
+        expect(result).toContain('Please enhance the following task description:');
         expect(result).toContain(testText);
       });
     });
@@ -295,7 +295,7 @@ describe('enhancement.ts', () => {
         const result = buildUserPrompt('technical', testText, false);
 
         expect(result).toContain(testText);
-        expect(result).toContain('Please enhance');
+        expect(result).toContain('Generate ONLY the additional details');
       });
     });
 
@@ -310,8 +310,8 @@ describe('enhancement.ts', () => {
       it('should handle empty text', () => {
         const result = buildUserPrompt('improve', '');
 
-        // With examples by default, it should contain "Now, please enhance"
-        expect(result).toContain('Now, please enhance');
+        // With examples by default, it should contain "Please enhance"
+        expect(result).toContain('Please enhance the following task description:');
         expect(result).toContain('Here are some examples');
       });
 
