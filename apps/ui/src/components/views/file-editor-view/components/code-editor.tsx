@@ -1,34 +1,13 @@
 import { useMemo, useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
 import CodeMirror, { type ReactCodeMirrorRef } from '@uiw/react-codemirror';
-import { EditorView, keymap } from '@codemirror/view';
-import { Extension } from '@codemirror/state';
+import { EditorView, keymap, Decoration, WidgetType } from '@codemirror/view';
+import { Extension, RangeSetBuilder, StateField } from '@codemirror/state';
 import { undo as cmUndo, redo as cmRedo } from '@codemirror/commands';
 import { HighlightStyle, syntaxHighlighting } from '@codemirror/language';
 import { tags as t } from '@lezer/highlight';
 import { search, openSearchPanel } from '@codemirror/search';
 
-// Language imports
-import { javascript } from '@codemirror/lang-javascript';
-import { html } from '@codemirror/lang-html';
-import { css } from '@codemirror/lang-css';
-import { json } from '@codemirror/lang-json';
-import { markdown } from '@codemirror/lang-markdown';
-import { python } from '@codemirror/lang-python';
-import { java } from '@codemirror/lang-java';
-import { rust } from '@codemirror/lang-rust';
-import { cpp } from '@codemirror/lang-cpp';
-import { sql } from '@codemirror/lang-sql';
-import { php } from '@codemirror/lang-php';
-import { xml } from '@codemirror/lang-xml';
-import { StreamLanguage } from '@codemirror/language';
-import { shell } from '@codemirror/legacy-modes/mode/shell';
-import { yaml } from '@codemirror/legacy-modes/mode/yaml';
-import { toml } from '@codemirror/legacy-modes/mode/toml';
-import { dockerFile } from '@codemirror/legacy-modes/mode/dockerfile';
-import { go } from '@codemirror/legacy-modes/mode/go';
-import { ruby } from '@codemirror/legacy-modes/mode/ruby';
-import { swift } from '@codemirror/legacy-modes/mode/swift';
-
+import { getLanguageExtension } from '@/lib/codemirror-languages';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-media-query';
 import { DEFAULT_FONT_VALUE } from '@/config/ui-font-options';
@@ -55,6 +34,8 @@ export interface CodeEditorHandle {
   undo: () => void;
   /** Redoes the last undone edit */
   redo: () => void;
+  /** Returns the current text selection with line range, or null if nothing is selected */
+  getSelection: () => { text: string; fromLine: number; toLine: number } | null;
 }
 
 interface CodeEditorProps {
@@ -72,133 +53,10 @@ interface CodeEditorProps {
   className?: string;
   /** When true, scrolls the cursor into view (e.g. after virtual keyboard opens) */
   scrollCursorIntoView?: boolean;
-}
-
-/** Detect language extension based on file extension */
-function getLanguageExtension(filePath: string): Extension | null {
-  const name = filePath.split('/').pop()?.toLowerCase() || '';
-  const dotIndex = name.lastIndexOf('.');
-  // Files without an extension (no dot, or dotfile with dot at position 0)
-  const ext = dotIndex > 0 ? name.slice(dotIndex + 1) : '';
-
-  // Handle files by name first
-  switch (name) {
-    case 'dockerfile':
-    case 'dockerfile.dev':
-    case 'dockerfile.prod':
-      return StreamLanguage.define(dockerFile);
-    case 'makefile':
-    case 'gnumakefile':
-      return StreamLanguage.define(shell);
-    case '.gitignore':
-    case '.dockerignore':
-    case '.npmignore':
-    case '.eslintignore':
-      return StreamLanguage.define(shell); // close enough for ignore files
-    case '.env':
-    case '.env.local':
-    case '.env.development':
-    case '.env.production':
-      return StreamLanguage.define(shell);
-  }
-
-  switch (ext) {
-    // JavaScript/TypeScript
-    case 'js':
-    case 'mjs':
-    case 'cjs':
-      return javascript();
-    case 'jsx':
-      return javascript({ jsx: true });
-    case 'ts':
-    case 'mts':
-    case 'cts':
-      return javascript({ typescript: true });
-    case 'tsx':
-      return javascript({ jsx: true, typescript: true });
-
-    // Web
-    case 'html':
-    case 'htm':
-    case 'svelte':
-    case 'vue':
-      return html();
-    case 'css':
-    case 'scss':
-    case 'less':
-      return css();
-    case 'json':
-    case 'jsonc':
-    case 'json5':
-      return json();
-    case 'xml':
-    case 'svg':
-    case 'xsl':
-    case 'xslt':
-    case 'plist':
-      return xml();
-
-    // Markdown
-    case 'md':
-    case 'mdx':
-    case 'markdown':
-      return markdown();
-
-    // Python
-    case 'py':
-    case 'pyx':
-    case 'pyi':
-      return python();
-
-    // Java/Kotlin
-    case 'java':
-    case 'kt':
-    case 'kts':
-      return java();
-
-    // Systems
-    case 'rs':
-      return rust();
-    case 'c':
-    case 'h':
-      return cpp();
-    case 'cpp':
-    case 'cc':
-    case 'cxx':
-    case 'hpp':
-    case 'hxx':
-      return cpp();
-    case 'go':
-      return StreamLanguage.define(go);
-    case 'swift':
-      return StreamLanguage.define(swift);
-
-    // Scripting
-    case 'rb':
-    case 'erb':
-      return StreamLanguage.define(ruby);
-    case 'php':
-      return php();
-    case 'sh':
-    case 'bash':
-    case 'zsh':
-    case 'fish':
-      return StreamLanguage.define(shell);
-
-    // Data
-    case 'sql':
-    case 'mysql':
-    case 'pgsql':
-      return sql();
-    case 'yaml':
-    case 'yml':
-      return StreamLanguage.define(yaml);
-    case 'toml':
-      return StreamLanguage.define(toml);
-
-    default:
-      return null; // Plain text fallback
-  }
+  /** Raw unified diff string for the file, used to highlight added/removed lines */
+  diffContent?: string | null;
+  /** Fires when the text selection state changes (true = non-empty selection) */
+  onSelectionChange?: (hasSelection: boolean) => void;
 }
 
 /** Get a human-readable language name */
@@ -295,6 +153,217 @@ export function getLanguageName(filePath: string): string {
   }
 }
 
+// ─── Inline Diff Decorations ─────────────────────────────────────────────
+
+/** Parsed diff info: added line numbers and groups of deleted lines with content */
+interface DiffInfo {
+  addedLines: Set<number>;
+  /**
+   * Groups of consecutive deleted lines keyed by the new-file line number
+   * they appear before. E.g. key=3 means the deleted lines were removed
+   * just before line 3 in the current file.
+   */
+  deletedGroups: Map<number, string[]>;
+}
+
+/** Parse a unified diff to extract added lines and groups of deleted lines */
+function parseUnifiedDiff(diffContent: string): DiffInfo {
+  const addedLines = new Set<number>();
+  const deletedGroups = new Map<number, string[]>();
+  const lines = diffContent.split('\n');
+
+  let currentNewLine = 0;
+  let inHunk = false;
+  let pendingDeletions: string[] = [];
+
+  const flushDeletions = () => {
+    if (pendingDeletions.length > 0) {
+      const existing = deletedGroups.get(currentNewLine);
+      if (existing) {
+        existing.push(...pendingDeletions);
+      } else {
+        deletedGroups.set(currentNewLine, [...pendingDeletions]);
+      }
+      pendingDeletions = [];
+    }
+  };
+
+  for (const line of lines) {
+    // Parse hunk header: @@ -oldStart,oldCount +newStart,newCount @@ ...
+    if (line.startsWith('@@')) {
+      flushDeletions();
+      const match = line.match(/@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
+      if (match) {
+        currentNewLine = parseInt(match[1], 10);
+        inHunk = true;
+      }
+      continue;
+    }
+
+    if (!inHunk) continue;
+
+    // Skip diff header lines
+    if (
+      line.startsWith('--- ') ||
+      line.startsWith('+++ ') ||
+      line.startsWith('diff ') ||
+      line.startsWith('index ')
+    ) {
+      continue;
+    }
+
+    if (line.startsWith('+')) {
+      flushDeletions();
+      addedLines.add(currentNewLine);
+      currentNewLine++;
+    } else if (line.startsWith('-')) {
+      // Accumulate deleted lines to show as a group
+      pendingDeletions.push(line.substring(1));
+    } else if (line.startsWith(' ') || line === '') {
+      flushDeletions();
+      if (!line.startsWith('\\')) {
+        // Skip "\ No newline at end of file"
+        currentNewLine++;
+      }
+    }
+  }
+
+  flushDeletions();
+  return { addedLines, deletedGroups };
+}
+
+/** Widget that renders a block of deleted lines inline in the editor */
+class DeletedLinesWidget extends WidgetType {
+  constructor(readonly lines: string[]) {
+    super();
+  }
+
+  toDOM() {
+    const container = document.createElement('div');
+    container.className = 'cm-diff-deleted-widget';
+    container.style.cssText =
+      'background-color: oklch(0.55 0.22 25 / 0.1); border-left: 3px solid oklch(0.55 0.22 25 / 0.5);';
+
+    for (const line of this.lines) {
+      const lineEl = document.createElement('div');
+      lineEl.style.cssText =
+        'text-decoration: line-through; color: oklch(0.55 0.22 25 / 0.8); background-color: oklch(0.55 0.22 25 / 0.15); padding: 0 0.5rem; padding-left: calc(0.5rem - 3px); white-space: pre; font-family: inherit;';
+      lineEl.textContent = line || ' ';
+      container.appendChild(lineEl);
+    }
+
+    return container;
+  }
+
+  eq(other: DeletedLinesWidget) {
+    return (
+      this.lines.length === other.lines.length && this.lines.every((l, i) => l === other.lines[i])
+    );
+  }
+
+  ignoreEvent() {
+    return true;
+  }
+}
+
+/** Create a CodeMirror extension that decorates lines based on diff */
+function createDiffDecorations(diffContent: string | null | undefined): Extension {
+  if (!diffContent) {
+    return [];
+  }
+
+  const { addedLines, deletedGroups } = parseUnifiedDiff(diffContent);
+  if (addedLines.size === 0 && deletedGroups.size === 0) {
+    return [];
+  }
+
+  const addedLineDecoration = Decoration.line({
+    class: 'cm-diff-added-line',
+    attributes: { style: 'background-color: oklch(0.65 0.2 145 / 0.15);' },
+  });
+
+  const extensions: Extension[] = [];
+
+  // Line decorations for added lines
+  if (addedLines.size > 0) {
+    extensions.push(
+      EditorView.decorations.of((view) => {
+        const builder = new RangeSetBuilder<Decoration>();
+        const doc = view.state.doc;
+
+        for (let i = 1; i <= doc.lines; i++) {
+          if (addedLines.has(i)) {
+            const linePos = doc.line(i).from;
+            builder.add(linePos, linePos, addedLineDecoration);
+          }
+        }
+
+        return builder.finish();
+      })
+    );
+  }
+
+  // Widget decorations for deleted line groups.
+  // Block decorations MUST be provided via a StateField (not a plugin/function).
+  if (deletedGroups.size > 0) {
+    const buildDeletedDecorations = (doc: {
+      lines: number;
+      line(n: number): { from: number; to: number };
+    }) => {
+      const builder = new RangeSetBuilder<Decoration>();
+      const positions = [...deletedGroups.keys()].sort((a, b) => a - b);
+
+      for (const pos of positions) {
+        const deletedLines = deletedGroups.get(pos)!;
+        if (pos <= doc.lines) {
+          const linePos = doc.line(pos).from;
+          builder.add(
+            linePos,
+            linePos,
+            Decoration.widget({
+              widget: new DeletedLinesWidget(deletedLines),
+              block: true,
+              side: -1,
+            })
+          );
+        } else {
+          const lastLinePos = doc.line(doc.lines).to;
+          builder.add(
+            lastLinePos,
+            lastLinePos,
+            Decoration.widget({
+              widget: new DeletedLinesWidget(deletedLines),
+              block: true,
+              side: 1,
+            })
+          );
+        }
+      }
+
+      return builder.finish();
+    };
+
+    extensions.push(
+      StateField.define({
+        create(state) {
+          return buildDeletedDecorations(state.doc);
+        },
+        update(decorations, tr) {
+          if (tr.docChanged) {
+            return decorations.map(tr.changes);
+          }
+          return decorations;
+        },
+        provide: (f) => EditorView.decorations.from(f),
+      })
+    );
+  }
+
+  return extensions;
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+
 // Syntax highlighting using CSS variables for theme compatibility
 const syntaxColors = HighlightStyle.define([
   { tag: t.keyword, color: 'var(--chart-4, oklch(0.7 0.15 280))' },
@@ -338,6 +407,8 @@ export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(function
     onSave,
     className,
     scrollCursorIntoView = false,
+    diffContent,
+    onSelectionChange,
   },
   ref
 ) {
@@ -347,12 +418,16 @@ export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(function
   // Stable refs for callbacks to avoid frequent extension rebuilds
   const onSaveRef = useRef(onSave);
   const onCursorChangeRef = useRef(onCursorChange);
+  const onSelectionChangeRef = useRef(onSelectionChange);
   useEffect(() => {
     onSaveRef.current = onSave;
   }, [onSave]);
   useEffect(() => {
     onCursorChangeRef.current = onCursorChange;
   }, [onCursorChange]);
+  useEffect(() => {
+    onSelectionChangeRef.current = onSelectionChange;
+  }, [onSelectionChange]);
 
   // Expose imperative methods to parent components
   useImperativeHandle(
@@ -380,6 +455,16 @@ export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(function
           editorRef.current.view.focus();
           cmRedo(editorRef.current.view);
         }
+      },
+      getSelection: () => {
+        const view = editorRef.current?.view;
+        if (!view) return null;
+        const { from, to } = view.state.selection.main;
+        if (from === to) return null;
+        const text = view.state.sliceDoc(from, to);
+        const fromLine = view.state.doc.lineAt(from).number;
+        const toLine = view.state.doc.lineAt(to).number;
+        return { text, fromLine, toLine };
       },
     }),
     []
@@ -537,10 +622,16 @@ export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(function
       editorTheme,
       search(),
       EditorView.updateListener.of((update) => {
-        if (update.selectionSet && onCursorChangeRef.current) {
-          const pos = update.state.selection.main.head;
-          const line = update.state.doc.lineAt(pos);
-          onCursorChangeRef.current(line.number, pos - line.from + 1);
+        if (update.selectionSet) {
+          if (onCursorChangeRef.current) {
+            const pos = update.state.selection.main.head;
+            const line = update.state.doc.lineAt(pos);
+            onCursorChangeRef.current(line.number, pos - line.from + 1);
+          }
+          if (onSelectionChangeRef.current) {
+            const { from, to } = update.state.selection.main;
+            onSelectionChangeRef.current(from !== to);
+          }
         }
       }),
     ];
@@ -572,8 +663,13 @@ export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(function
       exts.push(langExt);
     }
 
+    // Add inline diff decorations if diff content is provided
+    if (diffContent) {
+      exts.push(createDiffDecorations(diffContent));
+    }
+
     return exts;
-  }, [filePath, wordWrap, tabSize, editorTheme]);
+  }, [filePath, wordWrap, tabSize, editorTheme, diffContent]);
 
   return (
     <div className={cn('h-full w-full', className)}>

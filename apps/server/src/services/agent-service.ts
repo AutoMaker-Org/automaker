@@ -487,7 +487,19 @@ export class AgentService {
         Object.keys(customSubagents).length > 0;
 
       // Base tools that match the provider's default set
-      const baseTools = ['Read', 'Write', 'Edit', 'Glob', 'Grep', 'Bash', 'WebSearch', 'WebFetch'];
+      const baseTools = [
+        'Read',
+        'Write',
+        'Edit',
+        'MultiEdit',
+        'Glob',
+        'Grep',
+        'LS',
+        'Bash',
+        'WebSearch',
+        'WebFetch',
+        'TodoWrite',
+      ];
 
       if (allowedTools) {
         allowedTools = [...allowedTools]; // Create a copy to avoid mutating SDK options

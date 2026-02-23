@@ -60,6 +60,7 @@ interface AutoModeEventPayload {
   featureId?: string;
   featureName?: string;
   passes?: boolean;
+  executionMode?: 'auto' | 'manual';
   message?: string;
   error?: string;
   errorType?: string;
@@ -97,6 +98,18 @@ function isFeatureStatusChangedPayload(
     typeof payload.projectPath === 'string' &&
     typeof payload.status === 'string'
   );
+}
+
+/**
+ * Feature completed event payload structure
+ */
+interface FeatureCompletedPayload {
+  featureId: string;
+  featureName?: string;
+  projectPath: string;
+  passes?: boolean;
+  message?: string;
+  executionMode?: 'auto' | 'manual';
 }
 
 /**
@@ -150,6 +163,8 @@ export class EventHookService {
         this.handleAutoModeEvent(payload as AutoModeEventPayload);
       } else if (type === 'feature:created') {
         this.handleFeatureCreatedEvent(payload as FeatureCreatedPayload);
+      } else if (type === 'feature:completed') {
+        this.handleFeatureCompletedEvent(payload as FeatureCompletedPayload);
       }
     });
 
@@ -187,6 +202,9 @@ export class EventHookService {
 
     switch (payload.type) {
       case 'auto_mode_feature_complete':
+        // Only map explicit auto-mode completion events.
+        // Manual feature completions are emitted as feature:completed.
+        if (payload.executionMode !== 'auto') return;
         trigger = payload.passes ? 'feature_success' : 'feature_error';
         // Track this feature so feature_status_changed doesn't double-fire hooks
         if (payload.featureId) {
@@ -246,6 +264,43 @@ export class EventHookService {
 
     // Execute matching hooks (pass passes for feature completion events)
     await this.executeHooksForTrigger(trigger, context, { passes: payload.passes });
+  }
+
+  /**
+   * Handle feature:completed events and trigger matching hooks
+   */
+  private async handleFeatureCompletedEvent(payload: FeatureCompletedPayload): Promise<void> {
+    if (!payload.featureId || !payload.projectPath) return;
+
+    const passes = payload.passes ?? true;
+    const trigger: EventHookTrigger = passes ? 'feature_success' : 'feature_error';
+
+    // Load feature name if we have featureId but no featureName
+    let featureName: string | undefined = undefined;
+    if (payload.projectPath && this.featureLoader) {
+      try {
+        const feature = await this.featureLoader.get(payload.projectPath, payload.featureId);
+        if (feature?.title) {
+          featureName = feature.title;
+        }
+      } catch (error) {
+        logger.warn(`Failed to load feature ${payload.featureId} for event hook:`, error);
+      }
+    }
+
+    const isErrorTrigger = trigger === 'feature_error';
+    const context: HookContext = {
+      featureId: payload.featureId,
+      featureName: featureName || payload.featureName,
+      projectPath: payload.projectPath,
+      projectName: this.extractProjectName(payload.projectPath),
+      error: isErrorTrigger ? payload.message : undefined,
+      errorType: undefined,
+      timestamp: new Date().toISOString(),
+      eventType: trigger,
+    };
+
+    await this.executeHooksForTrigger(trigger, context, { passes });
   }
 
   /**

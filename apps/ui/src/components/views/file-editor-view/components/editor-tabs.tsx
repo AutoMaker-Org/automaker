@@ -1,4 +1,5 @@
-import { X, Circle, MoreHorizontal, Save } from 'lucide-react';
+import { useRef, useEffect, useCallback } from 'react';
+import { X, Circle, MoreHorizontal, Save, ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { EditorTab } from '../use-file-editor-store';
 import {
@@ -84,61 +85,103 @@ export function EditorTabs({
   isDirty,
   showSaveButton,
 }: EditorTabsProps) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const activeTabRef = useRef<HTMLDivElement>(null);
+
+  // Scroll the active tab into view when it changes
+  useEffect(() => {
+    if (activeTabRef.current) {
+      activeTabRef.current.scrollIntoView({
+        behavior: 'smooth',
+        block: 'nearest',
+        inline: 'nearest',
+      });
+    }
+  }, [activeTabId]);
+
+  const scrollBy = useCallback((direction: 'left' | 'right') => {
+    if (!scrollRef.current) return;
+    const amount = direction === 'left' ? -200 : 200;
+    scrollRef.current.scrollBy({ left: amount, behavior: 'smooth' });
+  }, []);
+
   if (tabs.length === 0) return null;
 
   return (
-    <div
-      className="flex items-center border-b border-border bg-muted/30 overflow-x-auto"
-      data-testid="editor-tabs"
-    >
-      {tabs.map((tab) => {
-        const isActive = tab.id === activeTabId;
-        const fileColor = getFileColor(tab.fileName);
+    <div className="flex items-center border-b border-border bg-muted/30" data-testid="editor-tabs">
+      {/* Scroll left arrow */}
+      <button
+        onClick={() => scrollBy('left')}
+        className="shrink-0 p-1 text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+        title="Scroll tabs left"
+      >
+        <ChevronLeft className="w-4 h-4" />
+      </button>
 
-        return (
-          <div
-            key={tab.id}
-            className={cn(
-              'group flex items-center gap-1.5 px-3 py-1.5 cursor-pointer border-r border-border min-w-0 max-w-[200px] text-sm transition-colors',
-              isActive
-                ? 'bg-background text-foreground border-b-2 border-b-primary'
-                : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
-            )}
-            onClick={() => onTabSelect(tab.id)}
-            title={tab.filePath}
-          >
-            {/* Dirty indicator */}
-            {tab.isDirty ? (
-              <Circle className="w-2 h-2 shrink-0 fill-current text-primary" />
-            ) : (
-              <span className={cn('w-2 h-2 rounded-full shrink-0', fileColor)} />
-            )}
+      {/* Scrollable tab area */}
+      <div
+        ref={scrollRef}
+        className="flex items-center overflow-x-auto flex-1 min-w-0 scrollbar-none"
+      >
+        {tabs.map((tab) => {
+          const isActive = tab.id === activeTabId;
+          const fileColor = getFileColor(tab.fileName);
 
-            {/* File name */}
-            <span className="truncate">{tab.fileName}</span>
-
-            {/* Close button */}
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onTabClose(tab.id);
-              }}
+          return (
+            <div
+              key={tab.id}
+              ref={isActive ? activeTabRef : undefined}
               className={cn(
-                'p-0.5 rounded shrink-0 transition-colors',
-                'opacity-0 group-hover:opacity-100',
-                isActive && 'opacity-60',
-                'hover:bg-accent'
+                'group flex items-center gap-1.5 px-3 py-1.5 cursor-pointer border-r border-border min-w-0 max-w-[200px] shrink-0 text-sm transition-colors',
+                isActive
+                  ? 'bg-background text-foreground border-b-2 border-b-primary'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
               )}
-              title="Close"
+              onClick={() => onTabSelect(tab.id)}
+              title={tab.filePath}
             >
-              <X className="w-3 h-3" />
-            </button>
-          </div>
-        );
-      })}
+              {/* Dirty indicator */}
+              {tab.isDirty ? (
+                <Circle className="w-2 h-2 shrink-0 fill-current text-primary" />
+              ) : (
+                <span className={cn('w-2 h-2 rounded-full shrink-0', fileColor)} />
+              )}
+
+              {/* File name */}
+              <span className="truncate">{tab.fileName}</span>
+
+              {/* Close button */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onTabClose(tab.id);
+                }}
+                className={cn(
+                  'p-0.5 rounded shrink-0 transition-colors',
+                  'opacity-0 group-hover:opacity-100',
+                  isActive && 'opacity-60',
+                  'hover:bg-accent'
+                )}
+                title="Close"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Scroll right arrow */}
+      <button
+        onClick={() => scrollBy('right')}
+        className="shrink-0 p-1 text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+        title="Scroll tabs right"
+      >
+        <ChevronRight className="w-4 h-4" />
+      </button>
 
       {/* Tab actions: save button (mobile) + close-all dropdown */}
-      <div className="ml-auto shrink-0 flex items-center px-1 gap-0.5">
+      <div className="shrink-0 flex items-center px-1 gap-0.5 border-l border-border">
         {/* Save button — shown in the tab bar on mobile */}
         {showSaveButton && onSave && (
           <button

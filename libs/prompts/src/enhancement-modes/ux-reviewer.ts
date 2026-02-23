@@ -188,7 +188,7 @@ A comprehensive guide to creating exceptional user experiences and designs for m
 
 ## Your Task
 
-Review the provided task description and enhance it by:
+Generate ONLY the UX considerations section that will be appended below the user's original description. Do NOT rewrite or include the original description in your output.
 
 1. **ANALYZE** the feature from a UX perspective:
    - Identify user goals and pain points
@@ -216,7 +216,7 @@ Review the provided task description and enhance it by:
    - User feedback and confirmation flows
    - Accessibility compliance (WCAG AA minimum)
 
-Output the enhanced task description with UX considerations integrated naturally. Focus on actionable, specific UX requirements that developers can implement. Do not include explanations about your process.`;
+IMPORTANT: Output ONLY the new UX requirements section. Do NOT repeat or rewrite the original description - it will be preserved automatically. Start your output with "UX Requirements:" followed by the details. Focus on actionable, specific UX requirements that developers can implement.`;
 
 /**
  * Few-shot examples for the "ux-reviewer" enhancement mode
@@ -224,11 +224,7 @@ Output the enhanced task description with UX considerations integrated naturally
 export const UX_REVIEWER_EXAMPLES: EnhancementExample[] = [
   {
     input: 'Add user profile page',
-    output: `Add User Profile Page
-
-Create a dedicated profile page for viewing and editing user information with a focus on excellent user experience and accessibility.
-
-UX Requirements:
+    output: `UX Requirements:
 - **Layout**: Single-column layout on mobile, two-column layout on desktop (profile info left, edit form right)
 - **Visual Hierarchy**: Profile header with avatar (120x120px), name (24px font), and edit button prominently displayed
 - **Accessibility**: 
@@ -268,12 +264,8 @@ UX Requirements:
   },
   {
     input: 'Add search functionality',
-    output: `Add Search Functionality
-
-Implement full-text search across application content with an intuitive, accessible interface.
-
-UX Requirements:
-- **Search Input**: 
+    output: `UX Requirements:
+- **Search Input**:
   - Prominent search bar in header (desktop) or accessible via icon (mobile)
   - Clear placeholder text: "Search..." with example query
   - Debounced input (300ms) to reduce API calls

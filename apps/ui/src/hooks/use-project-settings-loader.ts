@@ -26,6 +26,10 @@ export function useProjectSettingsLoader() {
     (state) => state.setAutoDismissInitScriptIndicator
   );
   const setWorktreeCopyFiles = useAppStore((state) => state.setWorktreeCopyFiles);
+  const setProjectUseWorktrees = useAppStore((state) => state.setProjectUseWorktrees);
+  const setPinnedWorktreesCount = useAppStore((state) => state.setPinnedWorktreesCount);
+  const setWorktreeDropdownThreshold = useAppStore((state) => state.setWorktreeDropdownThreshold);
+  const setAlwaysUseWorktreeDropdown = useAppStore((state) => state.setAlwaysUseWorktreeDropdown);
 
   const appliedProjectRef = useRef<{ path: string; dataUpdatedAt: number } | null>(null);
 
@@ -100,6 +104,24 @@ export function useProjectSettingsLoader() {
       setWorktreeCopyFiles(projectPath, settings.worktreeCopyFiles);
     }
 
+    // Apply useWorktrees if present
+    if (settings.useWorktrees !== undefined) {
+      setProjectUseWorktrees(projectPath, settings.useWorktrees);
+    }
+
+    // Apply worktree display settings if present
+    if (settings.pinnedWorktreesCount !== undefined) {
+      setPinnedWorktreesCount(projectPath, settings.pinnedWorktreesCount);
+    }
+
+    if (settings.worktreeDropdownThreshold !== undefined) {
+      setWorktreeDropdownThreshold(projectPath, settings.worktreeDropdownThreshold);
+    }
+
+    if (settings.alwaysUseWorktreeDropdown !== undefined) {
+      setAlwaysUseWorktreeDropdown(projectPath, settings.alwaysUseWorktreeDropdown);
+    }
+
     // Apply activeClaudeApiProfileId and phaseModelOverrides if present
     // These are stored directly on the project, so we need to update both
     // currentProject AND the projects array to keep them in sync
@@ -167,5 +189,9 @@ export function useProjectSettingsLoader() {
     setDefaultDeleteBranch,
     setAutoDismissInitScriptIndicator,
     setWorktreeCopyFiles,
+    setProjectUseWorktrees,
+    setPinnedWorktreesCount,
+    setWorktreeDropdownThreshold,
+    setAlwaysUseWorktreeDropdown,
   ]);
 }

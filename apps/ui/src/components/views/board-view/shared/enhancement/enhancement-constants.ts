@@ -18,3 +18,14 @@ export const ENHANCEMENT_MODE_DESCRIPTIONS: Record<EnhancementMode, string> = {
   acceptance: 'Add specific acceptance criteria and test cases',
   'ux-reviewer': 'Add user experience considerations and flows',
 };
+
+/** Modes that rewrite/replace the entire description */
+export const REWRITE_MODES: EnhancementMode[] = ['improve', 'simplify'];
+
+/** Modes that append additional content below the original description */
+export const ADDITIVE_MODES: EnhancementMode[] = ['technical', 'acceptance', 'ux-reviewer'];
+
+/** Check if a mode appends content rather than replacing */
+export function isAdditiveMode(mode: EnhancementMode): boolean {
+  return ADDITIVE_MODES.includes(mode);
+}

@@ -11,7 +11,7 @@ import type { EnhancementExample } from '@automaker/types';
  */
 export const ACCEPTANCE_SYSTEM_PROMPT = `You are a QA specialist skilled at defining testable acceptance criteria for software features.
 
-Your task is to enhance a task description by adding clear acceptance criteria:
+Your task is to generate ONLY the acceptance criteria that will be appended below the user's original description. Do NOT rewrite or include the original description in your output.
 
 1. UNDERSTAND the feature:
    - Identify all user-facing behaviors
@@ -34,7 +34,7 @@ Your task is to enhance a task description by adding clear acceptance criteria:
    - Avoid vague terms like "quickly" or "easily"
    - Include specific values where applicable
 
-Output the original description followed by a clear "Acceptance Criteria:" section with numbered, testable criteria. Do not include explanations about your process.`;
+IMPORTANT: Output ONLY the acceptance criteria section. Do NOT repeat or rewrite the original description - it will be preserved automatically. Start your output with "Acceptance Criteria:" followed by the numbered criteria.`;
 
 /**
  * Few-shot examples for the "acceptance" enhancement mode
@@ -42,11 +42,7 @@ Output the original description followed by a clear "Acceptance Criteria:" secti
 export const ACCEPTANCE_EXAMPLES: EnhancementExample[] = [
   {
     input: 'Add password reset functionality',
-    output: `Add Password Reset Functionality
-
-Allow users to reset their password via email when they forget it.
-
-Acceptance Criteria:
+    output: `Acceptance Criteria:
 
 1. Given a user is on the login page, when they click "Forgot Password", then they should see a password reset form requesting their email.
 
@@ -62,11 +58,7 @@ Acceptance Criteria:
   },
   {
     input: 'Shopping cart checkout',
-    output: `Shopping Cart Checkout
-
-Implement the checkout flow for purchasing items in the shopping cart.
-
-Acceptance Criteria:
+    output: `Acceptance Criteria:
 
 1. Given a user has items in their cart, when they click "Checkout", then they should see an order summary with item details and total price.
 

@@ -133,12 +133,16 @@ export const TOOL_PRESETS = {
     'Read',
     'Write',
     'Edit',
+    'MultiEdit',
     'Glob',
     'Grep',
+    'LS',
     'Bash',
     'WebSearch',
     'WebFetch',
     'TodoWrite',
+    'Task',
+    'Skill',
   ] as const,
 
   /** Tools for chat/interactive mode */
@@ -146,12 +150,16 @@ export const TOOL_PRESETS = {
     'Read',
     'Write',
     'Edit',
+    'MultiEdit',
     'Glob',
     'Grep',
+    'LS',
     'Bash',
     'WebSearch',
     'WebFetch',
     'TodoWrite',
+    'Task',
+    'Skill',
   ] as const,
 } as const;
 

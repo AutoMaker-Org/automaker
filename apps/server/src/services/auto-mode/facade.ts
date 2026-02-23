@@ -767,6 +767,7 @@ export class AutoModeServiceFacade {
         featureId,
         featureName: feature?.title,
         branchName: feature?.branchName ?? null,
+        executionMode: 'auto',
         passes: allPassed,
         message: allPassed
           ? 'All verification checks passed'
@@ -829,6 +830,7 @@ export class AutoModeServiceFacade {
           featureId,
           featureName: feature?.title,
           branchName: feature?.branchName ?? null,
+          executionMode: 'auto',
           passes: true,
           message: `Changes committed: ${hash.trim().substring(0, 8)}`,
           projectPath: this.projectPath,

@@ -370,6 +370,17 @@ export interface AppState {
   // List of relative file paths to copy from project root into new worktrees
   worktreeCopyFilesByProject: Record<string, string[]>;
 
+  // Worktree Display Settings (per-project, keyed by project path)
+  // Number of worktrees always visible (pinned) without expanding a dropdown (default: 1)
+  pinnedWorktreesCountByProject: Record<string, number>;
+  // Explicit list of branch names assigned to pinned slots (ordered)
+  // When set, these branches are shown in the pinned slots instead of using default ordering
+  pinnedWorktreeBranchesByProject: Record<string, string[]>;
+  // Minimum number of worktrees before the list collapses into a dropdown (default: 3)
+  worktreeDropdownThresholdByProject: Record<string, number>;
+  // Always use dropdown layout regardless of worktree count (default: false)
+  alwaysUseWorktreeDropdownByProject: Record<string, boolean>;
+
   // UI State (previously in localStorage, now synced via API)
   /** Whether worktree panel is collapsed in board view */
   worktreePanelCollapsed: boolean;
@@ -813,6 +824,17 @@ export interface AppActions {
   // Worktree Copy Files actions (per-project)
   setWorktreeCopyFiles: (projectPath: string, files: string[]) => void;
   getWorktreeCopyFiles: (projectPath: string) => string[];
+
+  // Worktree Display Settings actions (per-project)
+  setPinnedWorktreesCount: (projectPath: string, count: number) => void;
+  getPinnedWorktreesCount: (projectPath: string) => number;
+  setPinnedWorktreeBranches: (projectPath: string, branches: string[]) => void;
+  getPinnedWorktreeBranches: (projectPath: string) => string[];
+  swapPinnedWorktreeBranch: (projectPath: string, slotIndex: number, newBranch: string) => void;
+  setWorktreeDropdownThreshold: (projectPath: string, threshold: number) => void;
+  getWorktreeDropdownThreshold: (projectPath: string) => number;
+  setAlwaysUseWorktreeDropdown: (projectPath: string, always: boolean) => void;
+  getAlwaysUseWorktreeDropdown: (projectPath: string) => boolean;
 
   // UI State actions (previously in localStorage, now synced via API)
   setWorktreePanelCollapsed: (collapsed: boolean) => void;

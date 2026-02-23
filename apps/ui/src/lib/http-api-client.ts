@@ -2746,6 +2746,9 @@ export class HttpApiClient implements ElectronAPI {
         defaultDeleteBranchWithWorktree?: boolean;
         autoDismissInitScriptIndicator?: boolean;
         worktreeCopyFiles?: string[];
+        pinnedWorktreesCount?: number;
+        worktreeDropdownThreshold?: number;
+        alwaysUseWorktreeDropdown?: boolean;
         lastSelectedSessionId?: string;
         testCommand?: string;
       };

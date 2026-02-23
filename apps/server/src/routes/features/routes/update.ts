@@ -5,6 +5,7 @@
 import type { Request, Response } from 'express';
 import { FeatureLoader } from '../../../services/feature-loader.js';
 import type { Feature, FeatureStatus } from '@automaker/types';
+import type { EventEmitter } from '../../../lib/events.js';
 import { getErrorMessage, logError } from '../common.js';
 import { createLogger } from '@automaker/utils';
 
@@ -13,7 +14,7 @@ const logger = createLogger('features/update');
 // Statuses that should trigger syncing to app_spec.txt
 const SYNC_TRIGGER_STATUSES: FeatureStatus[] = ['verified', 'completed'];
 
-export function createUpdateHandler(featureLoader: FeatureLoader) {
+export function createUpdateHandler(featureLoader: FeatureLoader, events?: EventEmitter) {
   return async (req: Request, res: Response): Promise<void> => {
     try {
       const {
@@ -53,6 +54,20 @@ export function createUpdateHandler(featureLoader: FeatureLoader) {
         enhancementMode,
         preEnhancementDescription
       );
+
+      // Manual feature updates do not emit auto_mode_feature_complete.
+      // Emit a dedicated completion event when status transitions into a completed state.
+      if (newStatus && SYNC_TRIGGER_STATUSES.includes(newStatus) && previousStatus !== newStatus) {
+        events?.emit('feature:completed', {
+          featureId,
+          featureName: updated.title,
+          projectPath,
+          passes: true,
+          message:
+            newStatus === 'verified' ? 'Feature verified manually' : 'Feature completed manually',
+          executionMode: 'manual',
+        });
+      }
 
       // Trigger sync to app_spec.txt when status changes to verified or completed
       if (newStatus && SYNC_TRIGGER_STATUSES.includes(newStatus) && previousStatus !== newStatus) {

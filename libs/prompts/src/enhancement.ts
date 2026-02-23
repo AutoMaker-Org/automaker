@@ -128,6 +128,9 @@ export function getExamples(mode: EnhancementMode): EnhancementExample[] {
   return EXAMPLES[mode];
 }
 
+/** Modes that append additional content rather than rewriting the description */
+const ADDITIVE_MODES: EnhancementMode[] = ['technical', 'acceptance', 'ux-reviewer'];
+
 /**
  * Build a user prompt for enhancement with optional few-shot examples
  *
@@ -142,9 +145,14 @@ export function buildUserPrompt(
   includeExamples: boolean = true
 ): string {
   const examples = includeExamples ? getExamples(mode) : [];
+  const isAdditive = ADDITIVE_MODES.includes(mode);
+
+  const instruction = isAdditive
+    ? 'Generate ONLY the additional details section for the following task description. Do NOT rewrite or repeat the original description:'
+    : 'Please enhance the following task description:';
 
   if (examples.length === 0) {
-    return `Please enhance the following task description:\n\n${text}`;
+    return `${instruction}\n\n${text}`;
   }
 
   // Build few-shot examples section
@@ -155,13 +163,17 @@ export function buildUserPrompt(
     )
     .join('\n\n---\n\n');
 
-  return `Here are some examples of how to enhance task descriptions:
+  const examplesIntro = isAdditive
+    ? 'Here are examples of the additional details section to generate (note: these show ONLY the appended content, not the original description):'
+    : 'Here are some examples of how to enhance task descriptions:';
+
+  return `${examplesIntro}
 
 ${examplesSection}
 
 ---
 
-Now, please enhance the following task description:
+${instruction}
 
 ${text}`;
 }

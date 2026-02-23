@@ -11,10 +11,16 @@ import {
   Undo2,
   Redo2,
   Settings,
+  Diff,
+  FolderKanban,
 } from 'lucide-react';
 import { createLogger } from '@automaker/utils/logger';
+import { useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from '@tanstack/react-router';
 import { useAppStore } from '@/store/app-store';
 import { getElectronAPI } from '@/lib/electron';
+import { cn, generateUUID, pathsEqual } from '@/lib/utils';
+import { queryKeys } from '@/lib/query-keys';
 import { useIsMobile } from '@/hooks/use-media-query';
 import { useVirtualKeyboardResize } from '@/hooks/use-virtual-keyboard-resize';
 import { Button } from '@/components/ui/button';
@@ -23,7 +29,6 @@ import {
   HeaderActionsPanelTrigger,
 } from '@/components/ui/header-actions-panel';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { cn } from '@/lib/utils';
 
 import { toast } from 'sonner';
 import {
@@ -42,6 +47,7 @@ import {
 } from './components/markdown-preview';
 import { WorktreeDirectoryDropdown } from './components/worktree-directory-dropdown';
 import { GitDetailPanel } from './components/git-detail-panel';
+import { AddFeatureDialog } from '@/components/views/board-view/dialogs';
 
 const logger = createLogger('FileEditorView');
 
@@ -111,10 +117,13 @@ interface FileEditorViewProps {
 }
 
 export function FileEditorView({ initialPath }: FileEditorViewProps) {
-  const { currentProject } = useAppStore();
+  const { currentProject, defaultSkipTests, getCurrentWorktree, worktreesByProject } =
+    useAppStore();
   const currentWorktree = useAppStore((s) =>
     currentProject?.path ? (s.currentWorktreeByProject[currentProject.path] ?? null) : null
   );
+  const queryClient = useQueryClient();
+  const navigate = useNavigate();
   // Read persisted editor font settings from app store
   const editorFontSize = useAppStore((s) => s.editorFontSize);
   const editorFontFamily = useAppStore((s) => s.editorFontFamily);
@@ -131,6 +140,9 @@ export function FileEditorView({ initialPath }: FileEditorViewProps) {
   const editorRef = useRef<CodeEditorHandle>(null);
   const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showActionsPanel, setShowActionsPanel] = useState(false);
+  const [hasEditorSelection, setHasEditorSelection] = useState(false);
+  const [showAddFeatureDialog, setShowAddFeatureDialog] = useState(false);
+  const [featureSelectionContext, setFeatureSelectionContext] = useState<string | undefined>();
 
   // Derive the effective working path from the current worktree selection.
   // When a worktree is selected (path is non-null), use the worktree path;
@@ -151,7 +163,6 @@ export function FileEditorView({ initialPath }: FileEditorViewProps) {
     tabSize,
     wordWrap,
     maxFileSize,
-    setFileTree,
     openTab,
     closeTab,
     closeAllTabs,
@@ -159,14 +170,11 @@ export function FileEditorView({ initialPath }: FileEditorViewProps) {
     markTabSaved,
     setMarkdownViewMode,
     setMobileBrowserVisible,
-    setGitStatusMap,
-    setExpandedFolders,
-    setEnhancedGitStatusMap,
-    setGitBranch,
-    setActiveFileGitDetails,
     activeFileGitDetails,
     gitBranch,
-    enhancedGitStatusMap,
+    showInlineDiff,
+    setShowInlineDiff,
+    activeFileDiff,
   } = store;
 
   const activeTab = tabs.find((t) => t.id === activeTabId) || null;
@@ -217,6 +225,7 @@ export function FileEditorView({ initialPath }: FileEditorViewProps) {
         };
 
         const tree = await buildTree(treePath);
+        const { setFileTree, setExpandedFolders } = useFileEditorStore.getState();
         setFileTree(tree);
 
         if (expandedSnapshot !== null) {
@@ -230,12 +239,14 @@ export function FileEditorView({ initialPath }: FileEditorViewProps) {
         logger.error('Failed to load file tree:', error);
       }
     },
-    [effectivePath, setFileTree, setExpandedFolders]
+    [effectivePath]
   );
 
   // ─── Load Git Status ─────────────────────────────────────────
   const loadGitStatus = useCallback(async () => {
     if (!effectivePath) return;
+    const { setGitStatusMap, setEnhancedGitStatusMap, setGitBranch } =
+      useFileEditorStore.getState();
 
     try {
       const api = getElectronAPI();
@@ -289,7 +300,7 @@ export function FileEditorView({ initialPath }: FileEditorViewProps) {
       // Git might not be available - that's okay
       logger.debug('Git status not available:', error);
     }
-  }, [effectivePath, setGitStatusMap, setEnhancedGitStatusMap, setGitBranch]);
+  }, [effectivePath]);
 
   // ─── Load subdirectory children lazily ───────────────────────
   const loadSubdirectory = useCallback(async (dirPath: string): Promise<FileTreeNode[]> => {
@@ -448,6 +459,33 @@ export function FileEditorView({ initialPath }: FileEditorViewProps) {
     [handleFileSelect, isMobile, setMobileBrowserVisible]
   );
 
+  // ─── Load File Diff for Inline Display ───────────────────────────────────
+  const loadFileDiff = useCallback(
+    async (filePath: string) => {
+      if (!effectivePath) return;
+      const { setActiveFileDiff } = useFileEditorStore.getState();
+      try {
+        const api = getElectronAPI();
+        if (!api.git?.getFileDiff) return;
+
+        // Get relative path
+        const relativePath = filePath.startsWith(effectivePath)
+          ? filePath.substring(effectivePath.length + 1)
+          : filePath;
+
+        const result = await api.git.getFileDiff(effectivePath, relativePath);
+        if (result.success && result.diff) {
+          setActiveFileDiff(result.diff);
+        } else {
+          setActiveFileDiff(null);
+        }
+      } catch {
+        setActiveFileDiff(null);
+      }
+    },
+    [effectivePath]
+  );
+
   // ─── Handle Save ─────────────────────────────────────────────
   const handleSave = useCallback(async () => {
     if (!activeTab || !activeTab.isDirty) return;
@@ -458,15 +496,18 @@ export function FileEditorView({ initialPath }: FileEditorViewProps) {
 
       if (result.success) {
         markTabSaved(activeTab.id, activeTab.content);
-        // Refresh git status after save
+        // Refresh git status and inline diff after save
         loadGitStatus();
+        if (showInlineDiff) {
+          loadFileDiff(activeTab.filePath);
+        }
       } else {
         logger.error('Failed to save file:', result.error);
       }
     } catch (error) {
       logger.error('Failed to save file:', error);
     }
-  }, [activeTab, markTabSaved, loadGitStatus]);
+  }, [activeTab, markTabSaved, loadGitStatus, showInlineDiff, loadFileDiff]);
 
   // ─── Auto Save: save a specific tab by ID ───────────────────
   const saveTabById = useCallback(
@@ -482,6 +523,11 @@ export function FileEditorView({ initialPath }: FileEditorViewProps) {
         if (result.success) {
           markTabSaved(tab.id, tab.content);
           loadGitStatus();
+          // Refresh inline diff for the saved file if diff is active
+          const { showInlineDiff, activeTabId: currentActive } = useFileEditorStore.getState();
+          if (showInlineDiff && tab.id === currentActive) {
+            loadFileDiff(tab.filePath);
+          }
         } else {
           logger.error('Auto-save failed:', result.error);
         }
@@ -489,7 +535,7 @@ export function FileEditorView({ initialPath }: FileEditorViewProps) {
         logger.error('Auto-save failed:', error);
       }
     },
-    [markTabSaved, loadGitStatus]
+    [markTabSaved, loadGitStatus, loadFileDiff]
   );
 
   // ─── Auto Save: on tab switch ──────────────────────────────
@@ -559,6 +605,151 @@ export function FileEditorView({ initialPath }: FileEditorViewProps) {
       editorRef.current.redo();
     }
   }, []);
+
+  // ─── Get current branch from selected worktree ────────────
+  const currentBranch = useMemo(() => {
+    if (!currentProject?.path) return '';
+    const currentWorktreeInfo = getCurrentWorktree(currentProject.path);
+    const worktrees = worktreesByProject[currentProject.path] ?? [];
+    const currentWorktreePath = currentWorktreeInfo?.path ?? null;
+
+    const selectedWorktree =
+      currentWorktreePath === null
+        ? worktrees.find((w) => w.isMain)
+        : worktrees.find((w) => !w.isMain && pathsEqual(w.path, currentWorktreePath));
+
+    return selectedWorktree?.branch || worktrees.find((w) => w.isMain)?.branch || '';
+  }, [currentProject?.path, getCurrentWorktree, worktreesByProject]);
+
+  // ─── Create Feature from Selection ─────────────────────────
+  const handleCreateFeatureFromSelection = useCallback(() => {
+    if (!activeTab || !editorRef.current || !effectivePath) return;
+
+    const selection = editorRef.current.getSelection();
+    if (!selection) return;
+
+    // Compute relative path from effectivePath
+    const relativePath = activeTab.filePath.startsWith(effectivePath)
+      ? activeTab.filePath.substring(effectivePath.length + 1)
+      : activeTab.filePath.split('/').pop() || activeTab.filePath;
+
+    // Get language extension for code fence
+    const langName = getLanguageName(activeTab.filePath).toLowerCase();
+    const langMap: Record<string, string> = {
+      javascript: 'js',
+      jsx: 'jsx',
+      typescript: 'ts',
+      tsx: 'tsx',
+      python: 'py',
+      ruby: 'rb',
+      shell: 'sh',
+      'c++': 'cpp',
+      'plain text': '',
+    };
+    const fenceLang = langMap[langName] || langName;
+
+    // Truncate selection to ~200 lines
+    const lines = selection.text.split('\n');
+    const truncated = lines.length > 200;
+    const codeText = truncated ? lines.slice(0, 200).join('\n') + '\n// ...' : selection.text;
+
+    const description = [
+      `**File:** \`${relativePath}\` (Lines ${selection.fromLine}-${selection.toLine})`,
+      '',
+      `\`\`\`${fenceLang}`,
+      codeText,
+      '```',
+      truncated ? `\n*Selection truncated (${lines.length} lines total)*` : '',
+      '',
+      '---',
+      '',
+    ]
+      .filter((line) => line !== undefined)
+      .join('\n');
+
+    setFeatureSelectionContext(description);
+    setShowAddFeatureDialog(true);
+  }, [activeTab, effectivePath]);
+
+  // ─── Handle feature creation from AddFeatureDialog ─────────
+  const handleAddFeatureFromEditor = useCallback(
+    async (featureData: {
+      title: string;
+      category: string;
+      description: string;
+      priority: number;
+      model: string;
+      thinkingLevel: string;
+      reasoningEffort: string;
+      skipTests: boolean;
+      branchName: string;
+      planningMode: string;
+      requirePlanApproval: boolean;
+      excludedPipelineSteps?: string[];
+      workMode: string;
+      imagePaths?: Array<{ id: string; path: string; description?: string }>;
+      textFilePaths?: Array<{ id: string; path: string; description?: string }>;
+    }) => {
+      if (!currentProject?.path) {
+        toast.error('No project selected');
+        return;
+      }
+
+      try {
+        const api = getElectronAPI();
+        if (api.features?.create) {
+          const feature = {
+            id: `editor-${generateUUID()}`,
+            title: featureData.title,
+            description: featureData.description,
+            category: featureData.category,
+            status: 'backlog' as const,
+            passes: false,
+            priority: featureData.priority,
+            model: featureData.model,
+            thinkingLevel: featureData.thinkingLevel,
+            reasoningEffort: featureData.reasoningEffort,
+            skipTests: featureData.skipTests,
+            branchName: featureData.workMode === 'current' ? currentBranch : featureData.branchName,
+            planningMode: featureData.planningMode,
+            requirePlanApproval: featureData.requirePlanApproval,
+            excludedPipelineSteps: featureData.excludedPipelineSteps,
+            ...(featureData.imagePaths?.length ? { imagePaths: featureData.imagePaths } : {}),
+            ...(featureData.textFilePaths?.length
+              ? { textFilePaths: featureData.textFilePaths }
+              : {}),
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          };
+
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const result = await api.features.create(currentProject.path, feature as any);
+          if (result.success) {
+            queryClient.invalidateQueries({
+              queryKey: queryKeys.features.all(currentProject.path),
+            });
+            toast.success(
+              `Created feature: ${featureData.title || featureData.description.slice(0, 50)}`,
+              {
+                action: {
+                  label: 'View Board',
+                  onClick: () => navigate({ to: '/board' }),
+                },
+              }
+            );
+            setShowAddFeatureDialog(false);
+            setFeatureSelectionContext(undefined);
+          } else {
+            toast.error(result.error || 'Failed to create feature');
+          }
+        }
+      } catch (err) {
+        logger.error('Create feature from editor error:', err);
+        toast.error(err instanceof Error ? err.message : 'Failed to create feature');
+      }
+    },
+    [currentProject?.path, currentBranch, queryClient, navigate]
+  );
 
   // ─── File Operations ─────────────────────────────────────────
   const handleCreateFile = useCallback(
@@ -847,6 +1038,7 @@ export function FileEditorView({ initialPath }: FileEditorViewProps) {
   const loadFileGitDetails = useCallback(
     async (filePath: string) => {
       if (!effectivePath) return;
+      const { setActiveFileGitDetails } = useFileEditorStore.getState();
       try {
         const api = getElectronAPI();
         if (!api.git?.getDetails) return;
@@ -866,7 +1058,7 @@ export function FileEditorView({ initialPath }: FileEditorViewProps) {
         setActiveFileGitDetails(null);
       }
     },
-    [effectivePath, setActiveFileGitDetails]
+    [effectivePath]
   );
 
   // Load git details when active tab changes
@@ -874,9 +1066,24 @@ export function FileEditorView({ initialPath }: FileEditorViewProps) {
     if (activeTab && !activeTab.isBinary) {
       loadFileGitDetails(activeTab.filePath);
     } else {
-      setActiveFileGitDetails(null);
+      useFileEditorStore.getState().setActiveFileGitDetails(null);
     }
-  }, [activeTab?.filePath, activeTab?.isBinary, loadFileGitDetails, setActiveFileGitDetails]);
+  }, [activeTab?.filePath, activeTab?.isBinary, loadFileGitDetails]);
+
+  // Load file diff when inline diff is enabled and active tab changes
+  useEffect(() => {
+    if (showInlineDiff && activeTab && !activeTab.isBinary && !activeTab.isTooLarge) {
+      loadFileDiff(activeTab.filePath);
+    } else {
+      useFileEditorStore.getState().setActiveFileDiff(null);
+    }
+  }, [
+    showInlineDiff,
+    activeTab?.filePath,
+    activeTab?.isBinary,
+    activeTab?.isTooLarge,
+    loadFileDiff,
+  ]);
 
   // ─── Handle Cursor Change ────────────────────────────────────
   // Stable callback to avoid recreating CodeMirror extensions on every render.
@@ -938,7 +1145,7 @@ export function FileEditorView({ initialPath }: FileEditorViewProps) {
               return n;
             });
           };
-          setFileTree(updateChildren(fileTree));
+          useFileEditorStore.getState().setFileTree(updateChildren(fileTree));
         }
       }
 
@@ -946,7 +1153,7 @@ export function FileEditorView({ initialPath }: FileEditorViewProps) {
       // on every render, which would make this useCallback's dependency unstable.
       useFileEditorStore.getState().toggleFolder(path);
     },
-    [loadSubdirectory, setFileTree]
+    [loadSubdirectory]
   );
 
   // ─── Initial Load ────────────────────────────────────────────
@@ -1088,6 +1295,8 @@ export function FileEditorView({ initialPath }: FileEditorViewProps) {
                       onCursorChange={handleCursorChange}
                       onSave={handleSave}
                       scrollCursorIntoView={isMobile && isKeyboardOpen}
+                      diffContent={showInlineDiff ? activeFileDiff : null}
+                      onSelectionChange={setHasEditorSelection}
                     />
                   </Panel>
                   <PanelResizeHandle
@@ -1119,6 +1328,8 @@ export function FileEditorView({ initialPath }: FileEditorViewProps) {
                   onCursorChange={handleCursorChange}
                   onSave={handleSave}
                   scrollCursorIntoView={isMobile && isKeyboardOpen}
+                  diffContent={showInlineDiff ? activeFileDiff : null}
+                  onSelectionChange={setHasEditorSelection}
                 />
               )}
             </>
@@ -1302,6 +1513,41 @@ export function FileEditorView({ initialPath }: FileEditorViewProps) {
               </Button>
             )}
 
+          {/* Desktop: Inline Diff toggle */}
+          {activeTab &&
+            !activeTab.isBinary &&
+            !activeTab.isTooLarge &&
+            !(isMobile && mobileBrowserVisible) && (
+              <Button
+                variant={showInlineDiff ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setShowInlineDiff(!showInlineDiff)}
+                className="hidden lg:flex"
+                title={showInlineDiff ? 'Hide git diff highlighting' : 'Show git diff highlighting'}
+              >
+                <Diff className="w-4 h-4 mr-2" />
+                Diff
+              </Button>
+            )}
+
+          {/* Desktop: Create Feature from selection */}
+          {hasEditorSelection &&
+            activeTab &&
+            !activeTab.isBinary &&
+            !activeTab.isTooLarge &&
+            !(isMobile && mobileBrowserVisible) && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleCreateFeatureFromSelection}
+                className="hidden lg:flex"
+                title="Create a board feature from the selected code"
+              >
+                <FolderKanban className="w-4 h-4 mr-2" />
+                Create Feature
+              </Button>
+            )}
+
           {/* Editor Settings popover */}
           <Popover>
             <PopoverTrigger asChild>
@@ -1415,6 +1661,37 @@ export function FileEditorView({ initialPath }: FileEditorViewProps) {
           </Button>
         )}
 
+        {/* Inline Diff toggle */}
+        {activeTab && !activeTab.isBinary && !activeTab.isTooLarge && (
+          <button
+            onClick={() => setShowInlineDiff(!showInlineDiff)}
+            className={cn(
+              'flex items-center gap-2 w-full p-2 rounded-lg border transition-colors text-sm',
+              showInlineDiff
+                ? 'bg-primary/10 border-primary/30 text-primary'
+                : 'bg-muted/30 border-border text-muted-foreground hover:text-foreground'
+            )}
+          >
+            <Diff className="w-4 h-4" />
+            <span>{showInlineDiff ? 'Hide Git Diff' : 'Show Git Diff'}</span>
+          </button>
+        )}
+
+        {/* Create Feature from selection */}
+        {hasEditorSelection && activeTab && !activeTab.isBinary && !activeTab.isTooLarge && (
+          <Button
+            variant="outline"
+            className="w-full justify-start"
+            onClick={() => {
+              handleCreateFeatureFromSelection();
+              setShowActionsPanel(false);
+            }}
+          >
+            <FolderKanban className="w-4 h-4 mr-2" />
+            Create Feature from Selection
+          </Button>
+        )}
+
         {/* File info */}
         {activeTab && !activeTab.isBinary && !activeTab.isTooLarge && (
           <div className="flex flex-col gap-1.5 p-3 rounded-lg bg-muted/30 border border-border">
@@ -1478,6 +1755,27 @@ export function FileEditorView({ initialPath }: FileEditorViewProps) {
           </Panel>
         </PanelGroup>
       )}
+
+      {/* Add Feature Dialog - opened from code selection */}
+      <AddFeatureDialog
+        open={showAddFeatureDialog}
+        onOpenChange={(open) => {
+          setShowAddFeatureDialog(open);
+          if (!open) {
+            setFeatureSelectionContext(undefined);
+          }
+        }}
+        onAdd={handleAddFeatureFromEditor}
+        categorySuggestions={['From Editor']}
+        branchSuggestions={[]}
+        defaultSkipTests={defaultSkipTests}
+        defaultBranch={currentBranch}
+        currentBranch={currentBranch || undefined}
+        isMaximized={false}
+        projectPath={currentProject?.path}
+        prefilledDescription={featureSelectionContext}
+        prefilledCategory="From Editor"
+      />
     </div>
   );
 }

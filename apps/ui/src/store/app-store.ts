@@ -371,7 +371,7 @@ const initialState: AppState = {
   defaultPlanningMode: 'skip' as PlanningMode,
   defaultRequirePlanApproval: false,
   defaultFeatureModel: DEFAULT_GLOBAL_SETTINGS.defaultFeatureModel,
-  defaultThinkingLevel: DEFAULT_GLOBAL_SETTINGS.defaultThinkingLevel ?? 'none',
+  defaultThinkingLevel: DEFAULT_GLOBAL_SETTINGS.defaultThinkingLevel ?? 'adaptive',
   defaultReasoningEffort: DEFAULT_GLOBAL_SETTINGS.defaultReasoningEffort ?? 'none',
   defaultMaxTurns: DEFAULT_GLOBAL_SETTINGS.defaultMaxTurns ?? 1000,
   pendingPlanApproval: null,
@@ -396,6 +396,10 @@ const initialState: AppState = {
   autoDismissInitScriptIndicatorByProject: {},
   useWorktreesByProject: {},
   worktreeCopyFilesByProject: {},
+  pinnedWorktreesCountByProject: {},
+  pinnedWorktreeBranchesByProject: {},
+  worktreeDropdownThresholdByProject: {},
+  alwaysUseWorktreeDropdownByProject: {},
   worktreePanelCollapsed: false,
   lastProjectDir: '',
   recentFolders: [],
@@ -2640,6 +2644,60 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
       },
     })),
   getWorktreeCopyFiles: (projectPath) => get().worktreeCopyFilesByProject[projectPath] ?? [],
+
+  // Worktree Display Settings actions
+  setPinnedWorktreesCount: (projectPath, count) =>
+    set((state) => ({
+      pinnedWorktreesCountByProject: {
+        ...state.pinnedWorktreesCountByProject,
+        [projectPath]: count,
+      },
+    })),
+  getPinnedWorktreesCount: (projectPath) => get().pinnedWorktreesCountByProject[projectPath] ?? 0,
+  setPinnedWorktreeBranches: (projectPath, branches) =>
+    set((state) => ({
+      pinnedWorktreeBranchesByProject: {
+        ...state.pinnedWorktreeBranchesByProject,
+        [projectPath]: branches,
+      },
+    })),
+  getPinnedWorktreeBranches: (projectPath) =>
+    get().pinnedWorktreeBranchesByProject[projectPath] ?? [],
+  swapPinnedWorktreeBranch: (projectPath, slotIndex, newBranch) =>
+    set((state) => {
+      const current = [...(state.pinnedWorktreeBranchesByProject[projectPath] ?? [])];
+      // If the new branch is already in another slot, swap them
+      const existingIndex = current.indexOf(newBranch);
+      if (existingIndex !== -1 && existingIndex !== slotIndex) {
+        // Swap: put the old branch from this slot into the other slot
+        current[existingIndex] = current[slotIndex] ?? '';
+      }
+      current[slotIndex] = newBranch;
+      return {
+        pinnedWorktreeBranchesByProject: {
+          ...state.pinnedWorktreeBranchesByProject,
+          [projectPath]: current,
+        },
+      };
+    }),
+  setWorktreeDropdownThreshold: (projectPath, threshold) =>
+    set((state) => ({
+      worktreeDropdownThresholdByProject: {
+        ...state.worktreeDropdownThresholdByProject,
+        [projectPath]: threshold,
+      },
+    })),
+  getWorktreeDropdownThreshold: (projectPath) =>
+    get().worktreeDropdownThresholdByProject[projectPath] ?? 3,
+  setAlwaysUseWorktreeDropdown: (projectPath, always) =>
+    set((state) => ({
+      alwaysUseWorktreeDropdownByProject: {
+        ...state.alwaysUseWorktreeDropdownByProject,
+        [projectPath]: always,
+      },
+    })),
+  getAlwaysUseWorktreeDropdown: (projectPath) =>
+    get().alwaysUseWorktreeDropdownByProject[projectPath] ?? true,
 
   // UI State actions
   setWorktreePanelCollapsed: (collapsed) => set({ worktreePanelCollapsed: collapsed }),

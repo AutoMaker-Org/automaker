@@ -17,10 +17,13 @@ import {
 } from 'lucide-react';
 import { Spinner } from '@/components/ui/spinner';
 import { TruncatedFilePath } from '@/components/ui/truncated-file-path';
+import { CodeMirrorDiffView } from '@/components/ui/codemirror-diff-view';
 import { Button } from './button';
 import { useWorktreeDiffs, useGitDiffs } from '@/hooks/queries';
 import { getElectronAPI } from '@/lib/electron';
 import { toast } from 'sonner';
+import { parseDiff, splitDiffByFile } from '@/lib/diff-utils';
+import type { ParsedFileDiff } from '@/lib/diff-utils';
 import type { FileStatus, MergeStateInfo } from '@/types/electron';
 
 interface GitDiffPanelProps {
@@ -35,23 +38,6 @@ interface GitDiffPanelProps {
   enableStaging?: boolean;
   /** The worktree path to use for staging operations (required when enableStaging is true) */
   worktreePath?: string;
-}
-
-interface ParsedDiffHunk {
-  header: string;
-  lines: {
-    type: 'context' | 'addition' | 'deletion' | 'header';
-    content: string;
-    lineNumber?: { old?: number; new?: number };
-  }[];
-}
-
-interface ParsedFileDiff {
-  filePath: string;
-  hunks: ParsedDiffHunk[];
-  isNew?: boolean;
-  isDeleted?: boolean;
-  isRenamed?: boolean;
 }
 
 const getFileIcon = (status: string) => {
@@ -127,174 +113,6 @@ function getStagingState(file: FileStatus): 'staged' | 'unstaged' | 'partial' {
   if (hasIndexChanges && hasWorkTreeChanges) return 'partial';
   if (hasIndexChanges) return 'staged';
   return 'unstaged';
-}
-
-/**
- * Parse unified diff format into structured data
- */
-function parseDiff(diffText: string): ParsedFileDiff[] {
-  if (!diffText) return [];
-
-  const files: ParsedFileDiff[] = [];
-  const lines = diffText.split('\n');
-  let currentFile: ParsedFileDiff | null = null;
-  let currentHunk: ParsedDiffHunk | null = null;
-  let oldLineNum = 0;
-  let newLineNum = 0;
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-
-    // New file diff
-    if (line.startsWith('diff --git')) {
-      if (currentFile) {
-        if (currentHunk) {
-          currentFile.hunks.push(currentHunk);
-        }
-        files.push(currentFile);
-      }
-      // Extract file path from diff header
-      const match = line.match(/diff --git a\/(.*?) b\/(.*)/);
-      currentFile = {
-        filePath: match ? match[2] : 'unknown',
-        hunks: [],
-      };
-      currentHunk = null;
-      continue;
-    }
-
-    // New file indicator
-    if (line.startsWith('new file mode')) {
-      if (currentFile) currentFile.isNew = true;
-      continue;
-    }
-
-    // Deleted file indicator
-    if (line.startsWith('deleted file mode')) {
-      if (currentFile) currentFile.isDeleted = true;
-      continue;
-    }
-
-    // Renamed file indicator
-    if (line.startsWith('rename from') || line.startsWith('rename to')) {
-      if (currentFile) currentFile.isRenamed = true;
-      continue;
-    }
-
-    // Skip index, ---/+++ lines
-    if (line.startsWith('index ') || line.startsWith('--- ') || line.startsWith('+++ ')) {
-      continue;
-    }
-
-    // Hunk header
-    if (line.startsWith('@@')) {
-      if (currentHunk && currentFile) {
-        currentFile.hunks.push(currentHunk);
-      }
-      // Parse line numbers from @@ -old,count +new,count @@
-      const hunkMatch = line.match(/@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
-      oldLineNum = hunkMatch ? parseInt(hunkMatch[1], 10) : 1;
-      newLineNum = hunkMatch ? parseInt(hunkMatch[2], 10) : 1;
-      currentHunk = {
-        header: line,
-        lines: [{ type: 'header', content: line }],
-      };
-      continue;
-    }
-
-    // Diff content lines
-    if (currentHunk) {
-      if (line.startsWith('+')) {
-        currentHunk.lines.push({
-          type: 'addition',
-          content: line.substring(1),
-          lineNumber: { new: newLineNum },
-        });
-        newLineNum++;
-      } else if (line.startsWith('-')) {
-        currentHunk.lines.push({
-          type: 'deletion',
-          content: line.substring(1),
-          lineNumber: { old: oldLineNum },
-        });
-        oldLineNum++;
-      } else if (line.startsWith(' ') || line === '') {
-        currentHunk.lines.push({
-          type: 'context',
-          content: line.substring(1) || '',
-          lineNumber: { old: oldLineNum, new: newLineNum },
-        });
-        oldLineNum++;
-        newLineNum++;
-      }
-    }
-  }
-
-  // Don't forget the last file and hunk
-  if (currentFile) {
-    if (currentHunk) {
-      currentFile.hunks.push(currentHunk);
-    }
-    files.push(currentFile);
-  }
-
-  return files;
-}
-
-function DiffLine({
-  type,
-  content,
-  lineNumber,
-}: {
-  type: 'context' | 'addition' | 'deletion' | 'header';
-  content: string;
-  lineNumber?: { old?: number; new?: number };
-}) {
-  const bgClass = {
-    context: 'bg-transparent',
-    addition: 'bg-green-500/10',
-    deletion: 'bg-red-500/10',
-    header: 'bg-blue-500/10',
-  };
-
-  const textClass = {
-    context: 'text-foreground-secondary',
-    addition: 'text-green-400',
-    deletion: 'text-red-400',
-    header: 'text-blue-400',
-  };
-
-  const prefix = {
-    context: ' ',
-    addition: '+',
-    deletion: '-',
-    header: '',
-  };
-
-  if (type === 'header') {
-    return (
-      <div className={cn('px-2 py-1 font-mono text-xs', bgClass[type], textClass[type])}>
-        {content}
-      </div>
-    );
-  }
-
-  return (
-    <div className={cn('flex font-mono text-xs', bgClass[type])}>
-      <span className="w-12 flex-shrink-0 text-right pr-2 text-muted-foreground select-none border-r border-border-glass">
-        {lineNumber?.old ?? ''}
-      </span>
-      <span className="w-12 flex-shrink-0 text-right pr-2 text-muted-foreground select-none border-r border-border-glass">
-        {lineNumber?.new ?? ''}
-      </span>
-      <span className={cn('w-4 flex-shrink-0 text-center select-none', textClass[type])}>
-        {prefix[type]}
-      </span>
-      <span className={cn('flex-1 px-2 whitespace-pre-wrap break-all', textClass[type])}>
-        {content || '\u00A0'}
-      </span>
-    </div>
-  );
 }
 
 function StagingBadge({ state }: { state: 'staged' | 'unstaged' | 'partial' }) {
@@ -401,6 +219,7 @@ function MergeStateBanner({ mergeState }: { mergeState: MergeStateInfo }) {
 
 function FileDiffSection({
   fileDiff,
+  rawDiff,
   isExpanded,
   onToggle,
   fileStatus,
@@ -410,6 +229,8 @@ function FileDiffSection({
   isStagingFile,
 }: {
   fileDiff: ParsedFileDiff;
+  /** Raw unified diff string for this file, used by CodeMirror merge view */
+  rawDiff?: string;
   isExpanded: boolean;
   onToggle: () => void;
   fileStatus?: FileStatus;
@@ -418,14 +239,8 @@ function FileDiffSection({
   onUnstage?: (filePath: string) => void;
   isStagingFile?: boolean;
 }) {
-  const additions = fileDiff.hunks.reduce(
-    (acc, hunk) => acc + hunk.lines.filter((l) => l.type === 'addition').length,
-    0
-  );
-  const deletions = fileDiff.hunks.reduce(
-    (acc, hunk) => acc + hunk.lines.filter((l) => l.type === 'deletion').length,
-    0
-  );
+  const additions = fileDiff.additions;
+  const deletions = fileDiff.deletions;
 
   const stagingState = fileStatus ? getStagingState(fileStatus) : undefined;
 
@@ -521,20 +336,9 @@ function FileDiffSection({
           )}
         </div>
       </div>
-      {isExpanded && (
-        <div className="bg-background border-t border-border max-h-[400px] overflow-y-auto scrollbar-visible">
-          {fileDiff.hunks.map((hunk, hunkIndex) => (
-            <div key={hunkIndex} className="border-b border-border-glass last:border-b-0">
-              {hunk.lines.map((line, lineIndex) => (
-                <DiffLine
-                  key={lineIndex}
-                  type={line.type}
-                  content={line.content}
-                  lineNumber={line.lineNumber}
-                />
-              ))}
-            </div>
-          ))}
+      {isExpanded && rawDiff && (
+        <div className="bg-background border-t border-border">
+          <CodeMirrorDiffView fileDiff={rawDiff} filePath={fileDiff.filePath} maxHeight="400px" />
         </div>
       )}
     </div>
@@ -618,6 +422,16 @@ export function GitDiffPanel({
     }
     return diffs;
   }, [diffContent, mergeState, fileStatusMap]);
+
+  // Build a map from file path to raw diff string for CodeMirror merge view
+  const fileDiffMap = useMemo(() => {
+    const map = new Map<string, string>();
+    const perFileDiffs = splitDiffByFile(diffContent);
+    for (const entry of perFileDiffs) {
+      map.set(entry.filePath, entry.diff);
+    }
+    return map;
+  }, [diffContent]);
 
   const toggleFile = (filePath: string) => {
     setExpandedFiles((prev) => {
@@ -822,25 +636,9 @@ export function GitDiffPanel({
     return { staged, partial, unstaged, total: files.length };
   }, [enableStaging, files]);
 
-  // Total stats
-  const totalAdditions = parsedDiffs.reduce(
-    (acc, file) =>
-      acc +
-      file.hunks.reduce(
-        (hAcc, hunk) => hAcc + hunk.lines.filter((l) => l.type === 'addition').length,
-        0
-      ),
-    0
-  );
-  const totalDeletions = parsedDiffs.reduce(
-    (acc, file) =>
-      acc +
-      file.hunks.reduce(
-        (hAcc, hunk) => hAcc + hunk.lines.filter((l) => l.type === 'deletion').length,
-        0
-      ),
-    0
-  );
+  // Total stats (pre-computed by shared parseDiff)
+  const totalAdditions = parsedDiffs.reduce((acc, file) => acc + file.additions, 0);
+  const totalDeletions = parsedDiffs.reduce((acc, file) => acc + file.deletions, 0);
 
   return (
     <div
@@ -1053,6 +851,7 @@ export function GitDiffPanel({
                   <FileDiffSection
                     key={fileDiff.filePath}
                     fileDiff={fileDiff}
+                    rawDiff={fileDiffMap.get(fileDiff.filePath)}
                     isExpanded={expandedFiles.has(fileDiff.filePath)}
                     onToggle={() => toggleFile(fileDiff.filePath)}
                     fileStatus={fileStatusMap.get(fileDiff.filePath)}

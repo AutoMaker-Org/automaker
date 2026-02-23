@@ -148,6 +148,8 @@ export interface WorktreeDropdownProps {
   onSetTracking?: (worktree: WorktreeInfo, remote: string) => void;
   /** List of remote names that have a branch matching the current branch name */
   remotesWithBranch?: string[];
+  /** When false, the trigger button uses a subdued style instead of the primary highlight. Defaults to true. */
+  highlightTrigger?: boolean;
 }
 
 /**
@@ -245,10 +247,11 @@ export function WorktreeDropdown({
   onSyncWithRemote,
   onSetTracking,
   remotesWithBranch,
+  highlightTrigger = true,
 }: WorktreeDropdownProps) {
   // Find the currently selected worktree to display in the trigger
   const selectedWorktree = worktrees.find((w) => isWorktreeSelected(w));
-  const displayBranch = selectedWorktree?.branch || 'Select worktree';
+  const displayBranch = selectedWorktree?.branch || `+${worktrees.length} more`;
   const { truncated: truncatedBranch, isTruncated: isBranchNameTruncated } = truncateBranchName(
     displayBranch,
     MAX_TRIGGER_BRANCH_NAME_LENGTH
@@ -292,15 +295,28 @@ export function WorktreeDropdown({
   const triggerButton = useMemo(
     () => (
       <Button
-        variant="outline"
+        variant={selectedWorktree && highlightTrigger ? 'default' : 'outline'}
         size="sm"
         className={cn(
-          'h-7 px-3 gap-1.5 font-mono text-xs bg-secondary/50 hover:bg-secondary min-w-0 border-r-0 rounded-r-none'
+          'h-7 px-3 gap-1.5 font-mono text-xs min-w-0',
+          selectedWorktree &&
+            highlightTrigger &&
+            'bg-primary text-primary-foreground border-r-0 rounded-l-md rounded-r-none',
+          selectedWorktree &&
+            !highlightTrigger &&
+            'bg-secondary/50 hover:bg-secondary border-r-0 rounded-l-md rounded-r-none',
+          !selectedWorktree && 'bg-secondary/50 hover:bg-secondary rounded-md'
         )}
         disabled={isActivating}
       >
         {/* Running/Activating indicator */}
-        {(selectedStatus.isRunning || isActivating) && <Spinner size="xs" className="shrink-0" />}
+        {(selectedStatus.isRunning || isActivating) && (
+          <Spinner
+            size="xs"
+            className="shrink-0"
+            variant={selectedWorktree && highlightTrigger ? 'foreground' : 'primary'}
+          />
+        )}
 
         {/* Branch icon */}
         <GitBranch className="w-3.5 h-3.5 shrink-0" />
@@ -403,7 +419,14 @@ export function WorktreeDropdown({
         <ChevronDown className="w-3 h-3 shrink-0 ml-auto" />
       </Button>
     ),
-    [isActivating, selectedStatus, truncatedBranch, selectedWorktree, branchCardCounts]
+    [
+      isActivating,
+      selectedStatus,
+      truncatedBranch,
+      selectedWorktree,
+      branchCardCounts,
+      highlightTrigger,
+    ]
   );
 
   // Wrap trigger button with dropdown trigger first to ensure ref is passed correctly
@@ -490,7 +513,7 @@ export function WorktreeDropdown({
       {selectedWorktree?.isMain && (
         <BranchSwitchDropdown
           worktree={selectedWorktree}
-          isSelected={true}
+          isSelected={highlightTrigger}
           branches={branches}
           filteredBranches={filteredBranches}
           branchFilter={branchFilter}
@@ -507,7 +530,7 @@ export function WorktreeDropdown({
       {selectedWorktree && (
         <WorktreeActionsDropdown
           worktree={selectedWorktree}
-          isSelected={true}
+          isSelected={highlightTrigger}
           aheadCount={aheadCount}
           behindCount={behindCount}
           hasRemoteBranch={hasRemoteBranch}

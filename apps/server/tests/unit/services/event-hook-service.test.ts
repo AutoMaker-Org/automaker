@@ -116,6 +116,7 @@ describe('EventHookService', () => {
 
       mockEmitter.simulateEvent('auto-mode:event', {
         type: 'auto_mode_feature_complete',
+        executionMode: 'auto',
         featureId: 'feat-1',
         featureName: 'Test Feature',
         passes: true,
@@ -144,6 +145,7 @@ describe('EventHookService', () => {
 
       mockEmitter.simulateEvent('auto-mode:event', {
         type: 'auto_mode_feature_complete',
+        executionMode: 'auto',
         featureId: 'feat-1',
         featureName: 'Test Feature',
         passes: false,
@@ -171,6 +173,7 @@ describe('EventHookService', () => {
 
       mockEmitter.simulateEvent('auto-mode:event', {
         type: 'auto_mode_feature_complete',
+        executionMode: 'auto',
         featureId: 'feat-1',
         featureName: 'Test Feature',
         passes: true,
@@ -200,6 +203,7 @@ describe('EventHookService', () => {
 
       mockEmitter.simulateEvent('auto-mode:event', {
         type: 'auto_mode_feature_complete',
+        executionMode: 'auto',
         featureId: 'feat-1',
         featureName: 'Test Feature',
         passes: false,
@@ -216,6 +220,55 @@ describe('EventHookService', () => {
       expect(storeCall.trigger).toBe('feature_error');
       // Error field should be populated for error triggers
       expect(storeCall.error).toBe('Feature stopped by user');
+    });
+
+    it('should ignore feature complete events without explicit auto execution mode', async () => {
+      service.initialize(
+        mockEmitter,
+        mockSettingsService,
+        mockEventHistoryService,
+        mockFeatureLoader
+      );
+
+      mockEmitter.simulateEvent('auto-mode:event', {
+        type: 'auto_mode_feature_complete',
+        featureId: 'feat-1',
+        featureName: 'Manual Feature',
+        passes: true,
+        message: 'Manually verified',
+        projectPath: '/test/project',
+      });
+
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(mockEventHistoryService.storeEvent).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('event mapping - feature:completed', () => {
+    it('should map manual completion to feature_success', async () => {
+      service.initialize(
+        mockEmitter,
+        mockSettingsService,
+        mockEventHistoryService,
+        mockFeatureLoader
+      );
+
+      mockEmitter.simulateEvent('feature:completed', {
+        featureId: 'feat-1',
+        featureName: 'Manual Feature',
+        projectPath: '/test/project',
+        passes: true,
+        executionMode: 'manual',
+      });
+
+      await vi.waitFor(() => {
+        expect(mockEventHistoryService.storeEvent).toHaveBeenCalled();
+      });
+
+      const storeCall = (mockEventHistoryService.storeEvent as ReturnType<typeof vi.fn>).mock
+        .calls[0][0];
+      expect(storeCall.trigger).toBe('feature_success');
+      expect(storeCall.passes).toBe(true);
     });
   });
 
@@ -400,6 +453,7 @@ describe('EventHookService', () => {
 
       mockEmitter.simulateEvent('auto-mode:event', {
         type: 'auto_mode_feature_complete',
+        executionMode: 'auto',
         featureId: 'feat-1',
         featureName: 'Test Feature',
         passes: true,
@@ -420,7 +474,6 @@ describe('EventHookService', () => {
     it('should NOT execute error hooks when feature completes successfully', async () => {
       // This is the key regression test for the bug:
       // "Error event hook fired when a feature completes successfully"
-      const errorHookCommand = vi.fn();
       const hooks = [
         {
           id: 'hook-error',
@@ -444,6 +497,7 @@ describe('EventHookService', () => {
 
       mockEmitter.simulateEvent('auto-mode:event', {
         type: 'auto_mode_feature_complete',
+        executionMode: 'auto',
         featureId: 'feat-1',
         featureName: 'Test Feature',
         passes: true,
@@ -480,6 +534,7 @@ describe('EventHookService', () => {
 
       mockEmitter.simulateEvent('auto-mode:event', {
         type: 'auto_mode_feature_complete',
+        executionMode: 'auto',
         featureId: 'feat-1',
         passes: true,
         message: 'Done',
@@ -507,6 +562,7 @@ describe('EventHookService', () => {
 
       mockEmitter.simulateEvent('auto-mode:event', {
         type: 'auto_mode_feature_complete',
+        executionMode: 'auto',
         featureId: 'feat-1',
         featureName: 'Fallback Name',
         passes: true,
@@ -757,6 +813,7 @@ describe('EventHookService', () => {
 
       mockEmitter.simulateEvent('auto-mode:event', {
         type: 'auto_mode_feature_complete',
+        executionMode: 'auto',
         featureId: 'feat-1',
         passes: false,
         message: 'Feature stopped by user',

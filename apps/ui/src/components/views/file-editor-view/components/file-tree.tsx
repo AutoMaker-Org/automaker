@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import {
   File,
   Folder,
@@ -31,7 +31,11 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { useFileEditorStore, type FileTreeNode } from '../use-file-editor-store';
+import {
+  useFileEditorStore,
+  type FileTreeNode,
+  type EnhancedGitFileStatus,
+} from '../use-file-editor-store';
 import { useFileBrowser } from '@/contexts/file-browser-context';
 
 interface FileTreeProps {
@@ -103,6 +107,49 @@ function getGitStatusLabel(status: string | undefined): string {
     default:
       return status;
   }
+}
+
+/** Status priority for determining the "dominant" status on a folder (higher = more prominent) */
+const STATUS_PRIORITY: Record<string, number> = {
+  U: 6, // Conflicted - highest priority
+  D: 5, // Deleted
+  A: 4, // Added
+  M: 3, // Modified
+  R: 2, // Renamed
+  S: 1, // Staged
+  '?': 0, // Untracked
+};
+
+/** Compute aggregated git status info for a folder from the status maps */
+function computeFolderGitRollup(
+  folderPath: string,
+  gitStatusMap: Map<string, string>,
+  enhancedGitStatusMap: Map<string, EnhancedGitFileStatus>
+): { count: number; dominantStatus: string | null; totalAdded: number; totalRemoved: number } {
+  const prefix = folderPath + '/';
+  let count = 0;
+  let dominantStatus: string | null = null;
+  let dominantPriority = -1;
+  let totalAdded = 0;
+  let totalRemoved = 0;
+
+  for (const [filePath, status] of gitStatusMap) {
+    if (filePath.startsWith(prefix)) {
+      count++;
+      const priority = STATUS_PRIORITY[status] ?? -1;
+      if (priority > dominantPriority) {
+        dominantPriority = priority;
+        dominantStatus = status;
+      }
+      const enhanced = enhancedGitStatusMap.get(filePath);
+      if (enhanced) {
+        totalAdded += enhanced.linesAdded;
+        totalRemoved += enhanced.linesRemoved;
+      }
+    }
+  }
+
+  return { count, dominantStatus, totalAdded, totalRemoved };
 }
 
 /**
@@ -281,6 +328,12 @@ function TreeNode({
   const linesRemoved = enhancedStatus?.linesRemoved || 0;
   const enhancedLabel = enhancedStatus?.statusLabel || statusLabel;
 
+  // Folder-level git status rollup
+  const folderRollup = useMemo(() => {
+    if (!node.isDirectory) return null;
+    return computeFolderGitRollup(node.path, gitStatusMap, enhancedGitStatusMap);
+  }, [node.isDirectory, node.path, gitStatusMap, enhancedGitStatusMap]);
+
   // Drag state
   const isDragging = dragState.draggedPaths.includes(node.path);
   const isDropTarget = dragState.dropTargetPath === node.path && node.isDirectory;
@@ -385,9 +438,16 @@ function TreeNode({
 
   // Build tooltip with enhanced info
   let tooltip = node.name;
-  if (enhancedLabel) tooltip += ` (${enhancedLabel})`;
-  if (linesAdded > 0 || linesRemoved > 0) {
-    tooltip += ` +${linesAdded} -${linesRemoved}`;
+  if (node.isDirectory && folderRollup && folderRollup.count > 0) {
+    tooltip += ` (${folderRollup.count} modified file${folderRollup.count !== 1 ? 's' : ''})`;
+    if (folderRollup.totalAdded > 0 || folderRollup.totalRemoved > 0) {
+      tooltip += ` +${folderRollup.totalAdded} -${folderRollup.totalRemoved}`;
+    }
+  } else {
+    if (enhancedLabel) tooltip += ` (${enhancedLabel})`;
+    if (linesAdded > 0 || linesRemoved > 0) {
+      tooltip += ` +${linesAdded} -${linesRemoved}`;
+    }
   }
 
   return (
@@ -456,7 +516,32 @@ function TreeNode({
           {/* Name */}
           <span className="truncate flex-1">{node.name}</span>
 
-          {/* Diff stats (lines added/removed) shown inline */}
+          {/* Folder: modified file count badge and rollup indicator */}
+          {node.isDirectory && folderRollup && folderRollup.count > 0 && (
+            <>
+              <span
+                className="text-[10px] font-medium shrink-0 px-1 py-0 rounded-full bg-muted text-muted-foreground"
+                title={`${folderRollup.count} modified file${folderRollup.count !== 1 ? 's' : ''}`}
+              >
+                {folderRollup.count}
+              </span>
+              <span
+                className={cn('w-1.5 h-1.5 rounded-full shrink-0', {
+                  'bg-yellow-500': folderRollup.dominantStatus === 'M',
+                  'bg-green-500':
+                    folderRollup.dominantStatus === 'A' || folderRollup.dominantStatus === 'S',
+                  'bg-red-500': folderRollup.dominantStatus === 'D',
+                  'bg-gray-400': folderRollup.dominantStatus === '?',
+                  'bg-purple-500': folderRollup.dominantStatus === 'R',
+                  'bg-cyan-500': folderRollup.dominantStatus === 'C',
+                  'bg-orange-500': folderRollup.dominantStatus === 'U',
+                })}
+                title={`${getGitStatusLabel(folderRollup.dominantStatus ?? undefined)} (${folderRollup.count})`}
+              />
+            </>
+          )}
+
+          {/* File: diff stats (lines added/removed) shown inline */}
           {!node.isDirectory && (linesAdded > 0 || linesRemoved > 0) && (
             <span className="flex items-center gap-1 text-[10px] shrink-0 opacity-70">
               {linesAdded > 0 && (
@@ -474,8 +559,8 @@ function TreeNode({
             </span>
           )}
 
-          {/* Git status indicator - two-tone badge for staged+unstaged */}
-          {gitStatus && (
+          {/* File: git status indicator - two-tone badge for staged+unstaged */}
+          {!node.isDirectory && gitStatus && (
             <span className="flex items-center gap-0 shrink-0">
               {isStaged && isUnstaged ? (
                 // Two-tone badge: staged (green) + unstaged (yellow)

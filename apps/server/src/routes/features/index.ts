@@ -44,7 +44,11 @@ export function createFeaturesRoutes(
     validatePathParams('projectPath'),
     createCreateHandler(featureLoader, events)
   );
-  router.post('/update', validatePathParams('projectPath'), createUpdateHandler(featureLoader));
+  router.post(
+    '/update',
+    validatePathParams('projectPath'),
+    createUpdateHandler(featureLoader, events)
+  );
   router.post(
     '/bulk-update',
     validatePathParams('projectPath'),
