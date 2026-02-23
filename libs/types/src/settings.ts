@@ -271,10 +271,13 @@ export function getThinkingLevelsForModel(model: string): ThinkingLevel[] {
 /**
  * Get the default thinking level for a given model.
  * Used when selecting a model via the primary button in the two-stage selector.
- * Always returns 'none' — users can configure their preferred default
- * via the defaultThinkingLevel setting in the model defaults page.
+ * Returns 'adaptive' for Opus models (which support adaptive thinking),
+ * and 'none' for all other models.
  */
-export function getDefaultThinkingLevel(_model: string): ThinkingLevel {
+export function getDefaultThinkingLevel(model: string): ThinkingLevel {
+  if (isAdaptiveThinkingModel(model)) {
+    return 'adaptive';
+  }
   return 'none';
 }
 
@@ -1434,6 +1437,23 @@ export interface ProjectSettings {
    */
   worktreeCopyFiles?: string[];
 
+  // Worktree Display Settings
+  /**
+   * Number of non-main worktrees to pin as tabs in the UI.
+   * The main worktree is always shown separately. Default: 0.
+   */
+  pinnedWorktreesCount?: number;
+  /**
+   * Minimum number of worktrees before the list collapses into a compact dropdown selector.
+   * Must be >= pinnedWorktreesCount to avoid conflicting configurations. Default: 3.
+   */
+  worktreeDropdownThreshold?: number;
+  /**
+   * When true, always show worktrees in a combined dropdown regardless of count.
+   * Overrides the dropdown threshold. Default: true.
+   */
+  alwaysUseWorktreeDropdown?: boolean;
+
   // Session Tracking
   /** Last chat session selected in this project */
   lastSelectedSessionId?: string;
@@ -1556,7 +1576,7 @@ export const DEFAULT_PHASE_MODELS: PhaseModelConfig = {
   validationModel: { model: 'claude-sonnet' },
 
   // Generation - use powerful models for quality
-  specGenerationModel: { model: 'claude-opus' },
+  specGenerationModel: { model: 'claude-opus', thinkingLevel: 'adaptive' },
   featureGenerationModel: { model: 'claude-sonnet' },
   backlogPlanningModel: { model: 'claude-sonnet' },
   projectAnalysisModel: { model: 'claude-sonnet' },
@@ -1622,7 +1642,7 @@ export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
   useWorktrees: true,
   defaultPlanningMode: 'skip',
   defaultRequirePlanApproval: false,
-  defaultFeatureModel: { model: 'claude-opus' }, // Use canonical ID
+  defaultFeatureModel: { model: 'claude-opus', thinkingLevel: 'adaptive' }, // Use canonical ID with adaptive thinking
   muteDoneSound: false,
   disableSplashScreen: false,
   serverLogLevel: 'info',
@@ -1630,7 +1650,7 @@ export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
   showQueryDevtools: true,
   enableAiCommitMessages: true,
   phaseModels: DEFAULT_PHASE_MODELS,
-  defaultThinkingLevel: 'none',
+  defaultThinkingLevel: 'adaptive',
   defaultReasoningEffort: 'none',
   defaultMaxTurns: 1000,
   enhancementModel: 'sonnet', // Legacy alias still supported

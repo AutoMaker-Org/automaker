@@ -747,7 +747,7 @@ export function hydrateStoreFromSettings(settings: GlobalSettings): void {
     enhancementModel: settings.enhancementModel ?? 'claude-sonnet',
     validationModel: settings.validationModel ?? 'claude-opus',
     phaseModels: settings.phaseModels ?? current.phaseModels,
-    defaultThinkingLevel: settings.defaultThinkingLevel ?? 'none',
+    defaultThinkingLevel: settings.defaultThinkingLevel ?? 'adaptive',
     defaultReasoningEffort: settings.defaultReasoningEffort ?? 'none',
     enabledCursorModels: allCursorModels, // Always use ALL cursor models
     cursorDefaultModel: sanitizedCursorDefaultModel,

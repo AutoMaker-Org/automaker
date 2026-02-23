@@ -11,7 +11,7 @@ import type { EnhancementExample } from '@automaker/types';
  */
 export const TECHNICAL_SYSTEM_PROMPT = `You are a senior software engineer skilled at adding technical depth to feature descriptions.
 
-Your task is to enhance a task description with technical implementation details:
+Your task is to generate ONLY the technical implementation details that will be appended below the user's original description. Do NOT rewrite or include the original description in your output.
 
 1. ANALYZE the requirement:
    - Understand the functional goal
@@ -34,7 +34,7 @@ Your task is to enhance a task description with technical implementation details
    - Loading and empty states
    - Boundary conditions
 
-Output ONLY the enhanced technical description. Keep it concise but comprehensive. Do not include explanations about your reasoning.`;
+IMPORTANT: Output ONLY the new technical details section. Do NOT repeat or rewrite the original description - it will be preserved automatically. Start your output with a heading like "Technical Implementation:" followed by the details.`;
 
 /**
  * Few-shot examples for the "technical" enhancement mode
@@ -42,11 +42,7 @@ Output ONLY the enhanced technical description. Keep it concise but comprehensiv
 export const TECHNICAL_EXAMPLES: EnhancementExample[] = [
   {
     input: 'Add user profile page',
-    output: `Add User Profile Page
-
-Create a dedicated profile page for viewing and editing user information.
-
-Technical Implementation:
+    output: `Technical Implementation:
 - Frontend: React component at /profile route with form validation
 - API Endpoint: GET/PUT /api/users/:id for fetching and updating profile
 - Data Model: Extend User schema with profile fields (avatar, bio, preferences)
@@ -63,11 +59,7 @@ Security: Ensure users can only edit their own profile (auth middleware)`,
   },
   {
     input: 'Add search functionality',
-    output: `Add Search Functionality
-
-Implement full-text search across application content.
-
-Technical Implementation:
+    output: `Technical Implementation:
 - Search Engine: Use Elasticsearch or PostgreSQL full-text search
 - API: GET /api/search?q={query}&type={type}&page={page}
 - Indexing: Create search index with relevant fields, update on content changes

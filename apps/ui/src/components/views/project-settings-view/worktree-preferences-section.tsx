@@ -3,6 +3,7 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Slider } from '@/components/ui/slider';
 import { ShellSyntaxEditor } from '@/components/ui/shell-syntax-editor';
 import {
   GitBranch,
@@ -15,6 +16,8 @@ import {
   Copy,
   Plus,
   FolderOpen,
+  LayoutGrid,
+  Pin,
 } from 'lucide-react';
 import { Spinner } from '@/components/ui/spinner';
 import { cn } from '@/lib/utils';
@@ -63,6 +66,12 @@ export function WorktreePreferencesSection({ project }: WorktreePreferencesSecti
   const copyFilesFromStore = useAppStore((s) => s.worktreeCopyFilesByProject[project.path]);
   const copyFiles = copyFilesFromStore ?? EMPTY_FILES;
   const setWorktreeCopyFiles = useAppStore((s) => s.setWorktreeCopyFiles);
+
+  // Worktree display settings
+  const pinnedWorktreesCount = useAppStore(
+    (s) => s.pinnedWorktreesCountByProject[project.path] ?? 0
+  );
+  const setPinnedWorktreesCount = useAppStore((s) => s.setPinnedWorktreesCount);
 
   // Get effective worktrees setting (project override or global fallback)
   const effectiveUseWorktrees = projectUseWorktrees ?? globalUseWorktrees;
@@ -115,6 +124,9 @@ export function WorktreePreferencesSection({ project }: WorktreePreferencesSecti
           if (response.settings.worktreeCopyFiles !== undefined) {
             setWorktreeCopyFiles(currentPath, response.settings.worktreeCopyFiles);
           }
+          if (response.settings.pinnedWorktreesCount !== undefined) {
+            setPinnedWorktreesCount(currentPath, response.settings.pinnedWorktreesCount);
+          }
         }
       } catch (error) {
         if (!isCancelled) {
@@ -135,6 +147,7 @@ export function WorktreePreferencesSection({ project }: WorktreePreferencesSecti
     setDefaultDeleteBranch,
     setAutoDismissInitScriptIndicator,
     setWorktreeCopyFiles,
+    setPinnedWorktreesCount,
   ]);
 
   // Load init script content when project changes
@@ -501,6 +514,71 @@ export function WorktreePreferencesSection({ project }: WorktreePreferencesSecti
             <p className="text-xs text-muted-foreground/80 leading-relaxed">
               When deleting a worktree, automatically check the "Also delete the branch" option.
             </p>
+          </div>
+        </div>
+
+        {/* Separator */}
+        <div className="border-t border-border/30" />
+
+        {/* Worktree Display Settings */}
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <LayoutGrid className="w-4 h-4 text-brand-500" />
+            <Label className="text-foreground font-medium">Display Settings</Label>
+          </div>
+          <p className="text-xs text-muted-foreground/80 leading-relaxed">
+            Control how worktrees are presented in the panel. Pinned worktrees appear as tabs, and
+            remaining worktrees are available in a combined overflow dropdown.
+          </p>
+
+          {/* Pinned Worktrees Count */}
+          <div className="group flex items-start space-x-3 p-3 rounded-xl hover:bg-accent/30 transition-colors duration-200 -mx-3">
+            <div className="mt-0.5">
+              <Pin className="w-4 h-4 text-brand-500" />
+            </div>
+            <div className="space-y-2 flex-1">
+              <div className="flex items-center justify-between">
+                <Label
+                  htmlFor="pinned-worktrees-count"
+                  className="text-foreground cursor-pointer font-medium"
+                >
+                  Pinned Worktree Tabs
+                </Label>
+                <span className="text-sm font-medium text-foreground tabular-nums">
+                  {pinnedWorktreesCount}
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground/80 leading-relaxed">
+                Number of worktree tabs to pin (excluding the main worktree, which is always shown).
+              </p>
+              <Slider
+                id="pinned-worktrees-count"
+                min={0}
+                max={25}
+                step={1}
+                value={[pinnedWorktreesCount]}
+                onValueChange={(value) => {
+                  // Update local state immediately for visual feedback
+                  const newValue = value[0] ?? 1;
+                  setPinnedWorktreesCount(project.path, newValue);
+                }}
+                onValueCommit={async (value) => {
+                  const newValue = value[0] ?? 1;
+
+                  // Persist to server
+                  try {
+                    const httpClient = getHttpApiClient();
+                    await httpClient.settings.updateProject(project.path, {
+                      pinnedWorktreesCount: newValue,
+                    });
+                  } catch (error) {
+                    console.error('Failed to persist pinnedWorktreesCount:', error);
+                    toast.error('Failed to save pinned worktrees setting');
+                  }
+                }}
+                className="w-full"
+              />
+            </div>
           </div>
         </div>
 

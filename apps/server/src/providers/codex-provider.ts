@@ -127,11 +127,16 @@ const DEFAULT_ALLOWED_TOOLS = [
   'Read',
   'Write',
   'Edit',
+  'MultiEdit',
   'Glob',
   'Grep',
+  'LS',
   'Bash',
   'WebSearch',
   'WebFetch',
+  'TodoWrite',
+  'Task',
+  'Skill',
 ] as const;
 const SEARCH_TOOL_NAMES = new Set(['WebSearch', 'WebFetch']);
 const MIN_MAX_TURNS = 1;

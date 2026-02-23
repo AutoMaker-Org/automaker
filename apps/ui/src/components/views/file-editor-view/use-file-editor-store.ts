@@ -65,6 +65,14 @@ export interface DragState {
   dropTargetPath: string | null;
 }
 
+/** Inline diff line information */
+export interface DiffLine {
+  type: 'added' | 'removed' | 'unchanged';
+  content: string;
+  oldLineNumber?: number;
+  newLineNumber?: number;
+}
+
 interface FileEditorState {
   // File tree state
   fileTree: FileTreeNode[];
@@ -101,6 +109,12 @@ interface FileEditorState {
   // Git details for the currently active file (loaded on demand)
   activeFileGitDetails: GitFileDetailsInfo | null;
 
+  // Inline diff display
+  /** Whether to show inline git diffs in the editor */
+  showInlineDiff: boolean;
+  /** The diff content for the active file (raw unified diff) */
+  activeFileDiff: string | null;
+
   // Drag and drop state
   dragState: DragState;
 
@@ -135,6 +149,9 @@ interface FileEditorState {
   setGitBranch: (branch: string) => void;
   setActiveFileGitDetails: (details: GitFileDetailsInfo | null) => void;
 
+  setShowInlineDiff: (show: boolean) => void;
+  setActiveFileDiff: (diff: string | null) => void;
+
   setDragState: (state: DragState) => void;
   setSelectedPaths: (paths: Set<string>) => void;
   toggleSelectedPath: (path: string) => void;
@@ -159,6 +176,8 @@ const initialState = {
   enhancedGitStatusMap: new Map<string, EnhancedGitFileStatus>(),
   gitBranch: '',
   activeFileGitDetails: null as GitFileDetailsInfo | null,
+  showInlineDiff: false,
+  activeFileDiff: null as string | null,
   dragState: { draggedPaths: [], dropTargetPath: null } as DragState,
   selectedPaths: new Set<string>(),
 };
@@ -206,8 +225,18 @@ export const useFileEditorStore = create<FileEditorState>()(
 
         const id = `tab-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
         const newTab: EditorTab = { ...tabData, id };
+        let updatedTabs = [...tabs, newTab];
+
+        // Enforce max open tabs – evict the oldest non-dirty tab when over the limit
+        const MAX_TABS = 25;
+        while (updatedTabs.length > MAX_TABS) {
+          const evictIdx = updatedTabs.findIndex((t) => t.id !== id && !t.isDirty);
+          if (evictIdx === -1) break; // all other tabs are dirty, keep them
+          updatedTabs.splice(evictIdx, 1);
+        }
+
         set({
-          tabs: [...tabs, newTab],
+          tabs: updatedTabs,
           activeTabId: id,
         });
       },
@@ -281,6 +310,9 @@ export const useFileEditorStore = create<FileEditorState>()(
       setEnhancedGitStatusMap: (map) => set({ enhancedGitStatusMap: map }),
       setGitBranch: (branch) => set({ gitBranch: branch }),
       setActiveFileGitDetails: (details) => set({ activeFileGitDetails: details }),
+
+      setShowInlineDiff: (show) => set({ showInlineDiff: show }),
+      setActiveFileDiff: (diff) => set({ activeFileDiff: diff }),
 
       setDragState: (state) => set({ dragState: state }),
       setSelectedPaths: (paths) => set({ selectedPaths: paths }),

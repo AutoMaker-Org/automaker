@@ -6,13 +6,21 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Sparkles, ChevronDown, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { getElectronAPI } from '@/lib/electron';
 import { ModelOverrideTrigger, useModelOverride } from '@/components/shared';
-import { EnhancementMode, ENHANCEMENT_MODE_LABELS } from './enhancement-constants';
+import {
+  EnhancementMode,
+  ENHANCEMENT_MODE_LABELS,
+  REWRITE_MODES,
+  ADDITIVE_MODES,
+  isAdditiveMode,
+} from './enhancement-constants';
 import { useAppStore } from '@/store/app-store';
 
 const logger = createLogger('EnhanceWithAI');
@@ -79,7 +87,10 @@ export function EnhanceWithAI({
 
       if (result?.success && result.enhancedText) {
         const originalText = value;
-        const enhancedText = result.enhancedText;
+        // For additive modes, prepend the original description above the AI-generated content
+        const enhancedText = isAdditiveMode(enhancementMode)
+          ? `${originalText.trim()}\n\n${result.enhancedText.trim()}`
+          : result.enhancedText;
         onChange(enhancedText);
 
         // Track in history if callback provided (includes original for restoration)
@@ -119,13 +130,19 @@ export function EnhanceWithAI({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start">
-              {(Object.entries(ENHANCEMENT_MODE_LABELS) as [EnhancementMode, string][]).map(
-                ([mode, label]) => (
-                  <DropdownMenuItem key={mode} onClick={() => setEnhancementMode(mode)}>
-                    {label}
-                  </DropdownMenuItem>
-                )
-              )}
+              <DropdownMenuLabel>Rewrite</DropdownMenuLabel>
+              {REWRITE_MODES.map((mode) => (
+                <DropdownMenuItem key={mode} onClick={() => setEnhancementMode(mode)}>
+                  {ENHANCEMENT_MODE_LABELS[mode]}
+                </DropdownMenuItem>
+              ))}
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel>Append Details</DropdownMenuLabel>
+              {ADDITIVE_MODES.map((mode) => (
+                <DropdownMenuItem key={mode} onClick={() => setEnhancementMode(mode)}>
+                  {ENHANCEMENT_MODE_LABELS[mode]}
+                </DropdownMenuItem>
+              ))}
             </DropdownMenuContent>
           </DropdownMenu>
 

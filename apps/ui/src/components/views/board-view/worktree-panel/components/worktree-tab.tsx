@@ -108,6 +108,14 @@ interface WorktreeTabProps {
   onRunTerminalScript?: (worktree: WorktreeInfo, command: string) => void;
   /** Callback to open the script editor UI */
   onEditScripts?: () => void;
+  /** Available worktrees for swapping into this slot (non-main only) */
+  availableWorktreesForSwap?: WorktreeInfo[];
+  /** The slot index for this tab in the pinned list (0-based, excluding main) */
+  slotIndex?: number;
+  /** Callback when user swaps this slot to a different worktree */
+  onSwapWorktree?: (slotIndex: number, newBranch: string) => void;
+  /** List of currently pinned branch names (to show which are pinned in the swap dropdown) */
+  pinnedBranches?: string[];
 }
 
 export function WorktreeTab({
@@ -181,6 +189,10 @@ export function WorktreeTab({
   terminalScripts,
   onRunTerminalScript,
   onEditScripts,
+  availableWorktreesForSwap,
+  slotIndex,
+  onSwapWorktree,
+  pinnedBranches,
 }: WorktreeTabProps) {
   // Make the worktree tab a drop target for feature cards
   const { setNodeRef, isOver } = useDroppable({
@@ -550,6 +562,10 @@ export function WorktreeTab({
         terminalScripts={terminalScripts}
         onRunTerminalScript={onRunTerminalScript}
         onEditScripts={onEditScripts}
+        availableWorktreesForSwap={availableWorktreesForSwap}
+        slotIndex={slotIndex}
+        onSwapWorktree={onSwapWorktree}
+        pinnedBranches={pinnedBranches}
       />
     </div>
   );
