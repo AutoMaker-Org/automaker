@@ -168,9 +168,11 @@ export async function navigateToWelcome(page: Page): Promise<void> {
   // Handle login redirect if needed
   await handleLoginScreenIfPresent(page);
 
-  // Wait for either welcome-view or dashboard-view (app redirects to /dashboard when no project)
+  // Wait for either welcome-view, dashboard-view, or overview-view (app redirects based on project state)
   await page
-    .locator('[data-testid="welcome-view"], [data-testid="dashboard-view"]')
+    .locator(
+      '[data-testid="welcome-view"], [data-testid="dashboard-view"], [data-testid="overview-view"]'
+    )
     .first()
     .waitFor({ state: 'visible', timeout: 10000 });
 }

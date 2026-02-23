@@ -310,6 +310,8 @@ export function SessionManager({
         });
         if (activeSessionsList.length > 0) {
           onSelectSession(activeSessionsList[0].id);
+        } else {
+          onSelectSession(null);
         }
       }
     }

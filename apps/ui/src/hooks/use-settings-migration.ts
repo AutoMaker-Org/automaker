@@ -806,7 +806,11 @@ export function hydrateStoreFromSettings(settings: GlobalSettings): void {
     // (error boundary reloads → restores same bad path → crash again).
     // The use-worktrees validation effect will re-discover valid worktrees
     // from the server once they load.
-    currentWorktreeByProject: sanitizeWorktreeByProject(settings.currentWorktreeByProject),
+    currentWorktreeByProject: Object.fromEntries(
+      Object.entries(sanitizeWorktreeByProject(settings.currentWorktreeByProject)).filter(
+        ([, worktree]) => worktree.path === null
+      )
+    ),
     // UI State
     worktreePanelCollapsed: settings.worktreePanelCollapsed ?? false,
     lastProjectDir: settings.lastProjectDir ?? '',

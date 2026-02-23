@@ -15,6 +15,7 @@ import {
   FolderKanban,
 } from 'lucide-react';
 import { createLogger } from '@automaker/utils/logger';
+import { resolveModelString } from '@automaker/model-resolver';
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { useAppStore } from '@/store/app-store';
@@ -706,7 +707,7 @@ export function FileEditorView({ initialPath }: FileEditorViewProps) {
             status: 'backlog' as const,
             passes: false,
             priority: featureData.priority,
-            model: featureData.model,
+            model: resolveModelString(featureData.model),
             thinkingLevel: featureData.thinkingLevel,
             reasoningEffort: featureData.reasoningEffort,
             skipTests: featureData.skipTests,

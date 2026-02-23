@@ -16,25 +16,66 @@ import {
   handleLoginScreenIfPresent,
 } from '../utils';
 
+/**
+ * Helper to build overview API response bodies.
+ * Each test sets `overviewMockResponse` before navigating so the single
+ * route handler registered in `beforeEach` returns the right data.
+ */
+function makeOverviewResponse(
+  overrides: {
+    projects?: unknown[];
+    aggregate?: Record<string, unknown>;
+    recentActivity?: unknown[];
+    status?: number;
+    error?: string;
+  } = {}
+) {
+  const { projects = [], aggregate, recentActivity = [], status = 200, error } = overrides;
+
+  const defaultAggregate = {
+    projectCounts: { total: 0, active: 0, idle: 0, waiting: 0, withErrors: 0, allCompleted: 0 },
+    featureCounts: { total: 0, pending: 0, running: 0, completed: 0, failed: 0, verified: 0 },
+    totalUnreadNotifications: 0,
+    projectsWithAutoModeRunning: 0,
+    computedAt: new Date().toISOString(),
+  };
+
+  return {
+    status,
+    body: error
+      ? JSON.stringify({ error })
+      : JSON.stringify({
+          success: true,
+          projects,
+          aggregate: aggregate ?? defaultAggregate,
+          recentActivity,
+          generatedAt: new Date().toISOString(),
+        }),
+  };
+}
+
 test.describe('Projects Overview Dashboard', () => {
+  // Mutable mock response - tests set this before navigating.
+  // The single route handler in beforeEach reads it on every request.
+  let overviewMock: { status: number; body: string };
+
   test.beforeEach(async ({ page }) => {
+    // Start with an empty default
+    overviewMock = makeOverviewResponse();
+
     // Set up mock projects state
     await setupMockMultipleProjects(page, 3);
 
     // Intercept settings API to preserve mock project data and prevent
     // the server's settings from overriding our test setup.
-    // Without this, background reconciliation can clear the mock projects.
     await page.route('**/api/settings/global', async (route) => {
       const method = route.request().method();
       if (method === 'PUT') {
-        // Allow settings sync writes to pass through
         return route.continue();
       }
       const response = await route.fetch();
       const json = await response.json();
       if (json.settings) {
-        // Always overwrite projects with mock data so CI-provided projects
-        // that don't contain 'test-project-1' can't break hydration.
         json.settings.projects = [
           {
             id: 'test-project-1',
@@ -63,7 +104,6 @@ test.describe('Projects Overview Dashboard', () => {
     });
 
     // Mock the initialize-project endpoint for mock paths that don't exist on disk.
-    // This prevents auto-open from failing when it tries to verify the project directory.
     await page.route('**/api/project/initialize', async (route) => {
       await route.fulfill({
         status: 200,
@@ -81,44 +121,21 @@ test.describe('Projects Overview Dashboard', () => {
       });
     });
 
+    // Single overview route handler that reads from the mutable `overviewMock`.
+    // Tests update `overviewMock` before navigating to control the response.
+    await page.route('**/api/projects/overview', async (route) => {
+      await route.fulfill({
+        status: overviewMock.status,
+        contentType: 'application/json',
+        body: overviewMock.body,
+      });
+    });
+
     await authenticateForTests(page);
   });
 
   test('should navigate to overview from sidebar and display overview UI', async ({ page }) => {
-    // Mock the projects overview API response
-    await page.route('**/api/projects/overview', async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          success: true,
-          projects: [],
-          aggregate: {
-            projectCounts: {
-              total: 0,
-              active: 0,
-              idle: 0,
-              waiting: 0,
-              withErrors: 0,
-              allCompleted: 0,
-            },
-            featureCounts: {
-              total: 0,
-              pending: 0,
-              running: 0,
-              completed: 0,
-              failed: 0,
-              verified: 0,
-            },
-            totalUnreadNotifications: 0,
-            projectsWithAutoModeRunning: 0,
-            computedAt: new Date().toISOString(),
-          },
-          recentActivity: [],
-          generatedAt: new Date().toISOString(),
-        }),
-      });
-    });
+    // Use default empty overview mock (set in beforeEach)
 
     // Go to the app
     await page.goto('/board');
@@ -136,7 +153,7 @@ test.describe('Projects Overview Dashboard', () => {
     }
 
     // Click on the Dashboard link in the sidebar (navigates to /overview)
-    const overviewLink = page.locator('[data-testid="nav-overview"]');
+    const overviewLink = page.getByRole('button', { name: 'Dashboard' });
     await expect(overviewLink).toBeVisible({ timeout: 5000 });
     await overviewLink.click();
 
@@ -149,78 +166,70 @@ test.describe('Projects Overview Dashboard', () => {
     // Verify the refresh button is present
     await expect(page.getByRole('button', { name: /Refresh/i })).toBeVisible();
 
-    // Verify the Open Project and New Project buttons are present
-    await expect(page.getByRole('button', { name: /Open Project/i })).toBeVisible();
-    await expect(page.getByRole('button', { name: /New Project/i })).toBeVisible();
+    // Verify the Open Project and New Project buttons are present in the overview header
+    const overviewHeader = page.locator('[data-testid="overview-view"] header');
+    await expect(overviewHeader.getByRole('button', { name: /Open Project/i })).toBeVisible();
+    await expect(overviewHeader.getByRole('button', { name: /New Project/i })).toBeVisible();
   });
 
   test('should display aggregate statistics cards', async ({ page }) => {
-    // Mock the projects overview API response
-    await page.route('**/api/projects/overview', async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          success: true,
-          projects: [
-            {
-              projectId: 'test-project-1',
-              projectName: 'Test Project 1',
-              projectPath: '/mock/test-project-1',
-              healthStatus: 'active',
-              featureCounts: { pending: 2, running: 1, completed: 3, failed: 0, verified: 2 },
-              totalFeatures: 8,
-              isAutoModeRunning: true,
-              unreadNotificationCount: 1,
-            },
-            {
-              projectId: 'test-project-2',
-              projectName: 'Test Project 2',
-              projectPath: '/mock/test-project-2',
-              healthStatus: 'idle',
-              featureCounts: { pending: 5, running: 0, completed: 10, failed: 1, verified: 8 },
-              totalFeatures: 24,
-              isAutoModeRunning: false,
-              unreadNotificationCount: 0,
-            },
-          ],
-          aggregate: {
-            projectCounts: {
-              total: 2,
-              active: 1,
-              idle: 1,
-              waiting: 0,
-              withErrors: 1,
-              allCompleted: 0,
-            },
-            featureCounts: {
-              total: 32,
-              pending: 7,
-              running: 1,
-              completed: 13,
-              failed: 1,
-              verified: 10,
-            },
-            totalUnreadNotifications: 1,
-            projectsWithAutoModeRunning: 1,
-            computedAt: new Date().toISOString(),
-          },
-          recentActivity: [
-            {
-              id: 'activity-1',
-              projectId: 'test-project-1',
-              projectName: 'Test Project 1',
-              type: 'feature_completed',
-              description: 'Feature completed: Add login form',
-              severity: 'success',
-              timestamp: new Date().toISOString(),
-              featureId: 'feature-1',
-              featureTitle: 'Add login form',
-            },
-          ],
-          generatedAt: new Date().toISOString(),
-        }),
-      });
+    overviewMock = makeOverviewResponse({
+      projects: [
+        {
+          projectId: 'test-project-1',
+          projectName: 'Test Project 1',
+          projectPath: '/mock/test-project-1',
+          healthStatus: 'active',
+          featureCounts: { pending: 2, running: 1, completed: 3, failed: 0, verified: 2 },
+          totalFeatures: 8,
+          isAutoModeRunning: true,
+          unreadNotificationCount: 1,
+        },
+        {
+          projectId: 'test-project-2',
+          projectName: 'Test Project 2',
+          projectPath: '/mock/test-project-2',
+          healthStatus: 'idle',
+          featureCounts: { pending: 5, running: 0, completed: 10, failed: 1, verified: 8 },
+          totalFeatures: 24,
+          isAutoModeRunning: false,
+          unreadNotificationCount: 0,
+        },
+      ],
+      aggregate: {
+        projectCounts: {
+          total: 2,
+          active: 1,
+          idle: 1,
+          waiting: 0,
+          withErrors: 1,
+          allCompleted: 0,
+        },
+        featureCounts: {
+          total: 32,
+          pending: 7,
+          running: 1,
+          completed: 13,
+          failed: 1,
+          verified: 10,
+        },
+        totalUnreadNotifications: 1,
+        projectsWithAutoModeRunning: 1,
+        computedAt: new Date().toISOString(),
+      },
+      recentActivity: [
+        {
+          id: 'activity-1',
+          projectId: 'test-project-1',
+          projectName: 'Test Project 1',
+          type: 'feature_completed',
+          description: 'Feature completed: Add login form',
+          severity: 'success',
+          timestamp: new Date().toISOString(),
+          featureId: 'feature-1',
+          featureTitle: 'Add login form',
+        },
+      ],
     });
 
     // Navigate directly to overview
@@ -249,50 +258,40 @@ test.describe('Projects Overview Dashboard', () => {
   });
 
   test('should display project status cards', async ({ page }) => {
-    // Mock the projects overview API response
-    await page.route('**/api/projects/overview', async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          success: true,
-          projects: [
-            {
-              projectId: 'test-project-1',
-              projectName: 'Test Project 1',
-              projectPath: '/mock/test-project-1',
-              healthStatus: 'active',
-              featureCounts: { pending: 2, running: 1, completed: 3, failed: 0, verified: 2 },
-              totalFeatures: 8,
-              isAutoModeRunning: true,
-              unreadNotificationCount: 1,
-            },
-          ],
-          aggregate: {
-            projectCounts: {
-              total: 1,
-              active: 1,
-              idle: 0,
-              waiting: 0,
-              withErrors: 0,
-              allCompleted: 0,
-            },
-            featureCounts: {
-              total: 8,
-              pending: 2,
-              running: 1,
-              completed: 3,
-              failed: 0,
-              verified: 2,
-            },
-            totalUnreadNotifications: 1,
-            projectsWithAutoModeRunning: 1,
-            computedAt: new Date().toISOString(),
-          },
-          recentActivity: [],
-          generatedAt: new Date().toISOString(),
-        }),
-      });
+    overviewMock = makeOverviewResponse({
+      projects: [
+        {
+          projectId: 'test-project-1',
+          projectName: 'Test Project 1',
+          projectPath: '/mock/test-project-1',
+          healthStatus: 'active',
+          featureCounts: { pending: 2, running: 1, completed: 3, failed: 0, verified: 2 },
+          totalFeatures: 8,
+          isAutoModeRunning: true,
+          unreadNotificationCount: 1,
+        },
+      ],
+      aggregate: {
+        projectCounts: {
+          total: 1,
+          active: 1,
+          idle: 0,
+          waiting: 0,
+          withErrors: 0,
+          allCompleted: 0,
+        },
+        featureCounts: {
+          total: 8,
+          pending: 2,
+          running: 1,
+          completed: 3,
+          failed: 0,
+          verified: 2,
+        },
+        totalUnreadNotifications: 1,
+        projectsWithAutoModeRunning: 1,
+        computedAt: new Date().toISOString(),
+      },
     });
 
     // Navigate directly to overview
@@ -318,50 +317,40 @@ test.describe('Projects Overview Dashboard', () => {
   });
 
   test('should navigate to board when clicking on a project card', async ({ page }) => {
-    // Mock the projects overview API response
-    await page.route('**/api/projects/overview', async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          success: true,
-          projects: [
-            {
-              projectId: 'test-project-1',
-              projectName: 'Test Project 1',
-              projectPath: '/mock/test-project-1',
-              healthStatus: 'idle',
-              featureCounts: { pending: 0, running: 0, completed: 0, failed: 0, verified: 0 },
-              totalFeatures: 0,
-              isAutoModeRunning: false,
-              unreadNotificationCount: 0,
-            },
-          ],
-          aggregate: {
-            projectCounts: {
-              total: 1,
-              active: 0,
-              idle: 1,
-              waiting: 0,
-              withErrors: 0,
-              allCompleted: 0,
-            },
-            featureCounts: {
-              total: 0,
-              pending: 0,
-              running: 0,
-              completed: 0,
-              failed: 0,
-              verified: 0,
-            },
-            totalUnreadNotifications: 0,
-            projectsWithAutoModeRunning: 0,
-            computedAt: new Date().toISOString(),
-          },
-          recentActivity: [],
-          generatedAt: new Date().toISOString(),
-        }),
-      });
+    overviewMock = makeOverviewResponse({
+      projects: [
+        {
+          projectId: 'test-project-1',
+          projectName: 'Test Project 1',
+          projectPath: '/mock/test-project-1',
+          healthStatus: 'idle',
+          featureCounts: { pending: 0, running: 0, completed: 0, failed: 0, verified: 0 },
+          totalFeatures: 0,
+          isAutoModeRunning: false,
+          unreadNotificationCount: 0,
+        },
+      ],
+      aggregate: {
+        projectCounts: {
+          total: 1,
+          active: 0,
+          idle: 1,
+          waiting: 0,
+          withErrors: 0,
+          allCompleted: 0,
+        },
+        featureCounts: {
+          total: 0,
+          pending: 0,
+          running: 0,
+          completed: 0,
+          failed: 0,
+          verified: 0,
+        },
+        totalUnreadNotifications: 0,
+        projectsWithAutoModeRunning: 0,
+        computedAt: new Date().toISOString(),
+      },
     });
 
     // Navigate directly to overview
@@ -378,40 +367,7 @@ test.describe('Projects Overview Dashboard', () => {
   });
 
   test('should display empty state when no projects exist', async ({ page }) => {
-    // Mock empty projects overview API response
-    await page.route('**/api/projects/overview', async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          success: true,
-          projects: [],
-          aggregate: {
-            projectCounts: {
-              total: 0,
-              active: 0,
-              idle: 0,
-              waiting: 0,
-              withErrors: 0,
-              allCompleted: 0,
-            },
-            featureCounts: {
-              total: 0,
-              pending: 0,
-              running: 0,
-              completed: 0,
-              failed: 0,
-              verified: 0,
-            },
-            totalUnreadNotifications: 0,
-            projectsWithAutoModeRunning: 0,
-            computedAt: new Date().toISOString(),
-          },
-          recentActivity: [],
-          generatedAt: new Date().toISOString(),
-        }),
-      });
-    });
+    // Default overviewMock already returns empty projects - no change needed
 
     // Navigate directly to overview
     await page.goto('/overview');
@@ -427,15 +383,9 @@ test.describe('Projects Overview Dashboard', () => {
   });
 
   test('should show error state when API fails', async ({ page }) => {
-    // Mock API error
-    await page.route('**/api/projects/overview', async (route) => {
-      await route.fulfill({
-        status: 500,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          error: 'Internal server error',
-        }),
-      });
+    overviewMock = makeOverviewResponse({
+      status: 500,
+      error: 'Internal server error',
     });
 
     // Navigate directly to overview
