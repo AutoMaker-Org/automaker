@@ -101,6 +101,7 @@ export function WorktreePanel({
     hasRemoteBranch,
     trackingRemote,
     getTrackingRemote,
+    remotesWithBranch,
     isLoadingBranches,
     branchFilter,
     setBranchFilter,
@@ -955,6 +956,7 @@ export function WorktreePanel({
             onSync={handleSyncWithRemoteSelection}
             onSyncWithRemote={handleSyncWithSpecificRemote}
             onSetTracking={handleSetTrackingForRemote}
+            remotesWithBranch={remotesWithBranch}
             onOpenInEditor={handleOpenInEditor}
             onOpenInIntegratedTerminal={handleOpenInIntegratedTerminal}
             onOpenInExternalTerminal={handleOpenInExternalTerminal}
@@ -1202,6 +1204,7 @@ export function WorktreePanel({
             onSync={handleSyncWithRemoteSelection}
             onSyncWithRemote={handleSyncWithSpecificRemote}
             onSetTracking={handleSetTrackingForRemote}
+            remotesWithBranch={remotesWithBranch}
             remotesCache={remotesCache}
             onOpenInEditor={handleOpenInEditor}
             onOpenInIntegratedTerminal={handleOpenInIntegratedTerminal}
@@ -1346,6 +1349,7 @@ export function WorktreePanel({
                 terminalScripts={terminalScripts}
                 onRunTerminalScript={handleRunTerminalScript}
                 onEditScripts={handleEditScripts}
+                remotesWithBranch={remotesWithBranch}
               />
             )}
           </div>
@@ -1437,6 +1441,7 @@ export function WorktreePanel({
                       terminalScripts={terminalScripts}
                       onRunTerminalScript={handleRunTerminalScript}
                       onEditScripts={handleEditScripts}
+                      remotesWithBranch={remotesWithBranch}
                     />
                   );
                 })}

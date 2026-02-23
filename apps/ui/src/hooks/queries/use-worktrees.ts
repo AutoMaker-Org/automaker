@@ -188,6 +188,8 @@ interface BranchesResult {
   hasCommits: boolean;
   /** The name of the remote that the current branch is tracking (e.g. "origin"), if any */
   trackingRemote?: string;
+  /** List of remote names that have a branch matching the current branch name */
+  remotesWithBranch?: string[];
 }
 
 /**
@@ -246,6 +248,7 @@ export function useWorktreeBranches(worktreePath: string | undefined, includeRem
         isGitRepo: true,
         hasCommits: true,
         trackingRemote: result.result?.trackingRemote,
+        remotesWithBranch: result.result?.remotesWithBranch,
       };
     },
     enabled: !!worktreePath,

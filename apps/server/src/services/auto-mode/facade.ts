@@ -296,7 +296,7 @@ export class AutoModeServiceFacade {
             previousContent: opts?.previousContent as string | undefined,
             systemPrompt: opts?.systemPrompt as string | undefined,
             autoLoadClaudeMd: opts?.autoLoadClaudeMd as boolean | undefined,
-            useClaudeCodeSystemPrompt: opts?.useClaudeCodeSystemPrompt as boolean | undefined,
+            useClaudeCodeSystemPrompt,
             thinkingLevel: opts?.thinkingLevel as ThinkingLevel | undefined,
             reasoningEffort: opts?.reasoningEffort as ReasoningEffort | undefined,
             branchName: opts?.branchName as string | null | undefined,

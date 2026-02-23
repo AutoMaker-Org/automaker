@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -38,14 +38,14 @@ export function QuickAddDialog({ open, onOpenChange, onAdd, onAddAndStart }: Qui
     effectiveDefaultFeatureModel || { model: 'claude-opus' }
   );
 
-  // Reset form when dialog opens
-  const wasOpenRef = useRef(false);
-  if (open && !wasOpenRef.current) {
-    setDescription('');
-    setDescriptionError(false);
-    setModelEntry(effectiveDefaultFeatureModel || { model: 'claude-opus' });
-  }
-  wasOpenRef.current = open;
+  // Reset form when dialog opens (in useEffect to avoid state mutation during render)
+  useEffect(() => {
+    if (open) {
+      setDescription('');
+      setDescriptionError(false);
+      setModelEntry(effectiveDefaultFeatureModel || { model: 'claude-opus' });
+    }
+  }, [open, effectiveDefaultFeatureModel]);
 
   const handleSubmit = (actionFn: (description: string, modelEntry: PhaseModelEntry) => void) => {
     if (!description.trim()) {

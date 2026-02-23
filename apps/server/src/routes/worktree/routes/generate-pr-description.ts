@@ -234,8 +234,9 @@ export function createGeneratePRDescriptionHandler(
           maxBuffer: 1024 * 1024 * 5,
         });
         stagedDiff = stdout;
-      } catch {
+      } catch (err) {
         // Non-fatal — staged diff is a best-effort supplement
+        logger.debug('Failed to get staged diff', err);
       }
 
       // --- Step 3: unstaged changes (tracked files only) ---
@@ -246,21 +247,25 @@ export function createGeneratePRDescriptionHandler(
           maxBuffer: 1024 * 1024 * 5,
         });
         unstagedDiff = stdout;
-      } catch {
+      } catch (err) {
         // Non-fatal — unstaged diff is a best-effort supplement
+        logger.debug('Failed to get unstaged diff', err);
       }
 
       // --- Combine and deduplicate ---
-      // Build a map of filePath → diff content, favouring the most complete source.
-      // Priority: committedDiff > stagedDiff > unstagedDiff so that committed content
-      // is never overwritten by a smaller partial diff.
+      // Build a map of filePath → diff content by concatenating hunks from all sources
+      // in chronological order (committed → staged → unstaged) so that no changes
+      // are lost when a file appears in multiple diff sources.
       const combinedFileHunks = new Map<string, string>();
 
-      // Process in reverse priority so higher-priority sources overwrite lower ones
-      for (const source of [unstagedDiff, stagedDiff, committedDiff]) {
+      for (const source of [committedDiff, stagedDiff, unstagedDiff]) {
         const hunks = parseDiffIntoFileHunks(source);
         for (const [filePath, hunk] of hunks) {
-          combinedFileHunks.set(filePath, hunk);
+          if (combinedFileHunks.has(filePath)) {
+            combinedFileHunks.set(filePath, combinedFileHunks.get(filePath)! + hunk);
+          } else {
+            combinedFileHunks.set(filePath, hunk);
+          }
         }
       }
 
@@ -268,8 +273,9 @@ export function createGeneratePRDescriptionHandler(
 
       // Log what files were included for observability
       if (combinedFileHunks.size > 0) {
-        logger.info(
-          `PR description scope: ${combinedFileHunks.size} file(s): ${Array.from(combinedFileHunks.keys()).join(', ')}`
+        logger.info(`PR description scope: ${combinedFileHunks.size} file(s)`);
+        logger.debug(
+          `PR description scope files: ${Array.from(combinedFileHunks.keys()).join(', ')}`
         );
       }
 

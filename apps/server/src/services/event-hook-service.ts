@@ -76,6 +76,15 @@ interface FeatureCreatedPayload {
 }
 
 /**
+ * Feature status changed event payload structure
+ */
+interface FeatureStatusChangedPayload {
+  featureId: string;
+  projectPath: string;
+  status: string;
+}
+
+/**
  * Event Hook Service
  *
  * Manages execution of user-configured event hooks in response to system events.
@@ -87,6 +96,13 @@ export class EventHookService {
   private eventHistoryService: EventHistoryService | null = null;
   private featureLoader: FeatureLoader | null = null;
   private unsubscribe: (() => void) | null = null;
+
+  /**
+   * Track feature IDs that have already had hooks fired via auto_mode_feature_complete
+   * to prevent double-firing when feature_status_changed also fires for the same feature.
+   * Entries are automatically cleaned up after 30 seconds.
+   */
+  private recentlyHandledFeatures = new Set<string>();
 
   /**
    * Initialize the service with event emitter, settings service, event history service, and feature loader
@@ -126,6 +142,7 @@ export class EventHookService {
     this.settingsService = null;
     this.eventHistoryService = null;
     this.featureLoader = null;
+    this.recentlyHandledFeatures.clear();
   }
 
   /**
@@ -140,14 +157,25 @@ export class EventHookService {
     switch (payload.type) {
       case 'auto_mode_feature_complete':
         trigger = payload.passes ? 'feature_success' : 'feature_error';
+        // Track this feature so feature_status_changed doesn't double-fire hooks
+        if (payload.featureId) {
+          this.markFeatureHandled(payload.featureId);
+        }
         break;
       case 'auto_mode_error':
         // Feature-level error (has featureId) vs auto-mode level error
         trigger = payload.featureId ? 'feature_error' : 'auto_mode_error';
+        // Track this feature so feature_status_changed doesn't double-fire hooks
+        if (payload.featureId) {
+          this.markFeatureHandled(payload.featureId);
+        }
         break;
       case 'auto_mode_idle':
         trigger = 'auto_mode_complete';
         break;
+      case 'feature_status_changed':
+        this.handleFeatureStatusChanged(payload as unknown as FeatureStatusChangedPayload);
+        return;
       default:
         // Other event types don't trigger hooks
         return;
@@ -201,6 +229,64 @@ export class EventHookService {
     };
 
     await this.executeHooksForTrigger('feature_created', context);
+  }
+
+  /**
+   * Handle feature_status_changed events for non-auto-mode feature completion.
+   *
+   * Auto-mode features already emit auto_mode_feature_complete which triggers hooks.
+   * This handler catches manual (non-auto-mode) feature completions by detecting
+   * status transitions to completion states (verified, waiting_approval).
+   */
+  private async handleFeatureStatusChanged(payload: FeatureStatusChangedPayload): Promise<void> {
+    // Skip if this feature was already handled via auto_mode_feature_complete
+    if (this.recentlyHandledFeatures.has(payload.featureId)) {
+      return;
+    }
+
+    let trigger: EventHookTrigger | null = null;
+
+    if (payload.status === 'verified' || payload.status === 'waiting_approval') {
+      trigger = 'feature_success';
+    } else {
+      // Only completion statuses trigger hooks from status changes
+      return;
+    }
+
+    // Load feature name
+    let featureName: string | undefined = undefined;
+    if (this.featureLoader) {
+      try {
+        const feature = await this.featureLoader.get(payload.projectPath, payload.featureId);
+        if (feature?.title) {
+          featureName = feature.title;
+        }
+      } catch (error) {
+        logger.warn(`Failed to load feature ${payload.featureId} for status change hook:`, error);
+      }
+    }
+
+    const context: HookContext = {
+      featureId: payload.featureId,
+      featureName,
+      projectPath: payload.projectPath,
+      projectName: this.extractProjectName(payload.projectPath),
+      timestamp: new Date().toISOString(),
+      eventType: trigger,
+    };
+
+    await this.executeHooksForTrigger(trigger, context, { passes: true });
+  }
+
+  /**
+   * Mark a feature as recently handled to prevent double-firing hooks.
+   * Entries are cleaned up after 30 seconds.
+   */
+  private markFeatureHandled(featureId: string): void {
+    this.recentlyHandledFeatures.add(featureId);
+    setTimeout(() => {
+      this.recentlyHandledFeatures.delete(featureId);
+    }, 30000);
   }
 
   /**

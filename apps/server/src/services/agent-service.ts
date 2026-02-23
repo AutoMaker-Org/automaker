@@ -359,11 +359,20 @@ export class AgentService {
       );
 
       // Load useClaudeCodeSystemPrompt setting (project setting takes precedence over global)
-      const useClaudeCodeSystemPrompt = await getUseClaudeCodeSystemPromptSetting(
-        effectiveWorkDir,
-        this.settingsService,
-        '[AgentService]'
-      );
+      // Wrap in try/catch so transient settingsService errors don't abort message processing
+      let useClaudeCodeSystemPrompt = true;
+      try {
+        useClaudeCodeSystemPrompt = await getUseClaudeCodeSystemPromptSetting(
+          effectiveWorkDir,
+          this.settingsService,
+          '[AgentService]'
+        );
+      } catch (err) {
+        this.logger.error(
+          '[AgentService] getUseClaudeCodeSystemPromptSetting failed, defaulting to true',
+          err
+        );
+      }
 
       // Load MCP servers from settings (global setting only)
       const mcpServers = await getMCPServersFromSettings(this.settingsService, '[AgentService]');

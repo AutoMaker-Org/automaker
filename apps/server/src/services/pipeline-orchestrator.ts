@@ -71,8 +71,16 @@ export class PipelineOrchestrator {
   ) {}
 
   async executePipeline(ctx: PipelineContext): Promise<void> {
-    const { projectPath, featureId, feature, steps, workDir, abortController, autoLoadClaudeMd } =
-      ctx;
+    const {
+      projectPath,
+      featureId,
+      feature,
+      steps,
+      workDir,
+      abortController,
+      autoLoadClaudeMd,
+      useClaudeCodeSystemPrompt,
+    } = ctx;
     const prompts = await getPromptCustomization(this.settingsService, '[AutoMode]');
     const contextResult = await this.loadContextFilesFn({
       projectPath,
@@ -122,6 +130,7 @@ export class PipelineOrchestrator {
           previousContent: previousContext,
           systemPrompt: contextFilesPrompt || undefined,
           autoLoadClaudeMd,
+          useClaudeCodeSystemPrompt,
           thinkingLevel: feature.thinkingLevel,
           reasoningEffort: feature.reasoningEffort,
         }

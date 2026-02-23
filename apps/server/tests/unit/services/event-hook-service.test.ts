@@ -524,6 +524,196 @@ describe('EventHookService', () => {
     });
   });
 
+  describe('event mapping - feature_status_changed (non-auto-mode completion)', () => {
+    it('should trigger feature_success when status changes to verified', async () => {
+      mockFeatureLoader = createMockFeatureLoader({
+        'feat-1': { title: 'Manual Feature' },
+      });
+
+      service.initialize(
+        mockEmitter,
+        mockSettingsService,
+        mockEventHistoryService,
+        mockFeatureLoader
+      );
+
+      mockEmitter.simulateEvent('auto-mode:event', {
+        type: 'feature_status_changed',
+        featureId: 'feat-1',
+        projectPath: '/test/project',
+        status: 'verified',
+      });
+
+      await vi.waitFor(() => {
+        expect(mockEventHistoryService.storeEvent).toHaveBeenCalled();
+      });
+
+      const storeCall = (mockEventHistoryService.storeEvent as ReturnType<typeof vi.fn>).mock
+        .calls[0][0];
+      expect(storeCall.trigger).toBe('feature_success');
+      expect(storeCall.featureName).toBe('Manual Feature');
+      expect(storeCall.passes).toBe(true);
+    });
+
+    it('should trigger feature_success when status changes to waiting_approval', async () => {
+      service.initialize(
+        mockEmitter,
+        mockSettingsService,
+        mockEventHistoryService,
+        mockFeatureLoader
+      );
+
+      mockEmitter.simulateEvent('auto-mode:event', {
+        type: 'feature_status_changed',
+        featureId: 'feat-1',
+        projectPath: '/test/project',
+        status: 'waiting_approval',
+      });
+
+      await vi.waitFor(() => {
+        expect(mockEventHistoryService.storeEvent).toHaveBeenCalled();
+      });
+
+      const storeCall = (mockEventHistoryService.storeEvent as ReturnType<typeof vi.fn>).mock
+        .calls[0][0];
+      expect(storeCall.trigger).toBe('feature_success');
+    });
+
+    it('should NOT trigger hooks for non-completion status changes', async () => {
+      service.initialize(
+        mockEmitter,
+        mockSettingsService,
+        mockEventHistoryService,
+        mockFeatureLoader
+      );
+
+      mockEmitter.simulateEvent('auto-mode:event', {
+        type: 'feature_status_changed',
+        featureId: 'feat-1',
+        projectPath: '/test/project',
+        status: 'in_progress',
+      });
+
+      // Give it time to process
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      expect(mockEventHistoryService.storeEvent).not.toHaveBeenCalled();
+    });
+
+    it('should NOT double-fire hooks when auto_mode_feature_complete already fired', async () => {
+      service.initialize(
+        mockEmitter,
+        mockSettingsService,
+        mockEventHistoryService,
+        mockFeatureLoader
+      );
+
+      // First: auto_mode_feature_complete fires (auto-mode path)
+      mockEmitter.simulateEvent('auto-mode:event', {
+        type: 'auto_mode_feature_complete',
+        featureId: 'feat-1',
+        featureName: 'Auto Feature',
+        passes: true,
+        message: 'Feature completed',
+        projectPath: '/test/project',
+      });
+
+      await vi.waitFor(() => {
+        expect(mockEventHistoryService.storeEvent).toHaveBeenCalledTimes(1);
+      });
+
+      // Then: feature_status_changed fires for the same feature
+      mockEmitter.simulateEvent('auto-mode:event', {
+        type: 'feature_status_changed',
+        featureId: 'feat-1',
+        projectPath: '/test/project',
+        status: 'verified',
+      });
+
+      // Give it time to process
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      // Should still only have been called once (from auto_mode_feature_complete)
+      expect(mockEventHistoryService.storeEvent).toHaveBeenCalledTimes(1);
+    });
+
+    it('should NOT double-fire hooks when auto_mode_error already fired for feature', async () => {
+      service.initialize(
+        mockEmitter,
+        mockSettingsService,
+        mockEventHistoryService,
+        mockFeatureLoader
+      );
+
+      // First: auto_mode_error fires for a feature
+      mockEmitter.simulateEvent('auto-mode:event', {
+        type: 'auto_mode_error',
+        featureId: 'feat-1',
+        error: 'Something failed',
+        errorType: 'execution',
+        projectPath: '/test/project',
+      });
+
+      await vi.waitFor(() => {
+        expect(mockEventHistoryService.storeEvent).toHaveBeenCalledTimes(1);
+      });
+
+      // Then: feature_status_changed fires for the same feature (e.g., reset to backlog)
+      mockEmitter.simulateEvent('auto-mode:event', {
+        type: 'feature_status_changed',
+        featureId: 'feat-1',
+        projectPath: '/test/project',
+        status: 'verified', // unlikely after error, but tests the dedup
+      });
+
+      // Give it time to process
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      // Should still only have been called once
+      expect(mockEventHistoryService.storeEvent).toHaveBeenCalledTimes(1);
+    });
+
+    it('should fire hooks for different features independently', async () => {
+      service.initialize(
+        mockEmitter,
+        mockSettingsService,
+        mockEventHistoryService,
+        mockFeatureLoader
+      );
+
+      // Auto-mode completion for feat-1
+      mockEmitter.simulateEvent('auto-mode:event', {
+        type: 'auto_mode_feature_complete',
+        featureId: 'feat-1',
+        passes: true,
+        message: 'Done',
+        projectPath: '/test/project',
+      });
+
+      await vi.waitFor(() => {
+        expect(mockEventHistoryService.storeEvent).toHaveBeenCalledTimes(1);
+      });
+
+      // Manual completion for feat-2 (different feature)
+      mockEmitter.simulateEvent('auto-mode:event', {
+        type: 'feature_status_changed',
+        featureId: 'feat-2',
+        projectPath: '/test/project',
+        status: 'verified',
+      });
+
+      await vi.waitFor(() => {
+        expect(mockEventHistoryService.storeEvent).toHaveBeenCalledTimes(2);
+      });
+
+      // feat-2 should have triggered feature_success
+      const secondCall = (mockEventHistoryService.storeEvent as ReturnType<typeof vi.fn>).mock
+        .calls[1][0];
+      expect(secondCall.trigger).toBe('feature_success');
+      expect(secondCall.featureId).toBe('feat-2');
+    });
+  });
+
   describe('error context for error events', () => {
     it('should use payload.error when available for error triggers', async () => {
       service.initialize(

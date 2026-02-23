@@ -177,7 +177,9 @@ export async function generateBacklogPlan(
       try {
         primaryBranch = await getCurrentBranch(projectPath);
       } catch {
-        // If git fails, fall back to common defaults
+        // If git fails, fall back to 'main' so unassigned features are visible
+        // when branchName matches a common default branch name
+        primaryBranch = 'main';
       }
       const isMainBranch = branchName === primaryBranch;
 

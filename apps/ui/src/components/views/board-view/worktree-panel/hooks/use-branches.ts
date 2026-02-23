@@ -17,6 +17,8 @@ export interface UseBranchesReturn {
   trackingRemote: string | undefined;
   /** Per-worktree tracking remote lookup — avoids stale values when multiple panels share the hook */
   getTrackingRemote: (worktreePath: string) => string | undefined;
+  /** List of remote names that have a branch matching the current branch name */
+  remotesWithBranch: string[];
   isLoadingBranches: boolean;
   branchFilter: string;
   setBranchFilter: (filter: string) => void;
@@ -49,6 +51,7 @@ export function useBranches(): UseBranchesReturn {
   const behindCount = branchData?.behindCount ?? 0;
   const hasRemoteBranch = branchData?.hasRemoteBranch ?? false;
   const trackingRemote = branchData?.trackingRemote;
+  const remotesWithBranch = branchData?.remotesWithBranch ?? [];
 
   // Per-worktree tracking remote cache: keeps results from previous fetchBranches()
   // calls so multiple WorktreePanel instances don't all share a single stale value.
@@ -119,6 +122,7 @@ export function useBranches(): UseBranchesReturn {
     hasRemoteBranch,
     trackingRemote,
     getTrackingRemote,
+    remotesWithBranch,
     isLoadingBranches,
     branchFilter,
     setBranchFilter,

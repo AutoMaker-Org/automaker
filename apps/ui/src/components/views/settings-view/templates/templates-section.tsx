@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -259,13 +259,19 @@ export function TemplatesSection({
     setDialogOpen(false);
   };
 
+  // Memoized sorted copy — avoids mutating the Zustand-managed templates array
+  const sortedTemplates = useMemo(
+    () => [...templates].sort((a, b) => (a.order ?? 0) - (b.order ?? 0)),
+    [templates]
+  );
+
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
 
     if (over && active.id !== over.id) {
-      const oldIndex = templates.findIndex((t) => t.id === active.id);
-      const newIndex = templates.findIndex((t) => t.id === over.id);
-      const reordered = arrayMove(templates, oldIndex, newIndex);
+      const oldIndex = sortedTemplates.findIndex((t) => t.id === active.id);
+      const newIndex = sortedTemplates.findIndex((t) => t.id === over.id);
+      const reordered = arrayMove(sortedTemplates, oldIndex, newIndex);
       onReorderTemplates(reordered.map((t) => t.id));
     }
   };
@@ -318,21 +324,19 @@ export function TemplatesSection({
             onDragEnd={handleDragEnd}
           >
             <SortableContext
-              items={templates.map((t) => t.id)}
+              items={sortedTemplates.map((t) => t.id)}
               strategy={verticalListSortingStrategy}
             >
               <div className="space-y-2">
-                {templates
-                  .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
-                  .map((template) => (
-                    <SortableTemplateItem
-                      key={template.id}
-                      template={template}
-                      onEdit={() => handleEdit(template)}
-                      onToggleEnabled={() => handleToggleEnabled(template)}
-                      onDelete={() => handleDelete(template)}
-                    />
-                  ))}
+                {sortedTemplates.map((template) => (
+                  <SortableTemplateItem
+                    key={template.id}
+                    template={template}
+                    onEdit={() => handleEdit(template)}
+                    onToggleEnabled={() => handleToggleEnabled(template)}
+                    onDelete={() => handleDelete(template)}
+                  />
+                ))}
               </div>
             </SortableContext>
           </DndContext>

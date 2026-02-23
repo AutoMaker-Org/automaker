@@ -1028,9 +1028,9 @@ export function BoardView() {
         images: [],
         imagePaths: [],
         skipTests: defaultSkipTests,
-        model: modelEntry.model as ModelAlias,
+        model: resolveModelString(modelEntry.model) as ModelAlias,
         thinkingLevel: (modelEntry.thinkingLevel as ThinkingLevel) || 'none',
-        branchName: '',
+        branchName: addFeatureUseSelectedWorktreeBranch ? selectedWorktreeBranch : '',
         priority: 2,
         planningMode: useAppStore.getState().defaultPlanningMode ?? 'skip',
         requirePlanApproval: useAppStore.getState().defaultRequirePlanApproval ?? false,
@@ -1038,7 +1038,12 @@ export function BoardView() {
         workMode: addFeatureUseSelectedWorktreeBranch ? 'custom' : 'current',
       });
     },
-    [handleAddFeature, defaultSkipTests, addFeatureUseSelectedWorktreeBranch]
+    [
+      handleAddFeature,
+      defaultSkipTests,
+      addFeatureUseSelectedWorktreeBranch,
+      selectedWorktreeBranch,
+    ]
   );
 
   // Handler for Quick Add & Start - creates and immediately starts a feature
@@ -1057,9 +1062,9 @@ export function BoardView() {
         images: [],
         imagePaths: [],
         skipTests: defaultSkipTests,
-        model: modelEntry.model as ModelAlias,
+        model: resolveModelString(modelEntry.model) as ModelAlias,
         thinkingLevel: (modelEntry.thinkingLevel as ThinkingLevel) || 'none',
-        branchName: '',
+        branchName: addFeatureUseSelectedWorktreeBranch ? selectedWorktreeBranch : '',
         priority: 2,
         planningMode: useAppStore.getState().defaultPlanningMode ?? 'skip',
         requirePlanApproval: useAppStore.getState().defaultRequirePlanApproval ?? false,
@@ -1068,7 +1073,12 @@ export function BoardView() {
         initialStatus: 'in_progress',
       });
     },
-    [handleAddAndStartFeature, defaultSkipTests, addFeatureUseSelectedWorktreeBranch]
+    [
+      handleAddAndStartFeature,
+      defaultSkipTests,
+      addFeatureUseSelectedWorktreeBranch,
+      selectedWorktreeBranch,
+    ]
   );
 
   // Handler for template selection - creates a feature from a template

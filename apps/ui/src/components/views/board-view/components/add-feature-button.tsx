@@ -76,7 +76,7 @@ export function AddFeatureButton({
           className="h-6 w-6 p-0 rounded-none border-l border-primary-foreground/20"
           onClick={onQuickAdd}
           title="Quick Add"
-          data-testid="quick-add-button"
+          data-testid={`${testIdPrefix}-quick-add-button`}
         >
           <Zap className="w-3 h-3" />
         </Button>
@@ -140,7 +140,7 @@ export function AddFeatureButton({
           fullWidth && 'flex-shrink-0'
         )}
         onClick={onQuickAdd}
-        data-testid="quick-add-button"
+        data-testid={`${testIdPrefix}-quick-add-button`}
       >
         <Zap className="w-3.5 h-3.5 mr-1" />
         Quick
@@ -156,6 +156,8 @@ export function AddFeatureButton({
               enabledTemplates.length > 0 ? 'px-1.5' : 'w-7 p-0',
               fullWidth && 'flex-shrink-0'
             )}
+            aria-label="Templates"
+            title="Templates"
             data-testid={`${testIdPrefix}-dropdown-trigger`}
           >
             <FileText className="w-3.5 h-3.5 mr-0.5" />

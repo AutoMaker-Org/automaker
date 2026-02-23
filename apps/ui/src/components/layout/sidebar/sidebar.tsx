@@ -283,13 +283,14 @@ export function Sidebar() {
 
   const switchProjectSafely = useCallback(
     async (targetProject: Project) => {
-      try {
-        // Ensure .automaker directory structure exists before switching
-        await initializeProject(targetProject.path);
-      } catch (error) {
-        logger.error('Failed to initialize project during switch:', error);
-        // Continue with switch even if initialization fails -
-        // the project may already be initialized
+      // Ensure .automaker directory structure exists before switching
+      const initResult = await initializeProject(targetProject.path);
+      if (!initResult.success) {
+        logger.error('Failed to initialize project during switch:', initResult.error);
+        toast.warning(
+          `Could not fully initialize project: ${initResult.error ?? 'Unknown error'}. Some features may not work correctly.`
+        );
+        // Continue with switch despite init failure — project may already be partially initialized
       }
 
       // Batch project switch + navigation to prevent multi-render cascades.

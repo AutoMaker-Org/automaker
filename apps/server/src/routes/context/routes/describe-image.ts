@@ -153,6 +153,19 @@ function mapDescribeImageError(rawMessage: string | undefined): {
       : signalMatch
         ? ` (signal: ${signalMatch[1]})`
         : '';
+
+    // Crash/OS-kill signals suggest a process crash, not an auth failure —
+    // omit auth recovery advice and suggest retry/reporting instead.
+    const crashSignals = ['SIGSEGV', 'SIGABRT', 'SIGKILL', 'SIGBUS', 'SIGTRAP'];
+    const isCrashSignal = signalMatch ? crashSignals.includes(signalMatch[1]) : false;
+
+    if (isCrashSignal) {
+      return {
+        statusCode: 503,
+        userMessage: `Claude crashed unexpectedly${detail} while describing the image. This may be a transient condition. Please try again. If the problem persists, collect logs and report the issue.`,
+      };
+    }
+
     return {
       statusCode: 503,
       userMessage: `Claude exited unexpectedly${detail} while describing the image. This is usually a transient issue. Try again. If it keeps happening, re-run \`claude login\` or update your API key in Setup.`,

@@ -93,8 +93,12 @@ export function useWorktrees({
         // Fallback to "main" only if worktrees haven't loaded yet
         const mainWorktree = worktrees.find((w) => w.isMain);
         const mainBranch = mainWorktree?.branch || 'main';
-        // Wrap in startTransition to prevent cascading re-renders
-        // during worktree list updates that could trigger React error #185
+        // Note: Zustand uses useSyncExternalStore so setCurrentWorktree updates
+        // are flushed synchronously. The real guard against React error #185 is
+        // dependency isolation — currentWorktree is intentionally excluded from
+        // the validation effect deps below (via currentWorktreeRef) so we don't
+        // create a feedback loop. startTransition may still help batch unrelated
+        // React state updates but does NOT defer or prevent Zustand-driven cascades.
         startTransition(() => {
           setCurrentWorktree(projectPath, null, mainBranch);
         });
@@ -113,13 +117,13 @@ export function useWorktrees({
 
       if (isSameWorktree) return;
 
-      // Wrap in startTransition to let React batch the worktree switch into
-      // a single low-priority update. Without this, the synchronous store
-      // mutation fires separate renders where selectedWorktree changes but
-      // dependent state (autoMode, columnFeatures) is still stale, causing
-      // a cascade of effects and store mutations that can trigger React
-      // error #185 (maximum update depth exceeded) — especially on mobile
-      // PWA where renders are slower and more susceptible to cascading.
+      // Note: Zustand uses useSyncExternalStore so setCurrentWorktree updates are
+      // flushed synchronously — startTransition does NOT prevent Zustand-driven
+      // cascades. The actual protection against React error #185 is dependency
+      // isolation via currentWorktreeRef (currentWorktree is excluded from the
+      // validation effect's dependency array). startTransition may still help
+      // batch unrelated concurrent React state updates but should not be relied
+      // upon for Zustand update ordering.
       startTransition(() => {
         setCurrentWorktree(projectPath, worktree.isMain ? null : worktree.path, worktree.branch);
       });

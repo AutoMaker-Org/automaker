@@ -334,12 +334,14 @@ function buildClaudeMdOptions(config: CreateSdkOptionsConfig): {
 
 /**
  * System prompt configuration for SDK options
- * When using preset mode with claude_code, CLAUDE.md files are automatically loaded
+ * The 'claude_code' preset provides the system prompt only — it does NOT auto-load
+ * CLAUDE.md files. CLAUDE.md auto-loading is controlled independently by
+ * settingSources (set via autoLoadClaudeMd). These two settings are orthogonal.
  */
 export interface SystemPromptConfig {
-  /** Use preset mode with claude_code to enable CLAUDE.md auto-loading */
+  /** Use preset mode to select the base system prompt */
   type: 'preset';
-  /** The preset to use - 'claude_code' enables CLAUDE.md loading */
+  /** The preset to use - 'claude_code' uses the Claude Code system prompt */
   preset: 'claude_code';
   /** Optional additional prompt to append to the preset */
   append?: string;

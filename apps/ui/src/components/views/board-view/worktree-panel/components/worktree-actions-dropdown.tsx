@@ -147,6 +147,8 @@ interface WorktreeActionsDropdownProps {
   onSyncWithRemote?: (worktree: WorktreeInfo, remote: string) => void;
   /** Set tracking branch to a specific remote */
   onSetTracking?: (worktree: WorktreeInfo, remote: string) => void;
+  /** List of remote names that have a branch matching the current branch name */
+  remotesWithBranch?: string[];
 }
 
 /**
@@ -182,7 +184,9 @@ function RemoteActionMenuItem({
             <Icon className="w-3.5 h-3.5 mr-2" />
             {remote.name}
             {trackingRemote === remote.name && (
-              <span className="ml-auto text-[10px] text-muted-foreground mr-1">tracking</span>
+              <span className="ml-auto text-[10px] bg-muted text-muted-foreground px-1.5 py-0.5 rounded mr-2">
+                tracking
+              </span>
             )}
           </DropdownMenuItem>
           <DropdownMenuSubTrigger
@@ -282,6 +286,7 @@ export function WorktreeActionsDropdown({
   onSync,
   onSyncWithRemote,
   onSetTracking,
+  remotesWithBranch,
 }: WorktreeActionsDropdownProps) {
   // Get available editors for the "Open In" submenu
   const { editors } = useAvailableEditors();
@@ -325,6 +330,21 @@ export function WorktreeActionsDropdown({
       : !gitRepoStatus.hasCommits
         ? 'Repository has no commits yet'
         : null;
+
+  // Check if the branch exists on remotes other than the tracking remote.
+  // This indicates the branch was pushed to a different remote than the one being tracked,
+  // so the ahead/behind counts may be misleading.
+  const otherRemotesWithBranch = useMemo(() => {
+    if (!remotesWithBranch || remotesWithBranch.length === 0) return [];
+    if (!trackingRemote) return remotesWithBranch;
+    return remotesWithBranch.filter((r) => r !== trackingRemote);
+  }, [remotesWithBranch, trackingRemote]);
+
+  // True when branch exists on a different remote but NOT on the tracking remote
+  const isOnDifferentRemote =
+    otherRemotesWithBranch.length > 0 &&
+    trackingRemote &&
+    !remotesWithBranch?.includes(trackingRemote);
 
   // Determine if the changes/PR section has any visible items
   // Show Create PR when no existing PR is linked
@@ -783,9 +803,15 @@ export function WorktreeActionsDropdown({
                   {!isGitOpsAvailable && (
                     <AlertCircle className="w-3 h-3 ml-auto text-muted-foreground" />
                   )}
-                  {isGitOpsAvailable && behindCount > 0 && (
+                  {isGitOpsAvailable && !isOnDifferentRemote && behindCount > 0 && (
                     <span className="ml-auto text-[10px] bg-muted px-1.5 py-0.5 rounded">
                       {behindCount} behind
+                    </span>
+                  )}
+                  {isGitOpsAvailable && isOnDifferentRemote && (
+                    <span className="ml-auto inline-flex items-center gap-0.5 text-[10px] bg-blue-500/20 text-blue-600 dark:text-blue-400 px-1.5 py-0.5 rounded">
+                      <Globe className="w-2.5 h-2.5" />
+                      on {otherRemotesWithBranch.join(', ')}
                     </span>
                   )}
                 </DropdownMenuItem>
@@ -832,9 +858,15 @@ export function WorktreeActionsDropdown({
               {!isGitOpsAvailable && (
                 <AlertCircle className="w-3 h-3 ml-auto text-muted-foreground" />
               )}
-              {isGitOpsAvailable && behindCount > 0 && (
+              {isGitOpsAvailable && !isOnDifferentRemote && behindCount > 0 && (
                 <span className="ml-auto text-[10px] bg-muted px-1.5 py-0.5 rounded">
                   {behindCount} behind
+                </span>
+              )}
+              {isGitOpsAvailable && isOnDifferentRemote && (
+                <span className="ml-auto inline-flex items-center gap-0.5 text-[10px] bg-blue-500/20 text-blue-600 dark:text-blue-400 px-1.5 py-0.5 rounded">
+                  <Globe className="w-2.5 h-2.5" />
+                  on {otherRemotesWithBranch.join(', ')}
                 </span>
               )}
             </DropdownMenuItem>
@@ -856,7 +888,9 @@ export function WorktreeActionsDropdown({
                     }
                   }}
                   disabled={
-                    isPushing || (hasRemoteBranch && aheadCount === 0) || !isGitOpsAvailable
+                    isPushing ||
+                    (hasRemoteBranch && !isOnDifferentRemote && aheadCount === 0) ||
+                    !isGitOpsAvailable
                   }
                   className={cn(
                     'text-xs flex-1 pr-0 rounded-r-none',
@@ -874,21 +908,33 @@ export function WorktreeActionsDropdown({
                       local only
                     </span>
                   )}
-                  {isGitOpsAvailable && hasRemoteBranch && aheadCount > 0 && (
-                    <span className="ml-auto text-[10px] bg-primary/20 text-primary px-1.5 py-0.5 rounded">
-                      {aheadCount} ahead
+                  {isGitOpsAvailable && hasRemoteBranch && isOnDifferentRemote && (
+                    <span className="ml-auto inline-flex items-center gap-0.5 text-[10px] bg-blue-500/20 text-blue-600 dark:text-blue-400 px-1.5 py-0.5 rounded">
+                      <Globe className="w-2.5 h-2.5" />
+                      on {otherRemotesWithBranch.join(', ')}
                     </span>
                   )}
-                  {isGitOpsAvailable && hasRemoteBranch && trackingRemote && (
-                    <span
-                      className={cn(
-                        'text-[10px] bg-muted text-muted-foreground px-1.5 py-0.5 rounded',
-                        aheadCount > 0 ? 'ml-1' : 'ml-auto'
-                      )}
-                    >
-                      {trackingRemote}
-                    </span>
-                  )}
+                  {isGitOpsAvailable &&
+                    hasRemoteBranch &&
+                    !isOnDifferentRemote &&
+                    aheadCount > 0 && (
+                      <span className="ml-auto text-[10px] bg-primary/20 text-primary px-1.5 py-0.5 rounded">
+                        {aheadCount} ahead
+                      </span>
+                    )}
+                  {isGitOpsAvailable &&
+                    hasRemoteBranch &&
+                    !isOnDifferentRemote &&
+                    trackingRemote && (
+                      <span
+                        className={cn(
+                          'text-[10px] bg-muted text-muted-foreground px-1.5 py-0.5 rounded',
+                          aheadCount > 0 ? 'ml-1' : 'ml-auto'
+                        )}
+                      >
+                        {trackingRemote}
+                      </span>
+                    )}
                 </DropdownMenuItem>
                 <DropdownMenuSubTrigger
                   className={cn(
@@ -932,7 +978,11 @@ export function WorktreeActionsDropdown({
                   onPush(worktree);
                 }
               }}
-              disabled={isPushing || (hasRemoteBranch && aheadCount === 0) || !isGitOpsAvailable}
+              disabled={
+                isPushing ||
+                (hasRemoteBranch && !isOnDifferentRemote && aheadCount === 0) ||
+                !isGitOpsAvailable
+              }
               className={cn('text-xs', !isGitOpsAvailable && 'opacity-50 cursor-not-allowed')}
             >
               <Upload className={cn('w-3.5 h-3.5 mr-2', isPushing && 'animate-pulse')} />
@@ -946,12 +996,18 @@ export function WorktreeActionsDropdown({
                   local only
                 </span>
               )}
-              {isGitOpsAvailable && hasRemoteBranch && aheadCount > 0 && (
+              {isGitOpsAvailable && hasRemoteBranch && isOnDifferentRemote && (
+                <span className="ml-auto inline-flex items-center gap-0.5 text-[10px] bg-blue-500/20 text-blue-600 dark:text-blue-400 px-1.5 py-0.5 rounded">
+                  <Globe className="w-2.5 h-2.5" />
+                  on {otherRemotesWithBranch.join(', ')}
+                </span>
+              )}
+              {isGitOpsAvailable && hasRemoteBranch && !isOnDifferentRemote && aheadCount > 0 && (
                 <span className="ml-auto text-[10px] bg-primary/20 text-primary px-1.5 py-0.5 rounded">
                   {aheadCount} ahead
                 </span>
               )}
-              {isGitOpsAvailable && hasRemoteBranch && trackingRemote && (
+              {isGitOpsAvailable && hasRemoteBranch && !isOnDifferentRemote && trackingRemote && (
                 <span
                   className={cn(
                     'text-[10px] bg-muted text-muted-foreground px-1.5 py-0.5 rounded',
