@@ -785,7 +785,7 @@ export async function refreshSettingsFromServer(): Promise<boolean> {
         ? migratePhaseModelEntry(serverSettings.defaultFeatureModel)
         : { model: 'claude-opus', thinkingLevel: 'adaptive' },
       muteDoneSound: serverSettings.muteDoneSound,
-      defaultMaxTurns: serverSettings.defaultMaxTurns ?? 1000,
+      defaultMaxTurns: serverSettings.defaultMaxTurns ?? 10000,
       disableSplashScreen: serverSettings.disableSplashScreen ?? false,
       serverLogLevel: serverSettings.serverLogLevel ?? 'info',
       enableRequestLogging: serverSettings.enableRequestLogging ?? true,

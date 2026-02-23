@@ -374,7 +374,7 @@ const initialState: AppState = {
   defaultFeatureModel: DEFAULT_GLOBAL_SETTINGS.defaultFeatureModel,
   defaultThinkingLevel: DEFAULT_GLOBAL_SETTINGS.defaultThinkingLevel ?? 'adaptive',
   defaultReasoningEffort: DEFAULT_GLOBAL_SETTINGS.defaultReasoningEffort ?? 'none',
-  defaultMaxTurns: DEFAULT_GLOBAL_SETTINGS.defaultMaxTurns ?? 1000,
+  defaultMaxTurns: DEFAULT_GLOBAL_SETTINGS.defaultMaxTurns ?? 10000,
   pendingPlanApproval: null,
   claudeRefreshInterval: 60,
   claudeUsage: null,
@@ -2496,7 +2496,7 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
     // Guard against NaN/Infinity before flooring and clamping
     const safeValue = Number.isFinite(maxTurns) ? maxTurns : 1;
     // Clamp to valid range
-    const clamped = Math.max(1, Math.min(2000, Math.floor(safeValue)));
+    const clamped = Math.max(1, Math.min(10000, Math.floor(safeValue)));
     set({ defaultMaxTurns: clamped });
     // Sync to server
     try {

@@ -34,10 +34,10 @@ import {
 const logger = createLogger('SettingsHelper');
 
 /** Default number of agent turns used when no value is configured. */
-export const DEFAULT_MAX_TURNS = 1000;
+export const DEFAULT_MAX_TURNS = 10000;
 
 /** Upper bound for the max-turns clamp; values above this are capped here. */
-export const MAX_ALLOWED_TURNS = 2000;
+export const MAX_ALLOWED_TURNS = 10000;
 
 /**
  * Get the autoLoadClaudeMd setting, with project settings taking precedence over global.

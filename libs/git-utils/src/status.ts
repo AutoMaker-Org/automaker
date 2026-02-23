@@ -171,8 +171,9 @@ export async function detectMergeCommit(
 
 /**
  * Detect the current merge state of a git repository.
- * Checks for .git/MERGE_HEAD, .git/REBASE_HEAD, .git/CHERRY_PICK_HEAD
- * to determine if a merge/rebase/cherry-pick is in progress.
+ * Checks for .git/MERGE_HEAD, .git/rebase-merge, .git/rebase-apply,
+ * and .git/CHERRY_PICK_HEAD to determine if a merge/rebase/cherry-pick
+ * is in progress.
  *
  * @param repoPath - Path to the git repository or worktree
  * @returns MergeStateInfo describing the current merge state
@@ -196,7 +197,6 @@ export async function detectMergeState(repoPath: string): Promise<MergeStateInfo
 
     const checks = [
       { file: 'MERGE_HEAD', type: 'merge' as const },
-      { file: 'REBASE_HEAD', type: 'rebase' as const },
       { file: 'rebase-merge', type: 'rebase' as const },
       { file: 'rebase-apply', type: 'rebase' as const },
       { file: 'CHERRY_PICK_HEAD', type: 'cherry-pick' as const },
