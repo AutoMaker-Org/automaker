@@ -2899,9 +2899,10 @@ export class HttpApiClient implements ElectronAPI {
     generate: (
       projectPath: string,
       prompt: string,
-      model?: string
+      model?: string,
+      branchName?: string
     ): Promise<{ success: boolean; error?: string }> =>
-      this.post('/api/backlog-plan/generate', { projectPath, prompt, model }),
+      this.post('/api/backlog-plan/generate', { projectPath, prompt, model, branchName }),
 
     stop: (): Promise<{ success: boolean; error?: string }> =>
       this.post('/api/backlog-plan/stop', {}),

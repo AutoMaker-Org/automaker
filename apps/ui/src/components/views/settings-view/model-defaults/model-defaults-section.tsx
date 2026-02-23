@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Workflow, RotateCcw, Replace, Sparkles, Brain } from 'lucide-react';
+import { Workflow, RotateCcw, Replace, Brain } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAppStore } from '@/store/app-store';
 import { Button } from '@/components/ui/button';
@@ -135,31 +135,13 @@ function FeatureDefaultModelSection() {
         </p>
       </div>
       <div className="space-y-3">
-        <div
-          className={cn(
-            'flex items-center justify-between p-4 rounded-xl',
-            'bg-accent/20 border border-border/30',
-            'hover:bg-accent/30 transition-colors'
-          )}
-        >
-          <div className="flex items-center gap-3 flex-1 pr-4">
-            <div className="w-8 h-8 rounded-lg bg-brand-500/10 flex items-center justify-center">
-              <Sparkles className="w-4 h-4 text-brand-500" />
-            </div>
-            <div>
-              <h4 className="text-sm font-medium text-foreground">Default Feature Model</h4>
-              <p className="text-xs text-muted-foreground">
-                Model and thinking level used when creating new feature cards
-              </p>
-            </div>
-          </div>
-          <PhaseModelSelector
-            compact
-            value={defaultValue}
-            onChange={setDefaultFeatureModel}
-            align="end"
-          />
-        </div>
+        <PhaseModelSelector
+          label="Default Feature Model"
+          description="Model and thinking level used when creating new feature cards"
+          value={defaultValue}
+          onChange={setDefaultFeatureModel}
+          align="end"
+        />
       </div>
     </div>
   );
@@ -201,30 +183,30 @@ function DefaultThinkingLevelSection() {
         {/* Default Thinking Level (Claude models) */}
         <div
           className={cn(
-            'flex items-center justify-between p-4 rounded-xl',
+            'flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-xl',
             'bg-accent/20 border border-border/30',
             'hover:bg-accent/30 transition-colors'
           )}
         >
-          <div className="flex items-center gap-3 flex-1 pr-4">
-            <div className="w-8 h-8 rounded-lg bg-purple-500/10 flex items-center justify-center">
+          <div className="flex items-center gap-3 flex-1">
+            <div className="w-8 h-8 rounded-lg bg-purple-500/10 flex items-center justify-center shrink-0">
               <Brain className="w-4 h-4 text-purple-500" />
             </div>
-            <div>
+            <div className="min-w-0">
               <h4 className="text-sm font-medium text-foreground">Default Thinking Level</h4>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-muted-foreground truncate">
                 Applied to Claude models when quick-selected
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-1.5 flex-wrap justify-end">
+          <div className="flex items-center gap-1 flex-wrap justify-start sm:justify-end">
             {THINKING_LEVEL_OPTIONS.map((option) => (
               <button
                 key={option.id}
                 onClick={() => setDefaultThinkingLevel(option.id)}
                 className={cn(
-                  'px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all',
-                  'border',
+                  'px-2 py-1 sm:px-2.5 sm:py-1.5 rounded-lg text-xs font-medium transition-all',
+                  'border whitespace-nowrap',
                   defaultThinkingLevel === option.id
                     ? 'bg-primary text-primary-foreground border-primary shadow-sm'
                     : 'bg-background border-border/50 text-muted-foreground hover:bg-accent hover:text-foreground'
@@ -240,30 +222,30 @@ function DefaultThinkingLevelSection() {
         {/* Default Reasoning Effort (Codex models) */}
         <div
           className={cn(
-            'flex items-center justify-between p-4 rounded-xl',
+            'flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-xl',
             'bg-accent/20 border border-border/30',
             'hover:bg-accent/30 transition-colors'
           )}
         >
-          <div className="flex items-center gap-3 flex-1 pr-4">
-            <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center">
+          <div className="flex items-center gap-3 flex-1">
+            <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center shrink-0">
               <Brain className="w-4 h-4 text-blue-500" />
             </div>
-            <div>
+            <div className="min-w-0">
               <h4 className="text-sm font-medium text-foreground">Default Reasoning Effort</h4>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-muted-foreground truncate">
                 Applied to Codex/OpenAI models when quick-selected
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-1.5 flex-wrap justify-end">
+          <div className="flex items-center gap-1 flex-wrap justify-start sm:justify-end">
             {REASONING_EFFORT_LEVELS.map((option) => (
               <button
                 key={option.id}
                 onClick={() => setDefaultReasoningEffort(option.id)}
                 className={cn(
-                  'px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all',
-                  'border',
+                  'px-2 py-1 sm:px-2.5 sm:py-1.5 rounded-lg text-xs font-medium transition-all',
+                  'border whitespace-nowrap',
                   defaultReasoningEffort === option.id
                     ? 'bg-primary text-primary-foreground border-primary shadow-sm'
                     : 'bg-background border-border/50 text-muted-foreground hover:bg-accent hover:text-foreground'

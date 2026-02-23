@@ -21,6 +21,7 @@ import { createChatOptions, validateWorkingDirectory } from '../lib/sdk-options.
 import type { SettingsService } from './settings-service.js';
 import {
   getAutoLoadClaudeMdSetting,
+  getUseClaudeCodeSystemPromptSetting,
   filterClaudeMdFromContext,
   getMCPServersFromSettings,
   getPromptCustomization,
@@ -357,6 +358,13 @@ export class AgentService {
         '[AgentService]'
       );
 
+      // Load useClaudeCodeSystemPrompt setting (project setting takes precedence over global)
+      const useClaudeCodeSystemPrompt = await getUseClaudeCodeSystemPromptSetting(
+        effectiveWorkDir,
+        this.settingsService,
+        '[AgentService]'
+      );
+
       // Load MCP servers from settings (global setting only)
       const mcpServers = await getMCPServersFromSettings(this.settingsService, '[AgentService]');
 
@@ -443,6 +451,7 @@ export class AgentService {
         systemPrompt: combinedSystemPrompt,
         abortController: session.abortController!,
         autoLoadClaudeMd,
+        useClaudeCodeSystemPrompt,
         thinkingLevel: effectiveThinkingLevel, // Pass thinking level for Claude models
         maxTurns: userMaxTurns, // User-configured max turns from settings
         mcpServers: Object.keys(mcpServers).length > 0 ? mcpServers : undefined,

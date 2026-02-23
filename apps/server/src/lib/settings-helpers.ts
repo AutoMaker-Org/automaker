@@ -81,6 +81,49 @@ export async function getAutoLoadClaudeMdSetting(
 }
 
 /**
+ * Get the useClaudeCodeSystemPrompt setting, with project settings taking precedence over global.
+ * Falls back to global settings and defaults to true when unset.
+ * Returns true if settings service is not available.
+ *
+ * @param projectPath - Path to the project
+ * @param settingsService - Optional settings service instance
+ * @param logPrefix - Prefix for log messages (e.g., '[AgentService]')
+ * @returns Promise resolving to the useClaudeCodeSystemPrompt setting value
+ */
+export async function getUseClaudeCodeSystemPromptSetting(
+  projectPath: string,
+  settingsService?: SettingsService | null,
+  logPrefix = '[SettingsHelper]'
+): Promise<boolean> {
+  if (!settingsService) {
+    logger.info(
+      `${logPrefix} SettingsService not available, useClaudeCodeSystemPrompt defaulting to true`
+    );
+    return true;
+  }
+
+  try {
+    // Check project settings first (takes precedence)
+    const projectSettings = await settingsService.getProjectSettings(projectPath);
+    if (projectSettings.useClaudeCodeSystemPrompt !== undefined) {
+      logger.info(
+        `${logPrefix} useClaudeCodeSystemPrompt from project settings: ${projectSettings.useClaudeCodeSystemPrompt}`
+      );
+      return projectSettings.useClaudeCodeSystemPrompt;
+    }
+
+    // Fall back to global settings
+    const globalSettings = await settingsService.getGlobalSettings();
+    const result = globalSettings.useClaudeCodeSystemPrompt ?? true;
+    logger.info(`${logPrefix} useClaudeCodeSystemPrompt from global settings: ${result}`);
+    return result;
+  } catch (error) {
+    logger.error(`${logPrefix} Failed to load useClaudeCodeSystemPrompt setting:`, error);
+    throw error;
+  }
+}
+
+/**
  * Get the default max turns setting from global settings.
  *
  * Reads the user's configured `defaultMaxTurns` setting, which controls the maximum

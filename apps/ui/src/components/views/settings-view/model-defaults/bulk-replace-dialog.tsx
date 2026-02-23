@@ -254,7 +254,7 @@ export function BulkReplaceDialog({ open, onOpenChange }: BulkReplaceDialogProps
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col">
+      <DialogContent className="max-w-[calc(100%-2rem)] sm:max-w-2xl max-h-[80vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>Bulk Replace Models</DialogTitle>
           <DialogDescription>

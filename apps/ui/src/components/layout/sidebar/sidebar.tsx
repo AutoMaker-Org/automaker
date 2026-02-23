@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, startTransition } from 'react';
 import { createLogger } from '@automaker/utils/logger';
 import { useNavigate, useLocation } from '@tanstack/react-router';
 import { PanelLeftClose, ChevronDown } from 'lucide-react';
@@ -281,6 +281,26 @@ export function Sidebar() {
   // Register keyboard shortcuts
   useKeyboardShortcuts(navigationShortcuts);
 
+  const switchProjectSafely = useCallback(
+    async (targetProject: Project) => {
+      try {
+        // Ensure .automaker directory structure exists before switching
+        await initializeProject(targetProject.path);
+      } catch (error) {
+        logger.error('Failed to initialize project during switch:', error);
+        // Continue with switch even if initialization fails -
+        // the project may already be initialized
+      }
+
+      // Batch project switch + navigation to prevent multi-render cascades.
+      startTransition(() => {
+        setCurrentProject(targetProject);
+        navigate({ to: '/board' });
+      });
+    },
+    [setCurrentProject, navigate]
+  );
+
   // Keyboard shortcuts for project switching (1-9, 0)
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -305,15 +325,14 @@ export function Sidebar() {
       if (projectIndex !== null && projectIndex < projects.length) {
         const targetProject = projects[projectIndex];
         if (targetProject && targetProject.id !== currentProject?.id) {
-          setCurrentProject(targetProject);
-          navigate({ to: '/board' });
+          void switchProjectSafely(targetProject);
         }
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [projects, currentProject, setCurrentProject, navigate]);
+  }, [projects, currentProject, switchProjectSafely]);
 
   const isActiveRoute = (id: string) => {
     const routePath = id === 'welcome' ? '/' : `/${id}`;

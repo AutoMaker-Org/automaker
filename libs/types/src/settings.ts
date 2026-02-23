@@ -209,6 +209,87 @@ export type TerminalPromptTheme =
 /** PlanningMode - Planning levels for feature generation workflows */
 export type PlanningMode = 'skip' | 'lite' | 'spec' | 'full';
 
+/**
+ * FeatureTemplate - Pre-configured task prompts for quick feature creation
+ *
+ * Templates allow users to quickly create features with pre-written prompts.
+ * Built-in templates are protected from deletion but can be disabled.
+ */
+export interface FeatureTemplate {
+  /** Unique identifier */
+  id: string;
+  /** Display name (shown in dropdown) */
+  name: string;
+  /** Pre-written prompt/task description */
+  prompt: string;
+  /** Optional preferred model for this template */
+  model?: PhaseModelEntry;
+  /** Whether this is a built-in template (protected from deletion) */
+  isBuiltIn?: boolean;
+  /** Whether this template is enabled (hidden if false) */
+  enabled?: boolean;
+  /** Sort order (lower = higher in list) */
+  order?: number;
+}
+
+/** Default built-in feature templates */
+export const DEFAULT_FEATURE_TEMPLATES: FeatureTemplate[] = [
+  {
+    id: 'run-tests-lint-format',
+    name: 'Run tests, lint, and format',
+    prompt:
+      'Run all tests, lint checks, and format the codebase. Fix any issues found. Ensure the code passes all quality checks before marking complete.',
+    isBuiltIn: true,
+    enabled: true,
+    order: 0,
+  },
+  {
+    id: 'write-tests-for-changes',
+    name: 'Write tests for current changes',
+    prompt:
+      'Analyze the current uncommitted changes and write comprehensive tests for the modified code. Focus on edge cases and ensure good test coverage.',
+    isBuiltIn: true,
+    enabled: true,
+    order: 1,
+  },
+  {
+    id: 'review-recent-changes',
+    name: 'Review and summarize recent changes',
+    prompt:
+      'Review the recent commits and changes in this codebase. Provide a summary of what was changed, identify any potential issues, and suggest improvements.',
+    isBuiltIn: true,
+    enabled: true,
+    order: 2,
+  },
+  {
+    id: 'fix-lint-errors',
+    name: 'Fix lint errors',
+    prompt:
+      'Run the linter and fix all reported errors. Ensure the codebase passes lint checks without warnings.',
+    isBuiltIn: true,
+    enabled: true,
+    order: 3,
+  },
+  {
+    id: 'update-dependencies',
+    name: 'Update and test dependencies',
+    prompt:
+      'Check for outdated dependencies, update them to their latest stable versions, and run tests to ensure nothing breaks. Document any breaking changes or migration steps required.',
+    isBuiltIn: true,
+    enabled: true,
+    order: 4,
+  },
+  {
+    id: 'code-review-and-fix',
+    name: 'Code review and fix issues',
+    prompt:
+      'Perform a thorough code review of the current codebase. Identify and fix any issues found, including: code quality problems, potential bugs, security vulnerabilities, performance bottlenecks, and violations of best practices. After fixing all issues, run tests and lint to verify everything passes.',
+    isBuiltIn: true,
+    enabled: true,
+    order: 5,
+  },
+];
+
 /** ServerLogLevel - Log verbosity level for the API server */
 export type ServerLogLevel = 'error' | 'warn' | 'info' | 'debug';
 
@@ -1205,6 +1286,8 @@ export interface GlobalSettings {
   // Claude Agent SDK Settings
   /** Auto-load CLAUDE.md files using SDK's settingSources option */
   autoLoadClaudeMd?: boolean;
+  /** Use Claude Code's built-in system prompt (claude_code preset) as the base prompt */
+  useClaudeCodeSystemPrompt?: boolean;
   /** Skip the sandbox environment warning dialog on startup */
   skipSandboxWarning?: boolean;
 
@@ -1283,6 +1366,13 @@ export interface GlobalSettings {
    * @see EventHook for configuration details
    */
   eventHooks?: EventHook[];
+
+  // Feature Templates Configuration
+  /**
+   * Feature templates for quick task creation from the Add Feature dropdown
+   * Built-in templates are protected from deletion but can be disabled
+   */
+  featureTemplates?: FeatureTemplate[];
 
   // Claude-Compatible Providers Configuration
   /**
@@ -1445,6 +1535,8 @@ export interface ProjectSettings {
   // Claude Agent SDK Settings
   /** Auto-load CLAUDE.md files using SDK's settingSources option (project override) */
   autoLoadClaudeMd?: boolean;
+  /** Use Claude Code's built-in system prompt (claude_code preset) as the base prompt (project override) */
+  useClaudeCodeSystemPrompt?: boolean;
 
   // Subagents Configuration
   /**
@@ -1663,6 +1755,7 @@ export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
   lastSelectedSessionByProject: {},
   currentWorktreeByProject: {},
   autoLoadClaudeMd: true,
+  useClaudeCodeSystemPrompt: true,
   skipSandboxWarning: false,
   codexAutoLoadAgents: DEFAULT_CODEX_AUTO_LOAD_AGENTS,
   codexSandboxMode: DEFAULT_CODEX_SANDBOX_MODE,
@@ -1680,6 +1773,8 @@ export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
   subagentsSources: ['user', 'project'],
   // Event hooks
   eventHooks: [],
+  // Feature templates
+  featureTemplates: DEFAULT_FEATURE_TEMPLATES,
   // New provider system
   claudeCompatibleProviders: [],
   // Deprecated - kept for migration

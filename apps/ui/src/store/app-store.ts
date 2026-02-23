@@ -22,6 +22,7 @@ import type {
   ServerLogLevel,
   ParsedTask,
   PlanSpec,
+  FeatureTemplate,
 } from '@automaker/types';
 import {
   getAllCursorModelIds,
@@ -341,6 +342,7 @@ const initialState: AppState = {
   copilotDefaultModel: DEFAULT_COPILOT_MODEL,
   disabledProviders: [],
   autoLoadClaudeMd: false,
+  useClaudeCodeSystemPrompt: true,
   skipSandboxWarning: false,
   mcpServers: [],
   defaultEditorCommand: null,
@@ -355,6 +357,7 @@ const initialState: AppState = {
   subagentsSources: ['user', 'project'] as Array<'user' | 'project'>,
   promptCustomization: {},
   eventHooks: [],
+  featureTemplates: DEFAULT_GLOBAL_SETTINGS.featureTemplates ?? [],
   claudeCompatibleProviders: [],
   claudeApiProfiles: [],
   activeClaudeApiProfileId: null,
@@ -1393,6 +1396,15 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
       logger.error('Failed to sync autoLoadClaudeMd:', error);
     }
   },
+  setUseClaudeCodeSystemPrompt: async (enabled) => {
+    set({ useClaudeCodeSystemPrompt: enabled });
+    try {
+      const httpApi = getHttpApiClient();
+      await httpApi.settings.updateGlobal({ useClaudeCodeSystemPrompt: enabled });
+    } catch (error) {
+      logger.error('Failed to sync useClaudeCodeSystemPrompt:', error);
+    }
+  },
   setSkipSandboxWarning: async (skip) => {
     set({ skipSandboxWarning: skip });
     try {
@@ -1434,6 +1446,69 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
       await httpApi.settings.updateGlobal({ eventHooks: hooks });
     } catch (error) {
       logger.error('Failed to sync event hooks:', error);
+    }
+  },
+
+  // Feature Template actions
+  setFeatureTemplates: async (templates) => {
+    set({ featureTemplates: templates });
+    try {
+      const httpApi = getHttpApiClient();
+      await httpApi.settings.updateGlobal({ featureTemplates: templates });
+    } catch (error) {
+      logger.error('Failed to sync feature templates:', error);
+    }
+  },
+  addFeatureTemplate: async (template) => {
+    set((state) => ({
+      featureTemplates: [...state.featureTemplates, template],
+    }));
+    try {
+      const httpApi = getHttpApiClient();
+      await httpApi.settings.updateGlobal({ featureTemplates: get().featureTemplates });
+    } catch (error) {
+      logger.error('Failed to sync feature templates:', error);
+    }
+  },
+  updateFeatureTemplate: async (id, updates) => {
+    set((state) => ({
+      featureTemplates: state.featureTemplates.map((t) => (t.id === id ? { ...t, ...updates } : t)),
+    }));
+    try {
+      const httpApi = getHttpApiClient();
+      await httpApi.settings.updateGlobal({ featureTemplates: get().featureTemplates });
+    } catch (error) {
+      logger.error('Failed to sync feature templates:', error);
+    }
+  },
+  deleteFeatureTemplate: async (id) => {
+    set((state) => ({
+      featureTemplates: state.featureTemplates.filter((t) => t.id !== id),
+    }));
+    try {
+      const httpApi = getHttpApiClient();
+      await httpApi.settings.updateGlobal({ featureTemplates: get().featureTemplates });
+    } catch (error) {
+      logger.error('Failed to sync feature templates:', error);
+    }
+  },
+  reorderFeatureTemplates: async (templateIds) => {
+    set((state) => {
+      const templateMap = new Map(state.featureTemplates.map((t) => [t.id, t]));
+      const reordered: FeatureTemplate[] = [];
+      templateIds.forEach((id, index) => {
+        const template = templateMap.get(id);
+        if (template) {
+          reordered.push({ ...template, order: index });
+        }
+      });
+      return { featureTemplates: reordered };
+    });
+    try {
+      const httpApi = getHttpApiClient();
+      await httpApi.settings.updateGlobal({ featureTemplates: get().featureTemplates });
+    } catch (error) {
+      logger.error('Failed to sync feature templates:', error);
     }
   },
 

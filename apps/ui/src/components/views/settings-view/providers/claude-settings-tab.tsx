@@ -12,7 +12,13 @@ import { ProviderToggle } from './provider-toggle';
 import { Info } from 'lucide-react';
 
 export function ClaudeSettingsTab() {
-  const { apiKeys, autoLoadClaudeMd, setAutoLoadClaudeMd } = useAppStore();
+  const {
+    apiKeys,
+    autoLoadClaudeMd,
+    setAutoLoadClaudeMd,
+    useClaudeCodeSystemPrompt,
+    setUseClaudeCodeSystemPrompt,
+  } = useAppStore();
   const { claudeAuthStatus } = useSetupStore();
 
   // Use CLI status hook
@@ -53,6 +59,8 @@ export function ClaudeSettingsTab() {
       <ClaudeMdSettings
         autoLoadClaudeMd={autoLoadClaudeMd}
         onAutoLoadClaudeMdChange={setAutoLoadClaudeMd}
+        useClaudeCodeSystemPrompt={useClaudeCodeSystemPrompt}
+        onUseClaudeCodeSystemPromptChange={setUseClaudeCodeSystemPrompt}
       />
 
       {/* Skills Configuration */}

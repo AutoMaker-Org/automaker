@@ -2210,7 +2210,7 @@ export function PhaseModelSelector({
       aria-expanded={open}
       disabled={disabled}
       className={cn(
-        'w-[280px] justify-between h-9 px-3 bg-background/50 border-border/50 hover:bg-background/80 hover:text-foreground',
+        'w-full sm:w-[280px] justify-between h-11 rounded-xl border-border px-3 bg-background/50 hover:bg-background/80 hover:text-foreground',
         triggerClassName
       )}
     >
@@ -2237,8 +2237,8 @@ export function PhaseModelSelector({
   // The popover content (shared between both modes)
   const popoverContent = (
     <PopoverContent
-      className="w-[320px] p-0"
-      align={align}
+      className="w-[min(calc(100vw-2rem),320px)] p-0"
+      align={isMobile ? 'start' : align}
       onWheel={(e) => e.stopPropagation()}
       onTouchMove={(e) => e.stopPropagation()}
       onPointerDownOutside={(e) => {
@@ -2431,13 +2431,13 @@ export function PhaseModelSelector({
   return (
     <div
       className={cn(
-        'flex items-center justify-between p-4 rounded-xl',
+        'flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-xl',
         'bg-accent/20 border border-border/30',
         'hover:bg-accent/30 transition-colors'
       )}
     >
       {/* Label and Description */}
-      <div className="flex-1 pr-4">
+      <div className="w-full min-w-0 sm:flex-1 sm:pr-4">
         <h4 className="text-sm font-medium text-foreground">{label}</h4>
         <p className="text-xs text-muted-foreground">{description}</p>
       </div>

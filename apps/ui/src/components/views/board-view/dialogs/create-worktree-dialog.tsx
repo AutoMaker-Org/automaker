@@ -10,12 +10,27 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { GitBranch, AlertCircle, ChevronDown, ChevronRight, Globe, RefreshCw } from 'lucide-react';
+import {
+  GitBranch,
+  AlertCircle,
+  ChevronDown,
+  ChevronRight,
+  Globe,
+  RefreshCw,
+  Cloud,
+} from 'lucide-react';
 import { Spinner } from '@/components/ui/spinner';
 import { getElectronAPI } from '@/lib/electron';
 import { getHttpApiClient } from '@/lib/http-api-client';
 import { BranchAutocomplete } from '@/components/ui/branch-autocomplete';
 import { toast } from 'sonner';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 /**
  * Parse git/worktree error messages and return user-friendly versions
@@ -113,10 +128,19 @@ export function CreateWorktreeDialog({
   // allow free-form branch entry via allowCreate as a fallback.
   const [branchFetchError, setBranchFetchError] = useState<string | null>(null);
 
+  // Remote selection state
+  const [selectedRemote, setSelectedRemote] = useState<string>('local');
+  const [availableRemotes, setAvailableRemotes] = useState<Array<{ name: string; url: string }>>(
+    []
+  );
+  const [remoteBranches, setRemoteBranches] = useState<
+    Map<string, Array<{ name: string; fullRef: string }>>
+  >(new Map());
+
   // AbortController ref so in-flight branch fetches can be cancelled when the dialog closes
   const branchFetchAbortRef = useRef<AbortController | null>(null);
 
-  // Fetch available branches (local + remote) when the base branch section is expanded
+  // Fetch available branches and remotes when the base branch section is expanded
   const fetchBranches = useCallback(
     async (signal?: AbortSignal) => {
       if (!projectPath) return;
@@ -125,13 +149,16 @@ export function CreateWorktreeDialog({
       try {
         const api = getHttpApiClient();
 
-        // Fetch branches using the project path (use listBranches on the project root).
-        // Pass the AbortSignal so controller.abort() cancels the in-flight HTTP request.
-        const branchResult = await api.worktree.listBranches(projectPath, true, signal);
+        // Fetch both branches and remotes in parallel
+        const [branchResult, remotesResult] = await Promise.all([
+          api.worktree.listBranches(projectPath, true, signal),
+          api.worktree.listRemotes(projectPath),
+        ]);
 
         // If the fetch was aborted while awaiting, bail out to avoid stale state writes
         if (signal?.aborted) return;
 
+        // Process branches
         if (branchResult.success && branchResult.result) {
           setBranchFetchError(null);
           setAvailableBranches(
@@ -147,6 +174,30 @@ export function CreateWorktreeDialog({
           setBranchFetchError(message);
           setAvailableBranches([{ name: 'main', isRemote: false }]);
         }
+
+        // Process remotes
+        if (remotesResult.success && remotesResult.result) {
+          const remotes = remotesResult.result.remotes;
+          setAvailableRemotes(
+            remotes.map((r: { name: string; url: string; branches: unknown[] }) => ({
+              name: r.name,
+              url: r.url,
+            }))
+          );
+
+          // Build remote branches map for filtering
+          const branchesMap = new Map<string, Array<{ name: string; fullRef: string }>>();
+          remotes.forEach(
+            (r: {
+              name: string;
+              url: string;
+              branches: Array<{ name: string; fullRef: string }>;
+            }) => {
+              branchesMap.set(r.name, r.branches || []);
+            }
+          );
+          setRemoteBranches(branchesMap);
+        }
       } catch (err) {
         // If aborted, don't update state
         if (signal?.aborted) return;
@@ -160,6 +211,8 @@ export function CreateWorktreeDialog({
         // and enable free-form entry (allowCreate) so the user can still type
         // any branch name when the remote list is unavailable.
         setAvailableBranches([{ name: 'main', isRemote: false }]);
+        setAvailableRemotes([]);
+        setRemoteBranches(new Map());
       } finally {
         if (!signal?.aborted) {
           setIsLoadingBranches(false);
@@ -198,27 +251,30 @@ export function CreateWorktreeDialog({
       setAvailableBranches([]);
       setBranchFetchError(null);
       setIsLoadingBranches(false);
+      setSelectedRemote('local');
+      setAvailableRemotes([]);
+      setRemoteBranches(new Map());
     }
   }, [open]);
 
-  // Build branch name list for the autocomplete, with local branches first then remote
+  // Build branch name list for the autocomplete, filtered by selected remote
   const branchNames = useMemo(() => {
-    const local: string[] = [];
-    const remote: string[] = [];
-
-    for (const b of availableBranches) {
-      if (b.isRemote) {
-        // Skip bare remote refs without a branch name (e.g. "origin" by itself)
-        if (!b.name.includes('/')) continue;
-        remote.push(b.name);
-      } else {
-        local.push(b.name);
-      }
+    // If "local" is selected, show only local branches
+    if (selectedRemote === 'local') {
+      return availableBranches.filter((b) => !b.isRemote).map((b) => b.name);
     }
 
-    // Local branches first, then remote branches
-    return [...local, ...remote];
-  }, [availableBranches]);
+    // If a specific remote is selected, show only branches from that remote
+    const remoteBranchList = remoteBranches.get(selectedRemote);
+    if (remoteBranchList) {
+      return remoteBranchList.map((b) => b.fullRef);
+    }
+
+    // Fallback: filter from available branches by remote prefix
+    return availableBranches
+      .filter((b) => b.isRemote && b.name.startsWith(`${selectedRemote}/`))
+      .map((b) => b.name);
+  }, [availableBranches, selectedRemote, remoteBranches]);
 
   // Determine if the selected base branch is a remote branch.
   // Also detect manually entered remote-style names (e.g. "origin/feature")
@@ -418,6 +474,47 @@ export function CreateWorktreeDialog({
                   </div>
                 )}
 
+                {/* Remote Selector */}
+                <div className="grid gap-1.5">
+                  <Label htmlFor="remote-select" className="text-xs text-muted-foreground">
+                    Source
+                  </Label>
+                  <Select
+                    value={selectedRemote}
+                    onValueChange={(value) => {
+                      setSelectedRemote(value);
+                      // Clear base branch when switching remotes
+                      setBaseBranch('');
+                    }}
+                    disabled={isLoadingBranches}
+                  >
+                    <SelectTrigger id="remote-select" className="h-8">
+                      <SelectValue placeholder="Select source..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="local">
+                        <div className="flex items-center gap-2">
+                          <GitBranch className="w-3.5 h-3.5" />
+                          <span>Local Branches</span>
+                        </div>
+                      </SelectItem>
+                      {availableRemotes.map((remote) => (
+                        <SelectItem key={remote.name} value={remote.name}>
+                          <div className="flex items-center gap-2">
+                            <Cloud className="w-3.5 h-3.5" />
+                            <span>{remote.name}</span>
+                            {remote.url && (
+                              <span className="text-xs text-muted-foreground truncate max-w-[150px]">
+                                ({remote.url})
+                              </span>
+                            )}
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
                 <BranchAutocomplete
                   value={baseBranch}
                   onChange={(value) => {
@@ -425,9 +522,13 @@ export function CreateWorktreeDialog({
                     setError(null);
                   }}
                   branches={branchNames}
-                  placeholder="Select base branch (default: HEAD)..."
+                  placeholder={
+                    selectedRemote === 'local'
+                      ? 'Select local branch (default: HEAD)...'
+                      : `Select branch from ${selectedRemote}...`
+                  }
                   disabled={isLoadingBranches}
-                  allowCreate={!!branchFetchError}
+                  allowCreate={!!branchFetchError || selectedRemote === 'local'}
                 />
 
                 {isRemoteBaseBranch && (

@@ -30,6 +30,7 @@ import {
 import { MCPServersSection } from './settings-view/mcp-servers';
 import { PromptCustomizationSection } from './settings-view/prompts';
 import { EventHooksSection } from './settings-view/event-hooks';
+import { TemplatesSection } from './settings-view/templates/templates-section';
 import { ImportExportDialog } from './settings-view/components/import-export-dialog';
 import type { Theme } from './settings-view/shared/types';
 
@@ -65,6 +66,12 @@ export function SettingsView() {
     setSkipSandboxWarning,
     defaultMaxTurns,
     setDefaultMaxTurns,
+    featureTemplates,
+    setFeatureTemplates,
+    addFeatureTemplate,
+    updateFeatureTemplate,
+    deleteFeatureTemplate,
+    reorderFeatureTemplates,
   } = useAppStore();
 
   // Global theme (project-specific themes are managed in Project Settings)
@@ -140,6 +147,16 @@ export function SettingsView() {
           <PromptCustomizationSection
             promptCustomization={promptCustomization}
             onPromptCustomizationChange={setPromptCustomization}
+          />
+        );
+      case 'templates':
+        return (
+          <TemplatesSection
+            templates={featureTemplates}
+            onAddTemplate={addFeatureTemplate}
+            onUpdateTemplate={updateFeatureTemplate}
+            onDeleteTemplate={deleteFeatureTemplate}
+            onReorderTemplates={reorderFeatureTemplates}
           />
         );
       case 'model-defaults':

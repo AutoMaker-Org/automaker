@@ -23,6 +23,7 @@ export type {
   PhaseModelConfig,
   PhaseModelKey,
   PhaseModelEntry,
+  FeatureTemplate,
   // Claude-compatible provider types
   ApiKeySource,
   ClaudeCompatibleProviderType,
@@ -41,6 +42,7 @@ export {
   DEFAULT_CREDENTIALS,
   DEFAULT_PROJECT_SETTINGS,
   DEFAULT_PHASE_MODELS,
+  DEFAULT_FEATURE_TEMPLATES,
   SETTINGS_VERSION,
   CREDENTIALS_VERSION,
   PROJECT_SETTINGS_VERSION,

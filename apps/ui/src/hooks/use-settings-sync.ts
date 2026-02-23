@@ -25,6 +25,7 @@ import {
   DEFAULT_GEMINI_MODEL,
   DEFAULT_COPILOT_MODEL,
   DEFAULT_MAX_CONCURRENCY,
+  DEFAULT_PHASE_MODELS,
   getAllOpencodeModelIds,
   getAllCursorModelIds,
   getAllGeminiModelIds,
@@ -85,6 +86,7 @@ const SETTINGS_FIELDS_TO_SYNC = [
   'enabledDynamicModelIds',
   'disabledProviders',
   'autoLoadClaudeMd',
+  'useClaudeCodeSystemPrompt',
   'keyboardShortcuts',
   'mcpServers',
   'defaultEditorCommand',
@@ -100,6 +102,7 @@ const SETTINGS_FIELDS_TO_SYNC = [
   'subagentsSources',
   'promptCustomization',
   'eventHooks',
+  'featureTemplates',
   'claudeCompatibleProviders',
   'claudeApiProfiles',
   'activeClaudeApiProfileId',
@@ -727,6 +730,7 @@ export async function refreshSettingsFromServer(): Promise<boolean> {
             serverSettings.phaseModels.memoryExtractionModel
           ),
           commitMessageModel: migratePhaseModelEntry(serverSettings.phaseModels.commitMessageModel),
+          prDescriptionModel: migratePhaseModelEntry(serverSettings.phaseModels.prDescriptionModel),
         }
       : undefined;
 
@@ -785,7 +789,10 @@ export async function refreshSettingsFromServer(): Promise<boolean> {
       enableRequestLogging: serverSettings.enableRequestLogging ?? true,
       enhancementModel: serverSettings.enhancementModel,
       validationModel: serverSettings.validationModel,
-      phaseModels: migratedPhaseModels ?? serverSettings.phaseModels,
+      phaseModels: {
+        ...DEFAULT_PHASE_MODELS,
+        ...(migratedPhaseModels ?? serverSettings.phaseModels),
+      },
       enabledCursorModels: allCursorModels, // Always use ALL cursor models
       cursorDefaultModel: sanitizedCursorDefault,
       enabledOpencodeModels: sanitizedEnabledOpencodeModels,
@@ -797,6 +804,7 @@ export async function refreshSettingsFromServer(): Promise<boolean> {
       enabledDynamicModelIds: sanitizedDynamicModelIds,
       disabledProviders: serverSettings.disabledProviders ?? [],
       autoLoadClaudeMd: serverSettings.autoLoadClaudeMd ?? true,
+      useClaudeCodeSystemPrompt: serverSettings.useClaudeCodeSystemPrompt ?? true,
       keyboardShortcuts: {
         ...currentAppState.keyboardShortcuts,
         ...(serverSettings.keyboardShortcuts as unknown as Partial<
@@ -836,6 +844,8 @@ export async function refreshSettingsFromServer(): Promise<boolean> {
       recentFolders: serverSettings.recentFolders ?? [],
       // Event hooks
       eventHooks: serverSettings.eventHooks ?? [],
+      // Feature templates
+      featureTemplates: serverSettings.featureTemplates ?? [],
       // Codex CLI Settings
       codexAutoLoadAgents: serverSettings.codexAutoLoadAgents ?? false,
       codexSandboxMode: serverSettings.codexSandboxMode ?? 'workspace-write',

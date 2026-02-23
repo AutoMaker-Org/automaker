@@ -466,20 +466,8 @@ export function WorktreePanel({
 
   const isMobile = useIsMobile();
 
-  // Periodic interval check (30 seconds) to detect branch changes on disk
-  // Reduced polling to lessen repeated worktree list calls while keeping UI reasonably fresh
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
-  useEffect(() => {
-    intervalRef.current = setInterval(() => {
-      fetchWorktrees({ silent: true });
-    }, 30000);
-
-    return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-      }
-    };
-  }, [fetchWorktrees]);
+  // NOTE: Periodic polling is handled by React Query's refetchInterval
+  // in hooks/queries/use-worktrees.ts (30s). No separate setInterval needed.
 
   // Prune stale tracking-remote cache entries and remotes cache when worktrees change
   useEffect(() => {

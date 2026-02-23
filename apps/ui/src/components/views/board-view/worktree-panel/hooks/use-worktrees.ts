@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useRef } from 'react';
+import { useEffect, useCallback, useRef, startTransition } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAppStore } from '@/store/app-store';
 import { useWorktrees as useWorktreesQuery } from '@/hooks/queries';
@@ -93,7 +93,11 @@ export function useWorktrees({
         // Fallback to "main" only if worktrees haven't loaded yet
         const mainWorktree = worktrees.find((w) => w.isMain);
         const mainBranch = mainWorktree?.branch || 'main';
-        setCurrentWorktree(projectPath, null, mainBranch);
+        // Wrap in startTransition to prevent cascading re-renders
+        // during worktree list updates that could trigger React error #185
+        startTransition(() => {
+          setCurrentWorktree(projectPath, null, mainBranch);
+        });
       }
     }
   }, [worktrees, projectPath, setCurrentWorktree]);
@@ -109,7 +113,16 @@ export function useWorktrees({
 
       if (isSameWorktree) return;
 
-      setCurrentWorktree(projectPath, worktree.isMain ? null : worktree.path, worktree.branch);
+      // Wrap in startTransition to let React batch the worktree switch into
+      // a single low-priority update. Without this, the synchronous store
+      // mutation fires separate renders where selectedWorktree changes but
+      // dependent state (autoMode, columnFeatures) is still stale, causing
+      // a cascade of effects and store mutations that can trigger React
+      // error #185 (maximum update depth exceeded) — especially on mobile
+      // PWA where renders are slower and more susceptible to cascading.
+      startTransition(() => {
+        setCurrentWorktree(projectPath, worktree.isMain ? null : worktree.path, worktree.branch);
+      });
 
       // Defer feature query invalidation so the store update and client-side
       // re-filtering happen in the current render cycle first. The features
@@ -121,7 +134,7 @@ export function useWorktrees({
         queryClient.invalidateQueries({
           queryKey: queryKeys.features.all(projectPath),
         });
-      }, 0);
+      }, 100);
     },
     [projectPath, setCurrentWorktree, queryClient, currentWorktreePath]
   );

@@ -173,6 +173,8 @@ export type {
   EventHookHttpAction,
   EventHookAction,
   EventHook,
+  // Feature template types
+  FeatureTemplate,
   // Claude-compatible provider types (new)
   ApiKeySource,
   ClaudeCompatibleProviderType,
@@ -203,6 +205,8 @@ export {
   getDefaultThinkingLevel,
   // Event hook constants
   EVENT_HOOK_TRIGGER_LABELS,
+  // Feature template constants
+  DEFAULT_FEATURE_TEMPLATES,
   // Claude-compatible provider templates (new)
   CLAUDE_PROVIDER_TEMPLATES,
   // Claude API profile constants (deprecated)

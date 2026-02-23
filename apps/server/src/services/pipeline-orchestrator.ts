@@ -16,6 +16,7 @@ import * as secureFs from '../lib/secure-fs.js';
 import {
   getPromptCustomization,
   getAutoLoadClaudeMdSetting,
+  getUseClaudeCodeSystemPromptSetting,
   filterClaudeMdFromContext,
 } from '../lib/settings-helpers.js';
 import { validateWorkingDirectory } from '../lib/sdk-options.js';
@@ -122,6 +123,7 @@ export class PipelineOrchestrator {
           systemPrompt: contextFilesPrompt || undefined,
           autoLoadClaudeMd,
           thinkingLevel: feature.thinkingLevel,
+          reasoningEffort: feature.reasoningEffort,
         }
       );
       try {
@@ -354,6 +356,11 @@ export class PipelineOrchestrator {
         this.settingsService,
         '[AutoMode]'
       );
+      const useClaudeCodeSystemPrompt = await getUseClaudeCodeSystemPromptSetting(
+        projectPath,
+        this.settingsService,
+        '[AutoMode]'
+      );
       const context: PipelineContext = {
         projectPath,
         featureId,
@@ -364,6 +371,7 @@ export class PipelineOrchestrator {
         branchName: branchName ?? null,
         abortController,
         autoLoadClaudeMd,
+        useClaudeCodeSystemPrompt,
         testAttempts: 0,
         maxTestAttempts: 5,
       };

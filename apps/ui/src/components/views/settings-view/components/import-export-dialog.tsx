@@ -114,7 +114,7 @@ export function ImportExportDialog({ open, onOpenChange }: ImportExportDialogPro
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[85vh] flex flex-col">
+      <DialogContent className="max-w-[calc(100%-2rem)] sm:max-w-3xl lg:max-w-4xl max-h-[85vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>Import / Export Settings</DialogTitle>
           <DialogDescription>
@@ -125,7 +125,7 @@ export function ImportExportDialog({ open, onOpenChange }: ImportExportDialogPro
 
         <div className="flex-1 flex flex-col gap-4 min-h-0 mt-4">
           {/* Action Buttons */}
-          <div className="flex items-center justify-between gap-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-center gap-2">
               <Button
                 variant="outline"

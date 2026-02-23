@@ -142,11 +142,20 @@ function mapDescribeImageError(rawMessage: string | undefined): {
 
   if (!rawMessage) return baseResponse;
 
-  if (rawMessage.includes('Claude Code process exited')) {
+  if (
+    rawMessage.includes('Claude Code process exited') ||
+    rawMessage.includes('Claude Code process terminated by signal')
+  ) {
+    const exitCodeMatch = rawMessage.match(/exited with code (\d+)/);
+    const signalMatch = rawMessage.match(/terminated by signal (\w+)/);
+    const detail = exitCodeMatch
+      ? ` (exit code: ${exitCodeMatch[1]})`
+      : signalMatch
+        ? ` (signal: ${signalMatch[1]})`
+        : '';
     return {
       statusCode: 503,
-      userMessage:
-        'Claude exited unexpectedly while describing the image. Try again. If it keeps happening, re-run `claude login` or update your API key in Setup so Claude can restart cleanly.',
+      userMessage: `Claude exited unexpectedly${detail} while describing the image. This is usually a transient issue. Try again. If it keeps happening, re-run \`claude login\` or update your API key in Setup.`,
     };
   }
 

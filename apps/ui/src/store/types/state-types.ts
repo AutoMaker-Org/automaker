@@ -23,6 +23,7 @@ import type {
   SidebarStyle,
   ThinkingLevel,
   ReasoningEffort,
+  FeatureTemplate,
 } from '@automaker/types';
 
 import type {
@@ -234,6 +235,7 @@ export interface AppState {
 
   // Claude Agent SDK Settings
   autoLoadClaudeMd: boolean; // Auto-load CLAUDE.md files using SDK's settingSources option
+  useClaudeCodeSystemPrompt: boolean; // Use Claude Code's built-in system prompt as the base
   skipSandboxWarning: boolean; // Skip the sandbox environment warning dialog on startup
 
   // MCP Servers
@@ -264,6 +266,9 @@ export interface AppState {
 
   // Event Hooks
   eventHooks: EventHook[]; // Event hooks for custom commands or webhooks
+
+  // Feature Templates
+  featureTemplates: FeatureTemplate[]; // Feature templates for quick task creation
 
   // Claude-Compatible Providers (new system)
   claudeCompatibleProviders: ClaudeCompatibleProvider[]; // Providers that expose models to dropdowns
@@ -620,6 +625,7 @@ export interface AppActions {
 
   // Claude Agent SDK Settings actions
   setAutoLoadClaudeMd: (enabled: boolean) => Promise<void>;
+  setUseClaudeCodeSystemPrompt: (enabled: boolean) => Promise<void>;
   setSkipSandboxWarning: (skip: boolean) => Promise<void>;
 
   // Editor Configuration actions
@@ -639,6 +645,13 @@ export interface AppActions {
 
   // Event Hook actions
   setEventHooks: (hooks: EventHook[]) => Promise<void>;
+
+  // Feature Template actions
+  setFeatureTemplates: (templates: FeatureTemplate[]) => Promise<void>;
+  addFeatureTemplate: (template: FeatureTemplate) => Promise<void>;
+  updateFeatureTemplate: (id: string, updates: Partial<FeatureTemplate>) => Promise<void>;
+  deleteFeatureTemplate: (id: string) => Promise<void>;
+  reorderFeatureTemplates: (templateIds: string[]) => Promise<void>;
 
   // Claude-Compatible Provider actions (new system)
   addClaudeCompatibleProvider: (provider: ClaudeCompatibleProvider) => Promise<void>;

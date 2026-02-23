@@ -100,8 +100,8 @@ export function FeatureDefaultsSection({
           <div className="w-10 h-10 mt-0.5 rounded-xl flex items-center justify-center shrink-0 bg-brand-500/10">
             <Cpu className="w-5 h-5 text-brand-500" />
           </div>
-          <div className="flex-1 space-y-2">
-            <div className="flex items-center justify-between">
+          <div className="flex-1 min-w-0 space-y-2">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <Label className="text-foreground font-medium">Default Model</Label>
               <PhaseModelSelector
                 value={defaultFeatureModel}
@@ -124,8 +124,8 @@ export function FeatureDefaultsSection({
           <div className="w-10 h-10 mt-0.5 rounded-xl flex items-center justify-center shrink-0 bg-orange-500/10">
             <RotateCcw className="w-5 h-5 text-orange-500" />
           </div>
-          <div className="flex-1 space-y-2">
-            <div className="flex items-center justify-between">
+          <div className="flex-1 min-w-0 space-y-2">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <Label htmlFor="default-max-turns" className="text-foreground font-medium">
                 Max Agent Turns
               </Label>
@@ -187,14 +187,17 @@ export function FeatureDefaultsSection({
             {defaultPlanningMode === 'spec' && <FileText className="w-5 h-5 text-purple-500" />}
             {defaultPlanningMode === 'full' && <ScrollText className="w-5 h-5 text-amber-500" />}
           </div>
-          <div className="flex-1 space-y-2">
-            <div className="flex items-center justify-between">
+          <div className="flex-1 min-w-0 space-y-2">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <Label className="text-foreground font-medium">Default Planning Mode</Label>
               <Select
                 value={defaultPlanningMode}
                 onValueChange={(v: string) => onDefaultPlanningModeChange(v as PlanningMode)}
               >
-                <SelectTrigger className="w-[160px] h-8" data-testid="default-planning-mode-select">
+                <SelectTrigger
+                  className="w-full sm:w-[160px] h-8"
+                  data-testid="default-planning-mode-select"
+                >
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
