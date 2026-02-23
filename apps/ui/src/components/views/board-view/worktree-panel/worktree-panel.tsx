@@ -200,24 +200,9 @@ export function WorktreePanel({
   // Handle swapping a worktree in a specific slot
   const handleSwapWorktreeSlot = useCallback(
     (slotIndex: number, newBranch: string) => {
-      // slotIndex here is the index in the "other" slots (0-based, excluding main)
-      const currentPinned = [...pinnedWorktreeBranches];
-
-      // Ensure the array is long enough
-      const otherSlotCount = Math.max(0, pinnedWorktreesCount);
-      while (currentPinned.length < otherSlotCount) {
-        // Fill with current defaults
-        const mainWt = worktrees.find((w) => w.isMain);
-        const otherWts = worktrees.filter((w) => !w.isMain);
-        const usedBranches = new Set(currentPinned.filter(Boolean));
-        if (mainWt) usedBranches.add(mainWt.branch);
-        const available = otherWts.find((w) => !usedBranches.has(w.branch));
-        currentPinned.push(available?.branch ?? '');
-      }
-
       swapPinnedWorktreeBranch(projectPath, slotIndex, newBranch);
     },
-    [pinnedWorktreeBranches, pinnedWorktreesCount, worktrees, projectPath, swapPinnedWorktreeBranch]
+    [projectPath, swapPinnedWorktreeBranch]
   );
 
   // Initialize pinned branch assignments when worktrees change
@@ -1470,7 +1455,7 @@ export function WorktreePanel({
               onResolveConflicts={onResolveConflicts}
               onMerge={handleMerge}
               onDeleteWorktree={onDeleteWorktree}
-              onStartDevServer={handleStartDevServer}
+              onStartDevServer={handleStartDevServerAndShowLogs}
               onStopDevServer={handleStopDevServer}
               onOpenDevServerUrl={handleOpenDevServerUrl}
               onViewDevServerLogs={handleViewDevServerLogs}

@@ -36,6 +36,7 @@ import {
   DEFAULT_COPILOT_MODEL,
   DEFAULT_MAX_CONCURRENCY,
   DEFAULT_GLOBAL_SETTINGS,
+  getThinkingLevelsForModel,
 } from '@automaker/types';
 
 // Import types from modular type files
@@ -2457,7 +2458,20 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
   setDefaultFeatureModel: (entry) => set({ defaultFeatureModel: entry }),
 
   setDefaultThinkingLevel: async (level) => {
-    set({ defaultThinkingLevel: level });
+    const currentModel = get().defaultFeatureModel;
+    const modelId = typeof currentModel.model === 'string' ? currentModel.model : '';
+    const availableLevels = getThinkingLevelsForModel(modelId);
+
+    // Also update defaultFeatureModel's thinkingLevel if compatible
+    if (availableLevels.includes(level)) {
+      set({
+        defaultThinkingLevel: level,
+        defaultFeatureModel: { ...currentModel, thinkingLevel: level },
+      });
+    } else {
+      set({ defaultThinkingLevel: level });
+    }
+
     // Sync to server
     try {
       const httpApi = getHttpApiClient();
@@ -2653,7 +2667,7 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
         [projectPath]: count,
       },
     })),
-  getPinnedWorktreesCount: (projectPath) => get().pinnedWorktreesCountByProject[projectPath] ?? 0,
+  getPinnedWorktreesCount: (projectPath) => get().pinnedWorktreesCountByProject[projectPath] ?? 1,
   setPinnedWorktreeBranches: (projectPath, branches) =>
     set((state) => ({
       pinnedWorktreeBranchesByProject: {
@@ -2665,12 +2679,17 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
     get().pinnedWorktreeBranchesByProject[projectPath] ?? [],
   swapPinnedWorktreeBranch: (projectPath, slotIndex, newBranch) =>
     set((state) => {
-      const current = [...(state.pinnedWorktreeBranchesByProject[projectPath] ?? [])];
+      const src = state.pinnedWorktreeBranchesByProject[projectPath] ?? [];
+      // Pre-fill up to slotIndex to prevent sparse holes
+      const current: string[] = Array.from(
+        { length: Math.max(src.length, slotIndex + 1) },
+        (_, i) => src[i] ?? ''
+      );
       // If the new branch is already in another slot, swap them
       const existingIndex = current.indexOf(newBranch);
       if (existingIndex !== -1 && existingIndex !== slotIndex) {
         // Swap: put the old branch from this slot into the other slot
-        current[existingIndex] = current[slotIndex] ?? '';
+        current[existingIndex] = current[slotIndex];
       }
       current[slotIndex] = newBranch;
       return {
@@ -2697,7 +2716,7 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
       },
     })),
   getAlwaysUseWorktreeDropdown: (projectPath) =>
-    get().alwaysUseWorktreeDropdownByProject[projectPath] ?? true,
+    get().alwaysUseWorktreeDropdownByProject[projectPath] ?? false,
 
   // UI State actions
   setWorktreePanelCollapsed: (collapsed) => set({ worktreePanelCollapsed: collapsed }),

@@ -65,14 +65,6 @@ export interface DragState {
   dropTargetPath: string | null;
 }
 
-/** Inline diff line information */
-export interface DiffLine {
-  type: 'added' | 'removed' | 'unchanged';
-  content: string;
-  oldLineNumber?: number;
-  newLineNumber?: number;
-}
-
 interface FileEditorState {
   // File tree state
   fileTree: FileTreeNode[];

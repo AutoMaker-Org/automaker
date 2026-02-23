@@ -1,5 +1,5 @@
-/** Enhancement mode options for AI-powered prompt improvement */
-export type EnhancementMode = 'improve' | 'technical' | 'simplify' | 'acceptance' | 'ux-reviewer';
+import type { EnhancementMode } from '@automaker/types';
+export type { EnhancementMode } from '@automaker/types';
 
 /** Labels for enhancement modes displayed in the UI */
 export const ENHANCEMENT_MODE_LABELS: Record<EnhancementMode, string> = {

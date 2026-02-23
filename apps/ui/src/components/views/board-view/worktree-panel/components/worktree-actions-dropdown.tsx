@@ -1373,15 +1373,6 @@ export function WorktreeActionsDropdown({
             </DropdownMenuItem>
           </TooltipWrapper>
         )}
-        {!worktree.isMain && (
-          <DropdownMenuItem
-            onClick={() => onDeleteWorktree(worktree)}
-            className="text-xs text-destructive focus:text-destructive"
-          >
-            <Trash2 className="w-3.5 h-3.5 mr-2" />
-            Delete Worktree
-          </DropdownMenuItem>
-        )}
         {/* Swap Worktree submenu - only shown for non-main slots when there are other worktrees to swap to */}
         {!worktree.isMain &&
           availableWorktreesForSwap &&
@@ -1412,6 +1403,15 @@ export function WorktreeActionsDropdown({
               </DropdownMenuSubContent>
             </DropdownMenuSub>
           )}
+        {!worktree.isMain && (
+          <DropdownMenuItem
+            onClick={() => onDeleteWorktree(worktree)}
+            className="text-xs text-destructive focus:text-destructive"
+          >
+            <Trash2 className="w-3.5 h-3.5 mr-2" />
+            Delete Worktree
+          </DropdownMenuItem>
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   );

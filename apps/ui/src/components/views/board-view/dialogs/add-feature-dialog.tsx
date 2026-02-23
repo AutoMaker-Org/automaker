@@ -28,7 +28,11 @@ import { cn } from '@/lib/utils';
 import { modelSupportsThinking } from '@/lib/utils';
 import { useAppStore, ThinkingLevel, FeatureImage, PlanningMode, Feature } from '@/store/app-store';
 import type { ReasoningEffort, PhaseModelEntry, AgentModel } from '@automaker/types';
-import { supportsReasoningEffort, isAdaptiveThinkingModel } from '@automaker/types';
+import {
+  supportsReasoningEffort,
+  isAdaptiveThinkingModel,
+  getThinkingLevelsForModel,
+} from '@automaker/types';
 import {
   PrioritySelector,
   WorkModeSelector,
@@ -211,6 +215,7 @@ export function AddFeatureDialog({
     defaultRequirePlanApproval,
     useWorktrees,
     defaultFeatureModel,
+    defaultThinkingLevel,
     currentProject,
   } = useAppStore();
 
@@ -240,7 +245,22 @@ export function AddFeatureDialog({
       );
       setPlanningMode(defaultPlanningMode);
       setRequirePlanApproval(defaultRequirePlanApproval);
-      setModelEntry(effectiveDefaultFeatureModel);
+
+      // Apply defaultThinkingLevel from settings to the model entry.
+      // This ensures the "Quick-Select Defaults" thinking level setting is respected
+      // even when the user doesn't change the model in the dropdown.
+      const modelId =
+        typeof effectiveDefaultFeatureModel.model === 'string'
+          ? effectiveDefaultFeatureModel.model
+          : '';
+      const availableLevels = getThinkingLevelsForModel(modelId);
+      const effectiveThinkingLevel = availableLevels.includes(defaultThinkingLevel)
+        ? defaultThinkingLevel
+        : availableLevels[0];
+      setModelEntry({
+        ...effectiveDefaultFeatureModel,
+        thinkingLevel: effectiveThinkingLevel,
+      });
 
       // Initialize description history (empty for new feature)
       setDescriptionHistory([]);
@@ -269,6 +289,7 @@ export function AddFeatureDialog({
     defaultPlanningMode,
     defaultRequirePlanApproval,
     effectiveDefaultFeatureModel,
+    defaultThinkingLevel,
     useWorktrees,
     selectedNonMainWorktreeBranch,
     forceCurrentBranchMode,
@@ -394,7 +415,19 @@ export function AddFeatureDialog({
     // When a non-main worktree is selected, use its branch name for custom mode
     setBranchName(selectedNonMainWorktreeBranch || '');
     setPriority(2);
-    setModelEntry(effectiveDefaultFeatureModel);
+    // Apply defaultThinkingLevel to the model entry (same logic as dialog open)
+    const resetModelId =
+      typeof effectiveDefaultFeatureModel.model === 'string'
+        ? effectiveDefaultFeatureModel.model
+        : '';
+    const resetAvailableLevels = getThinkingLevelsForModel(resetModelId);
+    const resetThinkingLevel = resetAvailableLevels.includes(defaultThinkingLevel)
+      ? defaultThinkingLevel
+      : resetAvailableLevels[0];
+    setModelEntry({
+      ...effectiveDefaultFeatureModel,
+      thinkingLevel: resetThinkingLevel,
+    });
     setWorkMode(
       getDefaultWorkMode(useWorktrees, selectedNonMainWorktreeBranch, forceCurrentBranchMode)
     );

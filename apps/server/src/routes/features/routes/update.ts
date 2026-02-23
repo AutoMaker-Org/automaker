@@ -55,8 +55,7 @@ export function createUpdateHandler(featureLoader: FeatureLoader, events?: Event
         preEnhancementDescription
       );
 
-      // Manual feature updates do not emit auto_mode_feature_complete.
-      // Emit a dedicated completion event when status transitions into a completed state.
+      // Emit completion event and sync to app_spec.txt when status transitions to verified/completed
       if (newStatus && SYNC_TRIGGER_STATUSES.includes(newStatus) && previousStatus !== newStatus) {
         events?.emit('feature:completed', {
           featureId,
@@ -67,10 +66,7 @@ export function createUpdateHandler(featureLoader: FeatureLoader, events?: Event
             newStatus === 'verified' ? 'Feature verified manually' : 'Feature completed manually',
           executionMode: 'manual',
         });
-      }
 
-      // Trigger sync to app_spec.txt when status changes to verified or completed
-      if (newStatus && SYNC_TRIGGER_STATUSES.includes(newStatus) && previousStatus !== newStatus) {
         try {
           const synced = await featureLoader.syncFeatureToAppSpec(projectPath, updated);
           if (synced) {
