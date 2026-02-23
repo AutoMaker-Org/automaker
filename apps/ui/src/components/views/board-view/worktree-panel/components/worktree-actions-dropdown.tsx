@@ -159,14 +159,6 @@ interface WorktreeActionsDropdownProps {
   onSetTracking?: (worktree: WorktreeInfo, remote: string) => void;
   /** List of remote names that have a branch matching the current branch name */
   remotesWithBranch?: string[];
-  /** Available worktrees for swapping into this slot (non-main only) */
-  availableWorktreesForSwap?: WorktreeInfo[];
-  /** The slot index for this tab in the pinned list (0-based, excluding main) */
-  slotIndex?: number;
-  /** Callback when user swaps this slot to a different worktree */
-  onSwapWorktree?: (slotIndex: number, newBranch: string) => void;
-  /** List of currently pinned branch names (to show which are pinned in the swap dropdown) */
-  pinnedBranches?: string[];
 }
 
 /**
@@ -309,10 +301,6 @@ export function WorktreeActionsDropdown({
   onSyncWithRemote,
   onSetTracking,
   remotesWithBranch,
-  availableWorktreesForSwap,
-  slotIndex,
-  onSwapWorktree,
-  pinnedBranches,
 }: WorktreeActionsDropdownProps) {
   // Get available editors for the "Open In" submenu
   const { editors } = useAvailableEditors();

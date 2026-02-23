@@ -150,8 +150,6 @@ export interface WorktreeDropdownProps {
   onSetTracking?: (worktree: WorktreeInfo, remote: string) => void;
   /** List of remote names that have a branch matching the current branch name */
   remotesWithBranch?: string[];
-  /** When false, the trigger button uses a subdued style instead of the primary highlight. Defaults to true. */
-  highlightTrigger?: boolean;
 }
 
 /**
@@ -250,7 +248,6 @@ export function WorktreeDropdown({
   onSyncWithRemote,
   onSetTracking,
   remotesWithBranch,
-  highlightTrigger = true,
 }: WorktreeDropdownProps) {
   // Find the currently selected worktree to display in the trigger
   const selectedWorktree = worktrees.find((w) => isWorktreeSelected(w));
