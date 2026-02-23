@@ -167,6 +167,8 @@ interface WorktreeActionsDropdownProps {
   onSyncWithRemote?: (worktree: WorktreeInfo, remote: string) => void;
   /** Set tracking branch to a specific remote */
   onSetTracking?: (worktree: WorktreeInfo, remote: string) => void;
+  /** List of remote names that have a branch matching the current branch name */
+  remotesWithBranch?: string[];
 }
 
 /**
@@ -202,7 +204,9 @@ function RemoteActionMenuItem({
             <Icon className="w-3.5 h-3.5 mr-2" />
             {remote.name}
             {trackingRemote === remote.name && (
-              <span className="ml-auto text-[10px] text-muted-foreground mr-1">tracking</span>
+              <span className="ml-auto text-[10px] bg-muted text-muted-foreground px-1.5 py-0.5 rounded mr-2">
+                tracking
+              </span>
             )}
           </DropdownMenuItem>
           <DropdownMenuSubTrigger
@@ -384,6 +388,7 @@ export function WorktreeActionsDropdown({
   onSync,
   onSyncWithRemote,
   onSetTracking,
+  remotesWithBranch,
 }: WorktreeActionsDropdownProps) {
   // Get available editors for the "Open In" submenu
   const { editors } = useAvailableEditors();

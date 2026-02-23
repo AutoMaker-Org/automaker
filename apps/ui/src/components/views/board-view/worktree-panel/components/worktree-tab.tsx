@@ -134,6 +134,8 @@ interface WorktreeTabProps {
   onSyncWithRemote?: (worktree: WorktreeInfo, remote: string) => void;
   /** Set tracking branch to a specific remote */
   onSetTracking?: (worktree: WorktreeInfo, remote: string) => void;
+  /** List of remote names that have a branch matching the current branch name */
+  remotesWithBranch?: string[];
 }
 
 export function WorktreeTab({
@@ -220,6 +222,7 @@ export function WorktreeTab({
   onSync,
   onSyncWithRemote,
   onSetTracking,
+  remotesWithBranch,
 }: WorktreeTabProps) {
   // Make the worktree tab a drop target for feature cards
   const { setNodeRef, isOver } = useDroppable({
@@ -602,6 +605,7 @@ export function WorktreeTab({
         onSync={onSync}
         onSyncWithRemote={onSyncWithRemote}
         onSetTracking={onSetTracking}
+        remotesWithBranch={remotesWithBranch}
       />
     </div>
   );
