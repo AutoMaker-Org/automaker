@@ -479,7 +479,14 @@ export class PipelineOrchestrator {
           projectPath,
           undefined,
           undefined,
-          { projectPath, planningMode: 'skip', requirePlanApproval: false }
+          {
+            projectPath,
+            planningMode: 'skip',
+            requirePlanApproval: false,
+            useClaudeCodeSystemPrompt: context.useClaudeCodeSystemPrompt,
+            autoLoadClaudeMd: context.autoLoadClaudeMd,
+            reasoningEffort: context.feature.reasoningEffort,
+          }
         );
       }
     }
