@@ -740,8 +740,11 @@ describe('settings-service.ts', () => {
       // Legacy fields should be migrated to phaseModels with canonical IDs
       expect(settings.phaseModels.enhancementModel).toEqual({ model: 'claude-haiku' });
       expect(settings.phaseModels.validationModel).toEqual({ model: 'claude-opus' });
-      // Other fields should use defaults (canonical IDs)
-      expect(settings.phaseModels.specGenerationModel).toEqual({ model: 'claude-opus' });
+      // Other fields should use defaults (canonical IDs) - specGenerationModel includes thinkingLevel from DEFAULT_PHASE_MODELS
+      expect(settings.phaseModels.specGenerationModel).toEqual({
+        model: 'claude-opus',
+        thinkingLevel: 'adaptive',
+      });
     });
 
     it('should use default phase models when none are configured', async () => {
@@ -755,10 +758,13 @@ describe('settings-service.ts', () => {
 
       const settings = await settingsService.getGlobalSettings();
 
-      // Should use DEFAULT_PHASE_MODELS (with canonical IDs)
+      // Should use DEFAULT_PHASE_MODELS (with canonical IDs) - specGenerationModel includes thinkingLevel from DEFAULT_PHASE_MODELS
       expect(settings.phaseModels.enhancementModel).toEqual({ model: 'claude-sonnet' });
       expect(settings.phaseModels.fileDescriptionModel).toEqual({ model: 'claude-haiku' });
-      expect(settings.phaseModels.specGenerationModel).toEqual({ model: 'claude-opus' });
+      expect(settings.phaseModels.specGenerationModel).toEqual({
+        model: 'claude-opus',
+        thinkingLevel: 'adaptive',
+      });
     });
 
     it('should deep merge phaseModels on update', async () => {

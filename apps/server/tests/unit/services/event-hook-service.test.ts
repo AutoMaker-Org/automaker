@@ -673,6 +673,7 @@ describe('EventHookService', () => {
       // First: auto_mode_feature_complete fires (auto-mode path)
       mockEmitter.simulateEvent('auto-mode:event', {
         type: 'auto_mode_feature_complete',
+        executionMode: 'auto',
         featureId: 'feat-1',
         featureName: 'Auto Feature',
         passes: true,
@@ -746,6 +747,7 @@ describe('EventHookService', () => {
       // Auto-mode completion for feat-1
       mockEmitter.simulateEvent('auto-mode:event', {
         type: 'auto_mode_feature_complete',
+        executionMode: 'auto',
         featureId: 'feat-1',
         passes: true,
         message: 'Done',
