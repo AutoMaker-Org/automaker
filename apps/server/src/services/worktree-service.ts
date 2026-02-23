@@ -8,12 +8,9 @@
 
 import path from 'path';
 import fs from 'fs/promises';
-import { execFile } from 'child_process';
-import { promisify } from 'util';
+import { execGitCommand } from '@automaker/git-utils';
 import type { EventEmitter } from '../lib/events.js';
 import type { SettingsService } from './settings-service.js';
-
-const execFileAsync = promisify(execFile);
 
 /**
  * Get the list of remote names that have a branch matching the given branch name.
@@ -41,10 +38,9 @@ export async function getRemotesWithBranch(
   }
 
   try {
-    const { stdout: remoteRefsOutput } = await execFileAsync(
-      'git',
+    const remoteRefsOutput = await execGitCommand(
       ['for-each-ref', '--format=%(refname:short)', `refs/remotes/*/${currentBranch}`],
-      { cwd: worktreePath }
+      worktreePath
     );
 
     if (!remoteRefsOutput.trim()) {

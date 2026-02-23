@@ -27,6 +27,7 @@ import { getHttpApiClient } from '@/lib/http-api-client';
 import { toast } from 'sonner';
 import { useWorktreeBranches } from '@/hooks/queries';
 import { ModelOverrideTrigger, useModelOverride } from '@/components/shared';
+import { resolveModelString } from '@automaker/model-resolver';
 
 interface RemoteInfo {
   name: string;
@@ -313,7 +314,7 @@ export function CreatePRDialog({
       const result = await api.worktree.generatePRDescription(
         worktree.path,
         branchNameForApi,
-        prDescriptionModelOverride.effectiveModel,
+        resolveModelString(prDescriptionModelOverride.effectiveModel),
         prDescriptionModelOverride.effectiveModelEntry.thinkingLevel,
         prDescriptionModelOverride.effectiveModelEntry.providerId
       );
@@ -501,7 +502,7 @@ export function CreatePRDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[550px] flex flex-col">
+      <DialogContent className="sm:max-w-[550px] max-h-[85vh] flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <GitPullRequest className="w-5 h-5" />
