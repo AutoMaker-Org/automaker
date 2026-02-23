@@ -144,7 +144,9 @@ export function EditorTabs({
               {tab.isDirty ? (
                 <Circle className="w-2 h-2 shrink-0 fill-current text-primary" />
               ) : (
-                <span className={cn('w-2 h-2 rounded-full shrink-0', fileColor)} />
+                <span
+                  className={cn('w-2 h-2 rounded-full shrink-0', fileColor.replace('text-', 'bg-'))}
+                />
               )}
 
               {/* File name */}

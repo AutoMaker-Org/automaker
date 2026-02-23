@@ -291,9 +291,9 @@ function createDiffDecorations(diffContent: string | null | undefined): Extensio
         const builder = new RangeSetBuilder<Decoration>();
         const doc = view.state.doc;
 
-        for (let i = 1; i <= doc.lines; i++) {
-          if (addedLines.has(i)) {
-            const linePos = doc.line(i).from;
+        for (const lineNum of addedLines) {
+          if (lineNum <= doc.lines) {
+            const linePos = doc.line(lineNum).from;
             builder.add(linePos, linePos, addedLineDecoration);
           }
         }
@@ -419,6 +419,7 @@ export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(function
   const onSaveRef = useRef(onSave);
   const onCursorChangeRef = useRef(onCursorChange);
   const onSelectionChangeRef = useRef(onSelectionChange);
+  const lastHasSelectionRef = useRef(false);
   useEffect(() => {
     onSaveRef.current = onSave;
   }, [onSave]);
@@ -630,7 +631,11 @@ export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(function
           }
           if (onSelectionChangeRef.current) {
             const { from, to } = update.state.selection.main;
-            onSelectionChangeRef.current(from !== to);
+            const hasSelection = from !== to;
+            if (hasSelection !== lastHasSelectionRef.current) {
+              lastHasSelectionRef.current = hasSelection;
+              onSelectionChangeRef.current(hasSelection);
+            }
           }
         }
       }),

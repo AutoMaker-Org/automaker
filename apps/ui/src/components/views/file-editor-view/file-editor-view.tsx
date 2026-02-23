@@ -651,7 +651,7 @@ export function FileEditorView({ initialPath }: FileEditorViewProps) {
     // Truncate selection to ~200 lines
     const lines = selection.text.split('\n');
     const truncated = lines.length > 200;
-    const codeText = truncated ? lines.slice(0, 200).join('\n') + '\n// ...' : selection.text;
+    const codeText = truncated ? lines.slice(0, 200).join('\n') + '\n[...]' : selection.text;
 
     const description = [
       `**File:** \`${relativePath}\` (Lines ${selection.fromLine}-${selection.toLine})`,
