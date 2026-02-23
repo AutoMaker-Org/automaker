@@ -9,6 +9,7 @@ import type { Request, Response } from 'express';
 import { exec, execFile } from 'child_process';
 import { promisify } from 'util';
 import { getErrorMessage, logWorktreeError } from '../common.js';
+import { getRemotesWithBranch } from '../../../services/worktree-service.js';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -177,29 +178,8 @@ export function createListBranchesHandler() {
       // Check which remotes have a branch matching the current branch name.
       // This helps the UI distinguish between "branch exists on tracking remote" vs
       // "branch was pushed to a different remote" (e.g., pushed to 'upstream' but tracking 'origin').
-      if (hasAnyRemotes) {
-        try {
-          // Use for-each-ref to check cached remote refs (already fetched above if includeRemote was true)
-          const { stdout: remoteRefsOutput } = await execFileAsync(
-            'git',
-            ['for-each-ref', '--format=%(refname:short)', `refs/remotes/*/${currentBranch}`],
-            { cwd: worktreePath }
-          );
-          if (remoteRefsOutput.trim()) {
-            remotesWithBranch = remoteRefsOutput
-              .trim()
-              .split('\n')
-              .map((ref) => {
-                // Extract remote name from "remote/branch" format
-                const slashIdx = ref.indexOf('/');
-                return slashIdx !== -1 ? ref.slice(0, slashIdx) : ref;
-              })
-              .filter((name) => name.length > 0);
-          }
-        } catch {
-          // Ignore errors - remotesWithBranch remains empty
-        }
-      }
+      // Use for-each-ref to check cached remote refs (already fetched above if includeRemote was true)
+      remotesWithBranch = await getRemotesWithBranch(worktreePath, currentBranch, hasAnyRemotes);
 
       res.json({
         success: true,

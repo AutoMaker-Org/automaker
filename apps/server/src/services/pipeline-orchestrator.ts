@@ -613,7 +613,7 @@ export class PipelineOrchestrator {
       }
       // Only capture assertion details when they appear in failure context
       // or match explicit assertion error / expect patterns
-      if (trimmed.includes('AssertionError') || trimmed.includes('AssertionError')) {
+      if (trimmed.includes('AssertionError')) {
         failedTests.push(trimmed);
       } else if (
         inFailureContext &&

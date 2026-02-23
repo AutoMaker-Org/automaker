@@ -556,6 +556,10 @@ describe('EventHookService', () => {
     });
 
     it('should trigger feature_success when status changes to waiting_approval', async () => {
+      mockFeatureLoader = createMockFeatureLoader({
+        'feat-1': { title: 'Manual Feature' },
+      });
+
       service.initialize(
         mockEmitter,
         mockSettingsService,
@@ -577,6 +581,8 @@ describe('EventHookService', () => {
       const storeCall = (mockEventHistoryService.storeEvent as ReturnType<typeof vi.fn>).mock
         .calls[0][0];
       expect(storeCall.trigger).toBe('feature_success');
+      expect(storeCall.passes).toBe(true);
+      expect(storeCall.featureName).toBe('Manual Feature');
     });
 
     it('should NOT trigger hooks for non-completion status changes', async () => {

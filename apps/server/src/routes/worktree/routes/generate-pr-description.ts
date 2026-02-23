@@ -192,9 +192,15 @@ export function createGeneratePRDescriptionHandler(
         const sections = diffText.split(/(?=^diff --git )/m);
         for (const section of sections) {
           if (!section.trim()) continue;
-          const match = section.match(/^diff --git a\/(.+?) b\/.+/);
+          // Use a back-reference pattern so the "b/" side must match the "a/" capture,
+          // correctly handling paths that contain " b/" in their name.
+          // Falls back to a two-capture pattern to handle renames (a/ and b/ differ).
+          const backrefMatch = section.match(/^diff --git a\/(.+) b\/\1$/m);
+          const renameMatch = !backrefMatch ? section.match(/^diff --git a\/(.+) b\/(.+)$/m) : null;
+          const match = backrefMatch || renameMatch;
           if (match) {
-            const filePath = match[1];
+            // Prefer the backref capture (identical paths); for renames use the destination (match[2])
+            const filePath = backrefMatch ? match[1] : match[2];
             // Merge hunks if the same file appears in multiple diff sources
             const existing = fileHunks.get(filePath) ?? '';
             fileHunks.set(filePath, existing + section);

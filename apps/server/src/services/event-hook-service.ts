@@ -64,6 +64,8 @@ interface AutoModeEventPayload {
   error?: string;
   errorType?: string;
   projectPath?: string;
+  /** Status field present when type === 'feature_status_changed' */
+  status?: string;
 }
 
 /**
@@ -85,12 +87,30 @@ interface FeatureStatusChangedPayload {
 }
 
 /**
+ * Type guard to safely narrow AutoModeEventPayload to FeatureStatusChangedPayload
+ */
+function isFeatureStatusChangedPayload(
+  payload: AutoModeEventPayload
+): payload is AutoModeEventPayload & FeatureStatusChangedPayload {
+  return (
+    typeof payload.featureId === 'string' &&
+    typeof payload.projectPath === 'string' &&
+    typeof payload.status === 'string'
+  );
+}
+
+/**
  * Event Hook Service
  *
  * Manages execution of user-configured event hooks in response to system events.
  * Also stores events to history for debugging and replay.
  */
 export class EventHookService {
+  /** Feature status that indicates agent work is done and awaiting human review (tests skipped) */
+  private static readonly STATUS_WAITING_APPROVAL = 'waiting_approval';
+  /** Feature status that indicates agent work passed automated verification */
+  private static readonly STATUS_VERIFIED = 'verified';
+
   private emitter: EventEmitter | null = null;
   private settingsService: SettingsService | null = null;
   private eventHistoryService: EventHistoryService | null = null;
@@ -103,6 +123,12 @@ export class EventHookService {
    * Entries are automatically cleaned up after 30 seconds.
    */
   private recentlyHandledFeatures = new Set<string>();
+
+  /**
+   * Timer IDs for pending cleanup of recentlyHandledFeatures entries,
+   * keyed by featureId. Stored so they can be cancelled in destroy().
+   */
+  private recentlyHandledTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
   /**
    * Initialize the service with event emitter, settings service, event history service, and feature loader
@@ -138,11 +164,16 @@ export class EventHookService {
       this.unsubscribe();
       this.unsubscribe = null;
     }
+    // Cancel all pending cleanup timers to avoid cross-session mutations
+    for (const timerId of this.recentlyHandledTimers.values()) {
+      clearTimeout(timerId);
+    }
+    this.recentlyHandledTimers.clear();
+    this.recentlyHandledFeatures.clear();
     this.emitter = null;
     this.settingsService = null;
     this.eventHistoryService = null;
     this.featureLoader = null;
-    this.recentlyHandledFeatures.clear();
   }
 
   /**
@@ -174,7 +205,9 @@ export class EventHookService {
         trigger = 'auto_mode_complete';
         break;
       case 'feature_status_changed':
-        this.handleFeatureStatusChanged(payload as unknown as FeatureStatusChangedPayload);
+        if (isFeatureStatusChangedPayload(payload)) {
+          this.handleFeatureStatusChanged(payload);
+        }
         return;
       default:
         // Other event types don't trigger hooks
@@ -246,7 +279,10 @@ export class EventHookService {
 
     let trigger: EventHookTrigger | null = null;
 
-    if (payload.status === 'verified' || payload.status === 'waiting_approval') {
+    if (
+      payload.status === EventHookService.STATUS_VERIFIED ||
+      payload.status === EventHookService.STATUS_WAITING_APPROVAL
+    ) {
       trigger = 'feature_success';
     } else {
       // Only completion statuses trigger hooks from status changes
@@ -283,10 +319,17 @@ export class EventHookService {
    * Entries are cleaned up after 30 seconds.
    */
   private markFeatureHandled(featureId: string): void {
+    // Cancel any existing timer for this feature before setting a new one
+    const existing = this.recentlyHandledTimers.get(featureId);
+    if (existing !== undefined) {
+      clearTimeout(existing);
+    }
     this.recentlyHandledFeatures.add(featureId);
-    setTimeout(() => {
+    const timerId = setTimeout(() => {
       this.recentlyHandledFeatures.delete(featureId);
+      this.recentlyHandledTimers.delete(featureId);
     }, 30000);
+    this.recentlyHandledTimers.set(featureId, timerId);
   }
 
   /**

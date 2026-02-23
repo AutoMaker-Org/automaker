@@ -251,7 +251,7 @@ export function TemplatesSection({
         model: formData.model,
         isBuiltIn: false,
         enabled: true,
-        order: templates.length,
+        order: Math.max(...templates.map((t) => t.order ?? 0), -1) + 1,
       };
       await onAddTemplate(newTemplate);
       toast.success('Template created');
