@@ -254,6 +254,59 @@ describe('agent-service.ts', () => {
       );
     });
 
+    it('should emit tool_result with unknown tool name for unregistered tool_use_id', async () => {
+      const mockProvider = {
+        getName: () => 'gemini',
+        executeQuery: async function* () {
+          // Yield tool_result WITHOUT a preceding tool_use (unregistered tool_use_id)
+          yield {
+            type: 'assistant',
+            message: {
+              role: 'assistant',
+              content: [
+                {
+                  type: 'tool_result',
+                  tool_use_id: 'unregistered-id',
+                  content: 'Some result content',
+                },
+              ],
+            },
+          };
+          yield {
+            type: 'result',
+            subtype: 'success',
+          };
+        },
+      };
+
+      vi.mocked(ProviderFactory.getProviderForModel).mockReturnValue(mockProvider as any);
+
+      vi.mocked(promptBuilder.buildPromptWithImages).mockResolvedValue({
+        content: 'Hello',
+        hasImages: false,
+      });
+
+      await service.sendMessage({
+        sessionId: 'session-1',
+        message: 'Hello',
+      });
+
+      expect(mockEvents.emit).toHaveBeenCalledWith(
+        'agent:stream',
+        expect.objectContaining({
+          sessionId: 'session-1',
+          type: 'tool_result',
+          tool: {
+            name: 'unknown',
+            input: {
+              toolUseId: 'unregistered-id',
+              content: 'Some result content',
+            },
+          },
+        })
+      );
+    });
+
     it('should handle images in message', async () => {
       const mockProvider = {
         getName: () => 'claude',

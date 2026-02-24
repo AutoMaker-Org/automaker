@@ -641,13 +641,35 @@ export class AgentService {
                 const toolUseId = block.tool_use_id;
                 const toolName = toolUseId ? toolNamesById.get(toolUseId) : undefined;
 
+                // Normalize block.content to a string for the emitted event
+                const rawContent: unknown = block.content;
+                let contentString: string;
+                if (typeof rawContent === 'string') {
+                  contentString = rawContent;
+                } else if (Array.isArray(rawContent)) {
+                  // Extract text from content blocks (TextBlock, ImageBlock, etc.)
+                  contentString = rawContent
+                    .map((part: { text?: string; type?: string }) => {
+                      if (typeof part === 'string') return part;
+                      if (part.text) return part.text;
+                      // For non-text blocks (e.g., images), represent as type indicator
+                      if (part.type) return `[${part.type}]`;
+                      return JSON.stringify(part);
+                    })
+                    .join('\n');
+                } else if (rawContent !== undefined && rawContent !== null) {
+                  contentString = JSON.stringify(rawContent);
+                } else {
+                  contentString = '';
+                }
+
                 this.emitAgentEvent(sessionId, {
                   type: 'tool_result',
                   tool: {
                     name: toolName || 'unknown',
                     input: {
                       toolUseId,
-                      content: block.content || '',
+                      content: contentString,
                     },
                   },
                 });

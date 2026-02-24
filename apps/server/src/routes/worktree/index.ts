@@ -100,7 +100,7 @@ export function createWorktreeRoutes(
   router.post(
     '/update-pr-number',
     validatePathParams('worktreePath', 'projectPath?'),
-    requireGitRepoOnly,
+    requireValidWorktree,
     createUpdatePRNumberHandler()
   );
   router.post(

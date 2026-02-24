@@ -151,8 +151,8 @@ export function ChangePRNumberDialog({
               <span className="text-muted-foreground text-sm">#</span>
               <Input
                 id="pr-number"
-                type="number"
-                min="1"
+                type="text"
+                inputMode="numeric"
                 placeholder="e.g. 42"
                 value={prNumberInput}
                 onChange={(e) => {

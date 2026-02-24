@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
@@ -84,6 +84,9 @@ export function WorktreePreferencesSection({ project }: WorktreePreferencesSecti
   // Copy files state
   const [newCopyFilePath, setNewCopyFilePath] = useState('');
   const [fileSelectorOpen, setFileSelectorOpen] = useState(false);
+
+  // Ref for storing previous slider value for rollback on error
+  const sliderPrevRef = useRef<number | null>(null);
 
   // Check if there are unsaved changes
   const hasChanges = scriptContent !== originalContent;
@@ -556,13 +559,17 @@ export function WorktreePreferencesSection({ project }: WorktreePreferencesSecti
                 step={1}
                 value={[pinnedWorktreesCount]}
                 onValueChange={(value) => {
+                  // Capture previous value before mutation for potential rollback
+                  const prevCount = pinnedWorktreesCount;
                   // Update local state immediately for visual feedback
                   const newValue = value[0] ?? pinnedWorktreesCount;
                   setPinnedWorktreesCount(project.path, newValue);
+                  // Store prev for onValueCommit rollback
+                  sliderPrevRef.current = prevCount;
                 }}
                 onValueCommit={async (value) => {
                   const newValue = value[0] ?? pinnedWorktreesCount;
-                  const prev = pinnedWorktreesCount;
+                  const prev = sliderPrevRef.current ?? pinnedWorktreesCount;
 
                   // Persist to server
                   try {
@@ -573,7 +580,7 @@ export function WorktreePreferencesSection({ project }: WorktreePreferencesSecti
                   } catch (error) {
                     console.error('Failed to persist pinnedWorktreesCount:', error);
                     toast.error('Failed to save pinned worktrees setting');
-                    // Rollback optimistic update
+                    // Rollback optimistic update using captured previous value
                     setPinnedWorktreesCount(project.path, prev);
                   }
                 }}

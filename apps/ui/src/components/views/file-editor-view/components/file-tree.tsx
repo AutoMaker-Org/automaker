@@ -441,7 +441,7 @@ function TreeNode({
   // Build tooltip with enhanced info
   let tooltip = node.name;
   if (node.isDirectory && folderRollup && folderRollup.count > 0) {
-    tooltip += ` (${folderRollup.count} modified file${folderRollup.count !== 1 ? 's' : ''})`;
+    tooltip += ` (${folderRollup.count} changed file${folderRollup.count !== 1 ? 's' : ''})`;
     if (folderRollup.totalAdded > 0 || folderRollup.totalRemoved > 0) {
       tooltip += ` +${folderRollup.totalAdded} -${folderRollup.totalRemoved}`;
     }
@@ -534,6 +534,7 @@ function TreeNode({
                     folderRollup.dominantStatus === 'A' || folderRollup.dominantStatus === 'S',
                   'bg-red-500': folderRollup.dominantStatus === 'D',
                   'bg-gray-400': folderRollup.dominantStatus === '?',
+                  'bg-gray-600': folderRollup.dominantStatus === '!',
                   'bg-purple-500': folderRollup.dominantStatus === 'R',
                   'bg-cyan-500': folderRollup.dominantStatus === 'C',
                   'bg-orange-500': folderRollup.dominantStatus === 'U',

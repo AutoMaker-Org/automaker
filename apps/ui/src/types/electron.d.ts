@@ -33,6 +33,14 @@ export interface ToolUse {
   input: unknown;
 }
 
+export interface ToolResult {
+  name: string;
+  input: {
+    toolUseId?: string;
+    content: string;
+  };
+}
+
 export type StreamEvent =
   | {
       type: 'message';
@@ -54,7 +62,7 @@ export type StreamEvent =
   | {
       type: 'tool_result';
       sessionId: string;
-      tool: ToolUse;
+      tool: ToolResult;
     }
   | {
       type: 'complete';

@@ -3,6 +3,7 @@
  */
 
 import { spawn, type ChildProcess } from 'child_process';
+import { StringDecoder } from 'string_decoder';
 
 export interface SubprocessOptions {
   command: string;
@@ -175,11 +176,13 @@ export async function* spawnJSONLProcess(options: SubprocessOptions): AsyncGener
     const eventQueue: unknown[] = [];
     // Partial line buffer for incomplete lines across data chunks
     let lineBuffer = '';
+    // StringDecoder handles multibyte UTF-8 sequences that may be split across chunks
+    const decoder = new StringDecoder('utf8');
 
     childProcess.stdout.on('data', (chunk: Buffer) => {
       resetTimeout();
 
-      lineBuffer += chunk.toString();
+      lineBuffer += decoder.write(chunk);
       const lines = lineBuffer.split('\n');
       // Last element is either empty (line ended with \n) or a partial line
       lineBuffer = lines.pop() || '';
@@ -207,6 +210,9 @@ export async function* spawnJSONLProcess(options: SubprocessOptions): AsyncGener
     });
 
     childProcess.stdout.on('end', () => {
+      // Flush any remaining bytes from the decoder
+      lineBuffer += decoder.end();
+
       // Process any remaining partial line
       if (lineBuffer.trim()) {
         try {

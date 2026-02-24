@@ -25,6 +25,23 @@ const logger = createLogger('BoardActions');
 
 const MAX_DUPLICATES = 50;
 
+/**
+ * Removes a running task from all worktrees for a given project.
+ * Used when stopping features to ensure the task is removed from all worktree contexts,
+ * not just the current one.
+ */
+function removeRunningTaskFromAllWorktrees(projectId: string, featureId: string): void {
+  const store = useAppStore.getState();
+  const prefix = `${projectId}::`;
+  for (const [key, worktreeState] of Object.entries(store.autoModeByWorktree)) {
+    if (key.startsWith(prefix) && worktreeState.runningTasks?.includes(featureId)) {
+      const branchPart = key.slice(prefix.length);
+      const branch = branchPart === '__main__' ? null : branchPart;
+      store.removeRunningTask(projectId, branch, featureId);
+    }
+  }
+}
+
 interface UseBoardActionsProps {
   currentProject: { path: string; id: string } | null;
   features: Feature[];
@@ -507,17 +524,9 @@ export function useBoardActions({
       if (isRunning) {
         try {
           await autoMode.stopFeature(featureId);
-          // Remove from all worktrees (same fix as handleForceStopFeature)
+          // Remove from all worktrees
           if (currentProject) {
-            const store = useAppStore.getState();
-            const prefix = `${currentProject.id}::`;
-            for (const [key, worktreeState] of Object.entries(store.autoModeByWorktree)) {
-              if (key.startsWith(prefix) && worktreeState.runningTasks?.includes(featureId)) {
-                const branchPart = key.slice(prefix.length);
-                const branch = branchPart === '__main__' ? null : branchPart;
-                store.removeRunningTask(currentProject.id, branch, featureId);
-              }
-            }
+            removeRunningTaskFromAllWorktrees(currentProject.id, featureId);
           }
           toast.success('Agent stopped', {
             description: `Stopped and deleted: ${truncateDescription(feature.description)}`,
@@ -549,7 +558,7 @@ export function useBoardActions({
       removeFeature(featureId);
       await persistFeatureDelete(featureId);
     },
-    [features, runningAutoTasks, autoMode, removeFeature, persistFeatureDelete]
+    [features, runningAutoTasks, autoMode, removeFeature, persistFeatureDelete, currentProject]
   );
 
   const handleRunFeature = useCallback(
@@ -1021,15 +1030,7 @@ export function useBoardActions({
         // Without this, runningAutoTasksAllWorktrees still contains the feature
         // and the board column logic forces it into in_progress.
         if (currentProject) {
-          const store = useAppStore.getState();
-          const prefix = `${currentProject.id}::`;
-          for (const [key, worktreeState] of Object.entries(store.autoModeByWorktree)) {
-            if (key.startsWith(prefix) && worktreeState.runningTasks?.includes(feature.id)) {
-              const branchPart = key.slice(prefix.length);
-              const branch = branchPart === '__main__' ? null : branchPart;
-              store.removeRunningTask(currentProject.id, branch, feature.id);
-            }
-          }
+          removeRunningTaskFromAllWorktrees(currentProject.id, feature.id);
         }
 
         // Optimistically update the React Query features cache so the board
@@ -1186,18 +1187,10 @@ export function useBoardActions({
           })
         )
       );
-      // Remove from all worktrees (same fix as handleForceStopFeature)
+      // Remove from all worktrees
       if (currentProject) {
-        const store = useAppStore.getState();
-        const prefix = `${currentProject.id}::`;
         for (const feature of runningVerified) {
-          for (const [key, worktreeState] of Object.entries(store.autoModeByWorktree)) {
-            if (key.startsWith(prefix) && worktreeState.runningTasks?.includes(feature.id)) {
-              const branchPart = key.slice(prefix.length);
-              const branch = branchPart === '__main__' ? null : branchPart;
-              store.removeRunningTask(currentProject.id, branch, feature.id);
-            }
-          }
+          removeRunningTaskFromAllWorktrees(currentProject.id, feature.id);
         }
       }
     }

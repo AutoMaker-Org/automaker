@@ -175,6 +175,7 @@ describe('enhancement.ts', () => {
       expect(result).toHaveProperty('systemPrompt');
       expect(result).toHaveProperty('description');
       expect(result.systemPrompt).toBe(UX_REVIEWER_SYSTEM_PROMPT);
+      expect(result.description.toLowerCase()).toContain('user experience');
     });
 
     it('should handle uppercase mode', () => {
@@ -336,6 +337,13 @@ describe('enhancement.ts', () => {
 
         expect(result).toContain(testText);
         expect(result).toContain('Generate ONLY the additional details');
+      });
+
+      it('should use additive phrasing for ux-reviewer mode', () => {
+        const result = buildUserPrompt('ux-reviewer', testText, true);
+
+        expect(result).toContain(testText);
+        expect(result).toContain('Here are examples of the additional details section');
       });
     });
 

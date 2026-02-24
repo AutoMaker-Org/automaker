@@ -15,6 +15,7 @@ interface UseElectronAgentOptions {
   model?: string;
   thinkingLevel?: string;
   onToolUse?: (toolName: string, toolInput: unknown) => void;
+  onToolResult?: (toolName: string, result: unknown) => void;
 }
 
 // Server-side queued prompt type
@@ -72,6 +73,7 @@ export function useElectronAgent({
   model,
   thinkingLevel,
   onToolUse,
+  onToolResult,
 }: UseElectronAgentOptions): UseElectronAgentResult {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -309,9 +311,9 @@ export function useElectronAgent({
           break;
 
         case 'tool_result':
-          // Tool completed - surface as progress update
+          // Tool completed - surface result via onToolResult callback
           logger.info('Tool result:', event.tool.name);
-          onToolUse?.(`${event.tool.name} (done)`, event.tool.input);
+          onToolResult?.(event.tool.name, event.tool.input);
           break;
 
         case 'complete':
@@ -372,7 +374,7 @@ export function useElectronAgent({
         unsubscribeRef.current = null;
       }
     };
-  }, [sessionId, onToolUse]);
+  }, [sessionId, onToolUse, onToolResult]);
 
   // Send a message to the agent
   const sendMessage = useCallback(
