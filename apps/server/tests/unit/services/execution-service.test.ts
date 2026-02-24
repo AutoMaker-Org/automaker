@@ -1269,6 +1269,34 @@ describe('execution-service.ts', () => {
 
       expect(mockConcurrencyManager.release).toHaveBeenCalledWith('feature-1', { force: true });
     });
+
+    it('immediately updates feature status to interrupted before subprocess terminates', async () => {
+      const runningFeature = createRunningFeature('feature-1');
+      vi.mocked(mockConcurrencyManager.getRunningFeature).mockReturnValue(runningFeature);
+
+      await service.stopFeature('feature-1');
+
+      // Should update to 'interrupted' immediately so the UI reflects the stop
+      // without waiting for the CLI subprocess to fully terminate
+      expect(mockUpdateFeatureStatusFn).toHaveBeenCalledWith(
+        '/test/project',
+        'feature-1',
+        'interrupted'
+      );
+    });
+
+    it('still aborts and releases even if status update fails', async () => {
+      const runningFeature = createRunningFeature('feature-1');
+      const abortSpy = vi.spyOn(runningFeature.abortController, 'abort');
+      vi.mocked(mockConcurrencyManager.getRunningFeature).mockReturnValue(runningFeature);
+      vi.mocked(mockUpdateFeatureStatusFn).mockRejectedValueOnce(new Error('disk error'));
+
+      const result = await service.stopFeature('feature-1');
+
+      expect(result).toBe(true);
+      expect(abortSpy).toHaveBeenCalled();
+      expect(mockConcurrencyManager.release).toHaveBeenCalledWith('feature-1', { force: true });
+    });
   });
 
   describe('worktree resolution', () => {

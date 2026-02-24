@@ -562,6 +562,7 @@ export function WorktreePreferencesSection({ project }: WorktreePreferencesSecti
                 }}
                 onValueCommit={async (value) => {
                   const newValue = value[0] ?? pinnedWorktreesCount;
+                  const prev = pinnedWorktreesCount;
 
                   // Persist to server
                   try {
@@ -572,6 +573,8 @@ export function WorktreePreferencesSection({ project }: WorktreePreferencesSecti
                   } catch (error) {
                     console.error('Failed to persist pinnedWorktreesCount:', error);
                     toast.error('Failed to save pinned worktrees setting');
+                    // Rollback optimistic update
+                    setPinnedWorktreesCount(project.path, prev);
                   }
                 }}
                 className="w-full"

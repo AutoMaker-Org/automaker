@@ -63,6 +63,7 @@ import {
   PlanApprovalDialog,
   MergeRebaseDialog,
   QuickAddDialog,
+  ChangePRNumberDialog,
 } from './board-view/dialogs';
 import type { DependencyLinkType } from './board-view/dialogs';
 import { PipelineSettingsDialog } from './board-view/dialogs/pipeline-settings-dialog';
@@ -70,7 +71,6 @@ import { CreateWorktreeDialog } from './board-view/dialogs/create-worktree-dialo
 import { DeleteWorktreeDialog } from './board-view/dialogs/delete-worktree-dialog';
 import { CommitWorktreeDialog } from './board-view/dialogs/commit-worktree-dialog';
 import { CreatePRDialog } from './board-view/dialogs/create-pr-dialog';
-import { ChangePRNumberDialog } from './board-view/dialogs/change-pr-number-dialog';
 import { CreateBranchDialog } from './board-view/dialogs/create-branch-dialog';
 import { WorktreePanel } from './board-view/worktree-panel';
 import type {

@@ -52,6 +52,11 @@ export type StreamEvent =
       tool: ToolUse;
     }
   | {
+      type: 'tool_result';
+      sessionId: string;
+      tool: ToolUse;
+    }
+  | {
       type: 'complete';
       sessionId: string;
       messageId?: string;

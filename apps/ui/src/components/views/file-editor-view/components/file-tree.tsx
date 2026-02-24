@@ -119,6 +119,7 @@ const STATUS_PRIORITY: Record<string, number> = {
   C: 2, // Copied
   S: 1, // Staged
   '?': 0, // Untracked
+  '!': -1, // Ignored - lowest priority
 };
 
 /** Compute aggregated git status info for a folder from the status maps */
@@ -130,7 +131,7 @@ function computeFolderGitRollup(
   const prefix = folderPath + '/';
   let count = 0;
   let dominantStatus: string | null = null;
-  let dominantPriority = -1;
+  let dominantPriority = -2;
   let totalAdded = 0;
   let totalRemoved = 0;
 
@@ -522,7 +523,7 @@ function TreeNode({
             <>
               <span
                 className="text-[10px] font-medium shrink-0 px-1 py-0 rounded-full bg-muted text-muted-foreground"
-                title={`${folderRollup.count} modified file${folderRollup.count !== 1 ? 's' : ''}`}
+                title={`${folderRollup.count} changed file${folderRollup.count !== 1 ? 's' : ''}`}
               >
                 {folderRollup.count}
               </span>

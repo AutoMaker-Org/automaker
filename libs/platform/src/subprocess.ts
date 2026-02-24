@@ -3,7 +3,6 @@
  */
 
 import { spawn, type ChildProcess } from 'child_process';
-import readline from 'readline';
 
 export interface SubprocessOptions {
   command: string;
@@ -27,7 +26,16 @@ export interface SubprocessResult {
 }
 
 /**
- * Spawns a subprocess and streams JSONL output line-by-line
+ * Spawns a subprocess and streams JSONL output line-by-line.
+ *
+ * Uses direct 'data' event handling with manual line buffering instead of
+ * readline's async iterator. The readline async iterator (for await...of on
+ * readline.Interface) has a known issue where events batch up rather than
+ * being delivered immediately, because it layers events.on() Promises on top
+ * of the readline 'line' event emitter. This causes visible delays (20-40s
+ * between batches) in CLI providers like Gemini that produce frequent small
+ * events. Direct data event handling delivers parsed events to the consumer
+ * as soon as they arrive from the pipe.
  */
 export async function* spawnJSONLProcess(options: SubprocessOptions): AsyncGenerator<unknown> {
   const { command, args, cwd, env, abortController, timeout = 30000, stdinData } = options;
@@ -66,6 +74,19 @@ export async function* spawnJSONLProcess(options: SubprocessOptions): AsyncGener
   let stderrOutput = '';
   let lastOutputTime = Date.now();
   let timeoutHandle: NodeJS.Timeout | null = null;
+  let processExited = false;
+
+  // Stream consumer state - declared in outer scope so the abort handler can
+  // force the consumer to exit immediately without waiting for stdout to close.
+  // CLI tools (especially Gemini CLI) may take a long time to respond to SIGTERM,
+  // leaving the feature stuck in 'in_progress' state on the UI.
+  let streamEnded = false;
+  let notifyConsumer: (() => void) | null = null;
+
+  // Track process exit early so we don't block on an already-exited process
+  childProcess.on('exit', () => {
+    processExited = true;
+  });
 
   // Collect stderr for error reporting
   if (childProcess.stderr) {
@@ -102,6 +123,33 @@ export async function* spawnJSONLProcess(options: SubprocessOptions): AsyncGener
         clearTimeout(timeoutHandle);
       }
       childProcess.kill('SIGTERM');
+
+      // Force stream consumer to exit immediately instead of waiting for
+      // the process to close stdout. CLI tools (especially Gemini CLI) may
+      // take a long time to respond to SIGTERM while mid-API call.
+      streamEnded = true;
+      if (notifyConsumer) {
+        notifyConsumer();
+        notifyConsumer = null;
+      }
+
+      // Escalate to SIGKILL after 3 seconds if process hasn't exited.
+      // SIGKILL cannot be caught or ignored, guaranteeing termination.
+      const killTimer = setTimeout(() => {
+        if (!processExited) {
+          console.log('[SubprocessManager] Escalated to SIGKILL after SIGTERM timeout');
+          try {
+            childProcess.kill('SIGKILL');
+          } catch {
+            // Process may have already exited between the check and kill
+          }
+        }
+      }, 3000);
+
+      // Clean up the kill timer when process exits (don't leak timers)
+      childProcess.once('exit', () => {
+        clearTimeout(killTimer);
+      });
     };
     // Check if already aborted, if so call handler immediately
     if (abortController.signal.aborted) {
@@ -119,39 +167,96 @@ export async function* spawnJSONLProcess(options: SubprocessOptions): AsyncGener
     }
   };
 
-  // Parse stdout as JSONL (one JSON object per line)
+  // Parse stdout as JSONL using direct 'data' events with manual line buffering.
+  // This avoids the readline async iterator which batches events due to its
+  // internal events.on() Promise layering, causing significant delivery delays.
   if (childProcess.stdout) {
-    const rl = readline.createInterface({
-      input: childProcess.stdout,
-      crlfDelay: Infinity,
+    // Queue of parsed events ready to be yielded
+    const eventQueue: unknown[] = [];
+    // Partial line buffer for incomplete lines across data chunks
+    let lineBuffer = '';
+
+    childProcess.stdout.on('data', (chunk: Buffer) => {
+      resetTimeout();
+
+      lineBuffer += chunk.toString();
+      const lines = lineBuffer.split('\n');
+      // Last element is either empty (line ended with \n) or a partial line
+      lineBuffer = lines.pop() || '';
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+
+        try {
+          eventQueue.push(JSON.parse(trimmed));
+        } catch (parseError) {
+          console.error(`[SubprocessManager] Failed to parse JSONL line: ${trimmed}`, parseError);
+          eventQueue.push({
+            type: 'error',
+            error: `Failed to parse output: ${trimmed}`,
+          });
+        }
+      }
+
+      // Wake up the consumer if it's waiting for events
+      if (notifyConsumer && eventQueue.length > 0) {
+        notifyConsumer();
+        notifyConsumer = null;
+      }
+    });
+
+    childProcess.stdout.on('end', () => {
+      // Process any remaining partial line
+      if (lineBuffer.trim()) {
+        try {
+          eventQueue.push(JSON.parse(lineBuffer.trim()));
+        } catch (parseError) {
+          console.error(
+            `[SubprocessManager] Failed to parse final JSONL line: ${lineBuffer}`,
+            parseError
+          );
+          eventQueue.push({
+            type: 'error',
+            error: `Failed to parse output: ${lineBuffer}`,
+          });
+        }
+        lineBuffer = '';
+      }
+
+      streamEnded = true;
+      // Wake up consumer so it can exit the loop
+      if (notifyConsumer) {
+        notifyConsumer();
+        notifyConsumer = null;
+      }
+    });
+
+    childProcess.stdout.on('error', (error) => {
+      console.error('[SubprocessManager] stdout error:', error);
+      streamEnded = true;
+      if (notifyConsumer) {
+        notifyConsumer();
+        notifyConsumer = null;
+      }
     });
 
     try {
-      for await (const line of rl) {
-        resetTimeout();
-
-        if (!line.trim()) continue;
-
-        try {
-          const parsed = JSON.parse(line);
-          yield parsed;
-        } catch (parseError) {
-          console.error(`[SubprocessManager] Failed to parse JSONL line: ${line}`, parseError);
-          // Yield error but continue processing
-          yield {
-            type: 'error',
-            error: `Failed to parse output: ${line}`,
-          };
+      // Yield events as they arrive, waiting only when the queue is empty
+      while (!streamEnded || eventQueue.length > 0) {
+        if (eventQueue.length > 0) {
+          yield eventQueue.shift()!;
+        } else {
+          // Wait for the next data event to push events into the queue
+          await new Promise<void>((resolve) => {
+            notifyConsumer = resolve;
+          });
         }
       }
-    } catch (error) {
-      console.error('[SubprocessManager] Error reading stdout:', error);
-      throw error;
     } finally {
       if (timeoutHandle) {
         clearTimeout(timeoutHandle);
       }
-      rl.close();
       cleanupAbortListener();
     }
   } else {
@@ -159,8 +264,15 @@ export async function* spawnJSONLProcess(options: SubprocessOptions): AsyncGener
     cleanupAbortListener();
   }
 
-  // Wait for process to exit
+  // Wait for process to exit.
+  // If the process already exited (e.g., abort handler killed it while we were
+  // draining the stream), resolve immediately to avoid blocking forever.
   const exitCode = await new Promise<number | null>((resolve) => {
+    if (processExited) {
+      resolve(childProcess.exitCode ?? null);
+      return;
+    }
+
     childProcess.on('exit', (code) => {
       console.log(`[SubprocessManager] Process exited with code: ${code}`);
       resolve(code);
@@ -245,6 +357,17 @@ export async function spawnProcess(options: SubprocessOptions): Promise<Subproce
       abortHandler = () => {
         cleanupAbortListener();
         childProcess.kill('SIGTERM');
+
+        // Escalate to SIGKILL after 3 seconds if process hasn't exited
+        const killTimer = setTimeout(() => {
+          try {
+            childProcess.kill('SIGKILL');
+          } catch {
+            // Process may have already exited
+          }
+        }, 3000);
+        childProcess.once('exit', () => clearTimeout(killTimer));
+
         reject(new Error('Process aborted'));
       };
       abortController.signal.addEventListener('abort', abortHandler);

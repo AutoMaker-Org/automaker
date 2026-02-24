@@ -584,6 +584,7 @@ export class AgentService {
       let currentAssistantMessage: Message | null = null;
       let responseText = '';
       const toolUses: Array<{ name: string; input: unknown }> = [];
+      const toolNamesById = new Map<string, string>();
 
       for await (const msg of stream) {
         // Capture SDK session ID from any message and persist it.
@@ -628,10 +629,27 @@ export class AgentService {
                   input: block.input,
                 };
                 toolUses.push(toolUse);
+                if (block.tool_use_id) {
+                  toolNamesById.set(block.tool_use_id, toolUse.name);
+                }
 
                 this.emitAgentEvent(sessionId, {
                   type: 'tool_use',
                   tool: toolUse,
+                });
+              } else if (block.type === 'tool_result') {
+                const toolUseId = block.tool_use_id;
+                const toolName = toolUseId ? toolNamesById.get(toolUseId) : undefined;
+
+                this.emitAgentEvent(sessionId, {
+                  type: 'tool_result',
+                  tool: {
+                    name: toolName || 'unknown',
+                    input: {
+                      toolUseId,
+                      content: block.content || '',
+                    },
+                  },
                 });
               }
             }

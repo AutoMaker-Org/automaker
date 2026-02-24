@@ -504,6 +504,22 @@ Please continue from where you left off and complete all remaining tasks. Use th
   async stopFeature(featureId: string): Promise<boolean> {
     const running = this.concurrencyManager.getRunningFeature(featureId);
     if (!running) return false;
+    const { projectPath } = running;
+
+    // Immediately update feature status to 'interrupted' so the UI reflects
+    // the stop right away. CLI-based providers can take seconds to terminate
+    // their subprocess after the abort signal fires, leaving the feature stuck
+    // in 'in_progress' on the Kanban board until the executeFeature catch block
+    // eventually runs. By persisting and emitting the status change here, the
+    // board updates immediately regardless of how long the subprocess takes to stop.
+    try {
+      await this.updateFeatureStatusFn(projectPath, featureId, 'interrupted');
+    } catch (err) {
+      // Non-fatal: the abort still proceeds and executeFeature's catch block
+      // will attempt the same update once the subprocess terminates.
+      logger.warn(`stopFeature: failed to immediately update status for ${featureId}:`, err);
+    }
+
     running.abortController.abort();
     this.releaseRunningFeature(featureId, { force: true });
     return true;

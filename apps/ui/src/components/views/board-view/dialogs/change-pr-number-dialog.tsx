@@ -60,8 +60,13 @@ export function ChangePRNumberDialog({
   const handleSubmit = useCallback(async () => {
     if (!worktree) return;
 
-    const prNumber = parseInt(prNumberInput.trim(), 10);
-    if (isNaN(prNumber) || prNumber <= 0) {
+    const trimmed = prNumberInput.trim();
+    if (!/^\d+$/.test(trimmed)) {
+      setError('Please enter a valid positive PR number');
+      return;
+    }
+    const prNumber = Number(trimmed);
+    if (prNumber <= 0) {
       setError('Please enter a valid positive PR number');
       return;
     }

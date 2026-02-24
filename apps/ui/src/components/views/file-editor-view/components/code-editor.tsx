@@ -221,10 +221,7 @@ function parseUnifiedDiff(diffContent: string): DiffInfo {
       pendingDeletions.push(line.substring(1));
     } else if (line.startsWith(' ') || line === '') {
       flushDeletions();
-      if (!line.startsWith('\\')) {
-        // Skip "\ No newline at end of file"
-        currentNewLine++;
-      }
+      currentNewLine++;
     }
   }
 
@@ -255,7 +252,8 @@ class DeletedLinesWidget extends WidgetType {
     return container;
   }
 
-  eq(other: DeletedLinesWidget) {
+  eq(other: WidgetType) {
+    if (!(other instanceof DeletedLinesWidget)) return false;
     return (
       this.lines.length === other.lines.length && this.lines.every((l, i) => l === other.lines[i])
     );

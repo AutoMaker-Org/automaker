@@ -308,6 +308,12 @@ export function useElectronAgent({
           onToolUse?.(event.tool.name, event.tool.input);
           break;
 
+        case 'tool_result':
+          // Tool completed - surface as progress update
+          logger.info('Tool result:', event.tool.name);
+          onToolUse?.(`${event.tool.name} (done)`, event.tool.input);
+          break;
+
         case 'complete':
           // Agent finished processing for THIS session
           logger.info('Processing complete for session:', sessionId);

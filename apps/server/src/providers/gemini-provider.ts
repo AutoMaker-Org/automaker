@@ -24,7 +24,7 @@ import type {
 import { validateBareModelId } from '@automaker/types';
 import { GEMINI_MODEL_MAP, type GeminiAuthStatus } from '@automaker/types';
 import { createLogger, isAbortError } from '@automaker/utils';
-import { spawnJSONLProcess } from '@automaker/platform';
+import { spawnJSONLProcess, type SubprocessOptions } from '@automaker/platform';
 import { normalizeTodos } from './tool-normalization.js';
 
 // Create logger for this module
@@ -263,6 +263,14 @@ export class GeminiProvider extends CliProvider {
     // Use explicit approval-mode for clearer semantics
     cliArgs.push('--approval-mode', 'yolo');
 
+    // Force headless (non-interactive) mode with --prompt flag.
+    // The actual prompt content is passed via stdin (see buildSubprocessOptions()),
+    // but we MUST include -p to trigger headless mode. Without it, Gemini CLI
+    // starts in interactive mode which adds significant startup overhead
+    // (interactive REPL setup, extra context loading, etc.).
+    // Per Gemini CLI docs: stdin content is "appended to" the -p value.
+    cliArgs.push('--prompt', '');
+
     // Explicitly include the working directory in allowed workspace directories
     // This ensures Gemini CLI allows file operations in the project directory,
     // even if it has a different workspace cached from a previous session
@@ -278,9 +286,6 @@ export class GeminiProvider extends CliProvider {
     // Note: Gemini CLI doesn't have a --thinking-level flag.
     // Thinking capabilities are determined by the model selection (e.g., gemini-2.5-pro).
     // The model handles thinking internally based on the task complexity.
-
-    // The prompt will be passed as the last positional argument
-    // We'll append it in executeQuery after extracting the text
 
     return cliArgs;
   }
@@ -414,6 +419,32 @@ export class GeminiProvider extends CliProvider {
   // ==========================================================================
 
   /**
+   * Build subprocess options with stdin data for prompt and speed-optimized env vars.
+   *
+   * Passes the prompt via stdin instead of --prompt CLI arg to:
+   * - Avoid shell argument size limits with large prompts (system prompt + context)
+   * - Avoid shell escaping issues with special characters in prompts
+   * - Match the pattern used by Cursor, OpenCode, and Codex providers
+   *
+   * Also injects environment variables to reduce Gemini CLI startup overhead:
+   * - GEMINI_TELEMETRY_ENABLED=false: Disables OpenTelemetry collection
+   */
+  protected buildSubprocessOptions(options: ExecuteOptions, cliArgs: string[]): SubprocessOptions {
+    const subprocessOptions = super.buildSubprocessOptions(options, cliArgs);
+
+    // Pass prompt via stdin to avoid shell interpretation of special characters
+    // and shell argument size limits with large system prompts + context files
+    subprocessOptions.stdinData = this.extractPromptText(options);
+
+    // Disable telemetry to reduce startup overhead
+    if (subprocessOptions.env) {
+      subprocessOptions.env['GEMINI_TELEMETRY_ENABLED'] = 'false';
+    }
+
+    return subprocessOptions;
+  }
+
+  /**
    * Override error mapping for Gemini-specific error codes
    */
   protected mapError(stderr: string, exitCode: number | null): CliErrorInfo {
@@ -522,14 +553,21 @@ export class GeminiProvider extends CliProvider {
       );
     }
 
-    // Extract prompt text to pass as positional argument
-    const promptText = this.extractPromptText(options);
+    // Ensure .geminiignore exists in the working directory to prevent Gemini CLI
+    // from scanning .git and node_modules directories during startup. This reduces
+    // startup time significantly (reported: 35s → 11s) by skipping large directories
+    // that Gemini CLI would otherwise traverse for context discovery.
+    await this.ensureGeminiIgnore(options.cwd || process.cwd());
 
-    // Build CLI args and append the prompt as the last positional argument
-    const cliArgs = this.buildCliArgs(options);
-    cliArgs.push(promptText); // Gemini CLI uses positional args for the prompt
+    // Embed system prompt into the user prompt so Gemini CLI receives
+    // project context (CLAUDE.md, CODE_QUALITY.md, etc.) that would
+    // otherwise be silently dropped since Gemini CLI has no --system-prompt flag.
+    const effectiveOptions = this.embedSystemPromptIntoPrompt(options);
 
-    const subprocessOptions = this.buildSubprocessOptions(options, cliArgs);
+    // Build CLI args for headless execution.
+    const cliArgs = this.buildCliArgs(effectiveOptions);
+
+    const subprocessOptions = this.buildSubprocessOptions(effectiveOptions, cliArgs);
 
     let sessionId: string | undefined;
 
@@ -581,6 +619,49 @@ export class GeminiProvider extends CliProvider {
   // ==========================================================================
   // Gemini-Specific Methods
   // ==========================================================================
+
+  /**
+   * Ensure a .geminiignore file exists in the working directory.
+   *
+   * Gemini CLI scans the working directory for context discovery during startup.
+   * Excluding .git and node_modules dramatically reduces startup time by preventing
+   * traversal of large directories (reported improvement: 35s → 11s).
+   *
+   * Only creates the file if it doesn't already exist to avoid overwriting user config.
+   */
+  private async ensureGeminiIgnore(cwd: string): Promise<void> {
+    const ignorePath = path.join(cwd, '.geminiignore');
+    try {
+      await fs.access(ignorePath);
+      // File already exists, don't overwrite
+    } catch {
+      // File doesn't exist, create it with sensible defaults
+      try {
+        const content = [
+          '# Auto-generated by Automaker to speed up Gemini CLI startup',
+          '# Prevents Gemini CLI from scanning large directories during context discovery',
+          '.git',
+          'node_modules',
+          'dist',
+          'build',
+          '.next',
+          '.nuxt',
+          'coverage',
+          '.automaker',
+          '.worktrees',
+          '.vscode',
+          '.idea',
+          '*.lock',
+          '',
+        ].join('\n');
+        await fs.writeFile(ignorePath, content, 'utf-8');
+        logger.debug(`Created .geminiignore at ${ignorePath}`);
+      } catch (writeError) {
+        // Non-fatal: startup will just be slower without the ignore file
+        logger.debug(`Failed to create .geminiignore: ${writeError}`);
+      }
+    }
+  }
 
   /**
    * Create a GeminiError with details

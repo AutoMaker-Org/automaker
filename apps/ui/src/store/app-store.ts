@@ -2459,7 +2459,7 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
 
   setDefaultThinkingLevel: async (level) => {
     const currentModel = get().defaultFeatureModel;
-    const modelId = typeof currentModel.model === 'string' ? currentModel.model : '';
+    const modelId = currentModel.model;
     const availableLevels = getThinkingLevelsForModel(modelId);
 
     // Also update defaultFeatureModel's thinkingLevel if compatible
@@ -2685,8 +2685,8 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
         { length: Math.max(src.length, slotIndex + 1) },
         (_, i) => src[i] ?? ''
       );
-      // If the new branch is already in another slot, swap them
-      const existingIndex = current.indexOf(newBranch);
+      // If the new branch is already in another slot, swap them (only when newBranch is non-empty)
+      const existingIndex = newBranch !== '' ? current.indexOf(newBranch) : -1;
       if (existingIndex !== -1 && existingIndex !== slotIndex) {
         // Swap: put the old branch from this slot into the other slot
         current[existingIndex] = current[slotIndex];

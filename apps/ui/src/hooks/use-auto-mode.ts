@@ -906,6 +906,7 @@ export function useAutoMode(worktree?: WorktreeInfo) {
 
         if (result.success) {
           removeRunningTask(currentProject.id, branchName, featureId);
+
           logger.info('Feature stopped successfully:', featureId);
           addAutoModeActivity({
             featureId,

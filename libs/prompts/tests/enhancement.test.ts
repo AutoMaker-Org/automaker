@@ -10,10 +10,12 @@ import {
   TECHNICAL_SYSTEM_PROMPT,
   SIMPLIFY_SYSTEM_PROMPT,
   ACCEPTANCE_SYSTEM_PROMPT,
+  UX_REVIEWER_SYSTEM_PROMPT,
   IMPROVE_EXAMPLES,
   TECHNICAL_EXAMPLES,
   SIMPLIFY_EXAMPLES,
   ACCEPTANCE_EXAMPLES,
+  UX_REVIEWER_EXAMPLES,
 } from '../src/enhancement.js';
 
 describe('enhancement.ts', () => {
@@ -44,6 +46,12 @@ describe('enhancement.ts', () => {
       expect(typeof ACCEPTANCE_SYSTEM_PROMPT).toBe('string');
       expect(ACCEPTANCE_SYSTEM_PROMPT).toContain('acceptance criteria');
       expect(ACCEPTANCE_SYSTEM_PROMPT).toContain('testable');
+    });
+
+    it('should export UX_REVIEWER_SYSTEM_PROMPT', () => {
+      expect(UX_REVIEWER_SYSTEM_PROMPT).toBeDefined();
+      expect(typeof UX_REVIEWER_SYSTEM_PROMPT).toBe('string');
+      expect(UX_REVIEWER_SYSTEM_PROMPT).toContain('User Experience');
     });
   });
 
@@ -100,6 +108,19 @@ describe('enhancement.ts', () => {
       });
     });
 
+    it('should export UX_REVIEWER_EXAMPLES with valid structure', () => {
+      expect(UX_REVIEWER_EXAMPLES).toBeDefined();
+      expect(Array.isArray(UX_REVIEWER_EXAMPLES)).toBe(true);
+      expect(UX_REVIEWER_EXAMPLES.length).toBeGreaterThan(0);
+
+      UX_REVIEWER_EXAMPLES.forEach((example) => {
+        expect(example).toHaveProperty('input');
+        expect(example).toHaveProperty('output');
+        expect(typeof example.input).toBe('string');
+        expect(typeof example.output).toBe('string');
+      });
+    });
+
     it('should have shorter outputs in SIMPLIFY_EXAMPLES', () => {
       SIMPLIFY_EXAMPLES.forEach((example) => {
         // Simplify examples should have shorter output than input
@@ -148,6 +169,14 @@ describe('enhancement.ts', () => {
       expect(result.description).toContain('acceptance');
     });
 
+    it("should return prompt config for 'ux-reviewer' mode", () => {
+      const result = getEnhancementPrompt('ux-reviewer');
+
+      expect(result).toHaveProperty('systemPrompt');
+      expect(result).toHaveProperty('description');
+      expect(result.systemPrompt).toBe(UX_REVIEWER_SYSTEM_PROMPT);
+    });
+
     it('should handle uppercase mode', () => {
       const result = getEnhancementPrompt('IMPROVE');
 
@@ -194,6 +223,11 @@ describe('enhancement.ts', () => {
       const result = getSystemPrompt('acceptance');
       expect(result).toBe(ACCEPTANCE_SYSTEM_PROMPT);
     });
+
+    it("should return UX_REVIEWER_SYSTEM_PROMPT for 'ux-reviewer'", () => {
+      const result = getSystemPrompt('ux-reviewer');
+      expect(result).toBe(UX_REVIEWER_SYSTEM_PROMPT);
+    });
   });
 
   describe('getExamples', () => {
@@ -218,6 +252,12 @@ describe('enhancement.ts', () => {
     it("should return ACCEPTANCE_EXAMPLES for 'acceptance'", () => {
       const result = getExamples('acceptance');
       expect(result).toBe(ACCEPTANCE_EXAMPLES);
+      expect(result.length).toBeGreaterThan(0);
+    });
+
+    it("should return UX_REVIEWER_EXAMPLES for 'ux-reviewer'", () => {
+      const result = getExamples('ux-reviewer');
+      expect(result).toBe(UX_REVIEWER_EXAMPLES);
       expect(result.length).toBeGreaterThan(0);
     });
   });
@@ -365,6 +405,10 @@ describe('enhancement.ts', () => {
 
     it("should return true for 'acceptance'", () => {
       expect(isValidEnhancementMode('acceptance')).toBe(true);
+    });
+
+    it("should return true for 'ux-reviewer'", () => {
+      expect(isValidEnhancementMode('ux-reviewer')).toBe(true);
     });
 
     it('should return false for invalid mode', () => {
