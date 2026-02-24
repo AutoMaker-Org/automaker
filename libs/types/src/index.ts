@@ -202,6 +202,7 @@ export {
   getThinkingTokenBudget,
   isAdaptiveThinkingModel,
   getThinkingLevelsForModel,
+  normalizeThinkingLevelForModel,
   getDefaultThinkingLevel,
   // Event hook constants
   EVENT_HOOK_TRIGGER_LABELS,

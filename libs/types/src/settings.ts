@@ -350,6 +350,28 @@ export function getThinkingLevelsForModel(model: string): ThinkingLevel[] {
 }
 
 /**
+ * Normalize a selected thinking level to a value supported by the target model.
+ * Prefers preserving the selected level, falls back to 'none' when available.
+ */
+export function normalizeThinkingLevelForModel(
+  model: string,
+  thinkingLevel: ThinkingLevel | undefined
+): ThinkingLevel {
+  const availableLevels = getThinkingLevelsForModel(model);
+  const currentLevel = thinkingLevel || 'none';
+
+  if (availableLevels.includes(currentLevel)) {
+    return currentLevel;
+  }
+
+  if (availableLevels.includes('none')) {
+    return 'none';
+  }
+
+  return availableLevels[0];
+}
+
+/**
  * Get the default thinking level for a given model.
  * Used when selecting a model via the primary button in the two-stage selector.
  * Returns 'adaptive' for Opus models (which support adaptive thinking),

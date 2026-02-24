@@ -45,7 +45,7 @@ import { toast } from 'sonner';
 import type { PRReviewComment } from '@/lib/electron';
 import type { Feature } from '@/store/app-store';
 import type { PhaseModelEntry } from '@automaker/types';
-import { supportsReasoningEffort, isAdaptiveThinkingModel } from '@automaker/types';
+import { supportsReasoningEffort, normalizeThinkingLevelForModel } from '@automaker/types';
 import { resolveModelString } from '@automaker/model-resolver';
 import { PhaseModelSelector } from '@/components/views/settings-view/model-defaults';
 
@@ -590,20 +590,10 @@ export function PRCommentResolutionDialog({
   const wasOpenRef = useRef(false);
 
   const handleModelChange = useCallback((entry: PhaseModelEntry) => {
-    // Normalize thinking level when switching between adaptive and non-adaptive models
-    const isNewModelAdaptive =
-      typeof entry.model === 'string' && isAdaptiveThinkingModel(entry.model);
-    const currentLevel = entry.thinkingLevel || 'none';
+    const modelId = typeof entry.model === 'string' ? entry.model : '';
+    const normalizedThinkingLevel = normalizeThinkingLevelForModel(modelId, entry.thinkingLevel);
 
-    if (isNewModelAdaptive && currentLevel !== 'none' && currentLevel !== 'adaptive') {
-      // Switching TO an adaptive model with a manual level -> auto-switch to 'adaptive'
-      setModelEntry({ ...entry, thinkingLevel: 'adaptive' });
-    } else if (!isNewModelAdaptive && currentLevel === 'adaptive') {
-      // Switching FROM an adaptive model with adaptive -> auto-switch to 'high'
-      setModelEntry({ ...entry, thinkingLevel: 'high' });
-    } else {
-      setModelEntry(entry);
-    }
+    setModelEntry({ ...entry, thinkingLevel: normalizedThinkingLevel });
   }, []);
 
   // Fetch PR review comments

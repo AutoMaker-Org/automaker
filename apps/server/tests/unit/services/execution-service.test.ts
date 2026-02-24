@@ -211,7 +211,14 @@ describe('execution-service.ts', () => {
     });
 
     // Default mocks for secureFs
-    vi.mocked(secureFs.readFile).mockResolvedValue('Agent output content');
+    // Include tool usage markers to simulate meaningful agent output.
+    // The execution service checks for '🔧 Tool:' markers and minimum
+    // output length to determine if the agent did real work.
+    vi.mocked(secureFs.readFile).mockResolvedValue(
+      'Starting implementation...\n\n🔧 Tool: Read\nInput: {"file_path": "/src/index.ts"}\n\n' +
+        '🔧 Tool: Edit\nInput: {"file_path": "/src/index.ts", "old_string": "foo", "new_string": "bar"}\n\n' +
+        'Implementation complete. Updated the code as requested.'
+    );
     vi.mocked(secureFs.access).mockResolvedValue(undefined);
 
     // Re-setup platform mocks
@@ -1431,6 +1438,441 @@ describe('execution-service.ts', () => {
         'auto_mode_feature_complete',
         expect.objectContaining({ passes: true })
       );
+    });
+  });
+
+  describe('executeFeature - agent output validation', () => {
+    // Helper to generate realistic agent output with tool markers
+    const makeAgentOutput = (toolCount: number, extraText = ''): string => {
+      let output = 'Starting implementation...\n\n';
+      for (let i = 0; i < toolCount; i++) {
+        output += `🔧 Tool: Edit\nInput: {"file_path": "/src/file${i}.ts", "old_string": "old${i}", "new_string": "new${i}"}\n\n`;
+      }
+      output += `Implementation complete. ${extraText}`;
+      return output;
+    };
+
+    const createServiceWithMocks = () => {
+      return new ExecutionService(
+        mockEventBus,
+        mockConcurrencyManager,
+        mockWorktreeResolver,
+        mockSettingsService,
+        mockRunAgentFn,
+        mockExecutePipelineFn,
+        mockUpdateFeatureStatusFn,
+        mockLoadFeatureFn,
+        mockGetPlanningPromptPrefixFn,
+        mockSaveFeatureSummaryFn,
+        mockRecordLearningsFn,
+        mockContextExistsFn,
+        mockResumeFeatureFn,
+        mockTrackFailureFn,
+        mockSignalPauseFn,
+        mockRecordSuccessFn,
+        mockSaveExecutionStateFn,
+        mockLoadContextFilesFn
+      );
+    };
+
+    it('sets verified when agent output has tool usage and sufficient length', async () => {
+      const output = makeAgentOutput(3, 'Updated authentication module with new login flow.');
+      vi.mocked(secureFs.readFile).mockResolvedValue(output);
+
+      await service.executeFeature('/test/project', 'feature-1');
+
+      expect(mockUpdateFeatureStatusFn).toHaveBeenCalledWith(
+        '/test/project',
+        'feature-1',
+        'verified'
+      );
+    });
+
+    it('sets waiting_approval when agent output is empty', async () => {
+      vi.mocked(secureFs.readFile).mockResolvedValue('');
+
+      const svc = createServiceWithMocks();
+      await svc.executeFeature('/test/project', 'feature-1');
+
+      expect(mockUpdateFeatureStatusFn).toHaveBeenCalledWith(
+        '/test/project',
+        'feature-1',
+        'waiting_approval'
+      );
+    });
+
+    it('sets waiting_approval when agent output has no tool usage markers', async () => {
+      // Long output but no tool markers - agent printed text but didn't use tools
+      const longOutputNoTools = 'I analyzed the codebase and found several issues. '.repeat(20);
+      vi.mocked(secureFs.readFile).mockResolvedValue(longOutputNoTools);
+
+      const svc = createServiceWithMocks();
+      await svc.executeFeature('/test/project', 'feature-1');
+
+      expect(mockUpdateFeatureStatusFn).toHaveBeenCalledWith(
+        '/test/project',
+        'feature-1',
+        'waiting_approval'
+      );
+    });
+
+    it('sets waiting_approval when agent output has tool markers but is too short', async () => {
+      // Has a tool marker but total output is under 200 chars
+      const shortWithTool = '🔧 Tool: Read\nInput: {"file_path": "/src/index.ts"}\nDone.';
+      expect(shortWithTool.trim().length).toBeLessThan(200);
+
+      vi.mocked(secureFs.readFile).mockResolvedValue(shortWithTool);
+
+      const svc = createServiceWithMocks();
+      await svc.executeFeature('/test/project', 'feature-1');
+
+      expect(mockUpdateFeatureStatusFn).toHaveBeenCalledWith(
+        '/test/project',
+        'feature-1',
+        'waiting_approval'
+      );
+    });
+
+    it('sets waiting_approval when agent output file is missing (ENOENT)', async () => {
+      vi.mocked(secureFs.readFile).mockRejectedValue(new Error('ENOENT'));
+
+      const svc = createServiceWithMocks();
+      await svc.executeFeature('/test/project', 'feature-1');
+
+      expect(mockUpdateFeatureStatusFn).toHaveBeenCalledWith(
+        '/test/project',
+        'feature-1',
+        'waiting_approval'
+      );
+    });
+
+    it('sets waiting_approval when agent output is only whitespace', async () => {
+      vi.mocked(secureFs.readFile).mockResolvedValue('   \n\n\t  \n  ');
+
+      const svc = createServiceWithMocks();
+      await svc.executeFeature('/test/project', 'feature-1');
+
+      expect(mockUpdateFeatureStatusFn).toHaveBeenCalledWith(
+        '/test/project',
+        'feature-1',
+        'waiting_approval'
+      );
+    });
+
+    it('sets verified when output is exactly at the 200 char threshold with tool usage', async () => {
+      // Create output that's exactly 200 chars trimmed with tool markers
+      const toolMarker = '🔧 Tool: Edit\nInput: {"file_path": "/src/index.ts"}\n';
+      const padding = 'x'.repeat(200 - toolMarker.length);
+      const output = toolMarker + padding;
+      expect(output.trim().length).toBeGreaterThanOrEqual(200);
+
+      vi.mocked(secureFs.readFile).mockResolvedValue(output);
+
+      const svc = createServiceWithMocks();
+      await svc.executeFeature('/test/project', 'feature-1');
+
+      expect(mockUpdateFeatureStatusFn).toHaveBeenCalledWith(
+        '/test/project',
+        'feature-1',
+        'verified'
+      );
+    });
+
+    it('sets waiting_approval when output is 199 chars with tool usage (below threshold)', async () => {
+      const toolMarker = '🔧 Tool: Read\n';
+      const padding = 'x'.repeat(199 - toolMarker.length);
+      const output = toolMarker + padding;
+      expect(output.trim().length).toBe(199);
+
+      vi.mocked(secureFs.readFile).mockResolvedValue(output);
+
+      const svc = createServiceWithMocks();
+      await svc.executeFeature('/test/project', 'feature-1');
+
+      expect(mockUpdateFeatureStatusFn).toHaveBeenCalledWith(
+        '/test/project',
+        'feature-1',
+        'waiting_approval'
+      );
+    });
+
+    it('skipTests always takes priority over output validation', async () => {
+      // Meaningful output with tool usage - would normally be 'verified'
+      const output = makeAgentOutput(5, 'All changes applied successfully.');
+      vi.mocked(secureFs.readFile).mockResolvedValue(output);
+
+      mockLoadFeatureFn = vi.fn().mockResolvedValue({ ...testFeature, skipTests: true });
+      const svc = createServiceWithMocks();
+
+      await svc.executeFeature('/test/project', 'feature-1');
+
+      // skipTests=true always means waiting_approval regardless of output quality
+      expect(mockUpdateFeatureStatusFn).toHaveBeenCalledWith(
+        '/test/project',
+        'feature-1',
+        'waiting_approval'
+      );
+    });
+
+    it('skipTests with empty output still results in waiting_approval', async () => {
+      vi.mocked(secureFs.readFile).mockResolvedValue('');
+
+      mockLoadFeatureFn = vi.fn().mockResolvedValue({ ...testFeature, skipTests: true });
+      const svc = createServiceWithMocks();
+
+      await svc.executeFeature('/test/project', 'feature-1');
+
+      expect(mockUpdateFeatureStatusFn).toHaveBeenCalledWith(
+        '/test/project',
+        'feature-1',
+        'waiting_approval'
+      );
+    });
+
+    it('still records success even when output validation fails', async () => {
+      vi.mocked(secureFs.readFile).mockResolvedValue('');
+
+      const svc = createServiceWithMocks();
+      await svc.executeFeature('/test/project', 'feature-1');
+
+      // recordSuccess should still be called - the agent ran without errors
+      expect(mockRecordSuccessFn).toHaveBeenCalled();
+    });
+
+    it('still extracts summary when output has content but no tool markers', async () => {
+      const outputNoTools = 'A '.repeat(150); // > 200 chars but no tool markers
+      vi.mocked(secureFs.readFile).mockResolvedValue(outputNoTools);
+
+      const svc = createServiceWithMocks();
+      await svc.executeFeature('/test/project', 'feature-1');
+
+      // Summary extraction still runs even though status is waiting_approval
+      expect(extractSummary).toHaveBeenCalledWith(outputNoTools);
+      expect(mockSaveFeatureSummaryFn).toHaveBeenCalledWith(
+        '/test/project',
+        'feature-1',
+        'Test summary'
+      );
+    });
+
+    it('emits feature_complete with passes=true even when output validation routes to waiting_approval', async () => {
+      vi.mocked(secureFs.readFile).mockResolvedValue('');
+
+      const svc = createServiceWithMocks();
+      await svc.executeFeature('/test/project', 'feature-1', false, true);
+
+      // The agent ran without error - it's still a "pass" from the execution perspective
+      expect(mockEventBus.emitAutoModeEvent).toHaveBeenCalledWith(
+        'auto_mode_feature_complete',
+        expect.objectContaining({ passes: true })
+      );
+    });
+
+    it('handles realistic Cursor CLI output that exits quickly', async () => {
+      // Simulates a Cursor CLI that prints a brief message and exits
+      const cursorQuickExit = 'Task received. Processing...\nResult: completed successfully.';
+      expect(cursorQuickExit.includes('🔧 Tool:')).toBe(false);
+
+      vi.mocked(secureFs.readFile).mockResolvedValue(cursorQuickExit);
+
+      const svc = createServiceWithMocks();
+      await svc.executeFeature('/test/project', 'feature-1');
+
+      // No tool usage = waiting_approval
+      expect(mockUpdateFeatureStatusFn).toHaveBeenCalledWith(
+        '/test/project',
+        'feature-1',
+        'waiting_approval'
+      );
+    });
+
+    it('handles realistic Claude SDK output with multiple tool uses', async () => {
+      // Simulates a Claude SDK agent that does real work
+      const claudeOutput =
+        "I'll implement the requested feature.\n\n" +
+        '🔧 Tool: Read\nInput: {"file_path": "/src/components/App.tsx"}\n\n' +
+        'I can see the existing component structure. Let me modify it.\n\n' +
+        '🔧 Tool: Edit\nInput: {"file_path": "/src/components/App.tsx", "old_string": "const App = () => {", "new_string": "const App: React.FC = () => {"}\n\n' +
+        '🔧 Tool: Write\nInput: {"file_path": "/src/components/NewFeature.tsx"}\n\n' +
+        "I've created the new component and updated the existing one. The feature is now implemented with proper TypeScript types.";
+
+      vi.mocked(secureFs.readFile).mockResolvedValue(claudeOutput);
+
+      const svc = createServiceWithMocks();
+      await svc.executeFeature('/test/project', 'feature-1');
+
+      // Real work = verified
+      expect(mockUpdateFeatureStatusFn).toHaveBeenCalledWith(
+        '/test/project',
+        'feature-1',
+        'verified'
+      );
+    });
+
+    it('reads agent output from the correct path with utf-8 encoding', async () => {
+      const output = makeAgentOutput(2, 'Done with changes.');
+      vi.mocked(secureFs.readFile).mockResolvedValue(output);
+
+      const svc = createServiceWithMocks();
+      await svc.executeFeature('/test/project', 'feature-1');
+
+      // Verify readFile was called with the correct path derived from getFeatureDir
+      expect(secureFs.readFile).toHaveBeenCalledWith(
+        '/test/project/.automaker/features/feature-1/agent-output.md',
+        'utf-8'
+      );
+    });
+
+    it('completion message includes auto-verified when status is verified', async () => {
+      const output = makeAgentOutput(3, 'All changes applied.');
+      vi.mocked(secureFs.readFile).mockResolvedValue(output);
+
+      const svc = createServiceWithMocks();
+      await svc.executeFeature('/test/project', 'feature-1', false, true);
+
+      expect(mockEventBus.emitAutoModeEvent).toHaveBeenCalledWith(
+        'auto_mode_feature_complete',
+        expect.objectContaining({
+          message: expect.stringContaining('auto-verified'),
+        })
+      );
+    });
+
+    it('completion message does NOT include auto-verified when status is waiting_approval', async () => {
+      // Empty output → waiting_approval
+      vi.mocked(secureFs.readFile).mockResolvedValue('');
+
+      const svc = createServiceWithMocks();
+      await svc.executeFeature('/test/project', 'feature-1', false, true);
+
+      const completeCall = vi
+        .mocked(mockEventBus.emitAutoModeEvent)
+        .mock.calls.find((call) => call[0] === 'auto_mode_feature_complete');
+      expect(completeCall).toBeDefined();
+      expect((completeCall![1] as { message: string }).message).not.toContain('auto-verified');
+    });
+
+    it('uses same agentOutput for both status determination and summary extraction', async () => {
+      // Specific output that is long enough with tool markers (verified path)
+      // AND has content for summary extraction
+      const specificOutput =
+        '🔧 Tool: Read\nReading file...\n🔧 Tool: Edit\nEditing file...\n' +
+        'The implementation is complete. Here is a detailed description of what was done. '.repeat(
+          3
+        );
+      vi.mocked(secureFs.readFile).mockResolvedValue(specificOutput);
+
+      const svc = createServiceWithMocks();
+      await svc.executeFeature('/test/project', 'feature-1');
+
+      // Status should be verified (has tools + long enough)
+      expect(mockUpdateFeatureStatusFn).toHaveBeenCalledWith(
+        '/test/project',
+        'feature-1',
+        'verified'
+      );
+      // extractSummary should receive the exact same output
+      expect(extractSummary).toHaveBeenCalledWith(specificOutput);
+      // recordLearnings should also receive the same output
+      expect(mockRecordLearningsFn).toHaveBeenCalledWith(
+        '/test/project',
+        testFeature,
+        specificOutput
+      );
+    });
+
+    it('does not call recordMemoryUsage when output is empty and memoryFiles is empty', async () => {
+      vi.mocked(secureFs.readFile).mockResolvedValue('');
+      const { recordMemoryUsage } = await import('@automaker/utils');
+
+      const svc = createServiceWithMocks();
+      await svc.executeFeature('/test/project', 'feature-1');
+
+      // With empty output and empty memoryFiles, recordMemoryUsage should not be called
+      expect(recordMemoryUsage).not.toHaveBeenCalled();
+    });
+
+    it('handles output with special unicode characters correctly', async () => {
+      // Output with various unicode but includes tool markers
+      const unicodeOutput =
+        '🔧 Tool: Read\n' +
+        '🔧 Tool: Edit\n' +
+        'Añadiendo función de búsqueda con caracteres especiales: ñ, ü, ö, é, 日本語テスト. ' +
+        'Die Änderungen wurden erfolgreich implementiert. '.repeat(3);
+      vi.mocked(secureFs.readFile).mockResolvedValue(unicodeOutput);
+
+      const svc = createServiceWithMocks();
+      await svc.executeFeature('/test/project', 'feature-1');
+
+      // Should still detect tool markers and sufficient length
+      expect(mockUpdateFeatureStatusFn).toHaveBeenCalledWith(
+        '/test/project',
+        'feature-1',
+        'verified'
+      );
+    });
+
+    it('treats output with only newlines and spaces around tool marker as insufficient', async () => {
+      // Has tool marker but surrounded by whitespace, total trimmed < 200
+      const sparseOutput = '\n\n  🔧 Tool: Read  \n\n';
+      expect(sparseOutput.trim().length).toBeLessThan(200);
+
+      vi.mocked(secureFs.readFile).mockResolvedValue(sparseOutput);
+
+      const svc = createServiceWithMocks();
+      await svc.executeFeature('/test/project', 'feature-1');
+
+      expect(mockUpdateFeatureStatusFn).toHaveBeenCalledWith(
+        '/test/project',
+        'feature-1',
+        'waiting_approval'
+      );
+    });
+
+    it('detects tool marker substring correctly (partial match like "🔧 Tools:" does not count)', async () => {
+      // Output with a similar but not exact marker - "🔧 Tools:" instead of "🔧 Tool:"
+      const wrongMarker = '🔧 Tools: Read\n🔧 Tools: Edit\n' + 'Implementation done. '.repeat(20);
+      expect(wrongMarker.includes('🔧 Tool:')).toBe(false);
+
+      vi.mocked(secureFs.readFile).mockResolvedValue(wrongMarker);
+
+      const svc = createServiceWithMocks();
+      await svc.executeFeature('/test/project', 'feature-1');
+
+      // "🔧 Tools:" is not the same as "🔧 Tool:" - should be waiting_approval
+      expect(mockUpdateFeatureStatusFn).toHaveBeenCalledWith(
+        '/test/project',
+        'feature-1',
+        'waiting_approval'
+      );
+    });
+
+    it('pipeline merge_conflict status short-circuits before output validation', async () => {
+      // Set up pipeline that results in merge_conflict
+      vi.mocked(pipelineService.getPipelineConfig).mockResolvedValue({
+        version: 1,
+        steps: [{ id: 'step-1', name: 'Step 1', order: 1, instructions: 'Do step 1' }] as any,
+      });
+
+      // After pipeline, loadFeature returns merge_conflict status
+      let loadCallCount = 0;
+      mockLoadFeatureFn = vi.fn().mockImplementation(() => {
+        loadCallCount++;
+        if (loadCallCount === 1) return testFeature; // initial load
+        // All subsequent loads (task check + pipeline refresh) return merge_conflict
+        return { ...testFeature, status: 'merge_conflict' };
+      });
+
+      const svc = createServiceWithMocks();
+      await svc.executeFeature('/test/project', 'feature-1');
+
+      // Should NOT have called updateFeatureStatusFn with 'verified' or 'waiting_approval'
+      // because pipeline merge_conflict short-circuits the method
+      const statusCalls = vi
+        .mocked(mockUpdateFeatureStatusFn)
+        .mock.calls.filter((call) => call[2] === 'verified' || call[2] === 'waiting_approval');
+      // The only non-in_progress status call should be absent since merge_conflict returns early
+      expect(statusCalls.length).toBe(0);
     });
   });
 });

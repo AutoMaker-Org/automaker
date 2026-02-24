@@ -60,6 +60,12 @@ import type {
 
 const logger = createLogger('ExecutionService');
 
+/** Marker written by agent-executor for each tool invocation. */
+const TOOL_USE_MARKER = '🔧 Tool:';
+
+/** Minimum trimmed output length to consider agent work meaningful. */
+const MIN_MEANINGFUL_OUTPUT_LENGTH = 200;
+
 export class ExecutionService {
   constructor(
     private eventBus: TypedEventBus,
@@ -409,7 +415,41 @@ Please continue from where you left off and complete all remaining tasks. Use th
         }
       }
 
-      const finalStatus = feature.skipTests ? 'waiting_approval' : 'verified';
+      // Read agent output before determining final status.
+      // CLI-based providers (Cursor, Codex, etc.) may exit quickly without doing
+      // meaningful work. Check output to avoid prematurely marking as 'verified'.
+      const outputPath = path.join(getFeatureDir(projectPath, featureId), 'agent-output.md');
+      let agentOutput = '';
+      try {
+        agentOutput = (await secureFs.readFile(outputPath, 'utf-8')) as string;
+      } catch {
+        /* */
+      }
+
+      // Determine if the agent did meaningful work by checking for tool usage
+      // indicators in the output. The agent executor writes "🔧 Tool:" markers
+      // each time a tool is invoked. No tool usage suggests the CLI exited
+      // without performing implementation work.
+      const hasToolUsage = agentOutput.includes(TOOL_USE_MARKER);
+      const isOutputTooShort = agentOutput.trim().length < MIN_MEANINGFUL_OUTPUT_LENGTH;
+      const agentDidWork = hasToolUsage && !isOutputTooShort;
+
+      let finalStatus: 'verified' | 'waiting_approval';
+      if (feature.skipTests) {
+        finalStatus = 'waiting_approval';
+      } else if (!agentDidWork) {
+        // Agent didn't produce meaningful output (e.g., CLI exited quickly).
+        // Route to waiting_approval so the user can review and re-run.
+        finalStatus = 'waiting_approval';
+        logger.warn(
+          `[executeFeature] Feature ${featureId}: agent produced insufficient output ` +
+            `(${agentOutput.trim().length}/${MIN_MEANINGFUL_OUTPUT_LENGTH} chars, toolUsage=${hasToolUsage}). ` +
+            `Setting status to waiting_approval instead of verified.`
+        );
+      } else {
+        finalStatus = 'verified';
+      }
+
       await this.updateFeatureStatusFn(projectPath, featureId, finalStatus);
       this.recordSuccessFn();
 
@@ -421,13 +461,6 @@ Please continue from where you left off and complete all remaining tasks. Use th
       const hasIncompleteTasks = totalTasks > 0 && completedTasks < totalTasks;
 
       try {
-        const outputPath = path.join(getFeatureDir(projectPath, featureId), 'agent-output.md');
-        let agentOutput = '';
-        try {
-          agentOutput = (await secureFs.readFile(outputPath, 'utf-8')) as string;
-        } catch {
-          /* */
-        }
         if (agentOutput) {
           const summary = extractSummary(agentOutput);
           if (summary) await this.saveFeatureSummaryFn(projectPath, featureId, summary);

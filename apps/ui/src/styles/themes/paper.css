@@ -33,11 +33,11 @@
   --input: oklch(0.98 0 0);
   --ring: oklch(0.3 0 0);
 
-  --chart-1: oklch(0.3 0 0);
-  --chart-2: oklch(0.5 0 0);
-  --chart-3: oklch(0.4 0 0);
-  --chart-4: oklch(0.6 0 0);
-  --chart-5: oklch(0.35 0 0);
+  --chart-1: oklch(0.5 0.14 25); /* Warm red - strings, regex */
+  --chart-2: oklch(0.5 0.13 250); /* Blue - properties, variables */
+  --chart-3: oklch(0.55 0.13 145); /* Green - numbers */
+  --chart-4: oklch(0.45 0.14 300); /* Purple - keywords, booleans, tags */
+  --chart-5: oklch(0.5 0.12 180); /* Teal - types, classes */
 
   --sidebar: oklch(0.98 0 0);
   --sidebar-foreground: oklch(0.15 0 0);
