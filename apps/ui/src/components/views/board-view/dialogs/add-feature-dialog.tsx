@@ -26,6 +26,8 @@ import { useNavigate } from '@tanstack/react-router';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { modelSupportsThinking } from '@/lib/utils';
+import { useAppStore } from '@/store/app-store';
+import type { ThinkingLevel, PlanningMode, Feature, FeatureImage } from '@/store/types';
 import type { ReasoningEffort, PhaseModelEntry, AgentModel } from '@automaker/types';
 import {
   supportsReasoningEffort,

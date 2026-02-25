@@ -109,7 +109,7 @@ services:
     environment:
       - NODE_ENV=development
       - VITE_SERVER_URL=http://localhost:3008
-      - TEST_PORT=3007
+      - TEST_PORT=3107
       - VITE_SKIP_ELECTRON=true
       - VITE_APP_MODE=3
       - HUSKY=0

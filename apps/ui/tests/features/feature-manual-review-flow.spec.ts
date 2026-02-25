@@ -21,6 +21,7 @@ import {
   getKanbanColumn,
   authenticateForTests,
   handleLoginScreenIfPresent,
+  API_BASE_URL,
 } from '../utils';
 
 const TEST_TEMP_DIR = createTempDirPath('manual-review-test');
@@ -155,7 +156,6 @@ test.describe('Feature Manual Review Flow', () => {
       priority: 2,
     };
 
-    const API_BASE_URL = process.env.SERVER_URL || 'http://localhost:3008';
     const createResponse = await page.request.post(`${API_BASE_URL}/api/features/create`, {
       data: { projectPath, feature },
       headers: { 'Content-Type': 'application/json' },

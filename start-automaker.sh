@@ -57,6 +57,8 @@ DEFAULT_SERVER_PORT=${AUTOMAKER_SERVER_PORT:-3008}
 PORT_SEARCH_MAX_ATTEMPTS=100
 WEB_PORT=$DEFAULT_WEB_PORT
 SERVER_PORT=$DEFAULT_SERVER_PORT
+TEST_WEB_PORT=${TEST_PORT:-3107}
+TEST_SERVER_PORT=${TEST_SERVER_PORT:-3108}
 
 # Port validation function
 # Returns 0 if valid, 1 if invalid (with error message printed)
@@ -1184,7 +1186,8 @@ case $MODE in
         if [ -f .env ]; then
             export $(grep -v '^#' .env | xargs)
         fi
-        export TEST_PORT="$WEB_PORT"
+        export TEST_PORT="$TEST_WEB_PORT"
+        export TEST_SERVER_PORT="$TEST_SERVER_PORT"
         export VITE_SERVER_URL="http://${APP_HOST}:$SERVER_PORT"
         export PORT="$SERVER_PORT"
         export DATA_DIR="$SCRIPT_DIR/data"
@@ -1275,7 +1278,8 @@ case $MODE in
         ;;
     electron)
         # Set environment variables for Electron (it starts its own server)
-        export TEST_PORT="$WEB_PORT"
+        export TEST_PORT="$TEST_WEB_PORT"
+        export TEST_SERVER_PORT="$TEST_SERVER_PORT"
         export PORT="$SERVER_PORT"
         export VITE_SERVER_URL="http://localhost:$SERVER_PORT"
         export CORS_ORIGIN="http://localhost:$WEB_PORT,http://127.0.0.1:$WEB_PORT"

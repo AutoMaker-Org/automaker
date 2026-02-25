@@ -70,6 +70,10 @@ export default defineConfig({
             timeout: 120000,
             env: {
               ...process.env,
+              // Must set AUTOMAKER_WEB_PORT to match the port Playwright waits for
+              AUTOMAKER_WEB_PORT: String(port),
+              // Must set AUTOMAKER_SERVER_PORT so Vite proxy forwards to the correct backend port
+              AUTOMAKER_SERVER_PORT: String(serverPort),
               VITE_SKIP_SETUP: 'true',
               // Always skip electron plugin during tests - prevents duplicate server spawning
               VITE_SKIP_ELECTRON: 'true',

@@ -46,7 +46,8 @@ jobs:
           echo "SERVER_PID=$SERVER_PID" >> $GITHUB_ENV
 
         env:
-          PORT: 3008
+          PORT: 3108
+          TEST_SERVER_PORT: 3108
           NODE_ENV: test
           # Use a deterministic API key so Playwright can log in reliably
           AUTOMAKER_API_KEY: test-api-key-for-e2e-tests
@@ -81,13 +82,13 @@ jobs:
 
           # Wait for health endpoint
           for i in {1..60}; do
-            if curl -s -f http://localhost:3008/api/health > /dev/null 2>&1; then
+            if curl -s -f http://localhost:3108/api/health > /dev/null 2>&1; then
               echo "Backend server is ready!"
               echo "=== Backend logs ==="
               cat backend.log
               echo ""
               echo "Health check response:"
-              curl -s http://localhost:3008/api/health | jq . 2>/dev/null || echo "Health check: $(curl -s http://localhost:3008/api/health 2>/dev/null || echo 'No response')"
+              curl -s http://localhost:3108/api/health | jq . 2>/dev/null || echo "Health check: $(curl -s http://localhost:3108/api/health 2>/dev/null || echo 'No response')"
               exit 0
             fi
             
@@ -111,11 +112,11 @@ jobs:
           ps aux | grep -E "(node|tsx)" | grep -v grep || echo "No node processes found"
           echo ""
           echo "=== Port status ==="
-          netstat -tlnp 2>/dev/null | grep :3008 || echo "Port 3008 not listening"
-          lsof -i :3008 2>/dev/null || echo "lsof not available or port not in use"
+          netstat -tlnp 2>/dev/null | grep :3108 || echo "Port 3108 not listening"
+          lsof -i :3108 2>/dev/null || echo "lsof not available or port not in use"
           echo ""
           echo "=== Health endpoint test ==="
-          curl -v http://localhost:3008/api/health 2>&1 || echo "Health endpoint failed"
+          curl -v http://localhost:3`08/api/health 2>&1 || echo "Health endpoint failed"
 
           # Kill the server process if it's still hanging
           if kill -0 $SERVER_PID 2>/dev/null; then
@@ -132,8 +133,8 @@ jobs:
         run: npm run test --workspace=apps/ui
         env:
           CI: true
-          VITE_SERVER_URL: http://localhost:3008
-          SERVER_URL: http://localhost:3008
+          VITE_SERVER_URL: http://localhost:3108
+          SERVER_URL: http://localhost:3108
           VITE_SKIP_SETUP: 'true'
           # Keep UI-side login/defaults consistent
           AUTOMAKER_API_KEY: test-api-key-for-e2e-tests
@@ -148,7 +149,7 @@ jobs:
           ps aux | grep -E "(node|tsx)" | grep -v grep || echo "No node processes found"
           echo ""
           echo "=== Port status ==="
-          netstat -tlnp 2>/dev/null | grep :3008 || echo "Port 3008 not listening"
+          netstat -tlnp 2>/dev/null | grep :3108 || echo "Port 3108 not listening"
 
       - name: Upload Playwright report
         uses: actions/upload-artifact@v4

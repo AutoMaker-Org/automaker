@@ -22,6 +22,7 @@ import {
   getKanbanColumn,
   authenticateForTests,
   handleLoginScreenIfPresent,
+  API_BASE_URL,
 } from '../utils';
 
 const TEST_TEMP_DIR = createTempDirPath('running-task-display-test');
@@ -141,8 +142,6 @@ test.describe('Running Task Card Display', () => {
       branchName: '',
       priority: 2,
     };
-
-    const API_BASE_URL = process.env.SERVER_URL || 'http://localhost:3008';
 
     // Create both features via HTTP API
     const createInProgress = await page.request.post(`${API_BASE_URL}/api/features/create`, {
