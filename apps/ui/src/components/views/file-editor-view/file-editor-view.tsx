@@ -489,18 +489,35 @@ export function FileEditorView({ initialPath }: FileEditorViewProps) {
 
   // ─── Handle Save ─────────────────────────────────────────────
   const handleSave = useCallback(async () => {
-    if (!activeTab || !activeTab.isDirty) return;
+    // Get fresh state from the store to avoid stale closure issues
+    const { tabs: currentTabs, activeTabId: currentActiveTabId, updateTabContent } =
+      useFileEditorStore.getState();
+
+    if (!currentActiveTabId) return;
+
+    const tab = currentTabs.find((t) => t.id === currentActiveTabId);
+    if (!tab || !tab.isDirty) return;
+
+    // Get the current editor content directly from CodeMirror to ensure
+    // we save the latest content even if onChange hasn't fired yet
+    const editorContent = editorRef.current?.getValue();
+    const contentToSave = editorContent ?? tab.content;
+
+    // Sync the editor content to the store before saving
+    if (editorContent != null && editorContent !== tab.content) {
+      updateTabContent(tab.id, editorContent);
+    }
 
     try {
       const api = getElectronAPI();
-      const result = await api.writeFile(activeTab.filePath, activeTab.content);
+      const result = await api.writeFile(tab.filePath, contentToSave);
 
       if (result.success) {
-        markTabSaved(activeTab.id, activeTab.content);
+        markTabSaved(tab.id, contentToSave);
         // Refresh git status and inline diff after save
         loadGitStatus();
         if (showInlineDiff) {
-          loadFileDiff(activeTab.filePath);
+          loadFileDiff(tab.filePath);
         }
       } else {
         logger.error('Failed to save file:', result.error);
@@ -508,7 +525,7 @@ export function FileEditorView({ initialPath }: FileEditorViewProps) {
     } catch (error) {
       logger.error('Failed to save file:', error);
     }
-  }, [activeTab, markTabSaved, loadGitStatus, showInlineDiff, loadFileDiff]);
+  }, [markTabSaved, loadGitStatus, showInlineDiff, loadFileDiff]);
 
   // ─── Auto Save: save a specific tab by ID ───────────────────
   const saveTabById = useCallback(
@@ -710,6 +727,7 @@ export function FileEditorView({ initialPath }: FileEditorViewProps) {
             model: resolveModelString(featureData.model),
             thinkingLevel: featureData.thinkingLevel,
             reasoningEffort: featureData.reasoningEffort,
+            providerId: featureData.providerId,
             skipTests: featureData.skipTests,
             branchName: featureData.workMode === 'current' ? currentBranch : featureData.branchName,
             planningMode: featureData.planningMode,

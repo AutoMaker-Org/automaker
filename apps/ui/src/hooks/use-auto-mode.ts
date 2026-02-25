@@ -11,6 +11,10 @@ import { getGlobalEventsRecent } from '@/hooks/use-event-recency';
 const logger = createLogger('AutoMode');
 
 const AUTO_MODE_SESSION_KEY = 'automaker:autoModeRunningByWorktreeKey';
+// Session key delimiter for parsing stored worktree keys
+const SESSION_KEY_DELIMITER = '::';
+// Marker for main worktree in session storage keys
+const MAIN_WORKTREE_MARKER = '__main__';
 
 function arraysEqual(a: string[], b: string[]): boolean {
   if (a.length !== b.length) return false;
@@ -25,7 +29,7 @@ const AUTO_MODE_POLLING_INTERVAL = 30000;
  * @param branchName - The branch name, or null for main worktree
  */
 function getWorktreeSessionKey(projectPath: string, branchName: string | null): string {
-  return `${projectPath}::${branchName ?? '__main__'}`;
+  return `${projectPath}${SESSION_KEY_DELIMITER}${branchName ?? MAIN_WORKTREE_MARKER}`;
 }
 
 function readAutoModeSession(): Record<string, boolean> {
@@ -271,6 +275,63 @@ export function useAutoMode(worktree?: WorktreeInfo) {
       }
     } catch (error) {
       logger.error('Error syncing auto mode state with backend:', error);
+    }
+  }, [currentProject, setAutoModeRunning]);
+
+  // Restore auto mode state from session storage on mount.
+  // This ensures that auto mode indicators show up immediately on page load,
+  // before the refreshStatus API call completes. The session storage is
+  // populated whenever auto mode starts/stops, so it provides a reliable
+  // initial state that will be verified/corrected by refreshStatus.
+  useEffect(() => {
+    if (!currentProject) return;
+
+    try {
+      const sessionData = readAutoModeSession();
+      const projectPath = currentProject.path;
+
+      // Track restored worktrees to avoid redundant state updates
+      const restoredKeys = new Set<string>();
+
+      // Find all session storage keys that match this project
+      Object.entries(sessionData).forEach(([sessionKey, isRunning]) => {
+        if (!isRunning) return;
+
+        // Parse the session key: "projectPath::branchName" or "projectPath::__main__"
+        const parts = sessionKey.split(SESSION_KEY_DELIMITER, 2);
+        if (parts.length !== 2) {
+          // Malformed session key - skip it
+          logger.warn(`Malformed session storage key: ${sessionKey}`);
+          return;
+        }
+
+        const [keyProjectPath, keyBranchName] = parts;
+        if (keyProjectPath !== projectPath) return;
+
+        // Validate branch name: __main__ means null (main worktree)
+        if (keyBranchName !== MAIN_WORKTREE_MARKER && !keyBranchName) {
+          logger.warn(`Invalid branch name in session key: ${sessionKey}`);
+          return;
+        }
+
+        const branchName = keyBranchName === MAIN_WORKTREE_MARKER ? null : keyBranchName;
+
+        // Skip if we've already restored this worktree (prevents duplicates)
+        const worktreeKey = getWorktreeSessionKey(projectPath, branchName);
+        if (restoredKeys.has(worktreeKey)) {
+          return;
+        }
+        restoredKeys.add(worktreeKey);
+
+        // Restore the auto mode running state in the store
+        setAutoModeRunning(currentProject.id, branchName, true);
+      });
+
+      if (restoredKeys.size > 0) {
+        logger.debug(`Restored auto mode state for ${restoredKeys.size} worktree(s) from session storage`);
+      }
+    } catch (error) {
+      logger.error('Error restoring auto mode state from session storage:', error);
     }
   }, [currentProject, setAutoModeRunning]);
 

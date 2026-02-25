@@ -46,6 +46,7 @@ export type EventType =
   | 'worktree:init-started'
   | 'worktree:init-output'
   | 'worktree:init-completed'
+  | 'dev-server:starting'
   | 'dev-server:started'
   | 'dev-server:output'
   | 'dev-server:url-detected'

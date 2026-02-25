@@ -458,6 +458,21 @@ describe('execution-service.ts', () => {
       expect(callArgs[6]).toBe('claude-sonnet-4');
     });
 
+    it('passes providerId to runAgentFn when present on feature', async () => {
+      const featureWithProvider: Feature = {
+        ...testFeature,
+        providerId: 'zai-provider-1',
+      };
+      vi.mocked(mockLoadFeatureFn).mockResolvedValue(featureWithProvider);
+
+      await service.executeFeature('/test/project', 'feature-1');
+
+      expect(mockRunAgentFn).toHaveBeenCalled();
+      const callArgs = mockRunAgentFn.mock.calls[0];
+      const options = callArgs[7];
+      expect(options.providerId).toBe('zai-provider-1');
+    });
+
     it('executes pipeline after agent completes', async () => {
       const pipelineSteps = [{ id: 'step-1', name: 'Step 1', order: 1, instructions: 'Do step 1' }];
       vi.mocked(pipelineService.getPipelineConfig).mockResolvedValue({

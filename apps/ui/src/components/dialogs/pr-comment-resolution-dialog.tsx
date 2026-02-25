@@ -37,7 +37,13 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
 import { Markdown } from '@/components/ui/markdown';
-import { cn, modelSupportsThinking, generateUUID } from '@/lib/utils';
+import {
+  cn,
+  modelSupportsThinking,
+  generateUUID,
+  migrateModelId,
+  normalizeModelEntry,
+} from '@/lib/utils';
 import { useAppStore } from '@/store/app-store';
 import { useGitHubPRReviewComments } from '@/hooks/queries';
 import { useCreateFeature, useResolveReviewThread } from '@/hooks/mutations';
@@ -45,7 +51,7 @@ import { toast } from 'sonner';
 import type { PRReviewComment } from '@/lib/electron';
 import type { Feature } from '@/store/app-store';
 import type { PhaseModelEntry } from '@automaker/types';
-import { supportsReasoningEffort, normalizeThinkingLevelForModel } from '@automaker/types';
+import { supportsReasoningEffort } from '@automaker/types';
 import { resolveModelString } from '@automaker/model-resolver';
 import { PhaseModelSelector } from '@/components/views/settings-view/model-defaults';
 
@@ -730,14 +736,9 @@ export function PRCommentResolutionDialog({
 
     const selectedComments = comments.filter((c) => selectedIds.has(c.id));
 
-    // Resolve model settings from the current model entry
-    const selectedModel = resolveModelString(modelEntry.model);
-    const normalizedThinking = modelSupportsThinking(selectedModel)
-      ? modelEntry.thinkingLevel || 'none'
-      : 'none';
-    const normalizedReasoning = supportsReasoningEffort(selectedModel)
-      ? modelEntry.reasoningEffort || 'none'
-      : 'none';
+    // Resolve and normalize model settings
+    const normalizedEntry = normalizeModelEntry(modelEntry);
+    const selectedModel = resolveModelString(normalizedEntry.model);
 
     setIsCreating(true);
     setCreationErrors([]);
@@ -753,8 +754,9 @@ export function PRCommentResolutionDialog({
           steps: [],
           status: 'backlog',
           model: selectedModel,
-          thinkingLevel: normalizedThinking,
-          reasoningEffort: normalizedReasoning,
+          thinkingLevel: normalizedEntry.thinkingLevel,
+          reasoningEffort: normalizedEntry.reasoningEffort,
+          providerId: normalizedEntry.providerId,
           // Associate feature with the PR's branch so it appears on the correct worktree
           ...(pr.headRefName ? { branchName: pr.headRefName } : {}),
         };
@@ -779,8 +781,9 @@ export function PRCommentResolutionDialog({
               steps: [],
               status: 'backlog',
               model: selectedModel,
-              thinkingLevel: normalizedThinking,
-              reasoningEffort: normalizedReasoning,
+              thinkingLevel: normalizedEntry.thinkingLevel,
+              reasoningEffort: normalizedEntry.reasoningEffort,
+              providerId: normalizedEntry.providerId,
               // Associate feature with the PR's branch so it appears on the correct worktree
               ...(pr.headRefName ? { branchName: pr.headRefName } : {}),
             };

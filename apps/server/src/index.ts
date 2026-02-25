@@ -349,7 +349,9 @@ const ideationService = new IdeationService(events, settingsService, featureLoad
 
 // Initialize DevServerService with event emitter for real-time log streaming
 const devServerService = getDevServerService();
-devServerService.setEventEmitter(events);
+devServerService.initialize(DATA_DIR, events).catch((err) => {
+  logger.error('Failed to initialize DevServerService:', err);
+});
 
 // Initialize Notification Service with event emitter for real-time updates
 const notificationService = getNotificationService();

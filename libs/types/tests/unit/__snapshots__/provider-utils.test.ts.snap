@@ -1,0 +1,19 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`provider-utils.ts > validateBareModelId > with expectedProvider parameter > should reject non-matching provider prefixes even with expectedProvider set 1`] = `[Error: [CursorProvider] Model ID should not contain provider prefix 'codex-'. Got: 'codex-gpt-4'. This is likely a bug in ProviderFactory - it should strip the 'codex' prefix before passing the model to the provider.]`;
+
+exports[`provider-utils.ts > validateBareModelId > with expectedProvider parameter > should reject non-matching provider prefixes even with expectedProvider set 2`] = `[Error: [GeminiProvider] Model ID should not contain provider prefix 'cursor-'. Got: 'cursor-gpt-4'. This is likely a bug in ProviderFactory - it should strip the 'cursor' prefix before passing the model to the provider.]`;
+
+exports[`provider-utils.ts > validateBareModelId > without expectedProvider parameter > should reject model IDs with codex- prefix 1`] = `[Error: [TestProvider] Model ID should not contain provider prefix 'codex-'. Got: 'codex-gpt-4'. This is likely a bug in ProviderFactory - it should strip the 'codex' prefix before passing the model to the provider.]`;
+
+exports[`provider-utils.ts > validateBareModelId > without expectedProvider parameter > should reject model IDs with copilot- prefix 1`] = `[Error: [TestProvider] Model ID should not contain provider prefix 'copilot-'. Got: 'copilot-gpt-4'. This is likely a bug in ProviderFactory - it should strip the 'copilot' prefix before passing the model to the provider.]`;
+
+exports[`provider-utils.ts > validateBareModelId > without expectedProvider parameter > should reject model IDs with cursor- prefix 1`] = `[Error: [TestProvider] Model ID should not contain provider prefix 'cursor-'. Got: 'cursor-gpt-4'. This is likely a bug in ProviderFactory - it should strip the 'cursor' prefix before passing the model to the provider.]`;
+
+exports[`provider-utils.ts > validateBareModelId > without expectedProvider parameter > should reject model IDs with cursor- prefix 2`] = `[Error: [TestProvider] Model ID should not contain provider prefix 'cursor-'. Got: 'cursor-composer-1'. This is likely a bug in ProviderFactory - it should strip the 'cursor' prefix before passing the model to the provider.]`;
+
+exports[`provider-utils.ts > validateBareModelId > without expectedProvider parameter > should reject model IDs with gemini- prefix 1`] = `[Error: [TestProvider] Model ID should not contain provider prefix 'gemini-'. Got: 'gemini-2.5-flash'. This is likely a bug in ProviderFactory - it should strip the 'gemini' prefix before passing the model to the provider.]`;
+
+exports[`provider-utils.ts > validateBareModelId > without expectedProvider parameter > should reject model IDs with gemini- prefix 2`] = `[Error: [TestProvider] Model ID should not contain provider prefix 'gemini-'. Got: 'gemini-2.5-pro'. This is likely a bug in ProviderFactory - it should strip the 'gemini' prefix before passing the model to the provider.]`;
+
+exports[`provider-utils.ts > validateBareModelId > without expectedProvider parameter > should reject model IDs with opencode- prefix 1`] = `[Error: [TestProvider] Model ID should not contain provider prefix 'opencode-'. Got: 'opencode-gpt-4'. This is likely a bug in ProviderFactory - it should strip the 'opencode' prefix before passing the model to the provider.]`;

@@ -565,6 +565,7 @@ type EventType =
   | 'worktree:init-started'
   | 'worktree:init-output'
   | 'worktree:init-completed'
+  | 'dev-server:starting'
   | 'dev-server:started'
   | 'dev-server:output'
   | 'dev-server:stopped'
@@ -583,6 +584,11 @@ interface DevServerUrlEvent {
   worktreePath: string;
   url: string;
   port: number;
+  timestamp: string;
+}
+
+export interface DevServerStartingEvent {
+  worktreePath: string;
   timestamp: string;
 }
 
@@ -605,6 +611,7 @@ export interface DevServerStoppedEvent {
 export type DevServerUrlDetectedEvent = DevServerUrlEvent;
 
 export type DevServerLogEvent =
+  | { type: 'dev-server:starting'; payload: DevServerStartingEvent }
   | { type: 'dev-server:started'; payload: DevServerStartedEvent }
   | { type: 'dev-server:output'; payload: DevServerOutputEvent }
   | { type: 'dev-server:stopped'; payload: DevServerStoppedEvent }
@@ -2294,6 +2301,9 @@ export class HttpApiClient implements ElectronAPI {
     getDevServerLogs: (worktreePath: string): Promise<DevServerLogsResponse> =>
       this.get(`/api/worktree/dev-server-logs?worktreePath=${encodeURIComponent(worktreePath)}`),
     onDevServerLogEvent: (callback: (event: DevServerLogEvent) => void) => {
+      const unsub0 = this.subscribeToEvent('dev-server:starting', (payload) =>
+        callback({ type: 'dev-server:starting', payload: payload as DevServerStartingEvent })
+      );
       const unsub1 = this.subscribeToEvent('dev-server:started', (payload) =>
         callback({ type: 'dev-server:started', payload: payload as DevServerStartedEvent })
       );
@@ -2307,6 +2317,7 @@ export class HttpApiClient implements ElectronAPI {
         callback({ type: 'dev-server:url-detected', payload: payload as DevServerUrlDetectedEvent })
       );
       return () => {
+        unsub0();
         unsub1();
         unsub2();
         unsub3();

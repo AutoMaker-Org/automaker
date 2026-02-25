@@ -34,7 +34,8 @@ interface WorktreeTabProps {
   isSwitching: boolean;
   isPulling: boolean;
   isPushing: boolean;
-  isStartingDevServer: boolean;
+  isStartingAnyDevServer: boolean;
+  isDevServerStarting: boolean;
   aheadCount: number;
   behindCount: number;
   hasRemoteBranch: boolean;
@@ -146,7 +147,8 @@ export function WorktreeTab({
   isSwitching,
   isPulling,
   isPushing,
-  isStartingDevServer,
+  isStartingAnyDevServer,
+  isDevServerStarting,
   aheadCount,
   behindCount,
   hasRemoteBranch,
@@ -531,7 +533,8 @@ export function WorktreeTab({
         trackingRemote={trackingRemote}
         isPulling={isPulling}
         isPushing={isPushing}
-        isStartingDevServer={isStartingDevServer}
+        isStartingDevServer={isStartingAnyDevServer}
+        isDevServerStarting={isDevServerStarting}
         isDevServerRunning={isDevServerRunning}
         devServerInfo={devServerInfo}
         gitRepoStatus={gitRepoStatus}
