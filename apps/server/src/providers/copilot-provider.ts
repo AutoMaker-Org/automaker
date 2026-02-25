@@ -76,13 +76,18 @@ interface SdkToolExecutionStartEvent extends SdkEvent {
   };
 }
 
-interface SdkToolExecutionEndEvent extends SdkEvent {
-  type: 'tool.execution_end';
+interface SdkToolExecutionCompleteEvent extends SdkEvent {
+  type: 'tool.execution_complete';
   data: {
-    toolName: string;
     toolCallId: string;
-    result?: string;
-    error?: string;
+    success: boolean;
+    result?: {
+      content: string;
+    };
+    error?: {
+      message: string;
+      code?: string;
+    };
   };
 }
 
@@ -357,12 +362,12 @@ export class CopilotProvider extends CliProvider {
         };
       }
 
-      case 'tool.execution_end': {
-        const toolResultEvent = sdkEvent as SdkToolExecutionEndEvent;
+      case 'tool.execution_complete': {
+        const toolResultEvent = sdkEvent as SdkToolExecutionCompleteEvent;
         const isError = !!toolResultEvent.data.error;
         const content = isError
-          ? `[ERROR] ${toolResultEvent.data.error}`
-          : toolResultEvent.data.result || '';
+          ? `[ERROR] ${toolResultEvent.data.error.message}`
+          : toolResultEvent.data.result?.content || '';
 
         return {
           type: 'assistant',
@@ -628,7 +633,7 @@ export class CopilotProvider extends CliProvider {
           sessionComplete = true;
           pushEvent(event);
         } else {
-          // Push all other events (tool.execution_start, tool.execution_end, assistant.message, etc.)
+          // Push all other events (tool.execution_start, tool.execution_complete, assistant.message, etc.)
           pushEvent(event);
         }
       });
