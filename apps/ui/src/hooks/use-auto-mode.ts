@@ -288,12 +288,49 @@ export function useAutoMode(worktree?: WorktreeInfo) {
 
     try {
       const sessionData = readAutoModeSession();
-      const currentBranchName = branchNameRef.current;
-      const currentKey = getWorktreeSessionKey(currentProject.path, currentBranchName);
+      const projectPath = currentProject.path;
 
-      if (sessionData[currentKey] === true) {
-        setAutoModeRunning(currentProject.id, currentBranchName, true);
-        logger.debug(`Restored auto mode state from session storage for key: ${currentKey}`);
+      // Track restored worktrees to avoid redundant state updates
+      const restoredKeys = new Set<string>();
+
+      // Find all session storage keys that match this project
+      Object.entries(sessionData).forEach(([sessionKey, isRunning]) => {
+        if (!isRunning) return;
+
+        // Parse the session key: "projectPath::branchName" or "projectPath::__main__"
+        const parts = sessionKey.split(SESSION_KEY_DELIMITER, 2);
+        if (parts.length !== 2) {
+          // Malformed session key - skip it
+          logger.warn(`Malformed session storage key: ${sessionKey}`);
+          return;
+        }
+
+        const [keyProjectPath, keyBranchName] = parts;
+        if (keyProjectPath !== projectPath) return;
+
+        // Validate branch name: __main__ means null (main worktree)
+        if (keyBranchName !== MAIN_WORKTREE_MARKER && !keyBranchName) {
+          logger.warn(`Invalid branch name in session key: ${sessionKey}`);
+          return;
+        }
+
+        const branchName = keyBranchName === MAIN_WORKTREE_MARKER ? null : keyBranchName;
+
+        // Skip if we've already restored this worktree (prevents duplicates)
+        const worktreeKey = getWorktreeSessionKey(projectPath, branchName);
+        if (restoredKeys.has(worktreeKey)) {
+          return;
+        }
+        restoredKeys.add(worktreeKey);
+
+        // Restore the auto mode running state in the store
+        setAutoModeRunning(currentProject.id, branchName, true);
+      });
+
+      if (restoredKeys.size > 0) {
+        logger.debug(
+          `Restored auto mode state for ${restoredKeys.size} worktree(s) from session storage`
+        );
       }
     } catch (error) {
       logger.error('Error restoring auto mode state from session storage:', error);
