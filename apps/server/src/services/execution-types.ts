@@ -34,6 +34,7 @@ export type RunAgentFn = (
     useClaudeCodeSystemPrompt?: boolean;
     thinkingLevel?: ThinkingLevel;
     reasoningEffort?: ReasoningEffort;
+    providerId?: string;
     branchName?: string | null;
   }
 ) => Promise<void>;

@@ -133,6 +133,7 @@ export class PipelineOrchestrator {
           useClaudeCodeSystemPrompt,
           thinkingLevel: feature.thinkingLevel,
           reasoningEffort: feature.reasoningEffort,
+          providerId: feature.providerId,
         }
       );
       try {
@@ -490,7 +491,9 @@ export class PipelineOrchestrator {
             requirePlanApproval: false,
             useClaudeCodeSystemPrompt: context.useClaudeCodeSystemPrompt,
             autoLoadClaudeMd: context.autoLoadClaudeMd,
+            thinkingLevel: context.feature.thinkingLevel,
             reasoningEffort: context.feature.reasoningEffort,
+            providerId: context.feature.providerId,
           }
         );
       }

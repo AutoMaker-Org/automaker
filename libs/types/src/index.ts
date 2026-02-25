@@ -94,6 +94,7 @@ export {
   CODEX_MODEL_IDS,
   REASONING_CAPABLE_MODELS,
   supportsReasoningEffort,
+  normalizeReasoningEffortForModel,
   getAllCodexModelIds,
   DEFAULT_MODELS,
   type ClaudeCanonicalId,
@@ -285,6 +286,7 @@ export {
   normalizeModelString,
   validateBareModelId,
   supportsStructuredOutput,
+  PROVIDER_PREFIX_EXCEPTIONS,
 } from './provider-utils.js';
 
 // Model migration utilities

@@ -739,9 +739,9 @@ export class CodexProvider extends BaseProvider {
   }
 
   async *executeQuery(options: ExecuteOptions): AsyncGenerator<ProviderMessage> {
-    // Validate that model doesn't have a provider prefix
+    // Validate that model doesn't have a provider prefix (except codex- which should already be stripped)
     // AgentService should strip prefixes before passing to providers
-    validateBareModelId(options.model, 'CodexProvider');
+    validateBareModelId(options.model, 'CodexProvider', 'codex');
 
     try {
       const mcpServers = options.mcpServers ?? {};

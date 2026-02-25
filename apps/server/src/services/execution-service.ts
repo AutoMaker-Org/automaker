@@ -304,6 +304,7 @@ ${feature.spec}
           useClaudeCodeSystemPrompt,
           thinkingLevel: feature.thinkingLevel,
           reasoningEffort: feature.reasoningEffort,
+          providerId: feature.providerId,
           branchName: feature.branchName ?? null,
         }
       );
@@ -370,6 +371,7 @@ Please continue from where you left off and complete all remaining tasks. Use th
             useClaudeCodeSystemPrompt,
             thinkingLevel: feature.thinkingLevel,
             reasoningEffort: feature.reasoningEffort,
+            providerId: feature.providerId,
             branchName: feature.branchName ?? null,
           }
         );

@@ -31,6 +31,8 @@ export interface WorktreeDropdownItemProps {
   cardCount?: number;
   /** Whether the dev server is running for this worktree */
   devServerRunning?: boolean;
+  /** Whether the dev server is starting for this worktree */
+  devServerStarting?: boolean;
   /** Dev server information if running */
   devServerInfo?: DevServerInfo;
   /** Whether auto-mode is running for this worktree */
@@ -64,6 +66,7 @@ export function WorktreeDropdownItem({
   isRunning,
   cardCount,
   devServerRunning,
+  devServerStarting,
   devServerInfo,
   isAutoModeRunning = false,
   isTestRunning = false,
@@ -151,6 +154,16 @@ export function WorktreeDropdownItem({
             title={`Dev server running on port ${devServerInfo?.port}`}
           >
             <Globe className="w-3 h-3" />
+          </span>
+        )}
+
+        {/* Dev server starting indicator */}
+        {devServerStarting && (
+          <span
+            className="inline-flex items-center justify-center h-4 w-4 text-amber-500"
+            title="Dev server starting..."
+          >
+            <Spinner size="xs" variant="current" />
           </span>
         )}
 

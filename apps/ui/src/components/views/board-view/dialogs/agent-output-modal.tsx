@@ -8,14 +8,14 @@ import {
 } from '@/components/ui/dialog';
 import { List, FileText, GitBranch, ClipboardList } from 'lucide-react';
 import { Spinner } from '@/components/ui/spinner';
-import { getElectronAPI } from '@/lib/electron';
 import { LogViewer } from '@/components/ui/log-viewer';
 import { GitDiffPanel } from '@/components/ui/git-diff-panel';
 import { TaskProgressPanel } from '@/components/ui/task-progress-panel';
 import { Markdown } from '@/components/ui/markdown';
 import { useAppStore } from '@/store/app-store';
 import { extractSummary } from '@/lib/log-parser';
-import { useAgentOutput } from '@/hooks/queries';
+import { useAgentOutputWebSocket } from '@/hooks/use-agent-output-websocket';
+import { MODAL_CONSTANTS } from '@/components/views/board-view/dialogs/agent-output-modal.constants';
 import type { AutoModeEvent } from '@/types/electron';
 import type { BacklogPlanEvent } from '@automaker/types';
 
@@ -34,7 +34,7 @@ interface AgentOutputModalProps {
   branchName?: string;
 }
 
-type ViewMode = 'summary' | 'parsed' | 'raw' | 'changes';
+type ViewMode = typeof MODAL_CONSTANTS.VIEW_MODES[keyof typeof MODAL_CONSTANTS.VIEW_MODES];
 
 export function AgentOutputModal({
   open,
@@ -49,32 +49,29 @@ export function AgentOutputModal({
   const isBacklogPlan = featureId.startsWith('backlog-plan:');
 
   // Resolve project path - prefer prop, fallback to window.__currentProject
-  const resolvedProjectPath = projectPathProp || window.__currentProject?.path || '';
+  const resolvedProjectPath = projectPathProp || window.__currentProject?.path || undefined;
 
-  // Track additional content from WebSocket events (appended to query data)
-  const [streamedContent, setStreamedContent] = useState<string>('');
+  // Track view mode state
   const [viewMode, setViewMode] = useState<ViewMode | null>(null);
 
-  // Use React Query for initial output loading
-  const { data: initialOutput = '', isLoading } = useAgentOutput(resolvedProjectPath, featureId, {
-    enabled: open && !!resolvedProjectPath,
+  // Use custom hook for WebSocket event handling and output management
+  const { output, isLoading, streamedContent } = useAgentOutputWebSocket({
+    open,
+    featureId,
+    isBacklogPlan,
+    projectPath: resolvedProjectPath || '',
+    onFeatureComplete: (passes: boolean) => {
+      if (passes) {
+        onClose();
+      }
+    },
   });
-
-  // Reset streamed content when modal opens or featureId changes
-  useEffect(() => {
-    if (open) {
-      setStreamedContent('');
-    }
-  }, [open, featureId]);
-
-  // Combine initial output from query with streamed content from WebSocket
-  const output = initialOutput + streamedContent;
 
   // Extract summary from output
   const summary = useMemo(() => extractSummary(output), [output]);
 
   // Determine the effective view mode - default to summary if available, otherwise parsed
-  const effectiveViewMode = viewMode ?? (summary ? 'summary' : 'parsed');
+  const effectiveViewMode = viewMode ?? (summary ? MODAL_CONSTANTS.VIEW_MODES.SUMMARY : MODAL_CONSTANTS.VIEW_MODES.PARSED);
   const scrollRef = useRef<HTMLDivElement>(null);
   const autoScrollRef = useRef(true);
   const useWorktrees = useAppStore((state) => state.useWorktrees);
@@ -86,217 +83,13 @@ export function AgentOutputModal({
     }
   }, [output]);
 
-  // Listen to auto mode events and update output
-  useEffect(() => {
-    if (!open) return;
-
-    const api = getElectronAPI();
-    if (!api?.autoMode || isBacklogPlan) return;
-
-    console.log('[AgentOutputModal] Subscribing to events for featureId:', featureId);
-
-    const unsubscribe = api.autoMode.onEvent((event) => {
-      console.log(
-        '[AgentOutputModal] Received event:',
-        event.type,
-        'featureId:',
-        'featureId' in event ? event.featureId : 'none',
-        'modalFeatureId:',
-        featureId
-      );
-
-      // Filter events for this specific feature only (skip events without featureId)
-      if ('featureId' in event && event.featureId !== featureId) {
-        console.log('[AgentOutputModal] Skipping event - featureId mismatch');
-        return;
-      }
-
-      let newContent = '';
-
-      switch (event.type) {
-        case 'auto_mode_progress':
-          newContent = event.content || '';
-          break;
-        case 'auto_mode_tool': {
-          const toolName = event.tool || 'Unknown Tool';
-          const toolInput = event.input ? JSON.stringify(event.input, null, 2) : '';
-          newContent = `\n🔧 Tool: ${toolName}\n${toolInput ? `Input: ${toolInput}\n` : ''}`;
-          break;
-        }
-        case 'auto_mode_phase': {
-          const phaseEmoji =
-            event.phase === 'planning' ? '📋' : event.phase === 'action' ? '⚡' : '✅';
-          newContent = `\n${phaseEmoji} ${event.message}\n`;
-          break;
-        }
-        case 'auto_mode_error':
-          newContent = `\n❌ Error: ${event.error}\n`;
-          break;
-        case 'auto_mode_ultrathink_preparation': {
-          // Format thinking level preparation information
-          let prepContent = `\n🧠 Ultrathink Preparation\n`;
-
-          if (event.warnings && event.warnings.length > 0) {
-            prepContent += `\n⚠️ Warnings:\n`;
-            event.warnings.forEach((warning: string) => {
-              prepContent += `  • ${warning}\n`;
-            });
-          }
-
-          if (event.recommendations && event.recommendations.length > 0) {
-            prepContent += `\n💡 Recommendations:\n`;
-            event.recommendations.forEach((rec: string) => {
-              prepContent += `  • ${rec}\n`;
-            });
-          }
-
-          if (event.estimatedCost !== undefined) {
-            prepContent += `\n💰 Estimated Cost: ~$${event.estimatedCost.toFixed(
-              2
-            )} per execution\n`;
-          }
-
-          if (event.estimatedTime) {
-            prepContent += `\n⏱️ Estimated Time: ${event.estimatedTime}\n`;
-          }
-
-          newContent = prepContent;
-          break;
-        }
-        case 'planning_started': {
-          // Show when planning mode begins
-          if ('mode' in event && 'message' in event) {
-            const modeLabel =
-              event.mode === 'lite' ? 'Lite' : event.mode === 'spec' ? 'Spec' : 'Full';
-            newContent = `\n📋 Planning Mode: ${modeLabel}\n${event.message}\n`;
-          }
-          break;
-        }
-        case 'plan_approval_required':
-          // Show when plan requires approval
-          if ('planningMode' in event) {
-            newContent = `\n⏸️ Plan generated - waiting for your approval...\n`;
-          }
-          break;
-        case 'plan_approved':
-          // Show when plan is manually approved
-          if ('hasEdits' in event) {
-            newContent = event.hasEdits
-              ? `\n✅ Plan approved (with edits) - continuing to implementation...\n`
-              : `\n✅ Plan approved - continuing to implementation...\n`;
-          }
-          break;
-        case 'plan_auto_approved':
-          // Show when plan is auto-approved
-          newContent = `\n✅ Plan auto-approved - continuing to implementation...\n`;
-          break;
-        case 'plan_revision_requested': {
-          // Show when user requests plan revision
-          if ('planVersion' in event) {
-            const revisionEvent = event as Extract<
-              AutoModeEvent,
-              { type: 'plan_revision_requested' }
-            >;
-            newContent = `\n🔄 Revising plan based on your feedback (v${revisionEvent.planVersion})...\n`;
-          }
-          break;
-        }
-        case 'auto_mode_task_started': {
-          // Show when a task starts
-          if ('taskId' in event && 'taskDescription' in event) {
-            const taskEvent = event as Extract<AutoModeEvent, { type: 'auto_mode_task_started' }>;
-            newContent = `\n▶ Starting ${taskEvent.taskId}: ${taskEvent.taskDescription}\n`;
-          }
-          break;
-        }
-        case 'auto_mode_task_complete': {
-          // Show task completion progress
-          if ('taskId' in event && 'tasksCompleted' in event && 'tasksTotal' in event) {
-            const taskEvent = event as Extract<AutoModeEvent, { type: 'auto_mode_task_complete' }>;
-            newContent = `\n✓ ${taskEvent.taskId} completed (${taskEvent.tasksCompleted}/${taskEvent.tasksTotal})\n`;
-          }
-          break;
-        }
-        case 'auto_mode_phase_complete': {
-          // Show phase completion for full mode
-          if ('phaseNumber' in event) {
-            const phaseEvent = event as Extract<
-              AutoModeEvent,
-              { type: 'auto_mode_phase_complete' }
-            >;
-            newContent = `\n🏁 Phase ${phaseEvent.phaseNumber} complete\n`;
-          }
-          break;
-        }
-        case 'auto_mode_feature_complete': {
-          const emoji = event.passes ? '✅' : '⚠️';
-          newContent = `\n${emoji} Task completed: ${event.message}\n`;
-
-          // Close the modal when the feature is verified (passes = true)
-          if (event.passes) {
-            // Small delay to show the completion message before closing
-            setTimeout(() => {
-              onClose();
-            }, 1500);
-          }
-          break;
-        }
-      }
-
-      if (newContent) {
-        // Append new content from WebSocket to streamed content
-        setStreamedContent((prev) => prev + newContent);
-      }
-    });
-
-    return () => {
-      unsubscribe();
-    };
-  }, [open, featureId, isBacklogPlan]);
-
-  // Listen to backlog plan events and update output
-  useEffect(() => {
-    if (!open || !isBacklogPlan) return;
-
-    const api = getElectronAPI();
-    if (!api?.backlogPlan) return;
-
-    const unsubscribe = api.backlogPlan.onEvent((data: unknown) => {
-      const event = data as BacklogPlanEvent;
-      if (!event?.type) return;
-
-      let newContent = '';
-      switch (event.type) {
-        case 'backlog_plan_progress':
-          newContent = `\n🧭 ${event.content || 'Backlog plan progress update'}\n`;
-          break;
-        case 'backlog_plan_error':
-          newContent = `\n❌ Backlog plan error: ${event.error || 'Unknown error'}\n`;
-          break;
-        case 'backlog_plan_complete':
-          newContent = `\n✅ Backlog plan completed\n`;
-          break;
-        default:
-          newContent = `\nℹ️ ${event.type}\n`;
-          break;
-      }
-
-      if (newContent) {
-        setStreamedContent((prev) => prev + newContent);
-      }
-    });
-
-    return () => {
-      unsubscribe();
-    };
-  }, [open, isBacklogPlan]);
-
+  
   // Handle scroll to detect if user scrolled up
   const handleScroll = () => {
     if (!scrollRef.current) return;
 
     const { scrollTop, scrollHeight, clientHeight } = scrollRef.current;
-    const isAtBottom = scrollHeight - scrollTop - clientHeight < 50;
+    const isAtBottom = scrollHeight - scrollTop - clientHeight < MODAL_CONSTANTS.AUTOSCROLL_THRESHOLD;
     autoScrollRef.current = isAtBottom;
   };
 
@@ -321,7 +114,7 @@ export function AgentOutputModal({
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent
-        className="w-full max-h-[85dvh] max-w-[calc(100%-2rem)] sm:w-[60vw] sm:max-w-[60vw] sm:max-h-[80vh] rounded-xl flex flex-col"
+        className="w-full max-h-[85dvh] max-w-[calc(100%-2rem)] sm:w-[60vw] sm:max-w-[60vw] sm:max-h-[80vh] md:w-[90vw] md:max-w-[1200px] md:max-h-[85vh] rounded-xl flex flex-col"
         data-testid="agent-output-modal"
       >
         <DialogHeader className="shrink-0">
@@ -403,7 +196,7 @@ export function AgentOutputModal({
         )}
 
         {effectiveViewMode === 'changes' ? (
-          <div className="flex-1 min-h-0 sm:min-h-[200px] sm:max-h-[60vh] overflow-y-auto scrollbar-visible">
+          <div className={`flex-1 min-h-0 ${MODAL_CONSTANTS.COMPONENT_HEIGHTS.SMALL_MIN} ${MODAL_CONSTANTS.COMPONENT_HEIGHTS.SMALL_MAX} overflow-y-auto scrollbar-visible`}>
             {resolvedProjectPath ? (
               <GitDiffPanel
                 projectPath={resolvedProjectPath}
@@ -420,7 +213,7 @@ export function AgentOutputModal({
             )}
           </div>
         ) : effectiveViewMode === 'summary' && summary ? (
-          <div className="flex-1 min-h-0 sm:min-h-[200px] sm:max-h-[60vh] overflow-y-auto bg-card border border-border/50 rounded-lg p-4 scrollbar-visible">
+          <div className={`flex-1 min-h-0 ${MODAL_CONSTANTS.COMPONENT_HEIGHTS.SMALL_MIN} ${MODAL_CONSTANTS.COMPONENT_HEIGHTS.SMALL_MAX} overflow-y-auto bg-card border border-border/50 rounded-lg p-4 scrollbar-visible`}>
             <Markdown>{summary}</Markdown>
           </div>
         ) : (
@@ -428,7 +221,7 @@ export function AgentOutputModal({
             <div
               ref={scrollRef}
               onScroll={handleScroll}
-              className="flex-1 min-h-0 sm:min-h-[200px] sm:max-h-[60vh] overflow-y-auto bg-popover border border-border/50 rounded-lg p-4 font-mono text-xs scrollbar-visible"
+              className={`flex-1 min-h-0 ${MODAL_CONSTANTS.COMPONENT_HEIGHTS.SMALL_MIN} ${MODAL_CONSTANTS.COMPONENT_HEIGHTS.SMALL_MAX} overflow-y-auto bg-popover border border-border/50 rounded-lg p-4 font-mono text-xs scrollbar-visible`}
             >
               {isLoading && !output ? (
                 <div className="flex items-center justify-center h-full text-muted-foreground">

@@ -24,10 +24,14 @@ import {
 import { GitBranch, Cpu, FolderKanban, Settings2 } from 'lucide-react';
 import { useNavigate } from '@tanstack/react-router';
 import { toast } from 'sonner';
-import { cn, modelSupportsThinking } from '@/lib/utils';
+import {
+  cn,
+  modelSupportsThinking,
+  migrateModelId,
+  normalizeModelEntry,
+} from '@/lib/utils';
 import { Feature, ModelAlias, ThinkingLevel, PlanningMode } from '@/store/app-store';
 import type { ReasoningEffort, PhaseModelEntry, DescriptionHistoryEntry } from '@automaker/types';
-import { migrateModelId } from '@automaker/types';
 import {
   PrioritySelector,
   WorkModeSelector,
@@ -56,6 +60,7 @@ interface EditFeatureDialogProps {
       model: ModelAlias;
       thinkingLevel: ThinkingLevel;
       reasoningEffort: ReasoningEffort;
+      providerId?: string;
       imagePaths: DescriptionImagePath[];
       textFilePaths: DescriptionTextFilePath[];
       branchName: string; // Can be empty string to use current branch
@@ -109,11 +114,14 @@ export function EditFeatureDialog({
   );
 
   // Model selection state - migrate legacy model IDs to canonical format
-  const [modelEntry, setModelEntry] = useState<PhaseModelEntry>(() => ({
-    model: migrateModelId(feature?.model) || 'claude-opus',
-    thinkingLevel: feature?.thinkingLevel || 'none',
-    reasoningEffort: feature?.reasoningEffort || 'none',
-  }));
+  const [modelEntry, setModelEntry] = useState<PhaseModelEntry>(() =>
+    normalizeModelEntry({
+      model: migrateModelId(feature?.model) || 'claude-opus',
+      thinkingLevel: feature?.thinkingLevel || 'none',
+      reasoningEffort: feature?.reasoningEffort || 'none',
+      providerId: feature?.providerId,
+    })
+  );
 
   // Track the source of description changes for history
   const [descriptionChangeSource, setDescriptionChangeSource] = useState<
@@ -161,11 +169,14 @@ export function EditFeatureDialog({
       setPreEnhancementDescription(null);
       setLocalHistory(feature.descriptionHistory ?? []);
       // Reset model entry - migrate legacy model IDs
-      setModelEntry({
-        model: migrateModelId(feature.model) || 'claude-opus',
-        thinkingLevel: feature.thinkingLevel || 'none',
-        reasoningEffort: feature.reasoningEffort || 'none',
-      });
+      setModelEntry(
+        normalizeModelEntry({
+          model: migrateModelId(feature.model) || 'claude-opus',
+          thinkingLevel: feature.thinkingLevel || 'none',
+          reasoningEffort: feature.reasoningEffort || 'none',
+          providerId: feature.providerId,
+        })
+      );
       // Reset dependency state
       setParentDependencies(feature.dependencies ?? []);
       const childDeps = allFeatures
@@ -208,13 +219,7 @@ export function EditFeatureDialog({
       return;
     }
 
-    const selectedModel = modelEntry.model;
-    const normalizedThinking: ThinkingLevel = modelSupportsThinking(selectedModel)
-      ? (modelEntry.thinkingLevel ?? 'none')
-      : 'none';
-    const normalizedReasoning: ReasoningEffort = supportsReasoningEffort(selectedModel)
-      ? (modelEntry.reasoningEffort ?? 'none')
-      : 'none';
+    const normalizedEntry = normalizeModelEntry(modelEntry);
 
     // For 'current' mode, use empty string (work on current branch)
     // For 'auto' mode, use empty string (will be auto-generated in use-board-actions)
@@ -232,9 +237,10 @@ export function EditFeatureDialog({
       category: editingFeature.category,
       description: editingFeature.description,
       skipTests: editingFeature.skipTests ?? false,
-      model: selectedModel,
-      thinkingLevel: normalizedThinking,
-      reasoningEffort: normalizedReasoning,
+      model: normalizedEntry.model,
+      thinkingLevel: normalizedEntry.thinkingLevel,
+      reasoningEffort: normalizedEntry.reasoningEffort,
+      providerId: normalizedEntry.providerId,
       imagePaths: editingFeature.imagePaths ?? [],
       textFilePaths: editingFeature.textFilePaths ?? [],
       branchName: finalBranchName,

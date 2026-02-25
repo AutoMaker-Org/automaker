@@ -843,9 +843,10 @@ export class CursorProvider extends CliProvider {
   async *executeQuery(options: ExecuteOptions): AsyncGenerator<ProviderMessage> {
     this.ensureCliDetected();
 
-    // Validate that model doesn't have a provider prefix
+    // Validate that model doesn't have a provider prefix (except cursor- which should already be stripped)
     // AgentService should strip prefixes before passing to providers
-    validateBareModelId(options.model, 'CursorProvider');
+    // Note: Cursor's Gemini models (e.g., "gemini-3-pro") legitimately start with "gemini-"
+    validateBareModelId(options.model, 'CursorProvider', 'cursor');
 
     if (!this.cliPath) {
       throw this.createError(

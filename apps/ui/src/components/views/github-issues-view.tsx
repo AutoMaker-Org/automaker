@@ -209,6 +209,7 @@ export function GitHubIssuesView() {
             model: featureData.model,
             thinkingLevel: featureData.thinkingLevel,
             reasoningEffort: featureData.reasoningEffort,
+            providerId: featureData.providerId,
             skipTests: featureData.skipTests,
             branchName: featureData.workMode === 'current' ? currentBranch : featureData.branchName,
             planningMode: featureData.planningMode,

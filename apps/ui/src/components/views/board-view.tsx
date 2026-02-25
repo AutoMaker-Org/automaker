@@ -1018,7 +1018,12 @@ export function BoardView() {
   const handleQuickAdd = useCallback(
     async (
       description: string,
-      modelEntry: { model: string; thinkingLevel?: string; reasoningEffort?: string }
+      modelEntry: {
+        model: string;
+        thinkingLevel?: string;
+        reasoningEffort?: string;
+        providerId?: string;
+      }
     ) => {
       // Generate a title from the first line of the description
       const title = description.split('\n')[0].substring(0, 100);
@@ -1032,7 +1037,8 @@ export function BoardView() {
         skipTests: defaultSkipTests,
         model: resolveModelString(modelEntry.model) as ModelAlias,
         thinkingLevel: (modelEntry.thinkingLevel as ThinkingLevel) || 'none',
-        reasoningEffort: modelEntry.reasoningEffort,
+        reasoningEffort: modelEntry.reasoningEffort as ReasoningEffort,
+        providerId: modelEntry.providerId,
         branchName: addFeatureUseSelectedWorktreeBranch ? selectedWorktreeBranch : undefined,
         priority: 2,
         planningMode: useAppStore.getState().defaultPlanningMode ?? 'skip',
@@ -1053,7 +1059,12 @@ export function BoardView() {
   const handleQuickAddAndStart = useCallback(
     async (
       description: string,
-      modelEntry: { model: string; thinkingLevel?: string; reasoningEffort?: string }
+      modelEntry: {
+        model: string;
+        thinkingLevel?: string;
+        reasoningEffort?: string;
+        providerId?: string;
+      }
     ) => {
       // Generate a title from the first line of the description
       const title = description.split('\n')[0].substring(0, 100);
@@ -1067,7 +1078,8 @@ export function BoardView() {
         skipTests: defaultSkipTests,
         model: resolveModelString(modelEntry.model) as ModelAlias,
         thinkingLevel: (modelEntry.thinkingLevel as ThinkingLevel) || 'none',
-        reasoningEffort: modelEntry.reasoningEffort,
+        reasoningEffort: modelEntry.reasoningEffort as ReasoningEffort,
+        providerId: modelEntry.providerId,
         branchName: addFeatureUseSelectedWorktreeBranch ? selectedWorktreeBranch : undefined,
         priority: 2,
         planningMode: useAppStore.getState().defaultPlanningMode ?? 'skip',

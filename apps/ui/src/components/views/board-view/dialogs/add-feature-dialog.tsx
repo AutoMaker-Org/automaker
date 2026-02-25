@@ -24,7 +24,7 @@ import {
 import { Play, Cpu, FolderKanban, Settings2 } from 'lucide-react';
 import { useNavigate } from '@tanstack/react-router';
 import { toast } from 'sonner';
-import { cn } from '@/lib/utils';
+import { cn, normalizeModelEntry } from '@/lib/utils';
 import { modelSupportsThinking } from '@/lib/utils';
 import { useAppStore } from '@/store/app-store';
 import type { ThinkingLevel, PlanningMode, Feature, FeatureImage } from '@/store/types';
@@ -90,6 +90,7 @@ type FeatureData = {
   model: AgentModel;
   thinkingLevel: ThinkingLevel;
   reasoningEffort: ReasoningEffort;
+  providerId?: string;
   branchName: string;
   priority: number;
   planningMode: PlanningMode;
@@ -327,13 +328,7 @@ export function AddFeatureDialog({
     }
 
     const finalCategory = category || 'Uncategorized';
-    const selectedModel = modelEntry.model;
-    const normalizedThinking = modelSupportsThinking(selectedModel)
-      ? modelEntry.thinkingLevel || 'none'
-      : 'none';
-    const normalizedReasoning = supportsReasoningEffort(selectedModel)
-      ? modelEntry.reasoningEffort || 'none'
-      : 'none';
+    const normalizedEntry = normalizeModelEntry(modelEntry);
 
     // For 'current' mode, use empty string (work on current branch)
     // For 'auto' mode, use empty string (will be auto-generated in use-board-actions)
@@ -381,9 +376,10 @@ export function AddFeatureDialog({
       imagePaths,
       textFilePaths,
       skipTests,
-      model: selectedModel,
-      thinkingLevel: normalizedThinking,
-      reasoningEffort: normalizedReasoning,
+      model: normalizedEntry.model,
+      thinkingLevel: normalizedEntry.thinkingLevel,
+      reasoningEffort: normalizedEntry.reasoningEffort,
+      providerId: normalizedEntry.providerId,
       branchName: finalBranchName,
       priority,
       planningMode,

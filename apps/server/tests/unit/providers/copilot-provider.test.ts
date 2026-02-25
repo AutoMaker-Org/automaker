@@ -416,6 +416,27 @@ describe('copilot-provider.ts', () => {
       });
     });
 
+    it('should handle tool.execution_complete with error code', () => {
+      const event = {
+        type: 'tool.execution_complete',
+        data: {
+          toolCallId: 'call-567',
+          success: false,
+          error: {
+            message: 'Permission denied',
+            code: 'EACCES',
+          },
+        },
+      };
+
+      const result = provider.normalizeEvent(event);
+      expect(result?.message?.content?.[0]).toMatchObject({
+        type: 'tool_result',
+        tool_use_id: 'call-567',
+        content: '[ERROR] Permission denied',
+      });
+    });
+
     it('should normalize session.idle to success result', () => {
       const event = { type: 'session.idle' };
 

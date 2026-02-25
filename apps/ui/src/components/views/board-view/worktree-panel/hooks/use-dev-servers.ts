@@ -56,7 +56,8 @@ function showUrlDetectedToast(url: string, port: number): void {
 }
 
 export function useDevServers({ projectPath }: UseDevServersOptions) {
-  const [isStartingDevServer, setIsStartingDevServer] = useState(false);
+  const [isStartingAnyDevServer, setIsStartingAnyDevServer] = useState(false);
+  const [startingServers, setStartingServers] = useState<Set<string>>(new Set());
   const [runningDevServers, setRunningDevServers] = useState<Map<string, DevServerInfo>>(new Map());
 
   // Track which worktrees have had their url-detected toast shown to prevent re-triggering
@@ -327,7 +328,16 @@ export function useDevServers({ projectPath }: UseDevServersOptions) {
     if (!api?.worktree?.onDevServerLogEvent) return;
 
     const unsubscribe = api.worktree.onDevServerLogEvent((event) => {
-      if (event.type === 'dev-server:url-detected') {
+      if (event.type === 'dev-server:starting') {
+        const { worktreePath } = event.payload;
+        const key = normalizePath(worktreePath);
+        setStartingServers((prev) => {
+          const next = new Set(prev);
+          next.add(key);
+          return next;
+        });
+        logger.info(`Dev server starting for ${worktreePath} (reactive update)`);
+      } else if (event.type === 'dev-server:url-detected') {
         const { worktreePath, url, port } = event.payload;
         const key = normalizePath(worktreePath);
         // Clear the port detection timeout since URL was successfully detected
@@ -387,6 +397,15 @@ export function useDevServers({ projectPath }: UseDevServersOptions) {
         // Reactively add/update the server when it starts
         const { worktreePath, port, url } = event.payload;
         const key = normalizePath(worktreePath);
+
+        // Remove from starting set
+        setStartingServers((prev) => {
+          if (!prev.has(key)) return prev;
+          const next = new Set(prev);
+          next.delete(key);
+          return next;
+        });
+
         // Clear previous toast tracking for this key so a new detection triggers a fresh toast
         toastShownForRef.current.delete(key);
         setRunningDevServers((prev) => {
@@ -427,8 +446,8 @@ export function useDevServers({ projectPath }: UseDevServersOptions) {
 
   const handleStartDevServer = useCallback(
     async (worktree: WorktreeInfo) => {
-      if (isStartingDevServer) return;
-      setIsStartingDevServer(true);
+      if (isStartingAnyDevServer) return;
+      setIsStartingAnyDevServer(true);
 
       try {
         const api = getElectronAPI();
@@ -470,10 +489,10 @@ export function useDevServers({ projectPath }: UseDevServersOptions) {
           description: error instanceof Error ? error.message : undefined,
         });
       } finally {
-        setIsStartingDevServer(false);
+        setIsStartingAnyDevServer(false);
       }
     },
-    [isStartingDevServer, projectPath, startPortDetectionTimer]
+    [isStartingAnyDevServer, projectPath, startPortDetectionTimer]
   );
 
   const handleStopDevServer = useCallback(
@@ -543,6 +562,13 @@ export function useDevServers({ projectPath }: UseDevServersOptions) {
     [runningDevServers, getWorktreeKey]
   );
 
+  const isDevServerStarting = useCallback(
+    (worktree: WorktreeInfo) => {
+      return startingServers.has(getWorktreeKey(worktree));
+    },
+    [startingServers, getWorktreeKey]
+  );
+
   const getDevServerInfo = useCallback(
     (worktree: WorktreeInfo) => {
       return runningDevServers.get(getWorktreeKey(worktree));
@@ -551,10 +577,11 @@ export function useDevServers({ projectPath }: UseDevServersOptions) {
   );
 
   return {
-    isStartingDevServer,
+    isStartingAnyDevServer,
     runningDevServers,
     getWorktreeKey,
     isDevServerRunning,
+    isDevServerStarting,
     getDevServerInfo,
     handleStartDevServer,
     handleStopDevServer,

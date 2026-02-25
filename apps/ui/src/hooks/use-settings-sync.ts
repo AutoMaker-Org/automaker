@@ -105,7 +105,7 @@ const SETTINGS_FIELDS_TO_SYNC = [
   'promptCustomization',
   'eventHooks',
   'featureTemplates',
-  'claudeCompatibleProviders',
+  'claudeCompatibleProviders', // Claude-compatible provider configs - must persist to server
   'claudeApiProfiles',
   'activeClaudeApiProfileId',
   'projects',
@@ -823,6 +823,9 @@ export async function refreshSettingsFromServer(): Promise<boolean> {
       editorAutoSaveDelay: serverSettings.editorAutoSaveDelay ?? 1000,
       defaultTerminalId: serverSettings.defaultTerminalId ?? null,
       promptCustomization: serverSettings.promptCustomization ?? {},
+      // Claude-compatible providers - must be loaded from server for persistence
+      claudeCompatibleProviders: serverSettings.claudeCompatibleProviders ?? [],
+      // Deprecated Claude API profiles (kept for migration)
       claudeApiProfiles: serverSettings.claudeApiProfiles ?? [],
       activeClaudeApiProfileId: serverSettings.activeClaudeApiProfileId ?? null,
       projects: serverSettings.projects,
