@@ -374,6 +374,7 @@ describe('copilot-provider.ts', () => {
       const result = provider.normalizeEvent(event);
       expect(result?.message?.content?.[0]).toMatchObject({
         type: 'tool_result',
+        tool_use_id: 'call-456',
         content: '[ERROR] Command failed',
       });
     });
@@ -433,7 +434,7 @@ describe('copilot-provider.ts', () => {
       expect(result?.message?.content?.[0]).toMatchObject({
         type: 'tool_result',
         tool_use_id: 'call-567',
-        content: '[ERROR] Permission denied',
+        content: '[ERROR] Permission denied (EACCES)',
       });
     });
 
