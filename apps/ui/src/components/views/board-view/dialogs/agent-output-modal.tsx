@@ -166,6 +166,7 @@ export function AgentOutputModal({
 
   // Track view mode state
   const [viewMode, setViewMode] = useState<ViewMode | null>(null);
+  const [streamedContent, setStreamedContent] = useState<string>('');
 
   // Use custom hook for WebSocket event handling and output management
   const { output, isLoading } = useAgentOutputWebSocket({
