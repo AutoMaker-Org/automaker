@@ -28,7 +28,11 @@ import { cn } from '@/lib/utils';
 import { modelSupportsThinking } from '@/lib/utils';
 import { useAppStore, ThinkingLevel, FeatureImage, PlanningMode, Feature } from '@/store/app-store';
 import type { ReasoningEffort, PhaseModelEntry, AgentModel } from '@automaker/types';
-import { supportsReasoningEffort, normalizeThinkingLevelForModel } from '@automaker/types';
+import {
+  supportsReasoningEffort,
+  normalizeThinkingLevelForModel,
+  getThinkingLevelsForModel,
+} from '@automaker/types';
 import {
   PrioritySelector,
   WorkModeSelector,

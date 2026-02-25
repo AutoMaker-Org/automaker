@@ -18,6 +18,7 @@ import {
   authenticateForTests,
   handleLoginScreenIfPresent,
 } from '../utils';
+import { DEFAULT_ELEMENT_TIMEOUT_MS } from '../utils/core/waiting';
 
 const TEST_TEMP_DIR = createTempDirPath('planning-mode-verification-test');
 
@@ -69,7 +70,9 @@ test.describe('Planning Mode Fix Verification (GitHub #671)', () => {
     await handleLoginScreenIfPresent(page);
     await waitForNetworkIdle(page);
 
-    await expect(page.locator('[data-testid="board-view"]')).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('[data-testid="board-view"]')).toBeVisible({
+      timeout: DEFAULT_ELEMENT_TIMEOUT_MS,
+    });
     await expect(page.locator('[data-testid="kanban-column-backlog"]')).toBeVisible({
       timeout: 5000,
     });
@@ -77,9 +80,9 @@ test.describe('Planning Mode Fix Verification (GitHub #671)', () => {
     // Open the add feature dialog
     await clickAddFeature(page);
 
-    // Wait for dialog to be visible
+    // Wait for dialog to be visible (clickAddFeature already waits, but this adds an extra check)
     await expect(page.locator('[data-testid="add-feature-dialog"]')).toBeVisible({
-      timeout: 5000,
+      timeout: DEFAULT_ELEMENT_TIMEOUT_MS,
     });
 
     // Find the planning mode select trigger

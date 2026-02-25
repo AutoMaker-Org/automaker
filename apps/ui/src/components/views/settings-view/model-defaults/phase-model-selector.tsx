@@ -1017,6 +1017,7 @@ export function PhaseModelSelector({
             {/* Secondary zone: expand reasoning effort popover */}
             <Popover
               open={isExpanded}
+              modal={false}
               onOpenChange={(isOpen) => {
                 if (!isOpen) {
                   setExpandedCodexModel(null);
@@ -1409,7 +1410,9 @@ export function PhaseModelSelector({
                 return (
                   <button
                     key={level}
-                    onClick={() => {
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      e.preventDefault();
                       onChange({
                         providerId: provider.id,
                         model: model.id,
@@ -1497,6 +1500,7 @@ export function PhaseModelSelector({
             {/* Secondary zone: expand thinking level popover */}
             <Popover
               open={isExpanded}
+              modal={false}
               onOpenChange={(isOpen) => {
                 if (!isOpen) {
                   setExpandedProviderModel(null);
@@ -1549,7 +1553,9 @@ export function PhaseModelSelector({
                     return (
                       <button
                         key={level}
-                        onClick={() => {
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          e.preventDefault();
                           onChange({
                             providerId: provider.id,
                             model: model.id,
@@ -1752,7 +1758,9 @@ export function PhaseModelSelector({
                 return (
                   <button
                     key={level}
-                    onClick={() => {
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      e.preventDefault();
                       onChange({
                         model: model.id as ModelAlias,
                         thinkingLevel: level,
@@ -1856,6 +1864,7 @@ export function PhaseModelSelector({
             {/* Secondary zone: expand thinking level popover */}
             <Popover
               open={isExpanded}
+              modal={false}
               onOpenChange={(isOpen) => {
                 if (!isOpen) {
                   setExpandedClaudeModel(null);
@@ -1906,7 +1915,9 @@ export function PhaseModelSelector({
                     return (
                       <button
                         key={level}
-                        onClick={() => {
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          e.preventDefault();
                           onChange({
                             model: model.id as ModelAlias,
                             thinkingLevel: level,
@@ -2054,6 +2065,7 @@ export function PhaseModelSelector({
       >
         <Popover
           open={isExpanded}
+          modal={false}
           onOpenChange={(isOpen) => {
             if (!isOpen) {
               setExpandedGroup(null);

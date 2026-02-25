@@ -296,8 +296,28 @@ export class AgentExecutor {
             }
           }
         } else if (msg.type === 'error') {
-          throw new Error(AgentExecutor.sanitizeProviderError(msg.error));
-        } else if (msg.type === 'result' && msg.subtype === 'success') scheduleWrite();
+          const sanitized = AgentExecutor.sanitizeProviderError(msg.error);
+          logger.error(
+            `[execute] Feature ${featureId} received error from provider. ` +
+              `raw="${msg.error}", sanitized="${sanitized}", session_id=${msg.session_id ?? 'none'}`
+          );
+          throw new Error(sanitized);
+        } else if (msg.type === 'result') {
+          if (msg.subtype === 'success') {
+            scheduleWrite();
+          } else if (msg.subtype?.startsWith('error')) {
+            // Non-success result subtypes from the SDK (error_max_turns, error_during_execution, etc.)
+            logger.error(
+              `[execute] Feature ${featureId} ended with error subtype: ${msg.subtype}. ` +
+                `session_id=${msg.session_id ?? 'none'}`
+            );
+            throw new Error(`Agent execution ended with: ${msg.subtype}`);
+          } else {
+            logger.warn(
+              `[execute] Feature ${featureId} received unhandled result subtype: ${msg.subtype}`
+            );
+          }
+        }
       }
     } finally {
       clearInterval(streamHeartbeat);
@@ -447,16 +467,28 @@ export class AgentExecutor {
               });
           }
         } else if (msg.type === 'error') {
-          // Clean the error: strip ANSI codes and redundant "Error: " prefix
-          const cleanedError =
-            (msg.error || `Error during task ${task.id}`)
-              .replace(/\x1b\[[0-9;]*m/g, '')
-              .replace(/^Error:\s*/i, '')
-              .trim() || `Error during task ${task.id}`;
-          throw new Error(cleanedError);
-        } else if (msg.type === 'result' && msg.subtype === 'success') {
-          taskOutput += msg.result || '';
-          responseText += msg.result || '';
+          const fallback = `Error during task ${task.id}`;
+          const sanitized = AgentExecutor.sanitizeProviderError(msg.error || fallback);
+          logger.error(
+            `[executeTasksLoop] Feature ${featureId} task ${task.id} received error from provider. ` +
+              `raw="${msg.error}", sanitized="${sanitized}", session_id=${msg.session_id ?? 'none'}`
+          );
+          throw new Error(sanitized);
+        } else if (msg.type === 'result') {
+          if (msg.subtype === 'success') {
+            taskOutput += msg.result || '';
+            responseText += msg.result || '';
+          } else if (msg.subtype?.startsWith('error')) {
+            logger.error(
+              `[executeTasksLoop] Feature ${featureId} task ${task.id} ended with error subtype: ${msg.subtype}. ` +
+                `session_id=${msg.session_id ?? 'none'}`
+            );
+            throw new Error(`Agent execution ended with: ${msg.subtype}`);
+          } else {
+            logger.warn(
+              `[executeTasksLoop] Feature ${featureId} task ${task.id} received unhandled result subtype: ${msg.subtype}`
+            );
+          }
         }
       }
       if (!taskCompleteDetected)

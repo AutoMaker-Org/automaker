@@ -381,10 +381,13 @@ export class GeminiProvider extends CliProvider {
         const resultEvent = geminiEvent as GeminiResultEvent;
 
         if (resultEvent.status === 'error') {
+          const enrichedError =
+            resultEvent.error ||
+            `Gemini agent failed (duration: ${resultEvent.stats?.duration_ms ?? 'unknown'}ms, session: ${resultEvent.session_id ?? 'none'})`;
           return {
             type: 'error',
             session_id: resultEvent.session_id,
-            error: resultEvent.error || 'Unknown error',
+            error: enrichedError,
           };
         }
 
@@ -401,10 +404,12 @@ export class GeminiProvider extends CliProvider {
 
       case 'error': {
         const errorEvent = geminiEvent as GeminiResultEvent;
+        const enrichedError =
+          errorEvent.error || `Gemini agent failed (session: ${errorEvent.session_id ?? 'none'})`;
         return {
           type: 'error',
           session_id: errorEvent.session_id,
-          error: errorEvent.error || 'Unknown error',
+          error: enrichedError,
         };
       }
 

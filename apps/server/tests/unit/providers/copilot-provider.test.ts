@@ -397,6 +397,45 @@ describe('copilot-provider.ts', () => {
       });
     });
 
+    it('should use error code in fallback when session.error message is empty', () => {
+      const event = {
+        type: 'session.error',
+        data: { message: '', code: 'RATE_LIMIT_EXCEEDED' },
+      };
+
+      const result = provider.normalizeEvent(event);
+      expect(result).not.toBeNull();
+      expect(result!.type).toBe('error');
+      expect(result!.error).toContain('RATE_LIMIT_EXCEEDED');
+      expect(result!.error).not.toBe('Unknown error');
+    });
+
+    it('should return generic "Copilot agent error" fallback when both message and code are empty', () => {
+      const event = {
+        type: 'session.error',
+        data: { message: '', code: '' },
+      };
+
+      const result = provider.normalizeEvent(event);
+      expect(result).not.toBeNull();
+      expect(result!.type).toBe('error');
+      expect(result!.error).toBe('Copilot agent error');
+      // Must NOT be the old opaque 'Unknown error'
+      expect(result!.error).not.toBe('Unknown error');
+    });
+
+    it('should return generic "Copilot agent error" fallback when data has no code field', () => {
+      const event = {
+        type: 'session.error',
+        data: { message: '' },
+      };
+
+      const result = provider.normalizeEvent(event);
+      expect(result).not.toBeNull();
+      expect(result!.type).toBe('error');
+      expect(result!.error).toBe('Copilot agent error');
+    });
+
     it('should return null for unknown event types', () => {
       const event = { type: 'unknown.event' };
 

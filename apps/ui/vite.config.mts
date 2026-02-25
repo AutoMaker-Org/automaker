@@ -253,7 +253,7 @@ export default defineConfig(({ command }) => {
       allowedHosts: true,
       proxy: {
         '/api': {
-          target: 'http://localhost:' + (process.env.AUTOMAKER_SERVER_PORT ?? '5008'),
+          target: 'http://localhost:' + (process.env.AUTOMAKER_SERVER_PORT ?? '3008'),
           changeOrigin: true,
           ws: true,
         },

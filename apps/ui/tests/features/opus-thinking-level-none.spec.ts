@@ -72,9 +72,24 @@ test.describe('Opus thinking level', () => {
     await expect(opusItem).toBeVisible({ timeout: 10000 });
     await opusItem.locator('button[title="Adjust thinking level"]').click();
 
-    const noneOption = page.getByRole('button', { name: /None/i }).first();
+    // Wait for the thinking level popover to appear
+    // The nested popover contains "Thinking Level" text and "None" option
+    // Radix UI popovers need a brief delay for the animation to complete
+    const POPOVER_OPEN_DELAY_MS = 500;
+    await page.waitForTimeout(POPOVER_OPEN_DELAY_MS);
+
+    // Find and click the None button
+    // The button's accessible name includes description: "None No extended thinking"
+    const noneOption = page.getByRole('button', { name: /None.*No extended thinking/i }).first();
+    await expect(noneOption).toBeVisible({ timeout: 5000 });
     await noneOption.click();
 
+    // Wait for the popover to close and the state to update
+    // The React state update needs a brief moment to propagate to the badge
+    const STATE_UPDATE_DELAY_MS = 300;
+    await page.waitForTimeout(STATE_UPDATE_DELAY_MS);
+
+    // When "None" is selected, the badge should NOT show "Adaptive"
     await expect(page.locator('[data-testid="model-selector"]')).not.toContainText('Adaptive');
 
     await confirmAddFeature(page);

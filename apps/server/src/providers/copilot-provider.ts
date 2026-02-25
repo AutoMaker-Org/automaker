@@ -389,9 +389,14 @@ export class CopilotProvider extends CliProvider {
 
       case 'session.error': {
         const errorEvent = sdkEvent as SdkSessionErrorEvent;
+        const enrichedError =
+          errorEvent.data.message ||
+          (errorEvent.data.code
+            ? `Copilot agent error (code: ${errorEvent.data.code})`
+            : 'Copilot agent error');
         return {
           type: 'error',
-          error: errorEvent.data.message || 'Unknown error',
+          error: enrichedError,
         };
       }
 

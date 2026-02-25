@@ -562,10 +562,14 @@ export class CursorProvider extends CliProvider {
         const resultEvent = cursorEvent as CursorResultEvent;
 
         if (resultEvent.is_error) {
+          const errorText = resultEvent.error || resultEvent.result || '';
+          const enrichedError =
+            errorText ||
+            `Cursor agent failed (duration: ${resultEvent.duration_ms}ms, subtype: ${resultEvent.subtype}, session: ${resultEvent.session_id ?? 'none'})`;
           return {
             type: 'error',
             session_id: resultEvent.session_id,
-            error: resultEvent.error || resultEvent.result || 'Unknown error',
+            error: enrichedError,
           };
         }
 

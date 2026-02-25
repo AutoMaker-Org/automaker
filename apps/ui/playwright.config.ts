@@ -1,7 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
-const port = process.env.TEST_PORT || 3007;
-const serverPort = process.env.TEST_SERVER_PORT || 3008;
+const port = process.env.TEST_PORT || 3107;
+const serverPort = process.env.TEST_SERVER_PORT || 3108;
 const reuseServer = process.env.TEST_REUSE_SERVER === 'true';
 const useExternalBackend = !!process.env.VITE_SERVER_URL;
 // Always use mock agent for tests (disables rate limiting, uses mock Claude responses)

@@ -260,7 +260,13 @@ export interface ContentBlock {
  */
 export interface ProviderMessage {
   type: 'assistant' | 'user' | 'error' | 'result';
-  subtype?: 'success' | 'error' | 'error_max_turns' | 'error_max_structured_output_retries';
+  subtype?:
+    | 'success'
+    | 'error'
+    | 'error_max_turns'
+    | 'error_max_structured_output_retries'
+    | 'error_during_execution'
+    | 'error_max_budget_usd';
   session_id?: string;
   message?: {
     role: 'user' | 'assistant';

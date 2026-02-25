@@ -1,6 +1,13 @@
 import { Page, Locator } from '@playwright/test';
 
 /**
+ * Default timeout for element waiting operations in E2E tests.
+ * Increased from 5000ms to 10000ms to accommodate CI environments
+ * where dialog rendering may take longer due to React Query data fetching.
+ */
+export const DEFAULT_ELEMENT_TIMEOUT_MS = 10000;
+
+/**
  * Wait for the page to load
  * Uses 'load' state instead of 'networkidle' because the app has persistent
  * connections (websockets/polling) that prevent network from ever being idle.
@@ -20,7 +27,7 @@ export async function waitForElement(
 ): Promise<Locator> {
   const element = page.locator(`[data-testid="${testId}"]`);
   await element.waitFor({
-    timeout: options?.timeout ?? 5000,
+    timeout: options?.timeout ?? DEFAULT_ELEMENT_TIMEOUT_MS,
     state: options?.state ?? 'visible',
   });
   return element;
@@ -36,7 +43,7 @@ export async function waitForElementHidden(
 ): Promise<void> {
   const element = page.locator(`[data-testid="${testId}"]`);
   await element.waitFor({
-    timeout: options?.timeout ?? 5000,
+    timeout: options?.timeout ?? DEFAULT_ELEMENT_TIMEOUT_MS,
     state: 'hidden',
   });
 }

@@ -8,8 +8,8 @@ import { promisify } from 'util';
 
 const execAsync = promisify(exec);
 
-const SERVER_PORT = process.env.TEST_SERVER_PORT || 3008;
-const UI_PORT = process.env.TEST_PORT || 3007;
+const SERVER_PORT = process.env.TEST_SERVER_PORT || 3108;
+const UI_PORT = process.env.TEST_PORT || 3107;
 const USE_EXTERNAL_SERVER = !!process.env.VITE_SERVER_URL;
 
 async function killProcessOnPort(port) {

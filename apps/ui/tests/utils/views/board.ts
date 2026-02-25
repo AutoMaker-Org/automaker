@@ -1,4 +1,5 @@
 import { Page, Locator } from '@playwright/test';
+import { DEFAULT_ELEMENT_TIMEOUT_MS } from '../core/waiting';
 
 /**
  * Get a kanban card by feature ID
@@ -96,9 +97,16 @@ export async function getDragHandleForFeature(page: Page, featureId: string): Pr
  * Click the add feature button
  */
 export async function clickAddFeature(page: Page): Promise<void> {
-  await page.click('[data-testid="add-feature-button"]');
+  // There may be multiple add-feature buttons on the page (header, empty state).
+  // Use .first() to click the first visible one.
+  const addButton = page.locator('[data-testid="add-feature-button"]').first();
+  await addButton.waitFor({ state: 'visible', timeout: DEFAULT_ELEMENT_TIMEOUT_MS });
+  await addButton.click({ timeout: 5000 });
+
+  // Wait for dialog to be visible
   await page.waitForSelector('[data-testid="add-feature-dialog"]', {
-    timeout: 5000,
+    state: 'visible',
+    timeout: DEFAULT_ELEMENT_TIMEOUT_MS,
   });
 }
 
@@ -159,7 +167,7 @@ export async function confirmAddFeature(page: Page): Promise<void> {
   await page.click('[data-testid="confirm-add-feature"]');
   // Wait for dialog to close
   await page.waitForFunction(() => !document.querySelector('[data-testid="add-feature-dialog"]'), {
-    timeout: 5000,
+    timeout: DEFAULT_ELEMENT_TIMEOUT_MS,
   });
 }
 

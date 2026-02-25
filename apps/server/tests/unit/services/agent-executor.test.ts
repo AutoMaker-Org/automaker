@@ -685,6 +685,309 @@ describe('AgentExecutor', () => {
       await expect(executor.execute(options, callbacks)).rejects.toThrow('API rate limit exceeded');
     });
 
+    it('should throw "Unknown error" when provider stream yields error with empty message', async () => {
+      const executor = new AgentExecutor(
+        mockEventBus,
+        mockFeatureStateManager,
+        mockPlanApprovalService,
+        mockSettingsService
+      );
+
+      const mockProvider = {
+        getName: () => 'mock',
+        executeQuery: vi.fn().mockImplementation(function* () {
+          yield {
+            type: 'error',
+            error: '',
+            session_id: 'sess-123',
+          };
+        }),
+      } as unknown as BaseProvider;
+
+      const options: AgentExecutionOptions = {
+        workDir: '/test',
+        featureId: 'test-feature',
+        prompt: 'Test prompt',
+        projectPath: '/project',
+        abortController: new AbortController(),
+        provider: mockProvider,
+        effectiveBareModel: 'claude-sonnet-4-6',
+        planningMode: 'skip',
+      };
+
+      const callbacks = {
+        waitForApproval: vi.fn().mockResolvedValue({ approved: true }),
+        saveFeatureSummary: vi.fn(),
+        updateFeatureSummary: vi.fn(),
+        buildTaskPrompt: vi.fn().mockReturnValue('task prompt'),
+      };
+
+      await expect(executor.execute(options, callbacks)).rejects.toThrow('Unknown error');
+    });
+
+    it('should throw with sanitized error when provider yields ANSI-decorated error', async () => {
+      const executor = new AgentExecutor(
+        mockEventBus,
+        mockFeatureStateManager,
+        mockPlanApprovalService,
+        mockSettingsService
+      );
+
+      const mockProvider = {
+        getName: () => 'mock',
+        executeQuery: vi.fn().mockImplementation(function* () {
+          yield {
+            type: 'error',
+            // ANSI color codes + "Error: " prefix that should be stripped
+            error: '\x1b[31mError: Connection refused\x1b[0m',
+          };
+        }),
+      } as unknown as BaseProvider;
+
+      const options: AgentExecutionOptions = {
+        workDir: '/test',
+        featureId: 'test-feature',
+        prompt: 'Test prompt',
+        projectPath: '/project',
+        abortController: new AbortController(),
+        provider: mockProvider,
+        effectiveBareModel: 'claude-sonnet-4-6',
+        planningMode: 'skip',
+      };
+
+      const callbacks = {
+        waitForApproval: vi.fn().mockResolvedValue({ approved: true }),
+        saveFeatureSummary: vi.fn(),
+        updateFeatureSummary: vi.fn(),
+        buildTaskPrompt: vi.fn().mockReturnValue('task prompt'),
+      };
+
+      // Should strip ANSI codes and "Error: " prefix
+      await expect(executor.execute(options, callbacks)).rejects.toThrow('Connection refused');
+    });
+
+    it('should throw when result subtype is error_max_turns', async () => {
+      const executor = new AgentExecutor(
+        mockEventBus,
+        mockFeatureStateManager,
+        mockPlanApprovalService,
+        mockSettingsService
+      );
+
+      const mockProvider = {
+        getName: () => 'mock',
+        executeQuery: vi.fn().mockImplementation(function* () {
+          yield {
+            type: 'assistant',
+            message: {
+              content: [{ type: 'text', text: 'Working on it...' }],
+            },
+          };
+          yield {
+            type: 'result',
+            subtype: 'error_max_turns',
+            session_id: 'sess-456',
+          };
+        }),
+      } as unknown as BaseProvider;
+
+      const options: AgentExecutionOptions = {
+        workDir: '/test',
+        featureId: 'test-feature',
+        prompt: 'Test prompt',
+        projectPath: '/project',
+        abortController: new AbortController(),
+        provider: mockProvider,
+        effectiveBareModel: 'claude-sonnet-4-6',
+        planningMode: 'skip',
+      };
+
+      const callbacks = {
+        waitForApproval: vi.fn().mockResolvedValue({ approved: true }),
+        saveFeatureSummary: vi.fn(),
+        updateFeatureSummary: vi.fn(),
+        buildTaskPrompt: vi.fn().mockReturnValue('task prompt'),
+      };
+
+      await expect(executor.execute(options, callbacks)).rejects.toThrow(
+        'Agent execution ended with: error_max_turns'
+      );
+    });
+
+    it('should throw when result subtype is error_during_execution', async () => {
+      const executor = new AgentExecutor(
+        mockEventBus,
+        mockFeatureStateManager,
+        mockPlanApprovalService,
+        mockSettingsService
+      );
+
+      const mockProvider = {
+        getName: () => 'mock',
+        executeQuery: vi.fn().mockImplementation(function* () {
+          yield {
+            type: 'result',
+            subtype: 'error_during_execution',
+            session_id: 'sess-789',
+          };
+        }),
+      } as unknown as BaseProvider;
+
+      const options: AgentExecutionOptions = {
+        workDir: '/test',
+        featureId: 'test-feature',
+        prompt: 'Test prompt',
+        projectPath: '/project',
+        abortController: new AbortController(),
+        provider: mockProvider,
+        effectiveBareModel: 'claude-sonnet-4-6',
+        planningMode: 'skip',
+      };
+
+      const callbacks = {
+        waitForApproval: vi.fn().mockResolvedValue({ approved: true }),
+        saveFeatureSummary: vi.fn(),
+        updateFeatureSummary: vi.fn(),
+        buildTaskPrompt: vi.fn().mockReturnValue('task prompt'),
+      };
+
+      await expect(executor.execute(options, callbacks)).rejects.toThrow(
+        'Agent execution ended with: error_during_execution'
+      );
+    });
+
+    it('should throw when result subtype is error_max_structured_output_retries', async () => {
+      const executor = new AgentExecutor(
+        mockEventBus,
+        mockFeatureStateManager,
+        mockPlanApprovalService,
+        mockSettingsService
+      );
+
+      const mockProvider = {
+        getName: () => 'mock',
+        executeQuery: vi.fn().mockImplementation(function* () {
+          yield {
+            type: 'result',
+            subtype: 'error_max_structured_output_retries',
+          };
+        }),
+      } as unknown as BaseProvider;
+
+      const options: AgentExecutionOptions = {
+        workDir: '/test',
+        featureId: 'test-feature',
+        prompt: 'Test prompt',
+        projectPath: '/project',
+        abortController: new AbortController(),
+        provider: mockProvider,
+        effectiveBareModel: 'claude-sonnet-4-6',
+        planningMode: 'skip',
+      };
+
+      const callbacks = {
+        waitForApproval: vi.fn().mockResolvedValue({ approved: true }),
+        saveFeatureSummary: vi.fn(),
+        updateFeatureSummary: vi.fn(),
+        buildTaskPrompt: vi.fn().mockReturnValue('task prompt'),
+      };
+
+      await expect(executor.execute(options, callbacks)).rejects.toThrow(
+        'Agent execution ended with: error_max_structured_output_retries'
+      );
+    });
+
+    it('should throw when result subtype is error_max_budget_usd', async () => {
+      const executor = new AgentExecutor(
+        mockEventBus,
+        mockFeatureStateManager,
+        mockPlanApprovalService,
+        mockSettingsService
+      );
+
+      const mockProvider = {
+        getName: () => 'mock',
+        executeQuery: vi.fn().mockImplementation(function* () {
+          yield {
+            type: 'result',
+            subtype: 'error_max_budget_usd',
+            session_id: 'sess-budget',
+          };
+        }),
+      } as unknown as BaseProvider;
+
+      const options: AgentExecutionOptions = {
+        workDir: '/test',
+        featureId: 'test-feature',
+        prompt: 'Test prompt',
+        projectPath: '/project',
+        abortController: new AbortController(),
+        provider: mockProvider,
+        effectiveBareModel: 'claude-sonnet-4-6',
+        planningMode: 'skip',
+      };
+
+      const callbacks = {
+        waitForApproval: vi.fn().mockResolvedValue({ approved: true }),
+        saveFeatureSummary: vi.fn(),
+        updateFeatureSummary: vi.fn(),
+        buildTaskPrompt: vi.fn().mockReturnValue('task prompt'),
+      };
+
+      await expect(executor.execute(options, callbacks)).rejects.toThrow(
+        'Agent execution ended with: error_max_budget_usd'
+      );
+    });
+
+    it('should NOT throw when result subtype is success', async () => {
+      const executor = new AgentExecutor(
+        mockEventBus,
+        mockFeatureStateManager,
+        mockPlanApprovalService,
+        mockSettingsService
+      );
+
+      const mockProvider = {
+        getName: () => 'mock',
+        executeQuery: vi.fn().mockImplementation(function* () {
+          yield {
+            type: 'assistant',
+            message: {
+              content: [{ type: 'text', text: 'Done!' }],
+            },
+          };
+          yield {
+            type: 'result',
+            subtype: 'success',
+            session_id: 'sess-ok',
+          };
+        }),
+      } as unknown as BaseProvider;
+
+      const options: AgentExecutionOptions = {
+        workDir: '/test',
+        featureId: 'test-feature',
+        prompt: 'Test prompt',
+        projectPath: '/project',
+        abortController: new AbortController(),
+        provider: mockProvider,
+        effectiveBareModel: 'claude-sonnet-4-6',
+        planningMode: 'skip',
+      };
+
+      const callbacks = {
+        waitForApproval: vi.fn().mockResolvedValue({ approved: true }),
+        saveFeatureSummary: vi.fn(),
+        updateFeatureSummary: vi.fn(),
+        buildTaskPrompt: vi.fn().mockReturnValue('task prompt'),
+      };
+
+      // Should resolve without throwing
+      const result = await executor.execute(options, callbacks);
+      expect(result.aborted).toBe(false);
+      expect(result.responseText).toContain('Done!');
+    });
+
     it('should throw error when authentication fails in response', async () => {
       const executor = new AgentExecutor(
         mockEventBus,
