@@ -168,6 +168,7 @@ export function AgentOutputModal({
   // Track additional content from WebSocket events (appended to query data)
   const [streamedContent, setStreamedContent] = useState<string>('');
   const [viewMode, setViewMode] = useState<ViewMode | null>(null);
+  const [streamedContent, setStreamedContent] = useState<string>('');
 
   // Use React Query for initial output loading
   const {
