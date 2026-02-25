@@ -116,7 +116,7 @@ jobs:
           lsof -i :3108 2>/dev/null || echo "lsof not available or port not in use"
           echo ""
           echo "=== Health endpoint test ==="
-          curl -v http://localhost:3`08/api/health 2>&1 || echo "Health endpoint failed"
+          curl -v http://localhost:3108/api/health 2>&1 || echo "Health endpoint failed"
 
           # Kill the server process if it's still hanging
           if kill -0 $SERVER_PID 2>/dev/null; then
