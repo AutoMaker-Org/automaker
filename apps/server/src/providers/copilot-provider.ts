@@ -100,6 +100,16 @@ interface SdkSessionErrorEvent extends SdkEvent {
 }
 
 // =============================================================================
+// Constants
+// =============================================================================
+
+/**
+ * Prefix for error messages in tool results
+ * Consistent with GeminiProvider's error formatting
+ */
+const TOOL_ERROR_PREFIX = '[ERROR]' as const;
+
+// =============================================================================
 // Error Codes
 // =============================================================================
 
@@ -362,11 +372,18 @@ export class CopilotProvider extends CliProvider {
         };
       }
 
+      /**
+       * Tool execution completed event
+       * Handles both successful results and errors from tool executions
+       * Error messages optionally include error codes for better debugging
+       */
       case 'tool.execution_complete': {
         const toolResultEvent = sdkEvent as SdkToolExecutionCompleteEvent;
-        const isError = !!toolResultEvent.data.error;
-        const content = isError
-          ? `[ERROR] ${toolResultEvent.data.error.message}`
+        const error = toolResultEvent.data.error;
+
+        // Format error message with optional code for better debugging
+        const content = error
+          ? `${TOOL_ERROR_PREFIX} ${error.message}${error.code ? ` (${error.code})` : ''}`
           : toolResultEvent.data.result?.content || '';
 
         return {
