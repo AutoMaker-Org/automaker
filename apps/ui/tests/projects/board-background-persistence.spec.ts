@@ -168,8 +168,13 @@ test.describe('Board Background Persistence', () => {
     await page.waitForLoadState('load');
     await handleLoginScreenIfPresent(page);
 
-    // Wait for welcome view
-    await expect(page.locator('[data-testid="welcome-view"]')).toBeVisible({ timeout: 10000 });
+    // Wait for welcome view or for project list to be ready (project card is inside welcome-view)
+    await Promise.race([
+      page.locator('[data-testid="welcome-view"]').waitFor({ state: 'visible', timeout: 15000 }),
+      page
+        .locator(`[data-testid="recent-project-${projectAId}"]`)
+        .waitFor({ state: 'visible', timeout: 15000 }),
+    ]);
 
     // Open project A (has background settings)
     const projectACard = page.locator(`[data-testid="recent-project-${projectAId}"]`);

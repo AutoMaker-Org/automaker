@@ -174,3 +174,14 @@ export async function setupProjectWithFixture(
 export function getFixturePath(): string {
   return FIXTURE_PATH;
 }
+
+/**
+ * Set up a mock project with the fixture path (for profile/settings tests that need a project).
+ * Options such as customProfilesCount are reserved for future use (e.g. mocking server profile state).
+ */
+export async function setupMockProjectWithProfiles(
+  page: Page,
+  _options?: { customProfilesCount?: number }
+): Promise<void> {
+  await setupProjectWithFixture(page, FIXTURE_PATH);
+}

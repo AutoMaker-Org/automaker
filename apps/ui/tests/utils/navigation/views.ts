@@ -66,6 +66,13 @@ export async function navigateToContext(page: Page): Promise<void> {
   // Wait for the context view to be visible
   // Increase timeout to handle slower server startup
   await waitForElement(page, 'context-view', { timeout: 15000 });
+
+  // On mobile, close the sidebar if open so the header actions trigger is clickable (not covered by backdrop)
+  const backdrop = page.locator('[data-testid="sidebar-backdrop"]');
+  if (await backdrop.isVisible().catch(() => false)) {
+    await backdrop.click({ force: true });
+    await page.waitForTimeout(200);
+  }
 }
 
 /**

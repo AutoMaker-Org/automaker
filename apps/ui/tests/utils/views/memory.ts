@@ -1,8 +1,13 @@
 import { Page, Locator } from '@playwright/test';
-import { clickElement, fillInput } from '../core/interactions';
-import { waitForElement, waitForElementHidden } from '../core/waiting';
+import { clickElement, fillInput, handleLoginScreenIfPresent } from '../core/interactions';
+import {
+  waitForElement,
+  waitForElementHidden,
+  waitForSplashScreenToDisappear,
+} from '../core/waiting';
 import { getByTestId } from '../core/elements';
 import { expect } from '@playwright/test';
+import { authenticateForTests } from '../api/client';
 
 /**
  * Get the memory file list element
@@ -186,12 +191,21 @@ export async function switchMemoryToEditMode(page: Page): Promise<void> {
  * Note: Navigates directly to /memory since index route shows WelcomeView
  */
 export async function navigateToMemory(page: Page): Promise<void> {
+  // Authenticate before navigating (same pattern as navigateToContext / navigateToBoard)
+  await authenticateForTests(page);
+
   // Wait for any pending navigation to complete before starting a new one
   await page.waitForLoadState('domcontentloaded').catch(() => {});
   await page.waitForTimeout(100);
 
   // Navigate directly to /memory route
   await page.goto('/memory', { waitUntil: 'domcontentloaded' });
+
+  // Wait for splash screen to disappear (safety net)
+  await waitForSplashScreenToDisappear(page, 3000);
+
+  // Handle login redirect if needed (e.g. when redirected to /logged-out)
+  await handleLoginScreenIfPresent(page);
 
   // Wait for loading to complete (if present)
   const loadingElement = page.locator('[data-testid="memory-view-loading"]');
@@ -207,4 +221,17 @@ export async function navigateToMemory(page: Page): Promise<void> {
 
   // Wait for the memory view to be visible
   await waitForElement(page, 'memory-view', { timeout: 15000 });
+
+  // On mobile, close the sidebar if open so the header actions trigger is clickable (not covered by backdrop)
+  const backdrop = page.locator('[data-testid="sidebar-backdrop"]');
+  if (await backdrop.isVisible().catch(() => false)) {
+    await backdrop.click({ force: true });
+    await page.waitForTimeout(200);
+  }
+
+  // Ensure the header (and actions panel trigger on mobile) is interactive
+  await page
+    .locator('[data-testid="header-actions-panel-trigger"]')
+    .waitFor({ state: 'visible', timeout: 5000 })
+    .catch(() => {});
 }

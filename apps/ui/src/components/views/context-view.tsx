@@ -198,7 +198,12 @@ export function ContextView() {
       const result = await api.readdir(contextPath);
       if (result.success && result.entries) {
         const files: ContextFile[] = result.entries
-          .filter((entry) => entry.isFile && entry.name !== 'context-metadata.json')
+          .filter(
+            (entry) =>
+              entry.isFile &&
+              entry.name !== 'context-metadata.json' &&
+              (isMarkdownFilename(entry.name) || isImageFilename(entry.name))
+          )
           .map((entry) => ({
             name: entry.name,
             type: isImageFilename(entry.name) ? 'image' : 'text',
