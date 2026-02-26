@@ -62,10 +62,22 @@ export function resetMemoryDirectory(): void {
 }
 
 /**
+ * Resolve and validate a context fixture path to prevent path traversal
+ */
+function resolveContextFixturePath(filename: string): string {
+  const resolved = path.resolve(CONTEXT_PATH, filename);
+  const base = path.resolve(CONTEXT_PATH) + path.sep;
+  if (!resolved.startsWith(base)) {
+    throw new Error(`Invalid context filename: ${filename}`);
+  }
+  return resolved;
+}
+
+/**
  * Create a context file directly on disk (for test setup)
  */
 export function createContextFileOnDisk(filename: string, content: string): void {
-  const filePath = path.join(CONTEXT_PATH, filename);
+  const filePath = resolveContextFixturePath(filename);
   fs.writeFileSync(filePath, content);
 }
 
@@ -93,7 +105,7 @@ export function createMemoryFileOnDisk(filename: string, content: string): void 
  * Check if a context file exists on disk
  */
 export function contextFileExistsOnDisk(filename: string): boolean {
-  const filePath = path.join(CONTEXT_PATH, filename);
+  const filePath = resolveContextFixturePath(filename);
   return fs.existsSync(filePath);
 }
 

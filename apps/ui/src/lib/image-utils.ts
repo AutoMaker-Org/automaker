@@ -17,6 +17,12 @@ export const ACCEPTED_TEXT_TYPES = ['text/plain', 'text/markdown', 'text/x-markd
 // File extensions for text files (used for validation when MIME type is unreliable)
 export const ACCEPTED_TEXT_EXTENSIONS = ['.txt', '.md'];
 
+// File extensions for markdown files
+export const MARKDOWN_EXTENSIONS = ['.md', '.markdown'];
+
+// File extensions for image files (used for display filtering)
+export const IMAGE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.bmp'];
+
 // Default max file size (10MB)
 export const DEFAULT_MAX_FILE_SIZE = 10 * 1024 * 1024;
 
@@ -233,4 +239,30 @@ export function getTextFileMimeType(filename: string): string {
     return 'text/markdown';
   }
   return 'text/plain';
+}
+
+/**
+ * Check if a filename has a markdown extension
+ *
+ * @param filename - The filename to check
+ * @returns True if the filename has a .md or .markdown extension
+ */
+export function isMarkdownFilename(filename: string): boolean {
+  const dotIndex = filename.lastIndexOf('.');
+  if (dotIndex < 0) return false;
+  const ext = filename.toLowerCase().substring(dotIndex);
+  return MARKDOWN_EXTENSIONS.includes(ext);
+}
+
+/**
+ * Check if a filename has an image extension
+ *
+ * @param filename - The filename to check
+ * @returns True if the filename has an image extension
+ */
+export function isImageFilename(filename: string): boolean {
+  const dotIndex = filename.lastIndexOf('.');
+  if (dotIndex < 0) return false;
+  const ext = filename.toLowerCase().substring(dotIndex);
+  return IMAGE_EXTENSIONS.includes(ext);
 }

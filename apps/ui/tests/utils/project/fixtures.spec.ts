@@ -5,7 +5,14 @@
  */
 
 import { test, expect } from '@playwright/test';
-import { createMemoryFileOnDisk, memoryFileExistsOnDisk, resetMemoryDirectory } from './fixtures';
+import {
+  createMemoryFileOnDisk,
+  memoryFileExistsOnDisk,
+  resetMemoryDirectory,
+  createContextFileOnDisk,
+  contextFileExistsOnDisk,
+  resetContextDirectory,
+} from './fixtures';
 
 test.describe('Memory Fixture Utilities', () => {
   test.beforeEach(() => {
@@ -97,5 +104,77 @@ test.describe('Memory Fixture Utilities', () => {
     createMemoryFileOnDisk(filename, '# Multiple dots');
 
     expect(memoryFileExistsOnDisk(filename)).toBe(true);
+  });
+});
+
+test.describe('Context Fixture Utilities', () => {
+  test.beforeEach(() => {
+    resetContextDirectory();
+  });
+
+  test.afterEach(() => {
+    resetContextDirectory();
+  });
+
+  test('should create and detect a valid context file', () => {
+    const filename = 'test-context.md';
+    const content = '# Test Context Content';
+
+    createContextFileOnDisk(filename, content);
+
+    expect(contextFileExistsOnDisk(filename)).toBe(true);
+  });
+
+  test('should return false for non-existent context file', () => {
+    expect(contextFileExistsOnDisk('non-existent.md')).toBe(false);
+  });
+
+  test('should reject path traversal attempt with ../ for context files', () => {
+    const maliciousFilename = '../../../etc/passwd';
+
+    expect(() => {
+      createContextFileOnDisk(maliciousFilename, 'malicious content');
+    }).toThrow('Invalid context filename');
+
+    expect(() => {
+      contextFileExistsOnDisk(maliciousFilename);
+    }).toThrow('Invalid context filename');
+  });
+
+  test('should reject absolute path attempt for context files', () => {
+    const maliciousFilename = '/etc/passwd';
+
+    expect(() => {
+      createContextFileOnDisk(maliciousFilename, 'malicious content');
+    }).toThrow('Invalid context filename');
+
+    expect(() => {
+      contextFileExistsOnDisk(maliciousFilename);
+    }).toThrow('Invalid context filename');
+  });
+
+  test('should accept nested paths within context directory', () => {
+    const nestedFilename = 'subfolder/nested-file.md';
+
+    // The path itself is valid (doesn't escape the context directory)
+    expect(() => {
+      contextFileExistsOnDisk(nestedFilename);
+    }).not.toThrow();
+  });
+
+  test('should handle filenames without extensions for context', () => {
+    const filename = 'README';
+
+    createContextFileOnDisk(filename, 'content without extension');
+
+    expect(contextFileExistsOnDisk(filename)).toBe(true);
+  });
+
+  test('should handle filenames with multiple dots for context', () => {
+    const filename = 'my.context.file.md';
+
+    createContextFileOnDisk(filename, '# Multiple dots');
+
+    expect(contextFileExistsOnDisk(filename)).toBe(true);
   });
 });

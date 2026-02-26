@@ -44,7 +44,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
-import { sanitizeFilename } from '@/lib/image-utils';
+import { sanitizeFilename, isMarkdownFilename, isImageFilename } from '@/lib/image-utils';
 import { Markdown } from '../ui/markdown';
 import {
   DropdownMenu,
@@ -55,24 +55,6 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 
 const logger = createLogger('ContextView');
-
-// File extension utilities
-const MARKDOWN_EXTENSIONS = ['.md', '.markdown'];
-const IMAGE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.bmp'];
-
-const isMarkdownFile = (filename: string): boolean => {
-  const dotIndex = filename.lastIndexOf('.');
-  if (dotIndex < 0) return false;
-  const ext = filename.toLowerCase().substring(dotIndex);
-  return MARKDOWN_EXTENSIONS.includes(ext);
-};
-
-const isImageFile = (filename: string): boolean => {
-  const dotIndex = filename.lastIndexOf('.');
-  if (dotIndex < 0) return false;
-  const ext = filename.toLowerCase().substring(dotIndex);
-  return IMAGE_EXTENSIONS.includes(ext);
-};
 
 // Responsive layout classes
 const FILE_LIST_BASE_CLASSES = 'border-r border-border flex flex-col overflow-hidden';
@@ -219,7 +201,7 @@ export function ContextView() {
           .filter((entry) => entry.isFile && entry.name !== 'context-metadata.json')
           .map((entry) => ({
             name: entry.name,
-            type: isImageFile(entry.name) ? 'image' : 'text',
+            type: isImageFilename(entry.name) ? 'image' : 'text',
             path: `${contextPath}/${entry.name}`,
             description: metadata.files[entry.name]?.description,
           }));
@@ -256,7 +238,7 @@ export function ContextView() {
     // Note: Unsaved changes warning could be added here in the future
     // For now, silently proceed to avoid disrupting mobile UX flow
     loadFileContent(file);
-    setIsPreviewMode(isMarkdownFile(file.name));
+    setIsPreviewMode(isMarkdownFilename(file.name));
   };
 
   // Save current file
@@ -361,7 +343,7 @@ export function ContextView() {
 
     try {
       const api = getElectronAPI();
-      const isImage = isImageFile(file.name);
+      const isImage = isImageFilename(file.name);
 
       let filePath: string;
       let fileName: string;
@@ -602,7 +584,7 @@ export function ContextView() {
       // Update selected file with new name and path
       const renamedFile: ContextFile = {
         name: newName,
-        type: isImageFile(newName) ? 'image' : 'text',
+        type: isImageFilename(newName) ? 'image' : 'text',
         path: newPath,
         content: result.content,
         description: metadata.files[newName]?.description,
@@ -945,7 +927,7 @@ export function ContextView() {
                 </div>
                 <div className={cn('flex gap-2', isMobile && 'gap-1')}>
                   {/* Mobile: Icon-only buttons with aria-labels for accessibility */}
-                  {selectedFile.type === 'text' && isMarkdownFile(selectedFile.name) && (
+                  {selectedFile.type === 'text' && isMarkdownFilename(selectedFile.name) && (
                     <Button
                       variant={'outline'}
                       size="sm"
@@ -1135,7 +1117,7 @@ export function ContextView() {
                       .filter((f): f is globalThis.File => f !== null);
                   }
 
-                  const mdFile = files.find((f) => isMarkdownFile(f.name));
+                  const mdFile = files.find((f) => isMarkdownFilename(f.name));
                   if (mdFile) {
                     const content = await mdFile.text();
                     setNewMarkdownContent(content);

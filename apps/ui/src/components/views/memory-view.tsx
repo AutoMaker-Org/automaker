@@ -33,6 +33,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
+import { isMarkdownFilename } from '@/lib/image-utils';
 import { Markdown } from '../ui/markdown';
 import {
   DropdownMenu,
@@ -42,16 +43,6 @@ import {
 } from '@/components/ui/dropdown-menu';
 
 const logger = createLogger('MemoryView');
-
-// File extension utilities
-const MARKDOWN_EXTENSIONS = ['.md', '.markdown'];
-
-const isMarkdownFile = (filename: string): boolean => {
-  const dotIndex = filename.lastIndexOf('.');
-  if (dotIndex < 0) return false;
-  const ext = filename.toLowerCase().substring(dotIndex);
-  return MARKDOWN_EXTENSIONS.includes(ext);
-};
 
 // Responsive layout classes
 const FILE_LIST_BASE_CLASSES = 'border-r border-border flex flex-col overflow-hidden';
@@ -115,7 +106,7 @@ export function MemoryView() {
       const result = await api.readdir(memoryPath);
       if (result.success && result.entries) {
         const files: MemoryFile[] = result.entries
-          .filter((entry) => entry.isFile && isMarkdownFile(entry.name))
+          .filter((entry) => entry.isFile && isMarkdownFilename(entry.name))
           .map((entry) => ({
             name: entry.name,
             path: `${memoryPath}/${entry.name}`,
