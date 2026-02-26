@@ -168,7 +168,6 @@ export function AgentOutputModal({
   // Track additional content from WebSocket events (appended to query data)
   const [streamedContent, setStreamedContent] = useState<string>('');
   const [viewMode, setViewMode] = useState<ViewMode | null>(null);
-  const [streamedContent, setStreamedContent] = useState<string>('');
 
   // Use React Query for initial output loading
   const {
@@ -258,7 +257,8 @@ export function AgentOutputModal({
     if (!summaryScrollRef.current) return;
 
     const { scrollTop, scrollHeight, clientHeight } = summaryScrollRef.current;
-    const isAtBottom = scrollHeight - scrollTop - clientHeight < 50;
+    const isAtBottom =
+      scrollHeight - scrollTop - clientHeight < MODAL_CONSTANTS.AUTOSCROLL_THRESHOLD;
     setSummaryAutoScroll(isAtBottom);
   };
 

@@ -140,6 +140,7 @@ export function BacklogPlanDialog({
     setPrompt('');
     onClose();
   }, [
+    logger,
     projectPath,
     prompt,
     modelOverride,

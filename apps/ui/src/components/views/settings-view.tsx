@@ -67,7 +67,6 @@ export function SettingsView() {
     defaultMaxTurns,
     setDefaultMaxTurns,
     featureTemplates,
-    setFeatureTemplates,
     addFeatureTemplate,
     updateFeatureTemplate,
     deleteFeatureTemplate,

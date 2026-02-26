@@ -420,7 +420,7 @@ export function useSpecGeneration({ loadSpec }: UseSpecGenerationOptions) {
     return () => {
       unsubscribe();
     };
-  }, [currentProject?.path, loadSpec, errorMessage, currentPhase]);
+  }, [currentProject, loadSpec, errorMessage, currentPhase]);
 
   // Handler functions
   const handleCreateSpec = useCallback(async () => {

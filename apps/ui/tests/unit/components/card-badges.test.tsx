@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { CardBadges } from '../../../src/components/views/board-view/components/kanban-card/card-badges';
+import { TooltipProvider } from '../../../src/components/ui/tooltip';
+import type { Feature } from '@automaker/types';
 
 describe('CardBadges', () => {
   it('renders merge conflict warning badge when status is merge_conflict', () => {
@@ -8,9 +10,13 @@ describe('CardBadges', () => {
       id: 'feature-1',
       status: 'merge_conflict',
       error: undefined,
-    } as any;
+    } as unknown as Feature;
 
-    render(<CardBadges feature={feature} />);
+    render(
+      <TooltipProvider>
+        <CardBadges feature={feature} />
+      </TooltipProvider>
+    );
 
     expect(screen.getByTestId('merge-conflict-badge-feature-1')).toBeInTheDocument();
   });
@@ -20,9 +26,13 @@ describe('CardBadges', () => {
       id: 'feature-2',
       status: 'backlog',
       error: undefined,
-    } as any;
+    } as unknown as Feature;
 
-    const { container } = render(<CardBadges feature={feature} />);
+    const { container } = render(
+      <TooltipProvider>
+        <CardBadges feature={feature} />
+      </TooltipProvider>
+    );
 
     expect(container).toBeEmptyDOMElement();
   });

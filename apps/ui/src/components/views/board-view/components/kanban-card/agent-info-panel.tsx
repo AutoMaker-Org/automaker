@@ -13,7 +13,6 @@ import { getProviderIconForModel } from '@/components/ui/provider-icon';
 import { useFeature, useAgentOutput } from '@/hooks/queries';
 import { queryKeys } from '@/lib/query-keys';
 import { getFirstNonEmptySummary } from '@/lib/summary-selection';
-import { useAppStore } from '@/store/app-store';
 
 /**
  * Formats thinking level for compact display
@@ -258,9 +257,7 @@ export const AgentInfoPanel = memo(function AgentInfoPanel({
     return agentInfo?.todos || [];
   }, [
     freshPlanSpec,
-    feature.planSpec?.tasks,
-    feature.planSpec?.tasksCompleted,
-    feature.planSpec?.currentTaskId,
+    feature.planSpec,
     agentInfo?.todos,
     taskStatusMap,
     taskSummaryMap,

@@ -781,6 +781,7 @@ function RootLayoutContent() {
     };
 
     initAuth();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- setIpcConnected is stable, runs once on mount
   }, []); // Runs once per load; auth state drives routing rules
 
   // Note: Settings are now loaded in __root.tsx after successful session verification

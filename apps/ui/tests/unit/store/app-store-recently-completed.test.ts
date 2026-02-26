@@ -9,9 +9,6 @@ import { act } from '@testing-library/react';
 import { useAppStore } from '../../../src/store/app-store';
 
 describe('recentlyCompletedFeatures store', () => {
-  // Store the original state to restore after each test
-  const originalState = useAppStore.getState();
-
   beforeEach(() => {
     // Reset the store to a clean state before each test
     useAppStore.setState({

@@ -9,24 +9,25 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { AgentOutputModal } from '../../../src/components/views/board-view/dialogs/agent-output-modal';
 import { useAppStore } from '@automaker/ui/store/app-store';
-import { useAgentOutput, useWorktreeDiffs, useGitDiffs } from '@automaker/ui/hooks/queries';
+import {
+  useAgentOutput,
+  useFeature,
+  useWorktreeDiffs,
+  useGitDiffs,
+} from '@automaker/ui/hooks/queries';
 import { getElectronAPI } from '@automaker/ui/lib/electron';
-import { useAgentOutputWebSocket } from '@automaker/ui/hooks/use-agent-output-websocket';
 
 // Mock dependencies
 vi.mock('@automaker/ui/hooks/queries');
 vi.mock('@automaker/ui/lib/electron');
 vi.mock('@automaker/ui/store/app-store');
-vi.mock('@automaker/ui/hooks/use-agent-output-websocket');
 
-const mockUseAppStore = useAppStore as ReturnType<typeof useAppStore>;
-const mockUseAgentOutput = useAgentOutput as ReturnType<typeof useAgentOutput>;
-const mockGetElectronAPI = getElectronAPI as ReturnType<typeof getElectronAPI>;
-const mockUseWorktreeDiffs = useWorktreeDiffs as ReturnType<typeof useWorktreeDiffs>;
-const mockUseGitDiffs = useGitDiffs as ReturnType<typeof useGitDiffs>;
-const mockUseAgentOutputWebSocket = useAgentOutputWebSocket as ReturnType<
-  typeof useAgentOutputWebSocket
->;
+const mockUseAppStore = vi.mocked(useAppStore);
+const mockUseAgentOutput = vi.mocked(useAgentOutput);
+const mockUseFeature = vi.mocked(useFeature);
+const mockGetElectronAPI = vi.mocked(getElectronAPI);
+const mockUseWorktreeDiffs = vi.mocked(useWorktreeDiffs);
+const mockUseGitDiffs = vi.mocked(useGitDiffs);
 
 describe('AgentOutputModal Integration Tests', () => {
   const defaultProps = {
@@ -64,36 +65,33 @@ Successfully implemented a responsive navigation menu with hamburger menu for mo
       return selector({ useWorktrees: false });
     });
 
-    // Mock useAgentOutputWebSocket (the actual hook used by AgentOutputModal)
-    mockUseAgentOutputWebSocket.mockReturnValue({
-      output: mockOutput,
-      isLoading: false,
-      streamedContent: '',
-      error: null,
-    } as Partial<ReturnType<typeof useAgentOutputWebSocket>> as ReturnType<
-      typeof useAgentOutputWebSocket
-    >);
-
-    // Mock useAgentOutput with real output (not used by AgentOutputModal but kept for consistency)
+    // Mock useAgentOutput
     mockUseAgentOutput.mockReturnValue({
       data: mockOutput,
       isLoading: false,
       error: null,
-    } as Partial<ReturnType<typeof useAgentOutput>> as ReturnType<typeof useAgentOutput>);
+      refetch: vi.fn(),
+    } as ReturnType<typeof useAgentOutput>);
+
+    // Mock useFeature
+    mockUseFeature.mockReturnValue({
+      data: null,
+      refetch: vi.fn(),
+    } as ReturnType<typeof useFeature>);
 
     // Mock useWorktreeDiffs (needed for GitDiffPanel in changes view)
     mockUseWorktreeDiffs.mockReturnValue({
       data: [],
       isLoading: false,
       error: null,
-    } as Partial<ReturnType<typeof useWorktreeDiffs>> as ReturnType<typeof useWorktreeDiffs>);
+    } as ReturnType<typeof useWorktreeDiffs>);
 
     // Mock useGitDiffs (also needed for GitDiffPanel)
     mockUseGitDiffs.mockReturnValue({
       data: [],
       isLoading: false,
       error: null,
-    } as Partial<ReturnType<typeof useGitDiffs>> as ReturnType<typeof useGitDiffs>);
+    } as ReturnType<typeof useGitDiffs>);
 
     // Mock electron API
     mockGetElectronAPI.mockReturnValue(null);
@@ -170,14 +168,12 @@ Successfully implemented a responsive navigation menu with hamburger menu for mo
     });
 
     it('should show loading state when output is loading', () => {
-      mockUseAgentOutputWebSocket.mockReturnValue({
-        output: '',
+      mockUseAgentOutput.mockReturnValue({
+        data: '',
         isLoading: true,
-        streamedContent: '',
         error: null,
-      } as Partial<ReturnType<typeof useAgentOutputWebSocket>> as ReturnType<
-        typeof useAgentOutputWebSocket
-      >);
+        refetch: vi.fn(),
+      } as ReturnType<typeof useAgentOutput>);
 
       render(<AgentOutputModal {...defaultProps} />);
 
@@ -185,14 +181,12 @@ Successfully implemented a responsive navigation menu with hamburger menu for mo
     });
 
     it('should show no output message when output is empty', () => {
-      mockUseAgentOutputWebSocket.mockReturnValue({
-        output: '',
+      mockUseAgentOutput.mockReturnValue({
+        data: '',
         isLoading: false,
-        streamedContent: '',
         error: null,
-      } as Partial<ReturnType<typeof useAgentOutputWebSocket>> as ReturnType<
-        typeof useAgentOutputWebSocket
-      >);
+        refetch: vi.fn(),
+      } as ReturnType<typeof useAgentOutput>);
 
       render(<AgentOutputModal {...defaultProps} />);
 
@@ -282,14 +276,12 @@ Successfully implemented a responsive navigation menu with hamburger menu for mo
       expect(screen.getByTestId('agent-output-modal')).toBeInTheDocument();
 
       // Simulate output update
-      mockUseAgentOutputWebSocket.mockReturnValue({
-        output: mockOutput + '\nNew content',
+      mockUseAgentOutput.mockReturnValue({
+        data: mockOutput + '\nNew content',
         isLoading: false,
-        streamedContent: '',
         error: null,
-      } as Partial<ReturnType<typeof useAgentOutputWebSocket>> as ReturnType<
-        typeof useAgentOutputWebSocket
-      >);
+        refetch: vi.fn(),
+      } as ReturnType<typeof useAgentOutput>);
 
       // Re-render the component with the same props to trigger update
       await act(async () => {
@@ -323,7 +315,7 @@ Successfully implemented a responsive navigation menu with hamburger menu for mo
     });
 
     it('should fallback to window.__currentProject when projectPath is not provided', () => {
-      (window as any).__currentProject = { path: '/fallback/project' };
+      window.__currentProject = { path: '/fallback/project' };
 
       render(<AgentOutputModal {...defaultProps} />);
 

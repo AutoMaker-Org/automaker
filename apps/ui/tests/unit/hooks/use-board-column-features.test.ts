@@ -23,9 +23,6 @@ function createMockFeature(id: string, status: string, options: Partial<Feature>
 }
 
 describe('useBoardColumnFeatures', () => {
-  // Store original state to restore after tests
-  const originalState = useAppStore.getState();
-
   const defaultProps = {
     features: [] as Feature[],
     runningAutoTasks: [] as string[],
@@ -303,8 +300,10 @@ describe('useBoardColumnFeatures', () => {
 
   describe('recently completed features clearing on cache refresh', () => {
     it('should clear recently completed features when features list updates with terminal status', async () => {
-      const { addRecentlyCompletedFeature, clearRecentlyCompletedFeatures } =
-        useAppStore.getState();
+      const {
+        addRecentlyCompletedFeature,
+        clearRecentlyCompletedFeatures: _clearRecentlyCompletedFeatures,
+      } = useAppStore.getState();
 
       // Add feature to recently completed
       act(() => {

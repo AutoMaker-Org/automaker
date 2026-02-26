@@ -33,9 +33,9 @@ export const MODAL_CONSTANTS = {
     CHANGES: 'changes',
   } as const,
 
-  // Component heights
+  // Component heights (complete Tailwind class fragments for template interpolation)
   COMPONENT_HEIGHTS: {
-    SMALL_MIN: '200px',
-    SMALL_MAX: '60vh',
+    SMALL_MIN: 'sm:min-h-[200px]',
+    SMALL_MAX: 'sm:max-h-[60vh]',
   },
 } as const;

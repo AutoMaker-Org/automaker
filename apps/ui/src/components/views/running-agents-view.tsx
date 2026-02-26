@@ -55,7 +55,8 @@ export function RunningAgentsView() {
       // Use mutation for regular features
       stopFeature.mutate({ featureId: agent.featureId, projectPath: agent.projectPath });
     },
-    [stopFeature, refetch, logger]
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- logger is stable
+    [stopFeature, refetch]
   );
 
   const handleNavigateToProject = useCallback(
@@ -75,6 +76,7 @@ export function RunningAgentsView() {
         });
       }
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- logger is stable
     [projects, setCurrentProject, navigate]
   );
 
@@ -84,6 +86,7 @@ export function RunningAgentsView() {
       projectPath: agent.projectPath,
     });
     setSelectedAgent(agent);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- logger is stable
   }, []);
 
   if (isLoading) {

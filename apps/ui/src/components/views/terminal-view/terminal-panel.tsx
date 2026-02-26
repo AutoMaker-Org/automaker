@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback, useState } from 'react';
+import { useEffect, useRef, useCallback, useState, useMemo } from 'react';
 import { useNavigate } from '@tanstack/react-router';
 import { createLogger } from '@automaker/utils/logger';
 import {
@@ -516,18 +516,21 @@ export function TerminalPanel({
 
   // Get theme colors for search highlighting
   const terminalTheme = getTerminalTheme(effectiveTheme);
-  const searchOptions = {
-    caseSensitive: false,
-    regex: false,
-    decorations: {
-      matchBackground: terminalTheme.searchMatchBackground,
-      matchBorder: terminalTheme.searchMatchBorder,
-      matchOverviewRuler: terminalTheme.searchMatchBorder,
-      activeMatchBackground: terminalTheme.searchActiveMatchBackground,
-      activeMatchBorder: terminalTheme.searchActiveMatchBorder,
-      activeMatchColorOverviewRuler: terminalTheme.searchActiveMatchBorder,
-    },
-  };
+  const searchOptions = useMemo(
+    () => ({
+      caseSensitive: false,
+      regex: false,
+      decorations: {
+        matchBackground: terminalTheme.searchMatchBackground,
+        matchBorder: terminalTheme.searchMatchBorder,
+        matchOverviewRuler: terminalTheme.searchMatchBorder,
+        activeMatchBackground: terminalTheme.searchActiveMatchBackground,
+        activeMatchBorder: terminalTheme.searchActiveMatchBorder,
+        activeMatchColorOverviewRuler: terminalTheme.searchActiveMatchBorder,
+      },
+    }),
+    [terminalTheme]
+  );
 
   // Search functions
   const searchNext = useCallback(() => {
@@ -1368,7 +1371,15 @@ export function TerminalPanel({
         wsRef.current = null;
       }
     };
-  }, [sessionId, authToken, wsUrl, isTerminalReady, fetchWsToken]);
+  }, [
+    sessionId,
+    authToken,
+    wsUrl,
+    isTerminalReady,
+    fetchWsToken,
+    runCommandOnConnect,
+    onCommandRan,
+  ]);
 
   // Handle resize with debouncing
   const handleResize = useCallback(() => {
@@ -1605,7 +1616,7 @@ export function TerminalPanel({
   }, [zoomIn, zoomOut]);
 
   // Context menu actions for keyboard navigation
-  const menuActions = ['copy', 'paste', 'selectAll', 'clear'] as const;
+  const menuActions = useMemo(() => ['copy', 'paste', 'selectAll', 'clear'] as const, []);
 
   // Keep ref in sync with state for use in event handlers
   useEffect(() => {
@@ -1675,7 +1686,7 @@ export function TerminalPanel({
       document.removeEventListener('scroll', handleScroll, true);
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [contextMenu, closeContextMenu, handleContextMenuAction]);
+  }, [contextMenu, closeContextMenu, handleContextMenuAction, menuActions]);
 
   // Focus the correct menu item when navigation changes
   useEffect(() => {

@@ -227,6 +227,7 @@ export function useIssuesFilter(
       hasActiveFilter,
       matchedCount: matchedIssues.length,
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- filterState destructured to individual deps
   }, [
     issues,
     searchQuery,

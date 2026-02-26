@@ -3,7 +3,7 @@
  * These utilities help test responsive behavior across different screen sizes
  */
 
-import { Page } from '@playwright/test';
+import { Page, expect } from '@playwright/test';
 import { waitForElement } from '../core/waiting';
 import { TIMEOUTS } from '../core/constants';
 
@@ -168,8 +168,8 @@ export async function testModalResponsiveResize(
   await page.setViewportSize(VIEWPORTS[fromViewport]);
   await page.waitForTimeout(TIMEOUTS.animation);
 
-  // Get initial modal dimensions
-  const initialDimensions = await getModalComputedStyle(page);
+  // Get initial modal dimensions (used for comparison context)
+  await getModalComputedStyle(page);
 
   // Resize to new viewport
   await page.setViewportSize(VIEWPORTS[toViewport]);

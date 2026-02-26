@@ -88,7 +88,6 @@ export function useAutoMode(worktree?: WorktreeInfo) {
     setPendingPlanApproval,
     getWorktreeKey,
     getMaxConcurrencyForWorktree,
-    setMaxConcurrencyForWorktree,
     isPrimaryWorktreeBranch,
     globalMaxConcurrency,
     addRecentlyCompletedFeature,
@@ -104,7 +103,6 @@ export function useAutoMode(worktree?: WorktreeInfo) {
       setPendingPlanApproval: state.setPendingPlanApproval,
       getWorktreeKey: state.getWorktreeKey,
       getMaxConcurrencyForWorktree: state.getMaxConcurrencyForWorktree,
-      setMaxConcurrencyForWorktree: state.setMaxConcurrencyForWorktree,
       isPrimaryWorktreeBranch: state.isPrimaryWorktreeBranch,
       globalMaxConcurrency: state.maxConcurrency,
       addRecentlyCompletedFeature: state.addRecentlyCompletedFeature,
@@ -765,6 +763,7 @@ export function useAutoMode(worktree?: WorktreeInfo) {
     currentProject?.path,
     getMaxConcurrencyForWorktree,
     isPrimaryWorktreeBranch,
+    addRecentlyCompletedFeature,
   ]);
 
   // Start auto mode - calls backend to start the auto loop for this worktree

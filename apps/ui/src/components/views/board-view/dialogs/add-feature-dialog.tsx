@@ -25,15 +25,10 @@ import { Play, Cpu, FolderKanban, Settings2 } from 'lucide-react';
 import { useNavigate } from '@tanstack/react-router';
 import { toast } from 'sonner';
 import { cn, normalizeModelEntry } from '@/lib/utils';
-import { modelSupportsThinking } from '@/lib/utils';
 import { useAppStore } from '@/store/app-store';
 import type { ThinkingLevel, PlanningMode, Feature, FeatureImage } from '@/store/types';
 import type { ReasoningEffort, PhaseModelEntry, AgentModel } from '@automaker/types';
-import {
-  supportsReasoningEffort,
-  normalizeThinkingLevelForModel,
-  getThinkingLevelsForModel,
-} from '@automaker/types';
+import { normalizeThinkingLevelForModel, getThinkingLevelsForModel } from '@automaker/types';
 import {
   PrioritySelector,
   WorkModeSelector,

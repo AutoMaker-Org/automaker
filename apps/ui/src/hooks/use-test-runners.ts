@@ -59,7 +59,6 @@ export function useTestRunners(worktreePath?: string) {
   // Get store state and actions
   const {
     sessions,
-    activeSessionByWorktree,
     isLoading,
     error,
     startSession,
@@ -75,7 +74,6 @@ export function useTestRunners(worktreePath?: string) {
   } = useTestRunnersStore(
     useShallow((state) => ({
       sessions: state.sessions,
-      activeSessionByWorktree: state.activeSessionByWorktree,
       isLoading: state.isLoading,
       error: state.error,
       startSession: state.startSession,
@@ -95,12 +93,12 @@ export function useTestRunners(worktreePath?: string) {
   const activeSession = useMemo(() => {
     if (!worktreePath) return null;
     return getActiveSession(worktreePath);
-  }, [worktreePath, getActiveSession, activeSessionByWorktree]);
+  }, [worktreePath, getActiveSession]);
 
   const isRunning = useMemo(() => {
     if (!worktreePath) return false;
     return isWorktreeRunning(worktreePath);
-  }, [worktreePath, isWorktreeRunning, activeSessionByWorktree, sessions]);
+  }, [worktreePath, isWorktreeRunning]);
 
   // Get all sessions for the current worktree
   const worktreeSessions = useMemo(() => {

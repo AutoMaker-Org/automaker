@@ -161,6 +161,7 @@ function VirtualizedList<Item extends VirtualListItem>({
       const resolvedHeight = measured ?? estimatedItemHeight;
       return resolvedHeight + itemGap;
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items, estimatedItemHeight, itemGap, measureVersion]);
 
   const itemStarts = useMemo(() => {

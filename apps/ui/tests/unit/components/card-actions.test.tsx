@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { CardActions } from '../../../src/components/views/board-view/components/kanban-card/card-actions';
+import type { Feature } from '@automaker/types';
 
 describe('CardActions', () => {
   it('renders backlog logs button when context exists', () => {
@@ -8,7 +9,7 @@ describe('CardActions', () => {
       id: 'feature-logs',
       status: 'backlog',
       error: undefined,
-    } as any;
+    } as unknown as Feature;
 
     render(
       <CardActions
@@ -30,7 +31,7 @@ describe('CardActions', () => {
       id: 'feature-no-logs',
       status: 'backlog',
       error: undefined,
-    } as any;
+    } as unknown as Feature;
 
     render(
       <CardActions

@@ -212,7 +212,6 @@ export function WorktreePanel({
   // Read store state directly inside the effect to avoid a dependency cycle
   // (the effect writes to the same state it would otherwise depend on)
   useEffect(() => {
-    const mainWt = worktrees.find((w) => w.isMain);
     const otherWts = worktrees.filter((w) => !w.isMain);
     const otherSlotCount = Math.max(0, pinnedWorktreesCount);
 

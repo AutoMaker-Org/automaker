@@ -9,7 +9,7 @@ import {
   DEFAULT_MODEL,
   type FormatModelNameOptions,
 } from '../../../src/lib/agent-context-parser';
-import type { ClaudeCompatibleProvider } from '@automaker/types';
+import type { ClaudeCompatibleProvider, ProviderModel } from '@automaker/types';
 
 describe('agent-context-parser.ts', () => {
   describe('DEFAULT_MODEL', () => {
@@ -147,7 +147,7 @@ describe('agent-context-parser.ts', () => {
           {
             id: 'moonshot-ai',
             name: 'Moonshot AI',
-            models: [{ id: 'claude-sonnet-4-5' } as any], // No displayName
+            models: [{ id: 'claude-sonnet-4-5' } as unknown as ProviderModel], // No displayName
           },
         ];
 

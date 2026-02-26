@@ -256,7 +256,7 @@ export function CliSetupStep({ config, state, onNext, onBack, onSkip }: CliSetup
       setApiKeyVerificationStatus('error');
       setApiKeyVerificationError(errorMessage);
     }
-  }, [authStatus, config, setAuthStatus]);
+  }, [authStatus, config, setAuthStatus, apiKey]);
 
   const deleteApiKey = useCallback(async () => {
     setIsDeletingApiKey(true);

@@ -3,7 +3,6 @@ import { twMerge } from 'tailwind-merge';
 import type { ModelAlias, ModelProvider } from '@/store/app-store';
 import {
   normalizeThinkingLevelForModel,
-  supportsReasoningEffort,
   normalizeReasoningEffortForModel,
   LEGACY_CLAUDE_ALIAS_MAP,
   type PhaseModelEntry,
