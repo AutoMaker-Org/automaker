@@ -876,14 +876,18 @@ class DevServerService {
       // Capture stdout with buffer management and event emission
       if (devProcess.stdout) {
         devProcess.stdout.on('data', (data: Buffer) => {
-          this.handleProcessOutput(serverInfo, data);
+          this.handleProcessOutput(serverInfo, data).catch((error: unknown) => {
+            logger.error('Failed to handle dev server stdout output:', error);
+          });
         });
       }
 
       // Capture stderr with buffer management and event emission
       if (devProcess.stderr) {
         devProcess.stderr.on('data', (data: Buffer) => {
-          this.handleProcessOutput(serverInfo, data);
+          this.handleProcessOutput(serverInfo, data).catch((error: unknown) => {
+            logger.error('Failed to handle dev server stderr output:', error);
+          });
         });
       }
 

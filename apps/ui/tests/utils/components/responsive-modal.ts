@@ -85,7 +85,7 @@ export async function expectModalResponsiveClasses(
   const modal = page.locator('[data-testid="agent-output-modal"]');
 
   for (const className of expectedClasses) {
-    await expect(modal).toHaveClass(className);
+    await expect(modal).toHaveClass(new RegExp(className));
   }
 }
 

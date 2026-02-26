@@ -452,6 +452,12 @@ export function validateBareModelId(
       continue;
     }
 
+    // Skip validation if the model has the expected provider's own prefix
+    // (e.g., Gemini provider can receive models with "gemini-" prefix)
+    if (expectedProvider && provider === expectedProvider) {
+      continue;
+    }
+
     if (model.startsWith(prefix)) {
       throw new Error(
         `[${providerName}] Model ID should not contain provider prefix '${prefix}'. ` +

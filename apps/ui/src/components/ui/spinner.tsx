@@ -37,6 +37,7 @@ export function Spinner({ size = 'md', variant = 'primary', className }: Spinner
     <Loader2
       className={cn(sizeClasses[size], 'animate-spin', variantClasses[variant], className)}
       aria-hidden="true"
+      data-testid="spinner"
     />
   );
 }

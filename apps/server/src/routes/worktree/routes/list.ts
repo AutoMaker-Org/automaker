@@ -153,6 +153,21 @@ async function getCurrentBranch(cwd: string): Promise<string> {
   }
 }
 
+function normalizeBranchFromHeadRef(headRef: string): string | null {
+  let normalized = headRef.trim();
+  const prefixes = ['refs/heads/', 'refs/remotes/origin/', 'refs/remotes/', 'refs/'];
+
+  for (const prefix of prefixes) {
+    if (normalized.startsWith(prefix)) {
+      normalized = normalized.slice(prefix.length);
+      break;
+    }
+  }
+
+  // Return the full branch name, including any slashes (e.g., "feature/my-branch")
+  return normalized || null;
+}
+
 /**
  * Attempt to recover the branch name for a worktree in detached HEAD state.
  * This happens during rebase operations where git detaches HEAD from the branch.
@@ -175,7 +190,7 @@ async function recoverBranchForDetachedWorktree(worktreePath: string): Promise<s
     try {
       const headNamePath = path.join(gitDir, 'rebase-merge', 'head-name');
       const headName = (await secureFs.readFile(headNamePath, 'utf-8')) as string;
-      const branch = headName.trim().replace('refs/heads/', '');
+      const branch = normalizeBranchFromHeadRef(headName);
       if (branch) return branch;
     } catch {
       // Not a rebase-merge
@@ -185,7 +200,7 @@ async function recoverBranchForDetachedWorktree(worktreePath: string): Promise<s
     try {
       const headNamePath = path.join(gitDir, 'rebase-apply', 'head-name');
       const headName = (await secureFs.readFile(headNamePath, 'utf-8')) as string;
-      const branch = headName.trim().replace('refs/heads/', '');
+      const branch = normalizeBranchFromHeadRef(headName);
       if (branch) return branch;
     } catch {
       // Not a rebase-apply
@@ -252,13 +267,17 @@ async function scanWorktreesDirectory(
             try {
               const { stdout: headRef } = await execAsync('git rev-parse --abbrev-ref HEAD', {
                 cwd: worktreePath,
+                timeout: 5000,
               });
               const ref = headRef.trim();
               if (ref && ref !== 'HEAD') {
                 headBranch = ref;
               }
-            } catch {
-              // Can't determine branch from HEAD ref
+            } catch (error) {
+              // Can't determine branch from HEAD ref (including timeout) - fall back to detached HEAD recovery
+              logger.debug(
+                `Failed to resolve HEAD ref for ${worktreePath}: ${getErrorMessage(error)}`
+              );
             }
 
             // If HEAD is detached (rebase/merge in progress), try recovery from git state files

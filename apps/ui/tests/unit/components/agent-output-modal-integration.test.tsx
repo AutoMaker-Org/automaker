@@ -207,27 +207,22 @@ Successfully implemented a responsive navigation menu with hamburger menu for mo
     it('should not show spinner when status is verified', () => {
       render(<AgentOutputModal {...defaultProps} featureStatus="verified" />);
 
-      // Spinner has aria-hidden="true", so we can't query by role
-      // Instead, verify the modal content doesn't show loading state
-      expect(screen.getByText('Agent Output')).toBeInTheDocument();
+      // Spinner should NOT be present when status is verified
+      expect(screen.queryByTestId('spinner')).not.toBeInTheDocument();
     });
 
     it('should not show spinner when status is waiting_approval', () => {
       render(<AgentOutputModal {...defaultProps} featureStatus="waiting_approval" />);
 
-      // Spinner has aria-hidden="true", so we can't query by role
-      expect(screen.getByText('Agent Output')).toBeInTheDocument();
+      // Spinner should NOT be present when status is waiting_approval
+      expect(screen.queryByTestId('spinner')).not.toBeInTheDocument();
     });
 
     it('should show spinner when status is running', () => {
       render(<AgentOutputModal {...defaultProps} featureStatus="running" />);
 
-      // The modal should render when running - the title should be visible
-      expect(screen.getByText('Agent Output')).toBeInTheDocument();
-      // Find all SVG elements (the Loader2 icon renders as SVG)
-      const svgs = document.querySelectorAll('svg');
-      // There should be at least some SVGs rendered for icons
-      expect(svgs.length).toBeGreaterThan(0);
+      // Spinner should be present and visible when status is running
+      expect(screen.getByTestId('spinner')).toBeInTheDocument();
     });
   });
 
@@ -270,26 +265,75 @@ Successfully implemented a responsive navigation menu with hamburger menu for mo
     it('should auto-scroll to bottom when output changes', async () => {
       const { rerender } = render(<AgentOutputModal {...defaultProps} />);
 
-      // Find the scroll container - it's the div containing the log output
-      // Since there's no role="log", we'll use a different approach
-      // The modal should be rendered
-      expect(screen.getByTestId('agent-output-modal')).toBeInTheDocument();
+      // Find the scroll container - the div with overflow-y-auto that contains the log output
+      const modal = screen.getByTestId('agent-output-modal');
+      const scrollContainer = modal.querySelector('.overflow-y-auto.font-mono') as HTMLDivElement;
 
-      // Simulate output update
+      expect(scrollContainer).toBeInTheDocument();
+
+      // Mock the scrollHeight to simulate content growth
+      Object.defineProperty(scrollContainer, 'scrollHeight', {
+        value: 1000,
+        configurable: true,
+        writable: true,
+      });
+
+      // Simulate output update by changing the mock return value
       mockUseAgentOutput.mockReturnValue({
-        data: mockOutput + '\nNew content',
+        data: mockOutput + '\n\n## New Content\nThis is additional content that was streamed.',
         isLoading: false,
         error: null,
         refetch: vi.fn(),
       } as ReturnType<typeof useAgentOutput>);
 
-      // Re-render the component with the same props to trigger update
+      // Re-render the component to trigger the auto-scroll effect
       await act(async () => {
         rerender(<AgentOutputModal {...defaultProps} />);
       });
 
-      // Verify the modal is still rendered
-      expect(screen.getByTestId('agent-output-modal')).toBeInTheDocument();
+      // The auto-scroll effect sets scrollTop directly to scrollHeight
+      // Verify scrollTop was updated to the scrollHeight value
+      expect(scrollContainer.scrollTop).toBe(1000);
+    });
+
+    it('should update scrollTop when output is appended', async () => {
+      const { rerender } = render(<AgentOutputModal {...defaultProps} />);
+
+      const modal = screen.getByTestId('agent-output-modal');
+      const scrollContainer = modal.querySelector('.overflow-y-auto.font-mono') as HTMLDivElement;
+
+      expect(scrollContainer).toBeInTheDocument();
+
+      // Set initial scrollHeight
+      Object.defineProperty(scrollContainer, 'scrollHeight', {
+        value: 500,
+        configurable: true,
+        writable: true,
+      });
+
+      // Initial state - scrollTop should be set after first render
+      // (autoScrollRef.current starts as true)
+
+      // Now simulate more content being added
+      Object.defineProperty(scrollContainer, 'scrollHeight', {
+        value: 1500,
+        configurable: true,
+        writable: true,
+      });
+
+      mockUseAgentOutput.mockReturnValue({
+        data: mockOutput + '\n\nMore content added.',
+        isLoading: false,
+        error: null,
+        refetch: vi.fn(),
+      } as ReturnType<typeof useAgentOutput>);
+
+      await act(async () => {
+        rerender(<AgentOutputModal {...defaultProps} />);
+      });
+
+      // Verify scrollTop was updated to the new scrollHeight
+      expect(scrollContainer.scrollTop).toBe(1500);
     });
   });
 
