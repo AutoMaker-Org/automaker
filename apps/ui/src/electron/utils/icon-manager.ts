@@ -21,18 +21,23 @@ export function getIconPath(): string | null {
   let iconFile: string;
   if (process.platform === 'win32') {
     iconFile = 'icon.ico';
-  } else if (process.platform === 'darwin') {
-    iconFile = 'logo_larger.png';
   } else {
     iconFile = 'logo_larger.png';
   }
 
   // __dirname is apps/ui/dist-electron (Vite bundles all into single file)
-  // In production the asar layout is: /dist-electron/main.js and /dist/logo_larger.png
-  // Vite copies public/ assets to the root of dist/, NOT dist/public/
-  const iconPath = isDev
-    ? path.join(__dirname, '../public', iconFile)
-    : path.join(__dirname, '../dist', iconFile);
+  let iconPath: string;
+  if (isDev) {
+    iconPath = path.join(__dirname, '../public', iconFile);
+  } else if (process.platform === 'linux') {
+    // On Linux, use the icon copied to resourcesPath via extraResources.
+    // This places it outside app.asar so the window manager can read it
+    // directly, and matches the absolute path used in the .desktop entry.
+    iconPath = path.join(process.resourcesPath, iconFile);
+  } else {
+    // macOS / Windows: icon is inside the asar; Electron handles it natively.
+    iconPath = path.join(__dirname, '../dist', iconFile);
+  }
 
   try {
     if (!electronAppExists(iconPath)) {
