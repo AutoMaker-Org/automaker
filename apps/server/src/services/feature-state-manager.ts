@@ -593,23 +593,20 @@ export class FeatureStateManager {
 
         if (feature.summary) {
           // Check if this step already exists in the summary (e.g., if retried)
-          // Use string operations to avoid ReDoS vulnerability from regex
+          // Use section splitting to only match real section boundaries, not text in body content
           const separator = '\n\n---\n\n';
-          const headerWithNewline = stepHeader + '\n\n';
-          const headerIndex = feature.summary.indexOf(headerWithNewline);
+          const sections = feature.summary.split(separator);
+          let replaced = false;
+          const updatedSections = sections.map((section) => {
+            if (section.startsWith(`${stepHeader}\n\n`)) {
+              replaced = true;
+              return stepSection;
+            }
+            return section;
+          });
 
-          if (headerIndex !== -1) {
-            // Found existing section - find its end (next separator or end of string)
-            const afterHeader = headerIndex + headerWithNewline.length;
-            const nextSeparatorIndex = feature.summary.indexOf(separator, afterHeader);
-            const sectionEnd =
-              nextSeparatorIndex !== -1 ? nextSeparatorIndex : feature.summary.length;
-
-            // Replace the existing section with the new one
-            feature.summary =
-              feature.summary.substring(0, headerIndex) +
-              stepSection +
-              feature.summary.substring(sectionEnd);
+          if (replaced) {
+            feature.summary = updatedSections.join(separator);
             logger.info(
               `[saveFeatureSummary] Updated existing pipeline step summary for feature ${featureId}: step="${stepName}"`
             );

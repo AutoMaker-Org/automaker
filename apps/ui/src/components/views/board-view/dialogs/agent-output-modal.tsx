@@ -200,15 +200,24 @@ export function AgentOutputModal({
   // fall back to client-side extraction from raw output.
   const summary = getFirstNonEmptySummary(feature?.summary, extractedSummary);
 
+  // Normalize null to undefined for parser helpers that expect string | undefined
+  const normalizedSummary = summary ?? undefined;
+
   // Parse summary into phases for multi-step navigation
-  const phaseEntries = useMemo(() => parseAllPhaseSummaries(summary), [summary]);
-  const hasMultiplePhases = useMemo(() => isAccumulatedSummary(summary), [summary]);
+  const phaseEntries = useMemo(
+    () => parseAllPhaseSummaries(normalizedSummary),
+    [normalizedSummary]
+  );
+  const hasMultiplePhases = useMemo(
+    () => isAccumulatedSummary(normalizedSummary),
+    [normalizedSummary]
+  );
   const [activePhaseIndex, setActivePhaseIndex] = useState(0);
 
   // Reset active phase index when summary changes
   useEffect(() => {
     setActivePhaseIndex(0);
-  }, [summary]);
+  }, [normalizedSummary]);
 
   // Determine the effective view mode - default to summary if available, otherwise parsed
   const effectiveViewMode = viewMode ?? (summary ? 'summary' : 'parsed');
@@ -238,10 +247,10 @@ export function AgentOutputModal({
 
   // Auto-scroll summary panel to bottom when summary is updated
   useEffect(() => {
-    if (summaryAutoScroll && summaryScrollRef.current && summary) {
+    if (summaryAutoScroll && summaryScrollRef.current && normalizedSummary) {
       summaryScrollRef.current.scrollTop = summaryScrollRef.current.scrollHeight;
     }
-  }, [summary, summaryAutoScroll]);
+  }, [normalizedSummary, summaryAutoScroll]);
 
   // Handle scroll to detect if user scrolled up in summary panel
   const handleSummaryScroll = () => {
@@ -263,7 +272,7 @@ export function AgentOutputModal({
         targetCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }
     }
-  }, [activePhaseIndex, hasMultiplePhases, summary]);
+  }, [activePhaseIndex, hasMultiplePhases, normalizedSummary]);
 
   // Listen to auto mode events and update output
   useEffect(() => {

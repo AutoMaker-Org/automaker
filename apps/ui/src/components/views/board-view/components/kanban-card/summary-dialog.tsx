@@ -159,11 +159,20 @@ export function SummaryDialog({
   // then fall back to feature/agent-info summaries.
   const rawSummary = getFirstNonEmptySummary(summary, feature.summary, agentInfo?.summary);
 
+  // Normalize null to undefined for parser helpers that expect string | undefined
+  const normalizedSummary = rawSummary ?? undefined;
+
   // Memoize the parsed phases to avoid re-parsing on every render
-  const phaseEntries = useMemo(() => parseAllPhaseSummaries(rawSummary), [rawSummary]);
+  const phaseEntries = useMemo(
+    () => parseAllPhaseSummaries(normalizedSummary),
+    [normalizedSummary]
+  );
 
   // Memoize the multi-phase check
-  const hasMultiplePhases = useMemo(() => isAccumulatedSummary(rawSummary), [rawSummary]);
+  const hasMultiplePhases = useMemo(
+    () => isAccumulatedSummary(normalizedSummary),
+    [normalizedSummary]
+  );
 
   // Fetch agent output
   const { data: agentOutput = '', isLoading: isLoadingOutput } = useAgentOutput(
@@ -177,9 +186,9 @@ export function SummaryDialog({
   // Reset active phase index when summary changes
   useEffect(() => {
     setActivePhaseIndex(0);
-  }, [rawSummary]);
+  }, [normalizedSummary]);
 
-  // Scroll to active phase when it changes or when rawSummary changes
+  // Scroll to active phase when it changes or when normalizedSummary changes
   useEffect(() => {
     if (contentRef.current && hasMultiplePhases) {
       const phaseCards = contentRef.current.querySelectorAll('[data-phase-index]');
@@ -190,7 +199,7 @@ export function SummaryDialog({
         targetCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }
     }
-  }, [activePhaseIndex, hasMultiplePhases, rawSummary]);
+  }, [activePhaseIndex, hasMultiplePhases, normalizedSummary]);
 
   // Determine the dialog title based on number of phases
   const dialogTitle = hasMultiplePhases
@@ -277,7 +286,7 @@ export function SummaryDialog({
                     totalPhases={phaseEntries.length}
                     hasMultiplePhases={hasMultiplePhases}
                     isActive={hasMultiplePhases && index === activePhaseIndex}
-                    onClick={() => setActivePhaseIndex(index)}
+                    onClick={hasMultiplePhases ? () => setActivePhaseIndex(index) : undefined}
                   />
                 </div>
               ))

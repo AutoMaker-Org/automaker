@@ -909,6 +909,27 @@ describe('FeatureStateManager', () => {
       );
     });
 
+    it('should not match step header appearing in body text, only at section boundaries', async () => {
+      // Test case: body text contains "### Testing" which should NOT be matched
+      // Only headers at actual section boundaries should be replaced
+      const existingSummary = `${PIPELINE_SUMMARY_HEADER_PREFIX}Implementation\n\nThis step covers the Testing module.\n\n### Testing\n\nThe above is just markdown in body, not a section header.${PIPELINE_SUMMARY_SEPARATOR}${PIPELINE_SUMMARY_HEADER_PREFIX}Testing\n\nReal test section`;
+      (pipelineService.getStep as Mock).mockResolvedValue({ name: 'Testing', id: 'step2' });
+      (readJsonWithRecovery as Mock).mockResolvedValue({
+        data: { ...mockFeature, status: 'pipeline_step2', summary: existingSummary },
+        recovered: false,
+        source: 'main',
+      });
+
+      await manager.saveFeatureSummary('/project', 'feature-123', 'Updated test results');
+
+      const savedFeature = (atomicWriteJson as Mock).mock.calls[0][1] as Feature;
+      // The section replacement should only replace the actual Testing section at the boundary
+      // NOT the "### Testing" that appears in the body text
+      expect(savedFeature.summary).toBe(
+        `${PIPELINE_SUMMARY_HEADER_PREFIX}Implementation\n\nThis step covers the Testing module.\n\n### Testing\n\nThe above is just markdown in body, not a section header.${PIPELINE_SUMMARY_SEPARATOR}${PIPELINE_SUMMARY_HEADER_PREFIX}Testing\n\nUpdated test results`
+      );
+    });
+
     it('should handle step name with special regex characters safely', async () => {
       // Test case: step name contains characters that would break regex
       const existingSummary = `${PIPELINE_SUMMARY_HEADER_PREFIX}Code (Review)\n\nFirst attempt`;

@@ -384,14 +384,18 @@ export class AgentExecutor {
     const summary = extractSummary(sessionContent);
     if (summary) {
       await callbacks.saveFeatureSummary(projectPath, featureId, summary);
-    } else {
-      // If we're in a pipeline step, a summary is expected. Log a warning if it's missing.
-      // Use the passed status from options to avoid extra file I/O
-      if (isPipelineStatus(status)) {
-        logger.warn(
-          `[AgentExecutor] Mandatory summary extraction failed for pipeline feature ${featureId} (status="${status}")`
-        );
+      return;
+    }
+
+    // If we're in a pipeline step, a summary is expected. Use a fallback if extraction fails.
+    if (isPipelineStatus(status)) {
+      const fallback = sessionContent.trim();
+      if (fallback) {
+        await callbacks.saveFeatureSummary(projectPath, featureId, fallback);
       }
+      logger.warn(
+        `[AgentExecutor] Mandatory summary extraction failed for pipeline feature ${featureId} (status="${status}")`
+      );
     }
   }
 
