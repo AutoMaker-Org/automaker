@@ -12,6 +12,7 @@ import { SummaryDialog } from './summary-dialog';
 import { getProviderIconForModel } from '@/components/ui/provider-icon';
 import { useFeature, useAgentOutput } from '@/hooks/queries';
 import { queryKeys } from '@/lib/query-keys';
+import { getFirstNonEmptySummary } from '@/lib/summary-selection';
 
 /**
  * Formats thinking level for compact display
@@ -67,6 +68,8 @@ export const AgentInfoPanel = memo(function AgentInfoPanel({
   const [taskStatusMap, setTaskStatusMap] = useState<
     Map<string, 'pending' | 'in_progress' | 'completed'>
   >(new Map());
+  // Track real-time task summary updates from WebSocket events
+  const [taskSummaryMap, setTaskSummaryMap] = useState<Map<string, string>>(new Map());
   // Track last WebSocket event timestamp to know if we're receiving real-time updates
   const [lastWsEventTimestamp, setLastWsEventTimestamp] = useState<number | null>(null);
 
@@ -163,6 +166,11 @@ export const AgentInfoPanel = memo(function AgentInfoPanel({
     return null;
   }, [contextContent, agentOutputContent]);
 
+  // Prefer freshly fetched feature summary over potentially stale list data.
+  const effectiveSummary =
+    getFirstNonEmptySummary(freshFeature?.summary, feature.summary, summary, agentInfo?.summary) ??
+    undefined;
+
   // Fresh planSpec data from API (more accurate than store data for task progress)
   const freshPlanSpec = useMemo(() => {
     if (!freshFeature?.planSpec) return null;
@@ -197,11 +205,13 @@ export const AgentInfoPanel = memo(function AgentInfoPanel({
           return {
             content: task.description,
             status: (finalStatus || 'completed') as 'pending' | 'in_progress' | 'completed',
+            summary: task.summary,
           };
         }
 
         // Use real-time status from WebSocket events if available
         const realtimeStatus = taskStatusMap.get(task.id);
+        const realtimeSummary = taskSummaryMap.get(task.id);
 
         // Calculate status: WebSocket status > index-based status > task.status
         let effectiveStatus: 'pending' | 'in_progress' | 'completed';
@@ -224,6 +234,7 @@ export const AgentInfoPanel = memo(function AgentInfoPanel({
         return {
           content: task.description,
           status: effectiveStatus,
+          summary: realtimeSummary ?? task.summary,
         };
       });
     }
@@ -236,6 +247,7 @@ export const AgentInfoPanel = memo(function AgentInfoPanel({
     feature.planSpec?.currentTaskId,
     agentInfo?.todos,
     taskStatusMap,
+    taskSummaryMap,
     isFeatureFinished,
   ]);
 
@@ -280,6 +292,19 @@ export const AgentInfoPanel = memo(function AgentInfoPanel({
               newMap.set(taskEvent.taskId, 'completed');
               return newMap;
             });
+
+            if ('summary' in event) {
+              setTaskSummaryMap((prev) => {
+                const newMap = new Map(prev);
+                // Allow empty string (reset) or non-empty string to be set
+                const summary =
+                  typeof event.summary === 'string' && event.summary.trim().length > 0
+                    ? event.summary
+                    : null;
+                newMap.set(taskEvent.taskId, summary);
+                return newMap;
+              });
+            }
           }
           break;
       }
@@ -331,7 +356,13 @@ export const AgentInfoPanel = memo(function AgentInfoPanel({
   // OR if the feature is actively running (ensures panel stays visible during execution)
   // Note: hasPlanSpecTasks is already defined above and includes freshPlanSpec
   // (The backlog case was already handled above and returned early)
-  if (agentInfo || hasPlanSpecTasks || effectiveTodos.length > 0 || isActivelyRunning) {
+  if (
+    agentInfo ||
+    hasPlanSpecTasks ||
+    effectiveTodos.length > 0 ||
+    isActivelyRunning ||
+    effectiveSummary
+  ) {
     return (
       <>
         <div className="mb-3 space-y-2 overflow-hidden">
@@ -379,24 +410,31 @@ export const AgentInfoPanel = memo(function AgentInfoPanel({
               >
                 {(isTodosExpanded ? effectiveTodos : effectiveTodos.slice(0, 3)).map(
                   (todo, idx) => (
-                    <div key={idx} className="flex items-center gap-1.5 text-[10px]">
-                      {todo.status === 'completed' ? (
-                        <CheckCircle2 className="w-2.5 h-2.5 text-[var(--status-success)] shrink-0" />
-                      ) : todo.status === 'in_progress' ? (
-                        <Spinner size="xs" className="w-2.5 h-2.5 shrink-0" />
-                      ) : (
-                        <Circle className="w-2.5 h-2.5 text-muted-foreground/50 shrink-0" />
-                      )}
-                      <span
-                        className={cn(
-                          'break-words hyphens-auto line-clamp-2 leading-relaxed',
-                          todo.status === 'completed' && 'text-muted-foreground/60 line-through',
-                          todo.status === 'in_progress' && 'text-[var(--status-warning)]',
-                          todo.status === 'pending' && 'text-muted-foreground/80'
+                    <div key={idx} className="flex flex-col gap-0.5">
+                      <div className="flex items-center gap-1.5 text-[10px]">
+                        {todo.status === 'completed' ? (
+                          <CheckCircle2 className="w-2.5 h-2.5 text-[var(--status-success)] shrink-0" />
+                        ) : todo.status === 'in_progress' ? (
+                          <Spinner size="xs" className="w-2.5 h-2.5 shrink-0" />
+                        ) : (
+                          <Circle className="w-2.5 h-2.5 text-muted-foreground/50 shrink-0" />
                         )}
-                      >
-                        {todo.content}
-                      </span>
+                        <span
+                          className={cn(
+                            'break-words hyphens-auto line-clamp-2 leading-relaxed',
+                            todo.status === 'completed' && 'text-muted-foreground/60 line-through',
+                            todo.status === 'in_progress' && 'text-[var(--status-warning)]',
+                            todo.status === 'pending' && 'text-muted-foreground/80'
+                          )}
+                        >
+                          {todo.content}
+                        </span>
+                      </div>
+                      {todo.summary && isTodosExpanded && (
+                        <div className="pl-4 text-[9px] text-muted-foreground/50 italic break-words line-clamp-2">
+                          {todo.summary}
+                        </div>
+                      )}
                     </div>
                   )
                 )}
@@ -417,10 +455,12 @@ export const AgentInfoPanel = memo(function AgentInfoPanel({
             </div>
           )}
 
-          {/* Summary for waiting_approval and verified */}
-          {(feature.status === 'waiting_approval' || feature.status === 'verified') && (
-            <>
-              {(feature.summary || summary || agentInfo?.summary) && (
+          {/* Summary for waiting_approval, verified, and pipeline steps */}
+          {(feature.status === 'waiting_approval' ||
+            feature.status === 'verified' ||
+            (typeof feature.status === 'string' && feature.status.startsWith('pipeline_'))) && (
+            <div className="space-y-1.5">
+              {effectiveSummary && (
                 <div className="space-y-1.5 pt-2 border-t border-border/30 overflow-hidden">
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-1 text-[10px] text-[var(--status-success)] min-w-0">
@@ -446,37 +486,35 @@ export const AgentInfoPanel = memo(function AgentInfoPanel({
                     onPointerDown={(e) => e.stopPropagation()}
                     onMouseDown={(e) => e.stopPropagation()}
                   >
-                    {feature.summary || summary || agentInfo?.summary}
+                    {effectiveSummary}
                   </p>
                 </div>
               )}
-              {!feature.summary &&
-                !summary &&
-                !agentInfo?.summary &&
-                (agentInfo?.toolCallCount ?? 0) > 0 && (
-                  <div className="flex items-center gap-2 text-[10px] text-muted-foreground/60 pt-2 border-t border-border/30">
+              {!effectiveSummary && (agentInfo?.toolCallCount ?? 0) > 0 && (
+                <div className="flex items-center gap-2 text-[10px] text-muted-foreground/60 pt-2 border-t border-border/30">
+                  <span className="flex items-center gap-1">
+                    <Wrench className="w-2.5 h-2.5" />
+                    {agentInfo?.toolCallCount ?? 0} tool calls
+                  </span>
+                  {effectiveTodos.length > 0 && (
                     <span className="flex items-center gap-1">
-                      <Wrench className="w-2.5 h-2.5" />
-                      {agentInfo?.toolCallCount ?? 0} tool calls
+                      <CheckCircle2 className="w-2.5 h-2.5 text-[var(--status-success)]" />
+                      {effectiveTodos.filter((t) => t.status === 'completed').length} tasks done
                     </span>
-                    {effectiveTodos.length > 0 && (
-                      <span className="flex items-center gap-1">
-                        <CheckCircle2 className="w-2.5 h-2.5 text-[var(--status-success)]" />
-                        {effectiveTodos.filter((t) => t.status === 'completed').length} tasks done
-                      </span>
-                    )}
-                  </div>
-                )}
-            </>
+                  )}
+                </div>
+              )}
+            </div>
           )}
         </div>
         {/* SummaryDialog must be rendered alongside the expand button */}
         <SummaryDialog
           feature={feature}
           agentInfo={agentInfo}
-          summary={summary}
+          summary={effectiveSummary}
           isOpen={isSummaryDialogOpen}
           onOpenChange={setIsSummaryDialogOpen}
+          projectPath={projectPath}
         />
       </>
     );
@@ -488,9 +526,10 @@ export const AgentInfoPanel = memo(function AgentInfoPanel({
     <SummaryDialog
       feature={feature}
       agentInfo={agentInfo}
-      summary={summary}
+      summary={effectiveSummary}
       isOpen={isSummaryDialogOpen}
       onOpenChange={setIsSummaryDialogOpen}
+      projectPath={projectPath}
     />
   );
 });

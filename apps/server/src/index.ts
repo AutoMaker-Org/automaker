@@ -434,21 +434,18 @@ eventHookService.initialize(events, settingsService, eventHistoryService, featur
           logger.info('[STARTUP] Feature state reconciliation complete - no stale states found');
         }
 
-        // Resume interrupted features in the background after reconciliation.
-        // This uses the saved execution state to identify features that were running
-        // before the restart (their statuses have been reset to ready/backlog by
-        // reconciliation above). Running in background so it doesn't block startup.
-        if (totalReconciled > 0) {
-          for (const project of globalSettings.projects) {
-            autoModeService.resumeInterruptedFeatures(project.path).catch((err) => {
-              logger.warn(
-                `[STARTUP] Failed to resume interrupted features for ${project.path}:`,
-                err
-              );
-            });
-          }
-          logger.info('[STARTUP] Initiated background resume of interrupted features');
+        // Resume interrupted features in the background for all projects.
+        // This handles features stuck in transient states (in_progress, pipeline_*)
+        // or explicitly marked as interrupted. Running in background so it doesn't block startup.
+        for (const project of globalSettings.projects) {
+          autoModeService.resumeInterruptedFeatures(project.path).catch((err) => {
+            logger.warn(
+              `[STARTUP] Failed to resume interrupted features for ${project.path}:`,
+              err
+            );
+          });
         }
+        logger.info('[STARTUP] Initiated background resume of interrupted features');
       }
     } catch (err) {
       logger.warn('[STARTUP] Failed to reconcile feature states:', err);

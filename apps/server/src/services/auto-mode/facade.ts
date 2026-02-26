@@ -15,7 +15,12 @@ import path from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import type { Feature, PlanningMode, ThinkingLevel, ReasoningEffort } from '@automaker/types';
-import { DEFAULT_MAX_CONCURRENCY, DEFAULT_MODELS, stripProviderPrefix } from '@automaker/types';
+import {
+  DEFAULT_MAX_CONCURRENCY,
+  DEFAULT_MODELS,
+  stripProviderPrefix,
+  isPipelineStatus,
+} from '@automaker/types';
 import { resolveModelString } from '@automaker/model-resolver';
 import { createLogger, loadContextFiles, classifyError } from '@automaker/utils';
 import { getFeatureDir } from '@automaker/platform';
@@ -78,6 +83,37 @@ export class AutoModeServiceFacade {
     private readonly pipelineOrchestrator: PipelineOrchestrator,
     private readonly settingsService: SettingsService | null
   ) {}
+
+  /**
+   * Determine if a feature is eligible to be picked up by the auto-mode loop.
+   *
+   * @param feature - The feature to check
+   * @param branchName - The current worktree branch name (null for main)
+   * @param primaryBranch - The resolved primary branch name for the project
+   * @returns True if the feature is eligible for auto-dispatch
+   */
+  public static isFeatureEligibleForAutoMode(
+    feature: Feature,
+    branchName: string | null,
+    primaryBranch: string | null
+  ): boolean {
+    const isEligibleStatus =
+      feature.status === 'backlog' ||
+      feature.status === 'ready' ||
+      feature.status === 'interrupted' ||
+      isPipelineStatus(feature.status);
+
+    if (!isEligibleStatus) return false;
+
+    // Filter by branch/worktree alignment
+    if (branchName === null) {
+      // For main worktree, include features with no branch or matching primary branch
+      return !feature.branchName || (primaryBranch != null && feature.branchName === primaryBranch);
+    } else {
+      // For named worktrees, only include features matching that branch
+      return feature.branchName === branchName;
+    }
+  }
 
   /**
    * Classify and log an error at the facade boundary.
@@ -217,6 +253,7 @@ export class AutoModeServiceFacade {
           thinkingLevel?: ThinkingLevel;
           reasoningEffort?: ReasoningEffort;
           branchName?: string | null;
+          status?: string; // Feature status for pipeline summary check
           [key: string]: unknown;
         }
       ): Promise<void> => {
@@ -300,6 +337,7 @@ export class AutoModeServiceFacade {
             thinkingLevel: opts?.thinkingLevel as ThinkingLevel | undefined,
             reasoningEffort: opts?.reasoningEffort as ReasoningEffort | undefined,
             branchName: opts?.branchName as string | null | undefined,
+            status: opts?.status as string | undefined,
             provider,
             effectiveBareModel,
             credentials,
@@ -373,12 +411,8 @@ export class AutoModeServiceFacade {
         if (branchName === null) {
           primaryBranch = await worktreeResolver.getCurrentBranch(pPath);
         }
-        return features.filter(
-          (f) =>
-            (f.status === 'backlog' || f.status === 'ready') &&
-            (branchName === null
-              ? !f.branchName || (primaryBranch && f.branchName === primaryBranch)
-              : f.branchName === branchName)
+        return features.filter((f) =>
+          AutoModeServiceFacade.isFeatureEligibleForAutoMode(f, branchName, primaryBranch)
         );
       },
       (pPath, branchName, maxConcurrency) =>

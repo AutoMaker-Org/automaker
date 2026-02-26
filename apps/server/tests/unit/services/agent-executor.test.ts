@@ -1235,4 +1235,471 @@ describe('AgentExecutor', () => {
       expect(typeof result.aborted).toBe('boolean');
     });
   });
+
+  describe('pipeline summary fallback with scaffold stripping', () => {
+    it('should strip follow-up scaffold from fallback summary when extraction fails', async () => {
+      const executor = new AgentExecutor(
+        mockEventBus,
+        mockFeatureStateManager,
+        mockPlanApprovalService,
+        mockSettingsService
+      );
+
+      const mockProvider = {
+        getName: () => 'mock',
+        executeQuery: vi.fn().mockImplementation(function* () {
+          yield {
+            type: 'assistant',
+            message: {
+              content: [{ type: 'text', text: 'Some agent output without summary markers' }],
+            },
+          };
+          yield { type: 'result', subtype: 'success' };
+        }),
+      } as unknown as BaseProvider;
+
+      const saveFeatureSummary = vi.fn().mockResolvedValue(undefined);
+
+      const options: AgentExecutionOptions = {
+        workDir: '/test',
+        featureId: 'test-feature',
+        prompt: 'Test prompt',
+        projectPath: '/project',
+        abortController: new AbortController(),
+        provider: mockProvider,
+        effectiveBareModel: 'claude-sonnet-4-6',
+        planningMode: 'skip',
+        previousContent: 'Previous session content',
+        status: 'pipeline_step1', // Pipeline status to trigger fallback
+      };
+
+      const callbacks = {
+        waitForApproval: vi.fn().mockResolvedValue({ approved: true }),
+        saveFeatureSummary,
+        updateFeatureSummary: vi.fn(),
+        buildTaskPrompt: vi.fn().mockReturnValue('task prompt'),
+      };
+
+      await executor.execute(options, callbacks);
+
+      // The fallback summary should be called without the scaffold header
+      expect(saveFeatureSummary).toHaveBeenCalled();
+      const savedSummary = saveFeatureSummary.mock.calls[0][2];
+      // Should not contain the scaffold header
+      expect(savedSummary).not.toContain('---');
+      expect(savedSummary).not.toContain('Follow-up Session');
+      // Should contain the actual content
+      expect(savedSummary).toContain('Some agent output without summary markers');
+    });
+
+    it('should not save fallback when scaffold is the only content after stripping', async () => {
+      const executor = new AgentExecutor(
+        mockEventBus,
+        mockFeatureStateManager,
+        mockPlanApprovalService,
+        mockSettingsService
+      );
+
+      // Provider yields no content - only scaffold will be present
+      const mockProvider = {
+        getName: () => 'mock',
+        executeQuery: vi.fn().mockImplementation(function* () {
+          // Empty stream - no actual content
+        }),
+      } as unknown as BaseProvider;
+
+      const saveFeatureSummary = vi.fn().mockResolvedValue(undefined);
+
+      const options: AgentExecutionOptions = {
+        workDir: '/test',
+        featureId: 'test-feature',
+        prompt: 'Test prompt',
+        projectPath: '/project',
+        abortController: new AbortController(),
+        provider: mockProvider,
+        effectiveBareModel: 'claude-sonnet-4-6',
+        planningMode: 'skip',
+        previousContent: 'Previous session content',
+        status: 'pipeline_step1', // Pipeline status
+      };
+
+      const callbacks = {
+        waitForApproval: vi.fn().mockResolvedValue({ approved: true }),
+        saveFeatureSummary,
+        updateFeatureSummary: vi.fn(),
+        buildTaskPrompt: vi.fn().mockReturnValue('task prompt'),
+      };
+
+      await executor.execute(options, callbacks);
+
+      // Should not save an empty fallback (after scaffold is stripped)
+      expect(saveFeatureSummary).not.toHaveBeenCalled();
+    });
+
+    it('should save extracted summary when available, not fallback', async () => {
+      const executor = new AgentExecutor(
+        mockEventBus,
+        mockFeatureStateManager,
+        mockPlanApprovalService,
+        mockSettingsService
+      );
+
+      const mockProvider = {
+        getName: () => 'mock',
+        executeQuery: vi.fn().mockImplementation(function* () {
+          yield {
+            type: 'assistant',
+            message: {
+              content: [
+                {
+                  type: 'text',
+                  text: 'Some content\n\n<summary>Extracted summary here</summary>\n\nMore content',
+                },
+              ],
+            },
+          };
+          yield { type: 'result', subtype: 'success' };
+        }),
+      } as unknown as BaseProvider;
+
+      const saveFeatureSummary = vi.fn().mockResolvedValue(undefined);
+
+      const options: AgentExecutionOptions = {
+        workDir: '/test',
+        featureId: 'test-feature',
+        prompt: 'Test prompt',
+        projectPath: '/project',
+        abortController: new AbortController(),
+        provider: mockProvider,
+        effectiveBareModel: 'claude-sonnet-4-6',
+        planningMode: 'skip',
+        previousContent: 'Previous session content',
+        status: 'pipeline_step1', // Pipeline status
+      };
+
+      const callbacks = {
+        waitForApproval: vi.fn().mockResolvedValue({ approved: true }),
+        saveFeatureSummary,
+        updateFeatureSummary: vi.fn(),
+        buildTaskPrompt: vi.fn().mockReturnValue('task prompt'),
+      };
+
+      await executor.execute(options, callbacks);
+
+      // Should save the extracted summary, not the full content
+      expect(saveFeatureSummary).toHaveBeenCalledTimes(1);
+      expect(saveFeatureSummary).toHaveBeenCalledWith(
+        '/project',
+        'test-feature',
+        'Extracted summary here'
+      );
+    });
+
+    it('should handle scaffold with various whitespace patterns', async () => {
+      const executor = new AgentExecutor(
+        mockEventBus,
+        mockFeatureStateManager,
+        mockPlanApprovalService,
+        mockSettingsService
+      );
+
+      const mockProvider = {
+        getName: () => 'mock',
+        executeQuery: vi.fn().mockImplementation(function* () {
+          yield {
+            type: 'assistant',
+            message: {
+              content: [{ type: 'text', text: 'Agent response here' }],
+            },
+          };
+          yield { type: 'result', subtype: 'success' };
+        }),
+      } as unknown as BaseProvider;
+
+      const saveFeatureSummary = vi.fn().mockResolvedValue(undefined);
+
+      const options: AgentExecutionOptions = {
+        workDir: '/test',
+        featureId: 'test-feature',
+        prompt: 'Test prompt',
+        projectPath: '/project',
+        abortController: new AbortController(),
+        provider: mockProvider,
+        effectiveBareModel: 'claude-sonnet-4-6',
+        planningMode: 'skip',
+        previousContent: 'Previous session content',
+        status: 'pipeline_step1',
+      };
+
+      const callbacks = {
+        waitForApproval: vi.fn().mockResolvedValue({ approved: true }),
+        saveFeatureSummary,
+        updateFeatureSummary: vi.fn(),
+        buildTaskPrompt: vi.fn().mockReturnValue('task prompt'),
+      };
+
+      await executor.execute(options, callbacks);
+
+      // Should strip scaffold and save actual content
+      expect(saveFeatureSummary).toHaveBeenCalled();
+      const savedSummary = saveFeatureSummary.mock.calls[0][2];
+      expect(savedSummary.trim()).toBe('Agent response here');
+    });
+
+    it('should handle scaffold with extra newlines between markers', async () => {
+      const executor = new AgentExecutor(
+        mockEventBus,
+        mockFeatureStateManager,
+        mockPlanApprovalService,
+        mockSettingsService
+      );
+
+      const mockProvider = {
+        getName: () => 'mock',
+        executeQuery: vi.fn().mockImplementation(function* () {
+          yield {
+            type: 'assistant',
+            message: {
+              content: [{ type: 'text', text: 'Actual content after scaffold' }],
+            },
+          };
+          yield { type: 'result', subtype: 'success' };
+        }),
+      } as unknown as BaseProvider;
+
+      const saveFeatureSummary = vi.fn().mockResolvedValue(undefined);
+
+      // Set up with previous content to trigger scaffold insertion
+      const options: AgentExecutionOptions = {
+        workDir: '/test',
+        featureId: 'test-feature',
+        prompt: 'Test prompt',
+        projectPath: '/project',
+        abortController: new AbortController(),
+        provider: mockProvider,
+        effectiveBareModel: 'claude-sonnet-4-6',
+        planningMode: 'skip',
+        previousContent: 'Previous session content',
+        status: 'pipeline_step1',
+      };
+
+      const callbacks = {
+        waitForApproval: vi.fn().mockResolvedValue({ approved: true }),
+        saveFeatureSummary,
+        updateFeatureSummary: vi.fn(),
+        buildTaskPrompt: vi.fn().mockReturnValue('task prompt'),
+      };
+
+      await executor.execute(options, callbacks);
+
+      expect(saveFeatureSummary).toHaveBeenCalled();
+      const savedSummary = saveFeatureSummary.mock.calls[0][2];
+      // Verify the scaffold is stripped
+      expect(savedSummary).not.toMatch(/---\s*##\s*Follow-up Session/);
+    });
+
+    it('should handle content without any scaffold (first session)', async () => {
+      const executor = new AgentExecutor(
+        mockEventBus,
+        mockFeatureStateManager,
+        mockPlanApprovalService,
+        mockSettingsService
+      );
+
+      const mockProvider = {
+        getName: () => 'mock',
+        executeQuery: vi.fn().mockImplementation(function* () {
+          yield {
+            type: 'assistant',
+            message: {
+              content: [{ type: 'text', text: 'First session output without summary' }],
+            },
+          };
+          yield { type: 'result', subtype: 'success' };
+        }),
+      } as unknown as BaseProvider;
+
+      const saveFeatureSummary = vi.fn().mockResolvedValue(undefined);
+
+      // No previousContent means no scaffold
+      const options: AgentExecutionOptions = {
+        workDir: '/test',
+        featureId: 'test-feature',
+        prompt: 'Test prompt',
+        projectPath: '/project',
+        abortController: new AbortController(),
+        provider: mockProvider,
+        effectiveBareModel: 'claude-sonnet-4-6',
+        planningMode: 'skip',
+        previousContent: undefined, // No previous content
+        status: 'pipeline_step1',
+      };
+
+      const callbacks = {
+        waitForApproval: vi.fn().mockResolvedValue({ approved: true }),
+        saveFeatureSummary,
+        updateFeatureSummary: vi.fn(),
+        buildTaskPrompt: vi.fn().mockReturnValue('task prompt'),
+      };
+
+      await executor.execute(options, callbacks);
+
+      expect(saveFeatureSummary).toHaveBeenCalled();
+      const savedSummary = saveFeatureSummary.mock.calls[0][2];
+      expect(savedSummary).toBe('First session output without summary');
+    });
+
+    it('should handle non-pipeline status without saving fallback', async () => {
+      const executor = new AgentExecutor(
+        mockEventBus,
+        mockFeatureStateManager,
+        mockPlanApprovalService,
+        mockSettingsService
+      );
+
+      const mockProvider = {
+        getName: () => 'mock',
+        executeQuery: vi.fn().mockImplementation(function* () {
+          yield {
+            type: 'assistant',
+            message: {
+              content: [{ type: 'text', text: 'Output without summary' }],
+            },
+          };
+          yield { type: 'result', subtype: 'success' };
+        }),
+      } as unknown as BaseProvider;
+
+      const saveFeatureSummary = vi.fn().mockResolvedValue(undefined);
+
+      const options: AgentExecutionOptions = {
+        workDir: '/test',
+        featureId: 'test-feature',
+        prompt: 'Test prompt',
+        projectPath: '/project',
+        abortController: new AbortController(),
+        provider: mockProvider,
+        effectiveBareModel: 'claude-sonnet-4-6',
+        planningMode: 'skip',
+        previousContent: 'Previous content',
+        status: 'implementing', // Non-pipeline status
+      };
+
+      const callbacks = {
+        waitForApproval: vi.fn().mockResolvedValue({ approved: true }),
+        saveFeatureSummary,
+        updateFeatureSummary: vi.fn(),
+        buildTaskPrompt: vi.fn().mockReturnValue('task prompt'),
+      };
+
+      await executor.execute(options, callbacks);
+
+      // Should NOT save fallback for non-pipeline status
+      expect(saveFeatureSummary).not.toHaveBeenCalled();
+    });
+
+    it('should correctly handle content that starts with dashes but is not scaffold', async () => {
+      const executor = new AgentExecutor(
+        mockEventBus,
+        mockFeatureStateManager,
+        mockPlanApprovalService,
+        mockSettingsService
+      );
+
+      // Content that looks like it might have dashes but is actual content
+      const mockProvider = {
+        getName: () => 'mock',
+        executeQuery: vi.fn().mockImplementation(function* () {
+          yield {
+            type: 'assistant',
+            message: {
+              content: [{ type: 'text', text: '---This is a code comment or separator---' }],
+            },
+          };
+          yield { type: 'result', subtype: 'success' };
+        }),
+      } as unknown as BaseProvider;
+
+      const saveFeatureSummary = vi.fn().mockResolvedValue(undefined);
+
+      const options: AgentExecutionOptions = {
+        workDir: '/test',
+        featureId: 'test-feature',
+        prompt: 'Test prompt',
+        projectPath: '/project',
+        abortController: new AbortController(),
+        provider: mockProvider,
+        effectiveBareModel: 'claude-sonnet-4-6',
+        planningMode: 'skip',
+        previousContent: undefined,
+        status: 'pipeline_step1',
+      };
+
+      const callbacks = {
+        waitForApproval: vi.fn().mockResolvedValue({ approved: true }),
+        saveFeatureSummary,
+        updateFeatureSummary: vi.fn(),
+        buildTaskPrompt: vi.fn().mockReturnValue('task prompt'),
+      };
+
+      await executor.execute(options, callbacks);
+
+      expect(saveFeatureSummary).toHaveBeenCalled();
+      const savedSummary = saveFeatureSummary.mock.calls[0][2];
+      // Content should be preserved since it's not the scaffold pattern
+      expect(savedSummary).toContain('---This is a code comment or separator---');
+    });
+
+    it('should handle scaffold at different positions in content', async () => {
+      const executor = new AgentExecutor(
+        mockEventBus,
+        mockFeatureStateManager,
+        mockPlanApprovalService,
+        mockSettingsService
+      );
+
+      const mockProvider = {
+        getName: () => 'mock',
+        executeQuery: vi.fn().mockImplementation(function* () {
+          yield {
+            type: 'assistant',
+            message: {
+              content: [{ type: 'text', text: 'Content after scaffold marker' }],
+            },
+          };
+          yield { type: 'result', subtype: 'success' };
+        }),
+      } as unknown as BaseProvider;
+
+      const saveFeatureSummary = vi.fn().mockResolvedValue(undefined);
+
+      // With previousContent, scaffold will be at the start of sessionContent
+      const options: AgentExecutionOptions = {
+        workDir: '/test',
+        featureId: 'test-feature',
+        prompt: 'Test prompt',
+        projectPath: '/project',
+        abortController: new AbortController(),
+        provider: mockProvider,
+        effectiveBareModel: 'claude-sonnet-4-6',
+        planningMode: 'skip',
+        previousContent: 'Previous content',
+        status: 'pipeline_step1',
+      };
+
+      const callbacks = {
+        waitForApproval: vi.fn().mockResolvedValue({ approved: true }),
+        saveFeatureSummary,
+        updateFeatureSummary: vi.fn(),
+        buildTaskPrompt: vi.fn().mockReturnValue('task prompt'),
+      };
+
+      await executor.execute(options, callbacks);
+
+      expect(saveFeatureSummary).toHaveBeenCalled();
+      const savedSummary = saveFeatureSummary.mock.calls[0][2];
+      // Scaffold should be stripped, only actual content remains
+      expect(savedSummary).toBe('Content after scaffold marker');
+    });
+  });
 });

@@ -1,4 +1,3 @@
-// @ts-nocheck - completed features filtering and grouping with status transitions
 import {
   Dialog,
   DialogContent,
@@ -11,6 +10,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { ArchiveRestore, Trash2 } from 'lucide-react';
 import { Feature } from '@/store/app-store';
+import { extractImplementationSummary } from '@/lib/log-parser';
+import { getFirstNonEmptySummary } from '@/lib/summary-selection';
 
 interface CompletedFeaturesModalProps {
   open: boolean;
@@ -51,44 +52,54 @@ export function CompletedFeaturesModal({
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {completedFeatures.map((feature) => (
-                <Card
-                  key={feature.id}
-                  className="flex flex-col"
-                  data-testid={`completed-card-${feature.id}`}
-                >
-                  <CardHeader className="p-3 pb-2 flex-1">
-                    <CardTitle className="text-sm leading-tight line-clamp-3">
-                      {feature.description || feature.summary || feature.id}
-                    </CardTitle>
-                    <CardDescription className="text-xs mt-1 truncate">
-                      {feature.category || 'Uncategorized'}
-                    </CardDescription>
-                  </CardHeader>
-                  <div className="p-3 pt-0 flex gap-2">
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      className="flex-1 h-7 text-xs"
-                      onClick={() => onUnarchive(feature)}
-                      data-testid={`unarchive-${feature.id}`}
-                    >
-                      <ArchiveRestore className="w-3 h-3 mr-1" />
-                      Restore
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
-                      onClick={() => onDelete(feature)}
-                      data-testid={`delete-completed-${feature.id}`}
-                      title="Delete"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </Card>
-              ))}
+              {completedFeatures.map((feature) => {
+                const implementationSummary = extractImplementationSummary(feature.summary);
+                const displayText = getFirstNonEmptySummary(
+                  implementationSummary,
+                  feature.summary,
+                  feature.description,
+                  feature.id
+                );
+
+                return (
+                  <Card
+                    key={feature.id}
+                    className="flex flex-col"
+                    data-testid={`completed-card-${feature.id}`}
+                  >
+                    <CardHeader className="p-3 pb-2 flex-1">
+                      <CardTitle className="text-sm leading-tight line-clamp-3">
+                        {displayText ?? feature.id}
+                      </CardTitle>
+                      <CardDescription className="text-xs mt-1 truncate">
+                        {feature.category || 'Uncategorized'}
+                      </CardDescription>
+                    </CardHeader>
+                    <div className="p-3 pt-0 flex gap-2">
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        className="flex-1 h-7 text-xs"
+                        onClick={() => onUnarchive(feature)}
+                        data-testid={`unarchive-${feature.id}`}
+                      >
+                        <ArchiveRestore className="w-3 h-3 mr-1" />
+                        Restore
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
+                        onClick={() => onDelete(feature)}
+                        data-testid={`delete-completed-${feature.id}`}
+                        title="Delete"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </Card>
+                );
+              })}
             </div>
           )}
         </div>

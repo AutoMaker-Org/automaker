@@ -2,12 +2,17 @@ import { describe, it, expect, beforeEach, vi, type Mock } from 'vitest';
 import path from 'path';
 import { FeatureStateManager } from '@/services/feature-state-manager.js';
 import type { Feature } from '@automaker/types';
+import { isPipelineStatus } from '@automaker/types';
+
+const PIPELINE_SUMMARY_SEPARATOR = '\n\n---\n\n';
+const PIPELINE_SUMMARY_HEADER_PREFIX = '### ';
 import type { EventEmitter } from '@/lib/events.js';
 import type { FeatureLoader } from '@/services/feature-loader.js';
 import * as secureFs from '@/lib/secure-fs.js';
 import { atomicWriteJson, readJsonWithRecovery } from '@automaker/utils';
 import { getFeatureDir, getFeaturesDir } from '@automaker/platform';
 import { getNotificationService } from '@/services/notification-service.js';
+import { pipelineService } from '@/services/pipeline-service.js';
 
 /**
  * Helper to normalize paths for cross-platform test compatibility.
@@ -40,6 +45,16 @@ vi.mock('@/services/notification-service.js', () => ({
   getNotificationService: vi.fn(() => ({
     createNotification: vi.fn(),
   })),
+}));
+
+vi.mock('@/services/pipeline-service.js', () => ({
+  pipelineService: {
+    getStepIdFromStatus: vi.fn((status: string) => {
+      if (status.startsWith('pipeline_')) return status.replace('pipeline_', '');
+      return null;
+    }),
+    getStep: vi.fn(),
+  },
 }));
 
 describe('FeatureStateManager', () => {
@@ -341,9 +356,6 @@ describe('FeatureStateManager', () => {
 
   describe('markFeatureInterrupted', () => {
     it('should mark feature as interrupted', async () => {
-      (secureFs.readFile as Mock).mockResolvedValue(
-        JSON.stringify({ ...mockFeature, status: 'in_progress' })
-      );
       (readJsonWithRecovery as Mock).mockResolvedValue({
         data: { ...mockFeature, status: 'in_progress' },
         recovered: false,
@@ -358,20 +370,25 @@ describe('FeatureStateManager', () => {
     });
 
     it('should preserve pipeline_* statuses', async () => {
-      (secureFs.readFile as Mock).mockResolvedValue(
-        JSON.stringify({ ...mockFeature, status: 'pipeline_step_1' })
-      );
+      (readJsonWithRecovery as Mock).mockResolvedValue({
+        data: { ...mockFeature, status: 'pipeline_step_1' },
+        recovered: false,
+        source: 'main',
+      });
 
       await manager.markFeatureInterrupted('/project', 'feature-123', 'server shutdown');
 
       // Should NOT call atomicWriteJson because pipeline status is preserved
       expect(atomicWriteJson).not.toHaveBeenCalled();
+      expect(isPipelineStatus('pipeline_step_1')).toBe(true);
     });
 
     it('should preserve pipeline_complete status', async () => {
-      (secureFs.readFile as Mock).mockResolvedValue(
-        JSON.stringify({ ...mockFeature, status: 'pipeline_complete' })
-      );
+      (readJsonWithRecovery as Mock).mockResolvedValue({
+        data: { ...mockFeature, status: 'pipeline_complete' },
+        recovered: false,
+        source: 'main',
+      });
 
       await manager.markFeatureInterrupted('/project', 'feature-123');
 
@@ -379,7 +396,6 @@ describe('FeatureStateManager', () => {
     });
 
     it('should handle feature not found', async () => {
-      (secureFs.readFile as Mock).mockRejectedValue(new Error('ENOENT'));
       (readJsonWithRecovery as Mock).mockResolvedValue({
         data: null,
         recovered: true,
@@ -437,6 +453,29 @@ describe('FeatureStateManager', () => {
 
       const savedFeature = (atomicWriteJson as Mock).mock.calls[0][1] as Feature;
       expect(savedFeature.status).toBe('backlog');
+    });
+
+    it('should preserve pipeline_* statuses during reset', async () => {
+      const pipelineFeature: Feature = {
+        ...mockFeature,
+        status: 'pipeline_testing',
+        planSpec: { status: 'approved', version: 1, reviewedByUser: true },
+      };
+
+      (secureFs.readdir as Mock).mockResolvedValue([
+        { name: 'feature-123', isDirectory: () => true },
+      ]);
+      (readJsonWithRecovery as Mock).mockResolvedValue({
+        data: pipelineFeature,
+        recovered: false,
+        source: 'main',
+      });
+
+      await manager.resetStuckFeatures('/project');
+
+      // Status should NOT be changed, but needsUpdate might be true if other things reset
+      // In this case, nothing else should be reset, so atomicWriteJson shouldn't be called
+      expect(atomicWriteJson).not.toHaveBeenCalled();
     });
 
     it('should reset generating planSpec status to pending', async () => {
@@ -628,6 +667,379 @@ describe('FeatureStateManager', () => {
       expect(atomicWriteJson).not.toHaveBeenCalled();
       expect(mockEvents.emit).not.toHaveBeenCalled();
     });
+
+    it('should accumulate summary with step header for pipeline features', async () => {
+      (pipelineService.getStep as Mock).mockResolvedValue({ name: 'Code Review', id: 'step1' });
+      (readJsonWithRecovery as Mock).mockResolvedValue({
+        data: { ...mockFeature, status: 'pipeline_step1', summary: undefined },
+        recovered: false,
+        source: 'main',
+      });
+
+      await manager.saveFeatureSummary('/project', 'feature-123', 'First step output');
+
+      const savedFeature = (atomicWriteJson as Mock).mock.calls[0][1] as Feature;
+      expect(savedFeature.summary).toBe(
+        `${PIPELINE_SUMMARY_HEADER_PREFIX}Code Review\n\nFirst step output`
+      );
+    });
+
+    it('should append subsequent pipeline step summaries with separator', async () => {
+      const existingSummary = `${PIPELINE_SUMMARY_HEADER_PREFIX}Code Review\n\nFirst step output`;
+      (pipelineService.getStep as Mock).mockResolvedValue({ name: 'Testing', id: 'step2' });
+      (readJsonWithRecovery as Mock).mockResolvedValue({
+        data: { ...mockFeature, status: 'pipeline_step2', summary: existingSummary },
+        recovered: false,
+        source: 'main',
+      });
+
+      await manager.saveFeatureSummary('/project', 'feature-123', 'Second step output');
+
+      const savedFeature = (atomicWriteJson as Mock).mock.calls[0][1] as Feature;
+      expect(savedFeature.summary).toBe(
+        `${PIPELINE_SUMMARY_HEADER_PREFIX}Code Review\n\nFirst step output${PIPELINE_SUMMARY_SEPARATOR}${PIPELINE_SUMMARY_HEADER_PREFIX}Testing\n\nSecond step output`
+      );
+    });
+
+    it('should normalize existing non-phase summary before appending pipeline step summary', async () => {
+      const existingSummary = 'Implemented authentication and settings management.';
+      (pipelineService.getStep as Mock).mockResolvedValue({ name: 'Code Review', id: 'step1' });
+      (readJsonWithRecovery as Mock).mockResolvedValue({
+        data: { ...mockFeature, status: 'pipeline_step1', summary: existingSummary },
+        recovered: false,
+        source: 'main',
+      });
+
+      await manager.saveFeatureSummary('/project', 'feature-123', 'Reviewed and approved changes');
+
+      const savedFeature = (atomicWriteJson as Mock).mock.calls[0][1] as Feature;
+      expect(savedFeature.summary).toBe(
+        `${PIPELINE_SUMMARY_HEADER_PREFIX}Implementation\n\nImplemented authentication and settings management.${PIPELINE_SUMMARY_SEPARATOR}${PIPELINE_SUMMARY_HEADER_PREFIX}Code Review\n\nReviewed and approved changes`
+      );
+    });
+
+    it('should use fallback step name when pipeline step not found', async () => {
+      (pipelineService.getStep as Mock).mockResolvedValue(null);
+      (readJsonWithRecovery as Mock).mockResolvedValue({
+        data: { ...mockFeature, status: 'pipeline_unknown_step', summary: undefined },
+        recovered: false,
+        source: 'main',
+      });
+
+      await manager.saveFeatureSummary('/project', 'feature-123', 'Step output');
+
+      const savedFeature = (atomicWriteJson as Mock).mock.calls[0][1] as Feature;
+      expect(savedFeature.summary).toBe(
+        `${PIPELINE_SUMMARY_HEADER_PREFIX}Unknown Step\n\nStep output`
+      );
+    });
+
+    it('should overwrite summary for non-pipeline features', async () => {
+      (readJsonWithRecovery as Mock).mockResolvedValue({
+        data: { ...mockFeature, status: 'in_progress', summary: 'Old summary' },
+        recovered: false,
+        source: 'main',
+      });
+
+      await manager.saveFeatureSummary('/project', 'feature-123', 'New summary');
+
+      const savedFeature = (atomicWriteJson as Mock).mock.calls[0][1] as Feature;
+      expect(savedFeature.summary).toBe('New summary');
+    });
+
+    it('should emit full accumulated summary for pipeline features', async () => {
+      const existingSummary = '### Code Review\n\nFirst step output';
+      (pipelineService.getStep as Mock).mockResolvedValue({ name: 'Refinement', id: 'step2' });
+      (readJsonWithRecovery as Mock).mockResolvedValue({
+        data: { ...mockFeature, status: 'pipeline_step2', summary: existingSummary },
+        recovered: false,
+        source: 'main',
+      });
+
+      await manager.saveFeatureSummary('/project', 'feature-123', 'Refinement output');
+
+      const expectedSummary =
+        '### Code Review\n\nFirst step output\n\n---\n\n### Refinement\n\nRefinement output';
+      expect(mockEvents.emit).toHaveBeenCalledWith('auto-mode:event', {
+        type: 'auto_mode_summary',
+        featureId: 'feature-123',
+        projectPath: '/project',
+        summary: expectedSummary,
+      });
+    });
+
+    it('should skip accumulation for pipeline features when summary is empty', async () => {
+      (pipelineService.getStep as Mock).mockResolvedValue({ name: 'Testing', id: 'step1' });
+      (readJsonWithRecovery as Mock).mockResolvedValue({
+        data: { ...mockFeature, status: 'pipeline_step1', summary: '' },
+        recovered: false,
+        source: 'main',
+      });
+
+      await manager.saveFeatureSummary('/project', 'feature-123', 'Test output');
+
+      const savedFeature = (atomicWriteJson as Mock).mock.calls[0][1] as Feature;
+      // Empty string is falsy, so should start fresh
+      expect(savedFeature.summary).toBe('### Testing\n\nTest output');
+    });
+
+    it('should skip persistence when incoming summary is only whitespace', async () => {
+      (pipelineService.getStep as Mock).mockResolvedValue({ name: 'Testing', id: 'step1' });
+      (readJsonWithRecovery as Mock).mockResolvedValue({
+        data: { ...mockFeature, status: 'pipeline_step1', summary: '### Existing\n\nValue' },
+        recovered: false,
+        source: 'main',
+      });
+
+      await manager.saveFeatureSummary('/project', 'feature-123', '   \n\t  ');
+
+      expect(atomicWriteJson).not.toHaveBeenCalled();
+      expect(mockEvents.emit).not.toHaveBeenCalled();
+    });
+
+    it('should accumulate three pipeline steps in chronological order', async () => {
+      // Step 1: Code Review
+      (pipelineService.getStep as Mock).mockResolvedValue({ name: 'Code Review', id: 'step1' });
+      (readJsonWithRecovery as Mock).mockResolvedValue({
+        data: { ...mockFeature, status: 'pipeline_step1', summary: undefined },
+        recovered: false,
+        source: 'main',
+      });
+
+      await manager.saveFeatureSummary('/project', 'feature-123', 'Review findings');
+      const afterStep1 = (atomicWriteJson as Mock).mock.calls[0][1] as Feature;
+      expect(afterStep1.summary).toBe('### Code Review\n\nReview findings');
+
+      // Step 2: Testing (summary from step 1 exists)
+      vi.clearAllMocks();
+      (getFeatureDir as Mock).mockReturnValue('/project/.automaker/features/feature-123');
+      (pipelineService.getStep as Mock).mockResolvedValue({ name: 'Testing', id: 'step2' });
+      (readJsonWithRecovery as Mock).mockResolvedValue({
+        data: { ...mockFeature, status: 'pipeline_step2', summary: afterStep1.summary },
+        recovered: false,
+        source: 'main',
+      });
+
+      await manager.saveFeatureSummary('/project', 'feature-123', 'All tests pass');
+      const afterStep2 = (atomicWriteJson as Mock).mock.calls[0][1] as Feature;
+
+      // Step 3: Refinement (summaries from steps 1+2 exist)
+      vi.clearAllMocks();
+      (getFeatureDir as Mock).mockReturnValue('/project/.automaker/features/feature-123');
+      (pipelineService.getStep as Mock).mockResolvedValue({ name: 'Refinement', id: 'step3' });
+      (readJsonWithRecovery as Mock).mockResolvedValue({
+        data: { ...mockFeature, status: 'pipeline_step3', summary: afterStep2.summary },
+        recovered: false,
+        source: 'main',
+      });
+
+      await manager.saveFeatureSummary('/project', 'feature-123', 'Code polished');
+      const afterStep3 = (atomicWriteJson as Mock).mock.calls[0][1] as Feature;
+
+      // Verify the full accumulated summary has all three steps in order
+      expect(afterStep3.summary).toBe(
+        `${PIPELINE_SUMMARY_HEADER_PREFIX}Code Review\n\nReview findings${PIPELINE_SUMMARY_SEPARATOR}${PIPELINE_SUMMARY_HEADER_PREFIX}Testing\n\nAll tests pass${PIPELINE_SUMMARY_SEPARATOR}${PIPELINE_SUMMARY_HEADER_PREFIX}Refinement\n\nCode polished`
+      );
+    });
+
+    it('should replace existing step summary if called again for the same step', async () => {
+      const existingSummary = `${PIPELINE_SUMMARY_HEADER_PREFIX}Implementation\n\nInitial code${PIPELINE_SUMMARY_SEPARATOR}${PIPELINE_SUMMARY_HEADER_PREFIX}Code Review\n\nFirst review attempt`;
+      (pipelineService.getStep as Mock).mockResolvedValue({ name: 'Code Review', id: 'step1' });
+      (readJsonWithRecovery as Mock).mockResolvedValue({
+        data: { ...mockFeature, status: 'pipeline_step1', summary: existingSummary },
+        recovered: false,
+        source: 'main',
+      });
+
+      await manager.saveFeatureSummary(
+        '/project',
+        'feature-123',
+        'Second review attempt (success)'
+      );
+
+      const savedFeature = (atomicWriteJson as Mock).mock.calls[0][1] as Feature;
+      // Should REPLACE "First review attempt" with "Second review attempt (success)"
+      // and NOT append it as a new section
+      expect(savedFeature.summary).toBe(
+        `${PIPELINE_SUMMARY_HEADER_PREFIX}Implementation\n\nInitial code${PIPELINE_SUMMARY_SEPARATOR}${PIPELINE_SUMMARY_HEADER_PREFIX}Code Review\n\nSecond review attempt (success)`
+      );
+      // Ensure it didn't duplicate the separator or header
+      expect(
+        savedFeature.summary.match(new RegExp(PIPELINE_SUMMARY_HEADER_PREFIX + 'Code Review', 'g'))
+          ?.length
+      ).toBe(1);
+      expect(
+        savedFeature.summary.match(new RegExp(PIPELINE_SUMMARY_SEPARATOR.trim(), 'g'))?.length
+      ).toBe(1);
+    });
+
+    it('should replace last step summary without trailing separator', async () => {
+      // Test case: replacing the last step which has no separator after it
+      const existingSummary = `${PIPELINE_SUMMARY_HEADER_PREFIX}Implementation\n\nInitial code${PIPELINE_SUMMARY_SEPARATOR}${PIPELINE_SUMMARY_HEADER_PREFIX}Testing\n\nFirst test run`;
+      (pipelineService.getStep as Mock).mockResolvedValue({ name: 'Testing', id: 'step2' });
+      (readJsonWithRecovery as Mock).mockResolvedValue({
+        data: { ...mockFeature, status: 'pipeline_step2', summary: existingSummary },
+        recovered: false,
+        source: 'main',
+      });
+
+      await manager.saveFeatureSummary('/project', 'feature-123', 'All tests pass');
+
+      const savedFeature = (atomicWriteJson as Mock).mock.calls[0][1] as Feature;
+      expect(savedFeature.summary).toBe(
+        `${PIPELINE_SUMMARY_HEADER_PREFIX}Implementation\n\nInitial code${PIPELINE_SUMMARY_SEPARATOR}${PIPELINE_SUMMARY_HEADER_PREFIX}Testing\n\nAll tests pass`
+      );
+    });
+
+    it('should replace first step summary with separator after it', async () => {
+      // Test case: replacing the first step which has a separator after it
+      const existingSummary = `${PIPELINE_SUMMARY_HEADER_PREFIX}Implementation\n\nFirst attempt${PIPELINE_SUMMARY_SEPARATOR}${PIPELINE_SUMMARY_HEADER_PREFIX}Testing\n\nAll tests pass`;
+      (pipelineService.getStep as Mock).mockResolvedValue({ name: 'Implementation', id: 'step1' });
+      (readJsonWithRecovery as Mock).mockResolvedValue({
+        data: { ...mockFeature, status: 'pipeline_step1', summary: existingSummary },
+        recovered: false,
+        source: 'main',
+      });
+
+      await manager.saveFeatureSummary('/project', 'feature-123', 'Second attempt');
+
+      const savedFeature = (atomicWriteJson as Mock).mock.calls[0][1] as Feature;
+      expect(savedFeature.summary).toBe(
+        `${PIPELINE_SUMMARY_HEADER_PREFIX}Implementation\n\nSecond attempt${PIPELINE_SUMMARY_SEPARATOR}${PIPELINE_SUMMARY_HEADER_PREFIX}Testing\n\nAll tests pass`
+      );
+    });
+
+    it('should not match step header appearing in body text, only at section boundaries', async () => {
+      // Test case: body text contains "### Testing" which should NOT be matched
+      // Only headers at actual section boundaries should be replaced
+      const existingSummary = `${PIPELINE_SUMMARY_HEADER_PREFIX}Implementation\n\nThis step covers the Testing module.\n\n### Testing\n\nThe above is just markdown in body, not a section header.${PIPELINE_SUMMARY_SEPARATOR}${PIPELINE_SUMMARY_HEADER_PREFIX}Testing\n\nReal test section`;
+      (pipelineService.getStep as Mock).mockResolvedValue({ name: 'Testing', id: 'step2' });
+      (readJsonWithRecovery as Mock).mockResolvedValue({
+        data: { ...mockFeature, status: 'pipeline_step2', summary: existingSummary },
+        recovered: false,
+        source: 'main',
+      });
+
+      await manager.saveFeatureSummary('/project', 'feature-123', 'Updated test results');
+
+      const savedFeature = (atomicWriteJson as Mock).mock.calls[0][1] as Feature;
+      // The section replacement should only replace the actual Testing section at the boundary
+      // NOT the "### Testing" that appears in the body text
+      expect(savedFeature.summary).toBe(
+        `${PIPELINE_SUMMARY_HEADER_PREFIX}Implementation\n\nThis step covers the Testing module.\n\n### Testing\n\nThe above is just markdown in body, not a section header.${PIPELINE_SUMMARY_SEPARATOR}${PIPELINE_SUMMARY_HEADER_PREFIX}Testing\n\nUpdated test results`
+      );
+    });
+
+    it('should handle step name with special regex characters safely', async () => {
+      // Test case: step name contains characters that would break regex
+      const existingSummary = `${PIPELINE_SUMMARY_HEADER_PREFIX}Code (Review)\n\nFirst attempt`;
+      (pipelineService.getStep as Mock).mockResolvedValue({ name: 'Code (Review)', id: 'step1' });
+      (readJsonWithRecovery as Mock).mockResolvedValue({
+        data: { ...mockFeature, status: 'pipeline_step1', summary: existingSummary },
+        recovered: false,
+        source: 'main',
+      });
+
+      await manager.saveFeatureSummary('/project', 'feature-123', 'Second attempt');
+
+      const savedFeature = (atomicWriteJson as Mock).mock.calls[0][1] as Feature;
+      expect(savedFeature.summary).toBe(
+        `${PIPELINE_SUMMARY_HEADER_PREFIX}Code (Review)\n\nSecond attempt`
+      );
+    });
+
+    it('should handle step name with brackets safely', async () => {
+      // Test case: step name contains array-like syntax [0]
+      const existingSummary = `${PIPELINE_SUMMARY_HEADER_PREFIX}Step [0]\n\nFirst attempt`;
+      (pipelineService.getStep as Mock).mockResolvedValue({ name: 'Step [0]', id: 'step1' });
+      (readJsonWithRecovery as Mock).mockResolvedValue({
+        data: { ...mockFeature, status: 'pipeline_step1', summary: existingSummary },
+        recovered: false,
+        source: 'main',
+      });
+
+      await manager.saveFeatureSummary('/project', 'feature-123', 'Second attempt');
+
+      const savedFeature = (atomicWriteJson as Mock).mock.calls[0][1] as Feature;
+      expect(savedFeature.summary).toBe(
+        `${PIPELINE_SUMMARY_HEADER_PREFIX}Step [0]\n\nSecond attempt`
+      );
+    });
+
+    it('should handle pipelineService.getStepIdFromStatus throwing an error gracefully', async () => {
+      (pipelineService.getStepIdFromStatus as Mock).mockImplementation(() => {
+        throw new Error('Config not found');
+      });
+      (readJsonWithRecovery as Mock).mockResolvedValue({
+        data: { ...mockFeature, status: 'pipeline_my_step', summary: undefined },
+        recovered: false,
+        source: 'main',
+      });
+
+      await manager.saveFeatureSummary('/project', 'feature-123', 'Step output');
+
+      const savedFeature = (atomicWriteJson as Mock).mock.calls[0][1] as Feature;
+      // Should use fallback: capitalize each word in the status suffix
+      expect(savedFeature.summary).toBe(`${PIPELINE_SUMMARY_HEADER_PREFIX}My Step\n\nStep output`);
+    });
+
+    it('should handle pipelineService.getStep throwing an error gracefully', async () => {
+      (pipelineService.getStep as Mock).mockRejectedValue(new Error('Disk read error'));
+      (readJsonWithRecovery as Mock).mockResolvedValue({
+        data: { ...mockFeature, status: 'pipeline_code_review', summary: undefined },
+        recovered: false,
+        source: 'main',
+      });
+
+      await manager.saveFeatureSummary('/project', 'feature-123', 'Step output');
+
+      const savedFeature = (atomicWriteJson as Mock).mock.calls[0][1] as Feature;
+      // Should use fallback: capitalize each word in the status suffix
+      expect(savedFeature.summary).toBe(
+        `${PIPELINE_SUMMARY_HEADER_PREFIX}Code Review\n\nStep output`
+      );
+    });
+
+    it('should handle summary content with markdown formatting', async () => {
+      (pipelineService.getStep as Mock).mockResolvedValue({ name: 'Code Review', id: 'step1' });
+      (readJsonWithRecovery as Mock).mockResolvedValue({
+        data: { ...mockFeature, status: 'pipeline_step1', summary: undefined },
+        recovered: false,
+        source: 'main',
+      });
+
+      const markdownSummary =
+        '## Changes Made\n- Fixed **bug** in `parser.ts`\n- Added `validateInput()` function\n\n```typescript\nconst x = 1;\n```';
+
+      await manager.saveFeatureSummary('/project', 'feature-123', markdownSummary);
+
+      const savedFeature = (atomicWriteJson as Mock).mock.calls[0][1] as Feature;
+      expect(savedFeature.summary).toBe(
+        `${PIPELINE_SUMMARY_HEADER_PREFIX}Code Review\n\n${markdownSummary}`
+      );
+    });
+
+    it('should persist before emitting event for pipeline summary accumulation', async () => {
+      const callOrder: string[] = [];
+      const existingSummary = '### Code Review\n\nFirst step output';
+
+      (pipelineService.getStep as Mock).mockResolvedValue({ name: 'Testing', id: 'step2' });
+      (readJsonWithRecovery as Mock).mockResolvedValue({
+        data: { ...mockFeature, status: 'pipeline_step2', summary: existingSummary },
+        recovered: false,
+        source: 'main',
+      });
+      (atomicWriteJson as Mock).mockImplementation(async () => {
+        callOrder.push('persist');
+      });
+      (mockEvents.emit as Mock).mockImplementation(() => {
+        callOrder.push('emit');
+      });
+
+      await manager.saveFeatureSummary('/project', 'feature-123', 'Test results');
+
+      expect(callOrder).toEqual(['persist', 'emit']);
+    });
   });
 
   describe('updateTaskStatus', () => {
@@ -664,6 +1076,48 @@ describe('FeatureStateManager', () => {
         projectPath: '/project',
         taskId: 'task-1',
         status: 'completed',
+        tasks: expect.any(Array),
+      });
+    });
+
+    it('should update task status and summary and emit event', async () => {
+      const featureWithTasks: Feature = {
+        ...mockFeature,
+        planSpec: {
+          status: 'approved',
+          version: 1,
+          reviewedByUser: true,
+          tasks: [{ id: 'task-1', title: 'Task 1', status: 'pending', description: '' }],
+        },
+      };
+
+      (readJsonWithRecovery as Mock).mockResolvedValue({
+        data: featureWithTasks,
+        recovered: false,
+        source: 'main',
+      });
+
+      await manager.updateTaskStatus(
+        '/project',
+        'feature-123',
+        'task-1',
+        'completed',
+        'Task finished successfully'
+      );
+
+      // Verify persisted
+      const savedFeature = (atomicWriteJson as Mock).mock.calls[0][1] as Feature;
+      expect(savedFeature.planSpec?.tasks?.[0].status).toBe('completed');
+      expect(savedFeature.planSpec?.tasks?.[0].summary).toBe('Task finished successfully');
+
+      // Verify event emitted
+      expect(mockEvents.emit).toHaveBeenCalledWith('auto-mode:event', {
+        type: 'auto_mode_task_status',
+        featureId: 'feature-123',
+        projectPath: '/project',
+        taskId: 'task-1',
+        status: 'completed',
+        summary: 'Task finished successfully',
         tasks: expect.any(Array),
       });
     });

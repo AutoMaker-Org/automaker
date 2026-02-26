@@ -6,7 +6,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { List, FileText, GitBranch, ClipboardList } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { List, FileText, GitBranch, ClipboardList, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Spinner } from '@/components/ui/spinner';
 import { getElectronAPI } from '@/lib/electron';
 import { LogViewer } from '@/components/ui/log-viewer';
@@ -14,8 +15,15 @@ import { GitDiffPanel } from '@/components/ui/git-diff-panel';
 import { TaskProgressPanel } from '@/components/ui/task-progress-panel';
 import { Markdown } from '@/components/ui/markdown';
 import { useAppStore } from '@/store/app-store';
-import { extractSummary } from '@/lib/log-parser';
-import { useAgentOutput } from '@/hooks/queries';
+import {
+  extractSummary,
+  parseAllPhaseSummaries,
+  isAccumulatedSummary,
+  type PhaseSummaryEntry,
+} from '@/lib/log-parser';
+import { getFirstNonEmptySummary } from '@/lib/summary-selection';
+import { useAgentOutput, useFeature } from '@/hooks/queries';
+import { cn } from '@/lib/utils';
 import type { AutoModeEvent } from '@/types/electron';
 import type { BacklogPlanEvent } from '@automaker/types';
 
@@ -35,6 +43,112 @@ interface AgentOutputModalProps {
 }
 
 type ViewMode = 'summary' | 'parsed' | 'raw' | 'changes';
+
+/**
+ * Renders a single phase entry card with header and content.
+ */
+function PhaseEntryCard({
+  entry,
+  index,
+  totalPhases,
+  hasMultiplePhases,
+  isActive,
+  onClick,
+}: {
+  entry: PhaseSummaryEntry;
+  index: number;
+  totalPhases: number;
+  hasMultiplePhases: boolean;
+  isActive?: boolean;
+  onClick?: () => void;
+}) {
+  const handleKeyDown = (event: React.KeyboardEvent) => {
+    if (onClick && (event.key === 'Enter' || event.key === ' ')) {
+      event.preventDefault();
+      onClick();
+    }
+  };
+
+  return (
+    <div
+      className={cn(
+        'p-4 bg-card rounded-lg border border-border/50 transition-all',
+        isActive && 'ring-2 ring-primary/50 border-primary/50',
+        onClick && 'cursor-pointer'
+      )}
+      onClick={onClick}
+      onKeyDown={handleKeyDown}
+      role={onClick ? 'button' : undefined}
+      tabIndex={onClick ? 0 : undefined}
+    >
+      <div className="flex items-center gap-2 mb-3 pb-2 border-b border-border/30">
+        <span className="text-sm font-semibold text-primary">{entry.phaseName}</span>
+        {hasMultiplePhases && (
+          <span className="text-xs text-muted-foreground">
+            Step {index + 1} of {totalPhases}
+          </span>
+        )}
+      </div>
+      <Markdown>{entry.content || 'No summary available'}</Markdown>
+    </div>
+  );
+}
+
+/**
+ * Step navigator component for multi-phase summaries
+ */
+function StepNavigator({
+  phaseEntries,
+  activeIndex,
+  onIndexChange,
+}: {
+  phaseEntries: PhaseSummaryEntry[];
+  activeIndex: number;
+  onIndexChange: (index: number) => void;
+}) {
+  if (phaseEntries.length <= 1) return null;
+
+  return (
+    <div className="flex items-center gap-2 p-2 bg-muted/50 rounded-lg shrink-0">
+      <Button
+        variant="ghost"
+        size="sm"
+        className="h-7 w-7 p-0"
+        onClick={() => onIndexChange(Math.max(0, activeIndex - 1))}
+        disabled={activeIndex === 0}
+      >
+        <ChevronLeft className="w-4 h-4" />
+      </Button>
+
+      <div className="flex items-center gap-1 overflow-x-auto">
+        {phaseEntries.map((entry, index) => (
+          <button
+            key={`step-nav-${index}`}
+            onClick={() => onIndexChange(index)}
+            className={cn(
+              'px-2.5 py-1 rounded-md text-xs font-medium transition-all whitespace-nowrap',
+              index === activeIndex
+                ? 'bg-primary text-primary-foreground'
+                : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+            )}
+          >
+            {entry.phaseName}
+          </button>
+        ))}
+      </div>
+
+      <Button
+        variant="ghost"
+        size="sm"
+        className="h-7 w-7 p-0"
+        onClick={() => onIndexChange(Math.min(phaseEntries.length - 1, activeIndex + 1))}
+        disabled={activeIndex === phaseEntries.length - 1}
+      >
+        <ChevronRight className="w-4 h-4" />
+      </Button>
+    </div>
+  );
+}
 
 export function AgentOutputModal({
   open,
@@ -56,8 +170,17 @@ export function AgentOutputModal({
   const [viewMode, setViewMode] = useState<ViewMode | null>(null);
 
   // Use React Query for initial output loading
-  const { data: initialOutput = '', isLoading } = useAgentOutput(resolvedProjectPath, featureId, {
+  const {
+    data: initialOutput = '',
+    isLoading,
+    refetch: refetchAgentOutput,
+  } = useAgentOutput(resolvedProjectPath, featureId, {
     enabled: open && !!resolvedProjectPath,
+  });
+
+  // Fetch feature data to access the server-side accumulated summary
+  const { data: feature, refetch: refetchFeature } = useFeature(resolvedProjectPath, featureId, {
+    enabled: open && !!resolvedProjectPath && !isBacklogPlan,
   });
 
   // Reset streamed content when modal opens or featureId changes
@@ -70,8 +193,31 @@ export function AgentOutputModal({
   // Combine initial output from query with streamed content from WebSocket
   const output = initialOutput + streamedContent;
 
-  // Extract summary from output
-  const summary = useMemo(() => extractSummary(output), [output]);
+  // Extract summary from output (client-side fallback)
+  const extractedSummary = useMemo(() => extractSummary(output), [output]);
+
+  // Prefer server-side accumulated summary (handles pipeline step accumulation),
+  // fall back to client-side extraction from raw output.
+  const summary = getFirstNonEmptySummary(feature?.summary, extractedSummary);
+
+  // Normalize null to undefined for parser helpers that expect string | undefined
+  const normalizedSummary = summary ?? undefined;
+
+  // Parse summary into phases for multi-step navigation
+  const phaseEntries = useMemo(
+    () => parseAllPhaseSummaries(normalizedSummary),
+    [normalizedSummary]
+  );
+  const hasMultiplePhases = useMemo(
+    () => isAccumulatedSummary(normalizedSummary),
+    [normalizedSummary]
+  );
+  const [activePhaseIndex, setActivePhaseIndex] = useState(0);
+
+  // Reset active phase index when summary changes
+  useEffect(() => {
+    setActivePhaseIndex(0);
+  }, [normalizedSummary]);
 
   // Determine the effective view mode - default to summary if available, otherwise parsed
   const effectiveViewMode = viewMode ?? (summary ? 'summary' : 'parsed');
@@ -79,12 +225,54 @@ export function AgentOutputModal({
   const autoScrollRef = useRef(true);
   const useWorktrees = useAppStore((state) => state.useWorktrees);
 
+  // Force a fresh fetch when opening to avoid showing stale cached summaries.
+  useEffect(() => {
+    if (!open || !resolvedProjectPath || !featureId) return;
+    if (!isBacklogPlan) {
+      void refetchFeature();
+    }
+    void refetchAgentOutput();
+  }, [open, resolvedProjectPath, featureId, isBacklogPlan, refetchFeature, refetchAgentOutput]);
+
   // Auto-scroll to bottom when output changes
   useEffect(() => {
     if (autoScrollRef.current && scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [output]);
+
+  // Auto-scroll to bottom when summary changes (for pipeline step accumulation)
+  const summaryScrollRef = useRef<HTMLDivElement>(null);
+  const [summaryAutoScroll, setSummaryAutoScroll] = useState(true);
+
+  // Auto-scroll summary panel to bottom when summary is updated
+  useEffect(() => {
+    if (summaryAutoScroll && summaryScrollRef.current && normalizedSummary) {
+      summaryScrollRef.current.scrollTop = summaryScrollRef.current.scrollHeight;
+    }
+  }, [normalizedSummary, summaryAutoScroll]);
+
+  // Handle scroll to detect if user scrolled up in summary panel
+  const handleSummaryScroll = () => {
+    if (!summaryScrollRef.current) return;
+
+    const { scrollTop, scrollHeight, clientHeight } = summaryScrollRef.current;
+    const isAtBottom = scrollHeight - scrollTop - clientHeight < 50;
+    setSummaryAutoScroll(isAtBottom);
+  };
+
+  // Scroll to active phase when it changes or when summary changes
+  useEffect(() => {
+    if (summaryScrollRef.current && hasMultiplePhases) {
+      const phaseCards = summaryScrollRef.current.querySelectorAll('[data-phase-index]');
+      // Ensure index is within bounds
+      const safeIndex = Math.min(activePhaseIndex, phaseCards.length - 1);
+      const targetCard = phaseCards[safeIndex];
+      if (targetCard) {
+        targetCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }
+  }, [activePhaseIndex, hasMultiplePhases, normalizedSummary]);
 
   // Listen to auto mode events and update output
   useEffect(() => {
@@ -420,9 +608,49 @@ export function AgentOutputModal({
             )}
           </div>
         ) : effectiveViewMode === 'summary' && summary ? (
-          <div className="flex-1 min-h-0 sm:min-h-[200px] sm:max-h-[60vh] overflow-y-auto bg-card border border-border/50 rounded-lg p-4 scrollbar-visible">
-            <Markdown>{summary}</Markdown>
-          </div>
+          <>
+            {/* Step navigator for multi-phase summaries */}
+            {hasMultiplePhases && (
+              <StepNavigator
+                phaseEntries={phaseEntries}
+                activeIndex={activePhaseIndex}
+                onIndexChange={setActivePhaseIndex}
+              />
+            )}
+
+            <div
+              ref={summaryScrollRef}
+              onScroll={handleSummaryScroll}
+              className="flex-1 min-h-0 sm:min-h-[200px] sm:max-h-[60vh] overflow-y-auto scrollbar-visible space-y-4 p-1"
+            >
+              {hasMultiplePhases ? (
+                // Multi-phase: render individual phase cards
+                phaseEntries.map((entry, index) => (
+                  <div key={`phase-${index}-${entry.phaseName}`} data-phase-index={index}>
+                    <PhaseEntryCard
+                      entry={entry}
+                      index={index}
+                      totalPhases={phaseEntries.length}
+                      hasMultiplePhases={hasMultiplePhases}
+                      isActive={index === activePhaseIndex}
+                      onClick={() => setActivePhaseIndex(index)}
+                    />
+                  </div>
+                ))
+              ) : (
+                // Single phase: render as markdown
+                <div className="bg-card border border-border/50 rounded-lg p-4">
+                  <Markdown>{summary}</Markdown>
+                </div>
+              )}
+            </div>
+
+            <div className="text-xs text-muted-foreground text-center shrink-0">
+              {summaryAutoScroll
+                ? 'Auto-scrolling enabled'
+                : 'Scroll to bottom to enable auto-scroll'}
+            </div>
+          </>
         ) : (
           <>
             <div
