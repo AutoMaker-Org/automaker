@@ -59,10 +59,6 @@ export default defineConfig({
                     ALLOWED_ROOT_DIRECTORY: '',
                     // Simulate containerized environment to skip sandbox confirmation dialogs
                     IS_CONTAINERIZED: 'true',
-                    // Increase Node.js memory limit to prevent OOM during tests
-                    NODE_OPTIONS: [process.env.NODE_OPTIONS, '--max-old-space-size=4096']
-                      .filter(Boolean)
-                      .join(' '),
                   },
                 },
               ]),

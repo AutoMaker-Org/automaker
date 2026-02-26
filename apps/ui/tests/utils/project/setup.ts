@@ -84,9 +84,6 @@ export async function setupWelcomeView(
         setupComplete: true,
         isFirstRun: false,
         projects: opts?.recentProjects || [],
-        // Explicitly set currentProjectId to null so the fast-hydrate path
-        // does not restore a stale project from a previous test.
-        currentProjectId: null,
         theme: 'dark',
         sidebarOpen: true,
         maxConcurrency: 3,
@@ -106,7 +103,7 @@ export async function setupWelcomeView(
       }
 
       // Disable splash screen in tests
-      localStorage.setItem('automaker-disable-splash', 'true');
+      sessionStorage.setItem('automaker-splash-shown', 'true');
 
       // Set up a mechanism to keep currentProject null even after settings hydration
       // Settings API might restore a project, so we override it after hydration
@@ -229,7 +226,7 @@ export async function setupRealProject(
       localStorage.setItem('automaker-settings-cache', JSON.stringify(settingsCache));
 
       // Disable splash screen in tests
-      localStorage.setItem('automaker-disable-splash', 'true');
+      sessionStorage.setItem('automaker-splash-shown', 'true');
     },
     { path: projectPath, name: projectName, opts: options, versions: STORE_VERSIONS }
   );
@@ -294,7 +291,7 @@ export async function setupMockProject(page: Page): Promise<void> {
     localStorage.setItem('automaker-settings-cache', JSON.stringify(settingsCache));
 
     // Disable splash screen in tests
-    localStorage.setItem('automaker-disable-splash', 'true');
+    sessionStorage.setItem('automaker-splash-shown', 'true');
   }, STORE_VERSIONS);
 }
 
@@ -426,7 +423,7 @@ export async function setupMockProjectAtConcurrencyLimit(
       localStorage.setItem('automaker-settings-cache', JSON.stringify(settingsCache));
 
       // Disable splash screen in tests
-      localStorage.setItem('automaker-disable-splash', 'true');
+      sessionStorage.setItem('automaker-splash-shown', 'true');
     },
     { maxConcurrency, runningTasks, versions: STORE_VERSIONS }
   );
@@ -508,7 +505,7 @@ export async function setupMockProjectWithFeatures(
       (window as { __mockFeatures?: unknown[] }).__mockFeatures = mockFeatures;
 
       // Disable splash screen in tests
-      localStorage.setItem('automaker-disable-splash', 'true');
+      sessionStorage.setItem('automaker-splash-shown', 'true');
     },
     { opts: options, versions: STORE_VERSIONS }
   );
@@ -580,7 +577,7 @@ export async function setupMockProjectWithContextFile(
       localStorage.setItem('automaker-settings-cache', JSON.stringify(settingsCache));
 
       // Disable splash screen in tests
-      localStorage.setItem('automaker-disable-splash', 'true');
+      sessionStorage.setItem('automaker-splash-shown', 'true');
 
       // Set up mock file system with a context file for the feature
       // This will be used by the mock electron API
@@ -772,7 +769,7 @@ export async function setupEmptyLocalStorage(page: Page): Promise<void> {
     localStorage.setItem('automaker-settings-cache', JSON.stringify(settingsCache));
 
     // Disable splash screen in tests
-    localStorage.setItem('automaker-disable-splash', 'true');
+    sessionStorage.setItem('automaker-splash-shown', 'true');
   }, STORE_VERSIONS);
 }
 
@@ -835,7 +832,7 @@ export async function setupMockProjectsWithoutCurrent(page: Page): Promise<void>
     localStorage.setItem('automaker-settings-cache', JSON.stringify(settingsCache));
 
     // Disable splash screen in tests
-    localStorage.setItem('automaker-disable-splash', 'true');
+    sessionStorage.setItem('automaker-splash-shown', 'true');
   }, STORE_VERSIONS);
 }
 
@@ -913,7 +910,7 @@ export async function setupMockProjectWithSkipTestsFeatures(
       localStorage.setItem('automaker-settings-cache', JSON.stringify(settingsCache));
 
       // Disable splash screen in tests
-      localStorage.setItem('automaker-disable-splash', 'true');
+      sessionStorage.setItem('automaker-splash-shown', 'true');
     },
     { opts: options, versions: STORE_VERSIONS }
   );
@@ -988,7 +985,7 @@ export async function setupMockMultipleProjects(
       localStorage.setItem('automaker-settings-cache', JSON.stringify(settingsCache));
 
       // Disable splash screen in tests
-      localStorage.setItem('automaker-disable-splash', 'true');
+      sessionStorage.setItem('automaker-splash-shown', 'true');
     },
     { count: projectCount, versions: STORE_VERSIONS }
   );
@@ -1059,7 +1056,7 @@ export async function setupMockProjectWithAgentOutput(
       localStorage.setItem('automaker-settings-cache', JSON.stringify(settingsCache));
 
       // Disable splash screen in tests
-      localStorage.setItem('automaker-disable-splash', 'true');
+      sessionStorage.setItem('automaker-splash-shown', 'true');
 
       // Set up mock file system with output content for the feature
       // Now uses features/{id}/agent-output.md path
@@ -1218,7 +1215,7 @@ export async function setupFirstRun(page: Page): Promise<void> {
     localStorage.setItem('automaker-settings-cache', JSON.stringify(settingsCache));
 
     // Disable splash screen in tests
-    localStorage.setItem('automaker-disable-splash', 'true');
+    sessionStorage.setItem('automaker-splash-shown', 'true');
   }, STORE_VERSIONS);
 }
 
@@ -1241,6 +1238,6 @@ export async function setupComplete(page: Page): Promise<void> {
     localStorage.setItem('automaker-setup', JSON.stringify(setupState));
 
     // Disable splash screen in tests
-    localStorage.setItem('automaker-disable-splash', 'true');
+    sessionStorage.setItem('automaker-splash-shown', 'true');
   }, STORE_VERSIONS);
 }

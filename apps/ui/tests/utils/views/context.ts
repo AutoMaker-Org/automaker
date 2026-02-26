@@ -97,22 +97,10 @@ export async function deleteSelectedContextFile(page: Page): Promise<void> {
  */
 export async function saveContextFile(page: Page): Promise<void> {
   await clickElement(page, 'save-context-file');
-  // Wait for save to complete across desktop/mobile variants
-  // On desktop: button text shows "Saved"
-  // On mobile: icon-only button uses aria-label or title
+  // Wait for save to complete (button shows "Saved")
   await page.waitForFunction(
-    () => {
-      const btn = document.querySelector('[data-testid="save-context-file"]');
-      if (!btn) return false;
-      const stateText = [
-        btn.textContent ?? '',
-        btn.getAttribute('aria-label') ?? '',
-        btn.getAttribute('title') ?? '',
-      ]
-        .join(' ')
-        .toLowerCase();
-      return stateText.includes('saved');
-    },
+    () =>
+      document.querySelector('[data-testid="save-context-file"]')?.textContent?.includes('Saved'),
     { timeout: 5000 }
   );
 }
@@ -150,16 +138,13 @@ export async function selectContextFile(
 ): Promise<void> {
   const fileButton = await getByTestId(page, `context-file-${filename}`);
 
-  // Retry click + wait for content panel to handle timing issues
-  // Note: On mobile, delete button is hidden, so we wait for content panel instead
+  // Retry click + wait for delete button to handle timing issues
   await expect(async () => {
     // Use JavaScript click to ensure React onClick handler fires
     await fileButton.evaluate((el) => (el as HTMLButtonElement).click());
-    // Wait for content to appear (editor, preview, or image)
-    const contentLocator = page.locator(
-      '[data-testid="context-editor"], [data-testid="markdown-preview"], [data-testid="image-preview"]'
-    );
-    await expect(contentLocator).toBeVisible();
+    // Wait for the file to be selected (toolbar with delete button becomes visible)
+    const deleteButton = await getByTestId(page, 'delete-context-file');
+    await expect(deleteButton).toBeVisible();
   }).toPass({ timeout, intervals: [500, 1000, 2000] });
 }
 

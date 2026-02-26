@@ -54,16 +54,13 @@ export async function waitForElementHidden(
  */
 export async function waitForSplashScreenToDisappear(page: Page, timeout = 5000): Promise<void> {
   try {
-    // Check if splash screen is disabled or already shown (fastest check)
-    const splashDisabled = await page.evaluate(() => {
-      return (
-        localStorage.getItem('automaker-disable-splash') === 'true' ||
-        localStorage.getItem('automaker-splash-shown-session') === 'true'
-      );
+    // Check if splash screen is shown via sessionStorage first (fastest check)
+    const splashShown = await page.evaluate(() => {
+      return sessionStorage.getItem('automaker-splash-shown') === 'true';
     });
 
-    // If splash is disabled or already shown, it won't appear, so we're done
-    if (splashDisabled) {
+    // If splash is already marked as shown, it won't appear, so we're done
+    if (splashShown) {
       return;
     }
 
@@ -72,11 +69,8 @@ export async function waitForSplashScreenToDisappear(page: Page, timeout = 5000)
     // We check for elements that match the splash screen pattern
     await page.waitForFunction(
       () => {
-        // Check if splash is disabled or already shown
-        if (
-          localStorage.getItem('automaker-disable-splash') === 'true' ||
-          localStorage.getItem('automaker-splash-shown-session') === 'true'
-        ) {
+        // Check if splash is marked as shown in sessionStorage
+        if (sessionStorage.getItem('automaker-splash-shown') === 'true') {
           return true;
         }
 

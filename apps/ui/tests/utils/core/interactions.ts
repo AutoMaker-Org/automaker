@@ -1,5 +1,6 @@
 import { Page, expect } from '@playwright/test';
 import { getByTestId, getButtonByText } from './elements';
+import { waitForSplashScreenToDisappear } from './waiting';
 
 /**
  * Get the platform-specific modifier key (Meta for Mac, Control for Windows/Linux)
@@ -22,10 +23,10 @@ export async function pressModifierEnter(page: Page): Promise<void> {
  * Waits for the element to be visible before clicking to avoid flaky tests
  */
 export async function clickElement(page: Page, testId: string): Promise<void> {
-  // Splash screen waits are handled by navigation helpers (navigateToContext, navigateToMemory, etc.)
-  // before any clickElement calls, so we skip the splash check here to avoid blocking when
-  // other fixed overlays (e.g. HeaderActionsPanel backdrop at z-[60]) are present on the page.
+  // Wait for splash screen to disappear first (safety net)
+  await waitForSplashScreenToDisappear(page, 5000);
   const element = page.locator(`[data-testid="${testId}"]`);
+  // Wait for element to be visible and stable before clicking
   await element.waitFor({ state: 'visible', timeout: 10000 });
   await element.click();
 }
