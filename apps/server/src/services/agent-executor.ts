@@ -369,6 +369,30 @@ export class AgentExecutor {
   }
 
   /**
+   * Strip the follow-up session scaffold marker from content.
+   * The scaffold is added when resuming a session with previous content:
+   *   "\n\n---\n\n## Follow-up Session\n\n"
+   * This ensures fallback summaries don't include the scaffold header.
+   *
+   * The regex pattern handles variations in whitespace while matching the
+   * scaffold structure: dashes followed by "## Follow-up Session" at the
+   * start of the content.
+   */
+  private static stripFollowUpScaffold(content: string): string {
+    // Pattern matches: ^\s*---\s*##\s*Follow-up Session\s*
+    // - ^ = start of content (scaffold is always at the beginning of sessionContent)
+    // - \s* = any whitespace (handles \n\n before ---, spaces/tabs between markers)
+    // - --- = literal dashes
+    // - \s* = whitespace between dashes and heading
+    // - ## = heading marker
+    // - \s* = whitespace before "Follow-up"
+    // - Follow-up Session = literal heading text
+    // - \s* = trailing whitespace/newlines after heading
+    const scaffoldPattern = /^\s*---\s*##\s*Follow-up Session\s*/;
+    return content.replace(scaffoldPattern, '');
+  }
+
+  /**
    * Extract summary ONLY from the new content generated in this session
    * and save it via the provided callback.
    */
@@ -389,7 +413,9 @@ export class AgentExecutor {
 
     // If we're in a pipeline step, a summary is expected. Use a fallback if extraction fails.
     if (isPipelineStatus(status)) {
-      const fallback = sessionContent.trim();
+      // Strip any follow-up session scaffold before using as fallback
+      const cleanSessionContent = AgentExecutor.stripFollowUpScaffold(sessionContent);
+      const fallback = cleanSessionContent.trim();
       if (fallback) {
         await callbacks.saveFeatureSummary(projectPath, featureId, fallback);
       }
