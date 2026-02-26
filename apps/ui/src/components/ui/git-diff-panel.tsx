@@ -384,7 +384,8 @@ export function GitDiffPanel({
   const queryError = useWorktrees ? worktreeError : gitError;
 
   // Extract files, diff content, and merge state from the data
-  const files: FileStatus[] = diffsData?.files ?? [];
+  // Use useMemo to stabilize the files array reference to prevent unnecessary re-renders
+  const files = useMemo(() => diffsData?.files ?? [], [diffsData?.files]);
   const diffContent = diffsData?.diff ?? '';
   const mergeState: MergeStateInfo | undefined = diffsData?.mergeState;
   const error = queryError
@@ -584,7 +585,7 @@ export function GitDiffPanel({
       () => setStagingInProgress(new Set(allPaths)),
       () => setStagingInProgress(new Set())
     );
-  }, [worktreePath, projectPath, useWorktrees, enableStaging, files, executeStagingAction]);
+  }, [worktreePath, useWorktrees, enableStaging, files, executeStagingAction]);
 
   const handleUnstageAll = useCallback(async () => {
     const stagedFiles = files.filter((f) => {
@@ -607,7 +608,7 @@ export function GitDiffPanel({
       () => setStagingInProgress(new Set(allPaths)),
       () => setStagingInProgress(new Set())
     );
-  }, [worktreePath, projectPath, useWorktrees, enableStaging, files, executeStagingAction]);
+  }, [worktreePath, useWorktrees, enableStaging, files, executeStagingAction]);
 
   // Compute merge summary
   const mergeSummary = useMemo(() => {

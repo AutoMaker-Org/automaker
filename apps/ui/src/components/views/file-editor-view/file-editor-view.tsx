@@ -604,6 +604,7 @@ export function FileEditorView({ initialPath }: FileEditorViewProps) {
         autoSaveTimerRef.current = null;
       }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- activeTab is accessed for isDirty/content only
   }, [editorAutoSave, editorAutoSaveDelay, activeTab?.isDirty, activeTab?.content, handleSave]);
 
   // ─── Handle Search ──────────────────────────────────────────
@@ -1090,6 +1091,7 @@ export function FileEditorView({ initialPath }: FileEditorViewProps) {
     } else {
       useFileEditorStore.getState().setActiveFileGitDetails(null);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- activeTab accessed for specific properties only
   }, [activeTab?.filePath, activeTab?.isBinary, loadFileGitDetails]);
 
   // Load file diff when inline diff is enabled and active tab changes
@@ -1099,6 +1101,7 @@ export function FileEditorView({ initialPath }: FileEditorViewProps) {
     } else {
       useFileEditorStore.getState().setActiveFileDiff(null);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- activeTab accessed for specific properties only
   }, [
     showInlineDiff,
     activeTab?.filePath,

@@ -166,7 +166,6 @@ export function AgentOutputModal({
 
   // Track view mode state
   const [viewMode, setViewMode] = useState<ViewMode | null>(null);
-  const [streamedContent, setStreamedContent] = useState<string>('');
 
   // Use custom hook for WebSocket event handling and output management
   const { output, isLoading } = useAgentOutputWebSocket({
@@ -250,7 +249,8 @@ export function AgentOutputModal({
     if (!summaryScrollRef.current) return;
 
     const { scrollTop, scrollHeight, clientHeight } = summaryScrollRef.current;
-    const isAtBottom = scrollHeight - scrollTop - clientHeight < 50;
+    const isAtBottom =
+      scrollHeight - scrollTop - clientHeight < MODAL_CONSTANTS.AUTOSCROLL_THRESHOLD;
     setSummaryAutoScroll(isAtBottom);
   };
 

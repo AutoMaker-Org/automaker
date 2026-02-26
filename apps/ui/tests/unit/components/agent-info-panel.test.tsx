@@ -68,7 +68,7 @@ describe('AgentInfoPanel', () => {
     vi.clearAllMocks();
 
     // Default mock implementations
-    mockUseAppStore.mockImplementation((selector: (state: any) => any) => {
+    mockUseAppStore.mockImplementation((selector: (state: Record<string, unknown>) => unknown) => {
       const state = {
         claudeCompatibleProviders: [],
       };
@@ -90,12 +90,14 @@ describe('AgentInfoPanel', () => {
 
   describe('Provider-aware model name display', () => {
     it('should display provider displayName when providerId matches Moonshot AI', () => {
-      mockUseAppStore.mockImplementation((selector: (state: any) => any) => {
-        const state = {
-          claudeCompatibleProviders: mockProviders,
-        };
-        return selector(state);
-      });
+      mockUseAppStore.mockImplementation(
+        (selector: (state: Record<string, unknown>) => unknown) => {
+          const state = {
+            claudeCompatibleProviders: mockProviders,
+          };
+          return selector(state);
+        }
+      );
 
       const feature = createMockFeature({
         status: 'backlog',
@@ -111,12 +113,14 @@ describe('AgentInfoPanel', () => {
     });
 
     it('should display provider displayName when providerId matches Zhipu/GLM', () => {
-      mockUseAppStore.mockImplementation((selector: (state: any) => any) => {
-        const state = {
-          claudeCompatibleProviders: mockProviders,
-        };
-        return selector(state);
-      });
+      mockUseAppStore.mockImplementation(
+        (selector: (state: Record<string, unknown>) => unknown) => {
+          const state = {
+            claudeCompatibleProviders: mockProviders,
+          };
+          return selector(state);
+        }
+      );
 
       const feature = createMockFeature({
         status: 'backlog',
@@ -132,12 +136,14 @@ describe('AgentInfoPanel', () => {
     });
 
     it('should fallback to default model name when providerId is not found', () => {
-      mockUseAppStore.mockImplementation((selector: (state: any) => any) => {
-        const state = {
-          claudeCompatibleProviders: mockProviders,
-        };
-        return selector(state);
-      });
+      mockUseAppStore.mockImplementation(
+        (selector: (state: Record<string, unknown>) => unknown) => {
+          const state = {
+            claudeCompatibleProviders: mockProviders,
+          };
+          return selector(state);
+        }
+      );
 
       const feature = createMockFeature({
         status: 'backlog',
@@ -154,12 +160,14 @@ describe('AgentInfoPanel', () => {
     });
 
     it('should fallback to default model name when providers list is empty', () => {
-      mockUseAppStore.mockImplementation((selector: (state: any) => any) => {
-        const state = {
-          claudeCompatibleProviders: [],
-        };
-        return selector(state);
-      });
+      mockUseAppStore.mockImplementation(
+        (selector: (state: Record<string, unknown>) => unknown) => {
+          const state = {
+            claudeCompatibleProviders: [],
+          };
+          return selector(state);
+        }
+      );
 
       const feature = createMockFeature({
         status: 'backlog',
@@ -176,12 +184,14 @@ describe('AgentInfoPanel', () => {
     });
 
     it('should use default model name when providerId is undefined', () => {
-      mockUseAppStore.mockImplementation((selector: (state: any) => any) => {
-        const state = {
-          claudeCompatibleProviders: mockProviders,
-        };
-        return selector(state);
-      });
+      mockUseAppStore.mockImplementation(
+        (selector: (state: Record<string, unknown>) => unknown) => {
+          const state = {
+            claudeCompatibleProviders: mockProviders,
+          };
+          return selector(state);
+        }
+      );
 
       const feature = createMockFeature({
         status: 'backlog',
@@ -198,12 +208,14 @@ describe('AgentInfoPanel', () => {
     });
 
     it('should display correct model name for Opus models with provider', () => {
-      mockUseAppStore.mockImplementation((selector: (state: any) => any) => {
-        const state = {
-          claudeCompatibleProviders: mockProviders,
-        };
-        return selector(state);
-      });
+      mockUseAppStore.mockImplementation(
+        (selector: (state: Record<string, unknown>) => unknown) => {
+          const state = {
+            claudeCompatibleProviders: mockProviders,
+          };
+          return selector(state);
+        }
+      );
 
       const feature = createMockFeature({
         status: 'backlog',
@@ -219,12 +231,14 @@ describe('AgentInfoPanel', () => {
     });
 
     it('should memoize model format options to prevent unnecessary re-renders', () => {
-      mockUseAppStore.mockImplementation((selector: (state: any) => any) => {
-        const state = {
-          claudeCompatibleProviders: mockProviders,
-        };
-        return selector(state);
-      });
+      mockUseAppStore.mockImplementation(
+        (selector: (state: Record<string, unknown>) => unknown) => {
+          const state = {
+            claudeCompatibleProviders: mockProviders,
+          };
+          return selector(state);
+        }
+      );
 
       const feature = createMockFeature({
         status: 'backlog',

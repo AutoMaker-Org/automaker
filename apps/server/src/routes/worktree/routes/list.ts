@@ -146,10 +146,54 @@ async function detectConflictState(worktreePath: string): Promise<{
 
 async function getCurrentBranch(cwd: string): Promise<string> {
   try {
-    const { stdout } = await execAsync('git branch --show-current', { cwd });
+    const { stdout } = await execAsync('git branch --show-current', { cwd, timeout: 5000 });
     return stdout.trim();
   } catch {
     return '';
+  }
+}
+
+/**
+ * Attempt to recover the branch name for a worktree in detached HEAD state.
+ * This happens during rebase operations where git detaches HEAD from the branch.
+ * We look at git state files (rebase-merge/head-name, rebase-apply/head-name)
+ * to determine which branch the operation is targeting.
+ *
+ * Note: merge conflicts do NOT detach HEAD, so `git worktree list --porcelain`
+ * still includes the `branch` line for merge conflicts. This recovery is
+ * specifically for rebase and cherry-pick operations.
+ */
+async function recoverBranchForDetachedWorktree(worktreePath: string): Promise<string | null> {
+  try {
+    const { stdout: gitDirRaw } = await execAsync('git rev-parse --git-dir', {
+      cwd: worktreePath,
+      timeout: 5000,
+    });
+    const gitDir = path.resolve(worktreePath, gitDirRaw.trim());
+
+    // During a rebase, the original branch is stored in rebase-merge/head-name
+    try {
+      const headNamePath = path.join(gitDir, 'rebase-merge', 'head-name');
+      const headName = (await secureFs.readFile(headNamePath, 'utf-8')) as string;
+      const branch = headName.trim().replace('refs/heads/', '');
+      if (branch) return branch;
+    } catch {
+      // Not a rebase-merge
+    }
+
+    // rebase-apply also stores the original branch in head-name
+    try {
+      const headNamePath = path.join(gitDir, 'rebase-apply', 'head-name');
+      const headName = (await secureFs.readFile(headNamePath, 'utf-8')) as string;
+      const branch = headName.trim().replace('refs/heads/', '');
+      if (branch) return branch;
+    } catch {
+      // Not a rebase-apply
+    }
+
+    return null;
+  } catch {
+    return null;
   }
 }
 
@@ -204,22 +248,32 @@ async function scanWorktreesDirectory(
             });
           } else {
             // Try to get branch from HEAD if branch --show-current fails (detached HEAD)
+            let headBranch: string | null = null;
             try {
               const { stdout: headRef } = await execAsync('git rev-parse --abbrev-ref HEAD', {
                 cwd: worktreePath,
               });
-              const headBranch = headRef.trim();
-              if (headBranch && headBranch !== 'HEAD') {
-                logger.info(
-                  `Discovered worktree in .worktrees/ not in git worktree list: ${entry.name} (branch: ${headBranch})`
-                );
-                discovered.push({
-                  path: normalizedPath,
-                  branch: headBranch,
-                });
+              const ref = headRef.trim();
+              if (ref && ref !== 'HEAD') {
+                headBranch = ref;
               }
             } catch {
-              // Can't determine branch, skip this directory
+              // Can't determine branch from HEAD ref
+            }
+
+            // If HEAD is detached (rebase/merge in progress), try recovery from git state files
+            if (!headBranch) {
+              headBranch = await recoverBranchForDetachedWorktree(worktreePath);
+            }
+
+            if (headBranch) {
+              logger.info(
+                `Discovered worktree in .worktrees/ not in git worktree list: ${entry.name} (branch: ${headBranch})`
+              );
+              discovered.push({
+                path: normalizedPath,
+                branch: headBranch,
+              });
             }
           }
         }
@@ -386,7 +440,7 @@ export function createListHandler() {
       const worktrees: WorktreeInfo[] = [];
       const removedWorktrees: Array<{ path: string; branch: string }> = [];
       const lines = stdout.split('\n');
-      let current: { path?: string; branch?: string } = {};
+      let current: { path?: string; branch?: string; isDetached?: boolean } = {};
       let isFirst = true;
 
       // First pass: detect removed worktrees
@@ -395,8 +449,11 @@ export function createListHandler() {
           current.path = normalizePath(line.slice(9));
         } else if (line.startsWith('branch ')) {
           current.branch = line.slice(7).replace('refs/heads/', '');
+        } else if (line.startsWith('detached')) {
+          // Worktree is in detached HEAD state (e.g., during rebase)
+          current.isDetached = true;
         } else if (line === '') {
-          if (current.path && current.branch) {
+          if (current.path) {
             const isMainWorktree = isFirst;
             // Check if the worktree directory actually exists
             // Skip checking/pruning the main worktree (projectPath itself)
@@ -407,19 +464,36 @@ export function createListHandler() {
             } catch {
               worktreeExists = false;
             }
+
             if (!isMainWorktree && !worktreeExists) {
               // Worktree directory doesn't exist - it was manually deleted
-              removedWorktrees.push({
-                path: current.path,
-                branch: current.branch,
-              });
-            } else {
-              // Worktree exists (or is main worktree), add it to the list
+              // Only add to removed list if we know the branch name
+              if (current.branch) {
+                removedWorktrees.push({
+                  path: current.path,
+                  branch: current.branch,
+                });
+              }
+            } else if (current.branch) {
+              // Normal case: worktree with a known branch
               worktrees.push({
                 path: current.path,
                 branch: current.branch,
                 isMain: isMainWorktree,
                 isCurrent: current.branch === currentBranch,
+                hasWorktree: true,
+              });
+              isFirst = false;
+            } else if (current.isDetached && worktreeExists) {
+              // Detached HEAD (e.g., rebase in progress) - try to recover branch name.
+              // This is critical: without this, worktrees undergoing rebase/merge
+              // operations would silently disappear from the UI.
+              const recoveredBranch = await recoverBranchForDetachedWorktree(current.path);
+              worktrees.push({
+                path: current.path,
+                branch: recoveredBranch || `(detached)`,
+                isMain: isMainWorktree,
+                isCurrent: false,
                 hasWorktree: true,
               });
               isFirst = false;

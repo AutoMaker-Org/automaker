@@ -61,7 +61,7 @@ export function useBoardFeatures({ currentProject }: UseBoardFeaturesProps) {
     } catch {
       setPersistedCategories([]);
     }
-  }, [currentProject, loadFeatures]);
+  }, [currentProject]);
 
   // Save a new category to the persisted categories file
   const saveCategory = useCallback(
@@ -161,6 +161,7 @@ export function useBoardFeatures({ currentProject }: UseBoardFeaturesProps) {
     });
 
     return unsubscribe;
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- loadFeatures is a stable ref from React Query
   }, [currentProject]);
 
   // Check for interrupted features on mount

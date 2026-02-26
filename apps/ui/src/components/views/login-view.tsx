@@ -319,7 +319,8 @@ export function LoginView() {
     if (state.phase === 'redirecting') {
       navigate({ to: state.to });
     }
-  }, [state.phase, state.phase === 'redirecting' ? state.to : null, navigate]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- state.to only accessed when phase is redirecting
+  }, [state.phase, navigate]);
 
   // Handle login form submission
   const handleSubmit = (e: React.FormEvent) => {

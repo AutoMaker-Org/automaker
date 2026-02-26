@@ -6,10 +6,10 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, fireEvent, act } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { AgentOutputModal } from '../../../src/components/views/board-view/dialogs/agent-output-modal';
 import { useAppStore } from '@automaker/ui/store/app-store';
-import { useAgentOutput } from '@automaker/ui/hooks/queries';
+import { useAgentOutput, useFeature } from '@automaker/ui/hooks/queries';
 import { getElectronAPI } from '@automaker/ui/lib/electron';
 
 // Mock dependencies
@@ -17,9 +17,10 @@ vi.mock('@automaker/ui/hooks/queries');
 vi.mock('@automaker/ui/lib/electron');
 vi.mock('@automaker/ui/store/app-store');
 
-const mockUseAppStore = useAppStore as ReturnType<typeof useAppStore>;
-const mockUseAgentOutput = useAgentOutput as ReturnType<typeof useAgentOutput>;
-const mockGetElectronAPI = getElectronAPI as ReturnType<typeof getElectronAPI>;
+const mockUseAppStore = vi.mocked(useAppStore);
+const mockUseAgentOutput = vi.mocked(useAgentOutput);
+const mockUseFeature = vi.mocked(useFeature);
+const mockGetElectronAPI = vi.mocked(getElectronAPI);
 
 describe('AgentOutputModal Responsive Behavior', () => {
   const defaultProps = {
@@ -46,7 +47,14 @@ describe('AgentOutputModal Responsive Behavior', () => {
       data: '',
       isLoading: false,
       error: null,
+      refetch: vi.fn(),
     } as ReturnType<typeof useAgentOutput>);
+
+    // Mock useFeature
+    mockUseFeature.mockReturnValue({
+      data: null,
+      refetch: vi.fn(),
+    } as ReturnType<typeof useFeature>);
 
     // Mock electron API
     mockGetElectronAPI.mockReturnValue(null);
@@ -232,7 +240,7 @@ describe('AgentOutputModal Responsive Behavior', () => {
       const { rerender } = render(<AgentOutputModal {...defaultProps} />);
 
       // Update to tablet size
-      (window.matchMedia as any).mockImplementation((query: string) => ({
+      (window.matchMedia as ReturnType<typeof vi.fn>).mockImplementation((query: string) => ({
         matches: query === '(min-width: 768px)',
         addListener: vi.fn(),
         removeListener: vi.fn(),

@@ -8,6 +8,8 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook } from '@testing-library/react';
+import fs from 'fs';
+import path from 'path';
 import { useAppStore } from '@/store/app-store';
 
 // Mock the store
@@ -68,12 +70,12 @@ describe('PhaseModelSelector - useShallow Selector Behavior', () => {
       // Verify that when useAppStore is called with a selector (useShallow pattern),
       // it properly extracts the required state values
 
-      let capturedSelector: ((state: MockStoreState) => Partial<MockStoreState>) | null = null;
+      let _capturedSelector: ((state: MockStoreState) => Partial<MockStoreState>) | null = null;
 
       // Mock useAppStore to capture the selector function
-      mockUseAppStore.mockImplementation((selector?: any) => {
+      mockUseAppStore.mockImplementation((selector?: unknown) => {
         if (typeof selector === 'function') {
-          capturedSelector = selector;
+          _capturedSelector = selector as (state: MockStoreState) => Partial<MockStoreState>;
         }
         const mockState = createMockStoreState();
         return typeof selector === 'function' ? selector(mockState) : mockState;
@@ -111,7 +113,7 @@ describe('PhaseModelSelector - useShallow Selector Behavior', () => {
 
       const results: Partial<MockStoreState>[] = [];
 
-      mockUseAppStore.mockImplementation((selector?: any) => {
+      mockUseAppStore.mockImplementation((selector?: unknown) => {
         const mockState = createMockStoreState({
           enabledDynamicModelIds: ['model-1'],
         });
@@ -127,7 +129,7 @@ describe('PhaseModelSelector - useShallow Selector Behavior', () => {
       expect(firstCallResult?.enabledDynamicModelIds).toEqual(['model-1']);
 
       // Simulate store update with new array reference
-      mockUseAppStore.mockImplementation((selector?: any) => {
+      mockUseAppStore.mockImplementation((selector?: unknown) => {
         const mockState = createMockStoreState({
           enabledDynamicModelIds: ['model-1', 'model-2'], // New array reference
         });
@@ -151,7 +153,7 @@ describe('PhaseModelSelector - useShallow Selector Behavior', () => {
 
   describe('Store state integration with enabledDynamicModelIds', () => {
     it('should return all required state values from the selector', () => {
-      mockUseAppStore.mockImplementation((selector?: any) => {
+      mockUseAppStore.mockImplementation((selector?: unknown) => {
         const mockState = createMockStoreState({
           enabledCursorModels: ['cursor-small'],
           enabledGeminiModels: ['gemini-flash'],
@@ -189,7 +191,7 @@ describe('PhaseModelSelector - useShallow Selector Behavior', () => {
     });
 
     it('should handle empty enabledDynamicModelIds array', () => {
-      mockUseAppStore.mockImplementation((selector?: any) => {
+      mockUseAppStore.mockImplementation((selector?: unknown) => {
         const mockState = createMockStoreState({
           enabledDynamicModelIds: [],
         });
@@ -207,7 +209,7 @@ describe('PhaseModelSelector - useShallow Selector Behavior', () => {
     it('should detect changes when array content changes', () => {
       const referenceComparisons: { array: string[]; isArray: boolean; length: number }[] = [];
 
-      mockUseAppStore.mockImplementation((selector?: any) => {
+      mockUseAppStore.mockImplementation((selector?: unknown) => {
         const mockState = createMockStoreState({
           enabledDynamicModelIds: ['model-1', 'model-2'],
         });
@@ -225,7 +227,7 @@ describe('PhaseModelSelector - useShallow Selector Behavior', () => {
       renderHook(() => useAppStore());
 
       // Update to new array with different length
-      mockUseAppStore.mockImplementation((selector?: any) => {
+      mockUseAppStore.mockImplementation((selector?: unknown) => {
         const mockState = createMockStoreState({
           enabledDynamicModelIds: ['model-1', 'model-2', 'model-3'], // New array with additional item
         });
@@ -257,7 +259,7 @@ describe('PhaseModelSelector - useShallow Selector Behavior', () => {
     it('should handle array removal correctly', () => {
       const snapshots: string[][] = [];
 
-      mockUseAppStore.mockImplementation((selector?: any) => {
+      mockUseAppStore.mockImplementation((selector?: unknown) => {
         const mockState = createMockStoreState({
           enabledDynamicModelIds: ['model-1', 'model-2', 'model-3'],
         });
@@ -272,7 +274,7 @@ describe('PhaseModelSelector - useShallow Selector Behavior', () => {
       expect(snapshots[0]).toEqual(['model-1', 'model-2', 'model-3']);
 
       // Remove one model (simulate user toggling off)
-      mockUseAppStore.mockImplementation((selector?: any) => {
+      mockUseAppStore.mockImplementation((selector?: unknown) => {
         const mockState = createMockStoreState({
           enabledDynamicModelIds: ['model-1', 'model-3'], // model-2 removed
         });
@@ -294,8 +296,6 @@ describe('PhaseModelSelector - useShallow Selector Behavior', () => {
   describe('Code contract verification', () => {
     it('should verify useShallow import is present', () => {
       // Read the component file and verify useShallow is imported
-      const fs = require('fs');
-      const path = require('path');
       const componentPath = path.resolve(
         __dirname,
         '../../../src/components/views/settings-view/model-defaults/phase-model-selector.tsx'
@@ -307,8 +307,6 @@ describe('PhaseModelSelector - useShallow Selector Behavior', () => {
     });
 
     it('should verify useAppStore call uses useShallow', () => {
-      const fs = require('fs');
-      const path = require('path');
       const componentPath = path.resolve(
         __dirname,
         '../../../src/components/views/settings-view/model-defaults/phase-model-selector.tsx'

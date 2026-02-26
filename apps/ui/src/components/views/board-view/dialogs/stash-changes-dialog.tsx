@@ -510,9 +510,12 @@ export function StashChangesDialog({
               A descriptive message helps identify this stash later. Press{' '}
               <kbd className="px-1 py-0.5 text-[10px] bg-muted rounded border">
                 {typeof navigator !== 'undefined' &&
-                ((navigator as any).userAgentData?.platform || navigator.platform || '').includes(
-                  'Mac'
-                )
+                (
+                  (navigator as Navigator & { userAgentData?: { platform?: string } }).userAgentData
+                    ?.platform ||
+                  navigator.platform ||
+                  ''
+                ).includes('Mac')
                   ? '⌘'
                   : 'Ctrl'}
                 +Enter

@@ -177,7 +177,7 @@ export function FileBrowserDialog({
       onSelect(currentPath);
       onOpenChange(false);
     }
-  }, [currentPath, onSelect, onOpenChange]);
+  }, [currentPath, onSelect, onOpenChange, addRecentFolder]);
 
   // Handle Command/Ctrl+Enter keyboard shortcut to select current folder
   useEffect(() => {

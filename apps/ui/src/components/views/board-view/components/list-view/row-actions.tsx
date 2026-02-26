@@ -297,13 +297,16 @@ export const RowActions = memo(function RowActions({
 
   // Use controlled or uncontrolled state
   const open = isOpen ?? internalOpen;
-  const setOpen = (value: boolean) => {
-    if (onOpenChange) {
-      onOpenChange(value);
-    } else {
-      setInternalOpen(value);
-    }
-  };
+  const setOpen = useCallback(
+    (value: boolean) => {
+      if (onOpenChange) {
+        onOpenChange(value);
+      } else {
+        setInternalOpen(value);
+      }
+    },
+    [onOpenChange]
+  );
 
   const handleOpenChange = useCallback(
     (newOpen: boolean) => {

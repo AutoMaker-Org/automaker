@@ -428,11 +428,12 @@ export function useDevServers({ projectPath }: UseDevServersOptions) {
 
   // Cleanup all port detection timers on unmount
   useEffect(() => {
+    const timers = portDetectionTimers.current;
     return () => {
-      for (const timer of portDetectionTimers.current.values()) {
+      for (const timer of timers.values()) {
         clearTimeout(timer);
       }
-      portDetectionTimers.current.clear();
+      timers.clear();
     };
   }, []);
 

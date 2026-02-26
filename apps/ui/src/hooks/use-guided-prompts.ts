@@ -23,8 +23,8 @@ interface UseGuidedPromptsReturn {
 export function useGuidedPrompts(): UseGuidedPromptsReturn {
   const { data, isLoading, error, refetch } = useIdeationPrompts();
 
-  const prompts = data?.prompts ?? [];
-  const categories = data?.categories ?? [];
+  const prompts = useMemo(() => data?.prompts ?? [], [data?.prompts]);
+  const categories = useMemo(() => data?.categories ?? [], [data?.categories]);
 
   const getPromptsByCategory = useCallback(
     (category: IdeaCategory): IdeationPrompt[] => {

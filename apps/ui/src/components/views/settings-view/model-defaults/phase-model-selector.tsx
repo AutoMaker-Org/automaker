@@ -691,6 +691,7 @@ export function PhaseModelSelector({
     transformedCodexModels,
     allOpencodeModels,
     disabledProviders,
+    isCursorDisabled,
   ]);
 
   // Group OpenCode models by model type for better organization

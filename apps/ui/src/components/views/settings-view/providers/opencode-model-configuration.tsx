@@ -262,20 +262,23 @@ export function OpencodeModelConfiguration({
   const providerOrder: OpencodeProvider[] = ['opencode'];
 
   // Dynamic provider order (prioritize commonly used ones)
-  const dynamicProviderOrder = [
-    'github-copilot',
-    'google',
-    'openai',
-    'openrouter',
-    'anthropic',
-    'xai',
-    'deepseek',
-    'ollama',
-    'lmstudio',
-    'azure',
-    'amazon-bedrock',
-    'opencode', // Skip opencode in dynamic since it's in static
-  ];
+  const dynamicProviderOrder = useMemo(
+    () => [
+      'github-copilot',
+      'google',
+      'openai',
+      'openrouter',
+      'anthropic',
+      'xai',
+      'deepseek',
+      'ollama',
+      'lmstudio',
+      'azure',
+      'amazon-bedrock',
+      'opencode', // Skip opencode in dynamic since it's in static
+    ],
+    []
+  );
 
   const sortedDynamicProviders = useMemo(() => {
     const providerIndex = (providerId: string) => dynamicProviderOrder.indexOf(providerId);
@@ -294,7 +297,7 @@ export function OpencodeModelConfiguration({
       if (bIndex !== -1) return 1;
       return a.localeCompare(b);
     });
-  }, [dynamicModelsByProvider, providers]);
+  }, [dynamicModelsByProvider, providers, dynamicProviderOrder]);
 
   useEffect(() => {
     if (

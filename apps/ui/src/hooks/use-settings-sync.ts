@@ -450,6 +450,7 @@ export function useSettingsSync(): SettingsSyncState {
     }
 
     initializeSync();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- state.loaded is intentionally excluded to prevent infinite loop
   }, [authChecked, isAuthenticated, settingsLoaded]);
 
   // Subscribe to store changes and sync to server
