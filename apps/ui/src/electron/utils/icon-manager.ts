@@ -28,9 +28,11 @@ export function getIconPath(): string | null {
   }
 
   // __dirname is apps/ui/dist-electron (Vite bundles all into single file)
+  // In production the asar layout is: /dist-electron/main.js and /dist/logo_larger.png
+  // Vite copies public/ assets to the root of dist/, NOT dist/public/
   const iconPath = isDev
     ? path.join(__dirname, '../public', iconFile)
-    : path.join(__dirname, '../dist/public', iconFile);
+    : path.join(__dirname, '../dist', iconFile);
 
   try {
     if (!electronAppExists(iconPath)) {
