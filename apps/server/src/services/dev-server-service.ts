@@ -951,7 +951,9 @@ class DevServerService {
       this.runningServers.set(worktreePath, serverInfo);
 
       // Persist state change
-      await this.saveState().catch((err) => logger.error('Failed to save state in startDevServer:', err));
+      await this.saveState().catch((err) =>
+        logger.error('Failed to save state in startDevServer:', err)
+      );
 
       // Emit started event for WebSocket subscribers
       if (this.emitter) {
@@ -973,7 +975,11 @@ class DevServerService {
         serverInfo.urlDetectionTimeout = null;
 
         // Only run fallback if server is still running and URL wasn't detected
-        if (serverInfo.stopping || serverInfo.urlDetected || !this.runningServers.has(worktreePath)) {
+        if (
+          serverInfo.stopping ||
+          serverInfo.urlDetected ||
+          !this.runningServers.has(worktreePath)
+        ) {
           return;
         }
 
@@ -1086,7 +1092,9 @@ class DevServerService {
     this.runningServers.delete(worktreePath);
 
     // Persist state change
-    await this.saveState().catch((err) => logger.error('Failed to save state in stopDevServer:', err));
+    await this.saveState().catch((err) =>
+      logger.error('Failed to save state in stopDevServer:', err)
+    );
 
     return {
       success: true,

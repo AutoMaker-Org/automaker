@@ -1,6 +1,8 @@
 /**
  * Unit tests for AgentOutputModal responsive behavior
- * These tests verify the CSS classes and responsive properties of the modal
+ *
+ * These tests verify that Tailwind CSS responsive classes are correctly applied
+ * to the modal across different viewport sizes (mobile, tablet, desktop).
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
@@ -15,9 +17,9 @@ vi.mock('@automaker/ui/hooks/queries');
 vi.mock('@automaker/ui/lib/electron');
 vi.mock('@automaker/ui/store/app-store');
 
-const mockUseAppStore = useAppStore as any;
-const mockUseAgentOutput = useAgentOutput as any;
-const mockGetElectronAPI = getElectronAPI as any;
+const mockUseAppStore = useAppStore as ReturnType<typeof useAppStore>;
+const mockUseAgentOutput = useAgentOutput as ReturnType<typeof useAgentOutput>;
+const mockGetElectronAPI = getElectronAPI as ReturnType<typeof getElectronAPI>;
 
 describe('AgentOutputModal Responsive Behavior', () => {
   const defaultProps = {
@@ -32,7 +34,7 @@ describe('AgentOutputModal Responsive Behavior', () => {
     vi.clearAllMocks();
 
     // Mock useAppStore
-    mockUseAppStore.mockImplementation((selector: any) => {
+    mockUseAppStore.mockImplementation((selector) => {
       if (selector === 'state') {
         return { useWorktrees: false };
       }
@@ -43,7 +45,8 @@ describe('AgentOutputModal Responsive Behavior', () => {
     mockUseAgentOutput.mockReturnValue({
       data: '',
       isLoading: false,
-    });
+      error: null,
+    } as ReturnType<typeof useAgentOutput>);
 
     // Mock electron API
     mockGetElectronAPI.mockReturnValue(null);
@@ -62,10 +65,13 @@ describe('AgentOutputModal Responsive Behavior', () => {
 
       // Find the DialogContent element
       const dialogContent = screen.getByTestId('agent-output-modal');
+      // Base class should be present
       expect(dialogContent).toHaveClass('w-full');
-      expect(dialogContent).not.toHaveClass('sm:w-[60vw]');
-      expect(dialogContent).not.toHaveClass('md:w-[90vw]');
-      expect(dialogContent).not.toHaveClass('md:max-w-[1200px]');
+      // In Tailwind, all responsive classes are always present on the element
+      // The browser determines which ones apply based on viewport
+      expect(dialogContent).toHaveClass('sm:w-[60vw]');
+      expect(dialogContent).toHaveClass('md:w-[90vw]');
+      expect(dialogContent).toHaveClass('md:max-w-[1200px]');
     });
 
     it('should use max-w-[calc(100%-2rem)] on mobile', () => {
@@ -93,9 +99,11 @@ describe('AgentOutputModal Responsive Behavior', () => {
       render(<AgentOutputModal {...defaultProps} />);
 
       const dialogContent = screen.getByTestId('agent-output-modal');
+      // At sm breakpoint, sm:w-[60vw] should be applied (takes precedence over w-full)
       expect(dialogContent).toHaveClass('sm:w-[60vw]');
       expect(dialogContent).toHaveClass('sm:max-w-[60vw]');
-      expect(dialogContent).not.toHaveClass('md:w-[90vw]');
+      // md: classes are still present in Tailwind (just not applied at sm breakpoint)
+      expect(dialogContent).toHaveClass('md:w-[90vw]');
     });
 
     it('should use 80vh height on small screens', () => {
@@ -108,8 +116,10 @@ describe('AgentOutputModal Responsive Behavior', () => {
       render(<AgentOutputModal {...defaultProps} />);
 
       const dialogContent = screen.getByTestId('agent-output-modal');
+      // At sm breakpoint, sm:max-h-[80vh] should be applied
       expect(dialogContent).toHaveClass('sm:max-h-[80vh]');
-      expect(dialogContent).not.toHaveClass('md:max-h-[85vh]');
+      // md: class is still present in Tailwind (just not applied at sm breakpoint)
+      expect(dialogContent).toHaveClass('md:max-h-[85vh]');
     });
   });
 
@@ -124,9 +134,15 @@ describe('AgentOutputModal Responsive Behavior', () => {
       render(<AgentOutputModal {...defaultProps} />);
 
       const dialogContent = screen.getByTestId('agent-output-modal');
+      // At md breakpoint, the md:w-[90vw] class should be present
       expect(dialogContent).toHaveClass('md:w-[90vw]');
+      // The md:max-w-[1200px] overrides the sm:max-w-[60vw]
       expect(dialogContent).toHaveClass('md:max-w-[1200px]');
+      // The md:max-h-[85vh] overrides the sm:max-h-[80vh]
       expect(dialogContent).toHaveClass('md:max-h-[85vh]');
+      // sm: classes are still present (Tailwind cascades), but md: classes take precedence
+      expect(dialogContent).toHaveClass('sm:max-w-[60vw]');
+      expect(dialogContent).toHaveClass('sm:max-h-[80vh]');
     });
 
     it('should use max-w-[1200px] on tablet screens', () => {
@@ -139,8 +155,10 @@ describe('AgentOutputModal Responsive Behavior', () => {
       render(<AgentOutputModal {...defaultProps} />);
 
       const dialogContent = screen.getByTestId('agent-output-modal');
+      // At md breakpoint, md:max-w-[1200px] should be present and override sm:max-w-[60vw]
       expect(dialogContent).toHaveClass('md:max-w-[1200px]');
-      expect(dialogContent).not.toHaveClass('sm:max-w-[60vw]');
+      // sm: class is still present but md: takes precedence in Tailwind
+      expect(dialogContent).toHaveClass('sm:max-w-[60vw]');
     });
 
     it('should use 85vh height on tablet screens', () => {
@@ -153,8 +171,10 @@ describe('AgentOutputModal Responsive Behavior', () => {
       render(<AgentOutputModal {...defaultProps} />);
 
       const dialogContent = screen.getByTestId('agent-output-modal');
+      // At md breakpoint, md:max-h-[85vh] should be present and override sm:max-h-[80vh]
       expect(dialogContent).toHaveClass('md:max-h-[85vh]');
-      expect(dialogContent).not.toHaveClass('sm:max-h-[80vh]');
+      // sm: class is still present but md: takes precedence in Tailwind
+      expect(dialogContent).toHaveClass('sm:max-h-[80vh]');
     });
   });
 

@@ -51,7 +51,7 @@ import { toast } from 'sonner';
 import type { PRReviewComment } from '@/lib/electron';
 import type { Feature } from '@/store/app-store';
 import type { PhaseModelEntry } from '@automaker/types';
-import { supportsReasoningEffort } from '@automaker/types';
+import { normalizeThinkingLevelForModel, supportsReasoningEffort } from '@automaker/types';
 import { resolveModelString } from '@automaker/model-resolver';
 import { PhaseModelSelector } from '@/components/views/settings-view/model-defaults';
 
@@ -68,6 +68,8 @@ export interface PRCommentResolutionPRInfo {
   title: string;
   /** The branch name (headRefName) associated with this PR, used to assign features to the correct worktree */
   headRefName?: string;
+  /** The URL of the PR, used to set prUrl on created features */
+  url?: string;
 }
 
 interface PRCommentResolutionDialogProps {
@@ -757,6 +759,10 @@ export function PRCommentResolutionDialog({
           thinkingLevel: normalizedEntry.thinkingLevel,
           reasoningEffort: normalizedEntry.reasoningEffort,
           providerId: normalizedEntry.providerId,
+          planningMode: 'skip',
+          requirePlanApproval: false,
+          dependencies: [],
+          ...(pr.url ? { prUrl: pr.url } : {}),
           // Associate feature with the PR's branch so it appears on the correct worktree
           ...(pr.headRefName ? { branchName: pr.headRefName } : {}),
         };
@@ -784,6 +790,10 @@ export function PRCommentResolutionDialog({
               thinkingLevel: normalizedEntry.thinkingLevel,
               reasoningEffort: normalizedEntry.reasoningEffort,
               providerId: normalizedEntry.providerId,
+              planningMode: 'skip',
+              requirePlanApproval: false,
+              dependencies: [],
+              ...(pr.url ? { prUrl: pr.url } : {}),
               // Associate feature with the PR's branch so it appears on the correct worktree
               ...(pr.headRefName ? { branchName: pr.headRefName } : {}),
             };

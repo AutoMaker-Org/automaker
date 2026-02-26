@@ -204,6 +204,7 @@ export function parseLocalStorageSettings(): Partial<GlobalSettings> | null {
       projectHistoryIndex: state.projectHistoryIndex as number,
       lastSelectedSessionByProject:
         state.lastSelectedSessionByProject as GlobalSettings['lastSelectedSessionByProject'],
+      agentModelBySession: state.agentModelBySession as GlobalSettings['agentModelBySession'],
       // UI State from standalone localStorage keys or Zustand state
       worktreePanelCollapsed:
         worktreePanelCollapsed === 'true' || (state.worktreePanelCollapsed as boolean),
@@ -330,6 +331,15 @@ export function mergeSettings(
     Object.keys(localSettings.lastSelectedSessionByProject).length > 0
   ) {
     merged.lastSelectedSessionByProject = localSettings.lastSelectedSessionByProject;
+  }
+
+  if (
+    (!serverSettings.agentModelBySession ||
+      Object.keys(serverSettings.agentModelBySession).length === 0) &&
+    localSettings.agentModelBySession &&
+    Object.keys(localSettings.agentModelBySession).length > 0
+  ) {
+    merged.agentModelBySession = localSettings.agentModelBySession;
   }
 
   // For simple values, use localStorage if server value is default/undefined
@@ -799,6 +809,13 @@ export function hydrateStoreFromSettings(settings: GlobalSettings): void {
     projectHistory: settings.projectHistory ?? [],
     projectHistoryIndex: settings.projectHistoryIndex ?? -1,
     lastSelectedSessionByProject: settings.lastSelectedSessionByProject ?? {},
+    agentModelBySession: settings.agentModelBySession
+      ? Object.fromEntries(
+          Object.entries(settings.agentModelBySession as Record<string, unknown>).map(
+            ([sessionId, entry]) => [sessionId, migratePhaseModelEntry(entry)]
+          )
+        )
+      : current.agentModelBySession,
     // Sanitize currentWorktreeByProject: only restore entries where path is null
     // (main branch). Non-null paths point to worktree directories that may have
     // been deleted while the app was closed. Restoring a stale path causes the
@@ -926,6 +943,7 @@ function buildSettingsUpdateFromStore(): Record<string, unknown> {
     projectHistory: state.projectHistory,
     projectHistoryIndex: state.projectHistoryIndex,
     lastSelectedSessionByProject: state.lastSelectedSessionByProject,
+    agentModelBySession: state.agentModelBySession,
     currentWorktreeByProject: state.currentWorktreeByProject,
     worktreePanelCollapsed: state.worktreePanelCollapsed,
     lastProjectDir: state.lastProjectDir,

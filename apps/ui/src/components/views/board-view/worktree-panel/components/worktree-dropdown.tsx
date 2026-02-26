@@ -180,6 +180,7 @@ export function WorktreeDropdown({
   isActivating,
   branchCardCounts,
   isDevServerRunning,
+  isDevServerStarting,
   getDevServerInfo,
   isAutoModeRunningForWorktree,
   isTestRunningForWorktree,

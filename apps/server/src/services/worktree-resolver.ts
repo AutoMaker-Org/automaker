@@ -39,6 +39,18 @@ export interface WorktreeInfo {
  * 3. Listing all worktrees with normalized paths
  */
 export class WorktreeResolver {
+  private normalizeBranchName(branchName: string | null | undefined): string | null {
+    if (!branchName) return null;
+    let normalized = branchName.trim();
+    if (!normalized) return null;
+
+    normalized = normalized.replace(/^refs\/heads\//, '');
+    normalized = normalized.replace(/^refs\/remotes\/[^/]+\//, '');
+    normalized = normalized.replace(/^(origin|upstream)\//, '');
+
+    return normalized || null;
+  }
+
   /**
    * Get the current branch name for a git repository
    *
@@ -64,6 +76,9 @@ export class WorktreeResolver {
    */
   async findWorktreeForBranch(projectPath: string, branchName: string): Promise<string | null> {
     try {
+      const normalizedTargetBranch = this.normalizeBranchName(branchName);
+      if (!normalizedTargetBranch) return null;
+
       const { stdout } = await execAsync('git worktree list --porcelain', {
         cwd: projectPath,
       });
@@ -76,10 +91,10 @@ export class WorktreeResolver {
         if (line.startsWith('worktree ')) {
           currentPath = line.slice(9);
         } else if (line.startsWith('branch ')) {
-          currentBranch = line.slice(7).replace('refs/heads/', '');
+          currentBranch = this.normalizeBranchName(line.slice(7));
         } else if (line === '' && currentPath && currentBranch) {
           // End of a worktree entry
-          if (currentBranch === branchName) {
+          if (currentBranch === normalizedTargetBranch) {
             // Resolve to absolute path - git may return relative paths
             // On Windows, this is critical for cwd to work correctly
             // On all platforms, absolute paths ensure consistent behavior
@@ -91,7 +106,7 @@ export class WorktreeResolver {
       }
 
       // Check the last entry (if file doesn't end with newline)
-      if (currentPath && currentBranch && currentBranch === branchName) {
+      if (currentPath && currentBranch && currentBranch === normalizedTargetBranch) {
         return this.resolvePath(projectPath, currentPath);
       }
 
@@ -123,7 +138,7 @@ export class WorktreeResolver {
         if (line.startsWith('worktree ')) {
           currentPath = line.slice(9);
         } else if (line.startsWith('branch ')) {
-          currentBranch = line.slice(7).replace('refs/heads/', '');
+          currentBranch = this.normalizeBranchName(line.slice(7));
         } else if (line.startsWith('detached')) {
           // Detached HEAD - branch is null
           currentBranch = null;

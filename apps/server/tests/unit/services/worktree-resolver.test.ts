@@ -107,6 +107,25 @@ branch refs/heads/feature-y
       expect(result).toBe(normalizePath('/Users/dev/project/.worktrees/feature-x'));
     });
 
+    it('should normalize refs/heads and trim when resolving target branch', async () => {
+      mockExecAsync(async () => ({ stdout: porcelainOutput, stderr: '' }));
+
+      const result = await resolver.findWorktreeForBranch(
+        '/Users/dev/project',
+        '  refs/heads/feature-x  '
+      );
+
+      expect(result).toBe(normalizePath('/Users/dev/project/.worktrees/feature-x'));
+    });
+
+    it('should normalize remote-style target branch names', async () => {
+      mockExecAsync(async () => ({ stdout: porcelainOutput, stderr: '' }));
+
+      const result = await resolver.findWorktreeForBranch('/Users/dev/project', 'origin/feature-x');
+
+      expect(result).toBe(normalizePath('/Users/dev/project/.worktrees/feature-x'));
+    });
+
     it('should return null when branch not found', async () => {
       mockExecAsync(async () => ({ stdout: porcelainOutput, stderr: '' }));
 

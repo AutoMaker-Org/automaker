@@ -655,6 +655,206 @@ describe('settings-helpers.ts', () => {
       // Function should work the same with custom prefix
       expect(result.provider).toEqual(mockProvider);
     });
+
+    // Session restore scenarios - provider.enabled: undefined should be treated as enabled
+    describe('session restore scenarios (enabled: undefined)', () => {
+      it('should treat provider with enabled: undefined as enabled', async () => {
+        // This is the main bug fix: when providers are loaded from settings on session restore,
+        // enabled might be undefined (not explicitly set) and should be treated as enabled
+        const mockProvider = {
+          id: 'provider-1',
+          name: 'Provider 1',
+          enabled: undefined, // Not explicitly set - should be treated as enabled
+          models: [{ id: 'model-1', name: 'Model' }],
+        };
+        const mockSettingsService = {
+          getGlobalSettings: vi.fn().mockResolvedValue({
+            claudeCompatibleProviders: [mockProvider],
+          }),
+          getCredentials: vi.fn().mockResolvedValue({}),
+        } as unknown as SettingsService;
+
+        const result = await resolveProviderContext(mockSettingsService, 'model-1');
+
+        // Provider should be found and used even though enabled is undefined
+        expect(result.provider).toEqual(mockProvider);
+        expect(result.modelConfig?.id).toBe('model-1');
+      });
+
+      it('should use provider by ID when enabled is undefined', async () => {
+        // This tests the explicit providerId lookup with undefined enabled
+        const mockProvider = {
+          id: 'provider-1',
+          name: 'Provider 1',
+          enabled: undefined, // Not explicitly set - should be treated as enabled
+          models: [{ id: 'custom-model', name: 'Custom Model', mapsToClaudeModel: 'sonnet' }],
+        };
+        const mockSettingsService = {
+          getGlobalSettings: vi.fn().mockResolvedValue({
+            claudeCompatibleProviders: [mockProvider],
+          }),
+          getCredentials: vi.fn().mockResolvedValue({ anthropicApiKey: 'test-key' }),
+        } as unknown as SettingsService;
+
+        const result = await resolveProviderContext(
+          mockSettingsService,
+          'custom-model',
+          'provider-1'
+        );
+
+        // Provider should be found and used even though enabled is undefined
+        expect(result.provider).toEqual(mockProvider);
+        expect(result.credentials?.anthropicApiKey).toBe('test-key');
+        expect(result.resolvedModel).toContain('claude');
+      });
+
+      it('should find model via fallback in provider with enabled: undefined', async () => {
+        // Test fallback model lookup when provider has undefined enabled
+        const providerWithUndefinedEnabled = {
+          id: 'provider-1',
+          name: 'Provider 1',
+          // enabled is not set (undefined)
+          models: [{ id: 'model-1', name: 'Model' }],
+        };
+        const mockSettingsService = {
+          getGlobalSettings: vi.fn().mockResolvedValue({
+            claudeCompatibleProviders: [providerWithUndefinedEnabled],
+          }),
+          getCredentials: vi.fn().mockResolvedValue({}),
+        } as unknown as SettingsService;
+
+        const result = await resolveProviderContext(mockSettingsService, 'model-1');
+
+        expect(result.provider).toEqual(providerWithUndefinedEnabled);
+        expect(result.modelConfig?.id).toBe('model-1');
+      });
+
+      it('should still use provider for connection when model not found in its models array', async () => {
+        // This tests the fix: when providerId is explicitly set and provider is found,
+        // but the model isn't in that provider's models array, we still use that provider
+        // for connection settings (baseUrl, credentials)
+        const mockProvider = {
+          id: 'provider-1',
+          name: 'Provider 1',
+          enabled: true,
+          baseUrl: 'https://custom-api.example.com',
+          models: [{ id: 'other-model', name: 'Other Model' }],
+        };
+        const mockSettingsService = {
+          getGlobalSettings: vi.fn().mockResolvedValue({
+            claudeCompatibleProviders: [mockProvider],
+          }),
+          getCredentials: vi.fn().mockResolvedValue({ anthropicApiKey: 'test-key' }),
+        } as unknown as SettingsService;
+
+        const result = await resolveProviderContext(
+          mockSettingsService,
+          'unknown-model', // Model not in provider's models array
+          'provider-1'
+        );
+
+        // Provider should still be returned for connection settings
+        expect(result.provider).toEqual(mockProvider);
+        // modelConfig should be undefined since the model wasn't found
+        expect(result.modelConfig).toBeUndefined();
+        // resolvedModel should be undefined since no mapping was found
+        expect(result.resolvedModel).toBeUndefined();
+      });
+
+      it('should fallback to find modelConfig in other providers when not in explicit providerId provider', async () => {
+        // When providerId is set and provider is found, but model isn't there,
+        // we should still search for modelConfig in other providers
+        const provider1 = {
+          id: 'provider-1',
+          name: 'Provider 1',
+          enabled: true,
+          baseUrl: 'https://provider1.example.com',
+          models: [{ id: 'provider1-model', name: 'Provider 1 Model' }],
+        };
+        const provider2 = {
+          id: 'provider-2',
+          name: 'Provider 2',
+          enabled: true,
+          baseUrl: 'https://provider2.example.com',
+          models: [
+            {
+              id: 'shared-model',
+              name: 'Shared Model',
+              mapsToClaudeModel: 'sonnet',
+            },
+          ],
+        };
+        const mockSettingsService = {
+          getGlobalSettings: vi.fn().mockResolvedValue({
+            claudeCompatibleProviders: [provider1, provider2],
+          }),
+          getCredentials: vi.fn().mockResolvedValue({ anthropicApiKey: 'test-key' }),
+        } as unknown as SettingsService;
+
+        const result = await resolveProviderContext(
+          mockSettingsService,
+          'shared-model', // This model is in provider-2, not provider-1
+          'provider-1' // But we explicitly want to use provider-1
+        );
+
+        // Provider should still be provider-1 (for connection settings)
+        expect(result.provider).toEqual(provider1);
+        // But modelConfig should be found from provider-2
+        expect(result.modelConfig?.id).toBe('shared-model');
+        // And the model mapping should be resolved
+        expect(result.resolvedModel).toContain('claude');
+      });
+
+      it('should handle multiple providers with mixed enabled states', async () => {
+        // Test the full session restore scenario with multiple providers
+        const providers = [
+          {
+            id: 'provider-1',
+            name: 'First Provider',
+            enabled: undefined, // Undefined after restore
+            models: [{ id: 'model-a', name: 'Model A' }],
+          },
+          {
+            id: 'provider-2',
+            name: 'Second Provider',
+            // enabled field missing entirely
+            models: [{ id: 'model-b', name: 'Model B', mapsToClaudeModel: 'opus' }],
+          },
+          {
+            id: 'provider-3',
+            name: 'Disabled Provider',
+            enabled: false, // Explicitly disabled
+            models: [{ id: 'model-c', name: 'Model C' }],
+          },
+        ];
+
+        const mockSettingsService = {
+          getGlobalSettings: vi.fn().mockResolvedValue({
+            claudeCompatibleProviders: providers,
+          }),
+          getCredentials: vi.fn().mockResolvedValue({ anthropicApiKey: 'test-key' }),
+        } as unknown as SettingsService;
+
+        // Provider 1 should work (enabled: undefined)
+        const result1 = await resolveProviderContext(mockSettingsService, 'model-a', 'provider-1');
+        expect(result1.provider?.id).toBe('provider-1');
+        expect(result1.modelConfig?.id).toBe('model-a');
+
+        // Provider 2 should work (enabled field missing)
+        const result2 = await resolveProviderContext(mockSettingsService, 'model-b', 'provider-2');
+        expect(result2.provider?.id).toBe('provider-2');
+        expect(result2.modelConfig?.id).toBe('model-b');
+        expect(result2.resolvedModel).toContain('claude');
+
+        // Provider 3 with explicit providerId IS returned even if disabled
+        // (caller handles enabled state check)
+        const result3 = await resolveProviderContext(mockSettingsService, 'model-c', 'provider-3');
+        // Provider is found but modelConfig won't be found since disabled providers
+        // skip model lookup in their models array
+        expect(result3.provider).toEqual(providers[2]);
+        expect(result3.modelConfig).toBeUndefined();
+      });
+    });
   });
 
   describe('getAllProviderModels', () => {

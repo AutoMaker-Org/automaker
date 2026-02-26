@@ -25,6 +25,18 @@ const logger = createLogger('BoardActions');
 
 const MAX_DUPLICATES = 50;
 
+function normalizeFeatureBranchName(branchName?: string | null): string | undefined {
+  if (!branchName) return undefined;
+  let normalized = branchName.trim();
+  if (!normalized) return undefined;
+
+  normalized = normalized.replace(/^refs\/heads\//, '');
+  normalized = normalized.replace(/^refs\/remotes\/[^/]+\//, '');
+  normalized = normalized.replace(/^(origin|upstream)\//, '');
+
+  return normalized || undefined;
+}
+
 /**
  * Removes a running task from all worktrees for a given project.
  * Used when stopping features to ensure the task is removed from all worktree contexts,
@@ -137,6 +149,8 @@ export function useBoardActions({
       skipTests: boolean;
       model: ModelAlias;
       thinkingLevel: ThinkingLevel;
+      reasoningEffort?: ReasoningEffort;
+      providerId?: string;
       branchName: string;
       priority: number;
       planningMode: PlanningMode;
@@ -182,7 +196,7 @@ export function useBoardActions({
       if (workMode === 'current') {
         // Work directly on current branch - use the current worktree's branch if not on main
         // This ensures features created on a non-main worktree are associated with that worktree
-        finalBranchName = currentWorktreeBranch || undefined;
+        finalBranchName = normalizeFeatureBranchName(currentWorktreeBranch);
       } else if (workMode === 'auto') {
         // Auto-generate a branch name based on feature title and timestamp
         // Create a slug from the title: lowercase, replace non-alphanumeric with hyphens
@@ -196,7 +210,7 @@ export function useBoardActions({
         finalBranchName = `feature/${titleSlug}-${randomSuffix}`;
       } else {
         // Custom mode - use provided branch name
-        finalBranchName = featureData.branchName || undefined;
+        finalBranchName = normalizeFeatureBranchName(featureData.branchName);
       }
 
       // Create worktree for 'auto' or 'custom' modes when we have a branch name
@@ -388,11 +402,11 @@ export function useBoardActions({
       if (workMode === 'current') {
         // Work directly on current branch - use the current worktree's branch if not on main
         // This ensures features updated on a non-main worktree are associated with that worktree
-        finalBranchName = currentWorktreeBranch || undefined;
+        finalBranchName = normalizeFeatureBranchName(currentWorktreeBranch);
       } else if (workMode === 'auto') {
         // Preserve existing branch name if one exists (avoid orphaning worktrees on edit)
         if (updates.branchName?.trim()) {
-          finalBranchName = updates.branchName;
+          finalBranchName = normalizeFeatureBranchName(updates.branchName);
         } else {
           // Auto-generate a branch name based on feature title
           // Create a slug from the title: lowercase, replace non-alphanumeric with hyphens
@@ -406,7 +420,7 @@ export function useBoardActions({
           finalBranchName = `feature/${titleSlug}-${randomSuffix}`;
         }
       } else {
-        finalBranchName = updates.branchName || undefined;
+        finalBranchName = normalizeFeatureBranchName(updates.branchName);
       }
 
       // Create worktree for 'auto' or 'custom' modes when we have a branch name

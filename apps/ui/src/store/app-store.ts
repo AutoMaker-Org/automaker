@@ -295,6 +295,7 @@ const initialState: AppState = {
   chatHistoryOpen: false,
   autoModeByWorktree: {},
   autoModeActivityLog: [],
+  recentlyCompletedFeatures: new Set<string>(),
   maxConcurrency: DEFAULT_MAX_CONCURRENCY,
   boardViewMode: 'kanban',
   defaultSkipTests: true,
@@ -1090,6 +1091,16 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
     })),
 
   clearAutoModeActivity: () => set({ autoModeActivityLog: [] }),
+
+  addRecentlyCompletedFeature: (featureId: string) => {
+    set((state) => {
+      const newSet = new Set(state.recentlyCompletedFeatures);
+      newSet.add(featureId);
+      return { recentlyCompletedFeatures: newSet };
+    });
+  },
+
+  clearRecentlyCompletedFeatures: () => set({ recentlyCompletedFeatures: new Set() }),
 
   setMaxConcurrency: (max) => set({ maxConcurrency: max }),
 

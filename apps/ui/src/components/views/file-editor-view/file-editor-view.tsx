@@ -490,8 +490,11 @@ export function FileEditorView({ initialPath }: FileEditorViewProps) {
   // ─── Handle Save ─────────────────────────────────────────────
   const handleSave = useCallback(async () => {
     // Get fresh state from the store to avoid stale closure issues
-    const { tabs: currentTabs, activeTabId: currentActiveTabId, updateTabContent } =
-      useFileEditorStore.getState();
+    const {
+      tabs: currentTabs,
+      activeTabId: currentActiveTabId,
+      updateTabContent,
+    } = useFileEditorStore.getState();
 
     if (!currentActiveTabId) return;
 

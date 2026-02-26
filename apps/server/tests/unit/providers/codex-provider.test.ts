@@ -459,24 +459,16 @@ describe('codex-provider.ts', () => {
 
   describe('validateBareModelId integration', () => {
     it('should allow codex- prefixed models for Codex provider with expectedProvider="codex"', () => {
-      expect(() =>
-        validateBareModelId('codex-gpt-4', 'CodexProvider', 'codex')
-      ).not.toThrow();
+      expect(() => validateBareModelId('codex-gpt-4', 'CodexProvider', 'codex')).not.toThrow();
       expect(() =>
         validateBareModelId('codex-gpt-5.1-codex-max', 'CodexProvider', 'codex')
       ).not.toThrow();
     });
 
     it('should reject other provider prefixes for Codex provider', () => {
-      expect(() =>
-        validateBareModelId('cursor-gpt-4', 'CodexProvider', 'codex')
-      ).toThrow();
-      expect(() =>
-        validateBareModelId('gemini-2.5-flash', 'CodexProvider', 'codex')
-      ).toThrow();
-      expect(() =>
-        validateBareModelId('copilot-gpt-4', 'CodexProvider', 'codex')
-      ).toThrow();
+      expect(() => validateBareModelId('cursor-gpt-4', 'CodexProvider', 'codex')).toThrow();
+      expect(() => validateBareModelId('gemini-2.5-flash', 'CodexProvider', 'codex')).toThrow();
+      expect(() => validateBareModelId('copilot-gpt-4', 'CodexProvider', 'codex')).toThrow();
     });
   });
 });

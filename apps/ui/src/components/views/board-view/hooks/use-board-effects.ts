@@ -73,6 +73,10 @@ export function useBoardEffects({
     const checkAllContexts = async () => {
       const featuresWithPotentialContext = features.filter(
         (f) =>
+          f.status === 'backlog' ||
+          f.status === 'merge_conflict' ||
+          f.status === 'ready' ||
+          f.status === 'interrupted' ||
           f.status === 'in_progress' ||
           f.status === 'waiting_approval' ||
           f.status === 'verified' ||

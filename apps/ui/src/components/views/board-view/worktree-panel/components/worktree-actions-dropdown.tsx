@@ -561,12 +561,15 @@ export function WorktreeActionsDropdown({
                       (isStartingAnyDevServer || isDevServerStarting) && 'animate-pulse'
                     )}
                   />
-                  {isStartingAnyDevServer || isDevServerStarting ? 'Starting...' : 'Start Dev Server'}
+                  {isStartingAnyDevServer || isDevServerStarting
+                    ? 'Starting...'
+                    : 'Start Dev Server'}
                 </DropdownMenuItem>
                 <DropdownMenuSubTrigger
                   className={cn(
                     'text-xs px-1 rounded-l-none border-l border-border/30 h-8',
-                    (isStartingAnyDevServer || isDevServerStarting) && 'opacity-50 cursor-not-allowed'
+                    (isStartingAnyDevServer || isDevServerStarting) &&
+                      'opacity-50 cursor-not-allowed'
                   )}
                   disabled={isStartingAnyDevServer || isDevServerStarting}
                 />

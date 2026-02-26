@@ -454,7 +454,9 @@ export function validateBareModelId(
     if (
       expectedProvider &&
       expectedProvider in PROVIDER_PREFIX_EXCEPTIONS &&
-      (PROVIDER_PREFIX_EXCEPTIONS as Record<string, readonly string[]>)[expectedProvider].includes(provider)
+      (PROVIDER_PREFIX_EXCEPTIONS as Record<string, readonly string[]>)[expectedProvider].includes(
+        provider
+      )
     ) {
       continue;
     }

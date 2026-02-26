@@ -21,8 +21,7 @@ export function formatAutoModeEventContent(event: AutoModeEvent): string {
     }
 
     case 'auto_mode_phase': {
-      const phaseEmoji =
-        event.phase === 'planning' ? '📋' : event.phase === 'action' ? '⚡' : '✅';
+      const phaseEmoji = event.phase === 'planning' ? '📋' : event.phase === 'action' ? '⚡' : '✅';
       return `\n${phaseEmoji} ${event.message}\n`;
     }
 
@@ -103,12 +102,14 @@ export function formatBacklogPlanEventContent(event: BacklogPlanEvent): string {
 /**
  * Format ultrathink preparation details
  */
-function formatUltrathinkPreparation(event: AutoModeEvent & {
-  warnings?: string[];
-  recommendations?: string[];
-  estimatedCost?: number;
-  estimatedTime?: string;
-}): string {
+function formatUltrathinkPreparation(
+  event: AutoModeEvent & {
+    warnings?: string[];
+    recommendations?: string[];
+    estimatedCost?: number;
+    estimatedTime?: string;
+  }
+): string {
   let prepContent = '\n🧠 Ultrathink Preparation\n';
 
   if (event.warnings && event.warnings.length > 0) {

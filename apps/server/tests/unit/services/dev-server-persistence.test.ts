@@ -43,7 +43,7 @@ describe('DevServerService Persistence & Sync', () => {
     await fs.mkdir(worktreeDir, { recursive: true });
 
     mockEmitter = new EventEmitter();
-    
+
     // Default mock for secureFs.access - return resolved (file exists)
     vi.mocked(secureFs.access).mockResolvedValue(undefined);
 
@@ -94,14 +94,14 @@ describe('DevServerService Persistence & Sync', () => {
 
     // Delay spawn to simulate long starting time
     vi.mocked(spawn).mockImplementation(() => {
-        const p = createMockProcess();
-        // Don't return immediately, simulate some work
-        return p as any;
+      const p = createMockProcess();
+      // Don't return immediately, simulate some work
+      return p as any;
     });
 
     // Start first one (don't await yet if we want to test concurrency)
     const promise1 = service.startDevServer(worktreeDir, worktreeDir);
-    
+
     // Try to start second one immediately
     const result2 = await service.startDevServer(worktreeDir, worktreeDir);
 
@@ -122,7 +122,10 @@ describe('DevServerService Persistence & Sync', () => {
     await service.startDevServer(worktreeDir, worktreeDir);
 
     const statePath = path.join(testDataDir, 'dev-servers.json');
-    const exists = await fs.access(statePath).then(() => true).catch(() => false);
+    const exists = await fs
+      .access(statePath)
+      .then(() => true)
+      .catch(() => false);
     expect(exists).toBe(true);
 
     const content = await fs.readFile(statePath, 'utf-8');
@@ -133,22 +136,24 @@ describe('DevServerService Persistence & Sync', () => {
 
   it('should load state from dev-servers.json on initialize', async () => {
     // 1. Create a fake state file
-    const persistedInfo = [{
-      worktreePath: worktreeDir,
-      allocatedPort: 3005,
-      port: 3005,
-      url: 'http://localhost:3005',
-      startedAt: new Date().toISOString(),
-      urlDetected: true,
-      customCommand: 'npm run dev'
-    }];
+    const persistedInfo = [
+      {
+        worktreePath: worktreeDir,
+        allocatedPort: 3005,
+        port: 3005,
+        url: 'http://localhost:3005',
+        startedAt: new Date().toISOString(),
+        urlDetected: true,
+        customCommand: 'npm run dev',
+      },
+    ];
     await fs.writeFile(path.join(testDataDir, 'dev-servers.json'), JSON.stringify(persistedInfo));
 
     // 2. Mock port as IN USE (so it re-attaches)
     const mockServer = new EventEmitter() as any;
     mockServer.listen = vi.fn().mockImplementation((port: number, host: string) => {
-        // Fail to listen = port in use
-        process.nextTick(() => mockServer.emit('error', new Error('EADDRINUSE')));
+      // Fail to listen = port in use
+      process.nextTick(() => mockServer.emit('error', new Error('EADDRINUSE')));
     });
     vi.mocked(net.createServer).mockReturnValue(mockServer);
 
@@ -163,20 +168,22 @@ describe('DevServerService Persistence & Sync', () => {
 
   it('should prune stale servers from state on initialize if port is available', async () => {
     // 1. Create a fake state file
-    const persistedInfo = [{
-      worktreePath: worktreeDir,
-      allocatedPort: 3005,
-      port: 3005,
-      url: 'http://localhost:3005',
-      startedAt: new Date().toISOString(),
-      urlDetected: true
-    }];
+    const persistedInfo = [
+      {
+        worktreePath: worktreeDir,
+        allocatedPort: 3005,
+        port: 3005,
+        url: 'http://localhost:3005',
+        startedAt: new Date().toISOString(),
+        urlDetected: true,
+      },
+    ];
     await fs.writeFile(path.join(testDataDir, 'dev-servers.json'), JSON.stringify(persistedInfo));
 
     // 2. Mock port as AVAILABLE (so it prunes)
     const mockServer = new EventEmitter() as any;
     mockServer.listen = vi.fn().mockImplementation((port: number, host: string) => {
-        process.nextTick(() => mockServer.emit('listening'));
+      process.nextTick(() => mockServer.emit('listening'));
     });
     mockServer.close = vi.fn();
     vi.mocked(net.createServer).mockReturnValue(mockServer);
@@ -186,9 +193,9 @@ describe('DevServerService Persistence & Sync', () => {
     await service.initialize(testDataDir, mockEmitter as any);
 
     expect(service.isRunning(worktreeDir)).toBe(false);
-    
+
     // Give it a moment to complete the pruning saveState
-    await new Promise(resolve => setTimeout(resolve, 100));
+    await new Promise((resolve) => setTimeout(resolve, 100));
 
     // Check if file was updated
     const content = await fs.readFile(path.join(testDataDir, 'dev-servers.json'), 'utf-8');
@@ -208,9 +215,9 @@ describe('DevServerService Persistence & Sync', () => {
 
     // Simulate output with URL
     mockProcess.stdout.emit('data', Buffer.from('Local: http://localhost:5555/\n'));
-    
+
     // Give it a moment to process and save (needs to wait for saveQueue)
-    await new Promise(resolve => setTimeout(resolve, 300));
+    await new Promise((resolve) => setTimeout(resolve, 300));
 
     const content = await fs.readFile(path.join(testDataDir, 'dev-servers.json'), 'utf-8');
     const state = JSON.parse(content);
@@ -222,12 +229,12 @@ describe('DevServerService Persistence & Sync', () => {
 
 // Helper to create a mock child process
 function createMockProcess() {
-    const mockProcess = new EventEmitter() as any;
-    mockProcess.stdout = new EventEmitter();
-    mockProcess.stderr = new EventEmitter();
-    mockProcess.kill = vi.fn();
-    mockProcess.killed = false;
-    mockProcess.pid = 12345;
-    mockProcess.unref = vi.fn();
-    return mockProcess;
+  const mockProcess = new EventEmitter() as any;
+  mockProcess.stdout = new EventEmitter();
+  mockProcess.stderr = new EventEmitter();
+  mockProcess.kill = vi.fn();
+  mockProcess.killed = false;
+  mockProcess.pid = 12345;
+  mockProcess.unref = vi.fn();
+  return mockProcess;
 }

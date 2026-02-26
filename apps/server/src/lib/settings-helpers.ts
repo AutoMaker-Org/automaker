@@ -702,6 +702,27 @@ export interface ProviderContextResult {
 }
 
 /**
+ * Checks if a provider is enabled.
+ * Providers with enabled: undefined are treated as enabled (default state).
+ * Only explicitly set enabled: false means the provider is disabled.
+ */
+function isProviderEnabled(provider: ClaudeCompatibleProvider): boolean {
+  return provider.enabled !== false;
+}
+
+/**
+ * Finds a model config in a provider's models array by ID (case-insensitive).
+ */
+function findModelInProvider(
+  provider: ClaudeCompatibleProvider,
+  modelId: string
+): import('@automaker/types').ProviderModel | undefined {
+  return provider.models?.find(
+    (m) => m.id === modelId || m.id.toLowerCase() === modelId.toLowerCase()
+  );
+}
+
+/**
  * Resolves the provider and Claude-compatible model configuration.
  *
  * This is the central logic for resolving provider context, supporting:
@@ -726,6 +747,10 @@ export async function resolveProviderContext(
     const credentials = await settingsService.getCredentials();
     const providers = globalSettings.claudeCompatibleProviders || [];
 
+    logger.debug(
+      `${logPrefix} Resolving provider context: modelId="${modelId}", providerId="${providerId ?? 'none'}", providers count=${providers.length}`
+    );
+
     let provider: ClaudeCompatibleProvider | undefined;
     let modelConfig: import('@automaker/types').ProviderModel | undefined;
 
@@ -733,30 +758,42 @@ export async function resolveProviderContext(
     if (providerId) {
       provider = providers.find((p) => p.id === providerId);
       if (provider) {
-        if (provider.enabled === false) {
-          logger.warn(`${logPrefix} Explicitly requested provider "${provider.name}" is disabled`);
-        } else {
-          // Find the model config within this provider to check for mappings
-          modelConfig = provider.models?.find(
-            (m) => m.id === modelId || m.id.toLowerCase() === modelId.toLowerCase()
+        if (!isProviderEnabled(provider)) {
+          logger.warn(
+            `${logPrefix} Explicitly requested provider "${provider.name}" (${providerId}) is disabled (enabled=${provider.enabled})`
           );
+        } else {
+          logger.debug(
+            `${logPrefix} Found provider "${provider.name}" (${providerId}), enabled=${provider.enabled ?? 'undefined (treated as enabled)'}`
+          );
+          // Find the model config within this provider to check for mappings
+          modelConfig = findModelInProvider(provider, modelId);
+          if (!modelConfig && provider.models && provider.models.length > 0) {
+            logger.debug(
+              `${logPrefix} Model "${modelId}" not found in provider "${provider.name}". Available models: ${provider.models.map((m) => m.id).join(', ')}`
+            );
+          }
         }
       } else {
-        logger.warn(`${logPrefix} Explicitly requested provider "${providerId}" not found`);
+        logger.warn(
+          `${logPrefix} Explicitly requested provider "${providerId}" not found. Available providers: ${providers.map((p) => p.id).join(', ')}`
+        );
       }
     }
 
-    // 2. Fallback to model-based lookup across all providers if ID-based lookup failed
-    if (!provider || !modelConfig) {
+    // 2. Fallback to model-based lookup across all providers if modelConfig not found
+    // Note: We still search even if provider was found, to get the modelConfig for mapping
+    if (!modelConfig) {
       for (const p of providers) {
-        if (p.enabled === false || p.id === providerId) continue; // Skip disabled or already checked
+        if (!isProviderEnabled(p) || p.id === providerId) continue; // Skip disabled or already checked
 
-        const config = p.models?.find(
-          (m) => m.id === modelId || m.id.toLowerCase() === modelId.toLowerCase()
-        );
+        const config = findModelInProvider(p, modelId);
 
         if (config) {
-          provider = p;
+          // Only override provider if we didn't find one by explicit ID
+          if (!provider) {
+            provider = p;
+          }
           modelConfig = config;
           logger.debug(`${logPrefix} Found model "${modelId}" in provider "${p.name}" (fallback)`);
           break;
@@ -773,6 +810,11 @@ export async function resolveProviderContext(
         `${logPrefix} Model "${modelId}" maps to Claude model "${modelConfig.mapsToClaudeModel}" -> "${resolvedModel}"`
       );
     }
+
+    // Log final result for debugging
+    logger.debug(
+      `${logPrefix} Provider context resolved: provider=${provider?.name ?? 'none'}, modelConfig=${modelConfig ? 'found' : 'not found'}, resolvedModel=${resolvedModel ?? modelId}`
+    );
 
     return { provider, credentials, resolvedModel, modelConfig };
   } catch (error) {

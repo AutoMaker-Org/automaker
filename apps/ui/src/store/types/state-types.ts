@@ -121,6 +121,10 @@ export interface AppState {
       maxConcurrency?: number; // Maximum concurrent features for this worktree (defaults to 3)
     }
   >;
+  // Features that recently completed (via auto_mode_feature_complete event)
+  // Used to prevent race condition where completed features briefly appear in backlog
+  // due to stale cache data. Cleared when features are refetched.
+  recentlyCompletedFeatures: Set<string>;
   autoModeActivityLog: AutoModeActivity[];
   maxConcurrency: number; // Legacy: Maximum number of concurrent agent tasks (deprecated, use per-worktree maxConcurrency)
 
@@ -508,6 +512,9 @@ export interface AppActions {
   getWorktreeKey: (projectId: string, branchName: string | null) => string;
   addAutoModeActivity: (activity: Omit<AutoModeActivity, 'id' | 'timestamp'>) => void;
   clearAutoModeActivity: () => void;
+  // Recently completed features - prevents race condition with stale cache
+  addRecentlyCompletedFeature: (featureId: string) => void;
+  clearRecentlyCompletedFeatures: () => void;
   setMaxConcurrency: (max: number) => void; // Legacy: kept for backward compatibility
   getMaxConcurrencyForWorktree: (projectId: string, branchName: string | null) => number;
   setMaxConcurrencyForWorktree: (
