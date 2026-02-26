@@ -46,6 +46,9 @@ export function createWindow(): void {
       contextIsolation: true,
       nodeIntegration: false,
     },
+    // Hide the default Electron/Chromium menu bar on Linux (File/Edit/View/Help).
+    // It still appears on Alt-press so keyboard-only users aren't locked out.
+    autoHideMenuBar: true,
     // titleBarStyle is macOS-only; use hiddenInset for native look on macOS
     ...(process.platform === 'darwin' && { titleBarStyle: 'hiddenInset' as const }),
     backgroundColor: '#0a0a0a',

@@ -48,6 +48,13 @@ if (isDev) {
   }
 }
 
+// On Linux, auto-detect X11 vs Wayland so the app launches correctly from
+// desktop entries where the display protocol isn't guaranteed to be X11.
+// Must be set before app.whenReady() — has no effect on macOS/Windows.
+if (process.platform === 'linux') {
+  app.commandLine.appendSwitch('ozone-platform-hint', 'auto');
+}
+
 // Register IPC handlers
 registerAllHandlers();
 
