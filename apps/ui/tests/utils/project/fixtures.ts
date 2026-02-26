@@ -17,6 +17,7 @@ const WORKSPACE_ROOT = getWorkspaceRoot();
 const FIXTURE_PATH = path.join(WORKSPACE_ROOT, 'test/fixtures/projectA');
 const SPEC_FILE_PATH = path.join(FIXTURE_PATH, '.automaker/app_spec.txt');
 const CONTEXT_PATH = path.join(FIXTURE_PATH, '.automaker/context');
+const MEMORY_PATH = path.join(FIXTURE_PATH, '.automaker/memory');
 
 // Original spec content for resetting between tests
 const ORIGINAL_SPEC_CONTENT = `<app_spec>
@@ -51,6 +52,16 @@ export function resetContextDirectory(): void {
 }
 
 /**
+ * Reset the memory directory to empty state
+ */
+export function resetMemoryDirectory(): void {
+  if (fs.existsSync(MEMORY_PATH)) {
+    fs.rmSync(MEMORY_PATH, { recursive: true });
+  }
+  fs.mkdirSync(MEMORY_PATH, { recursive: true });
+}
+
+/**
  * Create a context file directly on disk (for test setup)
  */
 export function createContextFileOnDisk(filename: string, content: string): void {
@@ -59,10 +70,26 @@ export function createContextFileOnDisk(filename: string, content: string): void
 }
 
 /**
+ * Create a memory file directly on disk (for test setup)
+ */
+export function createMemoryFileOnDisk(filename: string, content: string): void {
+  const filePath = path.join(MEMORY_PATH, filename);
+  fs.writeFileSync(filePath, content);
+}
+
+/**
  * Check if a context file exists on disk
  */
 export function contextFileExistsOnDisk(filename: string): boolean {
   const filePath = path.join(CONTEXT_PATH, filename);
+  return fs.existsSync(filePath);
+}
+
+/**
+ * Check if a memory file exists on disk
+ */
+export function memoryFileExistsOnDisk(filename: string): boolean {
+  const filePath = path.join(MEMORY_PATH, filename);
   return fs.existsSync(filePath);
 }
 

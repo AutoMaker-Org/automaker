@@ -12,9 +12,12 @@ export async function navigateToBoard(page: Page): Promise<void> {
   // Authenticate before navigating
   await authenticateForTests(page);
 
+  // Wait for any pending navigation to complete before starting a new one
+  await page.waitForLoadState('domcontentloaded').catch(() => {});
+  await page.waitForTimeout(100);
+
   // Navigate directly to /board route
-  await page.goto('/board');
-  await page.waitForLoadState('load');
+  await page.goto('/board', { waitUntil: 'domcontentloaded' });
 
   // Wait for splash screen to disappear (safety net)
   await waitForSplashScreenToDisappear(page, 3000);
@@ -34,9 +37,13 @@ export async function navigateToContext(page: Page): Promise<void> {
   // Authenticate before navigating
   await authenticateForTests(page);
 
+  // Wait for any pending navigation to complete before starting a new one
+  // This prevents race conditions, especially on mobile viewports
+  await page.waitForLoadState('domcontentloaded').catch(() => {});
+  await page.waitForTimeout(100);
+
   // Navigate directly to /context route
-  await page.goto('/context');
-  await page.waitForLoadState('load');
+  await page.goto('/context', { waitUntil: 'domcontentloaded' });
 
   // Wait for splash screen to disappear (safety net)
   await waitForSplashScreenToDisappear(page, 3000);
@@ -69,9 +76,12 @@ export async function navigateToSpec(page: Page): Promise<void> {
   // Authenticate before navigating
   await authenticateForTests(page);
 
+  // Wait for any pending navigation to complete before starting a new one
+  await page.waitForLoadState('domcontentloaded').catch(() => {});
+  await page.waitForTimeout(100);
+
   // Navigate directly to /spec route
-  await page.goto('/spec');
-  await page.waitForLoadState('load');
+  await page.goto('/spec', { waitUntil: 'domcontentloaded' });
 
   // Wait for splash screen to disappear (safety net)
   await waitForSplashScreenToDisappear(page, 3000);
@@ -105,9 +115,12 @@ export async function navigateToAgent(page: Page): Promise<void> {
   // Authenticate before navigating
   await authenticateForTests(page);
 
+  // Wait for any pending navigation to complete before starting a new one
+  await page.waitForLoadState('domcontentloaded').catch(() => {});
+  await page.waitForTimeout(100);
+
   // Navigate directly to /agent route
-  await page.goto('/agent');
-  await page.waitForLoadState('load');
+  await page.goto('/agent', { waitUntil: 'domcontentloaded' });
 
   // Wait for splash screen to disappear (safety net)
   await waitForSplashScreenToDisappear(page, 3000);

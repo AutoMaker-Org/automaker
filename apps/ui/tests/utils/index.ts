@@ -22,6 +22,7 @@ export * from './navigation/views';
 // View-specific utilities
 export * from './views/board';
 export * from './views/context';
+export * from './views/memory';
 export * from './views/spec-editor';
 export * from './views/agent';
 export * from './views/settings';

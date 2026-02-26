@@ -98,6 +98,7 @@ export function HeaderActionsPanelTrigger({
       onClick={onToggle}
       className={cn('h-8 w-8 p-0 text-muted-foreground hover:text-foreground lg:hidden', className)}
       aria-label={isOpen ? 'Close actions menu' : 'Open actions menu'}
+      data-testid="header-actions-panel-trigger"
     >
       {isOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
     </Button>

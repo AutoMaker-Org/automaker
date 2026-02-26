@@ -138,13 +138,16 @@ export async function selectContextFile(
 ): Promise<void> {
   const fileButton = await getByTestId(page, `context-file-${filename}`);
 
-  // Retry click + wait for delete button to handle timing issues
+  // Retry click + wait for content panel to handle timing issues
+  // Note: On mobile, delete button is hidden, so we wait for content panel instead
   await expect(async () => {
     // Use JavaScript click to ensure React onClick handler fires
     await fileButton.evaluate((el) => (el as HTMLButtonElement).click());
-    // Wait for the file to be selected (toolbar with delete button becomes visible)
-    const deleteButton = await getByTestId(page, 'delete-context-file');
-    await expect(deleteButton).toBeVisible();
+    // Wait for content to appear (editor, preview, or image)
+    const contentLocator = page.locator(
+      '[data-testid="context-editor"], [data-testid="markdown-preview"], [data-testid="image-preview"]'
+    );
+    await expect(contentLocator).toBeVisible();
   }).toPass({ timeout, intervals: [500, 1000, 2000] });
 }
 
