@@ -3,7 +3,9 @@ import { defineConfig, devices } from '@playwright/test';
 const port = process.env.TEST_PORT || 3107;
 const serverPort = process.env.TEST_SERVER_PORT || 3108;
 const reuseServer = process.env.TEST_REUSE_SERVER === 'true';
-const useExternalBackend = !!process.env.VITE_SERVER_URL;
+// Only skip backend startup when explicitly requested for E2E runs.
+// VITE_SERVER_URL may be set in user shells for local dev and should not affect tests.
+const useExternalBackend = process.env.TEST_USE_EXTERNAL_BACKEND === 'true';
 // Always use mock agent for tests (disables rate limiting, uses mock Claude responses)
 const mockAgent = true;
 
@@ -19,7 +21,7 @@ export default defineConfig({
   reporter: 'html',
   timeout: 30000,
   use: {
-    baseURL: `http://localhost:${port}`,
+    baseURL: `http://127.0.0.1:${port}`,
     trace: 'on-failure',
     screenshot: 'only-on-failure',
     serviceWorkers: 'block',
@@ -43,7 +45,7 @@ export default defineConfig({
             : [
                 {
                   command: `cd ../server && npm run dev:test`,
-                  url: `http://localhost:${serverPort}/api/health`,
+                  url: `http://127.0.0.1:${serverPort}/api/health`,
                   // Don't reuse existing server to ensure we use the test API key
                   reuseExistingServer: false,
                   timeout: 60000,
@@ -72,7 +74,7 @@ export default defineConfig({
           // Frontend Vite dev server
           {
             command: `npm run dev`,
-            url: `http://localhost:${port}`,
+            url: `http://127.0.0.1:${port}`,
             reuseExistingServer: false,
             timeout: 120000,
             env: {

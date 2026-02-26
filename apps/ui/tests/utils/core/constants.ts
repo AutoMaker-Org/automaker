@@ -12,16 +12,16 @@
  * Uses TEST_SERVER_PORT env var (default 3108) for test runs
  */
 export const API_BASE_URL = process.env.TEST_SERVER_PORT
-  ? `http://localhost:${process.env.TEST_SERVER_PORT}`
-  : 'http://localhost:3108';
+  ? `http://127.0.0.1:${process.env.TEST_SERVER_PORT}`
+  : 'http://127.0.0.1:3108';
 
 /**
  * Base URL for the frontend web server
  * Uses TEST_PORT env var (default 3107) for test runs
  */
 export const WEB_BASE_URL = process.env.TEST_PORT
-  ? `http://localhost:${process.env.TEST_PORT}`
-  : 'http://localhost:3107';
+  ? `http://127.0.0.1:${process.env.TEST_PORT}`
+  : 'http://127.0.0.1:3107';
 
 /**
  * API endpoints for worktree operations

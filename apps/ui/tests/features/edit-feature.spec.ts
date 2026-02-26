@@ -99,6 +99,7 @@ test.describe('Edit Feature', () => {
       .first();
     const cardTestId = await featureCard.getAttribute('data-testid');
     const featureId = cardTestId?.replace('kanban-card-', '');
+    expect(featureId).toBeTruthy();
 
     // Collapse the sidebar first to avoid it intercepting clicks
     const collapseSidebarButton = page.locator('button:has-text("Collapse sidebar")');
@@ -133,13 +134,19 @@ test.describe('Edit Feature', () => {
       { timeout: 5000 }
     );
 
-    // Verify the updated description appears in the card
+    // Verify persistence on disk (source of truth for feature metadata)
+    const featureFilePath = path.join(
+      projectPath,
+      '.automaker',
+      'features',
+      featureId || '',
+      'feature.json'
+    );
+
     await expect(async () => {
-      const backlogColumn = page.locator('[data-testid="kanban-column-backlog"]');
-      const updatedCard = backlogColumn.locator('[data-testid^="kanban-card-"]').filter({
-        hasText: updatedDescription,
-      });
-      expect(await updatedCard.count()).toBeGreaterThan(0);
+      const raw = fs.readFileSync(featureFilePath, 'utf-8');
+      const parsed = JSON.parse(raw) as { description?: string };
+      expect(parsed.description).toBe(updatedDescription);
     }).toPass({ timeout: 10000 });
   });
 });

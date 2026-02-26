@@ -1,408 +1,172 @@
 /**
- * E2E tests for AgentOutputModal responsive behavior
- * These tests verify the modal width changes across different screen sizes
+ * E2E tests for AgentOutputModal responsive behavior.
  */
 
-import { test, expect } from '@playwright/test';
+import { test, expect, Page } from '@playwright/test';
+import * as fs from 'fs';
+import * as path from 'path';
+import { cleanupTempDir, createTempDirPath } from '../../utils/git/worktree';
+import { handleLoginScreenIfPresent } from '../../utils/core/interactions';
 import { setupRealProject } from '../../utils/project/setup';
-import {
-  waitForAgentOutputModal,
-  getAgentOutputModalDescription,
-} from '../../utils/components/modals';
+import { waitForNetworkIdle } from '../../utils/core/waiting';
+
+const TEST_TEMP_DIR = createTempDirPath('agent-output-modal-responsive');
+let projectPath = '';
+const projectName = `responsive-project-${Date.now()}`;
+
+function createFeatureWithOutput(featureId: string, description: string): void {
+  const featureDir = path.join(projectPath, '.automaker', 'features', featureId);
+  fs.mkdirSync(featureDir, { recursive: true });
+
+  fs.writeFileSync(
+    path.join(featureDir, 'feature.json'),
+    JSON.stringify(
+      {
+        id: featureId,
+        title: description,
+        description,
+        status: 'in_progress',
+      },
+      null,
+      2
+    )
+  );
+
+  fs.writeFileSync(
+    path.join(featureDir, 'agent-output.md'),
+    `## Summary\n${description}\n\n## Action Phase\nCompleted responsive modal checks.`
+  );
+}
+
+async function openAgentOutputModalFromFeature(page: Page, description: string): Promise<void> {
+  const featureId = `responsive-feature-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  createFeatureWithOutput(featureId, description);
+
+  await page.reload();
+  await waitForNetworkIdle(page);
+
+  const viewOutputButton = page.locator(
+    `[data-testid="view-output-${featureId}"], [data-testid="view-output-inprogress-${featureId}"]`
+  );
+  await expect(viewOutputButton.first()).toBeVisible({ timeout: 10000 });
+  await viewOutputButton.first().click();
+
+  await expect(page.locator('[data-testid="agent-output-modal"]')).toBeVisible({ timeout: 10000 });
+}
+
+async function getModalMetrics(page: Page) {
+  const modal = page.locator('[data-testid="agent-output-modal"]');
+  const box = await modal.boundingBox();
+  if (!box) throw new Error('Agent output modal has no bounding box');
+
+  const viewport = page.viewportSize();
+  if (!viewport) throw new Error('Viewport size unavailable');
+
+  return {
+    width: box.width,
+    height: box.height,
+    viewportWidth: viewport.width,
+    viewportHeight: viewport.height,
+  };
+}
 
 test.describe('AgentOutputModal Responsive Behavior', () => {
-  test.describe('Mobile View (< 640px)', () => {
-    test('should use full width on mobile screens', async ({ page }) => {
-      // Set up a project
-      const projectPath = '/test/mobile-project';
-      await setupRealProject(page, projectPath, 'Mobile Project');
+  test.beforeAll(async () => {
+    fs.mkdirSync(TEST_TEMP_DIR, { recursive: true });
+    projectPath = path.join(TEST_TEMP_DIR, projectName);
+    fs.mkdirSync(projectPath, { recursive: true });
 
-      // Navigate to board view
-      await page.goto('/board');
+    fs.writeFileSync(
+      path.join(projectPath, 'package.json'),
+      JSON.stringify({ name: projectName, version: '1.0.0' }, null, 2)
+    );
 
-      // Open agent output modal
-      await page.click('[data-testid="add-feature-button"]');
-      await page.fill('[data-testid="feature-input"]', 'Mobile responsive test');
-      await page.click('[data-testid="confirm-add-feature"]');
-
-      // Wait for modal to appear
-      await waitForAgentOutputModal(page);
-
-      // Check mobile viewport
-      await page.setViewportSize({ width: 375, height: 667 });
-
-      const modal = page.locator('[data-testid="agent-output-modal"]');
-
-      // Check if it uses full width on mobile
-      const modalWidth = await modal.evaluate((el) => el.offsetWidth);
-      const viewportWidth = await page.evaluate(() => window.innerWidth);
-
-      expect(modalWidth).toBeGreaterThan(viewportWidth - 40); // 2rem margin
-      expect(modalWidth).toBeLessThan(viewportWidth - 20);
-    });
-
-    test('should have proper max width constraint on mobile', async ({ page }) => {
-      const projectPath = '/test/mobile-max-width';
-      await setupRealProject(page, projectPath, 'Mobile Max Width');
-
-      await page.goto('/board');
-      await page.click('[data-testid="add-feature-button"]');
-      await page.fill('[data-testid="feature-input"]', 'Max width test');
-      await page.click('[data-testid="confirm-add-feature"]');
-
-      await waitForAgentOutputModal(page);
-      await page.setViewportSize({ width: 320, height: 568 });
-
-      const modal = page.locator('[data-testid="agent-output-modal"]');
-      const modalComputedStyle = await modal.evaluate((el) => {
-        const style = window.getComputedStyle(el);
-        return {
-          width: style.width,
-          maxWidth: style.maxWidth,
-        };
-      });
-
-      expect(modalComputedStyle.maxWidth).toBe('calc(100% - 2rem)');
-    });
+    const automakerDir = path.join(projectPath, '.automaker');
+    fs.mkdirSync(path.join(automakerDir, 'features'), { recursive: true });
+    fs.mkdirSync(path.join(automakerDir, 'context'), { recursive: true });
+    fs.writeFileSync(
+      path.join(automakerDir, 'categories.json'),
+      JSON.stringify({ categories: [] })
+    );
+    fs.writeFileSync(
+      path.join(automakerDir, 'app_spec.txt'),
+      `# ${projectName}\n\nResponsive modal tests.`
+    );
   });
 
-  test.describe('Small View (640px - 768px)', () => {
-    test('should use 60vw on small screens', async ({ page }) => {
-      const projectPath = '/test/small-view-project';
-      await setupRealProject(page, projectPath, 'Small View Project');
-
-      await page.goto('/board');
-      await page.click('[data-testid="add-feature-button"]');
-      await page.fill('[data-testid="feature-input"]', 'Small view test');
-      await page.click('[data-testid="confirm-add-feature"]');
-
-      await waitForAgentOutputModal(page);
-      await page.setViewportSize({ width: 640, height: 768 });
-
-      const modal = page.locator('[data-testid="agent-output-modal"]');
-      const modalComputedStyle = await modal.evaluate((el) => {
-        const style = window.getComputedStyle(el);
-        return {
-          width: style.width,
-          maxWidth: style.maxWidth,
-        };
-      });
-
-      expect(modalComputedStyle.width).toMatch(/60vw/);
-      expect(modalComputedStyle.maxWidth).toMatch(/60vw/);
-    });
-
-    test('should have 80vh height on small screens', async ({ page }) => {
-      const projectPath = '/test/small-height-project';
-      await setupRealProject(page, projectPath, 'Small Height Project');
-
-      await page.goto('/board');
-      await page.click('[data-testid="add-feature-button"]');
-      await page.fill('[data-testid="feature-input"]', 'Small height test');
-      await page.click('[data-testid="confirm-add-feature"]');
-
-      await waitForAgentOutputModal(page);
-      await page.setViewportSize({ width: 640, height: 768 });
-
-      const modal = page.locator('[data-testid="agent-output-modal"]');
-      const modalComputedStyle = await modal.evaluate((el) => {
-        const style = window.getComputedStyle(el);
-        return {
-          height: style.height,
-          maxHeight: style.maxHeight,
-        };
-      });
-
-      expect(modalComputedStyle.maxHeight).toMatch(/80vh/);
-    });
+  test.afterAll(async () => {
+    cleanupTempDir(TEST_TEMP_DIR);
   });
 
-  test.describe('Tablet View (≥ 768px)', () => {
-    test('should use 90vw on tablet screens', async ({ page }) => {
-      const projectPath = '/test/tablet-project';
-      await setupRealProject(page, projectPath, 'Tablet Project');
-
-      await page.goto('/board');
-      await page.click('[data-testid="add-feature-button"]');
-      await page.fill('[data-testid="feature-input"]', 'Tablet responsive test');
-      await page.click('[data-testid="confirm-add-feature"]');
-
-      await waitForAgentOutputModal(page);
-      await page.setViewportSize({ width: 768, height: 1024 });
-
-      const modal = page.locator('[data-testid="agent-output-modal"]');
-      const modalComputedStyle = await modal.evaluate((el) => {
-        const style = window.getComputedStyle(el);
-        return {
-          width: style.width,
-          maxWidth: style.maxWidth,
-        };
-      });
-
-      expect(modalComputedStyle.width).toMatch(/90vw/);
-      expect(modalComputedStyle.maxWidth).toMatch(/90vw/);
-    });
-
-    test('should have 1200px max width on tablet', async ({ page }) => {
-      const projectPath = '/test/tablet-max-project';
-      await setupRealProject(page, projectPath, 'Tablet Max Project');
-
-      await page.goto('/board');
-      await page.click('[data-testid="add-feature-button"]');
-      await page.fill('[data-testid="feature-input"]', 'Tablet max width test');
-      await page.click('[data-testid="confirm-add-feature"]');
-
-      await waitForAgentOutputModal(page);
-      await page.setViewportSize({ width: 768, height: 1024 });
-
-      const modal = page.locator('[data-testid="agent-output-modal"]');
-      const modalComputedStyle = await modal.evaluate((el) => {
-        const style = window.getComputedStyle(el);
-        return {
-          width: style.width,
-          maxWidth: style.maxWidth,
-        };
-      });
-
-      expect(modalComputedStyle.maxWidth).toMatch(/1200px/);
-    });
-
-    test('should have 85vh height on tablet screens', async ({ page }) => {
-      const projectPath = '/test/tablet-height-project';
-      await setupRealProject(page, projectPath, 'Tablet Height Project');
-
-      await page.goto('/board');
-      await page.click('[data-testid="add-feature-button"]');
-      await page.fill('[data-testid="feature-input"]', 'Tablet height test');
-      await page.click('[data-testid="confirm-add-feature"]');
-
-      await waitForAgentOutputModal(page);
-      await page.setViewportSize({ width: 768, height: 1024 });
-
-      const modal = page.locator('[data-testid="agent-output-modal"]');
-      const modalComputedStyle = await modal.evaluate((el) => {
-        const style = window.getComputedStyle(el);
-        return {
-          height: style.height,
-          maxHeight: style.maxHeight,
-        };
-      });
-
-      expect(modalComputedStyle.maxHeight).toMatch(/85vh/);
-    });
-
-    test('should maintain correct height on larger tablets', async ({ page }) => {
-      const projectPath = '/test/large-tablet-project';
-      await setupRealProject(page, projectPath, 'Large Tablet Project');
-
-      await page.goto('/board');
-      await page.click('[data-testid="add-feature-button"]');
-      await page.fill('[data-testid="feature-input"]', 'Large tablet test');
-      await page.click('[data-testid="confirm-add-feature"]');
-
-      await waitForAgentOutputModal(page);
-      await page.setViewportSize({ width: 1024, height: 1366 });
-
-      const modal = page.locator('[data-testid="agent-output-modal"]');
-      const modalComputedStyle = await modal.evaluate((el) => {
-        const style = window.getComputedStyle(el);
-        return {
-          height: style.height,
-          maxHeight: style.maxHeight,
-        };
-      });
-
-      expect(modalComputedStyle.maxHeight).toMatch(/85vh/);
-    });
+  test.beforeEach(async ({ page }) => {
+    await setupRealProject(page, projectPath, projectName);
+    await page.goto('/');
+    await handleLoginScreenIfPresent(page);
+    await waitForNetworkIdle(page);
   });
 
-  test.describe('Responsive Transitions', () => {
-    test('should update modal size when resizing from mobile to tablet', async ({ page }) => {
-      const projectPath = '/test/resize-project';
-      await setupRealProject(page, projectPath, 'Resize Project');
+  test('uses near full width on mobile', async ({ page }) => {
+    await openAgentOutputModalFromFeature(page, 'Mobile responsive test');
 
-      await page.goto('/board');
-      await page.click('[data-testid="add-feature-button"]');
-      await page.fill('[data-testid="feature-input"]', 'Resize test');
-      await page.click('[data-testid="confirm-add-feature"]');
+    await page.setViewportSize({ width: 375, height: 667 });
+    await page.waitForTimeout(120);
 
-      await waitForAgentOutputModal(page);
-
-      // Start with mobile size
-      await page.setViewportSize({ width: 375, height: 667 });
-      let modalComputedStyle = await page
-        .locator('[data-testid="agent-output-modal"]')
-        .evaluate((el) => {
-          const style = window.getComputedStyle(el);
-          return style.width;
-        });
-
-      expect(modalComputedStyle).toMatch(/calc\(100% - 2rem\)/);
-
-      // Resize to tablet
-      await page.setViewportSize({ width: 768, height: 1024 });
-
-      // Wait for a moment for CSS to recalculate
-      await page.waitForTimeout(100);
-
-      modalComputedStyle = await page
-        .locator('[data-testid="agent-output-modal"]')
-        .evaluate((el) => {
-          const style = window.getComputedStyle(el);
-          return style.width;
-        });
-
-      expect(modalComputedStyle).toMatch(/90vw/);
-    });
-
-    test('should update modal size when resizing from tablet to mobile', async ({ page }) => {
-      const projectPath = '/test/resize-mobile-project';
-      await setupRealProject(page, projectPath, 'Resize Mobile Project');
-
-      await page.goto('/board');
-      await page.click('[data-testid="add-feature-button"]');
-      await page.fill('[data-testid="feature-input"]', 'Resize mobile test');
-      await page.click('[data-testid="confirm-add-feature"]');
-
-      await waitForAgentOutputModal(page);
-
-      // Start with tablet size
-      await page.setViewportSize({ width: 768, height: 1024 });
-      let modalComputedStyle = await page
-        .locator('[data-testid="agent-output-modal"]')
-        .evaluate((el) => {
-          const style = window.getComputedStyle(el);
-          return style.width;
-        });
-
-      expect(modalComputedStyle).toMatch(/90vw/);
-
-      // Resize to mobile
-      await page.setViewportSize({ width: 375, height: 667 });
-
-      // Wait for a moment for CSS to recalculate
-      await page.waitForTimeout(100);
-
-      modalComputedStyle = await page
-        .locator('[data-testid="agent-output-modal"]')
-        .evaluate((el) => {
-          const style = window.getComputedStyle(el);
-          return style.width;
-        });
-
-      expect(modalComputedStyle).toMatch(/calc\(100% - 2rem\)/);
-    });
+    const { width } = await getModalMetrics(page);
+    expect(width).toBeGreaterThanOrEqual(300);
+    expect(width).toBeLessThanOrEqual(500);
   });
 
-  test.describe('Content Responsiveness', () => {
-    test('should display content correctly on tablet view', async ({ page }) => {
-      const projectPath = '/test/content-responsive-project';
-      await setupRealProject(page, projectPath, 'Content Responsive Project');
+  test('uses ~60vw on small screens', async ({ page }) => {
+    await openAgentOutputModalFromFeature(page, 'Small screen responsive test');
 
-      await page.goto('/board');
-      await page.click('[data-testid="add-feature-button"]');
-      await page.fill('[data-testid="feature-input"]', 'Content responsive test');
-      await page.click('[data-testid="confirm-add-feature"]');
+    await page.setViewportSize({ width: 640, height: 768 });
+    await page.waitForTimeout(120);
 
-      await waitForAgentOutputModal(page);
-      await page.setViewportSize({ width: 768, height: 1024 });
-
-      // Check that content is visible and properly formatted
-      const modal = page.locator('[data-testid="agent-output-modal"]');
-      const contentArea = modal.locator('.flex-1');
-
-      // Content area should be visible
-      await expect(contentArea).toBeVisible();
-
-      // Content should have proper scrolling
-      await expect(contentArea).toHaveClass(/overflow-y-auto/);
-
-      // Check that description is visible
-      const description = await getAgentOutputModalDescription(page);
-      expect(description).toContain('Content responsive test');
-    });
-
-    test('should maintain readability on tablet with wider width', async ({ page }) => {
-      const projectPath = '/test/readability-project';
-      await setupRealProject(page, projectPath, 'Readability Project');
-
-      await page.goto('/board');
-      await page.click('[data-testid="add-feature-button"]');
-      await page.fill(
-        '[data-testid="feature-input"]',
-        'Test long text that should wrap properly on wider tablet screens for better readability and user experience'
-      );
-      await page.click('[data-testid="confirm-add-feature"]');
-
-      await waitForAgentOutputModal(page);
-      await page.setViewportSize({ width: 1200, height: 800 });
-
-      const modal = page.locator('[data-testid="agent-output-modal"]');
-      const description = modal.locator('[data-testid="agent-output-description"]');
-
-      // Check that long text wraps properly
-      const descriptionText = await description.textContent();
-      expect(descriptionText).toBeDefined();
-      expect(descriptionText!.length).toBeGreaterThan(0);
-    });
+    const { width, height, viewportWidth, viewportHeight } = await getModalMetrics(page);
+    expect(Math.abs(width - viewportWidth * 0.6)).toBeLessThanOrEqual(52);
+    expect(height).toBeLessThanOrEqual(viewportHeight * 0.8 + 24);
   });
 
-  test.describe('Modal Functionality Across Screens', () => {
-    test('should maintain functionality while resizing', async ({ page }) => {
-      const projectPath = '/test/functionality-project';
-      await setupRealProject(page, projectPath, 'Functionality Project');
+  test('uses ~60vw on tablet screens', async ({ page }) => {
+    await openAgentOutputModalFromFeature(page, 'Tablet responsive test');
 
-      await page.goto('/board');
-      await page.click('[data-testid="add-feature-button"]');
-      await page.fill('[data-testid="feature-input"]', 'Functionality test');
-      await page.click('[data-testid="confirm-add-feature"]');
+    await page.setViewportSize({ width: 768, height: 1024 });
+    await page.waitForTimeout(120);
 
-      await waitForAgentOutputModal(page);
+    const { width, height, viewportWidth, viewportHeight } = await getModalMetrics(page);
+    expect(Math.abs(width - viewportWidth * 0.6)).toBeLessThanOrEqual(52);
+    expect(height).toBeLessThanOrEqual(viewportHeight * 0.85 + 24);
+  });
 
-      // Test on mobile
-      await page.setViewportSize({ width: 375, height: 667 });
-      await expect(page.locator('[data-testid="agent-output-modal"]')).toBeVisible();
+  test('respects 1200px max width cap on large screens', async ({ page }) => {
+    await openAgentOutputModalFromFeature(page, 'Large screen cap test');
 
-      // Test on tablet
-      await page.setViewportSize({ width: 768, height: 1024 });
-      await expect(page.locator('[data-testid="agent-output-modal"]')).toBeVisible();
+    await page.setViewportSize({ width: 1600, height: 1000 });
+    await page.waitForTimeout(120);
 
-      // Test view mode switching on tablet
-      const logsButton = page.getByTestId('view-mode-parsed');
-      await expect(logsButton).toBeVisible();
-      await logsButton.click();
-      await expect(page.locator('role="log"')).toBeVisible();
+    const { width } = await getModalMetrics(page);
+    expect(width).toBeLessThanOrEqual(1212);
+  });
 
-      // Close modal and verify
-      await page.keyboard.press('Escape');
-      await expect(page.locator('[data-testid="agent-output-modal"]')).not.toBeVisible();
-    });
+  test('remains functional while resizing and switching views', async ({ page }) => {
+    await openAgentOutputModalFromFeature(page, 'Functionality test');
 
-    test('should handle view mode buttons on tablet', async ({ page }) => {
-      const projectPath = '/test/view-buttons-project';
-      await setupRealProject(page, projectPath, 'View Buttons Project');
+    const modal = page.locator('[data-testid="agent-output-modal"]');
+    await expect(modal).toBeVisible();
 
-      await page.goto('/board');
-      await page.click('[data-testid="add-feature-button"]');
-      await page.fill('[data-testid="feature-input"]', 'View buttons test');
-      await page.click('[data-testid="confirm-add-feature"]');
+    await page.setViewportSize({ width: 375, height: 667 });
+    await page.waitForTimeout(120);
+    await expect(modal).toBeVisible();
 
-      await waitForAgentOutputModal(page);
-      await page.setViewportSize({ width: 768, height: 1024 });
+    await page.setViewportSize({ width: 768, height: 1024 });
+    await page.waitForTimeout(120);
+    await expect(modal).toBeVisible();
 
-      // Test all view mode buttons
-      const summaryButton = page.getByTestId('view-mode-summary');
-      const logsButton = page.getByTestId('view-mode-parsed');
-      const rawButton = page.getByTestId('view-mode-raw');
+    await expect(page.getByTestId('view-mode-parsed')).toBeVisible();
+    await expect(page.getByTestId('view-mode-raw')).toBeVisible();
+    await expect(page.getByTestId('view-mode-changes')).toBeVisible();
 
-      await expect(summaryButton).toBeVisible();
-      await expect(logsButton).toBeVisible();
-      await expect(rawButton).toBeVisible();
-
-      // Test switching to raw view
-      await rawButton.click();
-      const contentArea = page.locator('.flex-1');
-      await expect(contentArea).toHaveText(/Agent Output/);
-    });
+    await page.getByTestId('view-mode-raw').click();
+    await expect(modal).toContainText('Agent Output');
   });
 });

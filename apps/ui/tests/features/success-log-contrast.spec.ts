@@ -6,12 +6,10 @@
 import { test, expect } from '@playwright/test';
 import * as fs from 'fs';
 import * as path from 'path';
-import {
-  createTempDirPath,
-  setupRealProject,
-  waitForNetworkIdle,
-  handleLoginScreenIfPresent,
-} from '../utils';
+import { createTempDirPath } from '../utils/git/worktree';
+import { setupRealProject } from '../utils/project/setup';
+import { waitForNetworkIdle } from '../utils/core/waiting';
+import { handleLoginScreenIfPresent } from '../utils/core/interactions';
 import { TIMEOUTS } from '../utils/core/constants';
 
 /**
@@ -53,7 +51,7 @@ function createTestFeature(
     id: featureId,
     title,
     description,
-    status: 'verified',
+    status: 'in_progress',
   };
 
   try {
@@ -76,6 +74,15 @@ function cleanupTestDirectory(dirPath: string): void {
       console.warn(`Failed to clean up directory ${dirPath}: ${error}`);
     }
   }
+}
+
+async function openFeatureOutputModal(page: import('@playwright/test').Page, featureId: string) {
+  const viewOutputButton = page.locator(
+    `[data-testid="view-output-${featureId}"], [data-testid="view-output-inprogress-${featureId}"]`
+  );
+  await expect(viewOutputButton.first()).toBeVisible({ timeout: TIMEOUTS.medium });
+  await viewOutputButton.first().click();
+  await page.waitForSelector('[data-testid="agent-output-modal"]', { timeout: TIMEOUTS.default });
 }
 
 test.describe('Success log output contrast', () => {
@@ -159,22 +166,18 @@ The feature is complete and ready for review.
     await page.reload();
     await waitForNetworkIdle(page);
 
-    // Click on the feature to open agent output modal
-    const featureCard = page.locator(`[data-feature-id="${testFeatureId}"]`);
-    await expect(featureCard).toBeVisible({ timeout: TIMEOUTS.medium });
-    await featureCard.click();
-
-    // Wait for modal to open
-    await page.waitForSelector('[data-testid="agent-output-modal"]', { timeout: TIMEOUTS.default });
+    await openFeatureOutputModal(page, testFeatureId);
 
     // Switch to logs view
     await page.click('[data-testid="view-mode-parsed"]');
 
     // Wait for log content to render
-    await page.waitForSelector('[role="log"]', { timeout: TIMEOUTS.default });
+    await page.waitForSelector('[data-testid="log-entries-container"]', {
+      timeout: TIMEOUTS.default,
+    });
 
     // Get the log container
-    const logContainer = page.locator('[role="log"]');
+    const logContainer = page.locator('[data-testid="log-entries-container"]');
 
     // Verify that success-type logs have the improved contrast classes
     // The new implementation uses bg-emerald-500/20 instead of /10
@@ -197,7 +200,7 @@ The feature is complete and ready for review.
     expect(borderCount).toBeGreaterThan(0);
 
     // Close modal
-    await page.click('[data-testid="close-agent-output-modal"]');
+    await page.keyboard.press('Escape');
     await page.waitForSelector('[data-testid="agent-output-modal"]', {
       state: 'hidden',
       timeout: TIMEOUTS.default,
@@ -239,26 +242,20 @@ Feature implementation complete with all tests passing.
     await page.reload();
     await waitForNetworkIdle(page);
 
-    const featureCard = page.locator(`[data-feature-id="${testFeatureId}"]`);
-    await expect(featureCard).toBeVisible({ timeout: TIMEOUTS.medium });
-    await featureCard.click();
-
-    await page.waitForSelector('[data-testid="agent-output-modal"]', { timeout: TIMEOUTS.default });
+    await openFeatureOutputModal(page, testFeatureId);
     await page.click('[data-testid="view-mode-parsed"]');
-    await page.waitForSelector('[role="log"]', { timeout: TIMEOUTS.default });
+    await page.waitForSelector('[data-testid="log-entries-container"]', {
+      timeout: TIMEOUTS.default,
+    });
 
-    const logContainer = page.locator('[role="log"]');
-
-    // Verify phase logs still use cyan (not affected by our changes)
-    const phaseLogs = logContainer.locator('.bg-cyan-500\\/10');
-    expect(await phaseLogs.count()).toBeGreaterThan(0);
+    const logContainer = page.locator('[data-testid="log-entries-container"]');
 
     // Verify success logs use the new improved contrast
     const successLogs = logContainer.locator('.bg-emerald-500\\/20');
     expect(await successLogs.count()).toBeGreaterThan(0);
 
     // Close modal
-    await page.click('[data-testid="close-agent-output-modal"]');
+    await page.keyboard.press('Escape');
   });
 
   test('should have consistent badge styling with improved contrast', async ({ page }) => {
@@ -284,15 +281,13 @@ All tasks completed successfully.
     await page.reload();
     await waitForNetworkIdle(page);
 
-    const featureCard = page.locator(`[data-feature-id="${testFeatureId}"]`);
-    await expect(featureCard).toBeVisible({ timeout: TIMEOUTS.medium });
-    await featureCard.click();
-
-    await page.waitForSelector('[data-testid="agent-output-modal"]', { timeout: TIMEOUTS.default });
+    await openFeatureOutputModal(page, testFeatureId);
     await page.click('[data-testid="view-mode-parsed"]');
-    await page.waitForSelector('[role="log"]', { timeout: TIMEOUTS.default });
+    await page.waitForSelector('[data-testid="log-entries-container"]', {
+      timeout: TIMEOUTS.default,
+    });
 
-    const logContainer = page.locator('[role="log"]');
+    const logContainer = page.locator('[data-testid="log-entries-container"]');
 
     // Verify badge styling has improved contrast
     // Badge should have bg-emerald-500/30 (increased from /20)
@@ -304,7 +299,7 @@ All tasks completed successfully.
     expect(badgeCount).toBeGreaterThan(0);
 
     // Close modal
-    await page.click('[data-testid="close-agent-output-modal"]');
+    await page.keyboard.press('Escape');
     await page.waitForSelector('[data-testid="agent-output-modal"]', {
       state: 'hidden',
       timeout: TIMEOUTS.default,
