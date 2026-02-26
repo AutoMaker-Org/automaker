@@ -47,6 +47,8 @@ export interface ParsedTask {
   phase?: string;
   /** Task execution status */
   status: 'pending' | 'in_progress' | 'completed' | 'failed';
+  /** Optional task summary, e.g., "Created User model with email and password fields" */
+  summary?: string;
 }
 
 /**

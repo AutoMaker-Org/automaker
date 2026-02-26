@@ -4,6 +4,7 @@
 
 import path from 'path';
 import type { ExecuteOptions, ParsedTask } from '@automaker/types';
+import { isPipelineStatus } from '@automaker/types';
 import { buildPromptWithImages, createLogger, isAuthenticationError } from '@automaker/utils';
 import { getFeatureDir } from '@automaker/platform';
 import * as secureFs from '../lib/secure-fs.js';
@@ -91,6 +92,7 @@ export class AgentExecutor {
       existingApprovedPlanContent,
       persistedTasks,
       credentials,
+      status, // Feature status for pipeline summary check
       claudeCompatibleProvider,
       mcpServers,
       sdkSessionId,
@@ -207,6 +209,17 @@ export class AgentExecutor {
       if (writeTimeout) clearTimeout(writeTimeout);
       if (rawWriteTimeout) clearTimeout(rawWriteTimeout);
       await writeToFile();
+
+      // Extract and save summary from the new content generated in this session
+      await this.extractAndSaveSessionSummary(
+        projectPath,
+        featureId,
+        result.responseText,
+        previousContent,
+        callbacks,
+        status
+      );
+
       return {
         responseText: result.responseText,
         specDetected: true,
@@ -340,7 +353,76 @@ export class AgentExecutor {
         }
       }
     }
+
+    // Capture summary if it hasn't been captured by handleSpecGenerated or executeTasksLoop
+    // or if we're in a simple execution mode (planningMode='skip')
+    await this.extractAndSaveSessionSummary(
+      projectPath,
+      featureId,
+      responseText,
+      previousContent,
+      callbacks,
+      status
+    );
+
     return { responseText, specDetected, tasksCompleted, aborted };
+  }
+
+  /**
+   * Strip the follow-up session scaffold marker from content.
+   * The scaffold is added when resuming a session with previous content:
+   *   "\n\n---\n\n## Follow-up Session\n\n"
+   * This ensures fallback summaries don't include the scaffold header.
+   *
+   * The regex pattern handles variations in whitespace while matching the
+   * scaffold structure: dashes followed by "## Follow-up Session" at the
+   * start of the content.
+   */
+  private static stripFollowUpScaffold(content: string): string {
+    // Pattern matches: ^\s*---\s*##\s*Follow-up Session\s*
+    // - ^ = start of content (scaffold is always at the beginning of sessionContent)
+    // - \s* = any whitespace (handles \n\n before ---, spaces/tabs between markers)
+    // - --- = literal dashes
+    // - \s* = whitespace between dashes and heading
+    // - ## = heading marker
+    // - \s* = whitespace before "Follow-up"
+    // - Follow-up Session = literal heading text
+    // - \s* = trailing whitespace/newlines after heading
+    const scaffoldPattern = /^\s*---\s*##\s*Follow-up Session\s*/;
+    return content.replace(scaffoldPattern, '');
+  }
+
+  /**
+   * Extract summary ONLY from the new content generated in this session
+   * and save it via the provided callback.
+   */
+  private async extractAndSaveSessionSummary(
+    projectPath: string,
+    featureId: string,
+    responseText: string,
+    previousContent: string | undefined,
+    callbacks: AgentExecutorCallbacks,
+    status?: string
+  ): Promise<void> {
+    const sessionContent = responseText.substring(previousContent ? previousContent.length : 0);
+    const summary = extractSummary(sessionContent);
+    if (summary) {
+      await callbacks.saveFeatureSummary(projectPath, featureId, summary);
+      return;
+    }
+
+    // If we're in a pipeline step, a summary is expected. Use a fallback if extraction fails.
+    if (isPipelineStatus(status)) {
+      // Strip any follow-up session scaffold before using as fallback
+      const cleanSessionContent = AgentExecutor.stripFollowUpScaffold(sessionContent);
+      const fallback = cleanSessionContent.trim();
+      if (fallback) {
+        await callbacks.saveFeatureSummary(projectPath, featureId, fallback);
+      }
+      logger.warn(
+        `[AgentExecutor] Mandatory summary extraction failed for pipeline feature ${featureId} (status="${status}")`
+      );
+    }
   }
 
   private async executeTasksLoop(
@@ -439,14 +521,15 @@ export class AgentExecutor {
                 }
               }
               if (!taskCompleteDetected) {
-                const cid = detectTaskCompleteMarker(taskOutput);
-                if (cid) {
+                const completeMarker = detectTaskCompleteMarker(taskOutput);
+                if (completeMarker) {
                   taskCompleteDetected = true;
                   await this.featureStateManager.updateTaskStatus(
                     projectPath,
                     featureId,
-                    cid,
-                    'completed'
+                    completeMarker.id,
+                    'completed',
+                    completeMarker.summary
                   );
                 }
               }
@@ -524,8 +607,6 @@ export class AgentExecutor {
         }
       }
     }
-    const summary = extractSummary(responseText);
-    if (summary) await callbacks.saveFeatureSummary(projectPath, featureId, summary);
     return { responseText, tasksCompleted, aborted: false };
   }
 
@@ -722,8 +803,6 @@ export class AgentExecutor {
       );
       responseText = r.responseText;
     }
-    const summary = extractSummary(responseText);
-    if (summary) await callbacks.saveFeatureSummary(projectPath, featureId, summary);
     return { responseText, tasksCompleted };
   }
 
