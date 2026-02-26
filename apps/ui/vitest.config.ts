@@ -2,6 +2,9 @@ import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import path from 'path';
 
+// Ensure UI tests never inherit production mode from outer shells.
+process.env.NODE_ENV = 'test';
+
 export default defineConfig({
   plugins: [react()],
   test: {
