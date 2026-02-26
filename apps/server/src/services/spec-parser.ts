@@ -101,12 +101,18 @@ export function detectTaskStartMarker(text: string): string | null {
 }
 
 /**
- * Detect [TASK_COMPLETE] marker in text and extract task ID
+ * Detect [TASK_COMPLETE] marker in text and extract task ID and summary
  * Format: [TASK_COMPLETE] T###: Brief summary
  */
-export function detectTaskCompleteMarker(text: string): string | null {
-  const match = text.match(/\[TASK_COMPLETE\]\s*(T\d{3})/);
-  return match ? match[1] : null;
+export function detectTaskCompleteMarker(text: string): { id: string; summary?: string } | null {
+  // Use a non-greedy regex that stops before another marker or newline
+  const match = text.match(/\[TASK_COMPLETE\]\s*(T\d{3})(?::\s*([^\n\[]+))?/i);
+  if (!match) return null;
+
+  return {
+    id: match[1],
+    summary: match[2]?.trim(),
+  };
 }
 
 /**

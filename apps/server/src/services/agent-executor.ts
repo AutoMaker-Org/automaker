@@ -4,6 +4,7 @@
 
 import path from 'path';
 import type { ExecuteOptions, ParsedTask } from '@automaker/types';
+import { isPipelineStatus } from '@automaker/types';
 import { buildPromptWithImages, createLogger, isAuthenticationError } from '@automaker/utils';
 import { getFeatureDir } from '@automaker/platform';
 import * as secureFs from '../lib/secure-fs.js';
@@ -207,6 +208,16 @@ export class AgentExecutor {
       if (writeTimeout) clearTimeout(writeTimeout);
       if (rawWriteTimeout) clearTimeout(rawWriteTimeout);
       await writeToFile();
+
+      // Extract and save summary from the new content generated in this session
+      await this.extractAndSaveSessionSummary(
+        projectPath,
+        featureId,
+        result.responseText,
+        previousContent,
+        callbacks
+      );
+
       return {
         responseText: result.responseText,
         specDetected: true,
@@ -340,7 +351,52 @@ export class AgentExecutor {
         }
       }
     }
+
+    // Capture summary if it hasn't been captured by handleSpecGenerated or executeTasksLoop
+    // or if we're in a simple execution mode (planningMode='skip')
+    await this.extractAndSaveSessionSummary(
+      projectPath,
+      featureId,
+      responseText,
+      previousContent,
+      callbacks
+    );
+
     return { responseText, specDetected, tasksCompleted, aborted };
+  }
+
+  /**
+   * Extract summary ONLY from the new content generated in this session
+   * and save it via the provided callback.
+   */
+  private async extractAndSaveSessionSummary(
+    projectPath: string,
+    featureId: string,
+    responseText: string,
+    previousContent: string | undefined,
+    callbacks: AgentExecutorCallbacks
+  ): Promise<void> {
+    const sessionContent = responseText.substring(previousContent ? previousContent.length : 0);
+    const summary = extractSummary(sessionContent);
+    if (summary) {
+      await callbacks.saveFeatureSummary(projectPath, featureId, summary);
+    } else {
+      // If we're in a pipeline step, a summary is expected. Log a warning if it's missing.
+      // We need to fetch the feature to check its status.
+      try {
+        const featureDir = getFeatureDir(projectPath, featureId);
+        const featurePath = path.join(featureDir, 'feature.json');
+        const feature = (await secureFs.readFile(featurePath)).toString();
+        const featureData = JSON.parse(feature);
+        if (isPipelineStatus(featureData.status)) {
+          logger.warn(
+            `[AgentExecutor] Mandatory summary extraction failed for pipeline feature ${featureId} (status="${featureData.status}")`
+          );
+        }
+      } catch {
+        /* ignore failures in warning logging */
+      }
+    }
   }
 
   private async executeTasksLoop(
@@ -439,14 +495,15 @@ export class AgentExecutor {
                 }
               }
               if (!taskCompleteDetected) {
-                const cid = detectTaskCompleteMarker(taskOutput);
-                if (cid) {
+                const completeMarker = detectTaskCompleteMarker(taskOutput);
+                if (completeMarker) {
                   taskCompleteDetected = true;
                   await this.featureStateManager.updateTaskStatus(
                     projectPath,
                     featureId,
-                    cid,
-                    'completed'
+                    completeMarker.id,
+                    'completed',
+                    completeMarker.summary
                   );
                 }
               }
@@ -524,8 +581,6 @@ export class AgentExecutor {
         }
       }
     }
-    const summary = extractSummary(responseText);
-    if (summary) await callbacks.saveFeatureSummary(projectPath, featureId, summary);
     return { responseText, tasksCompleted, aborted: false };
   }
 
@@ -722,8 +777,6 @@ export class AgentExecutor {
       );
       responseText = r.responseText;
     }
-    const summary = extractSummary(responseText);
-    if (summary) await callbacks.saveFeatureSummary(projectPath, featureId, summary);
     return { responseText, tasksCompleted };
   }
 

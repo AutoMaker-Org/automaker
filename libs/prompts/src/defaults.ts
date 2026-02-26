@@ -291,6 +291,23 @@ export const DEFAULT_AUTO_MODE_PIPELINE_STEP_PROMPT_TEMPLATE = `## Pipeline Step
 
 ### Pipeline Step Instructions
 {{stepInstructions}}
+
+**CRITICAL: After completing the instructions, you MUST output a summary using this EXACT format:**
+
+<summary>
+## Summary: {{stepName}}
+
+### Changes Implemented
+- [List all changes made in this step]
+
+### Files Modified
+- [List all files modified in this step]
+
+### Outcome
+- [Describe the result of this step]
+</summary>
+
+The <summary> and </summary> tags MUST be on their own lines. This is REQUIRED.
 `;
 
 /**

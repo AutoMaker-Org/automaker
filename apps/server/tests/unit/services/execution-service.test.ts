@@ -1439,6 +1439,114 @@ describe('execution-service.ts', () => {
         expect.objectContaining({ passes: true })
       );
     });
+
+    // Helper to create ExecutionService with a custom loadFeatureFn that returns
+    // different features on first load (initial) vs subsequent loads (after completion)
+    const createServiceWithCustomLoad = (completedFeature: Feature): ExecutionService => {
+      let loadCallCount = 0;
+      mockLoadFeatureFn = vi.fn().mockImplementation(() => {
+        loadCallCount++;
+        return loadCallCount === 1 ? testFeature : completedFeature;
+      });
+
+      return new ExecutionService(
+        mockEventBus,
+        mockConcurrencyManager,
+        mockWorktreeResolver,
+        mockSettingsService,
+        mockRunAgentFn,
+        mockExecutePipelineFn,
+        mockUpdateFeatureStatusFn,
+        mockLoadFeatureFn,
+        mockGetPlanningPromptPrefixFn,
+        mockSaveFeatureSummaryFn,
+        mockRecordLearningsFn,
+        mockContextExistsFn,
+        mockResumeFeatureFn,
+        mockTrackFailureFn,
+        mockSignalPauseFn,
+        mockRecordSuccessFn,
+        mockSaveExecutionStateFn,
+        mockLoadContextFilesFn
+      );
+    };
+
+    it('does not overwrite accumulated summary when feature already has one', async () => {
+      const featureWithAccumulatedSummary: Feature = {
+        ...testFeature,
+        summary:
+          '### Implementation\n\nFirst step output\n\n---\n\n### Code Review\n\nReview findings',
+      };
+
+      const svc = createServiceWithCustomLoad(featureWithAccumulatedSummary);
+      await svc.executeFeature('/test/project', 'feature-1');
+
+      // saveFeatureSummaryFn should NOT be called because feature already has a summary
+      // This prevents overwriting accumulated pipeline summaries with just the last step's output
+      expect(mockSaveFeatureSummaryFn).not.toHaveBeenCalled();
+    });
+
+    it('saves summary when feature has no existing summary', async () => {
+      const featureWithoutSummary: Feature = {
+        ...testFeature,
+        summary: undefined,
+      };
+
+      vi.mocked(secureFs.readFile).mockResolvedValue(
+        '🔧 Tool: Edit\nInput: {"file_path": "/src/index.ts"}\n\n<summary>New summary</summary>'
+      );
+
+      const svc = createServiceWithCustomLoad(featureWithoutSummary);
+      await svc.executeFeature('/test/project', 'feature-1');
+
+      // Should save the extracted summary since feature has none
+      expect(mockSaveFeatureSummaryFn).toHaveBeenCalledWith(
+        '/test/project',
+        'feature-1',
+        'Test summary'
+      );
+    });
+
+    it('does not overwrite summary when feature has empty string summary (treats as no summary)', async () => {
+      // Empty string is falsy, so it should be treated as "no summary" and a new one should be saved
+      const featureWithEmptySummary: Feature = {
+        ...testFeature,
+        summary: '',
+      };
+
+      vi.mocked(secureFs.readFile).mockResolvedValue(
+        '🔧 Tool: Edit\nInput: {"file_path": "/src/index.ts"}\n\n<summary>New summary</summary>'
+      );
+
+      const svc = createServiceWithCustomLoad(featureWithEmptySummary);
+      await svc.executeFeature('/test/project', 'feature-1');
+
+      // Empty string is falsy, so it should save a new summary
+      expect(mockSaveFeatureSummaryFn).toHaveBeenCalledWith(
+        '/test/project',
+        'feature-1',
+        'Test summary'
+      );
+    });
+
+    it('preserves accumulated summary when feature is transitioned from pipeline to verified', async () => {
+      // This is the key scenario: feature went through pipeline steps, accumulated a summary,
+      // then status changed to 'verified' - we should NOT overwrite the accumulated summary
+      const featureWithAccumulatedSummary: Feature = {
+        ...testFeature,
+        status: 'verified',
+        summary:
+          '### Implementation\n\nCreated auth module\n\n---\n\n### Code Review\n\nApproved\n\n---\n\n### Testing\n\nAll tests pass',
+      };
+
+      vi.mocked(secureFs.readFile).mockResolvedValue('Agent output with summary');
+
+      const svc = createServiceWithCustomLoad(featureWithAccumulatedSummary);
+      await svc.executeFeature('/test/project', 'feature-1');
+
+      // The accumulated summary should be preserved
+      expect(mockSaveFeatureSummaryFn).not.toHaveBeenCalled();
+    });
   });
 
   describe('executeFeature - agent output validation', () => {

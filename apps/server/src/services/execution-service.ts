@@ -461,7 +461,10 @@ Please continue from where you left off and complete all remaining tasks. Use th
       const hasIncompleteTasks = totalTasks > 0 && completedTasks < totalTasks;
 
       try {
-        if (agentOutput) {
+        // Only save summary if feature doesn't already have one (e.g., accumulated from pipeline steps)
+        // This prevents overwriting accumulated summaries with just the last step's output
+        // The agent-executor already extracts and saves summaries during execution
+        if (agentOutput && !completedFeature?.summary) {
           const summary = extractSummary(agentOutput);
           if (summary) await this.saveFeatureSummaryFn(projectPath, featureId, summary);
         }

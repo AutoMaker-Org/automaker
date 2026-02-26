@@ -207,12 +207,21 @@ Let me begin by...
 
   describe('detectTaskCompleteMarker', () => {
     it('should detect task complete marker and return task ID', () => {
-      expect(detectTaskCompleteMarker('[TASK_COMPLETE] T001')).toBe('T001');
-      expect(detectTaskCompleteMarker('[TASK_COMPLETE] T042')).toBe('T042');
+      expect(detectTaskCompleteMarker('[TASK_COMPLETE] T001')).toEqual({
+        id: 'T001',
+        summary: undefined,
+      });
+      expect(detectTaskCompleteMarker('[TASK_COMPLETE] T042')).toEqual({
+        id: 'T042',
+        summary: undefined,
+      });
     });
 
     it('should handle marker with summary', () => {
-      expect(detectTaskCompleteMarker('[TASK_COMPLETE] T001: User model created')).toBe('T001');
+      expect(detectTaskCompleteMarker('[TASK_COMPLETE] T001: User model created')).toEqual({
+        id: 'T001',
+        summary: 'User model created',
+      });
     });
 
     it('should return null when no marker present', () => {
@@ -229,7 +238,28 @@ Done with the implementation:
 
 Moving on to...
 `;
-      expect(detectTaskCompleteMarker(accumulated)).toBe('T003');
+      expect(detectTaskCompleteMarker(accumulated)).toEqual({
+        id: 'T003',
+        summary: 'Database setup complete',
+      });
+    });
+
+    it('should find marker in the middle of a stream with trailing text', () => {
+      const streamText =
+        'The implementation is complete! [TASK_COMPLETE] T001: Added user model and tests. Now let me check the next task...';
+      expect(detectTaskCompleteMarker(streamText)).toEqual({
+        id: 'T001',
+        summary: 'Added user model and tests. Now let me check the next task...',
+      });
+    });
+
+    it('should find marker in the middle of a stream with multiple tasks and return the FIRST match', () => {
+      const streamText =
+        '[TASK_COMPLETE] T001: Task one done. Continuing... [TASK_COMPLETE] T002: Task two done. Moving on...';
+      expect(detectTaskCompleteMarker(streamText)).toEqual({
+        id: 'T001',
+        summary: 'Task one done. Continuing...',
+      });
     });
 
     it('should not confuse with TASK_START marker', () => {
@@ -635,6 +665,86 @@ Second paragraph of summary.
 ## Other
 `;
         expect(extractSummary(text)).toBe('First paragraph of summary.');
+      });
+    });
+
+    describe('pipeline accumulated output (multiple <summary> tags)', () => {
+      it('should return only the LAST summary tag from accumulated pipeline output', () => {
+        // Documents WHY the UI needs server-side feature.summary:
+        // When pipeline steps accumulate raw output in agent-output.md, each step
+        // writes its own <summary> tag. extractSummary takes only the LAST match,
+        // losing all previous steps' summaries.
+        const accumulatedOutput = `
+## Step 1: Code Review
+
+Some review output...
+
+<summary>
+## Code Review Summary
+- Found 3 issues
+- Suggested 2 improvements
+</summary>
+
+---
+
+## Follow-up Session
+
+## Step 2: Testing
+
+Running tests...
+
+<summary>
+## Testing Summary
+- All 15 tests pass
+- Coverage at 92%
+</summary>
+`;
+        const result = extractSummary(accumulatedOutput);
+        // Only the LAST summary tag is returned - the Code Review summary is lost
+        expect(result).toBe('## Testing Summary\n- All 15 tests pass\n- Coverage at 92%');
+        expect(result).not.toContain('Code Review');
+      });
+
+      it('should return only the LAST summary from three pipeline steps', () => {
+        const accumulatedOutput = `
+<summary>Step 1: Implementation complete</summary>
+
+---
+
+## Follow-up Session
+
+<summary>Step 2: Code review findings</summary>
+
+---
+
+## Follow-up Session
+
+<summary>Step 3: All tests passing</summary>
+`;
+        const result = extractSummary(accumulatedOutput);
+        expect(result).toBe('Step 3: All tests passing');
+        expect(result).not.toContain('Step 1');
+        expect(result).not.toContain('Step 2');
+      });
+
+      it('should handle accumulated output where only one step has a summary tag', () => {
+        const accumulatedOutput = `
+## Step 1: Implementation
+Some raw output without summary tags...
+
+---
+
+## Follow-up Session
+
+## Step 2: Testing
+
+<summary>
+## Test Results
+- All tests pass
+</summary>
+`;
+        const result = extractSummary(accumulatedOutput);
+        expect(result).toBe('## Test Results\n- All tests pass');
       });
     });
   });

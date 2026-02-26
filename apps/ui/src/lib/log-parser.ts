@@ -1246,8 +1246,236 @@ export function extractSummary(rawOutput: string): string | null {
 }
 
 /**
- * Gets the color classes for a log entry type
+ * Parses an accumulated summary string into individual phase summaries.
+ *
+ * The accumulated summary format uses markdown headers with `###` for phase names
+ * and `---` as separators between phases:
+ *
+ * ```
+ * ### Implementation
+ *
+ * [content]
+ *
+ * ---
+ *
+ * ### Testing
+ *
+ * [content]
+ * ```
+ *
+ * @param summary - The accumulated summary string to parse
+ * @returns A map of phase names (lowercase) to their content, or empty map if not parseable
  */
+const PHASE_SEPARATOR = '\n\n---\n\n';
+const PHASE_SEPARATOR_REGEX = /\n\n---\n\n/;
+const PHASE_HEADER_REGEX = /^###\s+(.+?)(?:\n|$)/;
+const PHASE_HEADER_WITH_PREFIX_REGEX = /^(###\s+)(.+?)(?:\n|$)/;
+
+function getPhaseSections(summary: string): {
+  sections: string[];
+  leadingImplementationSection: string | null;
+} {
+  const sections = summary.split(PHASE_SEPARATOR_REGEX);
+  const hasSeparator = summary.includes(PHASE_SEPARATOR);
+  const hasAnyHeader = sections.some((section) => PHASE_HEADER_REGEX.test(section.trim()));
+  const firstSection = sections[0]?.trim() ?? '';
+  const leadingImplementationSection =
+    hasSeparator && hasAnyHeader && firstSection && !PHASE_HEADER_REGEX.test(firstSection)
+      ? firstSection
+      : null;
+
+  return { sections, leadingImplementationSection };
+}
+
+export function parsePhaseSummaries(summary: string | undefined): Map<string, string> {
+  const phaseSummaries = new Map<string, string>();
+
+  if (!summary || !summary.trim()) {
+    return phaseSummaries;
+  }
+
+  const { sections, leadingImplementationSection } = getPhaseSections(summary);
+
+  // Backward compatibility for mixed format:
+  // [implementation summary without header] + --- + [### Pipeline Step ...]
+  // Treat the leading headerless section as "Implementation".
+  if (leadingImplementationSection) {
+    phaseSummaries.set('implementation', leadingImplementationSection);
+  }
+
+  for (const section of sections) {
+    // Match the phase header pattern: ### Phase Name
+    const headerMatch = section.match(PHASE_HEADER_REGEX);
+    if (headerMatch) {
+      const phaseName = headerMatch[1].trim().toLowerCase();
+      // Extract content after the header (skip the header line and leading newlines)
+      const content = section.substring(headerMatch[0].length).trim();
+      phaseSummaries.set(phaseName, content);
+    }
+  }
+
+  return phaseSummaries;
+}
+
+/**
+ * Extracts a specific phase summary from an accumulated summary string.
+ *
+ * @param summary - The accumulated summary string
+ * @param phaseName - The phase name to extract (case-insensitive, e.g., "Implementation", "implementation")
+ * @returns The content for the specified phase, or null if not found
+ */
+export function extractPhaseSummary(summary: string | undefined, phaseName: string): string | null {
+  const phaseSummaries = parsePhaseSummaries(summary);
+  const normalizedPhaseName = phaseName.toLowerCase();
+  return phaseSummaries.get(normalizedPhaseName) || null;
+}
+
+/**
+ * Gets the implementation phase summary from an accumulated summary string.
+ *
+ * This is a convenience function that handles various naming conventions:
+ * - "implementation"
+ * - "Implementation"
+ * - Any phase that contains "implement" in its name
+ *
+ * @param summary - The accumulated summary string
+ * @returns The implementation phase content, or null if not found
+ */
+export function extractImplementationSummary(summary: string | undefined): string | null {
+  if (!summary || !summary.trim()) {
+    return null;
+  }
+
+  const phaseSummaries = parsePhaseSummaries(summary);
+
+  // Try exact match first
+  const implementationContent = phaseSummaries.get('implementation');
+  if (implementationContent) {
+    return implementationContent;
+  }
+
+  // Fallback: find any phase containing "implement"
+  for (const [phaseName, content] of phaseSummaries) {
+    if (phaseName.includes('implement')) {
+      return content;
+    }
+  }
+
+  // If no phase summaries found, the summary might not be in accumulated format
+  // (legacy or non-pipeline feature). In this case, return the whole summary
+  // if it looks like a single summary (no phase headers).
+  if (!summary.includes('### ') && !summary.includes(PHASE_SEPARATOR)) {
+    return summary;
+  }
+
+  return null;
+}
+
+/**
+ * Checks if a summary string is in the accumulated multi-phase format.
+ *
+ * @param summary - The summary string to check
+ * @returns True if the summary has multiple phases, false otherwise
+ */
+export function isAccumulatedSummary(summary: string | undefined): boolean {
+  if (!summary || !summary.trim()) {
+    return false;
+  }
+
+  // Check for the presence of phase headers with separator
+  const hasMultiplePhases =
+    summary.includes(PHASE_SEPARATOR) && summary.match(/###\s+.+/g)?.length > 0;
+
+  return hasMultiplePhases;
+}
+
+/**
+ * Represents a single phase entry in an accumulated summary.
+ */
+export interface PhaseSummaryEntry {
+  /** The phase name (e.g., "Implementation", "Testing", "Code Review") */
+  phaseName: string;
+  /** The content of this phase's summary */
+  content: string;
+  /** The original header line (e.g., "### Implementation") */
+  header: string;
+}
+
+/** Default phase name used for non-accumulated summaries */
+const DEFAULT_PHASE_NAME = 'Summary';
+
+/**
+ * Parses an accumulated summary into individual phase entries.
+ * Returns phases in the order they appear in the summary.
+ *
+ * The accumulated summary format:
+ * ```
+ * ### Implementation
+ *
+ * [content]
+ *
+ * ---
+ *
+ * ### Testing
+ *
+ * [content]
+ * ```
+ *
+ * @param summary - The accumulated summary string to parse
+ * @returns Array of PhaseSummaryEntry objects, or empty array if not parseable
+ */
+export function parseAllPhaseSummaries(summary: string | undefined): PhaseSummaryEntry[] {
+  const entries: PhaseSummaryEntry[] = [];
+
+  if (!summary || !summary.trim()) {
+    return entries;
+  }
+
+  // Check if this is an accumulated summary (has phase headers at line starts)
+  // Use a more precise check: ### must be at the start of a line (not just anywhere in content)
+  const hasPhaseHeaders = /^###\s+/m.test(summary);
+  if (!hasPhaseHeaders) {
+    // Not an accumulated summary - return as single entry with generic name
+    return [
+      { phaseName: DEFAULT_PHASE_NAME, content: summary, header: `### ${DEFAULT_PHASE_NAME}` },
+    ];
+  }
+
+  const { sections, leadingImplementationSection } = getPhaseSections(summary);
+
+  // Backward compatibility for mixed format:
+  // [implementation summary without header] + --- + [### Pipeline Step ...]
+  if (leadingImplementationSection) {
+    entries.push({
+      phaseName: 'Implementation',
+      content: leadingImplementationSection,
+      header: '### Implementation',
+    });
+  }
+
+  for (const section of sections) {
+    // Match the phase header pattern: ### Phase Name
+    const headerMatch = section.match(PHASE_HEADER_WITH_PREFIX_REGEX);
+    if (headerMatch) {
+      const header = headerMatch[0].trim();
+      const phaseName = headerMatch[2].trim();
+      // Extract content after the header (skip the header line and leading newlines)
+      const content = section.substring(headerMatch[0].length).trim();
+      entries.push({ phaseName, content, header });
+    }
+  }
+
+  // Fallback: if we detected phase headers but couldn't parse any entries,
+  // treat the entire summary as a single entry to avoid showing "No summary available"
+  if (entries.length === 0) {
+    return [
+      { phaseName: DEFAULT_PHASE_NAME, content: summary, header: `### ${DEFAULT_PHASE_NAME}` },
+    ];
+  }
+
+  return entries;
+}
+
 export function getLogTypeColors(type: LogEntryType): {
   bg: string;
   border: string;

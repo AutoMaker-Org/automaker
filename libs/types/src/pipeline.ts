@@ -19,6 +19,13 @@ export interface PipelineConfig {
 
 export type PipelineStatus = `pipeline_${string}`;
 
+/**
+ * Type guard to check if a status string represents a pipeline stage.
+ */
+export function isPipelineStatus(status: string | null | undefined): status is PipelineStatus {
+  return typeof status === 'string' && status.startsWith('pipeline_');
+}
+
 export type FeatureStatusWithPipeline =
   | 'backlog'
   | 'ready'
@@ -28,3 +35,6 @@ export type FeatureStatusWithPipeline =
   | 'verified'
   | 'completed'
   | PipelineStatus;
+
+export const PIPELINE_SUMMARY_SEPARATOR = '\n\n---\n\n';
+export const PIPELINE_SUMMARY_HEADER_PREFIX = '### ';
