@@ -115,6 +115,7 @@ export class PipelineOrchestrator {
         projectPath,
       });
       const model = resolveModelString(feature.model, DEFAULT_MODELS.claude);
+      const currentStatus = `pipeline_${step.id}`;
       await this.runAgentFn(
         workDir,
         featureId,
@@ -133,6 +134,7 @@ export class PipelineOrchestrator {
           useClaudeCodeSystemPrompt,
           thinkingLevel: feature.thinkingLevel,
           reasoningEffort: feature.reasoningEffort,
+          status: currentStatus,
         }
       );
       try {
@@ -502,6 +504,7 @@ export class PipelineOrchestrator {
             useClaudeCodeSystemPrompt: context.useClaudeCodeSystemPrompt,
             autoLoadClaudeMd: context.autoLoadClaudeMd,
             reasoningEffort: context.feature.reasoningEffort,
+            status: context.feature.status,
           }
         );
       }

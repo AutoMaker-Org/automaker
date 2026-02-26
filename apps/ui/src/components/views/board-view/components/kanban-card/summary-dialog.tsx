@@ -53,13 +53,24 @@ function PhaseEntryCard({
   isActive?: boolean;
   onClick?: () => void;
 }) {
+  const handleKeyDown = (event: React.KeyboardEvent) => {
+    if (onClick && (event.key === 'Enter' || event.key === ' ')) {
+      event.preventDefault();
+      onClick();
+    }
+  };
+
   return (
     <div
       className={cn(
         'p-4 bg-card rounded-lg border border-border/50 transition-all',
-        isActive && 'ring-2 ring-primary/50 border-primary/50'
+        isActive && 'ring-2 ring-primary/50 border-primary/50',
+        onClick && 'cursor-pointer'
       )}
       onClick={onClick}
+      onKeyDown={handleKeyDown}
+      role={onClick ? 'button' : undefined}
+      tabIndex={onClick ? 0 : undefined}
     >
       {/* Phase header - styled to stand out */}
       <div className="flex items-center gap-2 mb-3 pb-2 border-b border-border/30">
@@ -168,16 +179,18 @@ export function SummaryDialog({
     setActivePhaseIndex(0);
   }, [rawSummary]);
 
-  // Scroll to active phase when it changes
+  // Scroll to active phase when it changes or when rawSummary changes
   useEffect(() => {
     if (contentRef.current && hasMultiplePhases) {
       const phaseCards = contentRef.current.querySelectorAll('[data-phase-index]');
-      const targetCard = phaseCards[activePhaseIndex];
+      // Ensure index is within bounds
+      const safeIndex = Math.min(activePhaseIndex, phaseCards.length - 1);
+      const targetCard = phaseCards[safeIndex];
       if (targetCard) {
         targetCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }
     }
-  }, [activePhaseIndex, hasMultiplePhases]);
+  }, [activePhaseIndex, hasMultiplePhases, rawSummary]);
 
   // Determine the dialog title based on number of phases
   const dialogTitle = hasMultiplePhases

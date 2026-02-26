@@ -106,6 +106,61 @@ function isAccumulatedSummary(summary: string | undefined): boolean {
   return summary.includes('\n\n---\n\n') && (summary.match(/###\s+.+/g)?.length ?? 0) > 0;
 }
 
+/**
+ * Returns the first summary candidate that contains non-whitespace content.
+ * Mirrors getFirstNonEmptySummary from apps/ui/src/lib/summary-selection.ts
+ */
+function getFirstNonEmptySummary(...candidates: (string | null | undefined)[]): string | null {
+  for (const candidate of candidates) {
+    if (typeof candidate === 'string' && candidate.trim().length > 0) {
+      return candidate;
+    }
+  }
+  return null;
+}
+
+// ============================================================================
+// Unit tests for helper functions
+// ============================================================================
+
+describe('getFirstNonEmptySummary', () => {
+  it('should return the first non-empty string', () => {
+    expect(getFirstNonEmptySummary(null, undefined, 'first', 'second')).toBe('first');
+  });
+
+  it('should skip null and undefined candidates', () => {
+    expect(getFirstNonEmptySummary(null, undefined, 'valid')).toBe('valid');
+  });
+
+  it('should skip whitespace-only strings', () => {
+    expect(getFirstNonEmptySummary('   ', '\n\t', 'actual content')).toBe('actual content');
+  });
+
+  it('should return null when all candidates are empty', () => {
+    expect(getFirstNonEmptySummary(null, undefined, '', '   ')).toBeNull();
+  });
+
+  it('should return null when no candidates provided', () => {
+    expect(getFirstNonEmptySummary()).toBeNull();
+  });
+
+  it('should handle empty string as invalid', () => {
+    expect(getFirstNonEmptySummary('', 'valid')).toBe('valid');
+  });
+
+  it('should prefer first valid candidate', () => {
+    expect(getFirstNonEmptySummary('first', 'second', 'third')).toBe('first');
+  });
+
+  it('should handle strings with only spaces as invalid', () => {
+    expect(getFirstNonEmptySummary('     ', '   \n  ', 'valid')).toBe('valid');
+  });
+
+  it('should accept strings with content surrounded by whitespace', () => {
+    expect(getFirstNonEmptySummary('  content with spaces  ')).toBe('  content with spaces  ');
+  });
+});
+
 describe('Agent Output Summary E2E Flow', () => {
   let manager: FeatureStateManager;
   let mockEvents: EventEmitter;
@@ -321,8 +376,8 @@ Working on tests...
 </summary>
 `;
 
-      // UI logic: feature?.summary || extractSummary(output)
-      const displaySummary = featureSummary || extractSummary(rawOutput);
+      // UI logic: getFirstNonEmptySummary(feature?.summary, extractSummary(output))
+      const displaySummary = getFirstNonEmptySummary(featureSummary, extractSummary(rawOutput));
 
       // Should use server-accumulated summary
       expect(displaySummary).toBe(featureSummary);
@@ -348,8 +403,8 @@ Working on tests...
 </summary>
 `;
 
-      // UI logic: feature?.summary || extractSummary(output)
-      const displaySummary = featureSummary || extractSummary(rawOutput);
+      // UI logic: getFirstNonEmptySummary(feature?.summary, extractSummary(output))
+      const displaySummary = getFirstNonEmptySummary(featureSummary, extractSummary(rawOutput));
 
       // Should fall back to client-side extraction
       expect(displaySummary).toContain('Implementation Complete');
@@ -496,7 +551,7 @@ Working on tests...
  *    - Feature is refetched with updated summary
  *
  * 4. UI DISPLAY:
- *    - AgentOutputModal uses: feature?.summary || extractSummary(output)
+ *    - AgentOutputModal uses: getFirstNonEmptySummary(feature?.summary, extractSummary(output))
  *    - feature.summary is preferred (contains all steps)
  *    - extractSummary() is fallback (last summary only)
  *    - parsePhaseSummaries() can split into individual phases for UI

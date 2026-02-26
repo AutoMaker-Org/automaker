@@ -234,7 +234,7 @@ export const AgentInfoPanel = memo(function AgentInfoPanel({
         return {
           content: task.description,
           status: effectiveStatus,
-          summary: realtimeSummary || task.summary,
+          summary: realtimeSummary ?? task.summary,
         };
       });
     }
@@ -293,10 +293,15 @@ export const AgentInfoPanel = memo(function AgentInfoPanel({
               return newMap;
             });
 
-            if ('summary' in event && event.summary) {
+            if ('summary' in event) {
               setTaskSummaryMap((prev) => {
                 const newMap = new Map(prev);
-                newMap.set(taskEvent.taskId, event.summary as string);
+                // Allow empty string (reset) or non-empty string to be set
+                const summary =
+                  typeof event.summary === 'string' && event.summary.trim().length > 0
+                    ? event.summary
+                    : null;
+                newMap.set(taskEvent.taskId, summary);
                 return newMap;
               });
             }

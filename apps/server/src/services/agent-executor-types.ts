@@ -44,6 +44,8 @@ export interface AgentExecutionOptions {
   specAlreadyDetected?: boolean;
   existingApprovedPlanContent?: string;
   persistedTasks?: ParsedTask[];
+  /** Feature status - used to check if pipeline summary extraction is required */
+  status?: string;
 }
 
 export interface AgentExecutionResult {

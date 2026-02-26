@@ -253,6 +253,7 @@ export class AutoModeServiceFacade {
           thinkingLevel?: ThinkingLevel;
           reasoningEffort?: ReasoningEffort;
           branchName?: string | null;
+          status?: string; // Feature status for pipeline summary check
           [key: string]: unknown;
         }
       ): Promise<void> => {
@@ -336,6 +337,7 @@ export class AutoModeServiceFacade {
             thinkingLevel: opts?.thinkingLevel as ThinkingLevel | undefined,
             reasoningEffort: opts?.reasoningEffort as ReasoningEffort | undefined,
             branchName: opts?.branchName as string | null | undefined,
+            status: opts?.status as string | undefined,
             provider,
             effectiveBareModel,
             credentials,

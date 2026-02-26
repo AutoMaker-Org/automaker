@@ -20,10 +20,14 @@ export interface PipelineConfig {
 export type PipelineStatus = `pipeline_${string}`;
 
 /**
- * Type guard to check if a status string represents a pipeline stage.
+ * Type guard to check if a status string represents a valid pipeline stage.
+ * Requires the 'pipeline_' prefix followed by at least one character.
  */
 export function isPipelineStatus(status: string | null | undefined): status is PipelineStatus {
-  return typeof status === 'string' && status.startsWith('pipeline_');
+  if (typeof status !== 'string') return false;
+  // Require 'pipeline_' prefix with at least one character after it
+  const prefix = 'pipeline_';
+  return status.startsWith(prefix) && status.length > prefix.length;
 }
 
 export type FeatureStatusWithPipeline =

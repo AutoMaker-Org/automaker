@@ -62,13 +62,24 @@ function PhaseEntryCard({
   isActive?: boolean;
   onClick?: () => void;
 }) {
+  const handleKeyDown = (event: React.KeyboardEvent) => {
+    if (onClick && (event.key === 'Enter' || event.key === ' ')) {
+      event.preventDefault();
+      onClick();
+    }
+  };
+
   return (
     <div
       className={cn(
         'p-4 bg-card rounded-lg border border-border/50 transition-all',
-        isActive && 'ring-2 ring-primary/50 border-primary/50'
+        isActive && 'ring-2 ring-primary/50 border-primary/50',
+        onClick && 'cursor-pointer'
       )}
       onClick={onClick}
+      onKeyDown={handleKeyDown}
+      role={onClick ? 'button' : undefined}
+      tabIndex={onClick ? 0 : undefined}
     >
       <div className="flex items-center gap-2 mb-3 pb-2 border-b border-border/30">
         <span className="text-sm font-semibold text-primary">{entry.phaseName}</span>
@@ -223,14 +234,14 @@ export function AgentOutputModal({
 
   // Auto-scroll to bottom when summary changes (for pipeline step accumulation)
   const summaryScrollRef = useRef<HTMLDivElement>(null);
-  const summaryAutoScrollRef = useRef(true);
+  const [summaryAutoScroll, setSummaryAutoScroll] = useState(true);
 
   // Auto-scroll summary panel to bottom when summary is updated
   useEffect(() => {
-    if (summaryAutoScrollRef.current && summaryScrollRef.current && summary) {
+    if (summaryAutoScroll && summaryScrollRef.current && summary) {
       summaryScrollRef.current.scrollTop = summaryScrollRef.current.scrollHeight;
     }
-  }, [summary]);
+  }, [summary, summaryAutoScroll]);
 
   // Handle scroll to detect if user scrolled up in summary panel
   const handleSummaryScroll = () => {
@@ -238,19 +249,21 @@ export function AgentOutputModal({
 
     const { scrollTop, scrollHeight, clientHeight } = summaryScrollRef.current;
     const isAtBottom = scrollHeight - scrollTop - clientHeight < 50;
-    summaryAutoScrollRef.current = isAtBottom;
+    setSummaryAutoScroll(isAtBottom);
   };
 
-  // Scroll to active phase when it changes
+  // Scroll to active phase when it changes or when summary changes
   useEffect(() => {
     if (summaryScrollRef.current && hasMultiplePhases) {
       const phaseCards = summaryScrollRef.current.querySelectorAll('[data-phase-index]');
-      const targetCard = phaseCards[activePhaseIndex];
+      // Ensure index is within bounds
+      const safeIndex = Math.min(activePhaseIndex, phaseCards.length - 1);
+      const targetCard = phaseCards[safeIndex];
       if (targetCard) {
         targetCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }
     }
-  }, [activePhaseIndex, hasMultiplePhases]);
+  }, [activePhaseIndex, hasMultiplePhases, summary]);
 
   // Listen to auto mode events and update output
   useEffect(() => {
@@ -624,7 +637,7 @@ export function AgentOutputModal({
             </div>
 
             <div className="text-xs text-muted-foreground text-center shrink-0">
-              {summaryAutoScrollRef.current
+              {summaryAutoScroll
                 ? 'Auto-scrolling enabled'
                 : 'Scroll to bottom to enable auto-scroll'}
             </div>

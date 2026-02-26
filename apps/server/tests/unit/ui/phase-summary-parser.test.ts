@@ -9,12 +9,23 @@
  *
  * The accumulated summary format uses markdown headers with `###` for phase names
  * and `---` as separators between phases.
+ *
+ * TODO: These test helper functions are mirrored from apps/ui/src/lib/log-parser.ts
+ * because server-side tests cannot import from the UI module. If the production
+ * implementation changes, these tests may pass while production fails.
+ * Consider adding an integration test that validates the actual UI parsing behavior.
  */
 
 import { describe, it, expect } from 'vitest';
 
-// Mirror the phase summary parsing functions from apps/ui/src/lib/log-parser.ts
-// We can't import directly because it's a UI file
+// ============================================================================
+// MIRRORED FUNCTIONS from apps/ui/src/lib/log-parser.ts
+// ============================================================================
+// NOTE: These functions are mirrored from the UI implementation because
+// server-side tests cannot import from apps/ui/. Keep these in sync with the
+// production implementation. The UI implementation includes additional
+// handling for getPhaseSections/leadingImplementationSection for backward
+// compatibility with mixed formats.
 
 /**
  * Parses an accumulated summary string into individual phase summaries.

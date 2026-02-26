@@ -593,27 +593,29 @@ export class FeatureStateManager {
 
         if (feature.summary) {
           // Check if this step already exists in the summary (e.g., if retried)
-          // Use regex to find the section for this step
-          const escapedStepHeader = stepHeader.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-          // The separator is actual newlines: \n\n---\n\n
-          // We need to escape it for regex: match literal \n as \\n in the pattern
-          const escapedSeparator = '\\n\\n---\\n\\n';
+          // Use string operations to avoid ReDoS vulnerability from regex
+          const separator = '\n\n---\n\n';
+          const headerWithNewline = stepHeader + '\n\n';
+          const headerIndex = feature.summary.indexOf(headerWithNewline);
 
-          // Regex finds the header and everything until the next separator or end of string
-          const stepRegex = new RegExp(
-            `(${escapedStepHeader}\\n\\n[\\s\\S]*?)(?=${escapedSeparator}|$)`,
-            'g'
-          );
+          if (headerIndex !== -1) {
+            // Found existing section - find its end (next separator or end of string)
+            const afterHeader = headerIndex + headerWithNewline.length;
+            const nextSeparatorIndex = feature.summary.indexOf(separator, afterHeader);
+            const sectionEnd =
+              nextSeparatorIndex !== -1 ? nextSeparatorIndex : feature.summary.length;
 
-          if (stepRegex.test(feature.summary)) {
-            // Replace the existing section
-            feature.summary = feature.summary.replace(stepRegex, stepSection);
+            // Replace the existing section with the new one
+            feature.summary =
+              feature.summary.substring(0, headerIndex) +
+              stepSection +
+              feature.summary.substring(sectionEnd);
             logger.info(
               `[saveFeatureSummary] Updated existing pipeline step summary for feature ${featureId}: step="${stepName}"`
             );
           } else {
             // Append as a new section
-            feature.summary = `${feature.summary}\n\n---\n\n${stepSection}`;
+            feature.summary = `${feature.summary}${separator}${stepSection}`;
             logger.info(
               `[saveFeatureSummary] Appended new pipeline step summary for feature ${featureId}: step="${stepName}"`
             );

@@ -873,6 +873,78 @@ describe('FeatureStateManager', () => {
       ).toBe(1);
     });
 
+    it('should replace last step summary without trailing separator', async () => {
+      // Test case: replacing the last step which has no separator after it
+      const existingSummary = `${PIPELINE_SUMMARY_HEADER_PREFIX}Implementation\n\nInitial code${PIPELINE_SUMMARY_SEPARATOR}${PIPELINE_SUMMARY_HEADER_PREFIX}Testing\n\nFirst test run`;
+      (pipelineService.getStep as Mock).mockResolvedValue({ name: 'Testing', id: 'step2' });
+      (readJsonWithRecovery as Mock).mockResolvedValue({
+        data: { ...mockFeature, status: 'pipeline_step2', summary: existingSummary },
+        recovered: false,
+        source: 'main',
+      });
+
+      await manager.saveFeatureSummary('/project', 'feature-123', 'All tests pass');
+
+      const savedFeature = (atomicWriteJson as Mock).mock.calls[0][1] as Feature;
+      expect(savedFeature.summary).toBe(
+        `${PIPELINE_SUMMARY_HEADER_PREFIX}Implementation\n\nInitial code${PIPELINE_SUMMARY_SEPARATOR}${PIPELINE_SUMMARY_HEADER_PREFIX}Testing\n\nAll tests pass`
+      );
+    });
+
+    it('should replace first step summary with separator after it', async () => {
+      // Test case: replacing the first step which has a separator after it
+      const existingSummary = `${PIPELINE_SUMMARY_HEADER_PREFIX}Implementation\n\nFirst attempt${PIPELINE_SUMMARY_SEPARATOR}${PIPELINE_SUMMARY_HEADER_PREFIX}Testing\n\nAll tests pass`;
+      (pipelineService.getStep as Mock).mockResolvedValue({ name: 'Implementation', id: 'step1' });
+      (readJsonWithRecovery as Mock).mockResolvedValue({
+        data: { ...mockFeature, status: 'pipeline_step1', summary: existingSummary },
+        recovered: false,
+        source: 'main',
+      });
+
+      await manager.saveFeatureSummary('/project', 'feature-123', 'Second attempt');
+
+      const savedFeature = (atomicWriteJson as Mock).mock.calls[0][1] as Feature;
+      expect(savedFeature.summary).toBe(
+        `${PIPELINE_SUMMARY_HEADER_PREFIX}Implementation\n\nSecond attempt${PIPELINE_SUMMARY_SEPARATOR}${PIPELINE_SUMMARY_HEADER_PREFIX}Testing\n\nAll tests pass`
+      );
+    });
+
+    it('should handle step name with special regex characters safely', async () => {
+      // Test case: step name contains characters that would break regex
+      const existingSummary = `${PIPELINE_SUMMARY_HEADER_PREFIX}Code (Review)\n\nFirst attempt`;
+      (pipelineService.getStep as Mock).mockResolvedValue({ name: 'Code (Review)', id: 'step1' });
+      (readJsonWithRecovery as Mock).mockResolvedValue({
+        data: { ...mockFeature, status: 'pipeline_step1', summary: existingSummary },
+        recovered: false,
+        source: 'main',
+      });
+
+      await manager.saveFeatureSummary('/project', 'feature-123', 'Second attempt');
+
+      const savedFeature = (atomicWriteJson as Mock).mock.calls[0][1] as Feature;
+      expect(savedFeature.summary).toBe(
+        `${PIPELINE_SUMMARY_HEADER_PREFIX}Code (Review)\n\nSecond attempt`
+      );
+    });
+
+    it('should handle step name with brackets safely', async () => {
+      // Test case: step name contains array-like syntax [0]
+      const existingSummary = `${PIPELINE_SUMMARY_HEADER_PREFIX}Step [0]\n\nFirst attempt`;
+      (pipelineService.getStep as Mock).mockResolvedValue({ name: 'Step [0]', id: 'step1' });
+      (readJsonWithRecovery as Mock).mockResolvedValue({
+        data: { ...mockFeature, status: 'pipeline_step1', summary: existingSummary },
+        recovered: false,
+        source: 'main',
+      });
+
+      await manager.saveFeatureSummary('/project', 'feature-123', 'Second attempt');
+
+      const savedFeature = (atomicWriteJson as Mock).mock.calls[0][1] as Feature;
+      expect(savedFeature.summary).toBe(
+        `${PIPELINE_SUMMARY_HEADER_PREFIX}Step [0]\n\nSecond attempt`
+      );
+    });
+
     it('should handle pipelineService.getStepIdFromStatus throwing an error gracefully', async () => {
       (pipelineService.getStepIdFromStatus as Mock).mockImplementation(() => {
         throw new Error('Config not found');

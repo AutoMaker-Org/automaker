@@ -9,8 +9,8 @@ describe('isPipelineStatus', () => {
     expect(isPipelineStatus('pipeline_complete')).toBe(true);
   });
 
-  it('should return true for pipeline_ prefix with any suffix', () => {
-    expect(isPipelineStatus('pipeline_')).toBe(true);
+  it('should return true for pipeline_ prefix with any non-empty suffix', () => {
+    expect(isPipelineStatus('pipeline_')).toBe(false); // Empty suffix is invalid
     expect(isPipelineStatus('pipeline_123')).toBe(true);
     expect(isPipelineStatus('pipeline_step_abc_123')).toBe(true);
   });

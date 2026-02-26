@@ -270,6 +270,44 @@ Moving on to...
       expect(detectTaskCompleteMarker('[TASK_COMPLETE] TASK1')).toBeNull();
       expect(detectTaskCompleteMarker('[TASK_COMPLETE] T1')).toBeNull();
     });
+
+    it('should allow brackets in summary text', () => {
+      // Regression test: summaries containing array[index] syntax should not be truncated
+      expect(
+        detectTaskCompleteMarker('[TASK_COMPLETE] T001: Supports array[index] access syntax')
+      ).toEqual({
+        id: 'T001',
+        summary: 'Supports array[index] access syntax',
+      });
+    });
+
+    it('should handle summary with multiple brackets', () => {
+      expect(
+        detectTaskCompleteMarker('[TASK_COMPLETE] T042: Fixed bug in data[0].items[key] mapping')
+      ).toEqual({
+        id: 'T042',
+        summary: 'Fixed bug in data[0].items[key] mapping',
+      });
+    });
+
+    it('should stop at newline in summary', () => {
+      const result = detectTaskCompleteMarker(
+        '[TASK_COMPLETE] T001: First line\nSecond line without marker'
+      );
+      expect(result).toEqual({
+        id: 'T001',
+        summary: 'First line',
+      });
+    });
+
+    it('should stop at next TASK_START marker', () => {
+      expect(
+        detectTaskCompleteMarker('[TASK_COMPLETE] T001: Summary text[TASK_START] T002')
+      ).toEqual({
+        id: 'T001',
+        summary: 'Summary text',
+      });
+    });
   });
 
   describe('detectPhaseCompleteMarker', () => {

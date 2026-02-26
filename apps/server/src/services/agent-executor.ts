@@ -92,6 +92,7 @@ export class AgentExecutor {
       existingApprovedPlanContent,
       persistedTasks,
       credentials,
+      status, // Feature status for pipeline summary check
       claudeCompatibleProvider,
       mcpServers,
       sdkSessionId,
@@ -215,7 +216,8 @@ export class AgentExecutor {
         featureId,
         result.responseText,
         previousContent,
-        callbacks
+        callbacks,
+        status
       );
 
       return {
@@ -359,7 +361,8 @@ export class AgentExecutor {
       featureId,
       responseText,
       previousContent,
-      callbacks
+      callbacks,
+      status
     );
 
     return { responseText, specDetected, tasksCompleted, aborted };
@@ -374,7 +377,8 @@ export class AgentExecutor {
     featureId: string,
     responseText: string,
     previousContent: string | undefined,
-    callbacks: AgentExecutorCallbacks
+    callbacks: AgentExecutorCallbacks,
+    status?: string
   ): Promise<void> {
     const sessionContent = responseText.substring(previousContent ? previousContent.length : 0);
     const summary = extractSummary(sessionContent);
@@ -382,19 +386,11 @@ export class AgentExecutor {
       await callbacks.saveFeatureSummary(projectPath, featureId, summary);
     } else {
       // If we're in a pipeline step, a summary is expected. Log a warning if it's missing.
-      // We need to fetch the feature to check its status.
-      try {
-        const featureDir = getFeatureDir(projectPath, featureId);
-        const featurePath = path.join(featureDir, 'feature.json');
-        const feature = (await secureFs.readFile(featurePath)).toString();
-        const featureData = JSON.parse(feature);
-        if (isPipelineStatus(featureData.status)) {
-          logger.warn(
-            `[AgentExecutor] Mandatory summary extraction failed for pipeline feature ${featureId} (status="${featureData.status}")`
-          );
-        }
-      } catch {
-        /* ignore failures in warning logging */
+      // Use the passed status from options to avoid extra file I/O
+      if (isPipelineStatus(status)) {
+        logger.warn(
+          `[AgentExecutor] Mandatory summary extraction failed for pipeline feature ${featureId} (status="${status}")`
+        );
       }
     }
   }
