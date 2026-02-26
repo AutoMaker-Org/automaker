@@ -163,8 +163,29 @@ export async function setupProjectWithFixture(
     };
     localStorage.setItem('automaker-setup', JSON.stringify(setupState));
 
+    // Set settings cache so the fast-hydrate path uses our fixture project.
+    // Without this, a stale settings cache from a previous test can override
+    // the project we just set in automaker-storage.
+    const settingsCache = {
+      setupComplete: true,
+      isFirstRun: false,
+      projects: [
+        {
+          id: mockProject.id,
+          name: mockProject.name,
+          path: mockProject.path,
+          lastOpened: mockProject.lastOpened,
+        },
+      ],
+      currentProjectId: mockProject.id,
+      theme: 'dark',
+      sidebarOpen: true,
+      maxConcurrency: 3,
+    };
+    localStorage.setItem('automaker-settings-cache', JSON.stringify(settingsCache));
+
     // Disable splash screen in tests
-    sessionStorage.setItem('automaker-splash-shown', 'true');
+    localStorage.setItem('automaker-disable-splash', 'true');
   }, projectPath);
 }
 

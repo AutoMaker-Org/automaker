@@ -381,7 +381,7 @@ export async function setupProjectWithPath(page: Page, projectPath: string): Pro
     localStorage.setItem('automaker-setup', JSON.stringify(setupState));
 
     // Disable splash screen in tests
-    sessionStorage.setItem('automaker-splash-shown', 'true');
+    localStorage.setItem('automaker-disable-splash', 'true');
   }, projectPath);
 }
 
@@ -435,7 +435,7 @@ export async function setupProjectWithPathNoWorktrees(
     localStorage.setItem('automaker-setup', JSON.stringify(setupState));
 
     // Disable splash screen in tests
-    sessionStorage.setItem('automaker-splash-shown', 'true');
+    localStorage.setItem('automaker-disable-splash', 'true');
   }, projectPath);
 }
 
@@ -493,7 +493,7 @@ export async function setupProjectWithStaleWorktree(
     localStorage.setItem('automaker-setup', JSON.stringify(setupState));
 
     // Disable splash screen in tests
-    sessionStorage.setItem('automaker-splash-shown', 'true');
+    localStorage.setItem('automaker-disable-splash', 'true');
   }, projectPath);
 }
 
