@@ -8,6 +8,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useDevServers } from '../../../src/components/views/board-view/worktree-panel/hooks/use-dev-servers';
 import { getElectronAPI } from '@/lib/electron';
+import type { ElectronAPI } from '@/lib/electron';
 import type { WorktreeInfo } from '../../../src/components/views/board-view/worktree-panel/types';
 
 vi.mock('@/lib/electron');
@@ -129,7 +130,7 @@ describe('useDevServers', () => {
           listDevServers: vi.fn().mockResolvedValue({ success: true, result: { servers: [] } }),
           onDevServerLogEvent: vi.fn().mockReturnValue(vi.fn()),
         },
-      } as any);
+      } as unknown as ElectronAPI);
 
       const { result } = renderHook(() => useDevServers({ projectPath }));
 
@@ -141,7 +142,7 @@ describe('useDevServers', () => {
     });
 
     it('should set isStartingAnyDevServer to true during start and false after completion', async () => {
-      let resolveStart: (value: any) => void;
+      let resolveStart: (value: unknown) => void;
       const startPromise = new Promise((resolve) => {
         resolveStart = resolve;
       });
@@ -153,7 +154,7 @@ describe('useDevServers', () => {
           listDevServers: vi.fn().mockResolvedValue({ success: true, result: { servers: [] } }),
           onDevServerLogEvent: vi.fn().mockReturnValue(vi.fn()),
         },
-      } as any);
+      } as unknown as ElectronAPI);
 
       const { result } = renderHook(() => useDevServers({ projectPath }));
 
@@ -196,7 +197,7 @@ describe('useDevServers', () => {
           listDevServers: vi.fn().mockResolvedValue({ success: true, result: { servers: [] } }),
           onDevServerLogEvent: vi.fn().mockReturnValue(vi.fn()),
         },
-      } as any);
+      } as unknown as ElectronAPI);
 
       const { result } = renderHook(() => useDevServers({ projectPath }));
 
@@ -229,7 +230,7 @@ describe('useDevServers', () => {
           listDevServers: mockListDevServers,
           onDevServerLogEvent: vi.fn().mockReturnValue(vi.fn()),
         },
-      } as any);
+      } as unknown as ElectronAPI);
 
       const { result } = renderHook(() => useDevServers({ projectPath }));
 

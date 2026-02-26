@@ -10,6 +10,7 @@ import {
   formatBacklogPlanEventContent,
 } from '../../../src/components/views/board-view/dialogs/event-content-formatter';
 import type { AutoModeEvent } from '@/types/electron';
+import type { BacklogPlanEvent } from '@automaker/types';
 
 describe('formatAutoModeEventContent', () => {
   describe('auto_mode_progress', () => {
@@ -281,40 +282,40 @@ describe('formatAutoModeEventContent', () => {
 describe('formatBacklogPlanEventContent', () => {
   it('should format backlog_plan_progress', () => {
     const event = { type: 'backlog_plan_progress', content: 'Analyzing features' };
-    const result = formatBacklogPlanEventContent(event as any);
+    const result = formatBacklogPlanEventContent(event as BacklogPlanEvent);
     expect(result).toContain('🧭');
     expect(result).toContain('Analyzing features');
   });
 
   it('should handle missing content in progress event', () => {
     const event = { type: 'backlog_plan_progress' };
-    const result = formatBacklogPlanEventContent(event as any);
+    const result = formatBacklogPlanEventContent(event as BacklogPlanEvent);
     expect(result).toContain('Backlog plan progress update');
   });
 
   it('should format backlog_plan_error', () => {
     const event = { type: 'backlog_plan_error', error: 'API failure' };
-    const result = formatBacklogPlanEventContent(event as any);
+    const result = formatBacklogPlanEventContent(event as BacklogPlanEvent);
     expect(result).toContain('❌');
     expect(result).toContain('API failure');
   });
 
   it('should handle missing error message', () => {
     const event = { type: 'backlog_plan_error' };
-    const result = formatBacklogPlanEventContent(event as any);
+    const result = formatBacklogPlanEventContent(event as BacklogPlanEvent);
     expect(result).toContain('Unknown error');
   });
 
   it('should format backlog_plan_complete', () => {
     const event = { type: 'backlog_plan_complete' };
-    const result = formatBacklogPlanEventContent(event as any);
+    const result = formatBacklogPlanEventContent(event as BacklogPlanEvent);
     expect(result).toContain('✅');
     expect(result).toContain('Backlog plan completed');
   });
 
   it('should format unknown backlog event type', () => {
     const event = { type: 'some_other_event' };
-    const result = formatBacklogPlanEventContent(event as any);
+    const result = formatBacklogPlanEventContent(event as BacklogPlanEvent);
     expect(result).toContain('some_other_event');
   });
 });

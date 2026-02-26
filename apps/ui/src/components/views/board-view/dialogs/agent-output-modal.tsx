@@ -26,6 +26,7 @@ import { useAgentOutput, useFeature } from '@/hooks/queries';
 import { cn } from '@/lib/utils';
 import type { AutoModeEvent } from '@/types/electron';
 import type { BacklogPlanEvent } from '@automaker/types';
+import { MODAL_CONSTANTS } from './agent-output-modal.constants';
 
 interface AgentOutputModalProps {
   open: boolean;
@@ -441,7 +442,7 @@ export function AgentOutputModal({
     return () => {
       unsubscribe();
     };
-  }, [open, featureId, isBacklogPlan]);
+  }, [open, featureId, isBacklogPlan, onClose]);
 
   // Listen to backlog plan events and update output
   useEffect(() => {

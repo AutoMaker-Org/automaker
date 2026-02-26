@@ -7,7 +7,7 @@
  * React warnings and unpredictable behavior (last value wins).
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -107,7 +107,7 @@ describe('worktree-panel.tsx prop integrity', () => {
     // A JSX opening tag starts with < and ends when indentation drops
     let currentJsxProps: Map<string, number[]> = new Map();
     let inJsxElement = false;
-    let elementIndent = 0;
+    let _elementIndent = 0;
 
     const duplicates: Array<{ prop: string; line: number; element: string }> = [];
 
@@ -121,7 +121,7 @@ describe('worktree-panel.tsx prop integrity', () => {
         const elementMatch = trimmed.match(/^<(\w+)/);
         if (elementMatch) {
           inJsxElement = true;
-          elementIndent = indent;
+          _elementIndent = indent;
           currentJsxProps = new Map();
         }
       }

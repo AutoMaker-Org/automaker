@@ -2,7 +2,7 @@
  * Test setup file for UI unit tests
  */
 import '@testing-library/jest-dom/vitest';
-import { vi } from 'vitest';
+import { beforeEach, vi } from 'vitest';
 
 // Mock window.matchMedia
 Object.defineProperty(window, 'matchMedia', {
@@ -35,3 +35,35 @@ globalThis.IntersectionObserver = vi.fn().mockImplementation(() => ({
 
 // Mock scrollTo
 window.scrollTo = vi.fn();
+
+// Mock localStorage with full Storage API methods used in unit tests and Zustand persist middleware
+const localStorageState = new Map<string, string>();
+const localStorageMock = {
+  getItem: vi.fn((key: string) => localStorageState.get(key) ?? null),
+  setItem: vi.fn((key: string, value: string) => {
+    localStorageState.set(key, value);
+  }),
+  removeItem: vi.fn((key: string) => {
+    localStorageState.delete(key);
+  }),
+  clear: vi.fn(() => {
+    localStorageState.clear();
+  }),
+  key: vi.fn((index: number) => Array.from(localStorageState.keys())[index] ?? null),
+  get length() {
+    return localStorageState.size;
+  },
+};
+Object.defineProperty(window, 'localStorage', {
+  writable: true,
+  value: localStorageMock,
+});
+
+beforeEach(() => {
+  localStorageState.clear();
+  localStorageMock.getItem.mockClear();
+  localStorageMock.setItem.mockClear();
+  localStorageMock.removeItem.mockClear();
+  localStorageMock.clear.mockClear();
+  localStorageMock.key.mockClear();
+});

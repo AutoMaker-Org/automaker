@@ -22,6 +22,7 @@
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { sanitizeWorktreeByProject } from '@/lib/settings-utils';
 import { useAppStore } from '@/store/app-store';
 
 interface UICacheState {
@@ -82,38 +83,6 @@ export const useUICacheStore = create<UICacheState & UICacheActions>()(
 );
 
 /**
- * Check whether an unknown value is a valid cached worktree entry.
- * Accepts objects with a non-empty string branch and a path that is null or a string.
- */
-function isValidCachedWorktreeEntry(
-  worktree: unknown
-): worktree is { path: string | null; branch: string } {
-  return (
-    typeof worktree === 'object' &&
-    worktree !== null &&
-    typeof (worktree as Record<string, unknown>).branch === 'string' &&
-    ((worktree as Record<string, unknown>).branch as string).trim().length > 0 &&
-    ((worktree as Record<string, unknown>).path === null ||
-      typeof (worktree as Record<string, unknown>).path === 'string')
-  );
-}
-
-/**
- * Filter a raw worktree map, discarding entries that fail structural validation.
- */
-function sanitizeCachedWorktreeByProject(
-  raw: Record<string, unknown>
-): Record<string, { path: string | null; branch: string }> {
-  const sanitized: Record<string, { path: string | null; branch: string }> = {};
-  for (const [key, worktree] of Object.entries(raw)) {
-    if (isValidCachedWorktreeEntry(worktree)) {
-      sanitized[key] = worktree;
-    }
-  }
-  return sanitized;
-}
-
-/**
  * Sync critical UI state from the main app store to the UI cache.
  * Call this whenever the app store changes to keep the cache up to date.
  *
@@ -151,7 +120,7 @@ export function syncUICache(appState: {
     // 1. restoreFromUICache() - early restore with validation
     // 2. use-worktrees.ts - runtime validation that resets to main if deleted
     // This allows users to have their feature worktree selection persist across refreshes.
-    update.cachedCurrentWorktreeByProject = sanitizeCachedWorktreeByProject(
+    update.cachedCurrentWorktreeByProject = sanitizeWorktreeByProject(
       appState.currentWorktreeByProject as Record<string, unknown>
     );
   }
@@ -209,7 +178,7 @@ export function restoreFromUICache(
   ) {
     // Validate structure only - keep both null (main) and non-null (worktree) paths
     // Runtime validation in use-worktrees.ts handles deleted worktrees gracefully
-    const sanitized = sanitizeCachedWorktreeByProject(
+    const sanitized = sanitizeWorktreeByProject(
       cache.cachedCurrentWorktreeByProject as Record<string, unknown>
     );
     if (Object.keys(sanitized).length > 0) {
