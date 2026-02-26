@@ -24,8 +24,10 @@ import {
   FilePlus,
   FileUp,
   MoreVertical,
+  ArrowLeft,
 } from 'lucide-react';
 import { Spinner } from '@/components/ui/spinner';
+import { useIsMobile } from '@/hooks/use-media-query';
 import {
   useKeyboardShortcuts,
   useKeyboardShortcutsConfig,
@@ -42,7 +44,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
-import { sanitizeFilename } from '@/lib/image-utils';
+import { sanitizeFilename, isMarkdownFilename, isImageFilename } from '@/lib/image-utils';
 import { Markdown } from '../ui/markdown';
 import {
   DropdownMenu,
@@ -53,6 +55,16 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 
 const logger = createLogger('ContextView');
+
+// Responsive layout classes
+const FILE_LIST_BASE_CLASSES = 'border-r border-border flex flex-col overflow-hidden';
+const FILE_LIST_DESKTOP_CLASSES = 'w-64';
+const FILE_LIST_EXPANDED_CLASSES = 'flex-1';
+const FILE_LIST_MOBILE_NO_SELECTION_CLASSES = 'w-full border-r-0';
+const FILE_LIST_MOBILE_SELECTION_CLASSES = 'hidden';
+
+const EDITOR_PANEL_BASE_CLASSES = 'flex-1 flex flex-col overflow-hidden';
+const EDITOR_PANEL_MOBILE_HIDDEN_CLASSES = 'hidden';
 
 interface ContextFile {
   name: string;
@@ -103,6 +115,9 @@ export function ContextView() {
   // File input ref for import
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Mobile detection
+  const isMobile = useIsMobile();
+
   // Keyboard shortcuts for this view
   const contextShortcuts: KeyboardShortcut[] = useMemo(
     () => [
@@ -121,18 +136,6 @@ export function ContextView() {
     if (!currentProject) return null;
     return `${currentProject.path}/.automaker/context`;
   }, [currentProject]);
-
-  const isMarkdownFile = (filename: string): boolean => {
-    const ext = filename.toLowerCase().substring(filename.lastIndexOf('.'));
-    return ext === '.md' || ext === '.markdown';
-  };
-
-  // Determine if a file is an image based on extension
-  const isImageFile = (filename: string): boolean => {
-    const imageExtensions = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.bmp'];
-    const ext = filename.toLowerCase().substring(filename.lastIndexOf('.'));
-    return imageExtensions.includes(ext);
-  };
 
   // Load context metadata
   const loadMetadata = useCallback(async (): Promise<ContextMetadata> => {
@@ -195,10 +198,15 @@ export function ContextView() {
       const result = await api.readdir(contextPath);
       if (result.success && result.entries) {
         const files: ContextFile[] = result.entries
-          .filter((entry) => entry.isFile && entry.name !== 'context-metadata.json')
+          .filter(
+            (entry) =>
+              entry.isFile &&
+              entry.name !== 'context-metadata.json' &&
+              (isMarkdownFilename(entry.name) || isImageFilename(entry.name))
+          )
           .map((entry) => ({
             name: entry.name,
-            type: isImageFile(entry.name) ? 'image' : 'text',
+            type: isImageFilename(entry.name) ? 'image' : 'text',
             path: `${contextPath}/${entry.name}`,
             description: metadata.files[entry.name]?.description,
           }));
@@ -232,11 +240,10 @@ export function ContextView() {
 
   // Select a file
   const handleSelectFile = (file: ContextFile) => {
-    if (hasChanges) {
-      // Could add a confirmation dialog here
-    }
+    // Note: Unsaved changes warning could be added here in the future
+    // For now, silently proceed to avoid disrupting mobile UX flow
     loadFileContent(file);
-    setIsPreviewMode(isMarkdownFile(file.name));
+    setIsPreviewMode(isMarkdownFilename(file.name));
   };
 
   // Save current file
@@ -341,7 +348,7 @@ export function ContextView() {
 
     try {
       const api = getElectronAPI();
-      const isImage = isImageFile(file.name);
+      const isImage = isImageFilename(file.name);
 
       let filePath: string;
       let fileName: string;
@@ -582,7 +589,7 @@ export function ContextView() {
       // Update selected file with new name and path
       const renamedFile: ContextFile = {
         name: newName,
-        type: isImageFile(newName) ? 'image' : 'text',
+        type: isImageFilename(newName) ? 'image' : 'text',
         path: newPath,
         content: result.content,
         description: metadata.files[newName]?.description,
@@ -790,7 +797,17 @@ export function ContextView() {
         )}
 
         {/* Left Panel - File List */}
-        <div className="w-64 border-r border-border flex flex-col overflow-hidden">
+        {/* Mobile: Full width, hidden when file is selected (full-screen editor) */}
+        {/* Desktop: Fixed width w-64, expands to fill space when no file selected */}
+        <div
+          className={cn(
+            FILE_LIST_BASE_CLASSES,
+            FILE_LIST_DESKTOP_CLASSES,
+            !selectedFile && FILE_LIST_EXPANDED_CLASSES,
+            isMobile && !selectedFile && FILE_LIST_MOBILE_NO_SELECTION_CLASSES,
+            isMobile && selectedFile && FILE_LIST_MOBILE_SELECTION_CLASSES
+          )}
+        >
           <div className="p-3 border-b border-border">
             <h2 className="text-sm font-semibold text-muted-foreground">
               Context Files ({contextFiles.length})
@@ -844,7 +861,12 @@ export function ContextView() {
                         <DropdownMenuTrigger asChild>
                           <button
                             onClick={(e) => e.stopPropagation()}
-                            className="opacity-0 group-hover:opacity-100 p-1 hover:bg-accent rounded transition-opacity"
+                            className={cn(
+                              'p-1 hover:bg-accent rounded transition-opacity',
+                              isMobile ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                            )}
+                            aria-label={`Actions for ${file.name}`}
+                            aria-haspopup="menu"
                             data-testid={`context-file-menu-${file.name}`}
                           >
                             <MoreVertical className="w-4 h-4" />
@@ -881,12 +903,31 @@ export function ContextView() {
         </div>
 
         {/* Right Panel - Editor/Preview */}
-        <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Mobile: Hidden when no file selected (file list shows full screen) */}
+        <div
+          className={cn(
+            EDITOR_PANEL_BASE_CLASSES,
+            isMobile && !selectedFile && EDITOR_PANEL_MOBILE_HIDDEN_CLASSES
+          )}
+        >
           {selectedFile ? (
             <>
               {/* File toolbar */}
               <div className="flex items-center justify-between p-3 border-b border-border bg-card">
                 <div className="flex items-center gap-2 min-w-0">
+                  {/* Mobile-only: Back button to return to file list */}
+                  {isMobile && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setSelectedFile(null)}
+                      className="shrink-0 -ml-1"
+                      aria-label="Back"
+                      title="Back"
+                    >
+                      <ArrowLeft className="h-4 w-4" />
+                    </Button>
+                  )}
                   {selectedFile.type === 'image' ? (
                     <ImageIcon className="w-4 h-4 text-muted-foreground flex-shrink-0" />
                   ) : (
@@ -894,23 +935,26 @@ export function ContextView() {
                   )}
                   <span className="text-sm font-medium truncate">{selectedFile.name}</span>
                 </div>
-                <div className="flex gap-2">
-                  {selectedFile.type === 'text' && isMarkdownFile(selectedFile.name) && (
+                <div className={cn('flex gap-2', isMobile && 'gap-1')}>
+                  {/* Mobile: Icon-only buttons with aria-labels for accessibility */}
+                  {selectedFile.type === 'text' && isMarkdownFilename(selectedFile.name) && (
                     <Button
                       variant={'outline'}
                       size="sm"
                       onClick={() => setIsPreviewMode(!isPreviewMode)}
                       data-testid="toggle-preview-mode"
+                      aria-label={isPreviewMode ? 'Edit' : 'Preview'}
+                      title={isPreviewMode ? 'Edit' : 'Preview'}
                     >
                       {isPreviewMode ? (
                         <>
-                          <Pencil className="w-4 h-4 mr-2" />
-                          Edit
+                          <Pencil className="w-4 h-4" />
+                          {!isMobile && <span className="ml-2">Edit</span>}
                         </>
                       ) : (
                         <>
-                          <Eye className="w-4 h-4 mr-2" />
-                          Preview
+                          <Eye className="w-4 h-4" />
+                          {!isMobile && <span className="ml-2">Preview</span>}
                         </>
                       )}
                     </Button>
@@ -921,20 +965,31 @@ export function ContextView() {
                       onClick={saveFile}
                       disabled={!hasChanges || isSaving}
                       data-testid="save-context-file"
+                      aria-label="Save"
+                      title="Save"
                     >
-                      <Save className="w-4 h-4 mr-2" />
-                      {isSaving ? 'Saving...' : hasChanges ? 'Save' : 'Saved'}
+                      <Save className="w-4 h-4" />
+                      {!isMobile && (
+                        <span className="ml-2">
+                          {isSaving ? 'Saving...' : hasChanges ? 'Save' : 'Saved'}
+                        </span>
+                      )}
                     </Button>
                   )}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setIsDeleteDialogOpen(true)}
-                    className="text-red-500 hover:text-red-400 hover:border-red-500/50"
-                    data-testid="delete-context-file"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
+                  {/* Desktop-only: Delete button (use dropdown on mobile to save space) */}
+                  {!isMobile && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setIsDeleteDialogOpen(true)}
+                      className="text-red-500 hover:text-red-400 hover:border-red-500/50"
+                      data-testid="delete-context-file"
+                      aria-label="Delete"
+                      title="Delete"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  )}
                 </div>
               </div>
 
@@ -1072,7 +1127,7 @@ export function ContextView() {
                       .filter((f): f is globalThis.File => f !== null);
                   }
 
-                  const mdFile = files.find((f) => isMarkdownFile(f.name));
+                  const mdFile = files.find((f) => isMarkdownFilename(f.name));
                   if (mdFile) {
                     const content = await mdFile.text();
                     setNewMarkdownContent(content);
