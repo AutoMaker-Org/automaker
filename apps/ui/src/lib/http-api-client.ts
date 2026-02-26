@@ -2492,7 +2492,8 @@ export class HttpApiClient implements ElectronAPI {
       issue: IssueValidationInput,
       model?: ModelId,
       thinkingLevel?: ThinkingLevel,
-      reasoningEffort?: ReasoningEffort
+      reasoningEffort?: ReasoningEffort,
+      providerId?: string
     ) =>
       this.post('/api/github/validate-issue', {
         projectPath,
@@ -2500,6 +2501,7 @@ export class HttpApiClient implements ElectronAPI {
         model,
         thinkingLevel,
         reasoningEffort,
+        providerId,
       }),
     getValidationStatus: (projectPath: string, issueNumber?: number) =>
       this.post('/api/github/validation-status', { projectPath, issueNumber }),

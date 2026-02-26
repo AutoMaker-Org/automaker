@@ -19,6 +19,7 @@ interface ValidateIssueInput {
   model?: ModelId;
   thinkingLevel?: ThinkingLevel;
   reasoningEffort?: ReasoningEffort;
+  providerId?: string;
   comments?: GitHubComment[];
   linkedPRs?: LinkedPRInfo[];
 }
@@ -47,7 +48,8 @@ interface ValidateIssueInput {
 export function useValidateIssue(projectPath: string) {
   return useMutation({
     mutationFn: async (input: ValidateIssueInput) => {
-      const { issue, model, thinkingLevel, reasoningEffort, comments, linkedPRs } = input;
+      const { issue, model, thinkingLevel, reasoningEffort, providerId, comments, linkedPRs } =
+        input;
 
       const api = getElectronAPI();
       if (!api.github?.validateIssue) {
@@ -71,7 +73,8 @@ export function useValidateIssue(projectPath: string) {
         validationInput,
         resolvedModel,
         thinkingLevel,
-        reasoningEffort
+        reasoningEffort,
+        providerId
       );
 
       if (!result.success) {

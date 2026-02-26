@@ -370,7 +370,8 @@ export interface GitHubAPI {
     issue: IssueValidationInput,
     model?: ModelId,
     thinkingLevel?: ThinkingLevel,
-    reasoningEffort?: ReasoningEffort
+    reasoningEffort?: ReasoningEffort,
+    providerId?: string
   ) => Promise<{ success: boolean; message?: string; issueNumber?: number; error?: string }>;
   /** Check validation status for an issue or all issues */
   getValidationStatus: (
@@ -3994,7 +3995,8 @@ function createMockGitHubAPI(): GitHubAPI {
       issue: IssueValidationInput,
       model?: ModelId,
       thinkingLevel?: ThinkingLevel,
-      reasoningEffort?: ReasoningEffort
+      reasoningEffort?: ReasoningEffort,
+      providerId?: string
     ) => {
       console.log('[Mock] Starting async validation:', {
         projectPath,
@@ -4002,6 +4004,7 @@ function createMockGitHubAPI(): GitHubAPI {
         model,
         thinkingLevel,
         reasoningEffort,
+        providerId,
       });
 
       // Simulate async validation in background

@@ -25,7 +25,7 @@ export function createBacklogPlanRoutes(
   );
   router.post('/stop', createStopHandler());
   router.get('/status', validatePathParams('projectPath'), createStatusHandler());
-  router.post('/apply', validatePathParams('projectPath'), createApplyHandler());
+  router.post('/apply', validatePathParams('projectPath'), createApplyHandler(settingsService));
   router.post('/clear', validatePathParams('projectPath'), createClearHandler());
 
   return router;

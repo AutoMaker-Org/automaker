@@ -60,6 +60,8 @@ export interface IssueValidationInput {
   issueTitle: string;
   issueBody: string;
   issueLabels?: string[];
+  /** Optional Claude-compatible provider ID (for custom providers like GLM/MiniMax) */
+  providerId?: string;
   /** Comments to include in validation analysis */
   comments?: GitHubComment[];
   /** Linked pull requests for this issue */

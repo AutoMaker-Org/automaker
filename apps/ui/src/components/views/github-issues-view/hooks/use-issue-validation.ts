@@ -264,6 +264,7 @@ export function useIssueValidation({
       const modelToUse = normalizedEntry.model;
       const thinkingLevelToUse = normalizedEntry.thinkingLevel;
       const reasoningEffortToUse = normalizedEntry.reasoningEffort;
+      const providerIdToUse = normalizedEntry.providerId;
 
       // Use mutation to trigger validation (toast is handled by mutation)
       validateIssueMutation.mutate({
@@ -271,6 +272,7 @@ export function useIssueValidation({
         model: modelToUse,
         thinkingLevel: thinkingLevelToUse,
         reasoningEffort: reasoningEffortToUse,
+        providerId: providerIdToUse,
         comments,
         linkedPRs,
       });
