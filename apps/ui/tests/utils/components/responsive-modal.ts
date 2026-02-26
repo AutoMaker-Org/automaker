@@ -178,13 +178,19 @@ export async function testModalResponsiveResize(
   // Get new modal dimensions
   const newDimensions = await getModalComputedStyle(page);
 
-  // Verify dimensions changed appropriately
+  // Verify dimensions changed appropriately using resolved pixel values
+  const toSize = VIEWPORTS[toViewport];
   if (fromViewport === 'mobile' && toViewport === 'tablet') {
-    expect(newDimensions.width).toMatch(/90vw/);
-    expect(newDimensions.maxWidth).toMatch(/1200px/);
+    const widthPx = parseFloat(newDimensions.width);
+    const maxWidthPx = parseFloat(newDimensions.maxWidth);
+    const expected90vw = toSize.width * 0.9;
+    expect(widthPx).toBeLessThanOrEqual(expected90vw + 2);
+    expect(maxWidthPx).toBeGreaterThanOrEqual(1200);
   } else if (fromViewport === 'tablet' && toViewport === 'mobile') {
-    expect(newDimensions.width).toMatch(/calc\(100% - 2rem\)/);
-    expect(newDimensions.maxWidth).not.toMatch(/1200px/);
+    const widthPx = parseFloat(newDimensions.width);
+    const maxWidthPx = parseFloat(newDimensions.maxWidth);
+    expect(widthPx).toBeGreaterThan(toSize.width - 60);
+    expect(maxWidthPx).toBeLessThan(1200);
   }
 }
 

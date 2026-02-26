@@ -443,21 +443,9 @@ export function validateBareModelId(
   }
 
   for (const [provider, prefix] of Object.entries(PROVIDER_PREFIXES)) {
-    // Skip validation if this prefix belongs to the expected provider
-    // (e.g., Cursor provider can receive models with "cursor-" prefix)
-    if (expectedProvider && provider === expectedProvider) {
-      continue;
-    }
-
     // Skip validation for configured provider prefix exceptions
     // (e.g., Cursor provider can receive models with "gemini-" prefix for Cursor Gemini models)
-    if (
-      expectedProvider &&
-      expectedProvider in PROVIDER_PREFIX_EXCEPTIONS &&
-      (PROVIDER_PREFIX_EXCEPTIONS as Record<string, readonly string[]>)[expectedProvider].includes(
-        provider
-      )
-    ) {
+    if (expectedProvider && PROVIDER_PREFIX_EXCEPTIONS[expectedProvider]?.includes(provider)) {
       continue;
     }
 

@@ -752,14 +752,6 @@ class DevServerService {
 
     this.startingServers.add(worktreePath);
 
-    // Emit starting event for WebSocket subscribers so all clients know it's in progress
-    if (this.emitter) {
-      this.emitter.emit('dev-server:starting', {
-        worktreePath,
-        timestamp: new Date().toISOString(),
-      });
-    }
-
     try {
       // Verify the worktree exists
       if (!(await this.fileExists(worktreePath))) {
@@ -833,6 +825,14 @@ class DevServerService {
       logger.debug(`Working directory (cwd): ${worktreePath}`);
       logger.debug(`Command: ${devCommand.cmd} ${devCommand.args.join(' ')} with PORT=${port}`);
 
+      // Emit starting only after preflight checks pass to avoid dangling starting state.
+      if (this.emitter) {
+        this.emitter.emit('dev-server:starting', {
+          worktreePath,
+          timestamp: new Date().toISOString(),
+        });
+      }
+
       // Spawn the dev process with PORT environment variable
       // FORCE_COLOR enables colored output even when not running in a TTY
       const env = {
@@ -856,12 +856,12 @@ class DevServerService {
 
       // Create server info early so we can reference it in handlers
       // We'll add it to runningServers after verifying the process started successfully
-      const hostname = process.env.HOSTNAME || 'localhost';
+      const fallbackHost = 'localhost';
       const serverInfo: DevServerInfo = {
         worktreePath,
         allocatedPort: port, // Immutable: records which port we reserved; never changed after this point
         port,
-        url: `http://${hostname}:${port}`, // Initial URL, may be updated by detectUrlFromOutput
+        url: `http://${fallbackHost}:${port}`, // Initial URL, may be updated by detectUrlFromOutput
         process: devProcess,
         startedAt: new Date(),
         scrollbackBuffer: '',
@@ -993,7 +993,7 @@ class DevServerService {
         // If still not detected after full rescan, use the allocated port as fallback
         if (!serverInfo.urlDetected) {
           logger.info(`URL detection fallback: using allocated port ${port} for ${worktreePath}`);
-          const fallbackUrl = `http://${hostname}:${port}`;
+          const fallbackUrl = `http://${fallbackHost}:${port}`;
           serverInfo.url = fallbackUrl;
           serverInfo.urlDetected = true;
 
@@ -1080,9 +1080,11 @@ class DevServerService {
       });
     }
 
-    // Kill the process
+    // Kill the process; persisted/re-attached entries may not have a process handle.
     if (server.process && !server.process.killed) {
       server.process.kill('SIGTERM');
+    } else {
+      this.killProcessOnPort(server.port);
     }
 
     // Free the originally-reserved port slot (allocatedPort is immutable and always

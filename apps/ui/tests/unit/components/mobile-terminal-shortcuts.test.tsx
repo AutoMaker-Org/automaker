@@ -53,7 +53,7 @@ function createDefaultProps(overrides: Partial<typeof defaultProps> = {}) {
 const defaultProps = {
   onSendInput: vi.fn(),
   isConnected: true,
-  activeModifier: 'none' as StickyModifier,
+  activeModifier: null as StickyModifier,
   onModifierChange: vi.fn(),
   onCopy: vi.fn(),
   onPaste: vi.fn(),

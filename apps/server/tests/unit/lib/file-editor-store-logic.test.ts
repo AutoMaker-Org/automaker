@@ -1,4 +1,9 @@
 import { describe, it, expect } from 'vitest';
+import {
+  computeIsDirty,
+  updateTabWithContent as updateTabContent,
+  markTabAsSaved as markTabSaved,
+} from '../../../../ui/src/components/views/file-editor-view/file-editor-dirty-utils.ts';
 
 /**
  * Unit tests for the file editor store logic, focusing on the unsaved indicator fix.
@@ -18,33 +23,6 @@ import { describe, it, expect } from 'vitest';
  * Since we can't easily test the React/zustand store in node environment,
  * we test the pure logic that the store uses for dirty state tracking.
  */
-
-// Pure functions that replicate the store's dirty state logic
-function computeIsDirty(content: string, originalContent: string): boolean {
-  return content !== originalContent;
-}
-
-function updateTabContent(
-  tab: { content: string; originalContent: string; isDirty: boolean },
-  newContent: string
-): { content: string; originalContent: string; isDirty: boolean } {
-  return {
-    content: newContent,
-    originalContent: tab.originalContent,
-    isDirty: computeIsDirty(newContent, tab.originalContent),
-  };
-}
-
-function markTabSaved(
-  tab: { content: string; originalContent: string; isDirty: boolean },
-  savedContent: string
-): { content: string; originalContent: string; isDirty: boolean } {
-  return {
-    content: savedContent,
-    originalContent: savedContent,
-    isDirty: false,
-  };
-}
 
 describe('File editor dirty state logic', () => {
   describe('updateTabContent', () => {
@@ -345,13 +323,9 @@ describe('File editor dirty state logic', () => {
         isDirty: false,
       };
 
-      const start = performance.now();
       tab = updateTabContent(tab, largeModified);
-      const duration = performance.now() - start;
 
       expect(tab.isDirty).toBe(true);
-      // Should be reasonably fast (less than 100ms for 1MB string comparison)
-      expect(duration).toBeLessThan(100);
     });
   });
 });

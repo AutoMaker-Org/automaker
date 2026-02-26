@@ -161,6 +161,8 @@ export function TerminalPanel({
   const [isImageDragOver, setIsImageDragOver] = useState(false);
   const [isProcessingImage, setIsProcessingImage] = useState(false);
   const hasRunInitialCommandRef = useRef(false);
+  const runCommandOnConnectRef = useRef(runCommandOnConnect);
+  const onCommandRanRef = useRef(onCommandRan);
   // Long-press timer for mobile context menu
   const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
   const longPressTouchStartRef = useRef<{ x: number; y: number } | null>(null);
@@ -175,6 +177,9 @@ export function TerminalPanel({
   const [searchQuery, setSearchQuery] = useState('');
   const showSearchRef = useRef(false);
   const [isAtBottom, setIsAtBottom] = useState(true);
+
+  runCommandOnConnectRef.current = runCommandOnConnect;
+  onCommandRanRef.current = onCommandRan;
 
   // Mobile text selection mode - renders terminal buffer as selectable DOM text
   const [isSelectMode, setIsSelectMode] = useState(false);
@@ -1212,8 +1217,9 @@ export function TerminalPanel({
               }
               // Run initial command if specified and not already run
               // Only run for new terminals (no scrollback received)
+              const initialCommand = runCommandOnConnectRef.current;
               if (
-                runCommandOnConnect &&
+                initialCommand &&
                 !hasRunInitialCommandRef.current &&
                 ws.readyState === WebSocket.OPEN
               ) {
@@ -1227,10 +1233,8 @@ export function TerminalPanel({
 
                 setTimeout(() => {
                   if (ws.readyState === WebSocket.OPEN) {
-                    ws.send(
-                      JSON.stringify({ type: 'input', data: runCommandOnConnect + lineEnding })
-                    );
-                    onCommandRan?.();
+                    ws.send(JSON.stringify({ type: 'input', data: initialCommand + lineEnding }));
+                    onCommandRanRef.current?.();
                   }
                 }, delay);
               }
@@ -1371,15 +1375,7 @@ export function TerminalPanel({
         wsRef.current = null;
       }
     };
-  }, [
-    sessionId,
-    authToken,
-    wsUrl,
-    isTerminalReady,
-    fetchWsToken,
-    runCommandOnConnect,
-    onCommandRan,
-  ]);
+  }, [sessionId, authToken, wsUrl, isTerminalReady, fetchWsToken]);
 
   // Handle resize with debouncing
   const handleResize = useCallback(() => {
@@ -1695,16 +1691,16 @@ export function TerminalPanel({
     buttons[focusedMenuIndex]?.focus();
   }, [focusedMenuIndex, contextMenu]);
 
-  // Reset select mode when viewport transitions from mobile to non-mobile.
-  // The select-mode overlay is only rendered when (isSelectMode && isMobile), so if the
-  // viewport becomes non-mobile while isSelectMode is true the overlay disappears but the
+  // Reset select mode when viewport transitions away from shortcuts-bar viewports.
+  // The select-mode overlay is only rendered when (isSelectMode && showShortcutsBar), so if the
+  // viewport no longer shows the shortcuts bar while isSelectMode is true the overlay disappears but the
   // state is left dirty with no UI to clear it. Resetting here keeps state consistent.
   useEffect(() => {
-    if (!isMobile && isSelectMode) {
+    if (!showShortcutsBar && isSelectMode) {
       setIsSelectMode(false);
       setSelectModeText('');
     }
-  }, [isMobile]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [showShortcutsBar, isSelectMode]);
 
   // Handle right-click context menu with boundary checking
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
@@ -2471,7 +2467,7 @@ export function TerminalPanel({
             Overlays the canvas so users can use native touch selection on real DOM text.
             xterm.js renders to a <canvas>, which prevents native text selection on mobile.
             This overlay shows the same content as real DOM text that supports touch selection. */}
-        {isSelectMode && isMobile && (
+        {isSelectMode && showShortcutsBar && (
           <div className="absolute inset-0 z-30 flex flex-col">
             {/* Header bar with copy/done actions */}
             <div className="flex items-center justify-between px-3 py-2 bg-brand-500/95 backdrop-blur-sm text-white shrink-0">

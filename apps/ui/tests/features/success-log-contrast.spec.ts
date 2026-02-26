@@ -202,6 +202,10 @@ The feature is complete and ready for review.
       state: 'hidden',
       timeout: TIMEOUTS.default,
     });
+    await page.waitForSelector('[data-testid="agent-output-modal"]', {
+      state: 'hidden',
+      timeout: TIMEOUTS.default,
+    });
   });
 
   test('should maintain consistency across all log types', async ({ page }) => {
@@ -301,5 +305,9 @@ All tasks completed successfully.
 
     // Close modal
     await page.click('[data-testid="close-agent-output-modal"]');
+    await page.waitForSelector('[data-testid="agent-output-modal"]', {
+      state: 'hidden',
+      timeout: TIMEOUTS.default,
+    });
   });
 });

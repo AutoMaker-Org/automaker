@@ -112,7 +112,7 @@ export function WorktreeMobileDropdown({
                     {changedFilesCount ?? '!'}
                   </span>
                 )}
-                {devServerRunning && devServerInfo?.urlDetected !== false && (
+                {devServerRunning && devServerInfo?.urlDetected === true && (
                   <Globe className="w-3 h-3 text-green-500" />
                 )}
                 {devServerStarting && <Spinner size="xs" variant="muted" />}

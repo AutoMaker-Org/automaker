@@ -60,9 +60,10 @@ vi.mock('@/routes/github/routes/check-github-remote.js', () => ({
 
 import { createListHandler } from '@/routes/worktree/routes/list.js';
 import * as secureFs from '@/lib/secure-fs.js';
-import { readAllWorktreeMetadata } from '@/lib/worktree-metadata.js';
+import { readAllWorktreeMetadata, updateWorktreePRInfo } from '@/lib/worktree-metadata.js';
 import { isGitRepo } from '@automaker/git-utils';
 import { isGhCliAvailable, normalizePath, getErrorMessage } from '@/routes/worktree/common.js';
+import { checkGitHubRemote } from '@/routes/github/routes/check-github-remote.js';
 
 /**
  * Set up exec mock with a handler that receives the command and cwd,
@@ -123,6 +124,7 @@ describe('worktree list - detached HEAD handling', () => {
     vi.mocked(isGitRepo).mockResolvedValue(true);
     vi.mocked(readAllWorktreeMetadata).mockResolvedValue(new Map());
     vi.mocked(isGhCliAvailable).mockResolvedValue(false);
+    vi.mocked(checkGitHubRemote).mockResolvedValue({ hasGitHubRemote: false });
     vi.mocked(normalizePath).mockImplementation((p: string) => p);
     vi.mocked(getErrorMessage).mockImplementation(
       (e: unknown) => (e as Error)?.message || 'Unknown error'
@@ -769,6 +771,200 @@ describe('worktree list - detached HEAD handling', () => {
       // Only main worktree should be present
       expect(response.worktrees).toHaveLength(1);
       expect(response.worktrees[0].branch).toBe('main');
+    });
+  });
+
+  describe('PR tracking precedence', () => {
+    it('should keep manually tracked PR from metadata when branch PR differs', async () => {
+      req.body = { projectPath: '/project', includeDetails: true };
+
+      vi.mocked(readAllWorktreeMetadata).mockResolvedValue(
+        new Map([
+          [
+            'feature-a',
+            {
+              branch: 'feature-a',
+              createdAt: '2026-01-01T00:00:00.000Z',
+              pr: {
+                number: 99,
+                url: 'https://github.com/org/repo/pull/99',
+                title: 'Manual override PR',
+                state: 'OPEN',
+                createdAt: '2026-01-01T00:00:00.000Z',
+              },
+            },
+          ],
+        ])
+      );
+      vi.mocked(isGhCliAvailable).mockResolvedValue(true);
+      vi.mocked(checkGitHubRemote).mockResolvedValue({
+        hasGitHubRemote: true,
+        owner: 'org',
+        repo: 'repo',
+      });
+      vi.mocked(secureFs.access).mockImplementation(async (p) => {
+        const pathStr = String(p);
+        if (
+          pathStr.includes('MERGE_HEAD') ||
+          pathStr.includes('rebase-merge') ||
+          pathStr.includes('rebase-apply') ||
+          pathStr.includes('CHERRY_PICK_HEAD')
+        ) {
+          throw new Error('ENOENT');
+        }
+        return undefined;
+      });
+
+      setupExecMock((cmd, cwd) => {
+        if (cmd.includes('git worktree list --porcelain')) {
+          return {
+            stdout: [
+              'worktree /project',
+              'branch refs/heads/main',
+              '',
+              'worktree /project/.worktrees/feature-a',
+              'branch refs/heads/feature-a',
+              '',
+            ].join('\n'),
+          };
+        }
+        if (cmd.includes('git branch --show-current')) {
+          return { stdout: cwd === '/project' ? 'main\n' : 'feature-a\n' };
+        }
+        if (cmd.includes('git status --porcelain')) {
+          return { stdout: '' };
+        }
+        if (cmd.includes('git rev-parse --git-dir')) {
+          return new Error('no git dir');
+        }
+        if (cmd.includes('gh pr list')) {
+          return {
+            stdout: JSON.stringify([
+              {
+                number: 42,
+                title: 'Branch PR',
+                url: 'https://github.com/org/repo/pull/42',
+                state: 'OPEN',
+                headRefName: 'feature-a',
+                createdAt: '2026-01-02T00:00:00.000Z',
+              },
+            ]),
+          };
+        }
+        return { stdout: '' };
+      });
+      disableWorktreesScan();
+
+      const handler = createListHandler();
+      await handler(req, res);
+
+      const response = vi.mocked(res.json).mock.calls[0][0] as {
+        worktrees: Array<{ branch: string; pr?: { number: number; title: string } }>;
+      };
+      const featureWorktree = response.worktrees.find((w) => w.branch === 'feature-a');
+      expect(featureWorktree?.pr?.number).toBe(99);
+      expect(featureWorktree?.pr?.title).toBe('Manual override PR');
+    });
+
+    it('should prefer GitHub PR when it matches metadata number and sync updated fields', async () => {
+      req.body = { projectPath: '/project-2', includeDetails: true };
+
+      vi.mocked(readAllWorktreeMetadata).mockResolvedValue(
+        new Map([
+          [
+            'feature-a',
+            {
+              branch: 'feature-a',
+              createdAt: '2026-01-01T00:00:00.000Z',
+              pr: {
+                number: 42,
+                url: 'https://github.com/org/repo/pull/42',
+                title: 'Old title',
+                state: 'OPEN',
+                createdAt: '2026-01-01T00:00:00.000Z',
+              },
+            },
+          ],
+        ])
+      );
+      vi.mocked(isGhCliAvailable).mockResolvedValue(true);
+      vi.mocked(checkGitHubRemote).mockResolvedValue({
+        hasGitHubRemote: true,
+        owner: 'org',
+        repo: 'repo',
+      });
+      vi.mocked(secureFs.access).mockImplementation(async (p) => {
+        const pathStr = String(p);
+        if (
+          pathStr.includes('MERGE_HEAD') ||
+          pathStr.includes('rebase-merge') ||
+          pathStr.includes('rebase-apply') ||
+          pathStr.includes('CHERRY_PICK_HEAD')
+        ) {
+          throw new Error('ENOENT');
+        }
+        return undefined;
+      });
+
+      setupExecMock((cmd, cwd) => {
+        if (cmd.includes('git worktree list --porcelain')) {
+          return {
+            stdout: [
+              'worktree /project-2',
+              'branch refs/heads/main',
+              '',
+              'worktree /project-2/.worktrees/feature-a',
+              'branch refs/heads/feature-a',
+              '',
+            ].join('\n'),
+          };
+        }
+        if (cmd.includes('git branch --show-current')) {
+          return { stdout: cwd === '/project-2' ? 'main\n' : 'feature-a\n' };
+        }
+        if (cmd.includes('git status --porcelain')) {
+          return { stdout: '' };
+        }
+        if (cmd.includes('git rev-parse --git-dir')) {
+          return new Error('no git dir');
+        }
+        if (cmd.includes('gh pr list')) {
+          return {
+            stdout: JSON.stringify([
+              {
+                number: 42,
+                title: 'New title from GitHub',
+                url: 'https://github.com/org/repo/pull/42',
+                state: 'MERGED',
+                headRefName: 'feature-a',
+                createdAt: '2026-01-02T00:00:00.000Z',
+              },
+            ]),
+          };
+        }
+        return { stdout: '' };
+      });
+      disableWorktreesScan();
+
+      const handler = createListHandler();
+      await handler(req, res);
+
+      const response = vi.mocked(res.json).mock.calls[0][0] as {
+        worktrees: Array<{ branch: string; pr?: { number: number; title: string; state: string } }>;
+      };
+      const featureWorktree = response.worktrees.find((w) => w.branch === 'feature-a');
+      expect(featureWorktree?.pr?.number).toBe(42);
+      expect(featureWorktree?.pr?.title).toBe('New title from GitHub');
+      expect(featureWorktree?.pr?.state).toBe('MERGED');
+      expect(vi.mocked(updateWorktreePRInfo)).toHaveBeenCalledWith(
+        '/project-2',
+        'feature-a',
+        expect.objectContaining({
+          number: 42,
+          title: 'New title from GitHub',
+          state: 'MERGED',
+        })
+      );
     });
   });
 });

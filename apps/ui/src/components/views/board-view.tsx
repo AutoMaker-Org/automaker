@@ -978,23 +978,27 @@ export function BoardView() {
 
   // Helper that creates a feature and immediately starts it (used by conflict handlers and the Make button)
   const handleAddAndStartFeature = useCallback(
-    async (featureData: Parameters<typeof handleAddFeature>[0]) => {
-      // Capture existing feature IDs before adding
-      const featuresBeforeIds = new Set(useAppStore.getState().features.map((f) => f.id));
+    async (featureData: Parameters<typeof handleAddFeature>[0]): Promise<string | null> => {
+      let createdFeatureId: string | null = null;
       try {
         // Create feature directly with in_progress status to avoid brief backlog flash
-        await handleAddFeature({ ...featureData, initialStatus: 'in_progress' });
+        const createdFeature = await handleAddFeature({
+          ...featureData,
+          initialStatus: 'in_progress',
+        });
+        createdFeatureId = createdFeature?.id ?? null;
       } catch (error) {
         logger.error('Failed to create feature:', error);
         toast.error('Failed to create feature', {
           description: error instanceof Error ? error.message : 'An error occurred',
         });
-        return;
+        return null;
       }
 
-      // Find the newly created feature by looking for an ID that wasn't in the original set
       const latestFeatures = useAppStore.getState().features;
-      const newFeature = latestFeatures.find((f) => !featuresBeforeIds.has(f.id));
+      const newFeature = createdFeatureId
+        ? latestFeatures.find((f) => f.id === createdFeatureId)
+        : undefined;
 
       if (newFeature) {
         try {
@@ -1011,6 +1015,8 @@ export function BoardView() {
           description: 'The feature was created but could not be started automatically.',
         });
       }
+
+      return createdFeatureId;
     },
     [handleAddFeature, handleStartImplementation]
   );
@@ -1150,17 +1156,15 @@ export function BoardView() {
         dependencies: [],
       };
 
-      // Capture feature IDs before creation so we can find the new one
-      const featuresBeforeIds = new Set(useAppStore.getState().features.map((f) => f.id));
-      await handleAddAndStartFeature(featureData);
+      const createdFeatureId = await handleAddAndStartFeature(featureData);
 
       // Set prUrl on the created feature if the PR has a URL
-      if (prInfo.url) {
-        const latestFeatures = useAppStore.getState().features;
-        const newFeature = latestFeatures.find((f) => !featuresBeforeIds.has(f.id));
-        if (newFeature) {
-          updateFeature(newFeature.id, { prUrl: prInfo.url });
-          persistFeatureUpdate(newFeature.id, { prUrl: prInfo.url });
+      if (prInfo.url && createdFeatureId) {
+        updateFeature(createdFeatureId, { prUrl: prInfo.url });
+        try {
+          await persistFeatureUpdate(createdFeatureId, { prUrl: prInfo.url });
+        } catch (error) {
+          logger.error('Failed to persist PR URL on created feature:', error);
         }
       }
     },

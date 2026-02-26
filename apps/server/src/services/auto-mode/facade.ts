@@ -28,8 +28,6 @@ import * as secureFs from '../../lib/secure-fs.js';
 import { validateWorkingDirectory, createAutoModeOptions } from '../../lib/sdk-options.js';
 import {
   getPromptCustomization,
-  getProviderById,
-  getProviderByModelId,
   resolveProviderContext,
   getMCPServersFromSettings,
   getDefaultMaxTurnsSetting,
@@ -228,8 +226,7 @@ export class AutoModeServiceFacade {
     /**
      * Shared agent-run helper used by both PipelineOrchestrator and ExecutionService.
      *
-     * Resolves the model string, looks up the custom provider/credentials via
-     * getProviderByModelId, then delegates to agentExecutor.execute with the
+     * Resolves provider/model context, then delegates to agentExecutor.execute with the
      * full payload.  The opts parameter uses an index-signature union so it
      * accepts both the typed ExecutionService opts object and the looser
      * Record<string, unknown> used by PipelineOrchestrator without requiring

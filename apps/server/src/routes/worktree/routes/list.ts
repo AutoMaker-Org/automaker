@@ -439,6 +439,7 @@ export function createListHandler() {
 
       const worktrees: WorktreeInfo[] = [];
       const removedWorktrees: Array<{ path: string; branch: string }> = [];
+      let hasMissingWorktree = false;
       const lines = stdout.split('\n');
       let current: { path?: string; branch?: string; isDetached?: boolean } = {};
       let isFirst = true;
@@ -466,6 +467,7 @@ export function createListHandler() {
             }
 
             if (!isMainWorktree && !worktreeExists) {
+              hasMissingWorktree = true;
               // Worktree directory doesn't exist - it was manually deleted
               // Only add to removed list if we know the branch name
               if (current.branch) {
@@ -503,8 +505,8 @@ export function createListHandler() {
         }
       }
 
-      // Prune removed worktrees from git (only if any were detected)
-      if (removedWorktrees.length > 0) {
+      // Prune removed worktrees from git (only if any missing worktrees were detected)
+      if (hasMissingWorktree) {
         try {
           await execAsync('git worktree prune', { cwd: projectPath });
         } catch {
@@ -566,7 +568,7 @@ export function createListHandler() {
         }
       }
 
-      // Assign PR info to each worktree, preferring fresh GitHub data over cached metadata.
+      // Assign PR info to each worktree.
       // Only fetch GitHub PRs if includeDetails is requested (performance optimization).
       // Uses --state all to detect merged/closed PRs, limited to 1000 recent PRs.
       const githubPRs = includeDetails
@@ -584,14 +586,27 @@ export function createListHandler() {
         const metadata = allMetadata.get(worktree.branch);
         const githubPR = githubPRs.get(worktree.branch);
 
-        if (githubPR) {
-          // Prefer fresh GitHub data (it has the current state)
+        const metadataPR = metadata?.pr;
+        // Preserve explicit user-selected PR tracking from metadata when it differs
+        // from branch-derived GitHub PR lookup. This allows "Change PR Number" to
+        // persist instead of being overwritten by gh pr list for the branch.
+        const hasManualOverride =
+          !!metadataPR && !!githubPR && metadataPR.number !== githubPR.number;
+
+        if (hasManualOverride) {
+          worktree.pr = metadataPR;
+        } else if (githubPR) {
+          // Use fresh GitHub data when there is no explicit override.
           worktree.pr = githubPR;
 
-          // Sync metadata with GitHub state when:
-          // 1. No metadata exists for this PR (PR created externally)
-          // 2. State has changed (e.g., merged/closed on GitHub)
-          const needsSync = !metadata?.pr || metadata.pr.state !== githubPR.state;
+          // Sync metadata when missing or stale so fallback data stays current.
+          const needsSync =
+            !metadataPR ||
+            metadataPR.number !== githubPR.number ||
+            metadataPR.state !== githubPR.state ||
+            metadataPR.title !== githubPR.title ||
+            metadataPR.url !== githubPR.url ||
+            metadataPR.createdAt !== githubPR.createdAt;
           if (needsSync) {
             // Fire and forget - don't block the response
             updateWorktreePRInfo(projectPath, worktree.branch, githubPR).catch((err) => {
@@ -600,9 +615,9 @@ export function createListHandler() {
               );
             });
           }
-        } else if (metadata?.pr && metadata.pr.state === 'OPEN') {
+        } else if (metadataPR && metadataPR.state === 'OPEN') {
           // Fall back to stored metadata only if the PR is still OPEN
-          worktree.pr = metadata.pr;
+          worktree.pr = metadataPR;
         }
       }
 

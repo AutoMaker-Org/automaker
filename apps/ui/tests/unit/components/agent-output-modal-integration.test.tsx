@@ -315,11 +315,14 @@ Successfully implemented a responsive navigation menu with hamburger menu for mo
     });
 
     it('should fallback to window.__currentProject when projectPath is not provided', () => {
-      window.__currentProject = { path: '/fallback/project' };
-
-      render(<AgentOutputModal {...defaultProps} />);
-
-      expect(screen.getByText('Implement a responsive navigation menu')).toBeInTheDocument();
+      const previousProject = window.__currentProject;
+      try {
+        window.__currentProject = { path: '/fallback/project' };
+        render(<AgentOutputModal {...defaultProps} />);
+        expect(screen.getByText('Implement a responsive navigation menu')).toBeInTheDocument();
+      } finally {
+        window.__currentProject = previousProject;
+      }
     });
   });
 
