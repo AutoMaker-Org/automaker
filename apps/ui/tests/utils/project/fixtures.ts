@@ -17,6 +17,7 @@ const WORKSPACE_ROOT = getWorkspaceRoot();
 const FIXTURE_PATH = path.join(WORKSPACE_ROOT, 'test/fixtures/projectA');
 const SPEC_FILE_PATH = path.join(FIXTURE_PATH, '.automaker/app_spec.txt');
 const CONTEXT_PATH = path.join(FIXTURE_PATH, '.automaker/context');
+const MEMORY_PATH = path.join(FIXTURE_PATH, '.automaker/memory');
 
 // Original spec content for resetting between tests
 const ORIGINAL_SPEC_CONTENT = `<app_spec>
@@ -51,10 +52,52 @@ export function resetContextDirectory(): void {
 }
 
 /**
+ * Reset the memory directory to empty state
+ */
+export function resetMemoryDirectory(): void {
+  if (fs.existsSync(MEMORY_PATH)) {
+    fs.rmSync(MEMORY_PATH, { recursive: true });
+  }
+  fs.mkdirSync(MEMORY_PATH, { recursive: true });
+}
+
+/**
+ * Resolve and validate a context fixture path to prevent path traversal
+ */
+function resolveContextFixturePath(filename: string): string {
+  const resolved = path.resolve(CONTEXT_PATH, filename);
+  const base = path.resolve(CONTEXT_PATH) + path.sep;
+  if (!resolved.startsWith(base)) {
+    throw new Error(`Invalid context filename: ${filename}`);
+  }
+  return resolved;
+}
+
+/**
  * Create a context file directly on disk (for test setup)
  */
 export function createContextFileOnDisk(filename: string, content: string): void {
-  const filePath = path.join(CONTEXT_PATH, filename);
+  const filePath = resolveContextFixturePath(filename);
+  fs.writeFileSync(filePath, content);
+}
+
+/**
+ * Resolve and validate a memory fixture path to prevent path traversal
+ */
+function resolveMemoryFixturePath(filename: string): string {
+  const resolved = path.resolve(MEMORY_PATH, filename);
+  const base = path.resolve(MEMORY_PATH) + path.sep;
+  if (!resolved.startsWith(base)) {
+    throw new Error(`Invalid memory filename: ${filename}`);
+  }
+  return resolved;
+}
+
+/**
+ * Create a memory file directly on disk (for test setup)
+ */
+export function createMemoryFileOnDisk(filename: string, content: string): void {
+  const filePath = resolveMemoryFixturePath(filename);
   fs.writeFileSync(filePath, content);
 }
 
@@ -62,7 +105,15 @@ export function createContextFileOnDisk(filename: string, content: string): void
  * Check if a context file exists on disk
  */
 export function contextFileExistsOnDisk(filename: string): boolean {
-  const filePath = path.join(CONTEXT_PATH, filename);
+  const filePath = resolveContextFixturePath(filename);
+  return fs.existsSync(filePath);
+}
+
+/**
+ * Check if a memory file exists on disk
+ */
+export function memoryFileExistsOnDisk(filename: string): boolean {
+  const filePath = resolveMemoryFixturePath(filename);
   return fs.existsSync(filePath);
 }
 
@@ -112,8 +163,29 @@ export async function setupProjectWithFixture(
     };
     localStorage.setItem('automaker-setup', JSON.stringify(setupState));
 
+    // Set settings cache so the fast-hydrate path uses our fixture project.
+    // Without this, a stale settings cache from a previous test can override
+    // the project we just set in automaker-storage.
+    const settingsCache = {
+      setupComplete: true,
+      isFirstRun: false,
+      projects: [
+        {
+          id: mockProject.id,
+          name: mockProject.name,
+          path: mockProject.path,
+          lastOpened: mockProject.lastOpened,
+        },
+      ],
+      currentProjectId: mockProject.id,
+      theme: 'dark',
+      sidebarOpen: true,
+      maxConcurrency: 3,
+    };
+    localStorage.setItem('automaker-settings-cache', JSON.stringify(settingsCache));
+
     // Disable splash screen in tests
-    sessionStorage.setItem('automaker-splash-shown', 'true');
+    localStorage.setItem('automaker-disable-splash', 'true');
   }, projectPath);
 }
 
@@ -122,4 +194,15 @@ export async function setupProjectWithFixture(
  */
 export function getFixturePath(): string {
   return FIXTURE_PATH;
+}
+
+/**
+ * Set up a mock project with the fixture path (for profile/settings tests that need a project).
+ * Options such as customProfilesCount are reserved for future use (e.g. mocking server profile state).
+ */
+export async function setupMockProjectWithProfiles(
+  page: Page,
+  _options?: { customProfilesCount?: number }
+): Promise<void> {
+  await setupProjectWithFixture(page, FIXTURE_PATH);
 }

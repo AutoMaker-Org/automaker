@@ -18,7 +18,9 @@ import {
   Pencil,
   FilePlus,
   MoreVertical,
+  ArrowLeft,
 } from 'lucide-react';
+import { useIsMobile } from '@/hooks/use-media-query';
 import { Spinner } from '@/components/ui/spinner';
 import {
   Dialog,
@@ -31,6 +33,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
+import { isMarkdownFilename } from '@/lib/image-utils';
 import { Markdown } from '../ui/markdown';
 import {
   DropdownMenu,
@@ -40,6 +43,16 @@ import {
 } from '@/components/ui/dropdown-menu';
 
 const logger = createLogger('MemoryView');
+
+// Responsive layout classes
+const FILE_LIST_BASE_CLASSES = 'border-r border-border flex flex-col overflow-hidden';
+const FILE_LIST_DESKTOP_CLASSES = 'w-64';
+const FILE_LIST_EXPANDED_CLASSES = 'flex-1';
+const FILE_LIST_MOBILE_NO_SELECTION_CLASSES = 'w-full border-r-0';
+const FILE_LIST_MOBILE_SELECTION_CLASSES = 'hidden';
+
+const EDITOR_PANEL_BASE_CLASSES = 'flex-1 flex flex-col overflow-hidden';
+const EDITOR_PANEL_MOBILE_HIDDEN_CLASSES = 'hidden';
 
 interface MemoryFile {
   name: string;
@@ -68,16 +81,14 @@ export function MemoryView() {
   // Actions panel state (for tablet/mobile)
   const [showActionsPanel, setShowActionsPanel] = useState(false);
 
+  // Mobile detection
+  const isMobile = useIsMobile();
+
   // Get memory directory path
   const getMemoryPath = useCallback(() => {
     if (!currentProject) return null;
     return `${currentProject.path}/.automaker/memory`;
   }, [currentProject]);
-
-  const isMarkdownFile = (filename: string): boolean => {
-    const ext = filename.toLowerCase().substring(filename.lastIndexOf('.'));
-    return ext === '.md' || ext === '.markdown';
-  };
 
   // Load memory files
   const loadMemoryFiles = useCallback(async () => {
@@ -95,7 +106,7 @@ export function MemoryView() {
       const result = await api.readdir(memoryPath);
       if (result.success && result.entries) {
         const files: MemoryFile[] = result.entries
-          .filter((entry) => entry.isFile && isMarkdownFile(entry.name))
+          .filter((entry) => entry.isFile && isMarkdownFilename(entry.name))
           .map((entry) => ({
             name: entry.name,
             path: `${memoryPath}/${entry.name}`,
@@ -130,9 +141,8 @@ export function MemoryView() {
 
   // Select a file
   const handleSelectFile = (file: MemoryFile) => {
-    if (hasChanges) {
-      // Could add a confirmation dialog here
-    }
+    // Note: Unsaved changes warning could be added here in the future
+    // For now, silently proceed to avoid disrupting mobile UX flow
     loadFileContent(file);
     setIsPreviewMode(true);
   };
@@ -381,7 +391,17 @@ export function MemoryView() {
       {/* Main content area with file list and editor */}
       <div className="flex-1 flex overflow-hidden">
         {/* Left Panel - File List */}
-        <div className="w-64 border-r border-border flex flex-col overflow-hidden">
+        {/* Mobile: Full width, hidden when file is selected (full-screen editor) */}
+        {/* Desktop: Fixed width w-64, expands to fill space when no file selected */}
+        <div
+          className={cn(
+            FILE_LIST_BASE_CLASSES,
+            FILE_LIST_DESKTOP_CLASSES,
+            !selectedFile && FILE_LIST_EXPANDED_CLASSES,
+            isMobile && !selectedFile && FILE_LIST_MOBILE_NO_SELECTION_CLASSES,
+            isMobile && selectedFile && FILE_LIST_MOBILE_SELECTION_CLASSES
+          )}
+        >
           <div className="p-3 border-b border-border">
             <h2 className="text-sm font-semibold text-muted-foreground">
               Memory Files ({memoryFiles.length})
@@ -455,31 +475,53 @@ export function MemoryView() {
         </div>
 
         {/* Right Panel - Editor/Preview */}
-        <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Mobile: Hidden when no file selected (file list shows full screen) */}
+        <div
+          className={cn(
+            EDITOR_PANEL_BASE_CLASSES,
+            isMobile && !selectedFile && EDITOR_PANEL_MOBILE_HIDDEN_CLASSES
+          )}
+        >
           {selectedFile ? (
             <>
               {/* File toolbar */}
               <div className="flex items-center justify-between p-3 border-b border-border bg-card">
                 <div className="flex items-center gap-2 min-w-0">
+                  {/* Mobile-only: Back button to return to file list */}
+                  {isMobile && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setSelectedFile(null)}
+                      className="shrink-0 -ml-1"
+                      aria-label="Back"
+                      title="Back"
+                    >
+                      <ArrowLeft className="h-4 w-4" />
+                    </Button>
+                  )}
                   <FileText className="w-4 h-4 text-muted-foreground flex-shrink-0" />
                   <span className="text-sm font-medium truncate">{selectedFile.name}</span>
                 </div>
-                <div className="flex gap-2">
+                <div className={cn('flex gap-2', isMobile && 'gap-1')}>
+                  {/* Mobile: Icon-only buttons with aria-labels for accessibility */}
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => setIsPreviewMode(!isPreviewMode)}
                     data-testid="toggle-preview-mode"
+                    aria-label={isPreviewMode ? 'Edit' : 'Preview'}
+                    title={isPreviewMode ? 'Edit' : 'Preview'}
                   >
                     {isPreviewMode ? (
                       <>
-                        <Pencil className="w-4 h-4 mr-2" />
-                        Edit
+                        <Pencil className="w-4 h-4" />
+                        {!isMobile && <span className="ml-2">Edit</span>}
                       </>
                     ) : (
                       <>
-                        <Eye className="w-4 h-4 mr-2" />
-                        Preview
+                        <Eye className="w-4 h-4" />
+                        {!isMobile && <span className="ml-2">Preview</span>}
                       </>
                     )}
                   </Button>
@@ -488,19 +530,30 @@ export function MemoryView() {
                     onClick={saveFile}
                     disabled={!hasChanges || isSaving}
                     data-testid="save-memory-file"
+                    aria-label="Save"
+                    title="Save"
                   >
-                    <Save className="w-4 h-4 mr-2" />
-                    {isSaving ? 'Saving...' : hasChanges ? 'Save' : 'Saved'}
+                    <Save className="w-4 h-4" />
+                    {!isMobile && (
+                      <span className="ml-2">
+                        {isSaving ? 'Saving...' : hasChanges ? 'Save' : 'Saved'}
+                      </span>
+                    )}
                   </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setIsDeleteDialogOpen(true)}
-                    className="text-red-500 hover:text-red-400 hover:border-red-500/50"
-                    data-testid="delete-memory-file"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
+                  {/* Desktop-only: Delete button (use dropdown on mobile to save space) */}
+                  {!isMobile && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setIsDeleteDialogOpen(true)}
+                      className="text-red-500 hover:text-red-400 hover:border-red-500/50"
+                      data-testid="delete-memory-file"
+                      aria-label="Delete"
+                      title="Delete"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  )}
                 </div>
               </div>
 
