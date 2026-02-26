@@ -80,10 +80,22 @@ export async function deleteSelectedMemoryFile(page: Page): Promise<void> {
  */
 export async function saveMemoryFile(page: Page): Promise<void> {
   await clickElement(page, 'save-memory-file');
-  // Wait for save to complete (button shows "Saved")
+  // Wait for save to complete across desktop/mobile variants
+  // On desktop: button text shows "Saved"
+  // On mobile: icon-only button uses aria-label or title
   await page.waitForFunction(
-    () =>
-      document.querySelector('[data-testid="save-memory-file"]')?.textContent?.includes('Saved'),
+    () => {
+      const btn = document.querySelector('[data-testid="save-memory-file"]');
+      if (!btn) return false;
+      const stateText = [
+        btn.textContent ?? '',
+        btn.getAttribute('aria-label') ?? '',
+        btn.getAttribute('title') ?? '',
+      ]
+        .join(' ')
+        .toLowerCase();
+      return stateText.includes('saved');
+    },
     { timeout: 5000 }
   );
 }

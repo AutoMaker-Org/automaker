@@ -47,7 +47,9 @@ const logger = createLogger('MemoryView');
 const MARKDOWN_EXTENSIONS = ['.md', '.markdown'];
 
 const isMarkdownFile = (filename: string): boolean => {
-  const ext = filename.toLowerCase().substring(filename.lastIndexOf('.'));
+  const dotIndex = filename.lastIndexOf('.');
+  if (dotIndex < 0) return false;
+  const ext = filename.toLowerCase().substring(dotIndex);
   return MARKDOWN_EXTENSIONS.includes(ext);
 };
 

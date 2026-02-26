@@ -20,6 +20,8 @@ import {
   clickElement,
   fillInput,
   waitForNetworkIdle,
+  authenticateForTests,
+  waitForElementHidden,
 } from '../utils';
 
 // Use mobile viewport for mobile tests
@@ -38,6 +40,7 @@ test.describe('Mobile Context View', () => {
     const fileName = 'mobile-test.md';
 
     await setupProjectWithFixture(page, getFixturePath());
+    await authenticateForTests(page);
 
     await navigateToContext(page);
 
@@ -55,10 +58,7 @@ test.describe('Mobile Context View', () => {
 
     await clickElement(page, 'confirm-create-markdown');
 
-    await page.waitForFunction(
-      () => !document.querySelector('[data-testid="create-markdown-dialog"]'),
-      { timeout: 5000 }
-    );
+    await waitForElementHidden(page, 'create-markdown-dialog', { timeout: 5000 });
 
     await waitForNetworkIdle(page);
     await waitForContextFile(page, fileName);
@@ -80,6 +80,7 @@ test.describe('Mobile Context View', () => {
     const fileName = 'back-button-test.md';
 
     await setupProjectWithFixture(page, getFixturePath());
+    await authenticateForTests(page);
 
     await navigateToContext(page);
 
@@ -97,10 +98,7 @@ test.describe('Mobile Context View', () => {
 
     await clickElement(page, 'confirm-create-markdown');
 
-    await page.waitForFunction(
-      () => !document.querySelector('[data-testid="create-markdown-dialog"]'),
-      { timeout: 5000 }
-    );
+    await waitForElementHidden(page, 'create-markdown-dialog', { timeout: 5000 });
 
     await waitForNetworkIdle(page);
     await waitForContextFile(page, fileName);
@@ -122,6 +120,7 @@ test.describe('Mobile Context View', () => {
     const fileName = 'back-navigation-test.md';
 
     await setupProjectWithFixture(page, getFixturePath());
+    await authenticateForTests(page);
 
     await navigateToContext(page);
 
@@ -135,10 +134,7 @@ test.describe('Mobile Context View', () => {
 
     await clickElement(page, 'confirm-create-markdown');
 
-    await page.waitForFunction(
-      () => !document.querySelector('[data-testid="create-markdown-dialog"]'),
-      { timeout: 5000 }
-    );
+    await waitForElementHidden(page, 'create-markdown-dialog', { timeout: 5000 });
 
     await waitForNetworkIdle(page);
     await waitForContextFile(page, fileName);
@@ -168,6 +164,7 @@ test.describe('Mobile Context View', () => {
     const fileName = 'icon-buttons-test.md';
 
     await setupProjectWithFixture(page, getFixturePath());
+    await authenticateForTests(page);
 
     await navigateToContext(page);
 
@@ -185,10 +182,7 @@ test.describe('Mobile Context View', () => {
 
     await clickElement(page, 'confirm-create-markdown');
 
-    await page.waitForFunction(
-      () => !document.querySelector('[data-testid="create-markdown-dialog"]'),
-      { timeout: 5000 }
-    );
+    await waitForElementHidden(page, 'create-markdown-dialog', { timeout: 5000 });
 
     await waitForNetworkIdle(page);
     await waitForContextFile(page, fileName);
@@ -225,6 +219,7 @@ test.describe('Mobile Context View', () => {
     const fileName = 'delete-button-test.md';
 
     await setupProjectWithFixture(page, getFixturePath());
+    await authenticateForTests(page);
 
     await navigateToContext(page);
 
@@ -238,10 +233,7 @@ test.describe('Mobile Context View', () => {
 
     await clickElement(page, 'confirm-create-markdown');
 
-    await page.waitForFunction(
-      () => !document.querySelector('[data-testid="create-markdown-dialog"]'),
-      { timeout: 5000 }
-    );
+    await waitForElementHidden(page, 'create-markdown-dialog', { timeout: 5000 });
 
     await waitForNetworkIdle(page);
     await waitForContextFile(page, fileName);
@@ -259,6 +251,7 @@ test.describe('Mobile Context View', () => {
     page,
   }) => {
     await setupProjectWithFixture(page, getFixturePath());
+    await authenticateForTests(page);
 
     await navigateToContext(page);
 

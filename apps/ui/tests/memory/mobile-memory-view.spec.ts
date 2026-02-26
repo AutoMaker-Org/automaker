@@ -21,6 +21,7 @@ import {
   fillInput,
   waitForNetworkIdle,
   authenticateForTests,
+  waitForElementHidden,
 } from '../utils';
 
 // Use mobile viewport for mobile tests
@@ -53,10 +54,7 @@ test.describe('Mobile Memory View', () => {
 
     await clickElement(page, 'confirm-create-memory');
 
-    await page.waitForFunction(
-      () => !document.querySelector('[data-testid="create-memory-dialog"]'),
-      { timeout: 5000 }
-    );
+    await waitForElementHidden(page, 'create-memory-dialog', { timeout: 5000 });
 
     await waitForNetworkIdle(page);
     await waitForMemoryFile(page, fileName);
@@ -96,10 +94,7 @@ test.describe('Mobile Memory View', () => {
 
     await clickElement(page, 'confirm-create-memory');
 
-    await page.waitForFunction(
-      () => !document.querySelector('[data-testid="create-memory-dialog"]'),
-      { timeout: 5000 }
-    );
+    await waitForElementHidden(page, 'create-memory-dialog', { timeout: 5000 });
 
     await waitForNetworkIdle(page);
     await waitForMemoryFile(page, fileName);
@@ -135,10 +130,7 @@ test.describe('Mobile Memory View', () => {
 
     await clickElement(page, 'confirm-create-memory');
 
-    await page.waitForFunction(
-      () => !document.querySelector('[data-testid="create-memory-dialog"]'),
-      { timeout: 5000 }
-    );
+    await waitForElementHidden(page, 'create-memory-dialog', { timeout: 5000 });
 
     await waitForNetworkIdle(page);
     await waitForMemoryFile(page, fileName);
@@ -186,10 +178,7 @@ test.describe('Mobile Memory View', () => {
 
     await clickElement(page, 'confirm-create-memory');
 
-    await page.waitForFunction(
-      () => !document.querySelector('[data-testid="create-memory-dialog"]'),
-      { timeout: 5000 }
-    );
+    await waitForElementHidden(page, 'create-memory-dialog', { timeout: 5000 });
 
     await waitForNetworkIdle(page);
     await waitForMemoryFile(page, fileName);
@@ -240,10 +229,7 @@ test.describe('Mobile Memory View', () => {
 
     await clickElement(page, 'confirm-create-memory');
 
-    await page.waitForFunction(
-      () => !document.querySelector('[data-testid="create-memory-dialog"]'),
-      { timeout: 5000 }
-    );
+    await waitForElementHidden(page, 'create-memory-dialog', { timeout: 5000 });
 
     await waitForNetworkIdle(page);
     await waitForMemoryFile(page, fileName);

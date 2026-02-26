@@ -61,12 +61,16 @@ const MARKDOWN_EXTENSIONS = ['.md', '.markdown'];
 const IMAGE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.bmp'];
 
 const isMarkdownFile = (filename: string): boolean => {
-  const ext = filename.toLowerCase().substring(filename.lastIndexOf('.'));
+  const dotIndex = filename.lastIndexOf('.');
+  if (dotIndex < 0) return false;
+  const ext = filename.toLowerCase().substring(dotIndex);
   return MARKDOWN_EXTENSIONS.includes(ext);
 };
 
 const isImageFile = (filename: string): boolean => {
-  const ext = filename.toLowerCase().substring(filename.lastIndexOf('.'));
+  const dotIndex = filename.lastIndexOf('.');
+  if (dotIndex < 0) return false;
+  const ext = filename.toLowerCase().substring(dotIndex);
   return IMAGE_EXTENSIONS.includes(ext);
 };
 

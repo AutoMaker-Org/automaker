@@ -97,10 +97,22 @@ export async function deleteSelectedContextFile(page: Page): Promise<void> {
  */
 export async function saveContextFile(page: Page): Promise<void> {
   await clickElement(page, 'save-context-file');
-  // Wait for save to complete (button shows "Saved")
+  // Wait for save to complete across desktop/mobile variants
+  // On desktop: button text shows "Saved"
+  // On mobile: icon-only button uses aria-label or title
   await page.waitForFunction(
-    () =>
-      document.querySelector('[data-testid="save-context-file"]')?.textContent?.includes('Saved'),
+    () => {
+      const btn = document.querySelector('[data-testid="save-context-file"]');
+      if (!btn) return false;
+      const stateText = [
+        btn.textContent ?? '',
+        btn.getAttribute('aria-label') ?? '',
+        btn.getAttribute('title') ?? '',
+      ]
+        .join(' ')
+        .toLowerCase();
+      return stateText.includes('saved');
+    },
     { timeout: 5000 }
   );
 }

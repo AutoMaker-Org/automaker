@@ -70,10 +70,22 @@ export function createContextFileOnDisk(filename: string, content: string): void
 }
 
 /**
+ * Resolve and validate a memory fixture path to prevent path traversal
+ */
+function resolveMemoryFixturePath(filename: string): string {
+  const resolved = path.resolve(MEMORY_PATH, filename);
+  const base = path.resolve(MEMORY_PATH) + path.sep;
+  if (!resolved.startsWith(base)) {
+    throw new Error(`Invalid memory filename: ${filename}`);
+  }
+  return resolved;
+}
+
+/**
  * Create a memory file directly on disk (for test setup)
  */
 export function createMemoryFileOnDisk(filename: string, content: string): void {
-  const filePath = path.join(MEMORY_PATH, filename);
+  const filePath = resolveMemoryFixturePath(filename);
   fs.writeFileSync(filePath, content);
 }
 
@@ -89,7 +101,7 @@ export function contextFileExistsOnDisk(filename: string): boolean {
  * Check if a memory file exists on disk
  */
 export function memoryFileExistsOnDisk(filename: string): boolean {
-  const filePath = path.join(MEMORY_PATH, filename);
+  const filePath = resolveMemoryFixturePath(filename);
   return fs.existsSync(filePath);
 }
 
