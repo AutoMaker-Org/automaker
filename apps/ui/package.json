@@ -275,7 +275,8 @@
         "libuuid"
       ],
       "compression": "xz",
-      "vendor": "AutoMaker Team"
+      "vendor": "AutoMaker Team",
+      "afterInstall": "scripts/rpm-after-install.sh"
     },
     "nsis": {
       "oneClick": false,
