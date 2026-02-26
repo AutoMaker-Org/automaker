@@ -9,6 +9,9 @@ const mockAgent = true;
 
 export default defineConfig({
   testDir: './tests',
+  // Keep Playwright scoped to E2E specs so Vitest unit files are not executed here.
+  testMatch: '**/*.spec.ts',
+  testIgnore: ['**/unit/**'],
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: 0,
