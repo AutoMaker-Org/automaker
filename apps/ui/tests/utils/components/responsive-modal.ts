@@ -211,7 +211,12 @@ export async function verifyModalFunctionalityAcrossViewports(
     await expect(description).toBeVisible();
 
     // Verify view mode buttons are visible
-    if (viewport === 'tablet' || viewport === 'tabletLarge' || viewport === 'desktop' || viewport === 'desktopLarge') {
+    if (
+      viewport === 'tablet' ||
+      viewport === 'tabletLarge' ||
+      viewport === 'desktop' ||
+      viewport === 'desktopLarge'
+    ) {
       const logsButton = page.getByTestId('view-mode-parsed');
       await expect(logsButton).toBeVisible();
     }

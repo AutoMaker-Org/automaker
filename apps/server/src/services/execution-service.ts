@@ -214,7 +214,12 @@ ${feature.spec}
       const branchName = feature.branchName;
       if (!worktreePath && useWorktrees && branchName) {
         worktreePath = await this.worktreeResolver.findWorktreeForBranch(projectPath, branchName);
-        if (worktreePath) logger.info(`Using worktree for branch "${branchName}": ${worktreePath}`);
+        if (!worktreePath) {
+          throw new Error(
+            `Worktree enabled but no worktree found for feature branch "${branchName}".`
+          );
+        }
+        logger.info(`Using worktree for branch "${branchName}": ${worktreePath}`);
       }
       const workDir = worktreePath ? path.resolve(worktreePath) : path.resolve(projectPath);
       validateWorkingDirectory(workDir);

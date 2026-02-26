@@ -1331,16 +1331,19 @@ describe('execution-service.ts', () => {
       );
     });
 
-    it('falls back to project path when worktree not found', async () => {
+    it('emits error and does not execute agent when worktree is not found in worktree mode', async () => {
       vi.mocked(mockWorktreeResolver.findWorktreeForBranch).mockResolvedValue(null);
 
       await service.executeFeature('/test/project', 'feature-1', true);
 
-      // Should still run agent, just with project path
-      expect(mockRunAgentFn).toHaveBeenCalled();
-      const callArgs = mockRunAgentFn.mock.calls[0];
-      // First argument is workDir - should be normalized path to /test/project
-      expect(callArgs[0]).toBe(normalizePath('/test/project'));
+      expect(mockRunAgentFn).not.toHaveBeenCalled();
+      expect(mockEventBus.emitAutoModeEvent).toHaveBeenCalledWith(
+        'auto_mode_error',
+        expect.objectContaining({
+          featureId: 'feature-1',
+          error: 'Worktree enabled but no worktree found for feature branch "feature/test-1".',
+        })
+      );
     });
 
     it('skips worktree resolution when useWorktrees is false', async () => {

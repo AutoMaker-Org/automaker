@@ -131,6 +131,7 @@ export const KanbanCard = memo(function KanbanCard({
     !!isCurrentAutoTask &&
     !isInExecutionState &&
     (feature.status === 'backlog' ||
+      feature.status === 'merge_conflict' ||
       feature.status === 'ready' ||
       feature.status === 'interrupted');
   // Show running visual treatment for both fully confirmed and stale-status running tasks
@@ -149,6 +150,7 @@ export const KanbanCard = memo(function KanbanCard({
     !isSelectionMode &&
     !isRunningWithStaleStatus &&
     (feature.status === 'backlog' ||
+      feature.status === 'merge_conflict' ||
       feature.status === 'interrupted' ||
       feature.status === 'ready' ||
       feature.status === 'waiting_approval' ||
@@ -194,7 +196,10 @@ export const KanbanCard = memo(function KanbanCard({
   const cardStyle = getCardBorderStyle(cardBorderEnabled, cardBorderOpacity);
 
   // Only allow selection for features matching the selection target
-  const isSelectable = isSelectionMode && feature.status === selectionTarget;
+  const isSelectable =
+    isSelectionMode &&
+    (feature.status === selectionTarget ||
+      (selectionTarget === 'backlog' && feature.status === 'merge_conflict'));
 
   const wrapperClasses = cn(
     'relative select-none outline-none transition-transform duration-200 ease-out',
@@ -275,6 +280,7 @@ export const KanbanCard = memo(function KanbanCard({
         isDraggable={isDraggable}
         isCurrentAutoTask={isActivelyRunning}
         isSelectionMode={isSelectionMode}
+        hasContext={hasContext}
         onEdit={onEdit}
         onDelete={onDelete}
         onViewOutput={onViewOutput}

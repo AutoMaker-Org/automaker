@@ -91,6 +91,7 @@ export function useAutoMode(worktree?: WorktreeInfo) {
     setMaxConcurrencyForWorktree,
     isPrimaryWorktreeBranch,
     globalMaxConcurrency,
+    addRecentlyCompletedFeature,
   } = useAppStore(
     useShallow((state) => ({
       autoModeByWorktree: state.autoModeByWorktree,
@@ -106,6 +107,7 @@ export function useAutoMode(worktree?: WorktreeInfo) {
       setMaxConcurrencyForWorktree: state.setMaxConcurrencyForWorktree,
       isPrimaryWorktreeBranch: state.isPrimaryWorktreeBranch,
       globalMaxConcurrency: state.maxConcurrency,
+      addRecentlyCompletedFeature: state.addRecentlyCompletedFeature,
     }))
   );
 
@@ -328,7 +330,9 @@ export function useAutoMode(worktree?: WorktreeInfo) {
       });
 
       if (restoredKeys.size > 0) {
-        logger.debug(`Restored auto mode state for ${restoredKeys.size} worktree(s) from session storage`);
+        logger.debug(
+          `Restored auto mode state for ${restoredKeys.size} worktree(s) from session storage`
+        );
       }
     } catch (error) {
       logger.error('Error restoring auto mode state from session storage:', error);
@@ -506,6 +510,9 @@ export function useAutoMode(worktree?: WorktreeInfo) {
           // Feature completed - remove from running tasks and UI will reload features on its own
           if (event.featureId) {
             logger.info('Feature completed:', event.featureId, 'passes:', event.passes);
+            // Track recently completed to prevent race condition where completed features
+            // briefly appear in backlog due to stale cache data
+            addRecentlyCompletedFeature(event.featureId);
             removeRunningTask(eventProjectId, eventBranchName, event.featureId);
             addAutoModeActivity({
               featureId: event.featureId,

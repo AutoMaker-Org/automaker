@@ -43,7 +43,7 @@ describe('DevServerService Event Types', () => {
     await fs.mkdir(worktreeDir, { recursive: true });
 
     mockEmitter = new EventEmitter();
-    
+
     vi.mocked(secureFs.access).mockResolvedValue(undefined);
 
     const mockServer = new EventEmitter() as any;
@@ -79,7 +79,7 @@ describe('DevServerService Event Types', () => {
       'dev-server:stopped': [],
     };
 
-    Object.keys(emittedEvents).forEach(type => {
+    Object.keys(emittedEvents).forEach((type) => {
       mockEmitter.on(type, (payload) => emittedEvents[type].push(payload));
     });
 
@@ -91,7 +91,7 @@ describe('DevServerService Event Types', () => {
     // 2. Output & URL Detected
     mockProcess.stdout.emit('data', Buffer.from('Local: http://localhost:5173/\n'));
     // Throttled output needs a bit of time
-    await new Promise(resolve => setTimeout(resolve, 100));
+    await new Promise((resolve) => setTimeout(resolve, 100));
     expect(emittedEvents['dev-server:output'].length).toBeGreaterThanOrEqual(1);
     expect(emittedEvents['dev-server:url-detected'].length).toBe(1);
     expect(emittedEvents['dev-server:url-detected'][0].url).toBe('http://localhost:5173/');
@@ -104,12 +104,12 @@ describe('DevServerService Event Types', () => {
 
 // Helper to create a mock child process
 function createMockProcess() {
-    const mockProcess = new EventEmitter() as any;
-    mockProcess.stdout = new EventEmitter();
-    mockProcess.stderr = new EventEmitter();
-    mockProcess.kill = vi.fn();
-    mockProcess.killed = false;
-    mockProcess.pid = 12345;
-    mockProcess.unref = vi.fn();
-    return mockProcess;
+  const mockProcess = new EventEmitter() as any;
+  mockProcess.stdout = new EventEmitter();
+  mockProcess.stderr = new EventEmitter();
+  mockProcess.kill = vi.fn();
+  mockProcess.killed = false;
+  mockProcess.pid = 12345;
+  mockProcess.unref = vi.fn();
+  return mockProcess;
 }

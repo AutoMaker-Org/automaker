@@ -24,12 +24,7 @@ import {
 import { GitBranch, Cpu, FolderKanban, Settings2 } from 'lucide-react';
 import { useNavigate } from '@tanstack/react-router';
 import { toast } from 'sonner';
-import {
-  cn,
-  modelSupportsThinking,
-  migrateModelId,
-  normalizeModelEntry,
-} from '@/lib/utils';
+import { cn, modelSupportsThinking, migrateModelId, normalizeModelEntry } from '@/lib/utils';
 import { Feature, ModelAlias, ThinkingLevel, PlanningMode } from '@/store/app-store';
 import type { ReasoningEffort, PhaseModelEntry, DescriptionHistoryEntry } from '@automaker/types';
 import {
@@ -213,7 +208,8 @@ export function EditFeatureDialog({
     if (!editingFeature) return;
 
     // Validate branch selection for custom mode
-    const isBranchSelectorEnabled = editingFeature.status === 'backlog';
+    const isBranchSelectorEnabled =
+      editingFeature.status === 'backlog' || editingFeature.status === 'merge_conflict';
     if (isBranchSelectorEnabled && workMode === 'custom' && !editingFeature.branchName?.trim()) {
       toast.error('Please select a branch name');
       return;
@@ -563,7 +559,9 @@ export function EditFeatureDialog({
                 branchSuggestions={branchSuggestions}
                 branchCardCounts={branchCardCounts}
                 currentBranch={currentBranch}
-                disabled={editingFeature.status !== 'backlog'}
+                disabled={
+                  editingFeature.status !== 'backlog' && editingFeature.status !== 'merge_conflict'
+                }
                 testIdPrefix="edit-feature-work-mode"
               />
             </div>
@@ -633,7 +631,8 @@ export function EditFeatureDialog({
               hotkeyActive={!!editingFeature}
               data-testid="confirm-edit-feature"
               disabled={
-                editingFeature.status === 'backlog' &&
+                (editingFeature.status === 'backlog' ||
+                  editingFeature.status === 'merge_conflict') &&
                 workMode === 'custom' &&
                 !editingFeature.branchName?.trim()
               }

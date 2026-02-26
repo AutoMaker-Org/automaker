@@ -87,9 +87,18 @@ describe('AutoModeServiceFacade Agent Runner', () => {
     const runAgentFn = (facade as any).executionService.runAgentFn;
 
     // 2. Execute
-    await runAgentFn('/workdir', 'feature-1', 'prompt', new AbortController(), '/project', [], 'model-1', {
-      providerId: 'zai-1'
-    });
+    await runAgentFn(
+      '/workdir',
+      'feature-1',
+      'prompt',
+      new AbortController(),
+      '/project',
+      [],
+      'model-1',
+      {
+        providerId: 'zai-1',
+      }
+    );
 
     // 3. Verify
     expect(settingsHelpers.resolveProviderContext).toHaveBeenCalledWith(
@@ -117,14 +126,23 @@ describe('AutoModeServiceFacade Agent Runner', () => {
     (settingsHelpers.resolveProviderContext as any).mockResolvedValue({
       provider: mockClaudeProvider,
       credentials: { apiKey: 'model-key' },
-      resolvedModel: 'resolved-model-1'
+      resolvedModel: 'resolved-model-1',
     });
 
     const runAgentFn = (facade as any).executionService.runAgentFn;
 
-    await runAgentFn('/workdir', 'feature-1', 'prompt', new AbortController(), '/project', [], 'model-1', {
-      // no providerId
-    });
+    await runAgentFn(
+      '/workdir',
+      'feature-1',
+      'prompt',
+      new AbortController(),
+      '/project',
+      [],
+      'model-1',
+      {
+        // no providerId
+      }
+    );
 
     expect(settingsHelpers.resolveProviderContext).toHaveBeenCalledWith(
       mockSettingsService,
@@ -148,26 +166,33 @@ describe('AutoModeServiceFacade Agent Runner', () => {
     const mockClaudeProvider = {
       id: 'zai-1',
       name: 'Zai',
-      models: [
-        { id: 'custom-model-1', mapsToClaudeModel: 'claude-3-opus' }
-      ]
+      models: [{ id: 'custom-model-1', mapsToClaudeModel: 'claude-3-opus' }],
     };
     (settingsHelpers.resolveProviderContext as any).mockResolvedValue({
       provider: mockClaudeProvider,
       credentials: { apiKey: 'test-key' },
-      resolvedModel: 'claude-3-5-opus'
+      resolvedModel: 'claude-3-5-opus',
     });
 
     const runAgentFn = (facade as any).executionService.runAgentFn;
 
-    await runAgentFn('/workdir', 'feature-1', 'prompt', new AbortController(), '/project', [], 'custom-model-1', {
-      providerId: 'zai-1'
-    });
+    await runAgentFn(
+      '/workdir',
+      'feature-1',
+      'prompt',
+      new AbortController(),
+      '/project',
+      [],
+      'custom-model-1',
+      {
+        providerId: 'zai-1',
+      }
+    );
 
     // Verify createAutoModeOptions was called with the mapped model
     expect(sdkOptions.createAutoModeOptions).toHaveBeenCalledWith(
       expect.objectContaining({
-        model: 'claude-3-5-opus'
+        model: 'claude-3-5-opus',
       })
     );
 

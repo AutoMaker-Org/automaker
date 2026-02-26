@@ -6,7 +6,10 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
 import { getElectronAPI } from '@/lib/electron';
 import { useAgentOutput } from '@/hooks/queries';
-import { formatAutoModeEventContent, formatBacklogPlanEventContent } from '@/components/views/board-view/dialogs/event-content-formatter';
+import {
+  formatAutoModeEventContent,
+  formatBacklogPlanEventContent,
+} from '@/components/views/board-view/dialogs/event-content-formatter';
 import type { AutoModeEvent } from '@/types/electron';
 import type { BacklogPlanEvent } from '@automaker/types';
 import { MODAL_CONSTANTS } from '@/components/views/board-view/dialogs/agent-output-modal.constants';
@@ -38,31 +41,34 @@ export function useAgentOutputWebSocket({
   const output = initialOutput + streamedContent;
 
   // Handle auto mode events
-  const handleAutoModeEvent = useCallback((event: AutoModeEvent) => {
-    // Filter events for this specific feature only
-    if ('featureId' in event && event.featureId !== featureId) {
-      return;
-    }
-
-    const newContent = formatAutoModeEventContent(event);
-
-    if (newContent) {
-      setStreamedContent((prev) => prev + newContent);
-    }
-
-    // Handle feature completion
-    if (event.type === 'auto_mode_feature_complete' && event.passes && onFeatureComplete) {
-      // Clear any existing timeout first
-      if (closeTimeoutRef.current) {
-        clearTimeout(closeTimeoutRef.current);
+  const handleAutoModeEvent = useCallback(
+    (event: AutoModeEvent) => {
+      // Filter events for this specific feature only
+      if ('featureId' in event && event.featureId !== featureId) {
+        return;
       }
 
-      // Set timeout to close modal after delay
-      closeTimeoutRef.current = setTimeout(() => {
-        onFeatureComplete(true);
-      }, MODAL_CONSTANTS.MODAL_CLOSE_DELAY_MS);
-    }
-  }, [featureId, onFeatureComplete]);
+      const newContent = formatAutoModeEventContent(event);
+
+      if (newContent) {
+        setStreamedContent((prev) => prev + newContent);
+      }
+
+      // Handle feature completion
+      if (event.type === 'auto_mode_feature_complete' && event.passes && onFeatureComplete) {
+        // Clear any existing timeout first
+        if (closeTimeoutRef.current) {
+          clearTimeout(closeTimeoutRef.current);
+        }
+
+        // Set timeout to close modal after delay
+        closeTimeoutRef.current = setTimeout(() => {
+          onFeatureComplete(true);
+        }, MODAL_CONSTANTS.MODAL_CLOSE_DELAY_MS);
+      }
+    },
+    [featureId, onFeatureComplete]
+  );
 
   // Handle backlog plan events
   const handleBacklogPlanEvent = useCallback((event: BacklogPlanEvent) => {

@@ -34,6 +34,7 @@ import type {
   BacklogPlanResult,
   FeatureStatusWithPipeline,
   FeatureTemplate,
+  ReasoningEffort,
 } from '@automaker/types';
 import { pathsEqual } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -1116,6 +1117,8 @@ export function BoardView() {
       title: prInfo.title,
       // Pass the worktree's branch so features are created on the correct worktree
       headRefName: worktree.branch,
+      // Pass the PR URL so features are created with prUrl set
+      url: prInfo.url,
     });
     setShowPRCommentDialog(true);
   }, []);
@@ -1144,11 +1147,24 @@ export function BoardView() {
         priority: 1,
         planningMode: 'skip' as const,
         requirePlanApproval: false,
+        dependencies: [],
       };
 
+      // Capture feature IDs before creation so we can find the new one
+      const featuresBeforeIds = new Set(useAppStore.getState().features.map((f) => f.id));
       await handleAddAndStartFeature(featureData);
+
+      // Set prUrl on the created feature if the PR has a URL
+      if (prInfo.url) {
+        const latestFeatures = useAppStore.getState().features;
+        const newFeature = latestFeatures.find((f) => !featuresBeforeIds.has(f.id));
+        if (newFeature) {
+          updateFeature(newFeature.id, { prUrl: prInfo.url });
+          persistFeatureUpdate(newFeature.id, { prUrl: prInfo.url });
+        }
+      }
     },
-    [handleAddAndStartFeature, defaultSkipTests]
+    [handleAddAndStartFeature, defaultSkipTests, updateFeature, persistFeatureUpdate]
   );
 
   // Handler for resolving conflicts - opens dialog to select remote branch, then creates a feature

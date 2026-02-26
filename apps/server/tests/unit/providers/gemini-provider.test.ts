@@ -260,21 +260,13 @@ describe('gemini-provider.ts', () => {
       expect(() =>
         validateBareModelId('gemini-2.5-flash', 'GeminiProvider', 'gemini')
       ).not.toThrow();
-      expect(() =>
-        validateBareModelId('gemini-2.5-pro', 'GeminiProvider', 'gemini')
-      ).not.toThrow();
+      expect(() => validateBareModelId('gemini-2.5-pro', 'GeminiProvider', 'gemini')).not.toThrow();
     });
 
     it('should reject other provider prefixes for Gemini provider', () => {
-      expect(() =>
-        validateBareModelId('cursor-gpt-4', 'GeminiProvider', 'gemini')
-      ).toThrow();
-      expect(() =>
-        validateBareModelId('codex-gpt-4', 'GeminiProvider', 'gemini')
-      ).toThrow();
-      expect(() =>
-        validateBareModelId('copilot-gpt-4', 'GeminiProvider', 'gemini')
-      ).toThrow();
+      expect(() => validateBareModelId('cursor-gpt-4', 'GeminiProvider', 'gemini')).toThrow();
+      expect(() => validateBareModelId('codex-gpt-4', 'GeminiProvider', 'gemini')).toThrow();
+      expect(() => validateBareModelId('copilot-gpt-4', 'GeminiProvider', 'gemini')).toThrow();
     });
   });
 });

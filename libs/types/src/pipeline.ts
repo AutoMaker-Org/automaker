@@ -32,6 +32,7 @@ export function isPipelineStatus(status: string | null | undefined): status is P
 
 export type FeatureStatusWithPipeline =
   | 'backlog'
+  | 'merge_conflict'
   | 'ready'
   | 'in_progress'
   | 'interrupted'

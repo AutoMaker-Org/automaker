@@ -3,6 +3,8 @@
  * Extracts useful information from agent context files for display in kanban cards
  */
 
+import type { ClaudeCompatibleProvider } from '@automaker/types';
+
 export interface AgentTaskInfo {
   // Task list extracted from TodoWrite tool calls
   todos: {
@@ -30,9 +32,39 @@ export interface AgentTaskInfo {
 export const DEFAULT_MODEL = 'claude-opus-4-6';
 
 /**
- * Formats a model name for display
+ * Options for formatting model names
  */
-export function formatModelName(model: string): string {
+export interface FormatModelNameOptions {
+  /** Provider ID to look up custom display names */
+  providerId?: string;
+  /** List of Claude-compatible providers to search for display names */
+  claudeCompatibleProviders?: ClaudeCompatibleProvider[];
+}
+
+/**
+ * Formats a model name for display, with optional provider-aware lookup.
+ *
+ * When a providerId and providers array are supplied, this function will:
+ * 1. Look up the provider configuration
+ * 2. Find the model in the provider's models array
+ * 3. Return the displayName from that configuration
+ *
+ * This allows Claude-compatible providers (like GLM, MiniMax, OpenRouter) to
+ * show their own model names (e.g., "GLM 4.7", "MiniMax M2.1") instead of
+ * the internal Claude model aliases (e.g., "Sonnet 4.5").
+ */
+export function formatModelName(model: string, options?: FormatModelNameOptions): string {
+  // If we have a providerId and providers array, look up the display name from the provider
+  if (options?.providerId && options?.claudeCompatibleProviders) {
+    const provider = options.claudeCompatibleProviders.find((p) => p.id === options.providerId);
+    if (provider?.models) {
+      const providerModel = provider.models.find((m) => m.id === model);
+      if (providerModel?.displayName) {
+        return providerModel.displayName;
+      }
+    }
+  }
+
   // Claude models
   if (model.includes('opus-4-6') || model === 'claude-opus') return 'Opus 4.6';
   if (model.includes('opus')) return 'Opus 4.5';

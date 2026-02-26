@@ -53,7 +53,7 @@ import { toast } from 'sonner';
 import { getElectronAPI } from '@/lib/electron';
 import { getApiKey, getSessionToken, getServerUrlSync } from '@/lib/http-api-client';
 import { writeToClipboard, readFromClipboard } from '@/lib/clipboard-utils';
-import { useIsMobile } from '@/hooks/use-media-query';
+import { useIsMobile, useIsTablet } from '@/hooks/use-media-query';
 import { useVirtualKeyboardResize } from '@/hooks/use-virtual-keyboard-resize';
 import { MobileTerminalShortcuts } from './mobile-terminal-shortcuts';
 import { applyStickyModifier, type StickyModifier } from './sticky-modifier-keys';
@@ -192,8 +192,10 @@ export function TerminalPanel({
   const INITIAL_RECONNECT_DELAY = 1000;
   const [processExitCode, setProcessExitCode] = useState<number | null>(null);
 
-  // Detect mobile viewport for shortcuts bar
+  // Detect mobile/tablet viewport for shortcuts bar
   const isMobile = useIsMobile();
+  const isTablet = useIsTablet();
+  const showShortcutsBar = isMobile || isTablet;
 
   // Track virtual keyboard height on mobile to prevent overlap
   const { keyboardHeight, isKeyboardOpen } = useVirtualKeyboardResize();
@@ -1506,21 +1508,36 @@ export function TerminalPanel({
   }, [fontSize, isTerminalReady]);
 
   // Update terminal theme when app theme or custom colors change (including system preference)
+  // We read directly from the store to ensure we have the latest values, avoiding potential
+  // stale closure issues with the useShallow subscription when the terminal first becomes ready.
+  // The dependency array includes the subscription values to trigger the effect when colors change,
+  // but we read from getState() inside to guarantee we always have the most current values.
   useEffect(() => {
     if (xtermRef.current && isTerminalReady) {
       // Clear any search decorations first to prevent stale color artifacts
       searchAddonRef.current?.clearDecorations();
       const baseTheme = getTerminalTheme(resolvedTheme);
+
+      // Read colors directly from store to ensure we have the latest values.
+      // This fixes a race condition where the terminal might be created before
+      // settings are fully hydrated from the server. We prioritize store values
+      // over subscription values to avoid stale closures.
+      const storeState = useAppStore.getState().terminalState;
+      const customBgColor = storeState.customBackgroundColor;
+      const customFgColor = storeState.customForegroundColor;
+
       const terminalTheme =
-        customBackgroundColor || customForegroundColor
+        customBgColor || customFgColor
           ? {
               ...baseTheme,
-              ...(customBackgroundColor && { background: customBackgroundColor }),
-              ...(customForegroundColor && { foreground: customForegroundColor }),
+              ...(customBgColor && { background: customBgColor }),
+              ...(customFgColor && { foreground: customFgColor }),
             }
           : baseTheme;
       xtermRef.current.options.theme = terminalTheme;
     }
+    // Note: customBackgroundColor and customForegroundColor are in dependencies to trigger
+    // re-renders when colors change, but we read from getState() inside for actual values
   }, [resolvedTheme, customBackgroundColor, customForegroundColor, isTerminalReady]);
 
   // Handle keyboard shortcuts for zoom (Ctrl+Plus, Ctrl+Minus, Ctrl+0)
@@ -2398,8 +2415,8 @@ export function TerminalPanel({
         </div>
       )}
 
-      {/* Mobile shortcuts bar - special keys, clipboard, and arrow keys for touch devices */}
-      {isMobile && (
+      {/* Mobile/tablet shortcuts bar - special keys, clipboard, and arrow keys for touch devices */}
+      {showShortcutsBar && (
         <MobileTerminalShortcuts
           onSendInput={sendTerminalInput}
           isConnected={connectionStatus === 'connected'}

@@ -319,7 +319,9 @@ export class AutoModeServiceFacade {
         });
 
         if (!sdkOpts) {
-          logger.error(`[createRunAgentFn] sdkOpts is UNDEFINED! createAutoModeOptions type: ${typeof createAutoModeOptions}`);
+          logger.error(
+            `[createRunAgentFn] sdkOpts is UNDEFINED! createAutoModeOptions type: ${typeof createAutoModeOptions}`
+          );
         }
 
         logger.info(

@@ -208,24 +208,16 @@ describe('cursor-provider.ts', () => {
     describe('validateBareModelId with Cursor Gemini models', () => {
       it('should allow gemini- prefixed models for Cursor provider with expectedProvider="cursor"', () => {
         // This is the key fix - Cursor Gemini models have bare IDs like "gemini-3-pro"
-        expect(() =>
-          validateBareModelId('gemini-3-pro', 'CursorProvider', 'cursor')
-        ).not.toThrow();
+        expect(() => validateBareModelId('gemini-3-pro', 'CursorProvider', 'cursor')).not.toThrow();
         expect(() =>
           validateBareModelId('gemini-3-flash', 'CursorProvider', 'cursor')
         ).not.toThrow();
       });
 
       it('should still reject other provider prefixes for Cursor provider', () => {
-        expect(() =>
-          validateBareModelId('codex-gpt-4', 'CursorProvider', 'cursor')
-        ).toThrow();
-        expect(() =>
-          validateBareModelId('copilot-gpt-4', 'CursorProvider', 'cursor')
-        ).toThrow();
-        expect(() =>
-          validateBareModelId('opencode-gpt-4', 'CursorProvider', 'cursor')
-        ).toThrow();
+        expect(() => validateBareModelId('codex-gpt-4', 'CursorProvider', 'cursor')).toThrow();
+        expect(() => validateBareModelId('copilot-gpt-4', 'CursorProvider', 'cursor')).toThrow();
+        expect(() => validateBareModelId('opencode-gpt-4', 'CursorProvider', 'cursor')).toThrow();
       });
 
       it('should accept cursor- prefixed models when expectedProvider is "cursor" (for double-prefix validation)', () => {

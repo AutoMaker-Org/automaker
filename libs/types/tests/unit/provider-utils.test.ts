@@ -81,9 +81,7 @@ describe('provider-utils.ts', () => {
 
     describe('with expectedProvider parameter', () => {
       it('should allow cursor- prefixed models when expectedProvider is "cursor"', () => {
-        expect(() =>
-          validateBareModelId('cursor-gpt-4', 'CursorProvider', 'cursor')
-        ).not.toThrow();
+        expect(() => validateBareModelId('cursor-gpt-4', 'CursorProvider', 'cursor')).not.toThrow();
         expect(() =>
           validateBareModelId('cursor-composer-1', 'CursorProvider', 'cursor')
         ).not.toThrow();
@@ -99,9 +97,7 @@ describe('provider-utils.ts', () => {
       });
 
       it('should allow codex- prefixed models when expectedProvider is "codex"', () => {
-        expect(() =>
-          validateBareModelId('codex-gpt-4', 'CodexProvider', 'codex')
-        ).not.toThrow();
+        expect(() => validateBareModelId('codex-gpt-4', 'CodexProvider', 'codex')).not.toThrow();
       });
 
       it('should allow copilot- prefixed models when expectedProvider is "copilot"', () => {
@@ -131,13 +127,9 @@ describe('provider-utils.ts', () => {
 
         it('should still reject other provider prefixes for Cursor provider', () => {
           // Cursor should NOT receive models with codex- prefix
-          expect(() =>
-            validateBareModelId('codex-gpt-4', 'CursorProvider', 'cursor')
-          ).toThrow();
+          expect(() => validateBareModelId('codex-gpt-4', 'CursorProvider', 'cursor')).toThrow();
           // Cursor should NOT receive models with copilot- prefix
-          expect(() =>
-            validateBareModelId('copilot-gpt-4', 'CursorProvider', 'cursor')
-          ).toThrow();
+          expect(() => validateBareModelId('copilot-gpt-4', 'CursorProvider', 'cursor')).toThrow();
         });
 
         it('should allow gemini- prefixed models for Gemini provider when expectedProvider is "gemini"', () => {
