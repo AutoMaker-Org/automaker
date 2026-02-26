@@ -40,9 +40,11 @@ export const PROVIDER_PREFIXES = {
  * // Cursor provider can receive model IDs starting with "gemini-" prefix
  * PROVIDER_PREFIX_EXCEPTIONS.cursor.includes('gemini') === true
  */
-export const PROVIDER_PREFIX_EXCEPTIONS = {
+export const PROVIDER_PREFIX_EXCEPTIONS: Partial<
+  Record<ModelProvider, readonly (keyof typeof PROVIDER_PREFIXES)[]>
+> = {
   cursor: ['gemini'],
-} as const satisfies Record<string, readonly string[]>;
+};
 
 /**
  * Check if a model string represents a Cursor model
@@ -436,13 +438,14 @@ export function supportsStructuredOutput(model: string | undefined | null): bool
 export function validateBareModelId(
   model: string,
   providerName: string,
-  expectedProvider?: string
+  expectedProvider?: ModelProvider
 ): void {
   if (!model || typeof model !== 'string') {
     throw new Error(`[${providerName}] Invalid model ID: expected string, got ${typeof model}`);
   }
 
-  for (const [provider, prefix] of Object.entries(PROVIDER_PREFIXES)) {
+  for (const provider of Object.keys(PROVIDER_PREFIXES) as Array<keyof typeof PROVIDER_PREFIXES>) {
+    const prefix = PROVIDER_PREFIXES[provider];
     // Skip validation for configured provider prefix exceptions
     // (e.g., Cursor provider can receive models with "gemini-" prefix for Cursor Gemini models)
     if (expectedProvider && PROVIDER_PREFIX_EXCEPTIONS[expectedProvider]?.includes(provider)) {
