@@ -24,8 +24,8 @@ import {
   waitForElementHidden,
 } from '../utils';
 
-// Use mobile viewport for mobile tests
-test.use({ ...devices['iPhone 13 Pro'] });
+// Use mobile viewport for mobile tests in Chromium CI
+test.use({ ...devices['Pixel 5'] });
 
 test.describe('Mobile Memory View', () => {
   test.beforeEach(async () => {
@@ -261,7 +261,7 @@ test.describe('Mobile Memory View', () => {
     expect(fileListBox).not.toBeNull();
 
     if (fileListBox) {
-      // On mobile (iPhone 13 Pro has width 390), the file list should take most of the width
+      // On mobile (Pixel 5 has width 393), the file list should take most of the width
       // We check that it's significantly wider than the desktop w-64 (256px)
       expect(fileListBox.width).toBeGreaterThan(300);
     }

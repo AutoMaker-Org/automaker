@@ -21,8 +21,8 @@ import {
   waitForElementHidden,
 } from '../utils';
 
-// Use mobile viewport for mobile tests
-test.use({ ...devices['iPhone 13 Pro'] });
+// Use mobile viewport for mobile tests in Chromium CI
+test.use({ ...devices['Pixel 5'] });
 
 test.describe('Mobile Context View Operations', () => {
   test.beforeEach(async () => {
