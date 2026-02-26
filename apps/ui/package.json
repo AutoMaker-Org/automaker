@@ -267,7 +267,9 @@
       "description": "An autonomous AI development studio that helps you build software faster using AI-powered agents",
       "synopsis": "AI-powered autonomous development studio",
       "desktop": {
-        "Icon": "/opt/Automaker/resources/logo_larger.png"
+        "entry": {
+          "Icon": "/opt/Automaker/resources/logo_larger.png"
+        }
       }
     },
     "rpm": {
