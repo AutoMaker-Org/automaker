@@ -13,6 +13,7 @@ import { getProviderIconForModel } from '@/components/ui/provider-icon';
 import { useFeature, useAgentOutput } from '@/hooks/queries';
 import { queryKeys } from '@/lib/query-keys';
 import { getFirstNonEmptySummary } from '@/lib/summary-selection';
+import { useAppStore } from '@/store/app-store';
 
 /**
  * Formats thinking level for compact display

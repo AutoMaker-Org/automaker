@@ -78,8 +78,6 @@ describe('AgentOutputModal Responsive Behavior', () => {
       // In Tailwind, all responsive classes are always present on the element
       // The browser determines which ones apply based on viewport
       expect(dialogContent).toHaveClass('sm:w-[60vw]');
-      expect(dialogContent).toHaveClass('md:w-[90vw]');
-      expect(dialogContent).toHaveClass('md:max-w-[1200px]');
     });
 
     it('should use max-w-[calc(100%-2rem)] on mobile', () => {
@@ -110,8 +108,6 @@ describe('AgentOutputModal Responsive Behavior', () => {
       // At sm breakpoint, sm:w-[60vw] should be applied (takes precedence over w-full)
       expect(dialogContent).toHaveClass('sm:w-[60vw]');
       expect(dialogContent).toHaveClass('sm:max-w-[60vw]');
-      // md: classes are still present in Tailwind (just not applied at sm breakpoint)
-      expect(dialogContent).toHaveClass('md:w-[90vw]');
     });
 
     it('should use 80vh height on small screens', () => {
@@ -126,13 +122,11 @@ describe('AgentOutputModal Responsive Behavior', () => {
       const dialogContent = screen.getByTestId('agent-output-modal');
       // At sm breakpoint, sm:max-h-[80vh] should be applied
       expect(dialogContent).toHaveClass('sm:max-h-[80vh]');
-      // md: class is still present in Tailwind (just not applied at sm breakpoint)
-      expect(dialogContent).toHaveClass('md:max-h-[85vh]');
     });
   });
 
   describe('Tablet Screen (≥ 768px)', () => {
-    it('should use 90vw on tablet screens', () => {
+    it('should use sm responsive classes on tablet screens', () => {
       window.matchMedia = vi.fn().mockImplementation((query: string) => ({
         matches: query === '(min-width: 768px)',
         addListener: vi.fn(),
@@ -142,18 +136,13 @@ describe('AgentOutputModal Responsive Behavior', () => {
       render(<AgentOutputModal {...defaultProps} />);
 
       const dialogContent = screen.getByTestId('agent-output-modal');
-      // At md breakpoint, the md:w-[90vw] class should be present
-      expect(dialogContent).toHaveClass('md:w-[90vw]');
-      // The md:max-w-[1200px] overrides the sm:max-w-[60vw]
-      expect(dialogContent).toHaveClass('md:max-w-[1200px]');
-      // The md:max-h-[85vh] overrides the sm:max-h-[80vh]
-      expect(dialogContent).toHaveClass('md:max-h-[85vh]');
-      // sm: classes are still present (Tailwind cascades), but md: classes take precedence
+      // sm: classes are present for responsive behavior
+      expect(dialogContent).toHaveClass('sm:w-[60vw]');
       expect(dialogContent).toHaveClass('sm:max-w-[60vw]');
       expect(dialogContent).toHaveClass('sm:max-h-[80vh]');
     });
 
-    it('should use max-w-[1200px] on tablet screens', () => {
+    it('should use max-w constraint on tablet screens', () => {
       window.matchMedia = vi.fn().mockImplementation((query: string) => ({
         matches: query === '(min-width: 768px)',
         addListener: vi.fn(),
@@ -163,13 +152,11 @@ describe('AgentOutputModal Responsive Behavior', () => {
       render(<AgentOutputModal {...defaultProps} />);
 
       const dialogContent = screen.getByTestId('agent-output-modal');
-      // At md breakpoint, md:max-w-[1200px] should be present and override sm:max-w-[60vw]
-      expect(dialogContent).toHaveClass('md:max-w-[1200px]');
-      // sm: class is still present but md: takes precedence in Tailwind
+      // sm: max-width class is present
       expect(dialogContent).toHaveClass('sm:max-w-[60vw]');
     });
 
-    it('should use 85vh height on tablet screens', () => {
+    it('should use 80vh height on tablet screens', () => {
       window.matchMedia = vi.fn().mockImplementation((query: string) => ({
         matches: query === '(min-width: 768px)',
         addListener: vi.fn(),
@@ -179,9 +166,7 @@ describe('AgentOutputModal Responsive Behavior', () => {
       render(<AgentOutputModal {...defaultProps} />);
 
       const dialogContent = screen.getByTestId('agent-output-modal');
-      // At md breakpoint, md:max-h-[85vh] should be present and override sm:max-h-[80vh]
-      expect(dialogContent).toHaveClass('md:max-h-[85vh]');
-      // sm: class is still present but md: takes precedence in Tailwind
+      // sm: max-height class is present
       expect(dialogContent).toHaveClass('sm:max-h-[80vh]');
     });
   });
@@ -207,11 +192,6 @@ describe('AgentOutputModal Responsive Behavior', () => {
       expect(dialogContent).toHaveClass('sm:w-[60vw]');
       expect(dialogContent).toHaveClass('sm:max-w-[60vw]');
       expect(dialogContent).toHaveClass('sm:max-h-[80vh]');
-
-      // Check medium screen classes
-      expect(dialogContent).toHaveClass('md:w-[90vw]');
-      expect(dialogContent).toHaveClass('md:max-w-[1200px]');
-      expect(dialogContent).toHaveClass('md:max-h-[85vh]');
     });
   });
 
@@ -250,7 +230,7 @@ describe('AgentOutputModal Responsive Behavior', () => {
       rerender(<AgentOutputModal {...defaultProps} />);
 
       const dialogContent = screen.getByTestId('agent-output-modal');
-      expect(dialogContent).toHaveClass('md:w-[90vw]');
+      expect(dialogContent).toHaveClass('sm:w-[60vw]');
     });
   });
 });

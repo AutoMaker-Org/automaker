@@ -1337,7 +1337,6 @@ export function WorktreePanel({
             isPulling={isPulling}
             isPushing={isPushing}
             isStartingAnyDevServer={isStartingAnyDevServer}
-            isDevServerStarting={isDevServerStarting(mainWorktree)}
             aheadCount={aheadCount}
             behindCount={behindCount}
             hasRemoteBranch={hasRemoteBranch}
@@ -1430,7 +1429,6 @@ export function WorktreePanel({
               isPulling={isPulling}
               isPushing={isPushing}
               isStartingAnyDevServer={isStartingAnyDevServer}
-              isDevServerStarting={isDevServerStarting(worktree)}
               aheadCount={aheadCount}
               behindCount={behindCount}
               hasRemoteBranch={hasRemoteBranch}
