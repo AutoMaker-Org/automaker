@@ -5,7 +5,10 @@
 
 import { test, expect } from '@playwright/test';
 import { setupRealProject } from '../../utils/project/setup';
-import { waitForAgentOutputModal, getAgentOutputModalDescription } from '../../utils/components/modals';
+import {
+  waitForAgentOutputModal,
+  getAgentOutputModalDescription,
+} from '../../utils/components/modals';
 
 test.describe('AgentOutputModal Responsive Behavior', () => {
   test.describe('Mobile View (< 640px)', () => {
@@ -227,10 +230,12 @@ test.describe('AgentOutputModal Responsive Behavior', () => {
 
       // Start with mobile size
       await page.setViewportSize({ width: 375, height: 667 });
-      let modalComputedStyle = await page.locator('[data-testid="agent-output-modal"]').evaluate((el) => {
-        const style = window.getComputedStyle(el);
-        return style.width;
-      });
+      let modalComputedStyle = await page
+        .locator('[data-testid="agent-output-modal"]')
+        .evaluate((el) => {
+          const style = window.getComputedStyle(el);
+          return style.width;
+        });
 
       expect(modalComputedStyle).toMatch(/calc\(100% - 2rem\)/);
 
@@ -240,10 +245,12 @@ test.describe('AgentOutputModal Responsive Behavior', () => {
       // Wait for a moment for CSS to recalculate
       await page.waitForTimeout(100);
 
-      modalComputedStyle = await page.locator('[data-testid="agent-output-modal"]').evaluate((el) => {
-        const style = window.getComputedStyle(el);
-        return style.width;
-      });
+      modalComputedStyle = await page
+        .locator('[data-testid="agent-output-modal"]')
+        .evaluate((el) => {
+          const style = window.getComputedStyle(el);
+          return style.width;
+        });
 
       expect(modalComputedStyle).toMatch(/90vw/);
     });
@@ -261,10 +268,12 @@ test.describe('AgentOutputModal Responsive Behavior', () => {
 
       // Start with tablet size
       await page.setViewportSize({ width: 768, height: 1024 });
-      let modalComputedStyle = await page.locator('[data-testid="agent-output-modal"]').evaluate((el) => {
-        const style = window.getComputedStyle(el);
-        return style.width;
-      });
+      let modalComputedStyle = await page
+        .locator('[data-testid="agent-output-modal"]')
+        .evaluate((el) => {
+          const style = window.getComputedStyle(el);
+          return style.width;
+        });
 
       expect(modalComputedStyle).toMatch(/90vw/);
 
@@ -274,10 +283,12 @@ test.describe('AgentOutputModal Responsive Behavior', () => {
       // Wait for a moment for CSS to recalculate
       await page.waitForTimeout(100);
 
-      modalComputedStyle = await page.locator('[data-testid="agent-output-modal"]').evaluate((el) => {
-        const style = window.getComputedStyle(el);
-        return style.width;
-      });
+      modalComputedStyle = await page
+        .locator('[data-testid="agent-output-modal"]')
+        .evaluate((el) => {
+          const style = window.getComputedStyle(el);
+          return style.width;
+        });
 
       expect(modalComputedStyle).toMatch(/calc\(100% - 2rem\)/);
     });
@@ -317,7 +328,10 @@ test.describe('AgentOutputModal Responsive Behavior', () => {
 
       await page.goto('/board');
       await page.click('[data-testid="add-feature-button"]');
-      await page.fill('[data-testid="feature-input"]', 'Test long text that should wrap properly on wider tablet screens for better readability and user experience');
+      await page.fill(
+        '[data-testid="feature-input"]',
+        'Test long text that should wrap properly on wider tablet screens for better readability and user experience'
+      );
       await page.click('[data-testid="confirm-add-feature"]');
 
       await waitForAgentOutputModal(page);

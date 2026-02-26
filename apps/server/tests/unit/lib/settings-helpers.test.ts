@@ -656,7 +656,6 @@ describe('settings-helpers.ts', () => {
       expect(result.provider).toEqual(mockProvider);
     });
 
-
     // Session restore scenarios - provider.enabled: undefined should be treated as enabled
     describe('session restore scenarios (enabled: undefined)', () => {
       it('should treat provider with enabled: undefined as enabled', async () => {

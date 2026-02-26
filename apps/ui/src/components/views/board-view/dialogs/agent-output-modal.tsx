@@ -44,7 +44,7 @@ interface AgentOutputModalProps {
   branchName?: string;
 }
 
-type ViewMode = typeof MODAL_CONSTANTS.VIEW_MODES[keyof typeof MODAL_CONSTANTS.VIEW_MODES];
+type ViewMode = (typeof MODAL_CONSTANTS.VIEW_MODES)[keyof typeof MODAL_CONSTANTS.VIEW_MODES];
 
 /**
  * Renders a single phase entry card with header and content.
@@ -222,7 +222,8 @@ export function AgentOutputModal({
   }, [normalizedSummary]);
 
   // Determine the effective view mode - default to summary if available, otherwise parsed
-  const effectiveViewMode = viewMode ?? (summary ? MODAL_CONSTANTS.VIEW_MODES.SUMMARY : MODAL_CONSTANTS.VIEW_MODES.PARSED);
+  const effectiveViewMode =
+    viewMode ?? (summary ? MODAL_CONSTANTS.VIEW_MODES.SUMMARY : MODAL_CONSTANTS.VIEW_MODES.PARSED);
   const scrollRef = useRef<HTMLDivElement>(null);
   const autoScrollRef = useRef(true);
   const useWorktrees = useAppStore((state) => state.useWorktrees);
@@ -487,7 +488,8 @@ export function AgentOutputModal({
     if (!scrollRef.current) return;
 
     const { scrollTop, scrollHeight, clientHeight } = scrollRef.current;
-    const isAtBottom = scrollHeight - scrollTop - clientHeight < MODAL_CONSTANTS.AUTOSCROLL_THRESHOLD;
+    const isAtBottom =
+      scrollHeight - scrollTop - clientHeight < MODAL_CONSTANTS.AUTOSCROLL_THRESHOLD;
     autoScrollRef.current = isAtBottom;
   };
 
@@ -594,7 +596,9 @@ export function AgentOutputModal({
         )}
 
         {effectiveViewMode === 'changes' ? (
-          <div className={`flex-1 min-h-0 ${MODAL_CONSTANTS.COMPONENT_HEIGHTS.SMALL_MIN} ${MODAL_CONSTANTS.COMPONENT_HEIGHTS.SMALL_MAX} overflow-y-auto scrollbar-visible`}>
+          <div
+            className={`flex-1 min-h-0 ${MODAL_CONSTANTS.COMPONENT_HEIGHTS.SMALL_MIN} ${MODAL_CONSTANTS.COMPONENT_HEIGHTS.SMALL_MAX} overflow-y-auto scrollbar-visible`}
+          >
             {resolvedProjectPath ? (
               <GitDiffPanel
                 projectPath={resolvedProjectPath}
