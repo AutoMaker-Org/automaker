@@ -17,6 +17,10 @@ vi.mock('child_process', () => ({
   exec: vi.fn(),
 }));
 
+vi.mock('@/lib/git.js', () => ({
+  execGitCommand: vi.fn(),
+}));
+
 vi.mock('@automaker/git-utils', () => ({
   isGitRepo: vi.fn(async () => true),
 }));
@@ -46,13 +50,17 @@ vi.mock('@/lib/worktree-metadata.js', () => ({
   updateWorktreePRInfo: vi.fn(async () => undefined),
 }));
 
-vi.mock('@/routes/worktree/common.js', () => ({
-  getErrorMessage: vi.fn((e: Error) => e?.message || 'Unknown error'),
-  logError: vi.fn(),
-  normalizePath: vi.fn((p: string) => p),
-  execEnv: {},
-  isGhCliAvailable: vi.fn().mockResolvedValue(false),
-}));
+vi.mock('@/routes/worktree/common.js', async (importOriginal) => {
+  const actual = (await importOriginal()) as Record<string, unknown>;
+  return {
+    ...actual,
+    getErrorMessage: vi.fn((e: Error) => e?.message || 'Unknown error'),
+    logError: vi.fn(),
+    normalizePath: vi.fn((p: string) => p),
+    execEnv: {},
+    isGhCliAvailable: vi.fn().mockResolvedValue(false),
+  };
+});
 
 vi.mock('@/routes/github/routes/check-github-remote.js', () => ({
   checkGitHubRemote: vi.fn().mockResolvedValue({ hasGitHubRemote: false }),
@@ -60,6 +68,7 @@ vi.mock('@/routes/github/routes/check-github-remote.js', () => ({
 
 import { createListHandler } from '@/routes/worktree/routes/list.js';
 import * as secureFs from '@/lib/secure-fs.js';
+import { execGitCommand } from '@/lib/git.js';
 import { readAllWorktreeMetadata, updateWorktreePRInfo } from '@/lib/worktree-metadata.js';
 import { isGitRepo } from '@automaker/git-utils';
 import { isGhCliAvailable, normalizePath, getErrorMessage } from '@/routes/worktree/common.js';
@@ -67,10 +76,7 @@ import { checkGitHubRemote } from '@/routes/github/routes/check-github-remote.js
 
 /**
  * Set up exec mock with a handler that receives the command and cwd,
- * allowing per-command+cwd responses.
- *
- * This uses the async pattern from worktree-resolver.test.ts to ensure
- * proper behavior with promisify(exec).
+ * allowing per-command+cwd responses. (Kept for tests that still reference it.)
  */
 function setupExecMock(
   handler: (cmd: string, cwd: string | undefined) => { stdout: string; stderr?: string } | Error
@@ -83,23 +89,18 @@ function setupExecMock(
         | ((error: Error | null, result: { stdout: string; stderr: string }) => void),
       callback?: (error: Error | null, result: { stdout: string; stderr: string }) => void
     ) => {
-      // Handle both exec(cmd, callback) and exec(cmd, options, callback)
       let actualCallback: (error: Error | null, result: { stdout: string; stderr: string }) => void;
       let actualOptions: Record<string, unknown> | undefined;
 
       if (typeof options === 'function') {
-        // 2-argument form: exec(cmd, callback)
         actualCallback = options;
         actualOptions = undefined;
       } else {
-        // 3-argument form: exec(cmd, options, callback)
         actualCallback = callback!;
         actualOptions = options;
       }
 
       const cwd = actualOptions?.cwd as string | undefined;
-
-      // Call callback synchronously - promisify will still create a Promise
       const result = handler(cmd, cwd);
       if (result instanceof Error) {
         actualCallback(result, { stdout: '', stderr: '' });
@@ -108,6 +109,49 @@ function setupExecMock(
       }
     }
   );
+}
+
+/**
+ * Set up execGitCommand mock (list handler uses this via lib/git.js, not child_process.exec).
+ */
+function setupExecGitCommandMock(options: {
+  porcelainOutput: string;
+  projectBranch?: string;
+  gitDirs?: Record<string, string>;
+  worktreeBranches?: Record<string, string>;
+}) {
+  const { porcelainOutput, projectBranch = 'main', gitDirs = {}, worktreeBranches = {} } = options;
+
+  vi.mocked(execGitCommand).mockImplementation(async (args: string[], cwd: string) => {
+    if (args[0] === 'worktree' && args[1] === 'list' && args[2] === '--porcelain') {
+      return porcelainOutput;
+    }
+    if (args[0] === 'branch' && args[1] === '--show-current') {
+      if (worktreeBranches[cwd] !== undefined) {
+        return worktreeBranches[cwd] + '\n';
+      }
+      return projectBranch + '\n';
+    }
+    if (args[0] === 'rev-parse' && args[1] === '--git-dir') {
+      if (cwd && gitDirs[cwd]) {
+        return gitDirs[cwd] + '\n';
+      }
+      throw new Error('not a git directory');
+    }
+    if (args[0] === 'rev-parse' && args[1] === '--abbrev-ref' && args[2] === 'HEAD') {
+      return 'HEAD\n';
+    }
+    if (args[0] === 'worktree' && args[1] === 'prune') {
+      return '';
+    }
+    if (args[0] === 'status' && args[1] === '--porcelain') {
+      return '';
+    }
+    if (args[0] === 'diff' && args[1] === '--name-only' && args[2] === '--diff-filter=U') {
+      return '';
+    }
+    return '';
+  });
 }
 
 describe('worktree list - detached HEAD handling', () => {
@@ -136,10 +180,16 @@ describe('worktree list - detached HEAD handling', () => {
     vi.mocked(secureFs.readdir).mockRejectedValue(new Error('ENOENT'));
     // Default: readFile fails
     vi.mocked(secureFs.readFile).mockRejectedValue(new Error('ENOENT'));
+
+    // Default execGitCommand so list handler gets valid porcelain/branch output (vitest clearMocks resets implementations)
+    setupExecGitCommandMock({
+      porcelainOutput: 'worktree /project\nbranch refs/heads/main\n\n',
+      projectBranch: 'main',
+    });
   });
 
   /**
-   * Helper: set up a standard exec mock that responds to common commands.
+   * Helper: set up execGitCommand mock for the list handler.
    * Worktree-specific behavior can be customized via the options parameter.
    */
   function setupStandardExec(options: {
@@ -150,40 +200,7 @@ describe('worktree list - detached HEAD handling', () => {
     /** Map of worktree cwd -> branch for `git branch --show-current` */
     worktreeBranches?: Record<string, string>;
   }) {
-    const {
-      porcelainOutput,
-      projectBranch = 'main',
-      gitDirs = {},
-      worktreeBranches = {},
-    } = options;
-
-    setupExecMock((cmd, cwd) => {
-      if (cmd.includes('git worktree list --porcelain')) {
-        return { stdout: porcelainOutput };
-      }
-      if (cmd.includes('git branch --show-current')) {
-        // Check if this is a worktree-specific call
-        if (cwd && worktreeBranches[cwd] !== undefined) {
-          return { stdout: worktreeBranches[cwd] + '\n' };
-        }
-        // Default: return project branch
-        return { stdout: projectBranch + '\n' };
-      }
-      if (cmd.includes('git rev-parse --git-dir')) {
-        if (cwd && gitDirs[cwd]) {
-          return { stdout: gitDirs[cwd] + '\n' };
-        }
-        return new Error('not a git directory');
-      }
-      if (cmd.includes('git rev-parse --abbrev-ref HEAD')) {
-        // For detached HEAD, return 'HEAD'
-        return { stdout: 'HEAD\n' };
-      }
-      if (cmd.includes('git worktree prune')) {
-        return { stdout: '' };
-      }
-      return { stdout: '' };
-    });
+    setupExecGitCommandMock(options);
   }
 
   /** Suppress .worktrees dir scan by making access throw for the .worktrees dir. */
@@ -373,31 +390,21 @@ describe('worktree list - detached HEAD handling', () => {
       });
       disableWorktreesScan();
 
-      // All readFile calls fail
+      // All readFile calls fail (no gitDirs so rev-parse --git-dir will throw)
       vi.mocked(secureFs.readFile).mockRejectedValue(new Error('ENOENT'));
 
-      // Override: git rev-parse --git-dir also fails
-      setupExecMock((cmd, cwd) => {
-        if (cmd.includes('git worktree list --porcelain')) {
-          return {
-            stdout: [
-              'worktree /project',
-              'branch refs/heads/main',
-              '',
-              'worktree /project/.worktrees/unknown-wt',
-              'detached',
-              '',
-            ].join('\n'),
-          };
-        }
-        if (cmd.includes('git branch --show-current')) {
-          if (cwd === '/project') return { stdout: 'main\n' };
-          return { stdout: '\n' }; // empty for recovery attempt too
-        }
-        if (cmd.includes('git rev-parse --git-dir')) {
-          return new Error('not a git directory');
-        }
-        return { stdout: '' };
+      setupStandardExec({
+        porcelainOutput: [
+          'worktree /project',
+          'branch refs/heads/main',
+          '',
+          'worktree /project/.worktrees/unknown-wt',
+          'detached',
+          '',
+        ].join('\n'),
+        worktreeBranches: {
+          '/project/.worktrees/unknown-wt': '', // empty = no branch
+        },
       });
 
       const handler = createListHandler();
@@ -561,29 +568,18 @@ describe('worktree list - detached HEAD handling', () => {
     it('should correctly advance isFirst flag past detached worktrees', async () => {
       req.body = { projectPath: '/project' };
 
-      setupExecMock((cmd, cwd) => {
-        if (cmd.includes('git worktree list --porcelain')) {
-          return {
-            stdout: [
-              'worktree /project',
-              'branch refs/heads/main',
-              '',
-              'worktree /project/.worktrees/detached-wt',
-              'detached',
-              '',
-              'worktree /project/.worktrees/normal-wt',
-              'branch refs/heads/feature-x',
-              '',
-            ].join('\n'),
-          };
-        }
-        if (cmd.includes('git branch --show-current')) {
-          return { stdout: 'main\n' };
-        }
-        if (cmd.includes('git rev-parse --git-dir')) {
-          return new Error('not a git directory');
-        }
-        return { stdout: '' };
+      setupStandardExec({
+        porcelainOutput: [
+          'worktree /project',
+          'branch refs/heads/main',
+          '',
+          'worktree /project/.worktrees/detached-wt',
+          'detached',
+          '',
+          'worktree /project/.worktrees/normal-wt',
+          'branch refs/heads/feature-x',
+          '',
+        ].join('\n'),
       });
       disableWorktreesScan();
       vi.mocked(secureFs.readFile).mockRejectedValue(new Error('ENOENT'));
@@ -680,24 +676,20 @@ describe('worktree list - detached HEAD handling', () => {
     it('should recover branch for discovered worktrees with detached HEAD', async () => {
       req.body = { projectPath: '/project' };
 
-      // git worktree list returns only main
-      setupExecMock((cmd, cwd) => {
-        if (cmd.includes('git worktree list --porcelain')) {
-          return { stdout: 'worktree /project\nbranch refs/heads/main\n\n' };
+      vi.mocked(execGitCommand).mockImplementation(async (args: string[], cwd: string) => {
+        if (args[0] === 'worktree' && args[1] === 'list') {
+          return 'worktree /project\nbranch refs/heads/main\n\n';
         }
-        if (cmd.includes('git branch --show-current')) {
-          if (cwd === '/project') return { stdout: 'main\n' };
-          // For the orphan worktree, branch --show-current returns empty (detached)
-          return { stdout: '\n' };
+        if (args[0] === 'branch' && args[1] === '--show-current') {
+          return cwd === '/project' ? 'main\n' : '\n';
         }
-        if (cmd.includes('git rev-parse --abbrev-ref HEAD')) {
-          // Returns HEAD for detached state
-          return { stdout: 'HEAD\n' };
+        if (args[0] === 'rev-parse' && args[1] === '--abbrev-ref') {
+          return 'HEAD\n';
         }
-        if (cmd.includes('git rev-parse --git-dir')) {
-          return { stdout: '/project/.worktrees/orphan-wt/.git\n' };
+        if (args[0] === 'rev-parse' && args[1] === '--git-dir') {
+          return '/project/.worktrees/orphan-wt/.git\n';
         }
-        return { stdout: '' };
+        return '';
       });
 
       // .worktrees directory exists and has an orphan worktree
@@ -734,21 +726,20 @@ describe('worktree list - detached HEAD handling', () => {
     it('should skip discovered worktrees when all branch detection fails', async () => {
       req.body = { projectPath: '/project' };
 
-      setupExecMock((cmd, cwd) => {
-        if (cmd.includes('git worktree list --porcelain')) {
-          return { stdout: 'worktree /project\nbranch refs/heads/main\n\n' };
+      vi.mocked(execGitCommand).mockImplementation(async (args: string[], cwd: string) => {
+        if (args[0] === 'worktree' && args[1] === 'list') {
+          return 'worktree /project\nbranch refs/heads/main\n\n';
         }
-        if (cmd.includes('git branch --show-current')) {
-          if (cwd === '/project') return { stdout: 'main\n' };
-          return { stdout: '\n' }; // empty for orphan
+        if (args[0] === 'branch' && args[1] === '--show-current') {
+          return cwd === '/project' ? 'main\n' : '\n';
         }
-        if (cmd.includes('git rev-parse --abbrev-ref HEAD')) {
-          return { stdout: 'HEAD\n' }; // detached
+        if (args[0] === 'rev-parse' && args[1] === '--abbrev-ref') {
+          return 'HEAD\n';
         }
-        if (cmd.includes('git rev-parse --git-dir')) {
-          return new Error('not a git dir'); // can't even find git dir
+        if (args[0] === 'rev-parse' && args[1] === '--git-dir') {
+          throw new Error('not a git dir');
         }
-        return { stdout: '' };
+        return '';
       });
 
       vi.mocked(secureFs.access).mockResolvedValue(undefined);
@@ -815,44 +806,65 @@ describe('worktree list - detached HEAD handling', () => {
         return undefined;
       });
 
-      setupExecMock((cmd, cwd) => {
-        if (cmd.includes('git worktree list --porcelain')) {
-          return {
-            stdout: [
-              'worktree /project',
-              'branch refs/heads/main',
-              '',
-              'worktree /project/.worktrees/feature-a',
-              'branch refs/heads/feature-a',
-              '',
-            ].join('\n'),
-          };
-        }
-        if (cmd.includes('git branch --show-current')) {
-          return { stdout: cwd === '/project' ? 'main\n' : 'feature-a\n' };
-        }
-        if (cmd.includes('git status --porcelain')) {
-          return { stdout: '' };
-        }
-        if (cmd.includes('git rev-parse --git-dir')) {
-          return new Error('no git dir');
-        }
-        if (cmd.includes('gh pr list')) {
-          return {
-            stdout: JSON.stringify([
-              {
-                number: 42,
-                title: 'Branch PR',
-                url: 'https://github.com/org/repo/pull/42',
-                state: 'OPEN',
-                headRefName: 'feature-a',
-                createdAt: '2026-01-02T00:00:00.000Z',
-              },
-            ]),
-          };
-        }
-        return { stdout: '' };
+      setupStandardExec({
+        porcelainOutput: [
+          'worktree /project',
+          'branch refs/heads/main',
+          '',
+          'worktree /project/.worktrees/feature-a',
+          'branch refs/heads/feature-a',
+          '',
+        ].join('\n'),
+        worktreeBranches: { '/project': 'main', '/project/.worktrees/feature-a': 'feature-a' },
       });
+      vi.mocked(execGitCommand).mockImplementation(async (args: string[], cwd: string) => {
+        if (args[0] === 'rev-parse' && args[1] === '--git-dir') {
+          throw new Error('no git dir');
+        }
+        if (args[0] === 'worktree' && args[1] === 'list') {
+          return [
+            'worktree /project',
+            'branch refs/heads/main',
+            '',
+            'worktree /project/.worktrees/feature-a',
+            'branch refs/heads/feature-a',
+            '',
+          ].join('\n');
+        }
+        if (args[0] === 'branch' && args[1] === '--show-current') {
+          return cwd === '/project' ? 'main\n' : 'feature-a\n';
+        }
+        if (args[0] === 'status' && args[1] === '--porcelain') {
+          return '';
+        }
+        return '';
+      });
+      (exec as unknown as Mock).mockImplementation(
+        (
+          cmd: string,
+          _opts: unknown,
+          callback?: (err: Error | null, out: { stdout: string; stderr: string }) => void
+        ) => {
+          const cb = typeof _opts === 'function' ? _opts : callback!;
+          if (cmd.includes('gh pr list')) {
+            cb(null, {
+              stdout: JSON.stringify([
+                {
+                  number: 42,
+                  title: 'Branch PR',
+                  url: 'https://github.com/org/repo/pull/42',
+                  state: 'OPEN',
+                  headRefName: 'feature-a',
+                  createdAt: '2026-01-02T00:00:00.000Z',
+                },
+              ]),
+              stderr: '',
+            });
+          } else {
+            cb(null, { stdout: '', stderr: '' });
+          }
+        }
+      );
       disableWorktreesScan();
 
       const handler = createListHandler();
@@ -906,44 +918,65 @@ describe('worktree list - detached HEAD handling', () => {
         return undefined;
       });
 
-      setupExecMock((cmd, cwd) => {
-        if (cmd.includes('git worktree list --porcelain')) {
-          return {
-            stdout: [
-              'worktree /project-2',
-              'branch refs/heads/main',
-              '',
-              'worktree /project-2/.worktrees/feature-a',
-              'branch refs/heads/feature-a',
-              '',
-            ].join('\n'),
-          };
-        }
-        if (cmd.includes('git branch --show-current')) {
-          return { stdout: cwd === '/project-2' ? 'main\n' : 'feature-a\n' };
-        }
-        if (cmd.includes('git status --porcelain')) {
-          return { stdout: '' };
-        }
-        if (cmd.includes('git rev-parse --git-dir')) {
-          return new Error('no git dir');
-        }
-        if (cmd.includes('gh pr list')) {
-          return {
-            stdout: JSON.stringify([
-              {
-                number: 42,
-                title: 'New title from GitHub',
-                url: 'https://github.com/org/repo/pull/42',
-                state: 'MERGED',
-                headRefName: 'feature-a',
-                createdAt: '2026-01-02T00:00:00.000Z',
-              },
-            ]),
-          };
-        }
-        return { stdout: '' };
+      setupStandardExec({
+        porcelainOutput: [
+          'worktree /project-2',
+          'branch refs/heads/main',
+          '',
+          'worktree /project-2/.worktrees/feature-a',
+          'branch refs/heads/feature-a',
+          '',
+        ].join('\n'),
+        worktreeBranches: { '/project-2': 'main', '/project-2/.worktrees/feature-a': 'feature-a' },
       });
+      vi.mocked(execGitCommand).mockImplementation(async (args: string[], cwd: string) => {
+        if (args[0] === 'rev-parse' && args[1] === '--git-dir') {
+          throw new Error('no git dir');
+        }
+        if (args[0] === 'worktree' && args[1] === 'list') {
+          return [
+            'worktree /project-2',
+            'branch refs/heads/main',
+            '',
+            'worktree /project-2/.worktrees/feature-a',
+            'branch refs/heads/feature-a',
+            '',
+          ].join('\n');
+        }
+        if (args[0] === 'branch' && args[1] === '--show-current') {
+          return cwd === '/project-2' ? 'main\n' : 'feature-a\n';
+        }
+        if (args[0] === 'status' && args[1] === '--porcelain') {
+          return '';
+        }
+        return '';
+      });
+      (exec as unknown as Mock).mockImplementation(
+        (
+          cmd: string,
+          _opts: unknown,
+          callback?: (err: Error | null, out: { stdout: string; stderr: string }) => void
+        ) => {
+          const cb = typeof _opts === 'function' ? _opts : callback!;
+          if (cmd.includes('gh pr list')) {
+            cb(null, {
+              stdout: JSON.stringify([
+                {
+                  number: 42,
+                  title: 'New title from GitHub',
+                  url: 'https://github.com/org/repo/pull/42',
+                  state: 'MERGED',
+                  headRefName: 'feature-a',
+                  createdAt: '2026-01-02T00:00:00.000Z',
+                },
+              ]),
+              stderr: '',
+            });
+          } else {
+            cb(null, { stdout: '', stderr: '' });
+          }
+        }
+      );
       disableWorktreesScan();
 
       const handler = createListHandler();

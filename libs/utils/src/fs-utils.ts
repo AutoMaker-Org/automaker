@@ -15,12 +15,16 @@ export async function mkdirSafe(dirPath: string): Promise<void> {
   // Check if path already exists using lstat (doesn't follow symlinks)
   try {
     const stats = await secureFs.lstat(resolvedPath);
-    // Path exists - if it's a directory or symlink, consider it success
-    if (stats.isDirectory() || stats.isSymbolicLink()) {
+    // Guard: some environments (e.g. mocked fs) may return undefined
+    if (stats == null) {
+      // Treat as path does not exist, fall through to create
+    } else if (stats.isDirectory() || stats.isSymbolicLink()) {
+      // Path exists - if it's a directory or symlink, consider it success
       return;
+    } else {
+      // It's a file - can't create directory
+      throw new Error(`Path exists and is not a directory: ${resolvedPath}`);
     }
-    // It's a file - can't create directory
-    throw new Error(`Path exists and is not a directory: ${resolvedPath}`);
   } catch (error: any) {
     // ENOENT means path doesn't exist - we should create it
     if (error.code !== 'ENOENT') {

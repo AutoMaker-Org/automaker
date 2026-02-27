@@ -16,9 +16,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Split tests across 3 parallel shards for ~3x faster CI
-        shardIndex: [1, 2, 3]
-        shardTotal: [3]
+        # shardIndex: [1, 2, 3]
+        # shardTotal: [3]
+        shardIndex: [1]
+        shardTotal: [1]
 
     steps:
       - name: Checkout code
