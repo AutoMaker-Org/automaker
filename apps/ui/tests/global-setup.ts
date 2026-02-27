@@ -8,6 +8,7 @@
 import { chromium, FullConfig } from '@playwright/test';
 import fs from 'fs';
 import path from 'path';
+import { cleanupLeftoverTestDirs } from './utils/cleanup-test-dirs';
 
 const TEST_PORT = process.env.TEST_PORT || '3107';
 const TEST_SERVER_PORT = process.env.TEST_SERVER_PORT || '3108';
@@ -18,6 +19,9 @@ const AUTH_DIR = path.join(__dirname, '.auth');
 const AUTH_STATE_PATH = path.join(AUTH_DIR, 'storage-state.json');
 
 async function globalSetup(config: FullConfig) {
+  // Clean up leftover test dirs from previous runs (aborted, crashed, etc.)
+  cleanupLeftoverTestDirs();
+
   // Note: Server killing is handled by the pretest script in package.json
   // GlobalSetup runs AFTER webServer starts, so we can't kill the server here
 
@@ -50,8 +54,9 @@ async function authenticateAndSaveState(_config: FullConfig) {
 
   const apiKey = process.env.AUTOMAKER_API_KEY || 'test-api-key-for-e2e-tests';
 
-  // Wait for backend to be ready
+  // Wait for backend to be ready (exponential backoff: 250ms → 500ms → 1s → 2s)
   const start = Date.now();
+  let backoff = 250;
   while (Date.now() - start < 30000) {
     try {
       const health = await fetch(`${API_BASE_URL}/api/health`, {
@@ -61,7 +66,8 @@ async function authenticateAndSaveState(_config: FullConfig) {
     } catch {
       // Retry
     }
-    await new Promise((r) => setTimeout(r, 250));
+    await new Promise((r) => setTimeout(r, backoff));
+    backoff = Math.min(backoff * 2, 2000);
   }
 
   // Launch a browser to get a proper context for login
@@ -84,32 +90,37 @@ async function authenticateAndSaveState(_config: FullConfig) {
       token?: string;
     } | null;
 
-    if (response?.success && response.token) {
-      // Set the session cookie
-      await context.addCookies([
-        {
-          name: 'automaker_session',
-          value: response.token,
-          domain: '127.0.0.1',
-          path: '/',
-          httpOnly: true,
-          sameSite: 'Lax',
-        },
-      ]);
+    if (!response?.success || !response.token) {
+      throw new Error(
+        '[GlobalSetup] Login failed - cannot proceed without authentication. ' +
+          'Check that the backend is running and AUTOMAKER_API_KEY is set correctly.'
+      );
+    }
 
-      // Verify auth works
-      const statusRes = await page.request.get(`${API_BASE_URL}/api/auth/status`, {
-        timeout: 5000,
-      });
-      const statusJson = (await statusRes.json().catch(() => null)) as {
-        authenticated?: boolean;
-      } | null;
+    // Set the session cookie
+    await context.addCookies([
+      {
+        name: 'automaker_session',
+        value: response.token,
+        domain: '127.0.0.1',
+        path: '/',
+        httpOnly: true,
+        sameSite: 'Lax',
+      },
+    ]);
 
-      if (!statusJson?.authenticated) {
-        console.warn('[GlobalSetup] Auth verification failed, tests may need to re-authenticate');
-      }
-    } else {
-      console.warn('[GlobalSetup] Login failed, tests will authenticate individually');
+    // Verify auth works
+    const statusRes = await page.request.get(`${API_BASE_URL}/api/auth/status`, {
+      timeout: 5000,
+    });
+    const statusJson = (await statusRes.json().catch(() => null)) as {
+      authenticated?: boolean;
+    } | null;
+
+    if (!statusJson?.authenticated) {
+      throw new Error(
+        '[GlobalSetup] Auth verification failed - session cookie was set but status check returned unauthenticated.'
+      );
     }
 
     // Save storage state for all workers to reuse

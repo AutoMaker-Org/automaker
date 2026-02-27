@@ -5,7 +5,48 @@
 
 import { Page, expect } from '@playwright/test';
 import { waitForElement } from '../core/waiting';
-import { TIMEOUTS } from '../core/constants';
+
+/**
+ * Wait for viewport resize to stabilize by polling element dimensions
+ * until they stop changing. Much more reliable than a fixed timeout.
+ */
+async function waitForLayoutStable(page: Page, testId: string, timeout = 2000): Promise<void> {
+  await page.waitForFunction(
+    ({ testId: tid, timeout: t }) => {
+      return new Promise<boolean>((resolve) => {
+        const el = document.querySelector(`[data-testid="${tid}"]`);
+        if (!el) {
+          resolve(true);
+          return;
+        }
+        let lastWidth = el.clientWidth;
+        let lastHeight = el.clientHeight;
+        let stableCount = 0;
+        const interval = setInterval(() => {
+          const w = el.clientWidth;
+          const h = el.clientHeight;
+          if (w === lastWidth && h === lastHeight) {
+            stableCount++;
+            if (stableCount >= 3) {
+              clearInterval(interval);
+              resolve(true);
+            }
+          } else {
+            stableCount = 0;
+            lastWidth = w;
+            lastHeight = h;
+          }
+        }, 50);
+        setTimeout(() => {
+          clearInterval(interval);
+          resolve(true);
+        }, t);
+      });
+    },
+    { testId, timeout },
+    { timeout: timeout + 500 }
+  );
+}
 
 /**
  * Viewport sizes for different device types
@@ -103,7 +144,7 @@ export async function testModalWidthAcrossViewports(
     await page.setViewportSize(size);
 
     // Wait for any responsive transitions
-    await page.waitForTimeout(TIMEOUTS.animation);
+    await waitForLayoutStable(page, 'agent-output-modal');
 
     // Get modal width
     const modalWidth = await getModalWidth(page);
@@ -148,7 +189,7 @@ export async function testModalHeightAcrossViewports(
     await page.setViewportSize(size);
 
     // Wait for any responsive transitions
-    await page.waitForTimeout(TIMEOUTS.animation);
+    await waitForLayoutStable(page, 'agent-output-modal');
 
     // Get modal height
     const modalHeight = await getModalHeight(page);
@@ -177,14 +218,14 @@ export async function testModalResponsiveResize(
 ): Promise<void> {
   // Set initial viewport
   await page.setViewportSize(VIEWPORTS[fromViewport]);
-  await page.waitForTimeout(TIMEOUTS.animation);
+  await waitForLayoutStable(page, 'agent-output-modal');
 
   // Get initial modal dimensions (used for comparison context)
   await getModalComputedStyle(page);
 
   // Resize to new viewport
   await page.setViewportSize(VIEWPORTS[toViewport]);
-  await page.waitForTimeout(TIMEOUTS.animation);
+  await waitForLayoutStable(page, 'agent-output-modal');
 
   // Get new modal dimensions
   const newDimensions = await getModalComputedStyle(page);
@@ -217,7 +258,7 @@ export async function verifyModalFunctionalityAcrossViewports(
 
     // Set viewport
     await page.setViewportSize(size);
-    await page.waitForTimeout(TIMEOUTS.animation);
+    await waitForLayoutStable(page, 'agent-output-modal');
 
     // Verify modal is visible
     const modal = await waitForElement(page, 'agent-output-modal');

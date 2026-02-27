@@ -148,11 +148,37 @@ export async function cleanupTestRepo(repoPath: string): Promise<void> {
 }
 
 /**
- * Cleanup a temp directory and all its contents
+ * Recursively remove directory contents then the directory (avoids ENOTEMPTY on some systems)
+ */
+function rmDirRecursive(dir: string): void {
+  const entries = fs.readdirSync(dir, { withFileTypes: true });
+  for (const entry of entries) {
+    const fullPath = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      rmDirRecursive(fullPath);
+      fs.rmdirSync(fullPath);
+    } else {
+      fs.unlinkSync(fullPath);
+    }
+  }
+}
+
+/**
+ * Cleanup a temp directory and all its contents.
+ * Tries rmSync first; on ENOTEMPTY (e.g. macOS with git worktrees) falls back to recursive delete.
  */
 export function cleanupTempDir(tempDir: string): void {
-  if (fs.existsSync(tempDir)) {
+  if (!fs.existsSync(tempDir)) return;
+  try {
     fs.rmSync(tempDir, { recursive: true, force: true });
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException)?.code;
+    if (code === 'ENOTEMPTY' || code === 'EPERM' || code === 'EBUSY') {
+      rmDirRecursive(tempDir);
+      fs.rmdirSync(tempDir);
+    } else {
+      throw err;
+    }
   }
 }
 

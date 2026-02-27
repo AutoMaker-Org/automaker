@@ -33,10 +33,12 @@ test.describe('Project Creation', () => {
     await setupWelcomeView(page, { workspaceDir: TEST_TEMP_DIR });
 
     // Intercept settings API BEFORE authenticateForTests (which navigates to the page).
-    // Only modify the FIRST GET so we start with no project; subsequent GETs (e.g. background
-    // refetch after hydration) pass through. Otherwise the refetch overwrites the store after
-    // we create a project and the board shows "No project selected".
-    let getCount = 0;
+    // Force empty project list on ALL GETs until we click "Create Project", so that
+    // background refetches from TanStack Query don't race and flip hasProjects=true
+    // (which would replace the empty-state card with the project-list header).
+    // Once projectCreated=true, subsequent GETs pass through so the store picks up
+    // the newly created project and navigates to the board.
+    let projectCreated = false;
     await page.route('**/api/settings/global', async (route) => {
       const method = route.request().method();
       if (method === 'PUT') {
@@ -44,8 +46,7 @@ test.describe('Project Creation', () => {
       }
       const response = await route.fetch();
       const json = await response.json();
-      getCount += 1;
-      if (getCount === 1 && json.settings) {
+      if (!projectCreated && json.settings) {
         json.settings.currentProjectId = null;
         json.settings.projects = [];
         json.settings.setupComplete = true;
@@ -148,6 +149,8 @@ test.describe('Project Creation', () => {
     await page.locator('[data-testid="project-name-input"]').fill(projectName);
     await expect(page.getByText('Will be created at:')).toBeVisible({ timeout: 5000 });
 
+    // Allow subsequent settings GETs to pass through so the store picks up the new project
+    projectCreated = true;
     await page.locator('[data-testid="confirm-create-project"]').click();
 
     await expect(page.locator('[data-testid="board-view"]')).toBeVisible({ timeout: 15000 });
@@ -156,7 +159,10 @@ test.describe('Project Creation', () => {
     const expandSidebarButton = page.locator('button:has-text("Expand sidebar")');
     if (await expandSidebarButton.isVisible()) {
       await expandSidebarButton.click();
-      await page.waitForTimeout(300);
+      await page
+        .locator('button:has-text("Collapse sidebar")')
+        .waitFor({ state: 'visible', timeout: 5000 })
+        .catch(() => {});
     }
 
     // Wait for project to be set as current and visible on the page

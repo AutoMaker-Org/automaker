@@ -300,6 +300,7 @@ export async function authenticateWithApiKey(page: Page, apiKey: string): Promis
     // Ensure the backend is up before attempting login (especially in local runs where
     // the backend may be started separately from Playwright).
     const start = Date.now();
+    let authBackoff = 250;
     while (Date.now() - start < 15000) {
       try {
         const health = await page.request.get(`${API_BASE_URL}/api/health`, {
@@ -309,7 +310,8 @@ export async function authenticateWithApiKey(page: Page, apiKey: string): Promis
       } catch {
         // Retry
       }
-      await page.waitForTimeout(250);
+      await page.waitForTimeout(authBackoff);
+      authBackoff = Math.min(authBackoff * 2, 2000);
     }
 
     // Ensure we're on a page (needed for cookies to work)
@@ -397,12 +399,14 @@ export async function waitForBackendHealth(
   checkIntervalMs = 500
 ): Promise<void> {
   const startTime = Date.now();
+  let backoff = checkIntervalMs;
 
   while (Date.now() - startTime < maxWaitMs) {
-    if (await checkBackendHealth(page, checkIntervalMs)) {
+    if (await checkBackendHealth(page, Math.min(backoff, 3000))) {
       return;
     }
-    await page.waitForTimeout(checkIntervalMs);
+    await page.waitForTimeout(backoff);
+    backoff = Math.min(backoff * 2, 2000);
   }
 
   throw new Error(

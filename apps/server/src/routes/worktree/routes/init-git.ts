@@ -45,12 +45,41 @@ export function createInitGitHandler() {
 
       // Initialize git with 'main' as the default branch (matching GitHub's standard since 2020)
       // and create an initial empty commit
-      await execAsync(
-        `git init --initial-branch=main && git commit --allow-empty -m "Initial commit"`,
-        {
-          cwd: projectPath,
+      try {
+        await execAsync(
+          `git init --initial-branch=main && git commit --allow-empty -m "Initial commit"`,
+          {
+            cwd: projectPath,
+          }
+        );
+      } catch (initError: unknown) {
+        const stderr =
+          initError && typeof initError === 'object' && 'stderr' in initError
+            ? String((initError as { stderr?: string }).stderr)
+            : '';
+        // Idempotent: if .git was created by a concurrent request or a stale lock exists,
+        // treat as "repo already exists" instead of failing
+        if (
+          /could not lock config file.*File exists|fatal: could not set 'core\.repositoryformatversion'/.test(
+            stderr
+          )
+        ) {
+          try {
+            await secureFs.access(gitDirPath);
+            res.json({
+              success: true,
+              result: {
+                initialized: false,
+                message: 'Git repository already exists',
+              },
+            });
+            return;
+          } catch {
+            // .git still missing, rethrow original error
+          }
         }
-      );
+        throw initError;
+      }
 
       res.json({
         success: true,

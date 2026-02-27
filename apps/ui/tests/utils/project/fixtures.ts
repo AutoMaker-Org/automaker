@@ -8,9 +8,38 @@ export { getWorkspaceRoot };
 const WORKSPACE_ROOT = getWorkspaceRoot();
 const FIXTURE_PATH = path.join(WORKSPACE_ROOT, 'test/fixtures/projectA');
 
+// Original spec content for resetting between tests
+const ORIGINAL_SPEC_CONTENT = `<app_spec>
+  <name>Test Project A</name>
+  <description>A test fixture project for Playwright testing</description>
+  <tech_stack>
+    <item>TypeScript</item>
+    <item>React</item>
+  </tech_stack>
+</app_spec>
+`;
+
 // Worker-isolated fixture path to avoid conflicts when running tests in parallel.
 // Each Playwright worker gets its own copy of the fixture directory.
 let _workerFixturePath: string | null = null;
+
+/**
+ * Bootstrap the shared fixture directory if it doesn't exist.
+ * The fixture contains a nested .git/ dir so it can't be tracked by the
+ * parent repo — in CI this directory won't exist after checkout.
+ */
+function ensureFixtureExists(): void {
+  if (fs.existsSync(FIXTURE_PATH)) return;
+
+  fs.mkdirSync(path.join(FIXTURE_PATH, '.automaker/context'), { recursive: true });
+
+  fs.writeFileSync(path.join(FIXTURE_PATH, '.automaker/app_spec.txt'), ORIGINAL_SPEC_CONTENT);
+  fs.writeFileSync(path.join(FIXTURE_PATH, '.automaker/categories.json'), '[]');
+  fs.writeFileSync(
+    path.join(FIXTURE_PATH, '.automaker/context/context-metadata.json'),
+    '{"files": {}}'
+  );
+}
 
 /**
  * Get a worker-isolated fixture path. Creates a copy of the fixture directory
@@ -19,6 +48,9 @@ let _workerFixturePath: string | null = null;
  */
 function getWorkerFixturePath(): string {
   if (_workerFixturePath) return _workerFixturePath;
+
+  // Ensure the source fixture exists (may not in CI)
+  ensureFixtureExists();
 
   // Use process.pid + a unique suffix to isolate per-worker
   const workerId = process.env.TEST_WORKER_INDEX || process.pid.toString();
@@ -53,17 +85,6 @@ function getWorkerMemoryPath(): string {
 function getWorkerSpecPath(): string {
   return path.join(getWorkerFixturePath(), '.automaker/app_spec.txt');
 }
-
-// Original spec content for resetting between tests
-const ORIGINAL_SPEC_CONTENT = `<app_spec>
-  <name>Test Project A</name>
-  <description>A test fixture project for Playwright testing</description>
-  <tech_stack>
-    <item>TypeScript</item>
-    <item>React</item>
-  </tech_stack>
-</app_spec>
-`;
 
 /**
  * Reset the fixture's app_spec.txt to original content

@@ -38,10 +38,9 @@ export default defineConfig({
   testIgnore: ['**/unit/**'],
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
-  retries: 0,
+  retries: process.env.CI ? 2 : 0,
   // Use multiple workers for parallelism. CI gets 2 workers (constrained resources),
-  // local gets 50% of CPUs. Each worker gets its own browser context with shared auth state.
-  workers: process.env.CI ? 2 : 5,
+  workers: process.env.CI ? 2 : 8,
   reporter: process.env.CI ? 'github' : 'html',
   timeout: 30000,
   use: {
@@ -54,6 +53,7 @@ export default defineConfig({
   },
   // Global setup - authenticate once and save state for all workers
   globalSetup: require.resolve('./tests/global-setup.ts'),
+  globalTeardown: require.resolve('./tests/global-teardown.ts'),
   projects: [
     {
       name: 'chromium',

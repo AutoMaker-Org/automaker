@@ -275,15 +275,17 @@ test.describe('Board Background Persistence', () => {
       }
       if (!cachedSettingsJson) {
         const response = await route.fetch();
-        cachedSettingsJson = await response.json();
+        cachedSettingsJson = (await response.json()) as Record<string, unknown>;
       }
-      const json = JSON.parse(JSON.stringify(cachedSettingsJson));
-      if (json.settings) {
-        json.settings.currentProjectId = effectiveCurrentProjectId;
-        json.settings.projects = [projectA, projectB];
-        json.settings.sidebarOpen = true;
-        json.settings.sidebarStyle = 'unified';
+      const json = JSON.parse(JSON.stringify(cachedSettingsJson)) as Record<string, unknown>;
+      if (!json.settings || typeof json.settings !== 'object') {
+        json.settings = {};
       }
+      const settings = json.settings as Record<string, unknown>;
+      settings.currentProjectId = effectiveCurrentProjectId;
+      settings.projects = [projectA, projectB];
+      settings.sidebarOpen = true;
+      settings.sidebarStyle = 'unified';
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -313,34 +315,36 @@ test.describe('Board Background Persistence', () => {
     // Wait for board view
     await expect(page.locator('[data-testid="board-view"]')).toBeVisible({ timeout: 15000 });
 
-    // CRITICAL: Wait for settings to be loaded (useProjectSettingsLoader hook)
-    // This ensures the background settings are fetched from the server
-    await page.waitForTimeout(2000);
-
-    // Check if background settings were applied by checking the store
-    // We can't directly access React state, so we'll verify via DOM/CSS
+    // Wait for settings to be loaded (useProjectSettingsLoader hook)
+    // Poll for the board view to be fully rendered and stable
     const boardView = page.locator('[data-testid="board-view"]');
-    await expect(boardView).toBeVisible();
+    await expect(boardView).toBeVisible({ timeout: 15000 });
 
-    // Wait for initial project load to stabilize
-    await page.waitForTimeout(500);
+    // Wait for settings API calls to complete (at least one settings call should have been made)
+    await expect(async () => {
+      expect(settingsApiCalls.length).toBeGreaterThan(0);
+    }).toPass({ timeout: 10000 });
 
     // Ensure sidebar is expanded before interacting with project selector
     const expandSidebarButton = page.locator('button:has-text("Expand sidebar")');
     if (await expandSidebarButton.isVisible()) {
       await expandSidebarButton.click();
-      await page.waitForTimeout(300);
+      await page
+        .locator('button:has-text("Collapse sidebar")')
+        .waitFor({ state: 'visible', timeout: 5000 })
+        .catch(() => {});
     }
 
     // Switch to project B (no background)
+    // Use retry pattern: background re-renders (worktree loading, settings sync) can
+    // swallow clicks or close the dropdown immediately after it opens.
     const projectSelector = page.locator('[data-testid="project-dropdown-trigger"]');
-    await expect(projectSelector).toBeVisible({ timeout: 5000 });
-    await projectSelector.click();
-
-    // Wait for dropdown to be visible
-    await expect(page.locator('[data-testid="project-dropdown-content"]')).toBeVisible({
-      timeout: 5000,
-    });
+    await expect(async () => {
+      await projectSelector.click();
+      await expect(page.locator('[data-testid="project-dropdown-content"]')).toBeVisible({
+        timeout: 2000,
+      });
+    }).toPass({ timeout: 10000 });
 
     const projectPickerB = page.locator(`[data-testid="project-item-${projectBId}"]`);
     await expect(projectPickerB).toBeVisible({ timeout: 5000 });
@@ -357,38 +361,46 @@ test.describe('Board Background Persistence', () => {
       page.locator('[data-testid="project-dropdown-trigger"]').getByText(projectBName)
     ).toBeVisible({ timeout: 15000 });
 
-    // Wait a bit for project B to fully load before switching
-    await page.waitForTimeout(500);
-
     // Ensure sidebar stays expanded after navigation (it may collapse when switching projects)
     const expandBtn = page.locator('button:has-text("Expand sidebar")');
     if (await expandBtn.isVisible()) {
       await expandBtn.click();
-      await page.waitForTimeout(300);
+      await page
+        .locator('button:has-text("Collapse sidebar")')
+        .waitFor({ state: 'visible', timeout: 5000 })
+        .catch(() => {});
     }
 
-    // Switch back to project A
-    effectiveCurrentProjectId = projectAId;
-    const projectSelector2 = page.locator('[data-testid="project-dropdown-trigger"]');
-    await expect(projectSelector2).toBeVisible({ timeout: 5000 });
-    await projectSelector2.click();
-
-    // Wait for dropdown to be visible
-    await expect(page.locator('[data-testid="project-dropdown-content"]')).toBeVisible({
-      timeout: 5000,
-    });
-
-    const projectPickerA = page.locator(`[data-testid="project-item-${projectAId}"]`);
-    await expect(projectPickerA).toBeVisible({ timeout: 5000 });
-    await projectPickerA.click();
+    // Switch back to project A. The dropdown list re-renders when settings poll (element
+    // becomes unstable/detached). Retry: open dropdown, wait for list to have items,
+    // then click by name so we get a fresh element if the list was re-rendered.
+    const trigger = page.locator('[data-testid="project-dropdown-trigger"]');
+    await expect(async () => {
+      await trigger.click();
+      await expect(page.locator('[data-testid="project-dropdown-content"]')).toBeVisible({
+        timeout: 2000,
+      });
+      // Wait for the list to be populated (at least project B item, since we're on B)
+      await expect(page.locator(`[data-testid="project-item-${projectBId}"]`)).toBeVisible({
+        timeout: 3000,
+      });
+      await page.getByRole('menuitem', { name: projectAName }).click({ force: true });
+    }).toPass({ timeout: 15000 });
 
     // Verify we're back on project A
     await expect(
       page.locator('[data-testid="project-dropdown-trigger"]').getByText(projectAName)
     ).toBeVisible({ timeout: 15000 });
 
-    // CRITICAL: Wait for settings to be loaded again
-    await page.waitForTimeout(2000);
+    // Wait for settings to be re-loaded for project A
+    const prevCallCount = settingsApiCalls.length;
+    await expect(async () => {
+      expect(settingsApiCalls.length).toBeGreaterThan(prevCallCount);
+    })
+      .toPass({ timeout: 10000 })
+      .catch(() => {
+        // Settings may be cached, which is fine
+      });
 
     // Verify that the settings API was called for project A at least once (initial load).
     // Note: When switching back, the app may use cached settings and skip re-fetching.
@@ -573,8 +585,11 @@ test.describe('Board Background Persistence', () => {
     // Should go straight to board view (not welcome) since we have currentProject
     await expect(page.locator('[data-testid="board-view"]')).toBeVisible({ timeout: 15000 });
 
-    // Wait for settings to load
-    await page.waitForTimeout(2000);
+    // Wait for settings to load by checking API calls
+    await expect(async () => {
+      const calls = settingsApiCalls.filter((call) => call.body.includes(projectPath));
+      expect(calls.length).toBeGreaterThanOrEqual(1);
+    }).toPass({ timeout: 10000 });
 
     // Verify that the settings API was called for this project
     const projectSettingsCalls = settingsApiCalls.filter((call) => call.body.includes(projectPath));
