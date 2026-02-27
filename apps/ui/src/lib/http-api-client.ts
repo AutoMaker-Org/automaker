@@ -2257,8 +2257,8 @@ export class HttpApiClient implements ElectronAPI {
       }),
     stageFiles: (worktreePath: string, files: string[], operation: 'stage' | 'unstage') =>
       this.post('/api/worktree/stage-files', { worktreePath, files, operation }),
-    pull: (worktreePath: string, remote?: string, stashIfNeeded?: boolean) =>
-      this.post('/api/worktree/pull', { worktreePath, remote, stashIfNeeded }),
+    pull: (worktreePath: string, remote?: string, stashIfNeeded?: boolean, remoteBranch?: string) =>
+      this.post('/api/worktree/pull', { worktreePath, remote, remoteBranch, stashIfNeeded }),
     checkoutBranch: (
       worktreePath: string,
       branchName: string,
@@ -2374,8 +2374,8 @@ export class HttpApiClient implements ElectronAPI {
       this.post('/api/worktree/stash-drop', { worktreePath, stashIndex }),
     cherryPick: (worktreePath: string, commitHashes: string[], options?: { noCommit?: boolean }) =>
       this.post('/api/worktree/cherry-pick', { worktreePath, commitHashes, options }),
-    rebase: (worktreePath: string, ontoBranch: string) =>
-      this.post('/api/worktree/rebase', { worktreePath, ontoBranch }),
+    rebase: (worktreePath: string, ontoBranch: string, remote?: string) =>
+      this.post('/api/worktree/rebase', { worktreePath, ontoBranch, remote }),
     abortOperation: (worktreePath: string) =>
       this.post('/api/worktree/abort-operation', { worktreePath }),
     continueOperation: (worktreePath: string) =>

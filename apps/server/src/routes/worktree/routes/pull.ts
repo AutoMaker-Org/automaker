@@ -23,9 +23,11 @@ import type { PullResult } from '../../../services/pull-service.js';
 export function createPullHandler() {
   return async (req: Request, res: Response): Promise<void> => {
     try {
-      const { worktreePath, remote, stashIfNeeded } = req.body as {
+      const { worktreePath, remote, remoteBranch, stashIfNeeded } = req.body as {
         worktreePath: string;
         remote?: string;
+        /** Specific remote branch to pull (e.g. 'main'). When provided, pulls this branch from the remote regardless of tracking config. */
+        remoteBranch?: string;
         /** When true, automatically stash local changes before pulling and reapply after */
         stashIfNeeded?: boolean;
       };
@@ -39,7 +41,7 @@ export function createPullHandler() {
       }
 
       // Execute the pull via the service
-      const result = await performPull(worktreePath, { remote, stashIfNeeded });
+      const result = await performPull(worktreePath, { remote, remoteBranch, stashIfNeeded });
 
       // Map service result to HTTP response
       mapResultToResponse(res, result);

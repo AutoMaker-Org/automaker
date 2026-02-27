@@ -28,6 +28,8 @@ const logger = createLogger('PullService');
 export interface PullOptions {
   /** Remote name to pull from (defaults to 'origin') */
   remote?: string;
+  /** Specific remote branch to pull (e.g. 'main'). When provided, overrides the tracking branch and fetches this branch from the remote. */
+  remoteBranch?: string;
   /** When true, automatically stash local changes before pulling and reapply after */
   stashIfNeeded?: boolean;
 }
@@ -243,6 +245,7 @@ export async function performPull(
 ): Promise<PullResult> {
   const targetRemote = options?.remote || 'origin';
   const stashIfNeeded = options?.stashIfNeeded ?? false;
+  const targetRemoteBranch = options?.remoteBranch;
 
   // 1. Get current branch name
   let branchName: string;
@@ -313,24 +316,34 @@ export async function performPull(
   }
 
   // 7. Verify upstream tracking or remote branch exists
-  const upstreamStatus = await hasUpstreamOrRemoteBranch(worktreePath, branchName, targetRemote);
-  if (upstreamStatus === 'none') {
-    let stashRecoveryFailed = false;
-    if (didStash) {
-      const stashPopped = await tryPopStash(worktreePath);
-      stashRecoveryFailed = !stashPopped;
+  // Skip this check when a specific remote branch is provided - we always use
+  // explicit 'git pull <remote> <branch>' args in that case.
+  let upstreamStatus: UpstreamStatus = 'tracking';
+  if (!targetRemoteBranch) {
+    upstreamStatus = await hasUpstreamOrRemoteBranch(worktreePath, branchName, targetRemote);
+    if (upstreamStatus === 'none') {
+      let stashRecoveryFailed = false;
+      if (didStash) {
+        const stashPopped = await tryPopStash(worktreePath);
+        stashRecoveryFailed = !stashPopped;
+      }
+      return {
+        success: false,
+        error: `Branch '${branchName}' has no upstream branch on remote '${targetRemote}'. Push it first or set upstream with: git branch --set-upstream-to=${targetRemote}/${branchName}${stashRecoveryFailed ? ' Local changes remain stashed and need manual recovery (run: git stash pop).' : ''}`,
+        stashRecoveryFailed: stashRecoveryFailed ? stashRecoveryFailed : undefined,
+      };
     }
-    return {
-      success: false,
-      error: `Branch '${branchName}' has no upstream branch on remote '${targetRemote}'. Push it first or set upstream with: git branch --set-upstream-to=${targetRemote}/${branchName}${stashRecoveryFailed ? ' Local changes remain stashed and need manual recovery (run: git stash pop).' : ''}`,
-      stashRecoveryFailed: stashRecoveryFailed ? stashRecoveryFailed : undefined,
-    };
   }
 
   // 8. Pull latest changes
+  // When a specific remote branch is requested, always use explicit remote + branch args.
   // When the branch has a configured upstream tracking ref, let Git use it automatically.
   // When only the remote branch exists (no tracking ref), explicitly specify remote and branch.
-  const pullArgs = upstreamStatus === 'tracking' ? ['pull'] : ['pull', targetRemote, branchName];
+  const pullArgs = targetRemoteBranch
+    ? ['pull', targetRemote, targetRemoteBranch]
+    : upstreamStatus === 'tracking'
+      ? ['pull']
+      : ['pull', targetRemote, branchName];
   let pullConflict = false;
   let pullConflictFiles: string[] = [];
 

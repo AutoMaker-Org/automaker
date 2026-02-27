@@ -2389,12 +2389,18 @@ function createMockWorktreeAPI(): WorktreeAPI {
       };
     },
 
-    pull: async (worktreePath: string, remote?: string, stashIfNeeded?: boolean) => {
+    pull: async (
+      worktreePath: string,
+      remote?: string,
+      stashIfNeeded?: boolean,
+      remoteBranch?: string
+    ) => {
       const targetRemote = remote || 'origin';
       console.log('[Mock] Pulling latest changes for:', {
         worktreePath,
         remote: targetRemote,
         stashIfNeeded,
+        remoteBranch,
       });
       return {
         success: true,
@@ -2902,8 +2908,8 @@ function createMockWorktreeAPI(): WorktreeAPI {
         },
       };
     },
-    rebase: async (worktreePath: string, ontoBranch: string) => {
-      console.log('[Mock] Rebase:', { worktreePath, ontoBranch });
+    rebase: async (worktreePath: string, ontoBranch: string, remote?: string) => {
+      console.log('[Mock] Rebase:', { worktreePath, ontoBranch, remote });
       return {
         success: true,
         result: {

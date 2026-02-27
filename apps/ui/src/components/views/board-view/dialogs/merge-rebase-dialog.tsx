@@ -192,15 +192,9 @@ export function MergeRebaseDialog({
       const api = getHttpApiClient();
 
       if (selectedStrategy === 'rebase') {
-        // First fetch the remote to ensure we have latest refs
-        try {
-          await api.worktree.pull(worktree.path, selectedRemote);
-        } catch {
-          // Fetch may fail if no upstream - that's okay, we'll try rebase anyway
-        }
-
-        // Attempt the rebase operation
-        const result = await api.worktree.rebase(worktree.path, selectedBranch);
+        // Attempt the rebase operation - the rebase service fetches from the remote
+        // before rebasing to ensure we have up-to-date refs
+        const result = await api.worktree.rebase(worktree.path, selectedBranch, selectedRemote);
 
         if (result.success) {
           toast.success(`Rebased onto ${selectedBranch}`, {
@@ -223,9 +217,18 @@ export function MergeRebaseDialog({
           setStep('select');
         }
       } else {
-        // Merge strategy - attempt to merge the remote branch
-        // Use the pull endpoint for merging remote branches
-        const result = await api.worktree.pull(worktree.path, selectedRemote, true);
+        // Merge strategy - merge the selected remote branch into the current branch.
+        // selectedBranch is a full ref like 'origin/main'; extract the short branch name
+        // so we can pass it to 'git pull <remote> <branch>'.
+        const remoteBranchShortName = selectedBranch.startsWith(`${selectedRemote}/`)
+          ? selectedBranch.slice(selectedRemote.length + 1)
+          : selectedBranch;
+        const result = await api.worktree.pull(
+          worktree.path,
+          selectedRemote,
+          true,
+          remoteBranchShortName
+        );
 
         if (result.success && result.result) {
           if (result.result.hasConflicts) {
