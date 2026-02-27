@@ -31,7 +31,7 @@ test.describe('Edit Feature', () => {
       fs.mkdirSync(TEST_TEMP_DIR, { recursive: true });
     }
 
-    projectPath = path.join(TEST_TEMP_DIR, projectName);
+    projectPath = path.resolve(path.join(TEST_TEMP_DIR, projectName));
     fs.mkdirSync(projectPath, { recursive: true });
 
     fs.writeFileSync(
@@ -82,7 +82,7 @@ test.describe('Edit Feature', () => {
     await confirmAddFeature(page);
     await page.waitForTimeout(2000);
 
-    // Wait for the feature to appear in the backlog
+    // Wait for the feature to appear in the backlog (optimistic UI)
     await expect(async () => {
       const backlogColumn = page.locator('[data-testid="kanban-column-backlog"]');
       const featureCard = backlogColumn.locator('[data-testid^="kanban-card-"]').filter({
@@ -100,6 +100,19 @@ test.describe('Edit Feature', () => {
     const cardTestId = await featureCard.getAttribute('data-testid');
     const featureId = cardTestId?.replace('kanban-card-', '');
     expect(featureId).toBeTruthy();
+
+    // Wait for feature.json to exist on disk (create API has completed); the card
+    // appears optimistically before the server writes the file.
+    const featureFilePath = path.join(
+      projectPath,
+      '.automaker',
+      'features',
+      featureId || '',
+      'feature.json'
+    );
+    await expect(async () => {
+      expect(fs.existsSync(featureFilePath)).toBe(true);
+    }).toPass({ timeout: 15000 });
 
     // Collapse the sidebar first to avoid it intercepting clicks
     const collapseSidebarButton = page.locator('button:has-text("Collapse sidebar")');
@@ -134,19 +147,21 @@ test.describe('Edit Feature', () => {
       { timeout: 5000 }
     );
 
-    // Verify persistence on disk (source of truth for feature metadata)
-    const featureFilePath = path.join(
-      projectPath,
-      '.automaker',
-      'features',
-      featureId || '',
-      'feature.json'
-    );
+    // Wait for the card to show the updated description so we know the update API has completed
+    await expect(
+      page
+        .locator('[data-testid="kanban-column-backlog"]')
+        .locator(`[data-testid="kanban-card-${featureId}"]`)
+        .filter({ hasText: updatedDescription })
+    ).toBeVisible({ timeout: 10000 });
 
+    // Verify persistence on disk (source of truth for feature metadata).
+    // Check file exists first so we retry on assertion failure instead of throwing ENOENT.
     await expect(async () => {
+      expect(fs.existsSync(featureFilePath)).toBe(true);
       const raw = fs.readFileSync(featureFilePath, 'utf-8');
       const parsed = JSON.parse(raw) as { description?: string };
       expect(parsed.description).toBe(updatedDescription);
-    }).toPass({ timeout: 10000 });
+    }).toPass({ timeout: 15000 });
   });
 });

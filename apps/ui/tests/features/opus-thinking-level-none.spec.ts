@@ -92,10 +92,29 @@ test.describe('Opus thinking level', () => {
     // When "None" is selected, the badge should NOT show "Adaptive"
     await expect(page.locator('[data-testid="model-selector"]')).not.toContainText('Adaptive');
 
+    // Wait for the create API to complete so the server has written the feature to disk
+    const createResponsePromise = page.waitForResponse(
+      (res) =>
+        res.url().includes('/api/features/create') &&
+        res.request().method() === 'POST' &&
+        res.status() === 200,
+      { timeout: 15000 }
+    );
+
     await confirmAddFeature(page);
+    await createResponsePromise;
+
+    // Wait for the feature to appear in the backlog
+    await expect(async () => {
+      const backlogColumn = page.locator('[data-testid="kanban-column-backlog"]');
+      const featureCard = backlogColumn.locator('[data-testid^="kanban-card-"]').filter({
+        hasText: featureDescription,
+      });
+      expect(await featureCard.count()).toBeGreaterThan(0);
+    }).toPass({ timeout: 10000 });
 
     const featuresDir = path.join(projectPath, '.automaker', 'features');
-    await expect.poll(() => fs.readdirSync(featuresDir).length).toBe(1);
+    await expect.poll(() => fs.readdirSync(featuresDir).length, { timeout: 10000 }).toBe(1);
 
     const featureDir = fs.readdirSync(featuresDir)[0];
     const featureJsonPath = path.join(featuresDir, featureDir, 'feature.json');

@@ -7,9 +7,52 @@ export { getWorkspaceRoot };
 
 const WORKSPACE_ROOT = getWorkspaceRoot();
 const FIXTURE_PATH = path.join(WORKSPACE_ROOT, 'test/fixtures/projectA');
-const SPEC_FILE_PATH = path.join(FIXTURE_PATH, '.automaker/app_spec.txt');
-const CONTEXT_PATH = path.join(FIXTURE_PATH, '.automaker/context');
-const MEMORY_PATH = path.join(FIXTURE_PATH, '.automaker/memory');
+
+// Worker-isolated fixture path to avoid conflicts when running tests in parallel.
+// Each Playwright worker gets its own copy of the fixture directory.
+let _workerFixturePath: string | null = null;
+
+/**
+ * Get a worker-isolated fixture path. Creates a copy of the fixture directory
+ * for this worker process so parallel tests don't conflict.
+ * Falls back to the shared fixture path for backwards compatibility.
+ */
+function getWorkerFixturePath(): string {
+  if (_workerFixturePath) return _workerFixturePath;
+
+  // Use process.pid + a unique suffix to isolate per-worker
+  const workerId = process.env.TEST_WORKER_INDEX || process.pid.toString();
+  const workerDir = path.join(WORKSPACE_ROOT, `test/fixtures/.worker-${workerId}`);
+
+  // Copy projectA fixture to worker directory if it doesn't exist
+  if (!fs.existsSync(workerDir)) {
+    fs.cpSync(FIXTURE_PATH, workerDir, { recursive: true });
+  }
+
+  _workerFixturePath = workerDir;
+  return workerDir;
+}
+
+/**
+ * Get the worker-isolated context path
+ */
+function getWorkerContextPath(): string {
+  return path.join(getWorkerFixturePath(), '.automaker/context');
+}
+
+/**
+ * Get the worker-isolated memory path
+ */
+function getWorkerMemoryPath(): string {
+  return path.join(getWorkerFixturePath(), '.automaker/memory');
+}
+
+/**
+ * Get the worker-isolated spec file path
+ */
+function getWorkerSpecPath(): string {
+  return path.join(getWorkerFixturePath(), '.automaker/app_spec.txt');
+}
 
 // Original spec content for resetting between tests
 const ORIGINAL_SPEC_CONTENT = `<app_spec>
@@ -26,39 +69,43 @@ const ORIGINAL_SPEC_CONTENT = `<app_spec>
  * Reset the fixture's app_spec.txt to original content
  */
 export function resetFixtureSpec(): void {
-  const dir = path.dirname(SPEC_FILE_PATH);
+  const specPath = getWorkerSpecPath();
+  const dir = path.dirname(specPath);
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
   }
-  fs.writeFileSync(SPEC_FILE_PATH, ORIGINAL_SPEC_CONTENT);
+  fs.writeFileSync(specPath, ORIGINAL_SPEC_CONTENT);
 }
 
 /**
  * Reset the context directory to empty state
  */
 export function resetContextDirectory(): void {
-  if (fs.existsSync(CONTEXT_PATH)) {
-    fs.rmSync(CONTEXT_PATH, { recursive: true });
+  const contextPath = getWorkerContextPath();
+  if (fs.existsSync(contextPath)) {
+    fs.rmSync(contextPath, { recursive: true });
   }
-  fs.mkdirSync(CONTEXT_PATH, { recursive: true });
+  fs.mkdirSync(contextPath, { recursive: true });
 }
 
 /**
  * Reset the memory directory to empty state
  */
 export function resetMemoryDirectory(): void {
-  if (fs.existsSync(MEMORY_PATH)) {
-    fs.rmSync(MEMORY_PATH, { recursive: true });
+  const memoryPath = getWorkerMemoryPath();
+  if (fs.existsSync(memoryPath)) {
+    fs.rmSync(memoryPath, { recursive: true });
   }
-  fs.mkdirSync(MEMORY_PATH, { recursive: true });
+  fs.mkdirSync(memoryPath, { recursive: true });
 }
 
 /**
  * Resolve and validate a context fixture path to prevent path traversal
  */
 function resolveContextFixturePath(filename: string): string {
-  const resolved = path.resolve(CONTEXT_PATH, filename);
-  const base = path.resolve(CONTEXT_PATH) + path.sep;
+  const contextPath = getWorkerContextPath();
+  const resolved = path.resolve(contextPath, filename);
+  const base = path.resolve(contextPath) + path.sep;
   if (!resolved.startsWith(base)) {
     throw new Error(`Invalid context filename: ${filename}`);
   }
@@ -77,8 +124,9 @@ export function createContextFileOnDisk(filename: string, content: string): void
  * Resolve and validate a memory fixture path to prevent path traversal
  */
 function resolveMemoryFixturePath(filename: string): string {
-  const resolved = path.resolve(MEMORY_PATH, filename);
-  const base = path.resolve(MEMORY_PATH) + path.sep;
+  const memoryPath = getWorkerMemoryPath();
+  const resolved = path.resolve(memoryPath, filename);
+  const base = path.resolve(memoryPath) + path.sep;
   if (!resolved.startsWith(base)) {
     throw new Error(`Invalid memory filename: ${filename}`);
   }
@@ -113,10 +161,11 @@ export function memoryFileExistsOnDisk(filename: string): boolean {
  * Set up localStorage with a project pointing to our test fixture
  * Note: In CI, setup wizard is also skipped via NEXT_PUBLIC_SKIP_SETUP env var
  * Project path must be under test/ or temp to avoid affecting the main project's git.
+ * Defaults to a worker-isolated copy of the fixture to support parallel test execution.
  */
 export async function setupProjectWithFixture(
   page: Page,
-  projectPath: string = FIXTURE_PATH
+  projectPath: string = getWorkerFixturePath()
 ): Promise<void> {
   assertSafeProjectPath(projectPath);
   await page.addInitScript((pathArg: string) => {
@@ -175,6 +224,7 @@ export async function setupProjectWithFixture(
       theme: 'dark',
       sidebarOpen: true,
       maxConcurrency: 3,
+      skipSandboxWarning: true,
     };
     localStorage.setItem('automaker-settings-cache', JSON.stringify(settingsCache));
 
@@ -184,10 +234,10 @@ export async function setupProjectWithFixture(
 }
 
 /**
- * Get the fixture path
+ * Get the fixture path (worker-isolated for parallel test execution)
  */
 export function getFixturePath(): string {
-  return FIXTURE_PATH;
+  return getWorkerFixturePath();
 }
 
 /**
@@ -198,5 +248,5 @@ export async function setupMockProjectWithProfiles(
   page: Page,
   _options?: { customProfilesCount?: number }
 ): Promise<void> {
-  await setupProjectWithFixture(page, FIXTURE_PATH);
+  await setupProjectWithFixture(page);
 }

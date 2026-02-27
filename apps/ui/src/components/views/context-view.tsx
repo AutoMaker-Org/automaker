@@ -242,8 +242,13 @@ export function ContextView() {
   const handleSelectFile = (file: ContextFile) => {
     // Note: Unsaved changes warning could be added here in the future
     // For now, silently proceed to avoid disrupting mobile UX flow
-    loadFileContent(file);
+    // Set selected file immediately for responsive UI feedback,
+    // then load content asynchronously
+    setSelectedFile(file);
+    setEditedContent(file.content || '');
+    setHasChanges(false);
     setIsPreviewMode(isMarkdownFilename(file.name));
+    loadFileContent(file);
   };
 
   // Save current file
@@ -527,11 +532,13 @@ export function ContextView() {
       delete metadata.files[selectedFile.name];
       await saveMetadata(metadata);
 
+      // Refresh file list before closing dialog so UI is updated when dialog dismisses
+      await loadContextFiles();
+
       setIsDeleteDialogOpen(false);
       setSelectedFile(null);
       setEditedContent('');
       setHasChanges(false);
-      await loadContextFiles();
     } catch (error) {
       logger.error('Failed to delete file:', error);
     }

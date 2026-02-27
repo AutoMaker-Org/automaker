@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useEffect } from 'react';
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { useAppStore, Feature, FeatureImagePath } from '@/store/app-store';
 import { useShallow } from 'zustand/react/shallow';
 import { GraphView } from './graph-view';
@@ -114,25 +114,28 @@ export function GraphViewPage() {
   const selectedWorktreeBranch =
     currentWorktreeBranch || worktrees.find((w) => w.isMain)?.branch || 'main';
 
+  const repoDefaultBranch = worktrees.find((w) => w.isMain)?.branch;
+
   // Branch card counts
   const branchCardCounts = useMemo(() => {
     return hookFeatures.reduce(
       (counts, feature) => {
         if (feature.status !== 'completed') {
-          const branch = (feature.branchName as string | undefined) ?? 'main';
+          const branch = (feature.branchName as string | undefined) ?? repoDefaultBranch ?? 'main';
           counts[branch] = (counts[branch] || 0) + 1;
         }
         return counts;
       },
       {} as Record<string, number>
     );
-  }, [hookFeatures]);
+  }, [hookFeatures, repoDefaultBranch]);
 
   // Graph worktree selector state
   const [branches, setBranches] = useState<BranchInfo[]>([]);
   const [branchFilter, setBranchFilter] = useState('');
   const [isLoadingBranches, setIsLoadingBranches] = useState(false);
   const switchBranchMutation = useSwitchBranch();
+  const latestLoadBranchesId = useRef(0);
 
   const graphWorktrees = useMemo<WorktreeInfo[]>(() => {
     return worktrees.map((worktree) => ({
@@ -165,15 +168,21 @@ export function GraphViewPage() {
   }, [branches, branchFilter]);
 
   const loadBranchesForWorktree = useCallback(async (worktreePath: string) => {
+    const requestId = ++latestLoadBranchesId.current;
     setIsLoadingBranches(true);
     try {
       const api = getElectronAPI();
       if (!api?.worktree?.listBranches) {
-        setBranches([]);
+        if (requestId === latestLoadBranchesId.current) {
+          setBranches([]);
+          setIsLoadingBranches(false);
+        }
         return;
       }
 
       const result = await api.worktree.listBranches(worktreePath, true);
+      if (requestId !== latestLoadBranchesId.current) return;
+
       if (!result.success || !result.result?.branches) {
         setBranches([]);
         return;
@@ -187,10 +196,13 @@ export function GraphViewPage() {
         }))
       );
     } catch (error) {
+      if (requestId !== latestLoadBranchesId.current) return;
       logger.error('Error loading branches for graph worktree selector:', error);
       setBranches([]);
     } finally {
-      setIsLoadingBranches(false);
+      if (requestId === latestLoadBranchesId.current) {
+        setIsLoadingBranches(false);
+      }
     }
   }, []);
 

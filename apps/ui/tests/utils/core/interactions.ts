@@ -70,21 +70,29 @@ const APP_CONTENT_SELECTOR =
 /**
  * Handle login screen if it appears after navigation
  * Returns true if login was handled, false if no login screen was found
+ *
+ * Optimized: uses a short timeout (3s) since we're pre-authenticated via storageState.
+ * Login screens should only appear in exceptional cases (session expired, etc.)
  */
 export async function handleLoginScreenIfPresent(page: Page): Promise<boolean> {
-  // Check for login screen by waiting for either login input or app-container to be visible
-  // Use data-testid selector (preferred) with fallback to the old selector
+  // Short timeout: with storageState auth, login should rarely appear
+  const maxWaitMs = 3000;
+
+  const appContent = page.locator(APP_CONTENT_SELECTOR);
   const loginInput = page
     .locator('[data-testid="login-api-key-input"], input[type="password"][placeholder*="API key"]')
     .first();
-  const appContent = page.locator(APP_CONTENT_SELECTOR);
   const loggedOutPage = page.getByRole('heading', { name: /logged out/i });
   const goToLoginButton = page.locator('button:has-text("Go to login")');
 
-  const maxWaitMs = 15000;
-
   // Race between login screen, logged-out page, a delayed redirect to /login, and actual content
+  // App content check is first in the array to win ties (most common case)
   const result = await Promise.race([
+    appContent
+      .first()
+      .waitFor({ state: 'visible', timeout: maxWaitMs })
+      .then(() => 'app-content' as const)
+      .catch(() => null),
     page
       .waitForURL((url) => url.pathname.includes('/login'), { timeout: maxWaitMs })
       .then(() => 'login-redirect' as const)
@@ -97,17 +105,17 @@ export async function handleLoginScreenIfPresent(page: Page): Promise<boolean> {
       .waitFor({ state: 'visible', timeout: maxWaitMs })
       .then(() => 'logged-out' as const)
       .catch(() => null),
-    appContent
-      .first()
-      .waitFor({ state: 'visible', timeout: maxWaitMs })
-      .then(() => 'app-content' as const)
-      .catch(() => null),
   ]);
+
+  // Happy path: app content loaded, no login needed
+  if (result === 'app-content' || result === null) {
+    return false;
+  }
 
   // Handle logged-out page - click "Go to login" button and then login
   if (result === 'logged-out') {
     await goToLoginButton.click();
-    await page.waitForLoadState('load');
+    await page.waitForLoadState('domcontentloaded');
     // Now handle the login screen
     return handleLoginScreenIfPresent(page);
   }
@@ -115,11 +123,11 @@ export async function handleLoginScreenIfPresent(page: Page): Promise<boolean> {
   const loginVisible = result === 'login-redirect' || result === 'login-input';
 
   if (loginVisible) {
+    // Wait for login input to be visible if we were redirected
+    await loginInput.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+
     const apiKey = process.env.AUTOMAKER_API_KEY || 'test-api-key-for-e2e-tests';
     await loginInput.fill(apiKey);
-
-    // Wait a moment for the button to become enabled
-    await page.waitForTimeout(100);
 
     // Wait for button to be enabled (it's disabled when input is empty)
     const loginButton = page
@@ -134,8 +142,7 @@ export async function handleLoginScreenIfPresent(page: Page): Promise<boolean> {
       appContent.first().waitFor({ state: 'visible', timeout: 15000 }),
     ]).catch(() => {});
 
-    // Wait for page to load
-    await page.waitForLoadState('load');
+    await page.waitForLoadState('domcontentloaded');
 
     return true;
   }
@@ -160,15 +167,17 @@ export async function focusOnInput(page: Page, testId: string): Promise<void> {
 
 /**
  * Close any open dialog by pressing Escape
- * Waits for dialog to be removed from DOM rather than using arbitrary timeout
+ * Waits for dialog overlay to disappear. Use shorter timeout when no dialog expected (e.g. navigation).
+ * @param options.timeout - Max wait for dialog to close (default 5000). Use ~1500 when dialog may not exist.
  */
-export async function closeDialogWithEscape(page: Page): Promise<void> {
+export async function closeDialogWithEscape(
+  page: Page,
+  options?: { timeout?: number }
+): Promise<void> {
   await page.keyboard.press('Escape');
-  // Wait for any dialog overlay to disappear
-  await page
-    .locator('[data-radix-dialog-overlay], [role="dialog"]')
-    .waitFor({ state: 'hidden', timeout: 5000 })
-    .catch(() => {
-      // Dialog may have already closed or not exist
-    });
+  const timeout = options?.timeout ?? 5000;
+  const openDialog = page.locator('[role="dialog"][data-state="open"]').first();
+  if ((await openDialog.count()) > 0) {
+    await openDialog.waitFor({ state: 'hidden', timeout }).catch(() => {});
+  }
 }

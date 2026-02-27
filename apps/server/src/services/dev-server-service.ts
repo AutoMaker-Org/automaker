@@ -214,7 +214,39 @@ class DevServerService {
       }
 
       const content = await fs.readFile(statePath, 'utf-8');
-      const persistedInfo: PersistedDevServerInfo[] = JSON.parse(content);
+      const rawParsed: unknown = JSON.parse(content);
+
+      if (!Array.isArray(rawParsed)) {
+        logger.warn('Dev server state file is not an array, skipping load');
+        return;
+      }
+
+      const persistedInfo: PersistedDevServerInfo[] = rawParsed.filter((entry: unknown) => {
+        if (entry === null || typeof entry !== 'object') {
+          logger.warn('Dropping invalid dev server entry (not an object):', entry);
+          return false;
+        }
+        const e = entry as Record<string, unknown>;
+        const valid =
+          typeof e.worktreePath === 'string' &&
+          e.worktreePath.length > 0 &&
+          typeof e.allocatedPort === 'number' &&
+          Number.isInteger(e.allocatedPort) &&
+          e.allocatedPort >= 1 &&
+          e.allocatedPort <= 65535 &&
+          typeof e.port === 'number' &&
+          Number.isInteger(e.port) &&
+          e.port >= 1 &&
+          e.port <= 65535 &&
+          typeof e.url === 'string' &&
+          typeof e.startedAt === 'string' &&
+          typeof e.urlDetected === 'boolean' &&
+          (e.customCommand === undefined || typeof e.customCommand === 'string');
+        if (!valid) {
+          logger.warn('Dropping malformed dev server entry:', e);
+        }
+        return valid;
+      }) as PersistedDevServerInfo[];
 
       logger.info(`Loading ${persistedInfo.length} dev servers from state`);
 

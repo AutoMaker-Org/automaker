@@ -13,7 +13,14 @@ import { promisify } from 'util';
 import path from 'path';
 import * as secureFs from '../../../lib/secure-fs.js';
 import { isGitRepo } from '@automaker/git-utils';
-import { getErrorMessage, logError, normalizePath, execEnv, isGhCliAvailable } from '../common.js';
+import {
+  getErrorMessage,
+  logError,
+  normalizePath,
+  execEnv,
+  isGhCliAvailable,
+  execGitCommand,
+} from '../common.js';
 import {
   readAllWorktreeMetadata,
   updateWorktreePRInfo,
@@ -29,11 +36,20 @@ import {
 const execAsync = promisify(exec);
 const logger = createLogger('Worktree');
 
-/** True when child_process cannot spawn the shell (e.g. ENOENT in sandboxed CI). */
+/** True when git (or shell) could not be spawned (e.g. ENOENT in sandboxed CI). */
 function isSpawnENOENT(error: unknown): boolean {
   if (!error || typeof error !== 'object') return false;
   const e = error as { code?: string; errno?: number; syscall?: string };
-  return (e.code === 'ENOENT' || e.errno === -2) && e.syscall === 'spawn';
+  // Accept ENOENT with or without syscall so wrapped/reexported errors are handled.
+  // Node may set syscall to 'spawn' or 'spawn git' (or other command name).
+  if (e.code === 'ENOENT' || e.errno === -2) {
+    return (
+      e.syscall === 'spawn' ||
+      (typeof e.syscall === 'string' && e.syscall.startsWith('spawn')) ||
+      e.syscall === undefined
+    );
+  }
+  return false;
 }
 
 /**
@@ -84,11 +100,8 @@ async function detectConflictState(worktreePath: string): Promise<{
   conflictFiles?: string[];
 }> {
   try {
-    // Find the canonical .git directory for this worktree
-    const { stdout: gitDirRaw } = await execAsync('git rev-parse --git-dir', {
-      cwd: worktreePath,
-      timeout: 15000,
-    });
+    // Find the canonical .git directory for this worktree (execGitCommand avoids /bin/sh in CI)
+    const gitDirRaw = await execGitCommand(['rev-parse', '--git-dir'], worktreePath);
     const gitDir = path.resolve(worktreePath, gitDirRaw.trim());
 
     // Check for merge, rebase, and cherry-pick state files/directories
@@ -128,10 +141,10 @@ async function detectConflictState(worktreePath: string): Promise<{
     // Get list of conflicted files using machine-readable git status
     let conflictFiles: string[] = [];
     try {
-      const { stdout: statusOutput } = await execAsync('git diff --name-only --diff-filter=U', {
-        cwd: worktreePath,
-        timeout: 15000,
-      });
+      const statusOutput = await execGitCommand(
+        ['diff', '--name-only', '--diff-filter=U'],
+        worktreePath
+      );
       conflictFiles = statusOutput
         .trim()
         .split('\n')
@@ -153,7 +166,7 @@ async function detectConflictState(worktreePath: string): Promise<{
 
 async function getCurrentBranch(cwd: string): Promise<string> {
   try {
-    const { stdout } = await execAsync('git branch --show-current', { cwd, timeout: 5000 });
+    const stdout = await execGitCommand(['branch', '--show-current'], cwd);
     return stdout.trim();
   } catch {
     return '';
@@ -187,10 +200,7 @@ function normalizeBranchFromHeadRef(headRef: string): string | null {
  */
 async function recoverBranchForDetachedWorktree(worktreePath: string): Promise<string | null> {
   try {
-    const { stdout: gitDirRaw } = await execAsync('git rev-parse --git-dir', {
-      cwd: worktreePath,
-      timeout: 5000,
-    });
+    const gitDirRaw = await execGitCommand(['rev-parse', '--git-dir'], worktreePath);
     const gitDir = path.resolve(worktreePath, gitDirRaw.trim());
 
     // During a rebase, the original branch is stored in rebase-merge/head-name
@@ -272,10 +282,10 @@ async function scanWorktreesDirectory(
             // Try to get branch from HEAD if branch --show-current fails (detached HEAD)
             let headBranch: string | null = null;
             try {
-              const { stdout: headRef } = await execAsync('git rev-parse --abbrev-ref HEAD', {
-                cwd: worktreePath,
-                timeout: 5000,
-              });
+              const headRef = await execGitCommand(
+                ['rev-parse', '--abbrev-ref', 'HEAD'],
+                worktreePath
+              );
               const ref = headRef.trim();
               if (ref && ref !== 'HEAD') {
                 headBranch = ref;
@@ -458,10 +468,8 @@ export function createListHandler() {
       // Get current branch in main directory
       const currentBranch = await getCurrentBranch(projectPath);
 
-      // Get actual worktrees from git
-      const { stdout } = await execAsync('git worktree list --porcelain', {
-        cwd: projectPath,
-      });
+      // Get actual worktrees from git (execGitCommand avoids /bin/sh in sandboxed CI)
+      const stdout = await execGitCommand(['worktree', 'list', '--porcelain'], projectPath);
 
       const worktrees: WorktreeInfo[] = [];
       const removedWorktrees: Array<{ path: string; branch: string }> = [];
@@ -534,7 +542,7 @@ export function createListHandler() {
       // Prune removed worktrees from git (only if any missing worktrees were detected)
       if (hasMissingWorktree) {
         try {
-          await execAsync('git worktree prune', { cwd: projectPath });
+          await execGitCommand(['worktree', 'prune'], projectPath);
         } catch {
           // Prune failed, but we'll still report the removed worktrees
         }
@@ -563,9 +571,7 @@ export function createListHandler() {
       if (includeDetails) {
         for (const worktree of worktrees) {
           try {
-            const { stdout: statusOutput } = await execAsync('git status --porcelain', {
-              cwd: worktree.path,
-            });
+            const statusOutput = await execGitCommand(['status', '--porcelain'], worktree.path);
             const changedFiles = statusOutput
               .trim()
               .split('\n')
@@ -653,11 +659,11 @@ export function createListHandler() {
         removedWorktrees: removedWorktrees.length > 0 ? removedWorktrees : undefined,
       });
     } catch (error) {
-      // When shell is unavailable (e.g. sandboxed E2E), return minimal list so UI still loads
+      // When git is unavailable (e.g. sandboxed E2E, PATH without git), return minimal list so UI still loads
       if (isSpawnENOENT(error)) {
-        const projectPath = (req.body as { projectPath?: string })?.projectPath;
-        if (projectPath) {
-          const mainPath = normalizePath(projectPath);
+        const projectPathFromBody = (req.body as { projectPath?: string })?.projectPath;
+        const mainPath = projectPathFromBody ? normalizePath(projectPathFromBody) : undefined;
+        if (mainPath) {
           res.json({
             success: true,
             worktrees: [

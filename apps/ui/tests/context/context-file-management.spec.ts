@@ -59,7 +59,10 @@ test.describe('Context File Management', () => {
 
     await page.waitForSelector('[data-testid="context-editor"]', { timeout: 5000 });
 
-    const editorContent = await getContextEditorContent(page);
-    expect(editorContent).toBe(testContent);
+    // Wait for async file content to load into the editor
+    await expect(async () => {
+      const editorContent = await getContextEditorContent(page);
+      expect(editorContent).toBe(testContent);
+    }).toPass({ timeout: 10000, intervals: [200, 500, 1000] });
   });
 });

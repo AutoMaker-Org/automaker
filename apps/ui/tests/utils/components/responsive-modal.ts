@@ -85,7 +85,7 @@ export async function expectModalResponsiveClasses(
   const modal = page.locator('[data-testid="agent-output-modal"]');
 
   for (const className of expectedClasses) {
-    await expect(modal).toHaveClass(new RegExp(className));
+    await expect(modal).toContainClass(className);
   }
 }
 
@@ -119,6 +119,17 @@ export async function testModalWidthAcrossViewports(
       const expected90vw = Math.floor(viewportWidth * 0.9);
       expect(modalWidth).toBeLessThanOrEqual(expected90vw);
       expect(modalWidth).toBeLessThanOrEqual(1200);
+    } else if (viewport === 'desktop' || viewport === 'desktopLarge') {
+      // Desktop: should be bounded by viewport and max-width constraints
+      const expectedMaxWidth = Math.floor(viewportWidth * 0.9);
+      const modalHeight = await getModalHeight(page);
+      const viewportHeight = size.height;
+      const expectedMaxHeight = Math.floor(viewportHeight * 0.9);
+      expect(modalWidth).toBeLessThanOrEqual(expectedMaxWidth);
+      expect(modalWidth).toBeLessThanOrEqual(1200);
+      expect(modalWidth).toBeGreaterThan(0);
+      expect(modalHeight).toBeLessThanOrEqual(expectedMaxHeight);
+      expect(modalHeight).toBeGreaterThan(0);
     }
   }
 }

@@ -1,6 +1,24 @@
 import { defineConfig, devices } from '@playwright/test';
+import path from 'path';
 
 const port = process.env.TEST_PORT || 3107;
+
+// PATH that includes common git locations so the E2E server can run git (worktree list, etc.)
+const pathSeparator = process.platform === 'win32' ? ';' : ':';
+const extraPath =
+  process.platform === 'win32'
+    ? [
+        process.env.LOCALAPPDATA && `${process.env.LOCALAPPDATA}\\Programs\\Git\\cmd`,
+        process.env.PROGRAMFILES && `${process.env.PROGRAMFILES}\\Git\\cmd`,
+      ].filter(Boolean)
+    : [
+        '/opt/homebrew/bin',
+        '/usr/local/bin',
+        '/usr/bin',
+        '/home/linuxbrew/.linuxbrew/bin',
+        process.env.HOME && `${process.env.HOME}/.local/bin`,
+      ].filter(Boolean);
+const e2eServerPath = [process.env.PATH, ...extraPath].filter(Boolean).join(pathSeparator);
 const serverPort = process.env.TEST_SERVER_PORT || 3108;
 // When true, no webServer is started; you must run UI (port 3107) and server (3108) yourself.
 const reuseServer = process.env.TEST_REUSE_SERVER === 'true';
@@ -10,6 +28,9 @@ const useExternalBackend = process.env.TEST_USE_EXTERNAL_BACKEND === 'true';
 // Always use mock agent for tests (disables rate limiting, uses mock Claude responses)
 const mockAgent = true;
 
+// Auth state file written by global setup, reused by all tests to skip per-test login
+const AUTH_STATE_PATH = path.join(__dirname, 'tests/.auth/storage-state.json');
+
 export default defineConfig({
   testDir: './tests',
   // Keep Playwright scoped to E2E specs so Vitest unit files are not executed here.
@@ -18,16 +39,20 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: 0,
-  workers: 1, // Run sequentially to avoid auth conflicts with shared server
-  reporter: 'html',
+  // Use multiple workers for parallelism. CI gets 2 workers (constrained resources),
+  // local gets 50% of CPUs. Each worker gets its own browser context with shared auth state.
+  workers: process.env.CI ? 2 : 5,
+  reporter: process.env.CI ? 'github' : 'html',
   timeout: 30000,
   use: {
     baseURL: `http://127.0.0.1:${port}`,
     trace: 'on-failure',
     screenshot: 'only-on-failure',
     serviceWorkers: 'block',
+    // Reuse auth state from global setup - avoids per-test login overhead
+    storageState: AUTH_STATE_PATH,
   },
-  // Global setup - authenticate before each test
+  // Global setup - authenticate once and save state for all workers
   globalSetup: require.resolve('./tests/global-setup.ts'),
   projects: [
     {
@@ -53,6 +78,8 @@ export default defineConfig({
                   env: {
                     ...process.env,
                     PORT: String(serverPort),
+                    // Ensure server can find git in CI/minimal env (worktree list, etc.)
+                    PATH: e2eServerPath,
                     // Enable mock agent in CI to avoid real API calls
                     AUTOMAKER_MOCK_AGENT: mockAgent ? 'true' : 'false',
                     // Set a test API key for web mode authentication

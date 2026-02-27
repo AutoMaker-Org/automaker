@@ -81,8 +81,8 @@ test.describe('My Tests', () => {
 
 E2E tests must **never** use the workspace/repo root (the project you're developing in) as the project path. The app and server can run git commands (checkout, worktree add, merge, etc.) on the current project; if that path is the main repo, tests can leave it in a different branch or with merge conflicts.
 
-- **Allowed:** Paths under `test/` (e.g. `createTempDirPath('...')` or `test/fixtures/projectA`) or under `os.tmpdir()`.
-- **Not allowed:** Workspace root or any path outside `test/` or temp.
+- **Allowed:** Paths under `tests/` (e.g. `createTempDirPath('...')` or `tests/fixtures/projectA`) or under `os.tmpdir()`.
+- **Not allowed:** Workspace root or any path outside `tests/` or temp.
 
 `setupRealProject` and `setupProjectWithFixture` enforce this: they throw if the project path is the workspace root or outside the allowed bases. Use `createTempDirPath()` for test-specific project dirs and the fixture path for fixture-based tests.
 

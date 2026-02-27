@@ -88,8 +88,11 @@ export async function createContextImage(
 export async function deleteSelectedContextFile(page: Page): Promise<void> {
   await clickElement(page, 'delete-context-file');
   await waitForElement(page, 'delete-context-dialog');
-  await clickElement(page, 'confirm-delete-file');
-  await waitForElementHidden(page, 'delete-context-dialog');
+  // Click the confirm button scoped to the dialog to avoid multiple matches
+  const dialog = page.locator('[data-testid="delete-context-dialog"]');
+  await dialog.locator('[data-testid="confirm-delete-file"]').click();
+  // Wait for dialog to close (server delete can take a moment)
+  await waitForElementHidden(page, 'delete-context-dialog', { timeout: 15000 });
 }
 
 /**

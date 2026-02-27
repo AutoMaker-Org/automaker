@@ -6,12 +6,11 @@
  */
 
 import type { Request, Response } from 'express';
-import { exec, execFile } from 'child_process';
+import { execFile } from 'child_process';
 import { promisify } from 'util';
-import { getErrorMessage, logWorktreeError } from '../common.js';
+import { getErrorMessage, logWorktreeError, execGitCommand } from '../common.js';
 import { getRemotesWithBranch } from '../../../services/worktree-service.js';
 
-const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
 
 interface BranchInfo {
@@ -36,18 +35,18 @@ export function createListBranchesHandler() {
         return;
       }
 
-      // Get current branch
-      const { stdout: currentBranchOutput } = await execAsync('git rev-parse --abbrev-ref HEAD', {
-        cwd: worktreePath,
-      });
+      // Get current branch (execGitCommand avoids spawning /bin/sh; works in sandboxed CI)
+      const currentBranchOutput = await execGitCommand(
+        ['rev-parse', '--abbrev-ref', 'HEAD'],
+        worktreePath
+      );
       const currentBranch = currentBranchOutput.trim();
 
       // List all local branches
-      // Use double quotes around the format string for cross-platform compatibility
-      // Single quotes are preserved literally on Windows; double quotes work on both
-      const { stdout: branchesOutput } = await execAsync('git branch --format="%(refname:short)"', {
-        cwd: worktreePath,
-      });
+      const branchesOutput = await execGitCommand(
+        ['branch', '--format=%(refname:short)'],
+        worktreePath
+      );
 
       const branches: BranchInfo[] = branchesOutput
         .trim()
@@ -68,18 +67,15 @@ export function createListBranchesHandler() {
         try {
           // Fetch latest remote refs (silently, don't fail if offline)
           try {
-            await execAsync('git fetch --all --quiet', {
-              cwd: worktreePath,
-              timeout: 10000, // 10 second timeout
-            });
+            await execGitCommand(['fetch', '--all', '--quiet'], worktreePath);
           } catch {
             // Ignore fetch errors - we'll use cached remote refs
           }
 
           // List remote branches
-          const { stdout: remoteBranchesOutput } = await execAsync(
-            'git branch -r --format="%(refname:short)"',
-            { cwd: worktreePath }
+          const remoteBranchesOutput = await execGitCommand(
+            ['branch', '-r', '--format=%(refname:short)'],
+            worktreePath
           );
 
           const localBranchNames = new Set(branches.map((b) => b.name));
@@ -118,9 +114,7 @@ export function createListBranchesHandler() {
       // Check if any remotes are configured for this repository
       let hasAnyRemotes = false;
       try {
-        const { stdout: remotesOutput } = await execAsync('git remote', {
-          cwd: worktreePath,
-        });
+        const remotesOutput = await execGitCommand(['remote'], worktreePath);
         hasAnyRemotes = remotesOutput.trim().length > 0;
       } catch {
         // If git remote fails, assume no remotes

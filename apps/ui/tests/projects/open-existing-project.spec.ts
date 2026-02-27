@@ -79,40 +79,37 @@ test.describe('Open Project', () => {
       ],
     });
 
-    // Intercept settings API BEFORE any navigation to prevent restoring a currentProject
-    // AND inject our test project into the projects list
+    // Intercept settings API: only modify the FIRST GET so we start with no current project
+    // but our test project in the list. Subsequent GETs pass through so background refetch
+    // doesn't overwrite the store after we open the project (which would show "No project selected").
+    let getCount = 0;
     await page.route('**/api/settings/global', async (route) => {
+      if (route.request().method() !== 'GET') {
+        return route.continue();
+      }
       let response;
       try {
         response = await route.fetch();
       } catch {
-        // If fetch fails, continue with original request
         await route.continue();
         return;
       }
-
       let json;
       try {
         json = await response.json();
       } catch {
-        // If response is disposed, continue with original request
         await route.continue();
         return;
       }
-
-      if (json.settings) {
-        // Remove currentProjectId to prevent restoring a project
+      getCount += 1;
+      if (getCount === 1 && json.settings) {
         json.settings.currentProjectId = null;
-
-        // Inject the test project into settings
         const testProject = {
           id: projectId,
           name: projectName,
           path: projectPath,
           lastOpened: new Date(Date.now() - 86400000).toISOString(),
         };
-
-        // Add to existing projects (or create array)
         const existingProjects = json.settings.projects || [];
         const hasProject = existingProjects.some(
           (p: { id: string; path: string }) => p.id === projectId
@@ -157,6 +154,9 @@ test.describe('Open Project', () => {
     }
 
     await recentProjectCard.click();
+
+    // Wait for navigation to board (init + navigate are async)
+    await page.waitForURL(/\/board/, { timeout: 20000 });
 
     // Wait for the board view to appear (project was opened)
     await expect(page.locator('[data-testid="board-view"]')).toBeVisible({ timeout: 15000 });

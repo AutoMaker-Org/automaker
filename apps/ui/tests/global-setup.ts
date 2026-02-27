@@ -1,12 +1,23 @@
 /**
  * Global setup for all e2e tests
- * This runs once before all tests start
+ * This runs once before all tests start.
+ * It authenticates with the backend and saves the session state so that
+ * all workers/tests can reuse it (avoiding per-test login overhead).
  */
 
-const TEST_PORT = process.env.TEST_PORT || '3107';
-const reuseServer = process.env.TEST_REUSE_SERVER === 'true';
+import { chromium, FullConfig } from '@playwright/test';
+import fs from 'fs';
+import path from 'path';
 
-async function globalSetup() {
+const TEST_PORT = process.env.TEST_PORT || '3107';
+const TEST_SERVER_PORT = process.env.TEST_SERVER_PORT || '3108';
+const reuseServer = process.env.TEST_REUSE_SERVER === 'true';
+const API_BASE_URL = `http://127.0.0.1:${TEST_SERVER_PORT}`;
+const WEB_BASE_URL = `http://127.0.0.1:${TEST_PORT}`;
+const AUTH_DIR = path.join(__dirname, '.auth');
+const AUTH_STATE_PATH = path.join(AUTH_DIR, 'storage-state.json');
+
+async function globalSetup(config: FullConfig) {
   // Note: Server killing is handled by the pretest script in package.json
   // GlobalSetup runs AFTER webServer starts, so we can't kill the server here
 
@@ -23,7 +34,89 @@ async function globalSetup() {
     }
   }
 
+  // Authenticate once and save state for all workers
+  await authenticateAndSaveState(config);
+
   console.log('[GlobalSetup] Setup complete');
+}
+
+/**
+ * Authenticate with the backend and save browser storage state.
+ * All test workers will load this state to skip per-test authentication.
+ */
+async function authenticateAndSaveState(_config: FullConfig) {
+  // Ensure auth directory exists
+  fs.mkdirSync(AUTH_DIR, { recursive: true });
+
+  const apiKey = process.env.AUTOMAKER_API_KEY || 'test-api-key-for-e2e-tests';
+
+  // Wait for backend to be ready
+  const start = Date.now();
+  while (Date.now() - start < 30000) {
+    try {
+      const health = await fetch(`${API_BASE_URL}/api/health`, {
+        signal: AbortSignal.timeout(3000),
+      });
+      if (health.ok) break;
+    } catch {
+      // Retry
+    }
+    await new Promise((r) => setTimeout(r, 250));
+  }
+
+  // Launch a browser to get a proper context for login
+  const browser = await chromium.launch();
+  const context = await browser.newContext();
+  const page = await context.newPage();
+
+  try {
+    // Navigate to the app first (needed for cookies to bind to the correct domain)
+    await page.goto(WEB_BASE_URL, { waitUntil: 'domcontentloaded', timeout: 30000 });
+
+    // Login via API
+    const loginResponse = await page.request.post(`${API_BASE_URL}/api/auth/login`, {
+      data: { apiKey },
+      headers: { 'Content-Type': 'application/json' },
+      timeout: 15000,
+    });
+    const response = (await loginResponse.json().catch(() => null)) as {
+      success?: boolean;
+      token?: string;
+    } | null;
+
+    if (response?.success && response.token) {
+      // Set the session cookie
+      await context.addCookies([
+        {
+          name: 'automaker_session',
+          value: response.token,
+          domain: '127.0.0.1',
+          path: '/',
+          httpOnly: true,
+          sameSite: 'Lax',
+        },
+      ]);
+
+      // Verify auth works
+      const statusRes = await page.request.get(`${API_BASE_URL}/api/auth/status`, {
+        timeout: 5000,
+      });
+      const statusJson = (await statusRes.json().catch(() => null)) as {
+        authenticated?: boolean;
+      } | null;
+
+      if (!statusJson?.authenticated) {
+        console.warn('[GlobalSetup] Auth verification failed, tests may need to re-authenticate');
+      }
+    } else {
+      console.warn('[GlobalSetup] Login failed, tests will authenticate individually');
+    }
+
+    // Save storage state for all workers to reuse
+    await context.storageState({ path: AUTH_STATE_PATH });
+  } finally {
+    await browser.close();
+  }
 }
 
 export default globalSetup;

@@ -44,7 +44,8 @@ test.describe('Mobile Memory View', () => {
     await fillInput(page, 'new-memory-name', fileName);
     await fillInput(page, 'new-memory-content', '# Mobile view test');
     await clickElement(page, 'confirm-create-memory');
-    await waitForElementHidden(page, 'create-memory-dialog', { timeout: 3000 });
+    // Allow enough time for the writeFile API call to complete under parallel load
+    await waitForElementHidden(page, 'create-memory-dialog', { timeout: 10000 });
     await waitForMemoryFile(page, fileName, 8000);
     await selectMemoryFile(page, fileName, 8000);
 

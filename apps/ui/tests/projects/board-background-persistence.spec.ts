@@ -3,7 +3,7 @@
  *
  * Tests that board background settings are properly saved and loaded when switching projects.
  * This verifies that:
- * 1. Background settings are saved to .automaker-local/settings.json
+ * 1. Background settings are saved to .automaker/settings.json
  * 2. Settings are loaded when switching back to a project
  * 3. Background image, opacity, and other settings are correctly restored
  * 4. Settings persist across app restarts (new page loads)
@@ -41,8 +41,8 @@ test.describe('Board Background Persistence', () => {
   test('should load board background settings when switching projects', async ({ page }) => {
     const projectAName = `project-a-${Date.now()}`;
     const projectBName = `project-b-${Date.now()}`;
-    const projectAPath = path.join(TEST_TEMP_DIR, projectAName);
-    const projectBPath = path.join(TEST_TEMP_DIR, projectBName);
+    const projectAPath = path.resolve(TEST_TEMP_DIR, projectAName);
+    const projectBPath = path.resolve(TEST_TEMP_DIR, projectBName);
     const projectAId = `project-a-${Date.now()}`;
     const projectBId = `project-b-${Date.now()}`;
 
@@ -62,8 +62,8 @@ test.describe('Board Background Persistence', () => {
       fs.writeFileSync(path.join(projectPath, 'README.md'), `# ${name}\n`);
     }
 
-    // Create .automaker-local directory for project A with background settings
-    const automakerDirA = path.join(projectAPath, '.automaker-local');
+    // Create .automaker directory for project A with background settings
+    const automakerDirA = path.join(projectAPath, '.automaker');
     fs.mkdirSync(automakerDirA, { recursive: true });
     fs.mkdirSync(path.join(automakerDirA, 'board'), { recursive: true });
     fs.mkdirSync(path.join(automakerDirA, 'features'), { recursive: true });
@@ -92,8 +92,8 @@ test.describe('Board Background Persistence', () => {
     };
     fs.writeFileSync(settingsPath, JSON.stringify(backgroundSettings, null, 2));
 
-    // Create minimal automaker-local directory for project B (no background)
-    const automakerDirB = path.join(projectBPath, '.automaker-local');
+    // Create minimal .automaker directory for project B (no background)
+    const automakerDirB = path.join(projectBPath, '.automaker');
     fs.mkdirSync(automakerDirB, { recursive: true });
     fs.mkdirSync(path.join(automakerDirB, 'features'), { recursive: true });
     fs.mkdirSync(path.join(automakerDirB, 'context'), { recursive: true });
@@ -166,30 +166,129 @@ test.describe('Board Background Persistence', () => {
           currentProjectId: projects[0].id,
           theme: 'dark',
           sidebarOpen: true,
+          sidebarStyle: 'unified',
           maxConcurrency: 3,
         };
         localStorage.setItem('automaker-settings-cache', JSON.stringify(settingsCache));
+
+        // Force unified sidebar (project-dropdown-trigger exists only in unified mode)
+        const uiCache = {
+          state: {
+            cachedProjectId: projects[0].id,
+            cachedSidebarOpen: true,
+            cachedSidebarStyle: 'unified',
+            cachedWorktreePanelCollapsed: false,
+            cachedCollapsedNavSections: {},
+            cachedCurrentWorktreeByProject: {},
+          },
+          version: 2,
+        };
+        localStorage.setItem('automaker-ui-cache', JSON.stringify(uiCache));
 
         localStorage.setItem('automaker-disable-splash', 'true');
       },
       { projects: [projectA, projectB], versions: { APP_STORE: 2, SETUP_STORE: 1 } }
     );
 
-    // Intercept settings API BEFORE authentication to ensure our test projects
-    // are consistently returned by the server. Only intercept GET requests -
-    // let PUT requests (settings saves) pass through unmodified.
+    // Fast-track initializeProject API calls for test project paths.
+    // initializeProject makes ~8 sequential HTTP calls (exists, stat, mkdir, etc.) that
+    // can take 10+ seconds under parallel load, blocking setCurrentProject entirely.
+    await page.route('**/api/fs/**', async (route) => {
+      const body = route.request().postDataJSON?.() ?? {};
+      const filePath = body?.filePath || body?.dirPath || '';
+      if (filePath.startsWith(projectAPath) || filePath.startsWith(projectBPath)) {
+        const url = route.request().url();
+        if (url.includes('/api/fs/exists')) {
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({ success: true, exists: true }),
+          });
+        } else if (url.includes('/api/fs/stat')) {
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({
+              success: true,
+              stats: { isDirectory: true, isFile: false, size: 0, mtime: new Date().toISOString() },
+            }),
+          });
+        } else if (url.includes('/api/fs/mkdir')) {
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({ success: true }),
+          });
+        } else if (url.includes('/api/fs/write')) {
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({ success: true }),
+          });
+        } else {
+          await route.continue();
+        }
+      } else {
+        await route.continue();
+      }
+    });
+
+    // Also fast-track git init for test projects
+    await page.route('**/api/worktree/init-git', async (route) => {
+      const body = route.request().postDataJSON?.() ?? {};
+      if (
+        body?.projectPath?.startsWith(projectAPath) ||
+        body?.projectPath?.startsWith(projectBPath)
+      ) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ success: true, result: { initialized: false } }),
+        });
+      } else {
+        await route.continue();
+      }
+    });
+
+    // Intercept settings API: inject test projects and track current project so that
+    // when the app switches to project B (PUT), subsequent GETs return B instead of
+    // overwriting back to A (which would prevent the dropdown from ever showing B).
+    let effectiveCurrentProjectId = projectAId;
+    let cachedSettingsJson: Record<string, unknown> | null = null;
     await page.route('**/api/settings/global', async (route) => {
-      if (route.request().method() !== 'GET') {
+      const method = route.request().method();
+      if (method === 'PUT') {
+        try {
+          const body = route.request().postDataJSON();
+          if (body?.currentProjectId === projectAId || body?.currentProjectId === projectBId) {
+            effectiveCurrentProjectId = body.currentProjectId;
+          }
+        } catch {
+          // ignore parse errors
+        }
         await route.continue();
         return;
       }
-      const response = await route.fetch();
-      const json = await response.json();
-      if (json.settings) {
-        json.settings.currentProjectId = projectAId;
-        json.settings.projects = [projectA, projectB];
+      if (method !== 'GET') {
+        await route.continue();
+        return;
       }
-      await route.fulfill({ response, json });
+      if (!cachedSettingsJson) {
+        const response = await route.fetch();
+        cachedSettingsJson = await response.json();
+      }
+      const json = JSON.parse(JSON.stringify(cachedSettingsJson));
+      if (json.settings) {
+        json.settings.currentProjectId = effectiveCurrentProjectId;
+        json.settings.projects = [projectA, projectB];
+        json.settings.sidebarOpen = true;
+        json.settings.sidebarStyle = 'unified';
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(json),
+      });
     });
 
     // Track API calls to /api/settings/project to verify settings are being loaded
@@ -245,18 +344,34 @@ test.describe('Board Background Persistence', () => {
 
     const projectPickerB = page.locator(`[data-testid="project-item-${projectBId}"]`);
     await expect(projectPickerB).toBeVisible({ timeout: 5000 });
+
+    // Update effectiveCurrentProjectId eagerly BEFORE clicking so any in-flight GET
+    // responses return project B instead of overwriting the store back to A.
+    effectiveCurrentProjectId = projectBId;
     await projectPickerB.click();
 
-    // Wait for project B to load
+    // Wait for the project switch to take effect (dropdown trigger shows project B name).
+    // With initializeProject API calls fast-tracked, setCurrentProject runs quickly
+    // and the startTransition commits within a few seconds.
     await expect(
       page.locator('[data-testid="project-dropdown-trigger"]').getByText(projectBName)
-    ).toBeVisible({ timeout: 5000 });
+    ).toBeVisible({ timeout: 15000 });
 
     // Wait a bit for project B to fully load before switching
     await page.waitForTimeout(500);
 
+    // Ensure sidebar stays expanded after navigation (it may collapse when switching projects)
+    const expandBtn = page.locator('button:has-text("Expand sidebar")');
+    if (await expandBtn.isVisible()) {
+      await expandBtn.click();
+      await page.waitForTimeout(300);
+    }
+
     // Switch back to project A
-    await projectSelector.click();
+    effectiveCurrentProjectId = projectAId;
+    const projectSelector2 = page.locator('[data-testid="project-dropdown-trigger"]');
+    await expect(projectSelector2).toBeVisible({ timeout: 5000 });
+    await projectSelector2.click();
 
     // Wait for dropdown to be visible
     await expect(page.locator('[data-testid="project-dropdown-content"]')).toBeVisible({
@@ -270,7 +385,7 @@ test.describe('Board Background Persistence', () => {
     // Verify we're back on project A
     await expect(
       page.locator('[data-testid="project-dropdown-trigger"]').getByText(projectAName)
-    ).toBeVisible({ timeout: 5000 });
+    ).toBeVisible({ timeout: 15000 });
 
     // CRITICAL: Wait for settings to be loaded again
     await page.waitForTimeout(2000);
@@ -319,8 +434,8 @@ test.describe('Board Background Persistence', () => {
       JSON.stringify({ name: projectName, version: '1.0.0' }, null, 2)
     );
 
-    // Create .automaker-local with background settings
-    const automakerDir = path.join(projectPath, '.automaker-local');
+    // Create .automaker with background settings
+    const automakerDir = path.join(projectPath, '.automaker');
     fs.mkdirSync(automakerDir, { recursive: true });
     fs.mkdirSync(path.join(automakerDir, 'board'), { recursive: true });
     fs.mkdirSync(path.join(automakerDir, 'features'), { recursive: true });

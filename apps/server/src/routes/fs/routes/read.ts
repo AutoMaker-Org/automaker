@@ -13,7 +13,8 @@ import { getErrorMessage, logError } from '../common.js';
 const OPTIONAL_FILES = ['categories.json', 'app_spec.txt', 'context-metadata.json'];
 
 function isOptionalFile(filePath: string): boolean {
-  if (OPTIONAL_FILES.some((optionalFile) => filePath.endsWith(optionalFile))) {
+  const basename = path.basename(filePath);
+  if (OPTIONAL_FILES.some((optionalFile) => basename === optionalFile)) {
     return true;
   }
   // Context and memory files may not exist yet during create/delete or test races
