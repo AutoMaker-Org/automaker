@@ -218,11 +218,19 @@ export function MergeRebaseDialog({
         }
       } else {
         // Merge strategy - merge the selected remote branch into the current branch.
-        // selectedBranch is a full ref like 'origin/main'; extract the short branch name
-        // so we can pass it to 'git pull <remote> <branch>'.
-        const remoteBranchShortName = selectedBranch.startsWith(`${selectedRemote}/`)
-          ? selectedBranch.slice(selectedRemote.length + 1)
-          : selectedBranch;
+        // selectedBranch may be a full ref (e.g. refs/remotes/origin/main); normalize to short name
+        // for 'git pull <remote> <branch>'.
+        let remoteBranchShortName = selectedBranch;
+        const remotePrefix = `refs/remotes/${selectedRemote}/`;
+        if (selectedBranch.startsWith(remotePrefix)) {
+          remoteBranchShortName = selectedBranch.slice(remotePrefix.length);
+        } else if (selectedBranch.startsWith(`${selectedRemote}/`)) {
+          remoteBranchShortName = selectedBranch.slice(selectedRemote.length + 1);
+        } else if (selectedBranch.startsWith('refs/heads/')) {
+          remoteBranchShortName = selectedBranch.slice('refs/heads/'.length);
+        } else if (selectedBranch.startsWith('refs/')) {
+          remoteBranchShortName = selectedBranch.slice('refs/'.length);
+        }
         const result = await api.worktree.pull(
           worktree.path,
           selectedRemote,

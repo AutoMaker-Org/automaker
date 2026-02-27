@@ -274,8 +274,14 @@ test.describe('Board Background Persistence', () => {
         return;
       }
       if (!cachedSettingsJson) {
-        const response = await route.fetch();
-        cachedSettingsJson = (await response.json()) as Record<string, unknown>;
+        try {
+          const response = await route.fetch();
+          cachedSettingsJson = (await response.json()) as Record<string, unknown>;
+        } catch {
+          // route.fetch() can fail during navigation; fall through to continue
+          await route.continue().catch(() => {});
+          return;
+        }
       }
       const json = JSON.parse(JSON.stringify(cachedSettingsJson)) as Record<string, unknown>;
       if (!json.settings || typeof json.settings !== 'object') {
@@ -286,11 +292,13 @@ test.describe('Board Background Persistence', () => {
       settings.projects = [projectA, projectB];
       settings.sidebarOpen = true;
       settings.sidebarStyle = 'unified';
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify(json),
-      });
+      await route
+        .fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(json),
+        })
+        .catch(() => {});
     });
 
     // Track API calls to /api/settings/project to verify settings are being loaded
@@ -371,20 +379,19 @@ test.describe('Board Background Persistence', () => {
         .catch(() => {});
     }
 
-    // Switch back to project A. The dropdown list re-renders when settings poll (element
-    // becomes unstable/detached). Retry: open dropdown, wait for list to have items,
-    // then click by name so we get a fresh element if the list was re-rendered.
+    // Switch back to project A. Settings polls can cause re-renders that detach dropdown
+    // items mid-click, so we retry the entire open-and-click sequence with short timeouts.
+    // Update effectiveCurrentProjectId eagerly to prevent polls from reverting the switch.
+    effectiveCurrentProjectId = projectAId;
     const trigger = page.locator('[data-testid="project-dropdown-trigger"]');
     await expect(async () => {
       await trigger.click();
       await expect(page.locator('[data-testid="project-dropdown-content"]')).toBeVisible({
         timeout: 2000,
       });
-      // Wait for the list to be populated (at least project B item, since we're on B)
-      await expect(page.locator(`[data-testid="project-item-${projectBId}"]`)).toBeVisible({
-        timeout: 3000,
-      });
-      await page.getByRole('menuitem', { name: projectAName }).click({ force: true });
+      await page
+        .locator(`[data-testid="project-item-${projectAId}"]`)
+        .click({ force: true, timeout: 1000 });
     }).toPass({ timeout: 15000 });
 
     // Verify we're back on project A

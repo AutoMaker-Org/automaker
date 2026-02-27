@@ -100,9 +100,18 @@ test.describe('Project Creation', () => {
       contentType: 'application/json',
       body: JSON.stringify(body),
     });
+    const workspaceDir = TEST_TEMP_DIR.replace(/\/$/, '');
     await page.route('**/api/fs/exists', async (route) => {
       if (route.request().method() === 'POST') {
-        await route.fulfill(fsJson(200, { success: true, exists: true }));
+        const body = route.request().postDataJSON?.() ?? {};
+        const filePath = (body?.filePath as string | undefined) ?? '';
+        const normalized = filePath.replace(/\/$/, '');
+        const isWorkspace = normalized === workspaceDir;
+        const isProjectDir =
+          normalized.startsWith(workspaceDir + '/') &&
+          normalized.slice(workspaceDir.length + 1).indexOf('/') === -1;
+        const exists = isWorkspace || isProjectDir;
+        await route.fulfill(fsJson(200, { success: true, exists }));
       } else {
         await route.continue();
       }

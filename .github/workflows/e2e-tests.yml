@@ -141,12 +141,14 @@ jobs:
         working-directory: apps/ui
         env:
           CI: true
-          VITE_SERVER_URL: http://localhost:3108
-          SERVER_URL: http://localhost:3108
           VITE_SKIP_SETUP: 'true'
           # Keep UI-side login/defaults consistent
           AUTOMAKER_API_KEY: test-api-key-for-e2e-tests
-          # Backend is already started above
+          # Backend is already started above - Playwright config sets
+          # AUTOMAKER_SERVER_PORT so the Vite proxy forwards /api/* to the backend.
+          # Do NOT set VITE_SERVER_URL here: it bypasses the Vite proxy and causes
+          # a cookie domain mismatch (cookies are bound to 127.0.0.1, but
+          # VITE_SERVER_URL=http://localhost:3108 makes the frontend call localhost).
           TEST_USE_EXTERNAL_BACKEND: 'true'
           TEST_SERVER_PORT: 3108
 

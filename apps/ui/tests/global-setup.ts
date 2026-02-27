@@ -57,17 +57,24 @@ async function authenticateAndSaveState(_config: FullConfig) {
   // Wait for backend to be ready (exponential backoff: 250ms → 500ms → 1s → 2s)
   const start = Date.now();
   let backoff = 250;
+  let healthy = false;
   while (Date.now() - start < 30000) {
     try {
       const health = await fetch(`${API_BASE_URL}/api/health`, {
         signal: AbortSignal.timeout(3000),
       });
-      if (health.ok) break;
+      if (health.ok) {
+        healthy = true;
+        break;
+      }
     } catch {
       // Retry
     }
     await new Promise((r) => setTimeout(r, backoff));
     backoff = Math.min(backoff * 2, 2000);
+  }
+  if (!healthy) {
+    throw new Error(`Backend health check timed out after 30s for ${API_BASE_URL}`);
   }
 
   // Launch a browser to get a proper context for login

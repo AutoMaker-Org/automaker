@@ -261,9 +261,13 @@ export async function navigateToMemory(page: Page): Promise<void> {
   }
 
   // Dismiss any open dialog that may block interactions (e.g. sandbox warning, onboarding).
-  // The sandbox dialog blocks Escape, so click "I Accept the Risks" if it's visible.
+  // The sandbox dialog blocks Escape, so click "I Accept the Risks" if it becomes visible within 1s.
   const sandboxAcceptBtn = page.locator('button:has-text("I Accept the Risks")');
-  if (await sandboxAcceptBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
+  const sandboxVisible = await sandboxAcceptBtn
+    .waitFor({ state: 'visible', timeout: 1000 })
+    .then(() => true)
+    .catch(() => false);
+  if (sandboxVisible) {
     await sandboxAcceptBtn.click();
     await page
       .locator('[role="dialog"][data-state="open"]')

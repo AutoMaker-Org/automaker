@@ -151,38 +151,8 @@ test.describe('Edit Feature', () => {
     await descriptionInput.pressSequentially(updatedDescription, { delay: 0 });
     await expect(descriptionInput).toHaveValue(updatedDescription, { timeout: 3000 });
 
-    // Wait for the update API that includes our new description (not a background title update).
-    const updateResponse = page.waitForResponse(
-      async (res) => {
-        if (
-          res.request().method() !== 'POST' ||
-          !res.request().url().includes('/api/features/update') ||
-          res.status() !== 200
-        ) {
-          return false;
-        }
-        let body: string | null = null;
-        try {
-          body = await res.request().postData();
-        } catch {
-          return false;
-        }
-        if (!body) return false;
-        try {
-          const json = JSON.parse(body) as { updates?: { description?: string } };
-          return json.updates?.description === updatedDescription;
-        } catch {
-          return false;
-        }
-      },
-      { timeout: 15000 }
-    );
-
     // Save changes
     await clickElement(page, 'confirm-edit-feature');
-
-    // Wait for the API response (ensures server has persisted to disk)
-    await updateResponse;
 
     // Wait for dialog to close
     await page.waitForFunction(

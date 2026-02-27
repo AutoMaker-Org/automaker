@@ -52,6 +52,13 @@ function getWorkerFixturePath(): string {
   // Ensure the source fixture exists (may not in CI)
   ensureFixtureExists();
 
+  if (!fs.existsSync(FIXTURE_PATH)) {
+    throw new Error(
+      `E2E source fixture is missing at ${FIXTURE_PATH}. ` +
+        'Run the setup script to create it: from apps/ui, run `node scripts/setup-e2e-fixtures.mjs` (or use `pnpm test`, which runs it via pretest).'
+    );
+  }
+
   // Use process.pid + a unique suffix to isolate per-worker
   const workerId = process.env.TEST_WORKER_INDEX || process.pid.toString();
   const workerDir = path.join(WORKSPACE_ROOT, `test/fixtures/.worker-${workerId}`);
