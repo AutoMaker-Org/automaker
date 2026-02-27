@@ -164,7 +164,7 @@ export async function selectContextFile(
       '[data-testid="context-editor"], [data-testid="markdown-preview"], [data-testid="image-preview"]'
     );
     await expect(contentLocator).toBeVisible();
-  }).toPass({ timeout, intervals: [200, 500, 1000] });
+q  }).toPass({ timeout, intervals: [200, 500, 1000] });
 }
 
 /**
