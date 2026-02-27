@@ -37,6 +37,7 @@ export function useBoardPersistence({ currentProject }: UseBoardPersistenceProps
       // resolve after setQueryData and overwrite the cache with stale data.
       await queryClient.cancelQueries({
         queryKey: queryKeys.features.all(currentProject.path),
+        exact: true,
       });
 
       // Capture previous cache snapshot for rollback on error
@@ -133,6 +134,7 @@ export function useBoardPersistence({ currentProject }: UseBoardPersistenceProps
       // Cancel any in-flight refetches to prevent them from overwriting our optimistic update
       await queryClient.cancelQueries({
         queryKey: queryKeys.features.all(currentProject.path),
+        exact: true,
       });
 
       // Capture previous cache snapshot for synchronous rollback on error
@@ -190,6 +192,7 @@ export function useBoardPersistence({ currentProject }: UseBoardPersistenceProps
       // Cancel any in-flight refetches to prevent them from overwriting our optimistic update
       await queryClient.cancelQueries({
         queryKey: queryKeys.features.all(currentProject.path),
+        exact: true,
       });
 
       // Optimistically remove from React Query cache for immediate board refresh

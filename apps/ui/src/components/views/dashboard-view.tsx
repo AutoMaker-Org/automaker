@@ -597,7 +597,10 @@ export function DashboardView() {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56">
-                  <DropdownMenuItem onClick={handleNewProject} data-testid="quick-setup-option">
+                  <DropdownMenuItem
+                    onClick={handleNewProject}
+                    data-testid="quick-setup-option-mobile"
+                  >
                     <Plus className="w-4 h-4 mr-2" />
                     Quick Setup
                   </DropdownMenuItem>
@@ -663,7 +666,7 @@ export function DashboardView() {
                       <DropdownMenuContent align="end" className="w-56">
                         <DropdownMenuItem
                           onClick={handleNewProject}
-                          data-testid="quick-setup-option"
+                          data-testid="quick-setup-option-no-projects"
                         >
                           <Plus className="w-4 h-4 mr-2" />
                           Quick Setup
@@ -760,7 +763,10 @@ export function DashboardView() {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-56">
-                      <DropdownMenuItem onClick={handleNewProject} data-testid="quick-setup-option">
+                      <DropdownMenuItem
+                        onClick={handleNewProject}
+                        data-testid="quick-setup-option-has-projects"
+                      >
                         <Plus className="w-4 h-4 mr-2" />
                         Quick Setup
                       </DropdownMenuItem>

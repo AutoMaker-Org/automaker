@@ -75,43 +75,6 @@ import { isGhCliAvailable, normalizePath, getErrorMessage } from '@/routes/workt
 import { checkGitHubRemote } from '@/routes/github/routes/check-github-remote.js';
 
 /**
- * Set up exec mock with a handler that receives the command and cwd,
- * allowing per-command+cwd responses. (Kept for tests that still reference it.)
- */
-function setupExecMock(
-  handler: (cmd: string, cwd: string | undefined) => { stdout: string; stderr?: string } | Error
-) {
-  (exec as unknown as Mock).mockImplementation(
-    (
-      cmd: string,
-      options:
-        | Record<string, unknown>
-        | ((error: Error | null, result: { stdout: string; stderr: string }) => void),
-      callback?: (error: Error | null, result: { stdout: string; stderr: string }) => void
-    ) => {
-      let actualCallback: (error: Error | null, result: { stdout: string; stderr: string }) => void;
-      let actualOptions: Record<string, unknown> | undefined;
-
-      if (typeof options === 'function') {
-        actualCallback = options;
-        actualOptions = undefined;
-      } else {
-        actualCallback = callback!;
-        actualOptions = options;
-      }
-
-      const cwd = actualOptions?.cwd as string | undefined;
-      const result = handler(cmd, cwd);
-      if (result instanceof Error) {
-        actualCallback(result, { stdout: '', stderr: '' });
-      } else {
-        actualCallback(null, { stdout: result.stdout, stderr: result.stderr || '' });
-      }
-    }
-  );
-}
-
-/**
  * Set up execGitCommand mock (list handler uses this via lib/git.js, not child_process.exec).
  */
 function setupExecGitCommandMock(options: {
@@ -392,20 +355,6 @@ describe('worktree list - detached HEAD handling', () => {
 
       // All readFile calls fail (no gitDirs so rev-parse --git-dir will throw)
       vi.mocked(secureFs.readFile).mockRejectedValue(new Error('ENOENT'));
-
-      setupStandardExec({
-        porcelainOutput: [
-          'worktree /project',
-          'branch refs/heads/main',
-          '',
-          'worktree /project/.worktrees/unknown-wt',
-          'detached',
-          '',
-        ].join('\n'),
-        worktreeBranches: {
-          '/project/.worktrees/unknown-wt': '', // empty = no branch
-        },
-      });
 
       const handler = createListHandler();
       await handler(req, res);
@@ -806,17 +755,6 @@ describe('worktree list - detached HEAD handling', () => {
         return undefined;
       });
 
-      setupStandardExec({
-        porcelainOutput: [
-          'worktree /project',
-          'branch refs/heads/main',
-          '',
-          'worktree /project/.worktrees/feature-a',
-          'branch refs/heads/feature-a',
-          '',
-        ].join('\n'),
-        worktreeBranches: { '/project': 'main', '/project/.worktrees/feature-a': 'feature-a' },
-      });
       vi.mocked(execGitCommand).mockImplementation(async (args: string[], cwd: string) => {
         if (args[0] === 'rev-parse' && args[1] === '--git-dir') {
           throw new Error('no git dir');
@@ -918,17 +856,6 @@ describe('worktree list - detached HEAD handling', () => {
         return undefined;
       });
 
-      setupStandardExec({
-        porcelainOutput: [
-          'worktree /project-2',
-          'branch refs/heads/main',
-          '',
-          'worktree /project-2/.worktrees/feature-a',
-          'branch refs/heads/feature-a',
-          '',
-        ].join('\n'),
-        worktreeBranches: { '/project-2': 'main', '/project-2/.worktrees/feature-a': 'feature-a' },
-      });
       vi.mocked(execGitCommand).mockImplementation(async (args: string[], cwd: string) => {
         if (args[0] === 'rev-parse' && args[1] === '--git-dir') {
           throw new Error('no git dir');

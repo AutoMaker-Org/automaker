@@ -86,7 +86,14 @@ export async function execGitCommand(
     command: 'git',
     args,
     cwd,
-    env: env !== undefined ? { ...gitEnv, ...env } : gitEnv,
+    env:
+      env !== undefined
+        ? {
+            ...gitEnv,
+            ...env,
+            PATH: [gitEnv.PATH, env.PATH].filter(Boolean).join(pathSeparator),
+          }
+        : gitEnv,
     ...(abortController !== undefined ? { abortController } : {}),
   });
 

@@ -32,18 +32,16 @@ export function cleanupLeftoverTestDirs(): void {
   const testBase = path.join(getWorkspaceRoot(), 'test');
   if (!fs.existsSync(testBase)) return;
 
+  const entries = fs.readdirSync(testBase, { withFileTypes: true });
   for (const prefix of TEST_DIR_PREFIXES) {
     const pattern = prefix + '-';
-    const entries = fs.readdirSync(testBase, { withFileTypes: true });
     for (const entry of entries) {
       if (entry.isDirectory() && entry.name.startsWith(pattern)) {
         const dirPath = path.join(testBase, entry.name);
         try {
           fs.rmSync(dirPath, { recursive: true, force: true });
-          // eslint-disable-next-line no-console
           console.log('[Cleanup] Removed', entry.name);
         } catch (err) {
-          // eslint-disable-next-line no-console
           console.warn('[Cleanup] Failed to remove', dirPath, err);
         }
       }

@@ -173,9 +173,17 @@ export function cleanupTempDir(tempDir: string): void {
     fs.rmSync(tempDir, { recursive: true, force: true });
   } catch (err) {
     const code = (err as NodeJS.ErrnoException)?.code;
-    if (code === 'ENOTEMPTY' || code === 'EPERM' || code === 'EBUSY') {
+    if (code === 'ENOENT') {
+      // Directory already removed, nothing to do
+    } else if (code === 'ENOTEMPTY' || code === 'EPERM' || code === 'EBUSY') {
       rmDirRecursive(tempDir);
-      fs.rmdirSync(tempDir);
+      try {
+        fs.rmdirSync(tempDir);
+      } catch (e2) {
+        if ((e2 as NodeJS.ErrnoException)?.code !== 'ENOENT') {
+          throw e2;
+        }
+      }
     } else {
       throw err;
     }

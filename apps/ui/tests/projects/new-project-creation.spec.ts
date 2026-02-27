@@ -151,7 +151,7 @@ test.describe('Project Creation', () => {
     await expect(page.locator('[data-testid="dashboard-view"]')).toBeVisible({ timeout: 15000 });
 
     await page.locator('[data-testid="create-new-project"]').click();
-    await page.locator('[data-testid="quick-setup-option"]').click();
+    await page.locator('[data-testid="quick-setup-option-no-projects"]').click();
 
     await expect(page.locator('[data-testid="new-project-modal"]')).toBeVisible({ timeout: 5000 });
 

@@ -168,7 +168,7 @@ jobs:
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: playwright-report-shard-${{ matrix.shardIndex }}
+          name: playwright-report-shard-${{ matrix.shardIndex }}-of-${{ matrix.shardTotal }}
           path: apps/ui/playwright-report/
           retention-days: 7
 
@@ -176,7 +176,7 @@ jobs:
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: test-results-shard-${{ matrix.shardIndex }}
+          name: test-results-shard-${{ matrix.shardIndex }}-of-${{ matrix.shardTotal }}
           path: |
             apps/ui/test-results/
           retention-days: 7
@@ -186,7 +186,7 @@ jobs:
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: blob-report-shard-${{ matrix.shardIndex }}
+          name: blob-report-shard-${{ matrix.shardIndex }}-of-${{ matrix.shardTotal }}
           path: apps/ui/blob-report/
           retention-days: 1
           if-no-files-found: ignore

@@ -553,7 +553,17 @@ test.describe('Board Background Persistence', () => {
         await route.continue();
         return;
       }
-      const response = await route.fetch();
+      let response: Awaited<ReturnType<typeof route.fetch>>;
+      try {
+        response = await route.fetch();
+      } catch {
+        await route.continue();
+        return;
+      }
+      if (!response.ok()) {
+        await route.fulfill({ response });
+        return;
+      }
       const json = await response.json();
       // Override to use our test project
       if (json.settings) {

@@ -40,6 +40,7 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   // Use multiple workers for parallelism. CI gets 2 workers (constrained resources),
+  // local runs use 8 workers for faster test execution.
   workers: process.env.CI ? 2 : 8,
   reporter: process.env.CI ? 'github' : 'html',
   timeout: 30000,
