@@ -22,11 +22,7 @@ import {
 } from '../utils';
 
 test.describe('Delete Context File', () => {
-  test.beforeEach(async () => {
-    resetContextDirectory();
-  });
-
-  test.afterEach(async () => {
+  test.beforeEach(() => {
     resetContextDirectory();
   });
 
@@ -35,10 +31,9 @@ test.describe('Delete Context File', () => {
 
     await setupProjectWithFixture(page, getFixturePath());
     await authenticateForTests(page);
-    await page.goto('/');
-    await waitForNetworkIdle(page);
 
     await navigateToContext(page);
+    await waitForNetworkIdle(page);
 
     // First create a context file to delete
     await clickElement(page, 'create-markdown-button');

@@ -28,11 +28,7 @@ import {
 test.use({ viewport: { width: 1280, height: 720 } });
 
 test.describe('Desktop Context View', () => {
-  test.beforeEach(async () => {
-    resetContextDirectory();
-  });
-
-  test.afterEach(async () => {
+  test.beforeEach(() => {
     resetContextDirectory();
   });
 

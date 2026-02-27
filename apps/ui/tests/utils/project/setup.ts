@@ -1,4 +1,5 @@
 import { Page } from '@playwright/test';
+import { assertSafeProjectPath } from '../core/safe-paths';
 
 /**
  * Store version constants - centralized to avoid hardcoding across tests
@@ -136,7 +137,8 @@ export async function setupWelcomeView(
 
 /**
  * Set up localStorage with a project at a real filesystem path
- * Use this when testing with actual files on disk
+ * Use this when testing with actual files on disk.
+ * Project path must be under test/ or temp to avoid affecting the main project's git.
  *
  * @param page - Playwright page
  * @param projectPath - Absolute path to the project directory
@@ -156,6 +158,7 @@ export async function setupRealProject(
     projectId?: string;
   }
 ): Promise<void> {
+  assertSafeProjectPath(projectPath);
   await page.addInitScript(
     ({
       path,

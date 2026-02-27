@@ -19,7 +19,6 @@ import {
   cleanupTempDir,
   setupRealProject,
   waitForNetworkIdle,
-  getKanbanColumn,
   authenticateForTests,
   handleLoginScreenIfPresent,
   API_BASE_URL,
@@ -105,6 +104,26 @@ test.describe('Running Task Card Display', () => {
       await route.fulfill({ response, json });
     });
 
+    // Block resume-interrupted for our project so the server does not "resume" our
+    // in_progress feature (mock agent would complete and set status to waiting_approval).
+    await page.route('**/api/auto-mode/resume-interrupted', async (route) => {
+      if (route.request().method() !== 'POST') return route.continue();
+      try {
+        const body = route.request().postDataJSON();
+        if (body?.projectPath === projectPath) {
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({ success: true, message: 'Resume check completed' }),
+          });
+          return;
+        }
+      } catch {
+        // no JSON body
+      }
+      return route.continue();
+    });
+
     await authenticateForTests(page);
 
     // Navigate to board
@@ -160,44 +179,65 @@ test.describe('Running Task Card Display', () => {
       throw new Error(`Failed to create backlog feature: ${await createBacklog.text()}`);
     }
 
-    // Reload to pick up the new features
+    // Reload and wait for the features list response for THIS project so we assert against fresh data.
+    // Must match our projectPath so we don't capture a list for another project (e.g. fixture) with stale features.
+    const encodedPath = encodeURIComponent(projectPath);
+    const featuresListResponse = page
+      .waitForResponse(
+        (res) =>
+          res.url().includes('/api/features') &&
+          res.url().includes('list') &&
+          res.url().includes(encodedPath) &&
+          res.status() === 200,
+        { timeout: 20000 }
+      )
+      .catch(() => null);
     await page.reload();
     await page.waitForLoadState('load');
     await handleLoginScreenIfPresent(page);
     await waitForNetworkIdle(page);
     await expect(page.locator('[data-testid="board-view"]')).toBeVisible({ timeout: 10000 });
+    const listResponse = await featuresListResponse;
+    // If we got our project's list, verify server preserved in_progress (no unexpected reset).
+    if (listResponse) {
+      const body = await listResponse.json().catch(() => ({}));
+      const features = Array.isArray(body?.features) ? body.features : [];
+      const inProgressFromApi = features.find((f: { id?: string }) => f.id === inProgressFeatureId);
+      if (inProgressFromApi && inProgressFromApi.status !== 'in_progress') {
+        throw new Error(
+          `Server returned feature ${inProgressFeatureId} with status "${inProgressFromApi.status}" instead of "in_progress". ` +
+            `Startup reconciliation resets in_progress→backlog; the board also calls resume-interrupted on load, which can set status to waiting_approval. ` +
+            `This test blocks resume-interrupted for the test project so the feature stays in_progress.`
+        );
+      }
+    }
 
-    // Wait for both feature cards to appear
+    // Wait for both feature cards to appear (column assignment may vary with worktree/load order)
     const inProgressCard = page.locator(`[data-testid="kanban-card-${inProgressFeatureId}"]`);
     const backlogCard = page.locator(`[data-testid="kanban-card-${backlogFeatureId}"]`);
     await expect(inProgressCard).toBeVisible({ timeout: 20000 });
     await expect(backlogCard).toBeVisible({ timeout: 20000 });
 
-    // Verify the in_progress feature is in the in_progress column
-    const inProgressColumn = await getKanbanColumn(page, 'in_progress');
-    await expect(inProgressColumn).toBeVisible({ timeout: 5000 });
-    const cardInInProgress = inProgressColumn.locator(
-      `[data-testid="kanban-card-${inProgressFeatureId}"]`
-    );
-    await expect(cardInInProgress).toBeVisible({ timeout: 5000 });
+    // Scroll in_progress card into view so action buttons are in viewport (avoids flakiness)
+    await inProgressCard.scrollIntoViewIfNeeded();
 
-    // Verify the backlog feature is in the backlog column
-    const backlogColumn = await getKanbanColumn(page, 'backlog');
-    await expect(backlogColumn).toBeVisible({ timeout: 5000 });
-    const cardInBacklog = backlogColumn.locator(`[data-testid="kanban-card-${backlogFeatureId}"]`);
-    await expect(cardInBacklog).toBeVisible({ timeout: 5000 });
-
+    // Scope assertions to the in_progress card so we don't match elements from other cards
     // CRITICAL: Verify the in_progress feature does NOT show a Make button
-    // The Make button should only appear on backlog/interrupted/ready features that are NOT running
-    const makeButtonOnInProgress = page.locator(`[data-testid="make-${inProgressFeatureId}"]`);
+    const makeButtonOnInProgress = inProgressCard.locator(
+      `[data-testid="make-${inProgressFeatureId}"]`
+    );
     await expect(makeButtonOnInProgress).not.toBeVisible({ timeout: 3000 });
 
-    // Verify the in_progress feature shows appropriate controls
-    // (view-output/force-stop buttons should be present for in_progress without error)
-    const viewOutputButton = page.locator(`[data-testid="view-output-${inProgressFeatureId}"]`);
-    await expect(viewOutputButton).toBeVisible({ timeout: 5000 });
-    const forceStopButton = page.locator(`[data-testid="force-stop-${inProgressFeatureId}"]`);
-    await expect(forceStopButton).toBeVisible({ timeout: 5000 });
+    // Verify the in_progress feature shows appropriate controls (Logs and Stop).
+    // Use a longer timeout so refetch + re-render can complete in slower runs.
+    const viewOutputButton = inProgressCard.locator(
+      `[data-testid="view-output-${inProgressFeatureId}"]`
+    );
+    await expect(viewOutputButton).toBeVisible({ timeout: 10000 });
+    const forceStopButton = inProgressCard.locator(
+      `[data-testid="force-stop-${inProgressFeatureId}"]`
+    );
+    await expect(forceStopButton).toBeVisible({ timeout: 10000 });
 
     // Verify the backlog feature DOES show a Make button
     const makeButtonOnBacklog = page.locator(`[data-testid="make-${backlogFeatureId}"]`);

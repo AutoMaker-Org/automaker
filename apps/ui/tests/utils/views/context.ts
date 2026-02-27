@@ -126,17 +126,21 @@ export async function toggleContextPreviewMode(page: Page): Promise<void> {
 
 /**
  * Wait for a specific file to appear in the context file list
- * Uses retry mechanism to handle race conditions with API/UI updates
+ * Uses retry mechanism to handle race conditions with API/UI updates.
+ * On mobile, scrolls the file list into view first so new items are visible.
  */
 export async function waitForContextFile(
   page: Page,
   filename: string,
-  timeout: number = 15000
+  timeout: number = 20000
 ): Promise<void> {
-  await expect(async () => {
-    const locator = page.locator(`[data-testid="context-file-${filename}"]`);
-    await expect(locator).toBeVisible();
-  }).toPass({ timeout, intervals: [500, 1000, 2000] });
+  // Ensure file list is in view (helps on mobile when list is scrollable)
+  const fileList = page.locator('[data-testid="context-file-list"]');
+  await fileList.scrollIntoViewIfNeeded().catch(() => {});
+
+  const locator = page.locator(`[data-testid="context-file-${filename}"]`);
+  // Use a longer per-attempt timeout so slow API/state updates can complete
+  await expect(locator).toBeVisible({ timeout });
 }
 
 /**
@@ -160,7 +164,7 @@ export async function selectContextFile(
       '[data-testid="context-editor"], [data-testid="markdown-preview"], [data-testid="image-preview"]'
     );
     await expect(contentLocator).toBeVisible();
-  }).toPass({ timeout, intervals: [500, 1000, 2000] });
+  }).toPass({ timeout, intervals: [200, 500, 1000] });
 }
 
 /**
@@ -173,7 +177,7 @@ export async function waitForFileContentToLoad(page: Page, timeout: number = 150
       '[data-testid="context-editor"], [data-testid="markdown-preview"], [data-testid="image-preview"]'
     );
     await expect(contentLocator).toBeVisible();
-  }).toPass({ timeout, intervals: [500, 1000, 2000] });
+  }).toPass({ timeout, intervals: [200, 500, 1000] });
 }
 
 /**

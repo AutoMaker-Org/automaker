@@ -18,6 +18,8 @@ const __dirname = path.dirname(__filename);
 const WORKSPACE_ROOT = path.resolve(__dirname, '../../..');
 const FIXTURE_PATH = path.join(WORKSPACE_ROOT, 'test/fixtures/projectA');
 const SPEC_FILE_PATH = path.join(FIXTURE_PATH, '.automaker/app_spec.txt');
+const CONTEXT_DIR = path.join(FIXTURE_PATH, '.automaker/context');
+const CONTEXT_METADATA_PATH = path.join(CONTEXT_DIR, 'context-metadata.json');
 const SERVER_SETTINGS_PATH = path.join(WORKSPACE_ROOT, 'apps/server/data/settings.json');
 // Create a shared test workspace directory that will be used as default for project creation
 const TEST_WORKSPACE_DIR = path.join(os.tmpdir(), 'automaker-e2e-workspace');
@@ -144,6 +146,14 @@ function setupFixtures() {
   // Create app_spec.txt
   fs.writeFileSync(SPEC_FILE_PATH, SPEC_CONTENT);
   console.log(`Created fixture file: ${SPEC_FILE_PATH}`);
+
+  // Create .automaker/context and context-metadata.json (expected by context view / FS read)
+  if (!fs.existsSync(CONTEXT_DIR)) {
+    fs.mkdirSync(CONTEXT_DIR, { recursive: true });
+    console.log(`Created directory: ${CONTEXT_DIR}`);
+  }
+  fs.writeFileSync(CONTEXT_METADATA_PATH, JSON.stringify({ files: {} }, null, 2));
+  console.log(`Created fixture file: ${CONTEXT_METADATA_PATH}`);
 
   // Reset server settings.json to a clean state for E2E tests
   const settingsDir = path.dirname(SERVER_SETTINGS_PATH);

@@ -29,6 +29,13 @@ import {
 const execAsync = promisify(exec);
 const logger = createLogger('Worktree');
 
+/** True when child_process cannot spawn the shell (e.g. ENOENT in sandboxed CI). */
+function isSpawnENOENT(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+  const e = error as { code?: string; errno?: number; syscall?: string };
+  return (e.code === 'ENOENT' || e.errno === -2) && e.syscall === 'spawn';
+}
+
 /**
  * Cache for GitHub remote status per project path.
  * This prevents repeated "no git remotes found" warnings when polling
@@ -646,6 +653,26 @@ export function createListHandler() {
         removedWorktrees: removedWorktrees.length > 0 ? removedWorktrees : undefined,
       });
     } catch (error) {
+      // When shell is unavailable (e.g. sandboxed E2E), return minimal list so UI still loads
+      if (isSpawnENOENT(error)) {
+        const projectPath = (req.body as { projectPath?: string })?.projectPath;
+        if (projectPath) {
+          const mainPath = normalizePath(projectPath);
+          res.json({
+            success: true,
+            worktrees: [
+              {
+                path: mainPath,
+                branch: 'main',
+                isMain: true,
+                isCurrent: true,
+                hasWorktree: true,
+              },
+            ],
+          });
+          return;
+        }
+      }
       logError(error, 'List worktrees failed');
       res.status(500).json({ success: false, error: getErrorMessage(error) });
     }

@@ -40,7 +40,7 @@ export async function navigateToContext(page: Page): Promise<void> {
   // Wait for any pending navigation to complete before starting a new one
   // This prevents race conditions, especially on mobile viewports
   await page.waitForLoadState('domcontentloaded').catch(() => {});
-  await page.waitForTimeout(100);
+  await page.waitForTimeout(50);
 
   // Navigate directly to /context route
   await page.goto('/context', { waitUntil: 'domcontentloaded' });
@@ -51,20 +51,40 @@ export async function navigateToContext(page: Page): Promise<void> {
   // Handle login redirect if needed
   await handleLoginScreenIfPresent(page);
 
+  // Wait for one of: context-view, context-view-no-project, or context-view-loading.
+  // Store hydration and loadContextFiles can be async, so we accept any of these first.
+  const viewSelector =
+    '[data-testid="context-view"], [data-testid="context-view-no-project"], [data-testid="context-view-loading"]';
+  await page.locator(viewSelector).first().waitFor({ state: 'visible', timeout: 20000 });
+
+  // If we see "no project", give hydration a moment then re-check (avoids flake when store hydrates after first paint).
+  const noProject = page.locator('[data-testid="context-view-no-project"]');
+  if (await noProject.isVisible().catch(() => false)) {
+    await page.waitForTimeout(500);
+    const viewNow = page.locator('[data-testid="context-view"]');
+    const loadingNow = page.locator('[data-testid="context-view-loading"]');
+    const visible =
+      (await viewNow.isVisible().catch(() => false)) ||
+      (await loadingNow.isVisible().catch(() => false));
+    if (!visible) {
+      throw new Error(
+        'Context view showed "No project selected". Ensure setupProjectWithFixture runs before navigateToContext and store has time to hydrate.'
+      );
+    }
+  }
+
   // Wait for loading to complete (if present)
   const loadingElement = page.locator('[data-testid="context-view-loading"]');
   try {
     const loadingVisible = await loadingElement.isVisible({ timeout: 2000 });
     if (loadingVisible) {
-      // Wait for loading to disappear (context view will appear)
-      await loadingElement.waitFor({ state: 'hidden', timeout: 10000 });
+      await loadingElement.waitFor({ state: 'hidden', timeout: 15000 });
     }
   } catch {
     // Loading element not found or already hidden, continue
   }
 
   // Wait for the context view to be visible
-  // Increase timeout to handle slower server startup
   await waitForElement(page, 'context-view', { timeout: 15000 });
 
   // On mobile, close the sidebar if open so the header actions trigger is clickable (not covered by backdrop)
@@ -72,7 +92,7 @@ export async function navigateToContext(page: Page): Promise<void> {
   const backdrop = page.locator('[data-testid="sidebar-backdrop"]');
   if (await backdrop.isVisible().catch(() => false)) {
     await backdrop.evaluate((el) => (el as HTMLElement).click());
-    await page.waitForTimeout(200);
+    await page.waitForTimeout(100);
   }
 }
 

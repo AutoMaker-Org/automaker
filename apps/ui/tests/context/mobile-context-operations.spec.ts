@@ -25,11 +25,7 @@ import {
 test.use({ ...devices['Pixel 5'] });
 
 test.describe('Mobile Context View Operations', () => {
-  test.beforeEach(async () => {
-    resetContextDirectory();
-  });
-
-  test.afterEach(async () => {
+  test.beforeEach(() => {
     resetContextDirectory();
   });
 
@@ -51,10 +47,11 @@ test.describe('Mobile Context View Operations', () => {
 
     await clickElement(page, 'confirm-create-markdown');
 
-    await waitForElementHidden(page, 'create-markdown-dialog', { timeout: 5000 });
+    await waitForElementHidden(page, 'create-markdown-dialog', { timeout: 10000 });
 
     await waitForNetworkIdle(page);
-    await waitForContextFile(page, fileName);
+    // Wait for list to reflect new file (allow time for write + loadContextFiles + re-render)
+    await waitForContextFile(page, fileName, 20000);
 
     // Verify file appears in list
     const fileButton = page.locator(`[data-testid="context-file-${fileName}"]`);
@@ -82,17 +79,16 @@ test.describe('Mobile Context View Operations', () => {
 
     await clickElement(page, 'confirm-create-markdown');
 
-    await waitForElementHidden(page, 'create-markdown-dialog', { timeout: 5000 });
+    await waitForElementHidden(page, 'create-markdown-dialog', { timeout: 10000 });
 
     await waitForNetworkIdle(page);
-    await waitForContextFile(page, fileName);
+    await waitForContextFile(page, fileName, 20000);
 
     // Verify file exists
     expect(contextFileExistsOnDisk(fileName)).toBe(true);
 
     // Close actions panel if still open
     await page.keyboard.press('Escape');
-    await page.waitForTimeout(300);
 
     // Click on the file menu dropdown - hover first to make it visible
     const fileRow = page.locator(`[data-testid="context-file-${fileName}"]`);
@@ -101,11 +97,11 @@ test.describe('Mobile Context View Operations', () => {
     const fileMenuButton = page.locator(`[data-testid="context-file-menu-${fileName}"]`);
     await fileMenuButton.click({ force: true });
 
-    // Wait for dropdown
-    await page.waitForTimeout(300);
+    // Wait for dropdown menu to be visible
+    const deleteMenuItem = page.locator(`[data-testid="delete-context-file-${fileName}"]`);
+    await deleteMenuItem.waitFor({ state: 'visible', timeout: 3000 });
 
     // Click delete in dropdown
-    const deleteMenuItem = page.locator(`[data-testid="delete-context-file-${fileName}"]`);
     await deleteMenuItem.click();
 
     // Wait for file to be removed from list

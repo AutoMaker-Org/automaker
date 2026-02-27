@@ -102,11 +102,7 @@ test.describe('Add Context Image', () => {
     fs.writeFileSync(testImagePath, pngHeader);
   });
 
-  test.beforeEach(async () => {
-    resetContextDirectory();
-  });
-
-  test.afterEach(async () => {
+  test.beforeEach(() => {
     resetContextDirectory();
   });
 
@@ -120,10 +116,9 @@ test.describe('Add Context Image', () => {
   test('should import an image file to context', async ({ page }) => {
     await setupProjectWithFixture(page, getFixturePath());
     await authenticateForTests(page);
-    await page.goto('/');
-    await waitForNetworkIdle(page);
 
     await navigateToContext(page);
+    await waitForNetworkIdle(page);
 
     // Wait for the file input to be attached to the DOM before setting files
     const fileInput = page.locator('[data-testid="file-import-input"]');

@@ -9,6 +9,7 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import { Page } from '@playwright/test';
 import { sanitizeBranchName, TIMEOUTS } from '../core/constants';
+import { getWorkspaceRoot } from '../core/safe-paths';
 
 const execAsync = promisify(exec);
 
@@ -35,19 +36,8 @@ export interface FeatureData {
 // ============================================================================
 
 /**
- * Get the workspace root directory (internal use only)
- * Note: Also exported from project/fixtures.ts for broader use
- */
-function getWorkspaceRoot(): string {
-  const cwd = process.cwd();
-  if (cwd.includes('apps/ui')) {
-    return path.resolve(cwd, '../..');
-  }
-  return cwd;
-}
-
-/**
- * Create a unique temp directory path for tests
+ * Create a unique temp directory path for tests (always under workspace test/ dir).
+ * Git operations in these dirs never affect the main project.
  */
 export function createTempDirPath(prefix: string = 'temp-worktree-tests'): string {
   const uniqueId = `${process.pid}-${Math.random().toString(36).substring(2, 9)}`;

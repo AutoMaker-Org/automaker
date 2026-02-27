@@ -124,7 +124,7 @@ export async function waitForMemoryFile(
   await expect(async () => {
     const locator = page.locator(`[data-testid="memory-file-${filename}"]`);
     await expect(locator).toBeVisible();
-  }).toPass({ timeout, intervals: [500, 1000, 2000] });
+  }).toPass({ timeout, intervals: [200, 500, 1000] });
 }
 
 /**
@@ -148,7 +148,7 @@ export async function selectMemoryFile(
       '[data-testid="memory-editor"], [data-testid="markdown-preview"]'
     );
     await expect(contentLocator).toBeVisible();
-  }).toPass({ timeout, intervals: [500, 1000, 2000] });
+  }).toPass({ timeout, intervals: [200, 500, 1000] });
 }
 
 /**
@@ -164,7 +164,7 @@ export async function waitForMemoryContentToLoad(
       '[data-testid="memory-editor"], [data-testid="markdown-preview"]'
     );
     await expect(contentLocator).toBeVisible();
-  }).toPass({ timeout, intervals: [500, 1000, 2000] });
+  }).toPass({ timeout, intervals: [200, 500, 1000] });
 }
 
 /**
@@ -187,6 +187,25 @@ export async function switchMemoryToEditMode(page: Page): Promise<void> {
 }
 
 /**
+ * Refresh the memory file list (clicks the Refresh button).
+ * Use instead of page.reload() to avoid ERR_CONNECTION_REFUSED when the dev server
+ * is under load, and to match real user behavior.
+ */
+export async function refreshMemoryList(page: Page): Promise<void> {
+  // Desktop: refresh button is visible; mobile: open panel then click mobile refresh
+  const desktopRefresh = page.locator('[data-testid="refresh-memory-button"]');
+  const mobileRefresh = page.locator('[data-testid="refresh-memory-button-mobile"]');
+  if (await desktopRefresh.isVisible().catch(() => false)) {
+    await desktopRefresh.click();
+  } else {
+    await clickElement(page, 'header-actions-panel-trigger');
+    await mobileRefresh.click();
+  }
+  // Allow list to re-fetch
+  await page.waitForTimeout(300);
+}
+
+/**
  * Navigate to the memory view
  * Note: Navigates directly to /memory since index route shows WelcomeView
  */
@@ -196,7 +215,7 @@ export async function navigateToMemory(page: Page): Promise<void> {
 
   // Wait for any pending navigation to complete before starting a new one
   await page.waitForLoadState('domcontentloaded').catch(() => {});
-  await page.waitForTimeout(100);
+  await page.waitForTimeout(50);
 
   // Navigate directly to /memory route
   await page.goto('/memory', { waitUntil: 'domcontentloaded' });
@@ -206,6 +225,28 @@ export async function navigateToMemory(page: Page): Promise<void> {
 
   // Handle login redirect if needed (e.g. when redirected to /logged-out)
   await handleLoginScreenIfPresent(page);
+
+  // Wait for one of: memory-view, memory-view-no-project, or memory-view-loading.
+  // Store hydration and loadMemoryFiles can be async, so we accept any of these first.
+  const viewSelector =
+    '[data-testid="memory-view"], [data-testid="memory-view-no-project"], [data-testid="memory-view-loading"]';
+  await page.locator(viewSelector).first().waitFor({ state: 'visible', timeout: 20000 });
+
+  // If we see "no project", give hydration a moment then re-check (avoids flake when store hydrates after first paint).
+  const noProject = page.locator('[data-testid="memory-view-no-project"]');
+  if (await noProject.isVisible().catch(() => false)) {
+    await page.waitForTimeout(500);
+    const viewNow = page.locator('[data-testid="memory-view"]');
+    const loadingNow = page.locator('[data-testid="memory-view-loading"]');
+    const visible =
+      (await viewNow.isVisible().catch(() => false)) ||
+      (await loadingNow.isVisible().catch(() => false));
+    if (!visible) {
+      throw new Error(
+        'Memory view showed "No project selected". Ensure setupProjectWithFixture runs before navigateToMemory and store has time to hydrate.'
+      );
+    }
+  }
 
   // Wait for loading to complete (if present)
   const loadingElement = page.locator('[data-testid="memory-view-loading"]');
@@ -227,7 +268,7 @@ export async function navigateToMemory(page: Page): Promise<void> {
   const backdrop = page.locator('[data-testid="sidebar-backdrop"]');
   if (await backdrop.isVisible().catch(() => false)) {
     await backdrop.evaluate((el) => (el as HTMLElement).click());
-    await page.waitForTimeout(200);
+    await page.waitForTimeout(100);
   }
 
   // Ensure the header (and actions panel trigger on mobile) is interactive

@@ -1,17 +1,9 @@
 import { Page } from '@playwright/test';
 import * as fs from 'fs';
 import * as path from 'path';
+import { getWorkspaceRoot, assertSafeProjectPath } from '../core/safe-paths';
 
-/**
- * Resolve the workspace root - handle both running from apps/ui and from root
- */
-export function getWorkspaceRoot(): string {
-  const cwd = process.cwd();
-  if (cwd.includes('apps/ui')) {
-    return path.resolve(cwd, '../..');
-  }
-  return cwd;
-}
+export { getWorkspaceRoot };
 
 const WORKSPACE_ROOT = getWorkspaceRoot();
 const FIXTURE_PATH = path.join(WORKSPACE_ROOT, 'test/fixtures/projectA');
@@ -120,11 +112,13 @@ export function memoryFileExistsOnDisk(filename: string): boolean {
 /**
  * Set up localStorage with a project pointing to our test fixture
  * Note: In CI, setup wizard is also skipped via NEXT_PUBLIC_SKIP_SETUP env var
+ * Project path must be under test/ or temp to avoid affecting the main project's git.
  */
 export async function setupProjectWithFixture(
   page: Page,
   projectPath: string = FIXTURE_PATH
 ): Promise<void> {
+  assertSafeProjectPath(projectPath);
   await page.addInitScript((pathArg: string) => {
     const mockProject = {
       id: 'test-project-fixture',

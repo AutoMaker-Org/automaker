@@ -245,7 +245,7 @@ export const CardActions = memo(function CardActions({
                       onViewOutput();
                     }}
                     onPointerDown={(e) => e.stopPropagation()}
-                    data-testid={`view-output-inprogress-${feature.id}`}
+                    data-testid={`view-output-${feature.id}`}
                   >
                     <FileText className="w-3 h-3" />
                   </Button>

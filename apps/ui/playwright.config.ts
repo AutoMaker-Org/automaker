@@ -2,6 +2,7 @@ import { defineConfig, devices } from '@playwright/test';
 
 const port = process.env.TEST_PORT || 3107;
 const serverPort = process.env.TEST_SERVER_PORT || 3108;
+// When true, no webServer is started; you must run UI (port 3107) and server (3108) yourself.
 const reuseServer = process.env.TEST_REUSE_SERVER === 'true';
 // Only skip backend startup when explicitly requested for E2E runs.
 // VITE_SERVER_URL may be set in user shells for local dev and should not affect tests.

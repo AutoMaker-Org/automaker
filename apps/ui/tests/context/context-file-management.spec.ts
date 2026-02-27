@@ -22,21 +22,16 @@ import {
 } from '../utils';
 
 test.describe('Context File Management', () => {
-  test.beforeEach(async () => {
-    resetContextDirectory();
-  });
-
-  test.afterEach(async () => {
+  test.beforeEach(() => {
     resetContextDirectory();
   });
 
   test('should create a new markdown context file', async ({ page }) => {
     await setupProjectWithFixture(page, getFixturePath());
     await authenticateForTests(page);
-    await page.goto('/');
-    await waitForNetworkIdle(page);
 
     await navigateToContext(page);
+    await waitForNetworkIdle(page);
 
     await clickElement(page, 'create-markdown-button');
     await page.waitForSelector('[data-testid="create-markdown-dialog"]', { timeout: 5000 });

@@ -5,6 +5,7 @@ export * from './core/elements';
 export * from './core/interactions';
 export * from './core/waiting';
 export * from './core/constants';
+export * from './core/safe-paths';
 
 // API utilities
 export * from './api/client';
