@@ -24,9 +24,9 @@ import {
 import { getFirstNonEmptySummary } from '@/lib/summary-selection';
 import { useAgentOutput, useFeature } from '@/hooks/queries';
 import { cn } from '@/lib/utils';
+import { MODAL_CONSTANTS } from '@/components/views/board-view/dialogs/agent-output-modal.constants';
 import type { AutoModeEvent } from '@/types/electron';
 import type { BacklogPlanEvent } from '@automaker/types';
-import { MODAL_CONSTANTS } from './agent-output-modal.constants';
 
 interface AgentOutputModalProps {
   open: boolean;
@@ -43,7 +43,7 @@ interface AgentOutputModalProps {
   branchName?: string;
 }
 
-type ViewMode = 'summary' | 'parsed' | 'raw' | 'changes';
+type ViewMode = (typeof MODAL_CONSTANTS.VIEW_MODES)[keyof typeof MODAL_CONSTANTS.VIEW_MODES];
 
 /**
  * Renders a single phase entry card with header and content.
@@ -164,11 +164,11 @@ export function AgentOutputModal({
   const isBacklogPlan = featureId.startsWith('backlog-plan:');
 
   // Resolve project path - prefer prop, fallback to window.__currentProject
-  const resolvedProjectPath = projectPathProp || window.__currentProject?.path || '';
+  const resolvedProjectPath = projectPathProp || window.__currentProject?.path || undefined;
 
-  // Track additional content from WebSocket events (appended to query data)
-  const [streamedContent, setStreamedContent] = useState<string>('');
+  // Track view mode state
   const [viewMode, setViewMode] = useState<ViewMode | null>(null);
+  const [streamedContent, setStreamedContent] = useState<string>('');
 
   // Use React Query for initial output loading
   const {
@@ -221,7 +221,8 @@ export function AgentOutputModal({
   }, [normalizedSummary]);
 
   // Determine the effective view mode - default to summary if available, otherwise parsed
-  const effectiveViewMode = viewMode ?? (summary ? 'summary' : 'parsed');
+  const effectiveViewMode =
+    viewMode ?? (summary ? MODAL_CONSTANTS.VIEW_MODES.SUMMARY : MODAL_CONSTANTS.VIEW_MODES.PARSED);
   const scrollRef = useRef<HTMLDivElement>(null);
   const autoScrollRef = useRef(true);
   const useWorktrees = useAppStore((state) => state.useWorktrees);
@@ -486,7 +487,8 @@ export function AgentOutputModal({
     if (!scrollRef.current) return;
 
     const { scrollTop, scrollHeight, clientHeight } = scrollRef.current;
-    const isAtBottom = scrollHeight - scrollTop - clientHeight < 50;
+    const isAtBottom =
+      scrollHeight - scrollTop - clientHeight < MODAL_CONSTANTS.AUTOSCROLL_THRESHOLD;
     autoScrollRef.current = isAtBottom;
   };
 
@@ -511,7 +513,7 @@ export function AgentOutputModal({
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent
-        className="w-full max-h-[85dvh] max-w-[calc(100%-2rem)] sm:w-[60vw] sm:max-w-[60vw] sm:max-h-[80vh] rounded-xl flex flex-col"
+        className="w-full max-h-[85dvh] max-w-[calc(100%-2rem)] sm:w-[60vw] sm:max-w-[60vw] sm:max-h-[80vh] md:w-[90vw] md:max-w-[1200px] md:max-h-[85vh] rounded-xl flex flex-col"
         data-testid="agent-output-modal"
       >
         <DialogHeader className="shrink-0">
@@ -593,7 +595,9 @@ export function AgentOutputModal({
         )}
 
         {effectiveViewMode === 'changes' ? (
-          <div className="flex-1 min-h-0 sm:min-h-[200px] sm:max-h-[60vh] overflow-y-auto scrollbar-visible">
+          <div
+            className={`flex-1 min-h-0 ${MODAL_CONSTANTS.COMPONENT_HEIGHTS.SMALL_MIN} ${MODAL_CONSTANTS.COMPONENT_HEIGHTS.SMALL_MAX} overflow-y-auto scrollbar-visible`}
+          >
             {resolvedProjectPath ? (
               <GitDiffPanel
                 projectPath={resolvedProjectPath}
@@ -658,7 +662,7 @@ export function AgentOutputModal({
             <div
               ref={scrollRef}
               onScroll={handleScroll}
-              className="flex-1 min-h-0 sm:min-h-[200px] sm:max-h-[60vh] overflow-y-auto bg-popover border border-border/50 rounded-lg p-4 font-mono text-xs scrollbar-visible"
+              className={`flex-1 min-h-0 ${MODAL_CONSTANTS.COMPONENT_HEIGHTS.SMALL_MIN} ${MODAL_CONSTANTS.COMPONENT_HEIGHTS.SMALL_MAX} overflow-y-auto bg-popover border border-border/50 rounded-lg p-4 font-mono text-xs scrollbar-visible`}
             >
               {isLoading && !output ? (
                 <div className="flex items-center justify-center h-full text-muted-foreground">

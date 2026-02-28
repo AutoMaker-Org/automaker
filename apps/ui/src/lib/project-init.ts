@@ -97,24 +97,25 @@ export async function initializeProject(projectPath: string): Promise<ProjectIni
       existingFiles.push('.git');
     }
 
-    // Create all required directories
-    for (const dir of REQUIRED_STRUCTURE.directories) {
-      const fullPath = `${projectPath}/${dir}`;
-      await api.mkdir(fullPath);
-    }
+    // Create all required directories in parallel
+    await Promise.all(
+      REQUIRED_STRUCTURE.directories.map((dir) => api.mkdir(`${projectPath}/${dir}`))
+    );
 
-    // Check and create required files
-    for (const [relativePath, defaultContent] of Object.entries(REQUIRED_STRUCTURE.files)) {
-      const fullPath = `${projectPath}/${relativePath}`;
-      const exists = await api.exists(fullPath);
+    // Check and create required files in parallel
+    await Promise.all(
+      Object.entries(REQUIRED_STRUCTURE.files).map(async ([relativePath, defaultContent]) => {
+        const fullPath = `${projectPath}/${relativePath}`;
+        const exists = await api.exists(fullPath);
 
-      if (!exists) {
-        await api.writeFile(fullPath, defaultContent as string);
-        createdFiles.push(relativePath);
-      } else {
-        existingFiles.push(relativePath);
-      }
-    }
+        if (!exists) {
+          await api.writeFile(fullPath, defaultContent as string);
+          createdFiles.push(relativePath);
+        } else {
+          existingFiles.push(relativePath);
+        }
+      })
+    );
 
     // Determine if this is a new project (no files needed to be created since features/ is empty by default)
     const isNewProject = createdFiles.length === 0 && existingFiles.length === 0;

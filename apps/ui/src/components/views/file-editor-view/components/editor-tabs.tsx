@@ -25,9 +25,18 @@ interface EditorTabsProps {
 
 /** Get a file icon color based on extension */
 function getFileColor(fileName: string): string {
-  const dotIndex = fileName.lastIndexOf('.');
-  // Files without an extension (no dot, or dotfile with dot at position 0)
-  const ext = dotIndex > 0 ? fileName.slice(dotIndex + 1).toLowerCase() : '';
+  const name = fileName.toLowerCase();
+
+  // Handle dotfiles and extensionless files by name first
+  if (name.startsWith('.env')) return 'text-yellow-600';
+  if (name === 'dockerfile' || name.startsWith('dockerfile.')) return 'text-blue-300';
+  if (name === 'makefile' || name === 'gnumakefile') return 'text-orange-300';
+  if (name === '.gitignore' || name === '.dockerignore' || name === '.npmignore')
+    return 'text-gray-400';
+
+  const dotIndex = name.lastIndexOf('.');
+  const ext = dotIndex > 0 ? name.slice(dotIndex + 1) : '';
+
   switch (ext) {
     case 'ts':
     case 'tsx':
@@ -71,7 +80,9 @@ function getFileColor(fileName: string): string {
     case 'zsh':
       return 'text-green-300';
     default:
-      return 'text-muted-foreground';
+      // Very faint dot for unknown file types so it's not confused
+      // with the filled dirty-indicator dot
+      return 'text-muted-foreground/30';
   }
 }
 

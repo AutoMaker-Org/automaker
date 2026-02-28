@@ -108,16 +108,14 @@ export class ExecutionService {
     return firstLine.length <= 60 ? firstLine : firstLine.substring(0, 57) + '...';
   }
 
-  buildFeaturePrompt(
-    feature: Feature,
-    taskExecutionPrompts: {
-      implementationInstructions: string;
-      playwrightVerificationInstructions: string;
-    }
-  ): string {
+  /**
+   * Build feature description section (without implementation instructions).
+   * Used when planning mode is active — the planning prompt provides its own instructions.
+   */
+  buildFeatureDescription(feature: Feature): string {
     const title = this.extractTitleFromDescription(feature.description);
 
-    let prompt = `## Feature Implementation Task
+    let prompt = `## Feature Task
 
 **Feature ID:** ${feature.id}
 **Title:** ${title}
@@ -145,6 +143,18 @@ ${feature.spec}
         .join('\n');
       prompt += `\n**Context Images Attached:**\n${feature.imagePaths.length} image(s) attached:\n${imagesList}\n`;
     }
+
+    return prompt;
+  }
+
+  buildFeaturePrompt(
+    feature: Feature,
+    taskExecutionPrompts: {
+      implementationInstructions: string;
+      playwrightVerificationInstructions: string;
+    }
+  ): string {
+    let prompt = this.buildFeatureDescription(feature);
 
     prompt += feature.skipTests
       ? `\n${taskExecutionPrompts.implementationInstructions}`
@@ -273,9 +283,15 @@ ${feature.spec}
       if (options?.continuationPrompt) {
         prompt = options.continuationPrompt;
       } else {
-        prompt =
-          (await this.getPlanningPromptPrefixFn(feature)) +
-          this.buildFeaturePrompt(feature, prompts.taskExecution);
+        const planningPrefix = await this.getPlanningPromptPrefixFn(feature);
+        if (planningPrefix) {
+          // Planning mode active: use planning instructions + feature description only.
+          // Do NOT include implementationInstructions — they conflict with the planning
+          // prompt's "DO NOT proceed with implementation until approval" directive.
+          prompt = planningPrefix + '\n\n' + this.buildFeatureDescription(feature);
+        } else {
+          prompt = this.buildFeaturePrompt(feature, prompts.taskExecution);
+        }
         if (feature.planningMode && feature.planningMode !== 'skip') {
           this.eventBus.emitAutoModeEvent('planning_started', {
             featureId: feature.id,

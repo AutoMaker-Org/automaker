@@ -297,9 +297,9 @@ export function AddFeatureDialog({
     prefilledCategory,
   ]);
 
-  // Clear requirePlanApproval when planning mode is skip or lite
+  // Clear requirePlanApproval when planning mode is skip (lite supports approval)
   useEffect(() => {
-    if (planningMode === 'skip' || planningMode === 'lite') {
+    if (planningMode === 'skip') {
       setRequirePlanApproval(false);
     }
   }, [planningMode]);
@@ -634,14 +634,14 @@ export function AddFeatureDialog({
                       id="add-feature-require-approval"
                       checked={requirePlanApproval}
                       onCheckedChange={(checked) => setRequirePlanApproval(!!checked)}
-                      disabled={planningMode === 'skip' || planningMode === 'lite'}
+                      disabled={planningMode === 'skip'}
                       data-testid="add-feature-planning-require-approval-checkbox"
                     />
                     <Label
                       htmlFor="add-feature-require-approval"
                       className={cn(
                         'text-xs font-normal',
-                        planningMode === 'skip' || planningMode === 'lite'
+                        planningMode === 'skip'
                           ? 'cursor-not-allowed text-muted-foreground'
                           : 'cursor-pointer'
                       )}

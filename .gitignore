@@ -76,6 +76,7 @@ test/board-bg-test-*/
 test/edit-feature-test-*/
 test/open-project-test-*/
 
+
 # Environment files (keep .example)
 .env
 .env.local

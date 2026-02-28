@@ -451,7 +451,7 @@ describe('execution-service.ts', () => {
       const callArgs = mockRunAgentFn.mock.calls[0];
       expect(callArgs[0]).toMatch(/test.*project/); // workDir contains project
       expect(callArgs[1]).toBe('feature-1');
-      expect(callArgs[2]).toContain('Feature Implementation Task');
+      expect(callArgs[2]).toContain('Feature Task');
       expect(callArgs[3]).toBeInstanceOf(AbortController);
       expect(callArgs[4]).toBe('/test/project');
       // Model (index 6) should be resolved

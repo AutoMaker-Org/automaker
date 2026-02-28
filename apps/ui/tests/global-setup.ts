@@ -8,7 +8,10 @@
 import { chromium, FullConfig } from '@playwright/test';
 import fs from 'fs';
 import path from 'path';
-import { cleanupLeftoverTestDirs } from './utils/cleanup-test-dirs';
+import {
+  cleanupLeftoverFixtureWorkerDirs,
+  cleanupLeftoverTestDirs,
+} from './utils/cleanup-test-dirs';
 
 const TEST_PORT = process.env.TEST_PORT || '3107';
 const TEST_SERVER_PORT = process.env.TEST_SERVER_PORT || '3108';
@@ -19,8 +22,9 @@ const AUTH_DIR = path.join(__dirname, '.auth');
 const AUTH_STATE_PATH = path.join(AUTH_DIR, 'storage-state.json');
 
 async function globalSetup(config: FullConfig) {
-  // Clean up leftover test dirs from previous runs (aborted, crashed, etc.)
+  // Clean up leftover test dirs and fixture worker copies from previous runs (aborted, crashed, etc.)
   cleanupLeftoverTestDirs();
+  cleanupLeftoverFixtureWorkerDirs();
 
   // Note: Server killing is handled by the pretest script in package.json
   // GlobalSetup runs AFTER webServer starts, so we can't kill the server here

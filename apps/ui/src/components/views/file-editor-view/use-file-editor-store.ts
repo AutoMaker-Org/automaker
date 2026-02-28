@@ -1,6 +1,10 @@
 import { create } from 'zustand';
 import { persist, type StorageValue } from 'zustand/middleware';
-import { updateTabWithContent, markTabAsSaved } from './file-editor-dirty-utils';
+import {
+  updateTabWithContent,
+  markTabAsSaved,
+  normalizeLineEndings,
+} from './file-editor-dirty-utils';
 
 export interface FileTreeNode {
   name: string;
@@ -128,6 +132,8 @@ interface FileEditorState {
   markTabSaved: (tabId: string, content: string) => void;
   updateTabScroll: (tabId: string, scrollTop: number) => void;
   updateTabCursor: (tabId: string, line: number, col: number) => void;
+  /** Re-sync an existing tab's originalContent and isDirty state from freshly-read disk content */
+  refreshTabContent: (tabId: string, diskContent: string) => void;
 
   setMarkdownViewMode: (mode: MarkdownViewMode) => void;
 
@@ -273,6 +279,24 @@ export const useFileEditorStore = create<FileEditorState>()(
         });
       },
 
+      refreshTabContent: (tabId, diskContent) => {
+        set({
+          tabs: get().tabs.map((t) => {
+            if (t.id !== tabId) return t;
+            // Normalize line endings so the baseline matches CodeMirror's
+            // internal representation (\r\n → \n). Without this, files with
+            // Windows line endings would always appear dirty.
+            const normalizedDisk = normalizeLineEndings(diskContent);
+            // If the editor content matches the freshly-read disk content, the file
+            // is clean (any previous isDirty was a stale persisted value).
+            // Otherwise keep the user's in-progress edits but update originalContent
+            // so isDirty is calculated against the actual on-disk baseline.
+            const isDirty = normalizeLineEndings(t.content) !== normalizedDisk;
+            return { ...t, originalContent: normalizedDisk, isDirty };
+          }),
+        });
+      },
+
       updateTabScroll: (tabId, scrollTop) => {
         set({
           tabs: get().tabs.map((t) => (t.id === tabId ? { ...t, scrollTop } : t)),
@@ -321,7 +345,7 @@ export const useFileEditorStore = create<FileEditorState>()(
     }),
     {
       name: STORE_NAME,
-      version: 1,
+      version: 2,
       // Only persist tab session state, not transient data (git status, file tree, drag state)
       partialize: (state) =>
         ({
@@ -338,11 +362,30 @@ export const useFileEditorStore = create<FileEditorState>()(
           try {
             const parsed = JSON.parse(raw) as StorageValue<PersistedFileEditorState>;
             if (!parsed?.state) return null;
+            // Normalize tabs: ensure originalContent is always a string. Tabs persisted
+            // before originalContent was added to the schema have originalContent=undefined,
+            // which causes isDirty=true on any content comparison. Default to content so
+            // the tab starts in a clean state.
+            // Also recalculate isDirty from content vs originalContent rather than trusting
+            // the persisted value, which can become stale (e.g. file saved externally,
+            // CodeMirror normalization, or schema migration).
+            const normalizedTabs = (parsed.state.tabs ?? []).map((tab) => {
+              const originalContent = normalizeLineEndings(
+                tab.originalContent ?? tab.content ?? ''
+              );
+              const content = tab.content ?? '';
+              return {
+                ...tab,
+                originalContent,
+                isDirty: normalizeLineEndings(content) !== originalContent,
+              };
+            });
             // Convert arrays back to Sets
             return {
               ...parsed,
               state: {
                 ...parsed.state,
+                tabs: normalizedTabs,
                 expandedFolders: new Set(parsed.state.expandedFolders ?? []),
               },
             } as unknown as StorageValue<FileEditorState>;
@@ -384,6 +427,22 @@ export const useFileEditorStore = create<FileEditorState>()(
           state.activeTabId = state.activeTabId ?? null;
           state.expandedFolders = state.expandedFolders ?? new Set<string>();
           state.markdownViewMode = state.markdownViewMode ?? 'split';
+        }
+        // Always ensure each tab has a valid originalContent field.
+        // Tabs persisted before originalContent was added to the schema would have
+        // originalContent=undefined, which causes isDirty=true on any onChange call
+        // (content !== undefined is always true). Fix by defaulting to content so the
+        // tab starts in a clean state; any genuine unsaved changes will be re-detected
+        // when the user next edits the file.
+        if (Array.isArray((state as Record<string, unknown>).tabs)) {
+          (state as Record<string, unknown>).tabs = (
+            (state as Record<string, unknown>).tabs as Array<Record<string, unknown>>
+          ).map((tab: Record<string, unknown>) => {
+            if (tab.originalContent === undefined || tab.originalContent === null) {
+              return { ...tab, originalContent: tab.content ?? '' };
+            }
+            return tab;
+          });
         }
         return state as unknown as FileEditorState;
       },

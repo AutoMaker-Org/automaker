@@ -129,12 +129,41 @@ export const isConnectionError = (error: unknown): boolean => {
 };
 
 /**
- * Handle a server offline error by notifying the UI to redirect.
- * Call this when a connection error is detected.
+ * Handle a server offline error by verifying the server is actually down
+ * before redirecting to login. Uses debouncing to coalesce rapid errors
+ * and a health check to confirm the server isn't just experiencing a
+ * transient network blip.
  */
+let serverOfflineCheckPending = false;
+
 export const handleServerOffline = (): void => {
-  logger.error('Server appears to be offline, redirecting to login...');
-  notifyServerOffline();
+  // Debounce: if a check is already in progress, skip
+  if (serverOfflineCheckPending) return;
+  serverOfflineCheckPending = true;
+
+  // Wait briefly to let transient errors settle, then verify with a health check
+  setTimeout(() => {
+    (async () => {
+      try {
+        const response = await fetch(`${getServerUrl()}/api/health`, {
+          method: 'GET',
+          cache: NO_STORE_CACHE_MODE,
+          signal: AbortSignal.timeout(5000),
+        });
+        if (response.ok) {
+          logger.info('Server health check passed, ignoring transient connection error');
+          return;
+        }
+      } catch {
+        // Health check failed - server is genuinely offline
+      }
+
+      logger.error('Server appears to be offline, redirecting to login...');
+      notifyServerOffline();
+    })().finally(() => {
+      serverOfflineCheckPending = false;
+    });
+  }, 2000);
 };
 
 /**
@@ -2080,6 +2109,44 @@ export class HttpApiClient implements ElectronAPI {
       conflictCount?: number;
       error?: string;
     }> => this.post('/api/features/check-conflicts', { projectPath, data }),
+    getOrphaned: (
+      projectPath: string
+    ): Promise<{
+      success: boolean;
+      orphanedFeatures?: Array<{ feature: Feature; missingBranch: string }>;
+      error?: string;
+    }> => this.post('/api/features/orphaned', { projectPath }),
+    resolveOrphaned: (
+      projectPath: string,
+      featureId: string,
+      action: 'delete' | 'create-worktree' | 'move-to-branch',
+      targetBranch?: string | null
+    ): Promise<{
+      success: boolean;
+      action?: string;
+      worktreePath?: string;
+      branchName?: string;
+      error?: string;
+    }> =>
+      this.post('/api/features/orphaned/resolve', { projectPath, featureId, action, targetBranch }),
+    bulkResolveOrphaned: (
+      projectPath: string,
+      featureIds: string[],
+      action: 'delete' | 'create-worktree' | 'move-to-branch',
+      targetBranch?: string | null
+    ): Promise<{
+      success: boolean;
+      resolvedCount?: number;
+      failedCount?: number;
+      results?: Array<{ featureId: string; success: boolean; action?: string; error?: string }>;
+      error?: string;
+    }> =>
+      this.post('/api/features/orphaned/bulk-resolve', {
+        projectPath,
+        featureIds,
+        action,
+        targetBranch,
+      }),
   };
 
   // Auto Mode API
