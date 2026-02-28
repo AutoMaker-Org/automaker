@@ -378,6 +378,7 @@ export class FeatureLoader {
       description: featureData.description || '',
       ...featureData,
       id: featureId,
+      createdAt: featureData.createdAt || new Date().toISOString(),
       imagePaths: migratedImagePaths,
       descriptionHistory: initialHistory,
     };

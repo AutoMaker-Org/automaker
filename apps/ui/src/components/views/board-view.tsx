@@ -1458,6 +1458,11 @@ export function BoardView() {
     ]
   );
 
+  // Use background hook (must be before useBoardColumnFeatures to get sortNewestCardOnTop)
+  const { backgroundSettings, backgroundImageStyle } = useBoardBackground({
+    currentProject,
+  });
+
   // Use column features hook
   const { getColumnFeatures, completedFeatures } = useBoardColumnFeatures({
     features: hookFeatures,
@@ -1467,6 +1472,7 @@ export function BoardView() {
     currentWorktreePath,
     currentWorktreeBranch,
     projectPath: currentProject?.path || null,
+    sortNewestCardOnTop: backgroundSettings.sortNewestCardOnTop,
   });
 
   // Build columnFeaturesMap for ListView
@@ -1479,11 +1485,6 @@ export function BoardView() {
     }
     return map;
   }, [pipelineConfig, getColumnFeatures]);
-
-  // Use background hook
-  const { backgroundSettings, backgroundImageStyle } = useBoardBackground({
-    currentProject,
-  });
 
   // Find feature for pending plan approval
   const pendingApprovalFeature = useMemo(() => {
@@ -1802,6 +1803,7 @@ export function BoardView() {
                     handleViewOutput(feature);
                   }
                 }}
+                sortNewestCardOnTop={backgroundSettings.sortNewestCardOnTop}
                 className="transition-opacity duration-200"
               />
             ) : (

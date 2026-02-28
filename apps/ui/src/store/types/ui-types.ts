@@ -79,6 +79,7 @@ export interface BackgroundSettings {
   cardBorderEnabled: boolean;
   cardBorderOpacity: number;
   hideScrollbar: boolean;
+  sortNewestCardOnTop: boolean;
 }
 
 // Keyboard Shortcuts - stored as strings like "K", "Shift+N", "Cmd+K"

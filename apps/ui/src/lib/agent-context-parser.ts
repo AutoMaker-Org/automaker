@@ -106,13 +106,16 @@ export function formatModelName(model: string, options?: FormatModelNameOptions)
     const modelName = model.substring(slashIndex + 1);
     // Extract last path segment (handles nested paths like "arcee-ai/trinity-large-preview:free")
     let lastSegment = modelName.split('/').pop()!;
-    // Strip tier suffixes like ":free", ":extended"
-    const colonIdx = lastSegment.indexOf(':');
-    if (colonIdx !== -1) {
-      lastSegment = lastSegment.slice(0, colonIdx);
+    // Detect and save tier suffixes like ":free", ":extended", ":beta", ":preview"
+    const tierMatch = lastSegment.match(/:(free|extended|beta|preview)$/i);
+    const tierSuffix = tierMatch ? tierMatch[0] : null;
+    if (tierSuffix) {
+      lastSegment = lastSegment.slice(0, lastSegment.length - tierSuffix.length);
     }
     // Clean up the model name for display (remove version tags, capitalize)
-    return lastSegment.replace(/[-_]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+    const cleanedName = lastSegment.replace(/[-_]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+    // Re-append the tier suffix so tier context remains visible
+    return tierSuffix ? `${cleanedName}${tierSuffix}` : cleanedName;
   }
 
   // Default: split by dash and capitalize

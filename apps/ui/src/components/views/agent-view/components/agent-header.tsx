@@ -63,6 +63,7 @@ export function AgentHeader({
             size="sm"
             onClick={onClearChat}
             disabled={isProcessing}
+            aria-label="Clear chat"
             className="text-muted-foreground hover:text-foreground h-8 w-8 p-0 sm:w-auto sm:px-3"
           >
             <Trash2 className="w-4 h-4 sm:mr-2" />

@@ -290,7 +290,7 @@ export const PriorityBadges = memo(function PriorityBadges({
             </div>
           </TooltipTrigger>
           <TooltipContent side="bottom" className="text-xs max-w-[250px]">
-            <p>Plan ready for review - tap to approve</p>
+            <p>Plan ready for review - click or tap to approve</p>
           </TooltipContent>
         </Tooltip>
       )}

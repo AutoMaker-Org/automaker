@@ -141,9 +141,9 @@ export function ModelSelector({
       // Switch to Claude's default model (canonical format)
       onModelSelect('claude-sonnet');
     } else if (provider === 'opencode' && selectedProvider !== 'opencode') {
-      // Switch to OpenCode's default model
+      // Switch to OpenCode's default model (prefer configured default over first available)
       const defaultModelId =
-        allOpencodeModels[0]?.id || opencodeDefaultModel || 'opencode-big-pickle';
+        opencodeDefaultModel || allOpencodeModels[0]?.id || 'opencode-big-pickle';
       onModelSelect(defaultModelId);
     }
   };

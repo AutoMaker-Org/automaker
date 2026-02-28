@@ -99,7 +99,7 @@ export function createWorktreeRoutes(
   router.post(
     '/delete',
     validatePathParams('projectPath', 'worktreePath'),
-    createDeleteHandler(featureLoader)
+    createDeleteHandler(events, featureLoader)
   );
   router.post('/create-pr', createCreatePRHandler());
   router.post('/pr-info', createPRInfoHandler());

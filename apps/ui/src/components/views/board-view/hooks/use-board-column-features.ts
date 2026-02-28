@@ -9,6 +9,22 @@ import {
 
 type ColumnId = Feature['status'];
 
+/**
+ * Extract creation time from a feature, falling back to the timestamp
+ * embedded in the feature ID (format: feature-{timestamp}-{random}).
+ */
+function getFeatureCreatedTime(feature: Feature): number {
+  if (feature.createdAt) {
+    return new Date(feature.createdAt).getTime();
+  }
+  // Fallback: extract timestamp from feature ID (e.g., "feature-1772299989679-185nwyp5kc7")
+  const match = feature.id.match(/^feature-(\d+)-/);
+  if (match) {
+    return parseInt(match[1], 10);
+  }
+  return 0;
+}
+
 interface UseBoardColumnFeaturesProps {
   features: Feature[];
   runningAutoTasks: string[];
@@ -17,6 +33,7 @@ interface UseBoardColumnFeaturesProps {
   currentWorktreePath: string | null; // Currently selected worktree path
   currentWorktreeBranch: string | null; // Branch name of the selected worktree (null = main)
   projectPath: string | null; // Main project path (for main worktree)
+  sortNewestCardOnTop?: boolean; // When true, sort cards by most recent (createdAt desc) in all columns
 }
 
 export function useBoardColumnFeatures({
@@ -27,6 +44,7 @@ export function useBoardColumnFeatures({
   currentWorktreePath,
   currentWorktreeBranch,
   projectPath,
+  sortNewestCardOnTop = false,
 }: UseBoardColumnFeaturesProps) {
   // Get recently completed features from store for race condition protection
   const recentlyCompletedFeatures = useAppStore((state) => state.recentlyCompletedFeatures);
@@ -279,6 +297,17 @@ export function useBoardColumnFeatures({
       }
     }
 
+    // Apply newest-on-top sorting to all columns when enabled
+    if (sortNewestCardOnTop) {
+      for (const columnId of Object.keys(map)) {
+        map[columnId] = [...map[columnId]].sort((a, b) => {
+          const aTime = getFeatureCreatedTime(a);
+          const bTime = getFeatureCreatedTime(b);
+          return bTime - aTime; // desc: newest first
+        });
+      }
+    }
+
     return map;
   }, [
     features,
@@ -289,6 +318,7 @@ export function useBoardColumnFeatures({
     currentWorktreeBranch,
     projectPath,
     recentlyCompletedFeatures,
+    sortNewestCardOnTop,
   ]);
 
   const getColumnFeatures = useCallback(

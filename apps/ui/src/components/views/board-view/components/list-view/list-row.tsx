@@ -410,8 +410,13 @@ export function getFeatureSortValue(
       return (feature.category || '').toLowerCase();
     case 'priority':
       return feature.priority || 999; // No priority sorts last
-    case 'createdAt':
-      return feature.createdAt ? new Date(feature.createdAt) : new Date(0);
+    case 'createdAt': {
+      if (feature.createdAt) return new Date(feature.createdAt);
+      // Fallback: extract timestamp from feature ID (e.g., "feature-1772299989679-185nwyp5kc7")
+      const match = feature.id.match(/^feature-(\d+)-/);
+      if (match) return new Date(parseInt(match[1], 10));
+      return new Date(0);
+    }
     case 'updatedAt':
       return feature.updatedAt ? new Date(feature.updatedAt) : new Date(0);
     default:

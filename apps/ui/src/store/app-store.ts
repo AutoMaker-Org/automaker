@@ -311,6 +311,7 @@ const initialState: AppState = {
   keyboardShortcuts: DEFAULT_KEYBOARD_SHORTCUTS,
   muteDoneSound: false,
   disableSplashScreen: false,
+  defaultSortNewestCardOnTop: false,
   serverLogLevel: 'info',
   enableRequestLogging: true,
   showQueryDevtools: true,
@@ -1234,6 +1235,9 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
   // Splash Screen actions
   setDisableSplashScreen: (disabled) => set({ disableSplashScreen: disabled }),
 
+  // Board Card Sorting (global default) actions
+  setDefaultSortNewestCardOnTop: (enabled) => set({ defaultSortNewestCardOnTop: enabled }),
+
   // Server Log Level actions
   setServerLogLevel: (level) => set({ serverLogLevel: level }),
   setEnableRequestLogging: (enabled) => set({ enableRequestLogging: enabled }),
@@ -1819,6 +1823,24 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
         },
       },
     })),
+  setSortNewestCardOnTop: (projectPath, enabled) =>
+    set((state) => ({
+      boardBackgroundByProject: {
+        ...state.boardBackgroundByProject,
+        [projectPath]: {
+          ...(state.boardBackgroundByProject[projectPath] ?? defaultBackgroundSettings),
+          sortNewestCardOnTop: enabled,
+        },
+      },
+    })),
+  setAllProjectsSortNewestCardOnTop: (enabled) =>
+    set((state) => {
+      const updated: typeof state.boardBackgroundByProject = {};
+      for (const [projectPath, settings] of Object.entries(state.boardBackgroundByProject)) {
+        updated[projectPath] = { ...settings, sortNewestCardOnTop: enabled };
+      }
+      return { boardBackgroundByProject: updated };
+    }),
   clearBoardBackground: (projectPath) =>
     set((state) => {
       const newBackgrounds = { ...state.boardBackgroundByProject };
@@ -2918,7 +2940,7 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
         const trulyNewModelIds = allFetchedIds.filter((id) => !currentKnownIds.includes(id));
         const updatedEnabledIds =
           trulyNewModelIds.length > 0
-            ? [...currentEnabledIds, ...trulyNewModelIds]
+            ? [...new Set([...currentEnabledIds, ...trulyNewModelIds])]
             : currentEnabledIds;
         // Track all discovered model IDs (union of known + newly fetched)
         const updatedKnownIds = [...new Set([...currentKnownIds, ...allFetchedIds])];

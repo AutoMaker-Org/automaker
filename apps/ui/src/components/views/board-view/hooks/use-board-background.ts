@@ -8,13 +8,18 @@ interface UseBoardBackgroundProps {
 
 export function useBoardBackground({ currentProject }: UseBoardBackgroundProps) {
   const boardBackgroundByProject = useAppStore((state) => state.boardBackgroundByProject);
+  const defaultSortNewestCardOnTop = useAppStore((state) => state.defaultSortNewestCardOnTop);
 
   // Get background settings for current project
+  // sortNewestCardOnTop always comes from the global defaultSortNewestCardOnTop setting;
+  // per-project settings control visual appearance (background image, opacity, etc.) only.
   const backgroundSettings = useMemo(() => {
-    return (
-      (currentProject && boardBackgroundByProject[currentProject.path]) || defaultBackgroundSettings
-    );
-  }, [currentProject, boardBackgroundByProject]);
+    const perProjectSettings = currentProject
+      ? boardBackgroundByProject[currentProject.path]
+      : null;
+    const base = perProjectSettings || defaultBackgroundSettings;
+    return { ...base, sortNewestCardOnTop: defaultSortNewestCardOnTop };
+  }, [currentProject, boardBackgroundByProject, defaultSortNewestCardOnTop]);
 
   // Build background image style if image exists
   const backgroundImageStyle = useMemo(() => {

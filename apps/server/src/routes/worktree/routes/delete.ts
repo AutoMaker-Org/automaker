@@ -11,11 +11,12 @@ import { getErrorMessage, logError, isValidBranchName } from '../common.js';
 import { execGitCommand } from '../../../lib/git.js';
 import { createLogger } from '@automaker/utils';
 import type { FeatureLoader } from '../../../services/feature-loader.js';
+import type { EventEmitter } from '../../../lib/events.js';
 
 const execAsync = promisify(exec);
 const logger = createLogger('Worktree');
 
-export function createDeleteHandler(featureLoader?: FeatureLoader) {
+export function createDeleteHandler(events: EventEmitter, featureLoader?: FeatureLoader) {
   return async (req: Request, res: Response): Promise<void> => {
     try {
       const { projectPath, worktreePath, deleteBranch } = req.body as {
@@ -143,19 +144,28 @@ export function createDeleteHandler(featureLoader?: FeatureLoader) {
           const allFeatures = await featureLoader.getAll(projectPath);
           const affectedFeatures = allFeatures.filter((f) => f.branchName === branchName);
           for (const feature of affectedFeatures) {
-            await featureLoader.update(projectPath, feature.id, {
-              branchName: null,
-            });
+            try {
+              await featureLoader.update(projectPath, feature.id, {
+                branchName: null,
+              });
+              featuresMovedToMain++;
+            } catch (featureUpdateError) {
+              // Non-fatal: log per-feature failure but continue migrating others
+              logger.warn('Failed to move feature to main worktree after deletion', {
+                error: getErrorMessage(featureUpdateError),
+                featureId: feature.id,
+                branchName,
+              });
+            }
           }
-          featuresMovedToMain = affectedFeatures.length;
           if (featuresMovedToMain > 0) {
             logger.info(
               `Moved ${featuresMovedToMain} feature(s) to main worktree after deleting worktree with branch: ${branchName}`
             );
           }
         } catch (featureError) {
-          // Non-fatal: log but don't fail the deletion
-          logger.warn('Failed to move features to main worktree after deletion', {
+          // Non-fatal: log but don't fail the deletion (getAll failed)
+          logger.warn('Failed to load features for migration to main worktree after deletion', {
             error: getErrorMessage(featureError),
             branchName,
           });

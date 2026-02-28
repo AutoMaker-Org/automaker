@@ -1198,6 +1198,10 @@ export interface GlobalSettings {
   /** Disable the splash screen overlay on app startup */
   disableSplashScreen: boolean;
 
+  // Board Card Sorting
+  /** Default: sort latest card on top in board columns and list view. Per-project setting overrides this. Default: false */
+  defaultSortNewestCardOnTop?: boolean;
+
   // Server Logging Preferences
   /** Log level for the API server (error, warn, info, debug). Default: info */
   serverLogLevel?: ServerLogLevel;
@@ -1767,6 +1771,7 @@ export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
   defaultFeatureModel: { model: 'claude-opus', thinkingLevel: 'adaptive' }, // Use canonical ID with adaptive thinking
   muteDoneSound: false,
   disableSplashScreen: false,
+  defaultSortNewestCardOnTop: false,
   serverLogLevel: 'info',
   enableRequestLogging: true,
   showQueryDevtools: true,

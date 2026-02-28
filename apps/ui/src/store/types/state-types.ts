@@ -168,6 +168,9 @@ export interface AppState {
   // Splash Screen Settings
   disableSplashScreen: boolean; // When true, skip showing the splash screen overlay on startup
 
+  // Board Card Sorting (global default)
+  defaultSortNewestCardOnTop: boolean; // Global default: sort latest card on top in board columns and list view
+
   // Server Log Level Settings
   serverLogLevel: ServerLogLevel; // Log level for the API server (error, warn, info, debug)
   enableRequestLogging: boolean; // Enable HTTP request logging (Morgan)
@@ -575,6 +578,9 @@ export interface AppActions {
   // Splash Screen actions
   setDisableSplashScreen: (disabled: boolean) => void;
 
+  // Board Card Sorting (global default) actions
+  setDefaultSortNewestCardOnTop: (enabled: boolean) => void;
+
   // Server Log Level actions
   setServerLogLevel: (level: ServerLogLevel) => void;
   setEnableRequestLogging: (enabled: boolean) => void;
@@ -617,6 +623,10 @@ export interface AppActions {
   setCodexEnableImages: (enabled: boolean) => Promise<void>;
 
   // OpenCode CLI Settings actions
+  // Note: setOpencodeDefaultModel, toggleOpencodeModel, setEnabledDynamicModelIds, and
+  // toggleDynamicModel return Promise<void> because they persist state to the server.
+  // TODO: harmonize other provider action types (e.g., setCursorDefaultModel, toggleCursorModel,
+  // setGeminiDefaultModel) to also return Promise<void> for consistent async persistence.
   setEnabledOpencodeModels: (models: OpencodeModelId[]) => void;
   setOpencodeDefaultModel: (model: OpencodeModelId) => Promise<void>;
   toggleOpencodeModel: (model: OpencodeModelId, enabled: boolean) => Promise<void>;
@@ -721,11 +731,14 @@ export interface AppActions {
     cardBorderEnabled: boolean;
     cardBorderOpacity: number;
     hideScrollbar: boolean;
+    sortNewestCardOnTop: boolean;
   };
   setCardGlassmorphism: (projectPath: string, enabled: boolean) => void;
   setCardBorderEnabled: (projectPath: string, enabled: boolean) => void;
   setCardBorderOpacity: (projectPath: string, opacity: number) => void;
   setHideScrollbar: (projectPath: string, hide: boolean) => void;
+  setSortNewestCardOnTop: (projectPath: string, enabled: boolean) => void;
+  setAllProjectsSortNewestCardOnTop: (enabled: boolean) => void;
   clearBoardBackground: (projectPath: string) => void;
 
   // Terminal actions
