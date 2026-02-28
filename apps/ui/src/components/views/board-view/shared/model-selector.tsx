@@ -8,7 +8,7 @@ import { useSetupStore } from '@/store/setup-store';
 import { getModelProvider } from '@automaker/types';
 import type { ModelProvider, CursorModelId } from '@automaker/types';
 import { CLAUDE_MODELS, CURSOR_MODELS, OPENCODE_MODELS, ModelOption } from './model-constants';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { Spinner } from '@/components/ui/spinner';
 import { useOpencodeModels } from '@/hooks/queries';
 
@@ -59,9 +59,17 @@ export function ModelSelector({
     }
   }, [isCodexAvailable, codexModels.length, codexModelsLoading, fetchCodexModels]);
 
-  // Fetch OpenCode models on mount if not already loaded
+  // Track whether we've already attempted to fetch OpenCode models to avoid repeated retries
+  const opencodeFetchTriedRef = useRef(false);
+
+  // Fetch OpenCode models on mount if not already loaded (only once per mount)
   useEffect(() => {
-    if (!opencodeModelsLoading && dynamicOpencodeModelsList.length === 0) {
+    if (
+      !opencodeModelsLoading &&
+      dynamicOpencodeModelsList.length === 0 &&
+      !opencodeFetchTriedRef.current
+    ) {
+      opencodeFetchTriedRef.current = true;
       fetchOpencodeModels();
     }
   }, [opencodeModelsLoading, dynamicOpencodeModelsList.length, fetchOpencodeModels]);

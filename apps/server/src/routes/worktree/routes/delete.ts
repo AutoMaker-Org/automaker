@@ -136,6 +136,14 @@ export function createDeleteHandler(events: EventEmitter, featureLoader?: Featur
         }
       }
 
+      // Emit worktree:deleted event after successful deletion
+      events.emit('worktree:deleted', {
+        worktreePath,
+        projectPath,
+        branchName,
+        branchDeleted,
+      });
+
       // Move features associated with the deleted branch to the main worktree
       // This prevents features from being orphaned when a worktree is deleted
       let featuresMovedToMain = 0;
@@ -149,6 +157,14 @@ export function createDeleteHandler(events: EventEmitter, featureLoader?: Featur
                 branchName: null,
               });
               featuresMovedToMain++;
+              // Emit feature:migrated event for each successfully migrated feature
+              events.emit('feature:migrated', {
+                featureId: feature.id,
+                status: 'migrated',
+                fromBranch: branchName,
+                toWorktreeId: null, // migrated to main worktree (no specific worktree)
+                projectPath,
+              });
             } catch (featureUpdateError) {
               // Non-fatal: log per-feature failure but continue migrating others
               logger.warn('Failed to move feature to main worktree after deletion', {

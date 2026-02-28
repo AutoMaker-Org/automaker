@@ -108,14 +108,18 @@ export function formatModelName(model: string, options?: FormatModelNameOptions)
     let lastSegment = modelName.split('/').pop()!;
     // Detect and save tier suffixes like ":free", ":extended", ":beta", ":preview"
     const tierMatch = lastSegment.match(/:(free|extended|beta|preview)$/i);
-    const tierSuffix = tierMatch ? tierMatch[0] : null;
-    if (tierSuffix) {
-      lastSegment = lastSegment.slice(0, lastSegment.length - tierSuffix.length);
+    if (tierMatch) {
+      lastSegment = lastSegment.slice(0, lastSegment.length - tierMatch[0].length);
     }
     // Clean up the model name for display (remove version tags, capitalize)
     const cleanedName = lastSegment.replace(/[-_]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
-    // Re-append the tier suffix so tier context remains visible
-    return tierSuffix ? `${cleanedName}${tierSuffix}` : cleanedName;
+    // Append tier as a human-friendly label in parentheses
+    if (tierMatch) {
+      const capitalizedTier =
+        tierMatch[1].charAt(0).toUpperCase() + tierMatch[1].slice(1).toLowerCase();
+      return `${cleanedName} (${capitalizedTier})`;
+    }
+    return cleanedName;
   }
 
   // Default: split by dash and capitalize

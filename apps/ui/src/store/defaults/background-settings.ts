@@ -10,5 +10,4 @@ export const defaultBackgroundSettings: BackgroundSettings = {
   cardBorderEnabled: true,
   cardBorderOpacity: 100,
   hideScrollbar: false,
-  sortNewestCardOnTop: false,
 };

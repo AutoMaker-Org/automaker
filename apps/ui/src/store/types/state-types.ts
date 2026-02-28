@@ -731,14 +731,11 @@ export interface AppActions {
     cardBorderEnabled: boolean;
     cardBorderOpacity: number;
     hideScrollbar: boolean;
-    sortNewestCardOnTop: boolean;
   };
   setCardGlassmorphism: (projectPath: string, enabled: boolean) => void;
   setCardBorderEnabled: (projectPath: string, enabled: boolean) => void;
   setCardBorderOpacity: (projectPath: string, opacity: number) => void;
   setHideScrollbar: (projectPath: string, hide: boolean) => void;
-  setSortNewestCardOnTop: (projectPath: string, enabled: boolean) => void;
-  setAllProjectsSortNewestCardOnTop: (enabled: boolean) => void;
   clearBoardBackground: (projectPath: string) => void;
 
   // Terminal actions

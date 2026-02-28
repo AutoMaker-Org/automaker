@@ -41,7 +41,6 @@ export function useBoardBackgroundSettings() {
           cardBorderEnabled: true,
           cardBorderOpacity: 100,
           hideScrollbar: false,
-          sortNewestCardOnTop: false,
         }
       );
     },
@@ -139,15 +138,6 @@ export function useBoardBackgroundSettings() {
     [store, persistSettings, getCurrentSettings]
   );
 
-  const setSortNewestCardOnTop = useCallback(
-    async (projectPath: string, enabled: boolean) => {
-      const current = getCurrentSettings(projectPath);
-      store.setSortNewestCardOnTop(projectPath, enabled);
-      await persistSettings(projectPath, { ...current, sortNewestCardOnTop: enabled });
-    },
-    [store, persistSettings, getCurrentSettings]
-  );
-
   const clearBoardBackground = useCallback(
     async (projectPath: string) => {
       store.clearBoardBackground(projectPath);
@@ -162,7 +152,6 @@ export function useBoardBackgroundSettings() {
         cardBorderEnabled: true,
         cardBorderOpacity: 100,
         hideScrollbar: false,
-        sortNewestCardOnTop: false,
       });
     },
     [store, persistSettings]
@@ -177,7 +166,6 @@ export function useBoardBackgroundSettings() {
     setCardBorderEnabled,
     setCardBorderOpacity,
     setHideScrollbar,
-    setSortNewestCardOnTop,
     clearBoardBackground,
     getCurrentSettings,
     persistSettings,

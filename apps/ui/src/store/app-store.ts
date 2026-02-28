@@ -1372,7 +1372,7 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
   toggleOpencodeModel: async (model, enabled) => {
     set((state) => ({
       enabledOpencodeModels: enabled
-        ? [...state.enabledOpencodeModels, model]
+        ? [...new Set([...state.enabledOpencodeModels, model])]
         : state.enabledOpencodeModels.filter((m) => m !== model),
     }));
     try {
@@ -1823,24 +1823,6 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
         },
       },
     })),
-  setSortNewestCardOnTop: (projectPath, enabled) =>
-    set((state) => ({
-      boardBackgroundByProject: {
-        ...state.boardBackgroundByProject,
-        [projectPath]: {
-          ...(state.boardBackgroundByProject[projectPath] ?? defaultBackgroundSettings),
-          sortNewestCardOnTop: enabled,
-        },
-      },
-    })),
-  setAllProjectsSortNewestCardOnTop: (enabled) =>
-    set((state) => {
-      const updated: typeof state.boardBackgroundByProject = {};
-      for (const [projectPath, settings] of Object.entries(state.boardBackgroundByProject)) {
-        updated[projectPath] = { ...settings, sortNewestCardOnTop: enabled };
-      }
-      return { boardBackgroundByProject: updated };
-    }),
   clearBoardBackground: (projectPath) =>
     set((state) => {
       const newBackgrounds = { ...state.boardBackgroundByProject };

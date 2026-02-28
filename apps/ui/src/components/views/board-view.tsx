@@ -133,6 +133,7 @@ export function BoardView() {
     getPrimaryWorktreeBranch,
     setPipelineConfig,
     featureTemplates,
+    defaultSortNewestCardOnTop,
   } = useAppStore(
     useShallow((state) => ({
       currentProject: state.currentProject,
@@ -152,6 +153,7 @@ export function BoardView() {
       getPrimaryWorktreeBranch: state.getPrimaryWorktreeBranch,
       setPipelineConfig: state.setPipelineConfig,
       featureTemplates: state.featureTemplates,
+      defaultSortNewestCardOnTop: state.defaultSortNewestCardOnTop,
     }))
   );
   // Also get keyboard shortcuts for the add feature shortcut
@@ -1458,7 +1460,7 @@ export function BoardView() {
     ]
   );
 
-  // Use background hook (must be before useBoardColumnFeatures to get sortNewestCardOnTop)
+  // Use background hook for visual settings (background image, opacity, etc.)
   const { backgroundSettings, backgroundImageStyle } = useBoardBackground({
     currentProject,
   });
@@ -1472,7 +1474,7 @@ export function BoardView() {
     currentWorktreePath,
     currentWorktreeBranch,
     projectPath: currentProject?.path || null,
-    sortNewestCardOnTop: backgroundSettings.sortNewestCardOnTop,
+    sortNewestCardOnTop: defaultSortNewestCardOnTop,
   });
 
   // Build columnFeaturesMap for ListView
@@ -1803,7 +1805,7 @@ export function BoardView() {
                     handleViewOutput(feature);
                   }
                 }}
-                sortNewestCardOnTop={backgroundSettings.sortNewestCardOnTop}
+                sortNewestCardOnTop={defaultSortNewestCardOnTop}
                 className="transition-opacity duration-200"
               />
             ) : (
