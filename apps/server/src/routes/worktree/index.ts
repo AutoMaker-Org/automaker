@@ -71,10 +71,12 @@ import { createSetTrackingHandler } from './routes/set-tracking.js';
 import { createSyncHandler } from './routes/sync.js';
 import { createUpdatePRNumberHandler } from './routes/update-pr-number.js';
 import type { SettingsService } from '../../services/settings-service.js';
+import type { FeatureLoader } from '../../services/feature-loader.js';
 
 export function createWorktreeRoutes(
   events: EventEmitter,
-  settingsService?: SettingsService
+  settingsService?: SettingsService,
+  featureLoader?: FeatureLoader
 ): Router {
   const router = Router();
 
@@ -94,7 +96,11 @@ export function createWorktreeRoutes(
     validatePathParams('projectPath'),
     createCreateHandler(events, settingsService)
   );
-  router.post('/delete', validatePathParams('projectPath', 'worktreePath'), createDeleteHandler());
+  router.post(
+    '/delete',
+    validatePathParams('projectPath', 'worktreePath'),
+    createDeleteHandler(events, featureLoader)
+  );
   router.post('/create-pr', createCreatePRHandler());
   router.post('/pr-info', createPRInfoHandler());
   router.post(

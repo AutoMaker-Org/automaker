@@ -58,6 +58,8 @@ export interface ListViewProps {
   sortConfig: SortConfig;
   /** Callback when sort column is changed */
   onSortChange: (column: SortColumn) => void;
+  /** When true, always sort by most recent (createdAt desc), overriding the current sort config */
+  sortNewestCardOnTop?: boolean;
   /** Action handlers for rows */
   actionHandlers: ListViewActionHandlers;
   /** Set of feature IDs that are currently running */
@@ -229,6 +231,7 @@ export const ListView = memo(function ListView({
   onToggleFeatureSelection,
   onRowClick,
   className,
+  sortNewestCardOnTop = false,
 }: ListViewProps) {
   // Track collapsed state for each status group
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
@@ -239,14 +242,23 @@ export const ListView = memo(function ListView({
 
   // Generate status groups from columnFeaturesMap
   const statusGroups = useMemo<StatusGroup[]>(() => {
+    // Effective sort config: when sortNewestCardOnTop is enabled, sort by createdAt desc
+    const effectiveSortConfig: SortConfig = sortNewestCardOnTop
+      ? { column: 'createdAt', direction: 'desc' }
+      : sortConfig;
+
     const columns = getColumnsWithPipeline(pipelineConfig);
     const groups: StatusGroup[] = [];
 
     for (const column of columns) {
       const features = columnFeaturesMap[column.id] || [];
       if (features.length > 0) {
-        // Sort features within the group according to current sort config
-        const sortedFeatures = sortFeatures(features, sortConfig.column, sortConfig.direction);
+        // Sort features within the group according to effective sort config
+        const sortedFeatures = sortFeatures(
+          features,
+          effectiveSortConfig.column,
+          effectiveSortConfig.direction
+        );
 
         groups.push({
           id: column.id as FeatureStatusWithPipeline,
@@ -259,7 +271,7 @@ export const ListView = memo(function ListView({
 
     // Sort groups by status order
     return groups.sort((a, b) => getStatusOrder(a.id) - getStatusOrder(b.id));
-  }, [columnFeaturesMap, pipelineConfig, sortConfig]);
+  }, [columnFeaturesMap, pipelineConfig, sortNewestCardOnTop, sortConfig]);
 
   // Calculate total feature count
   const totalFeatures = useMemo(

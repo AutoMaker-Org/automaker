@@ -11,9 +11,10 @@ export function useBoardBackground({ currentProject }: UseBoardBackgroundProps) 
 
   // Get background settings for current project
   const backgroundSettings = useMemo(() => {
-    return (
-      (currentProject && boardBackgroundByProject[currentProject.path]) || defaultBackgroundSettings
-    );
+    const perProjectSettings = currentProject
+      ? boardBackgroundByProject[currentProject.path]
+      : null;
+    return perProjectSettings || defaultBackgroundSettings;
   }, [currentProject, boardBackgroundByProject]);
 
   // Build background image style if image exists

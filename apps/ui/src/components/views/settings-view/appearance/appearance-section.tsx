@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { Palette, Moon, Sun, Type, Sparkles, PanelLeft, Columns2 } from 'lucide-react';
+import { Palette, Moon, Sun, Type, Sparkles, PanelLeft, Columns2, LayoutList } from 'lucide-react';
 import { darkThemes, lightThemes } from '@/config/theme-options';
 import {
   UI_SANS_FONT_OPTIONS,
@@ -28,6 +28,8 @@ export function AppearanceSection({ effectiveTheme, onThemeChange }: AppearanceS
     setDisableSplashScreen,
     sidebarStyle,
     setSidebarStyle,
+    defaultSortNewestCardOnTop,
+    setDefaultSortNewestCardOnTop,
   } = useAppStore();
 
   // Determine if current theme is light or dark
@@ -309,6 +311,31 @@ export function AppearanceSection({ effectiveTheme, onThemeChange }: AppearanceS
                 </div>
               </div>
             </button>
+          </div>
+        </div>
+
+        {/* Board Section */}
+        <div className="space-y-4 pt-6 border-t border-border/50">
+          <div className="flex items-center gap-2 mb-4">
+            <LayoutList className="w-4 h-4 text-muted-foreground" />
+            <Label className="text-foreground font-medium">Board</Label>
+          </div>
+
+          <div className="flex items-start justify-between gap-4">
+            <div className="space-y-1 flex-1">
+              <Label htmlFor="default-sort-newest-card-on-top" className="text-sm">
+                Sort Newest First
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                Sort all cards by creation date (newest on top) across all board columns and list
+                view.
+              </p>
+            </div>
+            <Switch
+              id="default-sort-newest-card-on-top"
+              checked={defaultSortNewestCardOnTop}
+              onCheckedChange={setDefaultSortNewestCardOnTop}
+            />
           </div>
         </div>
       </div>

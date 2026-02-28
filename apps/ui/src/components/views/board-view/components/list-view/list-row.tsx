@@ -2,7 +2,7 @@
 import { memo, useCallback, useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { AlertCircle, Lock, Hand, Sparkles, FileText } from 'lucide-react';
+import { AlertCircle, Lock, Hand, Sparkles, FileText, FileCheck } from 'lucide-react';
 import type { Feature } from '@/store/app-store';
 import { RowActions, type RowActionHandlers } from './row-actions';
 import { getColumnWidth, getColumnAlign } from './list-header';
@@ -120,7 +120,17 @@ const IndicatorBadges = memo(function IndicatorBadges({
     });
   }
 
-  if (hasPlan) {
+  if (feature.planSpec?.status === 'generated') {
+    badges.push({
+      key: 'plan-approval',
+      icon: FileCheck,
+      tooltip: 'Plan ready for review - tap to approve',
+      colorClass: 'text-purple-500',
+      bgClass: 'bg-purple-500/15',
+      borderClass: 'border-purple-500/30',
+      animate: true,
+    });
+  } else if (hasPlan) {
     badges.push({
       key: 'plan',
       icon: FileText,
@@ -400,8 +410,13 @@ export function getFeatureSortValue(
       return (feature.category || '').toLowerCase();
     case 'priority':
       return feature.priority || 999; // No priority sorts last
-    case 'createdAt':
-      return feature.createdAt ? new Date(feature.createdAt) : new Date(0);
+    case 'createdAt': {
+      if (feature.createdAt) return new Date(feature.createdAt);
+      // Fallback: extract timestamp from feature ID (e.g., "feature-1772299989679-185nwyp5kc7")
+      const match = feature.id.match(/^feature-(\d+)-/);
+      if (match) return new Date(parseInt(match[1], 10));
+      return new Date(0);
+    }
     case 'updatedAt':
       return feature.updatedAt ? new Date(feature.updatedAt) : new Date(0);
     default:

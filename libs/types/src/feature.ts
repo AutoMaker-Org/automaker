@@ -104,6 +104,7 @@ export interface Feature {
   planSpec?: PlanSpec;
   error?: string;
   summary?: string;
+  createdAt?: string; // ISO timestamp when feature was created
   startedAt?: string;
   descriptionHistory?: DescriptionHistoryEntry[]; // History of description changes
   [key: string]: unknown; // Keep catch-all for extensibility

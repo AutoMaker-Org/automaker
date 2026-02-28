@@ -312,7 +312,12 @@ export function BoardBackgroundModal({ open, onOpenChange }: BoardBackgroundModa
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto">
-        <SheetHeader className="px-6 pt-6">
+        <SheetHeader
+          className="px-6"
+          style={{
+            paddingTop: 'max(1.5rem, calc(env(safe-area-inset-top, 0px) + 1rem))',
+          }}
+        >
           <SheetTitle className="flex items-center gap-2">
             <ImageIcon className="w-5 h-5 text-brand-500" />
             Board Background Settings

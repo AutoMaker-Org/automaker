@@ -138,6 +138,7 @@ export function BoardView({ initialFeatureId }: BoardViewProps) {
     getPrimaryWorktreeBranch,
     setPipelineConfig,
     featureTemplates,
+    defaultSortNewestCardOnTop,
   } = useAppStore(
     useShallow((state) => ({
       currentProject: state.currentProject,
@@ -157,6 +158,7 @@ export function BoardView({ initialFeatureId }: BoardViewProps) {
       getPrimaryWorktreeBranch: state.getPrimaryWorktreeBranch,
       setPipelineConfig: state.setPipelineConfig,
       featureTemplates: state.featureTemplates,
+      defaultSortNewestCardOnTop: state.defaultSortNewestCardOnTop,
     }))
   );
   // Also get keyboard shortcuts for the add feature shortcut
@@ -1544,6 +1546,11 @@ export function BoardView({ initialFeatureId }: BoardViewProps) {
     ]
   );
 
+  // Use background hook for visual settings (background image, opacity, etc.)
+  const { backgroundSettings, backgroundImageStyle } = useBoardBackground({
+    currentProject,
+  });
+
   // Use column features hook
   const { getColumnFeatures, completedFeatures } = useBoardColumnFeatures({
     features: hookFeatures,
@@ -1553,6 +1560,7 @@ export function BoardView({ initialFeatureId }: BoardViewProps) {
     currentWorktreePath,
     currentWorktreeBranch,
     projectPath: currentProject?.path || null,
+    sortNewestCardOnTop: defaultSortNewestCardOnTop,
   });
 
   // Build columnFeaturesMap for ListView
@@ -1565,11 +1573,6 @@ export function BoardView({ initialFeatureId }: BoardViewProps) {
     }
     return map;
   }, [pipelineConfig, getColumnFeatures]);
-
-  // Use background hook
-  const { backgroundSettings, backgroundImageStyle } = useBoardBackground({
-    currentProject,
-  });
 
   // Find feature for pending plan approval
   const pendingApprovalFeature = useMemo(() => {
@@ -1888,6 +1891,7 @@ export function BoardView({ initialFeatureId }: BoardViewProps) {
                     handleViewOutput(feature);
                   }
                 }}
+                sortNewestCardOnTop={defaultSortNewestCardOnTop}
                 className="transition-opacity duration-200"
               />
             ) : (

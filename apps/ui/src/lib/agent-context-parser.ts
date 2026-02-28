@@ -93,6 +93,35 @@ export function formatModelName(model: string, options?: FormatModelNameOptions)
     return model.replace('cursor-', 'Cursor ').replace('gemini', 'Gemini');
   if (model.startsWith('cursor-grok')) return 'Cursor Grok';
 
+  // OpenCode static models (canonical opencode- prefix)
+  if (model === 'opencode-big-pickle') return 'Big Pickle';
+  if (model === 'opencode-glm-5-free') return 'GLM 5 Free';
+  if (model === 'opencode-gpt-5-nano') return 'GPT-5 Nano';
+  if (model === 'opencode-kimi-k2.5-free') return 'Kimi K2.5';
+  if (model === 'opencode-minimax-m2.5-free') return 'MiniMax M2.5';
+
+  // OpenCode dynamic models (provider/model format like "google/gemini-2.5-pro")
+  if (model.includes('/') && !model.includes('://')) {
+    const slashIndex = model.indexOf('/');
+    const modelName = model.substring(slashIndex + 1);
+    // Extract last path segment (handles nested paths like "arcee-ai/trinity-large-preview:free")
+    let lastSegment = modelName.split('/').pop()!;
+    // Detect and save tier suffixes like ":free", ":extended", ":beta", ":preview"
+    const tierMatch = lastSegment.match(/:(free|extended|beta|preview)$/i);
+    if (tierMatch) {
+      lastSegment = lastSegment.slice(0, lastSegment.length - tierMatch[0].length);
+    }
+    // Clean up the model name for display (remove version tags, capitalize)
+    const cleanedName = lastSegment.replace(/[-_]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+    // Append tier as a human-friendly label in parentheses
+    if (tierMatch) {
+      const capitalizedTier =
+        tierMatch[1].charAt(0).toUpperCase() + tierMatch[1].slice(1).toLowerCase();
+      return `${cleanedName} (${capitalizedTier})`;
+    }
+    return cleanedName;
+  }
+
   // Default: split by dash and capitalize
   return model.split('-').slice(1, 3).join(' ');
 }

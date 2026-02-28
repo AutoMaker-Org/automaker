@@ -9,6 +9,147 @@ import {
 
 type ColumnId = Feature['status'];
 
+/**
+ * Extract creation time from a feature, falling back to the timestamp
+ * embedded in the feature ID (format: feature-{timestamp}-{random}).
+ */
+function getFeatureCreatedTime(feature: Feature): number {
+  if (feature.createdAt) {
+    return new Date(feature.createdAt).getTime();
+  }
+  // Fallback: extract timestamp from feature ID (e.g., "feature-1772299989679-185nwyp5kc7")
+  const match = feature.id.match(/^feature-(\d+)-/);
+  if (match) {
+    return parseInt(match[1], 10);
+  }
+  return 0;
+}
+
+/**
+ * Sort features newest-first while respecting dependency ordering.
+ *
+ * Groups features into dependency chains and sorts the chains by the newest
+ * feature in each chain (descending). Within each chain, dependencies appear
+ * before their dependents (topological order preserved).
+ *
+ * Features without any dependency relationships are treated as single-item chains
+ * and sorted by their own creation time.
+ */
+function sortNewestWithDependencies(features: Feature[]): Feature[] {
+  if (features.length <= 1) return features;
+
+  const featureMap = new Map(features.map((f) => [f.id, f]));
+  const featureSet = new Set(features.map((f) => f.id));
+
+  // Build adjacency: parent -> children (dependency -> dependents) scoped to this list
+  const childrenOf = new Map<string, string[]>();
+  const parentOf = new Map<string, string[]>();
+  for (const f of features) {
+    childrenOf.set(f.id, []);
+    parentOf.set(f.id, []);
+  }
+  for (const f of features) {
+    for (const depId of f.dependencies || []) {
+      if (featureSet.has(depId)) {
+        childrenOf.get(depId)!.push(f.id);
+        parentOf.get(f.id)!.push(depId);
+      }
+    }
+  }
+
+  // Find connected components (dependency chains/groups)
+  const visited = new Set<string>();
+  const components: string[][] = [];
+
+  function collectComponent(startId: string): string[] {
+    const component: string[] = [];
+    const stack = [startId];
+    while (stack.length > 0) {
+      const id = stack.pop()!;
+      if (visited.has(id)) continue;
+      visited.add(id);
+      component.push(id);
+      // Traverse both directions to find full connected component
+      for (const childId of childrenOf.get(id) || []) {
+        if (!visited.has(childId)) stack.push(childId);
+      }
+      for (const pid of parentOf.get(id) || []) {
+        if (!visited.has(pid)) stack.push(pid);
+      }
+    }
+    return component;
+  }
+
+  for (const f of features) {
+    if (!visited.has(f.id)) {
+      components.push(collectComponent(f.id));
+    }
+  }
+
+  // For each component, find the newest feature time (used to sort components)
+  // and produce a topological ordering within the component
+  const sortedComponents: { newestTime: number; ordered: Feature[] }[] = [];
+
+  for (const component of components) {
+    let newestTime = 0;
+    for (const id of component) {
+      const t = getFeatureCreatedTime(featureMap.get(id)!);
+      if (t > newestTime) newestTime = t;
+    }
+
+    // Topological sort within component (dependencies first)
+    // Use the existing order from `features` as a stable fallback
+    const componentSet = new Set(component);
+    const inDegree = new Map<string, number>();
+    for (const id of component) {
+      let deg = 0;
+      for (const pid of parentOf.get(id) || []) {
+        if (componentSet.has(pid)) deg++;
+      }
+      inDegree.set(id, deg);
+    }
+
+    const queue: Feature[] = [];
+    for (const id of component) {
+      if (inDegree.get(id) === 0) {
+        queue.push(featureMap.get(id)!);
+      }
+    }
+    // Within same level, sort newest first
+    queue.sort((a, b) => getFeatureCreatedTime(b) - getFeatureCreatedTime(a));
+
+    const ordered: Feature[] = [];
+    while (queue.length > 0) {
+      const current = queue.shift()!;
+      ordered.push(current);
+      for (const childId of childrenOf.get(current.id) || []) {
+        if (!componentSet.has(childId)) continue;
+        const newDeg = (inDegree.get(childId) || 1) - 1;
+        inDegree.set(childId, newDeg);
+        if (newDeg === 0) {
+          queue.push(featureMap.get(childId)!);
+          queue.sort((a, b) => getFeatureCreatedTime(b) - getFeatureCreatedTime(a));
+        }
+      }
+    }
+
+    // Append any remaining (circular deps) at end
+    for (const id of component) {
+      if (!ordered.some((f) => f.id === id)) {
+        ordered.push(featureMap.get(id)!);
+      }
+    }
+
+    sortedComponents.push({ newestTime, ordered });
+  }
+
+  // Sort components by newest feature time (descending)
+  sortedComponents.sort((a, b) => b.newestTime - a.newestTime);
+
+  // Flatten: each component's internal order is preserved
+  return sortedComponents.flatMap((c) => c.ordered);
+}
+
 interface UseBoardColumnFeaturesProps {
   features: Feature[];
   runningAutoTasks: string[];
@@ -17,6 +158,7 @@ interface UseBoardColumnFeaturesProps {
   currentWorktreePath: string | null; // Currently selected worktree path
   currentWorktreeBranch: string | null; // Branch name of the selected worktree (null = main)
   projectPath: string | null; // Main project path (for main worktree)
+  sortNewestCardOnTop?: boolean; // When true, sort cards by most recent (createdAt desc) in all columns
 }
 
 export function useBoardColumnFeatures({
@@ -27,6 +169,7 @@ export function useBoardColumnFeatures({
   currentWorktreePath,
   currentWorktreeBranch,
   projectPath,
+  sortNewestCardOnTop = false,
 }: UseBoardColumnFeaturesProps) {
   // Get recently completed features from store for race condition protection
   const recentlyCompletedFeatures = useAppStore((state) => state.recentlyCompletedFeatures);
@@ -273,9 +416,34 @@ export function useBoardColumnFeatures({
           }
         }
 
-        map.backlog = [...unblocked, ...blocked];
+        if (sortNewestCardOnTop) {
+          // Sort each group newest-first while keeping dependency chains nested
+          map.backlog = [
+            ...sortNewestWithDependencies(unblocked),
+            ...sortNewestWithDependencies(blocked),
+          ];
+        } else {
+          map.backlog = [...unblocked, ...blocked];
+        }
       } else {
-        map.backlog = orderedFeatures;
+        if (sortNewestCardOnTop) {
+          map.backlog = sortNewestWithDependencies(orderedFeatures);
+        } else {
+          map.backlog = orderedFeatures;
+        }
+      }
+    }
+
+    // Apply newest-on-top sorting to non-backlog columns when enabled
+    // (Backlog is handled above with dependency-aware sorting)
+    if (sortNewestCardOnTop) {
+      for (const columnId of Object.keys(map)) {
+        if (columnId === 'backlog') continue;
+        map[columnId] = [...map[columnId]].sort((a, b) => {
+          const aTime = getFeatureCreatedTime(a);
+          const bTime = getFeatureCreatedTime(b);
+          return bTime - aTime; // desc: newest first
+        });
       }
     }
 
@@ -289,6 +457,7 @@ export function useBoardColumnFeatures({
     currentWorktreeBranch,
     projectPath,
     recentlyCompletedFeatures,
+    sortNewestCardOnTop,
   ]);
 
   const getColumnFeatures = useCallback(
