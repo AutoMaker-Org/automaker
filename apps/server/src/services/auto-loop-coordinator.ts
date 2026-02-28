@@ -483,13 +483,14 @@ export class AutoLoopCoordinator {
 
   /**
    * Check if a feature belongs to the current worktree based on branch name.
-   * For main worktree (branchName === null): includes features with no branchName.
-   * For feature worktrees (branchName !== null): only includes features with matching branchName.
+   * For main worktree (branchName === null or 'main'): includes features with no branchName or branchName === 'main'.
+   * For feature worktrees (branchName !== null and !== 'main'): only includes features with matching branchName.
    */
   private featureBelongsToWorktree(feature: Feature, branchName: string | null): boolean {
-    if (branchName === null) {
-      // Main worktree: include features with no branchName
-      return !feature.branchName;
+    const isMainWorktree = branchName === null || branchName === 'main';
+    if (isMainWorktree) {
+      // Main worktree: include features with no branchName or branchName === 'main'
+      return !feature.branchName || feature.branchName === 'main';
     } else {
       // Feature worktree: only include exact branch match
       return feature.branchName === branchName;

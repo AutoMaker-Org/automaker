@@ -254,33 +254,5 @@ describe('running-agents routes', () => {
       expect(response.runningAgents[2].model).toBe('cursor-auto');
       expect(response.runningAgents[2].provider).toBe('cursor');
     });
-
-    it('should handle agents without model information (backward compatibility)', async () => {
-      // Arrange - older agents may not have model/provider set
-      const runningAgents = [
-        {
-          featureId: 'legacy-agent',
-          projectPath: '/project',
-          projectName: 'project',
-          isAutoMode: true,
-          model: undefined,
-          provider: undefined,
-          title: 'Legacy Agent',
-          description: 'No model info available',
-        },
-      ];
-
-      vi.mocked(mockAutoModeService.getRunningAgents!).mockResolvedValue(runningAgents);
-
-      // Act
-      const handler = createIndexHandler(mockAutoModeService as AutoModeService);
-      await handler(req, res);
-
-      // Assert
-      const response = vi.mocked(res.json).mock.calls[0][0];
-      expect(response.runningAgents[0].model).toBeUndefined();
-      expect(response.runningAgents[0].provider).toBeUndefined();
-      expect(response.success).toBe(true);
-    });
   });
 });

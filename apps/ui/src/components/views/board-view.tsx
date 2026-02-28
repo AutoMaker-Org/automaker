@@ -1132,8 +1132,7 @@ export function BoardView({ initialFeatureId }: BoardViewProps) {
         thinkingLevel: (modelEntry.thinkingLevel as ThinkingLevel) || 'none',
         reasoningEffort: modelEntry.reasoningEffort as ReasoningEffort,
         providerId: modelEntry.providerId,
-        branchName:
-          (addFeatureUseSelectedWorktreeBranch ? selectedWorktreeBranch : undefined) ?? '',
+        branchName: addFeatureUseSelectedWorktreeBranch ? selectedWorktreeBranch : undefined,
         priority: 2,
         planningMode: useAppStore.getState().defaultPlanningMode ?? 'skip',
         requirePlanApproval: useAppStore.getState().defaultRequirePlanApproval ?? false,
@@ -1174,8 +1173,7 @@ export function BoardView({ initialFeatureId }: BoardViewProps) {
         thinkingLevel: (modelEntry.thinkingLevel as ThinkingLevel) || 'none',
         reasoningEffort: modelEntry.reasoningEffort as ReasoningEffort,
         providerId: modelEntry.providerId,
-        branchName:
-          (addFeatureUseSelectedWorktreeBranch ? selectedWorktreeBranch : undefined) ?? '',
+        branchName: addFeatureUseSelectedWorktreeBranch ? selectedWorktreeBranch : undefined,
         priority: 2,
         planningMode: useAppStore.getState().defaultPlanningMode ?? 'skip',
         requirePlanApproval: useAppStore.getState().defaultRequirePlanApproval ?? false,

@@ -254,7 +254,7 @@ export const AgentInfoPanel = memo(function AgentInfoPanel({
         return {
           content: task.description,
           status: effectiveStatus,
-          summary: realtimeSummary ?? task.summary,
+          summary: taskSummaryMap.has(task.id) ? realtimeSummary : task.summary,
         };
       });
     }

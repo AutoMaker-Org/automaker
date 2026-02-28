@@ -66,7 +66,8 @@ test.describe('Feature Deep Link', () => {
 
     // Setup project
     await setupRealProject(page, projectPath, projectName, { setAsCurrent: true });
-    await authenticateForTests(page);
+    const authOk = await authenticateForTests(page);
+    expect(authOk).toBe(true);
 
     // Create a feature first
     await page.goto('/board');
@@ -112,7 +113,7 @@ test.describe('Feature Deep Link', () => {
     }
 
     // Now navigate to the board with the featureId query parameter
-    await page.goto(`/board?featureId=${featureId}`);
+    await page.goto(`/board?featureId=${encodeURIComponent(featureId ?? '')}`);
     await page.waitForLoadState('load');
     await handleLoginScreenIfPresent(page);
     await waitForNetworkIdle(page);
@@ -130,7 +131,8 @@ test.describe('Feature Deep Link', () => {
   test('should handle invalid featureId gracefully', async ({ page }) => {
     // Setup project
     await setupRealProject(page, projectPath, projectName, { setAsCurrent: true });
-    await authenticateForTests(page);
+    const authOk2 = await authenticateForTests(page);
+    expect(authOk2).toBe(true);
 
     // Navigate with a non-existent feature ID
     const nonExistentId = 'non-existent-feature-id-12345';
@@ -153,7 +155,8 @@ test.describe('Feature Deep Link', () => {
   test('should handle navigation without featureId', async ({ page }) => {
     // Setup project
     await setupRealProject(page, projectPath, projectName, { setAsCurrent: true });
-    await authenticateForTests(page);
+    const authOk3 = await authenticateForTests(page);
+    expect(authOk3).toBe(true);
 
     // Navigate without featureId
     await page.goto('/board');

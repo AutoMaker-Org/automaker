@@ -100,18 +100,16 @@ export class NtfyService {
 
     logger.info(`Sending ntfy notification to ${endpoint.name}: ${title}`);
 
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), DEFAULT_NTFY_TIMEOUT);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), DEFAULT_NTFY_TIMEOUT);
 
+    try {
       const response = await fetch(url, {
         method: 'POST',
         headers,
         body,
         signal: controller.signal,
       });
-
-      clearTimeout(timeoutId);
 
       if (!response.ok) {
         const errorText = await response.text().catch(() => 'Unknown error');
@@ -133,6 +131,8 @@ export class NtfyService {
       const errorMessage = error instanceof Error ? error.message : String(error);
       logger.error(`Ntfy notification failed: ${errorMessage}`);
       return { success: false, error: errorMessage };
+    } finally {
+      clearTimeout(timeoutId);
     }
   }
 

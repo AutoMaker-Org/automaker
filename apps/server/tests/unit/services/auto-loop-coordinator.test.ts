@@ -1262,7 +1262,7 @@ describe('auto-loop-coordinator.ts', () => {
       });
     });
 
-    it('does NOT emit auto_mode_idle when features are in backlog or ready status', async () => {
+    it('emits auto_mode_idle when only backlog/ready features exist and no running/in_progress features', async () => {
       // backlog/ready features should be in loadPendingFeatures, not loadAllFeatures for idle check
       // But this test verifies the idle check doesn't incorrectly block on backlog/ready
       vi.mocked(mockLoadPendingFeatures).mockResolvedValue([]); // No pending (for current iteration check)

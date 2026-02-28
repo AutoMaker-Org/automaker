@@ -98,7 +98,16 @@ export function useAgentOutputWebSocket({
     if (isBacklogPlan) {
       // Handle backlog plan events
       if (api.backlogPlan) {
-        unsubscribe = api.backlogPlan.onEvent(handleBacklogPlanEvent as (data: unknown) => void);
+        unsubscribe = api.backlogPlan.onEvent((data: unknown) => {
+          if (
+            data !== null &&
+            typeof data === 'object' &&
+            'type' in data &&
+            typeof (data as { type: unknown }).type === 'string'
+          ) {
+            handleBacklogPlanEvent(data as BacklogPlanEvent);
+          }
+        });
       }
     } else {
       // Handle auto mode events

@@ -342,7 +342,7 @@ export function CreateWorktreeDialog({
       // When a remote is selected, prepend the remote name to form the full ref
       // (e.g. "main" with remote "origin" becomes "origin/main").
       const effectiveBaseBranch = trimmedBaseBranch
-        ? selectedRemote !== 'local' && !trimmedBaseBranch.includes('/')
+        ? selectedRemote !== 'local' && !trimmedBaseBranch.startsWith(`${selectedRemote}/`)
           ? `${selectedRemote}/${trimmedBaseBranch}`
           : trimmedBaseBranch
         : undefined;
@@ -445,7 +445,9 @@ export function CreateWorktreeDialog({
               <span>Base Branch</span>
               {baseBranch && !showBaseBranch && (
                 <code className="bg-muted px-1.5 py-0.5 rounded text-xs font-mono ml-1">
-                  {selectedRemote !== 'local' ? `${selectedRemote}/${baseBranch}` : baseBranch}
+                  {selectedRemote !== 'local' && !baseBranch.startsWith(`${selectedRemote}/`)
+                    ? `${selectedRemote}/${baseBranch}`
+                    : baseBranch}
                 </code>
               )}
             </button>

@@ -109,6 +109,10 @@ export function getModelDisplayName(model: ModelAlias | string): string {
     haiku: 'Claude Haiku',
     sonnet: 'Claude Sonnet',
     opus: 'Claude Opus',
+    // Claude canonical IDs (without version suffix)
+    'claude-haiku': 'Claude Haiku',
+    'claude-sonnet': 'Claude Sonnet',
+    'claude-opus': 'Claude Opus',
     // Claude full model IDs (returned by server)
     'claude-haiku-4-5': 'Claude Haiku',
     'claude-sonnet-4-20250514': 'Claude Sonnet',

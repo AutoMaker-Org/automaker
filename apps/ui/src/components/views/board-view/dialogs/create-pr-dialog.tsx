@@ -294,6 +294,7 @@ export function CreatePRDialog({
     setSelectedRemote('');
     setSelectedTargetRemote('');
     setIsGeneratingDescription(false);
+    setIsDescriptionExpanded(false);
     operationCompletedRef.current = false;
   }, [defaultBaseBranch]);
 

@@ -433,6 +433,7 @@ interface EndpointCardProps {
 function EndpointCard({ endpoint, onEdit, onDelete, onToggle }: EndpointCardProps) {
   return (
     <div
+      data-testid="endpoint-card"
       className={cn(
         'flex items-center gap-3 p-3 rounded-lg border',
         'bg-background/50 hover:bg-background/80 transition-colors',
@@ -536,6 +537,8 @@ function NtfyEndpointDialog({
   }, [open, editingEndpoint]);
 
   const handleSave = () => {
+    const trimmedPassword = password.trim();
+    const trimmedToken = token.trim();
     const endpoint: NtfyEndpointConfig = {
       id: editingEndpoint?.id || generateUUID(),
       name: name.trim(),
@@ -543,8 +546,15 @@ function NtfyEndpointDialog({
       topic: topic.trim(),
       authType,
       username: authType === 'basic' ? username.trim() : undefined,
-      password: authType === 'basic' ? password : undefined,
-      token: authType === 'token' ? token.trim() : undefined,
+      // Preserve existing secret if input was left blank when editing
+      password:
+        authType === 'basic'
+          ? trimmedPassword || (editingEndpoint ? editingEndpoint.password : undefined)
+          : undefined,
+      token:
+        authType === 'token'
+          ? trimmedToken || (editingEndpoint ? editingEndpoint.token : undefined)
+          : undefined,
       defaultTags: defaultTags.trim() || undefined,
       defaultEmoji: defaultEmoji.trim() || undefined,
       defaultClickUrl: defaultClickUrl.trim() || undefined,
@@ -555,7 +565,14 @@ function NtfyEndpointDialog({
   };
 
   // Validate form
-  const isValid = name.trim().length > 0 && topic.trim().length > 0 && !topic.includes(' ');
+  const isValid =
+    name.trim().length > 0 &&
+    topic.trim().length > 0 &&
+    !topic.includes(' ') &&
+    (authType !== 'basic' ||
+      (username.trim().length > 0 &&
+        (password.trim().length > 0 || Boolean(editingEndpoint?.password)))) &&
+    (authType !== 'token' || token.trim().length > 0 || Boolean(editingEndpoint?.token));
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

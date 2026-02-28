@@ -211,14 +211,14 @@ export function EventHookDialog({ open, onOpenChange, editingHook, onSave }: Eve
     onSave(hook);
   };
 
+  const selectedEndpoint = ntfyEndpoints.find((e) => e.id === ntfyEndpointId);
+
   const isValid = (() => {
     if (actionType === 'shell') return command.trim().length > 0;
     if (actionType === 'http') return url.trim().length > 0;
-    if (actionType === 'ntfy') return ntfyEndpointId.trim().length > 0;
+    if (actionType === 'ntfy') return Boolean(selectedEndpoint);
     return false;
   })();
-
-  const selectedEndpoint = ntfyEndpoints.find((e) => e.id === ntfyEndpointId);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -266,15 +266,15 @@ export function EventHookDialog({ open, onOpenChange, editingHook, onSave }: Eve
               <TabsList className="w-full">
                 <TabsTrigger value="shell" className="flex-1 gap-1">
                   <Terminal className="w-4 h-4" />
-                  <span className="hidden sm:inline">Shell</span>
+                  <span className="sr-only sm:inline">Shell</span>
                 </TabsTrigger>
                 <TabsTrigger value="http" className="flex-1 gap-1">
                   <Globe className="w-4 h-4" />
-                  <span className="hidden sm:inline">HTTP</span>
+                  <span className="sr-only sm:inline">HTTP</span>
                 </TabsTrigger>
                 <TabsTrigger value="ntfy" className="flex-1 gap-1">
                   <Bell className="w-4 h-4" />
-                  <span className="hidden sm:inline">Ntfy</span>
+                  <span className="sr-only sm:inline">Ntfy</span>
                 </TabsTrigger>
               </TabsList>
 

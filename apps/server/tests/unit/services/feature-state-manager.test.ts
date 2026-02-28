@@ -1495,15 +1495,15 @@ describe('FeatureStateManager', () => {
         throw new Error('Service unavailable');
       });
 
-      // Should not throw - call the async function and verify it doesn't throw
-      await expect(
-        async () =>
-          await subscribeCallback('auto-mode:event', {
-            type: 'auto_mode_error',
-            message: 'Error',
-            projectPath: '/project',
-          })
-      ).not.toThrow();
+      // Should not throw - the callback returns void so we just call it and wait for async work
+      subscribeCallback('auto-mode:event', {
+        type: 'auto_mode_error',
+        message: 'Error',
+        projectPath: '/project',
+      });
+
+      // Give async handleAutoModeEventError time to complete
+      await new Promise((resolve) => setTimeout(resolve, 0));
     });
   });
 

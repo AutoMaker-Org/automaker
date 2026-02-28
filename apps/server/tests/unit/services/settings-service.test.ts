@@ -14,6 +14,7 @@ import {
   type Credentials,
   type ProjectSettings,
 } from '@/types/settings.js';
+import type { NtfyEndpointConfig } from '@automaker/types';
 
 describe('settings-service.ts', () => {
   let testDataDir: string;
@@ -23,7 +24,7 @@ describe('settings-service.ts', () => {
   /**
    * Helper to create a test ntfy endpoint with sensible defaults
    */
-  function createTestNtfyEndpoint(overrides: Partial<any> = {}): any {
+  function createTestNtfyEndpoint(overrides: Partial<NtfyEndpointConfig> = {}): NtfyEndpointConfig {
     return {
       id: `endpoint-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
       name: 'Test Endpoint',
