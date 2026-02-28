@@ -232,9 +232,10 @@ export class AutoModeServiceCompat {
   }
 
   async detectOrphanedFeatures(
-    projectPath: string
+    projectPath: string,
+    preloadedFeatures?: Feature[]
   ): Promise<Array<{ feature: Feature; missingBranch: string }>> {
     const facade = this.createFacade(projectPath);
-    return facade.detectOrphanedFeatures();
+    return facade.detectOrphanedFeatures(preloadedFeatures);
   }
 }

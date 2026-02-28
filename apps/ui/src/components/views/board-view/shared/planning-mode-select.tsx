@@ -87,8 +87,8 @@ export function PlanningModeSelect({
 }: PlanningModeSelectProps) {
   const selectedMode = modes.find((m) => m.value === mode);
 
-  // Disable approval checkbox for skip/lite modes since they don't use planning
-  const isApprovalDisabled = disabled || mode === 'skip' || mode === 'lite';
+  // Disable approval checkbox for skip mode (lite supports approval)
+  const isApprovalDisabled = disabled || mode === 'skip';
 
   const selectDropdown = (
     <Select

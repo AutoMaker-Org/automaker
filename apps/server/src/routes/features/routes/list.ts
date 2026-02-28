@@ -46,7 +46,7 @@ export function createListHandler(
       // Note: detectOrphanedFeatures handles errors internally and always resolves
       if (autoModeService) {
         autoModeService
-          .detectOrphanedFeatures(projectPath)
+          .detectOrphanedFeatures(projectPath, features)
           .then((orphanedFeatures) => {
             if (orphanedFeatures.length > 0) {
               logger.info(

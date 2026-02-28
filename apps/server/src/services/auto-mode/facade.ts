@@ -463,9 +463,25 @@ export class AutoModeServiceFacade {
       (pPath, featureId, status) =>
         featureStateManager.updateFeatureStatus(pPath, featureId, status),
       (pPath, featureId) => featureStateManager.loadFeature(pPath, featureId),
-      async (_feature) => {
-        // getPlanningPromptPrefixFn - planning prompts handled by AutoModeService
-        return '';
+      async (feature) => {
+        // getPlanningPromptPrefixFn - select appropriate planning prompt based on feature's planningMode
+        if (!feature.planningMode || feature.planningMode === 'skip') {
+          return '';
+        }
+        const prompts = await getPromptCustomization(settingsService, '[PlanningPromptPrefix]');
+        const autoModePrompts = prompts.autoMode;
+        switch (feature.planningMode) {
+          case 'lite':
+            return feature.requirePlanApproval
+              ? autoModePrompts.planningLiteWithApproval + '\n\n'
+              : autoModePrompts.planningLite + '\n\n';
+          case 'spec':
+            return autoModePrompts.planningSpec + '\n\n';
+          case 'full':
+            return autoModePrompts.planningFull + '\n\n';
+          default:
+            return '';
+        }
       },
       (pPath, featureId, summary) =>
         featureStateManager.saveFeatureSummary(pPath, featureId, summary),
@@ -1117,12 +1133,13 @@ export class AutoModeServiceFacade {
 
   /**
    * Detect orphaned features (features with missing branches)
+   * @param preloadedFeatures - Optional pre-loaded features to avoid redundant disk reads
    */
-  async detectOrphanedFeatures(): Promise<OrphanedFeatureInfo[]> {
+  async detectOrphanedFeatures(preloadedFeatures?: Feature[]): Promise<OrphanedFeatureInfo[]> {
     const orphanedFeatures: OrphanedFeatureInfo[] = [];
 
     try {
-      const allFeatures = await this.featureLoader.getAll(this.projectPath);
+      const allFeatures = preloadedFeatures ?? (await this.featureLoader.getAll(this.projectPath));
       const featuresWithBranches = allFeatures.filter(
         (f) => f.branchName && f.branchName.trim() !== ''
       );

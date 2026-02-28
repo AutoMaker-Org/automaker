@@ -199,9 +199,9 @@ export function MassEditDialog({
     }
   }, [open, selectedFeatures]);
 
-  // Clear requirePlanApproval when planning mode is skip or lite
+  // Clear requirePlanApproval when planning mode is skip (lite supports approval)
   useEffect(() => {
-    if (planningMode === 'skip' || planningMode === 'lite') {
+    if (planningMode === 'skip') {
       setRequirePlanApproval(false);
     }
   }, [planningMode]);

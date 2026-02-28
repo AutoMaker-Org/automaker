@@ -88,21 +88,18 @@ export function ProjectSelectorWithOptions({
   const clearProjectHistory = useAppStore((s) => s.clearProjectHistory);
 
   const shortcuts = useKeyboardShortcutsConfig();
-  // Wrap setCurrentProject to ensure .automaker is initialized before switching
+  // Wrap setCurrentProject to initialize .automaker in background while switching
   const setCurrentProjectWithInit = useCallback(
-    async (p: Project) => {
+    (p: Project) => {
       if (p.id === currentProject?.id) {
         return;
       }
-      try {
-        // Ensure .automaker directory structure exists before switching
-        await initializeProject(p.path);
-      } catch (error) {
+      // Fire-and-forget: initialize .automaker directory structure in background
+      // so the project switch is not blocked by filesystem operations
+      initializeProject(p.path).catch((error) => {
         console.error('Failed to initialize project during switch:', error);
-        // Continue with switch even if initialization fails -
-        // the project may already be initialized
-      }
-      // Defer project switch update to avoid synchronous render cascades.
+      });
+      // Switch project immediately for instant UI response
       startTransition(() => {
         setCurrentProject(p);
       });
@@ -131,8 +128,8 @@ export function ProjectSelectorWithOptions({
     useProjectTheme();
 
   const handleSelectProject = useCallback(
-    async (p: Project) => {
-      await setCurrentProjectWithInit(p);
+    (p: Project) => {
+      setCurrentProjectWithInit(p);
       setIsProjectPickerOpen(false);
     },
     [setCurrentProjectWithInit, setIsProjectPickerOpen]

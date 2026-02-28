@@ -169,6 +169,7 @@ export function FileEditorView({ initialPath }: FileEditorViewProps) {
     closeAllTabs,
     setActiveTab,
     markTabSaved,
+    refreshTabContent,
     setMarkdownViewMode,
     setMobileBrowserVisible,
     activeFileGitDetails,
@@ -360,6 +361,20 @@ export function FileEditorView({ initialPath }: FileEditorViewProps) {
       const existing = tabs.find((t) => t.filePath === filePath);
       if (existing) {
         setActiveTab(existing.id);
+        // Re-read from disk to fix stale isDirty state that may have been
+        // persisted to localStorage (e.g. dotfiles restored as dirty after reload).
+        // Only refresh editable text files – binary/too-large tabs don't have content.
+        if (!existing.isBinary && !existing.isTooLarge) {
+          try {
+            const api = getElectronAPI();
+            const result = await api.readFile(filePath);
+            if (result.success && result.content !== undefined && !result.content.includes('\0')) {
+              refreshTabContent(existing.id, result.content);
+            }
+          } catch {
+            // Non-critical: if we can't re-read the file, keep the persisted state
+          }
+        }
         return;
       }
 
@@ -446,7 +461,7 @@ export function FileEditorView({ initialPath }: FileEditorViewProps) {
         logger.error('Failed to open file:', error);
       }
     },
-    [tabs, setActiveTab, openTab, maxFileSize]
+    [tabs, setActiveTab, openTab, refreshTabContent, maxFileSize]
   );
 
   // ─── Mobile-aware file select ────────────────────────────────

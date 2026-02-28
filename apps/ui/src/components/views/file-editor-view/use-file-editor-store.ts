@@ -128,6 +128,8 @@ interface FileEditorState {
   markTabSaved: (tabId: string, content: string) => void;
   updateTabScroll: (tabId: string, scrollTop: number) => void;
   updateTabCursor: (tabId: string, line: number, col: number) => void;
+  /** Re-sync an existing tab's originalContent and isDirty state from freshly-read disk content */
+  refreshTabContent: (tabId: string, diskContent: string) => void;
 
   setMarkdownViewMode: (mode: MarkdownViewMode) => void;
 
@@ -270,6 +272,20 @@ export const useFileEditorStore = create<FileEditorState>()(
       markTabSaved: (tabId, content) => {
         set({
           tabs: get().tabs.map((t) => (t.id === tabId ? markTabAsSaved(t, content) : t)),
+        });
+      },
+
+      refreshTabContent: (tabId, diskContent) => {
+        set({
+          tabs: get().tabs.map((t) => {
+            if (t.id !== tabId) return t;
+            // If the editor content matches the freshly-read disk content, the file
+            // is clean (any previous isDirty was a stale persisted value).
+            // Otherwise keep the user's in-progress edits but update originalContent
+            // so isDirty is calculated against the actual on-disk baseline.
+            const isDirty = t.content !== diskContent;
+            return { ...t, originalContent: diskContent, isDirty };
+          }),
         });
       },
 

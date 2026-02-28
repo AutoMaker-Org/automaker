@@ -131,12 +131,20 @@ export const queryClient = new QueryClient({
         if (error instanceof Error && error.message === 'Unauthorized') {
           return false;
         }
-        // Don't retry on connection errors (server offline)
+        // Retry connection errors a few times before declaring server offline.
+        // This handles transient network blips without immediately redirecting to login.
         if (isConnectionError(error)) {
-          return false;
+          return failureCount < 3;
         }
         // Retry up to 2 times for other errors (3 on mobile for flaky connections)
         return failureCount < (isMobileDevice ? 3 : 2);
+      },
+      retryDelay: (attemptIndex, error) => {
+        // Use shorter delays for connection errors to recover quickly from blips
+        if (isConnectionError(error)) {
+          return Math.min(1000 * 2 ** attemptIndex, 5000); // 1s, 2s, 4s (capped at 5s)
+        }
+        return Math.min(1000 * 2 ** attemptIndex, 30000);
       },
       // On mobile, disable refetch on focus to prevent the blank screen + reload
       // cycle that occurs when the user switches back to the app. WebSocket
