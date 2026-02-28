@@ -333,6 +333,7 @@ const initialState: AppState = {
   opencodeDefaultModel: DEFAULT_OPENCODE_MODEL,
   dynamicOpencodeModels: [],
   enabledDynamicModelIds: [],
+  knownDynamicModelIds: [],
   cachedOpencodeProviders: [],
   opencodeModelsLoading: false,
   opencodeModelsError: null,
@@ -1355,21 +1356,51 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
 
   // OpenCode CLI Settings actions
   setEnabledOpencodeModels: (models) => set({ enabledOpencodeModels: models }),
-  setOpencodeDefaultModel: (model) => set({ opencodeDefaultModel: model }),
-  toggleOpencodeModel: (model, enabled) =>
+  setOpencodeDefaultModel: async (model) => {
+    set({ opencodeDefaultModel: model });
+    try {
+      const httpApi = getHttpApiClient();
+      await httpApi.settings.updateGlobal({ opencodeDefaultModel: model });
+    } catch (error) {
+      logger.error('Failed to sync opencodeDefaultModel:', error);
+    }
+  },
+  toggleOpencodeModel: async (model, enabled) => {
     set((state) => ({
       enabledOpencodeModels: enabled
         ? [...state.enabledOpencodeModels, model]
         : state.enabledOpencodeModels.filter((m) => m !== model),
-    })),
+    }));
+    try {
+      const httpApi = getHttpApiClient();
+      await httpApi.settings.updateGlobal({ enabledOpencodeModels: get().enabledOpencodeModels });
+    } catch (error) {
+      logger.error('Failed to sync enabledOpencodeModels:', error);
+    }
+  },
   setDynamicOpencodeModels: (models) => set({ dynamicOpencodeModels: models }),
-  setEnabledDynamicModelIds: (ids) => set({ enabledDynamicModelIds: ids }),
-  toggleDynamicModel: (modelId, enabled) =>
+  setEnabledDynamicModelIds: async (ids) => {
+    set({ enabledDynamicModelIds: ids });
+    try {
+      const httpApi = getHttpApiClient();
+      await httpApi.settings.updateGlobal({ enabledDynamicModelIds: ids });
+    } catch (error) {
+      logger.error('Failed to sync enabledDynamicModelIds:', error);
+    }
+  },
+  toggleDynamicModel: async (modelId, enabled) => {
     set((state) => ({
       enabledDynamicModelIds: enabled
         ? [...state.enabledDynamicModelIds, modelId]
         : state.enabledDynamicModelIds.filter((id) => id !== modelId),
-    })),
+    }));
+    try {
+      const httpApi = getHttpApiClient();
+      await httpApi.settings.updateGlobal({ enabledDynamicModelIds: get().enabledDynamicModelIds });
+    } catch (error) {
+      logger.error('Failed to sync enabledDynamicModelIds:', error);
+    }
+  },
   setCachedOpencodeProviders: (providers) => set({ cachedOpencodeProviders: providers }),
 
   // Gemini CLI Settings actions
@@ -2877,13 +2908,43 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
           (m) => !m.id.startsWith(OPENCODE_BEDROCK_MODEL_PREFIX)
         );
 
+        // Auto-enable only models that are genuinely new (never seen before).
+        // Models that existed previously and were explicitly deselected by the user
+        // should NOT be re-enabled on subsequent fetches.
+        const currentEnabledIds = get().enabledDynamicModelIds;
+        const currentKnownIds = get().knownDynamicModelIds;
+        const allFetchedIds = filteredModels.map((m) => m.id);
+        // Only auto-enable models that have NEVER been seen before (not in knownDynamicModelIds)
+        const trulyNewModelIds = allFetchedIds.filter((id) => !currentKnownIds.includes(id));
+        const updatedEnabledIds =
+          trulyNewModelIds.length > 0
+            ? [...currentEnabledIds, ...trulyNewModelIds]
+            : currentEnabledIds;
+        // Track all discovered model IDs (union of known + newly fetched)
+        const updatedKnownIds = [...new Set([...currentKnownIds, ...allFetchedIds])];
+
         set({
           dynamicOpencodeModels: filteredModels,
+          enabledDynamicModelIds: updatedEnabledIds,
+          knownDynamicModelIds: updatedKnownIds,
           cachedOpencodeProviders: data.providers ?? [],
           opencodeModelsLoading: false,
           opencodeModelsLastFetched: now,
           opencodeModelsError: null,
         });
+
+        // Persist newly enabled model IDs and known model IDs to server settings
+        if (trulyNewModelIds.length > 0) {
+          try {
+            const httpApi = getHttpApiClient();
+            await httpApi.settings.updateGlobal({
+              enabledDynamicModelIds: updatedEnabledIds,
+              knownDynamicModelIds: updatedKnownIds,
+            });
+          } catch (syncError) {
+            logger.error('Failed to sync enabledDynamicModelIds after auto-enable:', syncError);
+          }
+        }
       } else {
         set({
           opencodeModelsLoading: false,

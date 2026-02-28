@@ -215,6 +215,7 @@ export interface AppState {
   // from `opencode models` CLI and depend on current provider authentication state
   dynamicOpencodeModels: ModelDefinition[]; // Dynamically discovered models from OpenCode CLI
   enabledDynamicModelIds: string[]; // Which dynamic models are enabled
+  knownDynamicModelIds: string[]; // All dynamic model IDs ever seen (used to avoid re-enabling explicitly deselected models)
   cachedOpencodeProviders: Array<{
     id: string;
     name: string;
@@ -617,11 +618,11 @@ export interface AppActions {
 
   // OpenCode CLI Settings actions
   setEnabledOpencodeModels: (models: OpencodeModelId[]) => void;
-  setOpencodeDefaultModel: (model: OpencodeModelId) => void;
-  toggleOpencodeModel: (model: OpencodeModelId, enabled: boolean) => void;
+  setOpencodeDefaultModel: (model: OpencodeModelId) => Promise<void>;
+  toggleOpencodeModel: (model: OpencodeModelId, enabled: boolean) => Promise<void>;
   setDynamicOpencodeModels: (models: ModelDefinition[]) => void;
-  setEnabledDynamicModelIds: (ids: string[]) => void;
-  toggleDynamicModel: (modelId: string, enabled: boolean) => void;
+  setEnabledDynamicModelIds: (ids: string[]) => Promise<void>;
+  toggleDynamicModel: (modelId: string, enabled: boolean) => Promise<void>;
   setCachedOpencodeProviders: (
     providers: Array<{ id: string; name: string; authenticated: boolean; authMethod?: string }>
   ) => void;

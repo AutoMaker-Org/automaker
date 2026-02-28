@@ -1253,6 +1253,8 @@ export interface GlobalSettings {
   opencodeDefaultModel?: OpencodeModelId;
   /** Which dynamic OpenCode models are enabled (empty = all discovered) */
   enabledDynamicModelIds?: string[];
+  /** All dynamic model IDs ever seen - used to distinguish new models from explicitly deselected ones */
+  knownDynamicModelIds?: string[];
 
   // Gemini CLI Settings (global)
   /** Which Gemini models are available in feature modal (empty = all) */
@@ -1780,6 +1782,7 @@ export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
   enabledOpencodeModels: getAllOpencodeModelIds(), // Returns prefixed IDs
   opencodeDefaultModel: DEFAULT_OPENCODE_MODEL, // Already prefixed
   enabledDynamicModelIds: [],
+  knownDynamicModelIds: [],
   enabledGeminiModels: getAllGeminiModelIds(), // Returns prefixed IDs
   geminiDefaultModel: DEFAULT_GEMINI_MODEL, // Already prefixed
   enabledCopilotModels: getAllCopilotModelIds(), // Returns prefixed IDs

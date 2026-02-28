@@ -685,6 +685,12 @@ export function hydrateStoreFromSettings(settings: GlobalSettings): void {
     (modelId) => !modelId.startsWith('amazon-bedrock/')
   );
 
+  const persistedKnownDynamicModelIds =
+    settings.knownDynamicModelIds ?? current.knownDynamicModelIds;
+  const sanitizedKnownDynamicModelIds = persistedKnownDynamicModelIds.filter(
+    (modelId) => !modelId.startsWith('amazon-bedrock/')
+  );
+
   // Convert ProjectRef[] to Project[] (minimal data, features will be loaded separately)
   const projects = (settings.projects ?? []).map((ref) => ({
     id: ref.id,
@@ -777,6 +783,7 @@ export function hydrateStoreFromSettings(settings: GlobalSettings): void {
     enabledOpencodeModels: sanitizedEnabledOpencodeModels,
     opencodeDefaultModel: sanitizedOpencodeDefaultModel,
     enabledDynamicModelIds: sanitizedDynamicModelIds,
+    knownDynamicModelIds: sanitizedKnownDynamicModelIds,
     disabledProviders: settings.disabledProviders ?? [],
     enableAiCommitMessages: settings.enableAiCommitMessages ?? true,
     enableSkills: settings.enableSkills ?? true,

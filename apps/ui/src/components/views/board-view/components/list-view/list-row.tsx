@@ -2,7 +2,7 @@
 import { memo, useCallback, useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { AlertCircle, Lock, Hand, Sparkles, FileText } from 'lucide-react';
+import { AlertCircle, Lock, Hand, Sparkles, FileText, FileCheck } from 'lucide-react';
 import type { Feature } from '@/store/app-store';
 import { RowActions, type RowActionHandlers } from './row-actions';
 import { getColumnWidth, getColumnAlign } from './list-header';
@@ -120,7 +120,17 @@ const IndicatorBadges = memo(function IndicatorBadges({
     });
   }
 
-  if (hasPlan) {
+  if (feature.planSpec?.status === 'generated') {
+    badges.push({
+      key: 'plan-approval',
+      icon: FileCheck,
+      tooltip: 'Plan ready for review - tap to approve',
+      colorClass: 'text-purple-500',
+      bgClass: 'bg-purple-500/15',
+      borderClass: 'border-purple-500/30',
+      animate: true,
+    });
+  } else if (hasPlan) {
     badges.push({
       key: 'plan',
       icon: FileText,

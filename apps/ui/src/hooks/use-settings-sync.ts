@@ -86,6 +86,7 @@ const SETTINGS_FIELDS_TO_SYNC = [
   'enabledCopilotModels',
   'copilotDefaultModel',
   'enabledDynamicModelIds',
+  'knownDynamicModelIds',
   'disabledProviders',
   'autoLoadClaudeMd',
   'useClaudeCodeSystemPrompt',
@@ -705,6 +706,12 @@ export async function refreshSettingsFromServer(): Promise<boolean> {
       (modelId) => !modelId.startsWith('amazon-bedrock/')
     );
 
+    const persistedKnownDynamicModelIds =
+      serverSettings.knownDynamicModelIds ?? currentAppState.knownDynamicModelIds;
+    const sanitizedKnownDynamicModelIds = persistedKnownDynamicModelIds.filter(
+      (modelId) => !modelId.startsWith('amazon-bedrock/')
+    );
+
     // Migrate phase models to canonical format
     const migratedPhaseModels = serverSettings.phaseModels
       ? {
@@ -807,6 +814,7 @@ export async function refreshSettingsFromServer(): Promise<boolean> {
       enabledCopilotModels: sanitizedEnabledCopilotModels,
       copilotDefaultModel: sanitizedCopilotDefaultModel,
       enabledDynamicModelIds: sanitizedDynamicModelIds,
+      knownDynamicModelIds: sanitizedKnownDynamicModelIds,
       disabledProviders: serverSettings.disabledProviders ?? [],
       autoLoadClaudeMd: serverSettings.autoLoadClaudeMd ?? true,
       useClaudeCodeSystemPrompt: serverSettings.useClaudeCodeSystemPrompt ?? true,
