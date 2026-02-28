@@ -44,6 +44,7 @@ export function ModelSelector({
     data: dynamicOpencodeModelsList = [],
     isLoading: dynamicOpencodeLoading,
     error: dynamicOpencodeError,
+    refetch: refetchOpencodeModels,
   } = useOpencodeModels();
 
   const selectedProvider = getModelProvider(selectedModel);
@@ -159,9 +160,12 @@ export function ModelSelector({
       // Switch to Claude's default model (canonical format)
       onModelSelect('claude-sonnet');
     } else if (provider === 'opencode' && selectedProvider !== 'opencode') {
-      // Switch to OpenCode's default model (prefer configured default over first available)
-      const defaultModelId =
-        opencodeDefaultModel || allOpencodeModels[0]?.id || 'opencode-big-pickle';
+      // Switch to OpenCode's default model (prefer configured default if it is actually enabled)
+      const isDefaultModelAvailable =
+        opencodeDefaultModel && allOpencodeModels.some((m) => m.id === opencodeDefaultModel);
+      const defaultModelId = isDefaultModelAvailable
+        ? opencodeDefaultModel
+        : allOpencodeModels[0]?.id || 'opencode-big-pickle';
       onModelSelect(defaultModelId);
     }
   };
@@ -502,7 +506,7 @@ export function ModelSelector({
                 <div className="text-sm text-red-400">Failed to load OpenCode models</div>
                 <button
                   type="button"
-                  onClick={() => fetchOpencodeModels()}
+                  onClick={() => refetchOpencodeModels()}
                   className="text-xs text-red-400 underline hover:no-underline"
                 >
                   Retry

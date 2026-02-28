@@ -54,7 +54,10 @@ export function SelectionActionBar({
   };
 
   const handleConfirmVerify = async () => {
-    if (!onVerify) return;
+    if (!onVerify) {
+      setShowVerifyDialog(false);
+      return;
+    }
     setIsVerifying(true);
     try {
       await onVerify();
@@ -223,7 +226,7 @@ export function SelectionActionBar({
             <Button
               className="bg-green-600 hover:bg-green-700"
               onClick={handleConfirmVerify}
-              disabled={isVerifying}
+              disabled={isVerifying || !onVerify}
               data-testid="confirm-bulk-verify-button"
             >
               {isVerifying ? (

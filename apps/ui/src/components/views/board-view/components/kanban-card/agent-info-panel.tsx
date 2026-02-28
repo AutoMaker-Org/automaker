@@ -458,6 +458,7 @@ export const AgentInfoPanel = memo(function AgentInfoPanel({
                 )}
                 {effectiveTodos.length > 3 && (
                   <button
+                    type="button"
                     onClick={(e) => {
                       e.stopPropagation();
                       setIsTodosExpanded(!isTodosExpanded);
@@ -482,6 +483,7 @@ export const AgentInfoPanel = memo(function AgentInfoPanel({
                 <div className="space-y-1.5 pt-2 border-t border-border/30 overflow-hidden">
                   <div className="flex items-center justify-between gap-2">
                     <button
+                      type="button"
                       onClick={(e) => {
                         e.stopPropagation();
                         setIsSummaryDialogOpen(true);
@@ -495,6 +497,7 @@ export const AgentInfoPanel = memo(function AgentInfoPanel({
                       <span className="truncate font-medium">Summary</span>
                     </button>
                     <button
+                      type="button"
                       onClick={(e) => {
                         e.stopPropagation();
                         setIsSummaryDialogOpen(true);
