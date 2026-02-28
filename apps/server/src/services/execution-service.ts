@@ -288,7 +288,7 @@ ${feature.spec}
           // Planning mode active: use planning instructions + feature description only.
           // Do NOT include implementationInstructions — they conflict with the planning
           // prompt's "DO NOT proceed with implementation until approval" directive.
-          prompt = planningPrefix + this.buildFeatureDescription(feature);
+          prompt = planningPrefix + '\n\n' + this.buildFeatureDescription(feature);
         } else {
           prompt = this.buildFeaturePrompt(feature, prompts.taskExecution);
         }

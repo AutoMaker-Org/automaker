@@ -4,6 +4,7 @@
  * POST /orphaned/bulk-resolve endpoint - Resolve multiple orphaned features at once
  */
 
+import crypto from 'crypto';
 import path from 'path';
 import type { Request, Response } from 'express';
 import { FeatureLoader } from '../../../services/feature-loader.js';
@@ -141,8 +142,9 @@ async function resolveOrphanedFeature(
         }
 
         const sanitizedName = missingBranch.replace(/[^a-zA-Z0-9_-]/g, '-');
+        const hash = crypto.createHash('sha1').update(missingBranch).digest('hex').slice(0, 8);
         const worktreesDir = path.join(projectPath, '.worktrees');
-        const worktreePath = path.join(worktreesDir, sanitizedName);
+        const worktreePath = path.join(worktreesDir, `${sanitizedName}-${hash}`);
 
         try {
           await execGitCommand(['worktree', 'add', '-b', missingBranch, worktreePath], projectPath);
@@ -172,6 +174,19 @@ async function resolveOrphanedFeature(
       case 'move-to-branch': {
         // Move the feature to a different branch (or clear branch to use main worktree)
         const newBranch = targetBranch || null;
+
+        // Validate that the target branch exists if one is specified
+        if (newBranch) {
+          try {
+            await execGitCommand(['rev-parse', '--verify', newBranch], projectPath);
+          } catch {
+            return {
+              featureId,
+              success: false,
+              error: `Target branch "${newBranch}" does not exist`,
+            };
+          }
+        }
 
         await featureLoader.update(projectPath, featureId, {
           branchName: newBranch,

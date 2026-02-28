@@ -17,6 +17,7 @@ import {
 import { cn } from '@/lib/utils';
 import { formatShortcut, type ThemeMode, useAppStore } from '@/store/app-store';
 import { initializeProject } from '@/lib/project-init';
+import { toast } from 'sonner';
 import type { Project } from '@/lib/electron';
 import {
   DropdownMenu,
@@ -98,6 +99,9 @@ export function ProjectSelectorWithOptions({
       // so the project switch is not blocked by filesystem operations
       initializeProject(p.path).catch((error) => {
         console.error('Failed to initialize project during switch:', error);
+        toast.error('Failed to initialize project .automaker', {
+          description: error instanceof Error ? error.message : String(error),
+        });
       });
       // Switch project immediately for instant UI response
       startTransition(() => {

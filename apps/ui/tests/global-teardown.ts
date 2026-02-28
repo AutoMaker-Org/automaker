@@ -6,10 +6,14 @@
  */
 
 import { FullConfig } from '@playwright/test';
-import { cleanupLeftoverTestDirs } from './utils/cleanup-test-dirs';
+import {
+  cleanupLeftoverFixtureWorkerDirs,
+  cleanupLeftoverTestDirs,
+} from './utils/cleanup-test-dirs';
 
 async function globalTeardown(_config: FullConfig) {
   cleanupLeftoverTestDirs();
+  cleanupLeftoverFixtureWorkerDirs();
   console.log('[GlobalTeardown] Cleanup complete');
 }
 

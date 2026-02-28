@@ -298,14 +298,16 @@ export function useAutoMode(worktree?: WorktreeInfo) {
         if (!isRunning) return;
 
         // Parse the session key: "projectPath::branchName" or "projectPath::__main__"
-        const parts = sessionKey.split(SESSION_KEY_DELIMITER, 2);
-        if (parts.length !== 2) {
+        // Use lastIndexOf to split from the right, since projectPath may contain the delimiter
+        const delimiterIndex = sessionKey.lastIndexOf(SESSION_KEY_DELIMITER);
+        if (delimiterIndex === -1) {
           // Malformed session key - skip it
           logger.warn(`Malformed session storage key: ${sessionKey}`);
           return;
         }
 
-        const [keyProjectPath, keyBranchName] = parts;
+        const keyProjectPath = sessionKey.slice(0, delimiterIndex);
+        const keyBranchName = sessionKey.slice(delimiterIndex + SESSION_KEY_DELIMITER.length);
         if (keyProjectPath !== projectPath) return;
 
         // Validate branch name: __main__ means null (main worktree)

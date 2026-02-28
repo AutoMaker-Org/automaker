@@ -25,6 +25,7 @@ import {
   ArrowRight,
   AlertTriangle,
   CheckSquare,
+  MinusSquare,
   Square,
 } from 'lucide-react';
 import { getHttpApiClient } from '@/lib/http-api-client';
@@ -211,7 +212,9 @@ export function OrphanedFeaturesSection({ project }: OrphanedFeaturesSectionProp
           setOrphanedFeatures((prev) => prev.filter((o) => !resolvedIds.has(o.feature.id)));
           setSelectedIds((prev) => {
             const next = new Set(prev);
-            resolvedIds.forEach((id) => next.delete(id));
+            for (const id of resolvedIds) {
+              next.delete(id);
+            }
             return next;
           });
 
@@ -240,7 +243,9 @@ export function OrphanedFeaturesSection({ project }: OrphanedFeaturesSectionProp
       } finally {
         setResolvingIds((prev) => {
           const next = new Set(prev);
-          featureIds.forEach((id) => next.delete(id));
+          for (const id of featureIds) {
+            next.delete(id);
+          }
           return next;
         });
         setDeleteConfirm(null);
@@ -352,7 +357,7 @@ export function OrphanedFeaturesSection({ project }: OrphanedFeaturesSectionProp
                         {allSelected ? (
                           <CheckSquare className="w-4 h-4 text-brand-500" />
                         ) : someSelected ? (
-                          <Checkbox checked="indeterminate" onCheckedChange={toggleSelectAll} />
+                          <MinusSquare className="w-4 h-4 text-brand-500" />
                         ) : (
                           <Square className="w-4 h-4" />
                         )}
