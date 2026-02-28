@@ -172,8 +172,13 @@ export type {
   EventHookHttpMethod,
   EventHookShellAction,
   EventHookHttpAction,
+  EventHookNtfyAction,
   EventHookAction,
   EventHook,
+  EventHookContext,
+  // Ntfy notification types
+  NtfyAuthenticationType,
+  NtfyEndpointConfig,
   // Feature template types
   FeatureTemplate,
   // Claude-compatible provider types (new)

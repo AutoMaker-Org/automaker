@@ -7,7 +7,7 @@
 
 import { useState, useCallback } from 'react';
 import { createLogger } from '@automaker/utils/logger';
-import { Bot, Folder, RefreshCw, Square, Activity, FileText } from 'lucide-react';
+import { Bot, Folder, RefreshCw, Square, Activity, FileText, Cpu } from 'lucide-react';
 import { Spinner } from '@/components/ui/spinner';
 import { getElectronAPI, type RunningAgent } from '@/lib/electron';
 import { useAppStore } from '@/store/app-store';
@@ -16,6 +16,16 @@ import { useNavigate } from '@tanstack/react-router';
 import { AgentOutputModal } from './board-view/dialogs/agent-output-modal';
 import { useRunningAgents } from '@/hooks/queries';
 import { useStopFeature } from '@/hooks/mutations';
+import { getModelDisplayName } from '@/lib/utils';
+
+function formatFeatureId(featureId: string): string {
+  // Strip 'feature-' prefix and timestamp for readability
+  // e.g. 'feature-1772305345138-epit9shpdxl' → 'epit9shpdxl'
+  const match = featureId.match(/^feature-\d+-(.+)$/);
+  if (match) return match[1];
+  // For other patterns like 'backlog-plan:...' or 'spec-generation:...', show as-is
+  return featureId;
+}
 
 export function RunningAgentsView() {
   const [selectedAgent, setSelectedAgent] = useState<RunningAgent | null>(null);
@@ -156,13 +166,19 @@ export function RunningAgentsView() {
 
                   {/* Agent info */}
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <span className="font-medium truncate" title={agent.title || agent.featureId}>
-                        {agent.title || agent.featureId}
+                        {agent.title || formatFeatureId(agent.featureId)}
                       </span>
                       {agent.isAutoMode && (
                         <span className="px-2 py-0.5 text-[10px] font-medium rounded-full bg-brand-500/10 text-brand-500 border border-brand-500/30">
                           AUTO
+                        </span>
+                      )}
+                      {agent.model && (
+                        <span className="px-2 py-0.5 text-[10px] font-medium rounded-full bg-purple-500/10 text-purple-500 border border-purple-500/30 flex items-center gap-1">
+                          <Cpu className="h-3 w-3" />
+                          {getModelDisplayName(agent.model)}
                         </span>
                       )}
                     </div>

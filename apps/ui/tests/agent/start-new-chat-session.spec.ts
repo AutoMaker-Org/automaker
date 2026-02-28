@@ -85,15 +85,8 @@ test.describe('Agent Chat Session', () => {
     const sessionCount = await countSessionItems(page);
     expect(sessionCount).toBeGreaterThanOrEqual(1);
 
-    // Ensure the new session is selected (click first session item if message list not yet visible)
-    // Handles race where list updates before selection is applied in CI
+    // Verify the message list is visible (indicates the newly created session was selected)
     const messageList = page.locator('[data-testid="message-list"]');
-    const sessionItem = page.locator('[data-testid^="session-item-"]').first();
-    if (!(await messageList.isVisible())) {
-      await sessionItem.click();
-    }
-
-    // Verify the message list is visible (indicates a session is selected)
     await expect(messageList).toBeVisible({ timeout: 10000 });
 
     // Verify the agent input is visible

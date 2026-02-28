@@ -33,6 +33,36 @@ import { pipelineService } from './pipeline-service.js';
 
 const logger = createLogger('FeatureStateManager');
 
+// Notification type constants
+const NOTIFICATION_TYPE_WAITING_APPROVAL = 'feature_waiting_approval';
+const NOTIFICATION_TYPE_VERIFIED = 'feature_verified';
+const NOTIFICATION_TYPE_FEATURE_ERROR = 'feature_error';
+const NOTIFICATION_TYPE_AUTO_MODE_ERROR = 'auto_mode_error';
+
+// Notification title constants
+const NOTIFICATION_TITLE_WAITING_APPROVAL = 'Feature Ready for Review';
+const NOTIFICATION_TITLE_VERIFIED = 'Feature Verified';
+const NOTIFICATION_TITLE_FEATURE_ERROR = 'Feature Failed';
+const NOTIFICATION_TITLE_AUTO_MODE_ERROR = 'Auto Mode Error';
+
+/**
+ * Auto-mode event payload structure
+ * This is the payload that comes with 'auto-mode:event' events
+ */
+interface AutoModeEventPayload {
+  type?: string;
+  featureId?: string;
+  featureName?: string;
+  passes?: boolean;
+  executionMode?: 'auto' | 'manual';
+  message?: string;
+  error?: string;
+  errorType?: string;
+  projectPath?: string;
+  /** Status field present when type === 'feature_status_changed' */
+  status?: string;
+}
+
 /**
  * FeatureStateManager handles feature status updates with persistence guarantees.
  *
@@ -45,10 +75,28 @@ const logger = createLogger('FeatureStateManager');
 export class FeatureStateManager {
   private events: EventEmitter;
   private featureLoader: FeatureLoader;
+  private unsubscribe: (() => void) | null = null;
 
   constructor(events: EventEmitter, featureLoader: FeatureLoader) {
     this.events = events;
     this.featureLoader = featureLoader;
+
+    // Subscribe to error events to create notifications
+    this.unsubscribe = events.subscribe((type, payload) => {
+      if (type === 'auto-mode:event') {
+        this.handleAutoModeEventError(payload as AutoModeEventPayload);
+      }
+    });
+  }
+
+  /**
+   * Cleanup subscriptions
+   */
+  destroy(): void {
+    if (this.unsubscribe) {
+      this.unsubscribe();
+      this.unsubscribe = null;
+    }
   }
 
   /**
@@ -106,77 +154,18 @@ export class FeatureStateManager {
       feature.status = status;
       feature.updatedAt = new Date().toISOString();
 
-      // Set justFinishedAt timestamp when moving to waiting_approval (agent just completed)
-      // Badge will show for 2 minutes after this timestamp
-      if (status === 'waiting_approval') {
+      // Handle justFinishedAt timestamp based on status
+      const shouldSetJustFinishedAt = status === 'waiting_approval';
+      const shouldClearJustFinishedAt = status !== 'waiting_approval';
+      if (shouldSetJustFinishedAt) {
         feature.justFinishedAt = new Date().toISOString();
+      } else if (shouldClearJustFinishedAt) {
+        feature.justFinishedAt = undefined;
+      }
 
-        // Finalize task statuses when feature is done:
-        // - Mark any in_progress tasks as completed (agent finished but didn't explicitly complete them)
-        // - Do NOT mark pending tasks as completed (they were never started)
-        // - Clear currentTaskId since no task is actively running
-        // This prevents cards in "waiting for review" from appearing to still have running tasks
-        if (feature.planSpec?.tasks) {
-          let tasksFinalized = 0;
-          let tasksPending = 0;
-          for (const task of feature.planSpec.tasks) {
-            if (task.status === 'in_progress') {
-              task.status = 'completed';
-              tasksFinalized++;
-            } else if (task.status === 'pending') {
-              tasksPending++;
-            }
-          }
-          if (tasksFinalized > 0) {
-            logger.info(
-              `[updateFeatureStatus] Finalized ${tasksFinalized} in_progress tasks for feature ${featureId} moving to waiting_approval`
-            );
-          }
-          if (tasksPending > 0) {
-            logger.warn(
-              `[updateFeatureStatus] Feature ${featureId} moving to waiting_approval with ${tasksPending} pending (never started) tasks out of ${feature.planSpec.tasks.length} total`
-            );
-          }
-          // Update tasksCompleted count to reflect actual completed tasks
-          feature.planSpec.tasksCompleted = feature.planSpec.tasks.filter(
-            (t) => t.status === 'completed'
-          ).length;
-          feature.planSpec.currentTaskId = undefined;
-        }
-      } else if (status === 'verified') {
-        // Also finalize in_progress tasks when moving directly to verified (skipTests=false)
-        // Do NOT mark pending tasks as completed - they were never started
-        if (feature.planSpec?.tasks) {
-          let tasksFinalized = 0;
-          let tasksPending = 0;
-          for (const task of feature.planSpec.tasks) {
-            if (task.status === 'in_progress') {
-              task.status = 'completed';
-              tasksFinalized++;
-            } else if (task.status === 'pending') {
-              tasksPending++;
-            }
-          }
-          if (tasksFinalized > 0) {
-            logger.info(
-              `[updateFeatureStatus] Finalized ${tasksFinalized} in_progress tasks for feature ${featureId} moving to verified`
-            );
-          }
-          if (tasksPending > 0) {
-            logger.warn(
-              `[updateFeatureStatus] Feature ${featureId} moving to verified with ${tasksPending} pending (never started) tasks out of ${feature.planSpec.tasks.length} total`
-            );
-          }
-          feature.planSpec.tasksCompleted = feature.planSpec.tasks.filter(
-            (t) => t.status === 'completed'
-          ).length;
-          feature.planSpec.currentTaskId = undefined;
-        }
-        // Clear the timestamp when moving to other statuses
-        feature.justFinishedAt = undefined;
-      } else {
-        // Clear the timestamp when moving to other statuses
-        feature.justFinishedAt = undefined;
+      // Finalize in-progress tasks when reaching terminal states (waiting_approval or verified)
+      if (status === 'waiting_approval' || status === 'verified') {
+        this.finalizeInProgressTasks(feature, featureId, status);
       }
 
       // PERSIST BEFORE EMIT (Pitfall 2)
@@ -193,19 +182,21 @@ export class FeatureStateManager {
       // Wrapped in try-catch so failures don't block syncFeatureToAppSpec below
       try {
         const notificationService = getNotificationService();
+        const displayName = this.getFeatureDisplayName(feature, featureId);
+
         if (status === 'waiting_approval') {
           await notificationService.createNotification({
-            type: 'feature_waiting_approval',
-            title: 'Feature Ready for Review',
-            message: `"${feature.name || featureId}" is ready for your review and approval.`,
+            type: NOTIFICATION_TYPE_WAITING_APPROVAL,
+            title: displayName,
+            message: NOTIFICATION_TITLE_WAITING_APPROVAL,
             featureId,
             projectPath,
           });
         } else if (status === 'verified') {
           await notificationService.createNotification({
-            type: 'feature_verified',
-            title: 'Feature Verified',
-            message: `"${feature.name || featureId}" has been verified and is complete.`,
+            type: NOTIFICATION_TYPE_VERIFIED,
+            title: displayName,
+            message: NOTIFICATION_TITLE_VERIFIED,
             featureId,
             projectPath,
           });
@@ -733,6 +724,137 @@ export class FeatureStateManager {
       }
     } catch (error) {
       logger.error(`Failed to update task ${taskId} status for ${featureId}:`, error);
+    }
+  }
+
+  /**
+   * Get the display name for a feature, preferring title over feature ID.
+   * Empty string titles are treated as missing and fallback to featureId.
+   *
+   * @param feature - The feature to get the display name for
+   * @param featureId - The feature ID to use as fallback
+   * @returns The display name (title or feature ID)
+   */
+  private getFeatureDisplayName(feature: Feature, featureId: string): string {
+    // Use title if it's a non-empty string, otherwise fallback to featureId
+    return feature.title && feature.title.trim() ? feature.title : featureId;
+  }
+
+  /**
+   * Handle auto-mode events to create error notifications.
+   * This listens for error events and creates notifications to alert users.
+   */
+  private async handleAutoModeEventError(payload: AutoModeEventPayload): Promise<void> {
+    if (!payload.type) return;
+
+    // Only handle error events
+    if (payload.type !== 'auto_mode_error' && payload.type !== 'auto_mode_feature_complete') {
+      return;
+    }
+
+    // For auto_mode_feature_complete, only notify on failures (passes === false)
+    if (payload.type === 'auto_mode_feature_complete' && payload.passes !== false) {
+      return;
+    }
+
+    // Get project path - handle different event formats
+    const projectPath = payload.projectPath;
+    if (!projectPath) return;
+
+    try {
+      const notificationService = getNotificationService();
+
+      // Determine notification type and title based on event type
+      // Only auto_mode_feature_complete events should create feature_error notifications
+      const isFeatureError = payload.type === 'auto_mode_feature_complete';
+      const notificationType = isFeatureError
+        ? NOTIFICATION_TYPE_FEATURE_ERROR
+        : NOTIFICATION_TYPE_AUTO_MODE_ERROR;
+      const notificationTitle = isFeatureError
+        ? NOTIFICATION_TITLE_FEATURE_ERROR
+        : NOTIFICATION_TITLE_AUTO_MODE_ERROR;
+
+      // Build error message
+      let errorMessage = payload.message || 'An error occurred';
+      if (payload.error) {
+        errorMessage = payload.error;
+      }
+
+      // Use feature title as notification title when available, fall back to gesture name
+      let title = notificationTitle;
+      if (payload.featureId) {
+        const displayName = await this.getFeatureDisplayNameById(projectPath, payload.featureId);
+        if (displayName) {
+          title = displayName;
+          errorMessage = `${notificationTitle}: ${errorMessage}`;
+        }
+      }
+
+      await notificationService.createNotification({
+        type: notificationType,
+        title,
+        message: errorMessage,
+        featureId: payload.featureId,
+        projectPath,
+      });
+    } catch (notificationError) {
+      logger.warn(`Failed to create error notification:`, notificationError);
+    }
+  }
+
+  /**
+   * Get feature display name by loading the feature directly.
+   */
+  private async getFeatureDisplayNameById(
+    projectPath: string,
+    featureId: string
+  ): Promise<string | null> {
+    const feature = await this.loadFeature(projectPath, featureId);
+    if (!feature) return null;
+    return this.getFeatureDisplayName(feature, featureId);
+  }
+
+  /**
+   * Finalize in-progress tasks when a feature reaches a terminal state.
+   * Marks in_progress tasks as completed but leaves pending tasks untouched.
+   *
+   * @param feature - The feature whose tasks should be finalized
+   * @param featureId - The feature ID for logging
+   * @param targetStatus - The status the feature is transitioning to
+   */
+  private finalizeInProgressTasks(feature: Feature, featureId: string, targetStatus: string): void {
+    if (!feature.planSpec?.tasks) {
+      return;
+    }
+
+    let tasksFinalized = 0;
+    let tasksPending = 0;
+
+    for (const task of feature.planSpec.tasks) {
+      if (task.status === 'in_progress') {
+        task.status = 'completed';
+        tasksFinalized++;
+      } else if (task.status === 'pending') {
+        tasksPending++;
+      }
+    }
+
+    // Update tasksCompleted count to reflect actual completed tasks
+    feature.planSpec.tasksCompleted = feature.planSpec.tasks.filter(
+      (t) => t.status === 'completed'
+    ).length;
+    feature.planSpec.currentTaskId = undefined;
+
+    if (tasksFinalized > 0) {
+      logger.info(
+        `[updateFeatureStatus] Finalized ${tasksFinalized} in_progress tasks for feature ${featureId} moving to ${targetStatus}`
+      );
+    }
+
+    if (tasksPending > 0) {
+      logger.warn(
+        `[updateFeatureStatus] Feature ${featureId} moving to ${targetStatus} with ${tasksPending} pending (never started) tasks out of ${feature.planSpec.tasks.length} total`
+      );
     }
   }
 

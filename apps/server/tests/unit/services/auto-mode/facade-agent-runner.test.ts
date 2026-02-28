@@ -58,7 +58,7 @@ describe('AutoModeServiceFacade Agent Runner', () => {
 
     // Helper to access the private createRunAgentFn via factory creation
     facade = AutoModeServiceFacade.create('/project', {
-      events: { on: vi.fn(), emit: vi.fn() } as any,
+      events: { on: vi.fn(), emit: vi.fn(), subscribe: vi.fn().mockReturnValue(vi.fn()) } as any,
       settingsService: mockSettingsService,
       sharedServices: {
         eventBus: { emitAutoModeEvent: vi.fn() } as any,

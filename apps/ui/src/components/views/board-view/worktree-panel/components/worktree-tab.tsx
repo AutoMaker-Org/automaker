@@ -533,7 +533,7 @@ export function WorktreeTab({
         trackingRemote={trackingRemote}
         isPulling={isPulling}
         isPushing={isPushing}
-        isStartingDevServer={isStartingAnyDevServer}
+        isStartingAnyDevServer={isStartingAnyDevServer}
         isDevServerStarting={isDevServerStarting}
         isDevServerRunning={isDevServerRunning}
         devServerInfo={devServerInfo}

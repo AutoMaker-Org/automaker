@@ -44,6 +44,7 @@ const PHASE_LABELS: Record<PhaseModelKey, string> = {
   projectAnalysisModel: 'Project Analysis',
   ideationModel: 'Ideation',
   memoryExtractionModel: 'Memory Extraction',
+  prDescriptionModel: 'PR Description',
 };
 
 const ALL_PHASES = Object.keys(PHASE_LABELS) as PhaseModelKey[];

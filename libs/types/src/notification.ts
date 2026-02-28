@@ -12,7 +12,9 @@ export type NotificationType =
   | 'feature_waiting_approval'
   | 'feature_verified'
   | 'spec_regeneration_complete'
-  | 'agent_complete';
+  | 'agent_complete'
+  | 'feature_error'
+  | 'auto_mode_error';
 
 /**
  * Notification - A single notification entry

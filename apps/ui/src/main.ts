@@ -56,7 +56,7 @@ if (process.platform === 'linux') {
   // Link the running process to its .desktop file so GNOME/KDE uses the
   // desktop entry's Icon for the taskbar instead of Electron's default.
   // Must be called before any window is created.
-  app.setDesktopName('automaker.desktop');
+  (app as unknown as { setDesktopName(name: string): void }).setDesktopName('automaker.desktop');
 }
 
 // Register IPC handlers

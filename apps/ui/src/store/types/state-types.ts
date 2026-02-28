@@ -18,6 +18,7 @@ import type {
   ModelDefinition,
   ServerLogLevel,
   EventHook,
+  NtfyEndpointConfig,
   ClaudeApiProfile,
   ClaudeCompatibleProvider,
   SidebarStyle,
@@ -270,6 +271,9 @@ export interface AppState {
 
   // Event Hooks
   eventHooks: EventHook[]; // Event hooks for custom commands or webhooks
+
+  // Ntfy.sh Notification Endpoints
+  ntfyEndpoints: NtfyEndpointConfig[]; // Configured ntfy.sh endpoints for push notifications
 
   // Feature Templates
   featureTemplates: FeatureTemplate[]; // Feature templates for quick task creation
@@ -663,6 +667,9 @@ export interface AppActions {
 
   // Event Hook actions
   setEventHooks: (hooks: EventHook[]) => Promise<void>;
+
+  // Ntfy Endpoint actions
+  setNtfyEndpoints: (endpoints: NtfyEndpointConfig[]) => Promise<void>;
 
   // Feature Template actions
   setFeatureTemplates: (templates: FeatureTemplate[]) => Promise<void>;

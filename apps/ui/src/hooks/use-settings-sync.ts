@@ -37,6 +37,7 @@ import {
   type CursorModelId,
   type GeminiModelId,
   type CopilotModelId,
+  type PhaseModelEntry,
 } from '@automaker/types';
 
 const logger = createLogger('SettingsSync');
@@ -104,6 +105,7 @@ const SETTINGS_FIELDS_TO_SYNC = [
   'subagentsSources',
   'promptCustomization',
   'eventHooks',
+  'ntfyEndpoints',
   'featureTemplates',
   'claudeCompatibleProviders', // Claude-compatible provider configs - must persist to server
   'claudeApiProfiles',
@@ -837,7 +839,10 @@ export async function refreshSettingsFromServer(): Promise<boolean> {
       agentModelBySession: serverSettings.agentModelBySession
         ? Object.fromEntries(
             Object.entries(serverSettings.agentModelBySession as Record<string, unknown>).map(
-              ([sessionId, entry]) => [sessionId, migratePhaseModelEntry(entry)]
+              ([sessionId, entry]) => [
+                sessionId,
+                migratePhaseModelEntry(entry as string | PhaseModelEntry | null | undefined),
+              ]
             )
           )
         : currentAppState.agentModelBySession,
@@ -852,6 +857,8 @@ export async function refreshSettingsFromServer(): Promise<boolean> {
       recentFolders: serverSettings.recentFolders ?? [],
       // Event hooks
       eventHooks: serverSettings.eventHooks ?? [],
+      // Ntfy endpoints
+      ntfyEndpoints: serverSettings.ntfyEndpoints ?? [],
       // Feature templates
       featureTemplates: serverSettings.featureTemplates ?? [],
       // Codex CLI Settings

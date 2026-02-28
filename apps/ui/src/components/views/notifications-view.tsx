@@ -9,28 +9,11 @@ import { useLoadNotifications, useNotificationEvents } from '@/hooks/use-notific
 import { getHttpApiClient } from '@/lib/http-api-client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardTitle } from '@/components/ui/card';
-import { Bell, Check, CheckCheck, Trash2, ExternalLink } from 'lucide-react';
+import { Bell, Check, CheckCheck, Trash2, ExternalLink, AlertCircle } from 'lucide-react';
 import { Spinner } from '@/components/ui/spinner';
 import { useNavigate } from '@tanstack/react-router';
 import type { Notification } from '@automaker/types';
-
-/**
- * Format a date as relative time (e.g., "2 minutes ago", "3 hours ago")
- */
-function formatRelativeTime(date: Date): string {
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffSec = Math.floor(diffMs / 1000);
-  const diffMin = Math.floor(diffSec / 60);
-  const diffHour = Math.floor(diffMin / 60);
-  const diffDay = Math.floor(diffHour / 24);
-
-  if (diffSec < 60) return 'just now';
-  if (diffMin < 60) return `${diffMin} minute${diffMin === 1 ? '' : 's'} ago`;
-  if (diffHour < 24) return `${diffHour} hour${diffHour === 1 ? '' : 's'} ago`;
-  if (diffDay < 7) return `${diffDay} day${diffDay === 1 ? '' : 's'} ago`;
-  return date.toLocaleDateString();
-}
+import { formatRelativeTime } from '@/lib/utils';
 
 export function NotificationsView() {
   const { currentProject } = useAppStore();
@@ -111,8 +94,8 @@ export function NotificationsView() {
 
       // Navigate to the relevant view based on notification type
       if (notification.featureId) {
-        // Navigate to board view - feature will be selected
-        navigate({ to: '/board' });
+        // Navigate to board view with feature ID to show output
+        navigate({ to: '/board', search: { featureId: notification.featureId } });
       }
     },
     [handleMarkAsRead, navigate]
@@ -128,6 +111,10 @@ export function NotificationsView() {
         return <Check className="h-5 w-5 text-blue-500" />;
       case 'agent_complete':
         return <Check className="h-5 w-5 text-purple-500" />;
+      case 'feature_error':
+        return <AlertCircle className="h-5 w-5 text-red-500" />;
+      case 'auto_mode_error':
+        return <AlertCircle className="h-5 w-5 text-red-500" />;
       default:
         return <Bell className="h-5 w-5" />;
     }
