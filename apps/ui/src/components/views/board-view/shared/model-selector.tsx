@@ -522,7 +522,7 @@ export function ModelSelector({
             )}
 
           {/* Model list */}
-          {allOpencodeModels.length > 0 && (
+          {!opencodeModelsLoading && !dynamicOpencodeLoading && allOpencodeModels.length > 0 && (
             <div className="flex flex-col gap-2">
               {allOpencodeModels.map((option) => {
                 const isSelected = selectedModel === option.id;

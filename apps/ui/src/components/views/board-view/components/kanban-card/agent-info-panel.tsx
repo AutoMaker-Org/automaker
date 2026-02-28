@@ -481,10 +481,19 @@ export const AgentInfoPanel = memo(function AgentInfoPanel({
               {effectiveSummary && (
                 <div className="space-y-1.5 pt-2 border-t border-border/30 overflow-hidden">
                   <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-1 text-[10px] text-[var(--status-success)] min-w-0">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setIsSummaryDialogOpen(true);
+                      }}
+                      onPointerDown={(e) => e.stopPropagation()}
+                      onMouseDown={(e) => e.stopPropagation()}
+                      className="flex items-center gap-1 text-[10px] text-[var(--status-success)] min-w-0 hover:opacity-80 transition-opacity cursor-pointer"
+                      title="View full summary"
+                    >
                       <Sparkles className="w-3 h-3 shrink-0" />
                       <span className="truncate font-medium">Summary</span>
-                    </div>
+                    </button>
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
