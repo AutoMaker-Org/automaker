@@ -2109,6 +2109,44 @@ export class HttpApiClient implements ElectronAPI {
       conflictCount?: number;
       error?: string;
     }> => this.post('/api/features/check-conflicts', { projectPath, data }),
+    getOrphaned: (
+      projectPath: string
+    ): Promise<{
+      success: boolean;
+      orphanedFeatures?: Array<{ feature: Feature; missingBranch: string }>;
+      error?: string;
+    }> => this.post('/api/features/orphaned', { projectPath }),
+    resolveOrphaned: (
+      projectPath: string,
+      featureId: string,
+      action: 'delete' | 'create-worktree' | 'move-to-branch',
+      targetBranch?: string | null
+    ): Promise<{
+      success: boolean;
+      action?: string;
+      worktreePath?: string;
+      branchName?: string;
+      error?: string;
+    }> =>
+      this.post('/api/features/orphaned/resolve', { projectPath, featureId, action, targetBranch }),
+    bulkResolveOrphaned: (
+      projectPath: string,
+      featureIds: string[],
+      action: 'delete' | 'create-worktree' | 'move-to-branch',
+      targetBranch?: string | null
+    ): Promise<{
+      success: boolean;
+      resolvedCount?: number;
+      failedCount?: number;
+      results?: Array<{ featureId: string; success: boolean; action?: string; error?: string }>;
+      error?: string;
+    }> =>
+      this.post('/api/features/orphaned/bulk-resolve', {
+        projectPath,
+        featureIds,
+        action,
+        targetBranch,
+      }),
   };
 
   // Auto Mode API

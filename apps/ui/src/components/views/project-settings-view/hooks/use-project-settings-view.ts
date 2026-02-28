@@ -9,6 +9,7 @@ export type ProjectSettingsViewId =
   | 'commands-scripts'
   | 'claude'
   | 'data'
+  | 'orphaned'
   | 'danger';
 
 interface UseProjectSettingsViewOptions {

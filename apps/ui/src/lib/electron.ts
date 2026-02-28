@@ -521,6 +521,35 @@ export interface FeaturesAPI {
     description: string,
     projectPath?: string
   ) => Promise<{ success: boolean; title?: string; error?: string }>;
+  getOrphaned: (projectPath: string) => Promise<{
+    success: boolean;
+    orphanedFeatures?: Array<{ feature: Feature; missingBranch: string }>;
+    error?: string;
+  }>;
+  resolveOrphaned: (
+    projectPath: string,
+    featureId: string,
+    action: 'delete' | 'create-worktree' | 'move-to-branch',
+    targetBranch?: string | null
+  ) => Promise<{
+    success: boolean;
+    action?: string;
+    worktreePath?: string;
+    branchName?: string;
+    error?: string;
+  }>;
+  bulkResolveOrphaned: (
+    projectPath: string,
+    featureIds: string[],
+    action: 'delete' | 'create-worktree' | 'move-to-branch',
+    targetBranch?: string | null
+  ) => Promise<{
+    success: boolean;
+    resolvedCount?: number;
+    failedCount?: number;
+    results?: Array<{ featureId: string; success: boolean; action?: string; error?: string }>;
+    error?: string;
+  }>;
 }
 
 export interface AutoModeAPI {
@@ -3938,6 +3967,25 @@ function createMockFeaturesAPI(): FeaturesAPI {
       const words = description.split(/\s+/).slice(0, 6).join(' ');
       const title = words.length > 40 ? words.substring(0, 40) + '...' : words;
       return { success: true, title: `Add ${title}` };
+    },
+    getOrphaned: async (_projectPath: string) => {
+      return { success: true, orphanedFeatures: [] };
+    },
+    resolveOrphaned: async (
+      _projectPath: string,
+      _featureId: string,
+      _action: 'delete' | 'create-worktree' | 'move-to-branch',
+      _targetBranch?: string | null
+    ) => {
+      return { success: false, error: 'Not supported in mock mode' };
+    },
+    bulkResolveOrphaned: async (
+      _projectPath: string,
+      _featureIds: string[],
+      _action: 'delete' | 'create-worktree' | 'move-to-branch',
+      _targetBranch?: string | null
+    ) => {
+      return { success: false, error: 'Not supported in mock mode' };
     },
   };
 }

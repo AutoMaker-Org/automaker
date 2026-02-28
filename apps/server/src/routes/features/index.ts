@@ -19,6 +19,11 @@ import { createAgentOutputHandler, createRawOutputHandler } from './routes/agent
 import { createGenerateTitleHandler } from './routes/generate-title.js';
 import { createExportHandler } from './routes/export.js';
 import { createImportHandler, createConflictCheckHandler } from './routes/import.js';
+import {
+  createOrphanedListHandler,
+  createOrphanedResolveHandler,
+  createOrphanedBulkResolveHandler,
+} from './routes/orphaned.js';
 
 export function createFeaturesRoutes(
   featureLoader: FeatureLoader,
@@ -69,6 +74,21 @@ export function createFeaturesRoutes(
     '/check-conflicts',
     validatePathParams('projectPath'),
     createConflictCheckHandler(featureLoader)
+  );
+  router.post(
+    '/orphaned',
+    validatePathParams('projectPath'),
+    createOrphanedListHandler(featureLoader, autoModeService)
+  );
+  router.post(
+    '/orphaned/resolve',
+    validatePathParams('projectPath'),
+    createOrphanedResolveHandler(featureLoader, autoModeService)
+  );
+  router.post(
+    '/orphaned/bulk-resolve',
+    validatePathParams('projectPath'),
+    createOrphanedBulkResolveHandler(featureLoader)
   );
 
   return router;

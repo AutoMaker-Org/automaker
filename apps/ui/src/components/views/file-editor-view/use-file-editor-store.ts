@@ -401,6 +401,22 @@ export const useFileEditorStore = create<FileEditorState>()(
           state.expandedFolders = state.expandedFolders ?? new Set<string>();
           state.markdownViewMode = state.markdownViewMode ?? 'split';
         }
+        // Always ensure each tab has a valid originalContent field.
+        // Tabs persisted before originalContent was added to the schema would have
+        // originalContent=undefined, which causes isDirty=true on any onChange call
+        // (content !== undefined is always true). Fix by defaulting to content so the
+        // tab starts in a clean state; any genuine unsaved changes will be re-detected
+        // when the user next edits the file.
+        if (Array.isArray((state as Record<string, unknown>).tabs)) {
+          (state as Record<string, unknown>).tabs = (
+            (state as Record<string, unknown>).tabs as Array<Record<string, unknown>>
+          ).map((tab: Record<string, unknown>) => {
+            if (tab.originalContent === undefined || tab.originalContent === null) {
+              return { ...tab, originalContent: tab.content ?? '' };
+            }
+            return tab;
+          });
+        }
         return state as unknown as FileEditorState;
       },
     }

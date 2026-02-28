@@ -6,6 +6,8 @@
  * Fix: Added useShallow selector to ensure proper reactivity when enabledDynamicModelIds array changes
  */
 
+import fs from 'fs';
+import path from 'path';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import fs from 'fs';

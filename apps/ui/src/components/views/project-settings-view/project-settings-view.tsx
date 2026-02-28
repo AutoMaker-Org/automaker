@@ -8,6 +8,7 @@ import { WorktreePreferencesSection } from './worktree-preferences-section';
 import { CommandsAndScriptsSection } from './commands-and-scripts-section';
 import { ProjectModelsSection } from './project-models-section';
 import { DataManagementSection } from './data-management-section';
+import { OrphanedFeaturesSection } from './orphaned-features-section';
 import { DangerZoneSection } from '../settings-view/danger-zone/danger-zone-section';
 import { DeleteProjectDialog } from '../settings-view/components/delete-project-dialog';
 import { RemoveFromAutomakerDialog } from '../settings-view/components/remove-from-automaker-dialog';
@@ -109,6 +110,8 @@ export function ProjectSettingsView() {
         return <ProjectModelsSection project={currentProject} />;
       case 'data':
         return <DataManagementSection project={currentProject} />;
+      case 'orphaned':
+        return <OrphanedFeaturesSection project={currentProject} />;
       case 'danger':
         return (
           <DangerZoneSection

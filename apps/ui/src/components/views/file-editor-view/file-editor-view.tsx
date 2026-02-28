@@ -361,15 +361,25 @@ export function FileEditorView({ initialPath }: FileEditorViewProps) {
       const existing = tabs.find((t) => t.filePath === filePath);
       if (existing) {
         setActiveTab(existing.id);
-        // Re-read from disk to fix stale isDirty state that may have been
-        // persisted to localStorage (e.g. dotfiles restored as dirty after reload).
-        // Only refresh editable text files – binary/too-large tabs don't have content.
-        if (!existing.isBinary && !existing.isTooLarge) {
+        // If the tab is showing as dirty, re-read from disk to verify that the
+        // stored content actually differs from what is on disk. This fixes stale
+        // isDirty=true state that can be persisted to localStorage (e.g. the file
+        // was saved externally, or the tab schema changed).
+        // We only do this when the tab IS dirty to avoid a race condition where a
+        // concurrent save clears isDirty and then our stale disk read would wrongly
+        // set it back to true.
+        if (!existing.isBinary && !existing.isTooLarge && existing.isDirty) {
           try {
             const api = getElectronAPI();
             const result = await api.readFile(filePath);
             if (result.success && result.content !== undefined && !result.content.includes('\0')) {
-              refreshTabContent(existing.id, result.content);
+              // Re-check isDirty after the async read: a concurrent save may have
+              // already cleared it. Only refresh if the tab is still dirty.
+              const { tabs: currentTabs } = useFileEditorStore.getState();
+              const currentTab = currentTabs.find((t) => t.id === existing.id);
+              if (currentTab?.isDirty) {
+                refreshTabContent(existing.id, result.content);
+              }
             }
           } catch {
             // Non-critical: if we can't re-read the file, keep the persisted state
@@ -718,6 +728,7 @@ export function FileEditorView({ initialPath }: FileEditorViewProps) {
       model: string;
       thinkingLevel: string;
       reasoningEffort: string;
+      providerId?: string;
       skipTests: boolean;
       branchName: string;
       planningMode: string;
