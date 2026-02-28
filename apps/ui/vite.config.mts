@@ -246,8 +246,14 @@ export default defineConfig(({ command }) => {
         // This prevents "Cannot read properties of null (reading 'useState')" caused by
         // react-dom setting the hooks dispatcher on one React instance while component
         // code reads it from a different instance.
-        { find: /^react-dom(\/|$)/, replacement: path.resolve(__dirname, '../../node_modules/react-dom') + '/' },
-        { find: /^react(\/|$)/, replacement: path.resolve(__dirname, '../../node_modules/react') + '/' },
+        {
+          find: /^react-dom(\/|$)/,
+          replacement: path.resolve(__dirname, '../../node_modules/react-dom') + '/',
+        },
+        {
+          find: /^react(\/|$)/,
+          replacement: path.resolve(__dirname, '../../node_modules/react') + '/',
+        },
       ],
       dedupe: ['react', 'react-dom'],
     },
