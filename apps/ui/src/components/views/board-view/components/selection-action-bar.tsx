@@ -50,6 +50,7 @@ export function SelectionActionBar({
   };
 
   const handleVerifyClick = () => {
+    if (!onVerify) return;
     setShowVerifyDialog(true);
   };
 
@@ -122,7 +123,7 @@ export function SelectionActionBar({
               variant="default"
               size="sm"
               onClick={handleVerifyClick}
-              disabled={selectedCount === 0}
+              disabled={selectedCount === 0 || !onVerify}
               className="h-8 bg-green-600 hover:bg-green-700 disabled:opacity-50"
               data-testid="selection-verify-button"
             >

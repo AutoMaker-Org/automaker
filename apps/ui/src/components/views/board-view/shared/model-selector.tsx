@@ -72,6 +72,7 @@ export function ModelSelector({
     if (
       isOpencodeEnabled &&
       !opencodeModelsLoading &&
+      !dynamicOpencodeLoading &&
       dynamicOpencodeModelsList.length === 0 &&
       !opencodeFetchTriedRef.current
     ) {
@@ -81,6 +82,7 @@ export function ModelSelector({
   }, [
     isOpencodeEnabled,
     opencodeModelsLoading,
+    dynamicOpencodeLoading,
     dynamicOpencodeModelsList.length,
     fetchOpencodeModels,
   ]);
@@ -165,8 +167,10 @@ export function ModelSelector({
         opencodeDefaultModel && allOpencodeModels.some((m) => m.id === opencodeDefaultModel);
       const defaultModelId = isDefaultModelAvailable
         ? opencodeDefaultModel
-        : allOpencodeModels[0]?.id || 'opencode-big-pickle';
-      onModelSelect(defaultModelId);
+        : allOpencodeModels[0]?.id;
+      if (defaultModelId) {
+        onModelSelect(defaultModelId);
+      }
     }
   };
 
