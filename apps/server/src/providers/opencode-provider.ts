@@ -1189,8 +1189,26 @@ export class OpencodeProvider extends CliProvider {
    * Format a display name for a model
    */
   private formatModelDisplayName(model: OpenCodeModelInfo): string {
+    // Extract the last path segment for nested model IDs
+    // e.g., "arcee-ai/trinity-large-preview:free" → "trinity-large-preview:free"
+    let rawName = model.name;
+    if (rawName.includes('/')) {
+      rawName = rawName.split('/').pop()!;
+    }
+
+    // Strip tier/pricing suffixes like ":free", ":extended"
+    const colonIdx = rawName.indexOf(':');
+    let suffix = '';
+    if (colonIdx !== -1) {
+      const tierPart = rawName.slice(colonIdx + 1);
+      if (/^(free|extended|beta|preview)$/i.test(tierPart)) {
+        suffix = ` (${tierPart.charAt(0).toUpperCase() + tierPart.slice(1)})`;
+      }
+      rawName = rawName.slice(0, colonIdx);
+    }
+
     // Capitalize and format the model name
-    const formattedName = model.name
+    const formattedName = rawName
       .split('-')
       .map((part) => {
         // Handle version numbers like "4-5" -> "4.5"
@@ -1218,7 +1236,7 @@ export class OpencodeProvider extends CliProvider {
     };
 
     const providerDisplay = providerNames[model.provider] || model.provider;
-    return `${formattedName} (${providerDisplay})`;
+    return `${formattedName}${suffix} (${providerDisplay})`;
   }
 
   /**

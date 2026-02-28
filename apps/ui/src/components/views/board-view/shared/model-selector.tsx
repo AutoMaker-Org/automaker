@@ -1,15 +1,16 @@
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Brain, AlertTriangle } from 'lucide-react';
-import { AnthropicIcon, CursorIcon, OpenAIIcon } from '@/components/ui/provider-icon';
+import { AnthropicIcon, CursorIcon, OpenAIIcon, OpenCodeIcon } from '@/components/ui/provider-icon';
 import { cn } from '@/lib/utils';
 import { useAppStore } from '@/store/app-store';
 import { useSetupStore } from '@/store/setup-store';
 import { getModelProvider } from '@automaker/types';
 import type { ModelProvider, CursorModelId } from '@automaker/types';
-import { CLAUDE_MODELS, CURSOR_MODELS, ModelOption } from './model-constants';
-import { useEffect } from 'react';
+import { CLAUDE_MODELS, CURSOR_MODELS, OPENCODE_MODELS, ModelOption } from './model-constants';
+import { useEffect, useRef } from 'react';
 import { Spinner } from '@/components/ui/spinner';
+import { useOpencodeModels } from '@/hooks/queries';
 
 interface ModelSelectorProps {
   selectedModel: string; // Can be ModelAlias or "cursor-{id}"
@@ -30,8 +31,21 @@ export function ModelSelector({
     codexModelsError,
     fetchCodexModels,
     disabledProviders,
+    enabledOpencodeModels,
+    opencodeDefaultModel,
+    enabledDynamicModelIds,
+    opencodeModelsLoading,
+    fetchOpencodeModels,
   } = useAppStore();
   const { cursorCliStatus, codexCliStatus } = useSetupStore();
+
+  // Use React Query for OpenCode models so changes in settings are reflected immediately
+  const {
+    data: dynamicOpencodeModelsList = [],
+    isLoading: dynamicOpencodeLoading,
+    error: dynamicOpencodeError,
+    refetch: refetchOpencodeModels,
+  } = useOpencodeModels();
 
   const selectedProvider = getModelProvider(selectedModel);
 
@@ -48,6 +62,30 @@ export function ModelSelector({
       fetchCodexModels();
     }
   }, [isCodexAvailable, codexModels.length, codexModelsLoading, fetchCodexModels]);
+
+  // Track whether we've already attempted to fetch OpenCode models to avoid repeated retries
+  const opencodeFetchTriedRef = useRef(false);
+
+  // Fetch OpenCode models on mount if not already loaded (only once per mount)
+  const isOpencodeEnabled = !disabledProviders.includes('opencode');
+  useEffect(() => {
+    if (
+      isOpencodeEnabled &&
+      !opencodeModelsLoading &&
+      !dynamicOpencodeLoading &&
+      dynamicOpencodeModelsList.length === 0 &&
+      !opencodeFetchTriedRef.current
+    ) {
+      opencodeFetchTriedRef.current = true;
+      fetchOpencodeModels();
+    }
+  }, [
+    isOpencodeEnabled,
+    opencodeModelsLoading,
+    dynamicOpencodeLoading,
+    dynamicOpencodeModelsList.length,
+    fetchOpencodeModels,
+  ]);
 
   // Transform codex models from store to ModelOption format
   const dynamicCodexModels: ModelOption[] = codexModels.map((model) => {
@@ -66,6 +104,36 @@ export function ModelSelector({
       hasThinking: model.hasThinking,
     };
   });
+
+  // Filter static OpenCode models based on enabled models from global settings
+  const filteredStaticOpencodeModels = OPENCODE_MODELS.filter((model) =>
+    (enabledOpencodeModels as string[]).includes(model.id)
+  );
+
+  // Filter dynamic OpenCode models based on enabled dynamic model IDs
+  const filteredDynamicOpencodeModels: ModelOption[] = dynamicOpencodeModelsList
+    .filter((model) => enabledDynamicModelIds.includes(model.id))
+    .map((model) => ({
+      id: model.id,
+      label: model.name,
+      description: model.description,
+      provider: 'opencode' as ModelProvider,
+    }));
+
+  // Combined OpenCode models (static + dynamic), deduplicating by model name
+  // Static IDs use dash format (opencode-glm-5-free), dynamic use slash format (opencode/glm-5-free)
+  const normalizeModelName = (id: string): string => {
+    if (id.startsWith('opencode-')) return id.slice('opencode-'.length);
+    if (id.startsWith('opencode/')) return id.slice('opencode/'.length);
+    return id;
+  };
+  const staticModelNames = new Set(
+    filteredStaticOpencodeModels.map((m) => normalizeModelName(m.id))
+  );
+  const uniqueDynamicModels = filteredDynamicOpencodeModels.filter(
+    (m) => !staticModelNames.has(normalizeModelName(m.id))
+  );
+  const allOpencodeModels = [...filteredStaticOpencodeModels, ...uniqueDynamicModels];
 
   // Filter Cursor models based on enabled models from global settings
   const filteredCursorModels = CURSOR_MODELS.filter((model) => {
@@ -93,6 +161,16 @@ export function ModelSelector({
     } else if (provider === 'claude' && selectedProvider !== 'claude') {
       // Switch to Claude's default model (canonical format)
       onModelSelect('claude-sonnet');
+    } else if (provider === 'opencode' && selectedProvider !== 'opencode') {
+      // Switch to OpenCode's default model (prefer configured default if it is actually enabled)
+      const isDefaultModelAvailable =
+        opencodeDefaultModel && allOpencodeModels.some((m) => m.id === opencodeDefaultModel);
+      const defaultModelId = isDefaultModelAvailable
+        ? opencodeDefaultModel
+        : allOpencodeModels[0]?.id;
+      if (defaultModelId) {
+        onModelSelect(defaultModelId);
+      }
     }
   };
 
@@ -100,12 +178,14 @@ export function ModelSelector({
   const isClaudeDisabled = disabledProviders.includes('claude');
   const isCursorDisabled = disabledProviders.includes('cursor');
   const isCodexDisabled = disabledProviders.includes('codex');
+  const isOpencodeDisabled = disabledProviders.includes('opencode');
 
   // Count available providers
   const availableProviders = [
     !isClaudeDisabled && 'claude',
     !isCursorDisabled && 'cursor',
     !isCodexDisabled && 'codex',
+    !isOpencodeDisabled && 'opencode',
   ].filter(Boolean) as ModelProvider[];
 
   return (
@@ -161,6 +241,22 @@ export function ModelSelector({
               >
                 <OpenAIIcon className="w-4 h-4" />
                 Codex CLI
+              </button>
+            )}
+            {!isOpencodeDisabled && (
+              <button
+                type="button"
+                onClick={() => handleProviderChange('opencode')}
+                className={cn(
+                  'flex-1 px-3 py-2 rounded-md border text-sm font-medium transition-colors flex items-center justify-center gap-2',
+                  selectedProvider === 'opencode'
+                    ? 'bg-primary text-primary-foreground border-primary'
+                    : 'bg-background hover:bg-accent border-border'
+                )}
+                data-testid={`${testIdPrefix}-provider-opencode`}
+              >
+                <OpenCodeIcon className="w-4 h-4" />
+                OpenCode
               </button>
             )}
           </div>
@@ -377,6 +473,95 @@ export function ModelSelector({
                         </Badge>
                       )}
                     </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* OpenCode Models */}
+      {selectedProvider === 'opencode' && !isOpencodeDisabled && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <Label className="flex items-center gap-2">
+              <OpenCodeIcon className="w-4 h-4 text-primary" />
+              OpenCode Model
+            </Label>
+            <span className="text-[11px] px-2 py-0.5 rounded-full border border-violet-500/40 text-violet-600 dark:text-violet-400">
+              CLI
+            </span>
+          </div>
+
+          {/* Loading state */}
+          {(opencodeModelsLoading || dynamicOpencodeLoading) && allOpencodeModels.length === 0 && (
+            <div className="flex items-center justify-center gap-2 p-6 text-sm text-muted-foreground">
+              <Spinner size="sm" />
+              Loading models...
+            </div>
+          )}
+
+          {/* Error state */}
+          {dynamicOpencodeError && !dynamicOpencodeLoading && (
+            <div className="flex items-start gap-2 p-3 rounded-lg bg-red-500/10 border border-red-500/20">
+              <AlertTriangle className="w-4 h-4 text-red-400 mt-0.5 shrink-0" />
+              <div className="space-y-1">
+                <div className="text-sm text-red-400">Failed to load OpenCode models</div>
+                <button
+                  type="button"
+                  onClick={() => refetchOpencodeModels()}
+                  className="text-xs text-red-400 underline hover:no-underline"
+                >
+                  Retry
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Empty state */}
+          {!opencodeModelsLoading &&
+            !dynamicOpencodeLoading &&
+            !dynamicOpencodeError &&
+            allOpencodeModels.length === 0 && (
+              <div className="text-sm text-muted-foreground p-3 border border-dashed rounded-md text-center">
+                No OpenCode models enabled. Enable models in Settings → AI Providers.
+              </div>
+            )}
+
+          {/* Model list */}
+          {!opencodeModelsLoading && !dynamicOpencodeLoading && allOpencodeModels.length > 0 && (
+            <div className="flex flex-col gap-2">
+              {allOpencodeModels.map((option) => {
+                const isSelected = selectedModel === option.id;
+                return (
+                  <button
+                    key={option.id}
+                    type="button"
+                    onClick={() => onModelSelect(option.id)}
+                    title={option.description}
+                    className={cn(
+                      'w-full px-3 py-2 rounded-md border text-sm font-medium transition-colors flex items-center justify-between',
+                      isSelected
+                        ? 'bg-primary text-primary-foreground border-primary'
+                        : 'bg-background hover:bg-accent border-border'
+                    )}
+                    data-testid={`${testIdPrefix}-${option.id}`}
+                  >
+                    <span>{option.label}</span>
+                    {option.badge && (
+                      <Badge
+                        variant="outline"
+                        className={cn(
+                          'text-xs',
+                          isSelected
+                            ? 'border-primary-foreground/50 text-primary-foreground'
+                            : 'border-muted-foreground/50 text-muted-foreground'
+                        )}
+                      >
+                        {option.badge}
+                      </Badge>
+                    )}
                   </button>
                 );
               })}

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Pencil, X, CheckSquare, Trash2, CheckCircle2 } from 'lucide-react';
+import { Pencil, X, CheckSquare, Trash2, CheckCircle2, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   Dialog,
@@ -18,7 +18,7 @@ interface SelectionActionBarProps {
   totalCount: number;
   onEdit?: () => void;
   onDelete?: () => void;
-  onVerify?: () => void;
+  onVerify?: () => Promise<void> | void;
   onClear: () => void;
   onSelectAll: () => void;
   mode?: SelectionActionMode;
@@ -36,6 +36,7 @@ export function SelectionActionBar({
 }: SelectionActionBarProps) {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showVerifyDialog, setShowVerifyDialog] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(false);
 
   const allSelected = selectedCount === totalCount && totalCount > 0;
 
@@ -49,12 +50,22 @@ export function SelectionActionBar({
   };
 
   const handleVerifyClick = () => {
+    if (!onVerify) return;
     setShowVerifyDialog(true);
   };
 
-  const handleConfirmVerify = () => {
-    setShowVerifyDialog(false);
-    onVerify?.();
+  const handleConfirmVerify = async () => {
+    if (!onVerify) {
+      setShowVerifyDialog(false);
+      return;
+    }
+    setIsVerifying(true);
+    try {
+      await onVerify();
+    } finally {
+      setIsVerifying(false);
+      setShowVerifyDialog(false);
+    }
   };
 
   return (
@@ -112,7 +123,7 @@ export function SelectionActionBar({
               variant="default"
               size="sm"
               onClick={handleVerifyClick}
-              disabled={selectedCount === 0}
+              disabled={selectedCount === 0 || !onVerify}
               className="h-8 bg-green-600 hover:bg-green-700 disabled:opacity-50"
               data-testid="selection-verify-button"
             >
@@ -184,7 +195,12 @@ export function SelectionActionBar({
       </Dialog>
 
       {/* Verify Confirmation Dialog */}
-      <Dialog open={showVerifyDialog} onOpenChange={setShowVerifyDialog}>
+      <Dialog
+        open={showVerifyDialog}
+        onOpenChange={(open) => {
+          if (!isVerifying) setShowVerifyDialog(open);
+        }}
+      >
         <DialogContent data-testid="bulk-verify-confirmation-dialog">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-green-600">
@@ -203,6 +219,7 @@ export function SelectionActionBar({
             <Button
               variant="ghost"
               onClick={() => setShowVerifyDialog(false)}
+              disabled={isVerifying}
               data-testid="cancel-bulk-verify-button"
             >
               Cancel
@@ -210,10 +227,15 @@ export function SelectionActionBar({
             <Button
               className="bg-green-600 hover:bg-green-700"
               onClick={handleConfirmVerify}
+              disabled={isVerifying || !onVerify}
               data-testid="confirm-bulk-verify-button"
             >
-              <CheckCircle2 className="w-4 h-4 mr-2" />
-              Verify
+              {isVerifying ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <CheckCircle2 className="w-4 h-4 mr-2" />
+              )}
+              {isVerifying ? 'Verifying...' : 'Verify'}
             </Button>
           </DialogFooter>
         </DialogContent>

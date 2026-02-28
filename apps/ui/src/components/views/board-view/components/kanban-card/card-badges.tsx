@@ -3,7 +3,15 @@ import { memo, useEffect, useMemo, useState } from 'react';
 import { Feature, useAppStore } from '@/store/app-store';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { AlertCircle, AlertTriangle, Lock, Hand, Sparkles, SkipForward } from 'lucide-react';
+import {
+  AlertCircle,
+  AlertTriangle,
+  Lock,
+  Hand,
+  Sparkles,
+  SkipForward,
+  FileCheck,
+} from 'lucide-react';
 import { getBlockingDependencies } from '@automaker/dependency-resolver';
 import { useShallow } from 'zustand/react/shallow';
 import { usePipelineConfig } from '@/hooks/queries/use-pipeline';
@@ -147,12 +155,15 @@ export const PriorityBadges = memo(function PriorityBadges({
     excludedStepCount > 0 && totalPipelineSteps > 0 && feature.status === 'backlog';
   const allPipelinesExcluded = hasPipelineExclusions && excludedStepCount >= totalPipelineSteps;
 
+  const showPlanApproval = feature.planSpec?.status === 'generated';
+
   const showBadges =
     feature.priority ||
     showManualVerification ||
     isBlocked ||
     isJustFinished ||
-    hasPipelineExclusions;
+    hasPipelineExclusions ||
+    showPlanApproval;
 
   if (!showBadges) {
     return null;
@@ -260,6 +271,26 @@ export const PriorityBadges = memo(function PriorityBadges({
           </TooltipTrigger>
           <TooltipContent side="bottom" className="text-xs">
             <p>Agent just finished working on this feature</p>
+          </TooltipContent>
+        </Tooltip>
+      )}
+
+      {/* Plan approval badge */}
+      {showPlanApproval && (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div
+              className={cn(
+                uniformBadgeClass,
+                'bg-purple-500/20 border-purple-500/50 text-purple-500 animate-pulse'
+              )}
+              data-testid={`plan-approval-badge-${feature.id}`}
+            >
+              <FileCheck className="w-3.5 h-3.5" />
+            </div>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" className="text-xs max-w-[250px]">
+            <p>Plan ready for review - click or tap to approve</p>
           </TooltipContent>
         </Tooltip>
       )}

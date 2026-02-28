@@ -85,7 +85,10 @@ export function PlanApprovalDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-4xl" data-testid="plan-approval-dialog">
+      <DialogContent
+        className="w-full h-full max-w-full max-h-full sm:w-[90vw] sm:max-w-[900px] sm:max-h-[85dvh] sm:h-auto sm:rounded-xl rounded-none flex flex-col dialog-fullscreen-mobile"
+        data-testid="plan-approval-dialog"
+      >
         <DialogHeader>
           <DialogTitle>
             {viewOnly ? 'View Plan' : 'Review Plan'}
@@ -146,12 +149,12 @@ export function PlanApprovalDialog({
           )}
 
           {/* Plan Content */}
-          <div className="flex-1 overflow-y-auto max-h-[70vh] border border-border rounded-lg">
+          <div className="flex-1 overflow-y-auto sm:max-h-[60vh] border border-border rounded-lg">
             {isEditMode && !viewOnly ? (
               <Textarea
                 value={editedPlan}
                 onChange={(e) => setEditedPlan(e.target.value)}
-                className="min-h-[400px] h-full w-full border-0 rounded-lg resize-none font-mono text-sm"
+                className="min-h-[200px] sm:min-h-[400px] h-full w-full border-0 rounded-lg resize-none font-mono text-sm"
                 placeholder="Enter plan content..."
                 disabled={isLoading}
               />
@@ -179,17 +182,31 @@ export function PlanApprovalDialog({
           )}
         </div>
 
-        <DialogFooter className="flex-shrink-0 gap-2">
+        <DialogFooter className="flex-shrink-0 gap-2 flex-col sm:flex-row">
           {viewOnly ? (
-            <Button variant="ghost" onClick={() => onOpenChange(false)}>
+            <Button
+              variant="ghost"
+              onClick={() => onOpenChange(false)}
+              className="w-full sm:w-auto"
+            >
               Close
             </Button>
           ) : showRejectFeedback ? (
             <>
-              <Button variant="ghost" onClick={handleCancelReject} disabled={isLoading}>
+              <Button
+                variant="ghost"
+                onClick={handleCancelReject}
+                disabled={isLoading}
+                className="w-full sm:w-auto"
+              >
                 Back
               </Button>
-              <Button variant="secondary" onClick={handleReject} disabled={isLoading}>
+              <Button
+                variant="secondary"
+                onClick={handleReject}
+                disabled={isLoading}
+                className="w-full sm:w-auto"
+              >
                 {isLoading ? (
                   <Spinner size="sm" className="mr-2" />
                 ) : (
@@ -200,21 +217,26 @@ export function PlanApprovalDialog({
             </>
           ) : (
             <>
-              <Button variant="outline" onClick={handleReject} disabled={isLoading}>
+              <Button
+                variant="outline"
+                onClick={handleReject}
+                disabled={isLoading}
+                className="w-full sm:w-auto order-2 sm:order-1"
+              >
                 <RefreshCw className="w-4 h-4 mr-2" />
                 Request Changes
               </Button>
               <Button
                 onClick={handleApprove}
                 disabled={isLoading}
-                className="bg-green-600 hover:bg-green-700 text-white"
+                className="bg-green-600 hover:bg-green-700 text-white w-full sm:w-auto order-1 sm:order-2"
               >
                 {isLoading ? (
                   <Spinner size="sm" variant="foreground" className="mr-2" />
                 ) : (
                   <Check className="w-4 h-4 mr-2" />
                 )}
-                Approve
+                Approve Plan
               </Button>
             </>
           )}

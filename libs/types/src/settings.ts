@@ -1198,6 +1198,10 @@ export interface GlobalSettings {
   /** Disable the splash screen overlay on app startup */
   disableSplashScreen: boolean;
 
+  // Board Card Sorting
+  /** Default: sort latest card on top in board columns and list view. Per-project setting overrides this. Default: false */
+  defaultSortNewestCardOnTop?: boolean;
+
   // Server Logging Preferences
   /** Log level for the API server (error, warn, info, debug). Default: info */
   serverLogLevel?: ServerLogLevel;
@@ -1253,6 +1257,8 @@ export interface GlobalSettings {
   opencodeDefaultModel?: OpencodeModelId;
   /** Which dynamic OpenCode models are enabled (empty = all discovered) */
   enabledDynamicModelIds?: string[];
+  /** All dynamic model IDs ever seen - used to distinguish new models from explicitly deselected ones */
+  knownDynamicModelIds?: string[];
 
   // Gemini CLI Settings (global)
   /** Which Gemini models are available in feature modal (empty = all) */
@@ -1765,6 +1771,7 @@ export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
   defaultFeatureModel: { model: 'claude-opus', thinkingLevel: 'adaptive' }, // Use canonical ID with adaptive thinking
   muteDoneSound: false,
   disableSplashScreen: false,
+  defaultSortNewestCardOnTop: false,
   serverLogLevel: 'info',
   enableRequestLogging: true,
   showQueryDevtools: true,
@@ -1780,6 +1787,7 @@ export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
   enabledOpencodeModels: getAllOpencodeModelIds(), // Returns prefixed IDs
   opencodeDefaultModel: DEFAULT_OPENCODE_MODEL, // Already prefixed
   enabledDynamicModelIds: [],
+  knownDynamicModelIds: [],
   enabledGeminiModels: getAllGeminiModelIds(), // Returns prefixed IDs
   geminiDefaultModel: DEFAULT_GEMINI_MODEL, // Already prefixed
   enabledCopilotModels: getAllCopilotModelIds(), // Returns prefixed IDs

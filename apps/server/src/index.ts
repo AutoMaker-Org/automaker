@@ -493,7 +493,7 @@ app.use(
 );
 app.use('/api/auto-mode', createAutoModeRoutes(autoModeService));
 app.use('/api/enhance-prompt', createEnhancePromptRoutes(settingsService));
-app.use('/api/worktree', createWorktreeRoutes(events, settingsService));
+app.use('/api/worktree', createWorktreeRoutes(events, settingsService, featureLoader));
 app.use('/api/git', createGitRoutes());
 app.use('/api/models', createModelsRoutes());
 app.use('/api/spec-regeneration', createSpecRegenerationRoutes(events, settingsService));

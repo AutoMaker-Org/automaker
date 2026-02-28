@@ -168,6 +168,9 @@ export interface AppState {
   // Splash Screen Settings
   disableSplashScreen: boolean; // When true, skip showing the splash screen overlay on startup
 
+  // Board Card Sorting (global default)
+  defaultSortNewestCardOnTop: boolean; // Global default: sort latest card on top in board columns and list view
+
   // Server Log Level Settings
   serverLogLevel: ServerLogLevel; // Log level for the API server (error, warn, info, debug)
   enableRequestLogging: boolean; // Enable HTTP request logging (Morgan)
@@ -215,6 +218,7 @@ export interface AppState {
   // from `opencode models` CLI and depend on current provider authentication state
   dynamicOpencodeModels: ModelDefinition[]; // Dynamically discovered models from OpenCode CLI
   enabledDynamicModelIds: string[]; // Which dynamic models are enabled
+  knownDynamicModelIds: string[]; // All dynamic model IDs ever seen (used to avoid re-enabling explicitly deselected models)
   cachedOpencodeProviders: Array<{
     id: string;
     name: string;
@@ -574,6 +578,9 @@ export interface AppActions {
   // Splash Screen actions
   setDisableSplashScreen: (disabled: boolean) => void;
 
+  // Board Card Sorting (global default) actions
+  setDefaultSortNewestCardOnTop: (enabled: boolean) => void;
+
   // Server Log Level actions
   setServerLogLevel: (level: ServerLogLevel) => void;
   setEnableRequestLogging: (enabled: boolean) => void;
@@ -616,12 +623,16 @@ export interface AppActions {
   setCodexEnableImages: (enabled: boolean) => Promise<void>;
 
   // OpenCode CLI Settings actions
+  // Note: setOpencodeDefaultModel, toggleOpencodeModel, setEnabledDynamicModelIds, and
+  // toggleDynamicModel return Promise<void> because they persist state to the server.
+  // TODO: harmonize other provider action types (e.g., setCursorDefaultModel, toggleCursorModel,
+  // setGeminiDefaultModel) to also return Promise<void> for consistent async persistence.
   setEnabledOpencodeModels: (models: OpencodeModelId[]) => void;
-  setOpencodeDefaultModel: (model: OpencodeModelId) => void;
-  toggleOpencodeModel: (model: OpencodeModelId, enabled: boolean) => void;
+  setOpencodeDefaultModel: (model: OpencodeModelId) => Promise<void>;
+  toggleOpencodeModel: (model: OpencodeModelId, enabled: boolean) => Promise<void>;
   setDynamicOpencodeModels: (models: ModelDefinition[]) => void;
-  setEnabledDynamicModelIds: (ids: string[]) => void;
-  toggleDynamicModel: (modelId: string, enabled: boolean) => void;
+  setEnabledDynamicModelIds: (ids: string[]) => Promise<void>;
+  toggleDynamicModel: (modelId: string, enabled: boolean) => Promise<void>;
   setCachedOpencodeProviders: (
     providers: Array<{ id: string; name: string; authenticated: boolean; authMethod?: string }>
   ) => void;

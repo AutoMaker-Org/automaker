@@ -268,6 +268,7 @@ export function useBoardActions({
         status: initialStatus,
         branchName: finalBranchName,
         dependencies: featureData.dependencies || [],
+        createdAt: new Date().toISOString(),
         ...(initialStatus === 'in_progress' ? { startedAt: new Date().toISOString() } : {}),
       };
       const createdFeature = addFeature(newFeatureData);

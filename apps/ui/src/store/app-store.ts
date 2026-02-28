@@ -311,6 +311,7 @@ const initialState: AppState = {
   keyboardShortcuts: DEFAULT_KEYBOARD_SHORTCUTS,
   muteDoneSound: false,
   disableSplashScreen: false,
+  defaultSortNewestCardOnTop: false,
   serverLogLevel: 'info',
   enableRequestLogging: true,
   showQueryDevtools: true,
@@ -333,6 +334,7 @@ const initialState: AppState = {
   opencodeDefaultModel: DEFAULT_OPENCODE_MODEL,
   dynamicOpencodeModels: [],
   enabledDynamicModelIds: [],
+  knownDynamicModelIds: [],
   cachedOpencodeProviders: [],
   opencodeModelsLoading: false,
   opencodeModelsError: null,
@@ -1233,6 +1235,9 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
   // Splash Screen actions
   setDisableSplashScreen: (disabled) => set({ disableSplashScreen: disabled }),
 
+  // Board Card Sorting (global default) actions
+  setDefaultSortNewestCardOnTop: (enabled) => set({ defaultSortNewestCardOnTop: enabled }),
+
   // Server Log Level actions
   setServerLogLevel: (level) => set({ serverLogLevel: level }),
   setEnableRequestLogging: (enabled) => set({ enableRequestLogging: enabled }),
@@ -1355,21 +1360,52 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
 
   // OpenCode CLI Settings actions
   setEnabledOpencodeModels: (models) => set({ enabledOpencodeModels: models }),
-  setOpencodeDefaultModel: (model) => set({ opencodeDefaultModel: model }),
-  toggleOpencodeModel: (model, enabled) =>
+  setOpencodeDefaultModel: async (model) => {
+    set({ opencodeDefaultModel: model });
+    try {
+      const httpApi = getHttpApiClient();
+      await httpApi.settings.updateGlobal({ opencodeDefaultModel: model });
+    } catch (error) {
+      logger.error('Failed to sync opencodeDefaultModel:', error);
+    }
+  },
+  toggleOpencodeModel: async (model, enabled) => {
     set((state) => ({
       enabledOpencodeModels: enabled
-        ? [...state.enabledOpencodeModels, model]
+        ? [...new Set([...state.enabledOpencodeModels, model])]
         : state.enabledOpencodeModels.filter((m) => m !== model),
-    })),
+    }));
+    try {
+      const httpApi = getHttpApiClient();
+      await httpApi.settings.updateGlobal({ enabledOpencodeModels: get().enabledOpencodeModels });
+    } catch (error) {
+      logger.error('Failed to sync enabledOpencodeModels:', error);
+    }
+  },
   setDynamicOpencodeModels: (models) => set({ dynamicOpencodeModels: models }),
-  setEnabledDynamicModelIds: (ids) => set({ enabledDynamicModelIds: ids }),
-  toggleDynamicModel: (modelId, enabled) =>
+  setEnabledDynamicModelIds: async (ids) => {
+    const deduped = Array.from(new Set(ids));
+    set({ enabledDynamicModelIds: deduped });
+    try {
+      const httpApi = getHttpApiClient();
+      await httpApi.settings.updateGlobal({ enabledDynamicModelIds: deduped });
+    } catch (error) {
+      logger.error('Failed to sync enabledDynamicModelIds:', error);
+    }
+  },
+  toggleDynamicModel: async (modelId, enabled) => {
     set((state) => ({
       enabledDynamicModelIds: enabled
-        ? [...state.enabledDynamicModelIds, modelId]
+        ? [...new Set([...state.enabledDynamicModelIds, modelId])]
         : state.enabledDynamicModelIds.filter((id) => id !== modelId),
-    })),
+    }));
+    try {
+      const httpApi = getHttpApiClient();
+      await httpApi.settings.updateGlobal({ enabledDynamicModelIds: get().enabledDynamicModelIds });
+    } catch (error) {
+      logger.error('Failed to sync enabledDynamicModelIds:', error);
+    }
+  },
   setCachedOpencodeProviders: (providers) => set({ cachedOpencodeProviders: providers }),
 
   // Gemini CLI Settings actions
@@ -2877,13 +2913,43 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
           (m) => !m.id.startsWith(OPENCODE_BEDROCK_MODEL_PREFIX)
         );
 
+        // Auto-enable only models that are genuinely new (never seen before).
+        // Models that existed previously and were explicitly deselected by the user
+        // should NOT be re-enabled on subsequent fetches.
+        const currentEnabledIds = get().enabledDynamicModelIds;
+        const currentKnownIds = get().knownDynamicModelIds;
+        const allFetchedIds = filteredModels.map((m) => m.id);
+        // Only auto-enable models that have NEVER been seen before (not in knownDynamicModelIds)
+        const trulyNewModelIds = allFetchedIds.filter((id) => !currentKnownIds.includes(id));
+        const updatedEnabledIds =
+          trulyNewModelIds.length > 0
+            ? [...new Set([...currentEnabledIds, ...trulyNewModelIds])]
+            : currentEnabledIds;
+        // Track all discovered model IDs (union of known + newly fetched)
+        const updatedKnownIds = [...new Set([...currentKnownIds, ...allFetchedIds])];
+
         set({
           dynamicOpencodeModels: filteredModels,
+          enabledDynamicModelIds: updatedEnabledIds,
+          knownDynamicModelIds: updatedKnownIds,
           cachedOpencodeProviders: data.providers ?? [],
           opencodeModelsLoading: false,
           opencodeModelsLastFetched: now,
           opencodeModelsError: null,
         });
+
+        // Persist newly enabled model IDs and known model IDs to server settings
+        if (trulyNewModelIds.length > 0) {
+          try {
+            const httpApi = getHttpApiClient();
+            await httpApi.settings.updateGlobal({
+              enabledDynamicModelIds: updatedEnabledIds,
+              knownDynamicModelIds: updatedKnownIds,
+            });
+          } catch (syncError) {
+            logger.error('Failed to sync enabledDynamicModelIds after auto-enable:', syncError);
+          }
+        }
       } else {
         set({
           opencodeModelsLoading: false,

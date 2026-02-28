@@ -174,6 +174,7 @@ export function parseLocalStorageSettings(): Partial<GlobalSettings> | null {
       defaultRequirePlanApproval: state.defaultRequirePlanApproval as boolean,
       muteDoneSound: state.muteDoneSound as boolean,
       disableSplashScreen: state.disableSplashScreen as boolean,
+      defaultSortNewestCardOnTop: state.defaultSortNewestCardOnTop as boolean,
       enhancementModel: state.enhancementModel as GlobalSettings['enhancementModel'],
       validationModel: state.validationModel as GlobalSettings['validationModel'],
       phaseModels: state.phaseModels as GlobalSettings['phaseModels'],
@@ -685,6 +686,12 @@ export function hydrateStoreFromSettings(settings: GlobalSettings): void {
     (modelId) => !modelId.startsWith('amazon-bedrock/')
   );
 
+  const persistedKnownDynamicModelIds =
+    settings.knownDynamicModelIds ?? current.knownDynamicModelIds;
+  const sanitizedKnownDynamicModelIds = persistedKnownDynamicModelIds.filter(
+    (modelId) => !modelId.startsWith('amazon-bedrock/')
+  );
+
   // Convert ProjectRef[] to Project[] (minimal data, features will be loaded separately)
   const projects = (settings.projects ?? []).map((ref) => ({
     id: ref.id,
@@ -764,6 +771,7 @@ export function hydrateStoreFromSettings(settings: GlobalSettings): void {
     },
     muteDoneSound: settings.muteDoneSound ?? false,
     disableSplashScreen: settings.disableSplashScreen ?? false,
+    defaultSortNewestCardOnTop: settings.defaultSortNewestCardOnTop ?? false,
     serverLogLevel: settings.serverLogLevel ?? 'info',
     enableRequestLogging: settings.enableRequestLogging ?? true,
     showQueryDevtools: settings.showQueryDevtools ?? true,
@@ -777,6 +785,7 @@ export function hydrateStoreFromSettings(settings: GlobalSettings): void {
     enabledOpencodeModels: sanitizedEnabledOpencodeModels,
     opencodeDefaultModel: sanitizedOpencodeDefaultModel,
     enabledDynamicModelIds: sanitizedDynamicModelIds,
+    knownDynamicModelIds: sanitizedKnownDynamicModelIds,
     disabledProviders: settings.disabledProviders ?? [],
     enableAiCommitMessages: settings.enableAiCommitMessages ?? true,
     enableSkills: settings.enableSkills ?? true,
@@ -906,6 +915,7 @@ function buildSettingsUpdateFromStore(): Record<string, unknown> {
     defaultRequirePlanApproval: state.defaultRequirePlanApproval,
     muteDoneSound: state.muteDoneSound,
     disableSplashScreen: state.disableSplashScreen,
+    defaultSortNewestCardOnTop: state.defaultSortNewestCardOnTop,
     serverLogLevel: state.serverLogLevel,
     enableRequestLogging: state.enableRequestLogging,
     enhancementModel: state.enhancementModel,
@@ -914,6 +924,7 @@ function buildSettingsUpdateFromStore(): Record<string, unknown> {
     defaultThinkingLevel: state.defaultThinkingLevel,
     defaultReasoningEffort: state.defaultReasoningEffort,
     enabledDynamicModelIds: state.enabledDynamicModelIds,
+    knownDynamicModelIds: state.knownDynamicModelIds,
     disabledProviders: state.disabledProviders,
     enableAiCommitMessages: state.enableAiCommitMessages,
     enableSkills: state.enableSkills,

@@ -69,6 +69,7 @@ const SETTINGS_FIELDS_TO_SYNC = [
   'defaultFeatureModel',
   'muteDoneSound',
   'disableSplashScreen',
+  'defaultSortNewestCardOnTop',
   'serverLogLevel',
   'enableRequestLogging',
   'showQueryDevtools',
@@ -86,6 +87,7 @@ const SETTINGS_FIELDS_TO_SYNC = [
   'enabledCopilotModels',
   'copilotDefaultModel',
   'enabledDynamicModelIds',
+  'knownDynamicModelIds',
   'disabledProviders',
   'autoLoadClaudeMd',
   'useClaudeCodeSystemPrompt',
@@ -482,6 +484,14 @@ export function useSettingsSync(): SettingsSyncState {
         return;
       }
 
+      // If the sort preference changed, sync immediately so it survives a page refresh
+      // before the debounce timer fires (1s debounce would be lost on quick refresh).
+      if (newState.defaultSortNewestCardOnTop !== prevState.defaultSortNewestCardOnTop) {
+        logger.debug('defaultSortNewestCardOnTop changed, syncing immediately');
+        syncNow();
+        return;
+      }
+
       // If projects array changed *meaningfully*, sync immediately.
       // This is critical — projects list changes must sync right away to prevent loss
       // when switching between Electron and web modes or closing the app.
@@ -705,6 +715,12 @@ export async function refreshSettingsFromServer(): Promise<boolean> {
       (modelId) => !modelId.startsWith('amazon-bedrock/')
     );
 
+    const persistedKnownDynamicModelIds =
+      serverSettings.knownDynamicModelIds ?? currentAppState.knownDynamicModelIds;
+    const sanitizedKnownDynamicModelIds = persistedKnownDynamicModelIds.filter(
+      (modelId) => !modelId.startsWith('amazon-bedrock/')
+    );
+
     // Migrate phase models to canonical format
     const migratedPhaseModels = serverSettings.phaseModels
       ? {
@@ -788,6 +804,7 @@ export async function refreshSettingsFromServer(): Promise<boolean> {
       muteDoneSound: serverSettings.muteDoneSound,
       defaultMaxTurns: serverSettings.defaultMaxTurns ?? 10000,
       disableSplashScreen: serverSettings.disableSplashScreen ?? false,
+      defaultSortNewestCardOnTop: serverSettings.defaultSortNewestCardOnTop ?? false,
       serverLogLevel: serverSettings.serverLogLevel ?? 'info',
       enableRequestLogging: serverSettings.enableRequestLogging ?? true,
       enhancementModel: serverSettings.enhancementModel,
@@ -807,6 +824,7 @@ export async function refreshSettingsFromServer(): Promise<boolean> {
       enabledCopilotModels: sanitizedEnabledCopilotModels,
       copilotDefaultModel: sanitizedCopilotDefaultModel,
       enabledDynamicModelIds: sanitizedDynamicModelIds,
+      knownDynamicModelIds: sanitizedKnownDynamicModelIds,
       disabledProviders: serverSettings.disabledProviders ?? [],
       autoLoadClaudeMd: serverSettings.autoLoadClaudeMd ?? true,
       useClaudeCodeSystemPrompt: serverSettings.useClaudeCodeSystemPrompt ?? true,

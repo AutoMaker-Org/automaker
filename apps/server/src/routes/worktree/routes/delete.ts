@@ -10,11 +10,13 @@ import { isGitRepo } from '@automaker/git-utils';
 import { getErrorMessage, logError, isValidBranchName } from '../common.js';
 import { execGitCommand } from '../../../lib/git.js';
 import { createLogger } from '@automaker/utils';
+import type { FeatureLoader } from '../../../services/feature-loader.js';
+import type { EventEmitter } from '../../../lib/events.js';
 
 const execAsync = promisify(exec);
 const logger = createLogger('Worktree');
 
-export function createDeleteHandler() {
+export function createDeleteHandler(events: EventEmitter, featureLoader?: FeatureLoader) {
   return async (req: Request, res: Response): Promise<void> => {
     try {
       const { projectPath, worktreePath, deleteBranch } = req.body as {
@@ -134,12 +136,65 @@ export function createDeleteHandler() {
         }
       }
 
+      // Emit worktree:deleted event after successful deletion
+      events.emit('worktree:deleted', {
+        worktreePath,
+        projectPath,
+        branchName,
+        branchDeleted,
+      });
+
+      // Move features associated with the deleted branch to the main worktree
+      // This prevents features from being orphaned when a worktree is deleted
+      let featuresMovedToMain = 0;
+      if (featureLoader && branchName) {
+        try {
+          const allFeatures = await featureLoader.getAll(projectPath);
+          const affectedFeatures = allFeatures.filter((f) => f.branchName === branchName);
+          for (const feature of affectedFeatures) {
+            try {
+              await featureLoader.update(projectPath, feature.id, {
+                branchName: null,
+              });
+              featuresMovedToMain++;
+              // Emit feature:migrated event for each successfully migrated feature
+              events.emit('feature:migrated', {
+                featureId: feature.id,
+                status: 'migrated',
+                fromBranch: branchName,
+                toWorktreeId: null, // migrated to main worktree (no specific worktree)
+                projectPath,
+              });
+            } catch (featureUpdateError) {
+              // Non-fatal: log per-feature failure but continue migrating others
+              logger.warn('Failed to move feature to main worktree after deletion', {
+                error: getErrorMessage(featureUpdateError),
+                featureId: feature.id,
+                branchName,
+              });
+            }
+          }
+          if (featuresMovedToMain > 0) {
+            logger.info(
+              `Moved ${featuresMovedToMain} feature(s) to main worktree after deleting worktree with branch: ${branchName}`
+            );
+          }
+        } catch (featureError) {
+          // Non-fatal: log but don't fail the deletion (getAll failed)
+          logger.warn('Failed to load features for migration to main worktree after deletion', {
+            error: getErrorMessage(featureError),
+            branchName,
+          });
+        }
+      }
+
       res.json({
         success: true,
         deleted: {
           worktreePath,
           branch: branchDeleted ? branchName : null,
           branchDeleted,
+          featuresMovedToMain,
         },
       });
     } catch (error) {
