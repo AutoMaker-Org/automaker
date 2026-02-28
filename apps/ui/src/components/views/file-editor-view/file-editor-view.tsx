@@ -37,6 +37,7 @@ import {
   type FileTreeNode,
   type EnhancedGitFileStatus,
 } from './use-file-editor-store';
+import { normalizeLineEndings } from './file-editor-dirty-utils';
 import { FileTree } from './components/file-tree';
 import { CodeEditor, getLanguageName, type CodeEditorHandle } from './components/code-editor';
 import { EditorTabs } from './components/editor-tabs';
@@ -453,11 +454,15 @@ export function FileEditorView({ initialPath }: FileEditorViewProps) {
             return;
           }
 
+          // Normalize line endings to match CodeMirror's internal representation
+          // (\r\n → \n). This prevents a false dirty state when CodeMirror reports
+          // its already-normalized content back via onChange.
+          const normalizedContent = normalizeLineEndings(result.content);
           openTab({
             filePath,
             fileName,
-            content: result.content,
-            originalContent: result.content,
+            content: normalizedContent,
+            originalContent: normalizedContent,
             isDirty: false,
             scrollTop: 0,
             cursorLine: 1,
@@ -1229,6 +1234,37 @@ export function FileEditorView({ initialPath }: FileEditorViewProps) {
       }
     };
   }, [effectivePath, loadTree, loadGitStatus]);
+
+  // ─── Refresh persisted tabs from disk ──────────────────────
+  // After mount, re-read all persisted (non-binary, non-large) tabs from disk
+  // to sync originalContent with the actual file state. This clears stale
+  // isDirty flags caused by external file changes or serialization artifacts.
+  const hasRefreshedTabsRef = useRef(false);
+
+  useEffect(() => {
+    if (!effectivePath || hasRefreshedTabsRef.current) return;
+    const { tabs: currentTabs, refreshTabContent: refresh } = useFileEditorStore.getState();
+    if (currentTabs.length === 0) return;
+
+    hasRefreshedTabsRef.current = true;
+
+    const refreshAll = async () => {
+      const api = getElectronAPI();
+      for (const tab of currentTabs) {
+        if (tab.isBinary || tab.isTooLarge) continue;
+        try {
+          const result = await api.readFile(tab.filePath);
+          if (result.success && result.content !== undefined && !result.content.includes('\0')) {
+            refresh(tab.id, result.content);
+          }
+        } catch {
+          // File may no longer exist — leave tab state as-is
+        }
+      }
+    };
+
+    refreshAll();
+  }, [effectivePath]);
 
   // Open initial path if provided
   useEffect(() => {

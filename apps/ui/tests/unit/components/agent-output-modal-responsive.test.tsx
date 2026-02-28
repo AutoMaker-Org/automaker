@@ -56,7 +56,6 @@ describe('AgentOutputModal Responsive Behavior', () => {
       refetch: vi.fn(),
     } as ReturnType<typeof useFeature>);
 
-
     // Mock electron API
     mockGetElectronAPI.mockReturnValue(null);
   });

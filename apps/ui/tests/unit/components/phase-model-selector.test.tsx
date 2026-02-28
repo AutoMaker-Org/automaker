@@ -10,8 +10,6 @@ import fs from 'fs';
 import path from 'path';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook } from '@testing-library/react';
-import fs from 'fs';
-import path from 'path';
 import { useAppStore } from '@/store/app-store';
 
 // Mock the store

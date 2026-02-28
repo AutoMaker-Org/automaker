@@ -27,7 +27,6 @@ import { cn } from '@/lib/utils';
 import { MODAL_CONSTANTS } from '@/components/views/board-view/dialogs/agent-output-modal.constants';
 import type { AutoModeEvent } from '@/types/electron';
 import type { BacklogPlanEvent } from '@automaker/types';
-import { MODAL_CONSTANTS } from './agent-output-modal.constants';
 
 interface AgentOutputModalProps {
   open: boolean;

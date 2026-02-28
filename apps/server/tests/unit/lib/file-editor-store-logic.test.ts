@@ -287,15 +287,17 @@ describe('File editor dirty state logic', () => {
       expect(tab.isDirty).toBe(true);
     });
 
-    it('should handle line ending differences as dirty', () => {
+    it('should treat CRLF and LF line endings as equivalent (not dirty)', () => {
       let tab = {
         content: 'line1\nline2',
         originalContent: 'line1\nline2',
         isDirty: false,
       };
 
+      // CodeMirror normalizes \r\n to \n internally, so content that only
+      // differs by line endings should NOT be considered dirty.
       tab = updateTabContent(tab, 'line1\r\nline2');
-      expect(tab.isDirty).toBe(true);
+      expect(tab.isDirty).toBe(false);
     });
 
     it('should handle unicode content correctly', () => {

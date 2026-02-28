@@ -1,6 +1,10 @@
 import { create } from 'zustand';
 import { persist, type StorageValue } from 'zustand/middleware';
-import { updateTabWithContent, markTabAsSaved } from './file-editor-dirty-utils';
+import {
+  updateTabWithContent,
+  markTabAsSaved,
+  normalizeLineEndings,
+} from './file-editor-dirty-utils';
 
 export interface FileTreeNode {
   name: string;
@@ -279,12 +283,16 @@ export const useFileEditorStore = create<FileEditorState>()(
         set({
           tabs: get().tabs.map((t) => {
             if (t.id !== tabId) return t;
+            // Normalize line endings so the baseline matches CodeMirror's
+            // internal representation (\r\n → \n). Without this, files with
+            // Windows line endings would always appear dirty.
+            const normalizedDisk = normalizeLineEndings(diskContent);
             // If the editor content matches the freshly-read disk content, the file
             // is clean (any previous isDirty was a stale persisted value).
             // Otherwise keep the user's in-progress edits but update originalContent
             // so isDirty is calculated against the actual on-disk baseline.
-            const isDirty = t.content !== diskContent;
-            return { ...t, originalContent: diskContent, isDirty };
+            const isDirty = normalizeLineEndings(t.content) !== normalizedDisk;
+            return { ...t, originalContent: normalizedDisk, isDirty };
           }),
         });
       },
@@ -337,7 +345,7 @@ export const useFileEditorStore = create<FileEditorState>()(
     }),
     {
       name: STORE_NAME,
-      version: 1,
+      version: 2,
       // Only persist tab session state, not transient data (git status, file tree, drag state)
       partialize: (state) =>
         ({
@@ -354,11 +362,30 @@ export const useFileEditorStore = create<FileEditorState>()(
           try {
             const parsed = JSON.parse(raw) as StorageValue<PersistedFileEditorState>;
             if (!parsed?.state) return null;
+            // Normalize tabs: ensure originalContent is always a string. Tabs persisted
+            // before originalContent was added to the schema have originalContent=undefined,
+            // which causes isDirty=true on any content comparison. Default to content so
+            // the tab starts in a clean state.
+            // Also recalculate isDirty from content vs originalContent rather than trusting
+            // the persisted value, which can become stale (e.g. file saved externally,
+            // CodeMirror normalization, or schema migration).
+            const normalizedTabs = (parsed.state.tabs ?? []).map((tab) => {
+              const originalContent = normalizeLineEndings(
+                tab.originalContent ?? tab.content ?? ''
+              );
+              const content = tab.content ?? '';
+              return {
+                ...tab,
+                originalContent,
+                isDirty: normalizeLineEndings(content) !== originalContent,
+              };
+            });
             // Convert arrays back to Sets
             return {
               ...parsed,
               state: {
                 ...parsed.state,
+                tabs: normalizedTabs,
                 expandedFolders: new Set(parsed.state.expandedFolders ?? []),
               },
             } as unknown as StorageValue<FileEditorState>;
