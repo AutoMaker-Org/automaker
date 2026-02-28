@@ -42,6 +42,11 @@ describe('atomic-writer.ts', () => {
     // Create a temporary directory for integration tests
     tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'atomic-writer-test-'));
     vi.clearAllMocks();
+    // Default: parent directory exists (atomicWriteJson always ensures parent dir)
+    (secureFs.lstat as unknown as MockInstance).mockResolvedValue({
+      isDirectory: () => true,
+      isSymbolicLink: () => false,
+    });
   });
 
   afterEach(async () => {
@@ -173,20 +178,25 @@ describe('atomic-writer.ts', () => {
       expect((secureFs.writeFile as unknown as MockInstance).mock.calls[2][1]).toBe('123');
     });
 
-    it('should create directories when createDirs is true', async () => {
+    it('should always create parent directories before writing', async () => {
       const filePath = path.join(tempDir, 'nested', 'deep', 'test.json');
       const data = { key: 'value' };
 
+      // Mock lstat to throw ENOENT (directory doesn't exist)
+      const enoentError = new Error('Not found') as NodeJS.ErrnoException;
+      enoentError.code = 'ENOENT';
+      (secureFs.lstat as unknown as MockInstance).mockRejectedValue(enoentError);
+      (secureFs.mkdir as unknown as MockInstance).mockResolvedValue(undefined);
       (secureFs.writeFile as unknown as MockInstance).mockResolvedValue(undefined);
       (secureFs.rename as unknown as MockInstance).mockResolvedValue(undefined);
-      // Mock lstat to indicate directory already exists
-      (secureFs.lstat as unknown as MockInstance).mockResolvedValue({
-        isDirectory: () => true,
-        isSymbolicLink: () => false,
-      });
 
-      await atomicWriteJson(filePath, data, { createDirs: true });
+      await atomicWriteJson(filePath, data);
 
+      // Should have called mkdir to create parent directories
+      expect(secureFs.mkdir).toHaveBeenCalledWith(
+        path.resolve(path.join(tempDir, 'nested', 'deep')),
+        { recursive: true }
+      );
       expect(secureFs.writeFile).toHaveBeenCalled();
     });
   });

@@ -13,7 +13,14 @@ import { promisify } from 'util';
 import path from 'path';
 import * as secureFs from '../../../lib/secure-fs.js';
 import { isGitRepo } from '@automaker/git-utils';
-import { getErrorMessage, logError, normalizePath, execEnv, isGhCliAvailable } from '../common.js';
+import {
+  getErrorMessage,
+  logError,
+  normalizePath,
+  execEnv,
+  isGhCliAvailable,
+  execGitCommand,
+} from '../common.js';
 import {
   readAllWorktreeMetadata,
   updateWorktreePRInfo,
@@ -28,6 +35,22 @@ import {
 
 const execAsync = promisify(exec);
 const logger = createLogger('Worktree');
+
+/** True when git (or shell) could not be spawned (e.g. ENOENT in sandboxed CI). */
+function isSpawnENOENT(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+  const e = error as { code?: string; errno?: number; syscall?: string };
+  // Accept ENOENT with or without syscall so wrapped/reexported errors are handled.
+  // Node may set syscall to 'spawn' or 'spawn git' (or other command name).
+  if (e.code === 'ENOENT' || e.errno === -2) {
+    return (
+      e.syscall === 'spawn' ||
+      (typeof e.syscall === 'string' && e.syscall.startsWith('spawn')) ||
+      e.syscall === undefined
+    );
+  }
+  return false;
+}
 
 /**
  * Cache for GitHub remote status per project path.
@@ -77,11 +100,8 @@ async function detectConflictState(worktreePath: string): Promise<{
   conflictFiles?: string[];
 }> {
   try {
-    // Find the canonical .git directory for this worktree
-    const { stdout: gitDirRaw } = await execAsync('git rev-parse --git-dir', {
-      cwd: worktreePath,
-      timeout: 15000,
-    });
+    // Find the canonical .git directory for this worktree (execGitCommand avoids /bin/sh in CI)
+    const gitDirRaw = await execGitCommand(['rev-parse', '--git-dir'], worktreePath);
     const gitDir = path.resolve(worktreePath, gitDirRaw.trim());
 
     // Check for merge, rebase, and cherry-pick state files/directories
@@ -121,10 +141,10 @@ async function detectConflictState(worktreePath: string): Promise<{
     // Get list of conflicted files using machine-readable git status
     let conflictFiles: string[] = [];
     try {
-      const { stdout: statusOutput } = await execAsync('git diff --name-only --diff-filter=U', {
-        cwd: worktreePath,
-        timeout: 15000,
-      });
+      const statusOutput = await execGitCommand(
+        ['diff', '--name-only', '--diff-filter=U'],
+        worktreePath
+      );
       conflictFiles = statusOutput
         .trim()
         .split('\n')
@@ -146,10 +166,66 @@ async function detectConflictState(worktreePath: string): Promise<{
 
 async function getCurrentBranch(cwd: string): Promise<string> {
   try {
-    const { stdout } = await execAsync('git branch --show-current', { cwd });
+    const stdout = await execGitCommand(['branch', '--show-current'], cwd);
     return stdout.trim();
   } catch {
     return '';
+  }
+}
+
+function normalizeBranchFromHeadRef(headRef: string): string | null {
+  let normalized = headRef.trim();
+  const prefixes = ['refs/heads/', 'refs/remotes/origin/', 'refs/remotes/', 'refs/'];
+
+  for (const prefix of prefixes) {
+    if (normalized.startsWith(prefix)) {
+      normalized = normalized.slice(prefix.length);
+      break;
+    }
+  }
+
+  // Return the full branch name, including any slashes (e.g., "feature/my-branch")
+  return normalized || null;
+}
+
+/**
+ * Attempt to recover the branch name for a worktree in detached HEAD state.
+ * This happens during rebase operations where git detaches HEAD from the branch.
+ * We look at git state files (rebase-merge/head-name, rebase-apply/head-name)
+ * to determine which branch the operation is targeting.
+ *
+ * Note: merge conflicts do NOT detach HEAD, so `git worktree list --porcelain`
+ * still includes the `branch` line for merge conflicts. This recovery is
+ * specifically for rebase and cherry-pick operations.
+ */
+async function recoverBranchForDetachedWorktree(worktreePath: string): Promise<string | null> {
+  try {
+    const gitDirRaw = await execGitCommand(['rev-parse', '--git-dir'], worktreePath);
+    const gitDir = path.resolve(worktreePath, gitDirRaw.trim());
+
+    // During a rebase, the original branch is stored in rebase-merge/head-name
+    try {
+      const headNamePath = path.join(gitDir, 'rebase-merge', 'head-name');
+      const headName = (await secureFs.readFile(headNamePath, 'utf-8')) as string;
+      const branch = normalizeBranchFromHeadRef(headName);
+      if (branch) return branch;
+    } catch {
+      // Not a rebase-merge
+    }
+
+    // rebase-apply also stores the original branch in head-name
+    try {
+      const headNamePath = path.join(gitDir, 'rebase-apply', 'head-name');
+      const headName = (await secureFs.readFile(headNamePath, 'utf-8')) as string;
+      const branch = normalizeBranchFromHeadRef(headName);
+      if (branch) return branch;
+    } catch {
+      // Not a rebase-apply
+    }
+
+    return null;
+  } catch {
+    return null;
   }
 }
 
@@ -204,22 +280,36 @@ async function scanWorktreesDirectory(
             });
           } else {
             // Try to get branch from HEAD if branch --show-current fails (detached HEAD)
+            let headBranch: string | null = null;
             try {
-              const { stdout: headRef } = await execAsync('git rev-parse --abbrev-ref HEAD', {
-                cwd: worktreePath,
-              });
-              const headBranch = headRef.trim();
-              if (headBranch && headBranch !== 'HEAD') {
-                logger.info(
-                  `Discovered worktree in .worktrees/ not in git worktree list: ${entry.name} (branch: ${headBranch})`
-                );
-                discovered.push({
-                  path: normalizedPath,
-                  branch: headBranch,
-                });
+              const headRef = await execGitCommand(
+                ['rev-parse', '--abbrev-ref', 'HEAD'],
+                worktreePath
+              );
+              const ref = headRef.trim();
+              if (ref && ref !== 'HEAD') {
+                headBranch = ref;
               }
-            } catch {
-              // Can't determine branch, skip this directory
+            } catch (error) {
+              // Can't determine branch from HEAD ref (including timeout) - fall back to detached HEAD recovery
+              logger.debug(
+                `Failed to resolve HEAD ref for ${worktreePath}: ${getErrorMessage(error)}`
+              );
+            }
+
+            // If HEAD is detached (rebase/merge in progress), try recovery from git state files
+            if (!headBranch) {
+              headBranch = await recoverBranchForDetachedWorktree(worktreePath);
+            }
+
+            if (headBranch) {
+              logger.info(
+                `Discovered worktree in .worktrees/ not in git worktree list: ${entry.name} (branch: ${headBranch})`
+              );
+              discovered.push({
+                path: normalizedPath,
+                branch: headBranch,
+              });
             }
           }
         }
@@ -378,15 +468,14 @@ export function createListHandler() {
       // Get current branch in main directory
       const currentBranch = await getCurrentBranch(projectPath);
 
-      // Get actual worktrees from git
-      const { stdout } = await execAsync('git worktree list --porcelain', {
-        cwd: projectPath,
-      });
+      // Get actual worktrees from git (execGitCommand avoids /bin/sh in sandboxed CI)
+      const stdout = await execGitCommand(['worktree', 'list', '--porcelain'], projectPath);
 
       const worktrees: WorktreeInfo[] = [];
       const removedWorktrees: Array<{ path: string; branch: string }> = [];
+      let hasMissingWorktree = false;
       const lines = stdout.split('\n');
-      let current: { path?: string; branch?: string } = {};
+      let current: { path?: string; branch?: string; isDetached?: boolean } = {};
       let isFirst = true;
 
       // First pass: detect removed worktrees
@@ -395,8 +484,11 @@ export function createListHandler() {
           current.path = normalizePath(line.slice(9));
         } else if (line.startsWith('branch ')) {
           current.branch = line.slice(7).replace('refs/heads/', '');
+        } else if (line.startsWith('detached')) {
+          // Worktree is in detached HEAD state (e.g., during rebase)
+          current.isDetached = true;
         } else if (line === '') {
-          if (current.path && current.branch) {
+          if (current.path) {
             const isMainWorktree = isFirst;
             // Check if the worktree directory actually exists
             // Skip checking/pruning the main worktree (projectPath itself)
@@ -407,19 +499,37 @@ export function createListHandler() {
             } catch {
               worktreeExists = false;
             }
+
             if (!isMainWorktree && !worktreeExists) {
+              hasMissingWorktree = true;
               // Worktree directory doesn't exist - it was manually deleted
-              removedWorktrees.push({
-                path: current.path,
-                branch: current.branch,
-              });
-            } else {
-              // Worktree exists (or is main worktree), add it to the list
+              // Only add to removed list if we know the branch name
+              if (current.branch) {
+                removedWorktrees.push({
+                  path: current.path,
+                  branch: current.branch,
+                });
+              }
+            } else if (current.branch) {
+              // Normal case: worktree with a known branch
               worktrees.push({
                 path: current.path,
                 branch: current.branch,
                 isMain: isMainWorktree,
                 isCurrent: current.branch === currentBranch,
+                hasWorktree: true,
+              });
+              isFirst = false;
+            } else if (current.isDetached && worktreeExists) {
+              // Detached HEAD (e.g., rebase in progress) - try to recover branch name.
+              // This is critical: without this, worktrees undergoing rebase/merge
+              // operations would silently disappear from the UI.
+              const recoveredBranch = await recoverBranchForDetachedWorktree(current.path);
+              worktrees.push({
+                path: current.path,
+                branch: recoveredBranch || `(detached)`,
+                isMain: isMainWorktree,
+                isCurrent: false,
                 hasWorktree: true,
               });
               isFirst = false;
@@ -429,10 +539,10 @@ export function createListHandler() {
         }
       }
 
-      // Prune removed worktrees from git (only if any were detected)
-      if (removedWorktrees.length > 0) {
+      // Prune removed worktrees from git (only if any missing worktrees were detected)
+      if (hasMissingWorktree) {
         try {
-          await execAsync('git worktree prune', { cwd: projectPath });
+          await execGitCommand(['worktree', 'prune'], projectPath);
         } catch {
           // Prune failed, but we'll still report the removed worktrees
         }
@@ -461,9 +571,7 @@ export function createListHandler() {
       if (includeDetails) {
         for (const worktree of worktrees) {
           try {
-            const { stdout: statusOutput } = await execAsync('git status --porcelain', {
-              cwd: worktree.path,
-            });
+            const statusOutput = await execGitCommand(['status', '--porcelain'], worktree.path);
             const changedFiles = statusOutput
               .trim()
               .split('\n')
@@ -492,7 +600,7 @@ export function createListHandler() {
         }
       }
 
-      // Assign PR info to each worktree, preferring fresh GitHub data over cached metadata.
+      // Assign PR info to each worktree.
       // Only fetch GitHub PRs if includeDetails is requested (performance optimization).
       // Uses --state all to detect merged/closed PRs, limited to 1000 recent PRs.
       const githubPRs = includeDetails
@@ -510,14 +618,27 @@ export function createListHandler() {
         const metadata = allMetadata.get(worktree.branch);
         const githubPR = githubPRs.get(worktree.branch);
 
-        if (githubPR) {
-          // Prefer fresh GitHub data (it has the current state)
+        const metadataPR = metadata?.pr;
+        // Preserve explicit user-selected PR tracking from metadata when it differs
+        // from branch-derived GitHub PR lookup. This allows "Change PR Number" to
+        // persist instead of being overwritten by gh pr list for the branch.
+        const hasManualOverride =
+          !!metadataPR && !!githubPR && metadataPR.number !== githubPR.number;
+
+        if (hasManualOverride) {
+          worktree.pr = metadataPR;
+        } else if (githubPR) {
+          // Use fresh GitHub data when there is no explicit override.
           worktree.pr = githubPR;
 
-          // Sync metadata with GitHub state when:
-          // 1. No metadata exists for this PR (PR created externally)
-          // 2. State has changed (e.g., merged/closed on GitHub)
-          const needsSync = !metadata?.pr || metadata.pr.state !== githubPR.state;
+          // Sync metadata when missing or stale so fallback data stays current.
+          const needsSync =
+            !metadataPR ||
+            metadataPR.number !== githubPR.number ||
+            metadataPR.state !== githubPR.state ||
+            metadataPR.title !== githubPR.title ||
+            metadataPR.url !== githubPR.url ||
+            metadataPR.createdAt !== githubPR.createdAt;
           if (needsSync) {
             // Fire and forget - don't block the response
             updateWorktreePRInfo(projectPath, worktree.branch, githubPR).catch((err) => {
@@ -526,9 +647,9 @@ export function createListHandler() {
               );
             });
           }
-        } else if (metadata?.pr && metadata.pr.state === 'OPEN') {
+        } else if (metadataPR && metadataPR.state === 'OPEN') {
           // Fall back to stored metadata only if the PR is still OPEN
-          worktree.pr = metadata.pr;
+          worktree.pr = metadataPR;
         }
       }
 
@@ -538,6 +659,26 @@ export function createListHandler() {
         removedWorktrees: removedWorktrees.length > 0 ? removedWorktrees : undefined,
       });
     } catch (error) {
+      // When git is unavailable (e.g. sandboxed E2E, PATH without git), return minimal list so UI still loads
+      if (isSpawnENOENT(error)) {
+        const projectPathFromBody = (req.body as { projectPath?: string })?.projectPath;
+        const mainPath = projectPathFromBody ? normalizePath(projectPathFromBody) : undefined;
+        if (mainPath) {
+          res.json({
+            success: true,
+            worktrees: [
+              {
+                path: mainPath,
+                branch: 'main',
+                isMain: true,
+                isCurrent: true,
+                hasWorktree: true,
+              },
+            ],
+          });
+          return;
+        }
+      }
       logError(error, 'List worktrees failed');
       res.status(500).json({ success: false, error: getErrorMessage(error) });
     }

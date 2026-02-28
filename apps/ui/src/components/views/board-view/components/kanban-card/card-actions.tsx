@@ -39,7 +39,7 @@ export const CardActions = memo(function CardActions({
   feature,
   isCurrentAutoTask,
   isRunningTask = false,
-  hasContext: _hasContext,
+  hasContext = false,
   shortcutKey,
   isSelectionMode = false,
   onEdit,
@@ -54,6 +54,8 @@ export const CardActions = memo(function CardActions({
   onViewPlan,
   onApprovePlan,
 }: CardActionsProps) {
+  const showBacklogLogsButton = hasContext && !!onViewOutput;
+
   // Hide all actions when in selection mode
   if (isSelectionMode) {
     return null;
@@ -243,7 +245,7 @@ export const CardActions = memo(function CardActions({
                       onViewOutput();
                     }}
                     onPointerDown={(e) => e.stopPropagation()}
-                    data-testid={`view-output-inprogress-${feature.id}`}
+                    data-testid={`view-output-${feature.id}`}
                   >
                     <FileText className="w-3 h-3" />
                   </Button>
@@ -348,6 +350,7 @@ export const CardActions = memo(function CardActions({
       {!isCurrentAutoTask &&
         isRunningTask &&
         (feature.status === 'backlog' ||
+          feature.status === 'merge_conflict' ||
           feature.status === 'interrupted' ||
           feature.status === 'ready') && (
           <>
@@ -395,6 +398,7 @@ export const CardActions = memo(function CardActions({
       {!isCurrentAutoTask &&
         !isRunningTask &&
         (feature.status === 'backlog' ||
+          feature.status === 'merge_conflict' ||
           feature.status === 'interrupted' ||
           feature.status === 'ready') && (
           <>
@@ -412,6 +416,22 @@ export const CardActions = memo(function CardActions({
               <Edit className="w-3 h-3 mr-1" />
               Edit
             </Button>
+            {showBacklogLogsButton && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 text-xs px-2"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onViewOutput();
+                }}
+                onPointerDown={(e) => e.stopPropagation()}
+                data-testid={`view-output-backlog-${feature.id}`}
+                title="View Logs"
+              >
+                <FileText className="w-3 h-3" />
+              </Button>
+            )}
             {feature.planSpec?.content && onViewPlan && (
               <Button
                 variant="outline"
@@ -440,8 +460,12 @@ export const CardActions = memo(function CardActions({
                 onPointerDown={(e) => e.stopPropagation()}
                 data-testid={`make-${feature.id}`}
               >
-                <PlayCircle className="w-3 h-3 mr-1" />
-                Make
+                {feature.status === 'merge_conflict' ? (
+                  <RotateCcw className="w-3 h-3 mr-1" />
+                ) : (
+                  <PlayCircle className="w-3 h-3 mr-1" />
+                )}
+                {feature.status === 'merge_conflict' ? 'Restart' : 'Make'}
               </Button>
             )}
           </>

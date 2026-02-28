@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useRef, startTransition } from 'react';
+import { useEffect, useCallback, useRef, startTransition, useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAppStore } from '@/store/app-store';
 import { useWorktrees as useWorktreesQuery } from '@/hooks/queries';
@@ -26,7 +26,7 @@ export function useWorktrees({
 
   // Use the React Query hook
   const { data, isLoading, refetch } = useWorktreesQuery(projectPath);
-  const worktrees = (data?.worktrees ?? []) as WorktreeInfo[];
+  const worktrees = useMemo(() => (data?.worktrees ?? []) as WorktreeInfo[], [data?.worktrees]);
 
   // Sync worktrees to Zustand store when they change.
   // Use a ref to track the previous worktrees and skip the store update when the

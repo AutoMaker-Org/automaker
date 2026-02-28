@@ -98,6 +98,7 @@ export interface Feature {
   excludedPipelineSteps?: string[]; // Array of pipeline step IDs to skip for this feature
   thinkingLevel?: ThinkingLevel;
   reasoningEffort?: ReasoningEffort;
+  providerId?: string;
   planningMode?: PlanningMode;
   requirePlanApproval?: boolean;
   planSpec?: PlanSpec;

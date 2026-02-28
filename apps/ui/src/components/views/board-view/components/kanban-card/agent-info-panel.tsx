@@ -13,6 +13,7 @@ import { getProviderIconForModel } from '@/components/ui/provider-icon';
 import { useFeature, useAgentOutput } from '@/hooks/queries';
 import { queryKeys } from '@/lib/query-keys';
 import { getFirstNonEmptySummary } from '@/lib/summary-selection';
+import { useAppStore } from '@/store/app-store';
 
 /**
  * Formats thinking level for compact display
@@ -64,6 +65,21 @@ export const AgentInfoPanel = memo(function AgentInfoPanel({
   const queryClient = useQueryClient();
   const [isSummaryDialogOpen, setIsSummaryDialogOpen] = useState(false);
   const [isTodosExpanded, setIsTodosExpanded] = useState(false);
+
+  // Get providers from store for provider-aware model name display
+  // This allows formatModelName to show provider-specific model names (e.g., "GLM 4.7" instead of "Sonnet 4.5")
+  // when a feature was executed using a Claude-compatible provider
+  const claudeCompatibleProviders = useAppStore((state) => state.claudeCompatibleProviders);
+
+  // Memoize the format options to avoid recreating the object on every render
+  const modelFormatOptions = useMemo(
+    () => ({
+      providerId: feature.providerId,
+      claudeCompatibleProviders,
+    }),
+    [feature.providerId, claudeCompatibleProviders]
+  );
+
   // Track real-time task status updates from WebSocket events
   const [taskStatusMap, setTaskStatusMap] = useState<
     Map<string, 'pending' | 'in_progress' | 'completed'>
@@ -74,7 +90,7 @@ export const AgentInfoPanel = memo(function AgentInfoPanel({
   const [lastWsEventTimestamp, setLastWsEventTimestamp] = useState<number | null>(null);
 
   // Determine if we should poll for updates
-  const shouldFetchData = feature.status !== 'backlog';
+  const shouldFetchData = feature.status !== 'backlog' && feature.status !== 'merge_conflict';
 
   // Track whether we're receiving WebSocket events (within threshold)
   // Use a state to trigger re-renders when the WebSocket connection becomes stale
@@ -242,9 +258,7 @@ export const AgentInfoPanel = memo(function AgentInfoPanel({
     return agentInfo?.todos || [];
   }, [
     freshPlanSpec,
-    feature.planSpec?.tasks,
-    feature.planSpec?.tasksCompleted,
-    feature.planSpec?.currentTaskId,
+    feature.planSpec,
     agentInfo?.todos,
     taskStatusMap,
     taskSummaryMap,
@@ -314,7 +328,7 @@ export const AgentInfoPanel = memo(function AgentInfoPanel({
   }, [feature.id, shouldListenToEvents]);
 
   // Model/Preset Info for Backlog Cards
-  if (feature.status === 'backlog') {
+  if (feature.status === 'backlog' || feature.status === 'merge_conflict') {
     const provider = getProviderFromModel(feature.model);
     const isCodex = provider === 'codex';
     const isClaude = provider === 'claude';
@@ -327,7 +341,9 @@ export const AgentInfoPanel = memo(function AgentInfoPanel({
               const ProviderIcon = getProviderIconForModel(feature.model);
               return <ProviderIcon className="w-3 h-3" />;
             })()}
-            <span className="font-medium">{formatModelName(feature.model ?? DEFAULT_MODEL)}</span>
+            <span className="font-medium">
+              {formatModelName(feature.model ?? DEFAULT_MODEL, modelFormatOptions)}
+            </span>
           </div>
           {isClaude && feature.thinkingLevel && feature.thinkingLevel !== 'none' ? (
             <div className="flex items-center gap-1 text-purple-400">
@@ -373,7 +389,9 @@ export const AgentInfoPanel = memo(function AgentInfoPanel({
                 const ProviderIcon = getProviderIconForModel(feature.model);
                 return <ProviderIcon className="w-3 h-3" />;
               })()}
-              <span className="font-medium">{formatModelName(feature.model ?? DEFAULT_MODEL)}</span>
+              <span className="font-medium">
+                {formatModelName(feature.model ?? DEFAULT_MODEL, modelFormatOptions)}
+              </span>
             </div>
             {agentInfo?.currentPhase && (
               <div

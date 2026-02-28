@@ -23,6 +23,12 @@ const BASE_STATUS_DISPLAY: Record<string, StatusDisplay> = {
     bgClass: 'bg-[var(--status-backlog)]/15',
     borderClass: 'border-[var(--status-backlog)]/30',
   },
+  merge_conflict: {
+    label: 'Merge Conflict',
+    colorClass: 'text-[var(--status-warning)]',
+    bgClass: 'bg-[var(--status-warning)]/15',
+    borderClass: 'border-[var(--status-warning)]/30',
+  },
   in_progress: {
     label: 'In Progress',
     colorClass: 'text-[var(--status-in-progress)]',
@@ -204,6 +210,7 @@ export function getStatusLabel(
 export function getStatusOrder(status: FeatureStatusWithPipeline): number {
   const baseOrder: Record<string, number> = {
     backlog: 0,
+    merge_conflict: 0,
     in_progress: 1,
     waiting_approval: 2,
     verified: 3,

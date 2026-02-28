@@ -38,7 +38,7 @@ import {
 import {
   getPromptCustomization,
   getAutoLoadClaudeMdSetting,
-  getProviderByModelId,
+  resolveProviderContext,
 } from '../../../lib/settings-helpers.js';
 import {
   trySetValidationRunning,
@@ -64,6 +64,8 @@ interface ValidateIssueRequestBody {
   thinkingLevel?: ThinkingLevel;
   /** Reasoning effort for Codex models (ignored for non-Codex models) */
   reasoningEffort?: ReasoningEffort;
+  /** Optional Claude-compatible provider ID for custom providers (e.g., GLM, MiniMax) */
+  providerId?: string;
   /** Comments to include in validation analysis */
   comments?: GitHubComment[];
   /** Linked pull requests for this issue */
@@ -87,6 +89,7 @@ async function runValidation(
   events: EventEmitter,
   abortController: AbortController,
   settingsService?: SettingsService,
+  providerId?: string,
   comments?: ValidationComment[],
   linkedPRs?: ValidationLinkedPR[],
   thinkingLevel?: ThinkingLevel,
@@ -176,7 +179,12 @@ ${basePrompt}`;
     let credentials = await settingsService?.getCredentials();
 
     if (settingsService) {
-      const providerResult = await getProviderByModelId(model, settingsService, '[ValidateIssue]');
+      const providerResult = await resolveProviderContext(
+        settingsService,
+        model,
+        providerId,
+        '[ValidateIssue]'
+      );
       if (providerResult.provider) {
         claudeCompatibleProvider = providerResult.provider;
         providerResolvedModel = providerResult.resolvedModel;
@@ -312,9 +320,15 @@ export function createValidateIssueHandler(
         model = 'opus',
         thinkingLevel,
         reasoningEffort,
+        providerId,
         comments: rawComments,
         linkedPRs: rawLinkedPRs,
       } = req.body as ValidateIssueRequestBody;
+
+      const normalizedProviderId =
+        typeof providerId === 'string' && providerId.trim().length > 0
+          ? providerId.trim()
+          : undefined;
 
       // Transform GitHubComment[] to ValidationComment[] if provided
       const validationComments: ValidationComment[] | undefined = rawComments?.map((c) => ({
@@ -364,12 +378,14 @@ export function createValidateIssueHandler(
         isClaudeModel(model) ||
         isCursorModel(model) ||
         isCodexModel(model) ||
-        isOpencodeModel(model);
+        isOpencodeModel(model) ||
+        !!normalizedProviderId;
 
       if (!isValidModel) {
         res.status(400).json({
           success: false,
-          error: 'Invalid model. Must be a Claude, Cursor, Codex, or OpenCode model ID (or alias).',
+          error:
+            'Invalid model. Must be a Claude, Cursor, Codex, or OpenCode model ID (or alias), or provide a valid providerId for custom Claude-compatible models.',
         });
         return;
       }
@@ -398,6 +414,7 @@ export function createValidateIssueHandler(
         events,
         abortController,
         settingsService,
+        normalizedProviderId,
         validationComments,
         validationLinkedPRs,
         thinkingLevel,

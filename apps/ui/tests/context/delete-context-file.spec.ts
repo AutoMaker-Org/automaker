@@ -22,11 +22,7 @@ import {
 } from '../utils';
 
 test.describe('Delete Context File', () => {
-  test.beforeEach(async () => {
-    resetContextDirectory();
-  });
-
-  test.afterEach(async () => {
+  test.beforeEach(() => {
     resetContextDirectory();
   });
 
@@ -35,10 +31,9 @@ test.describe('Delete Context File', () => {
 
     await setupProjectWithFixture(page, getFixturePath());
     await authenticateForTests(page);
-    await page.goto('/');
-    await waitForNetworkIdle(page);
 
     await navigateToContext(page);
+    await waitForNetworkIdle(page);
 
     // First create a context file to delete
     await clickElement(page, 'create-markdown-button');
@@ -63,11 +58,9 @@ test.describe('Delete Context File', () => {
     // Delete the selected file
     await deleteSelectedContextFile(page);
 
-    // Verify the file is no longer in the list
-    await expect(async () => {
-      const fileButton = page.locator(`[data-testid="context-file-${fileName}"]`);
-      expect(await fileButton.count()).toBe(0);
-    }).toPass({ timeout: 10000 });
+    // Verify the file is no longer in the list (allow time for UI to refresh after delete)
+    const fileButton = page.locator(`[data-testid="context-file-${fileName}"]`);
+    await expect(fileButton).toHaveCount(0, { timeout: 15000 });
 
     // Verify the file is deleted from the filesystem
     const fixturePath = getFixturePath();

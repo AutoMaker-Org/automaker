@@ -689,6 +689,145 @@ export interface ProviderByModelIdResult {
   resolvedModel: string | undefined;
 }
 
+/** Result from resolveProviderContext */
+export interface ProviderContextResult {
+  /** The provider configuration */
+  provider: ClaudeCompatibleProvider | undefined;
+  /** Credentials for API key resolution */
+  credentials: Credentials | undefined;
+  /** The resolved Claude model ID for SDK configuration */
+  resolvedModel: string | undefined;
+  /** The original model config from the provider if found */
+  modelConfig: import('@automaker/types').ProviderModel | undefined;
+}
+
+/**
+ * Checks if a provider is enabled.
+ * Providers with enabled: undefined are treated as enabled (default state).
+ * Only explicitly set enabled: false means the provider is disabled.
+ */
+function isProviderEnabled(provider: ClaudeCompatibleProvider): boolean {
+  return provider.enabled !== false;
+}
+
+/**
+ * Finds a model config in a provider's models array by ID (case-insensitive).
+ */
+function findModelInProvider(
+  provider: ClaudeCompatibleProvider,
+  modelId: string
+): import('@automaker/types').ProviderModel | undefined {
+  return provider.models?.find(
+    (m) => m.id === modelId || m.id.toLowerCase() === modelId.toLowerCase()
+  );
+}
+
+/**
+ * Resolves the provider and Claude-compatible model configuration.
+ *
+ * This is the central logic for resolving provider context, supporting:
+ * 1. Explicit lookup by providerId (most reliable for persistence)
+ * 2. Fallback lookup by modelId across all enabled providers
+ * 3. Resolution of mapsToClaudeModel for SDK configuration
+ *
+ * @param settingsService - Settings service instance
+ * @param modelId - The model ID to resolve
+ * @param providerId - Optional explicit provider ID
+ * @param logPrefix - Prefix for log messages
+ * @returns Promise resolving to the provider context
+ */
+export async function resolveProviderContext(
+  settingsService: SettingsService,
+  modelId: string,
+  providerId?: string,
+  logPrefix = '[SettingsHelper]'
+): Promise<ProviderContextResult> {
+  try {
+    const globalSettings = await settingsService.getGlobalSettings();
+    const credentials = await settingsService.getCredentials();
+    const providers = globalSettings.claudeCompatibleProviders || [];
+
+    logger.debug(
+      `${logPrefix} Resolving provider context: modelId="${modelId}", providerId="${providerId ?? 'none'}", providers count=${providers.length}`
+    );
+
+    let provider: ClaudeCompatibleProvider | undefined;
+    let modelConfig: import('@automaker/types').ProviderModel | undefined;
+
+    // 1. Try resolving by explicit providerId first (most reliable)
+    if (providerId) {
+      provider = providers.find((p) => p.id === providerId);
+      if (provider) {
+        if (!isProviderEnabled(provider)) {
+          logger.warn(
+            `${logPrefix} Explicitly requested provider "${provider.name}" (${providerId}) is disabled (enabled=${provider.enabled})`
+          );
+        } else {
+          logger.debug(
+            `${logPrefix} Found provider "${provider.name}" (${providerId}), enabled=${provider.enabled ?? 'undefined (treated as enabled)'}`
+          );
+          // Find the model config within this provider to check for mappings
+          modelConfig = findModelInProvider(provider, modelId);
+          if (!modelConfig && provider.models && provider.models.length > 0) {
+            logger.debug(
+              `${logPrefix} Model "${modelId}" not found in provider "${provider.name}". Available models: ${provider.models.map((m) => m.id).join(', ')}`
+            );
+          }
+        }
+      } else {
+        logger.warn(
+          `${logPrefix} Explicitly requested provider "${providerId}" not found. Available providers: ${providers.map((p) => p.id).join(', ')}`
+        );
+      }
+    }
+
+    // 2. Fallback to model-based lookup across all providers if modelConfig not found
+    // Note: We still search even if provider was found, to get the modelConfig for mapping
+    if (!modelConfig) {
+      for (const p of providers) {
+        if (!isProviderEnabled(p) || p.id === providerId) continue; // Skip disabled or already checked
+
+        const config = findModelInProvider(p, modelId);
+
+        if (config) {
+          // Only override provider if we didn't find one by explicit ID
+          if (!provider) {
+            provider = p;
+          }
+          modelConfig = config;
+          logger.debug(`${logPrefix} Found model "${modelId}" in provider "${p.name}" (fallback)`);
+          break;
+        }
+      }
+    }
+
+    // 3. Resolve the mapped Claude model if specified
+    let resolvedModel: string | undefined;
+    if (modelConfig?.mapsToClaudeModel) {
+      const { resolveModelString } = await import('@automaker/model-resolver');
+      resolvedModel = resolveModelString(modelConfig.mapsToClaudeModel);
+      logger.debug(
+        `${logPrefix} Model "${modelId}" maps to Claude model "${modelConfig.mapsToClaudeModel}" -> "${resolvedModel}"`
+      );
+    }
+
+    // Log final result for debugging
+    logger.debug(
+      `${logPrefix} Provider context resolved: provider=${provider?.name ?? 'none'}, modelConfig=${modelConfig ? 'found' : 'not found'}, resolvedModel=${resolvedModel ?? modelId}`
+    );
+
+    return { provider, credentials, resolvedModel, modelConfig };
+  } catch (error) {
+    logger.error(`${logPrefix} Failed to resolve provider context:`, error);
+    return {
+      provider: undefined,
+      credentials: undefined,
+      resolvedModel: undefined,
+      modelConfig: undefined,
+    };
+  }
+}
+
 /**
  * Find a ClaudeCompatibleProvider by one of its model IDs.
  * Searches through all enabled providers to find one that contains the specified model.

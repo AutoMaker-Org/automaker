@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useEffect } from 'react';
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { useAppStore, Feature, FeatureImagePath } from '@/store/app-store';
 import { useShallow } from 'zustand/react/shallow';
 import { GraphView } from './graph-view';
@@ -10,7 +10,13 @@ import {
 } from './board-view/dialogs';
 import { useBoardFeatures, useBoardActions, useBoardPersistence } from './board-view/hooks';
 import { useWorktrees } from './board-view/worktree-panel/hooks';
+import {
+  WorktreeMobileDropdown,
+  BranchSwitchDropdown,
+} from './board-view/worktree-panel/components';
+import type { BranchInfo, WorktreeInfo } from './board-view/worktree-panel/types';
 import { useAutoMode } from '@/hooks/use-auto-mode';
+import { useSwitchBranch } from '@/hooks/mutations';
 import { pathsEqual } from '@/lib/utils';
 import { Spinner } from '@/components/ui/spinner';
 import { getElectronAPI } from '@/lib/electron';
@@ -51,7 +57,7 @@ export function GraphViewPage() {
   );
 
   // Ensure worktrees are loaded when landing directly on graph view
-  useWorktrees({ projectPath: currentProject?.path ?? '' });
+  const { handleSelectWorktree } = useWorktrees({ projectPath: currentProject?.path ?? '' });
 
   const worktreesByProject = useAppStore((s) => s.worktreesByProject);
   const worktrees = useMemo(
@@ -107,6 +113,181 @@ export function GraphViewPage() {
   const currentWorktreeBranch = selectedWorktree?.branch ?? null;
   const selectedWorktreeBranch =
     currentWorktreeBranch || worktrees.find((w) => w.isMain)?.branch || 'main';
+
+  const repoDefaultBranch = worktrees.find((w) => w.isMain)?.branch;
+
+  // Branch card counts
+  const branchCardCounts = useMemo(() => {
+    return hookFeatures.reduce(
+      (counts, feature) => {
+        if (feature.status !== 'completed') {
+          const branch = (feature.branchName as string | undefined) ?? repoDefaultBranch ?? 'main';
+          counts[branch] = (counts[branch] || 0) + 1;
+        }
+        return counts;
+      },
+      {} as Record<string, number>
+    );
+  }, [hookFeatures, repoDefaultBranch]);
+
+  // Graph worktree selector state
+  const [branches, setBranches] = useState<BranchInfo[]>([]);
+  const [branchFilter, setBranchFilter] = useState('');
+  const [isLoadingBranches, setIsLoadingBranches] = useState(false);
+  const switchBranchMutation = useSwitchBranch();
+  const latestLoadBranchesId = useRef(0);
+
+  const graphWorktrees = useMemo<WorktreeInfo[]>(() => {
+    return worktrees.map((worktree) => ({
+      ...worktree,
+      isCurrent: worktree.isMain
+        ? currentWorktreePath === null
+        : pathsEqual(worktree.path, currentWorktreePath ?? ''),
+      hasWorktree: worktree.hasWorktree ?? true,
+    }));
+  }, [worktrees, currentWorktreePath]);
+
+  const isWorktreeSelected = useCallback(
+    (worktree: WorktreeInfo) => {
+      return worktree.isMain
+        ? currentWorktreePath === null
+        : pathsEqual(worktree.path, currentWorktreePath ?? '');
+    },
+    [currentWorktreePath]
+  );
+
+  const selectedGraphWorktree = useMemo(
+    () => graphWorktrees.find((worktree) => isWorktreeSelected(worktree)) ?? null,
+    [graphWorktrees, isWorktreeSelected]
+  );
+
+  const filteredBranches = useMemo(() => {
+    const query = branchFilter.trim().toLowerCase();
+    if (!query) return branches;
+    return branches.filter((branch) => branch.name.toLowerCase().includes(query));
+  }, [branches, branchFilter]);
+
+  const loadBranchesForWorktree = useCallback(async (worktreePath: string) => {
+    const requestId = ++latestLoadBranchesId.current;
+    setIsLoadingBranches(true);
+    try {
+      const api = getElectronAPI();
+      if (!api?.worktree?.listBranches) {
+        if (requestId === latestLoadBranchesId.current) {
+          setBranches([]);
+          setIsLoadingBranches(false);
+        }
+        return;
+      }
+
+      const result = await api.worktree.listBranches(worktreePath, true);
+      if (requestId !== latestLoadBranchesId.current) return;
+
+      if (!result.success || !result.result?.branches) {
+        setBranches([]);
+        return;
+      }
+
+      setBranches(
+        result.result.branches.map((branch) => ({
+          name: branch.name,
+          isCurrent: branch.isCurrent,
+          isRemote: branch.isRemote,
+        }))
+      );
+    } catch (error) {
+      if (requestId !== latestLoadBranchesId.current) return;
+      logger.error('Error loading branches for graph worktree selector:', error);
+      setBranches([]);
+    } finally {
+      if (requestId === latestLoadBranchesId.current) {
+        setIsLoadingBranches(false);
+      }
+    }
+  }, []);
+
+  const handleGraphSelectWorktree = useCallback(
+    (worktree: WorktreeInfo) => {
+      const matchingWorktree = worktrees.find((candidate) =>
+        worktree.isMain
+          ? candidate.isMain
+          : !candidate.isMain && pathsEqual(candidate.path, worktree.path)
+      );
+
+      if (matchingWorktree) {
+        handleSelectWorktree(matchingWorktree);
+      }
+    },
+    [worktrees, handleSelectWorktree]
+  );
+
+  const handleBranchDropdownOpenChange = useCallback(
+    (open: boolean) => {
+      if (!open || !selectedGraphWorktree) return;
+      setBranchFilter('');
+      loadBranchesForWorktree(selectedGraphWorktree.path);
+    },
+    [selectedGraphWorktree, loadBranchesForWorktree]
+  );
+
+  const handleGraphSwitchBranch = useCallback(
+    (worktree: WorktreeInfo, branchName: string) => {
+      switchBranchMutation.mutate({
+        worktreePath: worktree.path,
+        branchName,
+      });
+    },
+    [switchBranchMutation]
+  );
+
+  const graphWorktreeSelector = useMemo(() => {
+    return (
+      <div className="flex items-center gap-2 w-full sm:w-auto">
+        <WorktreeMobileDropdown
+          worktrees={graphWorktrees}
+          isWorktreeSelected={isWorktreeSelected}
+          hasRunningFeatures={() => false}
+          isDevServerRunning={() => false}
+          isDevServerStarting={() => false}
+          getDevServerInfo={() => undefined}
+          isActivating={false}
+          branchCardCounts={branchCardCounts}
+          onSelectWorktree={handleGraphSelectWorktree}
+        />
+        {selectedGraphWorktree && (
+          <BranchSwitchDropdown
+            worktree={selectedGraphWorktree}
+            isSelected={true}
+            standalone={true}
+            branches={branches}
+            filteredBranches={filteredBranches}
+            branchFilter={branchFilter}
+            isLoadingBranches={isLoadingBranches}
+            isSwitching={switchBranchMutation.isPending}
+            onOpenChange={handleBranchDropdownOpenChange}
+            onFilterChange={setBranchFilter}
+            onSwitchBranch={handleGraphSwitchBranch}
+            onCreateBranch={() => {
+              toast.info('Create branch is available in the board worktree panel.');
+            }}
+          />
+        )}
+      </div>
+    );
+  }, [
+    graphWorktrees,
+    isWorktreeSelected,
+    branchCardCounts,
+    handleGraphSelectWorktree,
+    selectedGraphWorktree,
+    branches,
+    filteredBranches,
+    branchFilter,
+    isLoadingBranches,
+    switchBranchMutation.isPending,
+    handleBranchDropdownOpenChange,
+    handleGraphSwitchBranch,
+  ]);
 
   // Branch suggestions
   const [branchSuggestions, setBranchSuggestions] = useState<string[]>([]);
@@ -204,20 +385,6 @@ export function GraphViewPage() {
       isActive = false;
     };
   }, [currentProject, pendingBacklogPlan]);
-
-  // Branch card counts
-  const branchCardCounts = useMemo(() => {
-    return hookFeatures.reduce(
-      (counts, feature) => {
-        if (feature.status !== 'completed') {
-          const branch = (feature.branchName as string | undefined) ?? 'main';
-          counts[branch] = (counts[branch] || 0) + 1;
-        }
-        return counts;
-      },
-      {} as Record<string, number>
-    );
-  }, [hookFeatures]);
 
   // Category suggestions
   const categorySuggestions = useMemo(() => {
@@ -424,6 +591,7 @@ export function GraphViewPage() {
         hasPendingPlan={Boolean(pendingBacklogPlan)}
         planUseSelectedWorktreeBranch={planUseSelectedWorktreeBranch}
         onPlanUseSelectedWorktreeBranchChange={setPlanUseSelectedWorktreeBranch}
+        worktreeSelector={graphWorktreeSelector}
       />
 
       {/* Edit Feature Dialog */}

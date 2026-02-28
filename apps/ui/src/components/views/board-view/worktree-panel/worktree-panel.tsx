@@ -87,8 +87,9 @@ export function WorktreePanel({
   } = useWorktrees({ projectPath, refreshTrigger, onRemovedWorktrees });
 
   const {
-    isStartingDevServer,
+    isStartingAnyDevServer,
     isDevServerRunning,
+    isDevServerStarting,
     getDevServerInfo,
     handleStartDevServer,
     handleStopDevServer,
@@ -211,7 +212,6 @@ export function WorktreePanel({
   // Read store state directly inside the effect to avoid a dependency cycle
   // (the effect writes to the same state it would otherwise depend on)
   useEffect(() => {
-    const mainWt = worktrees.find((w) => w.isMain);
     const otherWts = worktrees.filter((w) => !w.isMain);
     const otherSlotCount = Math.max(0, pinnedWorktreesCount);
 
@@ -487,7 +487,7 @@ export function WorktreePanel({
             description: `Stopped tests in ${worktree.branch}`,
           });
         } else {
-          toast.error('Failed to stop tests', {
+          toast.error(result.error || 'Failed to stop tests', {
             description: result.error || 'Unknown error',
           });
         }
@@ -982,6 +982,9 @@ export function WorktreePanel({
           worktrees={worktrees}
           isWorktreeSelected={isWorktreeSelected}
           hasRunningFeatures={hasRunningFeatures}
+          isDevServerRunning={isDevServerRunning}
+          isDevServerStarting={isDevServerStarting}
+          getDevServerInfo={getDevServerInfo}
           isActivating={isActivating}
           branchCardCounts={branchCardCounts}
           onSelectWorktree={handleSelectWorktree}
@@ -1017,7 +1020,8 @@ export function WorktreePanel({
             trackingRemote={getTrackingRemote(selectedWorktree.path)}
             isPulling={isPulling}
             isPushing={isPushing}
-            isStartingDevServer={isStartingDevServer}
+            isStartingAnyDevServer={isStartingAnyDevServer}
+            isDevServerStarting={isDevServerStarting(selectedWorktree)}
             isDevServerRunning={isDevServerRunning(selectedWorktree)}
             devServerInfo={getDevServerInfo(selectedWorktree)}
             gitRepoStatus={gitRepoStatus}
@@ -1245,6 +1249,7 @@ export function WorktreePanel({
           isActivating={isActivating}
           branchCardCounts={branchCardCounts}
           isDevServerRunning={isDevServerRunning}
+          isDevServerStarting={isDevServerStarting}
           getDevServerInfo={getDevServerInfo}
           isAutoModeRunningForWorktree={isAutoModeRunningForWorktree}
           isTestRunningForWorktree={isTestRunningForWorktree}
@@ -1261,7 +1266,7 @@ export function WorktreePanel({
           onCreateBranch={onCreateBranch}
           isPulling={isPulling}
           isPushing={isPushing}
-          isStartingDevServer={isStartingDevServer}
+          isStartingAnyDevServer={isStartingAnyDevServer}
           aheadCount={aheadCount}
           behindCount={behindCount}
           hasRemoteBranch={hasRemoteBranch}
@@ -1322,6 +1327,7 @@ export function WorktreePanel({
             isRunning={hasRunningFeatures(mainWorktree)}
             isActivating={isActivating}
             isDevServerRunning={isDevServerRunning(mainWorktree)}
+            isDevServerStarting={isDevServerStarting(mainWorktree)}
             devServerInfo={getDevServerInfo(mainWorktree)}
             branches={branches}
             filteredBranches={filteredBranches}
@@ -1330,7 +1336,7 @@ export function WorktreePanel({
             isSwitching={isSwitching}
             isPulling={isPulling}
             isPushing={isPushing}
-            isStartingDevServer={isStartingDevServer}
+            isStartingAnyDevServer={isStartingAnyDevServer}
             aheadCount={aheadCount}
             behindCount={behindCount}
             hasRemoteBranch={hasRemoteBranch}
@@ -1413,6 +1419,7 @@ export function WorktreePanel({
               isRunning={hasRunningFeatures(worktree)}
               isActivating={isActivating}
               isDevServerRunning={isDevServerRunning(worktree)}
+              isDevServerStarting={isDevServerStarting(worktree)}
               devServerInfo={getDevServerInfo(worktree)}
               branches={branches}
               filteredBranches={filteredBranches}
@@ -1421,7 +1428,7 @@ export function WorktreePanel({
               isSwitching={isSwitching}
               isPulling={isPulling}
               isPushing={isPushing}
-              isStartingDevServer={isStartingDevServer}
+              isStartingAnyDevServer={isStartingAnyDevServer}
               aheadCount={aheadCount}
               behindCount={behindCount}
               hasRemoteBranch={hasRemoteBranch}

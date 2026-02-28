@@ -44,6 +44,7 @@ export interface Feature extends Omit<
   branchName?: string; // Explicit type to override BaseFeature's index signature
   thinkingLevel?: ThinkingLevel; // Explicit type to override BaseFeature's index signature
   reasoningEffort?: ReasoningEffort; // Explicit type to override BaseFeature's index signature
+  providerId?: string; // Explicit type to override BaseFeature's index signature
   summary?: string; // Explicit type to override BaseFeature's index signature
 }
 

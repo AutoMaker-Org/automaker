@@ -226,6 +226,7 @@ export function ProjectBulkReplaceDialog({
     });
 
     return [defaultFeaturePreview, ...phasePreview];
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- generatePreviewItem is stable helper
   }, [
     phaseModels,
     projectOverrides,

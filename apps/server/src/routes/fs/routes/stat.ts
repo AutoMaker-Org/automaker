@@ -35,6 +35,16 @@ export function createStatHandler() {
         return;
       }
 
+      // File or directory does not exist - return 404 so UI can handle missing paths
+      const code =
+        error && typeof error === 'object' && 'code' in error
+          ? (error as { code: string }).code
+          : '';
+      if (code === 'ENOENT') {
+        res.status(404).json({ success: false, error: 'File or directory not found' });
+        return;
+      }
+
       logError(error, 'Get file stats failed');
       res.status(500).json({ success: false, error: getErrorMessage(error) });
     }

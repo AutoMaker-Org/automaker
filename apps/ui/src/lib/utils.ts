@@ -1,6 +1,12 @@
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import type { ModelAlias, ModelProvider } from '@/store/app-store';
+import {
+  normalizeThinkingLevelForModel,
+  normalizeReasoningEffortForModel,
+  LEGACY_CLAUDE_ALIAS_MAP,
+  type PhaseModelEntry,
+} from '@automaker/types';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -11,6 +17,30 @@ export function cn(...inputs: ClassValue[]) {
 // NOTE: Using subpath export to avoid pulling in Node.js-specific dependencies
 // (the main @automaker/utils barrel imports modules that depend on @automaker/platform)
 export { getErrorMessage } from '@automaker/utils/error-handler';
+
+/**
+ * Migrate legacy model aliases to canonical prefixed IDs.
+ * Returns the canonical ID if it's a legacy alias, otherwise returns the input unchanged.
+ */
+export function migrateModelId(modelId: string | undefined): string | undefined {
+  if (!modelId) return modelId;
+  return LEGACY_CLAUDE_ALIAS_MAP[modelId as keyof typeof LEGACY_CLAUDE_ALIAS_MAP] || modelId;
+}
+
+/**
+ * Normalize a model entry by ensuring thinking levels and reasoning efforts
+ * are valid for the selected model.
+ */
+export function normalizeModelEntry(entry: PhaseModelEntry): PhaseModelEntry {
+  const model = entry.model;
+
+  return {
+    model,
+    providerId: entry.providerId,
+    thinkingLevel: normalizeThinkingLevelForModel(model, entry.thinkingLevel),
+    reasoningEffort: normalizeReasoningEffortForModel(model, entry.reasoningEffort),
+  };
+}
 
 /**
  * Determine if the current model supports extended thinking controls

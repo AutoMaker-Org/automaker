@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback, useState } from 'react';
+import { useEffect, useRef, useCallback, useState, useMemo } from 'react';
 import { useNavigate } from '@tanstack/react-router';
 import { createLogger } from '@automaker/utils/logger';
 import {
@@ -53,7 +53,7 @@ import { toast } from 'sonner';
 import { getElectronAPI } from '@/lib/electron';
 import { getApiKey, getSessionToken, getServerUrlSync } from '@/lib/http-api-client';
 import { writeToClipboard, readFromClipboard } from '@/lib/clipboard-utils';
-import { useIsMobile } from '@/hooks/use-media-query';
+import { useIsMobile, useIsTablet } from '@/hooks/use-media-query';
 import { useVirtualKeyboardResize } from '@/hooks/use-virtual-keyboard-resize';
 import { MobileTerminalShortcuts } from './mobile-terminal-shortcuts';
 import { applyStickyModifier, type StickyModifier } from './sticky-modifier-keys';
@@ -161,6 +161,8 @@ export function TerminalPanel({
   const [isImageDragOver, setIsImageDragOver] = useState(false);
   const [isProcessingImage, setIsProcessingImage] = useState(false);
   const hasRunInitialCommandRef = useRef(false);
+  const runCommandOnConnectRef = useRef(runCommandOnConnect);
+  const onCommandRanRef = useRef(onCommandRan);
   // Long-press timer for mobile context menu
   const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
   const longPressTouchStartRef = useRef<{ x: number; y: number } | null>(null);
@@ -175,6 +177,9 @@ export function TerminalPanel({
   const [searchQuery, setSearchQuery] = useState('');
   const showSearchRef = useRef(false);
   const [isAtBottom, setIsAtBottom] = useState(true);
+
+  runCommandOnConnectRef.current = runCommandOnConnect;
+  onCommandRanRef.current = onCommandRan;
 
   // Mobile text selection mode - renders terminal buffer as selectable DOM text
   const [isSelectMode, setIsSelectMode] = useState(false);
@@ -192,8 +197,10 @@ export function TerminalPanel({
   const INITIAL_RECONNECT_DELAY = 1000;
   const [processExitCode, setProcessExitCode] = useState<number | null>(null);
 
-  // Detect mobile viewport for shortcuts bar
+  // Detect mobile/tablet viewport for shortcuts bar
   const isMobile = useIsMobile();
+  const isTablet = useIsTablet();
+  const showShortcutsBar = isMobile || isTablet;
 
   // Track virtual keyboard height on mobile to prevent overlap
   const { keyboardHeight, isKeyboardOpen } = useVirtualKeyboardResize();
@@ -514,18 +521,21 @@ export function TerminalPanel({
 
   // Get theme colors for search highlighting
   const terminalTheme = getTerminalTheme(effectiveTheme);
-  const searchOptions = {
-    caseSensitive: false,
-    regex: false,
-    decorations: {
-      matchBackground: terminalTheme.searchMatchBackground,
-      matchBorder: terminalTheme.searchMatchBorder,
-      matchOverviewRuler: terminalTheme.searchMatchBorder,
-      activeMatchBackground: terminalTheme.searchActiveMatchBackground,
-      activeMatchBorder: terminalTheme.searchActiveMatchBorder,
-      activeMatchColorOverviewRuler: terminalTheme.searchActiveMatchBorder,
-    },
-  };
+  const searchOptions = useMemo(
+    () => ({
+      caseSensitive: false,
+      regex: false,
+      decorations: {
+        matchBackground: terminalTheme.searchMatchBackground,
+        matchBorder: terminalTheme.searchMatchBorder,
+        matchOverviewRuler: terminalTheme.searchMatchBorder,
+        activeMatchBackground: terminalTheme.searchActiveMatchBackground,
+        activeMatchBorder: terminalTheme.searchActiveMatchBorder,
+        activeMatchColorOverviewRuler: terminalTheme.searchActiveMatchBorder,
+      },
+    }),
+    [terminalTheme]
+  );
 
   // Search functions
   const searchNext = useCallback(() => {
@@ -1207,8 +1217,9 @@ export function TerminalPanel({
               }
               // Run initial command if specified and not already run
               // Only run for new terminals (no scrollback received)
+              const initialCommand = runCommandOnConnectRef.current;
               if (
-                runCommandOnConnect &&
+                initialCommand &&
                 !hasRunInitialCommandRef.current &&
                 ws.readyState === WebSocket.OPEN
               ) {
@@ -1222,10 +1233,8 @@ export function TerminalPanel({
 
                 setTimeout(() => {
                   if (ws.readyState === WebSocket.OPEN) {
-                    ws.send(
-                      JSON.stringify({ type: 'input', data: runCommandOnConnect + lineEnding })
-                    );
-                    onCommandRan?.();
+                    ws.send(JSON.stringify({ type: 'input', data: initialCommand + lineEnding }));
+                    onCommandRanRef.current?.();
                   }
                 }, delay);
               }
@@ -1506,21 +1515,36 @@ export function TerminalPanel({
   }, [fontSize, isTerminalReady]);
 
   // Update terminal theme when app theme or custom colors change (including system preference)
+  // We read directly from the store to ensure we have the latest values, avoiding potential
+  // stale closure issues with the useShallow subscription when the terminal first becomes ready.
+  // The dependency array includes the subscription values to trigger the effect when colors change,
+  // but we read from getState() inside to guarantee we always have the most current values.
   useEffect(() => {
     if (xtermRef.current && isTerminalReady) {
       // Clear any search decorations first to prevent stale color artifacts
       searchAddonRef.current?.clearDecorations();
       const baseTheme = getTerminalTheme(resolvedTheme);
+
+      // Read colors directly from store to ensure we have the latest values.
+      // This fixes a race condition where the terminal might be created before
+      // settings are fully hydrated from the server. We prioritize store values
+      // over subscription values to avoid stale closures.
+      const storeState = useAppStore.getState().terminalState;
+      const customBgColor = storeState.customBackgroundColor;
+      const customFgColor = storeState.customForegroundColor;
+
       const terminalTheme =
-        customBackgroundColor || customForegroundColor
+        customBgColor || customFgColor
           ? {
               ...baseTheme,
-              ...(customBackgroundColor && { background: customBackgroundColor }),
-              ...(customForegroundColor && { foreground: customForegroundColor }),
+              ...(customBgColor && { background: customBgColor }),
+              ...(customFgColor && { foreground: customFgColor }),
             }
           : baseTheme;
       xtermRef.current.options.theme = terminalTheme;
     }
+    // Note: customBackgroundColor and customForegroundColor are in dependencies to trigger
+    // re-renders when colors change, but we read from getState() inside for actual values
   }, [resolvedTheme, customBackgroundColor, customForegroundColor, isTerminalReady]);
 
   // Handle keyboard shortcuts for zoom (Ctrl+Plus, Ctrl+Minus, Ctrl+0)
@@ -1588,7 +1612,7 @@ export function TerminalPanel({
   }, [zoomIn, zoomOut]);
 
   // Context menu actions for keyboard navigation
-  const menuActions = ['copy', 'paste', 'selectAll', 'clear'] as const;
+  const menuActions = useMemo(() => ['copy', 'paste', 'selectAll', 'clear'] as const, []);
 
   // Keep ref in sync with state for use in event handlers
   useEffect(() => {
@@ -1658,7 +1682,7 @@ export function TerminalPanel({
       document.removeEventListener('scroll', handleScroll, true);
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [contextMenu, closeContextMenu, handleContextMenuAction]);
+  }, [contextMenu, closeContextMenu, handleContextMenuAction, menuActions]);
 
   // Focus the correct menu item when navigation changes
   useEffect(() => {
@@ -1667,16 +1691,16 @@ export function TerminalPanel({
     buttons[focusedMenuIndex]?.focus();
   }, [focusedMenuIndex, contextMenu]);
 
-  // Reset select mode when viewport transitions from mobile to non-mobile.
-  // The select-mode overlay is only rendered when (isSelectMode && isMobile), so if the
-  // viewport becomes non-mobile while isSelectMode is true the overlay disappears but the
+  // Reset select mode when viewport transitions away from shortcuts-bar viewports.
+  // The select-mode overlay is only rendered when (isSelectMode && showShortcutsBar), so if the
+  // viewport no longer shows the shortcuts bar while isSelectMode is true the overlay disappears but the
   // state is left dirty with no UI to clear it. Resetting here keeps state consistent.
   useEffect(() => {
-    if (!isMobile && isSelectMode) {
+    if (!showShortcutsBar && isSelectMode) {
       setIsSelectMode(false);
       setSelectModeText('');
     }
-  }, [isMobile]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [showShortcutsBar, isSelectMode]);
 
   // Handle right-click context menu with boundary checking
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
@@ -2398,8 +2422,8 @@ export function TerminalPanel({
         </div>
       )}
 
-      {/* Mobile shortcuts bar - special keys, clipboard, and arrow keys for touch devices */}
-      {isMobile && (
+      {/* Mobile/tablet shortcuts bar - special keys, clipboard, and arrow keys for touch devices */}
+      {showShortcutsBar && (
         <MobileTerminalShortcuts
           onSendInput={sendTerminalInput}
           isConnected={connectionStatus === 'connected'}
@@ -2443,7 +2467,7 @@ export function TerminalPanel({
             Overlays the canvas so users can use native touch selection on real DOM text.
             xterm.js renders to a <canvas>, which prevents native text selection on mobile.
             This overlay shows the same content as real DOM text that supports touch selection. */}
-        {isSelectMode && isMobile && (
+        {isSelectMode && showShortcutsBar && (
           <div className="absolute inset-0 z-30 flex flex-col">
             {/* Header bar with copy/done actions */}
             <div className="flex items-center justify-between px-3 py-2 bg-brand-500/95 backdrop-blur-sm text-white shrink-0">

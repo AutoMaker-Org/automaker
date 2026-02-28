@@ -230,6 +230,7 @@ export function InterviewView() {
         });
       }
     }, 500);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- generateSpec is stable
   }, [input, isGenerating, isComplete, currentQuestionIndex, interviewData]);
 
   const generateSpec = useCallback(async (data: InterviewState) => {

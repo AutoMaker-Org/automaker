@@ -13,6 +13,8 @@ import path from 'path';
 import net from 'net';
 import { createLogger } from '@automaker/utils';
 import type { EventEmitter } from '../lib/events.js';
+import fs from 'fs/promises';
+import { constants } from 'fs';
 
 const logger = createLogger('DevServerService');
 
@@ -110,6 +112,21 @@ export interface DevServerInfo {
   urlDetected: boolean;
   // Timer for URL detection timeout fallback
   urlDetectionTimeout: NodeJS.Timeout | null;
+  // Custom command used to start the server
+  customCommand?: string;
+}
+
+/**
+ * Persistable subset of DevServerInfo for survival across server restarts
+ */
+interface PersistedDevServerInfo {
+  worktreePath: string;
+  allocatedPort: number;
+  port: number;
+  url: string;
+  startedAt: string;
+  urlDetected: boolean;
+  customCommand?: string;
 }
 
 // Port allocation starts at 3001 to avoid conflicts with common dev ports
@@ -121,8 +138,20 @@ const LIVERELOAD_PORTS = [35729, 35730, 35731] as const;
 
 class DevServerService {
   private runningServers: Map<string, DevServerInfo> = new Map();
+  private startingServers: Set<string> = new Set();
   private allocatedPorts: Set<number> = new Set();
   private emitter: EventEmitter | null = null;
+  private dataDir: string | null = null;
+  private saveQueue: Promise<void> = Promise.resolve();
+
+  /**
+   * Initialize the service with data directory for persistence
+   */
+  async initialize(dataDir: string, emitter: EventEmitter): Promise<void> {
+    this.dataDir = dataDir;
+    this.emitter = emitter;
+    await this.loadState();
+  }
 
   /**
    * Set the event emitter for streaming log events
@@ -130,6 +159,131 @@ class DevServerService {
    */
   setEventEmitter(emitter: EventEmitter): void {
     this.emitter = emitter;
+  }
+
+  /**
+   * Save the current state of running servers to disk
+   */
+  private async saveState(): Promise<void> {
+    if (!this.dataDir) return;
+
+    // Queue the save operation to prevent concurrent writes
+    this.saveQueue = this.saveQueue
+      .then(async () => {
+        if (!this.dataDir) return;
+        try {
+          const statePath = path.join(this.dataDir, 'dev-servers.json');
+          const persistedInfo: PersistedDevServerInfo[] = Array.from(
+            this.runningServers.values()
+          ).map((s) => ({
+            worktreePath: s.worktreePath,
+            allocatedPort: s.allocatedPort,
+            port: s.port,
+            url: s.url,
+            startedAt: s.startedAt.toISOString(),
+            urlDetected: s.urlDetected,
+            customCommand: s.customCommand,
+          }));
+
+          await fs.writeFile(statePath, JSON.stringify(persistedInfo, null, 2));
+          logger.debug(`Saved dev server state to ${statePath}`);
+        } catch (error) {
+          logger.error('Failed to save dev server state:', error);
+        }
+      })
+      .catch((error) => {
+        logger.error('Error in save queue:', error);
+      });
+
+    return this.saveQueue;
+  }
+
+  /**
+   * Load the state of running servers from disk
+   */
+  private async loadState(): Promise<void> {
+    if (!this.dataDir) return;
+
+    try {
+      const statePath = path.join(this.dataDir, 'dev-servers.json');
+      try {
+        await fs.access(statePath, constants.F_OK);
+      } catch {
+        // File doesn't exist, which is fine
+        return;
+      }
+
+      const content = await fs.readFile(statePath, 'utf-8');
+      const rawParsed: unknown = JSON.parse(content);
+
+      if (!Array.isArray(rawParsed)) {
+        logger.warn('Dev server state file is not an array, skipping load');
+        return;
+      }
+
+      const persistedInfo: PersistedDevServerInfo[] = rawParsed.filter((entry: unknown) => {
+        if (entry === null || typeof entry !== 'object') {
+          logger.warn('Dropping invalid dev server entry (not an object):', entry);
+          return false;
+        }
+        const e = entry as Record<string, unknown>;
+        const valid =
+          typeof e.worktreePath === 'string' &&
+          e.worktreePath.length > 0 &&
+          typeof e.allocatedPort === 'number' &&
+          Number.isInteger(e.allocatedPort) &&
+          e.allocatedPort >= 1 &&
+          e.allocatedPort <= 65535 &&
+          typeof e.port === 'number' &&
+          Number.isInteger(e.port) &&
+          e.port >= 1 &&
+          e.port <= 65535 &&
+          typeof e.url === 'string' &&
+          typeof e.startedAt === 'string' &&
+          typeof e.urlDetected === 'boolean' &&
+          (e.customCommand === undefined || typeof e.customCommand === 'string');
+        if (!valid) {
+          logger.warn('Dropping malformed dev server entry:', e);
+        }
+        return valid;
+      }) as PersistedDevServerInfo[];
+
+      logger.info(`Loading ${persistedInfo.length} dev servers from state`);
+
+      for (const info of persistedInfo) {
+        // Check if the process is still running on the port
+        // Since we can't reliably re-attach to the process for output,
+        // we'll just check if the port is in use.
+        const portInUse = !(await this.isPortAvailable(info.port));
+
+        if (portInUse) {
+          logger.info(`Re-attached to dev server on port ${info.port} for ${info.worktreePath}`);
+          const serverInfo: DevServerInfo = {
+            ...info,
+            startedAt: new Date(info.startedAt),
+            process: null, // Process object is lost, but we know it's running
+            scrollbackBuffer: '',
+            outputBuffer: '',
+            flushTimeout: null,
+            stopping: false,
+            urlDetectionTimeout: null,
+          };
+          this.runningServers.set(info.worktreePath, serverInfo);
+          this.allocatedPorts.add(info.allocatedPort);
+        } else {
+          logger.info(
+            `Dev server on port ${info.port} for ${info.worktreePath} is no longer running`
+          );
+        }
+      }
+
+      // Cleanup stale entries from the file if any
+      if (this.runningServers.size !== persistedInfo.length) {
+        await this.saveState();
+      }
+    } catch (error) {
+      logger.error('Failed to load dev server state:', error);
+    }
   }
 
   /**
@@ -148,6 +302,10 @@ class DevServerService {
     // been mutated by detectUrlFromOutput to reflect the actual detected port.
     this.allocatedPorts.delete(server.allocatedPort);
     this.runningServers.delete(worktreePath);
+
+    // Persist state change
+    this.saveState().catch((err) => logger.error('Failed to save state in pruneStaleServer:', err));
+
     if (this.emitter) {
       this.emitter.emit('dev-server:stopped', {
         worktreePath,
@@ -249,7 +407,7 @@ class DevServerService {
    * - PHP: "Development Server (http://localhost:8000) started"
    * - Generic: Any localhost URL with a port
    */
-  private detectUrlFromOutput(server: DevServerInfo, content: string): void {
+  private async detectUrlFromOutput(server: DevServerInfo, content: string): Promise<void> {
     // Skip if URL already detected
     if (server.urlDetected) {
       return;
@@ -304,6 +462,11 @@ class DevServerService {
 
           logger.info(`Detected server URL via ${description}: ${detectedUrl}`);
 
+          // Persist state change
+          await this.saveState().catch((err) =>
+            logger.error('Failed to save state in detectUrlFromOutput:', err)
+          );
+
           // Emit URL update event
           if (this.emitter) {
             this.emitter.emit('dev-server:url-detected', {
@@ -346,6 +509,11 @@ class DevServerService {
 
           logger.info(`Detected server port via ${description}: ${detectedPort} → ${detectedUrl}`);
 
+          // Persist state change
+          await this.saveState().catch((err) =>
+            logger.error('Failed to save state in detectUrlFromOutput Phase 2:', err)
+          );
+
           // Emit URL update event
           if (this.emitter) {
             this.emitter.emit('dev-server:url-detected', {
@@ -365,7 +533,7 @@ class DevServerService {
    * Handle incoming stdout/stderr data from dev server process
    * Buffers data for scrollback replay and schedules throttled emission
    */
-  private handleProcessOutput(server: DevServerInfo, data: Buffer): void {
+  private async handleProcessOutput(server: DevServerInfo, data: Buffer): Promise<void> {
     // Skip output if server is stopping
     if (server.stopping) {
       return;
@@ -374,7 +542,7 @@ class DevServerService {
     const content = data.toString();
 
     // Try to detect actual server URL from output
-    this.detectUrlFromOutput(server, content);
+    await this.detectUrlFromOutput(server, content);
 
     // Append to scrollback buffer for replay on reconnect
     this.appendToScrollback(server, content);
@@ -594,261 +762,305 @@ class DevServerService {
     };
     error?: string;
   }> {
-    // Check if already running
-    if (this.runningServers.has(worktreePath)) {
-      const existing = this.runningServers.get(worktreePath)!;
-      return {
-        success: true,
-        result: {
-          worktreePath: existing.worktreePath,
-          port: existing.port,
-          url: existing.url,
-          message: `Dev server already running on port ${existing.port}`,
-        },
-      };
-    }
-
-    // Verify the worktree exists
-    if (!(await this.fileExists(worktreePath))) {
+    // Check if already running or starting
+    if (this.runningServers.has(worktreePath) || this.startingServers.has(worktreePath)) {
+      const existing = this.runningServers.get(worktreePath);
+      if (existing) {
+        return {
+          success: true,
+          result: {
+            worktreePath: existing.worktreePath,
+            port: existing.port,
+            url: existing.url,
+            message: `Dev server already running on port ${existing.port}`,
+          },
+        };
+      }
       return {
         success: false,
-        error: `Worktree path does not exist: ${worktreePath}`,
+        error: 'Dev server is already starting',
       };
     }
 
-    // Determine the dev command to use
-    let devCommand: { cmd: string; args: string[] };
+    this.startingServers.add(worktreePath);
 
-    // Normalize custom command: trim whitespace and treat empty strings as undefined
-    const normalizedCustomCommand = customCommand?.trim();
-
-    if (normalizedCustomCommand) {
-      // Use the provided custom command
-      devCommand = this.parseCustomCommand(normalizedCustomCommand);
-      if (!devCommand.cmd) {
-        return {
-          success: false,
-          error: 'Invalid custom command: command cannot be empty',
-        };
-      }
-      logger.debug(`Using custom command: ${normalizedCustomCommand}`);
-    } else {
-      // Check for package.json when auto-detecting
-      const packageJsonPath = path.join(worktreePath, 'package.json');
-      if (!(await this.fileExists(packageJsonPath))) {
-        return {
-          success: false,
-          error: `No package.json found in: ${worktreePath}`,
-        };
-      }
-
-      // Get dev command from package manager detection
-      const detectedCommand = await this.getDevCommand(worktreePath);
-      if (!detectedCommand) {
-        return {
-          success: false,
-          error: `Could not determine dev command for: ${worktreePath}`,
-        };
-      }
-      devCommand = detectedCommand;
-    }
-
-    // Find available port
-    let port: number;
     try {
-      port = await this.findAvailablePort();
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Port allocation failed',
-      };
-    }
-
-    // Reserve the port (port was already force-killed in findAvailablePort)
-    this.allocatedPorts.add(port);
-
-    // Also kill common related ports (livereload, etc.)
-    // Some dev servers use fixed ports for HMR/livereload regardless of main port
-    for (const relatedPort of LIVERELOAD_PORTS) {
-      this.killProcessOnPort(relatedPort);
-    }
-
-    // Small delay to ensure related ports are freed
-    await new Promise((resolve) => setTimeout(resolve, 100));
-
-    logger.info(`Starting dev server on port ${port}`);
-    logger.debug(`Working directory (cwd): ${worktreePath}`);
-    logger.debug(`Command: ${devCommand.cmd} ${devCommand.args.join(' ')} with PORT=${port}`);
-
-    // Spawn the dev process with PORT environment variable
-    // FORCE_COLOR enables colored output even when not running in a TTY
-    const env = {
-      ...process.env,
-      PORT: String(port),
-      FORCE_COLOR: '1',
-      // Some tools use these additional env vars for color detection
-      COLORTERM: 'truecolor',
-      TERM: 'xterm-256color',
-    };
-
-    const devProcess = spawn(devCommand.cmd, devCommand.args, {
-      cwd: worktreePath,
-      env,
-      stdio: ['ignore', 'pipe', 'pipe'],
-      detached: false,
-    });
-
-    // Track if process failed early using object to work around TypeScript narrowing
-    const status = { error: null as string | null, exited: false };
-
-    // Create server info early so we can reference it in handlers
-    // We'll add it to runningServers after verifying the process started successfully
-    const hostname = process.env.HOSTNAME || 'localhost';
-    const serverInfo: DevServerInfo = {
-      worktreePath,
-      allocatedPort: port, // Immutable: records which port we reserved; never changed after this point
-      port,
-      url: `http://${hostname}:${port}`, // Initial URL, may be updated by detectUrlFromOutput
-      process: devProcess,
-      startedAt: new Date(),
-      scrollbackBuffer: '',
-      outputBuffer: '',
-      flushTimeout: null,
-      stopping: false,
-      urlDetected: false, // Will be set to true when actual URL is detected from output
-      urlDetectionTimeout: null, // Will be set after server starts successfully
-    };
-
-    // Capture stdout with buffer management and event emission
-    if (devProcess.stdout) {
-      devProcess.stdout.on('data', (data: Buffer) => {
-        this.handleProcessOutput(serverInfo, data);
-      });
-    }
-
-    // Capture stderr with buffer management and event emission
-    if (devProcess.stderr) {
-      devProcess.stderr.on('data', (data: Buffer) => {
-        this.handleProcessOutput(serverInfo, data);
-      });
-    }
-
-    // Helper to clean up resources and emit stop event
-    const cleanupAndEmitStop = (exitCode: number | null, errorMessage?: string) => {
-      if (serverInfo.flushTimeout) {
-        clearTimeout(serverInfo.flushTimeout);
-        serverInfo.flushTimeout = null;
+      // Verify the worktree exists
+      if (!(await this.fileExists(worktreePath))) {
+        return {
+          success: false,
+          error: `Worktree path does not exist: ${worktreePath}`,
+        };
       }
 
-      // Clear URL detection timeout to prevent stale fallback emission
-      if (serverInfo.urlDetectionTimeout) {
-        clearTimeout(serverInfo.urlDetectionTimeout);
-        serverInfo.urlDetectionTimeout = null;
+      // Determine the dev command to use
+      let devCommand: { cmd: string; args: string[] };
+
+      // Normalize custom command: trim whitespace and treat empty strings as undefined
+      const normalizedCustomCommand = customCommand?.trim();
+
+      if (normalizedCustomCommand) {
+        // Use the provided custom command
+        devCommand = this.parseCustomCommand(normalizedCustomCommand);
+        if (!devCommand.cmd) {
+          return {
+            success: false,
+            error: 'Invalid custom command: command cannot be empty',
+          };
+        }
+        logger.debug(`Using custom command: ${normalizedCustomCommand}`);
+      } else {
+        // Check for package.json when auto-detecting
+        const packageJsonPath = path.join(worktreePath, 'package.json');
+        if (!(await this.fileExists(packageJsonPath))) {
+          return {
+            success: false,
+            error: `No package.json found in: ${worktreePath}`,
+          };
+        }
+
+        // Get dev command from package manager detection
+        const detectedCommand = await this.getDevCommand(worktreePath);
+        if (!detectedCommand) {
+          return {
+            success: false,
+            error: `Could not determine dev command for: ${worktreePath}`,
+          };
+        }
+        devCommand = detectedCommand;
       }
 
-      // Emit stopped event (only if not already stopping - prevents duplicate events)
-      if (this.emitter && !serverInfo.stopping) {
-        this.emitter.emit('dev-server:stopped', {
+      // Find available port
+      let port: number;
+      try {
+        port = await this.findAvailablePort();
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Port allocation failed',
+        };
+      }
+
+      // Reserve the port (port was already force-killed in findAvailablePort)
+      this.allocatedPorts.add(port);
+
+      // Also kill common related ports (livereload, etc.)
+      // Some dev servers use fixed ports for HMR/livereload regardless of main port
+      for (const relatedPort of LIVERELOAD_PORTS) {
+        this.killProcessOnPort(relatedPort);
+      }
+
+      // Small delay to ensure related ports are freed
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      logger.info(`Starting dev server on port ${port}`);
+      logger.debug(`Working directory (cwd): ${worktreePath}`);
+      logger.debug(`Command: ${devCommand.cmd} ${devCommand.args.join(' ')} with PORT=${port}`);
+
+      // Emit starting only after preflight checks pass to avoid dangling starting state.
+      if (this.emitter) {
+        this.emitter.emit('dev-server:starting', {
           worktreePath,
-          port: serverInfo.port, // Use the detected port (may differ from allocated port if detectUrlFromOutput updated it)
-          exitCode,
-          error: errorMessage,
           timestamp: new Date().toISOString(),
         });
       }
 
-      this.allocatedPorts.delete(serverInfo.allocatedPort);
-      this.runningServers.delete(worktreePath);
-    };
-
-    devProcess.on('error', (error) => {
-      logger.error(`Process error:`, error);
-      status.error = error.message;
-      cleanupAndEmitStop(null, error.message);
-    });
-
-    devProcess.on('exit', (code) => {
-      logger.info(`Process for ${worktreePath} exited with code ${code}`);
-      status.exited = true;
-      cleanupAndEmitStop(code);
-    });
-
-    // Wait a moment to see if the process fails immediately
-    await new Promise((resolve) => setTimeout(resolve, 500));
-
-    if (status.error) {
-      return {
-        success: false,
-        error: `Failed to start dev server: ${status.error}`,
+      // Spawn the dev process with PORT environment variable
+      // FORCE_COLOR enables colored output even when not running in a TTY
+      const env = {
+        ...process.env,
+        PORT: String(port),
+        FORCE_COLOR: '1',
+        // Some tools use these additional env vars for color detection
+        COLORTERM: 'truecolor',
+        TERM: 'xterm-256color',
       };
-    }
 
-    if (status.exited) {
-      return {
-        success: false,
-        error: `Dev server process exited immediately. Check server logs for details.`,
-      };
-    }
-
-    // Server started successfully - add to running servers map
-    this.runningServers.set(worktreePath, serverInfo);
-
-    // Emit started event for WebSocket subscribers
-    if (this.emitter) {
-      this.emitter.emit('dev-server:started', {
-        worktreePath,
-        port,
-        url: serverInfo.url,
-        timestamp: new Date().toISOString(),
+      const devProcess = spawn(devCommand.cmd, devCommand.args, {
+        cwd: worktreePath,
+        env,
+        stdio: ['ignore', 'pipe', 'pipe'],
+        detached: false,
       });
-    }
 
-    // Set up URL detection timeout fallback.
-    // If URL detection hasn't succeeded after URL_DETECTION_TIMEOUT_MS, check if
-    // the allocated port is actually in use (server probably started successfully)
-    // and emit a url-detected event with the allocated port as fallback.
-    // Also re-scan the scrollback buffer in case the URL was printed before
-    // our patterns could match (e.g., it was split across multiple data chunks).
-    serverInfo.urlDetectionTimeout = setTimeout(() => {
-      serverInfo.urlDetectionTimeout = null;
+      // Track if process failed early using object to work around TypeScript narrowing
+      const status = { error: null as string | null, exited: false };
 
-      // Only run fallback if server is still running and URL wasn't detected
-      if (serverInfo.stopping || serverInfo.urlDetected || !this.runningServers.has(worktreePath)) {
-        return;
+      // Create server info early so we can reference it in handlers
+      // We'll add it to runningServers after verifying the process started successfully
+      const fallbackHost = 'localhost';
+      const serverInfo: DevServerInfo = {
+        worktreePath,
+        allocatedPort: port, // Immutable: records which port we reserved; never changed after this point
+        port,
+        url: `http://${fallbackHost}:${port}`, // Initial URL, may be updated by detectUrlFromOutput
+        process: devProcess,
+        startedAt: new Date(),
+        scrollbackBuffer: '',
+        outputBuffer: '',
+        flushTimeout: null,
+        stopping: false,
+        urlDetected: false, // Will be set to true when actual URL is detected from output
+        urlDetectionTimeout: null, // Will be set after server starts successfully
+        customCommand: normalizedCustomCommand,
+      };
+
+      // Capture stdout with buffer management and event emission
+      if (devProcess.stdout) {
+        devProcess.stdout.on('data', (data: Buffer) => {
+          this.handleProcessOutput(serverInfo, data).catch((error: unknown) => {
+            logger.error('Failed to handle dev server stdout output:', error);
+          });
+        });
       }
 
-      // Re-scan the entire scrollback buffer for URL patterns
-      // This catches cases where the URL was split across multiple output chunks
-      logger.info(`URL detection timeout for ${worktreePath}, re-scanning scrollback buffer`);
-      this.detectUrlFromOutput(serverInfo, serverInfo.scrollbackBuffer);
+      // Capture stderr with buffer management and event emission
+      if (devProcess.stderr) {
+        devProcess.stderr.on('data', (data: Buffer) => {
+          this.handleProcessOutput(serverInfo, data).catch((error: unknown) => {
+            logger.error('Failed to handle dev server stderr output:', error);
+          });
+        });
+      }
 
-      // If still not detected after full rescan, use the allocated port as fallback
-      if (!serverInfo.urlDetected) {
-        logger.info(`URL detection fallback: using allocated port ${port} for ${worktreePath}`);
-        const fallbackUrl = `http://${hostname}:${port}`;
-        serverInfo.url = fallbackUrl;
-        serverInfo.urlDetected = true;
+      // Helper to clean up resources and emit stop event
+      const cleanupAndEmitStop = (exitCode: number | null, errorMessage?: string) => {
+        if (serverInfo.flushTimeout) {
+          clearTimeout(serverInfo.flushTimeout);
+          serverInfo.flushTimeout = null;
+        }
 
-        if (this.emitter) {
-          this.emitter.emit('dev-server:url-detected', {
+        // Clear URL detection timeout to prevent stale fallback emission
+        if (serverInfo.urlDetectionTimeout) {
+          clearTimeout(serverInfo.urlDetectionTimeout);
+          serverInfo.urlDetectionTimeout = null;
+        }
+
+        // Emit stopped event (only if not already stopping - prevents duplicate events)
+        if (this.emitter && !serverInfo.stopping) {
+          this.emitter.emit('dev-server:stopped', {
             worktreePath,
-            url: fallbackUrl,
-            port,
+            port: serverInfo.port, // Use the detected port (may differ from allocated port if detectUrlFromOutput updated it)
+            exitCode,
+            error: errorMessage,
             timestamp: new Date().toISOString(),
           });
         }
-      }
-    }, URL_DETECTION_TIMEOUT_MS);
 
-    return {
-      success: true,
-      result: {
-        worktreePath,
-        port,
-        url: `http://${hostname}:${port}`,
-        message: `Dev server started on port ${port}`,
-      },
-    };
+        this.allocatedPorts.delete(serverInfo.allocatedPort);
+        this.runningServers.delete(worktreePath);
+
+        // Persist state change
+        this.saveState().catch((err) => logger.error('Failed to save state in cleanup:', err));
+      };
+
+      devProcess.on('error', (error) => {
+        logger.error(`Process error:`, error);
+        status.error = error.message;
+        cleanupAndEmitStop(null, error.message);
+      });
+
+      devProcess.on('exit', (code) => {
+        logger.info(`Process for ${worktreePath} exited with code ${code}`);
+        status.exited = true;
+        cleanupAndEmitStop(code);
+      });
+
+      // Wait a moment to see if the process fails immediately
+      await new Promise((resolve) => setTimeout(resolve, 500));
+
+      if (status.error) {
+        return {
+          success: false,
+          error: `Failed to start dev server: ${status.error}`,
+        };
+      }
+
+      if (status.exited) {
+        return {
+          success: false,
+          error: `Dev server process exited immediately. Check server logs for details.`,
+        };
+      }
+
+      // Server started successfully - add to running servers map
+      this.runningServers.set(worktreePath, serverInfo);
+
+      // Persist state change
+      await this.saveState().catch((err) =>
+        logger.error('Failed to save state in startDevServer:', err)
+      );
+
+      // Emit started event for WebSocket subscribers
+      if (this.emitter) {
+        this.emitter.emit('dev-server:started', {
+          worktreePath,
+          port,
+          url: serverInfo.url,
+          timestamp: new Date().toISOString(),
+        });
+      }
+
+      // Set up URL detection timeout fallback.
+      // If URL detection hasn't succeeded after URL_DETECTION_TIMEOUT_MS, check if
+      // the allocated port is actually in use (server probably started successfully)
+      // and emit a url-detected event with the allocated port as fallback.
+      // Also re-scan the scrollback buffer in case the URL was printed before
+      // our patterns could match (e.g., it was split across multiple data chunks).
+      serverInfo.urlDetectionTimeout = setTimeout(async () => {
+        serverInfo.urlDetectionTimeout = null;
+
+        // Only run fallback if server is still running and URL wasn't detected
+        if (
+          serverInfo.stopping ||
+          serverInfo.urlDetected ||
+          !this.runningServers.has(worktreePath)
+        ) {
+          return;
+        }
+
+        // Re-scan the entire scrollback buffer for URL patterns
+        // This catches cases where the URL was split across multiple output chunks
+        logger.info(`URL detection timeout for ${worktreePath}, re-scanning scrollback buffer`);
+        await this.detectUrlFromOutput(serverInfo, serverInfo.scrollbackBuffer).catch((err) =>
+          logger.error('Failed to re-scan scrollback buffer:', err)
+        );
+
+        // If still not detected after full rescan, use the allocated port as fallback
+        if (!serverInfo.urlDetected) {
+          logger.info(`URL detection fallback: using allocated port ${port} for ${worktreePath}`);
+          const fallbackUrl = `http://${fallbackHost}:${port}`;
+          serverInfo.url = fallbackUrl;
+          serverInfo.urlDetected = true;
+
+          // Persist state change
+          await this.saveState().catch((err) =>
+            logger.error('Failed to save state in URL detection fallback:', err)
+          );
+
+          if (this.emitter) {
+            this.emitter.emit('dev-server:url-detected', {
+              worktreePath: serverInfo.worktreePath,
+              url: fallbackUrl,
+              port,
+              timestamp: new Date().toISOString(),
+            });
+          }
+        }
+      }, URL_DETECTION_TIMEOUT_MS);
+
+      return {
+        success: true,
+        result: {
+          worktreePath: serverInfo.worktreePath,
+          port: serverInfo.port,
+          url: serverInfo.url,
+          message: `Dev server started on port ${port}`,
+        },
+      };
+    } finally {
+      this.startingServers.delete(worktreePath);
+    }
   }
 
   /**
@@ -904,9 +1116,11 @@ class DevServerService {
       });
     }
 
-    // Kill the process
+    // Kill the process; persisted/re-attached entries may not have a process handle.
     if (server.process && !server.process.killed) {
       server.process.kill('SIGTERM');
+    } else {
+      this.killProcessOnPort(server.port);
     }
 
     // Free the originally-reserved port slot (allocatedPort is immutable and always
@@ -914,6 +1128,11 @@ class DevServerService {
     // have been updated by detectUrlFromOutput to the actual detected port).
     this.allocatedPorts.delete(server.allocatedPort);
     this.runningServers.delete(worktreePath);
+
+    // Persist state change
+    await this.saveState().catch((err) =>
+      logger.error('Failed to save state in stopDevServer:', err)
+    );
 
     return {
       success: true,

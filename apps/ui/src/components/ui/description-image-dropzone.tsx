@@ -244,6 +244,7 @@ export function DescriptionImageDropZone({
       onTextFilesChange,
       previewImages,
       saveImageToTemp,
+      setPreviewImages,
     ]
   );
 
@@ -309,7 +310,7 @@ export function DescriptionImageDropZone({
         return newMap;
       });
     },
-    [images, onImagesChange]
+    [images, onImagesChange, setPreviewImages]
   );
 
   const removeTextFile = useCallback(

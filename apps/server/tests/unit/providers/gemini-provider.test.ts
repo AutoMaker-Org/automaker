@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { GeminiProvider } from '@/providers/gemini-provider.js';
 import type { ProviderMessage } from '@automaker/types';
+import { validateBareModelId } from '@automaker/types';
 
 describe('gemini-provider.ts', () => {
   let provider: GeminiProvider;
@@ -251,6 +252,21 @@ describe('gemini-provider.ts', () => {
       expect(msg).not.toBeNull();
       expect(msg.type).toBe('result');
       expect(msg.subtype).toBe('success');
+    });
+  });
+
+  describe('validateBareModelId integration', () => {
+    it('should allow gemini- prefixed models for Gemini provider with expectedProvider="gemini"', () => {
+      expect(() =>
+        validateBareModelId('gemini-2.5-flash', 'GeminiProvider', 'gemini')
+      ).not.toThrow();
+      expect(() => validateBareModelId('gemini-2.5-pro', 'GeminiProvider', 'gemini')).not.toThrow();
+    });
+
+    it('should reject other provider prefixes for Gemini provider', () => {
+      expect(() => validateBareModelId('cursor-gpt-4', 'GeminiProvider', 'gemini')).toThrow();
+      expect(() => validateBareModelId('codex-gpt-4', 'GeminiProvider', 'gemini')).toThrow();
+      expect(() => validateBareModelId('copilot-gpt-4', 'GeminiProvider', 'gemini')).toThrow();
     });
   });
 });

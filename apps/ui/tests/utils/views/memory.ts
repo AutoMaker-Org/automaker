@@ -1,10 +1,11 @@
 import { Page, Locator } from '@playwright/test';
-import { clickElement, fillInput, handleLoginScreenIfPresent } from '../core/interactions';
 import {
-  waitForElement,
-  waitForElementHidden,
-  waitForSplashScreenToDisappear,
-} from '../core/waiting';
+  clickElement,
+  fillInput,
+  handleLoginScreenIfPresent,
+  closeDialogWithEscape,
+} from '../core/interactions';
+import { waitForElement, waitForElementHidden } from '../core/waiting';
 import { getByTestId } from '../core/elements';
 import { expect } from '@playwright/test';
 import { authenticateForTests } from '../api/client';
@@ -124,7 +125,7 @@ export async function waitForMemoryFile(
   await expect(async () => {
     const locator = page.locator(`[data-testid="memory-file-${filename}"]`);
     await expect(locator).toBeVisible();
-  }).toPass({ timeout, intervals: [500, 1000, 2000] });
+  }).toPass({ timeout, intervals: [200, 500, 1000] });
 }
 
 /**
@@ -140,6 +141,8 @@ export async function selectMemoryFile(
 
   // Retry click + wait for content panel to handle timing issues
   // Note: On mobile, delete button is hidden, so we wait for content panel instead
+  // Use shorter inner timeout so retries can run; loadFileContent is async (API read)
+  const innerTimeout = Math.min(2000, Math.floor(timeout / 3));
   await expect(async () => {
     // Use JavaScript click to ensure React onClick handler fires
     await fileButton.evaluate((el) => (el as HTMLButtonElement).click());
@@ -147,8 +150,8 @@ export async function selectMemoryFile(
     const contentLocator = page.locator(
       '[data-testid="memory-editor"], [data-testid="markdown-preview"]'
     );
-    await expect(contentLocator).toBeVisible();
-  }).toPass({ timeout, intervals: [500, 1000, 2000] });
+    await expect(contentLocator).toBeVisible({ timeout: innerTimeout });
+  }).toPass({ timeout, intervals: [200, 500, 1000] });
 }
 
 /**
@@ -159,12 +162,13 @@ export async function waitForMemoryContentToLoad(
   page: Page,
   timeout: number = 15000
 ): Promise<void> {
+  const innerTimeout = Math.min(2000, Math.floor(timeout / 3));
   await expect(async () => {
     const contentLocator = page.locator(
       '[data-testid="memory-editor"], [data-testid="markdown-preview"]'
     );
-    await expect(contentLocator).toBeVisible();
-  }).toPass({ timeout, intervals: [500, 1000, 2000] });
+    await expect(contentLocator).toBeVisible({ timeout: innerTimeout });
+  }).toPass({ timeout, intervals: [200, 500, 1000] });
 }
 
 /**
@@ -187,36 +191,63 @@ export async function switchMemoryToEditMode(page: Page): Promise<void> {
 }
 
 /**
+ * Refresh the memory file list (clicks the Refresh button).
+ * Use instead of page.reload() to avoid ERR_CONNECTION_REFUSED when the dev server
+ * is under load, and to match real user behavior.
+ */
+export async function refreshMemoryList(page: Page): Promise<void> {
+  // Desktop: refresh button is visible; mobile: open panel then click mobile refresh
+  const desktopRefresh = page.locator('[data-testid="refresh-memory-button"]');
+  const mobileRefresh = page.locator('[data-testid="refresh-memory-button-mobile"]');
+  if (await desktopRefresh.isVisible().catch(() => false)) {
+    await desktopRefresh.click();
+  } else {
+    await clickElement(page, 'header-actions-panel-trigger');
+    await mobileRefresh.click();
+  }
+  // Allow list to re-fetch
+  await page.waitForTimeout(150);
+}
+
+/**
  * Navigate to the memory view
  * Note: Navigates directly to /memory since index route shows WelcomeView
  */
 export async function navigateToMemory(page: Page): Promise<void> {
-  // Authenticate before navigating (same pattern as navigateToContext / navigateToBoard)
+  // Authenticate before navigating (fast-path: skips if already authed via storageState)
   await authenticateForTests(page);
-
-  // Wait for any pending navigation to complete before starting a new one
-  await page.waitForLoadState('domcontentloaded').catch(() => {});
-  await page.waitForTimeout(100);
 
   // Navigate directly to /memory route
   await page.goto('/memory', { waitUntil: 'domcontentloaded' });
 
-  // Wait for splash screen to disappear (safety net)
-  await waitForSplashScreenToDisappear(page, 3000);
-
   // Handle login redirect if needed (e.g. when redirected to /logged-out)
   await handleLoginScreenIfPresent(page);
 
+  // Wait for one of: memory-view, memory-view-no-project, or memory-view-loading.
+  // Store hydration and loadMemoryFiles can be async, so we accept any of these first.
+  const viewSelector =
+    '[data-testid="memory-view"], [data-testid="memory-view-no-project"], [data-testid="memory-view-loading"]';
+  await page.locator(viewSelector).first().waitFor({ state: 'visible', timeout: 15000 });
+
+  // If we see "no project", give hydration a moment then re-check (avoids flake when store hydrates after first paint).
+  const noProject = page.locator('[data-testid="memory-view-no-project"]');
+  if (await noProject.isVisible().catch(() => false)) {
+    // Poll for the view to appear rather than a fixed timeout
+    await page
+      .locator('[data-testid="memory-view"], [data-testid="memory-view-loading"]')
+      .first()
+      .waitFor({ state: 'visible', timeout: 5000 })
+      .catch(() => {
+        throw new Error(
+          'Memory view showed "No project selected". Ensure setupProjectWithFixture runs before navigateToMemory and store has time to hydrate.'
+        );
+      });
+  }
+
   // Wait for loading to complete (if present)
   const loadingElement = page.locator('[data-testid="memory-view-loading"]');
-  try {
-    const loadingVisible = await loadingElement.isVisible({ timeout: 2000 });
-    if (loadingVisible) {
-      // Wait for loading to disappear (memory view will appear)
-      await loadingElement.waitFor({ state: 'hidden', timeout: 10000 });
-    }
-  } catch {
-    // Loading element not found or already hidden, continue
+  if (await loadingElement.isVisible().catch(() => false)) {
+    await loadingElement.waitFor({ state: 'hidden', timeout: 10000 });
   }
 
   // Wait for the memory view to be visible
@@ -227,7 +258,24 @@ export async function navigateToMemory(page: Page): Promise<void> {
   const backdrop = page.locator('[data-testid="sidebar-backdrop"]');
   if (await backdrop.isVisible().catch(() => false)) {
     await backdrop.evaluate((el) => (el as HTMLElement).click());
-    await page.waitForTimeout(200);
+  }
+
+  // Dismiss any open dialog that may block interactions (e.g. sandbox warning, onboarding).
+  // The sandbox dialog blocks Escape, so click "I Accept the Risks" if it becomes visible within 1s.
+  const sandboxAcceptBtn = page.locator('button:has-text("I Accept the Risks")');
+  const sandboxVisible = await sandboxAcceptBtn
+    .waitFor({ state: 'visible', timeout: 1000 })
+    .then(() => true)
+    .catch(() => false);
+  if (sandboxVisible) {
+    await sandboxAcceptBtn.click();
+    await page
+      .locator('[role="dialog"][data-state="open"]')
+      .first()
+      .waitFor({ state: 'hidden', timeout: 3000 })
+      .catch(() => {});
+  } else {
+    await closeDialogWithEscape(page, { timeout: 2000 });
   }
 
   // Ensure the header (and actions panel trigger on mobile) is interactive

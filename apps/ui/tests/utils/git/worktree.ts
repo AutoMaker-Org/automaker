@@ -9,6 +9,7 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import { Page } from '@playwright/test';
 import { sanitizeBranchName, TIMEOUTS } from '../core/constants';
+import { getWorkspaceRoot } from '../core/safe-paths';
 
 const execAsync = promisify(exec);
 
@@ -35,19 +36,8 @@ export interface FeatureData {
 // ============================================================================
 
 /**
- * Get the workspace root directory (internal use only)
- * Note: Also exported from project/fixtures.ts for broader use
- */
-function getWorkspaceRoot(): string {
-  const cwd = process.cwd();
-  if (cwd.includes('apps/ui')) {
-    return path.resolve(cwd, '../..');
-  }
-  return cwd;
-}
-
-/**
- * Create a unique temp directory path for tests
+ * Create a unique temp directory path for tests (always under workspace test/ dir).
+ * Git operations in these dirs never affect the main project.
  */
 export function createTempDirPath(prefix: string = 'temp-worktree-tests'): string {
   const uniqueId = `${process.pid}-${Math.random().toString(36).substring(2, 9)}`;
@@ -158,11 +148,45 @@ export async function cleanupTestRepo(repoPath: string): Promise<void> {
 }
 
 /**
- * Cleanup a temp directory and all its contents
+ * Recursively remove directory contents then the directory (avoids ENOTEMPTY on some systems)
+ */
+function rmDirRecursive(dir: string): void {
+  const entries = fs.readdirSync(dir, { withFileTypes: true });
+  for (const entry of entries) {
+    const fullPath = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      rmDirRecursive(fullPath);
+      fs.rmdirSync(fullPath);
+    } else {
+      fs.unlinkSync(fullPath);
+    }
+  }
+}
+
+/**
+ * Cleanup a temp directory and all its contents.
+ * Tries rmSync first; on ENOTEMPTY (e.g. macOS with git worktrees) falls back to recursive delete.
  */
 export function cleanupTempDir(tempDir: string): void {
-  if (fs.existsSync(tempDir)) {
+  if (!fs.existsSync(tempDir)) return;
+  try {
     fs.rmSync(tempDir, { recursive: true, force: true });
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException)?.code;
+    if (code === 'ENOENT') {
+      // Directory already removed, nothing to do
+    } else if (code === 'ENOTEMPTY' || code === 'EPERM' || code === 'EBUSY') {
+      rmDirRecursive(tempDir);
+      try {
+        fs.rmdirSync(tempDir);
+      } catch (e2) {
+        if ((e2 as NodeJS.ErrnoException)?.code !== 'ENOENT') {
+          throw e2;
+        }
+      }
+    } else {
+      throw err;
+    }
   }
 }
 

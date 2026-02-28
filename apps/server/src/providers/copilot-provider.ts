@@ -76,13 +76,18 @@ interface SdkToolExecutionStartEvent extends SdkEvent {
   };
 }
 
-interface SdkToolExecutionEndEvent extends SdkEvent {
-  type: 'tool.execution_end';
+interface SdkToolExecutionCompleteEvent extends SdkEvent {
+  type: 'tool.execution_complete';
   data: {
-    toolName: string;
     toolCallId: string;
-    result?: string;
-    error?: string;
+    success: boolean;
+    result?: {
+      content: string;
+    };
+    error?: {
+      message: string;
+      code?: string;
+    };
   };
 }
 
@@ -93,6 +98,16 @@ interface SdkSessionErrorEvent extends SdkEvent {
     code?: string;
   };
 }
+
+// =============================================================================
+// Constants
+// =============================================================================
+
+/**
+ * Prefix for error messages in tool results
+ * Consistent with GeminiProvider's error formatting
+ */
+const TOOL_ERROR_PREFIX = '[ERROR]' as const;
 
 // =============================================================================
 // Error Codes
@@ -357,12 +372,19 @@ export class CopilotProvider extends CliProvider {
         };
       }
 
-      case 'tool.execution_end': {
-        const toolResultEvent = sdkEvent as SdkToolExecutionEndEvent;
-        const isError = !!toolResultEvent.data.error;
-        const content = isError
-          ? `[ERROR] ${toolResultEvent.data.error}`
-          : toolResultEvent.data.result || '';
+      /**
+       * Tool execution completed event
+       * Handles both successful results and errors from tool executions
+       * Error messages optionally include error codes for better debugging
+       */
+      case 'tool.execution_complete': {
+        const toolResultEvent = sdkEvent as SdkToolExecutionCompleteEvent;
+        const error = toolResultEvent.data.error;
+
+        // Format error message with optional code for better debugging
+        const content = error
+          ? `${TOOL_ERROR_PREFIX} ${error.message}${error.code ? ` (${error.code})` : ''}`
+          : toolResultEvent.data.result?.content || '';
 
         return {
           type: 'assistant',
@@ -628,7 +650,7 @@ export class CopilotProvider extends CliProvider {
           sessionComplete = true;
           pushEvent(event);
         } else {
-          // Push all other events (tool.execution_start, tool.execution_end, assistant.message, etc.)
+          // Push all other events (tool.execution_start, tool.execution_complete, assistant.message, etc.)
           pushEvent(event);
         }
       });

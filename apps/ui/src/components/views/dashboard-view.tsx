@@ -591,12 +591,16 @@ export function DashboardView() {
                   <Button
                     size="icon"
                     className="bg-linear-to-r from-brand-500 to-brand-600 hover:from-brand-600 hover:to-brand-700 text-white"
+                    data-testid="create-new-project-mobile"
                   >
                     <Plus className="w-4 h-4" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56">
-                  <DropdownMenuItem onClick={handleNewProject}>
+                  <DropdownMenuItem
+                    onClick={handleNewProject}
+                    data-testid="quick-setup-option-mobile"
+                  >
                     <Plus className="w-4 h-4 mr-2" />
                     Quick Setup
                   </DropdownMenuItem>
@@ -662,7 +666,7 @@ export function DashboardView() {
                       <DropdownMenuContent align="end" className="w-56">
                         <DropdownMenuItem
                           onClick={handleNewProject}
-                          data-testid="quick-setup-option"
+                          data-testid="quick-setup-option-no-projects"
                         >
                           <Plus className="w-4 h-4 mr-2" />
                           Quick Setup
@@ -749,14 +753,20 @@ export function DashboardView() {
                   </Button>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button className="hidden sm:flex bg-linear-to-r from-brand-500 to-brand-600 hover:from-brand-600 hover:to-brand-700 text-white">
+                      <Button
+                        className="hidden sm:flex bg-linear-to-r from-brand-500 to-brand-600 hover:from-brand-600 hover:to-brand-700 text-white"
+                        data-testid="create-new-project-header"
+                      >
                         <Plus className="w-4 h-4 mr-2" />
                         New Project
                         <ChevronDown className="w-4 h-4 ml-2" />
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-56">
-                      <DropdownMenuItem onClick={handleNewProject}>
+                      <DropdownMenuItem
+                        onClick={handleNewProject}
+                        data-testid="quick-setup-option-has-projects"
+                      >
                         <Plus className="w-4 h-4 mr-2" />
                         Quick Setup
                       </DropdownMenuItem>

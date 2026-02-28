@@ -331,13 +331,15 @@ describe('copilot-provider.ts', () => {
       });
     });
 
-    it('should normalize tool.execution_end event', () => {
+    it('should normalize tool.execution_complete event', () => {
       const event = {
-        type: 'tool.execution_end',
+        type: 'tool.execution_complete',
         data: {
-          toolName: 'read_file',
           toolCallId: 'call-123',
-          result: 'file content',
+          success: true,
+          result: {
+            content: 'file content',
+          },
         },
       };
 
@@ -357,20 +359,82 @@ describe('copilot-provider.ts', () => {
       });
     });
 
-    it('should handle tool.execution_end with error', () => {
+    it('should handle tool.execution_complete with error', () => {
       const event = {
-        type: 'tool.execution_end',
+        type: 'tool.execution_complete',
         data: {
-          toolName: 'bash',
           toolCallId: 'call-456',
-          error: 'Command failed',
+          success: false,
+          error: {
+            message: 'Command failed',
+          },
         },
       };
 
       const result = provider.normalizeEvent(event);
       expect(result?.message?.content?.[0]).toMatchObject({
         type: 'tool_result',
+        tool_use_id: 'call-456',
         content: '[ERROR] Command failed',
+      });
+    });
+
+    it('should handle tool.execution_complete with empty result', () => {
+      const event = {
+        type: 'tool.execution_complete',
+        data: {
+          toolCallId: 'call-789',
+          success: true,
+          result: {
+            content: '',
+          },
+        },
+      };
+
+      const result = provider.normalizeEvent(event);
+      expect(result?.message?.content?.[0]).toMatchObject({
+        type: 'tool_result',
+        tool_use_id: 'call-789',
+        content: '',
+      });
+    });
+
+    it('should handle tool.execution_complete with missing result', () => {
+      const event = {
+        type: 'tool.execution_complete',
+        data: {
+          toolCallId: 'call-999',
+          success: true,
+          // No result field
+        },
+      };
+
+      const result = provider.normalizeEvent(event);
+      expect(result?.message?.content?.[0]).toMatchObject({
+        type: 'tool_result',
+        tool_use_id: 'call-999',
+        content: '',
+      });
+    });
+
+    it('should handle tool.execution_complete with error code', () => {
+      const event = {
+        type: 'tool.execution_complete',
+        data: {
+          toolCallId: 'call-567',
+          success: false,
+          error: {
+            message: 'Permission denied',
+            code: 'EACCES',
+          },
+        },
+      };
+
+      const result = provider.normalizeEvent(event);
+      expect(result?.message?.content?.[0]).toMatchObject({
+        type: 'tool_result',
+        tool_use_id: 'call-567',
+        content: '[ERROR] Permission denied (EACCES)',
       });
     });
 

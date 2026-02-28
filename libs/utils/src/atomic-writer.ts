@@ -98,17 +98,15 @@ export async function atomicWriteJson<T>(
   data: T,
   options: AtomicWriteOptions = {}
 ): Promise<void> {
-  const { indent = 2, createDirs = false, backupCount = 0 } = options;
+  const { indent = 2, backupCount = 0 } = options;
   const resolvedPath = path.resolve(filePath);
   // Use timestamp + random suffix to ensure uniqueness even for concurrent writes
   const uniqueSuffix = `${Date.now()}.${crypto.randomBytes(4).toString('hex')}`;
   const tempPath = `${resolvedPath}.tmp.${uniqueSuffix}`;
 
-  // Create parent directories if requested
-  if (createDirs) {
-    const dirPath = path.dirname(resolvedPath);
-    await mkdirSafe(dirPath);
-  }
+  // Always ensure parent directories exist before writing the temp file
+  const dirPath = path.dirname(resolvedPath);
+  await mkdirSafe(dirPath);
 
   const content = JSON.stringify(data, null, indent);
 

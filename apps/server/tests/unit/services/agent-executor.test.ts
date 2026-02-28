@@ -1181,6 +1181,50 @@ describe('AgentExecutor', () => {
       );
     });
 
+    it('should pass claudeCompatibleProvider to executeQuery options', async () => {
+      const executor = new AgentExecutor(
+        mockEventBus,
+        mockFeatureStateManager,
+        mockPlanApprovalService,
+        mockSettingsService
+      );
+
+      const mockProvider = {
+        getName: () => 'mock',
+        executeQuery: vi.fn().mockImplementation(function* () {
+          yield { type: 'result', subtype: 'success' };
+        }),
+      } as unknown as BaseProvider;
+
+      const mockClaudeProvider = { id: 'zai-1', name: 'Zai' } as any;
+
+      const options: AgentExecutionOptions = {
+        workDir: '/test',
+        featureId: 'test-feature',
+        prompt: 'Test prompt',
+        projectPath: '/project',
+        abortController: new AbortController(),
+        provider: mockProvider,
+        effectiveBareModel: 'claude-sonnet-4-6',
+        claudeCompatibleProvider: mockClaudeProvider,
+      };
+
+      const callbacks = {
+        waitForApproval: vi.fn().mockResolvedValue({ approved: true }),
+        saveFeatureSummary: vi.fn(),
+        updateFeatureSummary: vi.fn(),
+        buildTaskPrompt: vi.fn().mockReturnValue('task prompt'),
+      };
+
+      await executor.execute(options, callbacks);
+
+      expect(mockProvider.executeQuery).toHaveBeenCalledWith(
+        expect.objectContaining({
+          claudeCompatibleProvider: mockClaudeProvider,
+        })
+      );
+    });
+
     it('should return correct result structure', async () => {
       const executor = new AgentExecutor(
         mockEventBus,

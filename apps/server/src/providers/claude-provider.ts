@@ -188,6 +188,7 @@ export class ClaudeProvider extends BaseProvider {
   async *executeQuery(options: ExecuteOptions): AsyncGenerator<ProviderMessage> {
     // Validate that model doesn't have a provider prefix
     // AgentService should strip prefixes before passing to providers
+    // Claude doesn't use a provider prefix, so we don't need to specify an expected provider
     validateBareModelId(options.model, 'ClaudeProvider');
 
     const {

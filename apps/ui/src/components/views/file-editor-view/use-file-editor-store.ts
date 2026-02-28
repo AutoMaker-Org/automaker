@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist, type StorageValue } from 'zustand/middleware';
+import { updateTabWithContent, markTabAsSaved } from './file-editor-dirty-utils';
 
 export interface FileTreeNode {
   name: string;
@@ -262,17 +263,13 @@ export const useFileEditorStore = create<FileEditorState>()(
 
       updateTabContent: (tabId, content) => {
         set({
-          tabs: get().tabs.map((t) =>
-            t.id === tabId ? { ...t, content, isDirty: content !== t.originalContent } : t
-          ),
+          tabs: get().tabs.map((t) => (t.id === tabId ? updateTabWithContent(t, content) : t)),
         });
       },
 
       markTabSaved: (tabId, content) => {
         set({
-          tabs: get().tabs.map((t) =>
-            t.id === tabId ? { ...t, content, originalContent: content, isDirty: false } : t
-          ),
+          tabs: get().tabs.map((t) => (t.id === tabId ? markTabAsSaved(t, content) : t)),
         });
       },
 

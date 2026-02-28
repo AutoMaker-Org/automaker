@@ -282,9 +282,25 @@ export async function apiListBranches(
  */
 export async function authenticateWithApiKey(page: Page, apiKey: string): Promise<boolean> {
   try {
+    // Fast path: check if we already have a valid session (from global setup storageState)
+    try {
+      const statusRes = await page.request.get(`${API_BASE_URL}/api/auth/status`, {
+        timeout: 3000,
+      });
+      const statusJson = (await statusRes.json().catch(() => null)) as {
+        authenticated?: boolean;
+      } | null;
+      if (statusJson?.authenticated === true) {
+        return true;
+      }
+    } catch {
+      // Status check failed, proceed with full auth
+    }
+
     // Ensure the backend is up before attempting login (especially in local runs where
     // the backend may be started separately from Playwright).
     const start = Date.now();
+    let authBackoff = 250;
     while (Date.now() - start < 15000) {
       try {
         const health = await page.request.get(`${API_BASE_URL}/api/health`, {
@@ -294,7 +310,8 @@ export async function authenticateWithApiKey(page: Page, apiKey: string): Promis
       } catch {
         // Retry
       }
-      await page.waitForTimeout(250);
+      await page.waitForTimeout(authBackoff);
+      authBackoff = Math.min(authBackoff * 2, 2000);
     }
 
     // Ensure we're on a page (needed for cookies to work)
@@ -322,34 +339,22 @@ export async function authenticateWithApiKey(page: Page, apiKey: string): Promis
         {
           name: 'automaker_session',
           value: response.token,
-          domain: 'localhost',
+          domain: '127.0.0.1',
           path: '/',
           httpOnly: true,
           sameSite: 'Lax',
         },
       ]);
 
-      // Verify the session is working by polling auth status
-      // This replaces arbitrary timeout with actual condition check
-      let attempts = 0;
-      const maxAttempts = 10;
-      while (attempts < maxAttempts) {
-        const statusRes = await page.request.get(`${API_BASE_URL}/api/auth/status`, {
-          timeout: 5000,
-        });
-        const statusResponse = (await statusRes.json().catch(() => null)) as {
-          authenticated?: boolean;
-        } | null;
+      // Single verification check (no polling loop needed)
+      const verifyRes = await page.request.get(`${API_BASE_URL}/api/auth/status`, {
+        timeout: 5000,
+      });
+      const verifyJson = (await verifyRes.json().catch(() => null)) as {
+        authenticated?: boolean;
+      } | null;
 
-        if (statusResponse?.authenticated === true) {
-          return true;
-        }
-        attempts++;
-        // Use a very short wait between polling attempts (this is acceptable for polling)
-        await page.waitForTimeout(50);
-      }
-
-      return false;
+      return verifyJson?.authenticated === true;
     }
 
     return false;
@@ -394,12 +399,14 @@ export async function waitForBackendHealth(
   checkIntervalMs = 500
 ): Promise<void> {
   const startTime = Date.now();
+  let backoff = checkIntervalMs;
 
   while (Date.now() - startTime < maxWaitMs) {
-    if (await checkBackendHealth(page, checkIntervalMs)) {
+    if (await checkBackendHealth(page, Math.min(backoff, 3000))) {
       return;
     }
-    await page.waitForTimeout(checkIntervalMs);
+    await page.waitForTimeout(backoff);
+    backoff = Math.min(backoff * 2, 2000);
   }
 
   throw new Error(

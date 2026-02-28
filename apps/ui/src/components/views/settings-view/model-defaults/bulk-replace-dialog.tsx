@@ -214,7 +214,14 @@ export function BulkReplaceDialog({ open, onOpenChange }: BulkReplaceDialogProps
     });
 
     return [defaultFeaturePreview, ...phasePreview];
-  }, [phaseModels, selectedProviderConfig, enabledProviders, defaultFeatureModel]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- generatePreviewItem depends on enabledProviders and selectedProviderConfig, which are already in deps
+  }, [
+    phaseModels,
+    selectedProviderConfig,
+    enabledProviders,
+    defaultFeatureModel,
+    generatePreviewItem,
+  ]);
 
   // Count how many will change
   const changeCount = preview.filter((p) => p.isChanged).length;

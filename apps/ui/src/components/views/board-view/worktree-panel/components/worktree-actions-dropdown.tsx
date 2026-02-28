@@ -70,7 +70,8 @@ interface WorktreeActionsDropdownProps {
   hasRemoteBranch: boolean;
   isPulling: boolean;
   isPushing: boolean;
-  isStartingDevServer: boolean;
+  isStartingAnyDevServer: boolean;
+  isDevServerStarting: boolean;
   isDevServerRunning: boolean;
   devServerInfo?: DevServerInfo;
   gitRepoStatus: GitRepoStatus;
@@ -244,7 +245,8 @@ export function WorktreeActionsDropdown({
   hasRemoteBranch,
   isPulling,
   isPushing,
-  isStartingDevServer,
+  isStartingAnyDevServer,
+  isDevServerStarting,
   isDevServerRunning,
   devServerInfo,
   gitRepoStatus,
@@ -550,20 +552,26 @@ export function WorktreeActionsDropdown({
               <div className="flex items-center">
                 <DropdownMenuItem
                   onClick={() => onStartDevServer(worktree)}
-                  disabled={isStartingDevServer}
+                  disabled={isStartingAnyDevServer || isDevServerStarting}
                   className="text-xs flex-1 pr-0 rounded-r-none"
                 >
                   <Play
-                    className={cn('w-3.5 h-3.5 mr-2', isStartingDevServer && 'animate-pulse')}
+                    className={cn(
+                      'w-3.5 h-3.5 mr-2',
+                      (isStartingAnyDevServer || isDevServerStarting) && 'animate-pulse'
+                    )}
                   />
-                  {isStartingDevServer ? 'Starting...' : 'Start Dev Server'}
+                  {isStartingAnyDevServer || isDevServerStarting
+                    ? 'Starting...'
+                    : 'Start Dev Server'}
                 </DropdownMenuItem>
                 <DropdownMenuSubTrigger
                   className={cn(
                     'text-xs px-1 rounded-l-none border-l border-border/30 h-8',
-                    isStartingDevServer && 'opacity-50 cursor-not-allowed'
+                    (isStartingAnyDevServer || isDevServerStarting) &&
+                      'opacity-50 cursor-not-allowed'
                   )}
-                  disabled={isStartingDevServer}
+                  disabled={isStartingAnyDevServer || isDevServerStarting}
                 />
               </div>
               <DropdownMenuSubContent>{viewDevServerLogsItem}</DropdownMenuSubContent>

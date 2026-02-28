@@ -28,7 +28,7 @@ import * as secureFs from '../../lib/secure-fs.js';
 import { validateWorkingDirectory, createAutoModeOptions } from '../../lib/sdk-options.js';
 import {
   getPromptCustomization,
-  getProviderByModelId,
+  resolveProviderContext,
   getMCPServersFromSettings,
   getDefaultMaxTurnsSetting,
 } from '../../lib/settings-helpers.js';
@@ -226,8 +226,7 @@ export class AutoModeServiceFacade {
     /**
      * Shared agent-run helper used by both PipelineOrchestrator and ExecutionService.
      *
-     * Resolves the model string, looks up the custom provider/credentials via
-     * getProviderByModelId, then delegates to agentExecutor.execute with the
+     * Resolves provider/model context, then delegates to agentExecutor.execute with the
      * full payload.  The opts parameter uses an index-signature union so it
      * accepts both the typed ExecutionService opts object and the looser
      * Record<string, unknown> used by PipelineOrchestrator without requiring
@@ -266,16 +265,19 @@ export class AutoModeServiceFacade {
           | import('@automaker/types').ClaudeCompatibleProvider
           | undefined;
         let credentials: import('@automaker/types').Credentials | undefined;
+        let providerResolvedModel: string | undefined;
+
         if (settingsService) {
-          const providerResult = await getProviderByModelId(
-            resolvedModel,
+          const providerId = opts?.providerId as string | undefined;
+          const result = await resolveProviderContext(
             settingsService,
+            resolvedModel,
+            providerId,
             '[AutoModeFacade]'
           );
-          if (providerResult.provider) {
-            claudeCompatibleProvider = providerResult.provider;
-            credentials = providerResult.credentials;
-          }
+          claudeCompatibleProvider = result.provider;
+          credentials = result.credentials;
+          providerResolvedModel = result.resolvedModel;
         }
 
         // Build sdkOptions with proper maxTurns and allowedTools for auto-mode.
@@ -301,7 +303,7 @@ export class AutoModeServiceFacade {
 
         const sdkOpts = createAutoModeOptions({
           cwd: workDir,
-          model: resolvedModel,
+          model: providerResolvedModel || resolvedModel,
           systemPrompt: opts?.systemPrompt,
           abortController,
           autoLoadClaudeMd,
@@ -313,8 +315,14 @@ export class AutoModeServiceFacade {
             | undefined,
         });
 
+        if (!sdkOpts) {
+          logger.error(
+            `[createRunAgentFn] sdkOpts is UNDEFINED! createAutoModeOptions type: ${typeof createAutoModeOptions}`
+          );
+        }
+
         logger.info(
-          `[createRunAgentFn] Feature ${featureId}: model=${resolvedModel}, ` +
+          `[createRunAgentFn] Feature ${featureId}: model=${resolvedModel} (resolved=${providerResolvedModel || resolvedModel}), ` +
             `maxTurns=${sdkOpts.maxTurns}, allowedTools=${(sdkOpts.allowedTools as string[])?.length ?? 'default'}, ` +
             `provider=${provider.getName()}`
         );

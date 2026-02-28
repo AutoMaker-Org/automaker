@@ -370,7 +370,8 @@ export interface GitHubAPI {
     issue: IssueValidationInput,
     model?: ModelId,
     thinkingLevel?: ThinkingLevel,
-    reasoningEffort?: ReasoningEffort
+    reasoningEffort?: ReasoningEffort,
+    providerId?: string
   ) => Promise<{ success: boolean; message?: string; issueNumber?: number; error?: string }>;
   /** Check validation status for an issue or all issues */
   getValidationStatus: (
@@ -2388,12 +2389,18 @@ function createMockWorktreeAPI(): WorktreeAPI {
       };
     },
 
-    pull: async (worktreePath: string, remote?: string, stashIfNeeded?: boolean) => {
+    pull: async (
+      worktreePath: string,
+      remote?: string,
+      stashIfNeeded?: boolean,
+      remoteBranch?: string
+    ) => {
       const targetRemote = remote || 'origin';
       console.log('[Mock] Pulling latest changes for:', {
         worktreePath,
         remote: targetRemote,
         stashIfNeeded,
+        remoteBranch,
       });
       return {
         success: true,
@@ -2901,8 +2908,8 @@ function createMockWorktreeAPI(): WorktreeAPI {
         },
       };
     },
-    rebase: async (worktreePath: string, ontoBranch: string) => {
-      console.log('[Mock] Rebase:', { worktreePath, ontoBranch });
+    rebase: async (worktreePath: string, ontoBranch: string, remote?: string) => {
+      console.log('[Mock] Rebase:', { worktreePath, ontoBranch, remote });
       return {
         success: true,
         result: {
@@ -3994,7 +4001,8 @@ function createMockGitHubAPI(): GitHubAPI {
       issue: IssueValidationInput,
       model?: ModelId,
       thinkingLevel?: ThinkingLevel,
-      reasoningEffort?: ReasoningEffort
+      reasoningEffort?: ReasoningEffort,
+      providerId?: string
     ) => {
       console.log('[Mock] Starting async validation:', {
         projectPath,
@@ -4002,6 +4010,7 @@ function createMockGitHubAPI(): GitHubAPI {
         model,
         thinkingLevel,
         reasoningEffort,
+        providerId,
       });
 
       // Simulate async validation in background

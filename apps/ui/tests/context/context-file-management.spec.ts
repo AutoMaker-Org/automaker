@@ -22,21 +22,16 @@ import {
 } from '../utils';
 
 test.describe('Context File Management', () => {
-  test.beforeEach(async () => {
-    resetContextDirectory();
-  });
-
-  test.afterEach(async () => {
+  test.beforeEach(() => {
     resetContextDirectory();
   });
 
   test('should create a new markdown context file', async ({ page }) => {
     await setupProjectWithFixture(page, getFixturePath());
     await authenticateForTests(page);
-    await page.goto('/');
-    await waitForNetworkIdle(page);
 
     await navigateToContext(page);
+    await waitForNetworkIdle(page);
 
     await clickElement(page, 'create-markdown-button');
     await page.waitForSelector('[data-testid="create-markdown-dialog"]', { timeout: 5000 });
@@ -64,7 +59,10 @@ test.describe('Context File Management', () => {
 
     await page.waitForSelector('[data-testid="context-editor"]', { timeout: 5000 });
 
-    const editorContent = await getContextEditorContent(page);
-    expect(editorContent).toBe(testContent);
+    // Wait for async file content to load into the editor
+    await expect(async () => {
+      const editorContent = await getContextEditorContent(page);
+      expect(editorContent).toBe(testContent);
+    }).toPass({ timeout: 10000, intervals: [200, 500, 1000] });
   });
 });

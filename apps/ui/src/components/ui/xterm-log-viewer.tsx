@@ -178,7 +178,9 @@ export const XtermLogViewer = forwardRef<XtermLogViewerRef, XtermLogViewerProps>
         fitAddonRef.current = null;
         setIsReady(false);
       };
-    }, []); // Only run once on mount
+      // Only run once on mount - intentionally excluding deps to prevent re-initialization
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     // Update theme when it changes
     useEffect(() => {

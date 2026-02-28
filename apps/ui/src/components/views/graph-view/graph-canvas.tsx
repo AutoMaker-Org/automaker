@@ -1,4 +1,4 @@
-import { useCallback, useState, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useState, useEffect, useMemo, useRef, type ReactNode } from 'react';
 import {
   ReactFlow,
   Background,
@@ -81,6 +81,7 @@ interface GraphCanvasProps {
   backgroundSettings?: BackgroundSettings;
   className?: string;
   projectPath?: string | null;
+  worktreeSelector?: ReactNode;
 }
 
 // Helper to get session storage key for viewport
@@ -130,6 +131,7 @@ function GraphCanvasInner({
   backgroundSettings,
   className,
   projectPath,
+  worktreeSelector,
 }: GraphCanvasProps) {
   const [isLocked, setIsLocked] = useState(false);
   const [layoutDirection, setLayoutDirection] = useState<'LR' | 'TB'>('LR');
@@ -539,9 +541,10 @@ function GraphCanvasInner({
 
         <GraphLegend />
 
-        {/* Add Feature Button */}
-        <Panel position="top-right">
-          <div className="flex items-center gap-2">
+        {/* Worktree selector + actions */}
+        <Panel position="top-right" className="mt-14 sm:mt-0">
+          <div className="flex flex-col items-end gap-2">
+            {worktreeSelector}
             {onOpenPlanDialog && (
               <div className="flex items-center gap-1.5 rounded-md border border-border bg-secondary/60 px-2 py-1 shadow-sm">
                 {hasPendingPlan && (
@@ -572,7 +575,12 @@ function GraphCanvasInner({
                   )}
               </div>
             )}
-            <Button variant="default" size="sm" onClick={onAddFeature} className="gap-1.5">
+            <Button
+              variant="default"
+              size="sm"
+              onClick={onAddFeature}
+              className="gap-1.5 w-full sm:w-auto"
+            >
               <Plus className="w-4 h-4" />
               Add Feature
             </Button>

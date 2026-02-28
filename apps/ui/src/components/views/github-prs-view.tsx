@@ -39,7 +39,7 @@ import {
 export function GitHubPRsView() {
   const [selectedPR, setSelectedPR] = useState<GitHubPR | null>(null);
   const [commentDialogPR, setCommentDialogPR] = useState<GitHubPR | null>(null);
-  const { currentProject } = useAppStore();
+  const { currentProject, getEffectiveUseWorktrees } = useAppStore();
   const isMobile = useIsMobile();
 
   const {
@@ -84,6 +84,9 @@ export function GitHubPRsView() {
         model: resolveModelString('opus'),
         thinkingLevel: 'none',
         planningMode: 'skip',
+        requirePlanApproval: false,
+        dependencies: [],
+        ...(pr.url ? { prUrl: pr.url } : {}),
         ...(pr.headRefName ? { branchName: pr.headRefName } : {}),
       };
 
@@ -94,7 +97,11 @@ export function GitHubPRsView() {
         const api = getElectronAPI();
         if (api.autoMode?.runFeature) {
           try {
-            await api.autoMode.runFeature(currentProject.path, featureId);
+            await api.autoMode.runFeature(
+              currentProject.path,
+              featureId,
+              getEffectiveUseWorktrees(currentProject.path)
+            );
             toast.success('Feature created and started', {
               description: `Addressing review comments on PR #${pr.number}`,
             });
@@ -118,7 +125,7 @@ export function GitHubPRsView() {
         });
       }
     },
-    [currentProject, createFeature]
+    [currentProject, createFeature, getEffectiveUseWorktrees]
   );
 
   const formatDate = (dateString: string) => {

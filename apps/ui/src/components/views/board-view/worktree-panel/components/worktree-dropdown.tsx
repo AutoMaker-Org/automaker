@@ -53,6 +53,8 @@ export interface WorktreeDropdownProps {
   branchCardCounts?: Record<string, number>;
   /** Function to check if dev server is running for a worktree */
   isDevServerRunning: (worktree: WorktreeInfo) => boolean;
+  /** Function to check if dev server is starting for a worktree */
+  isDevServerStarting: (worktree: WorktreeInfo) => boolean;
   /** Function to get dev server info for a worktree */
   getDevServerInfo: (worktree: WorktreeInfo) => DevServerInfo | undefined;
   /** Function to check if auto-mode is running for a worktree */
@@ -78,7 +80,7 @@ export interface WorktreeDropdownProps {
   // Action dropdown props
   isPulling: boolean;
   isPushing: boolean;
-  isStartingDevServer: boolean;
+  isStartingAnyDevServer: boolean;
   aheadCount: number;
   behindCount: number;
   hasRemoteBranch: boolean;
@@ -178,6 +180,7 @@ export function WorktreeDropdown({
   isActivating,
   branchCardCounts,
   isDevServerRunning,
+  isDevServerStarting,
   getDevServerInfo,
   isAutoModeRunningForWorktree,
   isTestRunningForWorktree,
@@ -196,7 +199,7 @@ export function WorktreeDropdown({
   // Action dropdown props
   isPulling,
   isPushing,
-  isStartingDevServer,
+  isStartingAnyDevServer,
   aheadCount,
   behindCount,
   hasRemoteBranch,
@@ -270,6 +273,7 @@ export function WorktreeDropdown({
     if (!selectedWorktree) {
       return {
         devServerRunning: false,
+        devServerStarting: false,
         devServerInfo: undefined,
         autoModeRunning: false,
         isRunning: false,
@@ -279,6 +283,7 @@ export function WorktreeDropdown({
     }
     return {
       devServerRunning: isDevServerRunning(selectedWorktree),
+      devServerStarting: isDevServerStarting(selectedWorktree),
       devServerInfo: getDevServerInfo(selectedWorktree),
       autoModeRunning: isAutoModeRunningForWorktree(selectedWorktree),
       isRunning: hasRunningFeatures(selectedWorktree),
@@ -288,6 +293,7 @@ export function WorktreeDropdown({
   }, [
     selectedWorktree,
     isDevServerRunning,
+    isDevServerStarting,
     getDevServerInfo,
     isAutoModeRunningForWorktree,
     hasRunningFeatures,
@@ -357,6 +363,16 @@ export function WorktreeDropdown({
             title={`Dev server running on port ${selectedStatus.devServerInfo?.port}`}
           >
             <Globe className="w-3 h-3" />
+          </span>
+        )}
+
+        {/* Dev server starting indicator */}
+        {selectedStatus.devServerStarting && (
+          <span
+            className="inline-flex items-center justify-center h-4 w-4 text-amber-500 shrink-0"
+            title="Dev server starting..."
+          >
+            <Spinner size="xs" variant="current" />
           </span>
         )}
 
@@ -468,6 +484,7 @@ export function WorktreeDropdown({
                 isRunning={hasRunningFeatures(mainWorktree)}
                 cardCount={branchCardCounts?.[mainWorktree.branch]}
                 devServerRunning={isDevServerRunning(mainWorktree)}
+                devServerStarting={isDevServerStarting(mainWorktree)}
                 devServerInfo={getDevServerInfo(mainWorktree)}
                 isAutoModeRunning={isAutoModeRunningForWorktree(mainWorktree)}
                 isTestRunning={isTestRunningForWorktree(mainWorktree)}
@@ -493,6 +510,7 @@ export function WorktreeDropdown({
                     isRunning={hasRunningFeatures(worktree)}
                     cardCount={branchCardCounts?.[worktree.branch]}
                     devServerRunning={isDevServerRunning(worktree)}
+                    devServerStarting={isDevServerStarting(worktree)}
                     devServerInfo={getDevServerInfo(worktree)}
                     isAutoModeRunning={isAutoModeRunningForWorktree(worktree)}
                     isTestRunning={isTestRunningForWorktree(worktree)}
@@ -543,7 +561,8 @@ export function WorktreeDropdown({
           }
           isPulling={isPulling}
           isPushing={isPushing}
-          isStartingDevServer={isStartingDevServer}
+          isStartingDevServer={isStartingAnyDevServer}
+          isDevServerStarting={isDevServerStarting(selectedWorktree)}
           isDevServerRunning={isDevServerRunning(selectedWorktree)}
           devServerInfo={getDevServerInfo(selectedWorktree)}
           gitRepoStatus={gitRepoStatus}

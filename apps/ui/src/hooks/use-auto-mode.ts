@@ -11,6 +11,10 @@ import { getGlobalEventsRecent } from '@/hooks/use-event-recency';
 const logger = createLogger('AutoMode');
 
 const AUTO_MODE_SESSION_KEY = 'automaker:autoModeRunningByWorktreeKey';
+// Session key delimiter for parsing stored worktree keys
+const SESSION_KEY_DELIMITER = '::';
+// Marker for main worktree in session storage keys
+const MAIN_WORKTREE_MARKER = '__main__';
 
 function arraysEqual(a: string[], b: string[]): boolean {
   if (a.length !== b.length) return false;
@@ -25,7 +29,7 @@ const AUTO_MODE_POLLING_INTERVAL = 30000;
  * @param branchName - The branch name, or null for main worktree
  */
 function getWorktreeSessionKey(projectPath: string, branchName: string | null): string {
-  return `${projectPath}::${branchName ?? '__main__'}`;
+  return `${projectPath}${SESSION_KEY_DELIMITER}${branchName ?? MAIN_WORKTREE_MARKER}`;
 }
 
 function readAutoModeSession(): Record<string, boolean> {
@@ -84,9 +88,9 @@ export function useAutoMode(worktree?: WorktreeInfo) {
     setPendingPlanApproval,
     getWorktreeKey,
     getMaxConcurrencyForWorktree,
-    setMaxConcurrencyForWorktree,
     isPrimaryWorktreeBranch,
     globalMaxConcurrency,
+    addRecentlyCompletedFeature,
   } = useAppStore(
     useShallow((state) => ({
       autoModeByWorktree: state.autoModeByWorktree,
@@ -99,9 +103,9 @@ export function useAutoMode(worktree?: WorktreeInfo) {
       setPendingPlanApproval: state.setPendingPlanApproval,
       getWorktreeKey: state.getWorktreeKey,
       getMaxConcurrencyForWorktree: state.getMaxConcurrencyForWorktree,
-      setMaxConcurrencyForWorktree: state.setMaxConcurrencyForWorktree,
       isPrimaryWorktreeBranch: state.isPrimaryWorktreeBranch,
       globalMaxConcurrency: state.maxConcurrency,
+      addRecentlyCompletedFeature: state.addRecentlyCompletedFeature,
     }))
   );
 
@@ -271,6 +275,28 @@ export function useAutoMode(worktree?: WorktreeInfo) {
       }
     } catch (error) {
       logger.error('Error syncing auto mode state with backend:', error);
+    }
+  }, [currentProject, setAutoModeRunning]);
+
+  // Restore auto mode state from session storage on mount.
+  // This ensures that auto mode indicators show up immediately on page load,
+  // before the refreshStatus API call completes. The session storage is
+  // populated whenever auto mode starts/stops, so it provides a reliable
+  // initial state that will be verified/corrected by refreshStatus.
+  useEffect(() => {
+    if (!currentProject) return;
+
+    try {
+      const sessionData = readAutoModeSession();
+      const currentBranchName = branchNameRef.current;
+      const currentKey = getWorktreeSessionKey(currentProject.path, currentBranchName);
+
+      if (sessionData[currentKey] === true) {
+        setAutoModeRunning(currentProject.id, currentBranchName, true);
+        logger.debug(`Restored auto mode state from session storage for key: ${currentKey}`);
+      }
+    } catch (error) {
+      logger.error('Error restoring auto mode state from session storage:', error);
     }
   }, [currentProject, setAutoModeRunning]);
 
@@ -445,6 +471,9 @@ export function useAutoMode(worktree?: WorktreeInfo) {
           // Feature completed - remove from running tasks and UI will reload features on its own
           if (event.featureId) {
             logger.info('Feature completed:', event.featureId, 'passes:', event.passes);
+            // Track recently completed to prevent race condition where completed features
+            // briefly appear in backlog due to stale cache data
+            addRecentlyCompletedFeature(event.featureId);
             removeRunningTask(eventProjectId, eventBranchName, event.featureId);
             addAutoModeActivity({
               featureId: event.featureId,
@@ -697,6 +726,7 @@ export function useAutoMode(worktree?: WorktreeInfo) {
     currentProject?.path,
     getMaxConcurrencyForWorktree,
     isPrimaryWorktreeBranch,
+    addRecentlyCompletedFeature,
   ]);
 
   // Start auto mode - calls backend to start the auto loop for this worktree

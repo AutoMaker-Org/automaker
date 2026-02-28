@@ -55,9 +55,19 @@ export function useSpecGeneration({ loadSpec }: UseSpecGenerationOptions) {
   // Phase tracking and status
   const [currentPhase, setCurrentPhase] = useState<string>('');
   const [errorMessage, setErrorMessage] = useState<string>('');
+  const currentPhaseRef = useRef<string>('');
+  const errorMessageRef = useRef<string>('');
   const statusCheckRef = useRef<boolean>(false);
   const stateRestoredRef = useRef<boolean>(false);
   const pendingStatusTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    currentPhaseRef.current = currentPhase;
+  }, [currentPhase]);
+
+  useEffect(() => {
+    errorMessageRef.current = errorMessage;
+  }, [errorMessage]);
 
   // Reset all state when project changes
   useEffect(() => {
@@ -300,7 +310,7 @@ export function useSpecGeneration({ loadSpec }: UseSpecGenerationOptions) {
         setLogs(newLog);
         logger.debug('[useSpecGeneration] Progress:', event.content.substring(0, 100));
 
-        if (errorMessage) {
+        if (errorMessageRef.current) {
           setErrorMessage('');
         }
       } else if (event.type === 'spec_regeneration_tool') {
@@ -310,7 +320,7 @@ export function useSpecGeneration({ loadSpec }: UseSpecGenerationOptions) {
           event.tool?.includes('Feature');
 
         if (isFeatureTool) {
-          if (currentPhase !== 'feature_generation') {
+          if (currentPhaseRef.current !== 'feature_generation') {
             setCurrentPhase('feature_generation');
             setIsCreating(true);
             setIsRegenerating(true);
@@ -420,7 +430,7 @@ export function useSpecGeneration({ loadSpec }: UseSpecGenerationOptions) {
     return () => {
       unsubscribe();
     };
-  }, [currentProject?.path, loadSpec, errorMessage, currentPhase]);
+  }, [currentProject, loadSpec]);
 
   // Handler functions
   const handleCreateSpec = useCallback(async () => {

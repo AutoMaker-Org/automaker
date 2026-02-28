@@ -40,9 +40,6 @@ import {
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
@@ -1265,7 +1262,7 @@ export function TerminalView({
   // See: terminal-panel.tsx lines 319-399 for the shortcut handlers.
 
   // Collect all terminal IDs from a panel tree in order
-  const getTerminalIds = (panel: TerminalPanelContent): string[] => {
+  const getTerminalIds = useCallback((panel: TerminalPanelContent): string[] => {
     if (panel.type === 'terminal') {
       return [panel.sessionId];
     }
@@ -1273,7 +1270,7 @@ export function TerminalView({
       return panel.panels.flatMap(getTerminalIds);
     }
     return []; // testRunner type
-  };
+  }, []);
 
   // Get a STABLE key for a panel - uses the stable id for splits
   // This prevents unnecessary remounts when layout structure changes
@@ -1428,7 +1425,7 @@ export function TerminalView({
         setActiveTerminalSession(nextTerminal);
       }
     },
-    [activeTab?.layout, terminalState.activeSessionId, setActiveTerminalSession]
+    [activeTab?.layout, terminalState.activeSessionId, setActiveTerminalSession, getTerminalIds]
   );
 
   // Handle global keyboard shortcuts for pane navigation
@@ -1454,7 +1451,7 @@ export function TerminalView({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [navigateToTerminal]);
+  }, [navigateToTerminal, getTerminalIds]);
 
   // Render panel content recursively
   const renderPanelContent = (content: TerminalPanelContent): React.ReactNode => {

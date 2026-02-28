@@ -546,8 +546,8 @@ export class GeminiProvider extends CliProvider {
   async *executeQuery(options: ExecuteOptions): AsyncGenerator<ProviderMessage> {
     this.ensureCliDetected();
 
-    // Validate that model doesn't have a provider prefix
-    validateBareModelId(options.model, 'GeminiProvider');
+    // Validate that model doesn't have a provider prefix (except gemini- which should already be stripped)
+    validateBareModelId(options.model, 'GeminiProvider', 'gemini');
 
     if (!this.cliPath) {
       throw this.createError(

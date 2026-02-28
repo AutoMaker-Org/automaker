@@ -189,7 +189,15 @@ export function useGraphNodes({
     });
 
     return { nodes: nodeList, edges: edgeList };
-  }, [features, runningAutoTasks, filterResult, actionCallbacks, backgroundSettings]);
+  }, [
+    features,
+    runningAutoTasks,
+    filterResult,
+    actionCallbacks,
+    backgroundSettings,
+    renderMode,
+    enableEdgeAnimations,
+  ]);
 
   return { nodes, edges };
 }

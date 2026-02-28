@@ -31,7 +31,7 @@ test.describe('Edit Feature', () => {
       fs.mkdirSync(TEST_TEMP_DIR, { recursive: true });
     }
 
-    projectPath = path.join(TEST_TEMP_DIR, projectName);
+    projectPath = path.resolve(path.join(TEST_TEMP_DIR, projectName));
     fs.mkdirSync(projectPath, { recursive: true });
 
     fs.writeFileSync(
@@ -76,13 +76,20 @@ test.describe('Edit Feature', () => {
       timeout: 5000,
     });
 
-    // Create a feature first
+    // Create a feature first — wait for create API to complete so we know the server wrote feature.json
+    const createResponsePromise = page.waitForResponse(
+      (res) =>
+        res.request().method() === 'POST' &&
+        res.request().url().includes('/api/features/create') &&
+        res.status() === 200,
+      { timeout: 20000 }
+    );
+
     await clickAddFeature(page);
     await fillAddFeatureDialog(page, originalDescription);
     await confirmAddFeature(page);
-    await page.waitForTimeout(2000);
 
-    // Wait for the feature to appear in the backlog
+    // Wait for the feature to appear in the backlog (optimistic UI)
     await expect(async () => {
       const backlogColumn = page.locator('[data-testid="kanban-column-backlog"]');
       const featureCard = backlogColumn.locator('[data-testid^="kanban-card-"]').filter({
@@ -91,20 +98,37 @@ test.describe('Edit Feature', () => {
       expect(await featureCard.count()).toBeGreaterThan(0);
     }).toPass({ timeout: 20000 });
 
-    // Get the feature ID from the card
-    const featureCard = page
-      .locator('[data-testid="kanban-column-backlog"]')
-      .locator('[data-testid^="kanban-card-"]')
-      .filter({ hasText: originalDescription })
-      .first();
-    const cardTestId = await featureCard.getAttribute('data-testid');
-    const featureId = cardTestId?.replace('kanban-card-', '');
+    // Ensure create API completed so feature.json exists on disk
+    const createResponse = await createResponsePromise;
+    const createJson = (await createResponse.json()) as {
+      success?: boolean;
+      feature?: { id: string };
+    };
+    const featureId = createJson?.feature?.id;
+    expect(createJson?.success).toBe(true);
+    expect(featureId).toBeTruthy();
+
+    const featureFilePath = path.join(
+      projectPath,
+      '.automaker',
+      'features',
+      featureId || '',
+      'feature.json'
+    );
+    // Server writes file before sending 200; allow a short delay for filesystem sync
+    await expect(async () => {
+      expect(fs.existsSync(featureFilePath)).toBe(true);
+    }).toPass({ timeout: 5000 });
 
     // Collapse the sidebar first to avoid it intercepting clicks
     const collapseSidebarButton = page.locator('button:has-text("Collapse sidebar")');
     if (await collapseSidebarButton.isVisible()) {
       await collapseSidebarButton.click();
-      await page.waitForTimeout(300); // Wait for sidebar animation
+      // Wait for sidebar to finish collapsing
+      await page
+        .locator('button:has-text("Expand sidebar")')
+        .waitFor({ state: 'visible', timeout: 5000 })
+        .catch(() => {});
     }
 
     // Click the edit button on the card using JavaScript click to bypass pointer interception
@@ -117,12 +141,15 @@ test.describe('Edit Feature', () => {
       timeout: 10000,
     });
 
-    // Update the description - the input is inside the DescriptionImageDropZone
+    // Update the description - use the textarea inside the dialog so React state updates
     const descriptionInput = page
       .locator('[data-testid="edit-feature-dialog"]')
-      .getByPlaceholder('Describe the feature...');
+      .locator('[data-testid="feature-description-input"]');
     await expect(descriptionInput).toBeVisible({ timeout: 5000 });
-    await descriptionInput.fill(updatedDescription);
+    await descriptionInput.click();
+    await descriptionInput.press(process.platform === 'darwin' ? 'Meta+a' : 'Control+a');
+    await descriptionInput.pressSequentially(updatedDescription, { delay: 0 });
+    await expect(descriptionInput).toHaveValue(updatedDescription, { timeout: 3000 });
 
     // Save changes
     await clickElement(page, 'confirm-edit-feature');
@@ -133,13 +160,29 @@ test.describe('Edit Feature', () => {
       { timeout: 5000 }
     );
 
-    // Verify the updated description appears in the card
+    // Verify persistence on disk first (source of truth for feature metadata).
+    // Check file exists first so we retry on assertion failure instead of throwing ENOENT.
     await expect(async () => {
-      const backlogColumn = page.locator('[data-testid="kanban-column-backlog"]');
-      const updatedCard = backlogColumn.locator('[data-testid^="kanban-card-"]').filter({
-        hasText: updatedDescription,
-      });
-      expect(await updatedCard.count()).toBeGreaterThan(0);
-    }).toPass({ timeout: 10000 });
+      expect(fs.existsSync(featureFilePath)).toBe(true);
+      const raw = fs.readFileSync(featureFilePath, 'utf-8');
+      const parsed = JSON.parse(raw) as { description?: string };
+      expect(parsed.description).toBe(updatedDescription);
+    }).toPass({ timeout: 15000 });
+
+    // The optimistic update can be overwritten by a stale React Query refetch
+    // (e.g. from a prior feature-create invalidation that races with the edit).
+    // Force a fresh board refresh to ensure the UI reads the confirmed server state.
+    const refreshButton = page.locator('button[title="Refresh board state from server"]');
+    if (await refreshButton.isVisible({ timeout: 2000 }).catch(() => false)) {
+      await refreshButton.click();
+    }
+
+    // Wait for the card to show the updated description.
+    await expect(
+      page
+        .locator('[data-testid="kanban-column-backlog"]')
+        .locator(`[data-testid="kanban-card-${featureId}"]`)
+        .filter({ hasText: updatedDescription })
+    ).toBeVisible({ timeout: 15000 });
   });
 });

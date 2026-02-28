@@ -193,17 +193,16 @@ export function IssueDetailPanel({
               </>
             );
           })()}
-          {!isMobile && (
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => onCreateFeature(issue)}
-              title="Create a new feature to address this issue"
-            >
-              <Plus className="h-4 w-4 mr-1" />
-              Create Feature
-            </Button>
-          )}
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => onCreateFeature(issue)}
+            aria-label="Create Feature"
+            title="Create a new feature to address this issue"
+          >
+            <Plus className={cn('h-4 w-4', !isMobile && 'mr-1')} />
+            {!isMobile && 'Create Feature'}
+          </Button>
           <Button
             variant="outline"
             size="sm"
@@ -395,7 +394,7 @@ export function IssueDetailPanel({
           )}
         </div>
 
-        {/* Create Feature CTA - shown on mobile since it's hidden from the header */}
+        {/* Create Feature CTA */}
         {isMobile && (
           <div className="mt-6 p-4 rounded-lg bg-primary/5 border border-primary/20">
             <div className="flex items-center gap-2 mb-2">

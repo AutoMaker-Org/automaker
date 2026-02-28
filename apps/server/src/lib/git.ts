@@ -13,6 +13,27 @@ import { createLogger } from '@automaker/utils';
 
 const logger = createLogger('GitLib');
 
+// Extended PATH so git is found when the process does not inherit a full shell PATH
+// (e.g. Electron, some CI, or IDE-launched processes).
+const pathSeparator = process.platform === 'win32' ? ';' : ':';
+const extraPaths: string[] =
+  process.platform === 'win32'
+    ? ([
+        process.env.LOCALAPPDATA && `${process.env.LOCALAPPDATA}\\Programs\\Git\\cmd`,
+        process.env.PROGRAMFILES && `${process.env.PROGRAMFILES}\\Git\\cmd`,
+        process.env['ProgramFiles(x86)'] && `${process.env['ProgramFiles(x86)']}\\Git\\cmd`,
+      ].filter(Boolean) as string[])
+    : [
+        '/opt/homebrew/bin',
+        '/usr/local/bin',
+        '/usr/bin',
+        '/home/linuxbrew/.linuxbrew/bin',
+        process.env.HOME ? `${process.env.HOME}/.local/bin` : '',
+      ].filter(Boolean);
+
+const extendedPath = [process.env.PATH, ...extraPaths].filter(Boolean).join(pathSeparator);
+const gitEnv = { ...process.env, PATH: extendedPath };
+
 // ============================================================================
 // Secure Command Execution
 // ============================================================================
@@ -65,7 +86,14 @@ export async function execGitCommand(
     command: 'git',
     args,
     cwd,
-    ...(env !== undefined ? { env } : {}),
+    env:
+      env !== undefined
+        ? {
+            ...gitEnv,
+            ...env,
+            PATH: [gitEnv.PATH, env.PATH].filter(Boolean).join(pathSeparator),
+          }
+        : gitEnv,
     ...(abortController !== undefined ? { abortController } : {}),
   });
 

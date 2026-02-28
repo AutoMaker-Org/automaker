@@ -15,6 +15,7 @@ import {
   calculateReasoningTimeout,
   REASONING_TIMEOUT_MULTIPLIERS,
   DEFAULT_TIMEOUT_MS,
+  validateBareModelId,
 } from '@automaker/types';
 
 const OPENAI_API_KEY_ENV = 'OPENAI_API_KEY';
@@ -453,6 +454,21 @@ describe('codex-provider.ts', () => {
       expect(calculateReasoningTimeout('medium')).toBe(60000);
       expect(calculateReasoningTimeout('high')).toBe(90000);
       expect(calculateReasoningTimeout('xhigh')).toBe(120000);
+    });
+  });
+
+  describe('validateBareModelId integration', () => {
+    it('should allow codex- prefixed models for Codex provider with expectedProvider="codex"', () => {
+      expect(() => validateBareModelId('codex-gpt-4', 'CodexProvider', 'codex')).not.toThrow();
+      expect(() =>
+        validateBareModelId('codex-gpt-5.1-codex-max', 'CodexProvider', 'codex')
+      ).not.toThrow();
+    });
+
+    it('should reject other provider prefixes for Codex provider', () => {
+      expect(() => validateBareModelId('cursor-gpt-4', 'CodexProvider', 'codex')).toThrow();
+      expect(() => validateBareModelId('gemini-2.5-flash', 'CodexProvider', 'codex')).toThrow();
+      expect(() => validateBareModelId('copilot-gpt-4', 'CodexProvider', 'codex')).toThrow();
     });
   });
 });

@@ -1,4 +1,5 @@
 import { Page } from '@playwright/test';
+import { assertSafeProjectPath } from '../core/safe-paths';
 
 /**
  * Store version constants - centralized to avoid hardcoding across tests
@@ -108,18 +109,22 @@ export async function setupWelcomeView(
       // Disable splash screen in tests
       localStorage.setItem('automaker-disable-splash', 'true');
 
-      // Set up a mechanism to keep currentProject null even after settings hydration
-      // Settings API might restore a project, so we override it after hydration
-      // Use a flag to indicate we want welcome view
+      // Set up a mechanism to keep currentProject null even after settings hydration.
+      // Settings API might restore a project, so we watch for changes and override.
       sessionStorage.setItem('automaker-test-welcome-view', 'true');
 
-      // Override currentProject after a short delay to ensure it happens after settings hydration
-      setTimeout(() => {
+      // Use a MutationObserver + storage event to detect when hydration sets a project,
+      // then immediately override it back to null. This is more reliable than a fixed timeout.
+      const enforceWelcomeView = () => {
         const storage = localStorage.getItem('automaker-storage');
         if (storage) {
           try {
             const state = JSON.parse(storage);
-            if (state.state && sessionStorage.getItem('automaker-test-welcome-view') === 'true') {
+            if (
+              state.state &&
+              sessionStorage.getItem('automaker-test-welcome-view') === 'true' &&
+              state.state.currentProject !== null
+            ) {
               state.state.currentProject = null;
               state.state.currentView = 'welcome';
               localStorage.setItem('automaker-storage', JSON.stringify(state));
@@ -128,7 +133,17 @@ export async function setupWelcomeView(
             // Ignore parse errors
           }
         }
-      }, 2000); // Wait 2 seconds for settings hydration to complete
+      };
+
+      // Listen for storage changes (catches hydration from settings API)
+      window.addEventListener('storage', enforceWelcomeView);
+
+      // Also poll briefly to catch synchronous hydration that doesn't fire storage events
+      const pollInterval = setInterval(enforceWelcomeView, 200);
+      setTimeout(() => {
+        clearInterval(pollInterval);
+        window.removeEventListener('storage', enforceWelcomeView);
+      }, 5000); // Stop after 5s - hydration should be done by then
     },
     { opts: options, versions: STORE_VERSIONS }
   );
@@ -136,7 +151,8 @@ export async function setupWelcomeView(
 
 /**
  * Set up localStorage with a project at a real filesystem path
- * Use this when testing with actual files on disk
+ * Use this when testing with actual files on disk.
+ * Project path must be under test/ or temp to avoid affecting the main project's git.
  *
  * @param page - Playwright page
  * @param projectPath - Absolute path to the project directory
@@ -156,6 +172,7 @@ export async function setupRealProject(
     projectId?: string;
   }
 ): Promise<void> {
+  assertSafeProjectPath(projectPath);
   await page.addInitScript(
     ({
       path,

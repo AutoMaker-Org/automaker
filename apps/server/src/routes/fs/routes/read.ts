@@ -3,16 +3,29 @@
  */
 
 import type { Request, Response } from 'express';
+import path from 'path';
 import * as secureFs from '../../../lib/secure-fs.js';
 import { PathNotAllowedError } from '@automaker/platform';
 import { getErrorMessage, logError } from '../common.js';
 
 // Optional files that are expected to not exist in new projects
 // Don't log ENOENT errors for these to reduce noise
-const OPTIONAL_FILES = ['categories.json', 'app_spec.txt'];
+const OPTIONAL_FILES = ['categories.json', 'app_spec.txt', 'context-metadata.json'];
 
 function isOptionalFile(filePath: string): boolean {
-  return OPTIONAL_FILES.some((optionalFile) => filePath.endsWith(optionalFile));
+  const basename = path.basename(filePath);
+  if (OPTIONAL_FILES.some((optionalFile) => basename === optionalFile)) {
+    return true;
+  }
+  // Context and memory files may not exist yet during create/delete or test races
+  if (filePath.includes('.automaker/context/') || filePath.includes('.automaker/memory/')) {
+    const name = path.basename(filePath);
+    const lower = name.toLowerCase();
+    if (lower.endsWith('.md') || lower.endsWith('.txt') || lower.endsWith('.markdown')) {
+      return true;
+    }
+  }
+  return false;
 }
 
 function isENOENT(error: unknown): boolean {
@@ -39,12 +52,14 @@ export function createReadHandler() {
         return;
       }
 
-      // Don't log ENOENT errors for optional files (expected to be missing in new projects)
-      const shouldLog = !(isENOENT(error) && isOptionalFile(req.body?.filePath || ''));
-      if (shouldLog) {
+      const filePath = req.body?.filePath || '';
+      const optionalMissing = isENOENT(error) && isOptionalFile(filePath);
+      if (!optionalMissing) {
         logError(error, 'Read file failed');
       }
-      res.status(500).json({ success: false, error: getErrorMessage(error) });
+      // Return 404 for missing optional files so clients can handle "not found"
+      const status = optionalMissing ? 404 : 500;
+      res.status(status).json({ success: false, error: getErrorMessage(error) });
     }
   };
 }

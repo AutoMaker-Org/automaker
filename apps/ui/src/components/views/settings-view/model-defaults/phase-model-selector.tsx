@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { useAppStore } from '@/store/app-store';
+import { useShallow } from 'zustand/react/shallow';
 import { useIsMobile } from '@/hooks/use-media-query';
 import { useOpencodeModels } from '@/hooks/queries';
 import type {
@@ -186,7 +187,23 @@ export function PhaseModelSelector({
     claudeCompatibleProviders,
     defaultThinkingLevel: storeDefaultThinkingLevel,
     defaultReasoningEffort: storeDefaultReasoningEffort,
-  } = useAppStore();
+  } = useAppStore(
+    useShallow((state) => ({
+      enabledCursorModels: state.enabledCursorModels,
+      enabledGeminiModels: state.enabledGeminiModels,
+      enabledCopilotModels: state.enabledCopilotModels,
+      favoriteModels: state.favoriteModels,
+      toggleFavoriteModel: state.toggleFavoriteModel,
+      codexModels: state.codexModels,
+      codexModelsLoading: state.codexModelsLoading,
+      fetchCodexModels: state.fetchCodexModels,
+      enabledDynamicModelIds: state.enabledDynamicModelIds,
+      disabledProviders: state.disabledProviders,
+      claudeCompatibleProviders: state.claudeCompatibleProviders,
+      defaultThinkingLevel: state.defaultThinkingLevel,
+      defaultReasoningEffort: state.defaultReasoningEffort,
+    }))
+  );
 
   // Use React Query for OpenCode models so that changes made in the settings tab
   // (which also uses React Query) are immediately reflected here via the shared cache,
@@ -674,6 +691,7 @@ export function PhaseModelSelector({
     transformedCodexModels,
     allOpencodeModels,
     disabledProviders,
+    isCursorDisabled,
   ]);
 
   // Group OpenCode models by model type for better organization

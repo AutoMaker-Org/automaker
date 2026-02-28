@@ -70,6 +70,8 @@ export async function parseAndCreateFeatures(
         priority: feature.priority || 2,
         complexity: feature.complexity || 'moderate',
         dependencies: feature.dependencies || [],
+        planningMode: 'skip',
+        requirePlanApproval: false,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };

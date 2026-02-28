@@ -1137,7 +1137,8 @@ export interface WorktreeAPI {
   pull: (
     worktreePath: string,
     remote?: string,
-    stashIfNeeded?: boolean
+    stashIfNeeded?: boolean,
+    remoteBranch?: string
   ) => Promise<{
     success: boolean;
     result?: {

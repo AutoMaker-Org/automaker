@@ -34,6 +34,7 @@ import type {
   BacklogPlanResult,
   FeatureStatusWithPipeline,
   FeatureTemplate,
+  ReasoningEffort,
 } from '@automaker/types';
 import { pathsEqual } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -977,23 +978,27 @@ export function BoardView() {
 
   // Helper that creates a feature and immediately starts it (used by conflict handlers and the Make button)
   const handleAddAndStartFeature = useCallback(
-    async (featureData: Parameters<typeof handleAddFeature>[0]) => {
-      // Capture existing feature IDs before adding
-      const featuresBeforeIds = new Set(useAppStore.getState().features.map((f) => f.id));
+    async (featureData: Parameters<typeof handleAddFeature>[0]): Promise<string | null> => {
+      let createdFeatureId: string | null = null;
       try {
         // Create feature directly with in_progress status to avoid brief backlog flash
-        await handleAddFeature({ ...featureData, initialStatus: 'in_progress' });
+        const createdFeature = await handleAddFeature({
+          ...featureData,
+          initialStatus: 'in_progress',
+        });
+        createdFeatureId = createdFeature?.id ?? null;
       } catch (error) {
         logger.error('Failed to create feature:', error);
         toast.error('Failed to create feature', {
           description: error instanceof Error ? error.message : 'An error occurred',
         });
-        return;
+        return null;
       }
 
-      // Find the newly created feature by looking for an ID that wasn't in the original set
       const latestFeatures = useAppStore.getState().features;
-      const newFeature = latestFeatures.find((f) => !featuresBeforeIds.has(f.id));
+      const newFeature = createdFeatureId
+        ? latestFeatures.find((f) => f.id === createdFeatureId)
+        : undefined;
 
       if (newFeature) {
         try {
@@ -1010,6 +1015,8 @@ export function BoardView() {
           description: 'The feature was created but could not be started automatically.',
         });
       }
+
+      return createdFeatureId;
     },
     [handleAddFeature, handleStartImplementation]
   );
@@ -1018,7 +1025,12 @@ export function BoardView() {
   const handleQuickAdd = useCallback(
     async (
       description: string,
-      modelEntry: { model: string; thinkingLevel?: string; reasoningEffort?: string }
+      modelEntry: {
+        model: string;
+        thinkingLevel?: string;
+        reasoningEffort?: string;
+        providerId?: string;
+      }
     ) => {
       // Generate a title from the first line of the description
       const title = description.split('\n')[0].substring(0, 100);
@@ -1032,7 +1044,8 @@ export function BoardView() {
         skipTests: defaultSkipTests,
         model: resolveModelString(modelEntry.model) as ModelAlias,
         thinkingLevel: (modelEntry.thinkingLevel as ThinkingLevel) || 'none',
-        reasoningEffort: modelEntry.reasoningEffort,
+        reasoningEffort: modelEntry.reasoningEffort as ReasoningEffort,
+        providerId: modelEntry.providerId,
         branchName: addFeatureUseSelectedWorktreeBranch ? selectedWorktreeBranch : undefined,
         priority: 2,
         planningMode: useAppStore.getState().defaultPlanningMode ?? 'skip',
@@ -1053,7 +1066,12 @@ export function BoardView() {
   const handleQuickAddAndStart = useCallback(
     async (
       description: string,
-      modelEntry: { model: string; thinkingLevel?: string; reasoningEffort?: string }
+      modelEntry: {
+        model: string;
+        thinkingLevel?: string;
+        reasoningEffort?: string;
+        providerId?: string;
+      }
     ) => {
       // Generate a title from the first line of the description
       const title = description.split('\n')[0].substring(0, 100);
@@ -1067,7 +1085,8 @@ export function BoardView() {
         skipTests: defaultSkipTests,
         model: resolveModelString(modelEntry.model) as ModelAlias,
         thinkingLevel: (modelEntry.thinkingLevel as ThinkingLevel) || 'none',
-        reasoningEffort: modelEntry.reasoningEffort,
+        reasoningEffort: modelEntry.reasoningEffort as ReasoningEffort,
+        providerId: modelEntry.providerId,
         branchName: addFeatureUseSelectedWorktreeBranch ? selectedWorktreeBranch : undefined,
         priority: 2,
         planningMode: useAppStore.getState().defaultPlanningMode ?? 'skip',
@@ -1104,6 +1123,8 @@ export function BoardView() {
       title: prInfo.title,
       // Pass the worktree's branch so features are created on the correct worktree
       headRefName: worktree.branch,
+      // Pass the PR URL so features are created with prUrl set
+      url: prInfo.url,
     });
     setShowPRCommentDialog(true);
   }, []);
@@ -1132,11 +1153,22 @@ export function BoardView() {
         priority: 1,
         planningMode: 'skip' as const,
         requirePlanApproval: false,
+        dependencies: [],
       };
 
-      await handleAddAndStartFeature(featureData);
+      const createdFeatureId = await handleAddAndStartFeature(featureData);
+
+      // Set prUrl on the created feature if the PR has a URL
+      if (prInfo.url && createdFeatureId) {
+        updateFeature(createdFeatureId, { prUrl: prInfo.url });
+        try {
+          await persistFeatureUpdate(createdFeatureId, { prUrl: prInfo.url });
+        } catch (error) {
+          logger.error('Failed to persist PR URL on created feature:', error);
+        }
+      }
     },
-    [handleAddAndStartFeature, defaultSkipTests]
+    [handleAddAndStartFeature, defaultSkipTests, updateFeature, persistFeatureUpdate]
   );
 
   // Handler for resolving conflicts - opens dialog to select remote branch, then creates a feature

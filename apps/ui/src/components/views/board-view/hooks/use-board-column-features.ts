@@ -1,5 +1,5 @@
 // @ts-nocheck - column filtering logic with dependency resolution and status mapping
-import { useMemo, useCallback } from 'react';
+import { useMemo, useCallback, useEffect, useRef } from 'react';
 import { Feature, useAppStore } from '@/store/app-store';
 import {
   createFeatureMap,
@@ -28,6 +28,45 @@ export function useBoardColumnFeatures({
   currentWorktreeBranch,
   projectPath,
 }: UseBoardColumnFeaturesProps) {
+  // Get recently completed features from store for race condition protection
+  const recentlyCompletedFeatures = useAppStore((state) => state.recentlyCompletedFeatures);
+  const clearRecentlyCompletedFeatures = useAppStore(
+    (state) => state.clearRecentlyCompletedFeatures
+  );
+
+  // Track previous feature IDs to detect when features list has been refreshed
+  const prevFeatureIdsRef = useRef<Set<string>>(new Set());
+
+  // Clear recently completed features when the cache refreshes with updated statuses.
+  //
+  // RACE CONDITION SCENARIO THIS PREVENTS:
+  // 1. Feature completes on server -> status becomes 'verified'/'completed' on disk
+  // 2. Server emits auto_mode_feature_complete event
+  // 3. Frontend receives event -> removes feature from runningTasks, adds to recentlyCompletedFeatures
+  // 4. React Query invalidates features query, triggers async refetch
+  // 5. RACE: Before refetch completes, component may re-render with stale cache data
+  //    where status='backlog' and feature is no longer in runningTasks
+  // 6. This hook prevents the feature from appearing in backlog during that window
+  //
+  // When the refetch completes with fresh data (status='verified'/'completed'),
+  // this effect clears the recentlyCompletedFeatures set since it's no longer needed.
+  useEffect(() => {
+    const currentIds = new Set(features.map((f) => f.id));
+
+    // Check if any recently completed features now have terminal statuses in the new data
+    // If so, we can clear the tracking since the cache is now fresh
+    const hasUpdatedStatus = Array.from(recentlyCompletedFeatures).some((featureId) => {
+      const feature = features.find((f) => f.id === featureId);
+      return feature && (feature.status === 'verified' || feature.status === 'completed');
+    });
+
+    if (hasUpdatedStatus) {
+      clearRecentlyCompletedFeatures();
+    }
+
+    prevFeatureIdsRef.current = currentIds;
+  }, [features, recentlyCompletedFeatures, clearRecentlyCompletedFeatures]);
+
   // Memoize column features to prevent unnecessary re-renders
   const columnFeaturesMap = useMemo(() => {
     // Use a more flexible type to support dynamic pipeline statuses
@@ -44,6 +83,9 @@ export function useBoardColumnFeatures({
     // briefly appearing in backlog during the timing gap between when the server
     // starts executing a feature and when the UI receives the event/status update.
     const allRunningTaskIds = new Set(runningAutoTasksAllWorktrees);
+    // Get recently completed features for additional race condition protection
+    // These features should not appear in backlog even if cache has stale status
+    const recentlyCompleted = recentlyCompletedFeatures;
 
     // Filter features by search query (case-insensitive)
     const normalizedQuery = searchQuery.toLowerCase().trim();
@@ -148,12 +190,19 @@ export function useBoardColumnFeatures({
       // Filter all items by worktree, including backlog
       // This ensures backlog items with a branch assigned only show in that branch
       //
-      // 'ready' and 'interrupted' are transitional statuses that don't have dedicated columns:
+      // 'merge_conflict', 'ready', and 'interrupted' are backlog-lane statuses that don't
+      // have dedicated columns:
+      // - 'merge_conflict': Automatic merge failed; user must resolve conflicts before restart
       // - 'ready': Feature has an approved plan, waiting to be picked up for execution
       // - 'interrupted': Feature execution was aborted (e.g., user stopped it, server restart)
       // Both display in the backlog column and need the same allRunningTaskIds race-condition
       // protection as 'backlog' to prevent briefly flashing in backlog when already executing.
-      if (status === 'backlog' || status === 'ready' || status === 'interrupted') {
+      if (
+        status === 'backlog' ||
+        status === 'merge_conflict' ||
+        status === 'ready' ||
+        status === 'interrupted'
+      ) {
         // IMPORTANT: Check if this feature is running on ANY worktree before placing in backlog.
         // This prevents a race condition where the feature has started executing on the server
         // (and is tracked in a different worktree's running list) but the disk status hasn't
@@ -165,6 +214,14 @@ export function useBoardColumnFeatures({
           if (matchesWorktree) {
             map.in_progress.push(f);
           }
+        } else if (recentlyCompleted.has(f.id)) {
+          // Feature recently completed - skip placing in backlog to prevent race condition
+          // where stale cache has status='backlog' but feature actually completed.
+          // The feature will be placed correctly once the cache refreshes.
+          // Log for debugging (can remove after verification)
+          console.debug(
+            `Feature ${f.id} recently completed - skipping backlog placement during cache refresh`
+          );
         } else if (matchesWorktree) {
           map.backlog.push(f);
         }
@@ -231,6 +288,7 @@ export function useBoardColumnFeatures({
     currentWorktreePath,
     currentWorktreeBranch,
     projectPath,
+    recentlyCompletedFeatures,
   ]);
 
   const getColumnFeatures = useCallback(

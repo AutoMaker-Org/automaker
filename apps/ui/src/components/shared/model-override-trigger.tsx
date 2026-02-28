@@ -48,12 +48,13 @@ export function ModelOverrideTrigger({
       const globalDefault = phaseModels[phase];
       const normalizedGlobal = normalizeEntry(globalDefault);
 
-      // Compare models (and thinking levels if both have them)
+      // Compare models, thinking levels, and provider IDs
       const modelsMatch = entry.model === normalizedGlobal.model;
       const thinkingMatch =
         (entry.thinkingLevel || 'none') === (normalizedGlobal.thinkingLevel || 'none');
+      const providerMatch = entry.providerId === normalizedGlobal.providerId;
 
-      if (modelsMatch && thinkingMatch) {
+      if (modelsMatch && thinkingMatch && providerMatch) {
         onModelChange(null); // Clear override
       } else {
         onModelChange(entry); // Set override

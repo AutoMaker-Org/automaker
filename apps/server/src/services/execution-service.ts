@@ -214,7 +214,12 @@ ${feature.spec}
       const branchName = feature.branchName;
       if (!worktreePath && useWorktrees && branchName) {
         worktreePath = await this.worktreeResolver.findWorktreeForBranch(projectPath, branchName);
-        if (worktreePath) logger.info(`Using worktree for branch "${branchName}": ${worktreePath}`);
+        if (!worktreePath) {
+          throw new Error(
+            `Worktree enabled but no worktree found for feature branch "${branchName}".`
+          );
+        }
+        logger.info(`Using worktree for branch "${branchName}": ${worktreePath}`);
       }
       const workDir = worktreePath ? path.resolve(worktreePath) : path.resolve(projectPath);
       validateWorkingDirectory(workDir);
@@ -304,6 +309,7 @@ ${feature.spec}
           useClaudeCodeSystemPrompt,
           thinkingLevel: feature.thinkingLevel,
           reasoningEffort: feature.reasoningEffort,
+          providerId: feature.providerId,
           branchName: feature.branchName ?? null,
         }
       );
@@ -370,6 +376,7 @@ Please continue from where you left off and complete all remaining tasks. Use th
             useClaudeCodeSystemPrompt,
             thinkingLevel: feature.thinkingLevel,
             reasoningEffort: feature.reasoningEffort,
+            providerId: feature.providerId,
             branchName: feature.branchName ?? null,
           }
         );

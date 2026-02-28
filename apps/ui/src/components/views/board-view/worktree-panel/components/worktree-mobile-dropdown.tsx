@@ -7,15 +7,18 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { GitBranch, ChevronDown, CircleDot, Check } from 'lucide-react';
+import { GitBranch, ChevronDown, CircleDot, Check, Globe } from 'lucide-react';
 import { Spinner } from '@/components/ui/spinner';
 import { cn } from '@/lib/utils';
-import type { WorktreeInfo } from '../types';
+import type { WorktreeInfo, DevServerInfo } from '../types';
 
 interface WorktreeMobileDropdownProps {
   worktrees: WorktreeInfo[];
   isWorktreeSelected: (worktree: WorktreeInfo) => boolean;
   hasRunningFeatures: (worktree: WorktreeInfo) => boolean;
+  isDevServerRunning: (worktree: WorktreeInfo) => boolean;
+  isDevServerStarting: (worktree: WorktreeInfo) => boolean;
+  getDevServerInfo: (worktree: WorktreeInfo) => DevServerInfo | undefined;
   isActivating: boolean;
   branchCardCounts?: Record<string, number>;
   onSelectWorktree: (worktree: WorktreeInfo) => void;
@@ -25,6 +28,9 @@ export function WorktreeMobileDropdown({
   worktrees,
   isWorktreeSelected,
   hasRunningFeatures,
+  isDevServerRunning,
+  isDevServerStarting,
+  getDevServerInfo,
   isActivating,
   branchCardCounts,
   onSelectWorktree,
@@ -59,6 +65,9 @@ export function WorktreeMobileDropdown({
         {worktrees.map((worktree) => {
           const isSelected = isWorktreeSelected(worktree);
           const isRunning = hasRunningFeatures(worktree);
+          const devServerRunning = isDevServerRunning(worktree);
+          const devServerStarting = isDevServerStarting(worktree);
+          const devServerInfo = getDevServerInfo(worktree);
           const cardCount = branchCardCounts?.[worktree.branch];
           const hasChanges = worktree.hasChanges;
           const changedFilesCount = worktree.changedFilesCount;
@@ -103,6 +112,10 @@ export function WorktreeMobileDropdown({
                     {changedFilesCount ?? '!'}
                   </span>
                 )}
+                {devServerRunning && devServerInfo?.urlDetected === true && (
+                  <Globe className="w-3 h-3 text-green-500" />
+                )}
+                {devServerStarting && <Spinner size="xs" variant="muted" />}
               </div>
             </DropdownMenuItem>
           );

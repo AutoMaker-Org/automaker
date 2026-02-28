@@ -12,6 +12,7 @@ import { getElectronAPI } from '@/lib/electron';
 import { queryKeys } from '@/lib/query-keys';
 import { STALE_TIMES } from '@/lib/query-client';
 import { createSmartPollingInterval, getGlobalEventsRecent } from '@/hooks/use-event-recency';
+import { isPipelineStatus } from '@automaker/types';
 import type { Feature } from '@/store/app-store';
 
 const FEATURES_REFETCH_ON_FOCUS = false;
@@ -25,7 +26,7 @@ const FEATURES_CACHE_PREFIX = 'automaker:features-cache:';
  * Bump this version whenever the Feature shape changes so stale localStorage
  * entries with incompatible schemas are automatically discarded.
  */
-const FEATURES_CACHE_VERSION = 1;
+const FEATURES_CACHE_VERSION = 2;
 
 /** Maximum number of per-project cache entries to keep in localStorage (LRU). */
 const MAX_FEATURES_CACHE_ENTRIES = 10;
@@ -37,13 +38,75 @@ interface PersistedFeaturesCache {
   features: Feature[];
 }
 
+const STATIC_FEATURE_STATUSES: ReadonlySet<string> = new Set([
+  'backlog',
+  'merge_conflict',
+  'ready',
+  'in_progress',
+  'interrupted',
+  'waiting_approval',
+  'verified',
+  'completed',
+]);
+
+function isValidFeatureStatus(value: unknown): value is Feature['status'] {
+  return (
+    typeof value === 'string' && (STATIC_FEATURE_STATUSES.has(value) || isPipelineStatus(value))
+  );
+}
+
+function sanitizePersistedFeatureEntry(value: unknown): Feature | null {
+  if (typeof value !== 'object' || value === null) {
+    return null;
+  }
+
+  const raw = value as Record<string, unknown>;
+  const id = typeof raw.id === 'string' ? raw.id.trim() : '';
+  if (!id) {
+    return null;
+  }
+
+  return {
+    ...(raw as Feature),
+    id,
+    title: typeof raw.title === 'string' ? raw.title : undefined,
+    titleGenerating: typeof raw.titleGenerating === 'boolean' ? raw.titleGenerating : undefined,
+    category: typeof raw.category === 'string' ? raw.category : '',
+    description: typeof raw.description === 'string' ? raw.description : '',
+    steps: Array.isArray(raw.steps)
+      ? raw.steps.filter((step): step is string => typeof step === 'string')
+      : [],
+    status: isValidFeatureStatus(raw.status) ? raw.status : 'backlog',
+    branchName:
+      typeof raw.branchName === 'string' && raw.branchName.trim() ? raw.branchName : undefined,
+  };
+}
+
+export function sanitizePersistedFeatures(features: unknown): Feature[] {
+  if (!Array.isArray(features)) {
+    return [];
+  }
+  const sanitized: Feature[] = [];
+  for (const feature of features) {
+    const normalized = sanitizePersistedFeatureEntry(feature);
+    if (normalized) {
+      sanitized.push(normalized);
+    }
+  }
+  return sanitized;
+}
+
 function readPersistedFeatures(projectPath: string): PersistedFeaturesCache | null {
   if (typeof window === 'undefined') return null;
   try {
     const raw = window.localStorage.getItem(`${FEATURES_CACHE_PREFIX}${projectPath}`);
     if (!raw) return null;
-    const parsed = JSON.parse(raw) as PersistedFeaturesCache;
-    if (!parsed || !Array.isArray(parsed.features) || typeof parsed.timestamp !== 'number') {
+    const parsed = JSON.parse(raw) as {
+      schemaVersion?: number;
+      timestamp?: number;
+      features?: unknown;
+    };
+    if (!parsed || typeof parsed.timestamp !== 'number') {
       return null;
     }
     // Reject entries written by an older (or newer) schema version
@@ -52,7 +115,31 @@ function readPersistedFeatures(projectPath: string): PersistedFeaturesCache | nu
       window.localStorage.removeItem(`${FEATURES_CACHE_PREFIX}${projectPath}`);
       return null;
     }
-    return parsed;
+    const features = sanitizePersistedFeatures(parsed.features);
+
+    // If schema claims valid but nothing survived sanitization, treat as corrupt.
+    if (Array.isArray(parsed.features) && parsed.features.length > 0 && features.length === 0) {
+      window.localStorage.removeItem(`${FEATURES_CACHE_PREFIX}${projectPath}`);
+      return null;
+    }
+
+    // Migrate partial/corrupt entries in-place so later reads are clean.
+    if (Array.isArray(parsed.features) && features.length !== parsed.features.length) {
+      window.localStorage.setItem(
+        `${FEATURES_CACHE_PREFIX}${projectPath}`,
+        JSON.stringify({
+          schemaVersion: FEATURES_CACHE_VERSION,
+          timestamp: parsed.timestamp,
+          features,
+        } satisfies PersistedFeaturesCache)
+      );
+    }
+
+    return {
+      schemaVersion: FEATURES_CACHE_VERSION,
+      timestamp: parsed.timestamp,
+      features,
+    };
   } catch {
     return null;
   }

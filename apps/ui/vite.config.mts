@@ -239,12 +239,22 @@ export default defineConfig(({ command }) => {
       swCacheBuster(),
     ],
     resolve: {
-      alias: {
-        '@': path.resolve(__dirname, './src'),
-      },
-      // Deduplicate React to prevent "Cannot read properties of null (reading 'useState')"
-      // errors caused by CJS packages (like use-sync-external-store used by zustand@4 inside
-      // @xyflow/react) resolving React to a different instance than the pre-bundled ESM React.
+      alias: [
+        { find: '@', replacement: path.resolve(__dirname, './src') },
+        // Force ALL React imports (including from nested deps like zustand@4 inside
+        // @xyflow/react) to resolve to the single copy in the workspace root node_modules.
+        // This prevents "Cannot read properties of null (reading 'useState')" caused by
+        // react-dom setting the hooks dispatcher on one React instance while component
+        // code reads it from a different instance.
+        {
+          find: /^react-dom(\/|$)/,
+          replacement: path.resolve(__dirname, '../../node_modules/react-dom') + '/',
+        },
+        {
+          find: /^react(\/|$)/,
+          replacement: path.resolve(__dirname, '../../node_modules/react') + '/',
+        },
+      ],
       dedupe: ['react', 'react-dom'],
     },
     server: {
@@ -338,11 +348,17 @@ export default defineConfig(({ command }) => {
     },
     optimizeDeps: {
       exclude: ['@automaker/platform'],
-      // Ensure CJS packages that use require('react') are pre-bundled together with React
-      // so that the CJS interop resolves to the same React instance as the rest of the app.
-      // Without this, use-sync-external-store (used by zustand@4 inside @xyflow/react) may
-      // get a null React reference, causing "Cannot read properties of null (reading 'useState')".
-      include: ['react', 'react-dom', 'use-sync-external-store'],
+      // Pre-bundle CJS packages that use require('react') so the CJS interop resolves to
+      // the same React instance as the rest of the app. The nested zustand@4 inside
+      // @xyflow/react uses use-sync-external-store/shim/with-selector which does
+      // require('react') — both the base and subpath must be included here.
+      include: [
+        'react',
+        'react-dom',
+        'use-sync-external-store',
+        'use-sync-external-store/shim/with-selector',
+        '@xyflow/react',
+      ],
     },
     define: {
       __APP_VERSION__: JSON.stringify(appVersion),

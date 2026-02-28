@@ -67,6 +67,16 @@ export function registerProvider(name: string, registration: ProviderRegistratio
   providerRegistry.set(name.toLowerCase(), registration);
 }
 
+/** Cached mock provider instance when AUTOMAKER_MOCK_AGENT is set (E2E/CI). */
+let mockProviderInstance: BaseProvider | null = null;
+
+function getMockProvider(): BaseProvider {
+  if (!mockProviderInstance) {
+    mockProviderInstance = new MockProvider();
+  }
+  return mockProviderInstance;
+}
+
 export class ProviderFactory {
   /**
    * Determine which provider to use for a given model
@@ -75,6 +85,9 @@ export class ProviderFactory {
    * @returns Provider name (ModelProvider type)
    */
   static getProviderNameForModel(model: string): ModelProvider {
+    if (process.env.AUTOMAKER_MOCK_AGENT === 'true') {
+      return 'claude' as ModelProvider; // Name only; getProviderForModel returns MockProvider
+    }
     const lowerModel = model.toLowerCase();
 
     // Get all registered providers sorted by priority (descending)
@@ -113,6 +126,9 @@ export class ProviderFactory {
     modelId: string,
     options: { throwOnDisconnected?: boolean } = {}
   ): BaseProvider {
+    if (process.env.AUTOMAKER_MOCK_AGENT === 'true') {
+      return getMockProvider();
+    }
     const { throwOnDisconnected = true } = options;
     const providerName = this.getProviderForModelName(modelId);
 
@@ -142,6 +158,9 @@ export class ProviderFactory {
    * Get the provider name for a given model ID (without creating provider instance)
    */
   static getProviderForModelName(modelId: string): string {
+    if (process.env.AUTOMAKER_MOCK_AGENT === 'true') {
+      return 'claude';
+    }
     const lowerModel = modelId.toLowerCase();
 
     // Get all registered providers sorted by priority (descending)
@@ -272,6 +291,7 @@ export class ProviderFactory {
 // =============================================================================
 
 // Import providers for registration side-effects
+import { MockProvider } from './mock-provider.js';
 import { ClaudeProvider } from './claude-provider.js';
 import { CursorProvider } from './cursor-provider.js';
 import { CodexProvider } from './codex-provider.js';

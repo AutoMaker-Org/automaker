@@ -209,10 +209,12 @@ export function GitHubIssuesView() {
             model: featureData.model,
             thinkingLevel: featureData.thinkingLevel,
             reasoningEffort: featureData.reasoningEffort,
+            providerId: featureData.providerId,
             skipTests: featureData.skipTests,
             branchName: featureData.workMode === 'current' ? currentBranch : featureData.branchName,
             planningMode: featureData.planningMode,
             requirePlanApproval: featureData.requirePlanApproval,
+            dependencies: [],
             excludedPipelineSteps: featureData.excludedPipelineSteps,
             ...(featureData.imagePaths?.length ? { imagePaths: featureData.imagePaths } : {}),
             ...(featureData.textFilePaths?.length
@@ -288,6 +290,9 @@ export function GitHubIssuesView() {
             model: resolveModelString('opus'),
             thinkingLevel: 'none' as const,
             branchName: currentBranch,
+            planningMode: 'skip' as const,
+            requirePlanApproval: false,
+            dependencies: [],
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
           };

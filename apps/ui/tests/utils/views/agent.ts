@@ -21,6 +21,9 @@ export async function getNewSessionButton(page: Page): Promise<Locator> {
 export async function clickNewSessionButton(page: Page): Promise<void> {
   // Wait for splash screen to disappear first (safety net)
   await waitForSplashScreenToDisappear(page, 3000);
+  // Ensure session list (and thus SessionManager) is visible before clicking
+  const sessionList = page.locator('[data-testid="session-list"]');
+  await sessionList.waitFor({ state: 'visible', timeout: 10000 });
   const button = await getNewSessionButton(page);
   await button.click();
 }
@@ -76,12 +79,16 @@ export async function countSessionItems(page: Page): Promise<number> {
 
 /**
  * Wait for a new session to be created (by checking if a session item appears)
+ * Scopes to session-list to match countSessionItems and avoid matching stale elements
  */
 export async function waitForNewSession(page: Page, options?: { timeout?: number }): Promise<void> {
-  // Wait for any session item to appear
-  const sessionItem = page.locator('[data-testid^="session-item-"]').first();
-  await sessionItem.waitFor({
-    timeout: options?.timeout ?? 5000,
-    state: 'visible',
-  });
+  const timeout = options?.timeout ?? 10000;
+
+  // Ensure session list container is visible first (handles sidebar render delay)
+  const sessionList = page.locator('[data-testid="session-list"]');
+  await sessionList.waitFor({ state: 'visible', timeout });
+
+  // Wait for a session item to appear within the session list
+  const sessionItem = sessionList.locator('[data-testid^="session-item-"]').first();
+  await sessionItem.waitFor({ state: 'visible', timeout });
 }

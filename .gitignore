@@ -70,6 +70,11 @@ test/opus-thinking-*/
 test/agent-session-test-*/
 test/feature-backlog-test-*/
 test/running-task-display-test-*/
+test/agent-output-modal-responsive-*/
+test/fixtures/.worker-*/
+test/board-bg-test-*/
+test/edit-feature-test-*/
+test/open-project-test-*/
 
 # Environment files (keep .example)
 .env

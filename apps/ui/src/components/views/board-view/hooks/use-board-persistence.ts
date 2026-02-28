@@ -32,6 +32,14 @@ export function useBoardPersistence({ currentProject }: UseBoardPersistenceProps
     ) => {
       if (!currentProject) return;
 
+      // Cancel any in-flight refetches to prevent them from overwriting our optimistic update.
+      // Without this, a slow background refetch (e.g., from a prior create/invalidate) can
+      // resolve after setQueryData and overwrite the cache with stale data.
+      await queryClient.cancelQueries({
+        queryKey: queryKeys.features.all(currentProject.path),
+        exact: true,
+      });
+
       // Capture previous cache snapshot for rollback on error
       const previousFeatures = queryClient.getQueryData<Feature[]>(
         queryKeys.features.all(currentProject.path)
@@ -123,6 +131,12 @@ export function useBoardPersistence({ currentProject }: UseBoardPersistenceProps
         throw new Error('Features API not available');
       }
 
+      // Cancel any in-flight refetches to prevent them from overwriting our optimistic update
+      await queryClient.cancelQueries({
+        queryKey: queryKeys.features.all(currentProject.path),
+        exact: true,
+      });
+
       // Capture previous cache snapshot for synchronous rollback on error
       const previousFeatures = queryClient.getQueryData<Feature[]>(
         queryKeys.features.all(currentProject.path)
@@ -174,6 +188,12 @@ export function useBoardPersistence({ currentProject }: UseBoardPersistenceProps
   const persistFeatureDelete = useCallback(
     async (featureId: string) => {
       if (!currentProject) return;
+
+      // Cancel any in-flight refetches to prevent them from overwriting our optimistic update
+      await queryClient.cancelQueries({
+        queryKey: queryKeys.features.all(currentProject.path),
+        exact: true,
+      });
 
       // Optimistically remove from React Query cache for immediate board refresh
       const previousFeatures = queryClient.getQueryData<Feature[]>(

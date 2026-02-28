@@ -43,7 +43,11 @@ export function createUpdateHandler(featureLoader: FeatureLoader, events?: Event
 
       // Get the current feature to detect status changes
       const currentFeature = await featureLoader.get(projectPath, featureId);
-      const previousStatus = currentFeature?.status as FeatureStatus | undefined;
+      if (!currentFeature) {
+        res.status(404).json({ success: false, error: `Feature ${featureId} not found` });
+        return;
+      }
+      const previousStatus = currentFeature.status as FeatureStatus;
       const newStatus = updates.status as FeatureStatus | undefined;
 
       const updated = await featureLoader.update(

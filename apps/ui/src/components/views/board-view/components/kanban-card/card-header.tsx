@@ -1,4 +1,4 @@
-import { memo, useState } from 'react';
+import { memo, useState, useMemo } from 'react';
 import type { DraggableAttributes, DraggableSyntheticListeners } from '@dnd-kit/core';
 import { Feature } from '@/store/app-store';
 import { cn } from '@/lib/utils';
@@ -30,6 +30,7 @@ import { CountUpTimer } from '@/components/ui/count-up-timer';
 import { formatModelName, DEFAULT_MODEL } from '@/lib/agent-context-parser';
 import { DeleteConfirmDialog } from '@/components/ui/delete-confirm-dialog';
 import { getProviderIconForModel } from '@/components/ui/provider-icon';
+import { useAppStore } from '@/store/app-store';
 
 function DuplicateMenuItems({
   onDuplicate,
@@ -107,6 +108,7 @@ interface CardHeaderProps {
   isDraggable: boolean;
   isCurrentAutoTask: boolean;
   isSelectionMode?: boolean;
+  hasContext?: boolean;
   onEdit: () => void;
   onDelete: () => void;
   onViewOutput?: () => void;
@@ -123,6 +125,7 @@ export const CardHeaderSection = memo(function CardHeaderSection({
   isDraggable,
   isCurrentAutoTask,
   isSelectionMode = false,
+  hasContext = false,
   onEdit,
   onDelete,
   onViewOutput,
@@ -135,6 +138,21 @@ export const CardHeaderSection = memo(function CardHeaderSection({
 }: CardHeaderProps) {
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const showBacklogLogsButton = hasContext && !!onViewOutput;
+
+  // Get providers from store for provider-aware model name display
+  // This allows formatModelName to show provider-specific model names (e.g., "GLM 4.7" instead of "Sonnet 4.5")
+  // when a feature was executed using a Claude-compatible provider
+  const claudeCompatibleProviders = useAppStore((state) => state.claudeCompatibleProviders);
+
+  // Memoize the format options to avoid recreating the object on every render
+  const modelFormatOptions = useMemo(
+    () => ({
+      providerId: feature.providerId,
+      claudeCompatibleProviders,
+    }),
+    [feature.providerId, claudeCompatibleProviders]
+  );
 
   const handleDeleteClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -207,7 +225,9 @@ export const CardHeaderSection = memo(function CardHeaderSection({
                   <div className="px-2 py-1.5 text-[10px] text-muted-foreground border-t mt-1 pt-1.5">
                     <div className="flex items-center gap-1">
                       <ProviderIcon className="w-3 h-3" />
-                      <span>{formatModelName(feature.model ?? DEFAULT_MODEL)}</span>
+                      <span>
+                        {formatModelName(feature.model ?? DEFAULT_MODEL, modelFormatOptions)}
+                      </span>
                     </div>
                   </div>
                 );
@@ -221,6 +241,7 @@ export const CardHeaderSection = memo(function CardHeaderSection({
       {!isCurrentAutoTask &&
         !isSelectionMode &&
         (feature.status === 'backlog' ||
+          feature.status === 'merge_conflict' ||
           feature.status === 'interrupted' ||
           feature.status === 'ready') && (
           <div className="absolute top-2 right-2 flex items-center gap-1">
@@ -238,6 +259,22 @@ export const CardHeaderSection = memo(function CardHeaderSection({
             >
               <GitFork className="w-4 h-4" />
             </Button>
+            {showBacklogLogsButton && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 w-6 p-0 hover:bg-white/10 text-muted-foreground hover:text-foreground"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onViewOutput?.();
+                }}
+                onPointerDown={(e) => e.stopPropagation()}
+                data-testid={`logs-backlog-${feature.id}`}
+                title="Logs"
+              >
+                <FileText className="w-4 h-4" />
+              </Button>
+            )}
             <Button
               variant="ghost"
               size="sm"
@@ -444,7 +481,9 @@ export const CardHeaderSection = memo(function CardHeaderSection({
                     <div className="px-2 py-1.5 text-[10px] text-muted-foreground border-t mt-1 pt-1.5">
                       <div className="flex items-center gap-1">
                         <ProviderIcon className="w-3 h-3" />
-                        <span>{formatModelName(feature.model ?? DEFAULT_MODEL)}</span>
+                        <span>
+                          {formatModelName(feature.model ?? DEFAULT_MODEL, modelFormatOptions)}
+                        </span>
                       </div>
                     </div>
                   );

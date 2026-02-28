@@ -102,6 +102,20 @@ export function supportsReasoningEffort(modelId: string): boolean {
 }
 
 /**
+ * Normalize a selected reasoning effort level to a value supported by the target model.
+ * Returns 'none' for models that do not support reasoning effort.
+ */
+export function normalizeReasoningEffortForModel(
+  model: string,
+  reasoningEffort: import('./provider.js').ReasoningEffort | undefined
+): import('./provider.js').ReasoningEffort {
+  if (!supportsReasoningEffort(model)) {
+    return 'none';
+  }
+  return reasoningEffort || 'none';
+}
+
+/**
  * Get all Codex model IDs as an array
  */
 export function getAllCodexModelIds(): CodexModelId[] {

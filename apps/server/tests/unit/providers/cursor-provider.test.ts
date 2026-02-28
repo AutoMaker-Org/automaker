@@ -1,5 +1,6 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { CursorProvider } from '@/providers/cursor-provider.js';
+import { validateBareModelId } from '@automaker/types';
 
 describe('cursor-provider.ts', () => {
   describe('buildCliArgs', () => {
@@ -152,6 +153,83 @@ describe('cursor-provider.ts', () => {
       expect(msg).not.toBeNull();
       expect(msg!.type).toBe('result');
       expect(msg!.subtype).toBe('success');
+    });
+  });
+
+  describe('Cursor Gemini models support', () => {
+    let provider: CursorProvider;
+
+    beforeEach(() => {
+      provider = Object.create(CursorProvider.prototype) as CursorProvider & {
+        cliPath?: string;
+      };
+      provider.cliPath = '/usr/local/bin/cursor-agent';
+    });
+
+    describe('buildCliArgs with Cursor Gemini models', () => {
+      it('should handle cursor-gemini-3-pro model', () => {
+        const args = provider.buildCliArgs({
+          prompt: 'Write a function',
+          model: 'gemini-3-pro', // Bare model ID after stripping cursor- prefix
+          cwd: '/tmp/project',
+        });
+
+        const modelIndex = args.indexOf('--model');
+        expect(modelIndex).toBeGreaterThan(-1);
+        expect(args[modelIndex + 1]).toBe('gemini-3-pro');
+      });
+
+      it('should handle cursor-gemini-3-flash model', () => {
+        const args = provider.buildCliArgs({
+          prompt: 'Quick task',
+          model: 'gemini-3-flash', // Bare model ID after stripping cursor- prefix
+          cwd: '/tmp/project',
+        });
+
+        const modelIndex = args.indexOf('--model');
+        expect(modelIndex).toBeGreaterThan(-1);
+        expect(args[modelIndex + 1]).toBe('gemini-3-flash');
+      });
+
+      it('should include --resume with Cursor Gemini models when sdkSessionId is provided', () => {
+        const args = provider.buildCliArgs({
+          prompt: 'Continue task',
+          model: 'gemini-3-pro',
+          cwd: '/tmp/project',
+          sdkSessionId: 'cursor-gemini-session-123',
+        });
+
+        const resumeIndex = args.indexOf('--resume');
+        expect(resumeIndex).toBeGreaterThan(-1);
+        expect(args[resumeIndex + 1]).toBe('cursor-gemini-session-123');
+      });
+    });
+
+    describe('validateBareModelId with Cursor Gemini models', () => {
+      it('should allow gemini- prefixed models for Cursor provider with expectedProvider="cursor"', () => {
+        // This is the key fix - Cursor Gemini models have bare IDs like "gemini-3-pro"
+        expect(() => validateBareModelId('gemini-3-pro', 'CursorProvider', 'cursor')).not.toThrow();
+        expect(() =>
+          validateBareModelId('gemini-3-flash', 'CursorProvider', 'cursor')
+        ).not.toThrow();
+      });
+
+      it('should still reject other provider prefixes for Cursor provider', () => {
+        expect(() => validateBareModelId('codex-gpt-4', 'CursorProvider', 'cursor')).toThrow();
+        expect(() => validateBareModelId('copilot-gpt-4', 'CursorProvider', 'cursor')).toThrow();
+        expect(() => validateBareModelId('opencode-gpt-4', 'CursorProvider', 'cursor')).toThrow();
+      });
+
+      it('should accept cursor- prefixed models when expectedProvider is "cursor" (for double-prefix validation)', () => {
+        // Note: When expectedProvider="cursor", we skip the cursor- prefix check
+        // This is intentional because the validation happens AFTER prefix stripping
+        // So if cursor-gemini-3-pro reaches validateBareModelId with expectedProvider="cursor",
+        // it means the prefix was NOT properly stripped, but we skip it anyway
+        // since we're checking if the Cursor provider itself can receive cursor- prefixed models
+        expect(() =>
+          validateBareModelId('cursor-gemini-3-pro', 'CursorProvider', 'cursor')
+        ).not.toThrow();
+      });
     });
   });
 });

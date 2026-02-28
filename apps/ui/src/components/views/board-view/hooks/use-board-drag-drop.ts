@@ -196,7 +196,7 @@ export function useBoardDragDrop({
 
       // Handle different drag scenarios
       // Note: Worktrees are created server-side at execution time based on feature.branchName
-      if (draggedFeature.status === 'backlog') {
+      if (draggedFeature.status === 'backlog' || draggedFeature.status === 'merge_conflict') {
         // From backlog
         if (targetStatus === 'in_progress') {
           // Use helper function to handle concurrency check and start implementation

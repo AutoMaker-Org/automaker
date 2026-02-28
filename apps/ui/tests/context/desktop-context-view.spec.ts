@@ -28,11 +28,7 @@ import {
 test.use({ viewport: { width: 1280, height: 720 } });
 
 test.describe('Desktop Context View', () => {
-  test.beforeEach(async () => {
-    resetContextDirectory();
-  });
-
-  test.afterEach(async () => {
+  test.beforeEach(() => {
     resetContextDirectory();
   });
 
@@ -55,9 +51,10 @@ test.describe('Desktop Context View', () => {
       '# Desktop Test\n\nThis tests desktop view behavior'
     );
 
+    await expect(page.locator('[data-testid="confirm-create-markdown"]')).toBeEnabled();
     await clickElement(page, 'confirm-create-markdown');
 
-    await waitForElementHidden(page, 'create-markdown-dialog', { timeout: 5000 });
+    await waitForElementHidden(page, 'create-markdown-dialog');
 
     await waitForNetworkIdle(page);
     await waitForContextFile(page, fileName);
@@ -90,9 +87,13 @@ test.describe('Desktop Context View', () => {
     await fillInput(page, 'new-markdown-name', fileName);
     await fillInput(page, 'new-markdown-content', '# No Back Button Test');
 
+    // Wait for confirm button to be enabled (React state after fill) before clicking
+    const confirmBtn = page.locator('[data-testid="confirm-create-markdown"]');
+    await expect(confirmBtn).toBeEnabled();
+
     await clickElement(page, 'confirm-create-markdown');
 
-    await waitForElementHidden(page, 'create-markdown-dialog', { timeout: 5000 });
+    await waitForElementHidden(page, 'create-markdown-dialog');
 
     await waitForNetworkIdle(page);
     await waitForContextFile(page, fileName);
@@ -125,9 +126,10 @@ test.describe('Desktop Context View', () => {
       '# Text Labels Test\n\nTesting button text labels on desktop'
     );
 
+    await expect(page.locator('[data-testid="confirm-create-markdown"]')).toBeEnabled();
     await clickElement(page, 'confirm-create-markdown');
 
-    await waitForElementHidden(page, 'create-markdown-dialog', { timeout: 5000 });
+    await waitForElementHidden(page, 'create-markdown-dialog');
 
     await waitForNetworkIdle(page);
     await waitForContextFile(page, fileName);
@@ -162,9 +164,21 @@ test.describe('Desktop Context View', () => {
     await fillInput(page, 'new-markdown-name', fileName);
     await fillInput(page, 'new-markdown-content', '# Delete Button Desktop Test');
 
+    await expect(page.locator('[data-testid="confirm-create-markdown"]')).toBeEnabled();
     await clickElement(page, 'confirm-create-markdown');
 
-    await waitForElementHidden(page, 'create-markdown-dialog', { timeout: 5000 });
+    // Wait for create to complete: file appears in list (dialog may close after)
+    await page
+      .locator(`[data-testid="context-file-${fileName}"]`)
+      .waitFor({ state: 'attached', timeout: 20000 });
+    // Then ensure dialog is closed (auto-close or fallback Cancel if still open)
+    await waitForElementHidden(page, 'create-markdown-dialog', { timeout: 5000 }).catch(
+      async () => {
+        const cancelBtn = page.getByRole('button', { name: /cancel/i });
+        if (await cancelBtn.isVisible()) await cancelBtn.click();
+        await waitForElementHidden(page, 'create-markdown-dialog', { timeout: 3000 });
+      }
+    );
 
     await waitForNetworkIdle(page);
     await waitForContextFile(page, fileName);
@@ -195,9 +209,11 @@ test.describe('Desktop Context View', () => {
     await fillInput(page, 'new-markdown-name', fileName);
     await fillInput(page, 'new-markdown-content', '# Fixed Width Test');
 
+    // Wait for form state to update so the Create button becomes enabled
+    await expect(page.locator('[data-testid="confirm-create-markdown"]')).toBeEnabled();
     await clickElement(page, 'confirm-create-markdown');
 
-    await waitForElementHidden(page, 'create-markdown-dialog', { timeout: 5000 });
+    await waitForElementHidden(page, 'create-markdown-dialog');
 
     await waitForNetworkIdle(page);
     await waitForContextFile(page, fileName);

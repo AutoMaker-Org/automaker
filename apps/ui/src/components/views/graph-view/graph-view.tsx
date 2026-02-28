@@ -1,4 +1,4 @@
-import { useMemo, useCallback } from 'react';
+import { useMemo, useCallback, type ReactNode } from 'react';
 import { Feature, useAppStore } from '@/store/app-store';
 import { GraphCanvas } from './graph-canvas';
 import { useBoardBackground } from '../board-view/hooks';
@@ -27,6 +27,7 @@ interface GraphViewProps {
   hasPendingPlan?: boolean;
   planUseSelectedWorktreeBranch?: boolean;
   onPlanUseSelectedWorktreeBranchChange?: (value: boolean) => void;
+  worktreeSelector?: ReactNode;
 }
 
 export function GraphView({
@@ -50,6 +51,7 @@ export function GraphView({
   hasPendingPlan,
   planUseSelectedWorktreeBranch,
   onPlanUseSelectedWorktreeBranchChange,
+  worktreeSelector,
 }: GraphViewProps) {
   const currentProject = useAppStore((state) => state.currentProject);
 
@@ -235,6 +237,7 @@ export function GraphView({
         hasPendingPlan={hasPendingPlan}
         planUseSelectedWorktreeBranch={planUseSelectedWorktreeBranch}
         onPlanUseSelectedWorktreeBranchChange={onPlanUseSelectedWorktreeBranchChange}
+        worktreeSelector={worktreeSelector}
         backgroundStyle={backgroundImageStyle}
         backgroundSettings={backgroundSettings}
         projectPath={projectPath}

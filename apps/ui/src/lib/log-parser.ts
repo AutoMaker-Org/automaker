@@ -1526,11 +1526,11 @@ export function getLogTypeColors(type: LogEntryType): {
       };
     case 'success':
       return {
-        bg: 'bg-emerald-500/10',
-        border: 'border-emerald-500/30',
-        text: 'text-emerald-300',
+        bg: 'bg-emerald-500/20',
+        border: 'border-emerald-500/40',
+        text: 'text-emerald-200',
         icon: 'text-emerald-400',
-        badge: 'bg-emerald-500/20 text-emerald-300',
+        badge: 'bg-emerald-500/30 text-emerald-200',
       };
     case 'warning':
       return {

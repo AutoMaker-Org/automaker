@@ -13,6 +13,13 @@ jobs:
   e2e:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        # shardIndex: [1, 2, 3]
+        # shardTotal: [3]
+        shardIndex: [1]
+        shardTotal: [1]
 
     steps:
       - name: Checkout code
@@ -91,7 +98,7 @@ jobs:
               curl -s http://localhost:3108/api/health | jq . 2>/dev/null || echo "Health check: $(curl -s http://localhost:3108/api/health 2>/dev/null || echo 'No response')"
               exit 0
             fi
-            
+
             # Check if server process is still running
             if ! kill -0 $SERVER_PID 2>/dev/null; then
               echo "ERROR: Server process died during wait!"
@@ -99,7 +106,7 @@ jobs:
               cat backend.log
               exit 1
             fi
-            
+
             echo "Waiting... ($i/60)"
             sleep 1
           done
@@ -127,17 +134,23 @@ jobs:
 
           exit 1
 
-      - name: Run E2E tests
+      - name: Run E2E tests (shard ${{ matrix.shardIndex }}/${{ matrix.shardTotal }})
         # Playwright automatically starts the Vite frontend via webServer config
         # (see apps/ui/playwright.config.ts) - no need to start it manually
-        run: npm run test --workspace=apps/ui
+        run: npx playwright test --shard=${{ matrix.shardIndex }}/${{ matrix.shardTotal }}
+        working-directory: apps/ui
         env:
           CI: true
-          VITE_SERVER_URL: http://localhost:3108
-          SERVER_URL: http://localhost:3108
           VITE_SKIP_SETUP: 'true'
           # Keep UI-side login/defaults consistent
           AUTOMAKER_API_KEY: test-api-key-for-e2e-tests
+          # Backend is already started above - Playwright config sets
+          # AUTOMAKER_SERVER_PORT so the Vite proxy forwards /api/* to the backend.
+          # Do NOT set VITE_SERVER_URL here: it bypasses the Vite proxy and causes
+          # a cookie domain mismatch (cookies are bound to 127.0.0.1, but
+          # VITE_SERVER_URL=http://localhost:3108 makes the frontend call localhost).
+          TEST_USE_EXTERNAL_BACKEND: 'true'
+          TEST_SERVER_PORT: 3108
 
       - name: Print backend logs on failure
         if: failure()
@@ -155,7 +168,7 @@ jobs:
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: playwright-report
+          name: playwright-report-shard-${{ matrix.shardIndex }}-of-${{ matrix.shardTotal }}
           path: apps/ui/playwright-report/
           retention-days: 7
 
@@ -163,10 +176,19 @@ jobs:
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: test-results
+          name: test-results-shard-${{ matrix.shardIndex }}-of-${{ matrix.shardTotal }}
           path: |
             apps/ui/test-results/
           retention-days: 7
+          if-no-files-found: ignore
+
+      - name: Upload blob report for merging
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: blob-report-shard-${{ matrix.shardIndex }}-of-${{ matrix.shardTotal }}
+          path: apps/ui/blob-report/
+          retention-days: 1
           if-no-files-found: ignore
 
       - name: Cleanup - Kill backend server

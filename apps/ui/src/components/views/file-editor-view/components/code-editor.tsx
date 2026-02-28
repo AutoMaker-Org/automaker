@@ -36,6 +36,8 @@ export interface CodeEditorHandle {
   redo: () => void;
   /** Returns the current text selection with line range, or null if nothing is selected */
   getSelection: () => { text: string; fromLine: number; toLine: number } | null;
+  /** Returns the current editor content (may differ from store if onChange hasn't fired yet) */
+  getValue: () => string | null;
 }
 
 interface CodeEditorProps {
@@ -464,6 +466,11 @@ export const CodeEditor = forwardRef<CodeEditorHandle, CodeEditorProps>(function
         const fromLine = view.state.doc.lineAt(from).number;
         const toLine = view.state.doc.lineAt(to).number;
         return { text, fromLine, toLine };
+      },
+      getValue: () => {
+        const view = editorRef.current?.view;
+        if (!view) return null;
+        return view.state.doc.toString();
       },
     }),
     []

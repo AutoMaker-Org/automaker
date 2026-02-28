@@ -565,6 +565,7 @@ type EventType =
   | 'worktree:init-started'
   | 'worktree:init-output'
   | 'worktree:init-completed'
+  | 'dev-server:starting'
   | 'dev-server:started'
   | 'dev-server:output'
   | 'dev-server:stopped'
@@ -583,6 +584,11 @@ interface DevServerUrlEvent {
   worktreePath: string;
   url: string;
   port: number;
+  timestamp: string;
+}
+
+export interface DevServerStartingEvent {
+  worktreePath: string;
   timestamp: string;
 }
 
@@ -605,6 +611,7 @@ export interface DevServerStoppedEvent {
 export type DevServerUrlDetectedEvent = DevServerUrlEvent;
 
 export type DevServerLogEvent =
+  | { type: 'dev-server:starting'; payload: DevServerStartingEvent }
   | { type: 'dev-server:started'; payload: DevServerStartedEvent }
   | { type: 'dev-server:output'; payload: DevServerOutputEvent }
   | { type: 'dev-server:stopped'; payload: DevServerStoppedEvent }
@@ -2250,8 +2257,8 @@ export class HttpApiClient implements ElectronAPI {
       }),
     stageFiles: (worktreePath: string, files: string[], operation: 'stage' | 'unstage') =>
       this.post('/api/worktree/stage-files', { worktreePath, files, operation }),
-    pull: (worktreePath: string, remote?: string, stashIfNeeded?: boolean) =>
-      this.post('/api/worktree/pull', { worktreePath, remote, stashIfNeeded }),
+    pull: (worktreePath: string, remote?: string, stashIfNeeded?: boolean, remoteBranch?: string) =>
+      this.post('/api/worktree/pull', { worktreePath, remote, remoteBranch, stashIfNeeded }),
     checkoutBranch: (
       worktreePath: string,
       branchName: string,
@@ -2294,6 +2301,9 @@ export class HttpApiClient implements ElectronAPI {
     getDevServerLogs: (worktreePath: string): Promise<DevServerLogsResponse> =>
       this.get(`/api/worktree/dev-server-logs?worktreePath=${encodeURIComponent(worktreePath)}`),
     onDevServerLogEvent: (callback: (event: DevServerLogEvent) => void) => {
+      const unsub0 = this.subscribeToEvent('dev-server:starting', (payload) =>
+        callback({ type: 'dev-server:starting', payload: payload as DevServerStartingEvent })
+      );
       const unsub1 = this.subscribeToEvent('dev-server:started', (payload) =>
         callback({ type: 'dev-server:started', payload: payload as DevServerStartedEvent })
       );
@@ -2307,6 +2317,7 @@ export class HttpApiClient implements ElectronAPI {
         callback({ type: 'dev-server:url-detected', payload: payload as DevServerUrlDetectedEvent })
       );
       return () => {
+        unsub0();
         unsub1();
         unsub2();
         unsub3();
@@ -2363,8 +2374,8 @@ export class HttpApiClient implements ElectronAPI {
       this.post('/api/worktree/stash-drop', { worktreePath, stashIndex }),
     cherryPick: (worktreePath: string, commitHashes: string[], options?: { noCommit?: boolean }) =>
       this.post('/api/worktree/cherry-pick', { worktreePath, commitHashes, options }),
-    rebase: (worktreePath: string, ontoBranch: string) =>
-      this.post('/api/worktree/rebase', { worktreePath, ontoBranch }),
+    rebase: (worktreePath: string, ontoBranch: string, remote?: string) =>
+      this.post('/api/worktree/rebase', { worktreePath, ontoBranch, remote }),
     abortOperation: (worktreePath: string) =>
       this.post('/api/worktree/abort-operation', { worktreePath }),
     continueOperation: (worktreePath: string) =>
@@ -2481,7 +2492,8 @@ export class HttpApiClient implements ElectronAPI {
       issue: IssueValidationInput,
       model?: ModelId,
       thinkingLevel?: ThinkingLevel,
-      reasoningEffort?: ReasoningEffort
+      reasoningEffort?: ReasoningEffort,
+      providerId?: string
     ) =>
       this.post('/api/github/validate-issue', {
         projectPath,
@@ -2489,6 +2501,7 @@ export class HttpApiClient implements ElectronAPI {
         model,
         thinkingLevel,
         reasoningEffort,
+        providerId,
       }),
     getValidationStatus: (projectPath: string, issueNumber?: number) =>
       this.post('/api/github/validation-status', { projectPath, issueNumber }),
