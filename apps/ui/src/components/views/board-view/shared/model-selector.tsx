@@ -40,8 +40,11 @@ export function ModelSelector({
   const { cursorCliStatus, codexCliStatus } = useSetupStore();
 
   // Use React Query for OpenCode models so changes in settings are reflected immediately
-  const { data: dynamicOpencodeModelsList = [], isLoading: dynamicOpencodeLoading } =
-    useOpencodeModels();
+  const {
+    data: dynamicOpencodeModelsList = [],
+    isLoading: dynamicOpencodeLoading,
+    error: dynamicOpencodeError,
+  } = useOpencodeModels();
 
   const selectedProvider = getModelProvider(selectedModel);
 
@@ -63,8 +66,10 @@ export function ModelSelector({
   const opencodeFetchTriedRef = useRef(false);
 
   // Fetch OpenCode models on mount if not already loaded (only once per mount)
+  const isOpencodeEnabled = !disabledProviders.includes('opencode');
   useEffect(() => {
     if (
+      isOpencodeEnabled &&
       !opencodeModelsLoading &&
       dynamicOpencodeModelsList.length === 0 &&
       !opencodeFetchTriedRef.current
@@ -72,7 +77,12 @@ export function ModelSelector({
       opencodeFetchTriedRef.current = true;
       fetchOpencodeModels();
     }
-  }, [opencodeModelsLoading, dynamicOpencodeModelsList.length, fetchOpencodeModels]);
+  }, [
+    isOpencodeEnabled,
+    opencodeModelsLoading,
+    dynamicOpencodeModelsList.length,
+    fetchOpencodeModels,
+  ]);
 
   // Transform codex models from store to ModelOption format
   const dynamicCodexModels: ModelOption[] = codexModels.map((model) => {
@@ -484,12 +494,32 @@ export function ModelSelector({
             </div>
           )}
 
-          {/* Empty state */}
-          {!opencodeModelsLoading && !dynamicOpencodeLoading && allOpencodeModels.length === 0 && (
-            <div className="text-sm text-muted-foreground p-3 border border-dashed rounded-md text-center">
-              No OpenCode models enabled. Enable models in Settings → AI Providers.
+          {/* Error state */}
+          {dynamicOpencodeError && !dynamicOpencodeLoading && (
+            <div className="flex items-start gap-2 p-3 rounded-lg bg-red-500/10 border border-red-500/20">
+              <AlertTriangle className="w-4 h-4 text-red-400 mt-0.5 shrink-0" />
+              <div className="space-y-1">
+                <div className="text-sm text-red-400">Failed to load OpenCode models</div>
+                <button
+                  type="button"
+                  onClick={() => fetchOpencodeModels()}
+                  className="text-xs text-red-400 underline hover:no-underline"
+                >
+                  Retry
+                </button>
+              </div>
             </div>
           )}
+
+          {/* Empty state */}
+          {!opencodeModelsLoading &&
+            !dynamicOpencodeLoading &&
+            !dynamicOpencodeError &&
+            allOpencodeModels.length === 0 && (
+              <div className="text-sm text-muted-foreground p-3 border border-dashed rounded-md text-center">
+                No OpenCode models enabled. Enable models in Settings → AI Providers.
+              </div>
+            )}
 
           {/* Model list */}
           {allOpencodeModels.length > 0 && (

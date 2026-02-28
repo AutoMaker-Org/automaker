@@ -1384,10 +1384,11 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
   },
   setDynamicOpencodeModels: (models) => set({ dynamicOpencodeModels: models }),
   setEnabledDynamicModelIds: async (ids) => {
-    set({ enabledDynamicModelIds: ids });
+    const deduped = Array.from(new Set(ids));
+    set({ enabledDynamicModelIds: deduped });
     try {
       const httpApi = getHttpApiClient();
-      await httpApi.settings.updateGlobal({ enabledDynamicModelIds: ids });
+      await httpApi.settings.updateGlobal({ enabledDynamicModelIds: deduped });
     } catch (error) {
       logger.error('Failed to sync enabledDynamicModelIds:', error);
     }
@@ -1395,7 +1396,7 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
   toggleDynamicModel: async (modelId, enabled) => {
     set((state) => ({
       enabledDynamicModelIds: enabled
-        ? [...state.enabledDynamicModelIds, modelId]
+        ? [...new Set([...state.enabledDynamicModelIds, modelId])]
         : state.enabledDynamicModelIds.filter((id) => id !== modelId),
     }));
     try {
