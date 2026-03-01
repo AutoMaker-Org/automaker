@@ -84,7 +84,6 @@ test.describe('Feature Deep Link', () => {
     await clickAddFeature(page);
     await fillAddFeatureDialog(page, featureDescription);
     await confirmAddFeature(page);
-    await page.waitForTimeout(2000);
 
     // Wait for the feature to appear in the backlog
     await expect(async () => {
@@ -109,7 +108,7 @@ test.describe('Feature Deep Link', () => {
     const modal = page.locator('[data-testid="agent-output-modal"]');
     if (await modal.isVisible()) {
       await page.keyboard.press('Escape');
-      await page.waitForTimeout(500);
+      await expect(modal).toBeHidden({ timeout: 3000 });
     }
 
     // Now navigate to the board with the featureId query parameter

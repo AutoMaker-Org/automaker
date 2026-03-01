@@ -580,8 +580,8 @@ function NtfyEndpointDialog({
     const trimmed = serverUrl.trim();
     if (!trimmed) return false;
     try {
-      new URL(trimmed);
-      return true;
+      const parsed = new URL(trimmed);
+      return parsed.protocol === 'https:' || parsed.protocol === 'http:';
     } catch {
       return false;
     }
