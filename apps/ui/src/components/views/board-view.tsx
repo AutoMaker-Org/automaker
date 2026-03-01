@@ -310,6 +310,12 @@ export function BoardView({ initialFeatureId }: BoardViewProps) {
   // when the component re-renders but initialFeatureId hasn't changed.
   // We read worktrees from the store reactively so this effect re-runs once worktrees load.
   const handledFeatureIdRef = useRef<string | undefined>(undefined);
+
+  // Reset the handled ref whenever initialFeatureId changes (including to undefined),
+  // so navigating to the same featureId again after clearing works correctly.
+  useEffect(() => {
+    handledFeatureIdRef.current = undefined;
+  }, [initialFeatureId]);
   const deepLinkWorktrees = useAppStore(
     useCallback(
       (s) =>
@@ -2074,7 +2080,10 @@ export function BoardView({ initialFeatureId }: BoardViewProps) {
       {/* Agent Output Modal */}
       <AgentOutputModal
         open={showOutputModal}
-        onClose={() => setShowOutputModal(false)}
+        onClose={() => {
+          setShowOutputModal(false);
+          handledFeatureIdRef.current = undefined;
+        }}
         featureDescription={outputFeature?.description || ''}
         featureId={outputFeature?.id || ''}
         featureStatus={outputFeature?.status}

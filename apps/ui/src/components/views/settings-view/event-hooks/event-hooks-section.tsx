@@ -462,8 +462,18 @@ function EndpointCard({ endpoint, onEdit, onDelete, onToggle }: EndpointCardProp
 
       {/* Actions */}
       <div className="flex items-center gap-2">
-        <Switch checked={endpoint.enabled} onCheckedChange={onToggle} />
-        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onEdit}>
+        <Switch
+          checked={endpoint.enabled}
+          onCheckedChange={onToggle}
+          aria-label={`${endpoint.enabled ? 'Disable' : 'Enable'} endpoint ${endpoint.name}`}
+        />
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8"
+          onClick={onEdit}
+          aria-label={`Edit endpoint ${endpoint.name}`}
+        >
           <Pencil className="w-4 h-4" />
         </Button>
         <Button
@@ -471,6 +481,7 @@ function EndpointCard({ endpoint, onEdit, onDelete, onToggle }: EndpointCardProp
           size="icon"
           className="h-8 w-8 text-destructive hover:text-destructive"
           onClick={onDelete}
+          aria-label={`Delete endpoint ${endpoint.name}`}
         >
           <Trash2 className="w-4 h-4" />
         </Button>
@@ -565,8 +576,19 @@ function NtfyEndpointDialog({
   };
 
   // Validate form
+  const isServerUrlValid = (() => {
+    const trimmed = serverUrl.trim();
+    if (!trimmed) return false;
+    try {
+      new URL(trimmed);
+      return true;
+    } catch {
+      return false;
+    }
+  })();
   const isValid =
     name.trim().length > 0 &&
+    isServerUrlValid &&
     topic.trim().length > 0 &&
     !topic.includes(' ') &&
     (authType !== 'basic' ||

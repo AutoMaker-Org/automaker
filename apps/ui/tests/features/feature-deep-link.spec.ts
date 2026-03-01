@@ -146,10 +146,7 @@ test.describe('Feature Deep Link', () => {
 
     // Output modal should NOT appear (feature doesn't exist)
     const modal = page.locator('[data-testid="agent-output-modal"]');
-    // Give it a moment to potentially appear, but it shouldn't
-    await page.waitForTimeout(2000);
-    const modalVisible = await modal.isVisible();
-    expect(modalVisible).toBe(false);
+    await expect(modal).toBeHidden({ timeout: 3000 });
   });
 
   test('should handle navigation without featureId', async ({ page }) => {
@@ -172,8 +169,6 @@ test.describe('Feature Deep Link', () => {
 
     // Output modal should NOT appear
     const modal = page.locator('[data-testid="agent-output-modal"]');
-    await page.waitForTimeout(1000);
-    const modalVisible = await modal.isVisible();
-    expect(modalVisible).toBe(false);
+    await expect(modal).toBeHidden({ timeout: 2000 });
   });
 });

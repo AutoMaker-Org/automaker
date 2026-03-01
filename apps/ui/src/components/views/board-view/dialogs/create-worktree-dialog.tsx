@@ -33,6 +33,18 @@ import {
 } from '@/components/ui/select';
 
 /**
+ * Qualify a branch name with a remote prefix when appropriate.
+ * Returns undefined when branch is empty, and avoids double-prefixing.
+ */
+function qualifyRemoteBranch(remote: string, branch?: string): string | undefined {
+  const trimmed = branch?.trim();
+  if (!trimmed) return undefined;
+  if (remote === 'local') return trimmed;
+  if (trimmed.startsWith(`${remote}/`)) return trimmed;
+  return `${remote}/${trimmed}`;
+}
+
+/**
  * Parse git/worktree error messages and return user-friendly versions
  */
 function parseWorktreeError(error: string): { title: string; description?: string } {
@@ -341,11 +353,7 @@ export function CreateWorktreeDialog({
       // Pass the validated baseBranch if one was selected (otherwise defaults to HEAD).
       // When a remote is selected, prepend the remote name to form the full ref
       // (e.g. "main" with remote "origin" becomes "origin/main").
-      const effectiveBaseBranch = trimmedBaseBranch
-        ? selectedRemote !== 'local' && !trimmedBaseBranch.startsWith(`${selectedRemote}/`)
-          ? `${selectedRemote}/${trimmedBaseBranch}`
-          : trimmedBaseBranch
-        : undefined;
+      const effectiveBaseBranch = qualifyRemoteBranch(selectedRemote, trimmedBaseBranch);
       const result = await api.worktree.create(projectPath, branchName, effectiveBaseBranch);
 
       if (result.success && result.worktree) {
@@ -445,9 +453,7 @@ export function CreateWorktreeDialog({
               <span>Base Branch</span>
               {baseBranch && !showBaseBranch && (
                 <code className="bg-muted px-1.5 py-0.5 rounded text-xs font-mono ml-1">
-                  {selectedRemote !== 'local' && !baseBranch.startsWith(`${selectedRemote}/`)
-                    ? `${selectedRemote}/${baseBranch}`
-                    : baseBranch}
+                  {qualifyRemoteBranch(selectedRemote, baseBranch) ?? baseBranch}
                 </code>
               )}
             </button>
