@@ -62,11 +62,9 @@ export function SelectionActionBar({
     setIsVerifying(true);
     try {
       await onVerify();
-      setShowVerifyDialog(false);
-    } catch {
-      // Keep dialog open on failure so user retains context
     } finally {
       setIsVerifying(false);
+      setShowVerifyDialog(false);
     }
   };
 

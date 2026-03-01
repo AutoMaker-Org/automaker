@@ -248,6 +248,11 @@ export const ListView = memo(function ListView({
 
   // Generate status groups from columnFeaturesMap
   const statusGroups = useMemo<StatusGroup[]>(() => {
+    // Effective sort config: when sortNewestCardOnTop is enabled, sort by createdAt desc
+    const effectiveSortConfig: SortConfig = sortNewestCardOnTop
+      ? { column: 'createdAt', direction: 'desc' }
+      : sortConfig;
+
     const columns = getColumnsWithPipeline(pipelineConfig);
     const groups: StatusGroup[] = [];
 
@@ -272,7 +277,7 @@ export const ListView = memo(function ListView({
 
     // Sort groups by status order
     return groups.sort((a, b) => getStatusOrder(a.id) - getStatusOrder(b.id));
-  }, [columnFeaturesMap, pipelineConfig, effectiveSortConfig]);
+  }, [columnFeaturesMap, pipelineConfig, sortNewestCardOnTop, sortConfig]);
 
   // Calculate total feature count
   const totalFeatures = useMemo(
