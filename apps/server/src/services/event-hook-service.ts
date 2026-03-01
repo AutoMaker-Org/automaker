@@ -27,7 +27,11 @@ import type {
   EventHookTrigger,
   EventHookShellAction,
   EventHookHttpAction,
+  EventHookNtfyAction,
+  NtfyEndpointConfig,
+  EventHookContext,
 } from '@automaker/types';
+import { ntfyService, type NtfyContext } from './ntfy-service.js';
 
 const execAsync = promisify(exec);
 const logger = createLogger('EventHooks');
@@ -38,19 +42,8 @@ const DEFAULT_SHELL_TIMEOUT = 30000;
 /** Default timeout for HTTP requests (10 seconds) */
 const DEFAULT_HTTP_TIMEOUT = 10000;
 
-/**
- * Context available for variable substitution in hooks
- */
-interface HookContext {
-  featureId?: string;
-  featureName?: string;
-  projectPath?: string;
-  projectName?: string;
-  error?: string;
-  errorType?: string;
-  timestamp: string;
-  eventType: EventHookTrigger;
-}
+// Use the shared EventHookContext type (aliased locally as HookContext for clarity)
+type HookContext = EventHookContext;
 
 /**
  * Auto-mode event payload structure
@@ -451,6 +444,8 @@ export class EventHookService {
         await this.executeShellHook(hook.action, context, hookName);
       } else if (hook.action.type === 'http') {
         await this.executeHttpHook(hook.action, context, hookName);
+      } else if (hook.action.type === 'ntfy') {
+        await this.executeNtfyHook(hook.action, context, hookName);
       }
     } catch (error) {
       logger.error(`Hook "${hookName}" failed:`, error);
@@ -555,6 +550,89 @@ export class EventHookService {
         logger.error(`HTTP hook "${hookName}" timed out after ${DEFAULT_HTTP_TIMEOUT}ms`);
       }
       throw error;
+    }
+  }
+
+  /**
+   * Execute an ntfy.sh notification hook
+   */
+  private async executeNtfyHook(
+    action: EventHookNtfyAction,
+    context: HookContext,
+    hookName: string
+  ): Promise<void> {
+    if (!this.settingsService) {
+      logger.warn('Settings service not available for ntfy hook');
+      return;
+    }
+
+    // Get the endpoint configuration
+    const settings = await this.settingsService.getGlobalSettings();
+    const endpoints = settings.ntfyEndpoints || [];
+    const endpoint = endpoints.find((e) => e.id === action.endpointId);
+
+    if (!endpoint) {
+      logger.error(`Ntfy hook "${hookName}" references unknown endpoint: ${action.endpointId}`);
+      return;
+    }
+
+    // Convert HookContext to NtfyContext
+    const ntfyContext: NtfyContext = {
+      featureId: context.featureId,
+      featureName: context.featureName,
+      projectPath: context.projectPath,
+      projectName: context.projectName,
+      error: context.error,
+      errorType: context.errorType,
+      timestamp: context.timestamp,
+      eventType: context.eventType,
+    };
+
+    // Build click URL with deep-link if project context is available
+    let clickUrl = action.clickUrl;
+    if (!clickUrl && endpoint.defaultClickUrl) {
+      clickUrl = endpoint.defaultClickUrl;
+      // If we have a project path and the click URL looks like the server URL,
+      // append deep-link path
+      if (context.projectPath && clickUrl) {
+        try {
+          const url = new URL(clickUrl);
+          // Add featureId as query param for deep linking to board with feature output modal
+          if (context.featureId) {
+            url.pathname = '/board';
+            url.searchParams.set('featureId', context.featureId);
+          } else if (context.projectPath) {
+            url.pathname = '/board';
+          }
+          clickUrl = url.toString();
+        } catch (error) {
+          // If URL parsing fails, log warning and use as-is
+          logger.warn(
+            `Failed to parse defaultClickUrl "${clickUrl}" for deep linking: ${error instanceof Error ? error.message : String(error)}`
+          );
+        }
+      }
+    }
+
+    logger.info(`Executing ntfy hook "${hookName}" to endpoint "${endpoint.name}"`);
+
+    const result = await ntfyService.sendNotification(
+      endpoint,
+      {
+        title: action.title,
+        body: action.body,
+        tags: action.tags,
+        emoji: action.emoji,
+        clickUrl,
+        priority: action.priority,
+      },
+      ntfyContext
+    );
+
+    if (!result.success) {
+      logger.warn(`Ntfy hook "${hookName}" failed: ${result.error}`);
+    } else {
+      logger.info(`Ntfy hook "${hookName}" completed successfully`);
     }
   }
 

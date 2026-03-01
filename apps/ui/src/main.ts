@@ -53,10 +53,6 @@ if (isDev) {
 // Must be set before app.whenReady() — has no effect on macOS/Windows.
 if (process.platform === 'linux') {
   app.commandLine.appendSwitch('ozone-platform-hint', 'auto');
-  // Link the running process to its .desktop file so GNOME/KDE uses the
-  // desktop entry's Icon for the taskbar instead of Electron's default.
-  // Must be called before any window is created.
-  app.setDesktopName('automaker.desktop');
 }
 
 // Register IPC handlers

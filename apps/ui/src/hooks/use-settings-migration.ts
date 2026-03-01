@@ -39,6 +39,7 @@ import {
   migratePhaseModelEntry,
   type GlobalSettings,
   type CursorModelId,
+  type PhaseModelEntry,
 } from '@automaker/types';
 
 const logger = createLogger('SettingsMigration');
@@ -198,6 +199,8 @@ export function parseLocalStorageSettings(): Partial<GlobalSettings> | null {
       mcpServers: state.mcpServers as GlobalSettings['mcpServers'],
       promptCustomization: state.promptCustomization as GlobalSettings['promptCustomization'],
       eventHooks: state.eventHooks as GlobalSettings['eventHooks'],
+      ntfyEndpoints: state.ntfyEndpoints as GlobalSettings['ntfyEndpoints'],
+      featureTemplates: state.featureTemplates as GlobalSettings['featureTemplates'],
       projects: state.projects as GlobalSettings['projects'],
       trashedProjects: state.trashedProjects as GlobalSettings['trashedProjects'],
       currentProjectId: (state.currentProject as { id?: string } | null)?.id ?? null,
@@ -809,6 +812,8 @@ export function hydrateStoreFromSettings(settings: GlobalSettings): void {
     mcpServers: settings.mcpServers ?? [],
     promptCustomization: settings.promptCustomization ?? {},
     eventHooks: settings.eventHooks ?? [],
+    ntfyEndpoints: settings.ntfyEndpoints ?? [],
+    featureTemplates: settings.featureTemplates ?? [],
     claudeCompatibleProviders: settings.claudeCompatibleProviders ?? [],
     claudeApiProfiles: settings.claudeApiProfiles ?? [],
     activeClaudeApiProfileId: settings.activeClaudeApiProfileId ?? null,
@@ -821,7 +826,10 @@ export function hydrateStoreFromSettings(settings: GlobalSettings): void {
     agentModelBySession: settings.agentModelBySession
       ? Object.fromEntries(
           Object.entries(settings.agentModelBySession as Record<string, unknown>).map(
-            ([sessionId, entry]) => [sessionId, migratePhaseModelEntry(entry)]
+            ([sessionId, entry]) => [
+              sessionId,
+              migratePhaseModelEntry(entry as string | PhaseModelEntry | null | undefined),
+            ]
           )
         )
       : current.agentModelBySession,
@@ -945,6 +953,8 @@ function buildSettingsUpdateFromStore(): Record<string, unknown> {
     mcpServers: state.mcpServers,
     promptCustomization: state.promptCustomization,
     eventHooks: state.eventHooks,
+    ntfyEndpoints: state.ntfyEndpoints,
+    featureTemplates: state.featureTemplates,
     claudeCompatibleProviders: state.claudeCompatibleProviders,
     claudeApiProfiles: state.claudeApiProfiles,
     activeClaudeApiProfileId: state.activeClaudeApiProfileId,

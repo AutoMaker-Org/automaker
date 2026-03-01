@@ -33,6 +33,18 @@ import {
 } from '@/components/ui/select';
 
 /**
+ * Qualify a branch name with a remote prefix when appropriate.
+ * Returns undefined when branch is empty, and avoids double-prefixing.
+ */
+function qualifyRemoteBranch(remote: string, branch?: string): string | undefined {
+  const trimmed = branch?.trim();
+  if (!trimmed) return undefined;
+  if (remote === 'local') return trimmed;
+  if (trimmed.startsWith(`${remote}/`)) return trimmed;
+  return `${remote}/${trimmed}`;
+}
+
+/**
  * Parse git/worktree error messages and return user-friendly versions
  */
 function parseWorktreeError(error: string): { title: string; description?: string } {
@@ -264,19 +276,21 @@ export function CreateWorktreeDialog({
       return availableBranches.filter((b) => !b.isRemote).map((b) => b.name);
     }
 
-    // If a specific remote is selected, show only branches from that remote
+    // If a specific remote is selected, show only branches from that remote (without remote prefix)
     const remoteBranchList = remoteBranches.get(selectedRemote);
     if (remoteBranchList) {
-      return remoteBranchList.map((b) => b.fullRef);
+      return remoteBranchList.map((b) => b.name);
     }
 
-    // Fallback: filter from available branches by remote prefix
+    // Fallback: filter from available branches by remote prefix, stripping the prefix for display
+    const prefix = `${selectedRemote}/`;
     return availableBranches
-      .filter((b) => b.isRemote && b.name.startsWith(`${selectedRemote}/`))
-      .map((b) => b.name);
+      .filter((b) => b.isRemote && b.name.startsWith(prefix))
+      .map((b) => b.name.substring(prefix.length));
   }, [availableBranches, selectedRemote, remoteBranches]);
 
   // Determine if the selected base branch is a remote branch.
+  // When a remote is selected in the source dropdown, the branch is always remote.
   // Also detect manually entered remote-style names (e.g. "origin/feature")
   // so the UI shows the "Remote branch — will fetch latest" hint even when
   // the branch isn't in the fetched availableBranches list.
@@ -285,6 +299,8 @@ export function CreateWorktreeDialog({
     // If the branch list couldn't be fetched, availableBranches is a fallback
     // and may not reflect reality — suppress the remote hint to avoid misleading the user.
     if (branchFetchError) return false;
+    // If a remote is explicitly selected, the branch is remote
+    if (selectedRemote !== 'local') return true;
     // Check fetched branch list first
     const knownRemote = availableBranches.some((b) => b.name === baseBranch && b.isRemote);
     if (knownRemote) return true;
@@ -295,7 +311,7 @@ export function CreateWorktreeDialog({
       return !isKnownLocal;
     }
     return false;
-  }, [baseBranch, availableBranches, branchFetchError]);
+  }, [baseBranch, availableBranches, branchFetchError, selectedRemote]);
 
   const handleCreate = async () => {
     if (!branchName.trim()) {
@@ -334,8 +350,10 @@ export function CreateWorktreeDialog({
         return;
       }
 
-      // Pass the validated baseBranch if one was selected (otherwise defaults to HEAD)
-      const effectiveBaseBranch = trimmedBaseBranch || undefined;
+      // Pass the validated baseBranch if one was selected (otherwise defaults to HEAD).
+      // When a remote is selected, prepend the remote name to form the full ref
+      // (e.g. "main" with remote "origin" becomes "origin/main").
+      const effectiveBaseBranch = qualifyRemoteBranch(selectedRemote, trimmedBaseBranch);
       const result = await api.worktree.create(projectPath, branchName, effectiveBaseBranch);
 
       if (result.success && result.worktree) {
@@ -435,7 +453,7 @@ export function CreateWorktreeDialog({
               <span>Base Branch</span>
               {baseBranch && !showBaseBranch && (
                 <code className="bg-muted px-1.5 py-0.5 rounded text-xs font-mono ml-1">
-                  {baseBranch}
+                  {qualifyRemoteBranch(selectedRemote, baseBranch) ?? baseBranch}
                 </code>
               )}
             </button>

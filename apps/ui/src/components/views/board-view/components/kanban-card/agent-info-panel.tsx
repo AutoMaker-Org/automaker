@@ -85,7 +85,7 @@ export const AgentInfoPanel = memo(function AgentInfoPanel({
     Map<string, 'pending' | 'in_progress' | 'completed'>
   >(new Map());
   // Track real-time task summary updates from WebSocket events
-  const [taskSummaryMap, setTaskSummaryMap] = useState<Map<string, string>>(new Map());
+  const [taskSummaryMap, setTaskSummaryMap] = useState<Map<string, string | null>>(new Map());
   // Track last WebSocket event timestamp to know if we're receiving real-time updates
   const [lastWsEventTimestamp, setLastWsEventTimestamp] = useState<number | null>(null);
 
@@ -200,7 +200,11 @@ export const AgentInfoPanel = memo(function AgentInfoPanel({
   // Derive effective todos from planSpec.tasks when available, fallback to agentInfo.todos
   // Uses freshPlanSpec (from API) for accurate progress, with taskStatusMap for real-time updates
   const isFeatureFinished = feature.status === 'waiting_approval' || feature.status === 'verified';
-  const effectiveTodos = useMemo(() => {
+  const effectiveTodos = useMemo((): {
+    content: string;
+    status: 'pending' | 'in_progress' | 'completed';
+    summary?: string | null;
+  }[] => {
     // Use freshPlanSpec if available (fetched from API), fallback to store's feature.planSpec
     const planSpec = freshPlanSpec?.tasks?.length ? freshPlanSpec : feature.planSpec;
 
@@ -250,7 +254,7 @@ export const AgentInfoPanel = memo(function AgentInfoPanel({
         return {
           content: task.description,
           status: effectiveStatus,
-          summary: realtimeSummary ?? task.summary,
+          summary: taskSummaryMap.has(task.id) ? realtimeSummary : task.summary,
         };
       });
     }

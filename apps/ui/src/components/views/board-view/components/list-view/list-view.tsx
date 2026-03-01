@@ -240,6 +240,12 @@ export const ListView = memo(function ListView({
   const keyboardShortcuts = useAppStore((state) => state.keyboardShortcuts);
   const addFeatureShortcut = keyboardShortcuts.addFeature || 'N';
 
+  // Effective sort config: when sortNewestCardOnTop is enabled, sort by createdAt desc
+  const effectiveSortConfig: SortConfig = useMemo(
+    () => (sortNewestCardOnTop ? { column: 'createdAt', direction: 'desc' } : sortConfig),
+    [sortNewestCardOnTop, sortConfig]
+  );
+
   // Generate status groups from columnFeaturesMap
   const statusGroups = useMemo<StatusGroup[]>(() => {
     // Effective sort config: when sortNewestCardOnTop is enabled, sort by createdAt desc
@@ -454,7 +460,7 @@ export const ListView = memo(function ListView({
     >
       {/* Table header */}
       <ListHeader
-        sortConfig={sortConfig}
+        sortConfig={effectiveSortConfig}
         onSortChange={onSortChange}
         showCheckbox={isSelectionMode}
         allSelected={selectionState.allSelected}

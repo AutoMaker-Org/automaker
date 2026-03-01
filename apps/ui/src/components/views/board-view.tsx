@@ -114,7 +114,12 @@ const EMPTY_WORKTREES: ReturnType<ReturnType<typeof useAppStore.getState>['getWo
 
 const logger = createLogger('Board');
 
-export function BoardView() {
+interface BoardViewProps {
+  /** Feature ID from URL parameter - if provided, opens output modal for this feature on load */
+  initialFeatureId?: string;
+}
+
+export function BoardView({ initialFeatureId }: BoardViewProps) {
   const {
     currentProject,
     defaultSkipTests,
@@ -299,6 +304,93 @@ export function BoardView() {
     featuresWithContext,
     setFeaturesWithContext,
   });
+
+  // Handle initial feature ID from URL - switch to the correct worktree and open output modal
+  // Uses a ref to track which featureId has been handled to prevent re-opening
+  // when the component re-renders but initialFeatureId hasn't changed.
+  // We read worktrees from the store reactively so this effect re-runs once worktrees load.
+  const handledFeatureIdRef = useRef<string | undefined>(undefined);
+
+  // Reset the handled ref whenever initialFeatureId changes (including to undefined),
+  // so navigating to the same featureId again after clearing works correctly.
+  useEffect(() => {
+    handledFeatureIdRef.current = undefined;
+  }, [initialFeatureId]);
+  const deepLinkWorktrees = useAppStore(
+    useCallback(
+      (s) =>
+        currentProject?.path
+          ? (s.worktreesByProject[currentProject.path] ?? EMPTY_WORKTREES)
+          : EMPTY_WORKTREES,
+      [currentProject?.path]
+    )
+  );
+  useEffect(() => {
+    if (
+      !initialFeatureId ||
+      handledFeatureIdRef.current === initialFeatureId ||
+      isLoading ||
+      !hookFeatures.length ||
+      !currentProject?.path
+    ) {
+      return;
+    }
+
+    const feature = hookFeatures.find((f) => f.id === initialFeatureId);
+    if (!feature) return;
+
+    // If the feature has a branch, wait for worktrees to load so we can switch
+    if (feature.branchName && deepLinkWorktrees.length === 0) {
+      return; // Worktrees not loaded yet - effect will re-run when they load
+    }
+
+    // Switch to the correct worktree based on the feature's branchName
+    if (feature.branchName && deepLinkWorktrees.length > 0) {
+      const targetWorktree = deepLinkWorktrees.find((w) => w.branch === feature.branchName);
+      if (targetWorktree) {
+        const currentWt = useAppStore.getState().getCurrentWorktree(currentProject.path);
+        const isAlreadySelected = targetWorktree.isMain
+          ? currentWt?.path === null
+          : currentWt?.path === targetWorktree.path;
+        if (!isAlreadySelected) {
+          logger.info(
+            `Deep link: switching to worktree "${targetWorktree.branch}" for feature ${initialFeatureId}`
+          );
+          setCurrentWorktree(
+            currentProject.path,
+            targetWorktree.isMain ? null : targetWorktree.path,
+            targetWorktree.branch
+          );
+        }
+      }
+    } else if (!feature.branchName && deepLinkWorktrees.length > 0) {
+      // Feature has no branch - should be on the main worktree
+      const currentWt = useAppStore.getState().getCurrentWorktree(currentProject.path);
+      if (currentWt?.path !== null && currentWt !== null) {
+        const mainWorktree = deepLinkWorktrees.find((w) => w.isMain);
+        if (mainWorktree) {
+          logger.info(
+            `Deep link: switching to main worktree for unassigned feature ${initialFeatureId}`
+          );
+          setCurrentWorktree(currentProject.path, null, mainWorktree.branch);
+        }
+      }
+    }
+
+    logger.info(`Opening output modal for feature from URL: ${initialFeatureId}`);
+    setOutputFeature(feature);
+    setShowOutputModal(true);
+    handledFeatureIdRef.current = initialFeatureId;
+  }, [
+    initialFeatureId,
+    isLoading,
+    hookFeatures,
+    currentProject?.path,
+    deepLinkWorktrees,
+    setCurrentWorktree,
+    setOutputFeature,
+    setShowOutputModal,
+  ]);
 
   // Load pipeline config when project changes
   useEffect(() => {
@@ -1988,7 +2080,10 @@ export function BoardView() {
       {/* Agent Output Modal */}
       <AgentOutputModal
         open={showOutputModal}
-        onClose={() => setShowOutputModal(false)}
+        onClose={() => {
+          setShowOutputModal(false);
+          handledFeatureIdRef.current = undefined;
+        }}
         featureDescription={outputFeature?.description || ''}
         featureId={outputFeature?.id || ''}
         featureStatus={outputFeature?.status}

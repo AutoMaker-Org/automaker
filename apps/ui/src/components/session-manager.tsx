@@ -195,8 +195,10 @@ export function SessionManager({
     if (result.success && result.session?.id) {
       setNewSessionName('');
       setIsCreating(false);
-      await invalidateSessions();
+      // Select the new session immediately before invalidating the cache to avoid
+      // a race condition where the cache re-render resets the selected session.
       onSelectSession(result.session.id);
+      await invalidateSessions();
     }
   };
 
@@ -210,8 +212,10 @@ export function SessionManager({
     const result = await api.sessions.create(sessionName, projectPath, effectiveWorkingDirectory);
 
     if (result.success && result.session?.id) {
-      await invalidateSessions();
+      // Select the new session immediately before invalidating the cache to avoid
+      // a race condition where the cache re-render resets the selected session.
       onSelectSession(result.session.id);
+      await invalidateSessions();
     }
   }, [effectiveWorkingDirectory, projectPath, invalidateSessions, onSelectSession]);
 

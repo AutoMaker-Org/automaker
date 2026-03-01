@@ -1050,4 +1050,383 @@ describe('auto-loop-coordinator.ts', () => {
       );
     });
   });
+
+  describe('auto_mode_idle emission timing (idle check fix)', () => {
+    it('emits auto_mode_idle when no features in any state (empty project)', async () => {
+      vi.mocked(mockLoadPendingFeatures).mockResolvedValue([]);
+      vi.mocked(mockLoadAllFeatures).mockResolvedValue([]);
+      vi.mocked(mockConcurrencyManager.getRunningCountForWorktree).mockResolvedValue(0);
+
+      await coordinator.startAutoLoopForProject('/test/project', null, 1);
+
+      // Clear the initial event mock calls
+      vi.mocked(mockEventBus.emitAutoModeEvent).mockClear();
+
+      // Advance time to trigger loop iteration and idle event
+      await vi.advanceTimersByTimeAsync(11000);
+
+      // Stop the loop
+      await coordinator.stopAutoLoopForProject('/test/project', null);
+
+      expect(mockEventBus.emitAutoModeEvent).toHaveBeenCalledWith('auto_mode_idle', {
+        message: 'No pending features - auto mode idle',
+        projectPath: '/test/project',
+        branchName: null,
+      });
+    });
+
+    it('does NOT emit auto_mode_idle when features are in in_progress status', async () => {
+      // No pending features (backlog/ready)
+      vi.mocked(mockLoadPendingFeatures).mockResolvedValue([]);
+      // But there are features in in_progress status
+      const inProgressFeature: Feature = {
+        ...testFeature,
+        id: 'feature-1',
+        status: 'in_progress',
+        title: 'In Progress Feature',
+      };
+      vi.mocked(mockLoadAllFeatures).mockResolvedValue([inProgressFeature]);
+      // No running features in concurrency manager (they were released during status update)
+      vi.mocked(mockConcurrencyManager.getRunningCountForWorktree).mockResolvedValue(0);
+
+      await coordinator.startAutoLoopForProject('/test/project', null, 1);
+
+      // Clear the initial event mock calls
+      vi.mocked(mockEventBus.emitAutoModeEvent).mockClear();
+
+      // Advance time to trigger loop iteration
+      await vi.advanceTimersByTimeAsync(11000);
+
+      // Stop the loop
+      await coordinator.stopAutoLoopForProject('/test/project', null);
+
+      // Should NOT emit auto_mode_idle because there's an in_progress feature
+      expect(mockEventBus.emitAutoModeEvent).not.toHaveBeenCalledWith('auto_mode_idle', {
+        message: 'No pending features - auto mode idle',
+        projectPath: '/test/project',
+        branchName: null,
+      });
+    });
+
+    it('emits auto_mode_idle after in_progress feature completes', async () => {
+      const completedFeature: Feature = {
+        ...testFeature,
+        id: 'feature-1',
+        status: 'completed',
+        title: 'Completed Feature',
+      };
+
+      // Initially has in_progress feature
+      vi.mocked(mockLoadPendingFeatures).mockResolvedValue([]);
+      vi.mocked(mockLoadAllFeatures).mockResolvedValue([completedFeature]);
+      vi.mocked(mockConcurrencyManager.getRunningCountForWorktree).mockResolvedValue(0);
+
+      await coordinator.startAutoLoopForProject('/test/project', null, 1);
+
+      // Clear the initial event mock calls
+      vi.mocked(mockEventBus.emitAutoModeEvent).mockClear();
+
+      // Advance time to trigger loop iteration
+      await vi.advanceTimersByTimeAsync(11000);
+
+      // Stop the loop
+      await coordinator.stopAutoLoopForProject('/test/project', null);
+
+      // Should emit auto_mode_idle because all features are completed
+      expect(mockEventBus.emitAutoModeEvent).toHaveBeenCalledWith('auto_mode_idle', {
+        message: 'No pending features - auto mode idle',
+        projectPath: '/test/project',
+        branchName: null,
+      });
+    });
+
+    it('does NOT emit auto_mode_idle for in_progress features in main worktree (no branchName)', async () => {
+      vi.mocked(mockLoadPendingFeatures).mockResolvedValue([]);
+      // Feature in main worktree has no branchName
+      const mainWorktreeFeature: Feature = {
+        ...testFeature,
+        id: 'feature-main',
+        status: 'in_progress',
+        title: 'Main Worktree Feature',
+        branchName: undefined, // Main worktree feature
+      };
+      // Feature in branch worktree has branchName
+      const branchFeature: Feature = {
+        ...testFeature,
+        id: 'feature-branch',
+        status: 'in_progress',
+        title: 'Branch Feature',
+        branchName: 'feature/some-branch',
+      };
+      vi.mocked(mockLoadAllFeatures).mockResolvedValue([mainWorktreeFeature, branchFeature]);
+      vi.mocked(mockConcurrencyManager.getRunningCountForWorktree).mockResolvedValue(0);
+
+      // Start auto mode for main worktree
+      await coordinator.startAutoLoopForProject('/test/project', null, 1);
+
+      // Clear the initial event mock calls
+      vi.mocked(mockEventBus.emitAutoModeEvent).mockClear();
+
+      // Advance time to trigger loop iteration
+      await vi.advanceTimersByTimeAsync(11000);
+
+      // Stop the loop
+      await coordinator.stopAutoLoopForProject('/test/project', null);
+
+      // Should NOT emit auto_mode_idle because there's an in_progress feature in main worktree
+      expect(mockEventBus.emitAutoModeEvent).not.toHaveBeenCalledWith(
+        'auto_mode_idle',
+        expect.objectContaining({
+          projectPath: '/test/project',
+          branchName: null,
+        })
+      );
+    });
+
+    it('does NOT emit auto_mode_idle for in_progress features with matching branchName', async () => {
+      vi.mocked(mockLoadPendingFeatures).mockResolvedValue([]);
+      // Feature in matching branch
+      const matchingBranchFeature: Feature = {
+        ...testFeature,
+        id: 'feature-matching',
+        status: 'in_progress',
+        title: 'Matching Branch Feature',
+        branchName: 'feature/test-branch',
+      };
+      // Feature in different branch
+      const differentBranchFeature: Feature = {
+        ...testFeature,
+        id: 'feature-different',
+        status: 'in_progress',
+        title: 'Different Branch Feature',
+        branchName: 'feature/other-branch',
+      };
+      vi.mocked(mockLoadAllFeatures).mockResolvedValue([
+        matchingBranchFeature,
+        differentBranchFeature,
+      ]);
+      vi.mocked(mockConcurrencyManager.getRunningCountForWorktree).mockResolvedValue(0);
+
+      // Start auto mode for feature/test-branch
+      await coordinator.startAutoLoopForProject('/test/project', 'feature/test-branch', 1);
+
+      // Clear the initial event mock calls
+      vi.mocked(mockEventBus.emitAutoModeEvent).mockClear();
+
+      // Advance time to trigger loop iteration
+      await vi.advanceTimersByTimeAsync(11000);
+
+      // Stop the loop
+      await coordinator.stopAutoLoopForProject('/test/project', 'feature/test-branch');
+
+      // Should NOT emit auto_mode_idle because there's an in_progress feature with matching branch
+      expect(mockEventBus.emitAutoModeEvent).not.toHaveBeenCalledWith(
+        'auto_mode_idle',
+        expect.objectContaining({
+          projectPath: '/test/project',
+          branchName: 'feature/test-branch',
+        })
+      );
+    });
+
+    it('emits auto_mode_idle when in_progress feature has different branchName', async () => {
+      vi.mocked(mockLoadPendingFeatures).mockResolvedValue([]);
+      // Only feature is in a different branch
+      const differentBranchFeature: Feature = {
+        ...testFeature,
+        id: 'feature-different',
+        status: 'in_progress',
+        title: 'Different Branch Feature',
+        branchName: 'feature/other-branch',
+      };
+      vi.mocked(mockLoadAllFeatures).mockResolvedValue([differentBranchFeature]);
+      vi.mocked(mockConcurrencyManager.getRunningCountForWorktree).mockResolvedValue(0);
+
+      // Start auto mode for feature/test-branch
+      await coordinator.startAutoLoopForProject('/test/project', 'feature/test-branch', 1);
+
+      // Clear the initial event mock calls
+      vi.mocked(mockEventBus.emitAutoModeEvent).mockClear();
+
+      // Advance time to trigger loop iteration
+      await vi.advanceTimersByTimeAsync(11000);
+
+      // Stop the loop
+      await coordinator.stopAutoLoopForProject('/test/project', 'feature/test-branch');
+
+      // Should emit auto_mode_idle because the in_progress feature is in a different branch
+      expect(mockEventBus.emitAutoModeEvent).toHaveBeenCalledWith('auto_mode_idle', {
+        message: 'No pending features - auto mode idle',
+        projectPath: '/test/project',
+        branchName: 'feature/test-branch',
+      });
+    });
+
+    it('emits auto_mode_idle when only backlog/ready features exist and no running/in_progress features', async () => {
+      // backlog/ready features should be in loadPendingFeatures, not loadAllFeatures for idle check
+      // But this test verifies the idle check doesn't incorrectly block on backlog/ready
+      vi.mocked(mockLoadPendingFeatures).mockResolvedValue([]); // No pending (for current iteration check)
+      const backlogFeature: Feature = {
+        ...testFeature,
+        id: 'feature-1',
+        status: 'backlog',
+        title: 'Backlog Feature',
+      };
+      const readyFeature: Feature = {
+        ...testFeature,
+        id: 'feature-2',
+        status: 'ready',
+        title: 'Ready Feature',
+      };
+      vi.mocked(mockLoadAllFeatures).mockResolvedValue([backlogFeature, readyFeature]);
+      vi.mocked(mockConcurrencyManager.getRunningCountForWorktree).mockResolvedValue(0);
+
+      await coordinator.startAutoLoopForProject('/test/project', null, 1);
+
+      // Clear the initial event mock calls
+      vi.mocked(mockEventBus.emitAutoModeEvent).mockClear();
+
+      // Advance time to trigger loop iteration
+      await vi.advanceTimersByTimeAsync(11000);
+
+      // Stop the loop
+      await coordinator.stopAutoLoopForProject('/test/project', null);
+
+      // Should NOT emit auto_mode_idle because there are backlog/ready features
+      // (even though they're not in_progress, the idle check only looks at in_progress status)
+      // Actually, backlog/ready would be caught by loadPendingFeatures on next iteration,
+      // so this should emit idle since runningCount=0 and no in_progress features
+      expect(mockEventBus.emitAutoModeEvent).toHaveBeenCalledWith('auto_mode_idle', {
+        message: 'No pending features - auto mode idle',
+        projectPath: '/test/project',
+        branchName: null,
+      });
+    });
+
+    it('handles loadAllFeaturesFn error gracefully (falls back to emitting idle)', async () => {
+      vi.mocked(mockLoadPendingFeatures).mockResolvedValue([]);
+      vi.mocked(mockLoadAllFeatures).mockRejectedValue(new Error('Failed to load features'));
+      vi.mocked(mockConcurrencyManager.getRunningCountForWorktree).mockResolvedValue(0);
+
+      await coordinator.startAutoLoopForProject('/test/project', null, 1);
+
+      // Clear the initial event mock calls
+      vi.mocked(mockEventBus.emitAutoModeEvent).mockClear();
+
+      // Advance time to trigger loop iteration
+      await vi.advanceTimersByTimeAsync(11000);
+
+      // Stop the loop
+      await coordinator.stopAutoLoopForProject('/test/project', null);
+
+      // Should still emit auto_mode_idle when loadAllFeatures fails (defensive behavior)
+      expect(mockEventBus.emitAutoModeEvent).toHaveBeenCalledWith('auto_mode_idle', {
+        message: 'No pending features - auto mode idle',
+        projectPath: '/test/project',
+        branchName: null,
+      });
+    });
+
+    it('handles missing loadAllFeaturesFn gracefully (falls back to emitting idle)', async () => {
+      // Create coordinator without loadAllFeaturesFn
+      const coordWithoutLoadAll = new AutoLoopCoordinator(
+        mockEventBus,
+        mockConcurrencyManager,
+        mockSettingsService,
+        mockExecuteFeature,
+        mockLoadPendingFeatures,
+        mockSaveExecutionState,
+        mockClearExecutionState,
+        mockResetStuckFeatures,
+        mockIsFeatureFinished,
+        mockIsFeatureRunning
+        // loadAllFeaturesFn omitted
+      );
+
+      vi.mocked(mockLoadPendingFeatures).mockResolvedValue([]);
+      vi.mocked(mockConcurrencyManager.getRunningCountForWorktree).mockResolvedValue(0);
+
+      await coordWithoutLoadAll.startAutoLoopForProject('/test/project', null, 1);
+
+      // Clear the initial event mock calls
+      vi.mocked(mockEventBus.emitAutoModeEvent).mockClear();
+
+      // Advance time to trigger loop iteration
+      await vi.advanceTimersByTimeAsync(11000);
+
+      // Stop the loop
+      await coordWithoutLoadAll.stopAutoLoopForProject('/test/project', null);
+
+      // Should emit auto_mode_idle when loadAllFeaturesFn is missing (defensive behavior)
+      expect(mockEventBus.emitAutoModeEvent).toHaveBeenCalledWith('auto_mode_idle', {
+        message: 'No pending features - auto mode idle',
+        projectPath: '/test/project',
+        branchName: null,
+      });
+    });
+
+    it('only emits auto_mode_idle once per idle period (hasEmittedIdleEvent flag)', async () => {
+      vi.mocked(mockLoadPendingFeatures).mockResolvedValue([]);
+      vi.mocked(mockLoadAllFeatures).mockResolvedValue([]);
+      vi.mocked(mockConcurrencyManager.getRunningCountForWorktree).mockResolvedValue(0);
+
+      await coordinator.startAutoLoopForProject('/test/project', null, 1);
+
+      // Clear the initial event mock calls
+      vi.mocked(mockEventBus.emitAutoModeEvent).mockClear();
+
+      // Advance time multiple times to trigger multiple loop iterations
+      await vi.advanceTimersByTimeAsync(11000); // First idle check
+      await vi.advanceTimersByTimeAsync(11000); // Second idle check
+      await vi.advanceTimersByTimeAsync(11000); // Third idle check
+
+      // Stop the loop
+      await coordinator.stopAutoLoopForProject('/test/project', null);
+
+      // Should only emit auto_mode_idle once despite multiple iterations
+      const idleCalls = vi
+        .mocked(mockEventBus.emitAutoModeEvent)
+        .mock.calls.filter((call) => call[0] === 'auto_mode_idle');
+      expect(idleCalls.length).toBe(1);
+    });
+
+    it('premature auto_mode_idle bug scenario: runningCount=0 but feature still in_progress', async () => {
+      // This test reproduces the exact bug scenario described in the feature:
+      // When a feature completes, there's a brief window where:
+      // 1. The feature has been released from runningFeatures (so runningCount = 0)
+      // 2. The feature's status is still 'in_progress' during the status update transition
+      // 3. pendingFeatures returns empty (only checks 'backlog'/'ready' statuses)
+      // The fix ensures auto_mode_idle is NOT emitted in this window
+
+      vi.mocked(mockLoadPendingFeatures).mockResolvedValue([]); // No backlog/ready features
+      // Feature is still in in_progress status (during status update transition)
+      const transitioningFeature: Feature = {
+        ...testFeature,
+        id: 'feature-1',
+        status: 'in_progress',
+        title: 'Transitioning Feature',
+      };
+      vi.mocked(mockLoadAllFeatures).mockResolvedValue([transitioningFeature]);
+      // Feature has been released from concurrency manager (runningCount = 0)
+      vi.mocked(mockConcurrencyManager.getRunningCountForWorktree).mockResolvedValue(0);
+
+      await coordinator.startAutoLoopForProject('/test/project', null, 1);
+
+      // Clear the initial event mock calls
+      vi.mocked(mockEventBus.emitAutoModeEvent).mockClear();
+
+      // Advance time to trigger loop iteration
+      await vi.advanceTimersByTimeAsync(11000);
+
+      // Stop the loop
+      await coordinator.stopAutoLoopForProject('/test/project', null);
+
+      // The fix prevents auto_mode_idle from being emitted in this scenario
+      expect(mockEventBus.emitAutoModeEvent).not.toHaveBeenCalledWith('auto_mode_idle', {
+        message: 'No pending features - auto mode idle',
+        projectPath: '/test/project',
+        branchName: null,
+      });
+    });
+  });
 });

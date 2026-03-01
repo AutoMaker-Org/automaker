@@ -30,7 +30,7 @@ export function useAgentOutputWebSocket({
   onFeatureComplete,
 }: UseAgentOutputWebSocketProps) {
   const [streamedContent, setStreamedContent] = useState('');
-  const closeTimeoutRef = useRef<NodeJS.Timeout>();
+  const closeTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   // Use React Query for initial output loading
   const { data: initialOutput = '', isLoading } = useAgentOutput(projectPath, featureId, {
@@ -98,7 +98,16 @@ export function useAgentOutputWebSocket({
     if (isBacklogPlan) {
       // Handle backlog plan events
       if (api.backlogPlan) {
-        unsubscribe = api.backlogPlan.onEvent(handleBacklogPlanEvent);
+        unsubscribe = api.backlogPlan.onEvent((data: unknown) => {
+          if (
+            data !== null &&
+            typeof data === 'object' &&
+            'type' in data &&
+            typeof (data as { type: unknown }).type === 'string'
+          ) {
+            handleBacklogPlanEvent(data as BacklogPlanEvent);
+          }
+        });
       }
     } else {
       // Handle auto mode events

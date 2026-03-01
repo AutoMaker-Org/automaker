@@ -20,7 +20,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { GitPullRequest, ExternalLink, Sparkles, RefreshCw } from 'lucide-react';
+import {
+  GitPullRequest,
+  ExternalLink,
+  Sparkles,
+  RefreshCw,
+  Maximize2,
+  Minimize2,
+} from 'lucide-react';
 import { Spinner } from '@/components/ui/spinner';
 import { getElectronAPI } from '@/lib/electron';
 import { getHttpApiClient } from '@/lib/http-api-client';
@@ -93,6 +100,7 @@ export function CreatePRDialog({
 
   // Generate description state
   const [isGeneratingDescription, setIsGeneratingDescription] = useState(false);
+  const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
 
   // PR description model override
   const prDescriptionModelOverride = useModelOverride({ phase: 'prDescriptionModel' });
@@ -286,6 +294,7 @@ export function CreatePRDialog({
     setSelectedRemote('');
     setSelectedTargetRemote('');
     setIsGeneratingDescription(false);
+    setIsDescriptionExpanded(false);
     operationCompletedRef.current = false;
   }, [defaultBaseBranch]);
 
@@ -642,13 +651,28 @@ export function CreatePRDialog({
               </div>
 
               <div className="grid gap-2">
-                <Label htmlFor="pr-body">Description</Label>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="pr-body">Description</Label>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)}
+                    className="h-6 px-2 text-xs"
+                    title={isDescriptionExpanded ? 'Collapse description' : 'Expand description'}
+                  >
+                    {isDescriptionExpanded ? (
+                      <Minimize2 className="w-3 h-3" />
+                    ) : (
+                      <Maximize2 className="w-3 h-3" />
+                    )}
+                  </Button>
+                </div>
                 <Textarea
                   id="pr-body"
                   placeholder="Describe the changes in this PR..."
                   value={body}
                   onChange={(e) => setBody(e.target.value)}
-                  className="min-h-[80px]"
+                  className={isDescriptionExpanded ? 'min-h-[300px]' : 'min-h-[80px]'}
                 />
               </div>
 

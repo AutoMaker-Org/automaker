@@ -1433,10 +1433,14 @@ export interface WorktreeAPI {
     error?: string;
   }>;
 
-  // Subscribe to dev server log events (started, output, stopped, url-detected)
+  // Subscribe to dev server log events (starting, started, output, stopped, url-detected)
   onDevServerLogEvent: (
     callback: (
       event:
+        | {
+            type: 'dev-server:starting';
+            payload: { worktreePath: string; timestamp: string };
+          }
         | {
             type: 'dev-server:started';
             payload: { worktreePath: string; port: number; url: string; timestamp: string };

@@ -748,6 +748,49 @@ export type EventHookTrigger =
 export type EventHookHttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH';
 
 /**
+ * NtfyAuthenticationType - Authentication methods for ntfy.sh
+ *
+ * - 'none': No authentication (default for public topics)
+ * - 'basic': Username and password authentication
+ * - 'token': Access token authentication
+ */
+export type NtfyAuthenticationType = 'none' | 'basic' | 'token';
+
+/**
+ * NtfyEndpointConfig - Configuration for a ntfy.sh notification endpoint
+ *
+ * Stores reusable ntfy.sh server configuration that can be referenced
+ * by multiple event hooks. Supports custom servers (self-hosted),
+ * authentication, and notification customization.
+ */
+export interface NtfyEndpointConfig {
+  /** Unique identifier for this endpoint configuration */
+  id: string;
+  /** Display name (e.g., "Personal Phone", "Team Channel") */
+  name: string;
+  /** Server URL (default: https://ntfy.sh) */
+  serverUrl: string;
+  /** Topic name (required, no spaces) */
+  topic: string;
+  /** Authentication type */
+  authType: NtfyAuthenticationType;
+  /** Username for basic auth (required if authType === 'basic') */
+  username?: string;
+  /** Password for basic auth (required if authType === 'basic') */
+  password?: string;
+  /** Access token (required if authType === 'token') */
+  token?: string;
+  /** Default tags for notifications (comma-separated emoji codes) */
+  defaultTags?: string;
+  /** Default emoji for notifications (emoji or shortcode) */
+  defaultEmoji?: string;
+  /** Default click action URL (auto-populated with server URL) */
+  defaultClickUrl?: string;
+  /** Whether this endpoint is enabled */
+  enabled: boolean;
+}
+
+/**
  * EventHookShellAction - Configuration for executing a shell command
  *
  * Shell commands are executed in the server's working directory.
@@ -778,8 +821,32 @@ export interface EventHookHttpAction {
   body?: string;
 }
 
+/**
+ * EventHookNtfyAction - Configuration for sending ntfy.sh push notifications
+ *
+ * Uses a pre-configured ntfy.sh endpoint from the global settings.
+ * Supports variable substitution in title and body.
+ */
+export interface EventHookNtfyAction {
+  type: 'ntfy';
+  /** ID of the NtfyEndpointConfig to use */
+  endpointId: string;
+  /** Notification title (supports {{variable}} substitution, defaults to event name) */
+  title?: string;
+  /** Notification body/message (supports {{variable}} substitution) */
+  body?: string;
+  /** Tags for this specific notification (comma-separated, overrides endpoint default) */
+  tags?: string;
+  /** Emoji for this specific notification (overrides endpoint default) */
+  emoji?: string;
+  /** Click action URL (overrides endpoint default, supports {{variable}} substitution) */
+  clickUrl?: string;
+  /** Priority level (1=min, 3=default, 5=max/urgent) */
+  priority?: 1 | 2 | 3 | 4 | 5;
+}
+
 /** Union type for all hook action configurations */
-export type EventHookAction = EventHookShellAction | EventHookHttpAction;
+export type EventHookAction = EventHookShellAction | EventHookHttpAction | EventHookNtfyAction;
 
 /**
  * EventHook - Configuration for a single event hook
@@ -817,6 +884,31 @@ export const EVENT_HOOK_TRIGGER_LABELS: Record<EventHookTrigger, string> = {
   auto_mode_complete: 'Auto mode completed all features',
   auto_mode_error: 'Auto mode paused due to error',
 };
+
+/**
+ * EventHookContext - Context variables available for substitution in event hooks
+ *
+ * These variables can be used in shell commands, HTTP bodies, and ntfy notifications
+ * using the {{variableName}} syntax.
+ */
+export interface EventHookContext {
+  /** ID of the feature (if applicable) */
+  featureId?: string;
+  /** Title/name of the feature (if applicable) */
+  featureName?: string;
+  /** Absolute path to the project */
+  projectPath?: string;
+  /** Name of the project (derived from path) */
+  projectName?: string;
+  /** Error message (only for error events) */
+  error?: string;
+  /** Error type/classification (only for error events) */
+  errorType?: string;
+  /** ISO timestamp when the event occurred */
+  timestamp: string;
+  /** The event type that triggered the hook */
+  eventType: EventHookTrigger;
+}
 
 const DEFAULT_CODEX_AUTO_LOAD_AGENTS = false;
 const DEFAULT_CODEX_SANDBOX_MODE: CodexSandboxMode = 'workspace-write';
@@ -1398,6 +1490,14 @@ export interface GlobalSettings {
    */
   eventHooks?: EventHook[];
 
+  // Ntfy.sh Notification Endpoints
+  /**
+   * Configured ntfy.sh notification endpoints for push notifications.
+   * These endpoints can be referenced by event hooks to send notifications.
+   * @see NtfyEndpointConfig for configuration details
+   */
+  ntfyEndpoints?: NtfyEndpointConfig[];
+
   // Feature Templates Configuration
   /**
    * Feature templates for quick task creation from the Add Feature dropdown
@@ -1823,6 +1923,8 @@ export const DEFAULT_GLOBAL_SETTINGS: GlobalSettings = {
   subagentsSources: ['user', 'project'],
   // Event hooks
   eventHooks: [],
+  // Ntfy.sh notification endpoints
+  ntfyEndpoints: [],
   // Feature templates
   featureTemplates: DEFAULT_FEATURE_TEMPLATES,
   // New provider system

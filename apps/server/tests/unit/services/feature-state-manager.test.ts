@@ -279,6 +279,81 @@ describe('FeatureStateManager', () => {
       );
     });
 
+    it('should use feature.title as notification title for waiting_approval status', async () => {
+      const mockNotificationService = { createNotification: vi.fn() };
+      (getNotificationService as Mock).mockReturnValue(mockNotificationService);
+      const featureWithTitle: Feature = {
+        ...mockFeature,
+        title: 'My Awesome Feature Title',
+        name: 'old-name-property', // name property exists but should not be used
+      };
+      (readJsonWithRecovery as Mock).mockResolvedValue({
+        data: featureWithTitle,
+        recovered: false,
+        source: 'main',
+      });
+
+      await manager.updateFeatureStatus('/project', 'feature-123', 'waiting_approval');
+
+      expect(mockNotificationService.createNotification).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'feature_waiting_approval',
+          title: 'My Awesome Feature Title',
+          message: 'Feature Ready for Review',
+        })
+      );
+    });
+
+    it('should fallback to featureId as notification title when feature.title is undefined in waiting_approval notification', async () => {
+      const mockNotificationService = { createNotification: vi.fn() };
+      (getNotificationService as Mock).mockReturnValue(mockNotificationService);
+      const featureWithoutTitle: Feature = {
+        ...mockFeature,
+        title: undefined,
+        name: 'old-name-property',
+      };
+      (readJsonWithRecovery as Mock).mockResolvedValue({
+        data: featureWithoutTitle,
+        recovered: false,
+        source: 'main',
+      });
+
+      await manager.updateFeatureStatus('/project', 'feature-123', 'waiting_approval');
+
+      expect(mockNotificationService.createNotification).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'feature_waiting_approval',
+          title: 'feature-123',
+          message: 'Feature Ready for Review',
+        })
+      );
+    });
+
+    it('should handle empty string title by using featureId as notification title in waiting_approval notification', async () => {
+      const mockNotificationService = { createNotification: vi.fn() };
+      (getNotificationService as Mock).mockReturnValue(mockNotificationService);
+      const featureWithEmptyTitle: Feature = {
+        ...mockFeature,
+        title: '',
+        name: 'old-name-property',
+      };
+      (readJsonWithRecovery as Mock).mockResolvedValue({
+        data: featureWithEmptyTitle,
+        recovered: false,
+        source: 'main',
+      });
+
+      await manager.updateFeatureStatus('/project', 'feature-123', 'waiting_approval');
+
+      expect(mockNotificationService.createNotification).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'feature_waiting_approval',
+          title: 'feature-123',
+          message: 'Feature Ready for Review',
+        })
+      );
+    });
+
     it('should create notification for verified status', async () => {
       const mockNotificationService = { createNotification: vi.fn() };
       (getNotificationService as Mock).mockReturnValue(mockNotificationService);
@@ -294,6 +369,81 @@ describe('FeatureStateManager', () => {
         expect.objectContaining({
           type: 'feature_verified',
           featureId: 'feature-123',
+        })
+      );
+    });
+
+    it('should use feature.title as notification title for verified status', async () => {
+      const mockNotificationService = { createNotification: vi.fn() };
+      (getNotificationService as Mock).mockReturnValue(mockNotificationService);
+      const featureWithTitle: Feature = {
+        ...mockFeature,
+        title: 'My Awesome Feature Title',
+        name: 'old-name-property', // name property exists but should not be used
+      };
+      (readJsonWithRecovery as Mock).mockResolvedValue({
+        data: featureWithTitle,
+        recovered: false,
+        source: 'main',
+      });
+
+      await manager.updateFeatureStatus('/project', 'feature-123', 'verified');
+
+      expect(mockNotificationService.createNotification).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'feature_verified',
+          title: 'My Awesome Feature Title',
+          message: 'Feature Verified',
+        })
+      );
+    });
+
+    it('should fallback to featureId as notification title when feature.title is undefined in verified notification', async () => {
+      const mockNotificationService = { createNotification: vi.fn() };
+      (getNotificationService as Mock).mockReturnValue(mockNotificationService);
+      const featureWithoutTitle: Feature = {
+        ...mockFeature,
+        title: undefined,
+        name: 'old-name-property',
+      };
+      (readJsonWithRecovery as Mock).mockResolvedValue({
+        data: featureWithoutTitle,
+        recovered: false,
+        source: 'main',
+      });
+
+      await manager.updateFeatureStatus('/project', 'feature-123', 'verified');
+
+      expect(mockNotificationService.createNotification).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'feature_verified',
+          title: 'feature-123',
+          message: 'Feature Verified',
+        })
+      );
+    });
+
+    it('should handle empty string title by using featureId as notification title in verified notification', async () => {
+      const mockNotificationService = { createNotification: vi.fn() };
+      (getNotificationService as Mock).mockReturnValue(mockNotificationService);
+      const featureWithEmptyTitle: Feature = {
+        ...mockFeature,
+        title: '',
+        name: 'old-name-property',
+      };
+      (readJsonWithRecovery as Mock).mockResolvedValue({
+        data: featureWithEmptyTitle,
+        recovered: false,
+        source: 'main',
+      });
+
+      await manager.updateFeatureStatus('/project', 'feature-123', 'verified');
+
+      expect(mockNotificationService.createNotification).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'feature_verified',
+          title: 'feature-123',
+          message: 'Feature Verified',
         })
       );
     });
@@ -1209,6 +1359,181 @@ describe('FeatureStateManager', () => {
       await manager.updateTaskStatus('/project', 'feature-123', 'task-1', 'completed');
 
       expect(callOrder).toEqual(['persist', 'emit']);
+    });
+  });
+
+  describe('handleAutoModeEventError', () => {
+    let subscribeCallback: (type: string, payload: unknown) => void;
+
+    beforeEach(() => {
+      // Get the subscribe callback from the mock - the callback passed TO subscribe is at index [0]
+      // subscribe is called like: events.subscribe(callback), so callback is at mock.calls[0][0]
+      const mockCalls = (mockEvents.subscribe as Mock).mock.calls;
+      if (mockCalls.length > 0 && mockCalls[0].length > 0) {
+        subscribeCallback = mockCalls[0][0] as typeof subscribeCallback;
+      }
+    });
+
+    it('should ignore events with no type', async () => {
+      const mockNotificationService = { createNotification: vi.fn() };
+      (getNotificationService as Mock).mockReturnValue(mockNotificationService);
+
+      await subscribeCallback('auto-mode:event', {});
+
+      expect(mockNotificationService.createNotification).not.toHaveBeenCalled();
+    });
+
+    it('should ignore non-error events', async () => {
+      const mockNotificationService = { createNotification: vi.fn() };
+      (getNotificationService as Mock).mockReturnValue(mockNotificationService);
+
+      await subscribeCallback('auto-mode:event', {
+        type: 'auto_mode_feature_complete',
+        passes: true,
+        projectPath: '/project',
+      });
+
+      expect(mockNotificationService.createNotification).not.toHaveBeenCalled();
+    });
+
+    it('should create auto_mode_error notification with gesture name as title when no featureId', async () => {
+      const mockNotificationService = { createNotification: vi.fn() };
+      (getNotificationService as Mock).mockReturnValue(mockNotificationService);
+
+      await subscribeCallback('auto-mode:event', {
+        type: 'auto_mode_error',
+        message: 'Something went wrong',
+        projectPath: '/project',
+      });
+
+      expect(mockNotificationService.createNotification).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'auto_mode_error',
+          title: 'Auto Mode Error',
+          message: 'Something went wrong',
+          projectPath: '/project',
+        })
+      );
+    });
+
+    it('should use error field instead of message when available', async () => {
+      const mockNotificationService = { createNotification: vi.fn() };
+      (getNotificationService as Mock).mockReturnValue(mockNotificationService);
+
+      await subscribeCallback('auto-mode:event', {
+        type: 'auto_mode_error',
+        message: 'Some message',
+        error: 'The actual error',
+        projectPath: '/project',
+      });
+
+      expect(mockNotificationService.createNotification).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'auto_mode_error',
+          message: 'The actual error',
+        })
+      );
+    });
+
+    it('should use feature title as notification title for feature error with featureId', async () => {
+      const mockNotificationService = { createNotification: vi.fn() };
+      (getNotificationService as Mock).mockReturnValue(mockNotificationService);
+      (readJsonWithRecovery as Mock).mockResolvedValue({
+        data: { ...mockFeature, title: 'Login Page Feature' },
+        recovered: false,
+        source: 'main',
+      });
+
+      subscribeCallback('auto-mode:event', {
+        type: 'auto_mode_feature_complete',
+        passes: false,
+        featureId: 'feature-123',
+        error: 'Build failed',
+        projectPath: '/project',
+      });
+
+      // Wait for async handleAutoModeEventError to complete
+      await vi.waitFor(() => {
+        expect(mockNotificationService.createNotification).toHaveBeenCalledWith(
+          expect.objectContaining({
+            type: 'feature_error',
+            title: 'Login Page Feature',
+            message: 'Feature Failed: Build failed',
+            featureId: 'feature-123',
+          })
+        );
+      });
+    });
+
+    it('should ignore auto_mode_feature_complete without passes=false', async () => {
+      const mockNotificationService = { createNotification: vi.fn() };
+      (getNotificationService as Mock).mockReturnValue(mockNotificationService);
+
+      await subscribeCallback('auto-mode:event', {
+        type: 'auto_mode_feature_complete',
+        passes: true,
+        projectPath: '/project',
+      });
+
+      expect(mockNotificationService.createNotification).not.toHaveBeenCalled();
+    });
+
+    it('should handle missing projectPath gracefully', async () => {
+      const mockNotificationService = { createNotification: vi.fn() };
+      (getNotificationService as Mock).mockReturnValue(mockNotificationService);
+
+      await subscribeCallback('auto-mode:event', {
+        type: 'auto_mode_error',
+        message: 'Error occurred',
+      });
+
+      expect(mockNotificationService.createNotification).not.toHaveBeenCalled();
+    });
+
+    it('should handle notification service failures gracefully', async () => {
+      (getNotificationService as Mock).mockImplementation(() => {
+        throw new Error('Service unavailable');
+      });
+
+      // Should not throw - the callback returns void so we just call it and wait for async work
+      subscribeCallback('auto-mode:event', {
+        type: 'auto_mode_error',
+        message: 'Error',
+        projectPath: '/project',
+      });
+
+      // Give async handleAutoModeEventError time to complete
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+  });
+
+  describe('destroy', () => {
+    it('should unsubscribe from event subscription', () => {
+      const unsubscribeFn = vi.fn();
+      (mockEvents.subscribe as Mock).mockReturnValue(unsubscribeFn);
+
+      // Create a new manager to get a fresh subscription
+      const newManager = new FeatureStateManager(mockEvents, mockFeatureLoader);
+
+      // Call destroy
+      newManager.destroy();
+
+      // Verify unsubscribe was called
+      expect(unsubscribeFn).toHaveBeenCalled();
+    });
+
+    it('should handle destroy being called multiple times', () => {
+      const unsubscribeFn = vi.fn();
+      (mockEvents.subscribe as Mock).mockReturnValue(unsubscribeFn);
+
+      const newManager = new FeatureStateManager(mockEvents, mockFeatureLoader);
+
+      // Call destroy multiple times
+      newManager.destroy();
+      newManager.destroy();
+
+      // Should only unsubscribe once
+      expect(unsubscribeFn).toHaveBeenCalledTimes(1);
     });
   });
 });

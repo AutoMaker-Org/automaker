@@ -580,7 +580,7 @@ export function PhaseModelSelector({
         id: model.id,
         label: model.name,
         description: model.description,
-        badge: model.tier === 'premium' ? 'Premium' : model.tier === 'basic' ? 'Free' : undefined,
+        badge: model.tier === 'premium' ? 'Premium' : undefined,
         provider: 'opencode' as const,
       }));
 

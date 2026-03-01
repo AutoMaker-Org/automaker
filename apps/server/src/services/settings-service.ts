@@ -618,6 +618,36 @@ export class SettingsService {
       ignoreEmptyArrayOverwrite('eventHooks');
     }
 
+    // Guard ntfyEndpoints against accidental wipe
+    // (similar to eventHooks, these are user-configured and shouldn't be lost)
+    // Check for explicit permission to clear ntfyEndpoints (escape hatch for intentional clearing)
+    const allowEmptyNtfyEndpoints =
+      (sanitizedUpdates as Record<string, unknown>).__allowEmptyNtfyEndpoints === true;
+    // Remove the flag so it doesn't get persisted
+    delete (sanitizedUpdates as Record<string, unknown>).__allowEmptyNtfyEndpoints;
+
+    if (!allowEmptyNtfyEndpoints) {
+      const currentNtfyLen = Array.isArray(current.ntfyEndpoints)
+        ? current.ntfyEndpoints.length
+        : 0;
+      const newNtfyLen = Array.isArray(sanitizedUpdates.ntfyEndpoints)
+        ? sanitizedUpdates.ntfyEndpoints.length
+        : currentNtfyLen;
+
+      if (Array.isArray(sanitizedUpdates.ntfyEndpoints) && newNtfyLen === 0 && currentNtfyLen > 0) {
+        logger.warn(
+          '[WIPE_PROTECTION] Attempted to set ntfyEndpoints to empty array! Ignoring update.',
+          {
+            currentNtfyLen,
+            newNtfyLen,
+          }
+        );
+        delete sanitizedUpdates.ntfyEndpoints;
+      }
+    } else {
+      logger.info('[INTENTIONAL_CLEAR] Clearing ntfyEndpoints via escape hatch');
+    }
+
     // Empty object overwrite guard
     const ignoreEmptyObjectOverwrite = <K extends keyof GlobalSettings>(key: K): void => {
       const nextVal = sanitizedUpdates[key] as unknown;
@@ -1023,6 +1053,8 @@ export class SettingsService {
         keyboardShortcuts:
           (appState.keyboardShortcuts as KeyboardShortcuts) ||
           DEFAULT_GLOBAL_SETTINGS.keyboardShortcuts,
+        eventHooks: (appState.eventHooks as GlobalSettings['eventHooks']) || [],
+        ntfyEndpoints: (appState.ntfyEndpoints as GlobalSettings['ntfyEndpoints']) || [],
         projects: (appState.projects as ProjectRef[]) || [],
         trashedProjects: (appState.trashedProjects as TrashedProjectRef[]) || [],
         projectHistory: (appState.projectHistory as string[]) || [],

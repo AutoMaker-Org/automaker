@@ -14,11 +14,27 @@ import {
   type Credentials,
   type ProjectSettings,
 } from '@/types/settings.js';
+import type { NtfyEndpointConfig } from '@automaker/types';
 
 describe('settings-service.ts', () => {
   let testDataDir: string;
   let testProjectDir: string;
   let settingsService: SettingsService;
+
+  /**
+   * Helper to create a test ntfy endpoint with sensible defaults
+   */
+  function createTestNtfyEndpoint(overrides: Partial<NtfyEndpointConfig> = {}): NtfyEndpointConfig {
+    return {
+      id: `endpoint-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      name: 'Test Endpoint',
+      serverUrl: 'https://ntfy.sh',
+      topic: 'test-topic',
+      authType: 'none',
+      enabled: true,
+      ...overrides,
+    };
+  }
 
   beforeEach(async () => {
     testDataDir = path.join(os.tmpdir(), `settings-test-${Date.now()}`);
@@ -169,6 +185,150 @@ describe('settings-service.ts', () => {
       expect((updated.projects as any)[0]?.id).toBe('proj1');
       // Theme should be preserved in the same request if it attempted to wipe projects
       expect(updated.theme).toBe('solarized');
+    });
+
+    it('should not overwrite non-empty ntfyEndpoints with an empty array (data loss guard)', async () => {
+      const endpoint1 = createTestNtfyEndpoint({
+        id: 'endpoint-1',
+        name: 'My Ntfy',
+        topic: 'my-topic',
+      });
+      const initial: GlobalSettings = {
+        ...DEFAULT_GLOBAL_SETTINGS,
+        ntfyEndpoints: [endpoint1] as any,
+      };
+      const settingsPath = path.join(testDataDir, 'settings.json');
+      await fs.writeFile(settingsPath, JSON.stringify(initial, null, 2));
+
+      const updated = await settingsService.updateGlobalSettings({
+        ntfyEndpoints: [],
+      } as any);
+
+      // The empty array should be ignored - existing endpoints should be preserved
+      expect(updated.ntfyEndpoints?.length).toBe(1);
+      expect((updated.ntfyEndpoints as any)?.[0]?.id).toBe('endpoint-1');
+    });
+
+    it('should allow adding new ntfyEndpoints to existing list', async () => {
+      const endpoint1 = createTestNtfyEndpoint({
+        id: 'endpoint-1',
+        name: 'First Endpoint',
+        topic: 'first-topic',
+      });
+      const endpoint2 = createTestNtfyEndpoint({
+        id: 'endpoint-2',
+        name: 'Second Endpoint',
+        serverUrl: 'https://ntfy.example.com',
+        topic: 'second-topic',
+        authType: 'token',
+        token: 'test-token',
+      });
+
+      const initial: GlobalSettings = {
+        ...DEFAULT_GLOBAL_SETTINGS,
+        ntfyEndpoints: [endpoint1] as any,
+      };
+      const settingsPath = path.join(testDataDir, 'settings.json');
+      await fs.writeFile(settingsPath, JSON.stringify(initial, null, 2));
+
+      const updated = await settingsService.updateGlobalSettings({
+        ntfyEndpoints: [endpoint1, endpoint2] as any,
+      });
+
+      // Both endpoints should be present
+      expect(updated.ntfyEndpoints?.length).toBe(2);
+      expect((updated.ntfyEndpoints as any)?.[0]?.id).toBe('endpoint-1');
+      expect((updated.ntfyEndpoints as any)?.[1]?.id).toBe('endpoint-2');
+    });
+
+    it('should allow updating ntfyEndpoints with non-empty array', async () => {
+      const originalEndpoint = createTestNtfyEndpoint({
+        id: 'endpoint-1',
+        name: 'Original Name',
+        topic: 'original-topic',
+      });
+      const updatedEndpoint = createTestNtfyEndpoint({
+        id: 'endpoint-1',
+        name: 'Updated Name',
+        topic: 'updated-topic',
+        enabled: false,
+      });
+
+      const initial: GlobalSettings = {
+        ...DEFAULT_GLOBAL_SETTINGS,
+        ntfyEndpoints: [originalEndpoint] as any,
+      };
+      const settingsPath = path.join(testDataDir, 'settings.json');
+      await fs.writeFile(settingsPath, JSON.stringify(initial, null, 2));
+
+      const updated = await settingsService.updateGlobalSettings({
+        ntfyEndpoints: [updatedEndpoint] as any,
+      });
+
+      // The update should go through with the new values
+      expect(updated.ntfyEndpoints?.length).toBe(1);
+      expect((updated.ntfyEndpoints as any)?.[0]?.name).toBe('Updated Name');
+      expect((updated.ntfyEndpoints as any)?.[0]?.topic).toBe('updated-topic');
+      expect((updated.ntfyEndpoints as any)?.[0]?.enabled).toBe(false);
+    });
+
+    it('should allow empty ntfyEndpoints when no existing endpoints exist', async () => {
+      // Start with no endpoints (default state)
+      const settingsPath = path.join(testDataDir, 'settings.json');
+      await fs.writeFile(settingsPath, JSON.stringify(DEFAULT_GLOBAL_SETTINGS, null, 2));
+
+      // Trying to set empty array should be fine when there are no existing endpoints
+      const updated = await settingsService.updateGlobalSettings({
+        ntfyEndpoints: [],
+      } as any);
+
+      // Empty array should be set (no data loss because there was nothing to lose)
+      expect(updated.ntfyEndpoints?.length ?? 0).toBe(0);
+    });
+
+    it('should preserve ntfyEndpoints while updating other settings', async () => {
+      const endpoint = createTestNtfyEndpoint({
+        id: 'endpoint-1',
+        name: 'My Endpoint',
+        topic: 'my-topic',
+      });
+      const initial: GlobalSettings = {
+        ...DEFAULT_GLOBAL_SETTINGS,
+        theme: 'dark',
+        ntfyEndpoints: [endpoint] as any,
+      };
+      const settingsPath = path.join(testDataDir, 'settings.json');
+      await fs.writeFile(settingsPath, JSON.stringify(initial, null, 2));
+
+      // Update theme without sending ntfyEndpoints
+      const updated = await settingsService.updateGlobalSettings({
+        theme: 'light',
+      });
+
+      // Theme should be updated
+      expect(updated.theme).toBe('light');
+      // ntfyEndpoints should be preserved from existing settings
+      expect(updated.ntfyEndpoints?.length).toBe(1);
+      expect((updated.ntfyEndpoints as any)?.[0]?.id).toBe('endpoint-1');
+    });
+
+    it('should allow clearing ntfyEndpoints with escape hatch flag', async () => {
+      const endpoint = createTestNtfyEndpoint({ id: 'endpoint-1' });
+      const initial: GlobalSettings = {
+        ...DEFAULT_GLOBAL_SETTINGS,
+        ntfyEndpoints: [endpoint] as any,
+      };
+      const settingsPath = path.join(testDataDir, 'settings.json');
+      await fs.writeFile(settingsPath, JSON.stringify(initial, null, 2));
+
+      // Use escape hatch to intentionally clear ntfyEndpoints
+      const updated = await settingsService.updateGlobalSettings({
+        ntfyEndpoints: [],
+        __allowEmptyNtfyEndpoints: true,
+      } as any);
+
+      // The empty array should be applied because escape hatch was used
+      expect(updated.ntfyEndpoints?.length ?? 0).toBe(0);
     });
 
     it('should create data directory if it does not exist', async () => {
@@ -560,6 +720,73 @@ describe('settings-service.ts', () => {
       const projectSettings = await settingsService.getProjectSettings(testProjectDir);
       expect(projectSettings.theme).toBe('light');
       expect(projectSettings.boardBackground?.imagePath).toBe('/path/to/image.jpg');
+    });
+
+    it('should migrate ntfyEndpoints from localStorage data', async () => {
+      const localStorageData = {
+        'automaker-storage': JSON.stringify({
+          state: {
+            ntfyEndpoints: [
+              {
+                id: 'endpoint-1',
+                name: 'My Ntfy Server',
+                serverUrl: 'https://ntfy.sh',
+                topic: 'my-topic',
+                authType: 'none',
+                enabled: true,
+              },
+            ],
+          },
+        }),
+      };
+
+      const result = await settingsService.migrateFromLocalStorage(localStorageData);
+
+      expect(result.success).toBe(true);
+      expect(result.migratedGlobalSettings).toBe(true);
+
+      const settings = await settingsService.getGlobalSettings();
+      expect(settings.ntfyEndpoints?.length).toBe(1);
+      expect((settings.ntfyEndpoints as any)?.[0]?.id).toBe('endpoint-1');
+      expect((settings.ntfyEndpoints as any)?.[0]?.name).toBe('My Ntfy Server');
+      expect((settings.ntfyEndpoints as any)?.[0]?.topic).toBe('my-topic');
+    });
+
+    it('should migrate eventHooks and ntfyEndpoints together from localStorage data', async () => {
+      const localStorageData = {
+        'automaker-storage': JSON.stringify({
+          state: {
+            eventHooks: [
+              {
+                id: 'hook-1',
+                name: 'Test Hook',
+                eventType: 'feature:started',
+                enabled: true,
+                actions: [],
+              },
+            ],
+            ntfyEndpoints: [
+              {
+                id: 'endpoint-1',
+                name: 'My Endpoint',
+                serverUrl: 'https://ntfy.sh',
+                topic: 'test-topic',
+                authType: 'none',
+                enabled: true,
+              },
+            ],
+          },
+        }),
+      };
+
+      const result = await settingsService.migrateFromLocalStorage(localStorageData);
+
+      expect(result.success).toBe(true);
+      const settings = await settingsService.getGlobalSettings();
+      expect(settings.eventHooks?.length).toBe(1);
+      expect(settings.ntfyEndpoints?.length).toBe(1);
+      expect((settings.eventHooks as any)?.[0]?.id).toBe('hook-1');
+      expect((settings.ntfyEndpoints as any)?.[0]?.id).toBe('endpoint-1');
     });
 
     it('should handle direct localStorage values', async () => {

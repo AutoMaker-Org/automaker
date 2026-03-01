@@ -1,6 +1,6 @@
 {
   "name": "@automaker/ui",
-  "version": "0.15.0",
+  "version": "1.0.0",
   "description": "An autonomous AI development studio that helps you build software faster using AI-powered agents",
   "homepage": "https://github.com/AutoMaker-Org/automaker",
   "repository": {
@@ -9,6 +9,7 @@
   },
   "author": "AutoMaker Team",
   "license": "SEE LICENSE IN LICENSE",
+  "desktopName": "automaker.desktop",
   "private": true,
   "engines": {
     "node": ">=22.0.0 <23.0.0"

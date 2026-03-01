@@ -372,7 +372,7 @@ export function WorktreeDropdown({
             className="inline-flex items-center justify-center h-4 w-4 text-amber-500 shrink-0"
             title="Dev server starting..."
           >
-            <Spinner size="xs" variant="current" />
+            <Spinner size="xs" variant="primary" />
           </span>
         )}
 
@@ -561,7 +561,7 @@ export function WorktreeDropdown({
           }
           isPulling={isPulling}
           isPushing={isPushing}
-          isStartingDevServer={isStartingAnyDevServer}
+          isStartingAnyDevServer={isStartingAnyDevServer}
           isDevServerStarting={isDevServerStarting(selectedWorktree)}
           isDevServerRunning={isDevServerRunning(selectedWorktree)}
           devServerInfo={getDevServerInfo(selectedWorktree)}

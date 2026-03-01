@@ -101,12 +101,22 @@ export function getProviderFromModel(model?: string): ModelProvider {
 
 /**
  * Get display name for a model
+ * Handles both aliases (e.g., "sonnet") and full model IDs (e.g., "claude-sonnet-4-20250514")
  */
 export function getModelDisplayName(model: ModelAlias | string): string {
   const displayNames: Record<string, string> = {
+    // Claude aliases
     haiku: 'Claude Haiku',
     sonnet: 'Claude Sonnet',
     opus: 'Claude Opus',
+    // Claude canonical IDs (without version suffix)
+    'claude-haiku': 'Claude Haiku',
+    'claude-sonnet': 'Claude Sonnet',
+    'claude-opus': 'Claude Opus',
+    // Claude full model IDs (returned by server)
+    'claude-haiku-4-5': 'Claude Haiku',
+    'claude-sonnet-4-20250514': 'Claude Sonnet',
+    'claude-opus-4-6': 'Claude Opus',
     // Codex models
     'codex-gpt-5.2': 'GPT-5.2',
     'codex-gpt-5.1-codex-max': 'GPT-5.1 Codex Max',
@@ -210,4 +220,25 @@ export function generateUUID(): string {
   // Convert to hex string with proper UUID format
   const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
+/**
+ * Format a date as relative time (e.g., "2 minutes ago", "3 hours ago")
+ */
+export function formatRelativeTime(date: Date): string {
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffSec = Math.floor(diffMs / 1000);
+
+  if (diffSec < 0) return date.toLocaleDateString();
+
+  const diffMin = Math.floor(diffSec / 60);
+  const diffHour = Math.floor(diffMin / 60);
+  const diffDay = Math.floor(diffHour / 24);
+
+  if (diffSec < 60) return 'just now';
+  if (diffMin < 60) return `${diffMin} minute${diffMin === 1 ? '' : 's'} ago`;
+  if (diffHour < 24) return `${diffHour} hour${diffHour === 1 ? '' : 's'} ago`;
+  if (diffDay < 7) return `${diffDay} day${diffDay === 1 ? '' : 's'} ago`;
+  return date.toLocaleDateString();
 }

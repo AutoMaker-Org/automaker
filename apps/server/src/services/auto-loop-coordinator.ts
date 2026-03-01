@@ -15,6 +15,12 @@ const logger = createLogger('AutoLoopCoordinator');
 const CONSECUTIVE_FAILURE_THRESHOLD = 3;
 const FAILURE_WINDOW_MS = 60000;
 
+// Sleep intervals for the auto-loop (in milliseconds)
+const SLEEP_INTERVAL_CAPACITY_MS = 5000;
+const SLEEP_INTERVAL_IDLE_MS = 10000;
+const SLEEP_INTERVAL_NORMAL_MS = 2000;
+const SLEEP_INTERVAL_ERROR_MS = 5000;
+
 export interface AutoModeConfig {
   maxConcurrency: number;
   useWorktrees: boolean;
@@ -169,20 +175,32 @@ export class AutoLoopCoordinator {
         // presence is accounted for when deciding whether to dispatch new auto-mode tasks.
         const runningCount = await this.getRunningCountForWorktree(projectPath, branchName);
         if (runningCount >= projectState.config.maxConcurrency) {
-          await this.sleep(5000, projectState.abortController.signal);
+          await this.sleep(SLEEP_INTERVAL_CAPACITY_MS, projectState.abortController.signal);
           continue;
         }
         const pendingFeatures = await this.loadPendingFeaturesFn(projectPath, branchName);
         if (pendingFeatures.length === 0) {
           if (runningCount === 0 && !projectState.hasEmittedIdleEvent) {
-            this.eventBus.emitAutoModeEvent('auto_mode_idle', {
-              message: 'No pending features - auto mode idle',
+            // Double-check that we have no features in 'in_progress' state that might
+            // have been released from the concurrency manager but not yet updated to
+            // their final status. This prevents auto_mode_idle from firing prematurely
+            // when features are transitioning states (e.g., during status update).
+            const hasInProgressFeatures = await this.hasInProgressFeaturesForWorktree(
               projectPath,
-              branchName,
-            });
-            projectState.hasEmittedIdleEvent = true;
+              branchName
+            );
+
+            // Only emit auto_mode_idle if we're truly done with all features
+            if (!hasInProgressFeatures) {
+              this.eventBus.emitAutoModeEvent('auto_mode_idle', {
+                message: 'No pending features - auto mode idle',
+                projectPath,
+                branchName,
+              });
+              projectState.hasEmittedIdleEvent = true;
+            }
           }
-          await this.sleep(10000, projectState.abortController.signal);
+          await this.sleep(SLEEP_INTERVAL_IDLE_MS, projectState.abortController.signal);
           continue;
         }
 
@@ -228,10 +246,10 @@ export class AutoLoopCoordinator {
             }
           });
         }
-        await this.sleep(2000, projectState.abortController.signal);
+        await this.sleep(SLEEP_INTERVAL_NORMAL_MS, projectState.abortController.signal);
       } catch {
         if (projectState.abortController.signal.aborted) break;
-        await this.sleep(5000, projectState.abortController.signal);
+        await this.sleep(SLEEP_INTERVAL_ERROR_MS, projectState.abortController.signal);
       }
     }
     projectState.isRunning = false;
@@ -461,5 +479,49 @@ export class AutoLoopCoordinator {
       }, ms);
       signal?.addEventListener('abort', onAbort);
     });
+  }
+
+  /**
+   * Check if a feature belongs to the current worktree based on branch name.
+   * For main worktree (branchName === null or 'main'): includes features with no branchName or branchName === 'main'.
+   * For feature worktrees (branchName !== null and !== 'main'): only includes features with matching branchName.
+   */
+  private featureBelongsToWorktree(feature: Feature, branchName: string | null): boolean {
+    const isMainWorktree = branchName === null || branchName === 'main';
+    if (isMainWorktree) {
+      // Main worktree: include features with no branchName or branchName === 'main'
+      return !feature.branchName || feature.branchName === 'main';
+    } else {
+      // Feature worktree: only include exact branch match
+      return feature.branchName === branchName;
+    }
+  }
+
+  /**
+   * Check if there are features in 'in_progress' status for the current worktree.
+   * This prevents auto_mode_idle from firing prematurely when features are
+   * transitioning states (e.g., during status update from in_progress to completed).
+   */
+  private async hasInProgressFeaturesForWorktree(
+    projectPath: string,
+    branchName: string | null
+  ): Promise<boolean> {
+    if (!this.loadAllFeaturesFn) {
+      return false;
+    }
+
+    try {
+      const allFeatures = await this.loadAllFeaturesFn(projectPath);
+      return allFeatures.some(
+        (f) => f.status === 'in_progress' && this.featureBelongsToWorktree(f, branchName)
+      );
+    } catch (error) {
+      const errorInfo = classifyError(error);
+      logger.warn(
+        `Failed to load all features for idle check (projectPath=${projectPath}, branchName=${branchName}): ${errorInfo.message}`,
+        error
+      );
+      return false;
+    }
   }
 }

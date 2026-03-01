@@ -361,6 +361,7 @@ const initialState: AppState = {
   subagentsSources: ['user', 'project'] as Array<'user' | 'project'>,
   promptCustomization: {},
   eventHooks: [],
+  ntfyEndpoints: [],
   featureTemplates: DEFAULT_GLOBAL_SETTINGS.featureTemplates ?? [],
   claudeCompatibleProviders: [],
   claudeApiProfiles: [],
@@ -1498,6 +1499,17 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
       await httpApi.settings.updateGlobal({ eventHooks: hooks });
     } catch (error) {
       logger.error('Failed to sync event hooks:', error);
+    }
+  },
+
+  // Ntfy Endpoint actions
+  setNtfyEndpoints: async (endpoints) => {
+    set({ ntfyEndpoints: endpoints });
+    try {
+      const httpApi = getHttpApiClient();
+      await httpApi.settings.updateGlobal({ ntfyEndpoints: endpoints });
+    } catch (error) {
+      logger.error('Failed to sync ntfy endpoints:', error);
     }
   },
 

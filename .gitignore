@@ -71,7 +71,7 @@ test/agent-session-test-*/
 test/feature-backlog-test-*/
 test/running-task-display-test-*/
 test/agent-output-modal-responsive-*/
-test/fixtures/.worker-*/
+test/fixtures/
 test/board-bg-test-*/
 test/edit-feature-test-*/
 test/open-project-test-*/
