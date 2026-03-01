@@ -26,13 +26,10 @@ const TEST_TEMP_DIR = createTempDirPath('feature-deep-link-test');
 
 test.describe('Feature Deep Link', () => {
   let projectPath: string;
-  const projectName = `test-project-${Date.now()}`;
+  let projectName: string;
 
-  test.beforeAll(async () => {
-    if (!fs.existsSync(TEST_TEMP_DIR)) {
-      fs.mkdirSync(TEST_TEMP_DIR, { recursive: true });
-    }
-
+  test.beforeEach(async ({}, testInfo) => {
+    projectName = `test-project-${testInfo.workerIndex}-${Date.now()}`;
     projectPath = path.join(TEST_TEMP_DIR, projectName);
     fs.mkdirSync(projectPath, { recursive: true });
 
@@ -55,6 +52,12 @@ test.describe('Feature Deep Link', () => {
       path.join(automakerDir, 'app_spec.txt'),
       `# ${projectName}\n\nA test project for e2e testing.`
     );
+  });
+
+  test.afterEach(async () => {
+    if (projectPath && fs.existsSync(projectPath)) {
+      fs.rmSync(projectPath, { recursive: true, force: true });
+    }
   });
 
   test.afterAll(async () => {
