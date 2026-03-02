@@ -715,15 +715,27 @@ export function BoardView({ initialFeatureId }: BoardViewProps) {
   const selectedWorktreeBranch =
     currentWorktreeBranch || worktrees.find((w) => w.isMain)?.branch || 'main';
 
-  // Aggregate running auto tasks across all worktrees for this project
-  const autoModeByWorktree = useAppStore((state) => state.autoModeByWorktree);
-  const runningAutoTasksAllWorktrees = useMemo(() => {
-    if (!currentProject?.id) return [];
-    const prefix = `${currentProject.id}::`;
-    return Object.entries(autoModeByWorktree)
-      .filter(([key]) => key.startsWith(prefix))
-      .flatMap(([, state]) => state.runningTasks ?? []);
-  }, [autoModeByWorktree, currentProject?.id]);
+  // Aggregate running auto tasks across all worktrees for this project.
+  // IMPORTANT: Use a derived selector with shallow equality instead of subscribing
+  // to the raw autoModeByWorktree object. The raw subscription caused the entire
+  // BoardView to re-render on EVERY auto-mode state change (any worktree), which
+  // during worktree switches cascaded through DndContext/KanbanBoard and triggered
+  // React error #185 (maximum update depth exceeded), crashing the board view.
+  const runningAutoTasksAllWorktrees = useAppStore(
+    useShallow((state) => {
+      if (!currentProject?.id) return [] as string[];
+      const prefix = `${currentProject.id}::`;
+      const tasks: string[] = [];
+      for (const [key, worktreeState] of Object.entries(state.autoModeByWorktree)) {
+        if (key.startsWith(prefix) && worktreeState.runningTasks) {
+          for (const task of worktreeState.runningTasks) {
+            tasks.push(task);
+          }
+        }
+      }
+      return tasks;
+    })
+  );
 
   // Get in-progress features for keyboard shortcuts (needed before actions hook)
   // Must be after runningAutoTasks is defined
@@ -1506,6 +1518,7 @@ export function BoardView({ initialFeatureId }: BoardViewProps) {
     runningAutoTasks: runningAutoTasksAllWorktrees,
     persistFeatureUpdate,
     handleStartImplementation,
+    stopFeature: autoMode.stopFeature,
   });
 
   // Handle dependency link creation

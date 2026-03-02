@@ -1,9 +1,8 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { createLogger } from '@automaker/utils/logger';
 import { DragStartEvent, DragEndEvent } from '@dnd-kit/core';
 import { Feature } from '@/store/app-store';
 import { useAppStore } from '@/store/app-store';
-import { useAutoMode } from '@/hooks/use-auto-mode';
 import { toast } from 'sonner';
 import { COLUMNS, ColumnId } from '../constants';
 
@@ -20,6 +19,7 @@ interface UseBoardDragDropProps {
   runningAutoTasks: string[];
   persistFeatureUpdate: (featureId: string, updates: Partial<Feature>) => Promise<void>;
   handleStartImplementation: (feature: Feature) => Promise<boolean>;
+  stopFeature: (featureId: string) => Promise<void>;
 }
 
 export function useBoardDragDrop({
@@ -28,6 +28,7 @@ export function useBoardDragDrop({
   runningAutoTasks,
   persistFeatureUpdate,
   handleStartImplementation,
+  stopFeature,
 }: UseBoardDragDropProps) {
   const [activeFeature, setActiveFeature] = useState<Feature | null>(null);
   const [pendingDependencyLink, setPendingDependencyLink] = useState<PendingDependencyLink | null>(
@@ -39,10 +40,21 @@ export function useBoardDragDrop({
   // and triggers React error #185 (maximum update depth exceeded).
   const moveFeature = useAppStore((s) => s.moveFeature);
   const updateFeature = useAppStore((s) => s.updateFeature);
-  const autoMode = useAutoMode();
 
   // Note: getOrCreateWorktreeForFeature removed - worktrees are now created server-side
   // at execution time based on feature.branchName
+
+  // Clear stale activeFeature when features list changes (e.g. during worktree switches).
+  // Without this, the DragOverlay in KanbanBoard can try to render a feature from
+  // a previous worktree, causing property access crashes.
+  useEffect(() => {
+    setActiveFeature((current) => {
+      if (!current) return null;
+      // If the active feature is no longer in the features list, clear it
+      const stillExists = features.some((f) => f.id === current.id);
+      return stillExists ? current : null;
+    });
+  }, [features]);
 
   const handleDragStart = useCallback(
     (event: DragStartEvent) => {
@@ -244,7 +256,7 @@ export function useBoardDragDrop({
           // If the feature is currently running, stop it first
           if (isRunningTask) {
             try {
-              await autoMode.stopFeature(featureId);
+              await stopFeature(featureId);
               logger.info('Stopped running feature via drag to backlog:', featureId);
             } catch (error) {
               logger.error('Error stopping feature during drag to backlog:', error);
@@ -339,7 +351,7 @@ export function useBoardDragDrop({
       updateFeature,
       persistFeatureUpdate,
       handleStartImplementation,
-      autoMode,
+      stopFeature,
     ]
   );
 

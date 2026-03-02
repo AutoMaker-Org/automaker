@@ -1071,6 +1071,7 @@ export function WorktreePanel({
             onCherryPick={handleCherryPick}
             onAbortOperation={handleAbortOperation}
             onContinueOperation={handleContinueOperation}
+            onCreateConflictResolutionFeature={onCreateMergeConflictResolutionFeature}
             hasInitScript={hasInitScript}
             terminalScripts={terminalScripts}
             onRunTerminalScript={handleRunTerminalScript}
@@ -1310,6 +1311,7 @@ export function WorktreePanel({
           onCherryPick={handleCherryPick}
           onAbortOperation={handleAbortOperation}
           onContinueOperation={handleContinueOperation}
+          onCreateConflictResolutionFeature={onCreateMergeConflictResolutionFeature}
           terminalScripts={terminalScripts}
           onRunTerminalScript={handleRunTerminalScript}
           onEditScripts={handleEditScripts}
@@ -1391,6 +1393,7 @@ export function WorktreePanel({
             onCherryPick={handleCherryPick}
             onAbortOperation={handleAbortOperation}
             onContinueOperation={handleContinueOperation}
+            onCreateConflictResolutionFeature={onCreateMergeConflictResolutionFeature}
             hasInitScript={hasInitScript}
             hasTestCommand={hasTestCommand}
             terminalScripts={terminalScripts}
@@ -1478,6 +1481,7 @@ export function WorktreePanel({
               onCherryPick={handleCherryPick}
               onAbortOperation={handleAbortOperation}
               onContinueOperation={handleContinueOperation}
+              onCreateConflictResolutionFeature={onCreateMergeConflictResolutionFeature}
               hasInitScript={hasInitScript}
               hasTestCommand={hasTestCommand}
               terminalScripts={terminalScripts}

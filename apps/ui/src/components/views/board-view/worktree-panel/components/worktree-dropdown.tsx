@@ -27,6 +27,7 @@ import type {
   PRInfo,
   GitRepoStatus,
   TestSessionInfo,
+  MergeConflictInfo,
 } from '../types';
 import { WorktreeDropdownItem } from './worktree-dropdown-item';
 import { BranchSwitchDropdown } from './branch-switch-dropdown';
@@ -129,6 +130,8 @@ export interface WorktreeDropdownProps {
   onAbortOperation?: (worktree: WorktreeInfo) => void;
   /** Continue an in-progress merge/rebase/cherry-pick after resolving conflicts */
   onContinueOperation?: (worktree: WorktreeInfo) => void;
+  /** Create a feature to resolve merge/rebase/cherry-pick conflicts with AI */
+  onCreateConflictResolutionFeature?: (conflictInfo: MergeConflictInfo) => void;
   /** Remotes cache: maps worktree path to list of remotes */
   remotesCache?: Record<string, Array<{ name: string; url: string }>>;
   /** Pull from a specific remote, bypassing the remote selection dialog */
@@ -241,6 +244,7 @@ export function WorktreeDropdown({
   onCherryPick,
   onAbortOperation,
   onContinueOperation,
+  onCreateConflictResolutionFeature,
   remotesCache,
   onPullWithRemote,
   onPushWithRemote,
@@ -607,6 +611,7 @@ export function WorktreeDropdown({
           onCherryPick={onCherryPick}
           onAbortOperation={onAbortOperation}
           onContinueOperation={onContinueOperation}
+          onCreateConflictResolutionFeature={onCreateConflictResolutionFeature}
           hasInitScript={hasInitScript}
           terminalScripts={terminalScripts}
           onRunTerminalScript={onRunTerminalScript}

@@ -98,6 +98,7 @@ async function detectConflictState(worktreePath: string): Promise<{
   hasConflicts: boolean;
   conflictType?: 'merge' | 'rebase' | 'cherry-pick';
   conflictFiles?: string[];
+  conflictSourceBranch?: string;
 }> {
   try {
     // Find the canonical .git directory for this worktree (execGitCommand avoids /bin/sh in CI)
@@ -153,10 +154,84 @@ async function detectConflictState(worktreePath: string): Promise<{
       // Fall back to empty list if diff fails
     }
 
+    // Detect the source branch involved in the conflict
+    let conflictSourceBranch: string | undefined;
+    try {
+      if (conflictType === 'merge' && mergeHeadExists) {
+        // For merges, resolve MERGE_HEAD to a branch name
+        const mergeHead = (
+          await secureFs.readFile(path.join(gitDir, 'MERGE_HEAD'), 'utf-8')
+        ).trim();
+        try {
+          const branchName = await execGitCommand(
+            ['name-rev', '--name-only', '--refs=refs/heads/*', mergeHead],
+            worktreePath
+          );
+          const cleaned = branchName.trim().replace(/~\d+$/, '');
+          if (cleaned && cleaned !== 'undefined') {
+            conflictSourceBranch = cleaned;
+          }
+        } catch {
+          // Could not resolve to branch name
+        }
+      } else if (conflictType === 'rebase') {
+        // For rebases, read the onto branch from rebase-merge/head-name or rebase-apply/head-name
+        const headNamePath = rebaseMergeExists
+          ? path.join(gitDir, 'rebase-merge', 'onto-name')
+          : path.join(gitDir, 'rebase-apply', 'onto-name');
+        try {
+          const ontoName = (await secureFs.readFile(headNamePath, 'utf-8')).trim();
+          if (ontoName) {
+            conflictSourceBranch = ontoName.replace(/^refs\/heads\//, '');
+          }
+        } catch {
+          // onto-name may not exist; try to resolve the onto commit
+          try {
+            const ontoPath = rebaseMergeExists
+              ? path.join(gitDir, 'rebase-merge', 'onto')
+              : path.join(gitDir, 'rebase-apply', 'onto');
+            const ontoCommit = (await secureFs.readFile(ontoPath, 'utf-8')).trim();
+            if (ontoCommit) {
+              const branchName = await execGitCommand(
+                ['name-rev', '--name-only', '--refs=refs/heads/*', ontoCommit],
+                worktreePath
+              );
+              const cleaned = branchName.trim().replace(/~\d+$/, '');
+              if (cleaned && cleaned !== 'undefined') {
+                conflictSourceBranch = cleaned;
+              }
+            }
+          } catch {
+            // Could not resolve onto commit
+          }
+        }
+      } else if (conflictType === 'cherry-pick' && cherryPickHeadExists) {
+        // For cherry-picks, try to resolve CHERRY_PICK_HEAD to a branch name
+        const cherryPickHead = (
+          await secureFs.readFile(path.join(gitDir, 'CHERRY_PICK_HEAD'), 'utf-8')
+        ).trim();
+        try {
+          const branchName = await execGitCommand(
+            ['name-rev', '--name-only', '--refs=refs/heads/*', cherryPickHead],
+            worktreePath
+          );
+          const cleaned = branchName.trim().replace(/~\d+$/, '');
+          if (cleaned && cleaned !== 'undefined') {
+            conflictSourceBranch = cleaned;
+          }
+        } catch {
+          // Could not resolve to branch name
+        }
+      }
+    } catch {
+      // Ignore source branch detection errors
+    }
+
     return {
       hasConflicts: conflictFiles.length > 0,
       conflictType,
       conflictFiles,
+      conflictSourceBranch,
     };
   } catch {
     // If anything fails, assume no conflicts

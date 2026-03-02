@@ -46,11 +46,19 @@ import {
   ArrowLeftRight,
   Check,
   Hash,
+  Sparkles,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { Spinner } from '@/components/ui/spinner';
-import type { WorktreeInfo, DevServerInfo, PRInfo, GitRepoStatus, TestSessionInfo } from '../types';
+import type {
+  WorktreeInfo,
+  DevServerInfo,
+  PRInfo,
+  GitRepoStatus,
+  TestSessionInfo,
+  MergeConflictInfo,
+} from '../types';
 import { TooltipWrapper } from './tooltip-wrapper';
 import { useAvailableEditors, useEffectiveDefaultEditor } from '../hooks/use-available-editors';
 import {
@@ -137,6 +145,8 @@ interface WorktreeActionsDropdownProps {
   onAbortOperation?: (worktree: WorktreeInfo) => void;
   /** Continue an in-progress merge/rebase/cherry-pick after resolving conflicts */
   onContinueOperation?: (worktree: WorktreeInfo) => void;
+  /** Create a feature to resolve merge/rebase/cherry-pick conflicts with AI */
+  onCreateConflictResolutionFeature?: (conflictInfo: MergeConflictInfo) => void;
   hasInitScript: boolean;
   /** Terminal quick scripts configured for the project */
   terminalScripts?: TerminalScript[];
@@ -293,6 +303,7 @@ export function WorktreeActionsDropdown({
   onCherryPick,
   onAbortOperation,
   onContinueOperation,
+  onCreateConflictResolutionFeature,
   hasInitScript,
   terminalScripts,
   onRunTerminalScript,
@@ -465,6 +476,23 @@ export function WorktreeActionsDropdown({
                     : worktree.conflictType === 'cherry-pick'
                       ? 'Cherry-pick'
                       : 'Operation'}
+              </DropdownMenuItem>
+            )}
+            {onCreateConflictResolutionFeature && (
+              <DropdownMenuItem
+                onClick={() =>
+                  onCreateConflictResolutionFeature({
+                    sourceBranch: worktree.branch,
+                    targetBranch: worktree.branch,
+                    targetWorktreePath: worktree.path,
+                    conflictFiles: worktree.conflictFiles,
+                    operationType: worktree.conflictType,
+                  })
+                }
+                className="text-xs text-purple-500 focus:text-purple-600"
+              >
+                <Sparkles className="w-3.5 h-3.5 mr-2" />
+                Resolve with AI
               </DropdownMenuItem>
             )}
             <DropdownMenuSeparator />

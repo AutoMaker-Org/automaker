@@ -28,7 +28,7 @@ test.describe('Feature Deep Link', () => {
   let projectPath: string;
   let projectName: string;
 
-  test.beforeEach(async (_fixtures, testInfo) => {
+  test.beforeEach(async ({}, testInfo) => {
     projectName = `test-project-${testInfo.workerIndex}-${Date.now()}`;
     projectPath = path.join(TEST_TEMP_DIR, projectName);
     fs.mkdirSync(projectPath, { recursive: true });
