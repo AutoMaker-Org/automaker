@@ -595,8 +595,8 @@ function RootLayoutContent() {
                     '[FAST_HYDRATE] Background reconcile: cache updated (store untouched)'
                   );
 
-                  // Selectively reconcile event hooks from server.
-                  // Unlike projects/theme, eventHooks aren't rendered on the main view,
+                  // Selectively reconcile event hooks and ntfy endpoints from server.
+                  // Unlike projects/theme, these aren't rendered on the main view,
                   // so updating them won't cause a visible re-render flash.
                   const serverHooks = (finalSettings as GlobalSettings).eventHooks ?? [];
                   const currentHooks = useAppStore.getState().eventHooks;
@@ -608,6 +608,19 @@ function RootLayoutContent() {
                       `[FAST_HYDRATE] Reconciling eventHooks from server (server=${serverHooks.length}, store=${currentHooks.length})`
                     );
                     useAppStore.setState({ eventHooks: serverHooks });
+                  }
+
+                  // Reconcile ntfy endpoints from server (same rationale as eventHooks)
+                  const serverEndpoints = (finalSettings as GlobalSettings).ntfyEndpoints ?? [];
+                  const currentEndpoints = useAppStore.getState().ntfyEndpoints;
+                  if (
+                    JSON.stringify(serverEndpoints) !== JSON.stringify(currentEndpoints) &&
+                    serverEndpoints.length > 0
+                  ) {
+                    logger.info(
+                      `[FAST_HYDRATE] Reconciling ntfyEndpoints from server (server=${serverEndpoints.length}, store=${currentEndpoints.length})`
+                    );
+                    useAppStore.setState({ ntfyEndpoints: serverEndpoints });
                   }
                 } catch (e) {
                   logger.debug('[FAST_HYDRATE] Failed to update cache:', e);

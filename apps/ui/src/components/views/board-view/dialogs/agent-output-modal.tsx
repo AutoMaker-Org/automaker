@@ -179,10 +179,17 @@ export function AgentOutputModal({
     enabled: open && !!resolvedProjectPath,
   });
 
-  // Fetch feature data to access the server-side accumulated summary
+  // Fetch feature data to access the server-side accumulated summary.
+  // Also used to show fresh description/status instead of potentially stale props
+  // (e.g. when opening via deep link from a notification click).
   const { data: feature, refetch: refetchFeature } = useFeature(resolvedProjectPath, featureId, {
     enabled: open && !!resolvedProjectPath && !isBacklogPlan,
   });
+
+  // Prefer fresh data from server over potentially stale props passed at open time.
+  const resolvedDescription = feature?.description ?? featureDescription;
+  const resolvedStatus = feature?.status ?? featureStatus;
+  const resolvedBranchName = feature?.branchName ?? branchName;
 
   // Reset streamed content when modal opens or featureId changes
   useEffect(() => {
@@ -519,7 +526,7 @@ export function AgentOutputModal({
         <DialogHeader className="shrink-0">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pr-10">
             <DialogTitle className="flex items-center gap-2">
-              {featureStatus !== 'verified' && featureStatus !== 'waiting_approval' && (
+              {resolvedStatus !== 'verified' && resolvedStatus !== 'waiting_approval' && (
                 <Spinner size="md" />
               )}
               Agent Output
@@ -581,7 +588,7 @@ export function AgentOutputModal({
             className="mt-1 max-h-24 overflow-y-auto wrap-break-word"
             data-testid="agent-output-description"
           >
-            {featureDescription}
+            {resolvedDescription}
           </DialogDescription>
         </DialogHeader>
 
@@ -601,7 +608,7 @@ export function AgentOutputModal({
             {resolvedProjectPath ? (
               <GitDiffPanel
                 projectPath={resolvedProjectPath}
-                featureId={branchName || featureId}
+                featureId={resolvedBranchName || featureId}
                 compact={false}
                 useWorktrees={useWorktrees}
                 className="border-0 rounded-lg"
