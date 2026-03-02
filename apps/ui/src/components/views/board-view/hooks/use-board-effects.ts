@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { getElectronAPI } from '@/lib/electron';
 import { createLogger } from '@automaker/utils/logger';
 import type { Feature } from '@/store/app-store';
@@ -68,10 +68,27 @@ export function useBoardEffects({
   // Note: Running tasks sync is now handled by useAutoMode hook in BoardView
   // which correctly handles worktree/branch scoping.
 
+  // Build a stable fingerprint of feature IDs + statuses so context checks
+  // only re-run when the set of features or their statuses actually change,
+  // not on every React Query refetch that produces a new array reference.
+  const featuresFingerprint = useMemo(() => {
+    return features
+      .map((f) => `${f.id}:${f.status}`)
+      .sort()
+      .join(',');
+  }, [features]);
+
+  // Keep a ref to the latest features array for use inside the effect
+  const featuresRef = useRef(features);
+  useEffect(() => {
+    featuresRef.current = features;
+  }, [features]);
+
   // Check which features have context files
   useEffect(() => {
     const checkAllContexts = async () => {
-      const featuresWithPotentialContext = features.filter(
+      const currentFeatures = featuresRef.current;
+      const featuresWithPotentialContext = currentFeatures.filter(
         (f) =>
           f.status === 'backlog' ||
           f.status === 'merge_conflict' ||
@@ -99,10 +116,11 @@ export function useBoardEffects({
       setFeaturesWithContext(newSet);
     };
 
-    if (features.length > 0 && !isLoading) {
+    if (featuresFingerprint && !isLoading) {
       checkAllContexts();
     }
-  }, [features, isLoading, checkContextExists, setFeaturesWithContext]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [featuresFingerprint, isLoading, checkContextExists, setFeaturesWithContext]);
 
   // Re-check context when a feature stops, completes, or errors
   // This ensures hasContext is updated even if the features array doesn't change

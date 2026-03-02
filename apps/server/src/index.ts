@@ -261,7 +261,10 @@ morgan.token('status-colored', (_req, res) => {
 app.use(
   morgan(':method :url :status-colored', {
     // Skip when request logging is disabled or for health check endpoints
-    skip: (req) => !requestLoggingEnabled || req.url === '/api/health',
+    skip: (req) =>
+      !requestLoggingEnabled ||
+      req.url === '/api/health' ||
+      req.url === '/api/auto-mode/context-exists',
   })
 );
 // CORS configuration
