@@ -14,7 +14,6 @@ import { FeatureImagePath as DescriptionImagePath } from '@/components/ui/descri
 import { getElectronAPI } from '@/lib/electron';
 import { isConnectionError, handleServerOffline, getHttpApiClient } from '@/lib/http-api-client';
 import { toast } from 'sonner';
-import { useAutoMode } from '@/hooks/use-auto-mode';
 import { useVerifyFeature, useResumeFeature } from '@/hooks/mutations';
 import { truncateDescription } from '@/lib/utils';
 import { getBlockingDependencies } from '@automaker/dependency-resolver';
@@ -86,6 +85,7 @@ interface UseBoardActionsProps {
   onWorktreeCreated?: () => void;
   onWorktreeAutoSelect?: (worktree: { path: string; branch: string }) => void;
   currentWorktreeBranch: string | null; // Branch name of the selected worktree for filtering
+  stopFeature: (featureId: string) => Promise<boolean>; // Passed from parent's useAutoMode to avoid duplicate subscription
 }
 
 export function useBoardActions({
@@ -114,6 +114,7 @@ export function useBoardActions({
   onWorktreeCreated,
   onWorktreeAutoSelect,
   currentWorktreeBranch,
+  stopFeature,
 }: UseBoardActionsProps) {
   const queryClient = useQueryClient();
 
@@ -130,7 +131,6 @@ export function useBoardActions({
   const skipVerificationInAutoMode = useAppStore((s) => s.skipVerificationInAutoMode);
   const isPrimaryWorktreeBranch = useAppStore((s) => s.isPrimaryWorktreeBranch);
   const getPrimaryWorktreeBranch = useAppStore((s) => s.getPrimaryWorktreeBranch);
-  const autoMode = useAutoMode();
 
   // React Query mutations for feature operations
   const verifyFeatureMutation = useVerifyFeature(currentProject?.path ?? '');
@@ -538,7 +538,7 @@ export function useBoardActions({
 
       if (isRunning) {
         try {
-          await autoMode.stopFeature(featureId);
+          await stopFeature(featureId);
           // Remove from all worktrees
           if (currentProject) {
             removeRunningTaskFromAllWorktrees(currentProject.id, featureId);
@@ -573,7 +573,7 @@ export function useBoardActions({
       removeFeature(featureId);
       await persistFeatureDelete(featureId);
     },
-    [features, runningAutoTasks, autoMode, removeFeature, persistFeatureDelete, currentProject]
+    [features, runningAutoTasks, stopFeature, removeFeature, persistFeatureDelete, currentProject]
   );
 
   const handleRunFeature = useCallback(
@@ -1032,7 +1032,7 @@ export function useBoardActions({
   const handleForceStopFeature = useCallback(
     async (feature: Feature) => {
       try {
-        await autoMode.stopFeature(feature.id);
+        await stopFeature(feature.id);
 
         const targetStatus =
           feature.skipTests && feature.status === 'waiting_approval'
@@ -1040,7 +1040,7 @@ export function useBoardActions({
             : 'backlog';
 
         // Remove the running task from ALL worktrees for this project.
-        // autoMode.stopFeature only removes from its scoped worktree (branchName),
+        // stopFeature only removes from its scoped worktree (branchName),
         // but the feature may be tracked under a different worktree branch.
         // Without this, runningAutoTasksAllWorktrees still contains the feature
         // and the board column logic forces it into in_progress.
@@ -1085,7 +1085,7 @@ export function useBoardActions({
         });
       }
     },
-    [autoMode, moveFeature, persistFeatureUpdate, currentProject, queryClient]
+    [stopFeature, moveFeature, persistFeatureUpdate, currentProject, queryClient]
   );
 
   const handleStartNextFeatures = useCallback(async () => {
@@ -1197,7 +1197,7 @@ export function useBoardActions({
     if (runningVerified.length > 0) {
       await Promise.allSettled(
         runningVerified.map((feature) =>
-          autoMode.stopFeature(feature.id).catch((error) => {
+          stopFeature(feature.id).catch((error) => {
             logger.error('Error stopping feature before archive:', error);
           })
         )
@@ -1236,7 +1236,7 @@ export function useBoardActions({
       // Reload features to sync state with server on error
       loadFeatures();
     }
-  }, [features, runningAutoTasks, autoMode, updateFeature, currentProject, loadFeatures]);
+  }, [features, runningAutoTasks, stopFeature, updateFeature, currentProject, loadFeatures]);
 
   const handleDuplicateFeature = useCallback(
     async (feature: Feature, asChild: boolean = false) => {

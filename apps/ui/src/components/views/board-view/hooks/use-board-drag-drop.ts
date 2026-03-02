@@ -19,7 +19,7 @@ interface UseBoardDragDropProps {
   runningAutoTasks: string[];
   persistFeatureUpdate: (featureId: string, updates: Partial<Feature>) => Promise<void>;
   handleStartImplementation: (feature: Feature) => Promise<boolean>;
-  stopFeature: (featureId: string) => Promise<void>;
+  stopFeature: (featureId: string) => Promise<boolean>;
 }
 
 export function useBoardDragDrop({
@@ -256,8 +256,12 @@ export function useBoardDragDrop({
           // If the feature is currently running, stop it first
           if (isRunningTask) {
             try {
-              await stopFeature(featureId);
-              logger.info('Stopped running feature via drag to backlog:', featureId);
+              const stopped = await stopFeature(featureId);
+              if (stopped) {
+                logger.info('Stopped running feature via drag to backlog:', featureId);
+              } else {
+                logger.warn('Feature was not running by the time stop was requested:', featureId);
+              }
             } catch (error) {
               logger.error('Error stopping feature during drag to backlog:', error);
               toast.error('Failed to stop agent', {

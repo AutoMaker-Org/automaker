@@ -843,6 +843,7 @@ export function BoardView({ initialFeatureId }: BoardViewProps) {
     onWorktreeCreated: () => setWorktreeRefreshKey((k) => k + 1),
     onWorktreeAutoSelect: addAndSelectWorktree,
     currentWorktreeBranch,
+    stopFeature: autoMode.stopFeature,
   });
 
   // Handler for bulk updating multiple features

@@ -959,10 +959,10 @@ export function useAutoMode(worktree?: WorktreeInfo) {
 
   // Stop a specific feature
   const stopFeature = useCallback(
-    async (featureId: string) => {
+    async (featureId: string): Promise<boolean> => {
       if (!currentProject) {
         logger.error('No project selected');
-        return;
+        return false;
       }
 
       try {
@@ -983,6 +983,7 @@ export function useAutoMode(worktree?: WorktreeInfo) {
             message: 'Feature stopped by user',
             passes: false,
           });
+          return true;
         } else {
           logger.error('Failed to stop feature:', result.error);
           throw new Error(result.error || 'Failed to stop feature');

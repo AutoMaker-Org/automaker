@@ -482,7 +482,7 @@ export function WorktreeActionsDropdown({
               <DropdownMenuItem
                 onClick={() =>
                   onCreateConflictResolutionFeature({
-                    sourceBranch: worktree.branch,
+                    sourceBranch: worktree.conflictSourceBranch ?? worktree.branch,
                     targetBranch: worktree.branch,
                     targetWorktreePath: worktree.path,
                     conflictFiles: worktree.conflictFiles,

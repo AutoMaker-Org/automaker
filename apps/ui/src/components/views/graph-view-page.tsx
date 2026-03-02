@@ -475,6 +475,7 @@ export function GraphViewPage() {
       setCurrentWorktree(currentProject.path, newWorktree.path, newWorktree.branch);
     },
     currentWorktreeBranch,
+    stopFeature: autoMode.stopFeature,
   });
 
   // Handle add and start feature

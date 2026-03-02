@@ -87,6 +87,8 @@ interface WorktreeInfo {
   conflictType?: 'merge' | 'rebase' | 'cherry-pick';
   /** List of files with conflicts */
   conflictFiles?: string[];
+  /** Source branch involved in merge/rebase/cherry-pick, when resolvable */
+  conflictSourceBranch?: string;
 }
 
 /**
@@ -160,7 +162,7 @@ async function detectConflictState(worktreePath: string): Promise<{
       if (conflictType === 'merge' && mergeHeadExists) {
         // For merges, resolve MERGE_HEAD to a branch name
         const mergeHead = (
-          await secureFs.readFile(path.join(gitDir, 'MERGE_HEAD'), 'utf-8')
+          (await secureFs.readFile(path.join(gitDir, 'MERGE_HEAD'), 'utf-8')) as string
         ).trim();
         try {
           const branchName = await execGitCommand(
@@ -180,7 +182,7 @@ async function detectConflictState(worktreePath: string): Promise<{
           ? path.join(gitDir, 'rebase-merge', 'onto-name')
           : path.join(gitDir, 'rebase-apply', 'onto-name');
         try {
-          const ontoName = (await secureFs.readFile(headNamePath, 'utf-8')).trim();
+          const ontoName = ((await secureFs.readFile(headNamePath, 'utf-8')) as string).trim();
           if (ontoName) {
             conflictSourceBranch = ontoName.replace(/^refs\/heads\//, '');
           }
@@ -190,7 +192,7 @@ async function detectConflictState(worktreePath: string): Promise<{
             const ontoPath = rebaseMergeExists
               ? path.join(gitDir, 'rebase-merge', 'onto')
               : path.join(gitDir, 'rebase-apply', 'onto');
-            const ontoCommit = (await secureFs.readFile(ontoPath, 'utf-8')).trim();
+            const ontoCommit = ((await secureFs.readFile(ontoPath, 'utf-8')) as string).trim();
             if (ontoCommit) {
               const branchName = await execGitCommand(
                 ['name-rev', '--name-only', '--refs=refs/heads/*', ontoCommit],
@@ -208,7 +210,7 @@ async function detectConflictState(worktreePath: string): Promise<{
       } else if (conflictType === 'cherry-pick' && cherryPickHeadExists) {
         // For cherry-picks, try to resolve CHERRY_PICK_HEAD to a branch name
         const cherryPickHead = (
-          await secureFs.readFile(path.join(gitDir, 'CHERRY_PICK_HEAD'), 'utf-8')
+          (await secureFs.readFile(path.join(gitDir, 'CHERRY_PICK_HEAD'), 'utf-8')) as string
         ).trim();
         try {
           const branchName = await execGitCommand(
@@ -669,6 +671,7 @@ export function createListHandler() {
             // hasConflicts is true only when there are actual unresolved files
             worktree.hasConflicts = conflictState.hasConflicts;
             worktree.conflictFiles = conflictState.conflictFiles;
+            worktree.conflictSourceBranch = conflictState.conflictSourceBranch;
           } catch {
             // Ignore conflict detection errors
           }

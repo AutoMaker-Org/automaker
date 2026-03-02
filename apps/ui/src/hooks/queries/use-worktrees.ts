@@ -28,6 +28,8 @@ interface WorktreeInfo {
   conflictType?: 'merge' | 'rebase' | 'cherry-pick';
   /** List of files with conflicts */
   conflictFiles?: string[];
+  /** The branch that is the source of the conflict (e.g. the branch being merged in) */
+  conflictSourceBranch?: string;
 }
 
 interface RemovedWorktree {
