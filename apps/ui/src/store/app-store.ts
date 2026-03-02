@@ -2512,9 +2512,33 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
   setSpecCreatingForProject: (projectPath) => set({ specCreatingForProject: projectPath }),
   isSpecCreatingForProject: (projectPath) => get().specCreatingForProject === projectPath,
 
-  setDefaultPlanningMode: (mode) => set({ defaultPlanningMode: mode }),
-  setDefaultRequirePlanApproval: (require) => set({ defaultRequirePlanApproval: require }),
-  setDefaultFeatureModel: (entry) => set({ defaultFeatureModel: entry }),
+  setDefaultPlanningMode: async (mode) => {
+    set({ defaultPlanningMode: mode });
+    try {
+      const httpApi = getHttpApiClient();
+      await httpApi.settings.updateGlobal({ defaultPlanningMode: mode });
+    } catch (error) {
+      logger.error('Failed to sync defaultPlanningMode:', error);
+    }
+  },
+  setDefaultRequirePlanApproval: async (require) => {
+    set({ defaultRequirePlanApproval: require });
+    try {
+      const httpApi = getHttpApiClient();
+      await httpApi.settings.updateGlobal({ defaultRequirePlanApproval: require });
+    } catch (error) {
+      logger.error('Failed to sync defaultRequirePlanApproval:', error);
+    }
+  },
+  setDefaultFeatureModel: async (entry) => {
+    set({ defaultFeatureModel: entry });
+    try {
+      const httpApi = getHttpApiClient();
+      await httpApi.settings.updateGlobal({ defaultFeatureModel: entry });
+    } catch (error) {
+      logger.error('Failed to sync defaultFeatureModel:', error);
+    }
+  },
 
   setDefaultThinkingLevel: async (level) => {
     const currentModel = get().defaultFeatureModel;
@@ -2523,20 +2547,30 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
 
     // Also update defaultFeatureModel's thinkingLevel if compatible
     if (availableLevels.includes(level)) {
+      const updatedFeatureModel = { ...currentModel, thinkingLevel: level };
       set({
         defaultThinkingLevel: level,
-        defaultFeatureModel: { ...currentModel, thinkingLevel: level },
+        defaultFeatureModel: updatedFeatureModel,
       });
+      // Sync to server - include defaultFeatureModel since thinkingLevel is embedded there too
+      try {
+        const httpApi = getHttpApiClient();
+        await httpApi.settings.updateGlobal({
+          defaultThinkingLevel: level,
+          defaultFeatureModel: updatedFeatureModel,
+        });
+      } catch (error) {
+        logger.error('Failed to sync defaultThinkingLevel:', error);
+      }
     } else {
       set({ defaultThinkingLevel: level });
-    }
-
-    // Sync to server
-    try {
-      const httpApi = getHttpApiClient();
-      await httpApi.settings.updateGlobal({ defaultThinkingLevel: level });
-    } catch (error) {
-      logger.error('Failed to sync defaultThinkingLevel:', error);
+      // Sync to server
+      try {
+        const httpApi = getHttpApiClient();
+        await httpApi.settings.updateGlobal({ defaultThinkingLevel: level });
+      } catch (error) {
+        logger.error('Failed to sync defaultThinkingLevel:', error);
+      }
     }
   },
 

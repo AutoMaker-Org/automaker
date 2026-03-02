@@ -9,19 +9,53 @@ import { createLogger, atomicWriteJson, DEFAULT_BACKUP_COUNT } from '@automaker/
 import { getFeaturesDir } from '@automaker/platform';
 import { extractJsonWithArray } from '../../lib/json-extractor.js';
 import { getNotificationService } from '../../services/notification-service.js';
+import type { SettingsService } from '../../services/settings-service.js';
+import { resolvePhaseModel } from '@automaker/model-resolver';
 
 const logger = createLogger('SpecRegeneration');
 
 export async function parseAndCreateFeatures(
   projectPath: string,
   content: string,
-  events: EventEmitter
+  events: EventEmitter,
+  settingsService?: SettingsService
 ): Promise<void> {
   logger.info('========== parseAndCreateFeatures() started ==========');
   logger.info(`Content length: ${content.length} chars`);
   logger.info('========== CONTENT RECEIVED FOR PARSING ==========');
   logger.info(content);
   logger.info('========== END CONTENT ==========');
+
+  // Load default model and planning settings from settingsService
+  let defaultModel: string | undefined;
+  let defaultPlanningMode: string = 'skip';
+  let defaultRequirePlanApproval = false;
+
+  if (settingsService) {
+    try {
+      const globalSettings = await settingsService.getGlobalSettings();
+      const projectSettings = await settingsService.getProjectSettings(projectPath);
+
+      const defaultModelEntry =
+        projectSettings.defaultFeatureModel ?? globalSettings.defaultFeatureModel;
+      if (defaultModelEntry) {
+        const resolved = resolvePhaseModel(defaultModelEntry);
+        defaultModel = resolved.model;
+      }
+
+      defaultPlanningMode = globalSettings.defaultPlanningMode ?? 'skip';
+      defaultRequirePlanApproval = globalSettings.defaultRequirePlanApproval ?? false;
+
+      logger.info(
+        `[parseAndCreateFeatures] Using defaults: model=${defaultModel ?? 'none'}, planningMode=${defaultPlanningMode}, requirePlanApproval=${defaultRequirePlanApproval}`
+      );
+    } catch (settingsError) {
+      logger.warn(
+        '[parseAndCreateFeatures] Failed to load settings, using defaults:',
+        settingsError
+      );
+    }
+  }
 
   try {
     // Extract JSON from response using shared utility
@@ -61,7 +95,7 @@ export async function parseAndCreateFeatures(
       const featureDir = path.join(featuresDir, feature.id);
       await secureFs.mkdir(featureDir, { recursive: true });
 
-      const featureData = {
+      const featureData: Record<string, unknown> = {
         id: feature.id,
         category: feature.category || 'Uncategorized',
         title: feature.title,
@@ -70,11 +104,19 @@ export async function parseAndCreateFeatures(
         priority: feature.priority || 2,
         complexity: feature.complexity || 'moderate',
         dependencies: feature.dependencies || [],
-        planningMode: 'skip',
-        requirePlanApproval: false,
+        planningMode: defaultPlanningMode,
+        requirePlanApproval:
+          defaultPlanningMode === 'skip' || defaultPlanningMode === 'lite'
+            ? false
+            : defaultRequirePlanApproval,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
+
+      // Apply default model if available from settings
+      if (defaultModel) {
+        featureData.model = defaultModel;
+      }
 
       // Use atomic write with backup support for crash protection
       await atomicWriteJson(path.join(featureDir, 'feature.json'), featureData, {

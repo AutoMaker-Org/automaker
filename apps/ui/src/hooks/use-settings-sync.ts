@@ -864,8 +864,8 @@ export async function refreshSettingsFromServer(): Promise<boolean> {
             )
           )
         : currentAppState.agentModelBySession,
-      // Sanitize: only restore entries with path === null (main branch).
-      // Non-null paths may reference deleted worktrees, causing crash loops.
+      // Restore all valid worktree selections (both main branch and feature worktrees).
+      // The validation effect in use-worktrees.ts handles deleted worktrees gracefully.
       currentWorktreeByProject: sanitizeWorktreeByProject(
         serverSettings.currentWorktreeByProject ?? currentAppState.currentWorktreeByProject
       ),

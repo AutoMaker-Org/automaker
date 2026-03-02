@@ -833,18 +833,11 @@ export function hydrateStoreFromSettings(settings: GlobalSettings): void {
           )
         )
       : current.agentModelBySession,
-    // Sanitize currentWorktreeByProject: only restore entries where path is null
-    // (main branch). Non-null paths point to worktree directories that may have
-    // been deleted while the app was closed. Restoring a stale path causes the
-    // board to render an invalid worktree selection, triggering a crash loop
-    // (error boundary reloads → restores same bad path → crash again).
-    // The use-worktrees validation effect will re-discover valid worktrees
-    // from the server once they load.
-    currentWorktreeByProject: Object.fromEntries(
-      Object.entries(sanitizeWorktreeByProject(settings.currentWorktreeByProject)).filter(
-        ([, worktree]) => worktree.path === null
-      )
-    ),
+    // Restore all valid worktree selections (both main branch and feature worktrees).
+    // The validation effect in use-worktrees.ts handles deleted worktrees gracefully
+    // by resetting to main branch when the worktree list loads and the cached
+    // worktree no longer exists.
+    currentWorktreeByProject: sanitizeWorktreeByProject(settings.currentWorktreeByProject),
     // UI State
     worktreePanelCollapsed: settings.worktreePanelCollapsed ?? false,
     lastProjectDir: settings.lastProjectDir ?? '',

@@ -323,7 +323,7 @@ Your entire response should be valid JSON starting with { and ending with }. No 
     }
   }
 
-  await parseAndCreateFeatures(projectPath, contentForParsing, events);
+  await parseAndCreateFeatures(projectPath, contentForParsing, events, settingsService);
 
   logger.debug('========== generateFeaturesFromSpec() completed ==========');
 }
