@@ -147,6 +147,33 @@ describe('subprocess.ts', () => {
       expect(results[1]).toEqual({ type: 'second' });
     });
 
+    it('should skip non-JSON output lines (e.g., from bun/npm install)', async () => {
+      const mockProcess = createMockProcess({
+        stdoutLines: [
+          'bun install v1.3.10 (30e609e0)',
+          '{"type":"progress","value":50}',
+          'Checked 3 installs across 4 packages (no changes) [4.00ms]',
+          '{"type":"complete"}',
+        ],
+        exitCode: 0,
+      });
+
+      vi.mocked(cp.spawn).mockReturnValue(mockProcess);
+
+      const generator = spawnJSONLProcess(baseOptions);
+      const results = await collectAsyncGenerator(generator);
+
+      // Non-JSON lines should be skipped (logged but not yielded as errors)
+      expect(results).toHaveLength(2);
+      expect(results[0]).toEqual({ type: 'progress', value: 50 });
+      expect(results[1]).toEqual({ type: 'complete' });
+
+      // Non-JSON lines should be logged
+      expect(consoleSpy.log).toHaveBeenCalledWith(
+        expect.stringContaining('[SubprocessManager] Non-JSON output: bun install')
+      );
+    });
+
     it('should yield error for malformed JSON and continue processing', async () => {
       const mockProcess = createMockProcess({
         stdoutLines: ['{"type":"valid"}', '{invalid json}', '{"type":"also_valid"}'],

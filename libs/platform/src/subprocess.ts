@@ -1,5 +1,8 @@
 /**
  * Subprocess management utilities for CLI providers
+ *
+ * JSONL parsing is tolerant of non-JSON output (e.g., from bun/npm install).
+ * Lines that don't start with { or [ are logged but not treated as errors.
  */
 
 import { spawn, type ChildProcess } from 'child_process';
@@ -191,6 +194,15 @@ export async function* spawnJSONLProcess(options: SubprocessOptions): AsyncGener
         const trimmed = line.trim();
         if (!trimmed) continue;
 
+        // Only try to parse lines that look like JSON (start with { or [)
+        // This tolerates non-JSON output from tools like bun/npm install
+        const firstChar = trimmed[0];
+        if (firstChar !== '{' && firstChar !== '[') {
+          // Non-JSON output (e.g., "bun install v1.3.10") - log but don't error
+          console.log(`[SubprocessManager] Non-JSON output: ${trimmed}`);
+          continue;
+        }
+
         try {
           eventQueue.push(JSON.parse(trimmed));
         } catch (parseError) {
@@ -215,17 +227,25 @@ export async function* spawnJSONLProcess(options: SubprocessOptions): AsyncGener
 
       // Process any remaining partial line
       if (lineBuffer.trim()) {
-        try {
-          eventQueue.push(JSON.parse(lineBuffer.trim()));
-        } catch (parseError) {
-          console.error(
-            `[SubprocessManager] Failed to parse final JSONL line: ${lineBuffer}`,
-            parseError
-          );
-          eventQueue.push({
-            type: 'error',
-            error: `Failed to parse output: ${lineBuffer}`,
-          });
+        const trimmed = lineBuffer.trim();
+        const firstChar = trimmed[0];
+
+        // Only try to parse lines that look like JSON
+        if (firstChar === '{' || firstChar === '[') {
+          try {
+            eventQueue.push(JSON.parse(trimmed));
+          } catch (parseError) {
+            console.error(
+              `[SubprocessManager] Failed to parse final JSONL line: ${trimmed}`,
+              parseError
+            );
+            eventQueue.push({
+              type: 'error',
+              error: `Failed to parse output: ${trimmed}`,
+            });
+          }
+        } else {
+          console.log(`[SubprocessManager] Non-JSON output (final): ${trimmed}`);
         }
         lineBuffer = '';
       }
