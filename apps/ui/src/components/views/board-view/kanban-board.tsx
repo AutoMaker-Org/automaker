@@ -1,4 +1,5 @@
 import {
+  memo,
   useMemo,
   useRef,
   useState,
@@ -280,7 +281,7 @@ function VirtualizedList<Item extends VirtualListItem>({
   );
 }
 
-export function KanbanBoard({
+export const KanbanBoard = memo(function KanbanBoard({
   activeFeature,
   getColumnFeatures,
   backgroundImageStyle,
@@ -719,4 +720,4 @@ export function KanbanBoard({
       </DragOverlay>
     </div>
   );
-}
+});

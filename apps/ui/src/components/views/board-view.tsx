@@ -1905,7 +1905,15 @@ export function BoardView({ initialFeatureId }: BoardViewProps) {
                 selectedFeatureIds={selectedFeatureIds}
                 onToggleFeatureSelection={toggleFeatureSelection}
                 onRowClick={(feature) => {
-                  if (feature.status === 'backlog') {
+                  // Running features should always show logs, even if status is
+                  // stale (still 'backlog'/'ready'/'interrupted' during race window)
+                  const isRunning = runningAutoTasksAllWorktrees.includes(feature.id);
+                  const isBacklogLike =
+                    feature.status === 'backlog' ||
+                    feature.status === 'merge_conflict' ||
+                    feature.status === 'ready' ||
+                    feature.status === 'interrupted';
+                  if (isBacklogLike && !isRunning) {
                     setEditingFeature(feature);
                   } else {
                     handleViewOutput(feature);

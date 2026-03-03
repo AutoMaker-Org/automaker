@@ -115,16 +115,14 @@ export function useBoardFeatures({ currentProject }: UseBoardFeaturesProps) {
       // Board view only reacts to events for the currently selected project
       const eventProjectId = ('projectId' in event && event.projectId) || projectId;
 
-      if (event.type === 'auto_mode_feature_start') {
-        // Reload features when a feature starts to ensure status update (backlog -> in_progress) is reflected
-        logger.info(
-          `[BoardFeatures] Feature ${event.featureId} started for project ${projectPath}, reloading features to update status...`
-        );
-        loadFeatures();
-      } else if (event.type === 'auto_mode_feature_complete') {
-        // Reload features when a feature is completed
-        logger.info('Feature completed, reloading features...');
-        loadFeatures();
+      // NOTE: auto_mode_feature_start and auto_mode_feature_complete are NOT handled here
+      // for feature list reloading. That is handled by useAutoModeQueryInvalidation which
+      // invalidates the features.all query on those events. Duplicate invalidation here
+      // caused a re-render cascade through DndContext that triggered React error #185
+      // (maximum update depth exceeded), crashing the board view with an infinite spinner
+      // when a new feature was added and moved to in_progress.
+
+      if (event.type === 'auto_mode_feature_complete') {
         // Play ding sound when feature is done (unless muted)
         const { muteDoneSound } = useAppStore.getState();
         if (!muteDoneSound) {

@@ -214,10 +214,13 @@ export function extractSummary(text: string): string | null {
   }
 
   // Check for ## Summary section (use last match)
-  const sectionMatches = text.matchAll(/##\s*Summary\s*\n+([\s\S]*?)(?=\n##|\n\*\*|$)/gi);
+  // Use \n## [^#] to stop at same-level headers (## Foo) but NOT subsections (### Root Cause)
+  const sectionMatches = text.matchAll(/##\s*Summary\s*\n+([\s\S]*?)(?=\n## [^#]|\n\*\*|$)/gi);
   const sectionMatch = getLastMatch(sectionMatches);
   if (sectionMatch) {
-    return truncate(sectionMatch[1].trim(), 500);
+    const content = sectionMatch[1].trim();
+    // Keep full content (including ### subsections) up to max length
+    return content.length > 500 ? `${content.substring(0, 500)}...` : content;
   }
 
   // Check for **Goal**: section (lite mode, use last match)

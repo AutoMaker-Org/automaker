@@ -573,6 +573,55 @@ Implementation details.
 `;
         expect(extractSummary(text)).toBe('Summary content here.');
       });
+
+      it('should include ### subsections within the summary (not cut off at ### Root Cause)', () => {
+        const text = `
+## Summary
+
+Overview of changes.
+
+### Root Cause
+The bug was caused by X.
+
+### Fix Applied
+Changed Y to Z.
+
+## Other Section
+More content.
+`;
+        const result = extractSummary(text);
+        expect(result).not.toBeNull();
+        expect(result).toContain('Overview of changes.');
+        expect(result).toContain('### Root Cause');
+        expect(result).toContain('The bug was caused by X.');
+        expect(result).toContain('### Fix Applied');
+        expect(result).toContain('Changed Y to Z.');
+        expect(result).not.toContain('## Other Section');
+      });
+
+      it('should include ### subsections and stop at next ## header', () => {
+        const text = `
+## Summary
+
+Brief intro.
+
+### Changes
+- File A modified
+- File B added
+
+### Notes
+Important context.
+
+## Implementation
+Details here.
+`;
+        const result = extractSummary(text);
+        expect(result).not.toBeNull();
+        expect(result).toContain('Brief intro.');
+        expect(result).toContain('### Changes');
+        expect(result).toContain('### Notes');
+        expect(result).not.toContain('## Implementation');
+      });
     });
 
     describe('**Goal**: section (lite planning mode)', () => {
@@ -692,7 +741,7 @@ Summary section content.
         expect(extractSummary('Random text without any summary patterns')).toBeNull();
       });
 
-      it('should handle multiple paragraph summaries (return first paragraph)', () => {
+      it('should include all paragraphs in ## Summary section', () => {
         const text = `
 ## Summary
 
@@ -702,7 +751,9 @@ Second paragraph of summary.
 
 ## Other
 `;
-        expect(extractSummary(text)).toBe('First paragraph of summary.');
+        const result = extractSummary(text);
+        expect(result).toContain('First paragraph of summary.');
+        expect(result).toContain('Second paragraph of summary.');
       });
     });
 

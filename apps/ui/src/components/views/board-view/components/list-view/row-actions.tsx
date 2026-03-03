@@ -431,6 +431,45 @@ export const RowActions = memo(function RowActions({
             </>
           )}
 
+          {/* Running task with stale status (backlog/ready/interrupted but tracked as running).
+              These features are placed in the in_progress column by useBoardColumnFeatures
+              but their actual status hasn't updated yet, so no other menu block matches. */}
+          {!isCurrentAutoTask &&
+            isRunningTask &&
+            (feature.status === 'backlog' ||
+              feature.status === 'ready' ||
+              feature.status === 'interrupted' ||
+              feature.status === 'merge_conflict') && (
+              <>
+                {handlers.onViewOutput && (
+                  <MenuItem
+                    icon={FileText}
+                    label="View Logs"
+                    onClick={withClose(handlers.onViewOutput)}
+                  />
+                )}
+                <MenuItem icon={Edit} label="Edit" onClick={withClose(handlers.onEdit)} />
+                {handlers.onSpawnTask && (
+                  <MenuItem
+                    icon={GitFork}
+                    label="Spawn Sub-Task"
+                    onClick={withClose(handlers.onSpawnTask)}
+                  />
+                )}
+                {handlers.onForceStop && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <MenuItem
+                      icon={StopCircle}
+                      label="Force Stop"
+                      onClick={withClose(handlers.onForceStop)}
+                      variant="destructive"
+                    />
+                  </>
+                )}
+              </>
+            )}
+
           {/* Backlog actions */}
           {!isCurrentAutoTask &&
             !isRunningTask &&
