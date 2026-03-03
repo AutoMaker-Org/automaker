@@ -1246,7 +1246,9 @@ describe('EventHookService', () => {
       const options = mockFetch.mock.calls[0][1];
       // Hook values should override endpoint defaults
       expect(options.headers['Tags']).toBe('override-emoji,override-tag');
-      expect(options.headers['Click']).toBe('https://override.example.com');
+      // Click URL uses hook-specific base URL with deep link params applied
+      expect(options.headers['Click']).toContain('https://override.example.com/board');
+      expect(options.headers['Click']).toContain('featureId=feat-1');
       expect(options.headers['Priority']).toBe('5');
     });
 
@@ -1359,7 +1361,7 @@ describe('EventHookService', () => {
         expect(clickUrl).not.toContain('featureId=');
       });
 
-      it('should use hook-specific click URL overriding default with featureId', async () => {
+      it('should apply deep link params to hook-specific click URL', async () => {
         mockFetch.mockResolvedValueOnce({
           ok: true,
           status: 200,
@@ -1409,8 +1411,9 @@ describe('EventHookService', () => {
         const options = mockFetch.mock.calls[0][1];
         const clickUrl = options.headers['Click'];
 
-        // Should use the hook-specific click URL (not modified with featureId since it's a custom URL)
-        expect(clickUrl).toBe('https://custom.example.com/custom-page');
+        // Should use the hook-specific click URL with deep link params applied
+        expect(clickUrl).toContain('https://custom.example.com/board');
+        expect(clickUrl).toContain('featureId=feat-789');
       });
 
       it('should preserve existing query params when adding featureId', async () => {
