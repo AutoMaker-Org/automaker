@@ -28,6 +28,7 @@ test.describe('Feature Deep Link', () => {
   let projectPath: string;
   let projectName: string;
 
+  // eslint-disable-next-line no-empty-pattern
   test.beforeEach(async ({}, testInfo) => {
     projectName = `test-project-${testInfo.workerIndex}-${Date.now()}`;
     projectPath = path.join(TEST_TEMP_DIR, projectName);

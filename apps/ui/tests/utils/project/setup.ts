@@ -242,6 +242,7 @@ export async function setupRealProject(
         theme: 'dark',
         sidebarOpen: true,
         maxConcurrency: 3,
+        skipSandboxWarning: true,
       };
       localStorage.setItem('automaker-settings-cache', JSON.stringify(settingsCache));
 

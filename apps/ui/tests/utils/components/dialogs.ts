@@ -3,6 +3,27 @@ import { clickElement } from '../core/interactions';
 import { waitForElement, waitForElementHidden } from '../core/waiting';
 
 /**
+ * Dismiss the sandbox warning dialog if it appears.
+ * This dialog blocks pointer events and must be accepted before interacting
+ * with elements behind it.
+ */
+export async function dismissSandboxWarningIfVisible(page: Page): Promise<void> {
+  const sandboxAcceptBtn = page.locator('button:has-text("I Accept the Risks")');
+  const sandboxVisible = await sandboxAcceptBtn
+    .waitFor({ state: 'visible', timeout: 2000 })
+    .then(() => true)
+    .catch(() => false);
+  if (sandboxVisible) {
+    await sandboxAcceptBtn.click();
+    await page
+      .locator('[role="dialog"][data-state="open"]')
+      .first()
+      .waitFor({ state: 'hidden', timeout: 3000 })
+      .catch(() => {});
+  }
+}
+
+/**
  * Check if the add feature dialog is visible
  */
 export async function isAddFeatureDialogVisible(page: Page): Promise<boolean> {

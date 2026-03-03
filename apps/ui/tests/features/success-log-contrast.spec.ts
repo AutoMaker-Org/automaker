@@ -13,6 +13,7 @@ import {
   waitForNetworkIdle,
   authenticateForTests,
   handleLoginScreenIfPresent,
+  dismissSandboxWarningIfVisible,
 } from '../utils';
 
 /**
@@ -108,6 +109,9 @@ test.describe('Success log output contrast', () => {
     await waitForNetworkIdle(page);
 
     await expect(page.locator('[data-testid="board-view"]')).toBeVisible({ timeout: 10000 });
+
+    // Dismiss sandbox warning dialog if it appears (blocks pointer events)
+    await dismissSandboxWarningIfVisible(page);
 
     // Wait for the verified feature card to appear
     const featureCard = page.locator(`[data-testid="kanban-card-${featureId}"]`);
