@@ -588,29 +588,26 @@ export class EventHookService {
       eventType: context.eventType,
     };
 
-    // Build click URL with deep-link if project context is available
-    let clickUrl = action.clickUrl;
-    if (!clickUrl && endpoint.defaultClickUrl) {
-      clickUrl = endpoint.defaultClickUrl;
-      // If we have a project path and the click URL looks like the server URL,
-      // append deep-link path
-      if (context.projectPath && clickUrl) {
-        try {
-          const url = new URL(clickUrl);
-          // Add featureId as query param for deep linking to board with feature output modal
-          if (context.featureId) {
-            url.pathname = '/board';
-            url.searchParams.set('featureId', context.featureId);
-          } else if (context.projectPath) {
-            url.pathname = '/board';
-          }
-          clickUrl = url.toString();
-        } catch (error) {
-          // If URL parsing fails, log warning and use as-is
-          logger.warn(
-            `Failed to parse defaultClickUrl "${clickUrl}" for deep linking: ${error instanceof Error ? error.message : String(error)}`
-          );
+    // Resolve click URL: action-level overrides endpoint default
+    let clickUrl = action.clickUrl || endpoint.defaultClickUrl;
+
+    // Apply deep-link parameters to the resolved click URL
+    if (clickUrl && context.projectPath) {
+      try {
+        const url = new URL(clickUrl);
+        // Add featureId as query param for deep linking to board with feature output modal
+        if (context.featureId) {
+          url.pathname = '/board';
+          url.searchParams.set('featureId', context.featureId);
+        } else {
+          url.pathname = '/board';
         }
+        clickUrl = url.toString();
+      } catch (error) {
+        // If URL parsing fails, log warning and use as-is
+        logger.warn(
+          `Failed to parse click URL "${clickUrl}" for deep linking: ${error instanceof Error ? error.message : String(error)}`
+        );
       }
     }
 
