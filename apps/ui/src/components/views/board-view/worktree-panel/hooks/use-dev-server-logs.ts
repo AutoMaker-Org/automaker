@@ -5,6 +5,9 @@ import { pathsEqual } from '@/lib/utils';
 
 const logger = createLogger('DevServerLogs');
 
+// Maximum log buffer size (characters) - matches server-side MAX_SCROLLBACK_SIZE
+const MAX_LOG_BUFFER_SIZE = 50_000; // ~50KB
+
 export interface DevServerLogState {
   /** The log content (buffered + live) */
   logs: string;
@@ -136,13 +139,20 @@ export function useDevServerLogs({ worktreePath, autoSubscribe = true }: UseDevS
   }, []);
 
   /**
-   * Append content to logs
+   * Append content to logs, enforcing a maximum buffer size to prevent
+   * unbounded memory growth and progressive UI lag.
    */
   const appendLogs = useCallback((content: string) => {
-    setState((prev) => ({
-      ...prev,
-      logs: prev.logs + content,
-    }));
+    setState((prev) => {
+      let newLogs = prev.logs + content;
+      if (newLogs.length > MAX_LOG_BUFFER_SIZE) {
+        newLogs = newLogs.slice(-MAX_LOG_BUFFER_SIZE);
+      }
+      return {
+        ...prev,
+        logs: newLogs,
+      };
+    });
   }, []);
 
   // Fetch initial logs when worktreePath changes

@@ -100,6 +100,21 @@ test.describe('AgentOutputModal Responsive Behavior', () => {
 
     await expect(page.locator('[data-testid="board-view"]')).toBeVisible({ timeout: 10000 });
 
+    // Dismiss sandbox warning dialog if it appears (blocks pointer events)
+    const sandboxAcceptBtn = page.locator('button:has-text("I Accept the Risks")');
+    const sandboxVisible = await sandboxAcceptBtn
+      .waitFor({ state: 'visible', timeout: 2000 })
+      .then(() => true)
+      .catch(() => false);
+    if (sandboxVisible) {
+      await sandboxAcceptBtn.click();
+      await page
+        .locator('[role="dialog"][data-state="open"]')
+        .first()
+        .waitFor({ state: 'hidden', timeout: 3000 })
+        .catch(() => {});
+    }
+
     // Wait for the verified feature card to appear
     const featureCard = page.locator(`[data-testid="kanban-card-${featureId}"]`);
     await expect(featureCard).toBeVisible({ timeout: 10000 });

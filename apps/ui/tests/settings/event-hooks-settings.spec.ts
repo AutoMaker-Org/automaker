@@ -12,7 +12,7 @@
  */
 
 import { test, expect, type Page } from '@playwright/test';
-import { authenticateForTests, navigateToSettings } from '../utils';
+import { authenticateForTests, navigateToSettings, waitForSuccessToast } from '../utils';
 
 // Timeout constants for maintainability
 const TIMEOUTS = {
@@ -224,6 +224,9 @@ test.describe('Event Hooks Settings', () => {
     const addButton = dialog.locator('button:has-text("Add Endpoint")').last();
     await addButton.click();
 
+    // Wait for the success toast to confirm the save completed (including API call)
+    await waitForSuccessToast(page, 'Endpoint added', { timeout: 10000 });
+
     // Dialog should close
     await expect(dialog).toBeHidden({ timeout: TIMEOUTS.dialogHidden });
 
@@ -256,16 +259,13 @@ test.describe('Event Hooks Settings', () => {
     // The endpoints tab should show either existing endpoints or the empty state
     // The key is that it should NOT show "empty" if there are endpoints on the server
 
-    // Either we see "No endpoints configured" OR we see endpoint cards
-    const emptyState = page.locator('text=No endpoints configured');
+    // Either we see "No ntfy endpoints configured" OR we see endpoint cards
+    const emptyState = page.locator('text=No ntfy endpoints configured');
     const endpointCard = page.locator('[data-testid="endpoint-card"]').first();
 
-    // One of these should be visible
-    await expect(
-      Promise.race([
-        emptyState.waitFor({ state: 'visible', timeout: 5000 }).then(() => 'empty'),
-        endpointCard.waitFor({ state: 'visible', timeout: 5000 }).then(() => 'card'),
-      ])
-    ).resolves.toBeDefined();
+    // One of these should be visible (use Playwright's .or() to match either locator)
+    await expect(emptyState.or(endpointCard)).toBeVisible({
+      timeout: TIMEOUTS.endpointVisible,
+    });
   });
 });

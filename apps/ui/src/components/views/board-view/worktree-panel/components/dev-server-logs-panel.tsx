@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback, useState } from 'react';
+import { useEffect, useRef, useCallback, useState, useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import {
@@ -123,10 +123,19 @@ export function DevServerLogsPanel({
     }
   }, []);
 
+  const lineCount = useMemo(() => {
+    if (!logs) return 0;
+    // Count newlines directly instead of allocating a split array
+    let count = 1;
+    for (let i = 0; i < logs.length; i++) {
+      if (logs.charCodeAt(i) === 10) count++;
+    }
+    return count;
+  }, [logs]);
+
   if (!worktree) return null;
 
   const formattedStartTime = formatStartedAt(startedAt);
-  const lineCount = logs ? logs.split('\n').length : 0;
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>

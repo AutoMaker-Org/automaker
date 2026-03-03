@@ -119,7 +119,6 @@ export function useBoardEffects({
     if (featuresFingerprint && !isLoading) {
       checkAllContexts();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [featuresFingerprint, isLoading, checkContextExists, setFeaturesWithContext]);
 
   // Re-check context when a feature stops, completes, or errors
