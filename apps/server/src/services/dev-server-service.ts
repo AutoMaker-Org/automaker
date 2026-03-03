@@ -88,9 +88,13 @@ const PORT_PATTERNS: Array<{ pattern: RegExp; description: string }> = [
   },
 ];
 
-// Throttle output to prevent overwhelming WebSocket under heavy load
-const OUTPUT_THROTTLE_MS = 4; // ~250fps max update rate for responsive feedback
-const OUTPUT_BATCH_SIZE = 4096; // Smaller batches for lower latency
+// Throttle output to prevent overwhelming WebSocket under heavy load.
+// 100ms (~10fps) is sufficient for readable log streaming while keeping
+// WebSocket traffic manageable. The previous 4ms rate (~250fps) generated
+// up to 250 events/sec which caused progressive browser slowdown from
+// accumulated console logs, JSON serialization overhead, and React re-renders.
+const OUTPUT_THROTTLE_MS = 100; // ~10fps max update rate
+const OUTPUT_BATCH_SIZE = 8192; // Larger batches to compensate for lower frequency
 
 export interface DevServerInfo {
   worktreePath: string;

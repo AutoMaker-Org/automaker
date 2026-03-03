@@ -4,13 +4,17 @@ import { getElectronAPI } from '@/lib/electron';
 import { normalizePath } from '@/lib/utils';
 import { toast } from 'sonner';
 import type { DevServerInfo, WorktreeInfo } from '../types';
+import { useEventRecencyStore } from '@/hooks/use-event-recency';
 
 const logger = createLogger('DevServers');
 
 // Timeout (ms) for port detection before showing a warning to the user
 const PORT_DETECTION_TIMEOUT_MS = 30_000;
-// Interval (ms) for periodic state reconciliation with the backend
-const STATE_RECONCILE_INTERVAL_MS = 5_000;
+// Interval (ms) for periodic state reconciliation with the backend.
+// 30 seconds is sufficient since WebSocket events handle real-time updates;
+// reconciliation is only a fallback for missed events (PWA restart, WS gaps).
+// The previous 5-second interval added unnecessary HTTP pressure.
+const STATE_RECONCILE_INTERVAL_MS = 30_000;
 
 interface UseDevServersOptions {
   projectPath: string;
@@ -322,12 +326,24 @@ export function useDevServers({ projectPath }: UseDevServersOptions) {
     return () => clearInterval(intervalId);
   }, [clearPortDetectionTimer, startPortDetectionTimer]);
 
+  // Record global events so smart polling knows WebSocket is healthy.
+  // Without this, dev-server events don't suppress polling intervals,
+  // causing all queries (features, worktrees, running-agents) to poll
+  // at their default rates even though the WebSocket is actively connected.
+  const recordGlobalEvent = useEventRecencyStore((state) => state.recordGlobalEvent);
+
   // Subscribe to all dev server lifecycle events for reactive state updates
   useEffect(() => {
     const api = getElectronAPI();
     if (!api?.worktree?.onDevServerLogEvent) return;
 
     const unsubscribe = api.worktree.onDevServerLogEvent((event) => {
+      // Record that WS is alive (but only for lifecycle events, not output -
+      // output fires too frequently and would trigger unnecessary store updates)
+      if (event.type !== 'dev-server:output') {
+        recordGlobalEvent();
+      }
+
       if (event.type === 'dev-server:starting') {
         const { worktreePath } = event.payload;
         const key = normalizePath(worktreePath);
@@ -424,7 +440,7 @@ export function useDevServers({ projectPath }: UseDevServersOptions) {
     });
 
     return unsubscribe;
-  }, [clearPortDetectionTimer, startPortDetectionTimer]);
+  }, [clearPortDetectionTimer, startPortDetectionTimer, recordGlobalEvent]);
 
   // Cleanup all port detection timers on unmount
   useEffect(() => {

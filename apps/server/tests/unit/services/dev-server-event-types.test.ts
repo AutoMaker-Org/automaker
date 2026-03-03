@@ -90,8 +90,8 @@ describe('DevServerService Event Types', () => {
 
     // 2. Output & URL Detected
     mockProcess.stdout.emit('data', Buffer.from('Local: http://localhost:5173/\n'));
-    // Throttled output needs a bit of time
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    // Throttled output needs a bit of time (OUTPUT_THROTTLE_MS is 100ms)
+    await new Promise((resolve) => setTimeout(resolve, 250));
     expect(emittedEvents['dev-server:output'].length).toBeGreaterThanOrEqual(1);
     expect(emittedEvents['dev-server:url-detected'].length).toBe(1);
     expect(emittedEvents['dev-server:url-detected'][0].url).toBe('http://localhost:5173/');

@@ -238,24 +238,36 @@ export default defineConfig(({ command }) => {
       // Inject build hash into sw.js CACHE_NAME for automatic cache busting
       swCacheBuster(),
     ],
+    // Keep Vite dep-optimization cache local to apps/ui so each worktree gets
+    // its own pre-bundled dependencies. Shared cache state across worktrees can
+    // produce duplicate React instances (notably with @xyflow/react) and trigger
+    // "Invalid hook call" in the graph view.
+    cacheDir: path.resolve(__dirname, 'node_modules/.vite'),
     resolve: {
       alias: [
         { find: '@', replacement: path.resolve(__dirname, './src') },
         // Force ALL React imports (including from nested deps like zustand@4 inside
-        // @xyflow/react) to resolve to the single copy in the workspace root node_modules.
-        // This prevents "Cannot read properties of null (reading 'useState')" caused by
-        // react-dom setting the hooks dispatcher on one React instance while component
-        // code reads it from a different instance.
+        // @xyflow/react) to resolve to a single copy.
+        // Explicit subpath aliases must come BEFORE the broad regex so Vite's
+        // first-match-wins resolution applies the specific match first.
         {
           find: /^react-dom(\/|$)/,
           replacement: path.resolve(__dirname, '../../node_modules/react-dom') + '/',
+        },
+        {
+          find: 'react/jsx-runtime',
+          replacement: path.resolve(__dirname, '../../node_modules/react/jsx-runtime.js'),
+        },
+        {
+          find: 'react/jsx-dev-runtime',
+          replacement: path.resolve(__dirname, '../../node_modules/react/jsx-dev-runtime.js'),
         },
         {
           find: /^react(\/|$)/,
           replacement: path.resolve(__dirname, '../../node_modules/react') + '/',
         },
       ],
-      dedupe: ['react', 'react-dom'],
+      dedupe: ['react', 'react-dom', 'zustand', 'use-sync-external-store', '@xyflow/react'],
     },
     server: {
       host: process.env.HOST || '0.0.0.0',
@@ -355,8 +367,12 @@ export default defineConfig(({ command }) => {
       include: [
         'react',
         'react-dom',
+        'react/jsx-runtime',
+        'react/jsx-dev-runtime',
         'use-sync-external-store',
+        'use-sync-external-store/shim',
         'use-sync-external-store/shim/with-selector',
+        'zustand',
         '@xyflow/react',
       ],
     },

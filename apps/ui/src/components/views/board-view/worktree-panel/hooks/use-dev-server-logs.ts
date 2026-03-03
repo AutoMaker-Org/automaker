@@ -74,6 +74,27 @@ export function useDevServerLogs({ worktreePath, autoSubscribe = true }: UseDevS
   // Keep track of whether we've fetched initial logs
   const hasFetchedInitialLogs = useRef(false);
 
+  // Buffer for batching rapid output events into fewer setState calls.
+  // Content accumulates here and is flushed via requestAnimationFrame,
+  // ensuring at most one React re-render per animation frame (~60fps max).
+  // A fallback setTimeout ensures the buffer is flushed even when RAF is
+  // throttled (e.g., when the tab is in the background).
+  const pendingOutputRef = useRef('');
+  const rafIdRef = useRef<number | null>(null);
+  const timerIdRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const resetPendingOutput = useCallback(() => {
+    if (rafIdRef.current !== null) {
+      cancelAnimationFrame(rafIdRef.current);
+      rafIdRef.current = null;
+    }
+    if (timerIdRef.current !== null) {
+      clearTimeout(timerIdRef.current);
+      timerIdRef.current = null;
+    }
+    pendingOutputRef.current = '';
+  }, []);
+
   /**
    * Fetch buffered logs from the server
    */
@@ -130,6 +151,7 @@ export function useDevServerLogs({ worktreePath, autoSubscribe = true }: UseDevS
    * Clear logs and reset state
    */
   const clearLogs = useCallback(() => {
+    resetPendingOutput();
     setState({
       logs: '',
       logsVersion: 0,
@@ -144,13 +166,19 @@ export function useDevServerLogs({ worktreePath, autoSubscribe = true }: UseDevS
       serverError: null,
     });
     hasFetchedInitialLogs.current = false;
-  }, []);
+  }, [resetPendingOutput]);
 
-  /**
-   * Append content to logs, enforcing a maximum buffer size to prevent
-   * unbounded memory growth and progressive UI lag.
-   */
-  const appendLogs = useCallback((content: string) => {
+  const flushPendingOutput = useCallback(() => {
+    // Clear both scheduling handles to prevent duplicate flushes
+    rafIdRef.current = null;
+    if (timerIdRef.current !== null) {
+      clearTimeout(timerIdRef.current);
+      timerIdRef.current = null;
+    }
+    const content = pendingOutputRef.current;
+    if (!content) return;
+    pendingOutputRef.current = '';
+
     setState((prev) => {
       const combined = prev.logs + content;
       const didTrim = combined.length > MAX_LOG_BUFFER_SIZE;
@@ -169,6 +197,48 @@ export function useDevServerLogs({ worktreePath, autoSubscribe = true }: UseDevS
       };
     });
   }, []);
+
+  /**
+   * Append content to logs, enforcing a maximum buffer size to prevent
+   * unbounded memory growth and progressive UI lag.
+   *
+   * Uses requestAnimationFrame to batch rapid output events into at most
+   * one React state update per frame, preventing excessive re-renders.
+   * A fallback setTimeout(250ms) ensures the buffer is flushed even when
+   * RAF is throttled (e.g., when the tab is in the background).
+   * If the pending buffer reaches MAX_LOG_BUFFER_SIZE, flushes immediately
+   * to prevent unbounded memory growth.
+   */
+  const appendLogs = useCallback(
+    (content: string) => {
+      pendingOutputRef.current += content;
+
+      // Flush immediately if buffer has reached the size limit
+      if (pendingOutputRef.current.length >= MAX_LOG_BUFFER_SIZE) {
+        flushPendingOutput();
+        return;
+      }
+
+      // Schedule a RAF flush if not already scheduled
+      if (rafIdRef.current === null) {
+        rafIdRef.current = requestAnimationFrame(flushPendingOutput);
+      }
+
+      // Schedule a fallback timer flush if not already scheduled,
+      // to handle cases where RAF is throttled (background tab)
+      if (timerIdRef.current === null) {
+        timerIdRef.current = setTimeout(flushPendingOutput, 250);
+      }
+    },
+    [flushPendingOutput]
+  );
+
+  // Clean up pending RAF on unmount to prevent state updates after unmount
+  useEffect(() => {
+    return () => {
+      resetPendingOutput();
+    };
+  }, [resetPendingOutput]);
 
   // Fetch initial logs when worktreePath changes
   useEffect(() => {
@@ -196,6 +266,7 @@ export function useDevServerLogs({ worktreePath, autoSubscribe = true }: UseDevS
 
       switch (event.type) {
         case 'dev-server:started': {
+          resetPendingOutput();
           const { payload } = event;
           logger.info('Dev server started:', payload);
           setState((prev) => ({
@@ -245,7 +316,7 @@ export function useDevServerLogs({ worktreePath, autoSubscribe = true }: UseDevS
     });
 
     return unsubscribe;
-  }, [worktreePath, autoSubscribe, appendLogs]);
+  }, [worktreePath, autoSubscribe, appendLogs, resetPendingOutput]);
 
   return {
     ...state,

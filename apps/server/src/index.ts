@@ -598,24 +598,23 @@ wss.on('connection', (ws: WebSocket) => {
 
   // Subscribe to all events and forward to this client
   const unsubscribe = events.subscribe((type, payload) => {
-    logger.info('Event received:', {
+    // Use debug level for high-frequency events to avoid log spam
+    // that causes progressive memory growth and server slowdown
+    const isHighFrequency =
+      type === 'dev-server:output' || type === 'test-runner:output' || type === 'feature:progress';
+    const log = isHighFrequency ? logger.debug.bind(logger) : logger.info.bind(logger);
+
+    log('Event received:', {
       type,
       hasPayload: !!payload,
-      payloadKeys: payload ? Object.keys(payload) : [],
       wsReadyState: ws.readyState,
-      wsOpen: ws.readyState === WebSocket.OPEN,
     });
 
     if (ws.readyState === WebSocket.OPEN) {
       const message = JSON.stringify({ type, payload });
-      logger.info('Sending event to client:', {
-        type,
-        messageLength: message.length,
-        sessionId: (payload as Record<string, unknown>)?.sessionId,
-      });
       ws.send(message);
     } else {
-      logger.info('WARNING: Cannot send event, WebSocket not open. ReadyState:', ws.readyState);
+      logger.warn('Cannot send event, WebSocket not open. ReadyState:', ws.readyState);
     }
   });
 

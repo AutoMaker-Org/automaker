@@ -32,11 +32,7 @@ export function useBoardFeatures({ currentProject }: UseBoardFeaturesProps) {
   const isRestoring = useIsRestoring();
 
   // Use React Query for features
-  const {
-    data: features = [],
-    isLoading: isQueryLoading,
-    refetch: loadFeatures,
-  } = useFeatures(currentProject?.path);
+  const { data: features = [], isLoading: isQueryLoading } = useFeatures(currentProject?.path);
 
   // Don't report loading while IDB cache restore is in progress —
   // features will appear momentarily once the restore completes.
@@ -159,7 +155,6 @@ export function useBoardFeatures({ currentProject }: UseBoardFeaturesProps) {
     });
 
     return unsubscribe;
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- loadFeatures is a stable ref from React Query
   }, [currentProject]);
 
   // Check for interrupted features on mount

@@ -923,17 +923,20 @@ export class HttpApiClient implements ElectronAPI {
       this.ws.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
-          logger.info(
-            'WebSocket message:',
-            data.type,
-            'hasPayload:',
-            !!data.payload,
-            'callbacksRegistered:',
-            this.eventCallbacks.has(data.type)
-          );
+          // Only log non-high-frequency events to avoid progressive memory growth
+          // from accumulated console entries. High-frequency events (dev-server output,
+          // test runner output, agent progress) fire 10+ times/sec and would generate
+          // thousands of console entries per minute.
+          const isHighFrequency =
+            data.type === 'dev-server:output' ||
+            data.type === 'test-runner:output' ||
+            data.type === 'feature:progress' ||
+            (data.type === 'auto-mode:event' && data.payload?.type === 'auto_mode_progress');
+          if (!isHighFrequency) {
+            logger.info('WebSocket message:', data.type);
+          }
           const callbacks = this.eventCallbacks.get(data.type);
           if (callbacks) {
-            logger.info('Dispatching to', callbacks.size, 'callbacks');
             callbacks.forEach((cb) => cb(data.payload));
           }
         } catch (error) {
