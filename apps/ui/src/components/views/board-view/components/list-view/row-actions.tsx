@@ -30,6 +30,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import type { Feature } from '@/store/app-store';
+import { isBacklogLikeStatus } from '../../constants';
 
 /**
  * Action handler types for row actions
@@ -431,44 +432,41 @@ export const RowActions = memo(function RowActions({
             </>
           )}
 
-          {/* Running task with stale status (backlog/ready/interrupted but tracked as running).
+          {/* Running task with stale status - the feature is tracked as running but its
+              persisted status hasn't caught up yet during WebSocket/cache sync delays.
               These features are placed in the in_progress column by useBoardColumnFeatures
-              but their actual status hasn't updated yet, so no other menu block matches. */}
-          {!isCurrentAutoTask &&
-            isRunningTask &&
-            (feature.status === 'backlog' ||
-              feature.status === 'ready' ||
-              feature.status === 'interrupted' ||
-              feature.status === 'merge_conflict') && (
-              <>
-                {handlers.onViewOutput && (
+              (hooks/use-board-column-features.ts) but no other menu block matches their
+              stale status, so we provide running-appropriate actions here. */}
+          {!isCurrentAutoTask && isRunningTask && isBacklogLikeStatus(feature.status) && (
+            <>
+              {handlers.onViewOutput && (
+                <MenuItem
+                  icon={FileText}
+                  label="View Logs"
+                  onClick={withClose(handlers.onViewOutput)}
+                />
+              )}
+              <MenuItem icon={Edit} label="Edit" onClick={withClose(handlers.onEdit)} />
+              {handlers.onSpawnTask && (
+                <MenuItem
+                  icon={GitFork}
+                  label="Spawn Sub-Task"
+                  onClick={withClose(handlers.onSpawnTask)}
+                />
+              )}
+              {handlers.onForceStop && (
+                <>
+                  <DropdownMenuSeparator />
                   <MenuItem
-                    icon={FileText}
-                    label="View Logs"
-                    onClick={withClose(handlers.onViewOutput)}
+                    icon={StopCircle}
+                    label="Force Stop"
+                    onClick={withClose(handlers.onForceStop)}
+                    variant="destructive"
                   />
-                )}
-                <MenuItem icon={Edit} label="Edit" onClick={withClose(handlers.onEdit)} />
-                {handlers.onSpawnTask && (
-                  <MenuItem
-                    icon={GitFork}
-                    label="Spawn Sub-Task"
-                    onClick={withClose(handlers.onSpawnTask)}
-                  />
-                )}
-                {handlers.onForceStop && (
-                  <>
-                    <DropdownMenuSeparator />
-                    <MenuItem
-                      icon={StopCircle}
-                      label="Force Stop"
-                      onClick={withClose(handlers.onForceStop)}
-                      variant="destructive"
-                    />
-                  </>
-                )}
-              </>
-            )}
+                </>
+              )}
+            </>
+          )}
 
           {/* Backlog actions */}
           {!isCurrentAutoTask &&

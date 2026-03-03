@@ -83,7 +83,7 @@ import type {
   StashApplyConflictInfo,
 } from './board-view/worktree-panel/types';
 import { BoardErrorBoundary } from './board-view/board-error-boundary';
-import { COLUMNS, getColumnsWithPipeline } from './board-view/constants';
+import { COLUMNS, getColumnsWithPipeline, isBacklogLikeStatus } from './board-view/constants';
 import {
   useBoardFeatures,
   useBoardDragDrop,
@@ -1908,12 +1908,7 @@ export function BoardView({ initialFeatureId }: BoardViewProps) {
                   // Running features should always show logs, even if status is
                   // stale (still 'backlog'/'ready'/'interrupted' during race window)
                   const isRunning = runningAutoTasksAllWorktrees.includes(feature.id);
-                  const isBacklogLike =
-                    feature.status === 'backlog' ||
-                    feature.status === 'merge_conflict' ||
-                    feature.status === 'ready' ||
-                    feature.status === 'interrupted';
-                  if (isBacklogLike && !isRunning) {
+                  if (isBacklogLikeStatus(feature.status) && !isRunning) {
                     setEditingFeature(feature);
                   } else {
                     handleViewOutput(feature);
