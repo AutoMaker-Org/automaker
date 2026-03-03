@@ -137,6 +137,26 @@ export function getPipelineInsertIndex(): number {
 }
 
 /**
+ * Statuses that display in the backlog column because they don't have dedicated columns:
+ * - 'backlog': Default state for new features
+ * - 'ready': Feature has an approved plan, waiting for execution
+ * - 'interrupted': Feature execution was aborted (user stopped it, server restart)
+ * - 'merge_conflict': Automatic merge failed, user must resolve conflicts
+ *
+ * Used to determine row click behavior and menu actions when a feature is running
+ * but its status hasn't updated yet (race condition during WebSocket/cache sync).
+ * See use-board-column-features.ts for the column assignment logic.
+ */
+export function isBacklogLikeStatus(status: string): boolean {
+  return (
+    status === 'backlog' ||
+    status === 'ready' ||
+    status === 'interrupted' ||
+    status === 'merge_conflict'
+  );
+}
+
+/**
  * Check if a status is a pipeline status
  */
 export function isPipelineStatus(status: string): boolean {
