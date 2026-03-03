@@ -54,6 +54,8 @@ export function DevServerLogsPanel({
 
   const {
     logs,
+    logsVersion,
+    didTrim,
     isRunning,
     isLoading,
     error,
@@ -81,8 +83,9 @@ export function DevServerLogsPanel({
       return;
     }
 
-    // If logs got shorter (e.g., cleared), rewrite all
-    if (logs.length < lastLogsLengthRef.current) {
+    // If logs got shorter (e.g., cleared) or buffer was trimmed (content shifted),
+    // do a full rewrite so the terminal stays in sync
+    if (logs.length < lastLogsLengthRef.current || didTrim) {
       xtermRef.current.write(logs);
       lastLogsLengthRef.current = logs.length;
       return;
@@ -94,7 +97,7 @@ export function DevServerLogsPanel({
       xtermRef.current.append(newContent);
       lastLogsLengthRef.current = logs.length;
     }
-  }, [logs, worktree?.path]);
+  }, [logs, logsVersion, didTrim, worktree?.path]);
 
   // Reset when panel opens with a new worktree
   useEffect(() => {

@@ -11,6 +11,10 @@ const MAX_LOG_BUFFER_SIZE = 50_000; // ~50KB
 export interface DevServerLogState {
   /** The log content (buffered + live) */
   logs: string;
+  /** Incremented whenever logs content changes (including trim+shift) */
+  logsVersion: number;
+  /** True when the latest append caused head truncation */
+  didTrim: boolean;
   /** Whether the server is currently running */
   isRunning: boolean;
   /** Whether initial logs are being fetched */
@@ -55,6 +59,8 @@ interface UseDevServerLogsOptions {
 export function useDevServerLogs({ worktreePath, autoSubscribe = true }: UseDevServerLogsOptions) {
   const [state, setState] = useState<DevServerLogState>({
     logs: '',
+    logsVersion: 0,
+    didTrim: false,
     isRunning: false,
     isLoading: false,
     error: null,
@@ -126,6 +132,8 @@ export function useDevServerLogs({ worktreePath, autoSubscribe = true }: UseDevS
   const clearLogs = useCallback(() => {
     setState({
       logs: '',
+      logsVersion: 0,
+      didTrim: false,
       isRunning: false,
       isLoading: false,
       error: null,
@@ -144,13 +152,20 @@ export function useDevServerLogs({ worktreePath, autoSubscribe = true }: UseDevS
    */
   const appendLogs = useCallback((content: string) => {
     setState((prev) => {
-      let newLogs = prev.logs + content;
-      if (newLogs.length > MAX_LOG_BUFFER_SIZE) {
-        newLogs = newLogs.slice(-MAX_LOG_BUFFER_SIZE);
+      const combined = prev.logs + content;
+      const didTrim = combined.length > MAX_LOG_BUFFER_SIZE;
+      let newLogs = combined;
+      if (didTrim) {
+        const slicePoint = combined.length - MAX_LOG_BUFFER_SIZE;
+        // Find the next newline after the slice point to avoid cutting a line in half
+        const firstNewlineIndex = combined.indexOf('\n', slicePoint);
+        newLogs = combined.slice(firstNewlineIndex > -1 ? firstNewlineIndex + 1 : slicePoint);
       }
       return {
         ...prev,
         logs: newLogs,
+        didTrim,
+        logsVersion: prev.logsVersion + 1,
       };
     });
   }, []);
