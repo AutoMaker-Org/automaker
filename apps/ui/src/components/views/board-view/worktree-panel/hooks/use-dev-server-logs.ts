@@ -77,13 +77,20 @@ export function useDevServerLogs({ worktreePath, autoSubscribe = true }: UseDevS
   // Buffer for batching rapid output events into fewer setState calls.
   // Content accumulates here and is flushed via requestAnimationFrame,
   // ensuring at most one React re-render per animation frame (~60fps max).
+  // A fallback setTimeout ensures the buffer is flushed even when RAF is
+  // throttled (e.g., when the tab is in the background).
   const pendingOutputRef = useRef('');
   const rafIdRef = useRef<number | null>(null);
+  const timerIdRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const resetPendingOutput = useCallback(() => {
     if (rafIdRef.current !== null) {
       cancelAnimationFrame(rafIdRef.current);
       rafIdRef.current = null;
+    }
+    if (timerIdRef.current !== null) {
+      clearTimeout(timerIdRef.current);
+      timerIdRef.current = null;
     }
     pendingOutputRef.current = '';
   }, []);
@@ -162,7 +169,12 @@ export function useDevServerLogs({ worktreePath, autoSubscribe = true }: UseDevS
   }, [resetPendingOutput]);
 
   const flushPendingOutput = useCallback(() => {
+    // Clear both scheduling handles to prevent duplicate flushes
     rafIdRef.current = null;
+    if (timerIdRef.current !== null) {
+      clearTimeout(timerIdRef.current);
+      timerIdRef.current = null;
+    }
     const content = pendingOutputRef.current;
     if (!content) return;
     pendingOutputRef.current = '';
@@ -192,12 +204,30 @@ export function useDevServerLogs({ worktreePath, autoSubscribe = true }: UseDevS
    *
    * Uses requestAnimationFrame to batch rapid output events into at most
    * one React state update per frame, preventing excessive re-renders.
+   * A fallback setTimeout(250ms) ensures the buffer is flushed even when
+   * RAF is throttled (e.g., when the tab is in the background).
+   * If the pending buffer reaches MAX_LOG_BUFFER_SIZE, flushes immediately
+   * to prevent unbounded memory growth.
    */
   const appendLogs = useCallback(
     (content: string) => {
       pendingOutputRef.current += content;
+
+      // Flush immediately if buffer has reached the size limit
+      if (pendingOutputRef.current.length >= MAX_LOG_BUFFER_SIZE) {
+        flushPendingOutput();
+        return;
+      }
+
+      // Schedule a RAF flush if not already scheduled
       if (rafIdRef.current === null) {
         rafIdRef.current = requestAnimationFrame(flushPendingOutput);
+      }
+
+      // Schedule a fallback timer flush if not already scheduled,
+      // to handle cases where RAF is throttled (background tab)
+      if (timerIdRef.current === null) {
+        timerIdRef.current = setTimeout(flushPendingOutput, 250);
       }
     },
     [flushPendingOutput]
