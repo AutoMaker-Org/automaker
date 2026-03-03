@@ -216,7 +216,7 @@ export function extractSummary(text: string): string | null {
   // Check for ## Summary section (use last match)
   // Stop at \n## [^#] (same-level headers like "## Changes") but preserve ### subsections
   // (like "### Root Cause", "### Fix Applied") that belong to the summary content.
-  const sectionMatches = text.matchAll(/##\s*Summary\s*\n+([\s\S]*?)(?=\n## [^#]|\n\*\*|$)/gi);
+  const sectionMatches = text.matchAll(/##\s*Summary\s*\n+([\s\S]*?)(?=\n## [^#]|$)/gi);
   const sectionMatch = getLastMatch(sectionMatches);
   if (sectionMatch) {
     const content = sectionMatch[1].trim();
