@@ -343,7 +343,7 @@ export function BoardView({ initialFeatureId, initialProjectPath }: BoardViewPro
 
         // Derive project name from path basename
         const projectName =
-          initialProjectPath.split('/').filter(Boolean).pop() || initialProjectPath;
+          initialProjectPath.split(/[/\\]/).filter(Boolean).pop() || initialProjectPath;
         logger.info(`Deep link: switching to project "${projectName}" at ${initialProjectPath}`);
         upsertAndSetCurrentProject(initialProjectPath, projectName);
       } catch (error) {
