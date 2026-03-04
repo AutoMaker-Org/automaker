@@ -1,5 +1,5 @@
 // @ts-nocheck - column filtering logic with dependency resolution and status mapping
-import { useMemo, useCallback, useEffect, useRef } from 'react';
+import { useMemo, useCallback, useEffect } from 'react';
 import { Feature, useAppStore } from '@/store/app-store';
 import {
   createFeatureMap,
@@ -177,9 +177,6 @@ export function useBoardColumnFeatures({
     (state) => state.clearRecentlyCompletedFeatures
   );
 
-  // Track previous feature IDs to detect when features list has been refreshed
-  const prevFeatureIdsRef = useRef<Set<string>>(new Set());
-
   // Clear recently completed features when the cache refreshes with updated statuses.
   //
   // RACE CONDITION SCENARIO THIS PREVENTS:
@@ -193,12 +190,16 @@ export function useBoardColumnFeatures({
   //
   // When the refetch completes with fresh data (status='verified'/'completed'),
   // this effect clears the recentlyCompletedFeatures set since it's no longer needed.
+  // Clear recently completed features when the cache refreshes with updated statuses.
+  // IMPORTANT: Only depend on `features` (not `recentlyCompletedFeatures`) to avoid a
+  // re-trigger loop where clearing the set creates a new reference that re-fires this effect.
+  // Read recentlyCompletedFeatures from the store directly to get the latest value without
+  // subscribing to it as a dependency.
   useEffect(() => {
-    const currentIds = new Set(features.map((f) => f.id));
+    const currentRecentlyCompleted = useAppStore.getState().recentlyCompletedFeatures;
+    if (currentRecentlyCompleted.size === 0) return;
 
-    // Check if any recently completed features now have terminal statuses in the new data
-    // If so, we can clear the tracking since the cache is now fresh
-    const hasUpdatedStatus = Array.from(recentlyCompletedFeatures).some((featureId) => {
+    const hasUpdatedStatus = Array.from(currentRecentlyCompleted).some((featureId) => {
       const feature = features.find((f) => f.id === featureId);
       return feature && (feature.status === 'verified' || feature.status === 'completed');
     });
@@ -206,9 +207,7 @@ export function useBoardColumnFeatures({
     if (hasUpdatedStatus) {
       clearRecentlyCompletedFeatures();
     }
-
-    prevFeatureIdsRef.current = currentIds;
-  }, [features, recentlyCompletedFeatures, clearRecentlyCompletedFeatures]);
+  }, [features, clearRecentlyCompletedFeatures]);
 
   // Memoize column features to prevent unnecessary re-renders
   const columnFeaturesMap = useMemo(() => {

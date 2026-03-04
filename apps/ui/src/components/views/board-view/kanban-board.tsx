@@ -281,6 +281,10 @@ function VirtualizedList<Item extends VirtualListItem>({
   );
 }
 
+// Stable empty Set to use as default prop value. Using `new Set()` inline in
+// the destructuring creates a new reference on every render, defeating memo.
+const EMPTY_FEATURE_IDS = new Set<string>();
+
 export const KanbanBoard = memo(function KanbanBoard({
   activeFeature,
   getColumnFeatures,
@@ -317,7 +321,7 @@ export const KanbanBoard = memo(function KanbanBoard({
   onOpenPipelineSettings,
   isSelectionMode = false,
   selectionTarget = null,
-  selectedFeatureIds = new Set(),
+  selectedFeatureIds = EMPTY_FEATURE_IDS,
   onToggleFeatureSelection,
   onToggleSelectionMode,
   onAiSuggest,

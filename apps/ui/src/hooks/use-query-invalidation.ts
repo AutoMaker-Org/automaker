@@ -13,6 +13,7 @@ import type { AutoModeEvent, SpecRegenerationEvent, StreamEvent } from '@/types/
 import type { IssueValidationEvent } from '@automaker/types';
 import { debounce, type DebouncedFunction } from '@automaker/utils/debounce';
 import { useEventRecencyStore } from './use-event-recency';
+import { isAnyFeatureTransitioning } from '@/lib/feature-transition-state';
 
 /**
  * Debounce configuration for auto_mode_progress invalidations
@@ -31,8 +32,10 @@ const FEATURE_LIST_INVALIDATION_EVENTS: AutoModeEvent['type'][] = [
   'auto_mode_feature_start',
   'auto_mode_feature_complete',
   'auto_mode_error',
-  'auto_mode_started',
-  'auto_mode_stopped',
+  // NOTE: auto_mode_started and auto_mode_stopped are intentionally excluded.
+  // These events signal auto-loop state changes, NOT feature data changes.
+  // Including them caused unnecessary refetches that raced with optimistic
+  // updates during start/stop cycles, triggering React error #185 on mobile.
   'plan_approval_required',
   'plan_approved',
   'plan_rejected',
@@ -176,8 +179,12 @@ export function useAutoModeQueryInvalidation(projectPath: string | undefined) {
       // This allows polling to be disabled when WebSocket events are flowing
       recordGlobalEvent();
 
-      // Invalidate feature list for lifecycle events
-      if (FEATURE_LIST_INVALIDATION_EVENTS.includes(event.type)) {
+      // Invalidate feature list for lifecycle events.
+      // Skip invalidation when a feature is mid-transition (e.g., being cancelled)
+      // because persistFeatureUpdate already handles the optimistic cache update.
+      // Without this guard, auto_mode_error / auto_mode_stopped WS events race
+      // with the optimistic update and cause re-render cascades on mobile (React #185).
+      if (FEATURE_LIST_INVALIDATION_EVENTS.includes(event.type) && !isAnyFeatureTransitioning()) {
         queryClient.invalidateQueries({
           queryKey: queryKeys.features.all(currentProjectPath),
         });

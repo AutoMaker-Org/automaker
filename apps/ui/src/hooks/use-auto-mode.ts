@@ -22,6 +22,8 @@ function arraysEqual(a: string[], b: string[]): boolean {
   return a.every((id) => set.has(id));
 }
 const AUTO_MODE_POLLING_INTERVAL = 30000;
+// Stable empty array reference to avoid re-renders from `[] !== []`
+const EMPTY_TASKS: string[] = [];
 
 /**
  * Generate a worktree key for session storage
@@ -77,8 +79,12 @@ function isPlanApprovalEvent(
  * @param worktree - Optional worktree info. If not provided, uses main worktree (branchName = null)
  */
 export function useAutoMode(worktree?: WorktreeInfo) {
+  // Subscribe to stable action functions and scalar state via useShallow.
+  // IMPORTANT: Do NOT subscribe to autoModeByWorktree here. That object gets a
+  // new reference on every Zustand mutation to ANY worktree, which would re-render
+  // every useAutoMode consumer on every store change. Instead, we subscribe to the
+  // specific worktree's state below using a targeted selector.
   const {
-    autoModeByWorktree,
     setAutoModeRunning,
     addRunningTask,
     removeRunningTask,
@@ -93,7 +99,6 @@ export function useAutoMode(worktree?: WorktreeInfo) {
     addRecentlyCompletedFeature,
   } = useAppStore(
     useShallow((state) => ({
-      autoModeByWorktree: state.autoModeByWorktree,
       setAutoModeRunning: state.setAutoModeRunning,
       addRunningTask: state.addRunningTask,
       removeRunningTask: state.removeRunningTask,
@@ -144,40 +149,108 @@ export function useAutoMode(worktree?: WorktreeInfo) {
     [projects]
   );
 
-  // Get worktree-specific auto mode state
+  // Get worktree-specific auto mode state using a TARGETED selector with
+  // VALUE-BASED equality. This is critical for preventing cascading re-renders
+  // in board view, where DndContext amplifies every parent re-render.
+  //
+  // Why value-based equality matters: Every Zustand `set()` call (including
+  // `addAutoModeActivity` which fires on every WS event) triggers all subscriber
+  // selectors to re-run. Even our targeted selector that reads a specific key
+  // would return a new object reference (from the spread in `removeRunningTask`
+  // etc.), causing a re-render even when the actual values haven't changed.
+  // By extracting primitives and comparing with a custom equality function,
+  // we only re-render when isRunning/runningTasks/maxConcurrency actually change.
   const projectId = currentProject?.id;
-  const worktreeAutoModeState = useMemo(() => {
-    if (!projectId)
-      return {
-        isRunning: false,
-        runningTasks: [],
-        branchName: null,
-        maxConcurrency: DEFAULT_MAX_CONCURRENCY,
-      };
-    const key = getWorktreeKey(projectId, branchName);
-    return (
-      autoModeByWorktree[key] || {
-        isRunning: false,
-        runningTasks: [],
-        branchName,
-        maxConcurrency: DEFAULT_MAX_CONCURRENCY,
-      }
-    );
-  }, [autoModeByWorktree, projectId, branchName, getWorktreeKey]);
+  const worktreeKey = useMemo(
+    () => (projectId ? getWorktreeKey(projectId, branchName) : null),
+    [projectId, branchName, getWorktreeKey]
+  );
 
-  const isAutoModeRunning = worktreeAutoModeState.isRunning;
-  const runningAutoTasks = worktreeAutoModeState.runningTasks;
-  // Use the subscribed worktreeAutoModeState.maxConcurrency (from the reactive
-  // autoModeByWorktree store slice) so canStartNewTask stays reactive when
-  // refreshStatus updates worktree state or when the global setting changes.
-  // Falls back to the subscribed globalMaxConcurrency (also reactive) when no
-  // per-worktree value is set, and to DEFAULT_MAX_CONCURRENCY when no project.
+  // Subscribe to this specific worktree's state using useShallow.
+  // useShallow compares each property of the returned object with Object.is,
+  // so primitive properties (isRunning: boolean, maxConcurrency: number) are
+  // naturally stable. Only runningTasks (array) needs additional stabilization
+  // since filter()/spread creates new array references even for identical content.
+  const { worktreeIsRunning, worktreeRunningTasksRaw, worktreeMaxConcurrency } = useAppStore(
+    useShallow((state) => {
+      if (!worktreeKey) {
+        return {
+          worktreeIsRunning: false,
+          worktreeRunningTasksRaw: EMPTY_TASKS,
+          worktreeMaxConcurrency: undefined as number | undefined,
+        };
+      }
+      const wt = state.autoModeByWorktree[worktreeKey];
+      if (!wt) {
+        return {
+          worktreeIsRunning: false,
+          worktreeRunningTasksRaw: EMPTY_TASKS,
+          worktreeMaxConcurrency: undefined as number | undefined,
+        };
+      }
+      return {
+        worktreeIsRunning: wt.isRunning,
+        worktreeRunningTasksRaw: wt.runningTasks,
+        worktreeMaxConcurrency: wt.maxConcurrency,
+      };
+    })
+  );
+  // Stabilize runningTasks: useShallow uses Object.is per property, but
+  // runningTasks gets a new array ref after removeRunningTask/addRunningTask.
+  // Cache the previous value and only update when content actually changes.
+  const prevTasksRef = useRef<string[]>(EMPTY_TASKS);
+  const worktreeRunningTasks = useMemo(() => {
+    if (worktreeRunningTasksRaw === prevTasksRef.current) return prevTasksRef.current;
+    if (arraysEqual(prevTasksRef.current, worktreeRunningTasksRaw)) return prevTasksRef.current;
+    prevTasksRef.current = worktreeRunningTasksRaw;
+    return worktreeRunningTasksRaw;
+  }, [worktreeRunningTasksRaw]);
+
+  const isAutoModeRunning = worktreeIsRunning;
+  const runningAutoTasks = worktreeRunningTasks;
+  // Use worktreeMaxConcurrency (from the reactive per-key selector) so
+  // canStartNewTask stays reactive when refreshStatus updates worktree state
+  // or when the global setting changes.
   const maxConcurrency = projectId
-    ? (worktreeAutoModeState.maxConcurrency ?? globalMaxConcurrency)
+    ? (worktreeMaxConcurrency ?? globalMaxConcurrency)
     : DEFAULT_MAX_CONCURRENCY;
 
   // Check if we can start a new task based on concurrency limit
   const canStartNewTask = runningAutoTasks.length < maxConcurrency;
+
+  // Batch addAutoModeActivity calls to reduce Zustand set() frequency.
+  // Without batching, each WS event (especially auto_mode_progress which fires
+  // rapidly during streaming) triggers a separate set() → all subscriber selectors
+  // re-evaluate → on mobile this overwhelms React's batching → crash.
+  // This batches activities in a ref and flushes them in a single set() call.
+  const pendingActivitiesRef = useRef<Parameters<typeof addAutoModeActivity>[0][]>([]);
+  const flushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const batchedAddAutoModeActivity = useCallback(
+    (activity: Parameters<typeof addAutoModeActivity>[0]) => {
+      pendingActivitiesRef.current.push(activity);
+      if (!flushTimerRef.current) {
+        flushTimerRef.current = setTimeout(() => {
+          const batch = pendingActivitiesRef.current;
+          pendingActivitiesRef.current = [];
+          flushTimerRef.current = null;
+          // Flush all pending activities in a single store update
+          for (const act of batch) {
+            addAutoModeActivity(act);
+          }
+        }, 100);
+      }
+    },
+    [addAutoModeActivity]
+  );
+
+  // Cleanup flush timer on unmount
+  useEffect(() => {
+    return () => {
+      if (flushTimerRef.current) {
+        clearTimeout(flushTimerRef.current);
+      }
+    };
+  }, []);
 
   // Ref to prevent refreshStatus and WebSocket handlers from overwriting optimistic state
   // during start/stop transitions.
@@ -498,7 +571,7 @@ export function useAutoMode(worktree?: WorktreeInfo) {
         case 'auto_mode_feature_start':
           if (event.featureId) {
             addRunningTask(eventProjectId, eventBranchName, event.featureId);
-            addAutoModeActivity({
+            batchedAddAutoModeActivity({
               featureId: event.featureId,
               type: 'start',
               message: `Started working on feature`,
@@ -514,7 +587,7 @@ export function useAutoMode(worktree?: WorktreeInfo) {
             // briefly appear in backlog due to stale cache data
             addRecentlyCompletedFeature(event.featureId);
             removeRunningTask(eventProjectId, eventBranchName, event.featureId);
-            addAutoModeActivity({
+            batchedAddAutoModeActivity({
               featureId: event.featureId,
               type: 'complete',
               message: event.passes
@@ -551,7 +624,7 @@ export function useAutoMode(worktree?: WorktreeInfo) {
               ? `Authentication failed: Please check your API key in Settings or run 'claude login' in terminal to re-authenticate.`
               : event.error;
 
-            addAutoModeActivity({
+            batchedAddAutoModeActivity({
               featureId: event.featureId,
               type: 'error',
               message: errorMessage,
@@ -568,7 +641,7 @@ export function useAutoMode(worktree?: WorktreeInfo) {
         case 'auto_mode_progress':
           // Log progress updates (throttle to avoid spam)
           if (event.featureId && event.content && event.content.length > 10) {
-            addAutoModeActivity({
+            batchedAddAutoModeActivity({
               featureId: event.featureId,
               type: 'progress',
               message: event.content.substring(0, 200), // Limit message length
@@ -579,7 +652,7 @@ export function useAutoMode(worktree?: WorktreeInfo) {
         case 'auto_mode_tool':
           // Log tool usage
           if (event.featureId && event.tool) {
-            addAutoModeActivity({
+            batchedAddAutoModeActivity({
               featureId: event.featureId,
               type: 'tool',
               message: `Using tool: ${event.tool}`,
@@ -592,7 +665,7 @@ export function useAutoMode(worktree?: WorktreeInfo) {
           // Log phase transitions (Planning, Action, Verification)
           if (event.featureId && event.phase && event.message) {
             logger.debug(`[AutoMode] Phase: ${event.phase} for ${event.featureId}`);
-            addAutoModeActivity({
+            batchedAddAutoModeActivity({
               featureId: event.featureId,
               type: event.phase,
               message: event.message,
@@ -618,7 +691,7 @@ export function useAutoMode(worktree?: WorktreeInfo) {
           // Log when planning phase begins
           if (event.featureId && event.mode && event.message) {
             logger.debug(`[AutoMode] Planning started (${event.mode}) for ${event.featureId}`);
-            addAutoModeActivity({
+            batchedAddAutoModeActivity({
               featureId: event.featureId,
               type: 'planning',
               message: event.message,
@@ -631,7 +704,7 @@ export function useAutoMode(worktree?: WorktreeInfo) {
           // Log when plan is approved by user
           if (event.featureId) {
             logger.debug(`[AutoMode] Plan approved for ${event.featureId}`);
-            addAutoModeActivity({
+            batchedAddAutoModeActivity({
               featureId: event.featureId,
               type: 'action',
               message: event.hasEdits
@@ -646,7 +719,7 @@ export function useAutoMode(worktree?: WorktreeInfo) {
           // Log when plan is auto-approved (requirePlanApproval=false)
           if (event.featureId) {
             logger.debug(`[AutoMode] Plan auto-approved for ${event.featureId}`);
-            addAutoModeActivity({
+            batchedAddAutoModeActivity({
               featureId: event.featureId,
               type: 'action',
               message: 'Plan auto-approved, starting implementation...',
@@ -665,7 +738,7 @@ export function useAutoMode(worktree?: WorktreeInfo) {
             logger.debug(
               `[AutoMode] Plan revision requested for ${event.featureId} (v${revisionEvent.planVersion})`
             );
-            addAutoModeActivity({
+            batchedAddAutoModeActivity({
               featureId: event.featureId,
               type: 'planning',
               message: `Revising plan based on feedback (v${revisionEvent.planVersion})...`,
@@ -681,7 +754,7 @@ export function useAutoMode(worktree?: WorktreeInfo) {
             logger.debug(
               `[AutoMode] Task ${taskEvent.taskId} started for ${event.featureId}: ${taskEvent.taskDescription}`
             );
-            addAutoModeActivity({
+            batchedAddAutoModeActivity({
               featureId: event.featureId,
               type: 'progress',
               message: `▶ Starting ${taskEvent.taskId}: ${taskEvent.taskDescription}`,
@@ -696,7 +769,7 @@ export function useAutoMode(worktree?: WorktreeInfo) {
             logger.debug(
               `[AutoMode] Task ${taskEvent.taskId} completed for ${event.featureId} (${taskEvent.tasksCompleted}/${taskEvent.tasksTotal})`
             );
-            addAutoModeActivity({
+            batchedAddAutoModeActivity({
               featureId: event.featureId,
               type: 'progress',
               message: `✓ ${taskEvent.taskId} done (${taskEvent.tasksCompleted}/${taskEvent.tasksTotal})`,
@@ -714,7 +787,7 @@ export function useAutoMode(worktree?: WorktreeInfo) {
             logger.debug(
               `[AutoMode] Phase ${phaseEvent.phaseNumber} completed for ${event.featureId}`
             );
-            addAutoModeActivity({
+            batchedAddAutoModeActivity({
               featureId: event.featureId,
               type: 'action',
               message: `Phase ${phaseEvent.phaseNumber} completed`,
@@ -742,7 +815,7 @@ export function useAutoMode(worktree?: WorktreeInfo) {
             logger.debug(
               `[AutoMode] Summary saved for ${event.featureId}: ${summaryEvent.summary.substring(0, 100)}...`
             );
-            addAutoModeActivity({
+            batchedAddAutoModeActivity({
               featureId: event.featureId,
               type: 'progress',
               message: `Summary: ${summaryEvent.summary.substring(0, 100)}...`,
@@ -758,7 +831,7 @@ export function useAutoMode(worktree?: WorktreeInfo) {
     branchName,
     addRunningTask,
     removeRunningTask,
-    addAutoModeActivity,
+    batchedAddAutoModeActivity,
     getProjectIdFromPath,
     setPendingPlanApproval,
     setAutoModeRunning,
@@ -977,7 +1050,7 @@ export function useAutoMode(worktree?: WorktreeInfo) {
           removeRunningTask(currentProject.id, branchName, featureId);
 
           logger.info('Feature stopped successfully:', featureId);
-          addAutoModeActivity({
+          batchedAddAutoModeActivity({
             featureId,
             type: 'complete',
             message: 'Feature stopped by user',
@@ -993,7 +1066,7 @@ export function useAutoMode(worktree?: WorktreeInfo) {
         throw error;
       }
     },
-    [currentProject, branchName, removeRunningTask, addAutoModeActivity]
+    [currentProject, branchName, removeRunningTask, batchedAddAutoModeActivity]
   );
 
   return {

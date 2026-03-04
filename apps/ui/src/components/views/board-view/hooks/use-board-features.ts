@@ -87,36 +87,21 @@ export function useBoardFeatures({ currentProject }: UseBoardFeaturesProps) {
   );
 
   // Subscribe to auto mode events for notifications (ding sound, toasts)
-  // Note: Query invalidation is handled by useAutoModeQueryInvalidation in the root
+  // Note: Query invalidation is handled by useAutoModeQueryInvalidation in the root.
+  // Note: removeRunningTask is handled by useAutoMode — do NOT duplicate it here,
+  // as duplicate Zustand mutations cause re-render cascades (React error #185).
   useEffect(() => {
     const api = getElectronAPI();
     if (!api?.autoMode || !currentProject) return;
 
-    const { removeRunningTask } = useAppStore.getState();
-    const projectId = currentProject.id;
     const projectPath = currentProject.path;
 
     const unsubscribe = api.autoMode.onEvent((event) => {
       // Check if event is for the current project by matching projectPath
       const eventProjectPath = ('projectPath' in event && event.projectPath) as string | undefined;
       if (eventProjectPath && eventProjectPath !== projectPath) {
-        // Event is for a different project, ignore it
-        logger.debug(
-          `Ignoring auto mode event for different project: ${eventProjectPath} (current: ${projectPath})`
-        );
         return;
       }
-
-      // Use event's projectPath or projectId if available, otherwise use current project
-      // Board view only reacts to events for the currently selected project
-      const eventProjectId = ('projectId' in event && event.projectId) || projectId;
-
-      // NOTE: auto_mode_feature_start and auto_mode_feature_complete are NOT handled here
-      // for feature list reloading. That is handled by useAutoModeQueryInvalidation which
-      // invalidates the features.all query on those events. Duplicate invalidation here
-      // caused a re-render cascade through DndContext that triggered React error #185
-      // (maximum update depth exceeded), crashing the board view with an infinite spinner
-      // when a new feature was added and moved to in_progress.
 
       if (event.type === 'auto_mode_feature_complete') {
         // Play ding sound when feature is done (unless muted)
@@ -126,14 +111,7 @@ export function useBoardFeatures({ currentProject }: UseBoardFeaturesProps) {
           audio.play().catch((err) => logger.warn('Could not play ding sound:', err));
         }
       } else if (event.type === 'auto_mode_error') {
-        // Remove from running tasks
-        if (event.featureId) {
-          const eventBranchName =
-            'branchName' in event && event.branchName !== undefined ? event.branchName : null;
-          removeRunningTask(eventProjectId, eventBranchName, event.featureId);
-        }
-
-        // Show error toast
+        // Show error toast (removeRunningTask is handled by useAutoMode, not here)
         const isAuthError =
           event.errorType === 'authentication' ||
           (event.error &&
