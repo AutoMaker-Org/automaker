@@ -174,6 +174,51 @@ describe('subprocess.ts', () => {
       );
     });
 
+    it('should log non-JSON output (final) for partial lines at end of stream', async () => {
+      // Create a custom mock process that ends with a partial non-JSON line (no trailing \n)
+      const mockProcess = new EventEmitter() as cp.ChildProcess & {
+        stdout: Readable;
+        stderr: Readable;
+        kill: ReturnType<typeof vi.fn>;
+      };
+      const stdout = new Readable({ read() {} });
+      const stderr = new Readable({ read() {} });
+
+      mockProcess.stdout = stdout;
+      mockProcess.stderr = stderr;
+      mockProcess.kill = vi.fn().mockReturnValue(true);
+
+      vi.mocked(cp.spawn).mockReturnValue(mockProcess);
+
+      process.nextTick(async () => {
+        // Push a valid JSON line (with \n)
+        stdout.push('{"type":"valid"}\n');
+        await new Promise((resolve) => setImmediate(resolve));
+
+        // Push a partial non-JSON line WITHOUT \n - this stays in the buffer
+        stdout.push('npm WARN something');
+        await new Promise((resolve) => setImmediate(resolve));
+
+        // End stdout - triggers the 'end' handler which flushes the buffer
+        stdout.push(null);
+
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        mockProcess.emit('exit', 0);
+      });
+
+      const generator = spawnJSONLProcess(baseOptions);
+      const results = await collectAsyncGenerator(generator);
+
+      // Only the valid JSON should be yielded
+      expect(results).toHaveLength(1);
+      expect(results[0]).toEqual({ type: 'valid' });
+
+      // The final partial non-JSON line should be logged with "(final)" suffix
+      expect(consoleSpy.log).toHaveBeenCalledWith(
+        expect.stringContaining('[SubprocessManager] Non-JSON output (final): npm WARN something')
+      );
+    });
+
     it('should yield error for malformed JSON and continue processing', async () => {
       const mockProcess = createMockProcess({
         stdoutLines: ['{"type":"valid"}', '{invalid json}', '{"type":"also_valid"}'],

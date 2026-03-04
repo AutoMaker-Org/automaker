@@ -8,6 +8,24 @@
 import { spawn, type ChildProcess } from 'child_process';
 import { StringDecoder } from 'string_decoder';
 
+/**
+ * Checks if a line looks like a JSON candidate (starts with { or [)
+ * This is used to tolerate non-JSON output from tools like bun/npm install
+ */
+function isJsonCandidate(line: string): boolean {
+  if (!line) return false;
+  const firstChar = line[0];
+  return firstChar === '{' || firstChar === '[';
+}
+
+/**
+ * Logs a non-JSON line that was skipped during parsing
+ */
+function logNonJsonOutput(trimmed: string, isFinal: boolean = false): void {
+  const suffix = isFinal ? ' (final)' : '';
+  console.log(`[SubprocessManager] Non-JSON output${suffix}: ${trimmed}`);
+}
+
 export interface SubprocessOptions {
   command: string;
   args: string[];
@@ -196,10 +214,9 @@ export async function* spawnJSONLProcess(options: SubprocessOptions): AsyncGener
 
         // Only try to parse lines that look like JSON (start with { or [)
         // This tolerates non-JSON output from tools like bun/npm install
-        const firstChar = trimmed[0];
-        if (firstChar !== '{' && firstChar !== '[') {
+        if (!isJsonCandidate(trimmed)) {
           // Non-JSON output (e.g., "bun install v1.3.10") - log but don't error
-          console.log(`[SubprocessManager] Non-JSON output: ${trimmed}`);
+          logNonJsonOutput(trimmed);
           continue;
         }
 
@@ -228,10 +245,9 @@ export async function* spawnJSONLProcess(options: SubprocessOptions): AsyncGener
       // Process any remaining partial line
       if (lineBuffer.trim()) {
         const trimmed = lineBuffer.trim();
-        const firstChar = trimmed[0];
 
         // Only try to parse lines that look like JSON
-        if (firstChar === '{' || firstChar === '[') {
+        if (isJsonCandidate(trimmed)) {
           try {
             eventQueue.push(JSON.parse(trimmed));
           } catch (parseError) {
@@ -245,9 +261,8 @@ export async function* spawnJSONLProcess(options: SubprocessOptions): AsyncGener
             });
           }
         } else {
-          console.log(`[SubprocessManager] Non-JSON output (final): ${trimmed}`);
+          logNonJsonOutput(trimmed, true);
         }
-        lineBuffer = '';
       }
 
       streamEnded = true;
