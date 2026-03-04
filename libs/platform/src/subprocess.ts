@@ -19,11 +19,36 @@ function isJsonCandidate(line: string): boolean {
 }
 
 /**
+ * Sanitizes a string for safe logging by:
+ * 1. Stripping ANSI escape sequences
+ * 2. Removing control characters
+ * 3. Truncating to max length with marker
+ */
+function sanitizeForLog(str: string, maxLength: number = 200): string {
+  // Strip ANSI escape sequences (colors, cursor movement, etc.)
+  // Matches ESC[ followed by parameters and command letter
+  let sanitized = str.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '');
+
+  // Remove other control characters (except newline/tab which are already stripped)
+  // Keep printable ASCII (32-126) and common Unicode
+  sanitized = sanitized.replace(/[\x00-\x1f\x7f]/g, '');
+
+  // Truncate if too long
+  if (sanitized.length > maxLength) {
+    return sanitized.substring(0, maxLength) + '…[truncated]';
+  }
+
+  return sanitized;
+}
+
+/**
  * Logs a non-JSON line that was skipped during parsing
+ * Sanitizes output to prevent secret leaks and log forging
  */
 function logNonJsonOutput(trimmed: string, isFinal: boolean = false): void {
   const suffix = isFinal ? ' (final)' : '';
-  console.log(`[SubprocessManager] Non-JSON output${suffix}: ${trimmed}`);
+  const safePreview = sanitizeForLog(trimmed);
+  console.log(`[SubprocessManager] Non-JSON output${suffix}: ${safePreview}`);
 }
 
 export interface SubprocessOptions {

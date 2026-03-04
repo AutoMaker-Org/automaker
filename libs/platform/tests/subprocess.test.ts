@@ -219,6 +219,51 @@ describe('subprocess.ts', () => {
       );
     });
 
+    it('should sanitize non-JSON output before logging (strip ANSI and control chars)', async () => {
+      // ANSI escape sequence for red text: \x1b[31m
+      const ansiColoredLine = '\x1b[31m\x1b[1mbun install\x1b[0m done';
+      const mockProcess = createMockProcess({
+        stdoutLines: [ansiColoredLine, '{"type":"complete"}'],
+        exitCode: 0,
+      });
+
+      vi.mocked(cp.spawn).mockReturnValue(mockProcess);
+
+      const generator = spawnJSONLProcess(baseOptions);
+      await collectAsyncGenerator(generator);
+
+      // Should log sanitized version without ANSI codes
+      expect(consoleSpy.log).toHaveBeenCalledWith(
+        expect.stringContaining('[SubprocessManager] Non-JSON output: bun install done')
+      );
+      // Should NOT contain raw ANSI escape sequences
+      expect(consoleSpy.log).not.toHaveBeenCalledWith(expect.stringContaining('\x1b['));
+    });
+
+    it('should truncate very long non-JSON output before logging', async () => {
+      // Create a very long line (>200 chars)
+      const longLine = 'a'.repeat(300);
+      const mockProcess = createMockProcess({
+        stdoutLines: [longLine, '{"type":"complete"}'],
+        exitCode: 0,
+      });
+
+      vi.mocked(cp.spawn).mockReturnValue(mockProcess);
+
+      const generator = spawnJSONLProcess(baseOptions);
+      await collectAsyncGenerator(generator);
+
+      // Should log truncated version with marker
+      expect(consoleSpy.log).toHaveBeenCalledWith(expect.stringContaining('…[truncated]'));
+      // The logged message should be less than original length
+      const loggedCall = consoleSpy.log.mock.calls.find((call) =>
+        call[0].includes('[SubprocessManager] Non-JSON output')
+      );
+      expect(loggedCall).toBeDefined();
+      // The 'a' characters portion should be ~200 chars, not 300
+      expect(loggedCall![0].length).toBeLessThan(350);
+    });
+
     it('should yield error for malformed JSON and continue processing', async () => {
       const mockProcess = createMockProcess({
         stdoutLines: ['{"type":"valid"}', '{invalid json}', '{"type":"also_valid"}'],
