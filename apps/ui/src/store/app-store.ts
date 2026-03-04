@@ -1044,6 +1044,9 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
     set((state) => {
       const current = state.autoModeByWorktree[key];
       if (!current) return state;
+      // Idempotent: skip if task is not in the list to avoid creating new
+      // object references that trigger unnecessary re-renders.
+      if (!current.runningTasks.includes(taskId)) return state;
       return {
         autoModeByWorktree: {
           ...state.autoModeByWorktree,
@@ -1097,13 +1100,20 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
 
   addRecentlyCompletedFeature: (featureId: string) => {
     set((state) => {
+      // Idempotent: skip if already tracked to avoid creating a new Set reference
+      // that triggers unnecessary re-renders in useBoardColumnFeatures.
+      if (state.recentlyCompletedFeatures.has(featureId)) return state;
       const newSet = new Set(state.recentlyCompletedFeatures);
       newSet.add(featureId);
       return { recentlyCompletedFeatures: newSet };
     });
   },
 
-  clearRecentlyCompletedFeatures: () => set({ recentlyCompletedFeatures: new Set() }),
+  clearRecentlyCompletedFeatures: () => {
+    // Idempotent: skip if already empty to avoid creating a new Set reference.
+    if (get().recentlyCompletedFeatures.size === 0) return;
+    set({ recentlyCompletedFeatures: new Set() });
+  },
 
   setMaxConcurrency: (max) => set({ maxConcurrency: max }),
 

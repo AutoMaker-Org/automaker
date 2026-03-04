@@ -77,8 +77,12 @@ function isPlanApprovalEvent(
  * @param worktree - Optional worktree info. If not provided, uses main worktree (branchName = null)
  */
 export function useAutoMode(worktree?: WorktreeInfo) {
+  // Subscribe to stable action functions and scalar state via useShallow.
+  // IMPORTANT: Do NOT subscribe to autoModeByWorktree here. That object gets a
+  // new reference on every Zustand mutation to ANY worktree, which would re-render
+  // every useAutoMode consumer on every store change. Instead, we subscribe to the
+  // specific worktree's state below using a targeted selector.
   const {
-    autoModeByWorktree,
     setAutoModeRunning,
     addRunningTask,
     removeRunningTask,
@@ -93,7 +97,6 @@ export function useAutoMode(worktree?: WorktreeInfo) {
     addRecentlyCompletedFeature,
   } = useAppStore(
     useShallow((state) => ({
-      autoModeByWorktree: state.autoModeByWorktree,
       setAutoModeRunning: state.setAutoModeRunning,
       addRunningTask: state.addRunningTask,
       removeRunningTask: state.removeRunningTask,
@@ -144,26 +147,41 @@ export function useAutoMode(worktree?: WorktreeInfo) {
     [projects]
   );
 
-  // Get worktree-specific auto mode state
+  // Get worktree-specific auto mode state using a TARGETED selector.
+  // This only re-renders when THIS worktree's state changes, not when any other
+  // worktree's state changes. This is critical for preventing cascading re-renders
+  // in board view, where DndContext amplifies every parent re-render.
   const projectId = currentProject?.id;
-  const worktreeAutoModeState = useMemo(() => {
-    if (!projectId)
-      return {
-        isRunning: false,
-        runningTasks: [],
-        branchName: null,
-        maxConcurrency: DEFAULT_MAX_CONCURRENCY,
-      };
-    const key = getWorktreeKey(projectId, branchName);
-    return (
-      autoModeByWorktree[key] || {
-        isRunning: false,
-        runningTasks: [],
-        branchName,
-        maxConcurrency: DEFAULT_MAX_CONCURRENCY,
-      }
-    );
-  }, [autoModeByWorktree, projectId, branchName, getWorktreeKey]);
+  const worktreeKey = useMemo(
+    () => (projectId ? getWorktreeKey(projectId, branchName) : null),
+    [projectId, branchName, getWorktreeKey]
+  );
+  const worktreeAutoModeState = useAppStore(
+    useCallback(
+      (state: {
+        autoModeByWorktree: Record<
+          string,
+          {
+            isRunning: boolean;
+            runningTasks: string[];
+            branchName: string | null;
+            maxConcurrency?: number;
+          }
+        >;
+      }) => {
+        if (!worktreeKey) {
+          return null;
+        }
+        return state.autoModeByWorktree[worktreeKey] ?? null;
+      },
+      [worktreeKey]
+    )
+  ) ?? {
+    isRunning: false,
+    runningTasks: [] as string[],
+    branchName,
+    maxConcurrency: DEFAULT_MAX_CONCURRENCY,
+  };
 
   const isAutoModeRunning = worktreeAutoModeState.isRunning;
   const runningAutoTasks = worktreeAutoModeState.runningTasks;
