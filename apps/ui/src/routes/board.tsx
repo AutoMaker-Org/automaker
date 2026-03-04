@@ -4,6 +4,7 @@ import { z } from 'zod';
 // Search params schema for board route
 const boardSearchSchema = z.object({
   featureId: z.string().optional(),
+  projectPath: z.string().optional(),
 });
 
 // Component is lazy-loaded via board.lazy.tsx for code splitting.

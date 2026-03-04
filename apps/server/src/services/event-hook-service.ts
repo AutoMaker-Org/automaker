@@ -595,12 +595,12 @@ export class EventHookService {
     if (clickUrl && context.projectPath) {
       try {
         const url = new URL(clickUrl);
+        url.pathname = '/board';
+        // Add projectPath so the UI can switch to the correct project
+        url.searchParams.set('projectPath', context.projectPath);
         // Add featureId as query param for deep linking to board with feature output modal
         if (context.featureId) {
-          url.pathname = '/board';
           url.searchParams.set('featureId', context.featureId);
-        } else {
-          url.pathname = '/board';
         }
         clickUrl = url.toString();
       } catch (error) {

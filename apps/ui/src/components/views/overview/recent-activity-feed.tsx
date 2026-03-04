@@ -136,8 +136,14 @@ export function RecentActivityFeed({ activities, maxItems = 10 }: RecentActivity
         upsertAndSetCurrentProject(projectPath, projectName);
 
         if (activity.featureId) {
-          // Navigate to the specific feature
-          navigate({ to: '/board', search: { featureId: activity.featureId } });
+          // Navigate to the specific feature with project path for deep link handling
+          navigate({
+            to: '/board',
+            search: {
+              featureId: activity.featureId,
+              projectPath: projectPath || undefined,
+            },
+          });
         } else {
           navigate({ to: '/board' });
         }

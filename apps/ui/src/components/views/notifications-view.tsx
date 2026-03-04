@@ -94,8 +94,14 @@ export function NotificationsView() {
 
       // Navigate to the relevant view based on notification type
       if (notification.featureId) {
-        // Navigate to board view with feature ID to show output
-        navigate({ to: '/board', search: { featureId: notification.featureId } });
+        // Navigate to board view with feature ID and project path to show output
+        navigate({
+          to: '/board',
+          search: {
+            featureId: notification.featureId,
+            projectPath: notification.projectPath || undefined,
+          },
+        });
       }
     },
     [handleMarkAsRead, navigate]

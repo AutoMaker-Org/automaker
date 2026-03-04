@@ -68,7 +68,13 @@ export function NotificationBell({ projectPath }: NotificationBellProps) {
 
       // Navigate to the relevant view based on notification type
       if (notification.featureId) {
-        navigate({ to: '/board', search: { featureId: notification.featureId } });
+        navigate({
+          to: '/board',
+          search: {
+            featureId: notification.featureId,
+            projectPath: notification.projectPath || undefined,
+          },
+        });
       }
     },
     [handleMarkAsRead, setPopoverOpen, navigate]

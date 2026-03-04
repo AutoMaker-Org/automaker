@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
+import { useEffect, useState, useCallback, useMemo, useRef, startTransition } from 'react';
 import { createLogger } from '@automaker/utils/logger';
 import type { PointerEvent as ReactPointerEvent } from 'react';
 import {
@@ -37,6 +37,7 @@ import type {
   ReasoningEffort,
 } from '@automaker/types';
 import { pathsEqual } from '@/lib/utils';
+import { initializeProject } from '@/lib/project-init';
 import { toast } from 'sonner';
 import {
   BoardBackgroundModal,
@@ -117,9 +118,11 @@ const logger = createLogger('Board');
 interface BoardViewProps {
   /** Feature ID from URL parameter - if provided, opens output modal for this feature on load */
   initialFeatureId?: string;
+  /** Project path from URL parameter - if provided, switches to this project before handling deep link */
+  initialProjectPath?: string;
 }
 
-export function BoardView({ initialFeatureId }: BoardViewProps) {
+export function BoardView({ initialFeatureId, initialProjectPath }: BoardViewProps) {
   const {
     currentProject,
     defaultSkipTests,
@@ -139,6 +142,7 @@ export function BoardView({ initialFeatureId }: BoardViewProps) {
     setPipelineConfig,
     featureTemplates,
     defaultSortNewestCardOnTop,
+    upsertAndSetCurrentProject,
   } = useAppStore(
     useShallow((state) => ({
       currentProject: state.currentProject,
@@ -159,6 +163,7 @@ export function BoardView({ initialFeatureId }: BoardViewProps) {
       setPipelineConfig: state.setPipelineConfig,
       featureTemplates: state.featureTemplates,
       defaultSortNewestCardOnTop: state.defaultSortNewestCardOnTop,
+      upsertAndSetCurrentProject: state.upsertAndSetCurrentProject,
     }))
   );
   // Also get keyboard shortcuts for the add feature shortcut
@@ -305,6 +310,53 @@ export function BoardView({ initialFeatureId }: BoardViewProps) {
     setFeaturesWithContext,
   });
 
+  // Handle deep link project switching - if URL includes a projectPath that differs from
+  // the current project, switch to the target project first. The feature/worktree deep link
+  // effect below will fire naturally once the project switch triggers a features reload.
+  const handledProjectPathRef = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    if (!initialProjectPath || handledProjectPathRef.current === initialProjectPath) {
+      return;
+    }
+
+    // Check if we're already on the correct project
+    if (currentProject?.path && pathsEqual(currentProject.path, initialProjectPath)) {
+      handledProjectPathRef.current = initialProjectPath;
+      return;
+    }
+
+    handledProjectPathRef.current = initialProjectPath;
+
+    const switchProject = async () => {
+      try {
+        const initResult = await initializeProject(initialProjectPath);
+        if (!initResult.success) {
+          logger.warn(
+            `Deep link: failed to initialize project "${initialProjectPath}":`,
+            initResult.error
+          );
+          toast.error('Failed to open project from link', {
+            description: initResult.error || 'Unknown error',
+          });
+          return;
+        }
+
+        // Derive project name from path basename
+        const projectName =
+          initialProjectPath.split('/').filter(Boolean).pop() || initialProjectPath;
+        logger.info(`Deep link: switching to project "${projectName}" at ${initialProjectPath}`);
+        upsertAndSetCurrentProject(initialProjectPath, projectName);
+      } catch (error) {
+        logger.error('Deep link: project switch failed:', error);
+        toast.error('Failed to switch project', {
+          description: error instanceof Error ? error.message : 'Unknown error',
+        });
+      }
+    };
+
+    switchProject();
+  }, [initialProjectPath, currentProject?.path, upsertAndSetCurrentProject]);
+
   // Handle initial feature ID from URL - switch to the correct worktree and open output modal
   // Uses a ref to track which featureId has been handled to prevent re-opening
   // when the component re-renders but initialFeatureId hasn't changed.
@@ -325,6 +377,17 @@ export function BoardView({ initialFeatureId }: BoardViewProps) {
       [currentProject?.path]
     )
   );
+
+  // Track how many render cycles we've waited for worktrees during a deep link.
+  // If the Zustand store never gets populated (e.g., WorktreePanel hasn't mounted,
+  // useWorktrees setting is off, or the worktree query failed), we stop waiting
+  // after a threshold and open the modal without switching worktree.
+  const deepLinkRetryCountRef = useRef(0);
+  // Reset retry count when the feature ID changes
+  useEffect(() => {
+    deepLinkRetryCountRef.current = 0;
+  }, [initialFeatureId]);
+
   useEffect(() => {
     if (
       !initialFeatureId ||
@@ -339,14 +402,43 @@ export function BoardView({ initialFeatureId }: BoardViewProps) {
     const feature = hookFeatures.find((f) => f.id === initialFeatureId);
     if (!feature) return;
 
-    // If the feature has a branch, wait for worktrees to load so we can switch
-    if (feature.branchName && deepLinkWorktrees.length === 0) {
-      return; // Worktrees not loaded yet - effect will re-run when they load
+    // Resolve worktrees: prefer the Zustand store (reactive), but fall back to
+    // the React Query cache if the store hasn't been populated yet. The store is
+    // only synced by the WorktreePanel's useWorktrees hook, which may not have
+    // rendered yet during a deep link cold start. Reading the query cache directly
+    // avoids an indefinite wait that hangs the app on the loading screen.
+    let resolvedWorktrees = deepLinkWorktrees;
+    if (resolvedWorktrees.length === 0 && currentProject.path) {
+      const cachedData = queryClient.getQueryData(queryKeys.worktrees.all(currentProject.path)) as
+        | { worktrees?: WorktreeInfo[] }
+        | undefined;
+      if (cachedData?.worktrees && cachedData.worktrees.length > 0) {
+        resolvedWorktrees = cachedData.worktrees as typeof deepLinkWorktrees;
+      }
     }
 
-    // Switch to the correct worktree based on the feature's branchName
-    if (feature.branchName && deepLinkWorktrees.length > 0) {
-      const targetWorktree = deepLinkWorktrees.find((w) => w.branch === feature.branchName);
+    // If the feature has a branch and worktrees aren't available yet, wait briefly.
+    // After enough retries, proceed without switching worktree to avoid hanging.
+    const MAX_DEEP_LINK_RETRIES = 10;
+    if (feature.branchName && resolvedWorktrees.length === 0) {
+      deepLinkRetryCountRef.current++;
+      if (deepLinkRetryCountRef.current < MAX_DEEP_LINK_RETRIES) {
+        return; // Worktrees not loaded yet - effect will re-run when they load
+      }
+      // Exceeded retry limit — proceed without worktree switch to avoid hanging
+      logger.warn(
+        `Deep link: worktrees not available after ${MAX_DEEP_LINK_RETRIES} retries, ` +
+          `opening feature ${initialFeatureId} without switching worktree`
+      );
+    }
+
+    // Switch to the correct worktree based on the feature's branchName.
+    // IMPORTANT: Wrap in startTransition to batch the Zustand store update with
+    // any concurrent React state updates. Without this, the synchronous store
+    // mutation cascades through useAutoMode → refreshStatus → setAutoModeRunning,
+    // which can trigger React error #185 on mobile Safari/PWA crash loops.
+    if (feature.branchName && resolvedWorktrees.length > 0) {
+      const targetWorktree = resolvedWorktrees.find((w) => w.branch === feature.branchName);
       if (targetWorktree) {
         const currentWt = useAppStore.getState().getCurrentWorktree(currentProject.path);
         const isAlreadySelected = targetWorktree.isMain
@@ -356,23 +448,27 @@ export function BoardView({ initialFeatureId }: BoardViewProps) {
           logger.info(
             `Deep link: switching to worktree "${targetWorktree.branch}" for feature ${initialFeatureId}`
           );
-          setCurrentWorktree(
-            currentProject.path,
-            targetWorktree.isMain ? null : targetWorktree.path,
-            targetWorktree.branch
-          );
+          startTransition(() => {
+            setCurrentWorktree(
+              currentProject.path,
+              targetWorktree.isMain ? null : targetWorktree.path,
+              targetWorktree.branch
+            );
+          });
         }
       }
-    } else if (!feature.branchName && deepLinkWorktrees.length > 0) {
+    } else if (!feature.branchName && resolvedWorktrees.length > 0) {
       // Feature has no branch - should be on the main worktree
       const currentWt = useAppStore.getState().getCurrentWorktree(currentProject.path);
       if (currentWt?.path !== null && currentWt !== null) {
-        const mainWorktree = deepLinkWorktrees.find((w) => w.isMain);
+        const mainWorktree = resolvedWorktrees.find((w) => w.isMain);
         if (mainWorktree) {
           logger.info(
             `Deep link: switching to main worktree for unassigned feature ${initialFeatureId}`
           );
-          setCurrentWorktree(currentProject.path, null, mainWorktree.branch);
+          startTransition(() => {
+            setCurrentWorktree(currentProject.path, null, mainWorktree.branch);
+          });
         }
       }
     }
@@ -387,6 +483,7 @@ export function BoardView({ initialFeatureId }: BoardViewProps) {
     hookFeatures,
     currentProject?.path,
     deepLinkWorktrees,
+    queryClient,
     setCurrentWorktree,
     setOutputFeature,
     setShowOutputModal,
@@ -764,11 +861,15 @@ export function BoardView({ initialFeatureId }: BoardViewProps) {
 
   // Recovery handler for BoardErrorBoundary: reset worktree selection to main
   // so the board can re-render without the stale worktree state that caused the crash.
+  // Wrapped in startTransition to batch with concurrent React updates and avoid
+  // triggering another cascade during recovery.
   const handleBoardRecover = useCallback(() => {
     if (!currentProject) return;
     const mainWorktree = worktrees.find((w) => w.isMain);
     const mainBranch = mainWorktree?.branch || 'main';
-    setCurrentWorktree(currentProject.path, null, mainBranch);
+    startTransition(() => {
+      setCurrentWorktree(currentProject.path, null, mainBranch);
+    });
   }, [currentProject, worktrees, setCurrentWorktree]);
 
   // Helper function to add and select a worktree
