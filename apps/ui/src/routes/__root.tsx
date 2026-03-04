@@ -600,10 +600,7 @@ function RootLayoutContent() {
                   // so updating them won't cause a visible re-render flash.
                   const serverHooks = (finalSettings as GlobalSettings).eventHooks ?? [];
                   const currentHooks = useAppStore.getState().eventHooks;
-                  if (
-                    JSON.stringify(serverHooks) !== JSON.stringify(currentHooks) &&
-                    serverHooks.length > 0
-                  ) {
+                  if (JSON.stringify(serverHooks) !== JSON.stringify(currentHooks)) {
                     logger.info(
                       `[FAST_HYDRATE] Reconciling eventHooks from server (server=${serverHooks.length}, store=${currentHooks.length})`
                     );

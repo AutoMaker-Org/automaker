@@ -1506,7 +1506,11 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
     set({ eventHooks: hooks });
     try {
       const httpApi = getHttpApiClient();
-      await httpApi.settings.updateGlobal({ eventHooks: hooks });
+      await httpApi.settings.updateGlobal({
+        eventHooks: hooks,
+        // Signal the server that an empty array is intentional (not a wipe from stale state)
+        ...(hooks.length === 0 ? { __allowEmptyEventHooks: true } : {}),
+      });
     } catch (error) {
       logger.error('Failed to sync event hooks:', error);
     }
@@ -1517,7 +1521,11 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
     set({ ntfyEndpoints: endpoints });
     try {
       const httpApi = getHttpApiClient();
-      await httpApi.settings.updateGlobal({ ntfyEndpoints: endpoints });
+      await httpApi.settings.updateGlobal({
+        ntfyEndpoints: endpoints,
+        // Signal the server that an empty array is intentional (not a wipe from stale state)
+        ...(endpoints.length === 0 ? { __allowEmptyNtfyEndpoints: true } : {}),
+      });
     } catch (error) {
       logger.error('Failed to sync ntfy endpoints:', error);
     }

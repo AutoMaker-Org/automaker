@@ -2763,6 +2763,21 @@ export class HttpApiClient implements ElectronAPI {
           headers?: Record<string, string>;
           enabled?: boolean;
         }>;
+        eventHooks?: Array<{
+          id: string;
+          trigger: string;
+          enabled: boolean;
+          action: Record<string, unknown>;
+          name?: string;
+        }>;
+        ntfyEndpoints?: Array<{
+          id: string;
+          name: string;
+          serverUrl: string;
+          topic: string;
+          authType: string;
+          enabled: boolean;
+        }>;
       };
       error?: string;
     }> => this.get('/api/settings/global'),
