@@ -553,8 +553,14 @@ Please continue from where you left off and complete all remaining tasks. Use th
           );
         }
         // Don't overwrite terminal states like 'merge_conflict' that were set during pipeline execution
-        const currentFeature = await this.loadFeatureFn(projectPath, featureId);
-        if (currentFeature?.status !== 'merge_conflict') {
+        let currentStatus: string | undefined;
+        try {
+          const currentFeature = await this.loadFeatureFn(projectPath, featureId);
+          currentStatus = currentFeature?.status;
+        } catch {
+          // If loading fails, proceed with the status update anyway
+        }
+        if (currentStatus !== 'merge_conflict') {
           await this.updateFeatureStatusFn(projectPath, featureId, fallbackStatus);
         }
         this.eventBus.emitAutoModeEvent('auto_mode_error', {
