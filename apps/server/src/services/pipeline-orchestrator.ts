@@ -350,6 +350,7 @@ export class PipelineOrchestrator {
     });
     const abortController = runningEntry.abortController;
     runningEntry.branchName = feature.branchName ?? null;
+    let pipelineCompleted = false;
 
     try {
       validateWorkingDirectory(projectPath);
@@ -403,6 +404,7 @@ export class PipelineOrchestrator {
       };
 
       await this.executePipeline(context);
+      pipelineCompleted = true;
 
       // Re-fetch feature to check if executePipeline set a terminal status (e.g., merge_conflict)
       const reloadedFeature = await this.featureStateManager.loadFeature(projectPath, featureId);
@@ -439,8 +441,17 @@ export class PipelineOrchestrator {
           });
         }
       } else {
+        // If pipeline steps completed successfully, don't send the feature back to backlog.
+        // The pipeline work is done — set to waiting_approval so the user can review.
+        const fallbackStatus = pipelineCompleted ? 'waiting_approval' : 'backlog';
+        if (pipelineCompleted) {
+          logger.info(
+            `[resumeFromStep] Feature ${featureId} failed after pipeline completed. ` +
+              `Setting status to waiting_approval instead of backlog to preserve pipeline work.`
+          );
+        }
         logger.error(`Pipeline resume failed for ${featureId}:`, error);
-        await this.updateFeatureStatusFn(projectPath, featureId, 'backlog');
+        await this.updateFeatureStatusFn(projectPath, featureId, fallbackStatus);
         this.eventBus.emitAutoModeEvent('auto_mode_error', {
           featureId,
           featureName: feature.title,

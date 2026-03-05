@@ -2000,5 +2000,60 @@ describe('execution-service.ts', () => {
       // The only non-in_progress status call should be absent since merge_conflict returns early
       expect(statusCalls.length).toBe(0);
     });
+
+    it('sets waiting_approval instead of backlog when error occurs after pipeline completes', async () => {
+      // Set up pipeline with steps
+      vi.mocked(pipelineService.getPipelineConfig).mockResolvedValue({
+        version: 1,
+        steps: [{ id: 'step-1', name: 'Step 1', order: 1, instructions: 'Do step 1' }] as any,
+      });
+
+      // Pipeline succeeds, but reading agent output throws after pipeline completes
+      mockExecutePipelineFn = vi.fn().mockResolvedValue(undefined);
+      // Simulate an error after pipeline completes by making loadFeature throw
+      // on the post-pipeline refresh call
+      let loadCallCount = 0;
+      mockLoadFeatureFn = vi.fn().mockImplementation(() => {
+        loadCallCount++;
+        if (loadCallCount === 1) return testFeature; // initial load
+        // Second call is the task-retry check, third is the pipeline refresh
+        if (loadCallCount <= 2) return testFeature;
+        throw new Error('Unexpected post-pipeline error');
+      });
+
+      const svc = createServiceWithMocks();
+      await svc.executeFeature('/test/project', 'feature-1');
+
+      // Should set to waiting_approval, NOT backlog, since pipeline completed
+      const backlogCalls = vi
+        .mocked(mockUpdateFeatureStatusFn)
+        .mock.calls.filter((call) => call[2] === 'backlog');
+      expect(backlogCalls.length).toBe(0);
+
+      const waitingCalls = vi
+        .mocked(mockUpdateFeatureStatusFn)
+        .mock.calls.filter((call) => call[2] === 'waiting_approval');
+      expect(waitingCalls.length).toBeGreaterThan(0);
+    });
+
+    it('still sets backlog when error occurs before pipeline completes', async () => {
+      // Set up pipeline with steps
+      vi.mocked(pipelineService.getPipelineConfig).mockResolvedValue({
+        version: 1,
+        steps: [{ id: 'step-1', name: 'Step 1', order: 1, instructions: 'Do step 1' }] as any,
+      });
+
+      // Pipeline itself throws (e.g., agent error during pipeline step)
+      mockExecutePipelineFn = vi.fn().mockRejectedValue(new Error('Agent execution failed'));
+
+      const svc = createServiceWithMocks();
+      await svc.executeFeature('/test/project', 'feature-1');
+
+      // Should still set to backlog since pipeline did NOT complete
+      const backlogCalls = vi
+        .mocked(mockUpdateFeatureStatusFn)
+        .mock.calls.filter((call) => call[2] === 'backlog');
+      expect(backlogCalls.length).toBe(1);
+    });
   });
 });

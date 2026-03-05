@@ -179,6 +179,7 @@ ${feature.spec}
     const abortController = tempRunningFeature.abortController;
     if (isAutoMode) await this.saveExecutionStateFn(projectPath);
     let feature: Feature | null = null;
+    let pipelineCompleted = false;
 
     try {
       validateWorkingDirectory(projectPath);
@@ -431,6 +432,7 @@ Please continue from where you left off and complete all remaining tasks. Use th
           testAttempts: 0,
           maxTestAttempts: 5,
         });
+        pipelineCompleted = true;
         // Check if pipeline set a terminal status (e.g., merge_conflict) — don't overwrite it
         const refreshed = await this.loadFeatureFn(projectPath, featureId);
         if (refreshed?.status === 'merge_conflict') {
@@ -541,7 +543,16 @@ Please continue from where you left off and complete all remaining tasks. Use th
         }
       } else {
         logger.error(`Feature ${featureId} failed:`, error);
-        await this.updateFeatureStatusFn(projectPath, featureId, 'backlog');
+        // If pipeline steps completed successfully, don't send the feature back to backlog.
+        // The pipeline work is done — set to waiting_approval so the user can review.
+        const fallbackStatus = pipelineCompleted ? 'waiting_approval' : 'backlog';
+        if (pipelineCompleted) {
+          logger.info(
+            `[executeFeature] Feature ${featureId} failed after pipeline completed. ` +
+              `Setting status to waiting_approval instead of backlog to preserve pipeline work.`
+          );
+        }
+        await this.updateFeatureStatusFn(projectPath, featureId, fallbackStatus);
         this.eventBus.emitAutoModeEvent('auto_mode_error', {
           featureId,
           featureName: feature?.title,
