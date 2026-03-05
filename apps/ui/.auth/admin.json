@@ -1,0 +1,15 @@
+{
+  "cookies": [
+    {
+      "name": "automaker_session",
+      "value": "48b2fd3c98872c37e7d1445d13dfa9ba688d58f3e4212580611877b8efa2d586",
+      "domain": "localhost",
+      "path": "/",
+      "expires": 9999999999,
+      "httpOnly": true,
+      "secure": false,
+      "sameSite": "Lax"
+    }
+  ],
+  "origins": []
+}
